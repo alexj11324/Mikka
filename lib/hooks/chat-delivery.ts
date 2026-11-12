@@ -5,7 +5,6 @@ import { useTranslations } from 'next-intl'
 import { checkPageBuildBeforeAction } from '@/lib/app-build'
 import { useActionError } from '@/lib/use-action-error'
 import { prepareThreadReply } from '@/lib/thread-submission-input'
-import { RequestError } from '@/lib/factory/browser-request'
 import { useViewState } from './view-state'
 
 export type ChatSubmission = { id: string; text: string; at: number }
@@ -61,7 +60,12 @@ export function useThreadReplyCommand() {
       const result = await sendIssueThreadReply({ issueId, ...request })
       return result.error ? { status: 'failed', error: actionError(result.error) } : { status: 'accepted' }
     } catch (error) {
-      if (error instanceof RequestError && error.status < 500) return { status: 'failed', error: error.status === 429 ? feedback('sendRateLimited') : actionError(error.code) }
+      // The Web and Desktop action transports attach HTTP status to their Error. A lost response has no status.
+      const status = error instanceof Error && 'status' in error ? error.status : undefined
+      if (status === 401) return { status: 'failed', error: actionError('authRequired') }
+      if (status === 403) return { status: 'failed', error: feedback('sendAccessDenied') }
+      if (status === 426) return { status: 'failed', error: feedback('sendUpdateRequired') }
+      if (status === 429) return { status: 'failed', error: feedback('sendRateLimited') }
       return { status: 'uncertain', error: feedback('sendUncertain') }
     }
   }
