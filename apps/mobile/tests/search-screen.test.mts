@@ -1,8 +1,17 @@
 import assert from 'node:assert/strict'
+import { createRequire } from 'node:module'
 import { after, mock, test } from 'node:test'
-import { act, createElement as h, Fragment, type ReactNode } from 'react'
+import React, { act, createElement as h, Fragment, type ReactNode } from 'react'
 import { Window } from 'happy-dom'
 import { mobileMessages } from '../lib/messages.ts'
+
+// Node resolves the shared hook from the repository root. Mount it with the
+// same native React instance as this screen and its renderer.
+const nativeRequire = createRequire(import.meta.url)
+const sharedRequire = createRequire(new URL('../../../lib/hooks/use-task-continuation.ts', import.meta.url))
+if (sharedRequire.resolve('react') !== nativeRequire.resolve('react')) {
+  mock.module(sharedRequire.resolve('react'), { defaultExport: React, namedExports: { useRef: React.useRef, useState: React.useState } })
+}
 
 const browser = new Window({ url: 'https://fixture.example' })
 Object.assign(globalThis, { window: browser, document: browser.document, IS_REACT_ACT_ENVIRONMENT: true })
