@@ -24,7 +24,7 @@ export function acknowledgedPersonalMessages(scope: string | null): string[] {
   } catch { return [] }
 }
 
-export function usePersonalDelivery(scope: string | null, received: Set<string>, send: Send, reload: () => Promise<void>) {
+export function usePersonalDelivery(scope: string | null, canSend: boolean, received: Set<string>, send: Send, reload: () => Promise<void>) {
   const context = apiCache.context()
   const uncertain = copy.Coordinator.sendUncertain
   const read = useCallback(() => {
@@ -58,7 +58,7 @@ export function usePersonalDelivery(scope: string | null, received: Set<string>,
   }, [scope, rows, received, update])
 
   function start(item: Outgoing): Promise<boolean> | false {
-    if (!scope || item.context !== apiCache.context() || received.has(item.id)) return false
+    if (!canSend || !scope || item.context !== apiCache.context() || received.has(item.id)) return false
     const previous = active.get(item.id)
     if (previous) return previous
     if (!delivery.begin(item)) return false

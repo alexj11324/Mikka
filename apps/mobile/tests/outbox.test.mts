@@ -76,9 +76,10 @@ test('personal delivery keeps acknowledged messages until an authorized read and
   let reads = 0
   const reload = async () => { reads++; throw new Error('transcript unavailable') }
   let scope: string | null = 'owner-workspace-coordinator'
+  let canSend = true
   let received = new Set<string>()
   let held!: ReturnType<typeof usePersonalDelivery>
-  function Probe() { held = usePersonalDelivery(scope, received, send, reload); return null }
+  function Probe() { held = usePersonalDelivery(scope, canSend, received, send, reload); return null }
   let root = createRoot(document.body)
   const render = () => act(async () => { root.render(createElement(Probe)) })
   const separateScreen = async () => {
@@ -114,6 +115,13 @@ test('personal delivery keeps acknowledged messages until an authorized read and
     const restored=held.rows[0]
     assert.equal(restored.submissionId,'p2')
     assert.equal(restored.text,'same body')
+    canSend = false
+    await render()
+    assert.equal(held.start(held.rows[0]), false, 'the receipt cannot retry a disabled conversation')
+    assert.equal(requests.length, 2)
+    assert.equal(held.rows[0].phase, 'failed')
+    assert.equal(journal.readPersonal(scope)[0].submissionId, restored.submissionId)
+    canSend = true
     scope=null
     await render()
     assert.equal(held.start(restored),false)

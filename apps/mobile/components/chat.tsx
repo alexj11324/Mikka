@@ -87,11 +87,13 @@ export function useChatPhotos(): (messageId: string | undefined, count: number |
  * A pending message keeps its words and its retry action. Missing receipts say
  * 未确认; only a known server refusal says 未发送.
  */
-export function OutgoingBubble({ text, photos, failed, unconfirmed = false, error, onRetry }: { text: string; photos?: string[]; failed: boolean; unconfirmed?: boolean; error?: string; onRetry: () => void }) {
+export function OutgoingBubble({ text, photos, failed, unconfirmed = false, error, onRetry }: { text: string; photos?: string[]; failed: boolean; unconfirmed?: boolean; error?: string; onRetry?: () => void }) {
+  const canRetry = failed && Boolean(onRetry)
+  const reason = unconfirmed ? mobileMessages.Coordinator.sendUncertain : error ?? mobileMessages.GroupChat.notSent
   const parsed = splitChatFiles(text)
   const { quoted, words } = splitQuoted(parsed.text)
   return (
-    <Pressable accessibilityRole={failed ? 'button' : undefined} accessibilityHint={failed ? mobileMessages.Common.retry : undefined} disabled={!failed} onPress={onRetry} style={styles.outgoing}>
+    <Pressable accessibilityRole={failed ? 'button' : undefined} accessibilityState={failed ? { disabled: !canRetry } : undefined} accessibilityHint={canRetry ? mobileMessages.Common.retry : undefined} disabled={!canRetry} onPress={onRetry} style={styles.outgoing}>
       <View style={[{ alignItems: 'flex-end', gap: 4 }, !failed && { opacity: 0.6 }]}>
         {photos?.length ? <ChatImages images={photos.map(uri => ({ uri }))} align="right" /> : null}
         {text ? (
@@ -105,7 +107,7 @@ export function OutgoingBubble({ text, photos, failed, unconfirmed = false, erro
       {failed ? (
         <View style={styles.retryRow}>
           <CircleAlert size={14} color={colors.danger} strokeWidth={2.2} />
-          <Text style={styles.retry}>{`${unconfirmed ? mobileMessages.Coordinator.sendUncertain : error ?? mobileMessages.GroupChat.notSent} · ${mobileMessages.Common.retry}`}</Text>
+          <Text style={styles.retry}>{canRetry ? `${reason} · ${mobileMessages.Common.retry}` : reason}</Text>
         </View>
       ) : null}
     </Pressable>

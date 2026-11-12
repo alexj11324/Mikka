@@ -117,7 +117,7 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
   const scope = data ? personalScope : null
   const canSend = Boolean(scope) && !serviceUnavailable && agent.status !== 'resuming'
   const received = useMemo(() => new Set([...(data?.acknowledgedBeforeRead ?? []), ...(data?.items.flatMap(item => item.from === 'person' && item.submissionId ? [item.submissionId] : []) ?? [])]), [data?.items, data?.acknowledgedBeforeRead])
-  const personal = usePersonalDelivery(scope, received, agent.sendMessage, reloadAfterWrite)
+  const personal = usePersonalDelivery(scope, canSend, received, agent.sendMessage, reloadAfterWrite)
   const outbox = personal.rows
   const [text, setText] = useState(draft ?? '')
   const working = agent.status === 'busy' || outbox.some(item => item.phase === 'sending')
@@ -339,7 +339,7 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
           footer={<>
         {outbox.map(item => item.phase === 'accepted'
           ? <MyBubble key={item.id} text={item.text} photos={item.images.map(image => ({ uri: image.uri }))} />
-          : <OutgoingBubble key={item.id} text={item.text} photos={item.images.map(image => image.uri)} failed={item.phase === 'failed'} unconfirmed={item.error === mobileMessages.Coordinator.sendUncertain} error={item.error} onRetry={() => { void personal.start(item) }} />)}
+          : <OutgoingBubble key={item.id} text={item.text} photos={item.images.map(image => image.uri)} failed={item.phase === 'failed'} unconfirmed={item.error === mobileMessages.Coordinator.sendUncertain} error={item.error} onRetry={canSend ? () => { void personal.start(item) } : undefined} />)}
         {working ? <WaitingLine since={outbox.length ? null : waitingSince(items)} /> : null}
         {stopper.stuck ? <StopFailed busy={stopper.sending} onRetry={() => void stopper.stop()} /> : null}
         {!data && !error ? <View style={styles.loading}><Spinner /></View> : null}
