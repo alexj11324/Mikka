@@ -494,6 +494,13 @@
     "test": "tests/task-presentation.db.test.ts",
     "suite": "test:task-presentation-db"
   },
+  "lib/factory/public-flow.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the current Factory handoff, candidate acceptance and merge receipts from PostgreSQL so a self-hosted Inbox projects the same human attention as Task detail.",
+    "test": "lib/inbox/store.db.test.ts",
+    "suite": "test:inbox-db"
+  },
   "lib/factory/review-change.ts": {
     "mode": "built-in",
     "environment": [],
@@ -815,6 +822,13 @@
     "behavior": "Task resource registration persists its workspace and privacy defaults under the authorized PostgreSQL transaction.",
     "test": "tests/task-resource-registration.db.test.ts",
     "suite": "test:visibility-db"
+  },
+  "lib/task-state.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the stored Task status, pull request state and current run approval to place the same authorized Task in Inbox and Task detail on a self-hosted workspace.",
+    "test": "lib/inbox/store.db.test.ts",
+    "suite": "test:inbox-db"
   },
   "lib/task-workspace.ts": {
     "mode": "built-in",
