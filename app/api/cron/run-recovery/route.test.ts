@@ -11,6 +11,8 @@ let reconciled = 0
 mock.module(new URL('../../../../lib/computer/reconcile.ts', import.meta.url).href, { namedExports: {
   reconcileCloudMachines: async () => { reconciled++; return 2 },
 } })
+const expireReviews = mock.fn(async () => ({ closed: 2, pending: 1 }))
+mock.module(new URL('../../../../lib/coding-workspace/review-sessions.ts', import.meta.url).href, { namedExports: { expireReviewSessions: expireReviews } })
 let judged = 0
 mock.module(new URL('../../../../lib/run-outcome-judge.ts', import.meta.url).href, { namedExports: {
   judgePendingOutcomes: async () => { judged++; return 4 },
@@ -50,6 +52,7 @@ test('independent recovery requires the existing cron bearer before scanning own
   assert.equal((await call()).status, 503)
   assert.equal(calls, 0)
   assert.equal(taskSweeps, 0)
+  assert.equal(expireReviews.mock.callCount(), 0)
 })
 
 test('recovery returns bounded counts and no private database error or cached result', async () => {
@@ -57,9 +60,10 @@ test('recovery returns bounded counts and no private database error or cached re
   assert.equal(response.status, 200)
   assert.equal(response.headers.get('cache-control'), 'no-store')
   // Stale Bot computers are reconciled, ended runs judged (R-52), closed tasks' sandboxes ended and deleted workspaces' unfinished kills retried, in the same pass.
-  assert.deepEqual(await response.json(), { owners: 3, failed: 1, machines: 2, outcomes: 4, taskMachines: { reconciled: 5, pending: 0 }, sandboxKills: { killed: 1, pending: 1 }, tasks: { scanned: 3, recovered: 1, blocked: 1, deferred: 1, failed: 0 } })
+  assert.deepEqual(await response.json(), { owners: 3, failed: 1, machines: 2, outcomes: 4, reviewSessions: { closed: 2, pending: 1 }, taskMachines: { reconciled: 5, pending: 0 }, sandboxKills: { killed: 1, pending: 1 }, tasks: { scanned: 3, recovered: 1, blocked: 1, deferred: 1, failed: 0 } })
   assert.equal(taskSweeps, 1)
   assert.equal(reconciled, 1)
+  assert.equal(expireReviews.mock.callCount(), 1)
   assert.equal(judged, 1)
   assert.equal(ended, 1)
   assert.equal(retried, 1)
