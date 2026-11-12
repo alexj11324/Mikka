@@ -612,7 +612,7 @@
       "MIKKA_UI_OVERLAY_DIR",
       "MIKKA_UI_OVERLAY_SHA"
     ],
-    "behavior": "The public build resolves checked-in slot defaults; an optional official UI overlay must be valid and provide its required slots.",
+    "behavior": "Self-hosted installations build the server and its authentication and status pages from public source. Official Web and Desktop releases require a verified private checkout and its required slot exports.",
     "test": "lib/ui-overlay.test.mjs"
   },
   "lib/workers-ai-config.ts": {
