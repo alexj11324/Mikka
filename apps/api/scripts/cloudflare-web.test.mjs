@@ -74,6 +74,50 @@ test('gateway honors retained asset/API pins, uses current for version and navig
   assert.equal((await go('/mikka/api/version')).status, 503)
 })
 
+test('GitHub callback keeps one ingress across pins and forwards the signed bytes and backend response', async () => {
+  const calls = []
+  const original = new TextEncoder().encode('{\r\n  "test": "验收"\r\n}\n')
+  const env = { CURRENT_RELEASE: 'new', RELEASES: { old: 'OLD', new: 'NEW' },
+    OLD: { fetch: () => new Response('old') }, NEW: { fetch: () => new Response('new') },
+    GITHUB_WEBHOOK: { async fetch(input) {
+      const url = new URL(input.url)
+      assert.ok(['/mikka/api/webhooks/github', '/mikka/api/webhooks/github/'].includes(url.pathname))
+      assert.equal(input.headers.get('cloudflare-workers-version-overrides'), null)
+      assert.equal(input.headers.get('x-hub-signature-256'), 'test-signature')
+      assert.deepEqual(new Uint8Array(await input.arrayBuffer()), original)
+      calls.push(input.headers.get('x-github-event'))
+      return new Response('upstream', { status: 401 })
+    } },
+  }
+  for (const [path, event] of [['/mikka/api/webhooks/github?dpl=retired', 'workflow_run'],
+    ['/mikka/api/webhooks/github/?dpl=new&dpl=old', 'pull_request'], ['/mikka/%61pi/webhooks/%67ithub?dpl=old', 'check_suite']]) {
+    const result = await gateway.fetch(request(path, { method: 'POST', body: original, headers: {
+      'x-github-event': event, 'x-hub-signature-256': 'test-signature', 'x-deployment-id': 'old',
+      'cloudflare-workers-version-overrides': 'untrusted' } }), env)
+    assert.equal(result.status, 401)
+    assert.equal(await result.text(), 'upstream')
+  }
+  assert.deepEqual(calls, ['workflow_run', 'pull_request', 'check_suite'])
+  assert.equal(await (await gateway.fetch(request('/mikka/api/webhooks/github/other?dpl=old'), env)).text(), 'old')
+  env.GITHUB_WEBHOOK = null
+  assert.equal((await gateway.fetch(request('/mikka/api/webhooks/github'), env)).status, 503)
+  delete env.GITHUB_WEBHOOK
+  assert.equal(await (await gateway.fetch(request('/mikka/api/webhooks/github?dpl=old'), env)).text(), 'old')
+})
+
+test('gateway config can bind a discrete webhook service for both current and rollback gateways', () => {
+  const retained = ['abcdef0-1-1', 'abcdef0-2-1']
+  for (const current of retained) {
+    const input = { current, retained }
+    assert.ok(gatewayConfig(input).services.every(s => s.binding !== 'GITHUB_WEBHOOK'))
+    assert.deepEqual(gatewayConfig({ ...input, githubWebhook: 'github-events' }).services.at(-1),
+      { binding: 'GITHUB_WEBHOOK', service: 'github-events' })
+    for (const githubWebhook of [null, '', 'https://example.test', 'mikka-app-gateway', 'mikka-app-release-' + current]) {
+      assert.throws(() => gatewayConfig({ ...input, githubWebhook }), /WEB_GITHUB_WEBHOOK_SERVICE_INVALID/)
+    }
+  }
+})
+
 test('encoded route and asset names retain the same deployment and cache contract', async () => {
   const env = { CURRENT_RELEASE: 'new', RELEASES: { old: 'OLD', new: 'NEW' } }
   const seen = []
