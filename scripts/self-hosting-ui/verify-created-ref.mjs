@@ -1,15 +1,12 @@
-import { setTimeout as delay } from 'node:timers/promises'
-
-// GitHub can acknowledge creation before the new ref is visible on a read.
-export async function verifyCreatedRef(readRef, expectedSha, wait = delay) {
-  for (const pause of [500, 1500, 3500, 8000, 16000, 32000]) {
-    const ref = await readRef(true)
-    if (ref !== null) {
-      if (ref.object?.sha !== expectedSha) throw new Error('EVIDENCE_PUBLICATION_MISMATCH')
-      return
-    }
-    await wait(pause)
+function requireCommitRef(receipt, ref, sha) {
+  if (receipt?.ref !== ref || receipt.object?.type !== 'commit' || receipt.object.sha !== sha) {
+    throw new Error('EVIDENCE_PUBLICATION_MISMATCH')
   }
-  const ref = await readRef(false)
-  if (ref?.object?.sha !== expectedSha) throw new Error('EVIDENCE_PUBLICATION_MISMATCH')
+}
+
+export async function publishEvidenceRef(api, branch, sha) {
+  if (!/^[a-f0-9]{40}$/u.test(sha)) throw new Error('EVIDENCE_PUBLICATION_MISMATCH')
+  const ref = `refs/heads/${branch}`
+  requireCommitRef(await api('/refs', { ref, sha }), ref, sha)
+  requireCommitRef(await api(`/ref/heads/${branch}`), ref, sha)
 }
