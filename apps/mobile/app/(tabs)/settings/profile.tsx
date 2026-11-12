@@ -5,6 +5,7 @@ import { Avatar, Row, SettingsPage } from '@/components/settings'
 import { Text } from '@/components/Text'
 import { Group } from '@/components/ui'
 import { api, apiConnection } from '@/lib/api'
+import { authClient } from '@/lib/auth'
 import { apiCache } from '@/lib/api-cache'
 import { saveProfileName } from '@/lib/profile-name'
 import { useSettings } from '@/lib/settings'
@@ -15,6 +16,7 @@ import { mobileMessages as messages } from '@/lib/messages'
 /** 个人资料: photo and name; email read-only (Comma iOS Profile, Claude). The name saves when the field is left. */
 export default function ProfileScreen() {
   const { data, setData } = useSettings()
+  const { refetch } = authClient.useSession()
   const [name, setName] = useState(data?.user.name ?? '')
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
@@ -34,7 +36,7 @@ export default function ProfileScreen() {
       apiCache.commit(context, () => {
         setData(current => current && { ...current, user: { ...current.user, name: saved } })
         dirty.current = false; setName(saved)
-        connection.client.$store.notify('$sessionSignal')
+        void refetch({ query: { disableCookieCache: true } })
       })
     } catch { setProblem('名字未保存，修改已保留。') }
     finally { saving.current = false; setBusy(false) }
