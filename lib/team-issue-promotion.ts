@@ -18,6 +18,7 @@ import { runPolicyStopSQL, notifyStoppedPolicyRuns, type StoppedPolicyRun } from
 import { markReviewSessionsRevoked, drainRevokedReviewSessions } from './coding-workspace/review-sessions'
 
 const schema = z.object({ requestId: z.uuid(), issueId: z.uuid(), revision: z.number().int().positive(), teamId: z.uuid(), expectedTeamId: z.uuid().nullable() })
+type AppTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type WorkspaceTx = Parameters<Parameters<typeof workspaceDb.transaction>[0]>[0]
 type Code = 'teamIssueAccessDenied' | 'teamIssueRequestConflict' | 'teamIssueChanged'
 class PromotionError extends Error { constructor(readonly code: Code) { super(code) } }
@@ -42,9 +43,7 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
   let promotionStarted = false
   const reviewIds = new Set<string>()
   const fenceReview = async (database: Pick<typeof pool, 'query'>) => {
-    const captured = await markReviewSessionsRevoked(database, { taskId: issueId }, 'task_changed')
-    for (const id of captured) reviewIds.add(id)
-    return captured
+    for (const id of await markReviewSessionsRevoked(database, { taskId: issueId }, 'task_changed')) reviewIds.add(id)
   }
   try {
     await withTeamWorkspace(userId, teamId, async workspace => {
@@ -92,19 +91,30 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
       const [link] = await workspace.select().from(teamIssues).where(eq(teamIssues.issueId, issueId)).for('update')
       if (!link || link.teamId !== teamId || link.workspaceId !== team.workspaceId || link.userId !== userId) throw new PromotionError('teamIssueChanged')
       promotionStarted = true
-      let capturedInApp: string[] = []
-      return db.transaction(async tx => {
+      const lockPromotion = async (tx: AppTx) => {
         const [issue] = await tx.select().from(issues).where(eq(issues.id, issueId)).for('update')
         const [request] = await tx.select().from(teamIssuePromotions).where(eq(teamIssuePromotions.requestId, requestId)).for('update')
         if (!request || !issue || issue.userId !== userId || issue.ownershipState !== 'bound' || issue.workspaceId !== team.workspaceId || request.ownerId !== userId || request.issueId !== issueId || request.teamId !== teamId || request.expectedTeamId !== expectedTeamId || request.expectedRevision !== revision) throw new PromotionError('teamIssueChanged')
-        if (request.status === 'complete') return { issue: await issueView(issue, tx), linearSync: syncResult }
-        if (request.status !== 'preparing' || issue.revision !== revision || !issue.linearSyncBlocked) throw new PromotionError('teamIssueChanged')
+        const complete = request.status === 'complete'
+        if (!complete && (request.status !== 'preparing' || issue.revision !== revision || !issue.linearSyncBlocked)) throw new PromotionError('teamIssueChanged')
+        return { issue, complete }
+      }
+      // A grant can appear between Workspace stages even when the grouping
+      // already matched. Commit its exact fence before the fallible APP write.
+      const completed = await db.transaction(async tx => {
+        const { issue, complete } = await lockPromotion(tx)
+        if (complete) return { issue: await issueView(issue, tx), linearSync: syncResult }
+        await fenceReview(captureDatabaseQuery(tx))
+        return null
+      })
+      if (completed) return completed
+      return db.transaction(async tx => {
+        // Revalidate and retain the APP locks through the actual scope change.
+        const { issue, complete } = await lockPromotion(tx)
+        if (complete) return { issue: await issueView(issue, tx), linearSync: syncResult }
         await tx.execute(sql`select set_config('mikka.team_scope_verified', ${issueId}, true), set_config('mikka.team_scope_team', ${teamId}, true), set_config('mikka.team_scope_request', ${requestId}, true)`)
         const previousScopes = await documentScopesBeforeChange(issue)
         const previousLists = await issueListScopesBeforeChange(issue)
-        // Both promotion stages own the relation lock. Capture a grant made
-        // between them, then close only these IDs outside the outer WS locks.
-        capturedInApp = await fenceReview(captureDatabaseQuery(tx))
         const [saved] = await tx.update(issues).set({ linearSyncPolicy: 'disabled', linearSyncBlocked: true, scopeSetBy: 'user', scopeConfidence: null, revision: issue.revision + 1, updatedAt: new Date() }).where(eq(issues.id, issueId)).returning()
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId, userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...actor })
         await tx.update(teamIssuePromotions).set({ status: 'complete' }).where(eq(teamIssuePromotions.requestId, requestId))
@@ -115,12 +125,6 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
         const stopped = await tx.execute<StoppedPolicyRun>(runPolicyStopSQL({ kind: 'task', issueId }))
         notifyStoppedPolicyRuns(workspace, stopped.rows)
         return { issue: await issueView(saved, tx), linearSync: syncResult }
-      }).catch(async error => {
-        // The failed APP transaction rolled back its fence. The Workspace
-        // relation lock still excludes new grants. Persist only the exact
-        // leases this authorized transaction observed, then drain after unlock.
-        if (capturedInApp.length) await markReviewSessionsRevoked(pool, { leaseIds: capturedInApp }, 'task_changed')
-        throw error
       })
     })
   } catch (error) {

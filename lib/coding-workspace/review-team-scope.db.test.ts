@@ -207,13 +207,24 @@ test('review capabilities follow real team relation changes and their transactio
     assert.notEqual(later.lease.id, current.lease.id)
     await closeReviewSession(later.authority, { kind: 'terminal', id: later.lease.id }, pool)
   })
-  await t.test('failed promotion restores a lease first fenced in the second APP stage', async () => {
+  await t.test('the second promotion stage commits its exact fence before the scope write can fail', async () => {
     const f = await fixture(true), current = await grant(f)
+    // The sequence survives the deliberate rollback. Its trigger runs before
+    // review_reject_scope and sees the PostgreSQL transaction that wrote the fence.
+    await pool.query(`CREATE SEQUENCE observed_committed_fence;
+      CREATE FUNCTION observe_committed_fence() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+        IF EXISTS(SELECT 1 FROM coding_review_sessions s WHERE s."taskId"=NEW.id AND s."revokedAt" IS NOT NULL
+          AND pg_xact_status(s.xmin::text::xid8)='committed') THEN PERFORM nextval('observed_committed_fence'); END IF;
+        RETURN NEW;
+      END $$;
+      CREATE TRIGGER observe_committed_fence BEFORE UPDATE ON issues FOR EACH ROW WHEN (NEW.revision>OLD.revision)
+      EXECUTE FUNCTION observe_committed_fence()`)
     await pool.query('INSERT INTO review_scope_faults("taskId","rejectScope") VALUES($1,true)', [f.taskId])
     expectedLinks.set(f.taskId, workspaceA)
     const result = await promoteExistingIssueForUser(owner, { requestId: randomUUID(), issueId: f.taskId, revision: 1, teamId: teamA, expectedTeamId: teamA })
     assert.equal('error' in result ? result.error : null, 'teamIssueOutcomeUnknown')
     assert.equal((await pool.query('SELECT scope FROM issues WHERE id=$1', [f.taskId])).rows[0].scope, 'personal')
+    assert.equal((await pool.query('SELECT is_called FROM observed_committed_fence')).rows[0].is_called, true)
     assert.ok(closeIds.includes(current.lease.id))
     assert.equal(await leaseRow(current.lease.id), undefined)
     const later = await grant(f)
