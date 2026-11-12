@@ -33,6 +33,8 @@ export async function makeRepo(): Promise<string> {
       },
     })
   await git("init", "-q", "-b", "main")
+  // Finish Git's own writes before tests snapshot the complete fixture, including its .git directory.
+  await git("config", "maintenance.autoDetach", "false")
   writeFileSync(join(repo, "README.md"), "# Sandbox\n")
   writeFileSync(join(repo, ".gitignore"), ".env.local\nsetup-ran\n")
   writeFileSync(
