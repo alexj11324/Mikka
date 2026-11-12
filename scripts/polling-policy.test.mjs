@@ -4,6 +4,11 @@ import { auditPolling, auditRepository, findPolling, pollingAllowlist, pollingMe
 
 const rules = source => findPolling('components/example.tsx', source).map(d => d.rule)
 
+test('ordinary TypeScript assertions do not hide a positional mobile interval', () => {
+  const source = 'const path = <string>input\nconst page = useApi<Page>(path, 5000)'
+  assert.deepEqual(findPolling('apps/mobile/example.ts', source).map(result => result.rule), ['polling/helper'])
+})
+
 test('no polling outside the allowlist, and no allowlisted file polls more than it did', () => {
   assert.deepEqual(auditRepository().map(d => `${d.file}:${d.line}:${d.column} ${d.rule}`), [])
 })

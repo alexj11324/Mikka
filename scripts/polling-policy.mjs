@@ -120,7 +120,7 @@ function sleepLoops(source) {
 // and any unrecognized options still fail, even with nested calls in the path.
 function mobilePollingCalls(file, source) {
   if (!source.includes('useApi')) return []
-  const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
   const positions = []
   function visit(node) {
     if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'useApi' && node.arguments.length > 1) {
