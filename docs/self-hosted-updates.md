@@ -49,8 +49,20 @@ wait for an accepted SHA image with the new inventory. Check that image by
 digest before merging the promotion. The `baseline` fields in `upgrade.json`
 identify the images actually used for rollback and forward recovery.
 
-The [first stable delivery record](https://github.com/alexj11324/Mikka/issues/1963)
-tracks the immutable release and the original upgrade and recovery receipts.
+### Observed recovery on v0.1.0
+
+On 12 November 2026 the first stable release pinned `ghcr.io/alexj11324/mikka@sha256:67e772ad4ce5249ac665f3094c7cc76c03f1284076d154bdd780530ea63a3376` to commit `474d280d16201d28e02ebea4875138937cbbe701`. The image contained 328 migrations and supported client protocols 0 and 1. This pin identifies the release even after newer commits reach main.
+
+| Previous installation (GHCR digest) | Failed verification after startup | What restored service |
+| --- | --- | --- |
+| Same 328 migrations (`b05ce8f8`), `sha256:3af9a0c35673902d5c8d4e815a9d47f50f3b4ca197f41ffd815645d7a5177ec3` | The updater restored the previous image. The version endpoint returned HTTP 200. | The host received the release at 04:38:50 UTC and started the upgrade at 04:40:00 UTC, inside its 04:40-04:41 UTC window. The queued delivery survived a receiver restart. Redelivery did not start another upgrade. |
+| 321 migrations (`5c1e0522`), `sha256:aab2790169e5a9473b9d7729f300c19f74743d0a5098dddd04f45a3c63f672af` | The candidate applied 7 upstream migrations. A verification hook then dropped a column on a fixture table. The candidate stayed pinned with ingress drained (HTTP 503). | After correcting the failing check, the operator ran `recover` on the same stable digest. The original task and completed run were preserved, and the version endpoint returned HTTP 200. |
+
+Both installations refused the first upgrade while an agent run was active. Each device called the completion endpoint and received HTTP 204. PostgreSQL recorded `stopped/turn_ended`. Restoring the host updater’s `backup` into a fresh database reproduced the original task and its completed run. The application volume retained its sentinel. After recovery, the API reported the released revision and the host CLI returned the same digest.
+
+On independent receivers, two deliveries under `manual` left the state directory empty and started zero containers. Under `notify`, duplicates preserved the first receipt and a bad signature returned HTTP 401. GitHub recorded public `ReleaseEvent` `19857987976` for release ID `442497224`. The test delivered that release’s published body to the production mail adapter in a local MIME envelope. The transport receipt covers the local mail pipe and host receiver. It records no Internet SMTP delivery.
+
+[Stable release](https://github.com/alexj11324/Mikka/releases/tag/v0.1.0) · [Published image](https://github.com/alexj11324/Mikka/actions/runs/43144148149/job/130939919170) · [Upgrade and delivery receipts](https://github.com/alexj11324/Mikka/actions/runs/43153922171/artifacts/13915529271) · [Independent receipt verification](https://github.com/alexj11324/Mikka/actions/runs/43156670888/job/130978103092)
 
 ## Host-side CLI
 
