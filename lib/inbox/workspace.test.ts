@@ -7,7 +7,7 @@ import { ActionFailureError } from '../action-error'
 import { createInboxGuard } from './workspace'
 import { InboxStore } from './store'
 import { handleInbox } from './http'
-import { InboxRequestError, readInboxPage, submitInboxCommand } from './client'
+import { InboxRequestError, readableInboxCount, readInboxPage, submitInboxCommand } from './client'
 
 test('inbox reads and commands preserve the original session and machine provenance through canonical admission', async () => {
   const workspaceId = randomUUID(), url = 'https://app.invalid/api/inbox'
@@ -83,4 +83,14 @@ test('official writes accept only the server receipt including an idempotent rep
   const sent = fetch.mock.callCount()
   await assert.rejects(submitInboxCommand(body, 1), error => error instanceof InboxRequestError && error.code === 'decisionUnavailable')
   assert.equal(fetch.mock.callCount(), sent)
+})
+
+test('a failed badge refresh keeps its current scoped count until access is denied or a newer count arrives', () => {
+  for (const failure of [new TypeError('offline'), ...[409, 429, 503].map(status => new InboxRequestError('unavailable', status))]) {
+    assert.equal(readableInboxCount(2, failure), 2)
+    assert.equal(readableInboxCount(undefined, failure), undefined)
+  }
+  for (const status of [401, 403, 404]) assert.equal(readableInboxCount(2, new InboxRequestError('denied', status)), undefined)
+  assert.equal(readableInboxCount(0, undefined), 0)
+  assert.equal(readableInboxCount(1, undefined), 1)
 })
