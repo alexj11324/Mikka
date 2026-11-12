@@ -65,7 +65,9 @@ export function createApiHandler(routes: ApiRoute[], beginTrace: TraceFactory = 
     return trace.run(async () => {
       let prepared: WebTransport | Response | null | undefined
       const serviceBearer = /^Bearer\s+mksvc_/i.test(original.headers.get('authorization') ?? '')
-      if (serviceBearer && template !== '/api/service-identity/projects') {
+      const serviceProjectRead = template === '/api/service-identity/projects'
+        || (template === '/api/service-identity/projects/[projectId]' && original.method === 'GET')
+      if (serviceBearer && !serviceProjectRead) {
         result = failure(401)
         return result
       }

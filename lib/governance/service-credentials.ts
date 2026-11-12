@@ -8,6 +8,7 @@ import { enterpriseAccessAllowed } from '@/lib/enterprise/access-policy'
 import { lockEnterpriseOrganizationRead } from '@/lib/enterprise/live-store'
 import { enterprisePrincipal, type EnterpriseReader } from '@/lib/enterprise/principal'
 import { writeTransaction } from '@/lib/operations/write-transaction'
+import { projectRepositoryKey, projectBranch } from '@/lib/project-resources/contracts'
 import { checkExpiry } from '@/lib/tokens/format'
 import { workspaceDb } from '@/lib/workspace-db'
 import type { WorkspaceTransaction } from '@/lib/workspace-access'
@@ -74,10 +75,13 @@ async function serviceOrganizationAllowed(tx: PoolClient, organizationId: string
 
 /** The bearer proves only this nonhuman principal. The existing SQL ACL checks its
  * explicit Project grant, expiry and every ancestor on each bounded read. */
-export async function listServiceCredentialProjects(header: string | null, after: string | null) {
+type ProjectRead = { after: string | null } | { projectId: string }
+
+export async function readServiceCredentialProjects(header: string | null, read: ProjectRead) {
   const token = /^Bearer (mksvc_[A-Za-z0-9_-]{43})$/.exec(header ?? '')?.[1]
   if (!token) return null
-  const cursor = z.uuid().nullable().parse(after)
+  const cursor = 'after' in read ? z.uuid().nullable().parse(read.after) : null
+  const projectId = 'projectId' in read ? z.uuid().parse(read.projectId) : null
   const hash = digest(token)
   return workspaceDb.transaction(async workspace => {
     const { rows: [candidate] } = await workspace.execute<{ id: string; workspaceId: string }>(sql`SELECT id,"workspaceId" FROM mikka_workspace_service_identities
@@ -95,11 +99,36 @@ export async function listServiceCredentialProjects(header: string | null, after
     if (link?.archived) return null
     return writeTransaction(pool, async app => {
       if (link && !await serviceOrganizationAllowed(app, link.organizationId)) return null
-      const { rows } = await app.query<{ id: string }>(`SELECT p.id FROM resource_access_policies p
+      const { rows } = await app.query<{ id: string; visibility: string }>(`SELECT p.id,p.visibility FROM resource_access_policies p
         JOIN resource_access_grants g ON g."resourceKind"=p.kind AND g."resourceId"=p.id
         WHERE p."workspaceId"=$1 AND p.kind='project' AND g."subjectKind"='service' AND g."subjectId"=$2
-          AND ($3::uuid IS NULL OR p.id>$3::uuid) AND mikka_resource_acl_allowed('service',$2,$1,'project',p.id,'canReadContent')
-        ORDER BY p.id LIMIT 101`, [workspaceId, id, cursor])
+          AND ($3::uuid IS NULL OR p.id>$3::uuid) AND ($4::uuid IS NULL OR p.id=$4::uuid)
+          AND mikka_resource_acl_allowed('service',$2,$1,'project',p.id,'canReadContent')
+        ORDER BY p.id LIMIT 101`, [workspaceId, id, cursor, projectId])
+      if (projectId) {
+        if (!rows.length) throw new GovernanceError('not_found')
+        const { rows: [project] } = await workspace.execute<{
+          id: string; name: string; description: string; createdAt: string | Date; updatedAt: string | Date
+        }>(sql`SELECT id,name,description,"createdAt","updatedAt" FROM workspace_projects
+          WHERE id=${projectId}::uuid AND "workspaceId"=${workspaceId}::uuid AND "archivedAt" IS NULL`)
+        if (!project) throw new GovernanceError('not_found')
+        const { rows: repositories } = await workspace.execute<{
+          repositoryKey: string; baseBranch: string | null; isPrimary: boolean
+        }>(sql`SELECT "repositoryKey","baseBranch","isPrimary" FROM workspace_project_repositories
+          WHERE "projectId"=${projectId}::uuid AND "workspaceId"=${workspaceId}::uuid
+          ORDER BY "isPrimary" DESC,"repositoryKey"`)
+        const publicRepositories = repositories.flatMap(repo => {
+          const key = projectRepositoryKey.safeParse(repo.repositoryKey)
+          if (!key.success || key.data.startsWith('v2/file/')) return []
+          const branch = projectBranch.safeParse(repo.baseBranch)
+          return [{ repositoryKey: key.data, baseBranch: branch.success ? branch.data : null, isPrimary: repo.isPrimary }]
+        })
+        return {
+          ...project,
+          createdAt: new Date(project.createdAt).toISOString(), updatedAt: new Date(project.updatedAt).toISOString(),
+          visibility: rows[0].visibility, repositories: publicRepositories,
+        }
+      }
       const page = rows.slice(0, 100)
       const { rows: projects } = await workspace.execute<{ id: string; name: string }>(sql`SELECT id,name FROM workspace_projects
         WHERE "workspaceId"=${workspaceId}::uuid AND id=ANY(${sql.param(page.map(row => row.id))}::uuid[]) AND "archivedAt" IS NULL ORDER BY id`)

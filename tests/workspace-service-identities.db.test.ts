@@ -129,7 +129,7 @@ test('registered service identity routes enforce a fresh Workspace admin through
     assert.deepEqual(events, [{ action: 'grant_insert', actorId: owner }, { action: 'grant_delete', actorId: owner }])
   })
 
-  await t.test('an independent service bearer sees only explicit Projects and follows live revocation', async () => {
+  await t.test('an independent service bearer sees only explicit Projects and follows live revocation', async t => {
     const newIdentity = await request({ cookie, origin }, first.id, 'POST', '', { requestId: randomUUID(), name: 'Automation reader' })
     assert.equal(newIdentity.status, 200)
     const serviceId: string = newIdentity.body.id
@@ -139,6 +139,11 @@ test('registered service identity routes enforce a fresh Workspace admin through
       const url = origin + '/mikka/api/service-identity/projects' + (after ? '?after=' + after : '')
       const response = await fetch(url, { headers })
       return { status: response.status, data: await response.json(), noStore: response.headers.get('cache-control')?.includes('no-store') }
+    }
+    const projectDetails = async (headers: Record<string, string>, projectId: string) => {
+      const response = await fetch(origin + '/mikka/api/service-identity/projects/' + projectId, { headers })
+      assert.match(response.headers.get('cache-control') ?? '', /no-store/)
+      return { status: response.status, body: await response.json() }
     }
     const bearer = (token: string) => ({ authorization: 'Bearer ' + token })
     const rotate = (revision: number) => ({ action: 'rotate', revision })
@@ -171,16 +176,51 @@ test('registered service identity routes enforce a fresh Workspace admin through
     assert.ok(visible.noStore)
     assert.deepEqual(visible.data, { workspaceId: first.id, serviceIdentityId: serviceId, projects: [{ id: project, name: 'P' }], nextCursor: null })
     assert.deepEqual((await serviceRead(bearer(firstKey), project)).data.projects, [])
+    await t.test('the dedicated bearer reads only current, explicitly granted Project details', async () => {
+      const fixture = await pool.query('UPDATE workspace_projects SET description=$2 WHERE id=$1 RETURNING name,description,"createdAt","updatedAt"', [project, 'Release notes'])
+      await pool.query(`INSERT INTO workspace_project_repositories ("projectId","workspaceId","repositoryKey","baseBranch","isPrimary")
+        VALUES ($1,$2,'v2/github.com/example/fixture','release',true), ($1,$2,'/local/legacy-fixture','internal',false),
+          ($1,$2,'v2/file/localhost/unit-fixture','internal',false), ($1,$2,' V2/FILE/LOCALHOST/MIXED-CASE ','internal',false)`, [project, first.id])
+      const normal = await projectDetails(bearer(firstKey), project)
+      assert.equal(normal.status, 200)
+      const stored = fixture.rows[0]
+      assert.deepEqual(normal.body, {
+        id: project, name: stored.name, description: stored.description, visibility: 'shared',
+        createdAt: stored.createdAt.toISOString(), updatedAt: stored.updatedAt.toISOString(),
+        repositories: [{ repositoryKey: 'v2/github.com/example/fixture', baseBranch: 'release', isPrimary: true }],
+      })
+      const missing = await projectDetails(bearer(firstKey), randomUUID())
+      assert.equal(missing.status, 404)
+      for (const unavailable of [otherProject, privateProject]) assert.deepEqual(await projectDetails(bearer(firstKey), unavailable), missing)
+      assert.equal((await projectDetails({ cookie }, project)).status, 401)
+      assert.equal((await projectDetails(bearer(admin.token), project)).status, 401)
+      const detailUrl = origin + '/mikka/api/service-identity/projects/' + project
+      for (const method of ['POST', 'PUT', 'DELETE', 'HEAD']) {
+        const refused = await fetch(detailUrl, { method, headers: bearer(firstKey) })
+        assert.equal(refused.status, 401)
+      }
+      assert.equal((await fetch(detailUrl + '/environment', { headers: bearer(firstKey) })).status, 401)
+      assert.equal((await projectDetails(bearer(firstKey), 'invalid-id')).status, 400)
+      await pool.query(`UPDATE resource_access_policies SET "parentKind"='project',"parentId"=$1 WHERE kind='project' AND id=$2`, [privateProject, project])
+      try { assert.deepEqual(await projectDetails(bearer(firstKey), project), missing) }
+      finally { await pool.query(`UPDATE resource_access_policies SET "parentKind"=NULL,"parentId"=NULL WHERE kind='project' AND id=$1`, [project]) }
+      await pool.query('UPDATE workspace_projects SET "archivedAt"=now() WHERE id=$1', [project])
+      try { assert.deepEqual(await projectDetails(bearer(firstKey), project), missing) }
+      finally { await pool.query('UPDATE workspace_projects SET "archivedAt"=NULL WHERE id=$1', [project]) }
+    })
     const orgId = randomUUID()
     await pool.query('INSERT INTO mikka_organizations (id,name,"createdBy") VALUES ($1,$2,$3)', [orgId, 'Service fixture', owner])
     try {
       await pool.query('INSERT INTO mikka_organization_workspaces ("workspaceId","organizationId") VALUES ($1,$2)', [first.id, orgId])
       await pool.query('INSERT INTO enterprise_org_policy ("organizationId","enforceSso","allowMachineCredentials") VALUES ($1,true,false)', [orgId])
       assert.equal((await serviceRead(bearer(firstKey))).status, 401)
+      assert.equal((await projectDetails(bearer(firstKey), project)).status, 401)
       await pool.query('UPDATE enterprise_org_policy SET "allowMachineCredentials"=true WHERE "organizationId"=$1', [orgId])
       assert.equal((await serviceRead(bearer(firstKey))).status, 200)
+      assert.equal((await projectDetails(bearer(firstKey), project)).status, 200)
       await pool.query('UPDATE enterprise_org_policy SET "archivedAt"=now() WHERE "organizationId"=$1', [orgId])
       assert.equal((await serviceRead(bearer(firstKey))).status, 401)
+      assert.equal((await projectDetails(bearer(firstKey), project)).status, 401)
     } finally {
       await pool.query('DELETE FROM enterprise_org_policy WHERE "organizationId"=$1', [orgId])
       await pool.query('DELETE FROM mikka_organizations WHERE id=$1', [orgId])
@@ -190,6 +230,7 @@ test('registered service identity routes enforce a fresh Workspace admin through
     const secondKey: string = rotated.body.token
     assert.ok(secondKey && secondKey !== firstKey)
     assert.equal((await serviceRead(bearer(firstKey))).status, 401)
+    assert.equal((await projectDetails(bearer(firstKey), project)).status, 401)
     assert.equal((await serviceRead(bearer(secondKey))).status, 200)
     assert.equal((await request({ cookie, origin }, first.id, 'POST', credential, rotate(2))).status, 409)
     await pool.query('UPDATE mikka_workspace_service_identities SET "credentialExpiresAt"=now()-interval \'1 second\' WHERE id=$1', [serviceId])
@@ -204,6 +245,7 @@ test('registered service identity routes enforce a fresh Workspace admin through
     assert.equal(last.status, 200)
     assert.equal((await request(admin.token, first.id, 'PUT', resource + '/projects', { expectedProjectIds: [project], projectIds: [] })).status, 200)
     assert.deepEqual((await serviceRead(bearer(last.body.token))).data.projects, [])
+    assert.equal((await projectDetails(bearer(last.body.token), project)).status, 404)
     assert.equal((await request(admin.token, first.id, 'POST', credential, { action: 'revoke', revision: 7 })).status, 200)
     assert.equal((await serviceRead(bearer(last.body.token))).status, 401)
     const events = await pool.query('SELECT payload FROM workspace_audit_outbox WHERE "workspaceId"=$1 AND payload->>\'targetId\'=$2', [first.id, serviceId])
