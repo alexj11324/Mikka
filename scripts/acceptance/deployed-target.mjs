@@ -117,7 +117,7 @@ export async function webPublication(read, guard) {
   return { webAttempt: run.run_attempt, webDeployJobId: job.id }
 }
 
-async function targetState(read, guard) {
+export async function verifyVercelDeploymentState(read, guard) {
   const pin = async () => check((await read.version())?.build === guard.applicationSha, 'target_changed', 'public_version')
   const alias = async () => {
     let value
@@ -147,7 +147,7 @@ export async function attestDeployedTarget({ env = process.env, event, fetchImpl
   const guard = deployedTargetGuard(env, event), read = readers(env, fetchImpl)
   await driverAndIssue(read, guard)
   const publication = await webPublication(read, guard)
-  await targetState(read, guard)
+  await verifyVercelDeploymentState(read, guard)
   return { purpose: 'production-deployed-target', repository: REPOSITORY, ...guard, ...publication,
     projectId: PROJECT, teamId: TEAM, issueNumber: 1415, issueState: 'open', status: 'ready',
     metadataReadAuthorized: true, readable: true, executionReady: false, checkedAt: new Date(now()).toISOString() }
