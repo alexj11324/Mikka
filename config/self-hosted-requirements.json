@@ -494,6 +494,13 @@
     "test": "tests/task-presentation.db.test.ts",
     "suite": "test:task-presentation-db"
   },
+  "lib/factory/public-flow.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Project current Factory attention and completion from authorized PostgreSQL source and candidate receipts on the selected server.",
+    "test": "tests/task-presentation.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
   "lib/factory/review-change.ts": {
     "mode": "built-in",
     "environment": [],
@@ -815,6 +822,13 @@
     "behavior": "Task resource registration persists its workspace and privacy defaults under the authorized PostgreSQL transaction.",
     "test": "tests/task-resource-registration.db.test.ts",
     "suite": "test:visibility-db"
+  },
+  "lib/task-state.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The Inbox and Task views on the selected server use the same manual review status and pending pull-request states.",
+    "test": "lib/inbox/store.db.test.ts",
+    "suite": "test:inbox-db"
   },
   "lib/task-workspace.ts": {
     "mode": "built-in",
