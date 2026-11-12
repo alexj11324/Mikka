@@ -1,6 +1,6 @@
 'use client'
 
-import useSWR from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
 import type { DecisionReceipt } from './use-decision-submission'
 import { webSelectionVersion } from '@/lib/web-connection/selection'
 import { withBasePath } from '@/lib/base-path'
@@ -64,23 +64,23 @@ async function operationId(question: FactoryQuestionItem, text: string) {
   return [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join('-')
 }
 
-async function submitQuestion(question: FactoryQuestionItem, text: string): Promise<DecisionReceipt> {
-  const unavailable = factoryQuestionUnavailable(question.status)
-  if (unavailable) return { status: 'unavailable', error: unavailable }
+async function submitQuestion(question: FactoryQuestionItem, text: string, attempt: { selection: number; answerId: string; readOnly: boolean }): Promise<DecisionReceipt> {
+  const { selection, answerId } = attempt
   const path = withBasePath(`/api/factory/questions/${question.questionId}`)
-  const selection = webSelectionVersion()
   const changed = (): DecisionReceipt => ({ status: 'unavailable', error: 'decisionAccountChanged' })
-  const answerId = await operationId(question, text)
   if (selection !== webSelectionVersion()) return changed()
-  const response = await fetch(path, {
-    method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ reference: question.reference, answerId, text }),
-  }).catch(() => null)
-  const body = await response?.json().catch(() => null)
-  if (selection !== webSelectionVersion()) return changed()
-  if (response?.ok && body?.questionId === question.questionId && typeof body.continuationRunId === 'string' && body.continuationRunId) return { status: 'accepted' }
-  if (response && [401, 403, 404].includes(response.status)) return { status: 'unavailable', error: body?.error ?? 'decisionUnavailable' }
-  if (response && response.status >= 400 && response.status < 500 && response.status !== 409) return { status: 'failed', error: body?.error ?? 'actionFailed' }
+  let body: { questionId?: string; continuationRunId?: string; error?: string } | null = null
+  if (!attempt.readOnly) {
+    const response = await fetch(path, {
+      method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ reference: question.reference, answerId, text }),
+    }).catch(() => null)
+    body = response ? await response.json().catch(() => null) : null
+    if (selection !== webSelectionVersion()) return changed()
+    if (response?.ok && body?.questionId === question.questionId && typeof body.continuationRunId === 'string' && body.continuationRunId) return { status: 'accepted' }
+    if (response && [401, 403, 404].includes(response.status)) return { status: 'unavailable', error: body?.error ?? 'decisionUnavailable' }
+    if (response && response.status >= 400 && response.status < 500 && response.status !== 409) return { status: 'failed', error: body?.error ?? 'actionFailed' }
+  }
 
   // A refused revision or missing acknowledgement is reconciled with this same actor's authorized read.
   const reread = await fetch(path, { credentials: 'same-origin', cache: 'no-store' }).catch(() => null)
@@ -111,9 +111,20 @@ export function factoryQuestionsVersion(threads: readonly { id: string; status: 
  * changes when they may have (the chat's own version, the task list), and a change reads them again.
  */
 export function useFactoryQuestions(version: unknown, enabled = true) {
+  const { cache } = useSWRConfig()
   const { data, error, mutate } = useSWR(enabled ? ['factory-questions', version] : null, readQuestions, { revalidateOnFocus: false, keepPreviousData: true })
   async function submitAnswer(question: FactoryQuestionItem, text: string): Promise<DecisionReceipt> {
-    const result = await submitQuestion(question, text)
+    const unavailable = factoryQuestionUnavailable(question.status)
+    if (unavailable) return { status: 'unavailable', error: unavailable }
+    const selection = webSelectionVersion()
+    const operation = await operationId(question, text)
+    // Share only the operation ID across entries using this account's SWR cache.
+    const key = JSON.stringify(['unconfirmed-factory-answer', selection, question.questionId, question.reference.questionRevision])
+    const previous = cache.get(key)?.data as string | undefined
+    // A different answer must first read the ledger. It cannot replace an unknown operation in the same click.
+    const result = await submitQuestion(question, text, { selection, answerId: operation, readOnly: Boolean(previous && previous !== operation) })
+    if (result.status === 'uncertain') cache.set(key, { data: previous ?? operation })
+    else cache.delete(key)
     if (result.status === 'accepted') await mutate()
     return result
   }

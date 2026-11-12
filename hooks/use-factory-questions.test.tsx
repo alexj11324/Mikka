@@ -182,3 +182,32 @@ test('losing a response while switching accounts cannot send the question ID to 
     assert.deepEqual(methods, ['POST'])
   } finally { globalThis.fetch = original; installWebSelection(() => ({ version: 0, account: null })) }
 })
+
+test('with both the ACK and ledger offline, another entry cannot POST a changed answer until its authorized read settles', async () => {
+  await render()
+  const item = state.questions[0]
+  const original = globalThis.fetch
+  const calls: string[] = []
+  const bodies: string[] = []
+  let reachable = false
+  globalThis.fetch = async (path, init) => {
+    if (!String(path).endsWith('/questions/question-one')) return original(path, init)
+    calls.push(init?.method ?? 'GET')
+    if (init?.method === 'POST') {
+      bodies.push(JSON.parse(String(init.body)).text)
+      return reachable ? Response.json({ questionId: item.questionId, continuationRunId: 'next' }) : Response.json({}, { status: 503 })
+    }
+    return reachable ? Response.json({ id: item.questionId, status: 'open', reference: item.reference }) : Response.json({}, { status: 503 })
+  }
+  try {
+    assert.equal((await state.submitAnswer(item, 'Original')).status, 'uncertain')
+    await render('another-entry')
+    assert.equal((await state.submitAnswer(item, 'Different')).status, 'uncertain')
+    assert.deepEqual(calls, ['POST', 'GET', 'GET'])
+    reachable = true
+    assert.equal((await state.submitAnswer(item, 'Different')).status, 'failed')
+    assert.deepEqual(bodies, ['Original'])
+    await act(async () => { assert.equal((await state.submitAnswer(item, 'Different')).status, 'accepted') })
+    assert.deepEqual(bodies, ['Original', 'Different'])
+  } finally { globalThis.fetch = original }
+})
