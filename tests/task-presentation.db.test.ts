@@ -142,6 +142,46 @@ test('Task presentation batches keep current tenant authority and one Factory pr
       assert.doesNotMatch(JSON.stringify(own), /private body|private prompt|private reason/)
     })
 
+    await t.test('the shell reads dispatch membership once per batch and only for the reader’s own Bots', async () => {
+      const task = await makeTask(), bot = await makeBot(), peerBot = await makeBot(peer)
+      const ownerRun = await makeRun(task), peerRun = await makeRun(task, { userId: peer })
+      await application.query('UPDATE agent_runs SET "botId"=$1 WHERE id=$2', [bot, ownerRun])
+      await application.query('UPDATE agent_runs SET "botId"=$1 WHERE id=$2', [peerBot, peerRun])
+      const ids = [task]
+      for (let index = 0; index < 15; index++) ids.push(await makeTask())
+      const index = (reader: string, issueIds: string[]) => as(reader, shared, () =>
+        getTaskPresentations({ workspaceId: shared, issueIds, includeFactoryIdentity: true, includeBotDispatches: true }))
+      const one = await counted(() => index(owner, [task])), many = await counted(() => index(owner, ids))
+      assert.deepEqual(many.result.items[task].botDispatches, [{ botId: bot, runId: ownerRun, name: 'Synthetic bot '+bot, harness: 'codex' }])
+      assert.deepEqual(many.result.items[ids[1]].botDispatches, [])
+      assert.deepEqual((await index(peer, [task])).items[task].botDispatches, [{ botId: peerBot, runId: peerRun, name: 'Synthetic bot '+peerBot, harness: 'codex' }])
+      assert.equal(one.statements.length, many.statements.length)
+      const membershipReads = many.statements.filter(q => /select distinct .*from "agent_runs" inner join "bots"/i.test(q.sql))
+      assert.equal(membershipReads.length, 1)
+      t.diagnostic(JSON.stringify({ tasks: [1, 16], statements: [one.statements.length, many.statements.length], dispatchReads: membershipReads.length }))
+    })
+
+    await t.test('a read-only member sees the same threadless and Factory states in citation cards and detail', async () => {
+      const threadless = await makeTask(shared, {}, 'backlog')
+      const reviewed = await makeTask()
+      await makeFactory(reviewed, { userId: peer, stage: 'spec', status: 'passed' })
+      const ids = [threadless, reviewed]
+      for (const id of ids) {
+        await application.query("UPDATE resource_access_policies SET visibility='private' WHERE kind='task' AND id=$1", [id])
+        await application.query(`INSERT INTO resource_access_grants("resourceKind","resourceId","subjectKind","subjectId",capabilities)
+          VALUES ('task',$1,'account',$2,ARRAY['canReadContent'])`, [id, peer])
+        const { rows: [rights] } = await application.query(`SELECT mikka_resource_acl_allowed('account',$1,$2,'task',$3,'canReadContent') AS read,
+          mikka_resource_acl_allowed('account',$1,$2,'task',$3,'canSteer') AS steer`, [peer, shared, id])
+        assert.deepEqual(rights, { read: true, steer: false })
+      }
+      const { items } = await as(peer, shared, () => getTaskPresentations({ workspaceId: shared, issueIds: ids, includeReview: true }))
+      assert.deepEqual(ids.map(id => [items[id].state, items[id].reason]), [['todo', null], ['waiting', 'approval']])
+      for (const id of ids) {
+        const detail = await as(peer, shared, () => getTaskPresentation(id))
+        assert.deepEqual([items[id].state, items[id].reason], [detail.state, detail.reason])
+      }
+    })
+
     await t.test('evidence directory counts preserve submitted versions and require the authorized Factory source', async () => {
       const issue = await makeTask(), factory = await makeFactory(issue), run = await makeRun(issue)
       const unrelated = await makeTask(), invalid = await makeFactory(unrelated, { sourceKind: 'assistant_message' })

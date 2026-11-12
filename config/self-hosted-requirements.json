@@ -71,6 +71,16 @@
     "test": "app/api/webhooks/github/route.test.ts",
     "suite": "test:suggestions"
   },
+  "app/api/mobile/open/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "MIKKA_OFFICIAL_WEB_URL",
+      "MIKKA_OFFICIAL_WEB_ENABLED"
+    ],
+    "behavior": "Confirm the signed-in native account on its issuing origin. Self-hosted Task destinations use the configured official client, an expiring single-use record in the existing auth database, and a fresh Task access check.",
+    "test": "tests/mobile-handoff.test.ts",
+    "suite": "test:desktop-auth"
+  },
   "app/api/service-identity/projects/[projectId]/route.ts": {
     "mode": "built-in",
     "environment": [],
@@ -219,6 +229,15 @@
       "DATABASE_URL"
     ],
     "behavior": "Store the unique credential digest and optional expiry in the configured Workspace PostgreSQL database.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "drizzle/20261112030510_service_key_organization_binding.sql": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Bind explicitly organization-scoped service keys to their current Workspace attachment and invalidate the matching credential when the attachment is removed.",
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },
@@ -540,6 +559,13 @@
     "test": "lib/linear-sync/run-comment.test.ts",
     "suite": "test:linear-sync"
   },
+  "lib/mobile-task-handoff.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Accept only a validated Task or immutable receipt and an opaque rendezvous on the configured HTTPS server.",
+    "test": "lib/mobile-web-target.test.ts",
+    "suite": "test:mobile"
+  },
   "lib/platform/public-origin.ts": {
     "mode": "built-in",
     "environment": [],
@@ -667,6 +693,13 @@
     "test": "tests/task-create-only.db.test.ts",
     "suite": "test:coordinator-issue-create-db"
   },
+  "lib/task-dispatches.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read actual Task dispatches from PostgreSQL once per batch, restricted to the current workspace and the signed-in reader's own Bots.",
+    "test": "tests/task-presentation.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
   "lib/task-factory-events.ts": {
     "mode": "built-in",
     "environment": [],
@@ -714,8 +747,15 @@
       "MIKKA_UI_OVERLAY_DIR",
       "MIKKA_UI_OVERLAY_SHA"
     ],
-    "behavior": "The public build resolves checked-in slot defaults; an optional official UI overlay must be valid and provide its required slots.",
+    "behavior": "Self-hosted installations build the server and its authentication and status pages from public source. Official Web and Desktop releases require a verified private checkout and its required slot exports.",
     "test": "lib/ui-overlay.test.mjs"
+  },
+  "lib/web-connection/mobile-task-location.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Keep the entity out of the physical official URL and invalidate the in-memory route when the active server or account changes.",
+    "test": "lib/mobile-web-target.test.ts",
+    "suite": "test:mobile"
   },
   "lib/workers-ai-config.ts": {
     "mode": "optional-cloud",
@@ -812,7 +852,7 @@
     "test": "tests/slack-bot.test.mjs",
     "suite": "test:slack"
   },
-  "drizzle/20261112030510_slack_workspace_installations.sql": {
+  "drizzle/20261112030512_slack_workspace_installations.sql": {
     "mode": "built-in",
     "environment": [
       "MIKKA_DATABASE_URL",

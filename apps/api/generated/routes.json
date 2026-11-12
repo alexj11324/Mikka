@@ -1345,7 +1345,7 @@
         "GET",
         "POST"
       ],
-      "sourceHash": "04e14be83dee75ab06e6f82daf3ae596f2e525ac97a6cd6a85f6aa000e127929"
+      "sourceHash": "e83e89e6e09089db04d1884ed1e11519bcce57d7a4f10ccd3e67ff35d67b1700"
     },
     {
       "path": "/mikka/api/integrations/slack/callback",
@@ -1372,7 +1372,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "237809ab24e815fe536a16959458e982c3c532488ea950983909122ec1569c90"
+      "sourceHash": "8b8b1fbf13cdfb81ea272a37e8158cd0eddbe97522f14621b4b48371440929c8"
     },
     {
       "path": "/mikka/api/internal/eve/tools",
@@ -1534,7 +1534,7 @@
         "GET",
         "POST"
       ],
-      "sourceHash": "b480abfc4e7a12917755e26d1e6662e7d1a5d4a51a4c65e20fc38c0824a222c2"
+      "sourceHash": "8b2b26ab682a8112bf04af636e22c3cb1bae0d125cd7e7bc8e1a9958c5395e78"
     },
     {
       "path": "/mikka/api/mobile/pending-actions/[id]",

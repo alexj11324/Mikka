@@ -3,6 +3,7 @@ import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
 import { act, useRef, useState } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
+import * as live from '@/hooks/use-live-key'
 import type { GroupMessage, GroupMessagePage } from '@/lib/group-messages'
 
 let pages: GroupMessagePage[] = []
@@ -18,7 +19,10 @@ mock.module('swr/infinite', {
   defaultExport: (_key: unknown, _fetcher: unknown, config: Record<string, unknown>) => { infinite.config = config; return { data: pages, size: 1, setSize: async () => {}, mutate: async () => {}, isValidating: false } },
   namedExports: { unstable_serialize: (getKey: (index: number, previous: null) => unknown) => '$inf$' + JSON.stringify(getKey(0, null)) },
 })
-mock.module(new URL('../../hooks/use-live-key.tsx', import.meta.url).href, { namedExports: { useLiveKey: (...args: unknown[]) => { liveKeys.push(args) } } })
+mock.module(new URL('../../hooks/use-live-key.tsx', import.meta.url).href, { namedExports: {
+  ...live,
+  useLiveKey: (...args: unknown[]) => { liveKeys.push(args) },
+} })
 mock.module(new URL('../../app/actions/agents.ts', import.meta.url).href, { namedExports: { listAgents: async () => [] } })
 mock.module(new URL('../../app/actions/link-preview.ts', import.meta.url).href, { namedExports: { getLinkPreview: async () => null } })
 mock.module(new URL('../../lib/hooks/view-state.tsx', import.meta.url).href, { namedExports: {
