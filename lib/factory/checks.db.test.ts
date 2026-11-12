@@ -25,6 +25,7 @@ import {
 import { Pool } from "pg";
 import { assertE2eTarget } from "../../tests/helpers/e2e-target.mjs";
 import { createRequestDatabaseScope } from "../db";
+import { observePoolCommits } from "../db/commit-effects";
 import { hostedBillingScope } from "../abuse/context";
 import { HostedUsageStore } from "../abuse/store";
 import { exerciseFactoryRecoveryEntry } from "../../tests/support/factory-recovery-entry-fixture";
@@ -122,6 +123,7 @@ test(
         max: 12,
         options: "-c statement_timeout=15000 -c lock_timeout=5000",
       });
+      observePoolCommits(pool);
       const db = pool;
       modelDatabase = createRequestDatabaseScope(isolated.toString());
       closeWorkspaceDatabase = await bindFixtureWorkspaceDatabase(db);
