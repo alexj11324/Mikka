@@ -76,6 +76,10 @@ test('review capabilities follow real team relation changes and their transactio
   const expectedMembers = new Map<string, string | null>()
   const failClose = new Set<string>()
   const closeIds: string[] = []
+  const probeErrors: unknown[] = []
+  t.afterEach(() => {
+    if (probeErrors.length) throw new AggregateError(probeErrors.splice(0), 'Review close SQL observation failed')
+  })
   t.mock.method(reviewSessionTransport, 'close', async (...[target, ids, _expiresAt, kind]: Parameters<typeof reviewSessionTransport.close>) => {
     assert.equal(kind, 'terminal')
     const rows = await pool.query('SELECT "taskId","revokedAt","sandboxId" FROM coding_review_sessions WHERE id=ANY($1::uuid[])', [ids])
@@ -89,12 +93,18 @@ test('review capabilities follow real team relation changes and their transactio
     const scope = await workspacePool!.connect(), machine = await pool.connect()
     try {
       await scope.query('BEGIN'); await machine.query('BEGIN')
+      // Each observer takes the same exclusive relation lock to prove the writer released it.
+      // Concurrent provider closes must not mistake another observer for the writer.
+      await scope.query("SELECT pg_advisory_xact_lock(hashtextextended('review-team-scope-test-observer',0))")
       assert.equal((await scope.query("SELECT pg_try_advisory_xact_lock(hashtextextended('mikka-team-relations',0)) AS acquired")).rows[0].acquired, true,
         'gateway close does not hold the global Workspace relation lock')
       await scope.query('SELECT id FROM mikka_workspaces WHERE id=$1 FOR UPDATE NOWAIT', [target.workspaceId])
       const member = (await scope.query('SELECT status FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 FOR UPDATE NOWAIT', [target.workspaceId, target.ownerId])).rows[0]
       if (expectedMembers.has(target.workspaceId)) assert.equal(member?.status ?? null, expectedMembers.get(target.workspaceId), 'membership outcome committed before gateway IO')
       await machine.query('SELECT "runId" FROM thread_machines WHERE "runId"=$1 FOR UPDATE NOWAIT', [target.runId])
+    } catch (error) {
+      probeErrors.push(error)
+      throw error
     } finally {
       await scope.query('ROLLBACK'); scope.release()
       await machine.query('ROLLBACK'); machine.release()
@@ -113,6 +123,7 @@ test('review capabilities follow real team relation changes and their transactio
     assert.equal(closeIds.includes(current.lease.id), false)
     assert.deepEqual(await readReviewSession(current.authority, { kind: 'terminal' }, pool), current.lease)
     assert.equal((await resolve(pool, workspacePool!, session, f.taskId)).workspaceId, workspaceA)
+    await closeReviewSession(current.authority, { kind: 'terminal', id: current.lease.id }, pool)
   })
   await t.test('attaching a Team in the stored Workspace closes the completed Run capability before returning', async () => {
     const f = await fixture(), current = await grant(f)
@@ -261,6 +272,7 @@ test('review capabilities follow real team relation changes and their transactio
   await t.test('account runtime cleanup stays blocked until the final review close ACK', async () => {
     const { cleanupAccountRuntimes } = await import('../account/runtime-cleanup')
     const f = await administrativeFixture(), current = await grant(f)
+    const sibling = await grant(await administrativeFixture())
     failClose.add(current.lease.id)
     const cleanup = () => cleanupAccountRuntimes(owner, pool, async (database, actor, runId) => {
       assert.equal(actor.userId, owner)
@@ -269,6 +281,8 @@ test('review capabilities follow real team relation changes and their transactio
     }, async () => [], async () => ({ killed: 0, pending: 0 }))
     assert.deepEqual(await cleanup(), ['review_capability_close_pending'])
     assert.ok((await leaseRow(current.lease.id)).revokedAt)
+    assert.ok(closeIds.includes(sibling.lease.id))
+    assert.equal(await leaseRow(sibling.lease.id), undefined)
     assert.equal((await pool.query('SELECT id FROM "user" WHERE id=$1', [owner])).rowCount, 1)
     failClose.delete(current.lease.id)
     assert.deepEqual(await cleanup(), [])
