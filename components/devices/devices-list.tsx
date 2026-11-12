@@ -2,6 +2,7 @@
 
 import { SettingsLoading } from '@/components/settings/primitives'
 import { Fragment, useEffect, useState, type ReactNode } from 'react'
+import { toast } from 'sonner'
 import { Check, Copy, Laptop, MoreHorizontal, Plus, Server } from 'lucide-react'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import type { DeviceView } from '@/app/actions/agents'
@@ -17,6 +18,7 @@ import { Input } from '@/components/ui/input'
 import { Item, ItemGroup, ItemSeparator } from '@/components/ui/item'
 import { Switch } from '@/components/ui/switch'
 import { useDeviceActions } from '@/components/devices/use-device-actions'
+import { writeDeviceCommand } from '@/lib/devices/copy-command.mjs'
 import { cn } from '@/lib/utils'
 import type { SettingsDevicesProps } from '@/components/slots/settings-devices-contract'
 import { AgentMarks, installedAgents, sandboxBlockedAgents } from './agent-marks'
@@ -32,9 +34,17 @@ const AGENT_INSTALL = [
 /** The install commands in a popover; `label` replaces the trigger's words (a UI layer's own line). */
 export function InstallAgents({ label }: { label?: ReactNode } = {}) {
   const t = useTranslations('Devices')
+  const failureT = useTranslations('AiElements.message')
   const [copied, setCopied] = useState<string | null>(null)
-  function copy(command: string) {
-    void navigator.clipboard.writeText(command).then(() => setCopied(command), () => {})
+  const [copying, setCopying] = useState(false)
+  async function copy(command: string) {
+    if (copying) return
+    setCopying(true)
+    try {
+      const outcome = await writeDeviceCommand(command, navigator.clipboard)
+      if (outcome === 'copied') setCopied(command)
+      else { setCopied(null); toast.error(failureT('copyFailed')) }
+    } finally { setCopying(false) }
   }
   return <Popover>
     <PopoverTrigger className="shrink-0 cursor-pointer text-foreground underline underline-offset-2">{label ?? t('installAgent')}</PopoverTrigger>
@@ -43,7 +53,7 @@ export function InstallAgents({ label }: { label?: ReactNode } = {}) {
         <span className="text-xs"><HarnessLabel harness={harness} /></span>
         <span className="flex items-center gap-1">
           <code className="min-w-0 flex-1 truncate font-mono text-xs">{command}</code>
-          <Button variant="ghost" size="icon-sm" aria-label={t('copyInstall', { command })} onClick={() => copy(command)}>{copied === command ? <Check /> : <Copy />}</Button>
+          <Button variant="ghost" size="icon-sm" disabled={copying} aria-label={t('copyInstall', { command })} onClick={() => { void copy(command) }}>{copied === command ? <Check /> : <Copy />}</Button>
         </span>
       </div>)}
     </PopoverContent>
@@ -58,10 +68,21 @@ const USERNS_PERSIST = "echo 'kernel.apparmor_restrict_unprivileged_userns=0' | 
 /** A command the person runs on the device, with a copy button. */
 function FixCommand({ command }: { command: string }) {
   const t = useTranslations('Devices')
+  const failureT = useTranslations('AiElements.message')
   const [copied, setCopied] = useState(false)
+  const [copying, setCopying] = useState(false)
+  async function copy() {
+    if (copying) return
+    setCopying(true)
+    try {
+      const outcome = await writeDeviceCommand(command, navigator.clipboard)
+      if (outcome === 'copied') setCopied(true)
+      else { setCopied(false); toast.error(failureT('copyFailed')) }
+    } finally { setCopying(false) }
+  }
   return <span className="flex items-center gap-1">
     <code className="min-w-0 flex-1 break-all font-mono text-xs">{command}</code>
-    <Button variant="ghost" size="icon-sm" aria-label={t('copyInstall', { command })} onClick={() => { void navigator.clipboard.writeText(command).then(() => setCopied(true), () => {}) }}>{copied ? <Check /> : <Copy />}</Button>
+    <Button variant="ghost" size="icon-sm" disabled={copying} aria-label={t('copyInstall', { command })} onClick={() => { void copy() }}>{copied ? <Check /> : <Copy />}</Button>
   </span>
 }
 
