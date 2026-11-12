@@ -439,3 +439,46 @@ test('Thread releases the draft before version preflight and retries an unknown 
   assert.equal(composer!.value, 'next draft')
   assert.equal(container.querySelectorAll('[data-delivery-phase="accepted"]').length, 1)
 })
+
+test('Review retries the original candidate and event in place after the approval response is lost', async t => {
+  const runId = crypto.randomUUID()
+  thread = { ...base, id: runId, latestRunId: runId }
+  const binding = { taskId: crypto.randomUUID(), issueId: crypto.randomUUID(), attemptId: crypto.randomUUID(), candidateId: crypto.randomUUID(), revision: 3 }
+  const calls: { url: string; operation: string; input: { eventId: string; note: string; binding: typeof binding } }[] = []
+  const originalFetch = globalThis.fetch
+  t.mock.method(globalThis, 'fetch', async (url: RequestInfo | URL, options?: RequestInit) => {
+    if (!String(url).endsWith('/api/factory/tasks/' + binding.taskId + '/approval')) return originalFetch(url, options)
+    const body = JSON.parse(String(options?.body))
+    calls.push({ url: String(url), ...body })
+    if (calls.length === 1) throw new TypeError('response lost after the ledger committed')
+    return Response.json({ replayed: true })
+  })
+  let release!: (ok: boolean) => void
+  let canceled = 0
+  buildGate = new Promise(resolve => { release = resolve })
+  await renderLive('owner:workspace', { runId, changeRequest: { binding, label: 'Request changes', onCancel: () => { canceled++ } } })
+  await act(async () => composer!.onChange('Fix the original candidate'))
+  await act(async () => { composer!.onSubmit(); composer!.onSubmit() })
+  assert.equal(composer!.value, '')
+  assert.equal(canceled, 1)
+  assert.equal(calls.length, 0)
+  assert.equal(container.querySelectorAll('[data-delivery-phase="sending"]').length, 1)
+  await act(async () => release(true))
+  await renderLive('owner:workspace', { runId })
+  await act(async () => composer!.onChange('Separate next draft'))
+  const failed = container.querySelector('[data-delivery-phase="failed"]')
+  assert.match(failed?.textContent ?? '', /Fix the original candidate/)
+  const retry = [...failed!.querySelectorAll('button')].find(button => button.textContent === 'Retry')
+  assert.ok(retry)
+  await act(async () => retry.click())
+  assert.equal(replyCalls, 0, 'a Review command must reach its candidate ledger')
+  assert.equal(calls.length, 2)
+  assert.deepEqual(calls[0], calls[1])
+  assert.equal(calls[1].operation, 'reject')
+  assert.equal(calls[1].url.endsWith('/api/factory/tasks/' + binding.taskId + '/approval'), true)
+  assert.match(calls[1].input.eventId, /^[\da-f-]{36}$/i)
+  assert.deepEqual(calls[1].input.binding, binding)
+  assert.equal(calls[1].input.note, 'Fix the original candidate')
+  assert.equal(composer!.value, 'Separate next draft')
+  assert.equal(container.querySelectorAll('[data-delivery-phase="accepted"]').length, 1)
+})
