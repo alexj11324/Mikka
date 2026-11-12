@@ -13,7 +13,7 @@ stub('../lib/composio.ts', { getComposio: () => ({ connectedAccounts: { list: as
   if (failed) throw new TypeError('synthetic outage')
   return { items: userIds[0] === 'owner' ? fixtures : [] }
 } } }) })
-stub('../lib/db.ts', { db: {} })
+stub('../lib/db/index.ts', { db: {} })
 stub('../lib/db/schema.ts', { linearConnections: {} })
 stub('../lib/linear-sync/flags.ts', { linearSyncState: async () => 'disabled' })
 stub('../lib/linear-sync/oauth.ts', { linearOAuthConfigured: () => true })
