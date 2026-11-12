@@ -23,6 +23,7 @@ export function sourceContext(env, publicSource) {
   if (env.WORKERS_CI !== '1') fail('CLOUD_PUBLIC_CI_PROVIDER_REQUIRED')
   if (!fullSha.test(publicSource) || env.WORKERS_CI_COMMIT_SHA !== publicSource) fail('CLOUD_PUBLIC_CI_SOURCE_MISMATCH')
   if (!fullSha.test(env.MIKKA_CLOUD_SOURCE_SHA ?? '')) fail('CLOUD_PUBLIC_CI_PRIVATE_PIN_REQUIRED')
+  // oxlint-disable-next-line no-control-regex -- Reject control bytes in provider branch metadata.
   if (!env.WORKERS_CI_BRANCH || /[\s\x00-\x1f]/.test(env.WORKERS_CI_BRANCH) || env.WORKERS_CI_BRANCH.startsWith('-')) fail('CLOUD_PUBLIC_CI_BRANCH_INVALID')
   if (!env.WORKERS_CI_BUILD_UUID || /[\r\n]/.test(env.WORKERS_CI_BUILD_UUID)) fail('CLOUD_PUBLIC_CI_BUILD_ID_REQUIRED')
   return {
