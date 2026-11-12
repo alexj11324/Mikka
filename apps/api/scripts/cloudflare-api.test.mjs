@@ -144,12 +144,14 @@ test('the private API receives its sign-in and product bindings without inheriti
     BETTER_AUTH_SECRET: 'auth', TURNSTILE_SECRET_KEY: 'signup-verification', MIKKA_CLOUDFLARE_TASK_WORKSPACES: 'sponsor',
     MIKKA_DEPLOYMENT_ID: id, MIKKA_WORKFLOW_QUEUE_PUBLIC_KEY: 'public-verification-key',
     OPENAI_DECISIONS_API_KEY: 'decisions', CLOUDFLARE_WORKERS_AI_TOKEN: 'models',
+    DEVICE_GATEWAY_URL: 'https://gateway.example', DEVICE_GATEWAY_PUSH_SECRET: 'device-signing',
+    WORKSPACE_SECRETS_KEY: 'workspace-sealing',
     COMPOSIO_API_KEY: 'integrations', COMPOSIO_WEBHOOK_SECRET: 'hook-verification',
     COMPOSIO_CALLBACK_VERIFIER_URL: origin + '/mikka/api/integrations/composio/callback',
   }
   const unexpected = {
     GITHUB_APP_PRIVATE_KEY: 'app-signing', AWS_ACCESS_KEY_ID: 'aws', AWS_SECRET_ACCESS_KEY: 'aws-secret',
-    CREDENTIAL_BROKER_ROLE_ARN: 'broker', EVE_QUEUE_SIGNING_KEY: 'world-signing',
+    CREDENTIAL_MASTER_KEY: 'self-hosted-vault', CREDENTIAL_BROKER_ROLE_ARN: 'broker', EVE_QUEUE_SIGNING_KEY: 'world-signing',
     INFISICAL_CLIENT_SECRET: 'deploy', CLOUDFLARE_API_TOKEN: 'deploy', VERCEL_OIDC_TOKEN: 'legacy',
     NODE_OPTIONS: '--inspect', BETTER_AUTH_URL: 'https://incorrect.example', MIKKA_API_INGRESS: 'other',
     STRIPE_WEBHOOK_SECRET: {}, SMTP_URL: '', TASK_MACHINE: { destroy() {} },
