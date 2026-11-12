@@ -196,6 +196,10 @@ test('rejected or stalled cold version reads free the upstream and an independen
   assert.equal(bad.status, 502)
   assert.equal(cancelled, true)
   assert.equal(bad.headers.get('cache-control'), 'no-store')
+  env.API.fetch = async () => new Response(new ReadableStream({
+    start(controller) { controller.error(new Error('upstream body already closed')) },
+  }), { status: 429 })
+  assert.equal((await get(env)).status, 429)
 
   const deadline = new AbortController()
   const timeout = t.mock.method(AbortSignal, 'timeout', ms => {
