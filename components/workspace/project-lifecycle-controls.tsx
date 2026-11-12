@@ -7,6 +7,7 @@ import { archiveProject, deleteProject, getProjectLifecycleImpact, restoreProjec
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import type { Project } from './project-properties'
 
 export function ProjectLifecycleControls({ project, readerId, admin, beforeOpen, onUpdated, onDeleted }: {
@@ -89,10 +90,10 @@ export function ProjectLifecycleControls({ project, readerId, admin, beforeOpen,
               <dt>{t(`counts.${kind}` as never)}</dt><dd>{count}</dd>
             </div>)}
           </dl> : <p className="text-sm">{t('noLinks')}</p>}
-          {deleting && canDelete ? <label className="grid gap-2 text-sm">
+          {deleting && canDelete ? <Label className="grid gap-2 text-sm">
             {t('confirmName', { name: current.name })}
             <Input value={confirmation} disabled={pending} onChange={event => setConfirmation(event.target.value)} />
-          </label> : canSteer && <p className="text-sm text-muted-foreground">{current.archivedAt ? t('restoreHint') : t('archiveHint')}</p>}
+          </Label> : canSteer && <p className="text-sm text-muted-foreground">{current.archivedAt ? t('restoreHint') : t('archiveHint')}</p>}
           {canDelete && !current.canDelete && <p className="text-sm text-muted-foreground">{t('deleteBlocked')}</p>}
           {failure && <p role="alert" className="text-sm text-destructive">{failure}</p>}
           <DialogFooter className="flex-wrap">
