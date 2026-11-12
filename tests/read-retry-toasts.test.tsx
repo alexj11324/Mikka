@@ -43,7 +43,7 @@ stub('app/actions/agents.ts', {
   retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null,
   sendIssueThreadReply: async () => { throw new Error('This read test must not send') }, stopRun: async () => ({}),
 })
-stub('hooks/use-live-key.tsx', { useLiveKey: Empty, useLiveKeys: Empty, watchPageVisibility: () => () => {} })
+stub('hooks/use-live-key.tsx', { useLiveKey: Empty, useLiveKeys: Empty, useLiveScope: () => null, watchPageVisibility: () => () => {} })
 stub('components/artifacts/artifact-card.tsx', { ArtifactKindIcon: Empty, ArtifactAuthorAvatar: Empty })
 stub('components/artifacts/artifact-share.tsx', { ArtifactShare: Empty })
 stub('components/artifacts/selection-actions.tsx', { SelectionActions: Empty })

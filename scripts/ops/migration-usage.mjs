@@ -29,9 +29,47 @@ function billedProject(row) {
   const value = row.Tags?.ProjectId
   return typeof value === 'string' && /^prj_[a-zA-Z0-9]{6,128}$/.test(value) ? value : null
 }
-export async function vercelTotals(lines) {
+function appendPeriod(periods, from, to) {
+  const last = periods.at(-1)
+  if (last?.to === from) last.to = to
+  else periods.push({ from, to })
+}
+
+function chargePeriodCoverage(changes, requestedWindow) {
+  const observed = []
+  const unobservedInRequest = requestedWindow ? [] : null
+  const observedOutsideRequest = requestedWindow ? [] : null
+  let from, to
+  if (requestedWindow) {
+    from = iso(requestedWindow.from)
+    to = iso(requestedWindow.to)
+    if (from >= to) throw new Error('Invalid requested charge window')
+    for (const boundary of [from, to]) {
+      if (!changes.has(boundary)) changes.set(boundary, 0)
+    }
+  }
+
+  let previous = null, active = 0
+  for (const at of [...changes.keys()].sort()) {
+    if (previous !== null) {
+      const inRequest = requestedWindow && previous >= from && at <= to
+      if (active > 0) {
+        appendPeriod(observed, previous, at)
+        if (requestedWindow && !inRequest) appendPeriod(observedOutsideRequest, previous, at)
+      } else if (inRequest) {
+        appendPeriod(unobservedInRequest, previous, at)
+      }
+    }
+    active += changes.get(at)
+    previous = at
+  }
+  return { scope: 'returned-team-charge-records', observed, unobservedInRequest, observedOutsideRequest }
+}
+
+export async function vercelTotals(lines, requestedWindow) {
   const groups = new Map()
   const totals = new Map()
+  const periodChanges = new Map()
   let records = 0, firstPeriodStart = null, lastPeriodEnd = null
   for await (const line of lines) {
     if (!line.trim()) continue
@@ -41,6 +79,8 @@ export async function vercelTotals(lines) {
         !Number.isFinite(Date.parse(row.ChargePeriodStart)) || !Number.isFinite(Date.parse(row.ChargePeriodEnd))) {
       throw new Error('Incomplete provider billing record')
     }
+    const start = iso(row.ChargePeriodStart), end = iso(row.ChargePeriodEnd)
+    if (end < start) throw new Error('Reversed provider charge period')
     const billed = decimal(row.BilledCost), effective = decimal(row.EffectiveCost)
     const currency = row.BillingCurrency
     const dimensions = { currency, projectId: billedProject(row), subAccountType: row.SubAccountType ?? null, subAccountId: row.SubAccountId ?? null,
@@ -56,7 +96,8 @@ export async function vercelTotals(lines) {
     total.billed += billed
     total.effective += effective
     totals.set(currency, total)
-    const start = iso(row.ChargePeriodStart), end = iso(row.ChargePeriodEnd)
+    periodChanges.set(start, (periodChanges.get(start) ?? 0) + 1)
+    periodChanges.set(end, (periodChanges.get(end) ?? 0) - 1)
     if (!firstPeriodStart || start < firstPeriodStart) firstPeriodStart = start
     if (!lastPeriodEnd || end > lastPeriodEnd) lastPeriodEnd = end
     records++
@@ -85,7 +126,8 @@ export async function vercelTotals(lines) {
       throw Error('Project charges do not reconcile to provider currency totals')
     }
   }
-  return { records, firstPeriodStart, lastPeriodEnd, totalsByCurrency: [...totals.values()],
+  return { records, firstPeriodStart, lastPeriodEnd, chargePeriodCoverage: chargePeriodCoverage(periodChanges, requestedWindow),
+    totalsByCurrency: [...totals.values()],
     projects: [...projects.values()], charges: [...groups.values()] }
 }
 
@@ -158,7 +200,7 @@ async function main([provider, first, last, application, ...files]) {
       headers: { authorization: 'Bearer ' + token('VERCEL_TEAM_TOKEN') } })
     if (!response.ok) throw new Error('Vercel FOCUS HTTP ' + response.status)
     const lines = createInterface({ input: Readable.fromWeb(response.body), crlfDelay: Infinity })
-    return { provider, from, to, ...await vercelTotals(lines) }
+    return { provider, from, to, ...await vercelTotals(lines, { from, to }) }
   }
   if (provider !== 'cloudflare' || !/^(?:[a-f\d]{32}|[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12})$/.test(application)) {
     throw new Error('Expected vercel FROM TO or cloudflare FROM TO APPLICATION_ID [RECEIPT.json ...]')

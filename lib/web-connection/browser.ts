@@ -47,7 +47,7 @@ export const disconnectServer = (server: string) => required().disconnectServer(
 
 /** Must run directly from the click. Opening a blank popup before asynchronous
  * work avoids a blocked window; postMessage replaces any handoff polling. */
-export async function signInToServer(server: string): Promise<void> {
+export async function signInToServer(server: string, probe = false): Promise<void> {
   const owner = required()
   const popup = window.open('about:blank', 'mikka-server-sign-in', 'popup,width=520,height=720')
   if (!popup) throw new WebConnectionError('web_connection_popup_blocked')
@@ -56,7 +56,7 @@ export async function signInToServer(server: string): Promise<void> {
     const cloud = await cloudAuthClient.multiSession.listDeviceSessions()
     if (cloud.error && cloud.error.status !== 401) throw new WebConnectionError('web_connection_session_unavailable')
     if (cloud.data) await owner.rememberCloudAccounts(cloud.data.map(account => account.user.id))
-    if (owner.getSnapshot().expiredServer === server) {
+    if (probe || owner.getSnapshot().expiredServer === server) {
       const probe = await owner.addServer(server)
       if (probe.status !== 'ok') throw new WebConnectionError('web_connection_probe_required')
     }

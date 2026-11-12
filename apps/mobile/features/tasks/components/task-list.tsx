@@ -24,10 +24,12 @@ import { readPresentedTasks } from '../model/task-presentation-read'
 import { BOARD_LABEL, GROUP_LABEL, STATE_LABEL, TaskGroupIcon, TaskStateIcon } from './task-icons'
 
 /** The person's tasks (GET /api/mobile/tasks), read again when a task or one of its threads changes (the live channel). */
-export function useTasks(enabled = true, botId?: string) {
+export function useTasks(enabled = true, botId?: string | null) {
   const home = useHome().data
   const selected = home?.workspace.id
-  const path = botId ? selected ? '/api/mobile/tasks?' + new URLSearchParams({ workspaceId: selected, dispatchedBy: botId }) : null : '/api/mobile/tasks'
+  // Omitting botId opens workspace Tasks. A Bot route with no resolved identity has no collection yet.
+  const path = botId === undefined ? '/api/mobile/tasks'
+    : botId && selected ? '/api/mobile/tasks?' + new URLSearchParams({ workspaceId: selected, dispatchedBy: botId }) : null
   const list = useLiveApi<{ tasks: Task[]; workspaceId: string; next?: TaskListPageInput['after'] | null }>(enabled ? path : null,
     list => tasksLive(home?.live?.workspaceId, list?.workspaceId ?? home?.workspace.id, list?.tasks.map(task => task.id)), readPresentedTasks)
   const paging = useTaskContinuation(list.data?.tasks ?? [], list.data, list.data?.next ?? null, async after => {
@@ -48,12 +50,12 @@ export function useTasks(enabled = true, botId?: string) {
  * 待办 · 已完成, each under a grey rounded bar with its count that folds it; 已完成 starts folded. `bot` keeps one
  * bot's tasks (its 资料 page).
  */
-export function TaskList({ filter = 'all', bot, bottom = 24 }: { filter?: TaskFilter; bot?: string; bottom?: number }) {
+export function TaskList({ filter = 'all', bot, bottom = 24 }: { filter?: TaskFilter; bot?: string | null; bottom?: number }) {
   const insets = useSafeAreaInsets()
   const { data, error, loading, reload, paging } = useTasks(true, bot)
   const refresh = useRefresh(reload)
   const [toggled, setToggled] = useState<ReadonlySet<TaskGroup>>(new Set())
-  const tasks = bot ? paging.items.filter(task => task.dispatchedBy === bot || task.bot?.id === bot) : [...paging.items]
+  const tasks = bot === undefined ? paging.items : paging.items.filter(task => bot && (task.dispatchedBy === bot || task.bot?.id === bot))
   const rows = taskListRows(tasks, toggled, filter)
   const toggle = (id: TaskGroup) => setToggled(current => {
     const next = new Set(current)

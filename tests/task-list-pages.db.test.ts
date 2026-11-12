@@ -46,6 +46,23 @@ test('authorized Task collection traverses every threadless issue, including mic
     for (const [id, botId] of [[shared, firstBot], [shared, laterBot], [laterOnly, laterBot]]) {
       await seedRun(pool, { userId: user, agentId: agent, workspaceId, botId, issueId: id, status: 'done' })
     }
+    const undispatched = last.items[2].id
+    const mcp = await seedRun(pool, { userId: user, agentId: agent, workspaceId, botId: firstBot, issueId: undispatched })
+    await pool.query("update agent_runs set source='mcp' where id=$1", [mcp])
+    const { readTaskPresentations } = await import('../lib/task-presentation-read')
+    const index = await readTaskPresentations({ id: user }, { workspaceId, issueIds: [shared, laterOnly, undispatched, anchor], includeBotDispatches: true })
+    assert.deepEqual(new Set(index.items[shared].botDispatches?.map(row => row.botId)), new Set([firstBot, laterBot]))
+    assert.deepEqual(index.items[laterOnly].botDispatches?.map(row => row.botId), [laterBot])
+    assert.deepEqual(index.items[undispatched].botDispatches, [])
+    assert.equal(index.items[anchor], undefined, 'a foreign private Task and its dispatches are omitted')
+    assert.equal((await readTaskPresentations({ id: user }, { workspaceId, issueIds: [shared] })).items[shared].botDispatches, undefined)
+    const { botWorkTree } = await import('../components/nav/bot-work-tree')
+    const previousBot = botWorkTree(workspaceId, [firstBot], [], last.items, index.items).get(firstBot)?.[0]
+    assert.equal(previousBot?.issueId, shared)
+    assert.equal(previousBot?.state, index.items[shared].state)
+    assert.equal(previousBot?.runs[0].name, 'First dispatcher')
+    assert.equal(previousBot?.runs[0].harness, 'codex')
+    assert.equal(previousBot?.runs[0].id, (await pool.query('select id from agent_runs where "issueId"=$1 and "botId"=$2', [shared, firstBot])).rows[0].id)
     const byBot = (dispatchedBy: string) => run(() => listWorkspaceTaskPage({ workspaceId, after: null, dispatchedBy }))
     assert.deepEqual((await byBot(firstBot)).items.map(row => row.id), [shared])
     assert.deepEqual(new Set((await byBot(laterBot)).items.map(row => row.id)), new Set([shared, laterOnly]))
