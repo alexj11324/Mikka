@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { runServiceNpm } from './auto-update'
-import { mkdir, writeFile, rm } from 'node:fs/promises'
+import { mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 
@@ -36,11 +36,30 @@ export async function installService(server: string, deviceType = 'server', opti
     const file = join(home, 'Library/LaunchAgents', `${label}.plist`)
     await mkdir(dirname(file), { recursive: true, mode: 0o700 })
     await mkdir(join(home, 'Library/Logs'), { recursive: true })
-    await writeFile(file, content, { mode: 0o600 })
     const domain = `gui/${process.getuid!()}`
-    await exec('launchctl', ['bootout', `${domain}/${label}`]).catch(() => undefined)
-    await exec('launchctl', ['bootstrap', domain, file])
+    await installLaunchAgent(domain, file, content)
   }
+}
+
+export async function installLaunchAgent(domain: string, file: string, content: string, run: (program: string, args: string[]) => Promise<unknown> = exec) {
+  const target = `${domain}/${label}`
+  const previous = await readFile(file, 'utf8').catch((error: NodeJS.ErrnoException) => {
+    if (error.code === 'ENOENT') return undefined
+    throw error
+  })
+  if (previous === content) {
+    const registered = await run('launchctl', ['print', target]).then(() => true, () => false)
+    if (registered) {
+      // Reuse the existing registration: bootout is asynchronous on macOS.
+      await run('launchctl', ['kickstart', '-k', target])
+    } else {
+      await run('launchctl', ['bootstrap', domain, file])
+    }
+    return
+  }
+  await writeFile(file, content, { mode: 0o600 })
+  await run('launchctl', ['bootout', target]).catch(() => undefined)
+  await run('launchctl', ['bootstrap', domain, file])
 }
 
 /** Let the service manager launch the replacement, preserving the same account/config. */

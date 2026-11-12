@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { serviceDefinition, restartService, uninstallService } from '../src/service'
+import { installLaunchAgent, serviceDefinition, restartService, uninstallService } from '../src/service'
 import { mkdtemp, mkdir, writeFile, access, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -32,6 +32,39 @@ describe('managed daemon service', () => {
   })
   it('refuses unsupported platforms', () => {
     expect(() => serviceDefinition({ ...input, platform: 'win32' })).toThrow('Linux or macOS')
+  })
+  it('restarts an unchanged registered LaunchAgent in place and registers absent or changed definitions', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'mikka-launch-agent-'))
+    const file = join(home, 'agent.plist'), domain = 'gui/501', target = domain + '/com.aspectlylabs.mikka.daemon'
+    const before = serviceDefinition({ ...input, platform: 'darwin' })
+    const after = serviceDefinition({ ...input, platform: 'darwin', server: 'https://new.example.test' })
+    const calls: string[][] = []
+    let registered = false, rejectRestart = false
+    const run = async (program: string, args: string[]) => {
+      expect(program).toBe('launchctl')
+      calls.push(args)
+      if ((args[0] === 'print' || args[0] === 'bootout') && !registered) throw new Error('unregistered')
+      if (args[0] === 'kickstart' && rejectRestart) throw new Error('restart denied')
+      if (args[0] === 'bootstrap') registered = true
+      if (args[0] === 'bootout') registered = false
+    }
+    const register = [['bootout', target], ['bootstrap', domain, file]]
+    const restart = [['print', target], ['kickstart', '-k', target]]
+    try {
+      await installLaunchAgent(domain, file, before, run)
+      expect(calls.splice(0)).toEqual(register)
+      await installLaunchAgent(domain, file, before, run)
+      expect(calls.splice(0)).toEqual(restart)
+      rejectRestart = true
+      await expect(installLaunchAgent(domain, file, before, run)).rejects.toThrow('restart denied')
+      expect(calls.splice(0)).toEqual(restart)
+      await installLaunchAgent(domain, file, after, run)
+      expect(calls.splice(0)).toEqual(register)
+      expect(await readFile(file, 'utf8')).toBe(after)
+      registered = false
+      await installLaunchAgent(domain, file, after, run)
+      expect(calls).toEqual([['print', target], ['bootstrap', domain, file]])
+    } finally { await rm(home, { recursive: true, force: true }) }
   })
 })
 
