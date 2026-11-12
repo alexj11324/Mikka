@@ -30,6 +30,7 @@ const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' 
 const toolSourcesSha256 = createHash('sha256').update(Buffer.concat(await Promise.all(['scripts/ops/drill.mjs', 'scripts/ops/drill-state.mjs', 'scripts/ops/isolated-recovery.mjs', 'scripts/ops/monitor.mjs', 'lib/request-log.ts'].map(file => readFile(file))))).digest('hex')
 const sourcePatchSha256 = createHash('sha256').update(execFileSync('git', ['diff', 'HEAD'])).digest('hex')
 const { applyAccountDeletionManifest, exportAccountDeletionManifest, requestAccountDeletion, resumeAccountDeletion } = await import('../../lib/account/deletion-jobs.ts')
+const { registeredTask } = await import('../../tests/helpers/registered-task.ts')
 const main = new Pool({ connectionString: targets[0].url, max: 5 }), workspace = new Pool({ connectionString: targets[1].url, max: 5 })
 const survivor = `ops-survivor-${suffix}`, deleted = `ops-deleted-${suffix}`, ws = randomUUID(), deletedWs = randomUUID(), issue = randomUUID(), agent = randomUUID(), run = randomUUID(), approval = randomUUID(), token = randomUUID(), effect = randomUUID()
 const objectsDirectory = join(root, 'source-objects'), backupDirectory = join(root, 'backup'), restoredObjects = join(root, 'restored-objects')
@@ -50,7 +51,9 @@ try {
     await workspace.query('INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,$2,$3)', [id, owner, 'Controlled recovery workspace'])
     await workspace.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES($1,$2,$2,$3,\'admin\')', [id, owner, `${owner}@example.invalid`])
   }
-  await main.query('INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority) VALUES($1,$2,$3,\'Original backup task\',\'{}\',\'todo\',\'normal\')', [issue, survivor, ws])
+  await registeredTask(main, survivor, ws, issue, client => client.query(`INSERT INTO issues
+    (id,"userId","workspaceId","ownershipState",scope,"linearSyncPolicy","linearSyncBlocked",title,content,status,priority)
+    VALUES($1,$2,$3,'bound','workspace','disabled',true,'Original backup task','{}','todo','normal')`, [issue, survivor, ws]))
   await main.query('INSERT INTO agents(id,"userId",harness,name) VALUES($1,$2,\'codex\',\'Recovery fixture\')', [agent, survivor])
   await main.query('INSERT INTO agent_runs(id,"userId","agentId","issueId",status,"createdAt","leaseExpiresAt") VALUES($1,$2,$3,$4,\'running\',now()-interval \'10 minutes\',now()-interval \'5 minutes\')', [run, survivor, agent, issue])
   await main.query('INSERT INTO pending_actions(id,"userId",action,input) VALUES($1,$2,\'controlled.noop\',\'{}\')', [approval, survivor])
@@ -88,7 +91,9 @@ try {
   const restoredResult = await restoreIsolated(input)
   const checkMain = new Pool({ connectionString: restored[0].url }), checkWorkspace = new Pool({ connectionString: restored[1].url })
   try {
-    assert.equal((await checkMain.query('SELECT title FROM issues WHERE id=$1', [issue])).rows[0].title, 'Original backup task')
+    assert.deepEqual((await checkMain.query('SELECT title,"workspaceId","ownershipState" FROM issues WHERE id=$1', [issue])).rows[0], {
+      title: 'Original backup task', workspaceId: ws, ownershipState: 'bound',
+    })
     assert.equal((await checkMain.query('SELECT count(*)::int n FROM "user" WHERE id=$1', [deleted])).rows[0].n, 0)
     assert.equal((await checkWorkspace.query('SELECT count(*)::int n FROM mikka_workspaces WHERE id=$1', [deletedWs])).rows[0].n, 0)
     assert.equal((await checkMain.query('SELECT count(*)::int n FROM "user" WHERE id=$1', [survivor])).rows[0].n, 1)
