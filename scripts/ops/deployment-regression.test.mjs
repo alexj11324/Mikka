@@ -56,7 +56,7 @@ test('query has proven project scope and only deployment/environment filters and
   assert.throws(() => metricQuery("dpl_' injection", { start: ready, end: ready + 1 }), /id_invalid/)
 })
 
-test('only expected aggregate fields leave the boundary; malformed and truncated samples fail closed', () => {
+test('only expected aggregate fields leave the boundary and malformed samples report their cause', () => {
   const metric = 'vercel.function_invocation.count'
   const row = { dimensions: { route: '/api/tasks/[id]', httpStatus: '200' }, values: { requests: 20, cpu: 1000 }, payload: 'SECRET' }
   const count = metricRows({ summary: [row] }, metric)
@@ -64,11 +64,29 @@ test('only expected aggregate fields leave the boundary; malformed and truncated
   const result = aggregate(cpu, count)
   assert.equal(result.cpuPerRequestMs, 50)
   assert.ok(!JSON.stringify(result).includes('SECRET'))
-  for (const response of [{}, { summary: [{ ...row, dimensions: { ...row.dimensions, httpStatus: null } }] }, { summary: [{ ...row, values: { requests: null, cpu: 0 } }] }, { summary: [row, row] }, { summary: Array(100).fill(row) }])
-    assert.throws(() => metricRows(response, metric, 'count'))
-  assert.throws(() => metricRows({ summary: [{ ...row, values: { requests: 20 } }] }, 'vercel.function_invocation.function_cpu_time_ms'), /metric_value_invalid/)
-  assert.throws(() => metricRows({ summary: [{ ...row, values: { requests: 0.5, cpu: 10 } }] }, metric), /metric_value_invalid/)
+  const invalidStatus = { ...row, dimensions: { ...row.dimensions, httpStatus: null } }
+  assert.throws(() => metricRows({}, metric), { message: 'metric_groups_missing_or_truncated' })
+  assert.throws(() => metricRows({ summary: [invalidStatus] }, metric), { message: 'metric_dimensions_invalid' })
+  for (const requests of [null, 0.5, Number.MAX_SAFE_INTEGER + 1]) {
+    const invalidCount = { ...row, values: { requests, cpu: 10 } }
+    assert.throws(() => metricRows({ summary: [invalidCount] }, metric), { message: 'metric_value_invalid' })
+  }
+  const missingCpu = { ...row, values: { requests: 20 } }
+  assert.throws(() => metricRows({ summary: [missingCpu] }, 'vercel.function_invocation.function_cpu_time_ms'), { message: 'metric_value_invalid' })
   assert.throws(() => aggregate(new Map(), count), /scope_mismatch/)
+})
+
+test('request counts reject duplicate route/status groups and distinguish 99 complete groups from 100 capped groups', () => {
+  const metric = 'vercel.function_invocation.count'
+  const group = (route, httpStatus) => ({ dimensions: { route, httpStatus }, values: { requests: 1 } })
+  const distinct = [group('/api/tasks', '200'), group('/api/tasks', '500')]
+  assert.equal(metricRows({ summary: distinct }, metric).size, 2)
+  const duplicates = [group('/api/tasks', '200'), group('/api/tasks', 200)]
+  assert.throws(() => metricRows({ summary: duplicates }, metric), { message: 'metric_duplicate_group' })
+
+  const groups = Array.from({ length: 100 }, (_, i) => group(`/api/groups/${i}`, '200'))
+  assert.equal(metricRows({ summary: groups.slice(0, 99) }, metric).size, 99)
+  assert.throws(() => metricRows({ summary: groups }, metric), { message: 'metric_groups_missing_or_truncated' })
 })
 
 test('API failures never echo upstream payloads, token or exceptions', async () => {
@@ -77,7 +95,7 @@ test('API failures never echo upstream payloads, token or exceptions', async () 
   await assert.rejects(api('https://example.com', { token: 'SECRET' }), /origin_invalid/)
 })
 
-function fixture({ changed = false, aliasChanged = false, assignmentChanged = false, queries = [], rejectsCombined = 0 } = {}) {
+function fixture({ changed = false, aliasChanged = false, assignmentChanged = false, queries = [], combinedStatus = () => 200 } = {}) {
   let aliasReads = 0, detailReads = 0
   const raw = item => ({ ...item, projectId: PROJECT, meta: { githubCommitSha: item.sha }, target: 'production', readyState: 'READY', aliasAssigned: true, aliasAssignedAt: item.ready, url: item.id === after.id ? 'immutable.vercel.app' : 'before.vercel.app' })
   return async (url, options) => {
@@ -90,7 +108,10 @@ function fixture({ changed = false, aliasChanged = false, assignmentChanged = fa
     else if (path === '/metrics/v1') {
       const query = JSON.parse(options.body)
       queries.push(query)
-      if (query.outputs.length === 2 && rejectsCombined) return { ok: false, status: rejectsCombined }
+      if (query.outputs.length === 2) {
+        const status = combinedStatus(query)
+        if (status !== 200) return { ok: false, status }
+      }
       const metrics = query.metrics.value ? { value: query.metrics.value.aggregation === 'count' ? 20 : 2000 } : { requests: 20, cpu: 2000 }
       value = { summary: [{ dimensions: { route: '/api/tasks', httpStatus: '200' }, values: metrics }] }
     } else throw Error('UNEXPECTED_SECRET_ENDPOINT')
@@ -126,11 +147,22 @@ test('preserve the original two measurements if the provider rejects a combined 
   const opts = { token: 'SECRET', now: ready + 600_000 }
   const combined = await run({ ...opts, fetchImpl: fixture() })
   const queries = []
-  const separate = await run({ ...opts, fetchImpl: fixture({ rejectsCombined: 400, queries }) })
+  const separate = await run({ ...opts, fetchImpl: fixture({ combinedStatus: () => 400, queries }) })
   assert.equal(queries.length, 6)
   assert.deepEqual(separate.metricQueryMode, { before: 'separate', after: 'separate' })
   assert.deepEqual(combined.metricQueryMode, { before: 'combined', after: 'combined' })
   for (const field of ['before', 'after', 'status', 'reasons']) assert.deepEqual(separate[field], combined[field])
-  const denied = await run({ ...opts, fetchImpl: fixture({ rejectsCombined: 403 }) })
+  const denied = await run({ ...opts, fetchImpl: fixture({ combinedStatus: () => 403 }) })
   assert.deepEqual(denied.reasons, ['vercel_api_http_403'])
+})
+
+test('a 422 for only the earlier deployment records its fallback against the correct window', async () => {
+  const queries = []
+  const beforeFilter = `environment:production AND deploymentId:"${before.id}"`
+  const fetchImpl = fixture({ queries, combinedStatus: query => query.filter === beforeFilter ? 422 : 200 })
+  const report = await run({ token: 'SECRET', now: ready + 600_000, fetchImpl })
+  assert.deepEqual(report.metricQueryMode, { before: 'separate', after: 'combined' })
+  assert.equal(queries.filter(query => query.filter === beforeFilter).length, 3)
+  assert.equal(queries.length, 4)
+  assert.deepEqual(report.before, report.after)
 })
