@@ -352,7 +352,7 @@ async function recoverTaskFormReceipt(client, record, scope) {
 }
 
 /** A bounded NDJSON read, never a polling loop. Only safe identifiers/times leave. */
-async function dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs, leaseAudit = false, probe, scope }, now) {
+export async function dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs, leaseAudit = false, probe, scope }, now) {
   const marker = `STARTUP_OK_${record.sampleId}`
   const toolInput = { issueId: record.issueId, repo: REPOSITORY, target: deviceId ? { deviceId } : 'cloud', profileId,
     // The owned lease probe executes Python; read-only runs intentionally have
@@ -360,8 +360,9 @@ async function dispatchThroughCoordinator(client, record, { botId, profileId, de
     ...(agentId ? { agentId } : {}), readOnly: !(leaseAudit || probe),
     note: probe?.instructions ?? `Read one line of README (or list the repository root if absent), then reply ${marker}. Do not modify files, create branches, commit, push, open a PR, send messages, or spawn other agents.` }
   const sponsored = record.taskProvider === 'cloudflare'
+  const delivery = sponsored && probe?.sponsoredRepositoryDelivery === true
   const text = sponsored
-    ? `请用当前来源事件创建一个标题为「${record.title}」的测试任务，再调用一次 dispatch_run。issueId 必须是刚创建的任务，其余参数为 ${JSON.stringify(toolInput)}。使用该固定 Profile 与所选订阅，工作仅限读取该仓库的 README，返回 ${marker}。不要推送、发布、对外发消息或创建额外任务。`
+    ? `请用当前来源事件创建一个标题为「${record.title}」的测试任务，再调用一次 dispatch_run。issueId 必须是刚创建的任务，其余参数为 ${JSON.stringify(toolInput)}。使用该固定 Profile 与所选订阅。${delivery ? '按 note 原样派发唯一的仓库交付夹具，只允许指定文件、任务分支与 PR，禁止合并及创建额外任务。' : '工作仅限读取该仓库的 README，返回 ' + marker + '。不要推送、发布、对外发消息或创建额外任务。'}`
     : `执行已有测试任务 ${record.issueId}，不要创建另一项任务。请调用一次 dispatch_run，参数如下：${JSON.stringify(toolInput)}。使用已固定模型的指定 Profile，不另传 model，不换 Profile、订阅或电脑。派发完成后只汇报 runId。`
   const trace = sampledRequestTrace()
   record.requestTraceId = trace.traceId
@@ -390,6 +391,7 @@ async function dispatchThroughCoordinator(client, record, { botId, profileId, de
         }
         if (input?.issueId !== record.issueId || !input.note?.includes(marker)) return false
         assert(input.profileId === profileId, 'placement_mismatch')
+        if (delivery) assert(input.repo === toolInput.repo && input.readOnly === false && input.note === toolInput.note, 'fixture_scope_invalid')
         assert(!selectedCall || selectedCall === event.data.callId, 'multiple_dispatches')
         selectedCall = event.data.callId; record.dispatchCallId = selectedCall
         record.dispatchObservedAt ??= iso(now())
@@ -988,8 +990,10 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
   try {
     if (createCaseProbe) {
       probe = await createCaseProbe({ client, record, scope, now })
+      const delivery = taskProvider === 'cloudflare' && probe?.sponsoredRepositoryDelivery === true
+      const methods = delivery ? ['observe', 'matches'] : ['createIssue', 'observe', 'afterRelease']
       assert(typeof probe?.instructions === 'string' && probe.instructions.length > 0 && probe.instructions.length <= 10000
-        && ['createIssue', 'observe', 'afterRelease'].every(key => typeof probe[key] === 'function'), 'fixture_scope_invalid')
+        && methods.every(key => typeof probe[key] === 'function'), 'fixture_scope_invalid')
       record.requireReplyAfterTool = true
     }
     await pin()
@@ -1044,6 +1048,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     record.phase = 'execution_watch'
     await watchRun(client, record, timeoutMs, WebSocketImpl, now, undefined, leaseDriver || probe ? {
       ...(probe?.signal ? { signal: probe.signal } : {}),
+      ...(taskProvider === 'cloudflare' && probe?.sponsoredRepositoryDelivery === true ? { matches: probe.matches } : {}),
       observe: async (detail, live) => {
         const complete = observeChunks(record, detail, now())
         if (leaseDriver) record.leaseAudit = leaseDriver.leaseAuditReceipt(detail.chunks, record.runId, harness)
@@ -1107,7 +1112,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
         record.cleanup.errors.push({ step: 'review_after_machine_end', code: 'startup_review_verification_failed' })
       }
     }
-    if (probe) {
+    if (probe?.afterRelease) {
       try { await probe.afterRelease() }
       catch (error) {
         record.status = 'failed'

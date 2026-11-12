@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createHash } from 'node:crypto'
 import { TraceIdRatioBasedSampler } from '@opentelemetry/sdk-trace-base'
-import { alignServerTimings, cleanupCase, createSessionClient, hasStartupInitialization, observeChunks, parseOptions, readProductionWorkerRelease, runCloudStartup, sampledRequestTrace,
+import { alignServerTimings, cleanupCase, createSessionClient, dispatchThroughCoordinator, hasStartupInitialization, observeChunks, parseOptions, readProductionWorkerRelease, runCloudStartup, sampledRequestTrace,
   startupFailure, STARTUP_FAILURE_CODES, STARTUP_FAILURE_PHASES, watchRun } from './cloud-startup.mjs'
 import { mcpBusinessEvidence, readMcpHttpTiming, readRuntimeTiming, runtimeEvidence } from './cloud-startup-evidence.mjs'
 import { secretActionAllowed } from '../../lib/secrets/permissions.ts'
@@ -1994,4 +1994,45 @@ test('a native completed call carrying a refused business receipt never becomes 
   assert.equal(report.samples[0].runId, undefined)
   assert.equal(io.calls.some(call => call.action === 'agents.pollIssueThreads'), false)
   assert.doesNotMatch(JSON.stringify(report), /PRIVATE_RECEIPT/)
+})
+
+test('sponsored repository delivery binds the exact note, repository and writable dispatch to its owner', async () => {
+  const profileId = id(32), issueId = id(33), runId = id(34), now = () => epoch
+  const scope = { ownerId, workspaceId: workspace }
+  const note = 'Change only the approved fixture. Submit STARTUP_OK_pinned.'
+  async function dispatch(writable, mutate = value => value) {
+    const record = { sampleId: 'pinned', title: '测试 sponsored delivery', taskProvider: 'cloudflare' }
+    let input, text
+    const client = {
+      async rpc(action, args) {
+        if (action === 'coordinator.sendCoordinatorMessage') {
+          text = args[0]
+          const json = text.match(/其余参数为 (.*)。使用该固定 Profile/)[1]
+          input = { ...JSON.parse(json), issueId }
+          return { queued: true }
+        }
+        if (action === 'issues.getIssue') return { issue: {id: issueId, title: record.title, userId: ownerId, workspaceId: workspace} }
+        if (action === 'agents.pollIssueThreads') return { threads: [{id: runId, ownedByCurrentUser: true}] }
+        assert.fail(action)
+      },
+      async request(path) {
+        if (path.includes('/stream?')) return eveResponse(nativeCall('bound', mutate(input), {runId, thread: 'new', placement: {kind: 'cloud'}}))
+        return Response.json({ok: true, sessionId: 'wrun_fixture'})
+      },
+    }
+    await dispatchThroughCoordinator(client, record, {botId, profileId, scope, timeoutMs: 1000,
+      ...(writable ? {probe: {sponsoredRepositoryDelivery: true, instructions: note}} : {})}, now)
+    return { text, input, record }
+  }
+  const original = await dispatch(false)
+  assert.equal(original.input.readOnly, true)
+  assert.match(original.text, /工作仅限读取该仓库的 README/)
+  const delivery = await dispatch(true)
+  assert.equal(delivery.input.readOnly, false)
+  assert.equal(delivery.record.runId, runId)
+  assert.equal(delivery.input.note, note)
+  assert.doesNotMatch(delivery.text, /工作仅限读取该仓库的 README/)
+  for (const change of [{repo: 'other/repository'}, {readOnly: true}, {note: note + ' unrelated changes'}]) {
+    await assert.rejects(dispatch(true, input => ({...input, ...change})), /fixture_scope_invalid/)
+  }
 })
