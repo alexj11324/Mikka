@@ -66,7 +66,7 @@ function SessionGate() {
   if (!isPending || data?.session) {
     try { conversationJournal.bind(account.id, data?.session?.id ?? null) } catch { /* The send control reports unavailable storage before writing. */ }
   }
-  apiCache.setIdentity(data?.user ? `${account.id}:${data.user.id}` : null, data?.user?.id ?? null)
+  apiCache.setIdentity(data?.user ? `${account.id}:${data.user.id}` : null, data?.user?.id ?? null, data?.session?.id ?? null)
   if (isPending && !data) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.page }}><Spinner size={22} /></View>
   if (!data?.user) return <SignIn />
   if (account.user?.id !== data.user.id) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: colors.page }}>

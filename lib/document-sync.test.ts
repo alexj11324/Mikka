@@ -52,7 +52,7 @@ test('discussion acknowledgement follows the original Yjs write through a failed
   sync.afterAcknowledged(() => observed.push('first reply'))
   answer = () => { throw new Error('temporary failure') }
   await assert.rejects(sync.flush(), /temporary failure/)
-  assert.deepEqual(observed, [])
+  assert.equal(observed.length, 0)
   sync.doc.getMap('threads').set('discussion-2', 'another reply')
   sync.afterAcknowledged(() => observed.push('second reply'))
   answer = () => ({ version: 'b'.repeat(32) })

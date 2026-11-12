@@ -31,7 +31,7 @@ export function useConversationDelivery(target: ConversationTarget | null, recei
   const owner = home?.user.id
   const workspace = home?.workspace.id
   const context = apiCache.context()
-  const key = JSON.stringify(['conversation-send', owner, workspace, target?.kind,
+  const key = JSON.stringify(['conversation-send', owner, workspace, target?.kind === 'thread' && target.issueId ? 'task' : target?.kind,
     target?.kind === 'thread' ? target.issueId ?? target.id : target?.id])
   const authorized = Boolean(owner && workspace && target)
   const read = useCallback(() => {
