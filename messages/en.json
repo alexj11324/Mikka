@@ -1511,6 +1511,43 @@
       "restoreFailed": "Could not restore the description."
     }
   },
+  "ServiceIdentities": {
+    "title": "Service identities",
+    "empty": "No service identities yet.",
+    "name": "Identity name",
+    "more": "Load more identities",
+    "manage": "Manage {name}",
+    "active": "Active",
+    "disabled": "Disabled",
+    "rename": "Rename",
+    "disable": "Disable",
+    "restore": "Restore",
+    "confirmDisable": "Disable {name} and invalidate its key?",
+    "confirmRestore": "Restore {name}?",
+    "failed": "The request failed. Refresh to see the current settings.",
+    "conflict": "Another admin changed these settings. Refresh before saving.",
+    "denied": "You no longer have access to these settings.",
+    "back": "Back to service identities",
+    "projects": "Project access",
+    "noProjects": "No Projects are available.",
+    "confirmProjects": "Grant this identity read access to the selected Projects?",
+    "unavailableProject": "Previously granted Project",
+    "credential": "Service key",
+    "unconfigured": "No key issued",
+    "configured": "Key issued",
+    "expires": "Key expires {date}",
+    "expiration": "Expiration (optional)",
+    "issue": "Issue key",
+    "rotate": "Rotate key",
+    "revoke": "Revoke key",
+    "confirmRotate": "Issue a new key and invalidate any existing key?",
+    "confirmRevoke": "Revoke the service key?",
+    "keyValue": "New service key",
+    "copyNow": "Copy this key now. It is shown once.",
+    "dismissKey": "Done",
+    "confirm": "Confirm",
+    "reload": "Refresh settings"
+  },
   "Members": {
     "accessTitle": "Task access",
     "membersCount": "{count, plural, =1 {# member} other {# members}}",
@@ -2598,6 +2635,14 @@
         },
         "integration": {
           "permission_changed": "set {integration} to {to}"
+        },
+        "service_identity": {
+          "credential_rotated": "Service identity credential issued or rotated",
+          "credential_revoked": "Service identity credential revoked",
+          "created": "created service identity {target}",
+          "renamed": "renamed service identity {target}",
+          "disabled": "disabled service identity {target}",
+          "restored": "restored service identity {target}"
         },
         "secret": {
           "created": "added secret {target}",
@@ -5860,6 +5905,11 @@
       "default": "The task could not be completed. Check the error details or try again."
     },
     "governance_denied": {
+      "service_projects_changed": "Project assignments changed. Reload before replacing the list.",
+      "service_identity_disabled": "Restore this service identity before granting new Project access.",
+      "service_projects_confirmation": "Confirm that this service identity may read the selected Projects.",
+      "service_identity_changed": "This service identity changed. Reload it before applying your update.",
+      "service_identity_request_reused": "This request was already used to create a differently named service identity.",
       "plan_changed": "The plan changed. Review its current entitlements before applying this update.",
       "default": "The governance action could not be completed. Try again.",
       "access_denied": "You do not have permission to manage this organization or workspace.",
