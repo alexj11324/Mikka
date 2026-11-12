@@ -115,7 +115,7 @@ export async function runCi({ env = process.env, verify = false } = {}) {
   const definitions = [
     ['corepack', ['pnpm', 'install', '--frozen-lockfile']],
     ['corepack', ['pnpm', '--dir', '.hosted-ui', 'install', '--ignore-workspace', '--prod', '--ignore-scripts', '--frozen-lockfile']],
-    ['/bin/bash', ['-c', 'node --test scripts/cloudflare-ci.test.mjs scripts/cloudflare-native-oci.test.mjs']],
+    ['node', ['--test', 'scripts/cloudflare-ci.test.mjs', 'scripts/cloudflare-native-oci.test.mjs', 'scripts/cloudflare-cloud-ci.test.mjs']],
   ]
   if (target === 'renderers') definitions.push(
     ['corepack', ['pnpm', '--filter', '@mikka/frontend', 'build']],
