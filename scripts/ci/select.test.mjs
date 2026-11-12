@@ -121,7 +121,7 @@ test('every heavy consumer uses the same trusted triage and required names remai
 
 test('the actual required gate scripts reject unselected failures and selected skips', () => {
   const workflow = readFileSync('.github/workflows/ui-policy.yml','utf8')
-  const uiChecks = ['CORE', 'INTEGRATION', 'SOURCE', 'DAEMON', 'IMAGE', 'DESKTOP', 'ANALYTICS', 'GOVERNANCE']
+  const uiChecks = ['CORE', 'INTEGRATION', 'SOURCE', 'DAEMON', 'IMAGE', 'ANALYTICS', 'GOVERNANCE']
   for (const job of ['ui-policy','browser-tests']) {
     const block = workflow.split(`\n  ${job}:\n`)[1].split(/\n  [a-z][a-z-]*:\n/)[0]
     const script = block.split('        run: |\n')[1].split('      - uses:')[0].split('\n').map(line => line.slice(10)).join('\n')
@@ -147,6 +147,10 @@ test('the actual required gate scripts reject unselected failures and selected s
       else assert(!run({DB_RESULT:result}))
     }
     if (job === 'ui-policy') {
+      assert(!/\b(?:EXPECT_)?DESKTOP\b/.test(script), 'the automatic gate has no Desktop consumer')
+      for (const result of ['success', 'skipped', 'failure', 'cancelled', 'timed_out', '']) {
+        assert(run({ EXPECT_DESKTOP: 'true', DESKTOP: result }), 'a retired Desktop result does not affect the automatic gate')
+      }
       for (const key of uiChecks) {
         assert(run({['EXPECT_' + key]: 'false', [key]: 'skipped'}), key)
         for (const result of ['success', 'failure', 'cancelled']) {
