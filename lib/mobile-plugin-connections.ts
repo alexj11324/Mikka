@@ -2,7 +2,9 @@ import { and, eq, isNull } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { linearConnections } from '@/lib/db/schema'
 import { getComposio } from '@/lib/composio'
-import { toConnectedAccountView } from '@/lib/composio-accounts'
+import { toolkitAccountStates, type ToolkitState } from '@/lib/composio-account-state'
+import { listComposioAccountRecords } from '@/lib/composio-account-store'
+import { toConnectedAccountView, withAccountRecords } from '@/lib/composio-accounts'
 import { listComposioPages } from '@/lib/composio-pagination'
 import { GitHubAccessError, listAuthorizedRepositories } from '@/lib/github/user-access'
 import { linearSyncState } from '@/lib/linear-sync/flags'
@@ -32,19 +34,25 @@ async function linear(userId: string) {
 
 async function composioAccounts(userId: string) {
   const composio = getComposio()
-  if (!composio) return []
-  const rows = await listComposioPages(cursor => composio.connectedAccounts.list({ userIds: [userId], cursor }))
-  return rows.flatMap(row => {
-    const view = toConnectedAccountView(row)
-    return view ? [view.toolkit] : []
-  })
+  if (!composio) return {}
+  const [rows, records] = await Promise.all([
+    listComposioPages(cursor => composio.connectedAccounts.list({ userIds: [userId], cursor })),
+    listComposioAccountRecords(userId),
+  ])
+  const accounts = withAccountRecords(rows.flatMap(row => toConnectedAccountView(row) ?? []), records)
+  return toolkitAccountStates(accounts)
 }
 
 export async function mobilePluginConnections(userId: string, headers: Headers) {
   const sources = ['composio', 'github', 'linear', 'telegram'] as const
   const paused: string[] = []
+  const states: Record<string, ToolkitState> = {}
   const reads = await Promise.allSettled([
-    composioAccounts(userId), github(userId, headers),
+    composioAccounts(userId).then(accounts => {
+      Object.assign(states, accounts)
+      return Object.keys(accounts)
+    }),
+    github(userId, headers),
     linear(userId).then(state => {
       if (state === 'paused') paused.push('linear')
       return state === 'connected' ? ['linear'] : []
@@ -57,5 +65,6 @@ export async function mobilePluginConnections(userId: string, headers: Headers) 
     if (read.status === 'fulfilled') for (const id of read.value) toolkits.add(id)
     else failed.push({ source: sources[index], reason: read.reason instanceof GitHubAccessError ? read.reason.code : read.reason instanceof Error ? read.reason.name : 'unknown' })
   })
-  return { toolkits: [...toolkits], paused, failed }
+  for (const id of toolkits) states[id] ??= 'active'
+  return { toolkits: [...toolkits], states, paused, failed }
 }

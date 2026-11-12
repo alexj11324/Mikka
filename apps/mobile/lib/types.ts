@@ -298,7 +298,7 @@ export interface StoreCatalog {
 }
 
 /** The person's connected accounts (GET /api/integrations/composio). */
-export interface ComposioAccounts { configured: boolean; accounts: { id: string; toolkit: string; status: string; alias: string | null; email: string | null }[] }
+export interface ComposioAccounts { configured: boolean; accounts: { id: string; toolkit: string; status: string; enabled?: boolean; alias: string | null; email: string | null }[] }
 
 /** 插件 › 技能: one page of skills.sh (GET /api/skills/search). */
 export interface SkillsPage { data: { id: string; name: string; source: string; installs: number; url: string }[]; hasMore: boolean }

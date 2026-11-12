@@ -9,11 +9,13 @@ const row = (id: string, slug: string, status: string, isDisabled = false) => ({
   id, toolkit: { slug }, status, isDisabled, createdAt: '2026-11-01T00:00:00Z',
 })
 const fixtures = [row('a', 'third_party', 'EXPIRED'), row('b', 'third_party', 'ACTIVE', true), row('c', 'other', 'ACTIVE'),
-  row('d', 'old', 'REVOKED'), row('e', 'unfinished', 'INITIALIZING'), row('f', 'github', 'ACTIVE')]
+  row('d', 'old', 'REVOKED'), row('e', 'unfinished', 'INITIALIZING'), row('f', 'github', 'ACTIVE'),
+  row('g', 'denied_by_provider', 'ACTIVE'), row('h', 'expired_only', 'EXPIRED')]
 stub('../lib/composio.ts', { getComposio: () => ({ connectedAccounts: { list: async ({ userIds }: {userIds: string[]}) => {
   if (failed) throw new TypeError('synthetic outage')
   return { items: userIds[0] === 'owner' ? fixtures : [] }
 } } }) })
+stub('../lib/composio-account-store.ts', { listComposioAccountRecords: async (userId: string) => userId === 'owner' ? [{ accountId: 'g', toolkit: 'denied_by_provider', needsReconnect: true }] : [] })
 stub('../lib/db/index.ts', { db: {} })
 stub('../lib/db/schema.ts', { linearConnections: {} })
 stub('../lib/linear-sync/flags.ts', { linearSyncState: async () => linearAvailability })
@@ -27,7 +29,8 @@ beforeEach(() => { failed = false; returnedOwner = 'owner'; linearAvailability =
 
 test('Settings count and both native plugin lists receive one unique set of held accounts', async () => {
   const summary = await read('owner', new Headers())
-  assert.deepEqual(summary.toolkits.sort(), ['github', 'other', 'telegram', 'third_party'])
+  assert.deepEqual(summary.toolkits.sort(), ['denied_by_provider', 'expired_only', 'github', 'other', 'telegram', 'third_party'])
+  assert.deepEqual(summary.states, { third_party: 'paused', other: 'active', denied_by_provider: 'needsReconnect', expired_only: 'needsReconnect', github: 'active', telegram: 'active' })
   assert.deepEqual(summary.paused, ['linear'])
   assert.deepEqual(summary.failed, [])
 })
@@ -51,6 +54,7 @@ test('an old server uses the canonical account feed and advertises unavailable f
   const summary = legacyPluginConnections({ apps: [{ app: 'linear', connected: true, account: 'Example' }] },
     { configured: true, accounts: [{ id: 'a', toolkit: 'third_party', status: 'EXPIRED', alias: null, email: null }] }, { enabled: true })
   assert.deepEqual(summary.toolkits, ['third_party', 'linear'])
+  assert.deepEqual(summary.states, { third_party: 'needsReconnect', linear: 'active' })
   assert.deepEqual(summary.failed.map(item => item.source), ['github', 'telegram'])
 })
 

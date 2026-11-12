@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
+import { appState, needsReconnect } from '@/lib/composio-account-state'
 import { COMPOSIO_APP_IDS, composioConnectRedirect, type ComposioAppId, type ConnectedAccountView as AccountView } from '@/lib/composio-accounts'
 import type { StoreApp, StoreCatalog } from '@/lib/plugins/catalog'
 import type { AppDetail, AppTool } from '@/lib/plugins/app-detail'
@@ -138,8 +139,6 @@ function useTakeoverText() {
   }
 }
 
-/** An account Composio can no longer use until it is reconnected. */
-const needsReconnect = (account: ConnectedAccountView) => account.status !== 'ACTIVE'
 
 /** State and actions for the Composio apps, shared by the list and the detail page. */
 export function useConnectedApps(enabled = true) {
@@ -320,13 +319,7 @@ export function ConnectedAppsStatus({ apps }: { apps: ConnectedApps }) {
 }
 
 /** The app's overall state from its accounts. */
-/** One app's accounts read as one row: usable ones, all expired, on or off. Shared with UI layers. */
-export function appState(accounts: ConnectedAccountView[]) {
-  const usable = accounts.filter(account => !needsReconnect(account))
-  const expired = accounts.length > 0 && usable.length === 0
-  const on = usable.some(account => account.enabled)
-  return { usable, expired, on, off: accounts.length > 0 && !expired && !on }
-}
+export { appState }
 
 /** A plain click opens the app's page in place; a modified click keeps the link's own behaviour. */
 function openInPlace(event: MouseEvent<HTMLAnchorElement>, onOpen: (() => void) | undefined) {

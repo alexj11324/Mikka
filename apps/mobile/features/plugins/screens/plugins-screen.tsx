@@ -64,7 +64,12 @@ function Apps({ query, header }: { query: string; header: ReactElement }) {
   const refresh = useRefresh(reload)
   const connected = useMemo(() => new Set(connections.snapshot?.toolkits ?? []), [connections.snapshot])
   const stateText = (entry: Entry) => {
-    if (connected.has(entry.id)) return '已连接'
+    if (connected.has(entry.id)) {
+      const state = connections.snapshot?.states?.[entry.id]
+      if (state === 'needsReconnect') return '需要重新连接'
+      if (state === 'paused') return '已暂停'
+      return state === 'active' ? '已连接' : '已关联，状态未知'
+    }
     if (connections.snapshot?.paused?.includes(entry.id)) return '同步已暂停'
     if (connections.error && (!connections.snapshot || connections.snapshot.failed.some(failure => failure.source === (entry.own ? entry.id : 'composio')))) return '连接状态未知'
     return null
@@ -112,7 +117,7 @@ function Apps({ query, header }: { query: string; header: ReactElement }) {
         <GroupRow place={row.place} label={[row.item.name, stateText(row.item)].filter(Boolean).join('，')} onPress={() => void open(row.item.id)}>
           <AppIcon entry={row.item} />
           <Text style={styles.name} numberOfLines={1}>{row.item.name}</Text>
-          {connected.has(row.item.id) ? <View style={styles.connected} /> : stateText(row.item) ? <Text style={styles.state}>{stateText(row.item)}</Text> : null}
+          {stateText(row.item) === '已连接' ? <View style={styles.connected} /> : stateText(row.item) ? <Text style={styles.state}>{stateText(row.item)}</Text> : null}
           <Symbol name="chevron.right" size={13} color={colors.tertiary} />
         </GroupRow>
       )}
