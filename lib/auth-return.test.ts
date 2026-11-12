@@ -90,3 +90,9 @@ test('returns to an app page under 设置 › 连接, and only there', () => {
   assert.equal(safeAuthReturn('/settings?section=connections&app=Not%20A%20Slug'), '/')
   assert.equal(safeAuthReturn('/settings?section=account&app=github'), '/')
 })
+
+test('Slack handoff accepts only the single opaque parameter at the same-origin start route', () => {
+  const token='a'.repeat(43),path='/api/integrations/slack/connect?intent='+token
+  assert.equal(safeAuthReturn(path),path)
+  for (const value of [path+'&next=https://example.invalid',path+'&intent='+token,path+'!',path.replace('slack','other')]) assert.equal(safeAuthReturn(value),'/')
+})

@@ -591,7 +591,7 @@
         "GET",
         "PUT"
       ],
-      "sourceHash": "cea72e01b9b56bc51e6d5c3cc9041c192c1f423a958c25653726de73a4591858"
+      "sourceHash": "3d936d8ce9110e30a77c537e60a3d09b9d65998f5a6d91dd39bb3fd93350b2fe"
     },
     {
       "path": "/mikka/api/credentials",
@@ -1338,6 +1338,43 @@
       "sourceHash": "d450b093e5517282b41f6a49e6b712675ee8f33e8a0be7b4bafa04fa483ecf31"
     },
     {
+      "path": "/mikka/api/integrations/slack",
+      "template": "/api/integrations/slack",
+      "source": "app/api/integrations/slack/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "sourceHash": "e83e89e6e09089db04d1884ed1e11519bcce57d7a4f10ccd3e67ff35d67b1700"
+    },
+    {
+      "path": "/mikka/api/integrations/slack/callback",
+      "template": "/api/integrations/slack/callback",
+      "source": "app/api/integrations/slack/callback/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "356ae7ce8260750148587eb0642713baea2374e602f1d05418af8edcde00e166"
+    },
+    {
+      "path": "/mikka/api/integrations/slack/connect",
+      "template": "/api/integrations/slack/connect",
+      "source": "app/api/integrations/slack/connect/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "27330814a0184633ca4960260c2316a8d864b70064beb40aa5ee4de447939aed"
+    },
+    {
+      "path": "/mikka/api/internal/eve/slack-credential",
+      "template": "/api/internal/eve/slack-credential",
+      "source": "app/api/internal/eve/slack-credential/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "8b8b1fbf13cdfb81ea272a37e8158cd0eddbe97522f14621b4b48371440929c8"
+    },
+    {
       "path": "/mikka/api/internal/eve/tools",
       "template": "/api/internal/eve/tools",
       "source": "app/api/internal/eve/tools/route.ts",
@@ -1640,6 +1677,24 @@
         "PATCH"
       ],
       "sourceHash": "b8fc718d704bb3843de16f2bf3824b720f1c25a215236ad993017bb87568724e"
+    },
+    {
+      "path": "/mikka/api/organizations/[organizationId]/api-keys",
+      "template": "/api/organizations/[organizationId]/api-keys",
+      "source": "app/api/organizations/[organizationId]/api-keys/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "45eddd2d96aedaa760f8c1bb29321d52c5b8f1ec2c9a1d6e1aa43a1f14417bc0"
+    },
+    {
+      "path": "/mikka/api/organizations/[organizationId]/api-keys/[keyId]",
+      "template": "/api/organizations/[organizationId]/api-keys/[keyId]",
+      "source": "app/api/organizations/[organizationId]/api-keys/[keyId]/route.ts",
+      "methods": [
+        "PATCH"
+      ],
+      "sourceHash": "14510ca874701e7929d27a8e70ea28ab4d1a2507e34fd3c4fe170cef91ee65b0"
     },
     {
       "path": "/mikka/api/organizations/[organizationId]/approvals",
@@ -2659,7 +2714,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "559e9f4c322587e50099625e875750a3644d78f508a848154984428c5c78cc47"
+      "sourceHash": "1859c50d5222173907720d2d3f3681eb44b73064751b6ad8cb59d1e567497c13"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/fs/requests",

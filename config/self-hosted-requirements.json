@@ -81,6 +81,20 @@
     "test": "tests/mobile-handoff.test.ts",
     "suite": "test:desktop-auth"
   },
+  "app/api/organizations/[organizationId]/api-keys/[keyId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Require a fresh same-origin human session before renaming one visible organization-bound service credential.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "app/api/organizations/[organizationId]/api-keys/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List a page of key metadata for attached team Workspaces the signed-in Organization administrator also administers.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
   "app/api/service-identity/projects/[projectId]/route.ts": {
     "mode": "built-in",
     "environment": [],
@@ -238,6 +252,15 @@
       "DATABASE_URL"
     ],
     "behavior": "Bind explicitly organization-scoped service keys to their current Workspace attachment and invalidate the matching credential when the attachment is removed.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "drizzle/20261112032026_organization_service_key_names.sql": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Give each existing and future organization-bound service key an independent public ID and a nullable name in the Workspace database.",
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },
@@ -500,6 +523,13 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Governance mutations recheck the Workspace-scoped session and validate request origin and JSON before applying a change.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "lib/governance/organization-api-keys.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read only current, explicitly bound service keys visible under both admin roles and rename by the ID of a single issuance.",
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },
@@ -794,5 +824,152 @@
     "behavior": "The standalone broker is outside the standard Compose stack. When deployed separately its listen port is configurable and credential handlers enforce caller identity.",
     "test": "services/credential-broker/server.test.mjs",
     "suite": "test:self-hosted-broker"
+  },
+  "app/api/integrations/slack/callback/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "SLACK_APP_ID",
+      "SLACK_CLIENT_ID",
+      "SLACK_CLIENT_SECRET",
+      "BETTER_AUTH_URL",
+      "MIKKA_DATABASE_URL",
+      "DATABASE_URL",
+      "WORKSPACE_SECRETS_KEY"
+    ],
+    "behavior": "Accept one browser-bound Slack OAuth code and encrypt the bot grant for the currently authorized workspace.",
+    "test": "tests/slack-installation.db.test.ts",
+    "suite": "test:slack-installation-db"
+  },
+  "app/api/integrations/slack/connect/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "SLACK_APP_ID",
+      "SLACK_CLIENT_ID",
+      "SLACK_CLIENT_SECRET",
+      "BETTER_AUTH_URL",
+      "MIKKA_DATABASE_URL",
+      "DATABASE_URL"
+    ],
+    "behavior": "Consume an authenticated member’s one-time handoff before opening the official Slack consent URL.",
+    "test": "tests/slack-installation.db.test.ts",
+    "suite": "test:slack-installation-db"
+  },
+  "app/api/integrations/slack/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "SLACK_APP_ID",
+      "SLACK_CLIENT_ID",
+      "SLACK_CLIENT_SECRET",
+      "BETTER_AUTH_URL",
+      "MIKKA_DATABASE_URL",
+      "DATABASE_URL",
+      "WORKSPACE_SECRETS_KEY"
+    ],
+    "behavior": "Show or update only an active member’s Slack installation and channel preferences. Missing platform configuration disables installation.",
+    "test": "tests/slack-installation.db.test.ts",
+    "suite": "test:slack-installation-db"
+  },
+  "app/api/internal/eve/slack-credential/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "MIKKA_DATABASE_URL",
+      "DATABASE_URL",
+      "WORKSPACE_SECRETS_KEY",
+      "SLACK_APP_ID",
+      "BETTER_AUTH_SECRET"
+    ],
+    "behavior": "Require the scoped Eve principal, recipient proof, current workspace membership, and current link generation to obtain the native bot credential.",
+    "test": "tests/slack-installation.db.test.ts",
+    "suite": "test:slack-installation-db"
+  },
+  "apps/eve/agent/hooks/slack-installation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Store non-secret, verified Slack link coordinates in the official Eve session for rendering a resumed turn.",
+    "test": "tests/slack-bot.test.mjs",
+    "suite": "test:slack"
+  },
+  "drizzle/20261112030512_slack_workspace_installations.sql": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL",
+      "DATABASE_URL"
+    ],
+    "behavior": "Persist single-use browser state, encrypted Workspace installations, and member-specific channel preferences in the existing application PostgreSQL database.",
+    "test": "tests/slack-installation.db.test.ts",
+    "suite": "test:slack-installation-db"
+  },
+  "lib/slack/channel-grant.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "MIKKA_EVE_HOST",
+      "MIKKA_APP_ORIGIN",
+      "BETTER_AUTH_URL",
+      "MIKKA_EVE_PRODUCT_TOKEN",
+      "BETTER_AUTH_SECRET"
+    ],
+    "behavior": "Get an uncached, member-bound native Slack credential from the configured product host for this Eve session.",
+    "test": "lib/slack/install-provider.test.ts",
+    "suite": "test:slack"
+  },
+  "lib/slack/channel-scope.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Carry only verified coordinates within Eve’s signed request and durable session; absent Slack identity cannot resolve credentials.",
+    "test": "tests/slack-bot.test.mjs",
+    "suite": "test:slack"
+  },
+  "lib/slack/grant-proof.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_SECRET"
+    ],
+    "behavior": "Bind the dedicated Slack grant proof to the timed Eve authorization, team, sender, installation and active member link.",
+    "test": "lib/slack/install-provider.test.ts",
+    "suite": "test:slack"
+  },
+  "lib/slack/install-provider.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "SLACK_APP_ID",
+      "SLACK_CLIENT_ID",
+      "SLACK_CLIENT_SECRET",
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "Use Slack OAuth, bot identity validation, member-visible conversation metadata and official revocation APIs for an operator-configured Slack app.",
+    "test": "lib/slack/install-provider.test.ts",
+    "suite": "test:slack"
+  },
+  "lib/slack/installation-store.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "SLACK_APP_ID",
+      "SLACK_CLIENT_ID",
+      "SLACK_CLIENT_SECRET",
+      "BETTER_AUTH_URL",
+      "MIKKA_DATABASE_URL",
+      "DATABASE_URL",
+      "WORKSPACE_SECRETS_KEY"
+    ],
+    "behavior": "Encrypt grants under the workspace secret key, lock refreshes, verify the active member link and disable local use before remote uninstall.",
+    "test": "tests/slack-installation.db.test.ts",
+    "suite": "test:slack-installation-db"
+  },
+  "lib/slack/installed-routing.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read coordinates only from the platform-signed Slack app/team envelope, bound sender and validated revocation events.",
+    "test": "lib/slack/install-provider.test.ts",
+    "suite": "test:slack"
+  },
+  "lib/slack/eve-channel.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "SLACK_SIGNING_SECRET",
+      "SLACK_APP_ID"
+    ],
+    "behavior": "The official Eve Slack channel accepts signed events only from a verified Slack member with active workspace access and a current OAuth link.",
+    "test": "tests/slack-bot.test.mjs",
+    "suite": "test:slack"
   }
 }
