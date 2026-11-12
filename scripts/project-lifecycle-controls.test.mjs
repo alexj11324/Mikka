@@ -21,7 +21,7 @@ stub('components/ui/dialog.tsx', {
   Dialog: ({ open, children }) => open ? children : null, DialogContent: ({ children }) => children,
   DialogHeader: element('header'), DialogFooter: element('footer'), DialogTitle: element('h2'), DialogDescription: element('p'),
 })
-stub('components/ui/button.tsx', { Button: ({ variant, size, ...props }) => createElement('button', props) })
+stub('components/ui/button.tsx', { Button: ({ variant: _variant, size: _size, ...props }) => createElement('button', props) })
 stub('components/ui/input.tsx', { Input: element('input') })
 
 let createRoot, Controls
