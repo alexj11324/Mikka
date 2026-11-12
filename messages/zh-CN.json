@@ -6431,6 +6431,11 @@
       "notMemberNote": "组织角色不授予访问"
     },
     "invitations": {
+      "organizationSelect": "组织",
+      "noOrganizations": "暂未加入组织",
+      "statusPending": "待接受",
+      "statusAccepted": "已接受",
+      "statusRevoked": "已撤销",
       "description": "组织成员可以邀请新成员，不会授予工作区权限。",
       "title": "邀请组织成员",
       "label": "邮箱地址",
