@@ -27,7 +27,7 @@ export type WebTransport = {
 }
 export type PrepareWebTransport = (request: Request, route: string) => Promise<WebTransport | Response | null>
 
-function corsResponse(response: Response, origin: string) {
+function corsResponse(response: Response, origin: string, additionalHeaders: string[] = []) {
   const headers = new Headers(response.headers)
   // Existing workspace actions acknowledge their validated choice through a
   // preference cookie. Expose only that preference to a bearer-only client;
@@ -46,7 +46,7 @@ function corsResponse(response: Response, origin: string) {
   headers.delete('x-mikka-session-cache')
   headers.delete('access-control-allow-credentials')
   headers.set('access-control-allow-origin', origin)
-  headers.set('access-control-expose-headers', exposedHeaders.join(', '))
+  headers.set('access-control-expose-headers', [...exposedHeaders, ...additionalHeaders].join(', '))
   headers.set('cache-control', 'private, no-store')
   headers.set('vary', [...new Set([...(headers.get('vary') ?? '').split(',').map(value => value.trim()).filter(Boolean), 'Origin', 'Authorization'])].join(', '))
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
@@ -117,6 +117,12 @@ export function createWebTransport(options: {
       headers.set('origin', new URL(request.url).origin)
       headers.set('sec-fetch-site', 'same-origin')
     }
-    return { request: new NextRequest(request, { headers }), run: work => options.scope(identity, work), response: finish }
+    return { request: new NextRequest(request, { headers }), run: work => options.scope(identity, work), response: response => {
+      // The Eve client validates the schema before reading a line and uses the tail for replay.
+      const stream = method === 'GET' && route.startsWith('/api/agents/') && new URL(request.url).pathname.endsWith('/stream')
+        && response.ok && response.headers.get('content-type')?.split(';')[0]?.trim() === 'application/x-ndjson'
+      const readable = stream ? ['x-eve-stream-version', 'x-eve-stream-tail-index'].filter(name => response.headers.has(name)) : []
+      return corsResponse(response, origin, readable)
+    } }
   }
 }
