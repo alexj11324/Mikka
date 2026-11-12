@@ -18,6 +18,14 @@ import { useLiveKey, useLiveKeys } from '@/hooks/use-live-key'
 export type OrganizationRole = 'owner' | 'admin' | 'member'
 export type OrganizationListItem = { id: string; name: string; role: OrganizationRole }
 export type OrganizationMember = { organizationId: string; userId: string; role: OrganizationRole; status: 'active' | 'suspended'; name: string; email: string; createdAt: string; updatedAt: string }
+/** Organization membership only; invitations never confer Workspace/Project access. */
+export type OrganizationInvitation = {
+  id: string; email: string; createdBy: string; status: 'pending' | 'accepted' | 'revoked'
+  createdAt: string; expiresAt: string
+}
+export type OrganizationInvitationOutcome =
+  | { email: string; created: true; id: string; path: string }
+  | { email: string; created: false; reason: 'duplicate' | 'alreadyMember' | 'pending' }
 export type OrganizationAuditEvent = {
   id: string; organizationId?: string; actorId: string; action: string; result: 'success' | 'denied' | 'failure'
   correlationId?: string; targetId: string | null; metadata: Record<string, string | number | boolean | null>; createdAt: string
@@ -108,6 +116,7 @@ export function useOrganizationErrorText() {
 
 export const organizationsKey = ['organizations'] as const
 export const organizationKey = (id: string) => ['organization', id] as const
+export const organizationInvitationsKey = (id: string) => ['organization-invitations', id] as const
 export const identityKey = (id: string) => ['organization-identity', id] as const
 export const policyKey = (id: string) => ['organization-policy', id] as const
 
@@ -118,7 +127,7 @@ export const policyKey = (id: string) => ['organization-policy', id] as const
  * what they changed.
  */
 export function useOrganizationLive(workspaceId: string, organizationId: string | null | undefined) {
-  const keys = [governanceKey(workspaceId), organizationsKey, ...(organizationId ? [organizationKey(organizationId), identityKey(organizationId), policyKey(organizationId)] : [])]
+  const keys = [governanceKey(workspaceId), organizationsKey, ...(organizationId ? [organizationKey(organizationId), organizationInvitationsKey(organizationId), identityKey(organizationId), policyKey(organizationId)] : [])]
   useLiveKey('workspace_settings', workspaceId, keys.map(key => unstable_serialize(key)), workspaceId, { minIntervalMs: 2_000 })
 }
 
@@ -130,6 +139,12 @@ export function useOrganizations(enabled = true) {
 /** Members, bound workspaces, seats and recent events. 403 for anyone who is not an Organization owner or admin. */
 export function useOrganizationSummary(organizationId: string | null | undefined) {
   return useSWR(organizationId ? organizationKey(organizationId) : null, ([, id]) => request<OrganizationSummary>(org(id)), swr)
+}
+
+/** Uses Organization membership, not Workspace admin privilege. No polling. */
+export function useOrganizationInvitations(organizationId: string | null | undefined) {
+  return useSWR(organizationId ? organizationInvitationsKey(organizationId) : null,
+    ([, id]) => request<{ invitations: OrganizationInvitation[] }>(org(id, '/invitations')).then(value => value.invitations), swr)
 }
 
 export function useOrganizationIdentity(organizationId: string | null | undefined) {
@@ -164,6 +179,13 @@ export const organizationApi = {
   /** Binding needs both Organization admin and admin of that workspace. */
   bind: (id: string, workspaceId: string) => send<{ attached: true }>(org(id, '/workspaces'), 'POST', { workspaceId }),
   unbind: (id: string, workspaceId: string) => send<{ detached: true }>(org(id, '/workspaces'), 'DELETE', { workspaceId }),
+  /** All emails invite an ordinary Organization Member only, never a Workspace member. */
+  inviteMembers: (id: string, emails: string[]) =>
+    send<{ outcomes: OrganizationInvitationOutcome[] }>(org(id, '/invitations'), 'POST', { emails }),
+  revokeInvitation: (id: string, invitationId: string) =>
+    send<{ revoked: true }>(org(id, '/invitations'), 'DELETE', { invitationId }),
+  acceptInvitation: (token: string) =>
+    send<{ organizationId: string; joined: true; role: 'member' }>('/api/organization-invitations/accept', 'POST', { token }),
   /** An existing account, chosen by ID; an email match alone adds no one. */
   addMember: (id: string, userId: string, role: OrganizationRole) => send<{ member: OrganizationMember }>(org(id, '/members'), 'POST', { userId, role }),
   setRole: (id: string, userId: string, role: OrganizationRole) => send<{ updated: true }>(org(id, '/members'), 'PATCH', { userId, role }),
