@@ -14,6 +14,7 @@ import { Text } from '@/components/Text'
 import { GlassButton } from '@/components/GlassButton'
 import { HARNESS } from '@/lib/harness'
 import { useHome } from '@/lib/home'
+import { taskLinkAttempt } from '@/lib/push-route'
 import { taskDetailLive } from '@/lib/live-keys'
 import { readPresentedTask } from '../model/task-presentation-read'
 import type { TaskActivity, TaskDetail } from '@/lib/types'
@@ -53,20 +54,22 @@ export function TaskScreen() {
   const receipts = presentedFactoryEvents(data?.factoryEvents, task?.factoryTaskId)
   const activity = data ? activityEntries(data.activity, [...data.timeline ?? [], ...receipts]) : []
 
-  // A push opens the task, then the attempt it was about, once.
+  // Only the authorized Task detail can match a link to one of its runs.
+  const target = !loading && !error ? taskLinkAttempt(id, attempt, data) : undefined
   const opened = useRef(false)
+  useEffect(() => { opened.current = false }, [id, attempt])
   useEffect(() => {
-    if (opened.current || !attempt || !data) return
+    if (!target || opened.current) return
     opened.current = true
-    const found = data.activity.some(item => item.kind === 'attempt' && item.runId === attempt)
-    router.push(found ? conversationHref(data.task.id, attempt) : `/thread/${attempt}`)
-  }, [attempt, data, router])
+    router.push(conversationHref(id, target))
+  }, [id, target, router])
 
   return (
     <View style={styles.screen}>
       <NavBar scrolled={bar.scrolled} />
       <ScrollView {...underBar} onScroll={bar.onScroll} scrollEventThrottle={16} contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 96 }]}>
         <ReadNotice error={error} hasData={Boolean(data)} label={mobileMessages.Nav.tasks} onRetry={reload} />
+        {target === null && <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.activityMeta}>{mobileMessages.AgentCopy.conversationNotFound}</Text>}
         {loading && !data ? <View style={styles.center}><Spinner /></View> : null}
         {task ? (
           <>
