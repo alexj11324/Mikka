@@ -80,6 +80,7 @@ export function gatewayConfig({ current, retained, githubWebhook }) {
   if (githubWebhook !== undefined) services.push({ binding: 'GITHUB_WEBHOOK', service: githubWebhook })
   return {
     ...common, name: gateway, main: resolve(here, 'gateway.mjs'),
+    version_metadata: { binding: 'CF_VERSION_METADATA' },
     vars: { CURRENT_RELEASE: current, RELEASES: Object.fromEntries(bindings) },
     services,
   }

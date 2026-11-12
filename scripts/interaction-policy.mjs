@@ -75,7 +75,14 @@ export function auditInteractions(file, text) {
     if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) return hasEffects(node.body, seen)
     if (ts.isCallExpression(node)) {
       const call = node.expression.getText(source)
-      if (ignoredCalls.test(call) || notificationOnlyCalls.test(call) || /^Promise\.(?:resolve|reject)$/.test(call) && !node.arguments.some(arg => hasEffects(arg, seen))) return false
+      if (notificationOnlyCalls.test(call)) {
+        // A localized label is feedback. An awaited command can supply the text after completing its action.
+        return node.arguments.some(argument => {
+          const value = unwrap(argument)
+          return ts.isAwaitExpression(value) && hasEffects(value.expression, seen)
+        })
+      }
+      if (ignoredCalls.test(call) || /^Promise\.(?:resolve|reject)$/.test(call) && !node.arguments.some(arg => hasEffects(arg, seen))) return false
       if (node.arguments.some(arg => ts.isStringLiteralLike(arg) && placeholderText.test(arg.text))) return false
       if (ts.isIdentifier(node.expression) && binding(node.expression)) return meaningful(node.expression, seen)
       return true
