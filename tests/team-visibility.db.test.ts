@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import test from 'node:test'
+import test, { mock } from 'node:test'
 import type { RunFailure } from '@mikka/protocol/run-failure'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 
@@ -10,7 +10,11 @@ const authorized = disposableDatabase()
 if (url && !authorized) throw new Error('Visibility DB tests require a loopback *_e2e database')
 if (process.env.REQUIRE_DB === '1' && !authorized) throw new Error('Visibility database tests cannot skip in required CI')
 
-test('real API/core visibility: immutable tenant, optional Team, provider scope and suspension', { skip: !authorized }, async () => {
+test('real API/core visibility: immutable tenant, optional Team, provider scope and suspension', { skip: !authorized }, async t => {
+  const intl = await import('next-intl/server')
+  const locale = mock.module('next-intl/server', { namedExports: { ...intl, getLocale: async () => 'en',
+    getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
+  t.after(() => locale.restore())
   const { Pool } = await import('pg')
   const { drizzle } = await import('drizzle-orm/node-postgres')
   const pool = new Pool({ connectionString: url, max: 2 })
