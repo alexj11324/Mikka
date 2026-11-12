@@ -28,20 +28,23 @@ const backfillFresh = (ownerId: string) => Date.now() - (backfilled.get(ownerId)
 
 /** The person's personal workspace, created when they have none yet (as the app does on their first page). */
 export async function personalWorkspaceId(ownerId: string): Promise<string> {
-  const { pool } = await import('@/lib/db')
-  const found = (await pool.query<{ id: string }>(`SELECT w.id FROM mikka_workspaces w
+  const { workspacePool } = await import('@/lib/workspace-db')
+  const found = (await workspacePool.query<{ id: string }>(`SELECT w.id FROM mikka_workspaces w
       JOIN mikka_workspace_members m ON m."workspaceId"=w.id AND m."userId"=$1 AND m.status='active'
     WHERE w."userId"=$1 AND w.kind='personal' LIMIT 1`, [ownerId])).rows[0]?.id
   if (found) return found
+  const { pool } = await import('@/lib/db')
   const [person] = (await pool.query<{ id: string; email: string; name: string }>('SELECT id,email,name FROM "user" WHERE id=$1', [ownerId])).rows
   if (!person) throw Object.assign(new Error('workspaceAccessDenied'), { code: 'workspaceAccessDenied' })
   return (await import('@/lib/personal-workspace')).ensurePersonalWorkspace(person, 'zh-CN')
 }
 
 async function ensureFor(ownerId: string, workspaceId: string): Promise<CoordinatorBot> {
-  const [{ pool }, { ensureCoordinatorBot }] = await Promise.all([import('@/lib/db'), import('@/lib/computer/auto-runtime')])
+  const [{ pool }, { workspacePool }, { ensureCoordinatorBot }] = await Promise.all([
+    import('@/lib/db'), import('@/lib/workspace-db'), import('@/lib/computer/auto-runtime'),
+  ])
   // Only a workspace the person is an active member of gets their Coordinator.
-  const member = await pool.query('SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status=\'active\'', [workspaceId, ownerId])
+  const member = await workspacePool.query('SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status=\'active\'', [workspaceId, ownerId])
   if (!member.rowCount) throw Object.assign(new Error('workspaceAccessDenied'), { code: 'workspaceAccessDenied' })
   return { botId: await ensureCoordinatorBot(pool, { userId: ownerId, workspaceId }), workspaceId }
 }

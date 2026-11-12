@@ -7,12 +7,11 @@ import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { MessageSquareDiff } from 'lucide-react'
-import { getIssueThread, getThreadChanges, getThreadInstructions, sendIssueThreadReply, stopRun, type IssueThreadDetail } from '@/app/actions/agents'
+import { getIssueThread, getThreadChanges, getThreadInstructions, stopRun, type IssueThreadDetail } from '@/app/actions/agents'
 import { useActionError } from '@/lib/use-action-error'
-import { checkPageBuildBeforeAction } from '@/lib/app-build'
 import { sendReviewChange, type ReviewChangeTarget } from '@/lib/factory/review-change'
 import { RequestError } from '@/lib/factory/browser-request'
-import { useChatDelivery, type ChatSubmission } from '@/lib/hooks/chat-delivery'
+import { useChatDelivery, useThreadReplyCommand, type ChatSubmission } from '@/lib/hooks/chat-delivery'
 import { prepareThreadReply, type ThreadReplySubmission } from '@/lib/thread-submission-input'
 import { mergeThreadChunks, runFailureText, runIsActive, runIsWorking, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
 import { ThreadSteps } from './thread-steps'
@@ -168,6 +167,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const [draft, setDraft] = useViewState(`thread:${runId}:draft`, '')
   const feedback = useTranslations('Coordinator')
   const deliveryLabels = useTranslations('HostedThread')
+  const writer = useThreadReplyCommand()
   const delivery = useChatDelivery<ChatSubmission & { review?: ReviewChangeTarget; runId: string; expectedOwnerId?: string; expectedWorkspaceId?: string }>(`thread:${runId}`, feedback('sendUncertain'))
   const sendLock = useRef(false)
   const [submission, setSubmission] = useViewState<ThreadReplySubmission | null>(`thread:${runId}:submission`, null)
@@ -258,20 +258,18 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     if (!retryOriginalSession && !previous) { setDraft(''); setReplyQuote(null); setSubmission(null); if (review) changeRequest?.onCancel() }
     const fail = (reason: string) => retryOriginalSession ? setSendFailed(reason) : delivery.finish(command.id, { error: reason })
     try {
-      if (navigator.onLine === false) { fail(feedback('sendOffline')); return }
-      if (!await checkPageBuildBeforeAction()) { fail(feedback('sendUpdateRequired')); return }
       if (command.review) {
+        const blocked = await writer.preflight()
+        if (blocked) { fail(blocked); return }
         await sendReviewChange(command.review.binding, command.id, command.text, command.expectedOwnerId)
         delivery.finish(command.id, {})
         void mutate().catch(() => undefined)
         void mutateCache(`/api/factory/tasks/${command.review.binding.taskId}/approval?view=ledger`)
         return
       }
-      const request = retryOriginalSession ? { runId: liveRunId, text: words, retryOriginalSession,
-        ...(questionWake ? { questionWakeGeneration: questionWake.generation } : {}) } : { requestId: command.id, runId: command.runId, text: command.text,
-          expectedOwnerId: command.expectedOwnerId, expectedWorkspaceId: command.expectedWorkspaceId }
-      const result = await sendIssueThreadReply({ issueId, ...request })
-      if (result.error) { fail(actionError(result.error)); return }
+      const result = await writer.submit(issueId, retryOriginalSession ? { runId: liveRunId, text: words, retryOriginalSession,
+        ...(questionWake ? { questionWakeGeneration: questionWake.generation } : {}) } : command)
+      if (result.status !== 'accepted') { fail(result.error); return }
       if (!retryOriginalSession) delivery.finish(command.id, {})
       void mutate().catch(() => undefined); void mutateCache(['issue-threads', issueId])
     } catch (error) {
