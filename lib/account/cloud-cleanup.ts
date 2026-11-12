@@ -1,5 +1,6 @@
 import 'server-only'
 import type { Pool } from 'pg'
+import { observePoolCommits } from '@/lib/db/commit-effects'
 import { machineChanged } from '@/lib/live/computer-state'
 
 export interface AccountCloudProvider {
@@ -39,6 +40,7 @@ const ownerProvider = (ownerId: string): AccountCloudProvider => ({
 
 /** Main Bot computers are keyed by workspace AND owner (20261029080001), never workspace alone. */
 export async function cleanupOwnedCloudMachines(ownerId: string, database: Pool, runtime = ownerProvider(ownerId)): Promise<string[]> {
+  observePoolCommits(database)
   const reasons = new Set<string>()
   const machines = (await database.query<{ workspaceId: string }>('SELECT "workspaceId" FROM cloud_machines WHERE "ownerId"=$1 ORDER BY "workspaceId"', [ownerId])).rows
   for (const machine of machines) {
