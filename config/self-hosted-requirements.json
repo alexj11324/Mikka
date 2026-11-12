@@ -985,5 +985,12 @@
     "behavior": "The official Eve Slack channel accepts signed events only from a verified Slack member with active workspace access and a current OAuth link.",
     "test": "tests/slack-bot.test.mjs",
     "suite": "test:slack"
+  },
+  "lib/settings-data.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Team home reads the complete authorized Task count from this server using the existing authenticated Team directory request and PostgreSQL.",
+    "test": "tests/team-visibility.db.test.ts",
+    "suite": "test:visibility-db"
   }
 }
