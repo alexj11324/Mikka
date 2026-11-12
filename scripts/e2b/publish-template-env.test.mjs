@@ -9,6 +9,8 @@ import { fileURLToPath } from 'node:url'
 import { assertConservation, assertReleaseEvidence, currentWorkerSha, pairEnv, publicationInputFromFile, publish, runtimeConfigurationSha, PROJECT, TEAM } from './publish-template-env.mjs'
 import { reportDigest, templateModelsDigest } from './runtime-report.mjs'
 import * as webRelease from '../release/web-deploy.mjs'
+import { cloudflareRuntimeConfiguration } from './cloudflare-runtime-config.mjs'
+import { applicationEnvironment } from '../../cloudflare/api/ingress/environment.mjs'
 
 const SHA = 'a'.repeat(40), COMMIT = 'b'.repeat(40), OTHER = 'c'.repeat(40)
 const report = harness => ({ harness, installed: true, version: null, models: ['fixture-model'] })
@@ -84,6 +86,19 @@ test('publication reads complete file evidence and retains independently bound m
   const expected = { sha256: reportDigest(bytes), modelsSha256: templateModelsDigest(evidence), templates: TEMPLATES,
     sourceSha: SHA, sourceCommit: COMMIT, runId: '123', runAttempt: '2' }
   const input = publicationInputFromFile(path, expected)
+  const expectedRelease = { ...expected, workerSha: SHA }
+  const cloud = cloudflareRuntimeConfiguration(path, expectedRelease)
+  assert.deepEqual(cloud, { ...Object.fromEntries(pairEnv(input).map(({ key, value }) => [key, value])), MIKKA_CLOUD_WORKER_SOURCE_COMMIT: COMMIT })
+  assert.equal(runtimeConfigurationSha(cloud), SHA)
+  const cli = spawnSync(process.execPath, [fileURLToPath(new URL('./cloudflare-runtime-config.mjs', import.meta.url)), path, COMMIT, SHA, '123', '2', expected.sha256], { encoding: 'utf8' })
+  assert.equal(cli.status, 0, cli.stderr)
+  assert.deepEqual(JSON.parse(cli.stdout), cloud)
+  assert.ok(!cli.stdout.includes('providerManifest') && !cli.stdout.includes('subscriptionAcceptance'))
+  assert.deepEqual(applicationEnvironment({ PUBLIC_ORIGIN: 'https://app.example', ...cloud, E2B_API_KEY: 'platform-only' }), {
+    BETTER_AUTH_URL: 'https://app.example', MIKKA_API_INGRESS: 'cloudflare', ...cloud,
+  })
+  assert.throws(() => cloudflareRuntimeConfiguration(path, { ...expectedRelease, runAttempt: '3' }), /attempt_mismatch/)
+  assert.throws(() => cloudflareRuntimeConfiguration(path, { ...expectedRelease, sha256: 'c'.repeat(64) }), /digest_mismatch/)
   assert.deepEqual(input.releaseEvidence, evidence)
   assert.deepEqual(input.models, MODELS)
   assert.doesNotThrow(() => assertReleaseEvidence(input))
@@ -95,6 +110,7 @@ test('publication reads complete file evidence and retains independently bound m
   const invalid = Buffer.from(JSON.stringify(evidence))
   writeFileSync(path, invalid)
   assert.throws(() => assertReleaseEvidence(publicationInputFromFile(path, { ...expected, sha256: reportDigest(invalid) })), /runtime_release_shared_scope_invalid claude/)
+  assert.throws(() => cloudflareRuntimeConfiguration(path, { ...expectedRelease, sha256: reportDigest(invalid) }), /runtime_release_shared_scope_invalid claude/)
 })
 
 test('the publisher CLI reports a closed parse error without printing the report cause', t => {

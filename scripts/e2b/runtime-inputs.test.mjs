@@ -168,7 +168,7 @@ test('the workflow checks history before secrets and holds one queue across all 
   assert.match(check, /changed: \$\{\{ steps.history.outputs.changed \|\| 'false' \}\}/)
   assert.match(child, /run: node scripts\/e2b\/runtime-inputs.mjs recheck/)
   assert.match(caller, /reason:\n        description: [^\n]+\n        type: string\n        required: true/)
-  assert.match(caller, /release:\n    needs: \[test, check\]\n    if: needs.check.outputs.changed == 'true'\n    concurrency:\n      group: e2b-official-runtime-release\n      cancel-in-progress: false\n      queue: max/)
+  assert.match(caller, /release:\n    needs: \[test, check, web-ready\]\n    if: needs.check.outputs.changed == 'true'\n    concurrency:\n      group: e2b-official-runtime-release\n      cancel-in-progress: false\n      queue: max/)
   assert.match(child, /validate:\n    needs: recheck\n    if: needs.recheck.outputs.skip != 'true'/)
   assert.match(child, /cleanup:\n    needs: \[recheck, validate, await-web, subscriptions, publish\]/)
   assert.match(child, /group: production-smoke-owner-acceptance\n      cancel-in-progress: false\n      queue: max/)

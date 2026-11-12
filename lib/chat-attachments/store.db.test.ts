@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
+import { once } from 'node:events'
+import { createServer } from 'node:http'
 import { test } from 'node:test'
 import { Pool } from 'pg'
 import { withChatFiles, type ChatFileScope } from '@mikka/protocol/chat-attachments'
@@ -83,6 +85,87 @@ test(
       )
       return file
     }
+    await t.test('R2 keeps a recoverable owner through a rolled-back publication, retry and cleanup', async (t) => {
+      const objects = new Map<string, Buffer>()
+      const server = createServer(async (request, response) => {
+        const path = request.url!
+        if (!request.headers.authorization?.startsWith('AWS4-HMAC-SHA256 ')) {
+          response.writeHead(403).end()
+        } else if (request.method === 'PUT') {
+          const chunks: Buffer[] = []
+          for await (const chunk of request) chunks.push(Buffer.from(chunk))
+          objects.set(path, Buffer.concat(chunks))
+          response.writeHead(200).end()
+        } else if (request.method === 'DELETE') {
+          objects.delete(path)
+          response.writeHead(204).end()
+        } else {
+          response.writeHead(objects.has(path) ? 200 : 404).end(objects.get(path))
+        }
+      })
+      server.listen(0, '127.0.0.1')
+      await once(server, 'listening')
+      const env = {
+        S3_ENDPOINT: `http://127.0.0.1:${(server.address() as { port: number }).port}`,
+        S3_BUCKET: 'chat-attachment-test',
+        S3_ACCESS_KEY_ID: 'local-attachment',
+        S3_SECRET_ACCESS_KEY: randomUUID(),
+      }
+      const before = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]))
+      Object.assign(process.env, env)
+      t.after(() => {
+        server.closeAllConnections()
+        server.close()
+        for (const [key, value] of Object.entries(before)) {
+          if (value === undefined) delete process.env[key]
+          else process.env[key] = value
+        }
+      })
+      const storage = await import('@/lib/artifacts/storage')
+      const data = Buffer.from('initial body')
+      const changed = Buffer.from('changed body')
+      const start = () => store.beginChatFile(owner, { kind: 'bot', id: bot }, {
+        name: 'receipt.txt', mediaType: 'text/plain', size: data.length,
+      })
+      const first = await start()
+      const abandoned = await start()
+      const readKey = (id: string, bytes: Buffer) =>
+        `chat-files/${owner}/${id}/${createHash('sha256').update(bytes).digest('hex')}`
+      // Fail the metadata write in PostgreSQL after the actual signed HTTP PUT.
+      const constraint = 'attachment_qa_' + randomUUID().replaceAll('-', '')
+      await database.query(`ALTER TABLE chat_attachments ADD CONSTRAINT ${constraint}
+        CHECK (id NOT IN ('${first.id}', '${abandoned.id}') OR state <> 'ready') NOT VALID`)
+      try {
+        await assert.rejects(store.completeChatFile(peer, first.id, data), { code: 'notFound' })
+        for (const { id } of [first, abandoned]) {
+          await assert.rejects(store.completeChatFile(owner, id, data), { code: '23514' })
+          const key = readKey(id, data)
+          const saved = await database.query('SELECT state,"storageKey" FROM chat_attachments WHERE id=$1', [id])
+          assert.deepEqual(saved.rows[0], { state: 'uploading', storageKey: key })
+          assert.deepEqual(Buffer.from(await storage.getArtifactObjectBytes(key)), data)
+          await assert.rejects(store.readChatFile(owner, id), { code: 'notFound' })
+        }
+      } finally {
+        await database.query(`ALTER TABLE chat_attachments DROP CONSTRAINT ${constraint}`)
+      }
+      const [published, replay] = await Promise.all([
+        store.completeChatFile(owner, first.id, changed),
+        store.completeChatFile(owner, first.id, changed),
+      ])
+      assert.deepEqual(published, replay)
+      await assert.rejects(storage.getArtifactObjectBytes(readKey(first.id, data)), { code: 404 })
+      assert.deepEqual(Buffer.from(await store.chatFileBytes(await store.readChatFile(owner, first.id))), changed)
+      await assert.rejects(store.readChatFile(peer, first.id), { code: 'notFound' })
+      await store.removeChatFile(owner, abandoned.id)
+      await database.query(`UPDATE chat_attachments SET "uploadExpiresAt"=now()-interval '1 second' WHERE id=$1`, [abandoned.id])
+      await store.cleanupChatFiles()
+      await assert.rejects(storage.getArtifactObjectBytes(readKey(abandoned.id, data)), { code: 404 })
+      assert.deepEqual(Buffer.from(await storage.getArtifactObjectBytes(readKey(first.id, changed))), changed)
+      await store.removeChatFile(owner, first.id)
+      await database.query(`UPDATE chat_attachments SET "uploadExpiresAt"=now()-interval '1 second' WHERE id=$1`, [first.id])
+      await store.cleanupChatFiles()
+      await assert.rejects(storage.getArtifactObjectBytes(readKey(first.id, changed)), { code: 404 })
+    })
     await t.test(
       'same-origin chunks reject gaps, altered retries and other owners while allowing exact repeats',
       async () => {

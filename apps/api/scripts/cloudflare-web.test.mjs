@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -153,6 +154,41 @@ test('gateway config can bind a discrete webhook service for both current and ro
   }
 })
 
+test('only a successful version read carries the digest of the serving gateway version', async () => {
+  const header = 'x-mikka-gateway-version-sha256'
+  const id = '7dc7671b-543a-4220-b8d3-58193190ef4b'
+  const expected = createHash('sha256').update(id).digest('hex')
+  const value = { build: 'source', overlaySha: 'official', minMobileBuild: 0, mobileUpdateUrl: '', minDesktopVersion: null }
+  let status = 200
+  const env = { CURRENT_RELEASE: 'now', RELEASES: { now: 'APP' }, CF_VERSION_METADATA: { id }, APP: { fetch(input) {
+    assert.equal(input.headers.has(header), false)
+    return new Response(input.method === 'HEAD' ? null : JSON.stringify(value), {
+      status, headers: { [header]: 'spoofed', 'cache-control': 'no-store' },
+    })
+  } } }
+  const read = (path, method = 'GET') => gateway.fetch(request(path, { method, headers: { [header]: 'spoofed-client' } }), env)
+  const get = await read('/mikka/api/version?dpl=stale')
+  assert.equal(get.headers.get(header), expected)
+  assert.deepEqual(await get.json(), value)
+  const head = await read('/mikka/api/%76ersion', 'HEAD')
+  assert.equal(head.headers.get(header), expected)
+  assert.equal(head.headers.get('cache-control'), 'no-store')
+  assert.equal(await head.text(), '')
+  status = 503
+  assert.equal((await read('/mikka/api/version')).headers.has(header), false)
+  status = 200
+  for (const binding of [undefined, { id: id.toUpperCase() }, { id: 'unknown' }]) {
+    env.CF_VERSION_METADATA = binding
+    assert.equal((await read('/mikka/api/version')).headers.has(header), false)
+  }
+  const stream = new Response(new ReadableStream(), { headers: { [header]: 'upstream-only' } })
+  env.APP.fetch = input => { assert.equal(input.headers.get(header), 'spoofed-client'); return stream }
+  for (const [path, method] of [['/mikka/api/version', 'POST'], ['/mikka/api/status', 'GET']]) {
+    assert.equal(await read(path, method), stream)
+  }
+  await stream.body.cancel()
+})
+
 test('encoded route and asset names retain the same deployment and cache contract', async () => {
   const env = { CURRENT_RELEASE: 'new', RELEASES: { old: 'OLD', new: 'NEW' } }
   const seen = []
@@ -228,6 +264,7 @@ test('release config requires the official compiled shell, matching pins and pri
   await assert.rejects(releaseConfig(input), /sourceInOutput/)
   assert.throws(() => gatewayConfig({ current: 'new', retained: ['old'] }), /RETENTION_INVALID/)
   const routes = gatewayConfig({ current: input.id, retained: ['abcdef0-0-1', input.id] })
+  assert.deepEqual(routes.version_metadata, { binding: 'CF_VERSION_METADATA' })
   assert.equal(routes.services[1].service, config.name)
 })
 
