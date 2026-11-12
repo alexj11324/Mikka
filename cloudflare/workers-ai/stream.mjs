@@ -12,6 +12,7 @@ export function nativeChatStream(body) {
   if (!body) return body
   const decoder = new TextDecoder('utf-8', { ignoreBOM: true })
   let pending = '', frame = '', finished = false, passthrough = false, partialLine = false
+  let scanned = 0
 
   function chatFrame() {
     const lines = frame.split(/\r\n|\r|\n/)
@@ -34,7 +35,7 @@ export function nativeChatStream(body) {
   function consume(text, controller, end = false) {
     pending += text
     let start = 0
-    for (let i = 0; i < pending.length; i++) {
+    for (let i = scanned; i < pending.length; i++) {
       const char = pending[i]
       if (char !== '\r' && char !== '\n') continue
       if (char === '\r' && i + 1 === pending.length && !end) break
@@ -67,6 +68,8 @@ export function nativeChatStream(body) {
         partialLine = true
       }
     }
+    // A fragmented long line only needs to scan new input and a possible CRLF boundary.
+    scanned = pending.length - (!end && pending.endsWith('\r') ? 1 : 0)
     if (end && (frame || pending)) controller.enqueue(encoder.encode(frame + pending))
   }
 
