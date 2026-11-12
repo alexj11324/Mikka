@@ -26,10 +26,11 @@ export function withServiceIdentityAdmin<T>(workspaceId: string, actor: Enterpri
   })
 }
 
-export async function recordServiceIdentityChange(tx: WorkspaceTransaction, identity: Pick<ServiceIdentity, 'workspaceId' | 'id'>, actorId: string, actorName: string, action: AuditAction) {
+export async function recordServiceIdentityChange(tx: WorkspaceTransaction, identity: Pick<ServiceIdentity, 'workspaceId' | 'id'>, actorId: string, actorName: string, action: AuditAction, organizationId?: string) {
   await enqueueWorkspaceAudit(tx, {
     workspaceId: identity.workspaceId, actor: { type: 'user', id: actorId, name: actorName },
     action: `service_identity.${action}`, target: { type: 'service_identity', id: identity.id },
+    ...(organizationId && { metadata: { organizationId } }),
   })
   await workspaceListChanged(tx, identity.workspaceId, ['workspace_settings'])
 }
@@ -90,6 +91,7 @@ export function updateServiceIdentity(workspaceId: string, actor: EnterpriseRead
         "credentialExpiresAt"=CASE WHEN ${enabled} THEN "credentialExpiresAt" ELSE NULL END
       WHERE "workspaceId"=${workspaceId}::uuid AND id=${identityId}::uuid
       RETURNING ${publicColumns}`)
+    if (!enabled) await tx.execute(sql`DELETE FROM mikka_service_key_organization_bindings WHERE "identityId"=${identityId}::uuid`)
     await recordServiceIdentityChange(tx, updated, actor.id, actorName, change.action === 'rename' ? 'renamed' : enabled ? 'restored' : 'disabled')
     return updated
   })

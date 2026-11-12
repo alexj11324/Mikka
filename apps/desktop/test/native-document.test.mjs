@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import test from 'node:test'
 import vm from 'node:vm'
+import { selectWorkspaceMenuItem } from './parity-page-ready.mjs'
 import { nativeLifecycleFailure, observeNativeNavigation, selectBundledServer, waitForBundledDocument } from './native-document.mjs'
 
 // Exercise the installed SDK's actual URL matcher and Frame.waitForURL branch,
@@ -171,7 +172,7 @@ function workspaceSelectionPage({ current = false, immediateLoad = false, clickF
   let loaded = current, rejectNavigation, usableCalls = 0, waits = 0
   const ready = () => { loaded = true; events.emit('domcontentloaded') }
   const item = {
-    async getAttribute(name) { assert.equal(name, 'aria-current'); return current ? 'true' : null },
+    async getAttribute(name) { assert.equal(name, 'aria-checked'); return current ? 'true' : 'false' },
     async click() {
       calls.push('workspace-click')
       if (clickFailure) throw clickFailure
@@ -191,7 +192,7 @@ function workspaceSelectionPage({ current = false, immediateLoad = false, clickF
         assert.equal(options.name, 'Workspace menu')
         return { first: () => ({ async click() { calls.push('open-menu') } }) }
       }
-      assert.equal(role, 'menuitem'); assert.equal(options.name, 'Fixture workspace')
+      assert.equal(role, 'menuitemradio'); assert.equal(options.name, 'Fixture workspace')
       return item
     },
     waitForEvent(event, options) {
@@ -205,7 +206,7 @@ function workspaceSelectionPage({ current = false, immediateLoad = false, clickF
     },
   }
   const select = vm.runInNewContext('(' + selectFixtureSource + ')', {
-    menuNames: { en: 'Workspace menu' }, fixtures: { fixture: { workspaceName: 'Fixture workspace' } },
+    selectWorkspaceMenuItem, menuNames: { en: 'Workspace menu' }, fixtures: { fixture: { workspaceName: 'Fixture workspace' } },
     async usable() {
       usableCalls++; calls.push('usable')
       if (!loaded) throw new Error('page.evaluate: Execution context was destroyed, most likely because of a navigation')
