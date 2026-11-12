@@ -23,7 +23,7 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
   t.after(async () => { await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end() })
   // Actual migrated source columns, defaults and constraints. LIKE deliberately
   // omits foreign keys to public so every fixture stays in our private schema.
-  for (const table of ['"user"', 'issues', 'agent_runs', 'bots', 'suggestions', 'run_messages', 'factory_tasks', 'factory_attempts', 'factory_questions', 'factory_approvals', 'factory_merges', 'attention_matters', 'coordinator_events', 'mikka_workspaces', 'mikka_workspace_members', 'mikka_teams', 'mikka_team_issues', 'resource_access_policies', 'resource_access_grants']) {
+  for (const table of ['"user"', 'issues', 'agent_runs', 'bots', 'suggestions', 'run_messages', 'factory_tasks', 'factory_attempts', 'factory_questions', 'factory_approvals', 'factory_merges', 'attention_matters', 'coordinator_events', 'mikka_workspaces', 'mikka_workspace_members', 'mikka_teams', 'mikka_team_issues', 'resource_access_policies', 'resource_access_grants', 'run_publications', 'agent_tool_approvals', 'local_computer_reviews', 'factory_candidates', 'factory_deliverable_acceptances']) {
     await pool.query(`CREATE TABLE ${table} (LIKE public.${table} INCLUDING DEFAULTS INCLUDING CONSTRAINTS INCLUDING INDEXES)`)
   }
   // Exercise the function installed by the real ACL migrations against this
@@ -106,6 +106,25 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
     await assert.rejects(reject(suggestion), { code: 'inboxNotFound' })
     await assert.rejects(reject(teamSuggestion, other), { code: 'inboxNotFound' })
     await assert.rejects(reject(teamSuggestion, workspace, peer), { code: 'inboxNotFound' })
+  })
+  await t.test('owner approvals outrank an active run; expiration and blocking match the Task state', async () => {
+    const approval = randomUUID()
+    await pool.query("UPDATE agent_runs SET status='running',outcome=NULL WHERE id=$1", [run])
+    await pool.query(`INSERT INTO agent_tool_approvals(id,"runId","userId","deviceId","requestId",harness,method,input,digest,status,"expiresAt")
+      VALUES($1,$2,$3,$4,'inbox-review','codex','fixture','{}','digest','pending',now()+interval '1 hour')`, [approval, run, owner, randomUUID()])
+    const ownerRow = async () => (await list()).items.find(item => item.id === issue)
+    const before = taskStateOf({ status:'todo',metadata:{pullRequests:[]} }, {runId:run,status:'running',outcome:null,awaitingApproval:true})
+    assert.deepEqual([before.state,before.reason], ['waiting','approval'])
+    assert.equal((await ownerRow())?.reason, 'confirm')
+    assert.ok(!(await list(peer)).items.some(item => item.id === issue), 'a private tool prompt cannot create a teammate action')
+    await pool.query(`UPDATE agent_runs SET "failureDetails"=$2 WHERE id=$1`, [run, {
+      schemaVersion:1, runId:run, code:'run_failed', category:'subscription', occurredAt:'2026-11-08T00:00:00Z', appVersion:'fixture',
+    }])
+    assert.equal(await ownerRow(), undefined)
+    await pool.query('UPDATE agent_runs SET "failureDetails"=NULL WHERE id=$1', [run])
+    await pool.query('UPDATE agent_tool_approvals SET "expiresAt"=now() WHERE id=$1', [approval])
+    assert.equal(await ownerRow(), undefined)
+    await pool.query("UPDATE agent_runs SET status='waiting_input',outcome='needs_input' WHERE id=$1", [run])
   })
   await t.test('canonical ownership ignores missing and stale team links and denies unresolved tasks and corrupt personal members', async () => {
     await pool.query('DELETE FROM mikka_team_issues WHERE "issueId"=$1', [issue])
@@ -254,8 +273,11 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
   })
   await t.test('Factory human answers, approvals and successful merges create one source-bound receipt', async () => {
     const task = randomUUID(), attempt = randomUUID(), candidate = randomUUID(), question = randomUUID(), answer = randomUUID(), merge = randomUUID()
+    const sourceEvent = randomUUID()
+    await pool.query(`INSERT INTO coordinator_events(id,"userId","issueId",kind,"dedupeKey",payload,tier)
+      VALUES($1,$2,$3,'user_message',$4,'{}','background')`, [sourceEvent, owner, issue, 'inbox-'+sourceEvent])
     await pool.query(`INSERT INTO factory_tasks(id,"userId","issueId","sourceEventId",route,stage,status,"attemptId",reason,"workspaceId")
-      VALUES($1,$2,$3,$4,'{}','approval','pending',$5,'fixture',$6)`, [task, owner, issue, randomUUID(), attempt, workspace])
+      VALUES($1,$2,$3,$4,'{}','approval','pending',$5,'fixture',$6)`, [task, owner, issue, sourceEvent, attempt, workspace])
     await pool.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,"runId",reason)
       VALUES($1,$2,'approval',1,1,'pending',$3,'fixture')`, [attempt, task, run])
     await pool.query(`INSERT INTO factory_questions(id,"userId","issueId","taskId","attemptId",stage,"originRunId","originSessionId","originRevision","waitingBinding",kind,question,request,status,reason,"sourceEventId")
@@ -266,6 +288,14 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
     assert.ok(!(await list(peer, workspace, 'pending')).items.some(item => item.id === issue), 'a private question cannot make the Task pending for another member')
     await pool.query(`UPDATE factory_tasks SET stage='approval' WHERE id=$1`, [task])
     await pool.query(`UPDATE factory_questions SET "answerId"=$2,"answerSource"='human',"answeredAt"=now() WHERE id=$1`, [question, answer])
+    await pool.query("UPDATE factory_tasks SET stage='spec',status='passed' WHERE id=$1", [task])
+    assert.equal((await list()).items.find(item => item.id === issue)?.reason, 'review')
+    await pool.query("UPDATE factory_tasks SET status='blocked' WHERE id=$1", [task])
+    assert.ok(!(await list()).items.some(item => item.id === issue))
+    await pool.query("UPDATE factory_tasks SET stage='approval',status='pending' WHERE id=$1", [task])
+    await pool.query("UPDATE coordinator_events SET kind='matter_handoff' WHERE id=$1", [sourceEvent])
+    assert.ok(!(await list()).items.some(item => item.id === issue), 'an unverified Factory source cannot create an approval')
+    await pool.query("UPDATE coordinator_events SET kind='user_message' WHERE id=$1", [sourceEvent])
     await pool.query(`INSERT INTO run_messages(id,"runId","userId",text) VALUES($1,$2,$3,'answer')`, [answer, run, owner])
     await pool.query(`INSERT INTO factory_approvals(id,"taskId","candidateId","attemptId","userId","eventId",request,candidate,action,target,evidence,"approvedRevision","publishAttemptId","publishRevision","expiresAt","principalId")
       VALUES($1,$2,$3,$4,$5,$6,'{}','{}','deploy_preview','fixture','{}',1,$4,1,now()+interval '1 day','human')`, [randomUUID(), task, candidate, attempt, owner, randomUUID()])

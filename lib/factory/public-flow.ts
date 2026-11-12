@@ -3,6 +3,17 @@ import type { ReviewVerdict } from '@mikka/protocol/run';
 import type { FactoryTask } from './store';
 import { reviewCheckCounts, type ReviewCheckCounts } from '@/lib/github/review-checks';
 
+// These fragments operate on the same latest, reader- and tenant-bound Factory
+// row (t) and its exact candidate in the batch Task and Inbox readers.
+export const factorySourceAllowed = `EXISTS(SELECT 1 FROM coordinator_events e WHERE e.id=t."sourceEventId" AND e."userId"=t."userId"
+              AND e.kind='user_message' AND e."botId" IS NOT DISTINCT FROM t."botId"
+              AND (e."issueId" IS NULL OR e."issueId"=t."issueId")
+              AND (t."botId" IS NULL OR EXISTS(SELECT 1 FROM bots b WHERE b.id=t."botId"
+                AND b."ownerId"=t."userId" AND b."workspaceId"=t."workspaceId")))`
+export const factoryMerged = `EXISTS(SELECT 1 FROM factory_merges m WHERE m."taskId"=t.id AND m."candidateId"=t."candidateId" AND m."userId"=t."userId" AND m.status='merged' AND candidate.kind='repository')`
+export const factoryAccepted = `EXISTS(SELECT 1 FROM factory_deliverable_acceptances a WHERE a."taskId"=t.id AND a."candidateId"=t."candidateId" AND a."userId"=t."userId" AND candidate.kind IN ('report','deliverable'))`
+export const FACTORY_HANDOFF_STAGES = ['approval', 'publish', 'monitor'] as const
+
 export interface FactoryReviewSummary {
   branch: string | null; additions: number | null; deletions: number | null; changedFiles: number | null;
   headSha: string | null; checks: ReviewCheckCounts | null; checksUpdatedAt: string | null;
@@ -36,7 +47,7 @@ export function publicFactoryStage(stage: FactoryTask['stage'], status: FactoryT
   if (status === 'cancelled' || status === 'revoked') return 'cancelled';
   if (merged) return 'completed';
   return stage === 'clarify' ? 'triage' : stage === 'execute' || stage === 'verify' ? 'implement' :
-    stage === 'approval' || stage === 'publish' || stage === 'monitor' ? 'handoff' : stage;
+    FACTORY_HANDOFF_STAGES.some(value => value === stage) ? 'handoff' : stage;
 }
 const iso = (value: Date | string) => new Date(value).toISOString();
 type FlowStateEvidence = { merged?: boolean; accepted?: boolean; createdAt?: Date | string; finishedAt?: Date | string | null; questionSince?: Date | string | null };
@@ -61,8 +72,8 @@ export function publicFactoryState(task: Pick<FactoryTask, 'stage' | 'status'>, 
 export async function readFactoryFlowStates(tx: Pick<PoolClient, 'query'>, tasks: readonly Pick<FactoryTask, 'id' | 'stage' | 'status'>[]) {
   if (!tasks.length) return new Map<string, Pick<FactoryFlowView, 'stage' | 'needsYou' | 'completion'>>();
   const { rows } = await tx.query<FlowStateEvidence & { id: string }>(`SELECT t.id,current."createdAt",current."finishedAt",q."updatedAt" AS "questionSince",
-    EXISTS(SELECT 1 FROM factory_merges m WHERE m."taskId"=t.id AND m."candidateId"=t."candidateId" AND m."userId"=t."userId" AND m.status='merged' AND candidate.kind='repository') AS merged,
-    EXISTS(SELECT 1 FROM factory_deliverable_acceptances a WHERE a."taskId"=t.id AND a."candidateId"=t."candidateId" AND a."userId"=t."userId" AND candidate.kind IN ('report','deliverable')) AS accepted
+    ${factoryMerged} AS merged,
+    ${factoryAccepted} AS accepted
     FROM factory_tasks t LEFT JOIN factory_attempts current ON current.id=t."attemptId" AND current."taskId"=t.id
     LEFT JOIN factory_candidates candidate ON candidate.id=t."candidateId" AND candidate."taskId"=t.id
     LEFT JOIN LATERAL (SELECT "updatedAt" FROM factory_questions WHERE "taskId"=t.id AND "userId"=t."userId" AND status='waiting_user' ORDER BY "updatedAt",id LIMIT 1) q ON true
