@@ -2,11 +2,11 @@
 import { withFreshSession } from '@/lib/fresh-session'
 import { getTranslations } from 'next-intl/server'
 
-import { and, asc, count, eq, ne } from 'drizzle-orm'
+import { and, asc, count, eq, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { requireUser } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
-import { teams, teamMembers } from '@/lib/db/team-schema'
+import { teamIssues, teams, teamMembers } from '@/lib/db/team-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { loadWorkspaceContext, requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { accessibleTeams, lockTeamRelations, requireActiveTeam, requireTeam } from '@/lib/team-access'
@@ -14,7 +14,9 @@ import type { ActionResult } from '@/lib/action-result'
 import { workspaceAction } from '@/lib/workspace-admin/action'
 import { archiveTeamData, deleteTeamData, readTeamLifecycleAudit, removeTeamGroupingData, restoreTeamData, teamDeletionImpact, teamLifecycleImpact, type TeamDeletion, type TeamDeletionImpact } from '@/lib/workspace-admin/teams'
 import { workspaceListChanged } from '@/lib/live/lists'
-import { pool } from '@/lib/db'
+import { db, pool } from '@/lib/db'
+import { issues } from '@/lib/db/schema'
+import { issueVisibilityPredicate } from '@/lib/issue-visibility-policy'
 import { stopRunsForPolicyChange } from '@/lib/run-policy-stop'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 
@@ -86,9 +88,9 @@ export async function saveTeam(input: { id?: string; workspaceId: string; name: 
     })
   })
 }
-export async function listTeamMembers(id: string, tokenWorkspaceId?: string) {
+export async function listTeamMembers(id: string, tokenWorkspaceId?: string, includeTaskCount = false) {
   const user = await requireUser()
-  return workspaceDb.transaction(async tx => {
+  const { taskIds, workspaceId, ...directory } = await workspaceDb.transaction(async tx => {
     const team = await requireTeam(tx, id, user.id)
     assertTokenWorkspace(user, team.workspaceId)
     if (tokenWorkspaceId && tokenWorkspaceId !== team.workspaceId) throw new WorkspaceError('workspaceAccessDenied')
@@ -98,8 +100,19 @@ export async function listTeamMembers(id: string, tokenWorkspaceId?: string) {
     const canManage = team.admin === 'admin' || team.role === 'owner'
     const availableMembers = canManage ? await tx.select({ userId: workspaceMembers.userId, name: workspaceMembers.name, email: workspaceMembers.email, status: workspaceMembers.status }).from(workspaceMembers)
       .where(and(eq(workspaceMembers.workspaceId, team.workspaceId), eq(workspaceMembers.status, 'active'))).orderBy(asc(workspaceMembers.createdAt)) : []
-    return { members, canManage, workspaceMembers: availableMembers }
+    const links = includeTaskCount ? await tx.select({ id: teamIssues.issueId }).from(teamIssues)
+      .where(and(eq(teamIssues.teamId, team.id), eq(teamIssues.workspaceId, team.workspaceId))) : undefined
+    return { members, canManage, workspaceMembers: availableMembers, workspaceId: team.workspaceId, taskIds: links?.map(link => link.id) }
   })
+  if (!taskIds) return { ...directory, taskCount: undefined }
+  if (!taskIds.length) return { ...directory, taskCount: 0 }
+  // Team relations and Task ACLs may live in separate databases. Apply Task
+  // visibility to this Team's entire member set before exposing a total.
+  const [visible] = await db.select({ total: count() }).from(issues).where(and(
+    sql`${issues.id} = any(${sql.param(taskIds)}::uuid[])`,
+    issueVisibilityPredicate(user.id, { allowedIds: [], workspaceIds: [workspaceId] }),
+  ))
+  return { ...directory, taskCount: visible.total }
 }
 async function changeTeamMemberBody(input: { teamId: string; userId?: string; action: 'join' | 'leave' | 'add' | 'remove' | 'owner' | 'member' }) {
   const i18nText = await getTranslations();

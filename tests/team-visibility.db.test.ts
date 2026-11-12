@@ -24,6 +24,7 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
   const { readRun, visibleRuns, addRunMessage, requestRunStop } = await import('../lib/agent-runs')
   const tools = await import('../lib/mcp/tools')
   const actions = await import('../lib/mcp/actions')
+  const { listTeamMembers } = await import('../app/actions/teams')
   const { citationSources } = await import('../lib/coordinator/store')
   const { issuePropertyChoices } = await import('../lib/issue-property-choices')
   const { registeredTask } = await import('./helpers/registered-task')
@@ -62,6 +63,10 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
     assert.equal((await issueForUser(member,shared))?.id,shared)
     assert.equal(await issueForUser(member,foreignIssue),null)
     assert.equal((await issueForUser(member,unlinked))?.id,unlinked,'a Team is optional inside the authorized workspace')
+    const teamCount = (id: string, tenant: string) => scoped(id, tenant, () => listTeamMembers(team, tenant, true))
+    assert.equal((await teamCount(member, workspace)).taskCount, 1, 'a stale Team link from another tenant is not counted')
+    assert.equal((await scoped(member, workspace, () => listTeamMembers(team, workspace))).taskCount, undefined)
+    await assert.rejects(teamCount(foreign, otherWorkspace))
     // Exhaust the application pool as concurrent Factory transactions do.
     const scope = createRequestDatabaseScope(url!)
     await scope.run(async () => {
@@ -132,6 +137,7 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
     // Revoke after a successful read: no per-request/global positive cache.
     await pool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2',[workspace,member])
     assert.equal(await issueForUser(member,shared),null)
+    await assert.rejects(teamCount(member, workspace))
     assert.equal(await scoped(member, workspace, () => tools.getRun(member,sharedRun)),null)
     assert.deepEqual(await visibleRuns(member,{issueId:shared}),[])
     await pool.query('update mikka_workspace_members set status=\'active\' where "workspaceId"=$1 and "userId"=$2',[workspace,member])

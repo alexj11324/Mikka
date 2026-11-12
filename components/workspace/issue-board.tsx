@@ -39,6 +39,7 @@ export function useIssueBoardSaves({ issues, blocks, newestRuns, onUpdated, onBu
 }) {
   const t = useTranslations('Board')
   const tIssue = useTranslations('Issue')
+  const tDetail = useTranslations('IssueDetail')
   const translateError = useActionError()
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const [columns, setColumns] = useState<Columns>(() => groupIssues(issues, blocks))
@@ -62,32 +63,34 @@ export function useIssueBoardSaves({ issues, blocks, newestRuns, onUpdated, onBu
   })
   const saving = useRef(false)
   async function persist(issue: Issue, patch: { status?: string; priority?: string; block?: BlockFlag }, rollback: Columns) {
-    if (saving.current) return
+    if (saving.current) return false
     saving.current = true
     setPending(true)
     onBusyChange(true)
     setMessage(t('savingProperties'))
     try {
-      const moved = patch.status && patch.status !== issue.status ? await moveIssue({ id: issue.id, status: patch.status, revision: issue.revision })
-        : patch.priority ? await changeIssuePriority({ id: issue.id, priority: patch.priority, revision: issue.revision }) : null
-      // 受阻 by hand is the task's flag, saved after its status so one move is one card change.
-      const result = !patch.block ? moved! : moved && !('issue' in moved && moved.issue) ? moved
-        : await updateIssueMetadata({ id: issue.id, revision: moved && 'issue' in moved && moved.issue ? moved.issue.revision : issue.revision, patch: { block: patch.block } })
+      const result = patch.status
+        ? await moveIssue({ id: issue.id, status: patch.status, revision: issue.revision, block: patch.block })
+        : patch.priority
+          ? await changeIssuePriority({ id: issue.id, priority: patch.priority, revision: issue.revision })
+          : await updateIssueMetadata({ id: issue.id, revision: issue.revision, patch: { block: patch.block } })
       if (!('issue' in result) || !result.issue) {
         setColumns(rollback)
         const errorMessage = translateError(result.error)
         setMessage(errorMessage)
         toast.error(errorMessage)
-        return
+        return false
       }
       const savedIssue = result.issue
       setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.map(item => item.id === issue.id ? { ...item, status: savedIssue.status, priority: savedIssue.priority, metadata: savedIssue.metadata, revision: savedIssue.revision, updatedAt: savedIssue.updatedAt } : item)])))
       setMessage(patch.block?.blocked ? t('moved', { status: statusLabel(BLOCKED_COLUMN) }) : patch.status ? t('moved', { status: statusLabel(patch.status) }) : t('prioritySaved'))
+      return true
     } catch {
       setColumns(rollback)
       const errorMessage = t('moveRollback')
       setMessage(errorMessage)
       toast.error(errorMessage)
+      return false
     } finally {
       saving.current = false
       setPending(false)
@@ -126,19 +129,42 @@ export function useIssueBoardSaves({ issues, blocks, newestRuns, onUpdated, onBu
 
   async function remove(issue: Issue) {
     if (saving.current) return
-    const previous = columns
+    saving.current = true
+    setPending(true)
+    onBusyChange(true)
     setMotion(issue.id, 'leave')
-    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) await new Promise(resolve => window.setTimeout(resolve, CARD_MOTION_MS))
-    setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.filter(item => item.id !== issue.id)])))
-    setMotion(issue.id, null)
-    const result = await setIssueDeleted({ id: issue.id, revision: issue.revision }).catch(() => null)
-    if (!result || !('issue' in result)) {
-      setColumns(previous)
-      toast.error(result ? translateError(result.error) : t('deleteFailed'))
-      return
+    try {
+      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) await new Promise(resolve => window.setTimeout(resolve, CARD_MOTION_MS))
+      const result = await setIssueDeleted({ id: issue.id, revision: issue.revision })
+      if (result.error) {
+        toast.error(translateError(result.error))
+        return
+      }
+      setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.filter(item => item.id !== issue.id)])))
+      let restoring = false
+      async function restore() {
+        if (restoring) return
+        restoring = true
+        try {
+          const restored = await setIssueDeleted({ id: issue.id, restore: true })
+          if (restored.error) toast.error(translateError(restored.error))
+        } catch {
+          toast.error(tDetail('restoreViaLinkFailed'))
+        } finally {
+          restoring = false
+          void onUpdated().catch(() => {})
+        }
+      }
+      toast(t('deleted', { title: issue.title }), { action: { label: t('undo'), onClick: () => { void restore() } } })
+    } catch {
+      toast.error(t('deleteFailed'))
+    } finally {
+      setMotion(issue.id, null)
+      saving.current = false
+      setPending(false)
+      onBusyChange(false)
+      void onUpdated().catch(() => {})
     }
-    toast(t('deleted', { title: issue.title }), { action: { label: t('undo'), onClick: () => { void setIssueDeleted({ id: issue.id, restore: true }).then(() => onUpdated()) } } })
-    void onUpdated().catch(() => {})
   }
 
   function commit(next: Columns, meta: KanbanCommitMeta<Issue>) {
@@ -149,22 +175,22 @@ export function useIssueBoardSaves({ issues, blocks, newestRuns, onUpdated, onBu
     const issue = meta.previousValue[meta.activeContainer]?.find(item => item.id === String(meta.event.active.id))
     if (!issue) { setColumns(meta.previousValue); return }
     setColumns(next)
-    save(issue, meta.activeContainer, meta.overContainer, meta.previousValue)
+    void save(issue, meta.activeContainer, meta.overContainer, meta.previousValue)
   }
   // Into 受阻: the task keeps its status and is flagged. Out of it: its new status, and what blocked it is set aside.
   function save(issue: Issue, from: string, to: string, rollback: Columns) {
-    if (to === BLOCKED_COLUMN) void persist(issue, { block: FLAGGED_BLOCK }, rollback)
-    else if (from === BLOCKED_COLUMN) void persist(issue, { status: to, block: clearedBlock(runOf(issue)) }, rollback)
-    else void persist(issue, { status: to }, rollback)
+    if (to === BLOCKED_COLUMN) return persist(issue, { block: FLAGGED_BLOCK }, rollback)
+    if (from === BLOCKED_COLUMN) return persist(issue, { status: to, block: clearedBlock(runOf(issue)) }, rollback)
+    return persist(issue, { status: to }, rollback)
   }
   /** A card dropped into another column without dnd-kit (a UI layer's own board): moved at once, then saved. */
-  function moveTo(id: string, to: string) {
-    if (saving.current) return
+  async function moveTo(id: string, to: string) {
+    if (saving.current) return false
     const from = Object.keys(columns).find(key => columns[key]?.some(item => item.id === id))
     const issue = from ? columns[from]?.find(item => item.id === id) : undefined
-    if (!issue || !from || from === to || !(to in columns)) return
+    if (!issue || !from || from === to || !(to in columns)) return false
     setColumns(Object.fromEntries(Object.entries(columns).map(([key, items]) => [key, key === to ? [issue, ...items] : items.filter(item => item.id !== id)])))
-    save(issue, from, to, columns)
+    return save(issue, from, to, columns)
   }
   function metadataBusy(busy: boolean) { saving.current = busy; setPending(busy); onBusyChange(busy) }
   function metadataSaved(savedIssue: MetadataSavedIssue) {

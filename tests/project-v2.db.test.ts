@@ -295,6 +295,19 @@ test('Project v2: split database migration, canonical relationships and live ten
       await workspace.query(`INSERT INTO mikka_team_projects("projectId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)`, [createdId, firstTeam, alpha, member])
       const assigned = await actAs(member, () => actions.setProjectIssues({ id: createdId, revision: 1, issueIds: many, workspaceId: alpha }))
       assert.ok('project' in assigned, JSON.stringify(assigned)); assert.equal(assigned.project.issueIds.length, 125)
+      await application.query("UPDATE issues SET status='done' WHERE id=$1", [many[123]])
+      const list = await actAs(member, () => actions.listWorkspaceProjects(alpha))
+      assert.deepEqual(list.find(project => project.id === createdId)?.taskCounts, { total: 125, done: 1 })
+      const { listWorkspaceTaskPage } = await import('../app/actions/issues')
+      const page = (after: Parameters<typeof listWorkspaceTaskPage>[0]['after']) =>
+        actAs({ id: member, [tokenWorkspace]: alpha }, () => listWorkspaceTaskPage({ workspaceId: alpha, projectId: createdId, after }))
+      const first = await page(null)
+      assert.equal(first.items.length, 100)
+      assert.ok(first.next)
+      const rest = await page(first.next)
+      assert.equal(rest.items.length, 25)
+      assert.deepEqual([...first.items, ...rest.items].map(task => task.id).sort(), many.toSorted())
+      assert.equal(rest.next, null)
       const crossTenant = await actAs(member, () => actions.setProjectIssues({ id: createdId, revision: assigned.project.revision, issueIds: [foreignTask], workspaceId: alpha }))
       assert.match(crossTenant.error ?? '', /issueNotFound/)
       const conflictResult = await actAs(member, () => actions.setProjectIssues({ id: createdId, revision: assigned.project.revision, issueIds: [initialTasks[1]], workspaceId: alpha }))
@@ -335,6 +348,9 @@ test('Project v2: split database migration, canonical relationships and live ten
       const [task, batchTask] = await makeTasks(alpha, 2)
       const assigned = await actAs(member, () => actions.setProjectIssues({ id: source.id, revision: source.revision, issueIds: [task], workspaceId: alpha }))
       assert.ok('project' in assigned, JSON.stringify(assigned))
+      const staleMove = await actAs(member, () => actions.moveIssueToProject({ issueId: task, revision: 1, projectId: null, workspaceId: alpha }))
+      assert.match(staleMove.error ?? '', /issueOutdated/, 'a Task detail opened before a Project edit cannot overwrite the new link')
+      assert.equal((await workspace.query('SELECT "projectId" FROM workspace_project_tasks WHERE "issueId"=$1', [task])).rows[0].projectId, source.id)
       const { changeResourceAccess } = await import('../lib/resource-access/store')
       const policy = (await application.query(`SELECT revision FROM resource_access_policies WHERE kind='project' AND id=$1`, [destination.id])).rows[0]
       await changeResourceAccess(member, { kind: 'project', id: destination.id, workspaceId: alpha }, { expectedRevision: policy.revision, visibility: 'private', grants: [] })
@@ -346,7 +362,7 @@ test('Project v2: split database migration, canonical relationships and live ten
         events: (await workspace.query('SELECT * FROM workspace_project_events WHERE "projectId"=ANY($1::uuid[]) ORDER BY id', [[source.id, destination.id]])).rows,
       })
       const before = await snapshot()
-      const refusedMove = await actAs(member, () => actions.moveIssueToProject({ issueId: task, revision: 1, projectId: destination.id, workspaceId: alpha }))
+      const refusedMove = await actAs(member, () => actions.moveIssueToProject({ issueId: task, revision: 2, projectId: destination.id, workspaceId: alpha }))
       assert.equal(refusedMove.error, 'accessChangeConfirmationRequired')
       assert.equal(refusedMove.confirmable, true)
       assert.deepEqual(await snapshot(), before, 'refused move leaves both databases unchanged')
@@ -354,7 +370,7 @@ test('Project v2: split database migration, canonical relationships and live ten
       assert.equal(refusedBatch.error, 'accessChangeConfirmationRequired')
       assert.equal(refusedBatch.confirmable, true)
       assert.deepEqual(await snapshot(), before, 'refused batch leaves both databases unchanged')
-      const moved = await actAs(member, () => actions.moveIssueToProject({ issueId: task, revision: 1, projectId: destination.id, workspaceId: alpha, confirmAccess: true }))
+      const moved = await actAs(member, () => actions.moveIssueToProject({ issueId: task, revision: 2, projectId: destination.id, workspaceId: alpha, confirmAccess: true }))
       assert.ok(moved.issue, JSON.stringify(moved))
       assert.equal((await workspace.query('SELECT "projectId" FROM workspace_project_tasks WHERE "issueId"=$1', [task])).rows[0].projectId, destination.id)
       assert.deepEqual((await application.query(`SELECT "parentKind","parentId",visibility FROM resource_access_policies WHERE kind='task' AND id=$1`, [task])).rows[0],
@@ -363,6 +379,15 @@ test('Project v2: split database migration, canonical relationships and live ten
       const batched = await actAs(member, () => actions.setProjectIssues({ id: destination.id, revision: current.revision, issueIds: [task, batchTask], workspaceId: alpha, confirmAccess: true }))
       assert.ok('project' in batched, JSON.stringify(batched))
       assert.deepEqual(batched.project!.issueIds.sort(), [task, batchTask].sort())
+      const staleBatch = await actAs(member, () => actions.setProjectIssues({ id: source.id, revision: assigned.project!.revision, issueIds: [task], workspaceId: alpha }))
+      assert.match(staleBatch.error ?? '', /projectSaveConflict/, 'a Project picker opened before a single Task move cannot reclaim the Task')
+      const removed = await actAs(member, () => actions.setProjectIssues({ id: destination.id, revision: batched.project!.revision, issueIds: [task], workspaceId: alpha, confirmAccess: true }))
+      assert.ok('project' in removed, JSON.stringify(removed))
+      for (const id of [task, batchTask]) {
+        assert.equal((await application.query('SELECT revision FROM issues WHERE id=$1', [id])).rows[0].revision, 3)
+        const versions = await application.query('SELECT revision FROM issue_versions WHERE "issueId"=$1 ORDER BY revision', [id])
+        assert.deepEqual(versions.rows.map(row => row.revision), [2, 3])
+      }
     })
 
     await t.test('fresh membership and pinned Workspace gate writes, including the creator', async () => {
