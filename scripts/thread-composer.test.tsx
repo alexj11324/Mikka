@@ -533,4 +533,10 @@ test('Inbox waiting replies keep the original thread, viewer, workspace and requ
     expectedOwnerId: viewer.ownerId, expectedWorkspaceId: viewer.workspaceId })
   await act(async () => { assert.equal((await submit(issueId, laterRunId, 'Original answer')).status, 'accepted') })
   assert.notEqual((calls[3] as { requestId: string }).requestId, original.requestId, 'an acknowledged answer must not consume a later independent answer')
+  const { DesktopTransportError } = await import('../apps/desktop/src/renderer/read-batch')
+  for (const [status, expected] of [[401, messages.Errors.authRequired], [403, messages.Coordinator.sendAccessDenied],
+    [426, messages.Coordinator.sendUpdateRequired], [429, messages.Coordinator.sendRateLimited]] as const) {
+    postReply = async () => { throw new DesktopTransportError('desktop_rpc_request_rejected', { status }) }
+    await act(async () => { assert.deepEqual(await submit(issueId, runId, 'Denied ' + status), { status: 'failed', error: expected }) })
+  }
 })
