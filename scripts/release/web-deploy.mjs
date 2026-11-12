@@ -73,7 +73,7 @@ export async function productionSha({ token, fetchImpl = fetch }) {
   return SHA.test(sha ?? '') ? sha : ''
 }
 
-async function githubRead(path, { token, fetchImpl, timeoutMs = 20_000 }) {
+export async function githubRead(path, { token, fetchImpl, timeoutMs = 20_000 }) {
   if (!token) throw Error('webDeploy:githubTokenRequired')
   let response
   try {

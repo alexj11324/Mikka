@@ -54,6 +54,17 @@ the matching Web release is serving, the existing manual E2B release accepts a
 retry reason. It rechecks the live version after building and validates both
 official subscriptions before publishing template IDs.
 
+After a Cloudflare promotion, dispatch the same official runtime workflow on
+current main with its retry reason and `cloudflare_receipt`. The value is
+`<comment-id>-<sha256-of-entire-comment-body>` for the post-promotion record
+on #1954. Dispatch within ten minutes of its verification. The original owner
+acceptance window must cover the complete run. The workflow verifies the
+owner's source and inventory approval, the public DNS TXT commitment, the
+serving gateway version, and the deployment pin in the live sign-in page.
+The same release produces the immutable template report for the private
+Cloudflare API deployment. The legacy Web publisher runs only on the original
+release path with an empty Cloudflare receipt.
+
 See the [private runbook](https://github.com/alexj11324/mikka-cloud/blob/main/docs/operations/web-deploy.md).
 
 ## Logs are public
