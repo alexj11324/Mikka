@@ -29,6 +29,23 @@ export const organizationMembers = pgTable('mikka_organization_members', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [primaryKey({ columns: [table.organizationId, table.userId] }), index('mikka_org_members_user_idx').on(table.userId)])
 
+/** A pending invitation grants only Organization Member; no Workspace or Project ACL. */
+export const organizationInvitations = pgTable('mikka_organization_invitations', {
+  id: uuid('id').primaryKey(),
+  organizationId: uuid('organizationId').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  createdBy: text('createdBy').notNull(),
+  email: text('email').notNull(),
+  tokenHash: text('tokenHash').notNull().unique(),
+  status: text('status').$type<'pending' | 'accepted' | 'revoked'>().notNull().default('pending'),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+  acceptedBy: text('acceptedBy'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  unique('mikka_org_invitation_email_unique').on(table.organizationId, table.email),
+  index('mikka_org_invitation_org_idx').on(table.organizationId, table.createdAt),
+])
+
 export const organizationWorkspaces = pgTable('mikka_organization_workspaces', {
   workspaceId: uuid('workspaceId').primaryKey().references(() => workspaces.id, { onDelete: 'cascade' }),
   organizationId: uuid('organizationId').notNull().references(() => organizations.id, { onDelete: 'cascade' }),

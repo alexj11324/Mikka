@@ -81,6 +81,20 @@
     "test": "tests/mobile-handoff.test.ts",
     "suite": "test:desktop-auth"
   },
+  "app/api/organization-invitations/accept/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Accept one Organization Member invitation only for a verified matching email. Never admit the account to attached Workspaces or Projects.",
+    "test": "tests/organization-invitations.db.test.ts",
+    "suite": "test:organization-invitations-db"
+  },
+  "app/api/organizations/[organizationId]/invitations/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Let an active Organization member invite ordinary members, and revoke only their own pending invitations. Administrator access is explicitly scoped.",
+    "test": "tests/organization-invitations.db.test.ts",
+    "suite": "test:organization-invitations-db"
+  },
   "app/api/organizations/[organizationId]/api-keys/[keyId]/route.ts": {
     "mode": "built-in",
     "environment": [],
@@ -349,6 +363,15 @@
     "test": "lib/artifacts/storage.test.ts",
     "suite": "test:self-hosted-byok"
   },
+  "drizzle/20261112061146_organization_member_invitations.sql": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Persist hashed single-use Organization Member invitations in the Workspace PostgreSQL database; accepting one never writes Workspace or Project grants.",
+    "test": "tests/organization-invitations.db.test.ts",
+    "suite": "test:organization-invitations-db"
+  },
   "lib/audit/events.ts": {
     "mode": "built-in",
     "environment": [
@@ -425,6 +448,15 @@
     "behavior": "Keep ordinary transaction notifications after commit and fence only callbacks registered in a quarantined account recovery.",
     "test": "lib/account/deletion-restore.db.test.ts",
     "suite": "test:account-db"
+  },
+  "lib/db/governance-schema.ts": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Use canonical Workspace database schema for Organization invitations and member-only admission, without a second ACL fact source.",
+    "test": "tests/organization-invitations.db.test.ts",
+    "suite": "test:organization-invitations-db"
   },
   "lib/db/direct-session.ts": {
     "mode": "built-in",
@@ -608,6 +640,13 @@
     "behavior": "Read only current, explicitly bound service keys visible under both admin roles and rename by the ID of a single issuance.",
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
+  },
+  "lib/governance/organization-invitations.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the existing Organization membership authority to issue, revoke and accept email-bound Member-only invitations. Acceptance never grants Workspace, Project or credential access.",
+    "test": "tests/organization-invitations.db.test.ts",
+    "suite": "test:organization-invitations-db"
   },
   "lib/governance/service-credentials.ts": {
     "mode": "built-in",

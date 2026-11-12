@@ -1658,6 +1658,15 @@
       "sourceHash": "d6790ecc50cc9c10ae2e296ac8ed635e353cdfd6dc3ef515893786b4729af725"
     },
     {
+      "path": "/mikka/api/organization-invitations/accept",
+      "template": "/api/organization-invitations/accept",
+      "source": "app/api/organization-invitations/accept/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "8f0650314dcb8077bedab6c0456bec2408798dcc413fd0dc4b3762505a55e643"
+    },
+    {
       "path": "/mikka/api/organizations",
       "template": "/api/organizations",
       "source": "app/api/organizations/route.ts",
@@ -1735,6 +1744,17 @@
         "POST"
       ],
       "sourceHash": "d43347dc9bb57194d79cc76b270b49600738f08f0002b5dc8c31ea7716e3af3b"
+    },
+    {
+      "path": "/mikka/api/organizations/[organizationId]/invitations",
+      "template": "/api/organizations/[organizationId]/invitations",
+      "source": "app/api/organizations/[organizationId]/invitations/route.ts",
+      "methods": [
+        "DELETE",
+        "GET",
+        "POST"
+      ],
+      "sourceHash": "21060078d4b86cb3f54f10bc5f73dcfbafe256335bd1176f5c43d2d9c42ec62b"
     },
     {
       "path": "/mikka/api/organizations/[organizationId]/members",
