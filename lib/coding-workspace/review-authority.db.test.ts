@@ -527,19 +527,22 @@ test('task review: current owner, session, tenant and immutable physical checkou
     const current = await grant(f, 'preview'), other = await grant(unrelated, 'preview'), binding = await checkerBinding(f, 'review')
     const reader = { id: f.userId, [tokenWorkspace]: f.workspaceId }
     reviewJobs.length = 0
+    let appXid: string, workspaceXid: string
+    const statuses = async () => (await pool.query<{ app: string; workspace: string }>(
+      'SELECT pg_xact_status($1::xid8) AS app, pg_xact_status($2::xid8) AS workspace',
+      [appXid, workspaceXid])).rows[0]
     beforeClose = async () => {
-      const probe = await pool.connect()
-      try {
-        await probe.query('BEGIN')
-        await probe.query('SELECT id FROM mikka_workspaces WHERE id=$1 FOR UPDATE NOWAIT', [f.workspaceId])
-        await probe.query('SELECT "userId" FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 FOR UPDATE NOWAIT', [f.workspaceId, f.userId])
-        await probe.query('SELECT "runId" FROM thread_machines WHERE "runId"=$1 FOR UPDATE NOWAIT', [f.runId])
-      } finally { await probe.query('ROLLBACK'); probe.release() }
+      // A new authorized reader may now hold the same rows. The two original
+      // transactions must have committed and released all their own locks.
+      assert.deepEqual(await statuses(), { app: 'committed', workspace: 'committed' })
     }
     await withTaskWorkspace(reader, f.workspaceId, async () => {
       const client = await pool.connect()
       try {
         await client.query('BEGIN')
+        appXid = (await client.query('SELECT pg_current_xact_id()::text AS id')).rows[0].id
+        workspaceXid = (await workspacePool!.query('SELECT pg_current_xact_id()::text AS id')).rows[0].id
+        assert.deepEqual(await statuses(), { app: 'in progress', workspace: 'in progress' })
         await client.query('UPDATE factory_attempts SET output=\'{"ordinary":"progress"}\',status=\'running\' WHERE id=$1', [binding.attemptId])
         assert.equal((await leaseRow(current.lease.id)).revokedAt, null, 'ordinary checker progress adds no source fence')
         const result = await binding.bind(client)
@@ -548,6 +551,7 @@ test('task review: current owner, session, tenant and immutable physical checkou
         assert.equal((await leaseRow(current.lease.id)).revokedAt, null, 'uncommitted fence is not externally published')
         assert.equal(reviewJobs.length, 0)
         await client.query('COMMIT')
+        assert.deepEqual(await statuses(), { app: 'committed', workspace: 'in progress' })
         await new Promise(resolve => setImmediate(resolve))
         assert.equal(reviewJobs.length, 0, 'APP commit must still wait for the captured outer Workspace executor')
         assert.equal(closeCalls.length, 0)
