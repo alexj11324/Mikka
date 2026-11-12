@@ -627,7 +627,7 @@ class Gateway:
 
 
 async def serve(ready_fd=None, *, cloudflare=False):
-    gateway = Gateway(cloudflare=cloudflare)
+    gateway = Gateway(cloudflare=True) if cloudflare else Gateway()
     await gateway.start()
     stopped = asyncio.Event()
 
