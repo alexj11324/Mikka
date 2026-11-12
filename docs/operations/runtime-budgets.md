@@ -100,3 +100,5 @@ traffic groups and enough samples. Missing samples are `insufficient`; changed
 traffic is `not_comparable`. Neither result proves improvement. Source tests,
 configured definitions, workflow completion and actual runtime observations
 establish different layers of evidence.
+
+The same Cloudflare Container observation measures completed login, chat and API requests using the existing 99% success target and 10-second p95 threshold. A request still open after 120 seconds counts as a timeout. Select one complete 15-minute quarter at least 120 seconds in the past. Its single bounded log read includes the following two minutes for completions only. Requests that start in that grace interval belong to the next quarter. CPU, memory, database attribution and route profiles keep their original quarter boundaries. A source with no eligible starts or no observed latency leaves those alert IDs unassessed when notifying the existing internal sink.
