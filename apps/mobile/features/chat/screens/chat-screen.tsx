@@ -28,7 +28,7 @@ import { separatorLabel, startsGroup } from '@/lib/chat-time'
 import { isOpenUI } from '@/lib/openui'
 import type { HeldMessage } from '@/lib/message-actions'
 import { plainText, quotable } from '@/lib/quote'
-import { delivered, inFlight, marked, outgoingKey, queued, sendFailureState, submissionBody, unsettled, type Outgoing } from '@/lib/outbox'
+import { canAnswerCard, delivered, inFlight, marked, outgoingKey, queued, sendFailureState, submissionBody, unsettled, type Outgoing } from '@/lib/outbox'
 import { apiCache } from '@/lib/api-cache'
 import { askForPush, usePushState } from '@/lib/push-state'
 import { runName, type BotPage, type Chat, type CitationSource, type PendingAction } from '@/lib/types'
@@ -210,8 +210,8 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
     return request
   }
 
-  const send = async (typed: string, attachments: Attachment[] = []) => {
-    if (serviceUnavailable || agent.status === 'resuming') return false
+  const send = async (typed: string, attachments: Attachment[] = [], sourceCardId?: string) => {
+    if (serviceUnavailable || agent.status === 'resuming' || (sourceCardId && !canAnswerCard(pendingSends.current, sourceCardId))) return false
     const question = openInteractions(agent.view).find(item => item.request.allowFreeform && !item.answer)
     if (question && typed.trim() && !attachments.length) {
       try { await agent.respond(parseAnswers([{ interactionId: question.interactionId, text: typed.trim() }])); return true }
@@ -228,8 +228,11 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
     const context = apiCache.context()
     const targetBotId = data?.botId ?? botId
     const held = unsettled(pendingSends.current, message, images, self, context)
-    const item = held ?? queued([], outgoingKey(uuid.v4), message, images, { botId: targetBotId, chatKey: self, context })[0]
-    updateOutbox(list => held ? marked(list, item.key, 'sending') : [...list, item])
+    const previous = sourceCardId ? pendingSends.current.find(item => item.sourceCardId === sourceCardId) : undefined
+    // A lost acknowledgement may have committed. Only its original body and ID can be sent again.
+    if (previous && !held && previous.state !== 'failed') return false
+    const item = held ?? queued([], outgoingKey(uuid.v4), message, images, { botId: targetBotId, chatKey: self, context, sourceCardId })[0]
+    updateOutbox(list => held ? marked(list, item.key, 'sending') : [...list.filter(entry => entry !== previous), item])
     return deliver(item)
   }
 
@@ -245,8 +248,6 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
     // The composer still holds the words of a failed send; once they arrive it empties.
     if (await deliver(item)) setText(current => current.trim() === item.text ? '' : current)
   }
-
-  const answer = async (message: string) => send(message)
 
   // 停止: the turn ends on the server, keeping what it had said. Stop is away only while its request is out; one that fails or
   // leaves the chat working 10 seconds later shows 「没停下 · 重试」.
@@ -288,6 +289,7 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
     const separator = startsGroup(item.createdAt, items[index - 1]?.createdAt) ? separatorLabel(item.createdAt) : null
     const question = item.from === 'event' ? questionCard(item.line, sources) : null
     const selected = selection?.key === item.position ? selection : null
+    const cardId = item.streamId ?? item.id ?? `position:${item.position}`
     return (
       <Arrival animate={arrived(item.position)}>
         {separator ? <TimeSeparator label={separator} /> : null}
@@ -306,7 +308,7 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
         {item.from === 'coordinator' && item.text ? (
           <MessageRow onSelect={selected ? undefined : () => toggleSelection(item.position, item.text)}>
             {isOpenUI(item.text)
-              ? <OpenUIReply text={item.text} live={index > lastMine && !outbox.length} reply={items.slice(index + 1).find(next => next.from === 'person')?.text} answer={answer} sources={sources} onOpen={open} />
+              ? <OpenUIReply text={item.text} live={index > lastMine && canAnswerCard(outbox, cardId)} reply={items.slice(index + 1).find(next => next.from === 'person')?.text} answer={message => send(message, [], cardId)} sources={sources} onOpen={open} />
               : <BotBubble>{selected
                 ? <ChatSelectableText text={selected.text} onSelect={onSelected} onRect={rect => { selectionRect.current = rect }} />
                 : <Markdown text={item.text} sources={sources} onOpen={open} />}</BotBubble>}

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { delivered, inFlight, marked, outgoingKey, queued, sendFailureState, submissionBody, unsettled } from '../lib/outbox.ts'
+import { canAnswerCard, delivered, inFlight, marked, outgoingKey, queued, sendFailureState, submissionBody, unsettled } from '../lib/outbox.ts'
 
 test('an unconfirmed message keeps one UUID and immutable body through bubble and composer retries', () => {
   const key = outgoingKey()
@@ -26,4 +26,19 @@ test('transport failures stay unconfirmed while known validation/auth refusals a
   for (const failure of [Error('network'), { status: 408 }, { status: 500 }, { status: 502 }, null]) assert.equal(sendFailureState(failure), 'unconfirmed')
   for (const status of [400, 401, 403, 404, 409, 413]) assert.equal(sendFailureState({ status }), 'failed')
   assert.equal(outgoingKey(() => 'native-uuid'), 'native-uuid', 'Expo supplies the native UUID implementation without a new native module')
+})
+
+test('only the originating choice can reopen an unsettled answer and transport keeps its immutable body', () => {
+  const draft = queued([], 'op1', 'Keep the original draft', [], { sourceCardId: 'card-a', chatKey: 'chat', context: 3 })
+  assert.equal(canAnswerCard([], 'card-a'), true)
+  assert.equal(canAnswerCard(draft, 'card-a'), false)
+  for (const state of ['failed', 'unconfirmed'] as const) {
+    const saved = marked(draft, 'op1', state)
+    assert.equal(canAnswerCard(saved, 'card-a'), true)
+    assert.equal(canAnswerCard(saved, 'card-b'), false)
+    assert.equal(canAnswerCard([...saved, ...queued([], 'other', 'Another message')], 'card-a'), false)
+    const same = unsettled(saved, 'Keep the original draft', [], 'chat', 3)!
+    assert.equal(same.submissionId, 'op1')
+    assert.deepEqual(submissionBody(same), { text: 'Keep the original draft', botId: null, submissionId: 'op1' })
+  }
 })

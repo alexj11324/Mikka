@@ -36,7 +36,7 @@ export async function personalSubmissionRecorded(executor: Pick<typeof db, 'sele
   const [prior] = await executor.select({ userId: coordinatorEvents.userId, botId: coordinatorEvents.botId, kind: coordinatorEvents.kind, issueId: coordinatorEvents.issueId, runId: coordinatorEvents.runId, payload: coordinatorEvents.payload })
     .from(coordinatorEvents).where(eq(coordinatorEvents.dedupeKey, submissionKey(userId, botId, id))).limit(1)
   if (!prior) return false
-  if (prior.userId !== userId || prior.botId !== botId || prior.kind !== 'user_message' || prior.issueId !== null || prior.runId !== null || !isDeepStrictEqual(withoutHostSession(prior.payload), { text })) throw new SubmissionConflictError()
+  if (prior.userId !== userId || prior.botId !== botId || prior.kind !== 'user_message' || prior.issueId !== null || prior.runId !== null || !isDeepStrictEqual(withoutHostSession(prior.payload, id), { text })) throw new SubmissionConflictError()
   return true
 }
 
@@ -74,7 +74,7 @@ export async function recordPersonalSubmission(executor: Executor, userId: strin
   const [prior] = await executor.select({ id: coordinatorEvents.id, userId: coordinatorEvents.userId, botId: coordinatorEvents.botId, kind: coordinatorEvents.kind, issueId: coordinatorEvents.issueId, runId: coordinatorEvents.runId, payload: coordinatorEvents.payload })
     .from(coordinatorEvents).where(eq(coordinatorEvents.dedupeKey, dedupeKey)).limit(1)
   if (!prior) throw new Error('personalSubmissionUnavailable')
-  if (!submissionId || prior.userId !== userId || prior.botId !== botId || prior.kind !== event.kind || (prior.issueId !== null && !taskDestination && !taskCommand) || prior.runId !== null || !isDeepStrictEqual(withoutHostSession(prior.payload), withoutHostSession(event.payload))) throw new SubmissionConflictError()
+  if (!submissionId || prior.userId !== userId || prior.botId !== botId || prior.kind !== event.kind || (prior.issueId !== null && !taskDestination && !taskCommand) || prior.runId !== null || !isDeepStrictEqual(withoutHostSession(prior.payload, submissionId), withoutHostSession(event.payload, submissionId))) throw new SubmissionConflictError()
   return { duplicate: true, eventId: prior.id }
 }
 
@@ -106,8 +106,10 @@ export class PersonalSubmissionBodyError extends Error {
 // Replays keep the first immutable provenance. A later session cannot upgrade
 // a prior API message to browser authorization or rewrite its original receipt.
 // A host-only audience label added after that receipt is not part of its body.
-function withoutHostSession(payload:Record<string,unknown>){
-  const {humanSessionId:_hostSession,source,...content}=payload
+function withoutHostSession(payload: Record<string, unknown>, requestId?: string) {
+  const { humanSessionId: _hostSession, source, submissionId, ...content } = payload
+  // Older rows omit the echoed operation key. A different one remains a conflict.
+  if (submissionId !== undefined && submissionId !== requestId) content.submissionId = submissionId
   if(source!==undefined && source!=='person')return {...content,source}
   return content
 }

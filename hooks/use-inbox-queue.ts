@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+import { readAccessFailure } from '@/lib/swr/persistent-cache'
 import useSWRInfinite, { unstable_serialize } from 'swr/infinite'
 import { useLiveKeys } from '@/hooks/use-live-key'
 import { readInboxPage, submitInboxCommand, type InboxTab } from '@/lib/inbox/client'
@@ -18,7 +20,14 @@ export function useInboxQueue(ownerId: string | undefined, workspaceId: string |
   useLiveKeys(ownerId && workspaceId ? [
     { kind: 'pending_actions', id: workspaceId }, { kind: 'issue_list', id: workspaceId },
   ] : [], [unstable_serialize(getKey)], workspaceId)
-  const forbidden = read.error?.status === 401 || read.error?.status === 403
+  const scope = JSON.stringify([version, ownerId, workspaceId, tab])
+  const [deniedScope, setDeniedScope] = useState<string | null>(null)
+  const denied = Boolean(readAccessFailure(read.error))
+  useEffect(() => {
+    if (denied) setDeniedScope(scope)
+    else if (!read.error && read.data) setDeniedScope(null)
+  }, [scope, denied, read.error, read.data])
+  const forbidden = denied || deniedScope === scope
   const items = forbidden ? [] : read.data?.flatMap(page => page.items) ?? []
   const more = Boolean(read.data?.at(-1)?.nextCursor)
   async function command(entry: InboxEntry, action: 'reject' | 'undo_reject' | 'reopen' | 'snooze', until?: string) {
