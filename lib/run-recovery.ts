@@ -21,6 +21,7 @@ export async function recoverRuns(groupTurns: (work: () => Promise<unknown>) => 
   // Bot computers whose sandbox E2B no longer has stop claiming to run.
   const machines = runs('machines') ? await reconcileCloudMachines(pool).catch(() => null) : null
   // Ended runs never judged (any end path, and the last week before outcomes existed) get their outcome (R-52).
+  const reviewSessions = runs('reviewSessions') ? await (await import('./coding-workspace/review-sessions')).expireReviewSessions(pool).catch(() => null) : null
   const outcomes = runs('outcomes') ? await judgePendingOutcomes().catch(() => null) : null
   // The same durable owner follows create/resume, pause retries and retention,
   // including running machines whose individual Workflow ended or disappeared.
@@ -32,5 +33,5 @@ export async function recoverRuns(groupTurns: (work: () => Promise<unknown>) => 
   // Group turns left queued when their request ended: they no longer wait for someone to read the group.
   const started = Date.now()
   if (runs('groupTurns')) await groupTurns(() => resumePendingGroupTurns(started + 220000).catch(() => console.error('Group turn sweep failed')))
-  return { ...(leases ?? { owners: 0, failed: 0 }), machines, outcomes, taskMachines, sandboxKills, tasks }
+  return { ...(leases ?? { owners: 0, failed: 0 }), machines, outcomes, reviewSessions, taskMachines, sandboxKills, tasks }
 }

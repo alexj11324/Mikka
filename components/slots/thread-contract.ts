@@ -1,4 +1,5 @@
 import { createContext, type ReactNode } from 'react'
+import type { DecisionReceipt } from '@/hooks/use-decision-submission'
 import type { RunSource } from '@/lib/coordinator/citations'
 import type { ChatComposerProps } from './chat-composer-contract'
 
@@ -48,6 +49,7 @@ export type ThreadEntry =
     attachments?: { id: string; name: string; meta?: string }[]
     /** queued: written offline · sending · failed: shows 重试 (onRetry). */
     status?: 'sent' | 'sending' | 'failed'
+    deliveryMessage?: string
     onRetry?: () => void
     /** Copy and reactions. */
     actions?: ReactNode
@@ -69,6 +71,9 @@ export type ThreadEntry =
 
 /** A question waiting on the person (a Factory question): answered in the dock above the composer. */
 export type ThreadQuestion = {
+  revision?: number
+  unavailable?: string
+  recordedAnswer?: string
   id: string
   question: string
   /** The task it belongs to, in words. */
@@ -104,7 +109,7 @@ export type ThreadScreenProps = {
   notices?: ReactNode
   /** Questions waiting on the person; `onAnswer` sends the option's title or the person's own words. */
   questions: ThreadQuestion[]
-  onAnswer: (id: string, text: string) => void
+  onAnswer: (id: string, text: string) => Promise<DecisionReceipt>
   /** How many tasks run, for the head. */
   running: number
   /** Opens a task and the Inbox. */

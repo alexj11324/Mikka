@@ -64,7 +64,6 @@ export async function exerciseFactoryRecoveryEntry(
       visibleRuns: unused,
     });
     stub("../../lib/coordinator/native.ts", {
-      nativeCoordinatorEnabled: () => false,
       nativeCoordinatorStore: {
         assertToolActive: async (
           user: string,

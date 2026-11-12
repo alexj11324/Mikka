@@ -32,6 +32,43 @@ function runnerFixture(t, names = ['a', 'b', 'c']) {
   return { root, scripts: Object.keys(commands) }
 }
 
+test('the enterprise PostgreSQL command flushes every test record before exiting', async t => {
+  const command = JSON.parse(readFileSync('package.json', 'utf8')).scripts['test:enterprise-db']
+  const tokens = command.split(/\s+/)
+  assert.equal(tokens.shift(), 'node')
+  const flags = tokens.slice(0, tokens.indexOf('--test') + 1)
+  assert.equal(flags.at(-1), '--test')
+  assert.ok(!flags.includes('--test-force-exit'), 'forced exit can discard piped reports, including entire test files')
+  const directory = mkdtempSync(join(tmpdir(), 'enterprise-db-report-'))
+  t.after(() => rmSync(directory, { recursive:true, force:true }))
+  const fixtures = Array.from({ length:5 }, (_, index) => {
+    const file = join(directory, 'report-' + index + '.test.mjs')
+    writeFileSync(file, [
+      "import test from 'node:test'",
+      "for (let i = 0; i < 8; i++) test('database response ' + i, () => console.log('x'.repeat(16384)))",
+    ].join('\n'))
+    return file
+  })
+  const childEnv = { ...process.env }
+  delete childEnv.NODE_TEST_CONTEXT
+  const child = spawn(process.execPath, [...flags, ...fixtures], { env:childEnv, stdio:['ignore','pipe','pipe'] })
+  const chunks = [], diagnostics = []
+  child.stdout.on('data', chunk => chunks.push(chunk))
+  child.stderr.on('data', chunk => diagnostics.push(chunk))
+  child.stdout.once('data', () => {
+    child.stdout.pause()
+    setTimeout(() => child.stdout.resume(), 100)
+  })
+  const code = await new Promise((resolve, reject) => {
+    child.once('error', reject)
+    child.once('close', resolve)
+  })
+  const totals = parseSummary(Buffer.concat(chunks).toString())
+  assert.equal(code, 0, Buffer.concat(diagnostics).toString())
+  assert.equal(checkSummary('test:enterprise-db', code, totals), null)
+  assert.equal(totals.tests, fixtures.length * 8)
+})
+
 test('DB shards are deterministic, disjoint and exhaustive, with unsharded execution as default', () => {
   const scripts = ['test:g', 'test:c', 'test:f', 'test:a', 'test:d', 'test:b', 'test:e']
   assert.deepEqual(shardScripts(scripts), scripts)

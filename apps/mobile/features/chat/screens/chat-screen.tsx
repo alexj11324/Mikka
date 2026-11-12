@@ -3,7 +3,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Keyboard } from 'react-native'
 import { StyleSheet, View } from 'react-native'
 import { ChatMessageList, type ChatListHandle } from '@/features/chat/components/chat-message-list'
-import { chatHistoryPath, chatUpdatePath, mergeChatHistory, mergeChatRead, olderThrough, type ChatHistoryPage, type ChatRead } from '@/features/chat/model/chat-pages'
+import { chatHistoryPath, chatUpdatePath, mergeChatHistory, mergeChatRead, personalReadback, olderThrough, type ChatHistoryPage, type ChatRead } from '@/features/chat/model/chat-pages'
 import { latestOwnIndex } from '@/features/chat/model/chat-layout'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -25,11 +25,11 @@ import { api } from '@/lib/api'
 import { outgoing, type Attachment } from '@/lib/attachments'
 import { shortWhen } from '@/lib/clock'
 import { separatorLabel, startsGroup } from '@/lib/chat-time'
-import { isOpenUI } from '@/lib/openui'
 import type { HeldMessage } from '@/lib/message-actions'
 import { plainText, quotable } from '@/lib/quote'
-import { delivered, inFlight, marked, outgoingKey, queued, sendFailureState, submissionBody, unsettled, type Outgoing } from '@/lib/outbox'
+import { canAnswerCard, outgoingKey, personalMessage, unsettled } from '@/lib/outbox'
 import { apiCache } from '@/lib/api-cache'
+import { acknowledgedPersonalMessages, usePersonalDelivery } from '@/features/chat/components/personal-delivery'
 import { askForPush, usePushState } from '@/lib/push-state'
 import { runName, type BotPage, type Chat, type CitationSource, type PendingAction } from '@/lib/types'
 import { ChatHeader } from '@/features/chat/components/chat-header'
@@ -52,10 +52,9 @@ import { listRef, UNRESOLVED_LIVE_ID } from '@/lib/live'
 import { pendingActionsDeadline } from '@/lib/live-client'
 import { useStop } from '@/lib/useStop'
 import { useEveChat } from '@/lib/eve-chat'
-import { activeTurn, openInteractions } from 'eve/events'
-import { parseAnswers } from 'eve/client'
+import { activeTurn } from 'eve/events'
 import { EveInteractions } from '@/features/chat/components/eve-interactions'
-import { eveChatItems } from '@/features/chat/model/eve-messages'
+import { eveChatItems, generatedCardDocument } from '@/features/chat/model/eve-messages'
 import { StopFailed } from '@/components/StopFailed'
 import { ReadNotice } from '@/components/ReadNotice'
 import { ChatScrollToLatest } from '@/components/ChatScrollToLatest'
@@ -83,17 +82,26 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
   // The composer floats over the end of the list; the list leaves room for it.
   const [composerHeight, setComposerHeight] = useState(90)
   const path = `/api/mobile/chat${botId ? `?bot=${botId}` : ''}`
-  const home = useHome().data?.live?.workspaceId
-  const homeBots = useHome().data?.bots
+  const homeData = useHome().data
+  const home = homeData?.live?.workspaceId
+  const homeBots = homeData?.bots
   // The web's chat key (components/coordinator/coordinator-chat.tsx) on the person's home channel; a turn's lease
   // running out has no write, so the server names it as a deadline.
   // A push reads only what is new since the last read, and merges it into what is shown (#1408).
-  const readChat = useCallback(async (at: string) => mergeChatRead(apiCache.get<ChatRead>(at), await api<ChatRead>(chatUpdatePath(at, apiCache.get<ChatRead>(at)))), [])
-  const { data, error, reload, setData } = useLiveApi<ChatRead>(path, chat => ({
+  const personalScope = homeData?.user.id && home ? JSON.stringify(['personal-send', homeData.user.id, home, self]) : null
+  const readChat = useCallback(async (path: string) => {
+    const previous = apiCache.get<ChatRead>(path)
+    const acknowledged = acknowledgedPersonalMessages(personalScope)
+    const next = await api<ChatRead>(chatUpdatePath(path, previous))
+    const latest = apiCache.get<ChatRead>(path)
+    const merged = mergeChatRead(latest, next)
+    return merged === latest ? merged : personalReadback(merged, acknowledged)
+  }, [personalScope])
+  const { data, error, reload, reloadAfterWrite, setData } = useLiveApi<ChatRead>(path, chat => ({
     refs: [{ kind: 'bot_chat', id: chat?.botId && chat.live?.workspaceId ? chat.botId : UNRESOLVED_LIVE_ID, scope: chat?.live?.workspaceId ?? null }],
     minIntervalMs: 2_000, deadline: chat?.live?.deadline,
   }), readChat)
-  const agent = useEveChat(botId, Boolean(data), reload)
+  const agent = useEveChat(botId, Boolean(data), reload, homeData?.user.id, home)
   useEffect(() => { if (data && agent.session) void agent.resume().catch(() => undefined) }, [data, agent.session?.sessionId, agent.resume])
   const serviceUnavailable = data?.enabled === false
   const serviceRefresh = useRefresh(reload)
@@ -105,17 +113,13 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
   const pending = useLiveApi<PendingAction[]>('/api/pending-actions', items => ({
     refs: [listRef('pending_actions', home)], deadline: pendingActionsDeadline(items),
   }))
-  const [outbox, setOutbox] = useState<Outgoing[]>([])
-  const pendingSends = useRef<Outgoing[]>([])
-  const delivering = useRef(new Map<string, Promise<boolean>>())
   const apiContext = apiCache.context()
-  const updateOutbox = (change: (list: Outgoing[]) => Outgoing[]) => {
-    pendingSends.current = change(pendingSends.current)
-    setOutbox(pendingSends.current)
-  }
-  useEffect(() => { pendingSends.current = []; setOutbox([]) }, [botId, apiContext])
+  const scope = data ? personalScope : null
+  const received = useMemo(() => new Set([...(data?.acknowledgedBeforeRead ?? []), ...(data?.items.flatMap(item => item.from === 'person' && item.submissionId ? [item.submissionId] : []) ?? [])]), [data?.items, data?.acknowledgedBeforeRead])
+  const personal = usePersonalDelivery(scope, received, agent.sendMessage, reloadAfterWrite)
+  const outbox = personal.rows
   const [text, setText] = useState(draft ?? '')
-  const working = agent.status === 'busy' || inFlight(outbox)
+  const working = agent.status === 'busy' || outbox.some(item => item.phase === 'sending')
   const push = usePushState()
   const reduceMotion = useReducedMotionPreference()
   // Opened from a push about a proposal: its card sits at the end of the chat, which is where the chat opens.
@@ -179,6 +183,8 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
   const latestReply = items.reduce((last, item, index) => item.from === 'coordinator' && item.text ? index : item.from === 'person' ? -1 : last, -1)
   // A card is answered once the person has written after it (here or anywhere else).
   const lastMine = items.reduce((last, item, index) => item.from === 'person' ? index : last, -1)
+  const rowState = useMemo(() => ({ data, outbox, selection, working, lastMine, latestReply }),
+    [data, outbox, selection, working, lastMine, latestReply])
   const proactive = items.some((item, index) => item.from === 'coordinator' && items[index - 1]?.from === 'event')
 
   // iOS asks once; the moment is the first message the Coordinator sent on its own, not app launch.
@@ -191,32 +197,10 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
     else router.push(`/thread/${source.id}`)
   }
 
-  const deliver = (item: Outgoing): Promise<boolean> => {
-    const active = delivering.current.get(item.submissionId)
-    if (active) return active
-    const request = (async () => {
-      if (item.context !== apiCache.context()) return false
-      try {
-        const submission = submissionBody(item)
-        await agent.sendMessage(submission.text, item.submissionId, submission.images)
-        await reload()
-        return apiCache.commit(item.context, () => updateOutbox(list => delivered(list, item.key)))
-      } catch (error) {
-        apiCache.commit(item.context, () => updateOutbox(list => marked(list, item.key, sendFailureState(error))))
-        return false
-      }
-    })().finally(() => { delivering.current.delete(item.submissionId) })
-    delivering.current.set(item.submissionId, request)
-    return request
-  }
-
-  const send = async (typed: string, attachments: Attachment[] = []) => {
-    if (serviceUnavailable || agent.status === 'resuming') return false
-    const question = openInteractions(agent.view).find(item => item.request.allowFreeform && !item.answer)
-    if (question && typed.trim() && !attachments.length) {
-      try { await agent.respond(parseAnswers([{ interactionId: question.interactionId, text: typed.trim() }])); return true }
-      catch { return false }
-    }
+  const send = async (typed: string, attachments: Attachment[] = [], sourceCardId?: string) => {
+    if (!scope || serviceUnavailable || agent.status === 'resuming') return false
+    const pendingSends = personal.read().filter(item => !received.has(item.id))
+    if (sourceCardId && !canAnswerCard(pendingSends, sourceCardId)) return false
     // While words are selected, what is typed answers them: it goes out quoting the selection.
     const words = selection && !quote && typed.trim() ? quotedMessage(selectionQuote(selection.selected, selection.text), typed) : typed
     setSelection(null)
@@ -227,10 +211,15 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
     if (working) sentWhileWorking.current.add(message)
     const context = apiCache.context()
     const targetBotId = data?.botId ?? botId
-    const held = unsettled(pendingSends.current, message, images, self, context)
-    const item = held ?? queued([], outgoingKey(uuid.v4), message, images, { botId: targetBotId, chatKey: self, context })[0]
-    updateOutbox(list => held ? marked(list, item.key, 'sending') : [...list, item])
-    return deliver(item)
+    const held = sourceCardId ? unsettled(pendingSends, message, images, self, context, sourceCardId) : undefined
+    const previous = sourceCardId ? pendingSends.find(item => item.sourceCardId === sourceCardId) : undefined
+    // A lost acknowledgement may have committed. Only its original body and ID can be sent again.
+    if (previous && !held && (previous.phase !== 'failed' || previous.error === mobileMessages.Coordinator.sendUncertain)) return false
+    const item = held ?? personalMessage(outgoingKey(uuid.v4), message, images, { botId: targetBotId, chatKey: self, context, sourceCardId })
+    const acknowledgement = personal.start(item)
+    if (!acknowledgement) return false
+    if (previous && previous.id !== item.id) personal.discard(previous.id)
+    return sourceCardId ? acknowledgement : true
   }
 
   const selectionAction = (action: SelectionAction) => {
@@ -239,14 +228,6 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
     if (action.key === ADD_TO_CHAT.key) { setQuote(quotable(selectionQuote(selection.selected, selection.text))); setSelection(null); return }
     void send(quotedMessage(selectionQuote(selection.selected, selection.text), action.instruction))
   }
-
-  const retry = async (item: Outgoing) => {
-    updateOutbox(list => marked(list, item.key, 'sending'))
-    // The composer still holds the words of a failed send; once they arrive it empties.
-    if (await deliver(item)) setText(current => current.trim() === item.text ? '' : current)
-  }
-
-  const answer = async (message: string) => send(message)
 
   // 停止: the turn ends on the server, keeping what it had said. Stop is away only while its request is out; one that fails or
   // leaves the chat working 10 seconds later shows 「没停下 · 重试」.
@@ -286,6 +267,7 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
   const renderItem = (item: Chat['items'][number], index: number) => {
     // A centred time above each group: the first message, one 15 minutes after the last, or one on a new day.
     const separator = startsGroup(item.createdAt, items[index - 1]?.createdAt) ? separatorLabel(item.createdAt) : null
+    const cardDocument = generatedCardDocument(item)
     const question = item.from === 'event' ? questionCard(item.line, sources) : null
     const selected = selection?.key === item.position ? selection : null
     return (
@@ -305,8 +287,8 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
         ) : null}
         {item.from === 'coordinator' && item.text ? (
           <MessageRow onSelect={selected ? undefined : () => toggleSelection(item.position, item.text)}>
-            {isOpenUI(item.text)
-              ? <OpenUIReply text={item.text} live={index > lastMine && !outbox.length} reply={items.slice(index + 1).find(next => next.from === 'person')?.text} answer={answer} sources={sources} onOpen={open} />
+            {cardDocument
+              ? <OpenUIReply text={item.text} live={index > lastMine} canAnswer={child => canAnswerCard(outbox, `${cardDocument}:${child}`)} reply={items.slice(index + 1).find(next => next.from === 'person')?.text} answer={(message, child) => send(message, [], `${cardDocument}:${child}`)} sources={sources} onOpen={open} />
               : <BotBubble>{selected
                 ? <ChatSelectableText text={selected.text} onSelect={onSelected} onRect={rect => { selectionRect.current = rect }} />
                 : <Markdown text={item.text} sources={sources} onOpen={open} />}</BotBubble>}
@@ -349,16 +331,18 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
           if (down && endsSelection(down, { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY, at: Date.now() }, selectionRect.current)) setSelection(null)
         } : undefined}>
         {/* The system scroll: momentum, and a bounce at both ends even while the chat is shorter than the screen. */}
-        <ChatMessageList ref={list} testID="bot-chat-scroll" data={items} scrollEnabled onScrollUnderBar={underBar.onScroll} bottomInset={composerHeight} onAtLatestChange={setAtLatest}
-          keyOf={item => item.streamId ?? (item.pending ? `pending-${item.position}` : String(item.position))} renderItem={renderItem} anchorIndex={anchorIndex}
+        <ChatMessageList ref={list} testID="bot-chat-scroll" data={items} extraData={rowState} scrollEnabled onScrollUnderBar={underBar.onScroll} bottomInset={composerHeight} onAtLatestChange={setAtLatest}
+          keyOf={item => generatedCardDocument(item) ?? item.streamId ?? (item.pending ? `pending-${item.position}` : String(item.position))} renderItem={renderItem} anchorIndex={anchorIndex}
           onStartReached={data?.historyBefore ? () => void loadOlder() : undefined}
           header={loadingOlder ? <View style={styles.older}><Spinner size={16} /></View> : null}
           footer={<>
-        {outbox.map(item => <OutgoingBubble key={item.key} text={item.text} photos={item.images.map(image => image.uri)} failed={item.state !== 'sending'} unconfirmed={item.state === 'unconfirmed'} onRetry={() => void retry(item)} />)}
+        {outbox.map(item => item.phase === 'accepted'
+          ? <MyBubble key={item.id} text={item.text} photos={item.images.map(image => ({ uri: image.uri }))} />
+          : <OutgoingBubble key={item.id} text={item.text} photos={item.images.map(image => image.uri)} failed={item.phase === 'failed'} unconfirmed={item.error === mobileMessages.Coordinator.sendUncertain} error={item.error} onRetry={() => { void personal.start(item) }} />)}
         {working ? <WaitingLine since={outbox.length ? null : waitingSince(items)} /> : null}
         {stopper.stuck ? <StopFailed busy={stopper.sending} onRetry={() => void stopper.stop()} /> : null}
         {!data && !error ? <View style={styles.loading}><Spinner /></View> : null}
-        {data && data.enabled !== false && !items.length && !working ? <Text style={styles.empty}>有什么要我做的，直接说。</Text> : null}
+        {data && data.enabled !== false && !items.length && !outbox.length && !working ? <Text style={styles.empty}>有什么要我做的，直接说。</Text> : null}
         <ReadNotice error={error ?? agent.error} hasData={Boolean(data)} label={mobileMessages.Coordinator.conversation} onRetry={reload} />
         <ReadNotice error={pending.error} hasData={Boolean(pending.data)} label="待处理事项" onRetry={pending.reload} />
         {data?.failure && !working ? <FailedReply key={`${botId}:${JSON.stringify(data.failure)}`} failure={data.failure} botId={botId} onQueued={reload} modelChoice={typeof composerAccessory === 'function' ? composerAccessory(false) : composerAccessory} /> : null}

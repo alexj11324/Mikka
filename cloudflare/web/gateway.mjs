@@ -5,12 +5,28 @@ import { releaseRoutePath, versionPath } from './route-path.mjs'
 const versionHeader = 'x-mikka-gateway-version-sha256'
 const nativeVersion = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/
 
+function forward(request, service, url) {
+  const outbound = url ? new Request(url, request) : new Request(request)
+  outbound.headers.delete('cloudflare-workers-version-overrides')
+  return service.fetch(outbound)
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url)
     const params = url.searchParams.getAll('dpl')
     const header = request.headers.get('x-deployment-id')
     const path = releaseRoutePath(url.pathname)
+    // The GitHub App has one callback across releases. Its private ingress
+    // forwards non-CI events to the API and owns the signed CI queue.
+    if (Object.hasOwn(env, 'GITHUB_WEBHOOK') && (path === '/mikka/api/webhooks/github' || path === '/mikka/api/webhooks/github/')) {
+      if (typeof env.GITHUB_WEBHOOK?.fetch !== 'function') {
+        return new Response(null, { status: 503, headers: { 'cache-control': 'no-store' } })
+      }
+      if (path === url.pathname) return forward(request, env.GITHUB_WEBHOOK)
+      url.pathname = path
+      return forward(request, env.GITHUB_WEBHOOK, url)
+    }
     const api = path.startsWith('/mikka/api/')
     const pinnedAsset = url.pathname.startsWith('/mikka/') && /\/[^/]+\.[^/]+$/.test(path) && !api
     let id = env.CURRENT_RELEASE
@@ -29,10 +45,10 @@ export default {
     }
     // Only server-selected pins cross the private service boundary. Keep the
     // original body, signal, cookies, streaming and WebSocket upgrade intact.
+    const versionRead = path === versionPath && (request.method === 'GET' || request.method === 'HEAD')
+    if (!versionRead) return forward(request, env[binding])
     const outbound = new Request(request)
     outbound.headers.delete('cloudflare-workers-version-overrides')
-    const versionRead = path === versionPath && (request.method === 'GET' || request.method === 'HEAD')
-    if (!versionRead) return env[binding].fetch(outbound)
     outbound.headers.delete(versionHeader)
     const upstream = await env[binding].fetch(outbound)
     if (upstream.status === 101) return upstream

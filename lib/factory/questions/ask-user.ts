@@ -12,6 +12,7 @@ type QuestionView = {
   id: string; kind: string; question: string; context?: string | null; options: string[] | null;
   status: string; taskId: string; originRunId: string; continuationRunId?: string | null;
   reference: unknown; createdAt?: Date | string;
+  answerId?: string | null; answerSource?: string | null; answer?: unknown;
 };
 
 /** One pending Factory question in AskUserQuestion shape plus Mikka metadata.
@@ -20,7 +21,11 @@ type QuestionView = {
  * `value` is the option's stable identifier: it currently equals `label` and
  * switches to a real option id if options get one later. */
 export function toAskUserQuestion(q: QuestionView) {
+  const stored = q.answerSource === "human" && q.answerId && q.continuationRunId
+    ? z.object({ source: z.literal("human"), input: z.object({ answerId: z.literal(q.answerId), text: z.string().min(1) }) }).safeParse(q.answer)
+    : undefined;
   return {
+    ...(stored?.success ? { recordedAnswer: maskFactoryNote(stored.data.input.text) } : {}),
     questionId: q.id,
     taskId: q.taskId,
     runId: q.originRunId,

@@ -12,7 +12,7 @@ const target = process.env.E2E_DATABASE_URL
 const valid = isE2eTarget(target) && target === process.env.MIKKA_DATABASE_URL && target === process.env.DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !valid) throw new Error('Account deletion due tests require matching isolated loopback _e2e URLs')
 
-const TABLES = ['account_deletion_jobs', 'chat_attachments', 'chat_attachment_retirements']
+const TABLES = ['account_deletion_guards', 'account_deletion_jobs', 'chat_attachments', 'chat_attachment_retirements']
 
 test('account-deletion due times match what the sweeps select', { skip: !valid }, async t => {
   const schema = `account_deletions_due_${randomUUID().replaceAll('-', '')}`
@@ -62,6 +62,19 @@ test('account-deletion due times match what the sweeps select', { skip: !valid }
     const expires = new Date(Date.now() + 10 * 60_000)
     await file({ createdAt: created, removedAt: new Date(), uploadKey: 'upload', uploadExpiresAt: expires })
     assert.equal(await due(), expires.getTime() + 1)
+    await clear()
+  })
+
+  await t.test('a pending erasure owns its deadlines while a completed receipt cannot hide remaining cleanup', async () => {
+    const past = new Date(Date.now() - 30_000), release = new Date(Date.now() + 90_000)
+    await job({ stage: 'storage_pending', blocked: ['upload_grants_not_expired'], updatedAt: past, storageNotBefore: release })
+    await pool.query(`UPDATE account_deletion_jobs SET "subjectUserId"='owner'`)
+    await pool.query(`INSERT INTO account_deletion_guards("subjectId","jobId") SELECT "subjectUserId",id FROM account_deletion_jobs`)
+    await file({ createdAt: past, removedAt: past })
+    await pool.query(`INSERT INTO chat_attachment_retirements("storageKey","userId","notBefore") VALUES ('key','owner',$1)`, [past])
+    assert.equal(await due(), release.getTime())
+    await pool.query(`UPDATE account_deletion_jobs SET stage='completed'`)
+    assert.equal(await due(), past.getTime())
     await clear()
   })
 

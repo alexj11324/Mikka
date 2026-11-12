@@ -110,6 +110,50 @@ test('gateway honors retained asset/API pins, uses current for version and navig
   assert.equal((await go('/mikka/api/version')).status, 503)
 })
 
+test('GitHub callback keeps one ingress across pins and forwards the signed bytes and backend response', async () => {
+  const calls = []
+  const original = new TextEncoder().encode('{\r\n  "test": "验收"\r\n}\n')
+  const env = { CURRENT_RELEASE: 'new', RELEASES: { old: 'OLD', new: 'NEW' },
+    OLD: { fetch: () => new Response('old') }, NEW: { fetch: () => new Response('new') },
+    GITHUB_WEBHOOK: { async fetch(input) {
+      const url = new URL(input.url)
+      assert.ok(['/mikka/api/webhooks/github', '/mikka/api/webhooks/github/'].includes(url.pathname))
+      assert.equal(input.headers.get('cloudflare-workers-version-overrides'), null)
+      assert.equal(input.headers.get('x-hub-signature-256'), 'test-signature')
+      assert.deepEqual(new Uint8Array(await input.arrayBuffer()), original)
+      calls.push(input.headers.get('x-github-event'))
+      return new Response('upstream', { status: 401 })
+    } },
+  }
+  for (const [path, event] of [['/mikka/api/webhooks/github?dpl=retired', 'workflow_run'],
+    ['/mikka/api/webhooks/github/?dpl=new&dpl=old', 'pull_request'], ['/mikka/%61pi/webhooks/%67ithub?dpl=old', 'check_suite']]) {
+    const result = await gateway.fetch(request(path, { method: 'POST', body: original, headers: {
+      'x-github-event': event, 'x-hub-signature-256': 'test-signature', 'x-deployment-id': 'old',
+      'cloudflare-workers-version-overrides': 'untrusted' } }), env)
+    assert.equal(result.status, 401)
+    assert.equal(await result.text(), 'upstream')
+  }
+  assert.deepEqual(calls, ['workflow_run', 'pull_request', 'check_suite'])
+  assert.equal(await (await gateway.fetch(request('/mikka/api/webhooks/github/other?dpl=old'), env)).text(), 'old')
+  env.GITHUB_WEBHOOK = null
+  assert.equal((await gateway.fetch(request('/mikka/api/webhooks/github'), env)).status, 503)
+  delete env.GITHUB_WEBHOOK
+  assert.equal(await (await gateway.fetch(request('/mikka/api/webhooks/github?dpl=old'), env)).text(), 'old')
+})
+
+test('gateway config can bind a discrete webhook service for both current and rollback gateways', () => {
+  const retained = ['abcdef0-1-1', 'abcdef0-2-1']
+  for (const current of retained) {
+    const input = { current, retained }
+    assert.ok(gatewayConfig(input).services.every(s => s.binding !== 'GITHUB_WEBHOOK'))
+    assert.deepEqual(gatewayConfig({ ...input, githubWebhook: 'github-events' }).services.at(-1),
+      { binding: 'GITHUB_WEBHOOK', service: 'github-events' })
+    for (const githubWebhook of [null, '', 'https://example.test', 'mikka-app-gateway', 'mikka-app-release-' + current]) {
+      assert.throws(() => gatewayConfig({ ...input, githubWebhook }), /WEB_GITHUB_WEBHOOK_SERVICE_INVALID/)
+    }
+  }
+})
+
 test('only a successful version read carries the digest of the serving gateway version', async () => {
   const header = 'x-mikka-gateway-version-sha256'
   const id = '7dc7671b-543a-4220-b8d3-58193190ef4b'
@@ -254,6 +298,84 @@ test('version recovers from a stale overlay, unavailable backend and invalid doc
   const env = { RELEASE_SHA: source, OVERLAY_SHA: overlay, API: { fetch: async () => replies.shift() } }
   for (let i = 0; i < 4; i++) assert.equal((await release.fetch(request('/mikka/api/version'), env)).status, 503)
   assert.deepEqual(await (await release.fetch(request('/mikka/api/version'), env)).json(), value)
+})
+
+test('rejected or stalled cold version reads free the upstream and an independent request can recover', async t => {
+  const source = 'a'.repeat(40), overlay = 'b'.repeat(40)
+  const value = { build: source, overlaySha: overlay, minMobileBuild: 0, mobileUpdateUrl: '', minDesktopVersion: null }
+  let cancelled = false
+  const env = { RELEASE_SHA: source, OVERLAY_SHA: overlay, API: { fetch: async () => new Response(new ReadableStream({
+    cancel() { cancelled = true },
+  }), { status: 502 }) } }
+  const get = (e, init) => release.fetch(request('/mikka/api/version', init), e)
+  const bad = await get(env)
+  assert.equal(bad.status, 502)
+  assert.equal(cancelled, true)
+  assert.equal(bad.headers.get('cache-control'), 'no-store')
+  env.API.fetch = async () => new Response(new ReadableStream({
+    start(controller) { controller.error(new Error('upstream body already closed')) },
+  }), { status: 429 })
+  assert.equal((await get(env)).status, 429)
+
+  const deadline = new AbortController()
+  const timeout = t.mock.method(AbortSignal, 'timeout', ms => {
+    assert.equal(ms, 5_000)
+    return deadline.signal
+  })
+  const pending = () => {
+    const started = Promise.withResolvers()
+    env.API.fetch = req => {
+      started.resolve()
+      return new Promise((_, reject) => req.signal.addEventListener('abort', () => reject(req.signal.reason), { once: true }))
+    }
+    return started.promise
+  }
+  const route = request('/mikka/api/version')
+  const ready = pending(), slow = release.fetch(route, env)
+  await ready
+  deadline.abort(new DOMException('Timed out', 'TimeoutError'))
+  const failed = await slow
+  assert.equal(route.signal.aborted, false)
+  assert.equal(failed.status, 503)
+  assert.deepEqual(await failed.json(), { error: 'deploymentVersionUnavailable' })
+  timeout.mock.restore()
+
+  const caller = new AbortController()
+  const active = pending(), disconnected = get(env, { signal: caller.signal })
+  await active
+  caller.abort()
+  await assert.rejects(disconnected, { name: 'AbortError' })
+  env.API.fetch = async () => Response.json(value)
+  assert.deepEqual(await (await get(env)).json(), value)
+  env.API.fetch = () => assert.fail('unexpected upstream read')
+  assert.equal((await get(env, { method: 'HEAD' })).status, 200)
+})
+
+test('separate version bindings do not share cached values and private requests keep caller scope', async () => {
+  const publicFields = { build: 'a'.repeat(40), overlaySha: 'b'.repeat(40), minMobileBuild: 0, minDesktopVersion: null }
+  const scope = mobileUpdateUrl => ({
+    RELEASE_SHA: publicFields.build, OVERLAY_SHA: publicFields.overlaySha,
+    API: { async fetch(req) {
+      if (req.method === 'GET' && new URL(req.url).pathname === '/mikka/api/version') {
+        assert.equal(req.headers.get('authorization'), null)
+        assert.equal(req.headers.get('cookie'), null)
+        return Response.json({ ...publicFields, mobileUpdateUrl })
+      }
+      return new Response(req.headers.get('authorization'), { status: 202, headers: { 'cache-control': 'private, no-store' } })
+    } },
+  })
+  const first = scope('itms-beta://first'), second = scope('itms-beta://second')
+  for (const [env, link, tenant] of [[first, 'itms-beta://first', 'A'], [second, 'itms-beta://second', 'B'], [first, 'itms-beta://first', 'C']]) {
+    const headers = { authorization: 'Bearer scope-' + tenant, cookie: 'workspace=' + tenant }
+    const result = await release.fetch(request('/mikka/api/version', { headers }), env)
+    assert.equal((await result.json()).mobileUpdateUrl, link)
+    for (const path of ['/mikka/api/rpc', '/mikka/api/version']) {
+      const reply = await release.fetch(request(path, { method: 'POST', headers, body: 'opaque' }), env)
+      assert.equal(reply.status, 202)
+      assert.equal(reply.headers.get('cache-control'), 'private, no-store')
+      assert.equal(await reply.text(), headers.authorization)
+    }
+  }
 })
 
 test('published actions retain the compiler evidence and use the same deployment pin on the private-manifest 404', async () => {

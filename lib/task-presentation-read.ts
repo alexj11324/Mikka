@@ -6,7 +6,7 @@ import { db, pool, withDatabaseClient } from '@/lib/db'
 import { issues } from '@/lib/db/schema'
 import { readTaskDispatches } from '@/lib/task-dispatches'
 import { teamIssues } from '@/lib/db/team-schema'
-import { readFactoryFlowStates } from '@/lib/factory/public-flow'
+import { factorySourceAllowed, readFactoryFlowStates } from '@/lib/factory/public-flow'
 import { factoryEvidenceFolderCounts } from '@/lib/factory/evidence-folder-index'
 import { factoryScopeAllows } from '@/lib/factory/scope'
 import { FactoryError } from '@/lib/factory/contract'
@@ -114,11 +114,7 @@ async function readPresentationBatch(user: Reader, input: TaskPresentationsInput
         // the Factory reader, with the canonical Bot tenant checked explicitly.
         const { rows: factories } = await client.query<FactoryStateRow>(`
           SELECT DISTINCT ON (t."issueId") t.id,t."issueId",t."userId",t."workspaceId",t.stage,t.status,
-            EXISTS(SELECT 1 FROM coordinator_events e WHERE e.id=t."sourceEventId" AND e."userId"=t."userId"
-              AND e.kind='user_message' AND e."botId" IS NOT DISTINCT FROM t."botId"
-              AND (e."issueId" IS NULL OR e."issueId"=t."issueId")
-              AND (t."botId" IS NULL OR EXISTS(SELECT 1 FROM bots b WHERE b.id=t."botId"
-                AND b."ownerId"=t."userId" AND b."workspaceId"=t."workspaceId"))) AS "sourceAllowed"
+            ${factorySourceAllowed} AS "sourceAllowed"
           FROM factory_tasks t WHERE t."issueId"=ANY($1::uuid[]) AND t."userId"=$2 AND t."workspaceId"=$3
           ORDER BY t."issueId",t."updatedAt" DESC,t.id DESC`, [ids, reader.id, workspaceId])
         const authorized = factories.filter(task => task.sourceAllowed && factoryScopeAllows(task, byId.get(task.issueId)))

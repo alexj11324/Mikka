@@ -2,6 +2,9 @@ import type { BlockIssue, BlockRun, TaskBlock } from './task-blocked'
 import type { CompactRunFailure } from './run-failure-view'
 import type { FactoryFlowView } from './factory/public-flow'
 
+export const TASK_REVIEW_STATUS = 'review'
+export const OPEN_TASK_PR_STATES = ['open', 'draft'] as const
+
 export type TaskState = 'waiting' | 'blocked' | 'failed' | 'running' | 'queued' | 'todo' | 'done' | 'canceled' | 'duplicate'
 export type TaskReason = 'needs_input' | 'approval' | 'pr_review' | 'blocked' | 'quota' | 'offline' | 'blocked_by' | 'flagged' | null
 export type TaskGroup = 'pending' | 'running' | 'todo' | 'done'
@@ -70,7 +73,7 @@ export function taskStateOf(issue: BlockIssue, run?: TaskStateRun | null, contex
     if (run.outcome === 'needs_input') return view('waiting', 'needs_input')
     if (run.outcome === 'failed' || run.status === 'failed') return view('failed')
   }
-  if (issue.status === 'review' || issue.metadata.pullRequests.some(pr => pr.state === 'open' || pr.state === 'draft')) return view('waiting', 'pr_review')
+  if (issue.status === TASK_REVIEW_STATUS || issue.metadata.pullRequests.some(pr => OPEN_TASK_PR_STATES.some(state => state === pr.state))) return view('waiting', 'pr_review')
   return relation(context.schedule?.nextAt ? 'queued' : 'todo')
 }
 

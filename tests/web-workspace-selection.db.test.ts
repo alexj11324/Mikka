@@ -219,7 +219,7 @@ test('remote Web Workspace selection survives bearer-only HTTP and never broaden
       assert.equal(source.rowCount, 1); assert.equal(source.rows[0].workspaceId, alpha)
       const session = await auth.api.getSession({ headers: new Headers({ authorization: `Bearer ${owner.token}` }), query: { disableCookieCache: true } })
       assert.ok(session); assert.equal(session.user.id, owner.userId)
-      assert.deepEqual(source.rows[0].payload, { text, source: 'person', humanSessionId: session.session.id }, 'the message retains authenticated audience/session provenance, not the client Workspace expectation')
+      assert.deepEqual(source.rows[0].payload, { text, source: 'person', submissionId, humanSessionId: session.session.id }, 'the durable submission ID and authenticated session are the only provenance on the stored message')
       assert.equal(coordinatorWakes.length, wakes + 1)
       const recorded = await stored()
       const retryElsewhere = await rpc<{ error?: string }>('coordinator.sendCoordinatorMessage', args(alpha), beta)

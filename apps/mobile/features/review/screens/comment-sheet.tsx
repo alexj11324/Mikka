@@ -19,11 +19,11 @@ const MONO = Platform.select({ ios: 'Menlo', default: 'monospace' })
 export function CommentSheet() {
   const params = useLocalSearchParams<{ id: string; path: string; line: string; side: 'new' | 'old'; quote: string; comment?: string }>()
   const router = useRouter()
-  const [batch, setBatch] = useBatch(params.id)
+  const [batch, setBatch, scope] = useBatch(params.id)
   const existing = params.comment ? batch.comments.find(item => item.id === params.comment) : undefined
   const [body, setBody] = useState(existing?.body ?? '')
   const save = () => {
-    if (!body.trim()) return
+    if (!scope || !body.trim()) return
     tap()
     setBatch(current => addComment(current, { id: existing?.id ?? `${params.path}:${params.side}:${params.line}:${Date.now()}`, path: params.path, line: Number(params.line), side: params.side, body: body.trim(), quote: params.quote }))
     router.back()
@@ -34,9 +34,9 @@ export function CommentSheet() {
       <NavBar sheet fade={false} title={`第 ${params.line} 行`} right={{ icon: 'xmark', label: '关闭', web: <X size={20} color={colors.ink} />, onPress: () => router.back() }} />
       <ScrollView style={styles.screen} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
         <Text style={styles.quote} numberOfLines={3}>{params.quote}</Text>
-        <TextInput value={body} onChangeText={setBody} placeholder="写评论" placeholderTextColor={colors.secondary} multiline autoFocus
+        <TextInput editable={!!scope} value={body} onChangeText={setBody} placeholder="写评论" placeholderTextColor={colors.secondary} multiline autoFocus
           accessibilityLabel={`第 ${params.line} 行的评论`} style={styles.input} />
-        <CardButton label={existing ? '保存' : '加入评论'} primary disabled={!body.trim()} onPress={save} />
+        <CardButton label={existing ? '保存' : '加入评论'} primary disabled={!scope || !body.trim()} onPress={save} />
         {existing ? <View style={styles.delete}><CardButton label="删除" destructive onPress={remove} /></View> : null}
       </ScrollView>
     </>

@@ -2,14 +2,16 @@
 
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { PersonAvatar } from '@/components/person-avatar'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { MessageSquareDiff } from 'lucide-react'
-import { getIssueThread, getThreadChanges, getThreadInstructions, sendIssueThreadReply, stopRun, type IssueThreadDetail } from '@/app/actions/agents'
+import { getIssueThread, getThreadChanges, getThreadInstructions, stopRun, type IssueThreadDetail } from '@/app/actions/agents'
 import { useActionError } from '@/lib/use-action-error'
-import { checkPageBuildBeforeAction } from '@/lib/app-build'
+import { sendReviewChange, type ReviewChangeTarget } from '@/lib/factory/review-change'
+import { RequestError } from '@/lib/factory/browser-request'
+import { useChatDelivery, useThreadReplyCommand, type ChatSubmission } from '@/lib/hooks/chat-delivery'
 import { prepareThreadReply, type ThreadReplySubmission } from '@/lib/thread-submission-input'
 import { mergeThreadChunks, runFailureText, runIsActive, runIsWorking, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
 import { ThreadSteps } from './thread-steps'
@@ -108,7 +110,7 @@ function ThreadInstructions({ issueId, runId, mine }: { issueId: string | null; 
 type ThreadTab = 'chat' | 'changes' | 'acceptance'
 type IssueThreadPanelProps = { /** The task it works on; null for a thread with no task. */ issueId: string | null; runId: string; /** ← and Esc: back to the list it was opened from. */ onBack?: () => void; /** ✕, only where it closes more than ← does (全部线程 under it). */ onClose?: () => void; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void; /** Beside a chat: the task it works on, as a header link. */ onOpenTask?: () => void; /** The name its thread-list row shows (glossary: its task, else what it was asked); defaults to what it was asked. */ name?: string; /** Inside the Artifact window (P2): 要求修改 waits in the composer as a chip; sending it starts the fix run on the same PR. */ changeRequest?: ThreadChangeRequest; /** A task's earlier attempts, drawn above this one's transcript in the same scroll (the task-conversation slot). */ before?: ReactNode; /** With `before`: scroll to this run's section, an earlier one or this panel's own, once the conversation has loaded. */ focusRunId?: string; /** Only the transcript, for an earlier attempt inside another panel's `before`: no header, scroll, composer or acceptance. */ transcriptOnly?: boolean; /** Its place in its task's one conversation: the status line names the attempt, and the dispatch is not a person's bubble. */ attempt?: { n: number; first: boolean; taskTitle?: string }; /** With a layer's thread screen: this run's rows as data, reported instead of drawn (an earlier attempt in a task's conversation). */ collect?: (runId: string, entries: ThreadEntry[]) => void; /** With a layer's thread screen: the earlier attempts' rows, above this run's own. */ beforeEntries?: ThreadEntry[]; /** Readable control-run evidence that follows the writable root, without acquiring its composer. */ afterEntries?: ThreadEntry[]; after?: ReactNode }
 
-export type ThreadChangeRequest = { label: string; onSend: (note: string) => Promise<boolean>; onCancel: () => void }
+export type ThreadChangeRequest = ReviewChangeTarget & { onCancel: () => void }
 
 export function IssueThreadPanel(props: IssueThreadPanelProps) {
   // Drafts, in-flight callbacks and retry deadlines belong to exactly one run.
@@ -163,6 +165,11 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const viewingChanges = hasChanges && tab === 'changes'
   const transcript = useViewScroll<HTMLDivElement>(`thread:${runId}:chat`, !!data && !viewingChanges && !accepting)
   const [draft, setDraft] = useViewState(`thread:${runId}:draft`, '')
+  const feedback = useTranslations('Coordinator')
+  const deliveryLabels = useTranslations('HostedThread')
+  const writer = useThreadReplyCommand()
+  const delivery = useChatDelivery<ChatSubmission & { review?: ReviewChangeTarget; runId: string; expectedOwnerId?: string; expectedWorkspaceId?: string }>(`thread:${runId}`, feedback('sendUncertain'))
+  const sendLock = useRef(false)
   const [submission, setSubmission] = useViewState<ThreadReplySubmission | null>(`thread:${runId}:submission`, null)
   // Words picked from the agent's reply with 引用: they head the next message as quote lines.
   const [replyQuote, setReplyQuote] = useViewState<string | null>(`thread:${runId}:quote`, null)
@@ -170,7 +177,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const [sending, setSending] = useState(false)
   // false, or what to say: the refusal's reason when the server gave one (threadReplaced…), else 发送失败.
   const [sendFailed, setSendFailed] = useState<string | false>(false)
-  useEffect(() => { if (submission && !sending) setSendFailed(t('sendFailed')) }, [submission, sending, t])
+
   const actionError = useActionError()
   const [stopAttempt, setStopAttempt] = useState<number | null>(null)
   const [stopFailed, setStopFailed] = useState(false)
@@ -195,6 +202,11 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const requestedAt = stopAttempt ?? (data?.thread.stopRequestedAt ? new Date(data.thread.stopRequestedAt).getTime() : null)
   const stopRequested = active && (requestedAt !== null || !!view?.stopping)
   const stopPending = stopRequested && !stopFailed
+  const confirmedIds = useMemo(() => new Set(data?.messages?.flatMap(message => message.submissionId ? [message.submissionId] : [])), [data?.messages])
+  const localMessages = delivery.rows.filter(row => !confirmedIds.has(row.id))
+  useEffect(() => {
+    if (delivery.rows.some(row => confirmedIds.has(row.id))) delivery.setRows(current => current.filter(row => !confirmedIds.has(row.id)))
+  }, [confirmedIds, delivery.rows, delivery.setRows])
   const items = data ? threadItems(data.chunks, data.messages, runId) : []
   // The jump index, from the items already built: never a second fold of the stream.
   const outline = threadOutline(items)
@@ -228,37 +240,43 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   // 要求修改 from the Artifact window puts the person straight into the composer.
   const requesting = Boolean(changeRequest)
   useEffect(() => { if (requesting) inputRef.current?.focus() }, [requesting])
-  async function sendChangeRequest(request: ThreadChangeRequest) {
-    const text = draft.trim()
-    if (!text || sending) return
-    setSending(true); setSendFailed(false)
-    try {
-      if (await request.onSend(text)) { setDraft(current => current.trim() === text ? '' : current); void mutate(); void mutateCache(['issue-threads', issueId]) }
-      else setSendFailed(t('sendFailed'))
-    } finally { setSending(false) }
-  }
-  async function send(retry?: string, retryOriginalSession?: true) {
-    if (transcriptOnly) return
-    if (changeRequest && retry === undefined) return sendChangeRequest(changeRequest)
-    const text = retry ?? draft.trim()
+  async function send(retry?: string, retryOriginalSession?: true, previous?: typeof delivery.rows[number]) {
+    if (transcriptOnly || sendLock.current || readRejected) return
+    const review = previous?.review ?? (!previous && !retry ? changeRequest : undefined)
+    const text = previous?.text ?? retry ?? draft.trim()
     const questionWake = retryOriginalSession ? data?.thread.questionWake : null
     if (!text || sending || stopRequested || (question === 'resuming' && !questionWake)) return
-    if (retryOriginalSession ? !canRetry : replyBlocked) return
+    if (retryOriginalSession ? !canRetry : !review && replyBlocked) return
+    const words = previous?.text ?? (retry === undefined && !review ? withReplyQuote(text, replyQuote) : text)
+    // Preserve an interrupted send from the previous client version when its unchanged draft is submitted.
+    const saved = prepareThreadReply(submission, liveRunId, words)
+    const command = previous ?? { id: saved.requestId, runId: saved.runId, text: words, at: Date.now(), ...(review ? { review: { label: review.label, binding: review.binding } } : {}),
+      expectedOwnerId: data?.live?.viewerId, expectedWorkspaceId: data?.live?.runs.find(run => run.id === liveRunId)?.workspaceId ?? undefined }
+    if (!retryOriginalSession && !delivery.begin(command)) return
+    sendLock.current = true
     setSending(true); setSendFailed(false)
+    if (!retryOriginalSession && !previous) { setDraft(''); setReplyQuote(null); setSubmission(null); if (review) changeRequest?.onCancel() }
+    const fail = (reason: string) => retryOriginalSession ? setSendFailed(reason) : delivery.finish(command.id, { error: reason })
     try {
-      if (!await checkPageBuildBeforeAction()) return
-      const words = retry === undefined ? withReplyQuote(text, replyQuote) : text
-      const request = retryOriginalSession ? { runId: liveRunId, text: words, retryOriginalSession,
-        ...(questionWake ? { questionWakeGeneration: questionWake.generation } : {}) } : prepareThreadReply(submission, liveRunId, words)
-      if ('requestId' in request) setSubmission(request)
-      const result = await sendIssueThreadReply({ issueId, ...request })
-      if (result.error) { setSendFailed(actionError(result.error)); if ('requestId' in request) setSubmission(null); return }
-      if ('requestId' in request) setSubmission(null)
-      if (retry === undefined) { setDraft(current => current.trim() === text ? '' : current); setReplyQuote(null) }
-      void mutate(); void mutateCache(['issue-threads', issueId])
+      if (command.review) {
+        const blocked = await writer.preflight()
+        if (blocked) { fail(blocked); return }
+        await sendReviewChange(command.review.binding, command.id, command.text, command.expectedOwnerId)
+        delivery.finish(command.id, {})
+        void mutate().catch(() => undefined)
+        void mutateCache(`/api/factory/tasks/${command.review.binding.taskId}/approval?view=ledger`)
+        return
+      }
+      const result = await writer.submit(issueId, retryOriginalSession ? { runId: liveRunId, text: words, retryOriginalSession,
+        ...(questionWake ? { questionWakeGeneration: questionWake.generation } : {}) } : command)
+      if (result.status !== 'accepted') { fail(result.error); return }
+      if (!retryOriginalSession) delivery.finish(command.id, {})
+      void mutate().catch(() => undefined); void mutateCache(['issue-threads', issueId])
+    } catch (error) {
+      const reason = error instanceof RequestError && error.status < 500 ? error.status === 429 ? feedback('sendRateLimited') : actionError(error.code) : feedback('sendUncertain')
+      fail(reason)
     }
-    catch { setSendFailed(t('sendFailed')) }
-    finally { setSending(false) }
+    finally { sendLock.current = false; setSending(false) }
   }
   async function stop() {
     if (transcriptOnly) return
@@ -340,6 +358,13 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
                   <PersonBubble text={item.text} mine={false} />
                 </>)}
             </li>)}
+            {!readRejected && localMessages.map(row => <li key={row.id} data-delivery-id={row.id} data-delivery-phase={row.phase} className="flex flex-col items-end gap-1">
+              <PersonBubble text={row.text} mine />
+              {row.phase === 'sending' && <span role="status" className="text-xs text-muted-foreground">{deliveryLabels('sending')}</span>}
+              {row.phase === 'failed' && <span role="alert" className="flex items-center gap-2 text-xs">
+                {row.error}{(!replyBlocked || row.review) && <Button size="xs" variant="ghost" onClick={() => { void send(undefined, undefined, row) }}>{retryLabel}</Button>}
+              </span>}
+            </li>)}
           </ol>
           {!failedStagesId && failureLine}
           {/* The subscription ran out and the run went on on the person's key (lib/run-quota.ts). */}
@@ -398,9 +423,12 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     if (data.thread.quota?.switched.length || modelFallback.length || (!active && (view?.status ?? data.thread.status) === 'succeeded') || data.thread.feedbackEligible) bot('tail', [{ kind: 'text', text: '', node: tail }])
     if (active && !items.length) bot('waiting', [], { streaming: true })
   }
+  if (!readRejected) for (const row of localMessages) entries.push({ id: row.id, role: 'person', at: row.at, text: row.text,
+    status: row.phase === 'accepted' ? 'sent' : row.phase, deliveryMessage: row.error,
+    ...(row.phase === 'failed' && (!replyBlocked || row.review) ? { onRetry: () => { void send(undefined, undefined, row) } } : {}) })
   // Re-publish the admitted read itself. Identical message lengths or tool
   // counts do not prove the content, grant or attempt result is unchanged.
-  useEffect(() => { if (collect) collect(runId, entries) }, [collect, runId, data, active, canRetry, sending, view?.status, retryLabel]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (collect) collect(runId, entries) }, [collect, runId, data, active, canRetry, sending, view?.status, retryLabel, delivery.rows]) // eslint-disable-line react-hooks/exhaustive-deps
   if (collect) return null
   if (transcriptOnly) return <div data-attempt-section={runId} className="flex flex-col gap-3">{transcriptBody}</div>
   const conversation = !bare && detail ? <ThreadScreen botId={null} name={title} mark={author?.mark ?? null} entries={data ? [...beforeEntries ?? [], ...entries, ...afterEntries ?? []] : null}
@@ -414,7 +442,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive-foreground">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
     </>}
-    questions={[]} onAnswer={() => {}} running={0} onOpenTask={() => onOpenTask?.()} onOpenInbox={() => navigate({ section: 'suggestions' })} /> : <>
+    questions={[]} onAnswer={async () => ({ status: 'unavailable', error: '' })} running={0} onOpenTask={() => onOpenTask?.()} onOpenInbox={() => navigate({ section: 'suggestions' })} /> : <>
     <div ref={transcript} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
       {before}
       <div data-attempt-section={runId} className="flex flex-col gap-3">{transcriptBody}</div>

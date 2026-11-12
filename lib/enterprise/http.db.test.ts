@@ -11,6 +11,7 @@ import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { enterprisePrincipal } from './principal'
 import { Pool } from 'pg'
+import { observePoolCommits } from '../db/commit-effects'
 import { betterAuth } from 'better-auth'
 import { createAuthMiddleware } from 'better-auth/api'
 import { assertE2eTarget } from '../../tests/helpers/e2e-target.mjs'
@@ -44,6 +45,7 @@ class Cookies {
 
 test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revocation', { skip: !target, timeout: 120_000 }, async t => {
   const pool = new Pool({ connectionString: target, max: 4 })
+  observePoolCommits(pool)
   // Native HTTP uses the production API request adapters, as the mobile DB fixture does.
   const requestContext = await import('../../apps/api/src/context')
   t.mock.module('next/headers', { namedExports: await import('../../apps/api/compat/headers') })
@@ -283,6 +285,8 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     wantLogoutRequestSigned: true, wantLogoutResponseSigned: true })
   t.after(async () => {
     await Promise.all([close(appServer), close(idpServer)])
+    const { builtinGateway } = await import('../builtin-gateway/runtime')
+    await builtinGateway()?.stop()
     await pool.end()
     const [{ pool: appPool }, { workspacePool }] = await Promise.all([import('../db'), import('../workspace-db')])
     await Promise.all([appPool.end(), workspacePool.end()])

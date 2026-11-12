@@ -48,3 +48,30 @@ for (const [profile, paths] of Object.entries(sourceSuites)) {
     } finally { await rm(isolated, { recursive: true, force: true }) }
   })
 }
+
+test('expensive compilation requires the operator-reviewed public SHA, checksum and an artifact destination', async () => {
+  const { approvedEveBuild } = await import('./eve-artifact.mjs')
+  const job = {workload:'eve-host-build',sha:'a'.repeat(40),owner:'134/2/eve-host-build'}
+  const env = {EVE_BUILD_REVISION:job.sha,EVE_BUILD_SOURCE_SHA256:'b'.repeat(64),EVE_BUILD_ARTIFACTS:{}}
+  assert.deepEqual(approvedEveBuild(job,env),{sha:job.sha,sourceDigest:env.EVE_BUILD_SOURCE_SHA256,runId:'134',attempt:'2'})
+  for (const change of [{EVE_BUILD_REVISION:'b'.repeat(40)}, {EVE_BUILD_SOURCE_SHA256:'not-a-digest'}, {EVE_BUILD_ARTIFACTS:null}]) {
+    assert.throws(() => approvedEveBuild(job,{...env,...change}),/approved source/)
+  }
+  for (const owner of ['another/attempt','134/2/another','134/2/eve-host-build/other']) {
+    assert.throws(() => approvedEveBuild({...job,owner},env),/owner/)
+  }
+})
+
+test('a mismatched or missing R2 object cannot start a host verification', async () => {
+  const { verifyEveArtifact } = await import('./eve-artifact.mjs')
+  const artifact = { key: 'run-archive', size: 12, sha256: 'a'.repeat(64) }
+  for (const object of [null, { size: 11 }, { size: 12, checksums: { toJSON: () => ({ sha256: 'b'.repeat(64) }) } }]) {
+    let executions = 0
+    const vm = { exec() {++executions} }
+    await assert.rejects(verifyEveArtifact(vm, { get: async key => {
+      assert.equal(key, artifact.key)
+      return object
+    } }, artifact, 'probe', 'source', 'release'), /verification archive changed/)
+    assert.equal(executions, 0)
+  }
+})

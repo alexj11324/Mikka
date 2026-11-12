@@ -1,10 +1,11 @@
+import { boundedJson } from '../../bounded-json.mjs'
 import { timingSafeEqual } from 'node:crypto'
 import { handleTaskProcessSocket } from '../../task-sandbox/process-socket.mjs'
 
 const HOST = 'task-machine.internal'
 const MAX_FILE_BYTES = 4 * 1024 * 1024
 const MAX_METADATA_BYTES = 16 * 1024
-const writes = new Set(['/v1/open', '/v1/park', '/v1/status', '/v1/read-file', '/v1/write-file', '/v1/remove-path'])
+const writes = new Set(['/v1/open', '/v1/park', '/v1/status', '/v1/read-file', '/v1/write-file', '/v1/remove-path', '/v1/review'])
 
 const refused = (code, status) => Response.json({ error: code }, { status, headers: { 'cache-control': 'no-store' } })
 
@@ -20,25 +21,11 @@ export function configureTaskBridge(container, ctx) {
   ctx.blockConcurrencyWhile(() => container.setOutboundByHost(HOST, 'taskMachine', { token }))
 }
 
-async function boundedJson(request, limit) {
-  if (!request.body || Number(request.headers.get('content-length')) > limit) throw new RangeError()
-  const reader = request.body.getReader()
-  const decoder = new TextDecoder('utf-8', { fatal: true })
-  let total = 0, json = ''
-  try {
-    for (;;) {
-      const { value, done } = await reader.read()
-      if (done) break
-      total += value.byteLength
-      if (total > limit) { await reader.cancel(); throw new RangeError() }
-      json += decoder.decode(value, { stream: true })
-    }
-    return JSON.parse(json + decoder.decode())
-  } finally { reader.releaseLock() }
-}
-
 function machineFailure(error) {
   switch (error?.message) {
+    case 'Invalid task review scope': return refused('invalid_review', 400)
+    case 'Task review lease expired': return refused('lease_expired', 410)
+    case 'Original task review checkout unavailable': return refused('checkout_unavailable', 409)
     case 'Invalid task machine grant': return refused('invalid_grant', 400)
     case 'Task machine scope mismatch':
     case 'Task machine run mismatch': return refused('machine_not_found', 404)
@@ -86,6 +73,10 @@ export async function taskMachine(request, env, { params }) {
   try {
     // Only negotiated RPC arguments cross the binding; discard all HTTP headers.
     switch (url.pathname) {
+      case '/v1/review': {
+        const result = await machine.review(body.grant, body.operation)
+        return result instanceof Response ? result : Response.json(result,{headers:{'cache-control':'no-store'}})
+      }
       case '/v1/open': return Response.json(await machine.open(body.grant))
       case '/v1/park': return Response.json(await machine.park(body.grant))
       case '/v1/status': return Response.json(await machine.status(body.grant))
