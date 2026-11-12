@@ -7,7 +7,7 @@ description: "Audit business command-to-UI reachability and UI-to-command behavi
 
 ## Inputs and authority
 
-Read `docs/design/glossary.md`, `docs/design/work-domain-api.md`, `scripts/entity-ui-policy.mjs`, `scripts/interaction-policy.mjs`, `lib/issue-meta.ts`, `lib/task-state.ts`, and the current public/hosted code. Preserve the one canonical writer and authorized state projection. Source presence is a candidate; real reachability is established by actual component composition or a running official build.
+Read `docs/design/glossary.md`, `docs/design/work-domain-api.md`, `scripts/entity-ui-policy.mjs`, `scripts/interaction-policy.mjs`, `lib/issue-meta.ts`, `lib/task-state.ts`, and the current public/hosted code. Preserve the one canonical writer and authorized state projection. Source presence is a candidate; actual imports show which renderer can mount the action. Establish reachability by navigating the running official build as the expected user.
 
 **Separate business state from derived display state.** For Task, writable `IssueStatus` comes from `ISSUE_STATUS_CODES` (`backlog/todo/doing/review/done/canceled/duplicate`); `waiting/blocked/failed/running/queued` in `task-state.ts` are derived from Task/Run/Factory. Do NOT demand a button that directly sets derived `running`, or conflate stopping a Run with closing a Task.
 

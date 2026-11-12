@@ -20,6 +20,34 @@ For one result use:
 
 An audit must enumerate rows and explicit `not-tested` scope; claiming 100% coverage requires a defined denominator (all promised jobs × authorized roles × applicable entry classes) and independently observed outcomes. A static AST pass and a rendered menu count are not that denominator.
 
+## Run one domain
+
+1. Select one promised job and role from the [work domain](work-domain-api.md). Record both Git SHAs. In the public checkout run the existing command for the affected layer. For example, these checks exercise the source policies and the Task detail/entry owner respectively:
+
+   ```sh
+   node --test scripts/interaction-policy.test.mjs scripts/entity-ui-policy.test.mjs
+   pnpm test:issue-readonly-dom
+   ```
+
+   The first command tests the rules on known examples. The second covers public DOM and route contracts. Keep both outcomes distinct from a click in the official client. For a different job, select its existing suite in `package.json` and consult [test ownership](../ci/test-ownership.md).
+
+2. For a Web action prepare the [isolated accounts and database](../test-accounts.md) and check out the selected official UI revision under the public checkout at `.hosted-ui`. With Node 24 and the locked dependencies, use the [official overlay](../ui-overlay.md) and [Node runtime](../operations/web-runtime.md):
+
+   ```sh
+   git rev-parse HEAD
+   git -C .hosted-ui rev-parse HEAD
+   export MIKKA_UI_OVERLAY_DIR=.hosted-ui
+   export MIKKA_UI_OVERLAY_SHA="$(git -C .hosted-ui rev-parse HEAD)"
+   pnpm build:installation
+   pnpm start --hostname 127.0.0.1 --port 3000
+   ```
+
+   Confirm the reported revisions match the selected pair before navigating. Reuse an existing verified isolated build of that pair when available. The server and the browser must use the same origin and database-bound fixture. Record other clients with their own version and runtime.
+
+3. Drive the promised entry as the selected user. For example, open the same Task from its Board card and Search result. Attempt one business-status change in the canonical detail, check the acknowledged result, then reopen from the other entry and compare the stored status. On the restricted-role path, use a disposable account with that documented role and record the expected visible behavior. Capture the first failing step, account scope, request result and independent readback. Redact identity, credentials and private source.
+
+4. Update the row above with its evidence and owner. A reproduced failure goes directly into its owning source, focused regression, retest and normal PR. Preserve untested routes in the denominator while completing the other rows in the batch.
+
 ## First source-only sweep (2026-11-12, public main `b220d70f2b8ee762fb633eb65f85b86c01c496ce`)
 
 ### Confirmed *coverage* gaps, not yet product bugs
