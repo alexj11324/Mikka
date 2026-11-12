@@ -414,7 +414,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive-foreground">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
     </>}
-    questions={[]} onAnswer={() => {}} running={0} onOpenTask={() => onOpenTask?.()} onOpenInbox={() => navigate({ section: 'suggestions' })} /> : <>
+    questions={[]} onAnswer={async () => ({ status: 'unavailable', error: '' })} running={0} onOpenTask={() => onOpenTask?.()} onOpenInbox={() => navigate({ section: 'suggestions' })} /> : <>
     <div ref={transcript} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
       {before}
       <div data-attempt-section={runId} className="flex flex-col gap-3">{transcriptBody}</div>

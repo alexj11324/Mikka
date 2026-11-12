@@ -1151,6 +1151,18 @@
     "allStatuses": "全部状态"
   },
   "Errors": {
+    "decisionAccountChanged": "当前账号已更改，请在原服务器重新打开问题。",
+    "decisionUnavailable": "你已无法回答这个问题。",
+    "decisionRetry": "回答未记录，请重试。",
+    "decisionUnconfirmed": "尚未确认是否提交，重试可核对同一回答。",
+    "factoryQuestionChanged": "问题已更改，请重新打开查看当前选项。",
+    "factoryQuestionClosed": "此问题已停止接收回答。",
+    "factoryQuestionExpired": "问题已过期。",
+    "factoryNotFound": "问题不可用。",
+    "factoryStopped": "任务已停止。",
+    "factoryHumanRequired": "请重新登录后回答。",
+    "originRejected": "服务器未授权此请求。",
+    "decisionOffline": "重新连接后可回答。",
     "projectRepositoryDenied": "此仓库或目标分支不在工作区或项目允许的范围内。",
     "projectEnvironmentUnavailable": "所选环境或其所需资源无法用于本次运行。",
     "projectResourceConflict": "资源配置已被更新，请刷新后重试。",

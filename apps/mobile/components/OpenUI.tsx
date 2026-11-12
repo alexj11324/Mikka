@@ -1,4 +1,5 @@
-import { createContext, Fragment, useContext, useState } from 'react'
+import { createDecisionSubmission } from '../../../hooks/decision-submission'
+import { createContext, Fragment, useContext, useReducer, useState } from 'react'
 import { Image, Linking, Pressable, StyleSheet, TextInput, View } from 'react-native'
 import { ArrowUpRight, Check } from 'lucide-react-native'
 import { BotBubble } from '@/components/chat'
@@ -105,11 +106,15 @@ function Card({ value }: { value: Component }) {
 /** Sending an answer from a card: one at a time, kept on failure so it can be tapped again. */
 function useAnswer() {
   const { live, answer } = useCard()
-  const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
+  const [, update] = useReducer((value: number) => value + 1, 0)
+  const [operation] = useState(() => createDecisionSubmission(update))
+  const result = operation.state('reply')
+  const state = result.status === 'accepted' ? 'sent' : result.status === 'submitting' ? 'sending' : result.status === 'idle' ? 'idle' : 'failed'
   const send = async (text: string) => {
-    if (!live || state === 'sending' || state === 'sent') return
-    setState('sending')
-    setState(await answer(text) ? 'sent' : 'failed')
+    if (!live) return
+    await operation.submit('reply', async () => await answer(text)
+      ? { status: 'accepted' }
+      : { status: 'failed', error: 'messageNotSent' }, 'messageNotSent')
   }
   return { send, state, open: live && state !== 'sent' && state !== 'sending' }
 }
