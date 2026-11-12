@@ -463,7 +463,7 @@ test('runtime env, build and upload are ordered under the same job with fixed id
 })
 
 
-function desktopWebFixture({ version = () => OTHER, overlay = () => undefined, main = () => OTHER, budget = 500,
+function desktopWebFixture({ headers = { 'x-vercel-id': 'legacy' }, version = () => OTHER, overlay = () => undefined, main = () => OTHER, budget = 500,
   comparison = (base, head) => ({ url: `https://api.github.com/repos/alexj11324/Mikka/compare/${base}...${head}`,
     base_commit: { sha: base }, merge_base_commit: { sha: base }, status: 'ahead', ahead_by: 1, behind_by: 0 }),
   runs = build => [webRun({ head_sha: build })], job = build => buildJob({ head_sha: build }),
@@ -479,7 +479,7 @@ function desktopWebFixture({ version = () => OTHER, overlay = () => undefined, m
       assert.equal(init.headers.authorization, undefined)
       assert.equal(init.cache, 'no-store')
       activeBuild = version(elapsed, value => { elapsed = value })
-      return Response.json({ build: activeBuild, overlaySha: overlay(elapsed) })
+      return Response.json({ build: activeBuild, overlaySha: overlay(elapsed) }, { headers })
     }
     assert.equal(url.origin, 'https://api.github.com')
     assert.equal(init.headers.authorization, 'Bearer read-only-fixture')
@@ -513,6 +513,15 @@ test('desktop release accepts a deployed descendant while preserving its own sou
   assert.ok(fixture.calls.every(call => call.method === 'GET'))
   assert.equal(fixture.calls.some(call => call.url.includes('/git/ref/heads/main')), false,
     'an unrelated later main commit does not invalidate an already deployed descendant')
+})
+
+test('desktop cannot use the legacy publisher after cutover, even if the public source is unchanged', async () => {
+  for (const headers of [{}, { 'cf-ray': 'edge', 'x-mikka-gateway-version-sha256': 'a'.repeat(64) },
+    { 'x-vercel-id': 'old', 'x-mikka-gateway-version-sha256': 'a'.repeat(64) }]) {
+    const fixture = desktopWebFixture({ headers })
+    await assert.rejects(fixture.run(), /desktopProviderRequiresReceipt/)
+    assert.equal(fixture.calls.length, 1)
+  }
 })
 
 test('desktop replaces obsolete preflights while preserving active signing and documentation does not trigger a release', () => {

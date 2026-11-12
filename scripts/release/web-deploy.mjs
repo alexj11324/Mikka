@@ -94,14 +94,21 @@ export async function assertCurrentMain({ expectedBuild, token, fetchImpl = fetc
   if (ref.object.sha !== expectedBuild) throw Error(`webDeploy:mainChanged:expected=${expectedBuild}:actual=${ref.object.sha}`)
 }
 
-async function publicBuild(fetchImpl, timeoutMs, expectedOverlay) {
+async function publicBuild(fetchImpl, timeoutMs, expectedOverlay, requireLegacyDesktop = false) {
   try {
     const response = await fetchImpl(PRODUCTION_VERSION_URL, { cache: 'no-store', headers: { 'cache-control': 'no-cache' },
       signal: AbortSignal.timeout(Math.max(1, Math.ceil(timeoutMs))), redirect: 'error' })
     if (!response.ok) { await response.body?.cancel(); return null }
+    if (requireLegacyDesktop && (!response.headers.get('x-vercel-id') || response.headers.has('x-mikka-gateway-version-sha256'))) {
+      await response.body?.cancel()
+      throw Error('webDeploy:desktopProviderRequiresReceipt')
+    }
     const value = await response.json()
     return SHA.test(value?.build ?? '') && (!expectedOverlay || value.overlaySha === expectedOverlay) ? value.build : null
-  } catch { return null }
+  } catch (error) {
+    if (error?.message === 'webDeploy:desktopProviderRequiresReceipt') throw error
+    return null
+  }
 }
 
 /** Called again inside the shared publication queue before touching runtime env. */
@@ -116,7 +123,7 @@ export async function assertProductionSource({ expectedBuild, token, fetchImpl =
 /** The desktop can use a newer deployed backend only when GitHub proves that
  * exact public commit contains the desktop source. Never infer this from dates,
  * branch names or a successful workflow for a different commit. */
-async function containsDesktopSource({ expectedBuild, publicCommit, token, fetchImpl, timeoutMs }) {
+export async function containsDesktopSource({ expectedBuild, publicCommit, token, fetchImpl, timeoutMs }) {
   if (publicCommit === expectedBuild) return true
   const path = `/compare/${expectedBuild}...${publicCommit}`
   const comparison = await githubRead(path + '?per_page=1', { token, fetchImpl, timeoutMs })
@@ -155,7 +162,7 @@ export async function waitForWebDeployment({ expectedBuild, allowDescendant = fa
     if (allowDescendant === true) {
       // The live public build is the candidate, not whichever main head happens
       // to exist while signing. A newer docs-only main does not need a Web build.
-      webBuild = await publicBuild(fetchImpl, Math.min(10_000, remaining()), expectedOverlay)
+      webBuild = await publicBuild(fetchImpl, Math.min(10_000, remaining()), expectedOverlay, allowDescendant)
       if (remaining() <= 0) break
       if (!webBuild || !await containsDesktopSource({ expectedBuild, publicCommit: webBuild,
         token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })) {
@@ -208,7 +215,7 @@ export async function waitForWebDeployment({ expectedBuild, allowDescendant = fa
         continue
       }
       if (remaining() <= 0) break
-      if (await publicBuild(fetchImpl, Math.min(10_000, remaining()), expectedOverlay) === webBuild && remaining() > 0) {
+      if (await publicBuild(fetchImpl, Math.min(10_000, remaining()), expectedOverlay, allowDescendant) === webBuild && remaining() > 0) {
         if (allowDescendant !== true) await assertCurrentMain({ expectedBuild, token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })
         if (remaining() > 0) return { sourceCommit: expectedBuild, webRunId: run.id, webAttempt: run.run_attempt,
           publicBuild: webBuild, verifiedAt: new Date().toISOString() }

@@ -246,7 +246,7 @@ function fixture(options = {}) {
       return response({ deviceId: NEW_DEVICE, workspaceId: WORKSPACE })
     }
     if (path === '/mikka/v1/devices/' + NEW_DEVICE + '/gateway') {
-      assert.equal(options.core, true); assert.equal(method, 'GET'); assert.equal(newDevice.enabled, false)
+      assert.ok(options.core || options.releaseSocket); assert.equal(method, 'GET'); assert.equal(newDevice.enabled, false)
       return response({ url: 'wss://mikka-gateway.aspectlylabs.com/v1/devices/' + NEW_DEVICE + '/socket', protocol: ticketProtocol(),
         runControl: 'push', computerReviews: 'push', coordinatorResults: 'push' })
     }
@@ -276,11 +276,11 @@ function noSensitiveReport(report) {
 test('externally pinned source, overlay and provider bracket the same authenticated device cleanup', async () => {
   for (const provider of ['vercel', 'cloudflare']) {
     for (const mismatch of [null, 'source-before', 'provider-before', 'overlay-after']) {
-      const f = fixture()
+      const f = fixture({ releaseSocket:true })
       const releaseWitness = { provider, source:'a'.repeat(40), overlay:'b'.repeat(40), driver:'c'.repeat(40) }
       const env = {SMOKE_OWNER_EMAIL:ENV.SMOKE_OWNER_EMAIL, SMOKE_OWNER_PASSWORD:ENV.SMOKE_OWNER_PASSWORD}
       let reads = 0
-      const report = await f.run({ env, releaseWitness, fetchImpl:async (url, init) => {
+      const report = await f.run({ env, releaseWitness, socketFactory:f.socketFactory, fetchImpl:async (url, init) => {
         if (new URL(url).pathname !== '/mikka/api/version') return f.fetchImpl(url, init)
         reads++
         assert.equal(init.redirect, 'error')
@@ -295,6 +295,9 @@ test('externally pinned source, overlay and provider bracket the same authentica
         assert.equal(f.requests.length, 0)
       } else {
         assert.equal(reads, 2)
+        assert.equal(report.checks.deviceGateway, true)
+        assert.equal(f.sockets.length, 1)
+        assert.equal(f.sockets[0].readyState, 3)
         assert.ok(Object.values(report.cleanup).every(Boolean))
         assert.equal(report.client.sourceRevision, releaseWitness.driver)
       }

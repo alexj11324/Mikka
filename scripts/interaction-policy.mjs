@@ -5,7 +5,7 @@ const behaviorControls = /^(?:MorphPopoverTrigger|(?:Dialog|AlertDialog|Sheet|Dr
 const ignoredCalls = /^(?:console\.(?:log|info|debug|warn|error)|(?:[\w.]+\.)?(?:preventDefault|stopPropagation|stopImmediatePropagation))$/
 // A toast or native alert conveys feedback; on its own it never performs the button's command.
 // A handler that mutates state and then reports its result remains a valid action.
-const notificationOnlyCalls = /^(?:(?:window\.)?alert|toast\.(?:info|success|warning|warn|error))$/
+const notificationOnlyCalls = /^(?:(?:window\.)?alert|toast(?:\.(?:info|success|warning|warn|error|loading|message|custom))?)$/
 const placeholderText = /(?:coming\s+soon|not\s+implemented|待实现|尚未实现|敬请期待|功能开发中)/i
 
 export function auditInteractions(file, text) {

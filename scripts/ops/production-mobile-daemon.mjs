@@ -152,6 +152,10 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     report.boundaries = { modelRequestsByDriver: 0, cloudComputerBoots: 0, databaseAccessByDriver: false,
       browserExercised: false, providerLoginExercised: false, quotaEnforcementExercised: false, settlementExercised: false }
   }
+  if (releaseWitness) {
+    report.checks.deviceGateway = false
+    report.cleanup.deviceSocketClosed = true
+  }
   const jar = responseCookieJar(now)
   const marker = (core ? 'selfhost-core-' : 'm1415-wire-') + randomUUID()
   // The normal owner can match a later complete inventory to these exact
@@ -302,7 +306,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     check(url.origin === ORIGIN && !url.search && !url.hash
       && ((method === 'POST' && url.pathname === BASE + '/v1/devices/register')
         || (method === 'POST' && deviceId && url.pathname === BASE + '/v1/devices/' + deviceId + '/heartbeat')
-        || (core && method === 'GET' && deviceId && url.pathname === BASE + '/v1/devices/' + deviceId + '/gateway')
+        || ((core || releaseWitness) && method === 'GET' && deviceId && url.pathname === BASE + '/v1/devices/' + deviceId + '/gateway')
         || (method === 'GET' && url.pathname === BASE + '/v1/devices/' + target + '/repos'))
       && headers.get('authorization') === 'Bearer ' + credential && !headers.has('cookie')
       && headers.get('x-mikka-client-version') === contract.version, 'request_rejected')
@@ -472,7 +476,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     check(disabled.success === true && (await devices()).find(row => row.id === deviceId)?.enabled === false,
       'device_disable_failed')
     report.checks.schedulingDisabled = true
-    if (core) {
+    if (core || releaseWitness) {
       phase = 'core-device-gateway'
       const ticket = await client.deviceGateway(deviceId)
       deviceSocket = coreDeviceSocket(ticket, { deviceId, now, socketFactory })
