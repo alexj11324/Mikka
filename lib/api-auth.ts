@@ -20,6 +20,8 @@ export type ApiSession = {
  * rejects legacy-only tokens and every cookie session. */
 export async function getApiSession(options: { headers: Headers; query?: { disableCookieCache?: boolean; disableRefresh?: boolean }; audience?: ApiAudience }): Promise<ApiSession | null> {
   const authorization = options.headers.get('authorization')
+  // A service credential has its own API audience, including when sent with a valid human cookie.
+  if (/^Bearer\s+mksvc_/i.test(authorization ?? '')) return null
   const audience = options.audience ?? 'legacy'
   // An explicitly supplied PAT wins over a cookie, including when invalid.
   if (!/^Bearer\s+mkp_/i.test(authorization ?? '')) {

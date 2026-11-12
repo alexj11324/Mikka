@@ -1511,6 +1511,48 @@
       "restoreFailed": "恢复失败。"
     }
   },
+  "ServiceIdentities": {
+    "title": "服务身份",
+    "empty": "暂无服务身份。",
+    "name": "身份名称",
+    "more": "加载更多身份",
+    "manage": "管理{name}",
+    "active": "已启用",
+    "disabled": "已停用",
+    "rename": "重命名",
+    "disable": "停用",
+    "restore": "恢复",
+    "confirmDisable": "停用{name}并使其密钥失效？",
+    "confirmRestore": "恢复{name}？",
+    "failed": "操作失败。请刷新查看当前设置。",
+    "conflict": "其他管理员已修改设置。请刷新后再保存。",
+    "denied": "你已无权访问这些设置。",
+    "back": "返回服务身份列表",
+    "projects": "项目访问权限",
+    "noProjects": "暂无可选项目。",
+    "confirmProjects": "授予此身份读取所选项目的权限？",
+    "unavailableProject": "先前已授权的项目",
+    "credential": "服务密钥",
+    "unconfigured": "尚未签发密钥",
+    "configured": "已签发密钥",
+    "expires": "密钥于{date}到期",
+    "expiration": "到期时间（可选）",
+    "issue": "签发密钥",
+    "rotate": "轮换密钥",
+    "revoke": "撤销密钥",
+    "keyScope": "密钥范围",
+    "workspaceScope": "当前工作区",
+    "organizationScope": "组织 · {name}",
+    "detachment": "此工作区与组织解除关联时，密钥即被撤销。",
+    "scopeChanged": "原选组织已不可用。请选择当前关联的组织或此工作区。",
+    "confirmRotate": "签发新密钥并使现有密钥失效？",
+    "confirmRevoke": "撤销此服务密钥？",
+    "keyValue": "新服务密钥",
+    "copyNow": "请立即复制，此密钥仅显示一次。",
+    "dismissKey": "完成",
+    "confirm": "确认",
+    "reload": "刷新设置"
+  },
   "Members": {
     "accessTitle": "任务访问权限",
     "membersCount": "{count} 位成员",
@@ -2598,6 +2640,14 @@
         },
         "integration": {
           "permission_changed": "把 {integration} 改为{to}"
+        },
+        "service_identity": {
+          "credential_rotated": "已签发或轮换服务身份凭据",
+          "credential_revoked": "已撤销服务身份凭据",
+          "created": "创建了服务身份 {target}",
+          "renamed": "重命名了服务身份 {target}",
+          "disabled": "停用了服务身份 {target}",
+          "restored": "恢复了服务身份 {target}"
         },
         "secret": {
           "created": "添加了密钥 {target}",
@@ -5865,6 +5915,11 @@
       "default": "任务未能完成，请查看错误详情或重试。"
     },
     "governance_denied": {
+      "service_projects_changed": "项目授权已变更，请重新加载后再替换。",
+      "service_identity_disabled": "请先恢复此服务身份，再授予新的项目访问权限。",
+      "service_projects_confirmation": "请确认允许此服务身份读取所选项目。",
+      "service_identity_changed": "此服务身份已变更，请重新加载再更新。",
+      "service_identity_request_reused": "此请求已用于创建其他名称的服务身份。",
       "plan_changed": "套餐已变更，请重新核对当前权益后再应用。",
       "default": "治理操作未完成，请重试。",
       "access_denied": "你没有管理此组织或工作区的权限。",

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { dependencyTestCommand, isSelfHostedBackendInput, verifyChange } from './self-hosted-requirements.mjs'
 
@@ -51,4 +52,11 @@ test('every selected declaration maps to an executable Node test or matching rep
     [process.execPath, '--import', 'tsx', '--test-force-exit', '--test', database.test])
   assert.throws(() => dependencyTestCommand(spec, { 'test:demo': 'node other.ts' }))
   assert.throws(() => dependencyTestCommand({ ...spec, suite: 'postinstall' }, { postinstall: spec.test }))
+})
+
+test('the self-hosted product RPC declaration runs its acceptance file with the server loaders', () => {
+  const declarations = JSON.parse(readFileSync(new URL('../../config/self-hosted-requirements.json', import.meta.url), 'utf8'))
+  const { scripts } = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'))
+  assert.deepEqual(dependencyTestCommand(declarations['lib/eve/product-rpc.ts'], scripts),
+    [process.execPath, '--experimental-test-module-mocks', '--import', './scripts/server-test.mjs', '--import', 'tsx', '--test', 'lib/eve/product-tool.test.ts'])
 })

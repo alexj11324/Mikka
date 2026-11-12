@@ -7,6 +7,11 @@ import { nextCookies } from 'better-auth/next-js'
 import { openHandoff, sealHandoff } from '../lib/mobile-handoff'
 
 const ambientCookies: string[] = []
+const taskReaders = new Map<string, string>()
+mock.module(new URL('../lib/issue-access.ts', import.meta.url).href, { namedExports: {
+  issueForUser: async (user: { id: string }, issue: string) => taskReaders.get(issue) === user.id
+    ? { workspaceId: '11111111-1111-4111-8111-111111111111', ownershipState: 'bound' } : null,
+} })
 const members = new Map<string, Set<string>>()
 const ownedBots = new Map<string, { ownerId: string; workspaceId: string }>()
 mock.module(new URL('../lib/workspace-db.ts', import.meta.url).href, { namedExports: { workspaceDb: { transaction: async (operation: (tx: unknown) => unknown) => operation({}) } } })
@@ -50,13 +55,14 @@ test('handoff binds browser to issuing account, consumes token and rejects expir
   assert.ok(!JSON.stringify(data.verification).includes(token), 'stored token must be hashed')
   const response = await open(token)
   assert.equal(response.status, 200)
+  assert.equal(response.headers.get('referrer-policy'), 'strict-origin')
   assert.equal(ambientCookies.length, 0, 'nextCookies must not sign in before confirmation')
   assert.equal((await session(cookieHeader(response.headers))), null)
   const confirmed = await confirm(response)
   assert.equal(confirmed.status, 303)
   assert.equal(confirmed.headers.get('location'), 'https://handoff.test/?section=coordinator')
   assert.equal(response.headers.get('cache-control'), 'private, no-store')
-  assert.equal(response.headers.get('referrer-policy'), 'no-referrer')
+  assert.equal(confirmed.headers.get('referrer-policy'), 'no-referrer')
   assert.equal((await session(cookieHeader(confirmed.headers)))?.user.id, alice.id)
   const invalid = await open('invalid', bob.cookie)
   assert.equal(invalid.headers.getSetCookie().length, 0)
@@ -84,6 +90,7 @@ test('induced GET does not switch accounts; confirmation requires same origin an
   const bob = await signUp('bob2')
   const response = await open(await issue(alice.cookie), bob.cookie)
   assert.equal(response.status, 200)
+  assert.equal(response.headers.get('referrer-policy'), 'strict-origin')
   assert.equal(ambientCookies.length, 0, 'nextCookies must not sign in before confirmation')
   assert.equal((await session(bob.cookie))?.user.id, bob.id)
   assert.equal((await session(cookieHeader(response.headers))), null)
@@ -161,4 +168,56 @@ test('scope cannot be forged and membership is rechecked at confirmation', async
   assert.equal(revoked.status, 403)
   assert.equal(revoked.headers.getSetCookie().length, 0)
   assert.equal((await open(await issue(alice.cookie), undefined, `/?section=coordinator&workspace=${A}`)).status, 403)
+})
+
+
+test('a confirmed Task opens only for its originating account and server, without sending the Task or evidence in the redirect', async t => {
+  const oldEdition = process.env.MIKKA_EDITION, oldClient = process.env.MIKKA_OFFICIAL_WEB_URL
+  process.env.MIKKA_EDITION = 'community'
+  process.env.MIKKA_OFFICIAL_WEB_URL = 'https://official.example/mikka'
+  t.after(() => {
+    if (oldEdition === undefined) delete process.env.MIKKA_EDITION
+    else process.env.MIKKA_EDITION = oldEdition
+    if (oldClient === undefined) delete process.env.MIKKA_OFFICIAL_WEB_URL
+    else process.env.MIKKA_OFFICIAL_WEB_URL = oldClient
+  })
+  const reader = await signUp('task-reader'), wrong = await signUp('wrong-task-reader')
+  const taskId = '44444444-4444-4444-8444-444444444444', factory = '55555555-5555-4555-8555-555555555555', receipt = '66666666-6666-4666-8666-666666666666'
+  taskReaders.set(taskId, reader.id)
+  const { POST } = await route
+  async function claim(ref: string, cookie: string, origin = 'https://handoff.test') {
+    return POST(new Request(origin + '/api/mobile/open', { method: 'POST', headers: { origin, cookie, 'content-type': 'application/json' }, body: JSON.stringify({ ref }) }))
+  }
+  const source = 'https://handoff.test'
+  for (const target of ['/?issue=' + taskId, `/?issue=${taskId}&factoryTask=${factory}&evidence=${receipt}`]) {
+    const confirmed = await confirm(await open(await issue(reader.cookie), wrong.cookie, target))
+    assert.equal(confirmed.status, 200)
+    assert.equal(confirmed.headers.get('referrer-policy'), 'no-referrer')
+    assert.ok(confirmed.headers.get('content-security-policy')!.includes("form-action 'self'"))
+    const html = await confirmed.text()
+    const href = /<a href="([^"]+)"/.exec(html)![1].replaceAll('&amp;', '&')
+    assert.equal(confirmed.headers.get('location'), null)
+    const destination = new URL(href)
+    assert.equal(destination.origin, 'https://official.example')
+    assert.equal(destination.search, '')
+    assert.ok(![taskId, factory, receipt, reader.id].some(id => href.includes(id)))
+    const fragment = new URLSearchParams(destination.hash.slice(1))
+    assert.equal(fragment.get('server'), source)
+    const ref = fragment.get('mobileTask')!
+    assert.match(ref, /^[A-Za-z0-9_-]{43}$/)
+    assert.equal((await claim(ref, wrong.cookie)).status, 404)
+    assert.equal((await claim(ref, reader.cookie, 'https://wrong.test')).status, 404)
+    const own = await claim(ref, reader.cookie)
+    assert.equal(own.status, 200)
+    assert.deepEqual(await own.json(), { target, userId: reader.id, workspaceId: '11111111-1111-4111-8111-111111111111' })
+    assert.equal((await claim(ref, reader.cookie)).status, 404)
+  }
+  process.env.MIKKA_EDITION = 'cloud'
+  const cloud = await confirm(await open(await issue(reader.cookie), wrong.cookie, '/?issue=' + taskId))
+  const destination = new URL(cloud.headers.get('location')!)
+  assert.equal(destination.origin, source)
+  const ref = new URLSearchParams(destination.hash.slice(1)).get('mobileTask')!
+  taskReaders.delete(taskId)
+  assert.equal((await claim(ref, reader.cookie)).status, 404, 'revoked Task access is checked on its issuing site')
+
 })

@@ -29,8 +29,10 @@ import { setClientConfiguration } from './client-configuration'
 import { platform, AuthForm, BrowserRoute, setSession, onSessionChanged, authenticatedReturn, bootstrapScope, PlatformExtras, requireUpdate } from 'mikka:platform'
 import { loadWorkspace, preloadWorkspace } from './workspace-loader'
 import { InstalledWorkspace } from './installed-workspace'
+import { mobileTaskLaunch } from '@/lib/mobile-task-handoff'
 import { serverDocumentKind, serverPageKind } from '@/lib/server-pages'
 
+const MobileTaskHandoff = lazy(() => import('@/components/mobile-task-handoff'))
 const ServerStatus = lazy(() => import('@/components/server-status'))
 const Workspace = lazy(loadWorkspace)
 const SharedArtifactRoute = lazy(() => import('./deep-link-routes').then(module => ({ default: module.SharedArtifactRoute })))
@@ -48,8 +50,11 @@ export function App() {
   const locale = localeOf(location.pathname)
   useEffect(() => { document.documentElement.lang = locale }, [locale])
   const status = platform === 'web' && serverDocumentKind() === 'status'
+  const mobileTask = platform === 'web' && !serverDocumentKind() ? mobileTaskLaunch(location) : null
   return <NextIntlClientProvider locale={locale} messages={locale === 'en' ? en : zh} timeZone={Intl.DateTimeFormat().resolvedOptions().timeZone}>
-    <ThemeProvider>{status
+    <ThemeProvider>{mobileTask
+      ? <RendererBoundary><Suspense fallback={<WorkspaceLoading />}><MobileTaskHandoff key={location.href} launch={mobileTask} /></Suspense></RendererBoundary>
+      : status
       ? <RendererBoundary><Suspense fallback={<WorkspaceLoading />}><ServerStatus /></Suspense></RendererBoundary>
       : <><PlatformExtras /><SWRDefaults><RendererBoundary><SessionApplication /></RendererBoundary></SWRDefaults><Toaster /></>}</ThemeProvider>
   </NextIntlClientProvider>

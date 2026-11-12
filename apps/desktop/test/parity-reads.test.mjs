@@ -23,12 +23,12 @@ for (const restored of [false, true]) test(`workspace capture completes the ${re
       events.push('history-complete')
     },
   }
-  const ready = { getByRole: () => ready, getByText: () => ready, waitFor: async () => {} }
+  const ready = { getByRole: () => ready, first: () => ready, getByText: () => ready, waitFor: async () => {} }
   const conversation = {
     getByRole: (_role, options) => { assert.equal(options.name, 'Earlier messages'); return earlier },
     getByText: value => ({ waitFor: async () => { events.push(value) } }),
   }
-  const page = { getByRole: role => role === 'region' ? conversation : ready }
+  const page = { getByRole: role => role === 'log' ? conversation : ready }
   const messages = { Nav: {}, Shell: { panel: {} }, Coordinator: { conversation: 'Conversation' }, Common: { loadMore: 'Earlier messages' } }
   let completed = false
   const pending = pageReady(page, 'workspace-link', {}, messages).then(() => { completed = true })
@@ -218,13 +218,13 @@ function workspacePage({ current = false, clickError } = {}) {
   const document = Promise.withResolvers()
   const calls = { menu: 0, item: 0, document: 0, menuReady: 0, observedBeforeClick: false }
   const menu = { first: () => menu, click: async () => { calls.menu++ }, waitFor: async () => { calls.menuReady++ } }
-  const item = { getAttribute: async name => { assert.equal(name, 'aria-current'); return current ? 'true' : null }, click: async () => {
+  const item = { getAttribute: async name => { assert.equal(name, 'aria-checked'); return current ? 'true' : 'false' }, click: async () => {
     calls.item++
     calls.observedBeforeClick = calls.document === 1
     if (clickError) throw clickError
   } }
   const page = {
-    getByRole: role => { assert.ok(['button', 'menuitem'].includes(role)); return role === 'button' ? menu : item },
+    getByRole: role => { assert.ok(['button', 'menuitemradio'].includes(role)); return role === 'button' ? menu : item },
     // Both the old and new documents have this URL and the same ready menu.
     waitForURL: async predicate => { assert.equal(predicate(new URL('http://localhost:3000/mikka/en')), true) },
     waitForEvent: event => { assert.equal(event, 'domcontentloaded'); calls.document++; return document.promise },
@@ -313,7 +313,7 @@ test('lifecycle workspace selection waits for the switched document before its v
   await nextTurn()
   assert.equal(f.usableReads(), 0, 'A matching old document cannot begin the lifecycle viewport read')
   assert.equal(f.calls.observedBeforeClick, true)
-  assert.deepEqual(f.selected.at(-1), { role: 'menuitem', name: 'Fixture', exact: true })
+  assert.deepEqual(f.selected.at(-1), { role: 'menuitemradio', name: 'Fixture', exact: true })
   f.loaded()
   assert.equal(await result, 'zh-CN')
   assert.equal(f.usableReads(), 1)
@@ -409,10 +409,10 @@ test('artifact HTML still requires the rendered iframe document', { timeout: 100
   assert.equal(state.completed, true)
 })
 
-const taskFixture = { issueTitle: 'Review the desktop workspace', agentLabel: 'Codex' }
+const taskFixture = { issueTitle: 'Review the desktop workspace', agentLabel: 'Codex', botName: 'Ada' }
 const taskMessages = {
-  Workspace: { detail: { createdTask: 'Created the task' } },
-  IssueThreads: { open: 'Open thread {name}', conversation: 'Thread conversation' },
+  Workspace: { detail: { createdTask: 'Created the task', titleLabel: 'Task title' }, activity: { title: 'Activity' } },
+  IssueDetail: { frame: { openThread: 'Open thread {name}' } },
 }
 const taskDescription = 'Review conversations, task details, artifacts and workspace settings in the desktop app.'
 const threadReply = 'The review is complete. Conversations, task details and artifacts are ready.'
@@ -430,34 +430,45 @@ function taskReadiness(pending) {
     assert.ok(key, 'task text must be one of the existing positive readiness markers')
     return { waitFor: () => wait(key) }
   }
+  const title = {
+    _apiName: 'Locator',
+    async _expect(expression) {
+      assert.equal(expression, 'to.be.editable')
+      await wait('editable-title')
+      return { matches: true }
+    },
+  }
+  const activity = {
+    getByRole(role, options) {
+      if (role === 'button') {
+        assert.deepEqual(options, { name: 'Open thread Codex', exact: true, pressed: true })
+        return { waitFor: () => wait('thread-row') }
+      }
+      assert.equal(role, 'listitem')
+      return { filter({ hasText }) {
+        assert.equal(hasText, taskMessages.Workspace.detail.createdTask)
+        return { waitFor: () => wait('activity') }
+      } }
+    },
+  }
   let narrowed = false
   const task = {
     _apiName: 'Locator',
-    filter({ has }) {
-      assert.equal(has.selector, '#task-title')
-      narrowed = true
-      return this
-    },
+    filter({ has }) { assert.equal(has, title); narrowed = true; return this },
     async _expect(expression, options) {
-      assert.equal(narrowed, true, 'the nested thread shares this accessible name; select the region containing the task title')
+      assert.equal(narrowed, true)
       assert.equal(expression, 'to.have.attribute.value')
       assert.equal(options.expressionArg, 'aria-busy')
       assert.equal(options.expectedText[0].string, 'false')
       await wait('verified')
       return { matches: true }
     },
-    locator(selector) {
-      assert.equal(selector, '#task-title:not([readonly])')
-      return { waitFor: () => wait('editable-title') }
-    },
     getByText: text,
     getByRole(role, options) {
-      if (role === 'button') {
-        assert.deepEqual(options, { name: 'Open thread Codex', exact: true, pressed: true })
-        return { waitFor: () => wait('thread-row') }
-      }
-      assert.equal(role, 'list')
-      assert.deepEqual(options, { name: 'Thread conversation', exact: true })
+      if (role === 'textbox') { assert.deepEqual(options, { name: 'Task title', exact: true }); return title }
+      if (role === 'region') { assert.deepEqual(options, { name: 'Activity', exact: true }); return activity }
+      assert.equal(role, 'log')
+      assert.deepEqual(options, { name: taskFixture.botName, exact: true })
       return { getByText(value, options) {
         assert.equal(value, threadReply)
         assert.deepEqual(options, { exact: true })
@@ -467,11 +478,11 @@ function taskReadiness(pending) {
   }
   const page = {
     getByRole(role, options) {
+      if (role === 'textbox') { assert.deepEqual(options, { name: 'Task title', exact: true }); return title }
       assert.equal(role, 'region')
       assert.deepEqual(options, { name: taskFixture.issueTitle, exact: true })
       return task
     },
-    locator: selector => ({ selector }),
     getByText() { assert.fail('a reply or activity elsewhere on the page must not satisfy task readiness') },
   }
   return { page, release: waiting.resolve }
@@ -522,4 +533,26 @@ test('matching masks preserve the unchanged strict pixel comparison', async t =>
   assert.equal(changed.changedRatio, 1)
   assert.equal(changed.maximumRatio, 0.001)
   assert.equal(changed.passed, false)
+})
+
+test('the cold sample records the measured length only after exact composer readback', async () => {
+  const body = lifecycleSource.match(/async function usable\(page, draft = ''\) \{[\s\S]*?\n\}/)?.[0]
+  assert.ok(body)
+  const expected = 'Lifecycle readiness draft'
+  for (const measured of [expected, '', 'x'.repeat(expected.length)]) {
+    const evidence = {}
+    let fills = 0
+    const input = { first: () => input, waitFor: async () => {},
+      fill: async value => { assert.equal(value, expected); fills++ }, inputValue: async () => measured }
+    const page = { getByText: () => input, locator: selector => { assert.equal(selector, 'textarea[data-chat-composer]'); return input },
+      waitForFunction: async () => {} }
+    const usable = vm.runInNewContext(`(${body})`, { assert, evidence, message: 'seeded chat',
+      assertNativeViewport: async () => {}, viewport: {}, readComposerDiagnostics: async () => ({}) })
+    if (measured === expected) assert.equal(await usable(page, expected), 25)
+    else {
+      await assert.rejects(usable(page, expected), { name: 'AssertionError' })
+      assert.equal(evidence.composerFailure.expectedLength, 25)
+    }
+    assert.equal(fills, 1)
+  }
 })
