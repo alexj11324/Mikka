@@ -95,7 +95,7 @@ test('API failures never echo upstream payloads, token or exceptions', async () 
   await assert.rejects(api('https://example.com', { token: 'SECRET' }), /origin_invalid/)
 })
 
-function fixture({ changed = false, aliasChanged = false, assignmentChanged = false, queries = [], rejectsCombined = 0 } = {}) {
+function fixture({ changed = false, aliasChanged = false, assignmentChanged = false, queries = [], combinedStatus = () => 200 } = {}) {
   let aliasReads = 0, detailReads = 0
   const raw = item => ({ ...item, projectId: PROJECT, meta: { githubCommitSha: item.sha }, target: 'production', readyState: 'READY', aliasAssigned: true, aliasAssignedAt: item.ready, url: item.id === after.id ? 'immutable.vercel.app' : 'before.vercel.app' })
   return async (url, options) => {
@@ -108,7 +108,10 @@ function fixture({ changed = false, aliasChanged = false, assignmentChanged = fa
     else if (path === '/metrics/v1') {
       const query = JSON.parse(options.body)
       queries.push(query)
-      if (query.outputs.length === 2 && rejectsCombined) return { ok: false, status: rejectsCombined }
+      if (query.outputs.length === 2) {
+        const status = combinedStatus(query)
+        if (status !== 200) return { ok: false, status }
+      }
       const metrics = query.metrics.value ? { value: query.metrics.value.aggregation === 'count' ? 20 : 2000 } : { requests: 20, cpu: 2000 }
       value = { summary: [{ dimensions: { route: '/api/tasks', httpStatus: '200' }, values: metrics }] }
     } else throw Error('UNEXPECTED_SECRET_ENDPOINT')
@@ -144,11 +147,22 @@ test('preserve the original two measurements if the provider rejects a combined 
   const opts = { token: 'SECRET', now: ready + 600_000 }
   const combined = await run({ ...opts, fetchImpl: fixture() })
   const queries = []
-  const separate = await run({ ...opts, fetchImpl: fixture({ rejectsCombined: 400, queries }) })
+  const separate = await run({ ...opts, fetchImpl: fixture({ combinedStatus: () => 400, queries }) })
   assert.equal(queries.length, 6)
   assert.deepEqual(separate.metricQueryMode, { before: 'separate', after: 'separate' })
   assert.deepEqual(combined.metricQueryMode, { before: 'combined', after: 'combined' })
   for (const field of ['before', 'after', 'status', 'reasons']) assert.deepEqual(separate[field], combined[field])
-  const denied = await run({ ...opts, fetchImpl: fixture({ rejectsCombined: 403 }) })
+  const denied = await run({ ...opts, fetchImpl: fixture({ combinedStatus: () => 403 }) })
   assert.deepEqual(denied.reasons, ['vercel_api_http_403'])
+})
+
+test('a 422 for only the earlier deployment records its fallback against the correct window', async () => {
+  const queries = []
+  const beforeFilter = `environment:production AND deploymentId:"${before.id}"`
+  const fetchImpl = fixture({ queries, combinedStatus: query => query.filter === beforeFilter ? 422 : 200 })
+  const report = await run({ token: 'SECRET', now: ready + 600_000, fetchImpl })
+  assert.deepEqual(report.metricQueryMode, { before: 'separate', after: 'combined' })
+  assert.equal(queries.filter(query => query.filter === beforeFilter).length, 3)
+  assert.equal(queries.length, 4)
+  assert.deepEqual(report.before, report.after)
 })
