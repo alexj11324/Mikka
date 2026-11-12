@@ -482,3 +482,44 @@ test('Review retries the original candidate and event in place after the approva
   assert.equal(composer!.value, 'Separate next draft')
   assert.equal(container.querySelectorAll('[data-delivery-phase="accepted"]').length, 1)
 })
+
+test('Inbox waiting replies keep the original thread, viewer, workspace and request ID across an unknown result and remount', async () => {
+  const { useInboxThreadReply } = await import('../lib/hooks/chat-delivery')
+  const issueId = crypto.randomUUID(), runId = crypto.randomUUID(), laterRunId = crypto.randomUUID()
+  const viewer = { ownerId: crypto.randomUUID(), workspaceId: crypto.randomUUID() }
+  let submit!: ReturnType<typeof useInboxThreadReply>
+  function InboxReply({ current }: { current: typeof viewer | null }) {
+    submit = useInboxThreadReply(current)
+    return null
+  }
+  container = browser.document.createElement('div') as unknown as HTMLDivElement
+  document.body.append(container)
+  root = createRoot(container)
+  const renderInbox = (current: typeof viewer | null, visible = true) => act(async () => root!.render(
+    <actualViewState.ViewStateProvider scope={current ? current.ownerId + ':' + current.workspaceId : 'no-scope'}>
+      <IntlProvider locale="en" timeZone="UTC" messages={messages}>{visible && <InboxReply current={current} />}</IntlProvider>
+    </actualViewState.ViewStateProvider>,
+  ))
+  const calls: unknown[] = []
+  postReply = async request => {
+    calls.push(request)
+    if (calls.length === 1) throw new TypeError('lost response')
+    return { sent: true }
+  }
+  await renderInbox(null)
+  assert.equal((await submit(issueId, runId, 'Original answer')).status, 'unavailable')
+  assert.equal(calls.length, 0)
+  await renderInbox(viewer)
+  await act(async () => { assert.equal((await submit(issueId, runId, 'Original answer')).status, 'uncertain') })
+  await renderInbox(viewer, false)
+  await renderInbox(viewer)
+  await act(async () => { assert.equal((await submit(issueId, laterRunId, 'Original answer')).status, 'accepted') })
+  assert.equal(calls.length, 2)
+  assert.deepEqual(calls[0], calls[1])
+  const original = calls[1] as { requestId: string }
+  assert.match(original.requestId, /^[\da-f-]{36}$/i)
+  assert.deepEqual(original, { issueId, runId, text: 'Original answer', requestId: original.requestId,
+    expectedOwnerId: viewer.ownerId, expectedWorkspaceId: viewer.workspaceId })
+  await act(async () => { assert.equal((await submit(issueId, laterRunId, 'Original answer')).status, 'accepted') })
+  assert.notEqual((calls[2] as { requestId: string }).requestId, original.requestId, 'an acknowledged answer must not consume a later independent answer')
+})
