@@ -1,18 +1,17 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { withBasePath } from '@/lib/base-path'
 import { pool } from '@/lib/db'
 import { withRequestLog } from '@/lib/request-log'
 import { withTaskWorkspace } from '@/lib/task-workspace'
-import { installPlatform, redeemSlackCode, SLACK_CALLBACK_PATH, SLACK_STATE_COOKIE } from '@/lib/slack/install-provider'
+import { installPlatform, redeemSlackCode, SLACK_CALLBACK_PATH, SLACK_INSTALL_RETURN_PATH, SLACK_STATE_COOKIE } from '@/lib/slack/install-provider'
 import { acceptInstall, consumeInstall } from '@/lib/slack/installation-store'
 
 export const runtime = 'nodejs'
 async function handle(request: Request) {
   const url = new URL(request.url),
     platform = installPlatform()
-  const back = new URL(withBasePath('/?section=plugins&app=slack&installation=failed'), url.origin)
+  const back = new URL(SLACK_INSTALL_RETURN_PATH, url.origin)
   const redirect = () => {
     const response = NextResponse.redirect(back)
     response.cookies.set(SLACK_STATE_COOKIE, '', {
