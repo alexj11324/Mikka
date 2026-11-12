@@ -66,8 +66,22 @@ test('official jobs keep private code out of public artifacts and pin desktop to
     assert.match(install?.run ?? '', /--ignore-workspace --prod --ignore-scripts --frozen-lockfile/)
   }
   for (const job of [desktop.jobs.preflight, desktop.jobs.macos]) {
-    assert.ok(job.steps.some(step => step.run === 'node scripts/release/web-deploy.mjs await-desktop-web'))
+    const legacy = job.steps.find(step => step.run === 'node scripts/release/web-deploy.mjs await-desktop-web')
+    assert.equal(legacy.if, "github.event.inputs.cloudflare_receipt == ''")
+    assert.equal(job.permissions.issues, 'read')
   }
+  const proof = 'node scripts/release/cloudflare-promoted-web.mjs desktop'
+  const approved = job => job.steps.filter(step => step.run === proof)
+  assert.equal(approved(desktop.jobs.preflight).length, 1)
+  assert.equal(approved(desktop.jobs.macos).length, 2)
+  for (const step of [...approved(desktop.jobs.preflight), ...approved(desktop.jobs.macos)]) {
+    assert.equal(step.if, "github.event.inputs.cloudflare_receipt != ''")
+    assert.equal(step.env.CLOUDFLARE_RECEIPT, '${{ github.event.inputs.cloudflare_receipt }}')
+  }
+  const signing = desktop.jobs.macos.steps
+  assert.ok(signing.indexOf(approved(desktop.jobs.macos)[0]) < signing.findIndex(step => step.uses?.startsWith('Infisical/')))
+  assert.equal(signing.indexOf(approved(desktop.jobs.macos)[1]) + 1, signing.findIndex(step => step.uses?.startsWith('softprops/')))
+  assert.ok(signing.some(step => step.run?.includes('evidence.mjs verify')))
   const checkout = desktop.jobs.macos.steps.find(step => step.with?.repository === 'alexj11324/mikka-hosted-ui')
   assert.equal(checkout.with.ref, '${{ needs.preflight.outputs.overlay-sha }}')
   assert.equal(checkout.with['persist-credentials'], false)

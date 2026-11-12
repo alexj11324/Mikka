@@ -65,6 +65,13 @@ The same release produces the immutable template report for the private
 Cloudflare API deployment. The legacy Web publisher runs only on the original
 release path with an empty Cloudflare receipt.
 
+Desktop uses its existing signed and notarized macOS workflow. After promotion,
+dispatch Desktop release on main with the same fresh `cloudflare_receipt`.
+It verifies the serving Web version and exact overlay before allocating the
+Mac, before loading credentials, and immediately before publishing the sealed
+installer. The approved backend must contain the installer commit. The
+original Vercel path remains available while Vercel serves the canonical app.
+
 See the [private runbook](https://github.com/alexj11324/mikka-cloud/blob/main/docs/operations/web-deploy.md).
 
 ## Logs are public
