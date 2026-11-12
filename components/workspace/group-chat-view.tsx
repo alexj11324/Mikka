@@ -25,11 +25,14 @@ import { mentionsIn } from '@/lib/group-mentions'
 import { authorRuns, chronological, fetchGroupMessages, mergeGroupPoll, newestGroupPosition, GroupMessagesRequestError, postGroupMessage, stopGroupReply, type GroupMessagePage } from '@/lib/group-messages'
 import { toast } from 'sonner'
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
+import { useChatDelivery, type ChatSubmission } from '@/lib/hooks/chat-delivery'
+import { checkPageBuildBeforeAction } from '@/lib/app-build'
+import { groupSubmissionMessageId } from '@/lib/group-submission'
 import { useActionError } from '@/lib/use-action-error'
 import { readAccessFailure } from '@/lib/swr/persistent-cache'
 
 /** A message the person sent that the server has not stored yet; a failed one waits for 重试. */
-type Pending = { key: string; body: string; failed: boolean; sentId?: string }
+type GroupSend = ChatSubmission & { mentions: ReturnType<typeof mentionsIn> }
 
 /** The newest page and the members re-read on the group's live key, at most this often while a reply streams in. */
 const GROUP_MERGE_MS = 500
@@ -55,13 +58,15 @@ export function GroupChatView({ group, userId, people }: {
   people: Map<string, string>
 }) {
   const t = useTranslations('GroupChat')
+  const feedback = useTranslations('Coordinator')
   const { data: agents = [] } = useSWR('agents', listAgents)
   // The pill's avatar is the members' bloubs (R-36); the right column's 详情 reads the same request.
   const { data: members = [] } = useGroupMembers(group.id)
   const member = (type: 'user' | 'agent' | 'bot', id: string) => members.find(item => item.memberType === type && item.id === id)
   const [draft, setDraft] = useViewState(`group:${group.id}:draft`, '')
   // Navigation keeps unsent text and the same in-flight promise's result; it never resends.
-  const [pending, setPending] = useViewState<Pending[]>(`group:${group.id}:pending`, [])
+  const delivery = useChatDelivery<GroupSend>(`group:${userId}:${group.workspaceId}:${group.id}`, feedback('sendUncertain'))
+  const submittedDraft = useRef<string | null>(null)
   const [accessRejected, setAccessRejected] = useState(false)
   const shown = useRef<{ id: string; page: GroupMessagePage } | null>(null)
   const { data: pages, error, size, setSize, isValidating, mutate } = useSWRInfinite<GroupMessagePage>(
@@ -85,9 +90,8 @@ export function GroupChatView({ group, userId, people }: {
   const messages = useMemo(() => pages ? chronological(pages) : [], [pages])
   const receivedIds = useMemo(() => new Set(messages.map(message => message.id)), [messages])
   useEffect(() => {
-    if (!pending.some(item => item.sentId && receivedIds.has(item.sentId))) return
-    setPending(current => current.filter(item => !item.sentId || !receivedIds.has(item.sentId)))
-  }, [pending, receivedIds, setPending])
+    if (delivery.rows.some(row => row.storedId && receivedIds.has(row.storedId))) delivery.setRows(current => current.filter(row => !row.storedId || !receivedIds.has(row.storedId)))
+  }, [delivery.rows, delivery.setRows, receivedIds])
   const reactions = useMessageReactions(messages.map(message => message.id))
   const older = pages?.at(-1)?.nextBefore ?? null
   const loadingOlder = isValidating && !!pages && size > pages.length
@@ -109,25 +113,32 @@ export function GroupChatView({ group, userId, people }: {
     else toast.dismiss(id)
     return () => { toast.dismiss(id) }
   }, [backgroundFailed, userId, group.id, t, mutate])
-  const deliver = async (item: Pending) => {
-    setPending(list => list.map(entry => entry.key === item.key ? { ...entry, failed: false } : entry))
-    let sentId: string
-    try { sentId = (await postGroupMessage(group.id, item.body, mentionsIn(item.body, members))).id }
-    catch {
-      setPending(list => list.map(entry => entry.key === item.key ? { ...entry, failed: true } : entry))
-      return
+  const deliver = async (item: GroupSend, release?: () => void) => {
+    if (blockingCode || accessRejected || refused || !delivery.begin(item)) return
+    release?.()
+    try {
+      if (navigator.onLine === false) { delivery.finish(item.id, { error: feedback('sendOffline') }); return }
+      if (!await checkPageBuildBeforeAction()) { delivery.finish(item.id, { error: feedback('sendUpdateRequired') }); return }
+      void groupSubmissionMessageId(userId, group.id, item.id).then(storedId => {
+        delivery.setRows(current => current.map(row => row.id === item.id && !row.storedId ? { ...row, storedId } : row))
+      }).catch(() => undefined)
+      const sent = await postGroupMessage(group.id, item.text, item.mentions, fetch, { requestId: item.id, expectedOwnerId: userId, expectedWorkspaceId: group.workspaceId })
+      delivery.finish(item.id, { storedId: sent.id })
+      void mutate().catch(() => undefined)
+    } catch (error) {
+      const status = error instanceof GroupMessagesRequestError ? error.status : undefined
+      const reason = status === 429 ? feedback('sendRateLimited') : status && [401, 403, 404].includes(status) ? feedback('sendAccessDenied')
+        : status && status < 500 ? t('notSent') : feedback('sendUncertain')
+      delivery.finish(item.id, { error: reason })
     }
-    // Stored: never offered for 重试 again. It stays, hidden behind the stored copy once that is read, so it never flickers.
-    setPending(list => list.map(entry => entry.key === item.key ? { ...entry, sentId } : entry))
-    await mutate()
   }
   const send = () => {
-    const body = draft.trim()
-    if (!body) return
-    const item = { key: crypto.randomUUID(), body, failed: false }
-    setDraft('')
-    setPending(list => [...list, item])
-    void deliver(item)
+    const text = draft.trim()
+    if (!text || submittedDraft.current === draft) return
+    void deliver({ id: crypto.randomUUID(), at: Date.now(), text, mentions: mentionsIn(text, members) }, () => {
+      submittedDraft.current = draft
+      setDraft('')
+    })
   }
   const first = pages?.[0]
   // 停止: the reply ends on the server; the button waits until the group stops answering.
@@ -140,7 +151,7 @@ export function GroupChatView({ group, userId, people }: {
     try { await stopGroupReply(group.id) } catch { setStopping(false); toast.error(actionError()) }
     await mutate()
   }
-  const unsent = pending.filter(item => !item.sentId || !messages.some(message => message.id === item.sentId))
+  const unsent = delivery.rows.filter(item => !item.storedId || !receivedIds.has(item.storedId))
   // The newest message, a sent one or a bot answering keeps the chat at its end; loading older ones does not move it.
   const [following, setFollowing] = useViewState(`group:${group.id}:following`, true)
   const scroller = useViewScroll<HTMLDivElement>(`group:${group.id}:messages`, !!pages)
@@ -185,9 +196,9 @@ export function GroupChatView({ group, userId, people }: {
                         </div>
                       </li>
                     })}
-                    {unsent.map(item => <li key={item.key} data-pending={item.failed ? 'failed' : 'sending'} className={cn('flex flex-col items-end gap-1', !item.failed && 'opacity-60')}>
-                      <ChatMessage from="person" speaker={speaker} body={<CollapsibleMessage><UserMessageText text={item.body} /></CollapsibleMessage>} />
-                      {item.failed && <span role="alert" className="flex items-center gap-2 text-xs text-destructive-foreground">{t('notSent')}<Button variant="ghost" size="xs" onClick={() => { void deliver(item) }}>{t('retry')}</Button></span>}
+                    {unsent.map(item => <li key={item.id} data-pending={item.phase} className={cn('flex flex-col items-end gap-1', item.phase === 'sending' && 'opacity-60')}>
+                      <ChatMessage from="person" speaker={speaker} body={<CollapsibleMessage><UserMessageText text={item.text} /></CollapsibleMessage>} />
+                      {item.phase === 'failed' && <span role="alert" className="flex items-center gap-2 text-xs text-destructive-foreground">{item.error}<Button variant="ghost" size="xs" onClick={() => { void deliver(item) }}>{t('retry')}</Button></span>}
                     </li>)}
                     {first?.agentStatus && <li aria-label={t('answering')} className="flex"><span className="rounded-2xl bg-muted px-4 py-3"><Spinner aria-hidden="true" /></span></li>}
                   </ol>
@@ -197,7 +208,7 @@ export function GroupChatView({ group, userId, people }: {
       </div>
     </div>
     <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
-      <ChatComposer ref={null} value={draft} onChange={setDraft} onSubmit={send} label={t('composer', { name: group.title || t('untitled') })} disabled={!!blockingCode} attachmentScope={{ kind: 'group', id: group.id }}
+      <ChatComposer ref={null} value={draft} onChange={value => { submittedDraft.current = null; setDraft(value) }} onSubmit={send} label={t('composer', { name: group.title || t('untitled') })} disabled={!!blockingCode} attachmentScope={{ kind: 'group', id: group.id }}
         sending={stopping} editableWhileSending={stopping} running={replying && !stopping} onStop={replying && !stopping ? () => { void stop() } : undefined} />
     </div>
   </section>

@@ -22,7 +22,7 @@ export interface QuotaSwitchNotice { kind: 'quotaSwitch'; subscription: 'claude'
 export interface PointsSwitchNotice { kind: 'pointsSwitch'; model: string }
 export type SwitchNotice = QuotaSwitchNotice | PointsSwitchNotice
 interface EventProvenance { packet: string; eventKind: string; observedState: string | null; notice?: SwitchNotice }
-export type SourcedMessage = ModelMessage & { mikkaDisplay?: MessageDisplay; mikkaEvent?: EventProvenance; mikkaUserEvent?: { id: string | null; sentAt: string | null; taskDestination?: TaskDestination; profileId?: string; taskTitle?: string } }
+export type SourcedMessage = ModelMessage & { mikkaDisplay?: MessageDisplay; mikkaEvent?: EventProvenance; mikkaUserEvent?: { submissionId?: string; id: string | null; sentAt: string | null; taskDestination?: TaskDestination; profileId?: string; taskTitle?: string } }
 const asTime = (value: Date | string | null | undefined) => value instanceof Date ? value.toISOString() : value ?? null
 
 /** Called with the stored server event, never with JSON decoded from its body. */
@@ -34,7 +34,7 @@ export function sourcedEventMessage(event: EventSource, projection: string): Sou
     const taskTitle = taskTitleInputSchema.safeParse(event.payload.taskTitle)
     const display: MessageDisplay = event.payload.source === 'coordinator_welcome' ? { version: 1, kind: 'welcome' }
       : { version: 1, kind: 'person', text: typeof event.payload.text === 'string' ? event.payload.text : projection }
-    return { role: 'user', content: images.length ? [{ type: 'text', text: projection }, ...images] : projection, mikkaDisplay: display, mikkaUserEvent: { id: event.id ?? null, sentAt: asTime(event.createdAt), ...(destination.success ? { taskDestination: destination.data } : {}), ...(profile.success ? { profileId: profile.data } : {}), ...(taskTitle.success ? { taskTitle: taskTitle.data } : {}) } }
+    return { role: 'user', content: images.length ? [{ type: 'text', text: projection }, ...images] : projection, mikkaDisplay: display, mikkaUserEvent: { ...(typeof event.payload.submissionId === 'string' ? { submissionId: event.payload.submissionId } : {}), id: event.id ?? null, sentAt: asTime(event.createdAt), ...(destination.success ? { taskDestination: destination.data } : {}), ...(profile.success ? { profileId: profile.data } : {}), ...(taskTitle.success ? { taskTitle: taskTitle.data } : {}) } }
   }
   const packet = personalMessagePacket({ messageId: event.id ?? null, senderId: null,
     sourceSessionId: null, replyToSessionId: null, origin: 'runtime_notification',

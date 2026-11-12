@@ -65,7 +65,7 @@ export async function recordPersonalSubmission(executor: Executor, userId: strin
   const dedupeKey = submissionId
     ? submissionKey(userId, botId, submissionId)
     : `user_message:${randomUUID()}`
-  const event = { userId, botId, kind: 'user_message' as const, dedupeKey, issueId: null, runId: null, payload: { text, source: 'person', ...(taskCommand ? { taskCommand, taskCreationRequestId: submissionId } : {}), ...(images.length ? { images } : {}), ...(taskDestination ? { taskDestination } : {}), ...(profileId ? { profileId } : {}), ...(taskTitle ? { taskTitle } : {}), ...(retryOf?{retryOf}:{}),...(taskRequestSourceEventId?{taskRequestSourceEventId}:{}),...(options.humanSessionId ? { humanSessionId: options.humanSessionId } : {}) } }
+  const event = { userId, botId, kind: 'user_message' as const, dedupeKey, issueId: null, runId: null, payload: { text, source: 'person', ...(submissionId ? { submissionId } : {}), ...(taskCommand ? { taskCommand, taskCreationRequestId: submissionId } : {}), ...(images.length ? { images } : {}), ...(taskDestination ? { taskDestination } : {}), ...(profileId ? { profileId } : {}), ...(taskTitle ? { taskTitle } : {}), ...(retryOf?{retryOf}:{}),...(taskRequestSourceEventId?{taskRequestSourceEventId}:{}),...(options.humanSessionId ? { humanSessionId: options.humanSessionId } : {}) } }
   const [inserted] = await executor.insert(coordinatorEvents).values({ id: randomUUID(), ...event })
     .onConflictDoNothing({ target: coordinatorEvents.dedupeKey }).returning({ id: coordinatorEvents.id })
   if (inserted) return { duplicate: false, eventId: inserted.id }

@@ -20,6 +20,8 @@ const at = (path: string) => new URL(`../${path}`, import.meta.url).href
 let thread: Record<string, unknown> | null
 let draftText = ''
 let pageChecks = 0
+let buildGate: Promise<boolean> | undefined
+let postReply = async (_request: { requestId: string; text: string }) => ({ sent: true })
 let acceptance: FactoryTask | null = null
 const browser = new Window({ url: 'https://mikka.example/en' })
 for (const key of ['window', 'document', 'navigator', 'location', 'customElements', 'HTMLElement', 'Element', 'Node', 'CSS', 'MutationObserver', 'ResizeObserver'] as const) Object.defineProperty(globalThis, key, { configurable: true, value: key === 'window' ? browser : browser[key] })
@@ -51,13 +53,13 @@ mock.module(at('lib/hooks/view-state.tsx'), { namedExports: {
   ...actualViewState,
   useViewState: <T,>(key: string, initial: T) => actualViewState.useViewState(key, key.endsWith(':draft') ? draftText as T : initial),
 } })
-mock.module(at('lib/app-build.ts'), { namedExports: { ...actualAppBuild, checkPageBuildBeforeAction: async () => { pageChecks++; return true } } })
+mock.module(at('lib/app-build.ts'), { namedExports: { ...actualAppBuild, checkPageBuildBeforeAction: async () => { pageChecks++; return buildGate ?? true } } })
 mock.module(at('app/actions/agents.ts'), { namedExports: { retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null, getThreadName: async () => null, listIssueThreads: async () => null, pollIssueThreads: async () => null, getIssueThread: async () => {
   issueReads++
   if (readHold) await readHold
   if (readFailure) throw readFailure
   return { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: [], chunksAppend: false }
-}, getThreadChanges: async () => ({ state: 'none' }), getThreadInstructions: async () => '', getThreadMachine: async () => null, sendIssueThreadMessage: async () => {}, sendIssueThreadReply: async () => { replyCalls++; return { sent: true } }, stopRun: async () => ({}) } })
+}, getThreadChanges: async () => ({ state: 'none' }), getThreadInstructions: async () => '', getThreadMachine: async () => null, sendIssueThreadMessage: async () => {}, sendIssueThreadReply: async (request: { requestId: string; text: string }) => { replyCalls++; return postReply(request) }, stopRun: async () => ({}) } })
 mock.module(at('app/actions/artifacts.ts'), { namedExports: { listRunArtifacts: async () => [] } })
 mock.module(at('components/workspace/factory-acceptance.tsx'), { namedExports: {
   useThreadAcceptance: (issueId: string | null, runId: string) =>
@@ -91,7 +93,7 @@ before(async () => { ({ createRoot } = await import('react-dom/client')); ({ Iss
 const base = { id: 'run-1', issueId: 'issue-1', status: 'succeeded', outcome: null, question: null, continuation: null, stopping: false, ownedByCurrentUser: true,
   createdAt: new Date(0), finishedAt: new Date(0), latestRunId: 'run-1', prompt: 'Fix it', stopRequestedAt: null, replyAvailable: true, retryAvailable: true, quota: null, feedbackEligible: false,
   detail: { name: 'ZHIX-2 Fix it', agentName: 'Claude Code', harness: 'claude_code', summary: null } }
-beforeEach(() => { thread = { ...base }; acceptance = null; composer = null; replyCalls = 0; draftText = ''; pageChecks = 0; liveRead = false; readFailure = null; readHold = null; changesRead = null; issueReads = 0; notices.clear(); browser.sessionStorage.clear() })
+beforeEach(() => { buildGate = undefined; postReply = async () => ({ sent: true }); thread = { ...base }; acceptance = null; composer = null; replyCalls = 0; draftText = ''; pageChecks = 0; liveRead = false; readFailure = null; readHold = null; changesRead = null; issueReads = 0; notices.clear(); browser.sessionStorage.clear() })
 afterEach(async () => { if (root) { await act(async () => root!.unmount()); root = null; container.remove() } })
 after(() => browser.close())
 const render = (props: Partial<Parameters<typeof IssueThreadPanel>[0]> = {}) => renderToStaticMarkup(<IntlProvider locale="en" timeZone="UTC" messages={messages}>
@@ -406,3 +408,34 @@ for (const scenario of retainedPanelStates) {
     assert.equal(replyCalls, 0)
   })
 }
+
+test('Thread releases the draft before version preflight and retries an unknown ACK using the same immutable command', async () => {
+  const runId = crypto.randomUUID()
+  thread = { ...base, id: runId, latestRunId: runId }
+  let release!: (value: boolean) => void
+  buildGate = new Promise(resolve => { release = resolve })
+  const writes: { requestId: string; text: string }[] = []
+  postReply = async request => {
+    writes.push(request)
+    if (writes.length === 1) throw new TypeError('connection closed after write')
+    return { sent: true }
+  }
+  await renderLive('owner:workspace', { runId })
+  await act(async () => composer!.onChange('same words'))
+  await act(async () => { composer!.onSubmit(); composer!.onSubmit() })
+  assert.equal(composer!.value, '')
+  assert.equal(container.querySelectorAll('[data-delivery-phase="sending"]').length, 1)
+  assert.equal(replyCalls, 0)
+  await act(async () => composer!.onChange('next draft'))
+  await act(async () => release(true))
+  const failed = container.querySelector<HTMLElement>('[data-delivery-phase="failed"]')
+  assert.match(failed?.textContent ?? '', /same words/)
+  const retry = [...failed!.querySelectorAll('button')].find(button => button.textContent === 'Retry')
+  assert.ok(retry, 'the retry belongs to this failed message')
+  await act(async () => retry.click())
+  assert.equal(writes.length, 2)
+  assert.equal(writes[0].requestId, writes[1].requestId)
+  assert.equal(writes[1].text, 'same words')
+  assert.equal(composer!.value, 'next draft')
+  assert.equal(container.querySelectorAll('[data-delivery-phase="accepted"]').length, 1)
+})

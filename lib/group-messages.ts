@@ -50,11 +50,11 @@ export async function fetchGroupMessages(id: string, before?: string | null, fet
 }
 
 /** POST a message to the group; the bots it @mentions answer it, else the ones the server judges should. */
-export async function postGroupMessage(id: string, body: string, mentions: GroupMessage['mentions'], fetcher: typeof fetch = fetch): Promise<GroupMessage> {
+export async function postGroupMessage(id: string, body: string, mentions: GroupMessage['mentions'], fetcher: typeof fetch = fetch, operation?: { requestId: string; expectedOwnerId: string; expectedWorkspaceId: string }): Promise<GroupMessage> {
   let response: Response
   try {
     response = await fetcher(withBasePath(`/api/conversations/${encodeURIComponent(id)}/messages`), {
-      method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ body, mentions }),
+      method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ body, mentions, ...operation }),
     })
   } catch (cause) { throw new GroupMessagesRequestError('unavailable', undefined, { cause }) }
   const sent = await response.json().catch(() => null) as GroupMessage | null

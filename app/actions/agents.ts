@@ -17,7 +17,7 @@ import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
 import { db, pool } from '@/lib/db'
 import {
-  agents, agentRuns, deviceRepos, devices, runMessages, users,
+  agents, agentRuns, coordinatorEvents, deviceRepos, devices, runMessages, users,
   type SupportedHarness,
 } from '@/lib/db/schema'
 import { issueDeviceToken } from '@/lib/device-link'
@@ -337,11 +337,11 @@ async function readThreadIssue(runId: string): Promise<{ issueId: string | null 
 
 export interface IssueThreadDetail {
   /** Authorized scopes for every attempt; browser state never guesses them. */
-  live?: { runs: import('@/lib/live/panels').ThreadLiveReference[]; issueWorkspaceId: string | null; questionDeadline: ThreadQuestionDeadline | null; revisions?: Record<string, number> }
+  live?: { viewerId?: string; runs: import('@/lib/live/panels').ThreadLiveReference[]; issueWorkspaceId: string | null; questionDeadline: ThreadQuestionDeadline | null; revisions?: Record<string, number> }
   /** The owner sees the stop deadline too, so a reload does not reset the timeout. */
   thread: IssueThread & { failureDetails: RunFailure | null; prompt: string; /** `prompt` is the task alone; the Agent also received system instructions (getThreadInstructions). */ hasInstructions?: true; stopRequestedAt: Date | null; /** Host projection for the existing controls; mutations still revalidate. */ replyAvailable: boolean; retryAvailable: boolean; feedbackEligible:boolean; /** The latest masked run error or the host's fixed wake failure. */ error: string | null; /** The owner's own: quota switches and a quota pause (lib/run-quota-view.ts). */ quota: import('@/lib/run-quota-view').ThreadQuotaView | null; /** Host-confirmed provider recovery, within this owner's thread chain. */ modelFallback?: import('@/lib/run-model-fallback-view').ThreadModelFallbackView[] | null; /** Keep polling while the host prepares a continuation; no uncommitted switch is displayed. */ modelFallbackPending?: boolean }
   chunks: { chunk: Record<string, unknown>; at: Date }[]
-  messages: { id: string; text: string; at: Date; author: string; image: string | null; mine: boolean }[]
+  messages: { id: string; submissionId?: string; text: string; at: Date; author: string; image: string | null; mine: boolean }[]
   /** Where `chunks` ends; passed back, the next read returns only later chunks. */
   chunkCursor: ThreadChunkCursor | null
   /** `chunks` holds only the chunks after the cursor that was passed: append them to the ones held. */
@@ -472,8 +472,11 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
   const stored = cursor && !read.append ? (await db.select({ prompt: agentRuns.prompt, promptTaskStart: agentRuns.promptTaskStart, promptTaskLength: agentRuns.promptTaskLength }).from(agentRuns).where(eq(agentRuns.id, row.id)).limit(1))[0] ?? { prompt: '', promptTaskStart: null, promptTaskLength: null } : row
   // The thread shows the task it was given; the Agent's full instructions open on request (getThreadInstructions).
   const { task: prompt, hasInstructions } = threadPromptView(stored.prompt, stored.promptTaskStart, stored.promptTaskLength)
-  const messages = await db.select({ id: runMessages.id, text: runMessages.text, at: runMessages.createdAt, userId: runMessages.userId, name: users.name, email: users.email, image: users.image })
+  const messages = await db.select({ id: runMessages.id,
+    submissionId: sql<string | null>`${coordinatorEvents.payload}#>>'{threadSubmission,requestId}'`,
+    text: runMessages.text, at: runMessages.createdAt, userId: runMessages.userId, name: users.name, email: users.email, image: users.image })
     .from(runMessages).leftJoin(users, eq(users.id, runMessages.userId))
+    .leftJoin(coordinatorEvents, and(eq(coordinatorEvents.id, runMessages.id), eq(coordinatorEvents.userId, user.id), eq(coordinatorEvents.kind, 'user_message')))
     .where(inArray(runMessages.runId, runIds)).orderBy(asc(runMessages.createdAt))
   const { threads: [thread], deadline: questionDeadline } = projected ? await threadQuestions([withRunChain(projected, chain)], user.id) : { threads: [], deadline: null }
   if (!thread) throw new ActionFailureError('runNotFound')
@@ -530,10 +533,10 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
     readContextUsage(chainRunIds, row.id),
   ])
   return {
-    live: { runs, issueWorkspaceId, questionDeadline, ...(Object.keys(revisions).length ? { revisions } : {}) },
+    live: { viewerId: user.id, runs, issueWorkspaceId, questionDeadline, ...(Object.keys(revisions).length ? { revisions } : {}) },
     thread: { ...thread, failureDetails, questionWake, prompt: promptOmitted ? '' : prompt, ...(!promptOmitted && hasInstructions ? { hasInstructions: true as const } : {}), stopRequestedAt, replyAvailable, retryAvailable, quota, modelFallback: modelFallback?.notices ?? null, modelFallbackPending: modelFallback?.pending ?? false, error, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
-    messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
+    messages: messages.map(message => ({ id: message.id, ...(message.submissionId ? { submissionId: message.submissionId } : {}), text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
     chunkCursor: read.cursor,
     chunksAppend: read.append,
     context,
@@ -582,7 +585,7 @@ function safeHttpUrl(value: string) {
 }
 
 /** Something a person says in a running thread; the daemon delivers it to the agent. */
-export async function sendIssueThreadMessage(input: { issueId: string | null; runId: string; text: string; requestId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<{ runId: string; continued: boolean }> {
+export async function sendIssueThreadMessage(input: { issueId: string | null; runId: string; text: string; requestId?: string; expectedOwnerId?: string; expectedWorkspaceId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<{ runId: string; continued: boolean }> {
   const text = z.string().trim().min(1).max(10_000).safeParse(input.text)
   if (!text.success) throw new ActionFailureError('messageRequired')
   const { row, user } = await readableThread(input.issueId, input.runId, threadColumns)
@@ -590,6 +593,8 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
   if(!desktopHumanSessionId()&&(requestHeaders.has('authorization')||!requestHeaders.get('cookie')))throw new ActionFailureError('authRequired')
   const session=await auth.api.getSession({headers:requestHeaders,query:{disableCookieCache:true}})
   if(!session?.user||!session.session?.id||session.user.id!==user.id)throw new ActionFailureError('authRequired')
+  if (input.expectedOwnerId && session.user.id !== input.expectedOwnerId) throw new ActionFailureError('authRequired')
+  if (input.expectedWorkspaceId && (await loadWorkspaceContext(undefined, session.user)).workspace.id !== input.expectedWorkspaceId) throw new ActionFailureError('workspaceAccessDenied')
   if(row.userId!==user.id)throw new ActionFailureError('runNotFound')
   if(input.retryOriginalSession!==undefined && input.retryOriginalSession!==true)throw new ActionFailureError('runInvalid')
   if(input.requestId!==undefined && !z.uuid().safeParse(input.requestId).success)throw new ActionFailureError('validationGeneric')
@@ -634,7 +639,7 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
  * dispatch with no machine or model) returned as its code, so the thread says
  * why instead of 「发送失败」. Other failures still throw.
  */
-export async function sendIssueThreadReply(input: { issueId: string | null; runId: string; text: string; requestId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<ActionResult<{ sent: true; runId: string; continued: boolean }>> {
+export async function sendIssueThreadReply(input: { issueId: string | null; runId: string; text: string; requestId?: string; expectedOwnerId?: string; expectedWorkspaceId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<ActionResult<{ sent: true; runId: string; continued: boolean }>> {
   return runAction(async () => { const result=await sendIssueThreadMessage(input); return { sent: true as const,...result } })
 }
 

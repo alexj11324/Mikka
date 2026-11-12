@@ -37,7 +37,8 @@ import { CoordinatorReply } from './coordinator-reply'
 import { ChatComposer } from './chat-composer'
 import { BotModelPicker, botModelMenuKey, openModelPicker } from './bot-model-picker'
 import { CoordinatorContextUsage } from './coordinator-context-usage'
-import { useCoordinatorSubmit } from './use-coordinator-submit'
+import { useChatDelivery, type ChatSubmission } from '@/lib/hooks/chat-delivery'
+import { useCoordinatorSubmit, type CoordinatorMessageContext } from './use-coordinator-submit'
 import { useCoordinatorAgent } from './use-coordinator-agent'
 import { activeTurn } from 'eve/events'
 import { EveInteractions } from './eve-interactions'
@@ -109,6 +110,8 @@ const HEADER_FADE = 'md:[--scroll-fade-mask:linear-gradient(to_bottom,transparen
 export type CoordinatorPrefill = { text: string; nonce: number; suggestionId?: string }
 
 /** A chat read and when it was asked for, which anchors its live deadline (lib/live/list-read.ts). */
+type PersonalChatSend = ChatSubmission & { context: CoordinatorMessageContext }
+
 type ChatRead = Chat & { requestedAt?: number }
 /** Pushes closer together than this share one read; the stream shows a turn's words meanwhile. */
 const CHAT_MERGE_MS = 2_000
@@ -274,11 +277,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
     inputRef.current?.focus()
   }
   const deliveryInFlight = useRef(false)
-  // A message that did not go stays in the chat as a failed bubble with 重试, as in iMessage and Slack. Retrying here
-  // resends the same submission (same id), so it is stored once.
-  // `after`: the last stored position when it failed.
-  // `retryOf`: the stored failed message this send retries in place (重新发送); it stays hidden from then on.
-  const [failed, setFailed] = useState<{ text: string; withNotes: boolean; message: string; after: number; retryOf?: number } | null>(null)
+  const delivery = useChatDelivery<PersonalChatSend>(stateKey, t('sendUncertain'))
   const [retrying, setRetrying] = useState<ReadonlySet<number>>(() => new Set())
   const { submit, failureMessage } = useCoordinatorSubmit(stream)
   // Notes pinned in the browser wait in this composer while it is the chat on screen (not inside the reader).
@@ -309,10 +308,11 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
   const waitingQuestions = useMemo(() => waitingQuestionRuns(items, data?.sources, staleEvents), [items, data, staleEvents])
   /** The thread cards under `item`: those whose first reply it is; a live reply only threads no stored reply has carded. */
   const cardsOf = (item: Chat['items'][number], live: boolean) => item.threads.filter(id => (live ? !firstThreadCard.has(id) : firstThreadCard.get(id) === item.position) && sources?.[id]?.kind === 'run')
-  // A send whose result was unknown may have been stored after all: once it shows up in the chat, the failed bubble goes.
+  const received = useMemo(() => new Set(items.flatMap(item => item.from === 'person' && item.submissionId ? [item.submissionId] : [])), [items])
+  const localMessages = delivery.rows.filter(row => !received.has(row.id))
   useEffect(() => {
-    if (failed && items.some(item => item.from === 'person' && item.position > failed.after && item.text === failed.text)) setFailed(null)
-  }, [failed, items])
+    if (delivery.rows.some(row => received.has(row.id))) delivery.setRows(current => current.filter(row => !received.has(row.id)))
+  }, [received, delivery.rows, delivery.setRows])
   // New messages fade in briefly, as in Claude Code; what was there when the chat opened does not (R-37).
   // A stored reply that replaces a reply already streamed on screen is not new.
   const streamedThrough = useRef(-1)
@@ -471,30 +471,29 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
   }
 
   /** Sends `text` to the Coordinator or bot, with the browser's notes when `withNotes`: sent, failed (now a failed bubble), or skipped. */
-  async function deliver(text: string, withNotes = false, retryOf?: number): Promise<'sent' | 'failed' | 'skipped'> {
-    if (!text || sending || resuming || deliveryInFlight.current) return 'skipped'
-    deliveryInFlight.current = true
+  async function deliver(text: string, withNotes = false, retryOf?: number, previous?: PersonalChatSend, releaseDraft?: () => void): Promise<'sent' | 'failed' | 'skipped'> {
+    if (!text || sending || resuming || deliveryInFlight.current || unavailable) return 'skipped'
     const notes = withNotes && browser?.notes.length ? [...browser.notes] : undefined
-    const fail = (message: string | null) => {
-      if (!message) return 'skipped' as const
-      // Offline, the message never left: say that, not a generic failure (usability review N3). 重试 stays beside it.
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) message = t('sendOffline')
-      setFailed({ text, withNotes, message, after: items.at(-1)?.position ?? 0, ...(retryOf !== undefined ? { retryOf } : {}) })
-      return 'failed' as const
-    }
+    const command = previous ?? { id: crypto.randomUUID(), at: Date.now(), text,
+      context: { quote: embedded?.quote, botId, notes, expectedWorkspaceId: selectedWorkspaceId ?? undefined, expectedOwnerId: userId ?? liveOwner ?? undefined,
+        ...(retryOf !== undefined ? { retryOf } : {}) } }
+    if (!delivery.begin(command)) return 'skipped'
+    if (command.context.retryOf !== undefined) { const position = command.context.retryOf; setRetrying(current => new Set(current).add(position)) }
+    deliveryInFlight.current = true
+    setSending(true)
+    releaseDraft?.()
+    const fail = (message: string) => { delivery.finish(command.id, { error: message }); return 'failed' as const }
     try {
-      if (!await checkPageBuildBeforeAction()) return 'skipped'
-      setSending(true)
-      if (retryOf !== undefined) setRetrying(current => new Set(current).add(retryOf))
-      const outcome = await submit(text, { quote: embedded?.quote, botId, notes, ...(retryOf !== undefined ? { retryOf } : {}) })
-      if (outcome.kind !== 'accepted') return fail(failureMessage(outcome))
-      setFailed(current => current?.text === text ? null : current)
-      embedded?.clearQuote()
-      if (notes) browser?.removeMany(notes.map(note => note.n))
-      await mutate()
+      if (navigator.onLine === false) return fail(t('sendOffline'))
+      if (!await checkPageBuildBeforeAction()) return fail(t('sendUpdateRequired'))
+      const outcome = await submit(command.text, command.context, command.id)
+      if (outcome.kind !== 'accepted') return fail(failureMessage(outcome) ?? t('sendUncertain'))
+      delivery.finish(command.id, {})
+      if (command.context.notes) browser?.removeMany(command.context.notes.map(note => note.n))
+      void mutate().catch(() => undefined)
       setLocalSend(current => ({ key: stateKey, count: current.key === stateKey ? current.count + 1 : 1 }))
       return 'sent'
-    } catch { return fail(actionError()) } finally { deliveryInFlight.current = false; setSending(false) }
+    } catch { return fail(t('sendUncertain')) } finally { deliveryInFlight.current = false; setSending(false) }
   }
   /** Sends `text`; false if it did not go. */
   async function post(text: string, withNotes = false) {
@@ -503,12 +502,14 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
   async function send(event?: FormEvent) {
     event?.preventDefault()
     const text = draft.trim()
-    const result = text ? await deliver(withReplyQuote(text, replyQuote), true) : 'skipped'
-    if (result === 'skipped' || result === 'failed') return
-    setReplyQuote(null)
-    setDraft(current => current.trim() === text ? '' : current)
     const id = suggestion.current
-    suggestion.current = null
+    const result = text ? await deliver(withReplyQuote(text, replyQuote), true, undefined, undefined, () => {
+      setDraft('')
+      setReplyQuote(null)
+      embedded?.clearQuote()
+      suggestion.current = null
+    }) : 'skipped'
+    if (result !== 'sent') return
     if (id) {
       await fetch(withBasePath(`/api/suggestions/${id}`), { method: 'DELETE', credentials: 'same-origin' }).catch(() => undefined)
       void mutateAll(key => typeof key === 'string' && key.includes('/api/suggestions'))
@@ -574,7 +575,11 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
           {item.id && <MessageReactions reactions={reactions[item.id]} align="start" />}
         </MessageActions> : undefined })
     }
-    if (failed) entries.push({ id: 'failed', role: 'person', at: Date.now(), text: splitReplyQuote(failed.text).text, status: 'failed', onRetry: () => { void deliver(failed.text, failed.withNotes, failed.retryOf) } })
+    for (const row of localMessages) entries.push({ id: row.id, role: 'person', at: row.at, text: splitReplyQuote(row.text).text,
+      status: row.phase === 'accepted' ? 'sent' : row.phase, deliveryMessage: row.error,
+      attachments: [...(row.context.quote ? [{ id: 'artifact-quote', name: row.context.quote.label ?? row.context.quote.text, meta: tMessage('quote') }] : []),
+        ...(row.context.notes ?? []).map(note => ({ id: `note-${note.n}`, name: noteChipText(note), meta: tNavAll('Editor.richText.annotate') }))],
+      ...(row.phase === 'failed' ? { onRetry: () => { void deliver(row.text, false, undefined, row) } } : {}) })
     // Before the reply has anything to show: the Bot's turn, still empty, with its caret.
     if (working && items.length > 0 && !stream.replies.length && !(lastSaid?.from === 'coordinator' && lastSaid.text) && !stopping)
       entries.push({ id: 'waiting', role: 'bot', at: Date.now(), parts: [], streaming: true })
@@ -606,7 +611,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
         <ThreadScreen botId={botId} name={name} mark={avatar('pill')} entries={data ? entries : null} empty={empty} panels={compact ? undefined : panels} work={work.work}
           older={data?.historyBefore ? { loading: loadingHistory, onLoad: () => void loadHistory() } : undefined}
           working={working && !stopping} onStop={(working || sending || activeTurn(stream.view) !== undefined) && !resuming && !stopping ? () => { void stop() } : undefined}
-          composer={{ ref: inputRef, label: bot ? t('inputTo', { name: bot.name }) : t('input'), placeholder, value: draft, onChange: updateDraft, sending: sending || resuming, editableWhileSending: resuming && !sending, onSubmit: () => { void send() },
+          composer={{ ref: inputRef, label: bot ? t('inputTo', { name: bot.name }) : t('input'), placeholder, value: draft, onChange: updateDraft, sending: sending || resuming, editableWhileSending: sending || resuming, onSubmit: () => { void send() },
             attachmentScope: data?.botId ? { kind: 'bot', id: data.botId } : undefined, running: working && !stopping }}
           pending={[
             ...(replyQuote ? [{ id: 'reply-quote', name: replyQuote, meta: tMessage('quote'), onRemove: () => setReplyQuote(null) }] : []),
@@ -712,18 +717,18 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
                       : <MessageFooter className={cn(item.welcome ? 'self-start' : 'self-end')}><FailureReason retry={item.welcome} failure={item.failure} botId={botId} sending={sending} onResend={() => { if (item.welcome) void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate()); else void deliver(item.text, false, item.position) }} /></MessageFooter>)}</>} />}
             </MessageScrollerItem>
             </Fragment>)}
-            {failed && <MessageScrollerItem messageId="failed" data-testid="failed-message" className="[content-visibility:visible]">
+            {localMessages.map(row => <MessageScrollerItem key={row.id} messageId={row.id} data-testid={row.phase === 'failed' ? 'failed-message' : 'local-message'} className="[content-visibility:visible]">
               <Message align="end"><MessageContent>
                 <span className="flex w-full min-w-0 items-center justify-end gap-2">
-                  <CircleAlert aria-hidden="true" className="size-4 shrink-0 text-destructive-foreground" />
-                  <Bubble variant="secondary" align="end" className={cn(PERSON_BUBBLE, compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap"><PersonWords text={failed.text} /></BubbleContent></Bubble>
+                  {row.phase === 'failed' && <CircleAlert aria-hidden="true" className="size-4 shrink-0 text-destructive-foreground" />}
+                  <Bubble variant="secondary" align="end" className={cn(PERSON_BUBBLE, compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap"><PersonWords text={row.text} />{row.context.quote && <span>{row.context.quote.label ?? row.context.quote.text}</span>}</BubbleContent></Bubble>
                 </span>
-                <span role="alert" className="flex items-center justify-end gap-1 self-end text-xs text-destructive-foreground">
-                  {failed.message}
-                  <Button variant="ghost" size="xs" className="text-foreground" disabled={sending} onClick={() => { void deliver(failed.text, failed.withNotes, failed.retryOf) }}>{tCommon('retry')}</Button>
+                <span role={row.phase === 'failed' ? 'alert' : 'status'} className="flex items-center justify-end gap-1 self-end text-xs text-muted-foreground">
+                  {row.phase === 'sending' ? tNavAll('HostedThread.sending') : row.error}
+                  {row.phase === 'failed' && <Button variant="ghost" size="xs" className="text-foreground" disabled={sending} onClick={() => { void deliver(row.text, false, undefined, row) }}>{tCommon('retry')}</Button>}
                 </span>
               </MessageContent></Message>
-            </MessageScrollerItem>}
+            </MessageScrollerItem>)}
             {/* Before the reply has anything to show: the Trace's Thinking row. Once the reply streams, its own Trace takes
                 over. It fades in (R-37: opacity on a duration) and leaves at once: an exit would keep its height after the
                 reply lands and pull the scroll position back (coordinator-scroll.spec). */}
@@ -757,7 +762,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
         {waitingQuestions[0].runId && <Button variant="link" size="xs" className="h-auto min-w-0 max-w-full px-0 font-normal" onClick={() => showThread({ runId: waitingQuestions[0].runId! })}><span className="min-w-0 truncate">{waitingQuestions[0].title}</span></Button>}
       </p>}
       <PendingActions />
-      <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending || resuming} editableWhileSending={resuming && !sending} onSubmit={() => { void send() }} attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : undefined}
+      <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending || resuming} editableWhileSending={sending || resuming} onSubmit={() => { void send() }} attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : undefined}
         running={working && !stopping} onStop={(working || sending || activeTurn(stream.view) !== undefined) && !resuming && !stopping ? () => { void stop() } : undefined}
         model={<div className="flex min-w-0 items-center gap-1">
           <BotModelPicker botId={botId ?? null} running={working || sending} />

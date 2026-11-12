@@ -50,8 +50,8 @@ let root: Root, container: HTMLDivElement
 let createRoot: typeof import('react-dom/client')['createRoot']
 let GroupChatView: typeof import('./group-chat-view')['GroupChatView']
 let pendingSnapshot: unknown[] = []
-function PendingState({ groupId }: { groupId: string }) {
-  const [value] = useViewState<unknown[]>(`group:${groupId}:pending`, [])
+function PendingState({ groupId, owner, workspace }: { groupId: string; owner: string; workspace: string }) {
+  const [value] = useViewState<unknown[]>(`chat-send:group:${owner}:${workspace}:${groupId}`, [])
   pendingSnapshot = value
   return null
 }
@@ -83,7 +83,7 @@ afterEach(async () => { await act(async () => root.unmount()); container.remove(
 after(() => browser.happyDOM.close())
 const render = async ({ visible = true, owner = 'owner', workspace = 'workspace', groupId = 'group-one' } = {}) => {
   await act(async () => root.render(<ViewStateProvider scope={`${owner}:${workspace}`}>
-    <PendingState groupId={groupId} />
+    <PendingState groupId={groupId} owner={owner} workspace={workspace} />
     {visible && <GroupChatView key={groupId} group={{ id: groupId, title: 'Fixture group', workspaceId: workspace }} userId={owner} people={new Map()} />}
   </ViewStateProvider>))
 }

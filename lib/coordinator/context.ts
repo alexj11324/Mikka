@@ -358,6 +358,8 @@ export function jsonbText(value: unknown): string {
 }
 
 export interface ChatItem {
+  /** Authenticated logical send, shared by the local bubble and its stored echo. */
+  submissionId?: string
   /** coordinator_messages.id of the row this item starts at; absent while the message is still pending in the inbox. */
   id?: string
   position: number
@@ -508,7 +510,7 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
         // The turn that answered this message failed (store.failTurn): the reason stays under it.
         const reason = (message as { mikkaFailure?: unknown }).mikkaFailure
         const failure = typeof reason === 'string' && reason ? chatFailure({ working: false, error: reason, failureDetails: (message as { mikkaFailureDetails?: unknown }).mikkaFailureDetails }) : null
-        items.push({ ...base, from: 'person', text, ...((message as {mikkaEveAccepted?:unknown}).mikkaEveAccepted===true?{native:true as const}:{}), ...(quote ? { quote } : {}), ...(notes.length ? { notes } : {}), ...(suggestion ? { suggestion } : {}), ...(images ? { images } : {}), ...(failure ? { failure } : {}) })
+        items.push({ ...base, from: 'person', text, ...(source.mikkaUserEvent?.submissionId ? { submissionId: source.mikkaUserEvent.submissionId } : {}), ...((message as {mikkaEveAccepted?:unknown}).mikkaEveAccepted===true?{native:true as const}:{}), ...(quote ? { quote } : {}), ...(notes.length ? { notes } : {}), ...(suggestion ? { suggestion } : {}), ...(images ? { images } : {}), ...(failure ? { failure } : {}) })
       }
     } else if (message.role === 'assistant') {
       const schedule = scheduleChatResultSchema.safeParse((message as { mikkaScheduleResult?: unknown }).mikkaScheduleResult)

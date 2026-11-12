@@ -3783,6 +3783,9 @@
       },
       "sources": "{count, plural, one {# source} other {# sources}}"
     },
+    "sendUpdateRequired": "Update the app before retrying. Your message is saved here.",
+    "sendAccessDenied": "Sending was refused. Check your access before retrying.",
+    "sendRateLimited": "Too many requests. Try again in a moment.",
     "sendUncertain": "Delivery not confirmed",
     "sendOffline": "No connection. Not sent",
     "lengthCount": "{count} / {max}",
