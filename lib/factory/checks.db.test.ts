@@ -92,9 +92,10 @@ test(
     if (process.env.GITHUB_ACTIONS === "true") {
       assert.equal(process.env.CI, "true");
       assert.equal(target.hostname, "127.0.0.1");
-      assert.equal(target.port, "5432");
+      // The image job maps its dedicated PG17 service to a random loopback port.
+      assert.equal(target.port, process.env.MIKKA_TEST_DB_PORT ?? "5432");
       assert.equal(target.username, "e2e");
-      assert.equal(target.pathname, "/mikka_e2e");
+      assert.match(target.pathname, /^\/[A-Za-z0-9_]+_e2e$/);
     }
     const admin = new Pool({ connectionString: url });
     const database = `factory193_consumers_${randomUUID().replaceAll("-", "")}_e2e`;
