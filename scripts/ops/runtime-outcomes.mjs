@@ -56,7 +56,7 @@ export function coverageFor(entries, now) {
   return counts
 }
 
-export async function run({ token, now = Date.now(), fetchImpl = fetch, containerWindow }) {
+export async function run({ token, now = Date.now(), fetchImpl = fetch, containerWindow = /** @type {Awaited<ReturnType<typeof import('./cloudflare-container-logs.mjs').readContainerWindow>> | undefined} */ (undefined) }) {
   const report = { version: 1, status: 'insufficient', reasons: [], observedAt: iso(now),
     window: { start: iso(now - WINDOW_MS), end: iso(now) }, sampling: 'best_effort', policy: POLICY,
     scope: { ownerId: TEAM, projectId: PROJECT, environment: 'production' }, pages: 0, records: 0,

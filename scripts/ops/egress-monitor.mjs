@@ -75,7 +75,7 @@ export function summarize(events, deploymentId, now = Date.now(), environment = 
     measurement: 'sampled_json_result_bytes_not_wire_bytes', collection: 'best_effort' }
 }
 
-export async function run({ vercelToken, neonToken, now = Date.now(), fetchImpl = fetch, providerOnly = false, containerWindow }) {
+export async function run({ vercelToken, neonToken, now = Date.now(), fetchImpl = fetch, providerOnly = false, containerWindow = /** @type {Awaited<ReturnType<typeof import('./cloudflare-container-logs.mjs').readContainerWindow>> | undefined} */ (undefined) }) {
   if (providerOnly && containerWindow) fail('container_window_invalid')
   const report = { version: 1, observedAt: iso(now), windowStart: iso(now-WINDOW_MS), environment: containerWindow?.environment ?? 'production', reasons: [], status: 'insufficient',
     collectorSource: providerOnly ? 'cloudflare_provider_fallback' : 'github_runtime_collector', collectionScope: providerOnly ? 'provider' : 'provider_and_runtime' }
