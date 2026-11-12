@@ -24,8 +24,9 @@ let actor = OWNER // the signed-in user returned by requireIssueAccess
 let workspaceMembers = new Set([OWNER, MEMBER])
 let workspaceLease = false
 let deniedResources = new Set<string>()
+const reviewChanges: Array<{ id: string; status: string }> = []
 let writes: { id: string; metadata: IssueMetadata }[] = []
-const reset = (next: Row[]) => { rows = next; members = []; actor = OWNER; workspaceMembers = new Set([OWNER, MEMBER]); workspaceLease = false; deniedResources = new Set(); writes = [] }
+const reset = (next: Row[]) => { rows = next; members = []; actor = OWNER; workspaceMembers = new Set([OWNER, MEMBER]); workspaceLease = false; deniedResources = new Set(); writes = []; reviewChanges.length = 0 }
 
 const row = (rowId: string, meta: Partial<IssueMetadata> = {}, extra: Partial<Row> = {}): Row => ({
   id: rowId, userId: OWNER, workspaceId: WORKSPACE, ownershipState: 'bound', scope: 'workspace', scopeVersion: 1, revision: 1, title: rowId, status: 'todo', priority: 'none',
@@ -130,6 +131,14 @@ before(async () => {
       return []
     },
   } })
+  mock.module(file('./coding-workspace/review-sessions.ts'), { namedExports: {
+    reviewTaskChanged: (_tx: unknown, before: Row, after: Row) => {
+      assert.equal(workspaceLease, true)
+      assert.equal(before.id, after.id)
+      assert.equal(after.revision, before.revision + 1)
+      reviewChanges.push({ id: after.id, status: after.status })
+    },
+  } })
   mock.module(file('./issue-numbering.ts'), { namedExports: { allocateIssueNumbers: async () => 1 } })
   // Identifier formatting reads account data in current main; relation guards do not.
   mock.module(file('./task-identifier-server.ts'), { namedExports: {
@@ -199,7 +208,9 @@ test('duplicate: direct and transitive duplicate cycles rejected; a plain duplic
   reset([row(A), row(B, { duplicateOfId: A }), row(C, { duplicateOfId: B }), row(D)])
   assert.equal((await relate(A, 'duplicate', B)).error, 'issueDuplicateCycle')
   assert.equal((await relate(A, 'duplicate', C)).error, 'issueDuplicateCycle')
+  assert.deepEqual(reviewChanges, [])
   assert.equal((await relate(D, 'duplicate', C)).error, undefined)
+  assert.ok(reviewChanges.some(change => change.id === D && change.status === 'duplicate'))
 })
 
 test('blocking: direct, multi-level and mixed-direction cycles rejected', async () => {
