@@ -146,11 +146,11 @@ export async function reconcileFactoryAfterCompletion(db: Queryable, userId: str
 
 /** Shared after-commit hook for every path that ends a run outside the daemon
  * completion transaction (claim rejection, lease loss/retry, stop request).
- * Call only after the ending write committed. Default-off and never throws. */
+ * Call only after the ending write committed. Review cleanup applies to every
+ * ended run. The Factory reconciler checks its own deployment switches. */
 export async function afterRunEnded(userId: string, runId: string, reconcileFor: FactoryReconcileFor = defaultReconcileFor) {
   // An ended run is due for its outcome, and its task machine for parking, now (#1212).
   armDueTimerSoon('run-recovery')
-  if (!deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return 0
   try {
     const { pool } = await import('./db')
     // Normal native completion retains a review lease; stop/lost scope must
