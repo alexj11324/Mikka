@@ -94,3 +94,22 @@ test('guarded effect runs with membership lease held through commit', async () =
  await assert.rejects(writeTransaction(denied.pool,async()=>1,{guard:async()=>{throw Error('revoked')},guardedWork:async (_tx,value)=>{sent=true;return value}}),/revoked/)
  assert.equal(sent,false);assert.ok(!denied.statements.includes('COMMIT'))
 })
+
+test('both membership fences receive the same owned APP executor and a changed policy rolls back', async () => {
+ for (const revoke of [false, true]) {
+  const f=fixture();let owned!:PoolClient, checks=0, changed=false
+  const result=writeTransaction(f.pool,async tx=>{owned=tx;await tx.query('APP parent lock');return 1},{
+   guard:async()=>({check:async executor=>{
+    assert.equal(executor,owned,'membership must not acquire a second APP connection')
+    await executor!.query('APP current Enterprise policy');checks++
+    if(changed)throw Error('synthetic policy revoked')
+   },close:async()=>{}}),
+   guardedWork:async(tx,value)=>{assert.equal(tx,owned);changed=revoke;return value},
+  })
+  if(revoke)await assert.rejects(result,/synthetic policy revoked/)
+  else assert.equal(await result,1)
+  assert.equal(checks,2)
+  assert.deepEqual(f.statements,['BEGIN','APP parent lock','APP current Enterprise policy','APP current Enterprise policy',revoke?'ROLLBACK':'COMMIT'])
+  assert.deepEqual(f.releases,[undefined])
+ }
+})
