@@ -131,6 +131,19 @@ test('Organization invitations grant only a verified Member without inheriting W
     }, outsider))
   })
 
+  await t.test('removing a sender revokes outstanding links without opening the recipient workspace', async () => {
+    const sent = await invite.issueOrganizationInvitations(organizationId, sender.id, { emails: [outsider.email] })
+    const record = sent.outcomes[0]
+    if (!record.created) throw new Error('the expired invitation must be reissued before removal')
+    await organization.removeOrganizationMember(organizationId, owner.id, sender.id)
+    const [state] = await workspaceDb.select({ status: organizationInvitations.status }).from(organizationInvitations)
+      .where(eq(organizationInvitations.id, record.id))
+    assert.equal(state.status, 'revoked')
+    await assert.rejects(invite.acceptOrganizationInvitation({ token: record.path.split('/').at(-1)! }, outsider))
+    assert.equal((await workspaceDb.select().from(workspaceMembers)
+      .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, outsider.id)))).length, 0)
+  })
+
   const [active] = await workspaceDb.select({ role: organizationMembers.role }).from(organizationMembers)
     .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, invitee.id)))
   assert.equal(active.role, 'member')
