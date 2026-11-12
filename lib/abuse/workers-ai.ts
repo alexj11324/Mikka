@@ -2,21 +2,20 @@ import 'server-only'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import { ModelAdmissionError } from '@/lib/model-admission/contract'
-import { workersAiEndpoint } from '../workers-ai-config'
+import { workersAiTransport } from '../workers-ai-config'
 
 export const workersAiModelId = '@cf/deepseek-ai/deepseek-v4.1-flash-1017'
 
 /** One physical model on the account selected by the operator. No caller can supply a URL or key. */
 export function workersAiConfig(modelId: string, env = process.env) {
-  const endpoint = workersAiEndpoint(env)
-  const key = env.CLOUDFLARE_WORKERS_AI_TOKEN?.trim()
-  if (modelId !== COORDINATOR_MODEL || !endpoint || !key) throw new ModelAdmissionError('modelRouteDenied')
-  return { endpoint, key }
+  const transport = workersAiTransport(env)
+  if (modelId !== COORDINATOR_MODEL || !transport) throw new ModelAdmissionError('modelRouteDenied')
+  return transport
 }
 
 export function workersAiModel(config: ReturnType<typeof workersAiConfig>) {
   return createOpenAICompatible({
-    name: 'cloudflare-workers-ai', baseURL: config.endpoint, apiKey: config.key, includeUsage: true,
+    name: 'cloudflare-workers-ai', baseURL: config.baseURL, apiKey: config.key, includeUsage: true,
     fetch: (input, init) => fetch(input, { ...init, redirect: 'error' }),
   }).chatModel(workersAiModelId)
 }

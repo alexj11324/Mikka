@@ -166,7 +166,8 @@
     "mode": "optional-cloud",
     "environment": [
       "CLOUDFLARE_WORKERS_AI_ACCOUNT_ID",
-      "CLOUDFLARE_WORKERS_AI_TOKEN"
+      "CLOUDFLARE_WORKERS_AI_TOKEN",
+      "MIKKA_WORKERS_AI_CAPABILITY"
     ],
     "behavior": "Only an explicitly selected managed Workers AI model uses the Cloudflare account and token and the model route refuses missing configuration before provider I/O.",
     "test": "lib/abuse/model.test.ts",
@@ -308,6 +309,7 @@
       "MIKKA_DEFAULT_MODEL_ID",
       "MIKKA_EDITION",
       "MIKKA_HOSTED_MODEL_FALLBACK",
+      "MIKKA_WORKERS_AI_CAPABILITY",
       "VERCEL",
       "VERCEL_OIDC_TOKEN",
       "ZEROCAT_API_KEY",
@@ -632,9 +634,11 @@
     "mode": "optional-cloud",
     "environment": [
       "CLOUDFLARE_WORKERS_AI_ACCOUNT_ID",
-      "MIKKA_HOSTED_MODEL_FALLBACK"
+      "CLOUDFLARE_WORKERS_AI_TOKEN",
+      "MIKKA_HOSTED_MODEL_FALLBACK",
+      "MIKKA_WORKERS_AI_CAPABILITY"
     ],
-    "behavior": "The Workers AI route must be explicitly selected and the account ID must be valid and ordinary local installs do not need a Cloudflare account.",
+    "behavior": "A hosted Cloudflare container authorizes its fixed account with an instance-scoped service binding. Operators can also configure a model-specific REST token. Community installations can use their own configured model.",
     "test": "lib/abuse/model.test.ts",
     "suite": "test:abuse"
   },
