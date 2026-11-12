@@ -1,8 +1,10 @@
+import '../tests/support/server-only.mjs'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
+import { observePoolCommits } from './db/commit-effects'
 import { groupDirectory } from './group-conversations-directory'
 import { handleGroup, type GroupRequest } from './group-conversations-store'
 import { disposableDatabase } from '../tests/helpers/e2e-target.mjs'
@@ -47,6 +49,7 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
   await pool.query(`CREATE SCHEMA "${reverseSchema}"`)
   console.log(`Retaining synthetic group test schema ${reverseSchema} at ${new Date().toISOString()}`)
   const scoped = new Pool({ connectionString: dbURL, max: 16, options: `-c search_path=${schema}` })
+  observePoolCommits(scoped)
   try {
     const migration = await readFile(new URL('../drizzle/20261023213851_group_conversations.sql', import.meta.url), 'utf8')
     await Promise.all([scoped.query(migration), scoped.query(migration)])
