@@ -22,3 +22,9 @@ test('passing checks add nothing; running stands in for unsettled checks', () =>
   assert.deepEqual(reviewSummaryParts({ ...base, checks: { failed: 0, passed: 5, pending: 0 }, pr, running: false }).map(part => part.kind), ['pr', 'files'])
   assert.deepEqual(reviewSummaryParts({ ...base, pr, running: true }).map(part => part.kind), ['pr', 'files', 'running'])
 })
+
+test('partial review data shows only observed counts and never invents checks', () => {
+  const summary = { pr, files: 3, additions: null, deletions: null, checks: null, running: false }
+  assert.deepEqual(reviewSummaryParts(summary), [{ kind: 'pr', number: 1471 }, { kind: 'fileCount', count: 3 }])
+  assert.deepEqual(reviewSummaryParts({ ...summary, files: null }), [{ kind: 'pr', number: 1471 }])
+})

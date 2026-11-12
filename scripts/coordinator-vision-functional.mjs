@@ -65,9 +65,12 @@ const plan = {
   scope: 'shared-decision-transport-only; not HTTP/auth/database/deployed Coordinator acceptance',
 }
 if (!execute) {
-  console.log(JSON.stringify({ ...plan, inferencePerformed: false, requires: 'existing authorized AI_GATEWAY_API_KEY injection and known existing budget; no secret lookup' }))
+  console.log(JSON.stringify({ ...plan, inferencePerformed: false, requires: 'existing authorized credential for the configured Decisions endpoint and known existing budget; no secret lookup' }))
 } else {
-  assert.ok(process.env.AI_GATEWAY_API_KEY, 'No authorized existing decision key injected')
+  const keyPresent = DECISIONS_URL === 'https://api.openai.com/v1/decisions'
+    ? process.env.OPENAI_DECISIONS_API_KEY && process.env.DECISIONS_BILLING_PROFILE === 'openai-global-standard'
+    : process.env.DECISIONS_API_KEY || process.env.AI_GATEWAY_API_KEY
+  assert.ok(keyPresent, 'No authorized existing decision credential and billing profile for this endpoint')
   assert.ok(!process.env.MIKKA_AGENT_KIT_LIVE_EVAL, 'Keep live-eval unset')
   const actualFetch = globalThis.fetch
   const transport = []

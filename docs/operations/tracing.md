@@ -5,9 +5,10 @@ A runtime keeps one W3C trace across requests, Workflow steps, dispatch, cloud
 startup, agent work and completion; model generations and masked browser
 replays attach to the same operational context.
 Group by route and caller to find who drives database transfer, instead of
-diffing `pg_stat_statements`. This adds to the
-[database transfer monitoring](database-egress.md); the ops snapshot and the
-`db_sample` / `db_transport_sample` logs are unchanged.
+diffing `pg_stat_statements`. The `db_sample` / `db_transport_sample` log
+contracts remain unchanged. Company dashboards, queries, alert configuration
+and production observations are maintained through the
+[private operations entry](README.md).
 
 ## What is traced
 
@@ -218,307 +219,23 @@ gives every background statement a parent, a real name and a trace.
 
 ## Querying
 
-In the PostHog app: **Tracing** (`https://us.posthog.com/tracing`), filter
-service `mikka-web`, then by attribute, for example `mikka.client_kind = daemon`
-or `mikka.route = /v1/devices/[deviceId]/commands`.
-
-For Agent queries and operations, use `posthog-cli api`. Before the first
-PostHog command in a session, read its full `--agent-help` output, then list
-skills and install/read the matching skill as `AGENTS.md` requires.
-
-```sh
-posthog-cli api --agent-help
-posthog-cli api skill list
-```
-
-Use the installed guide's schema-discovery steps to find `query-apm-spans`.
-`flatSpans: true` returns database spans directly. The following is a query
-payload to validate against the discovered CLI schema.
-
-```json
-{ "query": { "serviceNames": ["mikka-web"], "flatSpans": true, "dateRange": { "date_from": "-6h" },
-  "filterGroup": [{ "key": "mikka.client_kind", "operator": "exact", "type": "span_attribute", "value": "daemon" },
-                  { "key": "db.operation", "operator": "is_set", "type": "span_attribute" }] } }
-```
-
-Discover `apm-attributes-list` and `apm-attribute-values-list` for attribute
-keys/values, and `apm-trace-get` for one trace's tree through the same CLI. Counts now mix full
-retention and sampling. Estimate totals with each span's
-`1 / mikka.trace.sample_rate`, not a single global multiplier; historical
-records without that field use the previous 0.1 rate.
+Company deployment queries, configuration and evidence are maintained through the [private operations entry](README.md).
 
 ## Dashboard and alerts
 
-The [「Mikka 数据库与错误」 dashboard](https://us.posthog.com/project/670821/dashboard/2306506)
-answers "who drives database transfer, and what fails" without SQL. Its
-collection health lives on the
-[monitoring dashboard](https://us.posthog.com/project/670821/dashboard/2297143).
-
-Read every number on it this way:
-
-- **Counts use per-span weights.** Critical spans and retained errors/slow
-  requests have rate 1; ordinary retained spans normally have rate 0.1.
-  `sampled_*` columns are what arrived; `estimated_*_weighted` sum
-  `1 / coalesce(toFloatOrNull(attributes['mikka.trace.sample_rate']), 0.1)`.
-  The 0.1 fallback preserves the historical convention, including old explicit
-  acceptance traffic whose original rate was not recorded. Missing telemetry
-  cannot be reconstructed by this estimator.
-- **Bytes are not Neon's bytes.** `mikka.db.response_bytes_approx` is the
-  JSON size of the returned rows, estimated from the first 50 rows. It ranks
-  routes and statements; it is not network transfer and not the bill. The
-  budget tiles and alerts use Neon's own numbers from the ops snapshot
-  ([database transfer](database-egress.md)).
-- **Hours are UTC**; the project's time zone is Asia/Shanghai. Hours with no
-  spans are left out, not drawn as zero.
-- **Error counts are spans** with `status_code = 2`, grouped by
-  `mikka.error.code` (else `error.type`); one failed request can produce
-  several.
-
-| Tile | Source |
-| --- | --- |
-| Reading note | `scripts/ops/posthog/dashboard-note.md` |
-| Daily / billing-period transfer budget | Ops snapshot (`daily-budget.sql`, `monthly-budget.sql`) |
-| 7d coverage and missing attributes | `coverage.sql` |
-| DB queries per hour by route, top 15, 24h and 7d | `route-queries.sql` |
-| DB response JSON bytes per hour by route, top 15, 24h and 7d | `route-bytes.sql` |
-| Queries and bytes by `mikka.client_kind` | `client-kinds.sql` |
-| Heaviest 20 statements, with parameterized SQL | `statements.sql` |
-| Error causes by code / detail; errors by route / code / detail | `error-causes.sql`, `errors.sql` |
+Company deployment queries, configuration and evidence are maintained through the [private operations entry](README.md).
 
 ### Alerts
 
-Five alerts, the plan's limit. All check hourly and email the subscribed
-users (Alex). In each alert's email, the `source` column names the route or
-error code and its numbers.
-
-| Alert | Fires when | Tune |
-| --- | --- | --- |
-| Mikka transfer reaches 50% of 500 GB plan allowance | The billing period's Neon transfer reaches 50% of the Launch plan's 500 GB (`monthly-budget.sql`) | The threshold `upper: 0.5` in `ALERTS` |
-| Mikka monitoring collection failed or heartbeat absent | No healthy ops snapshot in the last hour (`heartbeat.sql`) | — |
-| [1324] Mikka 来源数据库小时异常 | One `mikka-web` route's weighted DB queries in the last full UTC hour exceed `max(3 × its 7-day hourly median, 2000)`, or its weighted JSON bytes exceed `max(3 × median, 10 MB)`. Needs 24 covered full hours after that route first appears; bytes require ≥95% weighted coverage (`alert-source-anomaly.sql`) | `3 *` and the floors `2000` / `10000000` in `metrics`; `covered_hours >= 24` for route-specific warm-up |
-| [1324] Mikka 日速率外推超过500GB月额度 | Today's Neon transfer so far, scaled to 24 h and to the month's days, exceeds 500 GB. Only from 03:00 UTC, with a snapshot ≤60 min and provider data ≤180 min old (`alert-daily-pace.sql`) | `500000000000` (the allowance) and `utc_hours >= 3` |
-| [1324] Mikka 错误码小时突增 | One service's weighted error spans for one code in the last full UTC hour exceed `max(3 × its 7-day hourly median, 50)`, after 24 observed hours. Weight is `1 / sample_rate`, with legacy missing rates treated as `0.1`. Known handled Workflow hook 404, duplicate 409 and terminal 410 chains are excluded only with their own successful entry, proved by exact ancestry or an invocation-to-delivery span link (`alert-error-spike.sql`). | `3 *` and the floor `50` in `metrics` |
-
-The Workflow filter follows individual invocations within a continuous trace.
-A known hook lookup 404 must belong to that successful `after:workflow-wake`,
-or to that successful `cron:reconcile` and its 2xx HTTP request. A known event
-409/410 must belong to the SDK invocation tied to the exact successful 2xx
-`workflow.route.flow` delivery. Continuous mode uses its single native span
-link; legacy linked mode can use its exact local parent. Both allow the SDK's
-one known `vqs.process` consumer span between the invocation and delivery,
-with that consumer also successful. A link to a prior run origin does not
-establish delivery success by itself. The filter removes only the
-closed HTTP/SDK error pair and its recognized error wrapper; other errors stay
-visible. With neither a valid local parent chain nor a valid delivery link,
-the error remains in the alert. A successful root or another successful
-invocation in the same trace cannot excuse this invocation's failure.
-
-Every alert query returns exactly one row and the alert reads it
-(`first_row`). PostHog refuses an `any_row` alert whose query its `LIMIT`
-cuts short, and production has more routes than that limit. The two hourly
-queries rate each source (`per_source`: 1 breach, 0 none, `NULL` without
-current telemetry) and return the worst value; `source` names up to five
-breaching sources, worst first, or the heaviest one when none breaches.
-`NULL` (no current telemetry) does not fire; the heartbeat alert covers
-collection.
-
-The source alert fills zero-query hours only after the route's first partial
-hour has ended, and only while the service has telemetry. A new desktop route
-cannot inherit days of zero history from an older web service. The absolute
-2,000-query / 10-MB floors still apply after warm-up, including when the
-historical median is zero.
-
-Each source's alert text includes its three largest authenticated user-hash
-groups and five largest registered RPC-action groups by weighted query count,
-plus the total groups and unattributed counts. Earlier authentication spans can
-be attributed through their internal request UUID only when that same request
-has exactly one observed authenticated hash/action. It never uses an entire
-trace to infer the user, or treats a caller-supplied analytics identity as
-authentication. Missing and conflicting metadata remain `unattributed`,
-including data collected before these fields were deployed. The enrichment
-reads only the evaluated hour; it adds no production database reads.
+Company deployment queries, configuration and evidence are maintained through the [private operations entry](README.md).
 
 ### Desktop startup and login query counts
 
-The existing Desktop lifecycle acceptance saves `queryCounts` in `lifecycle.json`.
-It reads the already-instrumented primary API process's cumulative counter
-before and after each short window, without resetting it. The receipt binds
-every snapshot to the source revision, API origin, process ID, runtime and
-platform. A changed process, decreasing counter, unknown reading or unavailable
-instrumentation fails the measurement.
-
-The login comparison uses the same leased account, fixture workspace, locale
-and backend. Both sides perform the ordinary email sign-in and get-session
-flow. Native then completes the real browser-to-app PKCE handoff; Web uses the
-freshly verified session in a new Chromium context. Each window ends when the
-same seeded workspace and composer are usable. This measures ordinary business
-login, not a new Google/GitHub OAuth challenge. Native handoff can overlap its
-automatic renderer loading, so the receipt keeps that overlapping segment
-together instead of inventing separate totals.
-The short Web comparison finishes and closes before native authentication.
-Better Auth's multi-session plugin replaces an earlier same-account session
-in that browser cookie jar, and the PKCE handoff retains that session. Keeping
-native authentication last preserves its ordinary session for the subsequent
-bundled and hosted lifecycle checks without an extra login or relaxed expiry.
-
-A validated PKCE confirmation page in the system browser reads only
-`desktop.session` and the public login configuration. It does not initialize
-workspace authorization, onboarding or owner-evaluated features that the
-confirmation card cannot use. This applies only to the exact Web sign-in
-route with a valid handoff and no OAuth or Composio continuation. The installed
-renderer still requests its full bootstrap. Leaving the confirmation page
-requires a fresh workspace bootstrap, even when the workspace selector stays
-empty; identity-only data cannot mount workspace readers. Both the existing
-owner/session fence and the current bootstrap phase reject obsolete responses.
-
-The installed renderer groups eligible workspace reads that become ready in
-the same browser turn into a bounded `desktop.readBatch`. One posted task lets
-already-resolved hydration promises settle before the group is sent; its two
-MessageChannel ports close before the flush. Each item retains its
-registered argument schema and original authorization. Bootstrap, sign-in,
-account/workspace switches, credentials, catalog loading and explicit writes
-remain separate. The allowlisted views may perform their existing idempotent
-initialization; this is not a database `READ ONLY` transaction. Batches share
-only the current request's workspace memo and real owner/revision reads, never
-a cross-request authorization cache. Revision keys are combined before each
-reader proceeds to its data, preserving the original Live catch-up behavior.
-The validated batch declares only its existing owner-list revision kinds. Once
-an original reader resolves its real personal home, it can read those home
-counters together, including a sibling whose workspace lookup finishes later.
-Each reader receives only its original keys and keeps the conservative earlier
-revision. Selected-team and entity keys still follow their original readers.
-If a later reader fails, its planned home counter can be unused; no extra SQL
-statement or response key is introduced, but this is not zero extra bytes for
-every failed batch.
-No task/thread list is truncated or substituted for another. Queued reads are
-discarded when their owner/session/workspace generation retires, and in-flight
-responses retain Main's existing identity fence. There is no timed collection
-window. An older server's explicit unknown-action response is the only reason
-to fall back to individual reads; transport failures do not replay a batch.
-Native task-run, bot-summary and bot-roster readers return their original
-snapshot, so its actual HTTP dispatch can prove Live readiness coverage. That
-proof stays attached to the same response object, including its own batch item.
-Merged issue, thread and chat results retain their existing catch-up checks.
-
-Startup counts come from the first pair of the unchanged five-pair lifecycle:
-bundled Electron versus the preserved hosted Web renderer in the same compiled
-Electron shell, with retained authenticated state and the same warm backend.
-The hosted startup sample is not presented as an independent Chrome launch.
-
-Counts are actual `pg.Client.query` calls and PostgreSQL protocol bytes, without
-sampling. All concurrent traffic in that API process remains included. Fixture
-and lease/session tracking use the separate harness process and are excluded,
-as are connection handshakes and TCP/TLS overhead. In-flight response bytes may
-cross a checkpoint; the raw snapshots and UTC boundaries remain in the receipt.
-These are query/transport measurements, not provider billing. Read the actual
-paired values and investigate repeated RPC actions; screenshot counts or unit
-test success do not supply the missing measurement. This adds no long idle run
-and no latency pass/fail threshold.
-
-After the existing samples and cleanup, `queryCounts.rpcActions` reads at most
-16 MiB of that primary API's existing private log once. It pairs request starts
-and completions in memory, then retains only the two RPC routes, registered-action
-shapes, HTTP status counts and window counts. `startedInWindow` counts requests
-whose start is in the half-open measurement window; completions, confirmed
-crossings and missing boundaries are separate and must not be added together.
-These aggregate counts are RPC invocations, not per-action SQL counts. This
-projection discards internal IDs; raw logs and user hashes never enter the
-artifact. Missing, oversized, truncated,
-invalid or unpaired records explicitly make this diagnosis incomplete; unavailable
-windows do not become zero counts.
-The same log snapshot also groups calls by the existing authentication, handoff
-and workspace-selection checkpoint intervals. Closed phase names and contiguous
-boundaries are validated before reporting those groups; they add no request or
-database read. These groups distinguish a handoff read from a required workspace
-authorization read, without assigning guessed SQL counts to either. A missing
-startup window keeps the overall report incomplete while independently complete
-login records retain their own status.
-
-`rpcActions.windows` continues to count physical HTTP requests. The separate
-`rpcActions.logical.windows` counts ordinary RPCs once and batch items once,
-excluding the batch envelope. Every item has a paired `rpc_action_started` /
-`rpc_action` receipt with its own invocation ID, parent HTTP invocation ID,
-fixed action, status and duration. The parent completion's `rpcItemCount`
-detects even a missing whole pair. The diagnostic verifies parent identity,
-route and time containment; incomplete logical evidence stays incomplete.
-This aggregate projection uses internal IDs only while pairing the records.
-Each item also owns an ordinary sampled span and independent metadata scope,
-so parallel reads cannot overwrite another action's SQL attribution. Shared
-queries are attributed once to the action that starts them, without multiplying
-their query count by the number of waiting readers.
-
-The same primary-process snapshots also include `queryOperations`: actual SQL
-call counts partitioned by the existing innermost database-operation or request
-route at `pg.Client.query` entry. Only a fixed allowlist of authentication,
-workspace, Live ticket and list-read labels is retained; absent or unrecognized
-contexts go into `unattributed`. Every snapshot and window delta must sum exactly
-to its original `queryCalls`, and each bucket must remain monotonic. No query,
-request, checkpoint or exclusion is added. These labels identify the operation
-that issued a shared query, not every logical batch item that awaits it; connection
-bytes are not allocated to individual operations. Historical reports without this
-partition remain unavailable for this breakdown, rather than acquiring zeroes.
-
-`unattributedSources` refines only that existing `unattributed` bucket. Its
-test-only list names exact source-owned agent history, computer events,
-conversations, pending actions, settings, device, daemon and background job
-templates; `otherScoped` and `noScope` retain every remaining call without
-exporting the underlying label. Its counts must sum to `queryOperations.unattributed`
-at every snapshot and delta, while the original operation buckets and total stay
-unchanged. Missing historical refinements are unavailable, and a mixed or invalid
-partition fails validation. This diagnoses concurrent work without retaining SQL,
-parameters, request data, arbitrary routes or identity values.
-
-`rpcActions.queryDiagnostics` captures bounded, test-only metadata from the
-first existing checkpoint; its per-query CPU and memory work happens inside
-the measurement windows. After all existing measurements and cleanup, one
-read of the isolated counter's
-`/diagnostics` socket endpoint exports at most 8,192 query records in 2 MiB.
-It leaves the original `/metrics` snapshots, windows and totals unchanged.
-Each row contains the original cumulative query ordinal and indices into the
-closed context, statement and scope tables. Contexts retain internal random
-HTTP/item invocation IDs, method, route and action; they contain no user
-identity, request arguments or headers. These IDs join the existing completion
-receipts, including batch siblings with no SQL of their own.
-
-Queries belong to `(before.queryCalls, after.queryCalls]`, even when their
-request starts or finishes outside that window. An action unknown when SQL
-starts stays unknown. Shared SQL belongs once to the context that issued it.
-`normalizedStructureId` hashes a supported literal-free SQL shape; it is not
-the production raw-text `mikka.db.statement_id`, and equal shapes do not prove
-equal parameters or redundant work. Unsupported syntax, ambiguous contexts,
-overflow and missing receipts remain explicit unknown or incomplete evidence.
-The production request logger only registers a metadata getter; query capture
-and export run exclusively in the isolated acceptance preload.
+Company deployment queries, configuration and evidence are maintained through the [private operations entry](README.md).
 
 ### Changing them
 
-`scripts/ops/posthog-observability.mjs` holds the dashboard, its insights
-and the alerts; the SQL is in `scripts/ops/posthog/`. It finds each object by
-its production id, else its `key:<name>` tag, else its exact name, and
-changes only what differs, so running it twice changes nothing.
-
-Edit definitions or SQL through a PR. Run operational reads and writes through
-`posthog-cli api`, following the discovered guide and matching task skill.
-Preserve the definition manager's object IDs, tag/name resolution and
-change-only comparison. `scripts/ops/posthog-observability.mjs` still contains
-a direct REST client using `POSTHOG_PERSONAL_API_KEY`; its existence does not
-establish that the CLI-only operating requirement has been implemented in that
-script. Cloud credentials arrive through existing workload delivery. On Alex's
-Mac, follow `~/.codex/rules/infisical-api.md` for the signed authentication
-helper and direct Infisical HTTPS API.
-
-Validate the error-spike classifier with `node scripts/ops/posthog-alert-acceptance.mjs`.
-It runs one synthetic read-only query through the authenticated PostHog CLI in
-project 670821. `--query-only` prints the exact packet for review through the CLI.
-The 64 cases exercise the actual HogQL CTEs, including continuous/linked delivery,
-non-root entries, the single queue hop, wake/cron/nudge handling, missing or
-conflicting proof, unrelated failures and duplicate physical span rows. The
-recorded result binds exact SQL, fixtures, script, query and returned identities;
-CI checks that receipt offline and does not claim to rerun the remote engine.
-A SQL or fixture change requires a new actual engine result. The service-hour
-coverage, weighted median, warmup and thresholds retain the existing array
-aggregation; only proven handled attempts are removed from error counts.
-
+Company deployment queries, configuration and evidence are maintained through the [private operations entry](README.md).
 
 ## One run, one trace (#1512)
 
@@ -701,76 +418,17 @@ fragments and identifier segments. Live-channel `status` / `message` handling
 records only event kind, allowed key names and receive/skip state, never payload
 content. See [Replay privacy](https://posthog.com/docs/session-replay/privacy).
 
-On 2026-11-06 the project received only these explicit settings changes:
-`session_recording_opt_in=true`, `capture_console_log_opt_in=false`,
-`capture_performance_opt_in=false`. The existing masking/network configuration
-objects and sampling/retention settings were preserved; the SDK supplies the
-stricter local policy before capture.
+Project-level capture configuration and its deployment history belong to the
+[private operations entry](README.md). The SDK applies the local privacy policy
+before capture.
 
 ## Saved runtime timeline and scouts
 
-Production is PostHog US project **670821 (Mikka)**, timezone **Asia/Shanghai**.
-Saved SQL tables label their times in **UTC**.
-
-| Entry | Purpose |
-| --- | --- |
-| [运行时间线](https://us.posthog.com/project/670821/notebooks/C9vQAc1L) | Recent traces, complete selected span timeline and correlated structured logs |
-| [数据库与错误 dashboard](https://us.posthog.com/project/670821/dashboard/2306506) | Weighted source/route/statement/error analysis |
-| [采集健康 dashboard](https://us.posthog.com/project/670821/dashboard/2297143) | Collection health and supplier transfer budgets |
-| [PostHog Inbox](https://us.posthog.com/project/670821/inbox) | Findings from automatic APM and AI scouts |
-
-In the notebook, fill at least one of `run_id`, `thread_id`, `task_id` or
-`trace_id` and run all SQL cells. Multiple nonempty IDs match with OR; all spans
-of each matched trace then appear, including ancestors that do not carry the
-particular ID. `lookback_hours` defaults to 24 and is bounded to 1–336 hours,
-matching the standard 14-day tracing retention. Clear all IDs to browse only
-the recent-trace entry list. Queries use bound variables and omit SQL bodies,
-model input/output and free-form log messages. A lookup is bounded to 100 matched
-traces, 2,000 spans and 1,000 logs; narrow the window or use one trace ID if a
-limit is reached, and inspect the full trace in APM. The notebook uses SQL only
-and does not provision a Python sandbox.
-
-The live HogQL tables are `posthog.trace_spans` and `logs`. Their native
-`trace_id` / `span_id` strings are base64; display hex with
-`lower(hex(base64Decode(trace_id)))`. Native APM tools accept hex trace IDs.
-The notebook converts the supplied hex back with `base64Encode(unhex(...))`;
-join the native trace columns directly, without decoding both join sides.
-
-| Scout | Configuration ID | Schedule / output |
-| --- | --- | --- |
-| APM regression | `01a1b247-0a2c-7611-9061-0f7e791cfd2e` | Enabled, every 1440 minutes, emit to Inbox |
-| AI observability | `01a1b247-09d7-7388-be42-a8d96310c44b` | Enabled, every 1440 minutes, emit to Inbox |
-
-Both use the canonical PostHog skills and their default activity prechecks:
-APM requires spans within 24 hours; AI requires AI events within 7 days.
-No-data skips are expected, not successful generation acceptance. Other
-canonical scouts remain paused. The APM precheck passed and the initial manual
-run completed without an error on 2026-11-06 (19:21:17–19:27:00 UTC), emitting no
-findings. AI had no events before the #1512 deployment.
-The configuration is permanent monitoring; no Slack/webhook destination or
-automatic repository write permission was added.
+Company deployment queries, configuration and evidence are maintained through the [private operations entry](README.md).
 
 ### Acceptance evidence
 
-A pre-deployment baseline on 2026-11-06 found 77,527 web spans and 761 daemon
-spans in 24 hours; 759 daemon spans were roots. Logs service discovery was
-empty, AI event usage was zero, and Replay usage was zero. These are baseline
-observations, not proof that the new production path passed.
-
-After deployment, record the deployed commit and UTC window, one Coordinator
-trace and one real dispatch run with run/thread/task IDs. Verify all required
-stages, native log linkage, AI generations and masked Replay from those IDs.
-Record a controlled failure with retained rate 1, both scout configurations and
-the notebook result. Include actual PostHog URLs and screenshots/native exports
-in the PR. A client hash, a mocked collector or a successful notebook query alone
-does not close #1512.
-
-PostHog provides native PNG exports for saved insights/dashboards through
-`POST /api/projects/670821/exports/` and
-`GET /api/projects/670821/exports/:id/content/`, with `export:write/read`
-access. This does not establish support for exporting an arbitrary APM or
-Replay detail page; do not relabel a reconstructed chart as a UI screenshot.
-See the [exports API](https://posthog.com/docs/api/exports).
+Company deployment queries, configuration and evidence are maintained through the [private operations entry](README.md).
 
 ## Sampling and cost
 
@@ -803,112 +461,11 @@ See the [exports API](https://posthog.com/docs/api/exports).
 
 ### Cost baseline and bounds (2026-11-06)
 
-The billing API reported the free plan, **89 MB** of combined Logs/Tracing in the
-current billing period, and **73 MB** of traces on 2026-11-05. AI events and
-recordings were zero before the new instrumentation. Billing usage can lag
-ingestion; a single observed day is not a peak-capacity forecast.
-
-| Product | Published allowance and first paid tier recorded on 2026-11-06 |
-| --- | --- |
-| Logs + Tracing, shared ingestion | 10 GB/month free; $0.25/GB from 10–300 GB, then $0.15/GB |
-| Retention | 14 days standard; custom retention $0.05/GB per month retained |
-| AI Observability | 100,000 events/month free; then starts at $0.000350/event, decreasing with volume |
-| Web Session Replay | 5,000 recordings/month free; then starts at $0.0050/recording |
-| Self-driving / Inbox | Outcome pricing: $15 per actionable PR; reports without a code-change PR are free. The account shows 4,500 free Inbox credits, equivalent to three PRs |
-
-Sources: [Logs/Tracing pricing](https://posthog.com/logs/pricing),
-[retention](https://posthog.com/docs/logs/pricing),
-[AI pricing](https://posthog.com/ai-observability/pricing),
-[Replay pricing](https://posthog.com/session-replay/pricing), and
-[Self-driving pricing](https://posthog.com/docs/self-driving/pricing).
-No paid plan or retention upgrade was made for #1512.
-
-For a 30-day planning example, 73 MB/day is **2.19 GB/month** at the former
-sampling mix. If a fraction `f` of that represented traffic changes from 10%
-to 100% retention, the existing-span estimate is
-`2.19 × (1 + 9f) GB/month`. This is a scenario calculation: it assumes the
-same traffic, bytes per span and prior 10% rate. It excludes new spans/logs and
-changes in workload or tail-retained error/slow traffic.
-
-- At an assumed `f=0.10`, the estimate is **4.16 GB/month**. An illustrative
-  100 runs/day with 25 additional spans + 10 stage logs per run at 1 KB each
-  adds **0.105 GB/month**, for **4.27 GB/month** combined.
-- A deliberately broad bound where all represented traffic becomes 100% is
-  **21.9 GB/month** before new telemetry: about **$2.98/month** ingestion on a
-  paid plan. This account remains on its 10 GB free cap, so that number is a
-  paid-plan equivalent, not authorization to increase spending or a forecast
-  of an automatic charge.
-- At 100 runs/day and five captured model calls per run, generation events
-  alone are **15,000/month**; additional `$ai_*` events also count. At 100
-  browser sessions/day, Replay is **3,000/month**. These planning volumes
-  remain below their respective allowances, but are not measured demand.
-
-Recheck the observed bytes, AI events, recordings and actual plan after
-production acceptance through the CLI-discovered `billing-usage-get` and
-`billing-overview-get` operations. Do not apply the tracing
-multiplier to AI-event or Replay pricing.
+Company deployment queries, configuration and evidence are maintained through the [private operations entry](README.md).
 
 ### Repeatable production acceptance
 
-The manual `Run trace production acceptance` workflow runs only on `main`
-and requires its exact 40-character deployment SHA. Before executing it, verify
-the immutable Vercel deployment is READY, the production domain serves that SHA,
-and the entire matching `E2B additive runtime release` workflow has finished,
-including official-file conservation, real Claude Code and Codex subscription
-gates on the exact candidates, and the runtime-refresh web deployment. The
-versioned templates add Mikka under `/opt/mikka`; their original official files
-remain intact, and the previous accepted release remains available for rollback.
-The driver checks the public
-version during its run; that check alone does not prove the worker release.
-
-Start with `mode=preflight`. For an actual task, `mode=execute` uses the
-`ACME_DEMO_EMAIL` / `ACME_DEMO_PASSWORD` entries at Infisical `prod:/`, as
-explicitly authorized by [issue #1512](https://github.com/alexj11324/Mikka/issues/1512),
-and that account's own official Claude Haiku 5.5 or Codex GPT-6 Luna subscription. The
-`scripts/acceptance/run-observability.mjs` driver selects the account's unique
-personal workspace through the normal API and switches its own new session
-when required. This issue-specific authorization does not replace the shared
-**Acme Inc.** acceptance requirement for other work in
-[acceptance.md](../acceptance.md). A personal-workspace result cannot establish
-shared-team acceptance. Each model
-case is independent and submits once per revision. The driver verifies native execution identity, the current
-Factory flow's independent checks, exact Artifact bytes and the formal
-deliverable acceptance receipt. Factory v2 uses execute/review; historical
-flows still require verify. It never accepts a repository publication.
-
-`prepare=true` requires all visible owner-wide runs to be terminal, using the
-existing readers' 200-row, 30-day windows, and also checks the current workspace's
-complete Factory inventory. It temporarily prepares the account through existing
-settings APIs and restores unchanged settings afterward. For a browser case,
-select `mode=execute`, `prepare=true`, `browser-submit=true`, and exactly one
-`model-case` (`claude` or `codex`). The workflow starts its own fresh Chromium
-context, signs in through the normal email form, verifies the exact workspace
-and official Cloud backend, and submits the generated fixture once through
-**New task**. Its progress comment says that submission is automatic; do not
-submit a second copy manually. Run the other model case separately.
-
-Before clicking, the browser requires the active PostHog session to have
-started recording and observed a sanitized snapshot. This is client readiness,
-not proof of upload or playback. The helper closes its page, signs out, verifies
-an anonymous session, and closes the context and browser when the driver ends;
-cleanup failure fails the workflow. The separate CLI manual-browser path is
-described in the driver contract. The API-only case does not prove browser
-Replay. The driver also does not prove
-PostHog ingestion; correlate its recorded IDs with the actual APM, AI, Logs and
-Replay records afterward. See the full
-[driver contract](../../scripts/acceptance/run-observability.md).
-
-For the native PostHog export job, optional `session-id` and `trace-id`
-inputs must be supplied together. They request a bounded, read-only check of the
-real recording metadata and one actual snapshot source using the existing
-runner-held PostHog key. The resulting receipt contains only safe correlation
-IDs, status/proof fields, timestamps, event-type counts, byte count and SHA-256;
-raw recording events and page contents are never saved. Reading one recording
-segment does not verify full playback; the receipt keeps `playback_verified=false`.
-An operator-supplied trace ID is not proof of correlation: verify
-the same session in APM and confirm that the recorded event window overlaps the
-selected run. A missing recording, insufficient existing read scope or malformed
-snapshot fails this evidence check instead of being reported as a pass.
+Company deployment queries, configuration and evidence are maintained through the [private operations entry](README.md).
 
 ### Local overhead evidence
 

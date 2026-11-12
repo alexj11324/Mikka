@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { DECISION_MODEL, DECISIONS_URL, validatedAnswers, type DecisionAnswer } from '../lib/coordinator/decision'
+import { decisionTransport } from '../lib/coordinator/decision-provider'
 import { levelForScore, MODEL_ROUTING_EFFORTS, MODEL_ROUTING_TIERS, routingDecisionQuestions, routingTaskContent, type ModelRoutingEffort, type ModelRoutingTier } from '../lib/model-routing'
 
 /** Replays the labeled routing set against the real Decision route, once per
@@ -36,12 +37,12 @@ const productionTask = (task: string) => {
   return JSON.stringify({ title: issue.title, content: routingTaskContent(issue.content) }).slice(0, 12_000)
 }
 
-async function observe(example: LabeledExample, key: string): Promise<Observation> {
+async function observe(example: LabeledExample, transport: NonNullable<Awaited<ReturnType<typeof decisionTransport>>>): Promise<Observation> {
   const questions = routingDecisionQuestions()
   const base = { issue: example.issue, expected: example.tier, effortRange: example.effort }
   const response = await fetch(DECISIONS_URL, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15_000),
-    headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: DECISION_MODEL, input: JSON.stringify({ task: productionTask(example.task), stage: 'execute' }), questions }) })
+    headers: { Authorization: 'Bearer ' + transport.key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: transport.model, input: JSON.stringify({ task: productionTask(example.task), stage: 'execute' }), questions }) })
   if (!response.ok) { await response.body?.cancel(); return { ...base, unavailable: true } }
   const answers = validatedAnswers(await response.json(), questions)
   const score = (name: string) => {
@@ -54,9 +55,9 @@ async function observe(example: LabeledExample, key: string): Promise<Observatio
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  const key = process.env.AI_GATEWAY_API_KEY
-  if (!key) throw Error('AI_GATEWAY_API_KEY is required (the Decision route credential)')
+  const transport = await decisionTransport(DECISIONS_URL, DECISION_MODEL)
+  if (!transport) throw Error('No authorized transport for the configured Decisions endpoint')
   const observations: Observation[] = []
-  for (const example of labeledExamples()) observations.push(await observe(example, key))
+  for (const example of labeledExamples()) observations.push(await observe(example, transport))
   console.log(JSON.stringify({ model: DECISION_MODEL, observations, summary: summarize(observations) }, null, 2))
 }

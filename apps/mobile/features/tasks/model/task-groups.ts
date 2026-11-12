@@ -48,6 +48,7 @@ export function reasonWord(reason: TaskReason, blockedBy?: string | null): strin
     case 'pr_review': return mobileMessages.MobileCore.reasons.pr_review
     case 'blocked': return mobileMessages.MobileCore.reasons.blocked
     case 'quota': return mobileMessages.MobileCore.reasons.quota
+    case 'offline': return mobileMessages.Devices.offline
     case 'blocked_by': return blockedBy ? mobileMessages.MobileCore.reasons.blocked_by.replace('{task}', blockedBy) : mobileMessages.MobileCore.reasons.otherTask
     case 'flagged': return mobileMessages.MobileCore.reasons.flagged
   }

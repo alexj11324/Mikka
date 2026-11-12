@@ -9,9 +9,9 @@ import type { WorkspaceTransaction } from '@/lib/workspace-access'
 
 /** Look up only the tenant first, then lock Workspace → member → relations →
  * Team. This matches Project mutations and prevents a relation/member deadlock. */
-export async function withTeamWorkspace<T>(userId: string, teamId: string, operation: (tx: WorkspaceTransaction) => Promise<T>) {
+export async function withTeamWorkspace<T>(userId: string, teamId: string, operation: (tx: WorkspaceTransaction) => Promise<T>, expectedWorkspaceId?: string) {
   const [observed] = await workspaceDb.select({ workspaceId: teams.workspaceId }).from(teams).where(eq(teams.id, teamId))
-  if (!observed) throw new ActionFailureError('teamIssueAccessDenied')
+  if (!observed || (expectedWorkspaceId && observed.workspaceId !== expectedWorkspaceId)) throw new ActionFailureError('teamIssueAccessDenied')
   return withTaskWorkspace(userId, observed.workspaceId, async (workspace, tx) => {
     if (workspace.kind !== 'team') throw new ActionFailureError('teamIssueAccessDenied')
     await lockTeamRelations(tx)

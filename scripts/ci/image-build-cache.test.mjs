@@ -20,6 +20,8 @@ test('self-hosted image reuses a default-branch cache without trusting PR cache 
   assert(save.includes("github.ref == 'refs/heads/main'"))
   assert(save.includes('type=gha,scope=mikka-selfhost-public,mode=max'))
   assert(!workflow.includes('docker build --build-arg'), 'do not build the image twice')
+  const buildStep = workflow.split('      - name: Build the public standalone application\n')[1]?.split('      - name:')[0]
+  assert(buildStep?.includes("if: steps.existing.outputs.digest == ''"), 'keep the tested image when its immutable SHA tag already exists')
   assert.match(workflow, /MIKKA_BUILD_REVISION=\$\{\{ github\.sha \}\}/)
   assert.match(workflow, /MIKKA_BUILD_WORKER_SHA=\$\{\{ steps\.image-inputs\.outputs\.worker-sha \}\}/)
 })

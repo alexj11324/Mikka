@@ -21,7 +21,7 @@ export function serverPageKind(url: URL): ServerPageKind | null {
 /** Only a document served by the local backend sets this marker. A selected
  * remote server's discovery/bootstrap can never put the official app into it;
  * desktop/iOS documents do not carry the marker either. */
-export function serverDocumentKind(): ServerPageKind | null {
+export function serverDocumentKind(): ServerPageKind | 'status' | null {
   const kind = typeof document === 'undefined' ? undefined : document.documentElement?.dataset.mikkaServerPage
-  return kind === 'authentication' || kind === 'github' ? kind : null
+  return kind === 'authentication' || kind === 'github' || kind === 'status' ? kind : null
 }

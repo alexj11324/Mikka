@@ -28,6 +28,14 @@ function deviceId(id: unknown): string {
   return parsed.data
 }
 
+export async function setOwnedDeviceEnabled(userId: string, id: string, enabled: boolean): Promise<{ success: true }> {
+  const changed = await pool.query(`UPDATE devices SET enabled=$3,"updatedAt"=now()
+    WHERE id=$1 AND "ownerId"=$2 AND kind='local' AND "removedAt" IS NULL`, [id, userId, enabled])
+  if (!changed.rowCount) throw new ActionFailureError('deviceNotFound')
+  await ownerListChanged(pool, userId, ['thread_list', 'device_list'])
+  return { success: true }
+}
+
 /**
  * Renames one of the person's local devices. The name is locked, so the
  * daemon's next register keeps it instead of its hostname.

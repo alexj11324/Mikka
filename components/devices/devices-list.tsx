@@ -4,8 +4,7 @@ import { SettingsLoading } from '@/components/settings/primitives'
 import { Fragment, useEffect, useState, type ReactNode } from 'react'
 import { Check, Copy, Laptop, MoreHorizontal, Plus, Server } from 'lucide-react'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
-import { toast } from 'sonner'
-import { removeDevice, renameDevice, sendDeviceCommand, setDeviceEnabled, type DeviceView } from '@/app/actions/agents'
+import type { DeviceView } from '@/app/actions/agents'
 import { HarnessLabel } from '@/components/labels/entity-labels'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
@@ -17,13 +16,10 @@ import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field
 import { Input } from '@/components/ui/input'
 import { Item, ItemGroup, ItemSeparator } from '@/components/ui/item'
 import { Switch } from '@/components/ui/switch'
-import { useActionError } from '@/lib/use-action-error'
+import { useDeviceActions } from '@/components/devices/use-device-actions'
 import { cn } from '@/lib/utils'
 import type { SettingsDevicesProps } from '@/components/slots/settings-devices-contract'
 import { AgentMarks, installedAgents, sandboxBlockedAgents } from './agent-marks'
-
-type Command = 'redetect' | 'restart' | 'update'
-type Result = { error: string } | object
 
 /** Each agent's own published install command; the daemon detects it on 重新检测 Agent. */
 const AGENT_INSTALL = [
@@ -121,26 +117,11 @@ function DeviceRow({ device, onChanged, onReconnect }: { device: DeviceView; onC
   const t = useTranslations('Devices')
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
-  const translateError = useActionError()
+  const { busy, rename, remove, command, setEnabled } = useDeviceActions(device, onChanged)
   const [renaming, setRenaming] = useState(false)
   const [removing, setRemoving] = useState(false)
   const agents = installedAgents(device.harnesses)
   const blocked = sandboxBlockedAgents(device.harnesses)
-
-  async function run(action: () => Promise<Result>, done?: () => void): Promise<boolean> {
-    try {
-      const result = await action()
-      if ('error' in result) { toast.error(translateError(result.error)); return false }
-      done?.()
-      onChanged()
-      return true
-    } catch { toast.error(translateError('deviceSaveFailed')); return false }
-  }
-
-  // An offline device keeps the command until it reconnects (#491).
-  const command = (kind: Command) => run(() => sendDeviceCommand({ deviceId: device.id, kind }), () => {
-    toast.success(device.online ? t(`commands.sent.${kind}`, { name: device.name }) : t('commands.queued', { name: device.name }))
-  })
 
   const status = device.online
     ? t('online')
@@ -163,7 +144,7 @@ function DeviceRow({ device, onChanged, onReconnect }: { device: DeviceView; onC
     {/* 参与调度: the device's one switch (decision 2026-11-02-1400); on a phone it keeps its label on its own line. */}
     <span className="flex items-center gap-2 text-sm text-muted-foreground max-sm:order-last max-sm:basis-full max-sm:pl-8">
       <span aria-hidden="true">{t('allowScheduling')}</span>
-      <Switch checked={device.enabled} aria-label={t('allowSchedulingTo', { name: device.name })} onCheckedChange={enabled => { void run(() => setDeviceEnabled({ deviceId: device.id, enabled })) }} />
+      <Switch disabled={busy} checked={device.enabled} aria-label={t('allowSchedulingTo', { name: device.name })} onCheckedChange={enabled => { void setEnabled(enabled) }} />
     </span>
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('menu', { name: device.name })} />}><MoreHorizontal data-icon="inline-start" /></DropdownMenuTrigger>
@@ -180,7 +161,7 @@ function DeviceRow({ device, onChanged, onReconnect }: { device: DeviceView; onC
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
-    <RenameDialog device={device} open={renaming} onOpenChange={setRenaming} onSave={name => run(() => renameDevice(device.id, name), () => setRenaming(false))} />
+    <RenameDialog device={device} open={renaming} onOpenChange={setRenaming} onSave={async name => { const saved = await rename(name); if (saved) setRenaming(false); return saved }} />
     <AlertDialog open={removing} onOpenChange={setRemoving}>
       <AlertDialogContent>
         <AlertDialogHeader>
@@ -189,11 +170,7 @@ function DeviceRow({ device, onChanged, onReconnect }: { device: DeviceView; onC
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>{t('remove.cancel')}</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={() => { void run(() => removeDevice(device.id), () => {
-            setRemoving(false)
-            // #536 adds the outcome; an older backend answers without it.
-            if (device.online) toast.success(t('remove.uninstalling', { name: device.name }))
-          }) }}>{t('remove.confirm')}</AlertDialogAction>
+          <AlertDialogAction variant="destructive" disabled={busy} onClick={async event => { event.preventDefault(); if (await remove()) setRemoving(false) }}>{t('remove.confirm')}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

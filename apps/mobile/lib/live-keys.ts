@@ -50,9 +50,21 @@ export function botPageLive(_data: BotPage | null, botId: string | null | undefi
  * 任务: the open workspace's tasks, and the person's own (personal) ones on their home channel (useLiveIssueList);
  * a thread blocking or resuming moves its task in or out of 受阻, so it follows the person's runs too (task_run_list).
  */
-export function tasksLive(home: string | null | undefined, open: string | null | undefined): Spec {
+export function tasksLive(home: string | null | undefined, open: string | null | undefined, issueIds: readonly string[] = []): Spec {
   const scopes = [...new Set([open || null, home || null])]
-  return { minIntervalMs: LIST_MERGE_MS, refs: [...scopes.map(scope => listRef('issue_list', scope)), listRef('task_run_list', home)] }
+  return { minIntervalMs: LIST_MERGE_MS, refs: [...scopes.map(scope => listRef('issue_list', scope)), listRef('task_run_list', home),
+    ...issueIds.map(id => ({ kind: 'factory_issue' as const, id, scope: open }))] }
+}
+
+/** Only an open, authorized Task listens to its discussion and attempt keys. */
+export function taskDetailLive(id: string, workspaceId: string | null | undefined, home: string | null | undefined, open: string | null | undefined, factoryTaskId?: string, factoryActivityVersion?: number): Spec {
+  const spec = tasksLive(home, open)
+  if (workspaceId) for (const kind of ['issue_document', 'issue_threads'] as const) spec.refs.push({ kind, id, scope: workspaceId })
+  if (workspaceId && factoryActivityVersion === 1) {
+    spec.refs.push({ kind: 'factory_issue', id, scope: workspaceId })
+    if (factoryTaskId) spec.refs.push({ kind: 'factory_task', id: factoryTaskId, scope: workspaceId })
+  }
+  return spec
 }
 
 /** One thread: each of its runs' text (`thread`) and state (`run`), on the channel the server resolved for that run. */

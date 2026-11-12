@@ -10,9 +10,13 @@ export interface PreparedProductExecution {execution:AgentExecution|null;runtime
 
 /** Business actions execute on the app host, whose Workflow World owns task jobs. */
 export async function productRpc<T>(scope:EveScope,operation:ProductOperation,signal?:AbortSignal):Promise<T> {
-  const origin = process.env.MIKKA_APP_ORIGIN ?? process.env.BETTER_AUTH_URL ?? 'http://127.0.0.1:3000'
+  const hosted = process.env.MIKKA_EVE_HOST === 'cloudflare'
+  const origin = hosted ? 'https://product.internal' : process.env.MIKKA_APP_ORIGIN ?? process.env.BETTER_AUTH_URL ?? 'http://127.0.0.1:3000'
+  const capability = hosted ? process.env.MIKKA_EVE_PRODUCT_TOKEN : undefined
+  if (hosted && !capability) throw new Error('agentToolUnavailable')
   const response = await fetch(new URL('/mikka/api/internal/eve/tools',origin),{
-    method:'POST',headers:{authorization:internalEveAuthorization(scope),'content-type':'application/json'},
+    method:'POST',redirect:'error',headers:{authorization:internalEveAuthorization(scope),'content-type':'application/json',
+      ...(capability ? {'x-mikka-product-capability':capability} : {})},
     body:JSON.stringify(operation),signal,
   })
   if (!response.ok) throw new Error('agentToolUnavailable')

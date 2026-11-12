@@ -23,6 +23,7 @@ test('reading only the asked-about tasks\' team links gives exactly the full rea
   const { enterprisePrincipal } = await import('../lib/enterprise/principal')
   const { visibleRuns } = await import('../lib/agent-runs')
   const { citationSources } = await import('../lib/coordinator/store')
+  const { registeredTask } = await import('./helpers/registered-task')
 
   const tag = randomUUID().slice(0, 8)
   const owner = `narrow-owner-${tag}`, member = `narrow-member-${tag}`, removed = `narrow-removed-${tag}`, foreign = `narrow-foreign-${tag}`
@@ -47,7 +48,8 @@ test('reading only the asked-about tasks\' team links gives exactly the full rea
       [issue.shared, owner, 'workspace',workspace], [issue.secondTeam, owner, 'workspace',workspace], [issue.personal, owner, 'personal',ownerPersonal],
       [issue.unlinked, owner, 'workspace',workspace], [issue.foreign, foreign, 'workspace',otherWorkspace], [issue.ownPersonal, member, 'personal',memberPersonal],
     ]
-    for (const [id, u, scope, tenant] of issueRows) await pool.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId") values ($1,$2,$5,$3,\'doing\',\'normal\',$4,$6)', [id, u, doc(), scope, id,tenant])
+    for (const [id, u, scope, tenant] of issueRows) await registeredTask(pool, u, tenant, id, client =>
+      client.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId") values ($1,$2,$5,$3,\'doing\',\'normal\',$4,$6)', [id, u, doc(), scope, id,tenant]))
     for (const [id, t, w, u] of [[issue.shared, team, workspace, owner], [issue.secondTeam, secondTeam, workspace, owner], [issue.personal, team, workspace, owner], [issue.foreign, foreignTeam, otherWorkspace, foreign]]) {
       await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [id, t, w, u])
     }
