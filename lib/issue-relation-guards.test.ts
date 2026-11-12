@@ -208,7 +208,7 @@ test('duplicate: direct and transitive duplicate cycles rejected; a plain duplic
   reset([row(A), row(B, { duplicateOfId: A }), row(C, { duplicateOfId: B }), row(D)])
   assert.equal((await relate(A, 'duplicate', B)).error, 'issueDuplicateCycle')
   assert.equal((await relate(A, 'duplicate', C)).error, 'issueDuplicateCycle')
-  assert.deepEqual(reviewChanges, [])
+  assert.equal(reviewChanges.length, 0)
   assert.equal((await relate(D, 'duplicate', C)).error, undefined)
   assert.ok(reviewChanges.some(change => change.id === D && change.status === 'duplicate'))
 })
