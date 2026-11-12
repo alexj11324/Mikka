@@ -132,20 +132,23 @@ test('Task property menus expose every writable value, send precisely that value
   } finally { await closeReadOnly() }
 })
 
-test('team selection confirms the current team once after reopen and rejected changes retain the saved team', async () => {
+test('reselecting the current team does not write and rejected changes retain the saved team', async () => {
   const dispose = await mount()
   try {
     await pickTeam('existing')
-    assert.deepEqual(teamWrites, [{ issueId: 'task', teamId: 'existing', expectedTeamId: 'existing' }])
     await pickTeam('existing')
-    assert.equal(teamWrites.length, 1)
+    assert.deepEqual(teamWrites, [])
     assert.deepEqual(reads, [])
+    const change = { issueId: 'task', teamId: 'another', expectedTeamId: 'existing' }
     response = { ok: false, error: 'denied' }
     await pickTeam('another')
+    assert.deepEqual(teamWrites, [change])
+    assert.deepEqual(reads, [])
     assert.equal(row('team').menu.find(item => item.checked).id, 'existing')
     assert.equal(frame.rowsError, 'denied')
     response = null
     await pickTeam('another')
+    assert.deepEqual(teamWrites, [change, change])
     assert.equal(row('team').menu.find(item => item.checked).id, 'another')
     assert.deepEqual(reads, ['viewer-list'])
   } finally { await dispose() }
