@@ -43,6 +43,9 @@ on:
       - 'scripts/release/web-deploy.mjs'
       - 'scripts/release/build-vercel.mjs'
       - 'scripts/release/web-deploy.test.mjs'
+      - 'scripts/release/cloudflare-promoted-web*.mjs'
+      - 'cloudflare/web/gateway.mjs'
+      - 'cloudflare/web/prepare.mjs'
       # These paths select offline PR checks, not paid runtime build eligibility.
       - '.github/workflows/model-provider-fallback-acceptance.yml'
       - 'scripts/acceptance/model-provider-fallback.mjs'
@@ -60,6 +63,9 @@ on:
         description: Reason for this manual runtime retry (recorded in the dispatch event)
         type: string
         required: true
+      cloudflare_receipt:
+        description: Promoted Cloudflare Web receipt on Mikka issue 1954 (comment ID and body SHA-256)
+        type: string
 permissions:
   contents: read
 
@@ -85,7 +91,7 @@ jobs:
           ln -s "$RUNNER_TEMP/runtime-gate-tests/node_modules" node_modules
           mkdir -p node_modules/@mikka
           ln -s "$GITHUB_WORKSPACE/packages/protocol" node_modules/@mikka/protocol
-      - run: node --import tsx --test scripts/e2b/runtime-inputs.test.mjs scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs
+      - run: node --import tsx --test scripts/e2b/runtime-inputs.test.mjs scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/release/cloudflare-promoted-web.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs
       - run: python3 scripts/e2b/build-template.test.py
       - run: python3 packages/daemon/scripts/prepare-worker-install.test.py
       - run: python3 scripts/e2b/official-files.test.py
@@ -128,6 +134,7 @@ jobs:
     timeout-minutes: 95
     permissions:
       contents: read
+      issues: read
       actions: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -136,7 +143,14 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
+      - name: Verify the promoted Cloudflare Web before allocating template builders
+        if: github.event.inputs.cloudflare_receipt != ''
+        run: node scripts/release/cloudflare-promoted-web.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CLOUDFLARE_RECEIPT: ${{ github.event.inputs.cloudflare_receipt }}
       - name: Require this source's published Web build before allocating template builders
+        if: github.event.inputs.cloudflare_receipt == ''
         run: node scripts/release/web-deploy.mjs await-web
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -149,6 +163,7 @@ jobs:
       queue: max
     permissions:
       contents: read
+      issues: read
       actions: read
       id-token: write
     uses: ./.github/workflows/e2b-runtime-release.yml

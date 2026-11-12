@@ -2,8 +2,11 @@
 // names a private, immutable Worker with its own API, cloud and static assets.
 import { releaseRoutePath, versionPath } from './route-path.mjs'
 
+const versionHeader = 'x-mikka-gateway-version-sha256'
+const nativeVersion = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/
+
 export default {
-  fetch(request, env) {
+  async fetch(request, env) {
     const url = new URL(request.url)
     const params = url.searchParams.getAll('dpl')
     const header = request.headers.get('x-deployment-id')
@@ -28,6 +31,21 @@ export default {
     // original body, signal, cookies, streaming and WebSocket upgrade intact.
     const outbound = new Request(request)
     outbound.headers.delete('cloudflare-workers-version-overrides')
-    return env[binding].fetch(outbound)
+    const versionRead = path === versionPath && (request.method === 'GET' || request.method === 'HEAD')
+    if (!versionRead) return env[binding].fetch(outbound)
+    outbound.headers.delete(versionHeader)
+    const upstream = await env[binding].fetch(outbound)
+    if (upstream.status === 101) return upstream
+    const version = env.CF_VERSION_METADATA?.id
+    const attest = upstream.ok && typeof version === 'string' && nativeVersion.test(version)
+    if (!attest && !upstream.headers.has(versionHeader)) return upstream
+
+    const response = new Response(upstream.body, upstream)
+    response.headers.delete(versionHeader)
+    if (attest) {
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(version))
+      response.headers.set(versionHeader, Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join(''))
+    }
+    return response
   },
 }
