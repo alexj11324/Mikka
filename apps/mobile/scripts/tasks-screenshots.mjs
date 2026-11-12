@@ -120,6 +120,8 @@ const json = (body, status = 200) => ({ status, contentType: 'application/json',
 
 function apiResponse(url) {
   const path = new URL(url).pathname
+  if (path.endsWith('/api/auth/one-time-token/generate')) return json({ token: 'fixture-task-handoff' })
+  if (path === '/api/mobile/open') return { status: 200, contentType: 'text/plain', body: 'Synthetic mobile handoff destination' }
   if (path.endsWith('/api/auth/get-session')) return json(session)
   if (path === '/api/version') return json({})
   if (path === '/api/conversations') return json({ conversations: [] })
@@ -175,7 +177,7 @@ async function run() {
       const context = await browser.newContext({ viewport: { width: 393, height: 852 }, deviceScaleFactor: 2, colorScheme: theme, hasTouch: true, isMobile: true, locale: 'zh-CN' })
       const page = await context.newPage()
       page.on('pageerror', error => problems.push(`${theme}: ${error}`))
-      await page.route('**/*', async route => {
+      await context.route('**/*', async route => {
         const url = route.request().url()
         const hit = url.startsWith(origin) ? apiResponse(url) : null
         if (!hit && url.startsWith(`${origin}/api/`)) problems.push(`${theme}: unanswered ${new URL(url).pathname}`)
@@ -198,8 +200,9 @@ async function run() {
       const properties = page.getByRole('button', { name: '状态和优先级（网页版）', exact: true })
       await properties.focus()
       const [webTask] = await Promise.all([context.waitForEvent('page'), properties.press('Enter')])
-      await webTask.waitForLoadState('domcontentloaded')
-      assert.equal(webTask.url(), `${origin}/?issue=${TASK}`)
+      await webTask.waitForURL(url => url.origin === origin && url.pathname === '/api/mobile/open')
+      assert.equal(new URL(webTask.url()).searchParams.get('to'), `/?issue=${TASK}`)
+      assert.equal(new URL(webTask.url()).searchParams.get('token'), 'fixture-task-handoff')
       await webTask.close()
       // 活动's second row is the next Agent, named without a verb; it opens the conversation at its first run.
       await page.getByText('Claude Code', { exact: true }).last().click()
