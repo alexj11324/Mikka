@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AppState } from 'react-native'
 import { api, ApiError, onWorkspaceChange } from '@/lib/api'
 import { apiCache as cache } from './api-cache'
-import { needsForegroundRead } from './api-read-state'
+import { needsForegroundRead, withholdsCachedRead } from './api-read-state'
 import { live, useLive, type LiveSpec } from './live'
 import { presenceScope } from './presence-scope'
 
@@ -48,20 +48,23 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
   const [loading, setLoading] = useState(Boolean(path))
   const request = useRef(0)
   const context = cache.context()
+  const revision = path ? cache.revision(path) : 0
   const setData = useCallback((next: T | null | ((current: T | null) => T | null)) => {
     cache.commit(context, () => {
+      if (path && cache.revision(path) !== revision) return
       // A saved mutation is newer than a read already in flight.
       request.current++; pending.current = null; setLoading(false); setError(null); failed.current = false
       setStored(current => {
         let value = current
         cache.commit(context, () => {
+          if (path && cache.revision(path) !== revision) return
           value = typeof next === 'function' ? (next as (current: T | null) => T | null)(current) : next
           if (path && value !== null) cache.set(path, value, context)
         })
         return value
       })
     })
-  }, [path, context])
+  }, [path, context, revision])
   const alive = useRef(true)
   const loadedAt = useRef(0)
   // When the last successful read started (performance clock): a pushed deadline counts from it.
@@ -73,8 +76,9 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
     if (!path) return Promise.resolve()
     const context = cache.context()
     if (pending.current?.context === context && pending.current.path === path) return pending.current.promise
+    const readRevision = cache.revision(path)
     const ticket = ++request.current
-    const accept = (apply: () => void) => cache.commit(context, () => { if (alive.current && ticket === request.current) apply() })
+    const accept = (apply: () => void) => cache.commit(context, () => { if (alive.current && ticket === request.current && cache.revision(path) === readRevision) apply() })
     accept(() => setLoading(true))
     const started = typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now()
     const promise = (async () => {
@@ -82,7 +86,14 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
         const next = await read(path)
         accept(() => { cache.set(path, next, context); setStored(next); setError(null); failed.current = false; loadedAt.current = Date.now(); setRequestedAt(started) })
       } catch (failure) {
-        accept(() => { setError(failure as Error); failed.current = true })
+        accept(() => {
+          if (failure instanceof ApiError && withholdsCachedRead(failure.status)) {
+            cache.revoke(path, context, failure)
+          } else {
+            setError(failure as Error)
+            failed.current = true
+          }
+        })
       } finally {
         accept(() => setLoading(false))
         if (pending.current?.ticket === ticket) pending.current = null
@@ -91,6 +102,20 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
     pending.current = { context, path, ticket, promise }
     return promise
   }, [path, read])
+
+  useEffect(() => {
+    if (!path) return
+    return cache.onRevoked(path, reason => {
+      request.current++
+      pending.current = null
+      loadedAt.current = 0
+      failed.current = true
+      setStored(null)
+      setRequestedAt(null)
+      setLoading(false)
+      setError(reason)
+    })
+  }, [path])
 
   useEffect(() => {
     alive.current = true
