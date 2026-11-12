@@ -42,11 +42,11 @@ export function neonUsage(raw, now = Date.now()) {
 }
 
 /** Whitelist aggregate fields. Raw log messages, SQL, user IDs and values never enter reports. */
-export function summarize(events, deploymentId, now = Date.now()) {
+export function summarize(events, deploymentId, now = Date.now(), environment = 'production') {
   const groups = new Map(), requests = new Map(), seen = new Set()
   let samples = 0, sampledBytes = 0, truncated = 0, malformed = 0
   for (const event of events) {
-    if (event.deploymentId !== deploymentId || event.environment !== 'production') fail('log_scope_mismatch')
+    if (event.deploymentId !== deploymentId || event.environment !== environment) fail('log_scope_mismatch')
     if (event.truncated) { truncated++; continue }
     for (const line of (typeof event.message === 'string' ? event.message : '').split('\n')) {
       let e
@@ -75,30 +75,39 @@ export function summarize(events, deploymentId, now = Date.now()) {
     measurement: 'sampled_json_result_bytes_not_wire_bytes', collection: 'best_effort' }
 }
 
-export async function run({ vercelToken, neonToken, now = Date.now(), fetchImpl = fetch, providerOnly = false }) {
-  const report = { version: 1, observedAt: iso(now), windowStart: iso(now-WINDOW_MS), environment: 'production', reasons: [], status: 'insufficient',
+export async function run({ vercelToken, neonToken, now = Date.now(), fetchImpl = fetch, providerOnly = false, containerWindow = /** @type {Awaited<ReturnType<typeof import('./cloudflare-container-logs.mjs').readContainerWindow>> | undefined} */ (undefined) }) {
+  if (providerOnly && containerWindow) fail('container_window_invalid')
+  const report = { version: 1, observedAt: iso(now), windowStart: iso(now-WINDOW_MS), environment: containerWindow?.environment ?? 'production', reasons: [], status: 'insufficient',
     collectorSource: providerOnly ? 'cloudflare_provider_fallback' : 'github_runtime_collector', collectionScope: providerOnly ? 'provider' : 'provider_and_runtime' }
   const read = (path, body) => api(path, { token: vercelToken, body, fetchImpl, headers: { 'x-vercel-observability-query-reason': 'cli/logs-runtime' } })
   if (!providerOnly) try {
-    if (!vercelToken) fail('vercel_token_unavailable')
-    const alias = activeAlias(await read(`/v4/aliases/${PRODUCTION_ALIAS}`)), events = [], cursors = new Set()
-    report.deploymentId = alias.deploymentId
-    let cursor
-    for (let page = 0; ; page++) {
-      const response = await read('/v1/observability/events', { event: 'vercel.log', scope: { ownerId: TEAM, projectIds: [PROJECT] },
-        timeRange: { start: iso(now-WINDOW_MS), end: iso(now) }, select: ['deploymentId','environment','message','truncated'],
-        order: 'desc', limit: 1000, filter: `deploymentId:"${alias.deploymentId}" AND environment:production AND (db_sample OR api_request)`, ...(cursor ? {cursor} : {}) })
-      if (!Array.isArray(response.events) || typeof response.pagination?.hasMore !== 'boolean') fail('log_response_invalid')
-      events.push(...response.events)
-      if (response.meta?.excludedIntervals?.length) fail('log_intervals_excluded')
-      if (!response.pagination.hasMore) break
-      const next = response.pagination.nextCursor
-      if (page >= 9 || !next || cursors.has(next)) fail('log_pagination_incomplete')
-      cursors.add(next); cursor = next
+    if (containerWindow) {
+      const { applicationId, environment, start, end, events } = containerWindow
+      if (start !== now - WINDOW_MS || end !== now) fail('container_window_invalid')
+      report.collectorSource = 'cloudflare_container_runtime'
+      report.deploymentId = applicationId
+      report.runtime = summarize(events, applicationId, now, environment)
+    } else {
+      if (!vercelToken) fail('vercel_token_unavailable')
+      const alias = activeAlias(await read(`/v4/aliases/${PRODUCTION_ALIAS}`)), events = [], cursors = new Set()
+      report.deploymentId = alias.deploymentId
+      let cursor
+      for (let page = 0; ; page++) {
+        const response = await read('/v1/observability/events', { event: 'vercel.log', scope: { ownerId: TEAM, projectIds: [PROJECT] },
+          timeRange: { start: iso(now-WINDOW_MS), end: iso(now) }, select: ['deploymentId','environment','message','truncated'],
+          order: 'desc', limit: 1000, filter: `deploymentId:"${alias.deploymentId}" AND environment:production AND (db_sample OR api_request)`, ...(cursor ? {cursor} : {}) })
+        if (!Array.isArray(response.events) || typeof response.pagination?.hasMore !== 'boolean') fail('log_response_invalid')
+        events.push(...response.events)
+        if (response.meta?.excludedIntervals?.length) fail('log_intervals_excluded')
+        if (!response.pagination.hasMore) break
+        const next = response.pagination.nextCursor
+        if (page >= 9 || !next || cursors.has(next)) fail('log_pagination_incomplete')
+        cursors.add(next); cursor = next
+      }
+      const after = activeAlias(await read(`/v4/aliases/${PRODUCTION_ALIAS}`))
+      if (after.deploymentId !== alias.deploymentId || after.updatedAt !== alias.updatedAt) fail('deployment_changed')
+      report.runtime = summarize(events, alias.deploymentId, now)
     }
-    const after = activeAlias(await read(`/v4/aliases/${PRODUCTION_ALIAS}`))
-    if (after.deploymentId !== alias.deploymentId || after.updatedAt !== alias.updatedAt) fail('deployment_changed')
-    report.runtime = summarize(events, alias.deploymentId, now)
     if (report.runtime.truncated || report.runtime.malformed) report.reasons.push('log_records_incomplete')
     if (!report.runtime.samples) report.reasons.push('no_database_samples')
   } catch(e) { report.reasons.push(safeError(e)) }
@@ -131,6 +140,7 @@ export async function run({ vercelToken, neonToken, now = Date.now(), fetchImpl 
 
 /** One snapshot per run; bounded aggregates, no per-request external calls. */
 export async function publish(report, token, fetchImpl = fetch) {
+  if (report.environment && report.environment !== 'production') fail('production_telemetry_required')
   if (!token) fail('posthog_token_unavailable')
   const properties = { distinct_id: 'mikka-operations', $process_person_profile: false, environment: 'production',
     collector_source: report.collectorSource, collection_scope: report.collectionScope,

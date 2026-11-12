@@ -19,10 +19,10 @@ export function logQuery(deploymentId, now, cursor) {
 }
 
 /** Only fixed route templates and known logger fields cross this boundary. */
-export function readEntries(events, deploymentId) {
+export function readEntries(events, deploymentId, environment = 'production') {
   const entries = [], counts = { truncated: 0, malformed: 0 }
   for (const event of events) {
-    if (event.deploymentId !== deploymentId || event.environment !== 'production') fail('runtime_event_scope_mismatch')
+    if (event.deploymentId !== deploymentId || event.environment !== environment) fail('runtime_event_scope_mismatch')
     if (event.truncated === true) { counts.truncated++; continue }
     if (typeof event.message !== 'string') { counts.malformed++; continue }
     for (const line of event.message.split('\n').filter(line => line.trim())) {
@@ -56,7 +56,7 @@ export function coverageFor(entries, now) {
   return counts
 }
 
-export async function run({ token, now = Date.now(), fetchImpl = fetch }) {
+export async function run({ token, now = Date.now(), fetchImpl = fetch, containerWindow = /** @type {Awaited<ReturnType<typeof import('./cloudflare-container-logs.mjs').readContainerWindow>> | undefined} */ (undefined) }) {
   const report = { version: 1, status: 'insufficient', reasons: [], observedAt: iso(now),
     window: { start: iso(now - WINDOW_MS), end: iso(now) }, sampling: 'best_effort', policy: POLICY,
     scope: { ownerId: TEAM, projectId: PROJECT, environment: 'production' }, pages: 0, records: 0,
@@ -64,29 +64,41 @@ export async function run({ token, now = Date.now(), fetchImpl = fetch }) {
   const entries = []
   const read = (path, body) => api(path, { token, body, fetchImpl, headers: { 'x-vercel-observability-query-reason': 'cli/logs-runtime' } })
   try {
-    if (!token) fail('vercel_token_unavailable')
-    const before = activeAlias(await read(`/v4/aliases/${PRODUCTION_ALIAS}`))
-    report.scope.deploymentId = before.deploymentId
-    report.scope.aliasUpdatedAt = before.updatedAt
-    const cursors = new Set()
-    let cursor
-    for (;;) {
-      const page = await read('/v1/observability/events', logQuery(before.deploymentId, now, cursor))
-      if (!Array.isArray(page?.events) || typeof page.pagination?.hasMore !== 'boolean' ||
-        !(page.pagination.nextCursor === null || typeof page.pagination.nextCursor === 'string') ||
-        (page.meta?.excludedIntervals !== undefined && !Array.isArray(page.meta.excludedIntervals))) fail('runtime_response_invalid')
-      report.pages++; report.records += page.events.length
-      report.excludedIntervals += page.meta?.excludedIntervals?.length ?? 0
-      const parsed = readEntries(page.events, before.deploymentId)
-      entries.push(...parsed.entries); report.truncated += parsed.counts.truncated; report.malformed += parsed.counts.malformed
-      if (!page.pagination.hasMore) break
-      if (report.pages >= POLICY.maximumPages) fail('runtime_page_budget_exceeded')
-      const next = page.pagination.nextCursor
-      if (!next || cursors.has(next)) fail('runtime_pagination_incomplete')
-      cursors.add(next); cursor = next
+    if (containerWindow) {
+      const { applicationId, environment, start, end, pages, records, events } = containerWindow
+      if (start !== now - WINDOW_MS || end !== now) fail('container_window_invalid')
+      report.scope = { provider: 'cloudflare_containers', environment, deploymentId: applicationId }
+      report.pages = pages
+      report.records = records
+      const parsed = readEntries(events, applicationId, environment)
+      entries.push(...parsed.entries)
+      report.truncated = parsed.counts.truncated
+      report.malformed = parsed.counts.malformed
+    } else {
+      if (!token) fail('vercel_token_unavailable')
+      const before = activeAlias(await read(`/v4/aliases/${PRODUCTION_ALIAS}`))
+      report.scope.deploymentId = before.deploymentId
+      report.scope.aliasUpdatedAt = before.updatedAt
+      const cursors = new Set()
+      let cursor
+      for (;;) {
+        const page = await read('/v1/observability/events', logQuery(before.deploymentId, now, cursor))
+        if (!Array.isArray(page?.events) || typeof page.pagination?.hasMore !== 'boolean' ||
+          !(page.pagination.nextCursor === null || typeof page.pagination.nextCursor === 'string') ||
+          (page.meta?.excludedIntervals !== undefined && !Array.isArray(page.meta.excludedIntervals))) fail('runtime_response_invalid')
+        report.pages++; report.records += page.events.length
+        report.excludedIntervals += page.meta?.excludedIntervals?.length ?? 0
+        const parsed = readEntries(page.events, before.deploymentId)
+        entries.push(...parsed.entries); report.truncated += parsed.counts.truncated; report.malformed += parsed.counts.malformed
+        if (!page.pagination.hasMore) break
+        if (report.pages >= POLICY.maximumPages) fail('runtime_page_budget_exceeded')
+        const next = page.pagination.nextCursor
+        if (!next || cursors.has(next)) fail('runtime_pagination_incomplete')
+        cursors.add(next); cursor = next
+      }
+      const after = activeAlias(await read(`/v4/aliases/${PRODUCTION_ALIAS}`))
+      if (before.deploymentId !== after.deploymentId || before.updatedAt !== after.updatedAt) fail('runtime_deployment_changed')
     }
-    const after = activeAlias(await read(`/v4/aliases/${PRODUCTION_ALIAS}`))
-    if (before.deploymentId !== after.deploymentId || before.updatedAt !== after.updatedAt) fail('runtime_deployment_changed')
   } catch (error) {
     report.reasons.push(error instanceof Error && /^[a-z0-9_]+$/.test(error.message) ? error.message : 'runtime_collection_unavailable')
   }
@@ -107,7 +119,7 @@ export async function run({ token, now = Date.now(), fetchImpl = fetch }) {
 export function markdown(report) {
   const lines = [`## Runtime outcomes: ${report.status}`, '', `Reasons: ${report.reasons.join(', ') || 'none'}.`,
     '', `UTC window: ${report.window.start} → ${report.window.end}; deployment: ${report.scope.deploymentId ?? 'unavailable'}.`,
-    '', 'Vercel runtime pagination is best effort; equal-timestamp page boundaries can repeat or skip records. Counts describe observed structured logs, not a complete request or billing denominator.',
+    '', report.scope.provider === 'cloudflare_containers' ? 'Counts describe observed structured Container logs from the identified application.' : 'Vercel runtime pagination is best effort; equal-timestamp page boundaries can repeat or skip records. Counts describe observed structured logs, not a complete request or billing denominator.',
     '', '| Route | Requests observed | Completed pairs | Empty | Work | Ignored | Unknown | Empty ratio | Outcome coverage |',
     '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |']
   for (const [route, metric] of Object.entries(report.outcomes)) lines.push(`| ${route} | ${metric.count} | ${metric.completed} | ${metric.empty} | ${metric.work} | ${metric.ignored} | ${metric.unknown} | ${metric.emptyRatio === null ? 'unknown' : (metric.emptyRatio * 100).toFixed(2) + '%'} | ${metric.coverage === null ? 'unknown' : (metric.coverage * 100).toFixed(2) + '%'} |`)
