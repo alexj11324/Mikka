@@ -142,9 +142,7 @@ export function useOrganizationPolicy(organizationId: string | null | undefined)
 
 export function useOrganizationServiceKeys(organizationId: string, after: string | undefined, workspaceIds: readonly string[]) {
   const key = ['organization-service-keys', organizationId, after ?? ''] as const
-  const result = useSWR(key, () => organizationApi.serviceKeys(organizationId, after), {
-    shouldRetryOnError: false, revalidateOnFocus: true,
-  })
+  const result = useSWR(key, () => organizationApi.serviceKeys(organizationId, after), swr)
   const subscriptions = workspaceIds.map(id => ({ kind: 'workspace_settings' as const, id, workspaceId: id }))
   useLiveKeys(subscriptions, [unstable_serialize(key)], undefined, { minIntervalMs: 2_000 })
   return result

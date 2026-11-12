@@ -139,6 +139,8 @@ test('the private API receives its sign-in and product bindings without inheriti
   const { applicationEnvironment } = await import('../../../cloudflare/api/ingress/environment.mjs')
   const origin = 'https://app.example'
   const allowed = {
+    SLACK_APP_ID: 'AEXAMPLE', SLACK_CLIENT_ID: 'client-fixture', SLACK_CLIENT_SECRET: 'oauth-fixture',
+    WORKSPACE_SECRETS_KEY: 'sealing-fixture',
     GOOGLE_CLIENT_ID: 'google', GOOGLE_CLIENT_SECRET: 'google-credential',
     GITHUB_CLIENT_ID: 'github', GITHUB_CLIENT_SECRET: 'github-credential', GITHUB_WEBHOOK_SECRET: 'existing-hook',
     BETTER_AUTH_SECRET: 'auth', TURNSTILE_SECRET_KEY: 'signup-verification', MIKKA_CLOUDFLARE_TASK_WORKSPACES: 'sponsor',
@@ -146,6 +148,7 @@ test('the private API receives its sign-in and product bindings without inheriti
     OPENAI_DECISIONS_API_KEY: 'decisions', CLOUDFLARE_WORKERS_AI_TOKEN: 'models',
   }
   const unexpected = {
+    SLACK_SIGNING_SECRET: 'event-signing', SLACK_BOT_TOKEN: 'tenant-token', SLACK_USER_BINDINGS: 'tenant-map',
     GITHUB_APP_PRIVATE_KEY: 'app-signing', AWS_ACCESS_KEY_ID: 'aws', AWS_SECRET_ACCESS_KEY: 'aws-secret',
     CREDENTIAL_BROKER_ROLE_ARN: 'broker', EVE_QUEUE_SIGNING_KEY: 'world-signing',
     INFISICAL_CLIENT_SECRET: 'deploy', CLOUDFLARE_API_TOKEN: 'deploy', VERCEL_OIDC_TOKEN: 'legacy',
