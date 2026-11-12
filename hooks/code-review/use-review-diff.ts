@@ -41,7 +41,7 @@ export function useReviewDiff(taskId: string | null | undefined, options: { comm
 export function useReviewFile(taskId: string | null | undefined, path: string | null, head: string | null, reference?: TaskReviewRef | null) {
   const source = reference === undefined ? head : reference?.sourceVersion
   const key = taskId && path && source ? [...reviewKeys.file(taskId, path, source), reference?.snapshotId] as const : null
-  return useSWR<ReviewFileRead>(key, ([, id, file]) => getReviewFile(id, file, reference ?? undefined), {
+  return useSWR<ReviewFileRead>(key, ([, id, file]: readonly [string, string, string, string, string | undefined]) => getReviewFile(id, file, reference ?? undefined), {
     revalidateOnFocus: false, shouldRetryOnError: false,
   })
 }
@@ -49,7 +49,7 @@ export function useReviewFile(taskId: string | null | undefined, path: string | 
 /** The checks behind the check summary (R1b), read when it expands. */
 export function useReviewChecks(taskId: string | null | undefined, enabled = true, reference?: TaskReviewRef | null) {
   const key = taskId && enabled && reference !== null ? [...reviewKeys.checks(taskId), reference?.snapshotId, reference?.sourceVersion] as const : null
-  const result = useSWR<ReviewCheck[]>(key, ([, id]) => getReviewChecks(id, reference ?? undefined), {
+  const result = useSWR<ReviewCheck[]>(key, ([, id]: readonly [string, string, string | undefined, string | undefined]) => getReviewChecks(id, reference ?? undefined), {
     revalidateOnFocus: false, shouldRetryOnError: false,
   })
   return result
