@@ -2,8 +2,8 @@
 
 Mikka has one backend source and two deployment editions. A source change does
 **not** require a second self-hosted implementation. CI builds the community
-image from main and tests it with disposable PostgreSQL, an API/CLI acceptance
-driver and packaged Desktop. Main publishes a SHA image and the moving
+image from main and tests it with disposable PostgreSQL, the daemon and the
+API/CLI acceptance driver. Main publishes a SHA image and the moving
 `latest` tag, but existing installations are **not** automatically restarted.
 
 ## Stable channel (no silent main/latest upgrades)
@@ -28,6 +28,32 @@ The release drill needs two real, previously published installations. The
 first has the new schema and can return to its previous image after a failed
 probe. The second has the older schema and must recover forward after a
 migration. This sequence also applies to the first stable version.
+
+## Verify a published stable release
+
+Open the release for the installed tag and the matching **Publish self-hosted
+stable release** run. The run summary identifies the source commit, pinned
+server image and image-acceptance job. After the persisted-installation job
+passes, download the `self-hosted-upgrade-<tag>` artifact and open both JSON files.
+
+- `upgrade.json` records the previous and target images, the active run and
+  its completion, the verified database restore, and the result of each
+  recovery path. Compare the recorded OCI revision and digest to the release
+  before using the evidence for your installation.
+- `delivery.json` records how independent host receivers handled the upstream
+  release body and rejected an invalid signature. Its transport field states
+  how the message reached the test receiver.
+
+The first stable drill uses the migration inventory published by main commit
+`c0774a3764f72110b3f3c64fc35e155f18bddac0`. Its Linux/amd64 baseline is
+`ghcr.io/alexj11324/mikka@sha256:64331979e56acc1b5a05271ab2e99e2e8641160065fc81320f6e37edfaf657ab`.
+Its [image job](https://github.com/alexj11324/Mikka/actions/runs/43132363699/job/130899790146)
+exercised both database configurations and restarted the persisted installation
+before publishing that digest. Use the release's own receipt to identify the
+previous images actually selected for each recovery case.
+
+The [first stable delivery record](https://github.com/alexj11324/Mikka/issues/1963)
+tracks the immutable release and the original upgrade and recovery receipts.
 
 ## Host-side CLI
 
@@ -250,8 +276,10 @@ Compose file against a separate PostgreSQL 17 server and a PgBouncer
 transaction pool, and authenticated RPC requests from protocol 0, 1 and an
 unsupported client. The external fixture restricts DDL to the direct database role and checks
 actual query counts on the transaction pool. It uses disposable
-credentials and does not contact live Neon. The same candidate also runs
-daemon, mail, object storage, model, restart and packaged Desktop acceptance.
+credentials and does not contact live Neon. The image job also tests the daemon, mail, object storage, model requests
+and restart persistence. The packaged Desktop login and live-chat steps run
+on explicit tag and manual image runs. On normal PRs and main pushes, the
+client protocol evidence comes from authenticated RPC requests.
 
 For each added backend module, added exported capability, migration or newly
 read environment variable, add an entry keyed by its source path to
