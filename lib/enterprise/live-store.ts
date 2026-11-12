@@ -9,9 +9,14 @@ export type EnterpriseLiveCapability = {
   sessionId: string; expiresAt: Date;
 }
 
+/** Held by machine and session reads while an Organization policy change takes its exclusive barrier. */
+export async function lockEnterpriseOrganizationRead(tx: LiveExecutor, organizationId: string) {
+  await tx.query('select pg_advisory_xact_lock_shared(hashtextextended($1,0))', [`enterprise-live-org:${organizationId}`])
+}
+
 /** WS locks precede these APP locks. No session row/FK lock follows them. */
 export async function lockLiveRegistration(tx: LiveExecutor, organizationId: string | null, sessionId: string) {
-  if (organizationId) await tx.query('select pg_advisory_xact_lock_shared(hashtextextended($1,0))', [`enterprise-live-org:${organizationId}`])
+  if (organizationId) await lockEnterpriseOrganizationRead(tx, organizationId)
   await tx.query('select pg_advisory_xact_lock_shared(hashtextextended($1,0))', [`enterprise-live-session:${sessionId}`])
 }
 

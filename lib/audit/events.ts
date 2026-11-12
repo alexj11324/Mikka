@@ -43,6 +43,8 @@ export const AUDIT_ACTIONS = {
   'service_identity.renamed': 'security',
   'service_identity.disabled': 'security',
   'service_identity.restored': 'security',
+  'service_identity.credential_rotated': 'security',
+  'service_identity.credential_revoked': 'security',
   'token.created': 'security',
   'token.revoked': 'security',
   'token.rotated': 'security',
@@ -116,6 +118,8 @@ export const AUDIT_METADATA = {
   'service_identity.renamed': none,
   'service_identity.disabled': none,
   'service_identity.restored': none,
+  'service_identity.credential_rotated': none,
+  'service_identity.credential_revoked': none,
   'token.created': z.object({
     tokenName: label,
     expiresAt: z.string().datetime({ offset: true }).nullable(),

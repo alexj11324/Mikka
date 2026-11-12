@@ -5,6 +5,7 @@ import { ActionFailureError } from '@/lib/action-error'
 import { db } from '@/lib/db'
 import { workspaceListChanged } from '@/lib/live/lists'
 import type { EnterpriseReader } from '@/lib/enterprise/principal'
+import type { ResourceAction } from '@/lib/resource-access/contract'
 import { lockResourcesAccess } from '@/lib/resource-access/store'
 import { GovernanceError } from './errors'
 import { withServiceIdentityAdmin } from './service-identities'
@@ -22,11 +23,11 @@ async function assignedProjects(tx: AppTransaction, workspaceId: string, identit
   return rows.map(row => row.id)
 }
 
-async function lockManageableProjects(tx: AppTransaction, workspaceId: string, actorId: string, projectIds: string[], write: boolean) {
+async function lockManageableProjects(tx: AppTransaction, workspaceId: string, actorId: string, projectIds: string[], write: boolean, actions: readonly ResourceAction[] = ['canManageAccess']) {
   try {
-    await lockResourcesAccess(tx, actorId, projectIds.map(id => ({
-      reference: { kind: 'project', id, workspaceId }, action: 'canManageAccess',
-    })), write)
+    await lockResourcesAccess(tx, actorId, projectIds.flatMap(id => actions.map(action => ({
+      reference: { kind: 'project' as const, id, workspaceId }, action,
+    }))), write, false)
   } catch (cause) {
     if (cause instanceof ActionFailureError && cause.code === 'issueNotFound') throw new GovernanceError('not_found', cause)
     throw cause
@@ -65,6 +66,31 @@ export function serviceProjectAccess(workspaceId: string, actor: EnterpriseReade
         await workspaceListChanged(tx, workspaceId, ['workspace_settings'])
       }
       return { projectIds: target }
+    })
+  })
+}
+
+/** List Projects the signed-in administrator can actually share, using the same
+ * APP ACL used by a replacement. Read names only in the selected Workspace. */
+export function serviceProjectChoices(workspaceId: string, actor: EnterpriseReader, rawId: string, after: string | null) {
+  const identityId = z.uuid().parse(rawId)
+  const cursor = z.uuid().nullable().parse(after)
+  return withServiceIdentityAdmin(workspaceId, actor, async workspace => {
+    const { rows: identities } = await workspace.execute(sql`SELECT id FROM mikka_workspace_service_identities
+      WHERE "workspaceId"=${workspaceId}::uuid AND id=${identityId}::uuid FOR SHARE`)
+    if (!identities.length) throw new GovernanceError('not_found')
+    return db.transaction(async app => {
+      const { rows } = await app.execute<{ id: string }>(sql`SELECT id FROM resource_access_policies
+        WHERE kind='project' AND "workspaceId"=${workspaceId}::uuid AND (${cursor}::uuid IS NULL OR id>${cursor}::uuid)
+          AND mikka_resource_acl_allowed('account',${actor.id},"workspaceId",kind,id,'canReadContent')
+          AND mikka_resource_acl_allowed('account',${actor.id},"workspaceId",kind,id,'canManageAccess')
+        ORDER BY id LIMIT 101`)
+      const page = rows.slice(0, 100)
+      await lockManageableProjects(app, workspaceId, actor.id, page.map(row => row.id), false, ['canManageAccess', 'canReadContent'])
+      const { rows: projects } = await workspace.execute<{ id: string; name: string }>(sql`SELECT id,name FROM workspace_projects
+        WHERE "workspaceId"=${workspaceId}::uuid AND id=ANY(${sql.param(page.map(row => row.id))}::uuid[])
+          AND "archivedAt" IS NULL ORDER BY id`)
+      return { projects, nextCursor: rows.length > 100 ? page[99].id : null }
     })
   })
 }
