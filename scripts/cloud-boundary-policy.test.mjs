@@ -95,6 +95,15 @@ test('an existing Expo exception permits exactly one retained primitive, with no
   assert.ok(auditCloudBoundary(file, `${original}; const secret=env.MIKKA_CLOUD_SIGNING_KEY`).some(finding => finding.rule === 'cloud/private-environment'))
 })
 
+test('the build source exception binds the exact signer and installation endpoint to its helper', () => {
+  const file = 'scripts/private-source-auth.mjs'
+  const source = readFileSync(new URL('./private-source-auth.mjs', import.meta.url), 'utf8')
+  assert.deepEqual(auditCloudBoundary(file, source), [])
+  assert.ok(auditCloudBoundary('scripts/another-source-auth.mjs', source).length)
+  assert.ok(auditCloudBoundary(file, `${source}\ncreateSign('RSA-SHA256')`).some(finding => finding.rule === 'cloud/token-issuer'))
+  assert.ok(auditCloudBoundary(file, `${source}\nconst secret=env.MIKKA_CLOUD_SIGNING_KEY`).some(finding => finding.rule === 'cloud/private-environment'))
+})
+
 test('every exception has a reason, one exact fingerprint and a positive hit count', () => {
   for (const [file, entries] of Object.entries(cloudBoundaryAllowlist)) for (const entry of entries) {
     assert.ok(entry.reason.length >= 20, file)
@@ -118,6 +127,7 @@ test('the CI command fails on an added untracked violation and passes again afte
   // Reproduce only the retained primitives, never copy any private service code.
   f.write('lib/mobile-push-delivery.ts', `const endpoint='${expoURL}'`)
   f.write('scripts/dev-local/services.mjs', "if (path === '/v1/decisions') return localDecision()")
+  f.write('scripts/private-source-auth.mjs', readFileSync(new URL('./private-source-auth.mjs', import.meta.url), 'utf8'))
   f.write('docs/contract.md', 'MIKKA_CLOUD_SIGNING_KEY is not a public setting')
   f.write('tests/private.fixture.ts', 'const secret=env.MIKKA_CLOUD_SIGNING_KEY')
   const run = () => spawnSync(process.execPath, [policy], { cwd: f.root, encoding: 'utf8' })

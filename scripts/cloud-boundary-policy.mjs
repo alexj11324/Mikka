@@ -27,6 +27,12 @@ const legacy = (rule, text, reason, hits = 1) => ({ rule, fingerprint: fingerpri
  * and exact count: moving it, adding another, or leaving a stale entry fails.
  * These exceptions do not exempt private cloud tables, issuers or relays. */
 export const cloudBoundaryAllowlist = {
+  'scripts/private-source-auth.mjs': [
+    legacy('cloud/github-token-mint', '/app/installations/__expression__/access_tokens',
+      'Public-owned Cloud Services and marketing builds mint repository-scoped contents-read checkout tokens with the existing GitHub App.'),
+    legacy('cloud/token-issuer', "createSign('RSA-SHA256')",
+      'Build-only GitHub App JWT authenticates the two fixed private source checkouts for public-owned builds.'),
+  ],
   'lib/mobile-push-delivery.ts': [legacy('cloud/privileged-expo-delivery', 'https://exp.host/--/api/v2/push',
     'Existing first-party push delivery and receipt checks remain public under PR #1559 § 8; this shared base serves only this deployment, while community clients call the separate cloud relay.')],
   'scripts/dev-local/services.mjs': [legacy('cloud/service-route', '/v1/decisions',
