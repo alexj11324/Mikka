@@ -117,6 +117,27 @@
     "behavior": "The official Eve host opts into its private Cloudflare World explicitly. Leaving the selector unset preserves the normal workflow selection.",
     "test": "cloudflare/eve-runtime/test/config.test.mjs"
   },
+  "drizzle/20261109143100_coding_review_sessions.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Create the PostgreSQL human-review lease table, pending revocations and source-change triggers in the installation database.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
+  "drizzle/20261109143101_coding_review_task_workspace.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Fence a review when its Task changes workspace or loses its original stored ownership.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
+  "drizzle/20261109143102_coding_review_task_thread.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Invalidate existing leases for an actual replacement Task run after the Factory binding transaction finishes.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
   "drizzle/20261112030502_task_attachments.sql": {
     "mode": "built-in",
     "environment": [
@@ -166,7 +187,8 @@
     "mode": "optional-cloud",
     "environment": [
       "CLOUDFLARE_WORKERS_AI_ACCOUNT_ID",
-      "CLOUDFLARE_WORKERS_AI_TOKEN"
+      "CLOUDFLARE_WORKERS_AI_TOKEN",
+      "MIKKA_WORKERS_AI_CAPABILITY"
     ],
     "behavior": "Only an explicitly selected managed Workers AI model uses the Cloudflare account and token and the model route refuses missing configuration before provider I/O.",
     "test": "lib/abuse/model.test.ts",
@@ -242,6 +264,62 @@
     "test": "lib/factory/checks.db.test.ts",
     "suite": "test:factory-checks-db"
   },
+  "lib/coding-workspace/preview/runtime.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "The configured application origin issues a one-use URL only after the existing owner-provided E2B guest acknowledges the scoped preview; an unavailable guest stays unavailable.",
+    "test": "lib/coding-workspace/preview/runtime.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/coding-workspace/review-authority.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the authenticated installation workspace, current Task, native run and checkout from PostgreSQL, and reject a changed owner or credential.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
+  "lib/coding-workspace/review-machine.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "HTTPS_PROXY"
+    ],
+    "behavior": "An active lease can reconnect to its existing E2B sandbox using that owner’s stored provider key and optional HTTPS proxy; no device credential is reissued.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
+  "lib/coding-workspace/review-sessions.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Persist and fence terminal and preview leases in PostgreSQL. Preserve pending remote closes for the existing recovery timer.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
+  "lib/coding-workspace/terminal/runtime.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_SECRET",
+      "HTTPS_PROXY"
+    ],
+    "behavior": "Use the installation auth secret to derive an instance-specific terminal key. The owner’s E2B credential permits the same guest to open or close the signed gateway.",
+    "test": "lib/coding-workspace/terminal/runtime.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/coding-workspace/terminal/test-fixture.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Supplies disposable locally generated wire identities to the signed terminal contract tests.",
+    "test": "lib/coding-workspace/terminal/wire.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/coding-workspace/terminal/wire.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Bind a short-lived terminal action to its local installation key, current boot, lease and body digest.",
+    "test": "lib/coding-workspace/terminal/wire.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
   "lib/coordinator/ci-suite-transport.ts": {
     "mode": "built-in",
     "environment": [],
@@ -308,6 +386,7 @@
       "MIKKA_DEFAULT_MODEL_ID",
       "MIKKA_EDITION",
       "MIKKA_HOSTED_MODEL_FALLBACK",
+      "MIKKA_WORKERS_AI_CAPABILITY",
       "VERCEL",
       "VERCEL_OIDC_TOKEN",
       "ZEROCAT_API_KEY",
@@ -612,6 +691,13 @@
     "test": "tests/task-resource-registration.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "lib/task-thread-run.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Select the Task run using the installation’s PostgreSQL relations, excluding group chat and late-bound Factory checker runs.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
   "lib/task-workspace.ts": {
     "mode": "built-in",
     "environment": [],
@@ -632,9 +718,11 @@
     "mode": "optional-cloud",
     "environment": [
       "CLOUDFLARE_WORKERS_AI_ACCOUNT_ID",
-      "MIKKA_HOSTED_MODEL_FALLBACK"
+      "CLOUDFLARE_WORKERS_AI_TOKEN",
+      "MIKKA_HOSTED_MODEL_FALLBACK",
+      "MIKKA_WORKERS_AI_CAPABILITY"
     ],
-    "behavior": "The Workers AI route must be explicitly selected and the account ID must be valid and ordinary local installs do not need a Cloudflare account.",
+    "behavior": "A hosted Cloudflare container authorizes its fixed account with an instance-scoped service binding. Operators can also configure a model-specific REST token. Community installations can use their own configured model.",
     "test": "lib/abuse/model.test.ts",
     "suite": "test:abuse"
   },
