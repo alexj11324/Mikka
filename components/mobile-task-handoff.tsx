@@ -8,7 +8,7 @@ import { AuthCard } from '@/components/blocks/auth-19/components/auth-card'
 import { Button } from '@/components/ui/button'
 import { FieldError } from '@/components/ui/field'
 import { withBasePath } from '@/lib/base-path'
-import { cloudAuthClient } from '@/lib/auth-client'
+import { authClient } from '@/lib/auth-client'
 import { mobileTaskTarget } from '@/lib/mobile-task-handoff'
 import { currentWebServers, signInToServer } from '@/lib/web-connection/browser'
 import { canResumeMobileTask, showMobileTaskLocation } from '@/lib/web-connection/mobile-task-location'
@@ -43,7 +43,7 @@ export default function MobileTaskHandoff({ launch }: { launch: Launch }) {
       if (window.location.href !== document || snapshot.expiredServer || (cloud ? snapshot.account !== null : snapshot.account?.server !== server)) throw Error()
       let result: Target
       if (restore) {
-        const user = cloud ? (await cloudAuthClient.getSession({ query: { disableCookieCache: true } })).data?.user : (await directory.readSession())?.user
+        const user = (await authClient.getSession({ query: { disableCookieCache: true } })).data?.user
         if (user?.id !== saved.userId) throw Error()
         result = saved
       } else {
