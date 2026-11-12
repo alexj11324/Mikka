@@ -101,7 +101,7 @@ export function settingsHref(id: SettingsSectionId, workspaceId?: string): strin
  * personal workspace has every setting of the workspace itself (常规,
  * 密钥与环境, 用量, 计费) and none of these: 成员, 团队, 团队权限, 审计日志.
  */
-export const TEAM_ONLY_SECTIONS: ReadonlySet<SettingsSectionId> = new Set(['members', 'teams', 'permissions', 'audit', 'organization'])
+export const TEAM_ONLY_SECTIONS: ReadonlySet<SettingsSectionId> = new Set(['members', 'teams', 'permissions', 'audit'])
 
 export function visibleSettingsSections({ admin, personal = false, billing = true, cloudAdmin = false, organization = false }: { admin: boolean; personal?: boolean; billing?: boolean; cloudAdmin?: boolean; /** A UI layer draws 组织. */ organization?: boolean }): SettingsSectionDef[] {
   return SETTINGS_SECTIONS.filter(s => !s.unbuilt && (admin || !s.adminOnly) && !(personal && TEAM_ONLY_SECTIONS.has(s.id)) && (billing || s.id !== 'billing') && (cloudAdmin || s.id !== 'cloud') && (organization || s.id !== 'organization'))
