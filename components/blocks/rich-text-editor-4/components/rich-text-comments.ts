@@ -1,3 +1,4 @@
+import type { ThreadMessage, ThreadRecord } from '@/lib/task-discussion'
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model"
 import { Plugin, PluginKey, type EditorState } from "@tiptap/pm/state"
 import { Decoration, DecorationSet } from "@tiptap/pm/view"
@@ -21,21 +22,7 @@ export const THREAD_ORIGIN = "threads"
 /** A new thread's record; undo reverts it together with its anchor mark. */
 export const THREAD_CREATE_ORIGIN = "thread-create"
 
-export interface ThreadMessage {
-  id: string
-  author: string
-  authorUserId?: string
-  body: string
-  at: string
-}
-
-export interface ThreadRecord {
-  id: string
-  author: string
-  createdAt: string
-  resolved: boolean
-  messages: ThreadMessage[]
-}
+export type { ThreadMessage, ThreadRecord } from '@/lib/task-discussion'
 
 export interface ThreadSeed {
   id: string

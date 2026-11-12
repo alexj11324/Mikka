@@ -1,3 +1,4 @@
+import { readRendererActions } from '../../lib/renderer-actions.mjs'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
 import { Pool } from 'pg'
@@ -114,7 +115,7 @@ export function requestAllowed(path, init, environment, refs = {}) {
     if ([`${base}/api/version`, `${base}/api/auth/get-session`, `${base}/api/workspace/switcher`, `${base}/api/settings/issue-prefix`].includes(url.pathname)) return !url.search
     if (url.pathname === page) return [...url.searchParams].every(([key, value]) => ['issue', 'workspace'].includes(key) && uuid(value))
     if (url.pathname === `${page}/settings`) return [...url.searchParams].every(([key, value]) => key === 'section' && value === 'preferences' || key === 'workspace' && uuid(value))
-    return url.pathname === `${base}/renderer-manifest.json` && webDeploymentPin(url) !== null
+    return [`${base}/renderer-manifest.json`, `${base}/renderer-actions.json`].includes(url.pathname) && webDeploymentPin(url) !== null
       || chunkPath(url.href, environment) !== null || viteAssetPath(url.href, environment) !== null
   } catch { return false }
 }
@@ -154,7 +155,7 @@ export async function discoverReadActions(request, environment, issueId) {
   if (vitePins.size) {
     check(vitePins.size === 1, 'read_action_reference_missing')
     const [pin] = vitePins
-    const response = await request(`${environment.basePath}/renderer-manifest.json` + (pin ? '?dpl=' + encodeURIComponent(pin) : ''))
+    const response = await readRendererActions(request, environment.basePath, pin)
     check(response.ok && response.headers.get('content-type')?.includes('application/json'), 'public_action_manifest_unavailable')
     const source = await response.text()
     check(Buffer.byteLength(source) <= 8_000_000, 'public_asset_too_large')

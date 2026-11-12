@@ -179,7 +179,10 @@ export interface Suggestions { groups: { source: Source; items: Suggestion[] }[]
 
 /** Why a task is 受阻 (lib/task-blocked.ts on the web): its newest thread, a task it waits on (`blocker`, its number), or the person's flag. */
 export type TaskBlockReason = 'question' | 'quota' | 'run' | 'failed' | 'dependency' | 'flagged'
-export interface Task { id: string; identifier: string | null; title: string; status: string; priority: string; owner: string | null; updatedAt: string
+export interface Task {
+  /** Server-verified dispatch history on a scoped list; the latest Bot may differ. */
+  dispatchedBy?: string
+  id: string; identifier: string | null; title: string; status: string; priority: string; owner: string | null; updatedAt: string
   /** Absent from a server older than 受阻. */
   blocked?: { reason: TaskBlockReason; blocker: string | null } | null
   /** Its list group from its current thread (R-52, 2026-11-07); absent from an older server (features/tasks/model/task-groups.ts). */
@@ -200,7 +203,7 @@ export interface Task { id: string; identifier: string | null; title: string; st
 export type TaskState = 'waiting' | 'failed' | 'blocked' | 'running' | 'queued'
 /** The API's `state`: the four attempt states, or the board status of an open or closed task. */
 export type ServerTaskState = TaskState | 'todo' | 'done' | 'canceled' | 'duplicate'
-export type TaskReason = 'needs_input' | 'approval' | 'pr_review' | 'blocked' | 'quota' | 'blocked_by' | 'flagged'
+export type TaskReason = 'needs_input' | 'approval' | 'pr_review' | 'blocked' | 'quota' | 'offline' | 'blocked_by' | 'flagged'
 
 /** 待处理 · 进行中 · 待办 · 已完成 (decisions/2026-11-07-2045-tasks-only-threads-inside.md). */
 export type TaskGroup = 'pending' | 'running' | 'todo' | 'done'
@@ -222,6 +225,9 @@ export type TaskActivity =
 /** GET /api/mobile/tasks/:id (lib/mobile-tasks.ts on the server): the task's detail and its 活动, newest first. */
 export interface TaskDetail {
   task: Pick<Task, 'id' | 'identifier' | 'title' | 'status' | 'priority' | 'group' | 'state' | 'reason' | 'blockedBy'> & {
+    /** Authorized conversation head, null for read-only evidence. Absent on older servers. */
+    replyRunId?: string | null
+    factoryTaskId?: string
     bot: TaskBot | null
     schedule: TaskSchedule | null
     description: string | null
@@ -232,9 +238,13 @@ export interface TaskDetail {
     /** A factory task's flow: its stage, what it needs from the person, 审阅's verdict (2026-11-04-2200). Not sent yet. */
     flow?: import('../features/tasks/model/task-flow').TaskFlow | null
   }
+  /** Canonical, oldest-first history and discussions. Absent on older servers. */
+  timeline?: import('../../../lib/task-activity-timeline').TaskActivityFact[]
+  /** Raw, authorized receipts from the selected Factory response. The UI decodes its supported DTO version. */
+  factoryEvents?: unknown[]
   activity: TaskActivity[]
   /** The channel its task and run keys arrive on. */
-  live?: { workspaceId: string }
+  live?: { workspaceId: string; factoryActivityVersion?: 1 }
 }
 
 export interface Preferences {

@@ -1,13 +1,10 @@
 'use client'
 
-import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
+import { useEffect, useRef, useState } from 'react'
+import { useViewState } from '@/lib/hooks/view-state'
 import useSWR, { useSWRConfig } from 'swr'
 import useSWRInfinite from 'swr/infinite'
 import { useTranslations } from 'next-intl'
-import { toast } from 'sonner'
-import { ArrowUpRight, ChevronRight, Ellipsis, Plus, Puzzle, Search } from 'lucide-react'
 
 import { goToHref } from '@/components/workspace/workspace-navigation'
 import { withBasePath } from '@/lib/base-path'
@@ -18,24 +15,11 @@ import type { ConnectKind } from '@/lib/plugins/connect-kind'
 import { matchesStoreQuery, storeItemState, type StoreItemState } from '@/lib/plugins/store-state'
 import { getLinearIntegrationState } from '@/app/actions/linear-sync'
 import { getTelegramIntegrationStatus } from '@/app/actions/telegram'
-import { AppTile, ConnectedAppDetail, ConnectedAppsStatus, OWN_APPS, PluginBreadcrumb, isOwnApp, useAppInfo, useConnectedApps, useStoreCatalog, type ConnectedApps, type OwnAppId } from '@/components/plugins/connected-apps'
-import { CredentialDialog, type CredentialTarget } from '@/components/plugins/credential-dialog'
-import { GitHubSettings } from '@/components/plugins/github-settings'
-import { LinearSettings } from '@/components/settings/linear-settings'
-import { TelegramSettings } from '@/components/settings/telegram-settings'
-import { SettingsLoading, SettingsSection } from '@/components/settings/primitives'
-import { IconTile } from '@/components/reui/icon-tile'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
-import { SearchInput } from '@/components/ui/search-input'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import * as connectionsSlot from '@ui-slot/settings-connections'
-import type { AppPageProps } from '@/components/slots/settings-connections-contract'
-import { OwnAppsStatus, type OwnAppState, type OwnAppStates, type OwnAppsRead } from '@/components/plugins/connected-list'
+import { OWN_APPS, isOwnApp, useAppInfo, useConnectedApps, useStoreCatalog, type ConnectedApps, type OwnAppId } from '@/components/plugins/connected-apps'
+import { type CredentialTarget } from '@/components/plugins/credential-dialog'
+import { AppPage, ConnectionsList } from '@ui-slot/settings-connections'
+import { PluginsPage } from '@ui-slot/plugins'
+import { type OwnAppState, type OwnAppStates, type OwnAppsRead } from '@/components/plugins/connected-list'
 
 export const OWN_APP_STATES_KEY = 'plugin-own-app-states'
 /** Items a section shows before its ›. */
@@ -157,49 +141,18 @@ export function usePluginsView(section: 'plugins' | 'connections', linearNotice:
   return { apps, ownRead, app, category, href, go, openApp, tab, setTab, query, setQuery }
 }
 
-/** An app's own page (`&app=`), shared by 插件 and 设置 › 连接 and by UI layers: back goes to the list it came from. */
-// An app's own page from a UI layer (optional export, docs/ui-overlay.md), else the one below.
-const { ConnectionsList } = connectionsSlot
-const LayerAppPage = (connectionsSlot as { AppPage?: ComponentType<AppPageProps> | null }).AppPage ?? null
-
-export function PluginAppPage({ apps, app, category, rootLabel, href, go, linearNotice = null }: { apps: ConnectedApps; app: string; category: string | null; rootLabel: string; href: PluginsHref; go: PluginsGo; linearNotice?: 'connected' | 'error' | null }) {
-  if (LayerAppPage) return <LayerAppPage apps={apps} app={app} category={category} rootLabel={rootLabel} href={href} go={go} linearNotice={linearNotice} />
-  return <SharedAppPage apps={apps} app={app} category={category} rootLabel={rootLabel} href={href} go={go} linearNotice={linearNotice} />
+export function PluginsView({ section, ...props }: { section: 'plugins' | 'connections'; rootLabel: string; linearNotice?: 'connected' | 'error' | null; workspaceId?: string; workspaceName?: string }) {
+  return section === 'plugins' ? <PluginsPage /> : <ConnectionsView {...props} />
 }
 
-function SharedAppPage({ apps, app, category, rootLabel, href, go, linearNotice }: AppPageProps) {
-  const info = useAppInfo()
-  const back = () => go({ category })
-  const root = href({ category })
-  return <div className="flex flex-col gap-6">
-    {!isOwnApp(app)
-      ? <><ConnectedAppsStatus apps={apps} /><ConnectedAppDetail apps={apps} app={app} rootLabel={rootLabel} rootHref={root} onBack={back} /></>
-      : <div className="flex flex-col gap-8">
-        <PluginBreadcrumb rootLabel={rootLabel} rootHref={root} onBack={back} name={info(app).name} />
-        {app === 'github' ? <GitHubSettings /> : <>
-          <header className="flex flex-wrap items-center gap-4">
-            <AppTile app={app} size="xl" />
-            <h2 className="min-w-0 flex-1 text-xl font-semibold">{info(app).name}</h2>
-          </header>
-          {app === 'linear' ? <LinearSettings notice={linearNotice} /> : <TelegramSettings />}
-        </>}
-      </div>}
-  </div>
+function ConnectionsView({ rootLabel, linearNotice = null, workspaceId, workspaceName }: {
+  rootLabel: string; linearNotice?: 'connected' | 'error' | null; workspaceId?: string; workspaceName?: string
+}) {
+  const { apps, ownRead, app, category, href, go, openApp } = usePluginsView('connections', linearNotice)
+  if (app) return <AppPage apps={apps} app={app} category={category} rootLabel={rootLabel} href={href} go={go} linearNotice={linearNotice} />
+  return <ConnectionsList key={workspaceId} apps={apps} ownRead={ownRead} href={id => href({ app: id })} onOpen={openApp} workspaceId={workspaceId} workspaceName={workspaceName} />
 }
 
-/**
- * 插件 and 设置 › 连接 (decision 2026-10-31). The rail's page is the store:
- * every app a person can connect, as Codex's 插件. 设置 › 连接 lists only
- * what the person has connected. An app's own page (`&app=`) is shared.
- */
-export function PluginsView({ section, rootLabel, linearNotice = null, workspaceId, workspaceName }: { section: 'plugins' | 'connections'; rootLabel: string; linearNotice?: 'connected' | 'error' | null; workspaceId?: string; workspaceName?: string }) {
-  const { apps, ownRead, app, category, href, go, openApp, tab, setTab, query, setQuery } = usePluginsView(section, linearNotice)
-  if (app) return <PluginAppPage apps={apps} app={app} category={category} rootLabel={rootLabel} href={href} go={go} linearNotice={linearNotice} />
-  if (section === 'connections') return <ConnectionsList key={workspaceId} apps={apps} ownRead={ownRead} href={id => href({ app: id })} onOpen={openApp} workspaceId={workspaceId} workspaceName={workspaceName} />
-  return <Store apps={apps} ownRead={ownRead} category={category} rootLabel={rootLabel} href={href} go={go} tab={tab} setTab={setTab} query={query} setQuery={setQuery} />
-}
-
-/** The 技能 tab's list: skills.sh's all-time leaderboard, or the search, a page at a time as the list is scrolled. Shared with UI layers. */
 export function useSkillsSearch(query: string, enabled: boolean) {
   const [debouncedQuery, setDebouncedQuery] = useState(query.trim())
   const trimmedQuery = query.trim()
@@ -266,238 +219,4 @@ export function usePluginStore({ apps, ownRead, category, query, go }: { apps: C
     else void apps.connect(id)
   }
   return { catalog, sections, openSection, results, addable, stateOf, connect, keyTarget, setKeyTarget }
-}
-
-/** The rail's 插件: the 应用 store and the 技能 tab. */
-function Store({ apps, ownRead, category, rootLabel, href, go, tab, setTab, query, setQuery }: {
-  tab: PluginsTab
-  setTab: (tab: PluginsTab) => void
-  query: string
-  setQuery: (query: string) => void
-  apps: ConnectedApps
-  ownRead: OwnAppsRead
-  category: string | null
-  rootLabel: string
-  href: PluginsHref
-  go: PluginsGo
-}) {
-  const t = useTranslations('Plugins')
-  const tApps = useTranslations('Settings.integrations')
-  const common = useTranslations('Common')
-  const info = useAppInfo()
-  const [confirming, setConfirming] = useState<{ id: string; accountId: string } | null>(null)
-  const [disconnectError, setDisconnectError] = useState('')
-  const { catalog, sections, openSection, results, addable, stateOf, connect, keyTarget, setKeyTarget } = usePluginStore({ apps, ownRead, category, query, go })
-  const { skills, error, isLoading, isValidating, retry, hasMore, loadingMore, moreRef, trimmedQuery, shortQuery, queryReady } = useSkillsSearch(query, tab === 'skills')
-
-  const grid = (items: StoreEntry[]) => <ul className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
-    {items.map(item => <li key={item.id}><StoreItem item={item} state={stateOf(item.id)} apps={apps} href={href({ app: item.id, category })} onOpen={() => go({ app: item.id, category })} onConnect={() => connect(item.id)} onReplaceKey={accountId => setKeyTarget({ app: item.id, replaceAccountId: accountId })} onDisconnect={accountId => { setDisconnectError(''); setConfirming({ id: item.id, accountId }) }} /></li>)}
-  </ul>
-
-  return <div className="flex flex-col gap-6">
-    <Tabs value={tab} onValueChange={value => { if (value === 'apps' || value === 'skills') setTab(value) }}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <TabsList variant="line">
-          <TabsTrigger value="apps">{t('appsTab')}</TabsTrigger>
-          <TabsTrigger value="skills">{t('skillsTab')}</TabsTrigger>
-        </TabsList>
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-          <SearchInput
-            className="max-w-64"
-            aria-label={tab === 'skills' ? t('searchAria') : t('searchAppsAria')}
-            maxLength={100}
-            onChange={event => setQuery(event.target.value)}
-            placeholder={tab === 'skills' ? t('searchPlaceholder') : t('searchAppsPlaceholder')}
-            value={query}
-          />
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button type="button" variant="secondary" size="sm" disabled={!addable.length || Boolean(apps.pending)} />}><Plus data-icon="inline-start" />{t('add')}</DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="max-h-80 w-56">
-              <DropdownMenuGroup>
-                {addable.map(item => <DropdownMenuItem key={item.id} onClick={() => connect(item.id)}>
-                  <AppTile app={item.id} iconUrl={item.iconUrl} />{item.name}
-                </DropdownMenuItem>)}
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-      <TabsContent value="apps" className="flex flex-col gap-8 pt-4">
-        <ConnectedAppsStatus apps={apps} />
-        <OwnAppsStatus read={ownRead} />
-        {results ? results.length ? <StoreSection title={t('results')}>{grid(results)}</StoreSection> : <Empty className="min-h-48">
-          <EmptyHeader>
-            <EmptyMedia variant="icon"><Search aria-hidden="true" /></EmptyMedia>
-            <EmptyTitle>{t('noApps')}</EmptyTitle>
-          </EmptyHeader>
-          <Button type="button" variant="ghost" size="sm" onClick={() => setQuery('')}>{t('clearSearch')}</Button>
-        </Empty>
-        : openSection ? <div className="flex flex-col gap-6">
-          <PluginBreadcrumb rootLabel={rootLabel} rootHref={href()} onBack={() => go({})} name={openSection.name} />
-          {grid(openSection.items)}
-        </div>
-        : <>
-          {sections.map(item => <StoreSection key={item.id} title={item.name} more={item.items.length > item.preview ? { label: t('showAll', { name: item.name }), href: href({ category: item.id }), onOpen: () => go({ category: item.id }) } : undefined}>
-            {grid(item.items.slice(0, item.preview))}
-          </StoreSection>)}
-          {catalog.isLoading && <div role="status" aria-label={t('loadingApps')} className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
-            {Array.from({ length: SECTION_PREVIEW }, (_, index) => <div key={index} aria-hidden="true" className="flex items-center gap-3 px-3 py-2.5"><Skeleton className="size-10 rounded-lg" /><Skeleton className="h-4 w-32" /></div>)}
-          </div>}
-          {catalog.error && !catalog.data && <Empty className="min-h-32" role="alert">
-            <EmptyHeader><EmptyTitle>{t('storeLoadFailed')}</EmptyTitle></EmptyHeader>
-            <Button type="button" variant="secondary" size="sm" onClick={() => void catalog.mutate()}>{t('retry')}</Button>
-          </Empty>}
-        </>}
-      </TabsContent>
-      <TabsContent value="skills" className="flex flex-col gap-5 pt-4">
-        <h2 className="text-sm font-semibold">{trimmedQuery ? t('results') : t('leaderboard')}</h2>
-        {shortQuery ? null : error && !skills?.length ? (
-          <Empty className="min-h-48" role="alert">
-            <EmptyHeader>
-              <EmptyMedia variant="icon"><Puzzle aria-hidden="true" /></EmptyMedia>
-              <EmptyTitle>{t('loadFailed')}</EmptyTitle>
-            </EmptyHeader>
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <Button type="button" variant="secondary" size="sm" onClick={retry}>{t('retry')}</Button>
-              <Button variant="ghost" size="sm" nativeButton={false} render={<a href="https://skills.sh/" target="_blank" rel="noopener noreferrer" />}>
-                {t('browseSkills')}<ArrowUpRight data-icon="inline-end" />
-              </Button>
-            </div>
-          </Empty>
-        ) : isLoading || !queryReady ? (
-          <SettingsLoading label={t('loading')} />
-        ) : !skills?.length ? (
-          <Empty className="min-h-48">
-            <EmptyHeader>
-              <EmptyMedia variant="icon"><Search aria-hidden="true" /></EmptyMedia>
-              <EmptyTitle>{t('noResults')}</EmptyTitle>
-            </EmptyHeader>
-            <Button type="button" variant="ghost" size="sm" onClick={() => setQuery('')}>{t('clearSearch')}</Button>
-          </Empty>
-        ) : (
-          <SettingsSection id="plugin-skills">
-            {skills.map(skill => (
-              <div key={skill.id} className="relative flex items-center gap-3 py-3 pr-4 pl-5 transition-colors hover:bg-muted/50">
-                <a href={skill.url} target="_blank" rel="noopener noreferrer" aria-label={t('openSkill', { name: skill.name })} className="flex min-w-0 flex-1 items-center gap-3 outline-none after:absolute after:inset-0 focus-visible:after:ring-2 focus-visible:after:ring-ring/40 focus-visible:after:ring-inset">
-                  <IconTile size="sm" variant="elevated" aria-hidden="true"><Puzzle /></IconTile>
-                  <span className="flex min-w-0 flex-col gap-0.5">
-                    <span className="truncate text-sm font-medium">{skill.name}</span>
-                    <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                      <span className="truncate">{skill.source}</span>
-                      <span aria-hidden="true" className="size-1 shrink-0 rounded-full bg-muted-foreground/40" />
-                      <span className="shrink-0">{t('installCount', { count: skill.installs.toLocaleString() })}</span>
-                    </span>
-                  </span>
-                </a>
-                <ArrowUpRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-              </div>
-            ))}
-            {loadingMore && <div aria-hidden="true" className="flex items-center gap-3 py-3 pr-4 pl-5"><Skeleton className="size-8 rounded-lg" /><Skeleton className="h-4 w-40" /></div>}
-            {error && <div className="flex justify-center py-3"><Button type="button" variant="secondary" size="sm" disabled={isValidating} onClick={retry}>{t('retry')}</Button></div>}
-            {hasMore && <div ref={moreRef} aria-hidden="true" />}
-          </SettingsSection>
-        )}
-      </TabsContent>
-    </Tabs>
-
-    <CredentialDialog apps={apps} target={keyTarget} onClose={() => setKeyTarget(null)} />
-
-    <AlertDialog open={Boolean(confirming)} onOpenChange={open => { if (!open && !apps.pending) setConfirming(null) }}>
-      <AlertDialogContent size="sm">
-        <AlertDialogHeader>
-          <AlertDialogTitle>{tApps('disconnectTitle', { name: confirming ? info(confirming.id).name : '' })}</AlertDialogTitle>
-          <AlertDialogDescription>{tApps('disconnectConsequence', { name: confirming ? info(confirming.id).name : '' })}</AlertDialogDescription>
-        </AlertDialogHeader>
-        {disconnectError && <p role="alert" className="text-xs text-destructive-foreground">{disconnectError}</p>}
-        <AlertDialogFooter>
-          <AlertDialogCancel variant="secondary" disabled={Boolean(apps.pending)}>{common('cancel')}</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" disabled={Boolean(apps.pending)} onClick={() => {
-            if (!confirming) return
-            const name = info(confirming.id).name
-            void apps.disconnect(confirming.accountId).then(done => {
-              if (!done) { setDisconnectError(tApps('disconnectFailed')); return }
-              setConfirming(null)
-              toast.success(tApps('disconnected', { name }))
-            })
-          }}>{apps.pending ? tApps('working') : tApps('disconnect')}</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  </div>
-}
-
-/** A store section: its title, a › to the whole section when it holds more, and the grid. */
-function StoreSection({ title, more, children }: { title: string; more?: { label: string; href: string; onOpen: () => void }; children: ReactNode }) {
-  return <section className="flex flex-col gap-2">
-    <h2 className="flex items-center gap-1 text-sm font-semibold">
-      {more ? <a href={more.href} aria-label={more.label} onClick={event => { if (event.metaKey || event.ctrlKey || event.shiftKey) return; event.preventDefault(); more.onOpen() }} className="inline-flex items-center gap-0.5 rounded-md outline-none hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/40">
-        {title}<ChevronRight aria-hidden="true" className="size-4" />
-      </a> : title}
-    </h2>
-    {children}
-  </section>
-}
-
-/**
- * One store item, as Codex's: icon, name, Composio's one-line description when
- * it has one, and on the right `…` when connected or `+` when not. The item is
- * the link to the app's page; the control sits above it.
- */
-function StoreItem({ item, state, apps, href, onOpen, onConnect, onReplaceKey, onDisconnect }: { item: StoreEntry; state: StoreItemState | null; apps: ConnectedApps; href: string; onOpen: () => void; onConnect: () => void; onReplaceKey: (accountId: string) => void; onDisconnect: (accountId: string) => void }) {
-  const t = useTranslations('Plugins')
-  const tApps = useTranslations('Settings.integrations')
-  const own = isOwnApp(item.id)
-  const accounts = own ? [] : apps.accountsFor(item.id)
-  const usable = accounts.filter(account => account.status === 'ACTIVE')
-  const on = usable.some(account => account.enabled)
-  return <div className="relative flex items-center gap-3 rounded-xl py-2.5 pr-2 pl-3 transition-colors hover:bg-muted/50">
-    <a href={href} aria-label={tApps('openApp', { name: item.name })} onClick={event => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return; event.preventDefault(); onOpen() }} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring/40 focus-visible:after:ring-inset">
-      <AppTile app={item.id} iconUrl={item.iconUrl} />
-      <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-sm font-medium">{item.name}</span>
-          {/* How it connects, from Composio's auth schemes; 不支持 has no tag and no control. */}
-          {item.connect && item.connect !== 'unsupported' && <Badge variant="secondary" className="shrink-0">{t(`connectKind.${item.connect}`)}</Badge>}
-        </span>
-        {item.description && <span className="truncate text-xs text-muted-foreground">{item.description}</span>}
-      </span>
-    </a>
-    <div className="relative z-10 flex size-8 shrink-0 items-center justify-center">
-      {state === 'connected' ? <DropdownMenu>
-        <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-sm" aria-label={t('appMenu', { name: item.name })} disabled={Boolean(apps.pending)} />}><Ellipsis data-icon="inline-start" /></DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-40">
-          <DropdownMenuGroup>
-            <DropdownMenuItem onClick={onOpen}>{t('manage')}</DropdownMenuItem>
-            {usable.length > 0 && <DropdownMenuItem onClick={() => {
-              void apps.setEnabled(usable.filter(account => account.enabled === on).map(account => account.id), !on).then(ok => {
-                if (ok && on) toast.success(tApps('turnedOff', { name: item.name }))
-              })
-            }}>{on ? tApps('turnOff') : tApps('turnOn')}</DropdownMenuItem>}
-            {item.connect === 'credentials' && accounts.length === 1 && <DropdownMenuItem disabled={!apps.canEnterKey} onClick={() => onReplaceKey(accounts[0].id)}>{t('key.replace')}</DropdownMenuItem>}
-            {/* Several accounts: each is disconnected on the app's page. */}
-            {accounts.length === 1 && <DropdownMenuItem variant="destructive" onClick={() => onDisconnect(accounts[0].id)}>{tApps('disconnect')}</DropdownMenuItem>}
-          </DropdownMenuGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      : state === 'add' ? <Button type="button" variant="ghost" size="icon-sm" aria-label={t('connectApp', { name: item.name })} disabled={Boolean(apps.pending)} onClick={onConnect}>
-        <Plus data-icon="inline-start" />
-      </Button>
-      : state === null ? <Skeleton aria-hidden="true" data-slot="app-row-pending" className="size-7 rounded-md" /> : null}
-    </div>
-    {/* Not available here (not set up on this server, or its status could not be read): say so instead of an empty slot. */}
-    {state === 'unavailable' && <span className="shrink-0 text-xs text-muted-foreground">{t('unavailable')}</span>}
-  </div>
-}
-
-/** The rail's 插件 page: the store in its own scroll column. */
-export function PluginsPage() {
-  const t = useTranslations('Plugins')
-  const params = useSearchParams()
-  const scroll = useViewScroll<HTMLDivElement>(`plugins:${params.get("app") ?? ''}:${params.get("category") ?? ''}`)
-  return <div ref={scroll} className="min-h-0 flex-1 overflow-y-auto">
-    <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6">
-      <h1 className="sr-only">{t('title')}</h1>
-      <PluginsView section="plugins" rootLabel={t('title')} />
-    </main>
-  </div>
 }

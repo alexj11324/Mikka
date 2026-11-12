@@ -18,7 +18,7 @@ RUN --mount=type=cache,id=mikka-pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --store-dir /pnpm/store
 ARG MIKKA_BUILD_REVISION
 ENV MIKKA_BUILD_REVISION=${MIKKA_BUILD_REVISION}
-RUN pnpm generate:agent-ui && pnpm build:app
+RUN pnpm generate:agent-ui && pnpm build:server
 
 FROM node:24-bookworm-slim AS runtime
 ARG MIKKA_BUILD_REVISION

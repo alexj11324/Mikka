@@ -1,0 +1,9 @@
+# Cloudflare Eve host
+
+The Node 24 image starts the upstream Eve service compiled from `apps/eve`. Its agent configuration selects the official custom World interface when `MIKKA_EVE_WORKFLOW_WORLD=cloudflare`. The shared host performs verified queue deliveries and handles native Eve sessions. Task sandbox ownership and reclamation belong to the Sandbox Provider.
+
+Build with the repository's normal frozen dependencies and `NITRO_PRESET=node-server MIKKA_EVE_WORKFLOW_WORLD=cloudflare pnpm build:app`. Bind a source SHA, UI SHA and deployment ID, then run `node scripts/package-cf-eve-host.mjs`. The launcher verifies the build identity before executing the compiled Nitro entrypoint. The public validation workflow builds a portable image and exercises the compiled host. Private release automation supplies the company workload mappings, credentials, immutable image digest and acceptance records.
+
+The named service `EveService` accepts the native protocol at `https://eve.internal/eve/v1/*`. The private, release-pinned `EveWorkflowDelivery` only accepts signed POST deliveries to `/.well-known/workflow/v1/flow`. Node verifies the original body and revision. The default Worker has no HTTP routes. Configure the authority separately through the private `WORLD_SERVICE` binding and `WORLD_QUEUE_PUBLIC_KEY`. A per-Container capability and an exact-host TLS intercept protect the private Node transport. Business workflows use their own compartment and Node entrypoint.
+
+Use `EVE_HOST_POLICY=on-demand` for the shared event-driven service. After the SDK observes an idle host with no active requests, it can sleep. A queue delivery or Eve request wakes that immutable release. A temporary `shared-warm` qualification lease can retain bounded standby and crash recovery. One task finishing has no authority to stop the shared service.

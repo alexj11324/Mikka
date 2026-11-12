@@ -156,7 +156,7 @@ stub('../mcp/artifacts.ts', { submit: () => {}, oauthSubmitter: () => {}, runSub
 stub('../../app/actions/issues.ts', { getIssue: () => {}, saveIssue: () => {} })
 stub('../../app/actions/issue-metadata.ts', { updateIssueMetadata: () => {} })
 stub('../../app/actions/issue-operations.ts', { updateIssueRelation: () => {} })
-stub('../../app/actions/projects.ts', { listProjects: () => {}, moveIssueToProject: () => {} })
+stub('../../app/actions/projects.ts', { listProjects: () => {}, listWorkspaceProjects: () => {}, moveIssueToProject: () => {} })
 // Production resolves next/server through this compatibility layer and gives
 // every tool callback a request-owned after() queue.
 mock.module('next/server', { namedExports: apiServer })

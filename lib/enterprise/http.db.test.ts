@@ -1230,7 +1230,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
       assert.equal(personal.status, 200, 'the registered mobile detail route reads this plain session Personal task without a selection cookie')
       const personalBody = await personal.json()
       assert.equal(personalBody.task.id, personalTaskId)
-      assert.deepEqual(personalBody.live, { workspaceId: personalWorkspaceId })
+      assert.deepEqual(personalBody.live, { workspaceId: personalWorkspaceId, factoryActivityVersion: 1 })
       const workspaceCookie = `mikka-workspace=${workspaceId}`
       const cookiePersonal = await detailCall(plainToken, personalTaskId, { cookie: workspaceCookie })
       assert.equal(cookiePersonal.status, 200, 'an unrelated enforced-SSO Workspace cookie must not gate this Personal task')
@@ -1245,7 +1245,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
       assert.equal(admitted.status, 200)
       const admittedBody = await admitted.json()
       assert.equal(admittedBody.task.id, organizationTaskId)
-      assert.deepEqual(admittedBody.live, { workspaceId })
+      assert.deepEqual(admittedBody.live, { workspaceId, factoryActivityVersion: 1 })
       for (const selected of [workspaceId, 'not-a-workspace', randomUUID()]) {
         const denied = await detailCall(plainToken, personalTaskId, { cookie: workspaceCookie, 'x-mikka-workspace-id': selected })
         assert.equal(denied.status, 404, 'an explicit inaccessible or invalid Workspace never falls back to the Personal task')
@@ -1335,7 +1335,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
       const personal = await detailCall(owner.token, personalTaskId)
       assert.equal(personal.status, 200)
       const personalBody = await personal.json()
-      assert.equal(personalBody.task.id, personalTaskId); assert.deepEqual(personalBody.live, { workspaceId: personalWorkspaceId })
+      assert.equal(personalBody.task.id, personalTaskId); assert.deepEqual(personalBody.live, { workspaceId: personalWorkspaceId, factoryActivityVersion: 1 })
       const before = await successState(), input = { action: 'break-glass', reason }
       for (const token of [nonOwner.token, oldOwner.token]) {
         await deniedIdentity(await identityCall(token, input))
@@ -1360,7 +1360,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
       const task = await detailCall(owner.token, taskId)
       assert.equal(task.status, 200)
       const taskBody = await task.json()
-      assert.equal(taskBody.task.id, taskId); assert.deepEqual(taskBody.live, { workspaceId })
+      assert.equal(taskBody.task.id, taskId); assert.deepEqual(taskBody.live, { workspaceId, factoryActivityVersion: 1 })
       await deniedIdentity(await identityCall(otherOwnerSession.token))
       const unaffected = await detailCall(owner.token, personalTaskId)
       assert.equal(unaffected.status, 200); assert.deepEqual(await unaffected.json(), personalBody)

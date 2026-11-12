@@ -31,7 +31,7 @@ export interface AgentProfileDispatchRequest {
   deviceId?: string
   agentId?: string
   withoutCloud?: boolean
-  cloudPurpose?: 'task' | 'desktop'
+  cloudPurpose?: import('../cloud-template-models').CloudModelPurpose
   /** Only the legacy path uses this; real profile candidates can cross harnesses. */
   defaultHarness?: OrderHarness
   /** Host-only continuation of a default/legacy thread; never reselect its role. */

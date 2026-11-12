@@ -40,6 +40,7 @@ export interface OrderRow extends OrderEntry {
 }
 
 export interface OrderView {
+  sponsoredTasksAvailable?: true
   /** Actual dispatch rank and availability, from the same planner as new runs. */
   dispatchOrder?: SchedulingNode[]
   location: RunLocation

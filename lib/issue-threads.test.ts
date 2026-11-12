@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { agentStretches, canReadThread, projectIssueThreads, taskFreeThreadMembers, threadName, threadQuestionRunId, threadQuestionView, threadTime, withRunChain } from './issue-threads'
+import { agentStretches, taskConversationRoots, canReadThread, projectIssueThreads, taskFreeThreadMembers, threadName, threadQuestionRunId, threadQuestionView, threadTime, withRunChain } from './issue-threads'
 import type { RunChain } from './run-chain'
 import type { RunFailure } from '@mikka/protocol/run-failure'
 
@@ -224,4 +224,22 @@ test('agentStretches also splits where the custom Agent 配置 changes (2026-11-
   const t = (id: string, at: number, profile: string | null) => ({ id, createdAt: new Date(at), detail: { harness: 'codex', profile: profile ? { id: profile } : null } })
   const out = agentStretches([t('a', 1, null), t('b', 2, 'review'), t('c', 3, 'review'), t('d', 4, 'docs'), t('e', 5, null)])
   assert.deepEqual(out.map(s => [s.profile, s.ids]), [[null, ['a']], ['review', ['b', 'c']], ['docs', ['d']], [null, ['e']]])
+})
+
+test('the newest visible conversational continuation owns replies even after a private run or a Factory check', () => {
+  const visible = new Set(['teammate', 'viewer'])
+  const [first] = projectIssueThreads([make('first', 'viewer')], 'issue', 'viewer', visible)
+  const [later] = projectIssueThreads([make('second', 'viewer')], 'issue', 'viewer', visible)
+  const [redacted] = projectIssueThreads([make('other')], 'issue', 'viewer', visible)
+  first.latestRunId = 'resumed'
+  first.attempts.push({ ...first.attempts[0], runId: 'resumed', createdAt: new Date('2026-01-03') })
+  later.createdAt = new Date('2026-01-02')
+  later.attempts[0].createdAt = later.createdAt
+  const review = { ...later, id: 'review', kind: 'acceptance', createdAt: new Date('2026-01-04') }
+  for (const list of [[redacted, later, review, first], [first, review, later, redacted]]) {
+    const { readable, reply } = taskConversationRoots(list)
+    assert.deepEqual(readable.map(run => run.id), ['first', 'second', 'review'])
+    assert.equal(reply?.latestRunId, 'resumed')
+  }
+  assert.equal(taskConversationRoots([review, redacted]).reply, null)
 })

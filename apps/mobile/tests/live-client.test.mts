@@ -197,6 +197,7 @@ test('screens listen to the keys the web uses, on the right channel', () => {
   // 受阻 follows the person's runs too, on their home channel (lib/task-blocked.ts).
   assert.deepEqual(tasksLive(home, team).refs.map(ref => `${ref.kind}:${ref.id}`), [`issue_list:${team}`, `issue_list:${home}`, `task_run_list:${home}`])
   assert.deepEqual(tasksLive(home, home).refs.map(ref => `${ref.kind}:${ref.id}`), [`issue_list:${home}`, `task_run_list:${home}`], 'one issue key when the open workspace is the home')
+  assert.deepEqual(tasksLive(home, team, [bot]).refs.at(-1), { kind: 'factory_issue', id: bot, scope: team })
   const offline = threadsLive({ threads: [], devices: [{ id: bot, name: 'Mac', kind: 'laptop', online: false }] }, home)
   assert.deepEqual(offline.refs.map(ref => `${ref.kind}:${ref.scope}`), [`thread_list:${home}`, `device_list:${home}`])
   assert.equal(offline.presence, undefined)

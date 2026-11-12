@@ -1,4 +1,5 @@
 import { posthogConfig } from '@/lib/posthog-config'
+import { deploymentStage } from '../deployment-stage.mjs'
 
 // Settings for the server's PostHog traces (docs/operations/tracing.md). Read once
 // when instrumentation.ts registers tracing; nothing here touches the network.
@@ -11,8 +12,8 @@ export type TraceEnvironment = 'production' | 'preview' | 'dev'
 type Env = Record<string, string | undefined>
 
 export function traceEnvironment(env: Env = process.env): TraceEnvironment {
-  if (env.VERCEL_ENV === 'production') return 'production'
-  if (env.VERCEL_ENV === 'preview') return 'preview'
+  const stage = deploymentStage(env)
+  if (stage === 'production' || stage === 'preview') return stage
   return 'dev'
 }
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 /** Normal production sign-in and metadata reads only. No task, model or Settings writes. */
+import { readRendererActions } from '../../lib/renderer-actions.mjs'
 import { createHash } from 'node:crypto'
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
@@ -153,7 +154,7 @@ export function requestAllowed(url, method) {
   if (['/mikka/api/version', '/mikka/api/auth/get-session', '/mikka/api/bots', '/mikka/api/settings/workspace-bots',
     '/mikka/api/mobile/threads', '/mikka/en'].includes(path)) return !search
   if (path === '/mikka/en/settings') return search === '?section=models'
-  if (path === '/mikka/renderer-manifest.json') return webDeploymentPin(url) !== null
+  if (['/mikka/renderer-manifest.json', '/mikka/renderer-actions.json'].includes(path)) return webDeploymentPin(url) !== null
   if (['/mikka/api/settings/model-order', '/mikka/api/settings/api-keys', '/mikka/api/subscriptions'].includes(path))
     return [...url.searchParams.keys()].length === 1 && url.searchParams.has('workspace') && uuid(url.searchParams.get('workspace'))
   return publicChunk(url.toString()) !== null
@@ -192,7 +193,7 @@ export async function discoverReadinessActions(request) {
     try {
       check(vitePins.size === 1, 'response_invalid')
       const [pin] = vitePins
-      const response = await request('/mikka/renderer-manifest.json' + (pin ? '?dpl=' + encodeURIComponent(pin) : ''))
+      const response = await readRendererActions(request, '/mikka', pin)
       check(response.ok && response.headers.get('content-type')?.includes('application/json'), 'http_refused')
       const text = await response.text()
       check(Buffer.byteLength(text) <= 8_000_000, 'response_invalid')

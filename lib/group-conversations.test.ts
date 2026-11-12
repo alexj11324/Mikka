@@ -139,6 +139,18 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
     assert.equal((await run({ id, resource: 'members', method: 'DELETE', body: JSON.stringify({ memberType: 'user', memberId: 'owner' }) })).status, 422)
     assert.equal((await run({ id, resource: 'members', method: 'POST', body: JSON.stringify({ memberType: 'user', memberId: 'member' }) })).status, 200)
     assert.equal((await run({ id, resource: 'messages', userId: 'member' })).status, 200)
+    const changeAsMember = (method: 'POST' | 'DELETE', memberType: 'user' | 'agent' | 'bot', memberId: string) =>
+      run({ id, resource: 'members', method, userId: 'member', body: JSON.stringify({ memberType, memberId }) })
+    assert.equal((await changeAsMember('DELETE', 'user', 'owner')).status, 403)
+    assert.equal((await changeAsMember('DELETE', 'agent', ownAgent)).status, 403)
+    assert.equal((await changeAsMember('DELETE', 'bot', 'member')).status, 403)
+    assert.equal((await changeAsMember('DELETE', 'user', 'member')).status, 200)
+    assert.equal((await run({ id, resource: 'messages', userId: 'member' })).status, 404)
+    assert.equal(((await run({ userId: 'member' })).body as typeof list).conversations.length, 0)
+    assert.equal((await changeAsMember('POST', 'user', 'member')).status, 404)
+    assert.equal((await changeAsMember('DELETE', 'user', 'member')).status, 404)
+    assert.equal((await run({ id, resource: 'members', method: 'POST', body: JSON.stringify({ memberType: 'user', memberId: 'member' }) })).status, 200)
+    assert.equal((await run({ id, resource: 'messages', userId: 'member' })).status, 200)
     // Removal commits while a send waits on the conversation lock: sender must recheck.
     const removal = await scoped.connect()
     await removal.query('BEGIN')

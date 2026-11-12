@@ -18,6 +18,7 @@ mock.module(new URL('../lib/tracing.ts', import.meta.url).href, { namedExports: 
 const { api, apiConnection } = await import('../lib/api.ts')
 const { apiCache } = await import('../lib/api-cache.ts')
 const { presenceScope } = await import('../lib/presence-scope.ts')
+const { readPresentedTasks, readPresentedTask } = await import('../features/tasks/model/task-presentation-read.ts')
 
 test('a server switch while keychain reads cannot send the old cookie to the new server or sign it out', async t => {
   const requests: { url: string; cookie: string | null; redirect?: string }[] = []
@@ -59,4 +60,34 @@ test('an old explicit server connection cannot acquire the current server home p
     { url: `${first.server.url}/api/mobile/threads`, scope: null },
     { url: `${second.server.url}/api/mobile/threads`, scope: token },
   ])
+})
+
+test('the mobile list and detail use the same authorized Factory state with one POST per 200 distinct tasks', async t => {
+  const workspaceId = '81818181-0000-4000-8000-000000000001'
+  const tasks = Array.from({ length: 201 }, (_, index) => ({ id: String(index), title: String(index), state: 'done', status: 'done' }))
+  const projection = { version: 1, state: 'waiting', reason: 'pr_review', group: 'pending', blockedBy: null, primaryStatus: 'review' }
+  const batches: string[][] = []
+  t.mock.method(globalThis, 'fetch', async (url: string, init: RequestInit) => {
+    if (url.endsWith('/api/mobile/task-presentations')) {
+      assert.equal(init.method, 'POST')
+      const input = JSON.parse(String(init.body)) as { workspaceId: string; issueIds: string[] }
+      assert.equal(input.workspaceId, workspaceId)
+      batches.push(input.issueIds)
+      return Response.json({ version: 1, workspaceId, items: Object.fromEntries(input.issueIds.filter(id => id !== '200').map(id => [id, projection])) })
+    }
+    return Response.json(url.endsWith('/tasks') ? { workspaceId, tasks } : { task: tasks[0], activity: [], live: { workspaceId } })
+  })
+  const list = await readPresentedTasks('/api/mobile/tasks')
+  const detail = await readPresentedTask('/api/mobile/tasks/0')
+  assert.equal(list.tasks.length, 200, 'a task omitted by the authorized projection disappears')
+  assert.deepEqual(list.tasks[0], detail.task)
+  assert.deepEqual([detail.task.state, detail.task.reason, detail.task.status], ['waiting', 'pr_review', 'review'])
+  assert.deepEqual(batches.map(batch => batch.length), [200, 1, 1])
+})
+
+test('a tenant mismatch in the second mobile response rejects the read', async t => {
+  t.mock.method(globalThis, 'fetch', async (url: string) => Response.json(url.endsWith('/tasks')
+    ? { workspaceId: 'a', tasks: [{ id: '1' }] }
+    : { version: 1, workspaceId: 'b', items: { '1': { state: 'done' } } }))
+  await assert.rejects(readPresentedTasks('/api/mobile/tasks'), /taskPresentationScopeMismatch/)
 })

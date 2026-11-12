@@ -94,6 +94,32 @@ test('workspace transactions reuse one checkout, roll back savepoints, and relea
       assert.deepEqual(await rows(), ['after effect', 'before effect', 'nested', 'outer'])
     })
 
+    await t.test('a committed live notification starts independently while the workspace writer still holds its transaction', async () => {
+      const { scheduleLive } = await import('./live/notify')
+      const { workspaceTransactionKey } = await import('./workspace-db')
+      const entered = Promise.withResolvers<object | null>()
+      const completed = Promise.withResolvers<string>()
+      let writerTransaction: string | undefined
+      let borrowed: object | null = null
+      await workspaceDb.transaction(async writer => {
+        writerTransaction = (await writer.execute<{ id: string }>(sql`SELECT txid_current()::text AS id`)).rows[0].id
+        scheduleLive(async () => {
+          entered.resolve(workspaceTransactionKey())
+          try {
+            const id = await workspaceDb.transaction(async job =>
+              (await job.execute<{ id: string }>(sql`SELECT txid_current()::text AS id`)).rows[0].id)
+            completed.resolve(id)
+          } catch (error) { completed.reject(error) }
+        })
+        borrowed = await entered.promise
+        // A regressed job can finish its nested query before the writer releases
+        // the client, so the assertion reports the borrowed transaction cleanly.
+        if (borrowed) await completed.promise
+      })
+      assert.equal(borrowed, null, 'live work must never borrow the still-active writer transaction')
+      assert.notEqual(await completed.promise, writerTransaction)
+    })
+
     await t.test('a delayed callback cannot read through a released client currently borrowed by another transaction', async () => {
       let delayed!: () => Promise<string[]>
       await workspaceDb.transaction(async () => {

@@ -3,7 +3,7 @@ import { useTranslations } from 'next-intl'
 
 import { useViewState } from '@/lib/hooks/view-state'
 import { useAgentCopy } from '@/hooks/use-agent-copy'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ArrowDownAZ, ArrowUpAZ, Box, Plus } from 'lucide-react'
 import type { listIssues } from '@/app/actions/issues'
 import { Button } from '@/components/ui/button'
@@ -14,7 +14,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import dynamic from 'next/dynamic'
 
 import { PROJECT_STATUSES, PROJECT_ICON_TINTS, type Project } from './project-properties'
-import { ProjectPropertyControl } from './project-property-controls'
+import type { WorkspaceSettings } from '@/lib/workspace-access'
+import { projectDirectory, ProjectPropertyControl } from './project-property-controls'
 import { useProjectUpdate } from './use-project-update'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { usePresence } from '@/lib/use-presence'
@@ -27,10 +28,11 @@ const ProjectDetail = dynamic(() => import('./project-detail').then(module => mo
   loading: () => { const agentCopy = useAgentCopy(); return (<div role="status" aria-label={agentCopy.loadingProjectDetails} className="flex flex-col gap-6 p-6"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-40 w-full" /></div>) },
 })
 
-export function ProjectWorkspace({ projects, loading, error, projectId, team, initialTeamId, issues, userName, onSelect, onOpenTeam, onOpenIssue, onCreateIssue, onUpdated }: {
-  projects: Project[]; loading: boolean; error: boolean; projectId: string | null; team?: string; initialTeamId?: string; issues: Awaited<ReturnType<typeof listIssues>>; userName: string; onSelect: (id: string | null) => void; onOpenTeam: () => void; onOpenIssue: (id: string) => boolean; onCreateIssue: () => void; onUpdated: () => void
+export function ProjectWorkspace({ projects, loading, error, projectId, team, initialTeamId, issues, workspace, onSelect, onOpenTeam, onOpenIssue, onCreateIssue, onUpdated }: {
+  projects: Project[]; loading: boolean; error: boolean; projectId: string | null; team?: string; initialTeamId?: string; issues: Awaited<ReturnType<typeof listIssues>>; workspace?: WorkspaceSettings; onSelect: (id: string | null) => void; onOpenTeam: () => void; onOpenIssue: (id: string) => boolean; onCreateIssue: () => void; onUpdated: () => void
 }) {
   const i18nText = useTranslations();
+  const directory = useMemo(() => projectDirectory(workspace), [workspace])
   const [creating, setCreating] = useState(false)
   const createDialog = usePresence(creating)
   const { update, pending, error: saveError } = useProjectUpdate(onUpdated)
@@ -41,7 +43,7 @@ export function ProjectWorkspace({ projects, loading, error, projectId, team, in
   const filtered = projects.filter(item => (status === 'all' || item.status === status) && item.name.toLowerCase().includes(query.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name, 'zh-CN') * (ascending ? 1 : -1))
   if (error) return <Empty><EmptyHeader><EmptyTitle>{i18nText("Projects.loadErrorTitle")}</EmptyTitle></EmptyHeader><Button variant="outline" onClick={onUpdated}>{i18nText("Projects.reload")}</Button></Empty>
   if (loading) return <div role="status" aria-label={i18nText("Projects.loading")} className="flex flex-col gap-4 p-6"><Skeleton className="h-8 w-48" /><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>
-  if (project) return <ProjectDetail key={project.id} project={project} projects={projects} issues={issues} userName={userName} onBack={() => onSelect(null)} onOpenTeam={onOpenTeam} onOpenIssue={onOpenIssue} onCreateIssue={onCreateIssue} onUpdated={onUpdated} />
+  if (project) return <ProjectDetail key={project.id} project={project} projects={projects} issues={issues} directory={directory} onBack={() => onSelect(null)} onOpenTeam={onOpenTeam} onOpenIssue={onOpenIssue} onCreateIssue={onCreateIssue} onUpdated={onUpdated} />
   return <div className="flex min-w-0 flex-1 flex-col">
     <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><h1 className="text-sm font-medium">{team ? i18nText("FeatureCopy.c_4099b448", { value0: (team) }) : i18nText("Projects.title")}</h1><Button size="sm" variant="ghost" onClick={() => setCreating(true)}><Plus data-icon="inline-start" />{i18nText("Projects.form.createTitle")}</Button></div>
     <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"><span className="text-sm text-muted-foreground">{i18nText("FeatureCopy.c_e1b94a93")} {filtered.length}</span><div className="flex items-center gap-2"><SearchInput aria-label={i18nText("Projects.search")} placeholder={i18nText("Projects.searchPlaceholder")} className="w-40 sm:w-48" value={query} onChange={event => setQuery(event.target.value)} /><NativeSelect aria-label={i18nText("Projects.filterStatus")} value={status} onChange={event => setStatus(event.target.value)}><NativeSelectOption value="all">{i18nText("Projects.allStatuses")}</NativeSelectOption>{PROJECT_STATUSES.map(item => <NativeSelectOption key={item.value} value={item.value}>{({ backlog: i18nText("Projects.status.backlog"), planned: i18nText("FeatureCopy.c_0e4cd337"), started: i18nText("Projects.status.started"), paused: i18nText("Projects.status.paused"), completed: i18nText("Projects.status.completed"), canceled: i18nText("Projects.status.canceled") } as const)[item.value]}</NativeSelectOption>)}</NativeSelect></div></div>
@@ -50,8 +52,8 @@ export function ProjectWorkspace({ projects, loading, error, projectId, team, in
     {filtered.length ? <div className="px-3"><Table><TableHeader><TableRow><TableHead className="w-2/5"><Button variant="ghost" size="sm" onClick={() => setAscending(value => !value)}>{i18nText("Settings.workspaceForm.name")}{ascending ? <ArrowDownAZ data-icon="inline-end" /> : <ArrowUpAZ data-icon="inline-end" />}</Button></TableHead><TableHead>{i18nText("Projects.fields.health")}</TableHead><TableHead>{i18nText("Projects.fields.priority")}</TableHead><TableHead>{i18nText("Projects.fields.lead")}</TableHead><TableHead>{i18nText("Projects.fields.targetDate")}</TableHead><TableHead className="text-right">{i18nText("Projects.detail.issues")}</TableHead><TableHead>{i18nText("Projects.fields.status")}</TableHead></TableRow></TableHeader><TableBody>{filtered.map(item => {
       const linked = issues.filter(issue => item.issueIds.includes(issue.id))
       const completed = linked.filter(issue => issue.status === 'done').length
-      return <TableRow key={item.id}><TableCell><Button variant="ghost" className="h-auto w-full justify-start py-3 text-left whitespace-normal" onClick={() => onSelect(item.id)}><Box data-icon="inline-start" className={PROJECT_ICON_TINTS[item.properties.color]} /><span className="line-clamp-2">{item.name}</span></Button></TableCell><TableCell><ProjectPropertyControl field="health" value={item} userName={userName} disabled={pending} plain onChange={changes => void update(item, changes)} /></TableCell>{(['priority', 'lead', 'targetDate'] as const).map(field => <TableCell key={field}><ProjectPropertyControl field={field} value={item} userName={userName} disabled={pending} plain onChange={changes => void update(item, changes)} /></TableCell>)}<TableCell className="text-right">{linked.length}</TableCell><TableCell><div className="inline-flex items-center gap-2"><ProjectPropertyControl field="status" value={item} userName={userName} disabled={pending} plain onChange={changes => void update(item, changes)} /><span className="text-xs text-muted-foreground">{linked.length ? Math.round(completed / linked.length * 100) : 0}%</span></div></TableCell></TableRow>
+      return <TableRow key={item.id}><TableCell><Button variant="ghost" className="h-auto w-full justify-start py-3 text-left whitespace-normal" onClick={() => onSelect(item.id)}><Box data-icon="inline-start" className={PROJECT_ICON_TINTS[item.properties.color]} /><span className="line-clamp-2">{item.name}</span></Button></TableCell><TableCell><ProjectPropertyControl field="health" value={item} directory={directory} disabled={pending} plain onChange={changes => void update(item, changes)} /></TableCell>{(['priority', 'lead', 'targetDate'] as const).map(field => <TableCell key={field}><ProjectPropertyControl field={field} projectId={item.id} value={item} directory={directory} disabled={pending} plain onChange={changes => void update(item, changes)} /></TableCell>)}<TableCell className="text-right">{linked.length}</TableCell><TableCell><div className="inline-flex items-center gap-2"><ProjectPropertyControl field="status" value={item} directory={directory} disabled={pending} plain onChange={changes => void update(item, changes)} /><span className="text-xs text-muted-foreground">{linked.length ? Math.round(completed / linked.length * 100) : 0}%</span></div></TableCell></TableRow>
     })}</TableBody></Table></div> : <Empty className="min-h-80"><EmptyHeader><EmptyMedia variant="icon"><Box /></EmptyMedia><EmptyTitle>{query || status !== 'all' ? i18nText("Projects.noMatchTitle") : i18nText("Projects.emptyTitle")}</EmptyTitle></EmptyHeader><EmptyContent><Button size="sm" onClick={() => setCreating(true)}><Plus data-icon="inline-start" />{i18nText("Projects.form.createTitle")}</Button></EmptyContent></Empty>}
-    {createDialog.value && <ProjectForm open={createDialog.open} onOpenChangeComplete={createDialog.onOpenChangeComplete} initialTeamId={initialTeamId} projects={projects} userName={userName} onClose={() => setCreating(false)} onSaved={saved => { setCreating(false); onUpdated(); onSelect(saved.id) }} />}
+    {createDialog.value && <ProjectForm open={createDialog.open} onOpenChangeComplete={createDialog.onOpenChangeComplete} initialTeamId={initialTeamId} projects={projects} directory={directory} onClose={() => setCreating(false)} onSaved={saved => { setCreating(false); onUpdated(); onSelect(saved.id) }} />}
   </div>
 }

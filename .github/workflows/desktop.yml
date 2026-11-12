@@ -57,7 +57,7 @@ jobs:
       - run: pnpm --filter @mikka/desktop typecheck
       - run: pnpm --filter @mikka/desktop lint
       - run: pnpm --filter @mikka/desktop test
-      - run: pnpm --filter @mikka/desktop build
+      - run: pnpm --filter @mikka/desktop build --public-test-fixture
       - run: pnpm --filter @mikka/protocol typecheck
       - run: pnpm test:platform
       - run: pnpm test:idle-budget
@@ -135,7 +135,7 @@ jobs:
       - name: Prepare the isolated E2E schema
         run: pnpm test:e2e:setup
       - name: Build the production web backend
-        run: pnpm generate:agent-ui && pnpm build:app
+        run: pnpm generate:agent-ui && pnpm build:app --public-test-fixture
         env:
           NODE_OPTIONS: --max-old-space-size=6144
       - name: Archive the compiled Linux backend
@@ -146,7 +146,7 @@ jobs:
           path: /tmp/desktop-api-build.tar.gz
           retention-days: 2
       - name: Build the dev Electron shell
-        run: pnpm --filter @mikka/desktop build
+        run: pnpm --filter @mikka/desktop build --public-test-fixture
         env:
           MIKKA_DESKTOP_FLAVOR: dev
       - name: Isolated Electron authentication and runtime acceptance
@@ -263,7 +263,7 @@ jobs:
       - name: Build the production API for the native ARM64 runtime
         # Traced runtime dependencies may contain platform-specific binaries.
         # Compile on the Mac; the Linux artifact is a separate auditable build.
-        run: pnpm generate:agent-ui && pnpm build:app
+        run: pnpm generate:agent-ui && pnpm build:app --public-test-fixture
         env:
           NODE_OPTIONS: --max-old-space-size=6144
       - name: Package an inspector-enabled harness input

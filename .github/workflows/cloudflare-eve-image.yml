@@ -1,0 +1,60 @@
+name: Cloudflare Eve image
+on:
+  pull_request:
+    paths:
+      - 'apps/eve/**'
+      - 'lib/eve/**'
+      - 'packages/eve-cloudflare-world/**'
+      - 'cloudflare/eve-runtime/**'
+      - 'scripts/build-eve.mjs'
+      - 'scripts/package-cf-eve-host.mjs'
+      - 'scripts/build-cloudflare-eve-image.sh'
+      - 'scripts/compile-cloudflare-eve-host.sh'
+      - 'patches/@fantasticfour*'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/cloudflare-eve-image.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/eve/**'
+      - 'lib/eve/**'
+      - 'packages/eve-cloudflare-world/**'
+      - 'cloudflare/eve-runtime/**'
+      - 'scripts/build-eve.mjs'
+      - 'scripts/package-cf-eve-host.mjs'
+      - 'scripts/build-cloudflare-eve-image.sh'
+      - 'scripts/compile-cloudflare-eve-host.sh'
+      - 'patches/@fantasticfour*'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/cloudflare-eve-image.yml'
+permissions:
+  contents: read
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      NITRO_PRESET: node-server
+      MIKKA_EVE_WORKFLOW_WORLD: cloudflare
+      NODE_OPTIONS: --max-old-space-size=6144
+      MIKKA_BUILD_REVISION: ${{ github.sha }}
+      # A public checkout builds its server authentication and status resources.
+      # Only the private release supplies both an official UI checkout and its SHA.
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/pnpm-install
+        with:
+          skip-electron: 'true'
+      - name: Bind the existing release format
+        run: echo "MIKKA_DEPLOYMENT_ID=$(node lib/deployment-id.mjs)" >> "$GITHUB_ENV"
+      - name: Compile the official Eve runtime and shared product resources offline
+        run: bash scripts/build-cloudflare-eve-image.sh
+      - name: Build the portable Node 24 image
+        run: docker build -f cloudflare/eve-runtime/Dockerfile -t mikka-eve-qualification .
+      - name: Start the compiled host and require the native World
+        run: |
+          docker run --rm --network none \
+            --mount "type=bind,src=$PWD/cloudflare/eve-runtime/test/compiled-host.mjs,dst=/acceptance.mjs,readonly" \
+            mikka-eve-qualification node /acceptance.mjs

@@ -8,9 +8,9 @@ import { completedCiSuite } from './ci-suite-event'
 export const GITHUB_WEBHOOK_MAX_BYTES = 1_000_000
 const noStore = { 'Cache-Control': 'no-store' }
 
-export async function readGitHubWebhookBody(request: Request): Promise<string | null> {
+export async function readGitHubWebhookBody(request: Request, limit = GITHUB_WEBHOOK_MAX_BYTES): Promise<string | null> {
   const declared = request.headers.get('content-length')
-  if (declared && (!/^\d+$/.test(declared) || Number(declared) > GITHUB_WEBHOOK_MAX_BYTES)) return null
+  if (declared && (!/^\d+$/.test(declared) || Number(declared) > limit)) return null
   if (!request.body) return ''
   const reader = request.body.getReader(), chunks: Uint8Array[] = []
   let length = 0
@@ -18,7 +18,7 @@ export async function readGitHubWebhookBody(request: Request): Promise<string | 
     for (;;) {
       const next = await reader.read(); if (next.done) break
       length += next.value.byteLength
-      if (length > GITHUB_WEBHOOK_MAX_BYTES) { await reader.cancel(); return null }
+      if (length > limit) { await reader.cancel(); return null }
       chunks.push(next.value)
     }
   } finally { reader.releaseLock() }

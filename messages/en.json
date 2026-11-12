@@ -1,7 +1,33 @@
 {
+  "ServerStatus": {
+    "title": "Mikka server",
+    "address": "Server address",
+    "version": "Version",
+    "web": "Open Mikka Web",
+    "desktop": "Download Mikka Desktop",
+    "iosUnavailable": "To use the iOS app, enable its sign-in origin on this server.",
+    "ios": "In Mikka for iOS, choose this address on the sign-in screen.",
+    "create": "Create the first account",
+    "ready": "Ready",
+    "unavailable": "Unavailable",
+    "configuration": "Configuration",
+    "database": "Database",
+    "authentication": "Authentication"
+  },
   "MobileTaskSchedule": {
     "daily": "Every day at {time}",
     "interval": "Every {minutes, plural, one {1 minute} other {# minutes}}"
+  },
+  "TaskAttachments": {
+    "title": "Attachments",
+    "add": "Add file",
+    "empty": "No attachments",
+    "remove": "Remove {name}",
+    "failed": "Could not save the attachment change.",
+    "downloadFailed": "Could not download the attachment.",
+    "readFailed": "Could not load attachments.",
+    "size": "Choose a nonempty file up to 3 MiB.",
+    "limit": "Up to 10 files per task."
   },
   "Common": {
     "privacyPolicy": "Privacy policy",
@@ -1775,6 +1801,9 @@
       "leadUnset": "Unassigned",
       "leadNone": "No lead",
       "currentAccount": "Current account",
+      "directoryUnavailable": "Member directory unavailable",
+      "unavailablePerson": "Former member",
+      "inactivePerson": "{name} (suspended)",
       "memberCurrentAccount": "Currently accessible account",
       "dependencyCount": "{count, plural, =1 {1 dependency} other {# dependencies}}"
     },
@@ -2742,7 +2771,8 @@
         "subscription": "Model subscription",
         "native_login": "Device model account",
         "local_device": "Personal device",
-        "e2b": "Personal E2B account"
+        "e2b": "Personal E2B account",
+        "cloudflare_sponsored": "Mikka Cloudflare account"
       },
       "accountAmounts": {
         "provider_unknown": "Billed by provider / amount unknown",
@@ -4334,6 +4364,8 @@
       "costModelSubscription": "{owner} {provider} subscription pays for the model",
       "costModelApiKey": "{owner} {provider} API key pays for the model",
       "costModelLogin": "The model runs on the Agent account signed in on the computer",
+      "sponsoredCloudflare": "Mikka-sponsored Cloudflare machine",
+      "costRuntimeCloudflare": "Mikka pays for this task’s Cloudflare machine",
       "costRuntimeE2b": "{owner} E2B account pays for the cloud computer",
       "costRuntimeDevice": "the computer is {owner} {device}",
       "costMikkaFree": "Mikka charges nothing",
@@ -4397,7 +4429,8 @@
         "subscription": "Subscription",
         "native_login": "Native login",
         "local_device": "Local device",
-        "e2b": "E2B"
+        "e2b": "E2B",
+        "cloudflare_sponsored": "Mikka Cloudflare account"
       },
       "amounts": {
         "provider_unknown": "External cost unknown",
@@ -4772,6 +4805,11 @@
       "noneToday": "No new suggestions today."
     },
     "newTaskDialog": {
+      "intent": "Action",
+      "backlogTitlePlaceholder": "Title (optional, defaults to the first line)",
+      "createOnly": "Create only",
+      "createAndDispatch": "Create and dispatch",
+      "sponsoredCloud": "Cloudflare coding machine · paid by Mikka",
       "title": "New task",
       "description": "Describe what needs doing and the task is created for you.",
       "label": "Task description",
@@ -6745,6 +6783,7 @@
     "moreMany": "{first}, {second} and {count, number} more"
   },
   "HostedTasks": {
+    "loadMore": "Load more tasks",
     "open": "Open task",
     "status": "Status",
     "factoryStage": "Factory stage",
@@ -7072,6 +7111,7 @@
   },
   "CodeReview": {
     "summary": {
+      "fileCount": "{count, plural, one {# file} other {# files}}",
       "pr": "PR #{number}",
       "files": "{count, plural, one {# file} other {# files}} +{additions} −{deletions}",
       "failed": "⚠ {count, plural, one {# check} other {# checks}} failed",
@@ -7172,5 +7212,33 @@
     "content": "Content",
     "readFailed": "Unable to load {label}.",
     "refreshFailed": "Unable to refresh {label}. Previous content is shown."
+  },
+  "PersonalFiles": {
+    "overviewSub": "Files you keep and results from your tasks.",
+    "folders": "Folders",
+    "overviewEmpty": "No files yet.",
+    "createFolder": "New folder",
+    "folderName": "Folder name",
+    "folderNameTaken": "A folder with this name already exists. Choose another name.",
+    "create": "Create",
+    "personalFolder": "My files · {name}",
+    "back": "Artifact",
+    "file": "File",
+    "empty": "No files in this folder.",
+    "upload": "Upload files",
+    "history": "Version history",
+    "currentVersion": "Current version",
+    "version": "Version {seq} · {count} files · {date}",
+    "moreVersions": "More versions",
+    "moreFolders": "More folders",
+    "restore": "Restore version",
+    "restoreTitle": "Restore this version?",
+    "replace": "Replace files",
+    "replaceTitle": "Replace files with the same names?",
+    "conflict": "These files changed. Review the latest version before trying again.",
+    "tooLarge": "This file is too large.",
+    "accessUnavailable": "These files are no longer available to this account.",
+    "saveUnconfirmed": "The change could not be confirmed. Refresh the folder before trying again.",
+    "loadError": "Could not load personal files."
   }
 }

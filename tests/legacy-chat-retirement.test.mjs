@@ -17,7 +17,7 @@ test('Retired chat route exposes only the shared image GET, with no generation o
   assert.match(archive, /fetchAgentHistory/)
   // The left column lists bots only; an older chat opens from ⌘K, read-only.
   const nav = await source('components/nav/bot-list.tsx')
-  assert.match(nav, /Nav\.newBot/)
+  assert.match(nav, /export function useChatNav/)
   assert.doesNotMatch(nav, /choose\(\{ kind: 'agent'/)
   assert.doesNotMatch(nav, /sessions.map|recent.map/)
   assert.match(await source('components/nav/global-search.tsx'), /Nav\.openBotChat|tNav\('openBotChat'\)/)
