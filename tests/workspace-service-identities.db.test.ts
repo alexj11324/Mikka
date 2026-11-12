@@ -179,7 +179,8 @@ test('registered service identity routes enforce a fresh Workspace admin through
     await t.test('the dedicated bearer reads only current, explicitly granted Project details', async () => {
       const fixture = await pool.query('UPDATE workspace_projects SET description=$2 WHERE id=$1 RETURNING name,description,"createdAt","updatedAt"', [project, 'Release notes'])
       await pool.query(`INSERT INTO workspace_project_repositories ("projectId","workspaceId","repositoryKey","baseBranch","isPrimary")
-        VALUES ($1,$2,'v2/github.com/example/fixture','release',true), ($1,$2,'/local/legacy-fixture','internal',false)`, [project, first.id])
+        VALUES ($1,$2,'v2/github.com/example/fixture','release',true), ($1,$2,'/local/legacy-fixture','internal',false),
+          ($1,$2,'v2/file/localhost/unit-fixture','internal',false), ($1,$2,' V2/FILE/LOCALHOST/MIXED-CASE ','internal',false)`, [project, first.id])
       const normal = await projectDetails(bearer(firstKey), project)
       assert.equal(normal.status, 200)
       const stored = fixture.rows[0]

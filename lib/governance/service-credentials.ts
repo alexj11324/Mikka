@@ -119,7 +119,7 @@ export async function readServiceCredentialProjects(header: string | null, read:
           ORDER BY "isPrimary" DESC,"repositoryKey"`)
         const publicRepositories = repositories.flatMap(repo => {
           const key = projectRepositoryKey.safeParse(repo.repositoryKey)
-          if (!key.success) return []
+          if (!key.success || key.data.startsWith('v2/file/')) return []
           const branch = projectBranch.safeParse(repo.baseBranch)
           return [{ repositoryKey: key.data, baseBranch: branch.success ? branch.data : null, isPrimary: repo.isPrimary }]
         })
