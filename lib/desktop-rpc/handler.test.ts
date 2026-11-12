@@ -170,6 +170,17 @@ test('registry schemas reject forged authority, malformed nested input and extra
   assert.equal(desktopActionSchemas['coordinator.pollCoordinatorChat'].safeParse([null, undefined, { after: 2, cursor: 1, prefix: 'a'.repeat(32) }]).success, true)
 })
 
+test('Board status moves accept an optional checked block change across the shared RPC boundary', () => {
+  const schema = desktopActionSchemas['issues.moveIssue']
+  const move = { id: owner, revision: 3, status: 'doing' }
+  for (const input of [move, { ...move, block: { blocked: false, runId: null } }, { ...move, block: { blocked: false, runId: 'last-run' } }]) {
+    assert.deepEqual(schema.parse([input]), [input])
+  }
+  for (const block of [null, { blocked: false }, { blocked: 'false', runId: null }, { blocked: false, runId: null, issueId: peer }]) {
+    assert.equal(schema.safeParse([{ ...move, block }]).success, false)
+  }
+})
+
 test('explicit schemas and function map have exactly matching action names', () => {
   const registry = readFileSync(new URL('./registry.ts', import.meta.url), 'utf8')
   const registered = [...registry.matchAll(/^  '([^']+)':/gm)].map(match => match[1]).sort()

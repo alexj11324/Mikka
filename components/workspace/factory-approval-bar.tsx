@@ -113,10 +113,8 @@ export function ApprovalBar({ state, flow, isSkill, isDeliverable = false, envir
         <Button size="sm" variant="secondary" disabled={busy} onClick={onRevoke}>{t('revoke')}</Button>
         {canPublish && <Button size="sm" disabled={busy} aria-busy={busy} onClick={onPublish}><ActionIcon icon={Upload} busy={busy} />{t('publish')}</Button>}
       </>}
-      {(state === 'publishing' || state === 'checking') && <>
-        <Button size="sm" variant="secondary" disabled={busy} onClick={onRevoke}>{t('revoke')}</Button>
-        <Button size="sm" disabled={busy} aria-busy={busy} onClick={onReconcile}><ActionIcon icon={RefreshCw} busy={busy} />{t('reconcile')}</Button>
-      </>}
+      {(state === 'publishing' || state === 'checking') &&
+        <Button size="sm" disabled={busy} aria-busy={busy} onClick={onReconcile}><ActionIcon icon={RefreshCw} busy={busy} />{t('reconcile')}</Button>}
       {state === 'live' && reference && <Button size="sm" variant="outline" render={<a href={reference.href} target="_blank" rel="noopener noreferrer" />}><ExternalLink data-icon="inline-end" />{reference.label}</Button>}
     </ItemActions>
   </Item>

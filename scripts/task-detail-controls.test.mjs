@@ -49,7 +49,7 @@ stub('lib/hooks/use-relation-search.ts', { useRelationSearch: noop })
 stub('lib/use-action-error.ts', { useActionError: () => translate })
 stub('components/workspace/issue-activity-feed.tsx', { useActivityEvents: () => [] })
 stub('components/workspace/issue-activity.tsx', { useActivityDrafts: () => ({}) })
-stub('components/workspace/issue-threads.tsx', { useIssueThreads: () => ({ data: [] }) })
+stub('components/workspace/issue-threads.tsx', { useIssueThreads: () => ({ data: [{ detail: { agentName: 'Former delegate', bot: { color: 'blue', shape: 'round' } } }] }) })
 stub('components/workspace/issue-metadata-controls.tsx', { useIssueMetadataSave: () => ({}), IssueMetadataControls: noop, AccessChangeDialog: noop })
 stub('components/workspace/issue-assignee-menu.tsx', { AgentSphere: noop })
 stub('components/workspace/issue-detail-properties.tsx', { overdue: () => false })
@@ -106,6 +106,14 @@ test('team selection confirms the current team once after reopen and rejected ch
     await pickTeam('another')
     assert.equal(row('team').menu.find(item => item.checked).id, 'another')
     assert.deepEqual(reads, ['viewer-list'])
+  } finally { await dispose() }
+})
+
+test('clearing current delegation leaves historical Bot runs out of the Task delegate row', async () => {
+  issue.metadata = { ...issue.metadata, delegate: null }
+  const dispose = await mount()
+  try {
+    assert.equal(row('delegate'), undefined)
   } finally { await dispose() }
 })
 

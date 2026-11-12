@@ -58,7 +58,19 @@ async function readProject(tx: ProjectTransaction | typeof projectDb, reader: Pa
 async function projectsInContext(workspaceId?: string) {
   return withDatabaseOperation('/actions/projects/list', async () => {
     const context = await projectContext(workspaceId)
-    return (await accessibleProjects(context.user, projectDb, context.workspaceId)).toSorted((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+    const rows = await accessibleProjects(context.user, projectDb, context.workspaceId)
+    const taskIds = [...new Set(rows.flatMap(row => row.issueIds))]
+    const statuses = new Map<string, string>()
+    for (let offset = 0; offset < taskIds.length; offset += batchSize) {
+      const visible = await db.select({ id: issues.id, status: issues.status }).from(issues)
+        .where(and(inArray(issues.id, taskIds.slice(offset, offset + batchSize)),
+          issueVisibilityPredicate(context.user.id, { allowedIds: [], workspaceIds: [context.workspaceId] })))
+      for (const task of visible) statuses.set(task.id, task.status)
+    }
+    return rows.map(project => {
+      const visible = project.issueIds.filter(id => statuses.has(id))
+      return { ...project, taskCounts: { total: visible.length, done: visible.filter(id => statuses.get(id) === 'done').length } }
+    }).toSorted((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
   })
 }
 
@@ -142,6 +154,21 @@ async function persistProject(input: unknown, partial: boolean) {
 export async function saveProject(input: z.input<typeof projectInput>) { return persistProject(input, false) }
 export async function updateProjectProperties(input: { id: string; revision: number; changes: ProjectChanges; workspaceId?: string }) { return persistProject(input, true) }
 
+/** Both Project and Task editors invalidate the same Task revision after a membership change. */
+async function recordProjectTaskChanges(application: Parameters<Parameters<typeof db.transaction>[0]>[0], taskIds: string[], actorId: string) {
+  const saved = await application.update(issues)
+    .set({ revision: sql`${issues.revision} + 1`, updatedAt: new Date() })
+    .where(inArray(issues.id, taskIds)).returning()
+  if (saved.length !== taskIds.length) throw new ActionFailureError('issueOutdated')
+  await application.insert(issueVersions).values(saved.map(task => ({
+    id: crypto.randomUUID(), issueId: task.id, userId: task.userId, revision: task.revision,
+    title: task.title, content: task.content, status: task.status, priority: task.priority,
+    ...activityActor(actorId),
+  })))
+  for (const task of saved) await issueListChanged(application, task.id)
+  return saved
+}
+
 export async function moveIssueToProject(input: { issueId: string; revision: number; projectId: string | null; workspaceId?: string; confirmAccess?: boolean }) {
   const i18nText = await getTranslations()
   const parsed = z.object({ issueId: z.uuid(), revision: z.number().int().positive(), projectId: z.uuid().nullable(), workspaceId: z.uuid().optional(), confirmAccess: z.boolean().optional() }).safeParse(input)
@@ -192,12 +219,7 @@ export async function moveIssueToProject(input: { issueId: string; revision: num
           await tx.update(projects).set({ revision: project.revision + 1, updatedAt: new Date() }).where(eq(projects.id, project.id))
           await emitProjectChange(tx, project.id, context.user.id, i18nText(project.id === parsed.data.projectId ? 'Projects.activity.tasksAdded' : 'Projects.activity.tasksRemoved'))
         }
-        // The canonical relationship commits in the Workspace DB. APP keeps an
-        // optimistic-concurrency/version event, without a second project-name store.
-        const [saved] = await application.update(issues).set({ revision: task.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, task.id), eq(issues.revision, task.revision))).returning()
-        if (!saved) throw new ActionFailureError('issueOutdated')
-        await application.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(context.user.id) })
-        await issueListChanged(application, saved.id)
+        const [saved] = await recordProjectTaskChanges(application, [task.id], context.user.id)
         return saved
       })
     })
@@ -265,7 +287,9 @@ export async function setProjectIssues(input: { id: string; revision: number; is
         }
         await tx.update(projects).set({ revision: current.revision + 1, updatedAt: new Date() }).where(eq(projects.id, current.id))
         await emitProjectChange(tx, current.id, context.user.id, i18nText('FeatureCopy.c_310e5541', { value0: ids.length }))
-        for (const id of changed) await issueListChanged(application, id)
+        for (let offset = 0; offset < changed.length; offset += batchSize) {
+          await recordProjectTaskChanges(application, changed.slice(offset, offset + batchSize), context.user.id)
+        }
         return { project: await readProject(tx, context.user, context.workspaceId, current.id), error: undefined }
       }))
     })

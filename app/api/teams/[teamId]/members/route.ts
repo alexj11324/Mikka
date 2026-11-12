@@ -15,7 +15,7 @@ async function handleGET(request: Request, { params }: { params: Promise<{ teamI
   const { teamId } = await params
   if (!z.uuid().safeParse(teamId).success) return NextResponse.json({ error: i18nText("FeatureCopy.c_424dce2c") }, { status: 400, headers })
   try {
-    return NextResponse.json(await actAs(session.user.id, () => listTeamMembers(teamId, session.tokenWorkspaceId)), { headers })
+    return NextResponse.json(await actAs(session.user.id, () => listTeamMembers(teamId, session.tokenWorkspaceId, new URL(request.url).searchParams.get('include') === 'task-count')), { headers })
   } catch (error) {
     return NextResponse.json({ error: error instanceof WorkspaceError ? (i18nText.has(`Errors.${error.code}` as never) ? i18nText(`Errors.${error.code}` as never) : error.message) : i18nText("FeatureCopy.c_411f8090") }, { status: error instanceof WorkspaceError ? 403 : 500, headers })
   }

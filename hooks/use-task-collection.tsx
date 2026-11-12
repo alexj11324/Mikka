@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useMemo } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef } from 'react'
 import useSWR, { unstable_serialize } from 'swr'
 import { getTaskPresentations } from '@/app/actions/task-domain'
 import { useLiveKeys, useLiveScope } from '@/hooks/use-live-key'
@@ -17,13 +17,20 @@ export const TaskPresentationsContext = createContext<Readonly<Record<string, Ta
 export function useWorkspaceTaskPresentations(ownerId: string, workspaceId: string | undefined,
   home: string | null, issues: readonly Pick<CollectionIssue, 'id' | 'workspaceId'>[], enabled: boolean) {
   const ids = useMemo(() => issues.filter(issue => issue.workspaceId === workspaceId).map(issue => issue.id).sort(), [issues, workspaceId])
-  const key = enabled && workspaceId && ids.length ? ['task-presentations', ownerId, workspaceId, ids] : null
+  const key = workspaceId && ids.length ? ['task-presentations', ownerId, workspaceId, ids] : null
   const { data, error, isLoading, mutate } = useSWR(key, async () => Object.fromEntries(await readPresentationPages(workspaceId!, ids,
     input => getTaskPresentations({ ...input, includeFactoryIdentity: true, includeBotDispatches: true }))), {
-    revalidateOnFocus: false, shouldRetryOnError: false,
+    revalidateOnFocus: false, shouldRetryOnError: false, isPaused: () => !enabled,
   })
-  const keys = key ? [unstable_serialize(key)] : []
-  useLiveKeys(key && workspaceId ? [
+  // A write may finish inside SWR's deduplication interval while live reads are paused.
+  // Keep the authorized projection visible and explicitly read its new state on resume.
+  const wasEnabled = useRef(enabled)
+  useEffect(() => {
+    if (enabled && !wasEnabled.current) void mutate()
+    wasEnabled.current = enabled
+  }, [enabled, mutate])
+  const keys = enabled && key ? [unstable_serialize(key)] : []
+  useLiveKeys(enabled && key && workspaceId ? [
     { kind: 'issue_list', id: workspaceId, workspaceId },
     ...(home && home !== workspaceId ? [{ kind: 'issue_list' as const, id: home, workspaceId: home }] : []),
     ...(home ? [{ kind: 'task_run_list' as const, id: home, workspaceId: home }] : []),
