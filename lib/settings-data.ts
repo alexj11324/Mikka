@@ -7,6 +7,8 @@ export const memberSettingsKey = settingsKeys.memberSettings
 export const teamDirectoryKey = settingsKeys.teamDirectory
 export const teamMembersKey = settingsKeys.teamMembers
 export const fetchTeamMembers = ([, teamId]: ReturnType<typeof teamMembersKey>) => fetchSettingsData<Awaited<ReturnType<typeof listTeamMembers>>>(`/api/teams/${encodeURIComponent(teamId)}/members`)
+export const teamHomeKey = (userId: string, teamId: string) => ['team-home', userId, teamId] as const
+export const fetchTeamHome = ([, , teamId]: ReturnType<typeof teamHomeKey>) => fetchSettingsData<Awaited<ReturnType<typeof listTeamMembers>>>(`/api/teams/${encodeURIComponent(teamId)}/members?include=task-count`)
 export const fetchTeamDirectory = ([, workspaceId]: ReturnType<typeof teamDirectoryKey>) => fetchSettingsData<Awaited<ReturnType<typeof loadTeamDirectory>>>(`/api/teams/directory${workspaceId ? `?workspace=${encodeURIComponent(workspaceId)}` : ''}`)
 
 export class SettingsReadError extends Error {
