@@ -1,3 +1,4 @@
+import { readAccessFailure } from '../swr/persistent-cache'
 import { withBasePath } from '../base-path'
 import { webSelectionVersion } from '../web-connection/selection'
 import type { InboxCommand, InboxPage } from './contract'
@@ -14,6 +15,11 @@ async function inboxRequest(version: number, path: string, init: RequestInit) {
   if (version !== webSelectionVersion()) throw new InboxRequestError('decisionUnavailable', 409)
   if (!response.ok) throw new InboxRequestError(typeof data?.error === 'string' ? data.error : 'actionFailed', response.status)
   return data
+}
+
+/** A delayed or unavailable refresh can still display this scope's last authorized value. */
+export function readableInboxCount(count: number | undefined, error: unknown): number | undefined {
+  return readAccessFailure(error) ? undefined : count
 }
 
 export async function readInboxCount(workspaceId: string, version: number): Promise<number> {

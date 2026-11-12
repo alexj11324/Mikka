@@ -1,8 +1,9 @@
 'use client'
 
+import { useEffect } from 'react'
 import useSWR, { unstable_serialize } from 'swr'
 import { useLiveKeys } from './use-live-key'
-import { readInboxCount } from '@/lib/inbox/client'
+import { readInboxCount, readableInboxCount } from '@/lib/inbox/client'
 import { webSelectionVersion } from '@/lib/web-connection/selection'
 
 export function inboxCountKey(version: number, ownerId: string, workspaceId: string) {
@@ -13,11 +14,16 @@ export function inboxCountKey(version: number, ownerId: string, workspaceId: str
 export function useInboxCount(ownerId: string, workspaceId: string | undefined, enabled: boolean) {
   const version = webSelectionVersion()
   const key = enabled && workspaceId ? inboxCountKey(version, ownerId, workspaceId) : null
-  const { data, error } = useSWR(key, ([, selected, , workspace]) => readInboxCount(workspace, selected), {
+  const { data, error, mutate } = useSWR(key, ([, selected, , workspace]) => readInboxCount(workspace, selected), {
     revalidateOnFocus: false, shouldRetryOnError: false,
   })
   useLiveKeys(key && workspaceId ? [
     { kind: 'pending_actions', id: workspaceId }, { kind: 'issue_list', id: workspaceId },
   ] : [], key ? [unstable_serialize(key)] : [], workspaceId)
-  return error ? 0 : data ?? 0
+  const count = readableInboxCount(data, error)
+  useEffect(() => {
+    // Also retire a revoked count on standard in-memory SWR providers. A later network error cannot resurrect it.
+    if (data !== undefined && count === undefined) void mutate(undefined, { revalidate: false })
+  }, [count, data, mutate])
+  return key ? count ?? 0 : 0
 }
