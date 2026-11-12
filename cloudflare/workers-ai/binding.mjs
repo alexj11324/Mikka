@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'node:crypto'
 import { boundedJson } from '../bounded-json.mjs'
+import { nativeChatStream } from './stream.mjs'
 
 const host = 'workers-ai.internal'
 const model = '@cf/deepseek-ai/deepseek-v4.1-flash-1017'
@@ -61,6 +62,6 @@ export async function workersAiRequest(request, ai, capability) {
       await result.body?.cancel()
       return unavailable(502)
     }
-    return new Response(result.body, { headers: { 'content-type': type, 'cache-control': 'no-store' } })
+    return new Response(body.stream === true ? nativeChatStream(result.body) : result.body, { headers: { 'content-type': type, 'cache-control': 'no-store' } })
   } catch { return unavailable(502) }
 }
