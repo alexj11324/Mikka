@@ -1,30 +1,17 @@
-# Decisions
+# Effective decisions and historical provenance
 
-One file per product or design decision Alex made. This is the usual
-architecture-decision-record layout: a new decision is a new file, so parallel
-pull requests never edit the same lines.
+**Current behavior comes from the latest explicit user decision, current `AGENTS.md`, `docs/design/rules.md`, accepted design, and verified implementation.** This directory records *why* a decision was made; its date does not make it active forever.
 
-`../decisions.md` holds every decision made before 2026-10-31 17:30 UTC. It
-stays authoritative and is frozen: add nothing new there. To supersede one of
-its rows, strike that row (~~like this~~) and link the new file.
+## When instructions disagree
 
-## Adding a decision
+1. Follow the latest explicit approved decision and update the current product or release rule in the same PR.
+2. Do not use a superseded ADR, `../decisions.md`, dated audit, screenshot gallery or issue comment as the sole present-tense authority.
+3. When a historical record names a successor, read the successor. If history conflicts with current code and the decision is unknown, record the mismatch without silently reverting product behavior.
 
-Name the file `YYYY-MM-DD-HHMM-short-slug.md`, using UTC time, for example
-`2026-10-31-1730-decision-records.md`. Sorting the folder by name gives the
-order; newest is last. Write it the day you hear it:
+## Maintaining the current version
 
-```md
-# Short title
+For new significant decisions, record the durable current rule in `AGENTS.md`, `rules.md`, or the appropriate product/operations reference first. Keep a small dated ADR only when provenance is useful for safety or compatibility.
 
-- Date: 2026-10-31
-- Source: who said it and where, with the quote
-- Rule: rules.md ids it adds or changes, or —
-- Replaces: the older decision file or decisions.md row, or —
+When a superseded note has no remaining active links, tests or release dependencies, remove the tracked snapshot in a reviewed docs-cleanup PR. Git retains prior commit content unless a separately approved history rewrite occurs. **Never delete** live migration ledgers, security evidence, rollback references or paid-library implementation as a way to reduce documentation volume.
 
-What was decided, and what follows from it.
-```
-
-To supersede a decision, add the new file and set `Superseded by:` on the old
-one. Never delete a decision. Accepted Figma frames are listed in the decision
-that accepts them.
+The older `../decisions.md` is legacy background, not an instruction to recreate old interfaces or release paths. The [One UI decision](2026-11-08-2133-one-ui.md) still defines a single user-facing UI. Current build ownership is at [build source of truth](../../operations/build-source-of-truth.md).

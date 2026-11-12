@@ -12,8 +12,12 @@ bindings. Current workflow files define the triggers and selected coverage.
 - Keep `UI policy (strict)` and `Production build and browser interactions`
   successful for non-documentation PRs; the latter gates the selected isolated PostgreSQL suites across 1–4 dynamic
   shards. Full inventory validation runs even when DB execution is skipped. Despite its name, CI
-  does not build the production Web release artifact. `web-deploy.yml` builds
-  `main` on GitHub Actions and uploads the prebuilt output to Vercel.
+  does not build the production Web release artifact. The legacy `web-deploy.yml`
+  workflow (currently disabled for new Vercel publication) describes the original
+  **public-root** official build and its private read-only Overlay checkout.
+  Current Cloudflare native CI and the transitionary private-triggered OCI issuer
+  are **different** operations; neither changes long-term public build ownership.
+  See [build-source-of-truth.md](../../docs/operations/build-source-of-truth.md).
 - Ordinary acceptance uses API/CLI flows under decision 2026-11-01-1520.
   Targeted Desktop, Analytics and self-hosted jobs retain their selected browser
   checks. `browser-gate.yml` only keeps the protected check name
