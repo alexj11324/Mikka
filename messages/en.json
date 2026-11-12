@@ -211,7 +211,8 @@
     "ownDescription": {
       "github": "Repositories, pull requests and issues",
       "linear": "Issues and projects",
-      "telegram": "Talk to your bots in Telegram"
+      "telegram": "Talk to your bots in Telegram",
+      "slack": "Mentions and direct messages in Slack"
     },
     "unavailable": "Unavailable",
     "title": "Plugins",
@@ -2282,6 +2283,39 @@
       "githubAppPersonal": "Personal account",
       "githubAppOrganization": "Organization",
       "githubAppOrganizationName": "Organization name"
+    },
+    "slackInstallation": {
+      "title": "Slack bot",
+      "note": "Connect a Slack workspace to receive mentions and direct messages in Mikka.",
+      "workspace": "Mikka workspace",
+      "loading": "Loading Slack connection…",
+      "unconfigured": "The Slack bot is unavailable on this server.",
+      "unlinked": "No Slack account linked",
+      "connected": "Linked to {team}",
+      "revoking": "Uninstall pending. Replies are disabled.",
+      "connect": "Connect Slack",
+      "link": "Link my Slack account",
+      "handoff": "Continue in your browser with the same Mikka account.",
+      "actionFailed": "The change could not be completed. Check the current connection and try again.",
+      "readFailed": "Could not load the Slack connection.",
+      "failed": "Slack authorization did not finish. Use the same Mikka account and try again.",
+      "success": "Slack authorization completed.",
+      "enabled": "Receive Slack messages",
+      "enable": "Enable",
+      "disable": "Disable",
+      "watch": "Watched channels",
+      "watchNote": "Choose channels you and the bot have joined. Mentions and direct messages work without a selection.",
+      "choose": "Choose channels",
+      "empty": "No shared channels available. Invite the bot to a channel you already use.",
+      "unlink": "Unlink my account",
+      "unlinkConfirm": "Stop Slack messages for your Mikka account in this workspace?",
+      "uninstall": "Uninstall bot",
+      "uninstallConfirm": "Remove the bot from this Slack workspace and stop deliveries for everyone?",
+      "selected": "Watching",
+      "unselected": "Watch",
+      "retry": "Retry",
+      "cancel": "Cancel",
+      "toggle": "{action} #{channel}"
     },
     "telegram": {
       "title": "Telegram",
@@ -5198,6 +5232,11 @@
     "mine": "{emoji}: {others, plural, =0 {just you} one {you and # other} other {you and # others}}"
   },
   "GroupChat": {
+    "leave": "Leave group",
+    "leaveConfirm": "Leave {name}?",
+    "reinvite": "The group owner will need to invite you to return.",
+    "leaveDenied": "You can’t leave this group with your current membership.",
+    "leaveError": "Couldn’t leave the group. Try again.",
     "untitled": "Untitled group chat",
     "composer": "Message {name}",
     "messages": "Group chat messages",
