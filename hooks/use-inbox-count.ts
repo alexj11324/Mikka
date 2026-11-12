@@ -5,10 +5,14 @@ import { useLiveKeys } from './use-live-key'
 import { readInboxCount } from '@/lib/inbox/client'
 import { webSelectionVersion } from '@/lib/web-connection/selection'
 
+export function inboxCountKey(version: number, ownerId: string, workspaceId: string) {
+  return ['inbox-count', version, ownerId, workspaceId] as const
+}
+
 /** The rail reads the same authorized pending set as Inbox. This read cannot create a suggestion or wake a run. */
 export function useInboxCount(ownerId: string, workspaceId: string | undefined, enabled: boolean) {
   const version = webSelectionVersion()
-  const key = enabled && workspaceId ? ['inbox-count', version, ownerId, workspaceId] as const : null
+  const key = enabled && workspaceId ? inboxCountKey(version, ownerId, workspaceId) : null
   const { data, error } = useSWR(key, ([, selected, , workspace]) => readInboxCount(workspace, selected), {
     revalidateOnFocus: false, shouldRetryOnError: false,
   })
