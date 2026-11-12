@@ -1,7 +1,10 @@
 import type { ConversationCommand } from './conversation-submission'
+import type { Outgoing } from './outbox'
 
 type Storage = { getItem(key: string): string | null; setItem(key: string, value: string): void }
 type Saved = ConversationCommand & { storedId: string }
+type Entry = Saved | Outgoing
+const personal = (entry: Entry): entry is Outgoing => 'submissionId' in entry
 type Index = { session: string; scopes: Record<string, string> }
 
 /** Each operation uses its own storage value so the existing native chunked store handles long messages. */
@@ -20,7 +23,34 @@ export function createConversationJournal(storage: Storage) {
   function current() {
     if (!binding) return null
     const saved = index(binding.account)
-    return saved?.session === binding.session ? saved : { session: binding.session, scopes: {} } as Index
+    if (saved && saved.session !== binding.session) return null
+    return saved ?? { session: binding.session, scopes: {} } as Index
+  }
+  function read(scope: string): Entry[] {
+    const saved = current()
+    if (!saved || !binding) return []
+    const account = binding.account
+    return Object.entries(saved.scopes).flatMap(([id, value]) => {
+      if (scope !== value) return []
+      const raw = storage.getItem(commandKey(account, id))
+      return raw ? [JSON.parse(raw) as Entry] : []
+    })
+  }
+  function remember(scope: string, id: string, entry: Entry) {
+    const saved = current()
+    if (!binding || !saved) throw new Error('draftNotSaved')
+    const existingScope = saved.scopes[id]
+    if (existingScope !== undefined && existingScope !== scope) throw new Error('draftNotSaved')
+    const account = binding.account, key = commandKey(account, id), value = JSON.stringify(entry)
+    if (existingScope === undefined) {
+      saved.scopes[id] = scope
+      storage.setItem(indexKey(account), JSON.stringify(saved))
+    }
+    const stored = index(account)
+    if (stored?.session !== saved.session || stored.scopes[id] !== scope) throw new Error('draftNotSaved')
+    // Reserve the index first so logout can erase an interrupted chunked write.
+    storage.setItem(key, value)
+    if (storage.getItem(key) !== value) throw new Error('draftNotSaved')
   }
   return {
     bind(account: string, session: string | null) {
@@ -30,26 +60,16 @@ export function createConversationJournal(storage: Storage) {
       if (saved && saved.session !== session) clear(account, saved)
     },
     read(scope: string): Saved[] {
-      const saved = current()
-      if (!saved || !binding) return []
-      const account = binding.account
-      return Object.entries(saved.scopes).flatMap(([id, value]) => {
-        if (scope !== value) return []
-        const raw = storage.getItem(commandKey(account, id))
-        return raw ? [JSON.parse(raw) as Saved] : []
-      })
+      return read(scope).filter((entry): entry is Saved => !personal(entry))
+    },
+    readPersonal(scope: string): Outgoing[] {
+      return read(scope).filter(personal)
     },
     remember(scope: string, command: Saved) {
-      const saved = current()
-      if (!binding || !saved) throw new Error('draftNotSaved')
-      const key = commandKey(binding.account, command.id), value = JSON.stringify(command)
-      if (saved.scopes[command.id] !== scope) {
-        saved.scopes[command.id] = scope
-        storage.setItem(indexKey(binding.account), JSON.stringify(saved))
-      }
-      storage.setItem(key, value)
-      // The native adapter can recover an interrupted multi-part write. Only start transport with the exact command saved.
-      if (index(binding.account)?.scopes[command.id] !== scope || storage.getItem(key) !== value) throw new Error('draftNotSaved')
+      remember(scope, command.id, command)
+    },
+    rememberPersonal(scope: string, item: Outgoing) {
+      remember(scope, item.submissionId, item)
     },
     forget(scope: string, ids?: readonly string[]) {
       const saved = current()

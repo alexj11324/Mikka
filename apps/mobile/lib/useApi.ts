@@ -65,7 +65,7 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
       })
     })
   }, [path, context, revision])
-  const alive = useRef(true)
+  const activePath = useRef(path)
   const loadedAt = useRef(0)
   // When the last successful read started (performance clock): a pushed deadline counts from it.
   const [requestedAt, setRequestedAt] = useState<number | null>(null)
@@ -73,12 +73,12 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
   const pending = useRef<{ context: number; path: string; ticket: number; promise: Promise<void> } | null>(null)
 
   const load = useCallback((): Promise<void> => {
-    if (!path) return Promise.resolve()
+    if (!path || activePath.current !== path) return Promise.resolve()
     const context = cache.context()
     if (pending.current?.context === context && pending.current.path === path) return pending.current.promise
     const readRevision = cache.revision(path)
     const ticket = ++request.current
-    const accept = (apply: () => void) => cache.commit(context, () => { if (alive.current && ticket === request.current && cache.revision(path) === readRevision) apply() })
+    const accept = (apply: () => void) => cache.commit(context, () => { if (activePath.current === path && ticket === request.current && cache.revision(path) === readRevision) apply() })
     accept(() => setLoading(true))
     const started = typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now()
     const promise = (async () => {
@@ -103,6 +103,14 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
     return promise
   }, [path, read])
 
+  // A post-write read must start after the acknowledgement, even when a previous snapshot is in flight.
+  const reloadAfterWrite = useCallback(async () => {
+    if (!path) return
+    const reading = pending.current
+    if (reading?.path === path && reading.context === context) await reading.promise
+    if (activePath.current === path && context === cache.context() && revision === cache.revision(path)) await load()
+  }, [context, load, path, revision])
+
   useEffect(() => {
     if (!path) return
     return cache.onRevoked(path, reason => {
@@ -118,14 +126,14 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
   }, [path])
 
   useEffect(() => {
-    alive.current = true
+    activePath.current = path
     setSource({ path, context: cache.context() })
     setStored(path ? cache.get<T>(path) : null)
     setError(null)
     loadedAt.current = 0; failed.current = false; pending.current = null; setRequestedAt(null)
     setLoading(Boolean(path))
     void load()
-    return () => { alive.current = false; request.current++ }
+    return () => { activePath.current = null; request.current++ }
   }, [load, path])
 
   useEffect(() => onWorkspaceChange(() => {
@@ -148,7 +156,7 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
   }, [load, path, pushed])
 
   const sameSource = source.path === path && source.context === context
-  return { data: sameSource ? data : path ? cache.get<T>(path) : null, error: sameSource ? error : null, loading: sameSource ? loading : Boolean(path), reload: load, setData, requestedAt: sameSource ? requestedAt : null }
+  return { data: sameSource ? data : path ? cache.get<T>(path) : null, error: sameSource ? error : null, loading: sameSource ? loading : Boolean(path), reload: load, reloadAfterWrite, setData, requestedAt: sameSource ? requestedAt : null }
 }
 
 /** Pull to refresh for a list (the system's RefreshControl): reloads and shows the spinner until the data is back. */
