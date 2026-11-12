@@ -72,6 +72,10 @@ test('review capabilities follow real team relation changes and their transactio
   const grant = (f: Fixture) => resolve(pool, workspacePool!, session, f.taskId, {}, async (authority, client) => ({ authority,
     lease: await beginReviewSession(authority, { kind: 'terminal' }, client) }))
   const leaseRow = async (id: string) => (await pool.query('SELECT * FROM coding_review_sessions WHERE id=$1', [id])).rows[0]
+  // The committed live audience also takes SHARE on these rows. Another authorized
+  // reader may coexist, but a membership or Workspace writer must have released them.
+  const workspaceProbe = 'SELECT id FROM mikka_workspaces WHERE id=$1 FOR SHARE NOWAIT'
+  const memberProbe = 'SELECT status FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 FOR SHARE NOWAIT'
   const expectedLinks = new Map<string, string | null>()
   const expectedMembers = new Map<string, string | null>()
   const failClose = new Set<string>()
@@ -98,8 +102,8 @@ test('review capabilities follow real team relation changes and their transactio
       await scope.query("SELECT pg_advisory_xact_lock(hashtextextended('review-team-scope-test-observer',0))")
       assert.equal((await scope.query("SELECT pg_try_advisory_xact_lock(hashtextextended('mikka-team-relations',0)) AS acquired")).rows[0].acquired, true,
         'gateway close does not hold the global Workspace relation lock')
-      await scope.query('SELECT id FROM mikka_workspaces WHERE id=$1 FOR UPDATE NOWAIT', [target.workspaceId])
-      const member = (await scope.query('SELECT status FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 FOR UPDATE NOWAIT', [target.workspaceId, target.ownerId])).rows[0]
+      await scope.query(workspaceProbe, [target.workspaceId])
+      const member = (await scope.query(memberProbe, [target.workspaceId, target.ownerId])).rows[0]
       if (expectedMembers.has(target.workspaceId)) assert.equal(member?.status ?? null, expectedMembers.get(target.workspaceId), 'membership outcome committed before gateway IO')
       await machine.query('SELECT "runId" FROM thread_machines WHERE "runId"=$1 FOR UPDATE NOWAIT', [target.runId])
     } catch (error) {
@@ -115,6 +119,16 @@ test('review capabilities follow real team relation changes and their transactio
   const change = (f: Fixture, teamId: string | null, expectedTeamId: string | null) => actAs({ id: owner, [tokenWorkspace]: f.workspaceId },
     () => setIssueTeam({ issueId: f.taskId, teamId, expectedTeamId }))
 
+  await t.test('both close observations reject a still-held administrative writer immediately', async () => {
+    const { requireWorkspace } = await import('../workspace-access')
+    const { workspaceDb } = await import('../workspace-db')
+    const locked = (error: unknown) => error instanceof Error && 'code' in error && error.code === '55P03'
+    await workspaceDb.transaction(async tx => {
+      await requireWorkspace(tx, workspaceA, owner, true)
+      await assert.rejects(pool.query(workspaceProbe, [workspaceA]), locked)
+      await assert.rejects(pool.query(memberProbe, [workspaceA, owner]), locked)
+    })
+  })
   await t.test('attaching a foreign Workspace is rejected without changing Task tenancy or its existing capability', async () => {
     const f = await fixture(), current = await grant(f)
     assert.equal((await change(f, teamB, null)).ok, false)
@@ -231,15 +245,25 @@ test('review capabilities follow real team relation changes and their transactio
     assert.ok(closeIds.includes(current.lease.id)); assert.equal(await leaseRow(current.lease.id), undefined)
     await assert.rejects(resolve(pool, workspacePool!, session, f.taskId), error => error instanceof ReviewAuthorityError && error.status === 404)
   })
-  await t.test('referenced Team deletion is refused; explicit grouping removal drains its capability and preserves Task history', async () => {
+  await t.test('referenced Team deletion is refused; grouping removal drains while the committed live audience is reading', async t => {
     const { deleteTeamData, removeTeamGroupingData } = await import('../workspace-admin/teams')
     const { WorkspaceError } = await import('../workspace-access')
     const f = await administrativeFixture(true), current = await grant(f)
     await assert.rejects(deleteTeamData(f.adminId, f.team.id, f.team.name), error => error instanceof WorkspaceError && error.message === 'teamDeleteReferenced')
     assert.equal(closeIds.includes(current.lease.id), false)
     assert.deepEqual(await readReviewSession(current.authority, { kind: 'terminal' }, pool), current.lease)
+    const { sendEnterpriseLiveInvalidations } = await import('../enterprise/live-authority')
+    const close = reviewSessionTransport.close
+    let observedLiveAudience = false
+    t.mock.method(reviewSessionTransport, 'close', async (...args: Parameters<typeof close>) => {
+      await sendEnterpriseLiveInvalidations({ workspaceId: f.workspace.id, ownerId: owner }, async () => {
+        observedLiveAudience = true
+        await close(...args)
+      })
+    })
     expectedLinks.set(f.taskId, null)
     assert.equal((await removeTeamGroupingData(f.adminId, f.team.id, f.team.name)).removed.tasks, 1)
+    assert.equal(observedLiveAudience, true)
     assert.ok(closeIds.includes(current.lease.id)); assert.equal(await leaseRow(current.lease.id), undefined)
     assert.equal((await pool.query('SELECT "workspaceId" FROM issues WHERE id=$1', [f.taskId])).rows[0].workspaceId, f.workspace.id)
     assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE id=$1 AND "issueId"=$2', [f.runId, f.taskId])).rowCount, 1)
