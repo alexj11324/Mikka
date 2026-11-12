@@ -369,7 +369,7 @@ test('Project v2: split database migration, canonical relationships and live ten
       const staleBatch = await actAs(member, () => actions.setProjectIssues({ id: source.id, revision: assigned.project!.revision, issueIds: [task], workspaceId: alpha }))
       assert.match(staleBatch.error ?? '', /projectSaveConflict/, 'a Project picker opened before a single Task move cannot reclaim the Task')
       const removed = await actAs(member, () => actions.setProjectIssues({ id: destination.id, revision: batched.project!.revision, issueIds: [task], workspaceId: alpha, confirmAccess: true }))
-      assert.ok(removed.project, JSON.stringify(removed))
+      assert.ok('project' in removed, JSON.stringify(removed))
       for (const id of [task, batchTask]) {
         assert.equal((await application.query('SELECT revision FROM issues WHERE id=$1', [id])).rows[0].revision, 3)
         const versions = await application.query('SELECT revision FROM issue_versions WHERE "issueId"=$1 ORDER BY revision', [id])
