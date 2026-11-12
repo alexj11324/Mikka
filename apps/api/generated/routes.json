@@ -1338,6 +1338,43 @@
       "sourceHash": "d450b093e5517282b41f6a49e6b712675ee8f33e8a0be7b4bafa04fa483ecf31"
     },
     {
+      "path": "/mikka/api/integrations/slack",
+      "template": "/api/integrations/slack",
+      "source": "app/api/integrations/slack/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "sourceHash": "e83e89e6e09089db04d1884ed1e11519bcce57d7a4f10ccd3e67ff35d67b1700"
+    },
+    {
+      "path": "/mikka/api/integrations/slack/callback",
+      "template": "/api/integrations/slack/callback",
+      "source": "app/api/integrations/slack/callback/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "356ae7ce8260750148587eb0642713baea2374e602f1d05418af8edcde00e166"
+    },
+    {
+      "path": "/mikka/api/integrations/slack/connect",
+      "template": "/api/integrations/slack/connect",
+      "source": "app/api/integrations/slack/connect/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "27330814a0184633ca4960260c2316a8d864b70064beb40aa5ee4de447939aed"
+    },
+    {
+      "path": "/mikka/api/internal/eve/slack-credential",
+      "template": "/api/internal/eve/slack-credential",
+      "source": "app/api/internal/eve/slack-credential/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "8b8b1fbf13cdfb81ea272a37e8158cd0eddbe97522f14621b4b48371440929c8"
+    },
+    {
       "path": "/mikka/api/internal/eve/tools",
       "template": "/api/internal/eve/tools",
       "source": "app/api/internal/eve/tools/route.ts",
