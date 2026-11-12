@@ -1,9 +1,10 @@
+import { capacityWindow, legacyFilesystemBudget, routeWindow } from './cloudflare-capacity.mjs'
 import { run as egressReport } from './egress-monitor.mjs'
 import { WINDOW_MS } from './request-outcomes.mjs'
 import { run as outcomeReport } from './runtime-outcomes.mjs'
 
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/
-const fields = ['msg', 'timestamp', 'invocationId', 'route', 'status', 'outcome', 'error', 'statement', 'bytes', 'rows', 'sampleRate']
+const fields = ['msg', 'timestamp', 'invocationId', 'route', 'status', 'durationMs', 'outcome', 'error', 'statement', 'bytes', 'rows', 'sampleRate']
 const payloadKinds = new Set(['api_request_started', 'api_request', 'db_sample'])
 const limit = 1000
 const maxQueries = 10
@@ -69,7 +70,7 @@ export async function readContainerWindow({ application, environment, now, read 
 /** The protected caller verifies the live release and returns its immutable
  * application identity on each side of the read. A source change discards
  * the complete window before it reaches either report or any alert sink. */
-export async function collectContainerReports({ target, read, neonToken, fetchImpl = fetch, now = Date.now() }) {
+export async function collectContainerReports({ target, read, capacity = undefined, neonToken, fetchImpl = fetch, now = Date.now() }) {
   const before = await target()
   if (!/^[a-f0-9]{40}$/.test(before.source) || !uuid.test(before.apiVersion)) fail('container_release_invalid')
   const window = await readContainerWindow({ application: before.application, environment: before.environment, read, now })
@@ -77,8 +78,17 @@ export async function collectContainerReports({ target, read, neonToken, fetchIm
     outcomeReport({ now, containerWindow: window }),
     egressReport({ now, containerWindow: window, neonToken, fetchImpl }),
   ])
+  let health
+  if(capacity){
+    const { account, read:readCapacity }=capacity
+    const resources=await capacityWindow({application:window.applicationId,account,start:window.start,end:window.end,read:readCapacity})
+    const traffic=routeWindow(window.events,window.start,window.end)
+    const fiveMinuteWindows=resources.windows.map(item=>({capacity:item,traffic:routeWindow(window.events,item.start,item.end),
+      filesystem:legacyFilesystemBudget(window.events,item.start,item.end)}))
+    health={capacity:resources,traffic,fiveMinuteWindows}
+  }
   const after = await target()
   if (before.source !== after.source || before.apiVersion !== after.apiVersion || before.environment !== after.environment ||
     window.applicationId !== containerApplicationId(after.application)) fail('container_release_changed')
-  return { source: before.source, apiVersion: before.apiVersion, applicationId: window.applicationId, outcomes, egress }
+  return { source: before.source, apiVersion: before.apiVersion, applicationId: window.applicationId, outcomes, egress, ...(health ? {health} : {}) }
 }
