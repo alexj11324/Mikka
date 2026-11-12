@@ -15,8 +15,17 @@ export function productRequest(request, api, publicOrigin, capability) {
   if (!equalCapability(request.headers.get('x-mikka-product-capability'), capability)
       || !auth?.startsWith('Bearer mev_')) return new Response(null, { status: 403 })
   if (!api?.fetch) return new Response(null, { status: 503 })
-  return api.fetch(new Request(new URL(path, publicOrigin), {
-    method: 'POST', body: request.body, signal: request.signal, redirect: 'error', duplex: 'half',
+  return forwardProductRequest(request, api, publicOrigin, auth)
+}
+
+async function forwardProductRequest(request, api, publicOrigin, auth) {
+  const response = await api.fetch(new Request(new URL(path, publicOrigin), {
+    method: 'POST', body: request.body, signal: request.signal, redirect: 'manual', duplex: 'half',
     headers: { 'content-type': 'application/json', authorization: auth },
   }))
+  if (response.status >= 300 && response.status < 400) {
+    await response.body?.cancel().catch(() => {})
+    return new Response(null, { status: 502 })
+  }
+  return response
 }
