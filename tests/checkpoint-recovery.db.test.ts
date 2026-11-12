@@ -7,7 +7,6 @@ import { Pool } from 'pg'
 import { observePoolCommits } from '../lib/db/commit-effects'
 import { runCheckpointReceiptSchema, type RunCheckpoint, type RunCheckpointReceipt } from '@mikka/protocol/device'
 import { emptyRunReport } from '@mikka/protocol/run'
-import { observePoolCommits } from '../lib/db/commit-effects'
 
 const connection = process.env.E2E_DATABASE_URL
 if (connection) {
