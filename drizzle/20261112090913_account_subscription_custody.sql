@@ -1,3 +1,4 @@
+-- target: MIKKA_DATABASE_URL
 BEGIN;
 SET LOCAL lock_timeout = '5s';
 

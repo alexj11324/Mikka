@@ -183,7 +183,7 @@
     "behavior": "The official Eve host opts into its private Cloudflare World explicitly. Leaving the selector unset preserves the normal workflow selection.",
     "test": "cloudflare/eve-runtime/test/config.test.mjs"
   },
-  "drizzle/20261112084130_account_subscription_custody.sql": {
+  "drizzle/20261112090913_account_subscription_custody.sql": {
     "mode": "built-in",
     "environment": [
       "MIKKA_DATABASE_URL"
@@ -192,7 +192,7 @@
     "test": "lib/account/deletion-lock.db.test.ts",
     "suite": "test:account-db"
   },
-  "drizzle/20261112084131_workspace_subscription_custody.sql": {
+  "drizzle/20261112090914_workspace_subscription_custody.sql": {
     "mode": "built-in",
     "environment": [
       "DATABASE_URL"

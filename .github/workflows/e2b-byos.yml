@@ -30,26 +30,6 @@ env:
   SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
 
 jobs:
-  reserve-custody-migration-names:
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 2198 }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          persist-credentials: false
-      - name: Reserve both names with the repository's allocator in a separate worktree
-        shell: bash
-        run: |
-          set -euo pipefail
-          workspace="$(mktemp -d "${RUNNER_TEMP}/mikka-custody-ids.XXXXXXXX")/candidate"
-          git worktree add --detach "${workspace}" HEAD
-          cd "${workspace}"
-          node scripts/new-migration.mjs account_subscription_custody
-          node scripts/new-migration.mjs workspace_subscription_custody
-
   custody:
     # Draft-only work is exercised locally; ready_for_review runs CI.
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
