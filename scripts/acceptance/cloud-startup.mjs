@@ -36,7 +36,7 @@ const fail = (code, cause) => { throw new Error(`startup_${code}`, cause ? { cau
 export const STARTUP_FAILURE_PHASES = Object.freeze(['unknown', 'build_pin', 'sign_in', 'session_identity', 'workspace_identity',
   'team_selection', 'workspace_selection', 'personal_selection', 'personal_readiness', 'bot_create', 'bot_identity', 'timing_configuration', 'profile_selection', 'profile_create', 'profile_validation',
   'chat_model_selection', 'issue_create', 'coordinator_submit', 'coordinator_stream', 'thread_lookup', 'coordinator_stop',
-  'subscription_proof', 'bootstrap_publication', 'execution_watch', 'execution_receipt', 'cleanup'])
+  'subscription_proof', 'bootstrap_publication', 'execution_watch', 'execution_receipt', 'task_review', 'cleanup'])
 // These are driver-owned codes, never a prefix rule accepting arbitrary error
 // messages. The candidate validator independently projects this same contract.
 export const STARTUP_FAILURE_CODES = Object.freeze([
@@ -56,7 +56,7 @@ export const STARTUP_FAILURE_CODES = Object.freeze([
   'subscription_provenance_mismatch', 'test_bot_required', 'threshold_invalid', 'timeout', 'timeout_invalid',
   'timing_variable_cleanup_forbidden', 'timing_variable_create_failed', 'timing_variable_exists', 'timings_invalid',
   'vercel_token_required', 'version_pin_required', 'worker_configuration_invalid', 'worker_configuration_missing', 'worker_pin_invalid',
-  'worker_release_changed', 'worker_release_mismatch', 'workflow_run_missing', 'workspace_identity_mismatch', 'workspace_invalid',
+  'review_verification_failed', 'worker_release_changed', 'worker_release_mismatch', 'workflow_run_missing', 'workspace_identity_mismatch', 'workspace_invalid',
   'workspace_restore_failed',
   'owned_account_required', 'owned_actor_model_invalid', 'owned_workspace_mismatch', 'acceptance_actor_invalid',
   'owned_subscription_model_missing_or_ambiguous', 'owned_subscription_identity_mismatch',
@@ -959,7 +959,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
   deviceId, agentId, sourceCommit, expectedBuild, taskProvider, repository = REPOSITORY, titlePrefix = '测试 1505',
   sampleId = randomUUID(), timeoutMs = 240000, requireReply = true, minToolCalls = deviceId ? 0 : 1,
   runtimeEvidence: runtimeEvidenceMode = 'optional', officialTiming = 'disabled',
-  now = Date.now, WebSocketImpl = globalThis.WebSocket, pinBuild, leaseAudit = false, onCandidateRunQueued, createCaseProbe, onFixture }) {
+  now = Date.now, WebSocketImpl = globalThis.WebSocket, pinBuild, leaseAudit = false, onCandidateRunQueued, createCaseProbe, onFixture, verifyCompletedTask }) {
   assert(client && ['request', 'json', 'rpc'].every(key => typeof client[key] === 'function'), 'client_required')
   assert(UUID.test(botId ?? '') && UUID.test(profileId ?? ''), 'fixture_required')
   const owned = scope?.actor === OWNED_CODEX_ACTOR, personal = scope?.workspaceKind === 'personal'
@@ -984,7 +984,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     assert(typeof build === 'string' && (!expectedBuild || build === expectedBuild), 'build_mismatch')
     assert(!record.build || build === record.build, 'build_changed'); record.build = build
   })
-  let initialPinPassed = false, finalPinAttempted = false, probe
+  let initialPinPassed = false, finalPinAttempted = false, probe, verifyAfterEnd
   try {
     if (createCaseProbe) {
       probe = await createCaseProbe({ client, record, scope, now })
@@ -1064,6 +1064,14 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
       toolObservedToAgentStartMs: dateValue(record.agentStart.observedAt) - dateValue(record.dispatchObservedAt),
       toolObservedToFirstProviderMs: dateValue(record.firstProviderChunk.observedAt) - dateValue(record.dispatchObservedAt),
       warning: 'tool stream reception can lag dispatch; these are observations, not the <=5s gate' }
+    if (verifyCompletedTask) {
+      record.phase = 'task_review'
+      assert(taskProvider === 'cloudflare' && !personal && !owned && record.replyVerified &&
+        record.runtimeEvidence?.status === 'passed' && record.execution?.sharedScope?.verified, 'review_verification_failed')
+      verifyAfterEnd = await verifyCompletedTask({client, taskId: record.issueId, runId: record.runId,
+        ownerId: scope.ownerId, workspaceId: scope.workspaceId, expectedBuild, taskProvider})
+      assert(typeof verifyAfterEnd === 'function', 'review_verification_failed')
+    }
     record.credentialRoute = 'subscription'
     record.status = 'execution_proved_awaiting_server_timing'
   } catch (error) {
@@ -1091,6 +1099,14 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
       }
     }
     await cleanupCase(client, record, deviceId ? 'device' : 'cloud', { timeoutMs, WebSocketImpl, now, ...(probe ? { preserveIssue: true } : {}) })
+    if (verifyAfterEnd && record.cleanup.status === 'passed') {
+      try { await verifyAfterEnd() }
+      catch {
+        record.status = 'failed'
+        record.cleanup.status = 'failed'
+        record.cleanup.errors.push({ step: 'review_after_machine_end', code: 'startup_review_verification_failed' })
+      }
+    }
     if (probe) {
       try { await probe.afterRelease() }
       catch (error) {
@@ -1107,9 +1123,11 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
 }
 
 export async function runCloudStartup(options, { env = process.env, fetchImpl = fetch, WebSocketImpl = globalThis.WebSocket, now = Date.now,
-  readWorkerRelease = () => readProductionWorkerRelease({ token: env.VERCEL_TEAM_TOKEN, fetchImpl }), onCandidateRunQueued, createCaseProbe, caseProfileInstructions, onFixture } = {}) {
+  readWorkerRelease = () => readProductionWorkerRelease({ token: env.VERCEL_TEAM_TOKEN, fetchImpl }), onCandidateRunQueued, createCaseProbe, caseProfileInstructions, onFixture, verifyCompletedTask } = {}) {
   options = { ...options }
   validatePersonalOptions(options)
+  assert(verifyCompletedTask === undefined || typeof verifyCompletedTask === 'function' && options.taskProvider === 'cloudflare'
+    && options.workspaceKind !== 'personal' && (!options.actor || options.actor === 'shared_smoke'), 'option_invalid')
   if (options.taskProvider) {
     assert(options.taskProvider === 'cloudflare' && options.origin === 'https://app.aspectlylabs.com'
       && options.mode === 'acceptance' && options.harness === 'both' && options.runs === 2 && options.expectedBuild
@@ -1246,7 +1264,7 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
       }
       report.phase = 'profile_validation'
       const sample = await runSubscriptionCase({ client, ...options, botId, profileId: profile.id, profile, scope, harness, sampleId,
-        sourceCommit: options.revision, pinBuild: pin, now, WebSocketImpl, onCandidateRunQueued, createCaseProbe, onFixture })
+        sourceCommit: options.revision, pinBuild: pin, now, WebSocketImpl, onCandidateRunQueued, createCaseProbe, onFixture, verifyCompletedTask })
       report.samples.push(sample)
       const versionFailure = sample.versionPinFailure?.code ?? (['startup_build_mismatch', 'startup_build_changed',
         'startup_worker_release_mismatch', 'startup_worker_release_changed'].includes(sample.error) ? sample.error : null)

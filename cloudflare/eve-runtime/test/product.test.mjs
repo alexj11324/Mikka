@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import { productRequest } from '../runtime/product.mjs'
 
 const endpoint = 'https://product.internal/mikka/api/internal/eve/tools'
+const slackEndpoint = endpoint.replace('/tools', '/slack-credential')
 const origin = 'https://app.example.test'
 const request = (url = endpoint, method = 'POST', extra = {}) => new Request(url, { method,
   headers: { authorization: 'Bearer mev_fixture', 'x-mikka-product-capability': 'private-local', cookie: 'ignored', ...extra },
@@ -52,7 +53,8 @@ export default { fetch(request, env) {
           const operation = await request.json()
           if (operation.redirect) return Response.redirect('https://outside.example.test', 307)
           return Response.json({ operation, authorization: request.headers.get('authorization'),
-            capability: request.headers.get('x-mikka-product-capability'), redirect: request.redirect })
+            capability: request.headers.get('x-mikka-product-capability'), redirect: request.redirect,
+            proof: request.headers.get('x-mikka-slack-grant'), path: new URL(request.url).pathname })
         } }` },
     ],
   }))
@@ -61,11 +63,20 @@ export default { fetch(request, env) {
   const forwarded = await service.fetch(request())
   assert.equal(forwarded.status, 200)
   assert.deepEqual(await forwarded.json(), { operation: { operation: 'prepare' },
-    authorization: 'Bearer mev_fixture', capability: null, redirect: 'manual' })
-  const denied = await service.fetch(endpoint, { method: 'POST', headers: request().headers,
-    body: JSON.stringify({ redirect: true }) })
-  assert.equal(denied.status, 502)
-  assert.equal(denied.headers.get('location'), null)
+    authorization: 'Bearer mev_fixture', capability: null, redirect: 'manual', proof: null, path: new URL(endpoint).pathname })
+  assert.equal((await service.fetch(request(slackEndpoint))).status, 403)
+  const scoped = request(slackEndpoint, 'POST', { 'x-mikka-slack-grant': 'scoped-proof' })
+  const slack = await service.fetch(scoped)
+  assert.equal(slack.status, 200)
+  assert.deepEqual(await slack.json(), { operation: { operation: 'prepare' }, authorization: 'Bearer mev_fixture',
+    capability: null, redirect: 'manual', proof: 'scoped-proof', path: new URL(slackEndpoint).pathname })
+  for (const target of [endpoint, slackEndpoint]) {
+    const denied = await service.fetch(target, { method: 'POST', headers: scoped.headers,
+      body: JSON.stringify({ redirect: true }) })
+    assert.equal(denied.status, 502)
+    assert.equal(denied.headers.get('location'), null)
+    assert.equal(await denied.text(), '')
+  }
 })
 
 test('every redirect class returns an empty 502 even if the upstream body reset during cleanup', async () => {
@@ -91,4 +102,18 @@ test('every redirect class returns an empty 502 even if the upstream body reset 
     assert.equal(result.headers.get('location'), null)
     assert.equal(await result.text(), '')
   }
+})
+
+test('only the native Slack credential endpoint forwards a present grant proof', async () => {
+  const url = slackEndpoint
+  const api = { async fetch(forwarded) {
+    assert.equal(forwarded.url, origin + '/mikka/api/internal/eve/slack-credential')
+    assert.equal(forwarded.headers.get('x-mikka-slack-grant'), 'scoped-proof')
+    assert.equal(forwarded.headers.has('cookie'), false)
+    return new Response(null, { status: 204 })
+  } }
+  assert.equal((await productRequest(request(url), api, origin, 'private-local')).status, 403)
+  assert.equal((await productRequest(request(url, 'POST', { 'x-mikka-slack-grant': 'scoped-proof' }), api, origin, 'private-local')).status, 204)
+  const tool = { fetch(forwarded) { assert.equal(forwarded.headers.has('x-mikka-slack-grant'), false); return new Response() } }
+  await productRequest(request(endpoint, 'POST', { 'x-mikka-slack-grant': 'scoped-proof' }), tool, origin, 'private-local')
 })

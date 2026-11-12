@@ -60,8 +60,10 @@ export function useSuggestions() {
   async function send(id: string): Promise<string | null> {
     try {
       const result = await sendSuggestion(id)
-      if (result.error && result.error !== 'suggestionNotFound') return actionError(result.error)
-      await Promise.all([mutate(), mutateAll(SUGGESTION_COUNT_KEY), mutateAll(coordinatorChatKey()), mutateAll(key => key === 'threads' || Array.isArray(key) && key[0] === 'threads')])
+      if (result.error) return actionError(result.error)
+      if (result.queued !== true) return actionError()
+      // SWR owns read errors. Refreshing projections cannot undo a committed handoff.
+      void Promise.allSettled([mutate(), mutateAll(SUGGESTION_COUNT_KEY), mutateAll(coordinatorChatKey()), mutateAll(key => key === 'threads' || Array.isArray(key) && key[0] === 'threads')])
       return null
     } catch { return actionError() }
   }
