@@ -122,5 +122,5 @@ export function useFactoryQuestions(version: unknown, enabled = true) {
     const result = await submitAnswer(question, text)
     return result.status === 'accepted' ? null : result.error
   }
-  return { questions: data ?? [], error: error ?? null, reload: () => mutate(), answer, submitAnswer }
+  return { questions: data ?? [], loading: enabled && data === undefined && !error, error: error ?? null, reload: () => mutate(), answer, submitAnswer }
 }
