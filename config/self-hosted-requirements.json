@@ -565,6 +565,13 @@
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "lib/governance/organization-invitations.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the existing Organization membership authority to issue, revoke and accept email-bound Member-only invitations. Acceptance never grants Workspace, Project or credential access.",
+    "test": "tests/organization-invitations.db.test.ts",
+    "suite": "test:organization-invitations-db"
+  },
   "lib/governance/service-credentials.ts": {
     "mode": "built-in",
     "environment": [],
