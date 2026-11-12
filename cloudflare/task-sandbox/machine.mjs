@@ -5,6 +5,7 @@ import { machineGrant, sameGrant, workspaceName, liveUntil, verifyCheckpoint, MA
 import { TaskFiles } from './files.mjs'
 import { processOptions, taskProcess, stopTaskProcesses } from './process.mjs'
 import { TaskWorkspace } from './workspace.mjs'
+import { prepareReviewGuest } from './review-guest.mjs'
 
 export { DirectoryBackupGateway } from '@cloudflare/sandbox'
 
@@ -118,10 +119,15 @@ export class TaskMachine extends DurableObject {
       }
       try {
         await this.startImage(run)
+        // The native product image must protect the kernel before importing
+        // task files, registering the daemon or granting its first process.
+        const reviewBoot = this.env.NATIVE_TASK_EGRESS === 'direct'
+          ? await prepareReviewGuest(this.ctx.container)
+          : undefined
         const restored = await this.workspace.restore()
         if (restored && this.env.NATIVE_TASK_EGRESS === 'direct') await this.transferNativeHistory('restore')
         if (!restored) await new Files(this.ctx.container).mkdir('/workspace', { recursive: true })
-        await store.put('run', { ...run, restored, state: 'running' })
+        await store.put('run', { ...run, restored, ...(reviewBoot ? { reviewBoot } : {}), state: 'running' })
         return { state: 'running', restored, instanceId: this.ctx.id.toString() }
       } catch (error) {
         // No task operation has been authorized. Preserve the prior manifest
