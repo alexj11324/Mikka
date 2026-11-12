@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { test } from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../tests/helpers/e2e-target.mjs'
-import { expireSubscriptionAcquisitions, subscriptionCleanupDue } from './subscription-acquire-expiry'
+import { CLEANUP_DUE_SQL, expireSubscriptionAcquisitions, subscriptionCleanupDue } from './subscription-acquire-expiry'
 
 const databaseURL = process.env.E2E_DATABASE_URL
 const disposable = disposableDatabase(process.env, databaseURL)
@@ -28,6 +28,7 @@ async function withDatabase(run: (pool: Pool) => Promise<void>) {
       '20261027164509_byos_enrollment_cleanup.sql',
       '20261029043631_byos_account_label.sql',
       '20261029043633_byos_connection_removed.sql',
+      '20261031050731_account_deletion_jobs.sql',
       migration,
       migration,
     ]) await pool.query(await readFile(new URL(`../drizzle/${name}`, import.meta.url), 'utf8'))
@@ -286,3 +287,47 @@ test('the hourly pre-check is false when idle and true exactly when the sweep ha
     assert.equal(await subscriptionCleanupDue(pool), false, 'nothing left after the sweep')
   })
 })
+
+for (const consolidated of [true, false]) {
+  test(`ordinary cleanup leaves deletion-owned work to its job in a ${consolidated ? 'consolidated' : 'split'} database`, { skip: !disposable }, async () => {
+    await withDatabase(async pool => {
+      const job = randomUUID(), solo = randomUUID(), shared = randomUUID()
+      const inSolo = await connection(pool, 'former-member')
+      const byOwner = await connection(pool, 'deleting-owner')
+      const ordinary = await connection(pool, 'other-owner')
+      await pool.query('UPDATE byos_connections SET "workspaceId"=CASE WHEN id=$1 THEN $2 ELSE $3 END', [inSolo.id, solo, shared])
+      for (const row of [inSolo, byOwner, ordinary]) {
+        await pool.query(`INSERT INTO byos_secret_artifacts (name,"connectionId","ownerId","workspaceId",provider,kind,"notBefore")
+          SELECT id::text,id,"ownerId","workspaceId",provider,'grant',now() FROM byos_connections WHERE id=$1`, [row.id])
+      }
+      const enrollment = randomUUID()
+      await pool.query(`INSERT INTO byos_enrollment_transfers
+        ("enrollmentId","transferId","connectionId","ownerId","workspaceId",principal,"databaseIdentity","escrowDigest","providerSubject",epoch,"operationId","boundAt")
+        SELECT $1,$2,id,"ownerId","workspaceId",'fixture',$3,$3,'fixture',epoch-1,"operationId",now() FROM byos_connections WHERE id=$4`,
+      [enrollment, randomUUID(), digest, inSolo.id])
+      await pool.query('INSERT INTO byos_enrollment_sources ("enrollmentId",kind,"connectionId") VALUES ($1,\'escrow\',$2)', [enrollment, inSolo.id])
+      if (consolidated) {
+        await pool.query(await readFile(new URL('../drizzle/20261031050732_workspace_deletion_guards.sql', import.meta.url), 'utf8'))
+        await pool.query('INSERT INTO account_deletion_workspace_guards ("workspaceId","jobId") VALUES ($1,$2)', [solo, job])
+        await assert.rejects(pool.query('UPDATE byos_connections SET epoch=epoch WHERE id=$1', [inSolo.id]), { code: '55000' })
+      } else {
+        assert.equal((await pool.query("SELECT to_regclass('account_deletion_workspace_guards') AS guard")).rows[0].guard, null)
+      }
+      await pool.query(`INSERT INTO account_deletion_jobs (id,"subjectUserId","subjectEmailHash",stage,plan)
+        VALUES ($1,$2,$3,'external_pending',$4)`, [job, byOwner.ownerId, digest, JSON.stringify({ solo: [solo] })])
+      await pool.query('INSERT INTO account_deletion_guards ("subjectId","jobId") VALUES ($1,$2)', [byOwner.ownerId, job])
+      await pool.query(`INSERT INTO account_deletion_jobs (id,"subjectUserId","subjectEmailHash",stage,plan)
+        VALUES ($1,$2,$3,'cancelled',$4)`, [randomUUID(), ordinary.ownerId, digest, JSON.stringify({ solo: [shared] })])
+      const protectedIds = [inSolo.id, byOwner.id], before = await rows(pool, protectedIds)
+      assert.equal(await subscriptionCleanupDue(pool), true)
+      assert.deepEqual(await expireSubscriptionAcquisitions(pool), { expired: 1, ownerIds: [ordinary.ownerId] })
+      assert.deepEqual(await expireSubscriptionAcquisitions(pool, byOwner.ownerId), { expired: 0, ownerIds: [] })
+      assert.deepEqual((await pool.query(CLEANUP_DUE_SQL)).rows.map(row => row.connectionId), [ordinary.id])
+      await pool.query('UPDATE byos_secret_artifacts SET "deletedAt"=now() WHERE "connectionId"=$1', [ordinary.id])
+      assert.equal(await subscriptionCleanupDue(pool), false)
+      assert.deepEqual(await rows(pool, protectedIds), before)
+      assert.equal((await pool.query('SELECT count(*)::int AS retained FROM byos_secret_artifacts WHERE "deletedAt" IS NULL')).rows[0].retained, 2)
+      assert.equal((await pool.query('SELECT "deletedAt" FROM byos_enrollment_sources WHERE "enrollmentId"=$1', [enrollment])).rows[0].deletedAt, null)
+    })
+  })
+}
