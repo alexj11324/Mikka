@@ -2,6 +2,7 @@
 
 import { useViewState } from '@/lib/hooks/view-state'
 import { useContext, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { InlineLoadError } from '@/components/load-error'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
@@ -90,9 +91,10 @@ function useStoredFlag(key: string, fallback: boolean) {
  * Coordinator) over the status columns and 受阻 (lib/task-blocked.ts), with the
  * Coordinator conversation in a sidebar that folds into a pill (MIK-45).
  */
-export function BoardPage({ issues, userId, workspaceId, teamId, personalWorkspace = false, onOpen, onUpdated, onBusyChange }: { stateKey?: string; workspaceId?: string; teamId?: string;
+export function BoardPage({ issues, userId, workspaceId, teamId, personalWorkspace = false, presentationRead, onOpen, onUpdated, onBusyChange }: { stateKey?: string; workspaceId?: string; teamId?: string;
   /** In a personal workspace every task is the person's: no 全部 / 工作区 / 个人 segment and no lock on cards (glossary, Known naming debt). */
   personalWorkspace?: boolean
+  presentationRead: { isLoading: boolean; error?: unknown; mutate: () => Promise<unknown> }
   issues: Issue[]
   userId: string
   onOpen: (id: string) => boolean | void
@@ -103,6 +105,7 @@ export function BoardPage({ issues, userId, workspaceId, teamId, personalWorkspa
   const tNav = useTranslations('Nav')
   const tIssue = useTranslations('Issue')
   const tCommon = useTranslations('Common')
+  const tWorkspace = useTranslations('Workspace')
   const titleId = useId()
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
@@ -249,13 +252,18 @@ export function BoardPage({ issues, userId, workspaceId, teamId, personalWorkspa
     { label: t('cardProperties'), submenu: CARD_PROPERTIES.map(property => ({ label: t(`property.${property}`), checked: display.properties.includes(property), onSelect: () => setDisplay({ properties: display.properties.includes(property) ? display.properties.filter(item => item !== property) : [...display.properties, property] }) })) },
   ]
 
+  // A persisted Task status alone cannot determine its Board column while the projection is unavailable.
+  const readNotice = presentationRead.error
+    ? <InlineLoadError message={tWorkspace('taskStatesReadFailed')} retryLabel={tCommon('retry')} onRetry={() => { void presentationRead.mutate() }} />
+    : presentationRead.isLoading ? <p role="status" className="p-4 text-sm text-muted-foreground">{tCommon('loading')}</p> : null
+
   return <div className="flex min-h-0 flex-1">
     <section aria-labelledby={titleId} className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       <h1 id={titleId} className="sr-only">{t('title')}</h1>
-      <BoardScreenView issues={shown} columns={columns} hidden={display.hidden} blocks={blocks} newestRuns={newestRuns} context={{ properties: new Set(display.properties), agentStates, taskStates, subtasks, owners, blocks, personalWorkspace }}
+      {readNotice ?? <BoardScreenView issues={shown} columns={columns} hidden={display.hidden} blocks={blocks} newestRuns={newestRuns} context={{ properties: new Set(display.properties), agentStates, taskStates, subtasks, owners, blocks, personalWorkspace }}
         view={view} onView={next => update({ view: next })} scopes={scopes} scope={scope} onScope={next => update({ scope: next as Scope })}
         filterItems={filterItems} filterCount={activeFilters.length} sortItems={sortItems} tools={<span className="flex items-center gap-1 max-md:hidden">{refreshButton}{panelButton}</span>}
-        onNew={() => setNewTask(true)} onOpen={id => { onOpen(id) }} onDiscuss={discuss} onUpdated={onUpdated} onBusyChange={onBusyChange} />
+        onNew={() => setNewTask(true)} onOpen={id => { onOpen(id) }} onDiscuss={discuss} onUpdated={onUpdated} onBusyChange={onBusyChange} />}
     </section>
     {sidebar && <ResizablePane render="aside" aria-label={tNav('coordinator')} storageKey="mikka:board-sidebar-width" defaultWidth={360} min={280} max={560} edge="start" from="xl" label={tCommon('resize.boardSidebar')} className="hidden shrink-0 flex-col border-l xl:flex">
       {/* Same centered pill as the Coordinator page, so the two read as one conversation. */}

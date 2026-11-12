@@ -64,9 +64,30 @@ function issue(owner: string, workspace: string, suffix: string): Issue {
 }
 async function render({ owner = 'owner-one', workspace = 'workspace-one', visible = true, remount = false } = {}) {
   await act(async () => root.render(<ViewStateProvider scope={`${owner}:${workspace}`}>
-    {visible && <BoardPage key={remount ? `${owner}:${workspace}` : 'board'} issues={[issue(owner, workspace, 'one'), issue(owner, workspace, 'two')]} userId={owner} workspaceId={workspace} onOpen={nothing} onUpdated={async () => {}} onBusyChange={nothing} />}
+    {visible && <BoardPage presentationRead={{ isLoading: false, mutate: async () => undefined }} key={remount ? `${owner}:${workspace}` : 'board'} issues={[issue(owner, workspace, 'one'), issue(owner, workspace, 'two')]} userId={owner} workspaceId={workspace} onOpen={nothing} onUpdated={async () => {}} onBusyChange={nothing} />}
   </ViewStateProvider>))
 }
+test('a Board with an unresolved or failed Task presentation waits for the authorized projection before rendering cards', async () => {
+  const task = issue('owner-one', 'workspace-one', 'one')
+  let reads = 0
+  const mutate = async () => { reads++ }
+  const show = async (isLoading: boolean, error?: Error) => {
+    await act(async () => root.render(<BoardPage issues={[task]} userId="owner-one" workspaceId="workspace-one"
+      presentationRead={{ isLoading, error, mutate }} onOpen={nothing} onUpdated={async () => {}} onBusyChange={nothing} />))
+  }
+  await show(true)
+  assert.equal(container.querySelector('[role="status"]')?.textContent, 'loading')
+  assert.deepEqual(shown(), [])
+  await show(false, new Error('temporarily unavailable'))
+  const alert = container.querySelector('[role="alert"]')
+  assert.match(alert?.textContent ?? '', /taskStatesReadFailed/)
+  assert.deepEqual(shown(), [])
+  await act(async () => alert!.querySelector('button')!.click())
+  assert.equal(reads, 1)
+  await show(false)
+  assert.deepEqual(shown(), ['workspace-one task one'])
+})
+
 async function pick(label: string) {
   const choice = [...container.querySelectorAll<HTMLButtonElement>('button[role="menuitemcheckbox"]')].find(button => button.textContent === label)
   assert.ok(choice, `filter option ${label} exists in this workspace`)
