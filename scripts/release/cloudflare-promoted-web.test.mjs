@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import { verifyPromotedWeb } from './cloudflare-promoted-web.mjs'
+import { verifyPromotedWeb, verifyDesktopPromotedWeb } from './cloudflare-promoted-web.mjs'
 
 const digest = value => createHash('sha256').update(value).digest('hex')
 const product = 'abc1234'.padEnd(40, '5'), overlay = 'c'.repeat(40), releasePin = 'abc1234-902-1'
@@ -35,6 +35,13 @@ function fixture(change = {}) {
     assert.equal(options.cache, 'no-store')
     if (u.origin === 'https://api.github.com') {
       assert.equal(options.headers.authorization, 'Bearer test')
+      if (u.pathname.includes('/compare/')) {
+        const path = '/repos/' + repo + '/compare/' + env.GITHUB_SHA + '...' + product
+        assert.equal(u.pathname, path)
+        assert.equal(u.searchParams.get('per_page'), '1')
+        return Response.json({ url: 'https://api.github.com' + path, base_commit: { sha: env.GITHUB_SHA },
+          merge_base_commit: { sha: env.GITHUB_SHA }, status: 'ahead', ahead_by: 1, behind_by: 0, ...change.comparison })
+      }
       const body = { ['/repos/' + repo + '/issues/comments/81']: post, ['/repos/' + repo + '/issues/comments/80']: prior,
         ['/repos/' + repo + '/actions/runs/55/attempts/2']: started,
         ['/repos/' + repo + '/git/ref/heads/main']: { object: { type: 'commit', sha: change.main ?? product } } }[u.pathname]
@@ -53,7 +60,8 @@ function fixture(change = {}) {
     assert.equal(u.pathname, '/mikka/en/sign-in')
     return new Response(change.shell ?? '<script type="module" src="/mikka/assets/entry-123.js?dpl=' + releasePin + '"></script>')
   }
-  return { verify: () => verifyPromotedWeb({ env, fetchImpl, now: () => verified + (change.elapsed ?? 3600000) }), calls }
+  const options = { env, fetchImpl, now: () => verified + (change.elapsed ?? 3600000) }
+  return { verify: () => verifyPromotedWeb(options), desktop: () => verifyDesktopPromotedWeb(options), calls }
 }
 
 test('revalidates the live promoted Web on the original dispatch after 3976 seconds of native work', async () => {
@@ -104,6 +112,33 @@ test('rejects stale DNS, rollback, a legacy gateway serving the same SHA, and cl
     [{ shell: '<script src="/mikka/assets/current.js?dpl=' + releasePin + '&amp;dpl=old"></script>' }, 'servedClientPin'],
   ]) await assert.rejects(fixture(change).verify(), new RegExp(code), code)
 })
+test('Desktop binds its own original attempt, installer ancestry, overlay and serving gateway before publication', async () => {
+  const installer = '9'.repeat(40)
+  const run = { path: '.github/workflows/desktop-release.yml', head_sha: installer }
+  const env = { GITHUB_SHA: installer, MIKKA_UI_OVERLAY_SHA: overlay }
+  const good = fixture({ env, run, elapsed: 5400000 })
+  assert.deepEqual(await good.desktop(), { product, releasePin, overlay })
+  assert.ok(good.calls.some(path => path.includes('/compare/')))
+  await assert.rejects(good.verify(), /dispatchSource/)
+  const exact = fixture({ run: { ...run, head_sha: product } })
+  assert.deepEqual(await exact.desktop(), { product, releasePin, overlay })
+  assert.ok(!exact.calls.some(path => path.includes('/compare/')))
+  for (const [change, code] of [
+    [{ run: { ...run, path: workflow } }, 'runIdentity'],
+    [{ run: { ...run, head_sha: product } }, 'runIdentity'],
+    [{ run: { ...run, run_attempt: 3 } }, 'runIdentity'],
+    [{ run: { ...run, event: 'push' } }, 'runIdentity'],
+    [{ env: { ...env, EXPECTED_UI_OVERLAY_SHA: 'a'.repeat(40), MIKKA_UI_OVERLAY_SHA: '' } }, 'desktopOverlay'],
+    [{ env: { ...env, MIKKA_UI_OVERLAY_SHA: 'a'.repeat(40) } }, 'desktopOverlay'],
+    [{ comparison: { merge_base_commit: { sha: product }, status: 'diverged', behind_by: 1 } }, 'desktopSource'],
+    [{ comparison: { base_commit: { sha: product } } }, 'invalidCommitComparison'],
+    [{ main: installer }, 'mainChanged'],
+    [{ headers: { 'x-vercel-id': 'old' } }, 'gatewayVersion'],
+    [{ elapsed: 4 * 3600000 }, 'approvalWindow'],
+  ]) await assert.rejects(fixture({ env, run, ...change }).desktop(), new RegExp(code))
+  await assert.rejects(fixture({ run: { path: '.github/workflows/desktop-release.yml' } }).verify(), /runIdentity/)
+})
+
 test('both publication modes share the paid builder and subscriptions, while Cloudflare omits the legacy publisher', () => {
   const read = name => readFileSync(new URL('../../.github/workflows/' + name, import.meta.url), 'utf8')
   const parent = read('e2b-official-runtime.yml'), child = read('e2b-runtime-release.yml')

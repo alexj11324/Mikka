@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
+import { affectsWorker } from './select-release.mjs'
+import { readWebAuthority } from '../release/cloudflare-promoted-web.mjs'
 import { ALIAS, PROJECT, TEAM, WORKER, deployGateway, gitRepository, readJson, validateConfig } from './deploy.mjs'
 
 const SOURCE = 'a'.repeat(40), OLD = 'b'.repeat(40), NEW = 'c'.repeat(40)
@@ -22,7 +24,13 @@ function fixture() {
     async sameInputs() { return state.same },
   }
   const fetchImpl = async (url, init) => {
+    url = new URL(url)
     state.calls.push(url.pathname)
+    if (url.hostname === 'cloudflare-dns.com' || url.hostname === ALIAS) {
+      assert.equal(init.headers.authorization, undefined)
+      return url.hostname === ALIAS ? Response.json({build:state.live}, {headers:{'x-vercel-id':'fixture'}})
+        : Response.json({Status:3, Question:[{name:'_mikka-release.aspectlylabs.com.', type:16}]})
+    }
     assert.equal(init.method ?? 'GET', 'GET', 'all preflight/provider readback calls are read-only')
     assert.equal(init.redirect, 'error')
     let data
@@ -159,9 +167,9 @@ test('real Git ancestry and file comparisons permit unrelated main changes and r
     git(['config', 'user.name', 'Isolated release fixture'])
     git(['config', 'user.email', 'fixture@example.invalid'])
     mkdirSync(join(directory, 'lib'))
-    mkdirSync(join(directory, 'cloudflare/device-gateway'), { recursive: true })
+    mkdirSync(join(directory, 'cloudflare/device-gateway/src'), { recursive: true })
     writeFileSync(join(directory, 'lib/device-presence.ts'), 'export const fixture = true\n')
-    writeFileSync(join(directory, 'cloudflare/device-gateway/source.ts'), 'export const version = 1\n')
+    writeFileSync(join(directory, 'cloudflare/device-gateway/src/source.ts'), 'export const version = 1\n')
     git(['add', '.']); git(['commit', '--quiet', '-m', 'presence and gateway'])
     const source = git(['rev-parse', 'HEAD'])
     writeFileSync(join(directory, 'business.ts'), 'export const unrelated = true\n')
@@ -172,6 +180,9 @@ test('real Git ancestry and file comparisons permit unrelated main changes and r
     assert.equal(await repository.contains(business, source), false)
     assert.equal(await repository.sameInputs(source, business), true)
     await repository.assertCheckout(business)
+    writeFileSync(join(directory, 'cloudflare/device-gateway/src/source.test.ts'), 'export const tests = true\n')
+    git(['add', '.']); git(['commit', '--quiet', '-m', 'new gateway regression only'])
+    assert.equal(await repository.sameInputs(source, git(['rev-parse', 'HEAD'])), true, 'a test-only push must not abandon an in-flight release')
     mkdirSync(join(directory, 'lib/live'), { recursive: true })
     writeFileSync(join(directory, 'lib/live/presence.ts'), 'export const protocol = 1\n')
     writeFileSync(join(directory, 'lib/device-presence-grant.ts'), 'export const signature = 1\n')
@@ -179,9 +190,56 @@ test('real Git ancestry and file comparisons permit unrelated main changes and r
     const presence = git(['rev-parse', 'HEAD'])
     assert.equal(await repository.sameInputs(business, presence), false, 'new signing/protocol inputs must supersede an older Worker release')
     await repository.assertCheckout(presence)
-    writeFileSync(join(directory, 'cloudflare/device-gateway/source.ts'), 'export const version = 2\n')
+    writeFileSync(join(directory, 'cloudflare/device-gateway/src/source.ts'), 'export const version = 2\n')
     await assert.rejects(() => repository.assertCheckout(presence), /release_checkout_changed/)
     git(['add', '.']); git(['commit', '--quiet', '-m', 'newer gateway'])
     assert.equal(await repository.sameInputs(source, git(['rev-parse', 'HEAD'])), false)
   } finally { rmSync(directory, { recursive: true, force: true }) }
+})
+
+test('only production runtime and protocol changes qualify automatic publication', () => {
+  for (const p of ['cloudflare/device-gateway/src/route.ts', 'cloudflare/device-gateway/wrangler.jsonc',
+    'lib/live/revocation.ts', 'lib/device-presence-grant.ts', 'lib/live/session-ticket.ts']) assert.ok(affectsWorker('device', p))
+  for (const p of ['cloudflare/device-gateway/src/route.test.ts', 'cloudflare/device-gateway/test/runtime.test.mjs',
+    'scripts/device-gateway/deploy.mjs', 'lib/db/commit-effects.ts', 'lib/db/commit-effects.test.ts',
+    '.github/workflows/device-gateway.yml', 'cloudflare/suggestions-cron/src/index.mjs']) assert.equal(affectsWorker('device', p), false)
+  assert.ok(affectsWorker('cron', 'cloudflare/suggestions-cron/src/index.mjs'))
+  assert.ok(affectsWorker('cron', 'cloudflare/suggestions-cron/wrangler.jsonc'))
+  assert.equal(affectsWorker('cron', 'cloudflare/suggestions-cron/src/index.test.mjs'), false)
+  assert.throws(() => affectsWorker('unknown', 'any'), /unknown_edge_workload/)
+})
+
+test('legacy credentials remain unavailable to ambiguous and Cloudflare origin observations', async () => {
+  const question = [{name:'_mikka-release.aspectlylabs.com.', type:16}]
+  const answer = [{...question[0], data:'"mikka-release-v1=sha256:' + '1'.repeat(64) + '"'}]
+  const cfHeaders = {'cf-ray':'fixture', 'x-mikka-gateway-version-sha256':'2'.repeat(64)}
+  const read = (dns, headers) => async (url, init) => {
+    assert.equal(init.headers.authorization, undefined)
+    return new URL(url).hostname === ALIAS ? Response.json({build:SOURCE}, {headers}) : Response.json(dns)
+  }
+  assert.equal((await readWebAuthority(read({Status:0, Question:question, Answer:answer}, cfHeaders))).provider, 'cloudflare')
+  for (const observer of [read({Status:2, Question:question},{'x-vercel-id':'iad'}), read({Status:3, Question:question},cfHeaders),
+    read({Status:0, Question:question, Answer:answer},{'x-vercel-id':'iad'}), read({Status:0, TC:true, Question:question},{'x-vercel-id':'iad'})]) {
+    await assert.rejects(readWebAuthority(observer))
+  }
+})
+
+test('protected promotion is checked twice with version identity, with no Vercel reads or secrets', async () => {
+  const promotion = {schema:'mikka.cloudflare-promotion.v1',approvalComment:'1954',approvalSha256:'2'.repeat(64),
+    product:SOURCE,overlay:OLD,releasePin:'aaaaaaaa-1953-1',gatewayVersionSha256:'3'.repeat(64),
+    inventorySha256:'4'.repeat(64),verifiedAt:'2026-11-12T07:00:00.000Z',outcome:'promoted'}
+  for (const next of [promotion, {...promotion,gatewayVersionSha256:'5'.repeat(64)}, {...promotion,product:OLD}, {ready:true}]) {
+    const {state,options} = fixture()
+    let reads = 0
+    const release = deployGateway({...options,vercelToken:undefined, readPromotedWeb:async () => ++reads === 1 ? promotion : next})
+    if (next === promotion) {
+      assert.equal((await release).production.id, promotion.releasePin)
+      assert.equal(state.writes, 1)
+    } else {
+      await assert.rejects(release)
+      assert.equal(state.writes, 0)
+    }
+    assert.equal(reads, 2)
+    assert.ok(state.calls.every(path => path.startsWith('/client/v4/')))
+  }
 })
