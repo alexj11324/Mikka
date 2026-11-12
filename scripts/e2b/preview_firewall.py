@@ -20,7 +20,7 @@ class FirewallError(Exception):
         self.code = code
 
 
-def protect_port(port, *, run=subprocess.run):
+def protect_port(port, *, cloudflare=False, run=subprocess.run):
     if type(port) is not int or not 1024 <= port <= 65535 or port in (49983, 50005):
         raise FirewallError('invalid_port')
     try:
@@ -40,7 +40,8 @@ def protect_port(port, *, run=subprocess.run):
             and isinstance(value.get('sourceSha256'), str) and re.fullmatch('[a-f0-9]{64}', value['sourceSha256'])
             and isinstance(value.get('bootId'), str) and re.fullmatch('[a-f0-9-]{36}', value['bootId'])
             and type(value.get('installedTicks')) is int and value['installedTicks'] >= 0
-            and value.get('providerPorts') in ([49983], [49983, 50005])):
+            and ((value.get('provider') == 'cloudflare' and value.get('providerPorts') == []) if cloudflare
+                 else 'provider' not in value and value.get('providerPorts') in ([49983], [49983, 50005]))):
         raise FirewallError('firewall_unsupported')
     return {'protected': True, 'ipv4': True, 'ipv6': True, 'port': port}
 

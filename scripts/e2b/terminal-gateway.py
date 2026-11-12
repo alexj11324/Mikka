@@ -23,6 +23,7 @@ import signal
 import socket
 import stat
 import struct
+import sys
 import termios
 import time
 import uuid
@@ -218,6 +219,11 @@ class Session:
             if pid == 0:
                 try:
                     os.fchdir(cwd)
+                    if self.gateway.cloudflare:
+                        # Match the native Cloudflare task process. In particular,
+                        # a setuid executable in the image cannot raise privilege.
+                        if ctypes.CDLL(None, use_errno=True).prctl(38, 1, 0, 0, 0) != 0:
+                            os._exit(127)
                     os.setgroups([])
                     os.setgid(self.account.pw_gid)
                     os.setuid(self.account.pw_uid)
@@ -427,12 +433,15 @@ class Session:
 
 
 class Gateway:
-    def __init__(self, key, control=CONTROL, account=None):
+    def __init__(self, key, control=CONTROL, account=None, *, cloudflare=False):
         self.boot = str(uuid.uuid4())
         self.tickets = Tickets(key, self.boot)
         self.revoked = {}
         self.control = control
-        self.account = account or pwd.getpwnam('user')
+        self.cloudflare = cloudflare
+        self.account = account or pwd.getpwnam('node' if cloudflare else 'user')
+        if cloudflare and (self.account.pw_uid, self.account.pw_gid) != (1000, 1000):
+            raise RuntimeError('terminal_task_account_unavailable')
         if self.account.pw_uid == 0:
             raise RuntimeError('terminal_user_required')
         self.session = None
@@ -707,7 +716,7 @@ async def respond(writer, status, value=None):
     await writer.drain()
 
 
-async def main():
+async def main(*, cloudflare=False):
     if os.geteuid() != 0:
         raise RuntimeError('terminal_root_required')
     ROOT.mkdir(mode=0o700, exist_ok=True)
@@ -728,7 +737,7 @@ async def main():
             raise RuntimeError('terminal_key_unavailable')
     finally:
         os.close(fd)
-    gateway = Gateway(key)
+    gateway = Gateway(key, cloudflare=cloudflare)
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     listener.setsockopt(socket.SOL_SOCKET, socket.SO_MARK, 0x4D4B5056)
@@ -742,7 +751,9 @@ async def main():
 
 if __name__ == '__main__':
     try:
-        asyncio.run(main())
+        if sys.argv[1:] not in ([], ['--cloudflare-task']):
+            raise RuntimeError('terminal_gateway_unavailable')
+        asyncio.run(main(cloudflare=bool(sys.argv[1:])))
     except (KeyboardInterrupt, SystemExit):
         pass
     except BaseException:

@@ -195,10 +195,18 @@ def redirect_location(value, target, origin, path):
 
 
 class Gateway:
-    def __init__(self, root=ROOT, user_id=None, protect=protect_port):
+    def __init__(self, root=ROOT, user_id=None, protect=protect_port, *, cloudflare=False):
         self.root = root
-        self.user_id = pwd.getpwnam('user').pw_uid if user_id is None else user_id
-        self.protect = protect
+        self.cloudflare = cloudflare
+        if cloudflare:
+            account = pwd.getpwnam('node')
+            if (account.pw_uid, account.pw_gid) != (1000, 1000):
+                raise PreviewFailure('runtime_unavailable', 503)
+            self.user_id = account.pw_uid
+            self.protect = lambda port: protect_port(port, cloudflare=True)
+        else:
+            self.user_id = pwd.getpwnam('user').pw_uid if user_id is None else user_id
+            self.protect = protect
         self.binding = None
         self.target = None
         self.origin = None
@@ -430,7 +438,7 @@ class Gateway:
             if self.stopping:
                 raise PreviewFailure('control_unavailable', 503)
             if operation == 'version':
-                return {'version': VERSION}
+                return {'version': VERSION, **({'provider': 'cloudflare'} if self.cloudflare else {})}
             if operation == 'issue':
                 return self.issue(message)
             if operation == 'revoke':
@@ -618,8 +626,8 @@ class Gateway:
             return downstream
 
 
-async def serve(ready_fd=None):
-    gateway = Gateway()
+async def serve(ready_fd=None, *, cloudflare=False):
+    gateway = Gateway(cloudflare=True) if cloudflare else Gateway()
     await gateway.start()
     stopped = asyncio.Event()
 
@@ -680,7 +688,7 @@ def call_control(message):
             return json.loads(incoming.readline(16384))
 
 
-def ensure():
+def ensure(*, cloudflare=False):
     import fcntl
     import select
     ROOT.mkdir(mode=0o700, exist_ok=True)
@@ -692,6 +700,8 @@ def ensure():
         except (FileNotFoundError, ConnectionRefusedError):
             version = None
         if version:
+            if (version.get('provider') == 'cloudflare') != cloudflare:
+                raise PreviewFailure('runtime_version_mismatch', 409)
             if version.get('version') != VERSION:
                 if call_control({'operation': 'shutdown'}).get('stopped') is not True:
                     raise PreviewFailure('runtime_version_mismatch', 409)
@@ -699,7 +709,8 @@ def ensure():
                 return version
         read_fd, write_fd = os.pipe()
         try:
-            subprocess.Popen([sys.executable, str(Path(__file__).resolve()), 'serve', '--ready-fd', str(write_fd)],
+            subprocess.Popen([sys.executable, str(Path(__file__).resolve()), 'serve', '--ready-fd', str(write_fd),
+                              *(['--cloudflare-task'] if cloudflare else [])],
                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                              close_fds=True, pass_fds=(write_fd,), start_new_session=True)
             os.close(write_fd)
@@ -715,14 +726,15 @@ if __name__ == '__main__':
     parser.add_argument('operation', choices=('ensure', 'control', 'serve'))
     parser.add_argument('input', nargs='?')
     parser.add_argument('--ready-fd', type=int)
+    parser.add_argument('--cloudflare-task', action='store_true')
     args = parser.parse_args()
     try:
         if os.geteuid() != 0:
             raise PreviewFailure('infrastructure_only', 403)
         if args.operation == 'serve':
-            asyncio.run(serve(args.ready_fd))
+            asyncio.run(serve(args.ready_fd, cloudflare=args.cloudflare_task))
         elif args.operation == 'ensure':
-            print(json.dumps(ensure()))
+            print(json.dumps(ensure(cloudflare=args.cloudflare_task)))
         else:
             source = Path(args.input)
             # Inputs may contain one-use capabilities. Only root can read them,

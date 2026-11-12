@@ -8,6 +8,7 @@ The version marker is root-only and never contains task identity or secrets.
 import os
 import pwd
 import stat
+import sys
 from pathlib import Path
 
 
@@ -55,6 +56,14 @@ def install(root=Path('/run/mikka-review-control'), account=None):
 
 if __name__ == '__main__':
     try:
-        install()
+        if sys.argv[1:] == ['--cloudflare-task']:
+            account = pwd.getpwnam('node')
+            if (account.pw_uid, account.pw_gid) != (1000, 1000):
+                raise RuntimeError('terminal_control_install_refused')
+            install(account=account)
+        elif not sys.argv[1:]:
+            install()
+        else:
+            raise RuntimeError('terminal_control_install_refused')
     except Exception:
         raise SystemExit('terminal_control_install_refused') from None
