@@ -275,6 +275,19 @@
     "test": "lib/abuse/model.test.ts",
     "suite": "test:abuse"
   },
+  "lib/account/cloud-cleanup.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Register the supplied PostgreSQL pool before fencing the owner’s cloud runs and publishing committed machine changes.",
+    "test": "lib/account/cloud-cleanup.db.test.ts",
+    "suite": "test:account-db"
+  },
+  "lib/account/deletion-jobs.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Replay the current account deletion journal only against the isolated restored databases and object target, with external post-commit work quarantined.",
+    "test": "scripts/ops/recovery-drill.test.mjs"
+  },
   "lib/activity-actor-view.ts": {
     "mode": "built-in",
     "environment": [],
@@ -373,6 +386,13 @@
     "behavior": "The Coordinator allows an operator-selected decision endpoint and model. Requests use the existing credential and budget policy for that route.",
     "test": "lib/coordinator/native-decision.test.ts",
     "suite": "test:coordinator-events"
+  },
+  "lib/db/commit-effects.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Keep ordinary transaction notifications after commit and fence only callbacks registered in a quarantined account recovery.",
+    "test": "lib/account/deletion-restore.db.test.ts",
+    "suite": "test:account-db"
   },
   "lib/db/direct-session.ts": {
     "mode": "built-in",

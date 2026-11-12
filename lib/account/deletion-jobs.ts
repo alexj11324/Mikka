@@ -4,6 +4,7 @@ import { Pool, type PoolClient } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { pool, withDatabaseClient } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
+import { observePoolCommits, withoutCommitEffectsForRestore } from '@/lib/db/commit-effects'
 import { artifactStorage, deleteArtifactObject } from '@/lib/artifacts/storage'
 import { auditDigest } from '@/lib/audit/integrity'
 import { accountStorageKeys, deleteMainAccountData, deleteWorkspaceData, freezeProjectRetention, freezeTaskRetention, planWorkspaces, type Plan } from './delete'
@@ -30,7 +31,11 @@ export interface AccountDeletionOptions {
   /** Restore-only preservation decision from the independently retained current journal. */
   replayPlan?: Plan
 }
-const targets = (o: AccountDeletionOptions) => ({ main: o.mainPool ?? pool, workspace: o.workspacePool ?? workspacePool })
+const targets = (o: AccountDeletionOptions) => {
+  if (o.mainPool) observePoolCommits(o.mainPool)
+  if (o.workspacePool) observePoolCommits(o.workspacePool)
+  return { main: o.mainPool ?? pool, workspace: o.workspacePool ?? workspacePool }
+}
 const hashEmail = (email: string) => createHash('sha256').update(email.trim().toLowerCase()).digest('hex')
 const lockKey = (subject: string) => `mikka-account-write:${subject}`
 
@@ -347,7 +352,12 @@ export async function applyAccountDeletionManifest(manifest: AccountDeletionMani
       return retained
     })
     // Managed custody cleanup completed in the current journal; its warnings preserve upstream exceptions. Restore replays only local deletion against explicit isolated targets.
-    await resumeAccountDeletion(source.id, { ...options, externalCleanup: async () => ({ blockedReasons: [], warnings: source.warnings ?? [] }), replayPlan })
+    await withoutCommitEffectsForRestore([options.mainPool, options.workspacePool], () => resumeAccountDeletion(source.id, {
+      ...options,
+      externalCleanup: async () => ({ blockedReasons: [], warnings: source.warnings ?? [] }),
+      deleteObject: options.deleteObject ?? (async () => { throw new Error('accountDeletionRestoreObjectTargetRequired') }),
+      replayPlan,
+    }))
   }
   const remaining = (await options.mainPool.query('SELECT id FROM account_deletion_jobs WHERE id=ANY($1::uuid[]) AND stage<>\'completed\'', [[...ids]])).rows
   if (remaining.length) throw new Error('accountDeletionRestoreCleanupPending')

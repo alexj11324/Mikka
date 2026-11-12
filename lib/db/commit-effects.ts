@@ -9,6 +9,12 @@ export const COMMIT_EXECUTOR = Symbol.for('mikka.database.commitExecutor')
 const COMMIT_CONTEXT = Symbol.for('mikka.database.commitContext')
 type ObservedClient = PoolClient & { [STATE]?: State }
 const pools = new WeakSet<Pool>()
+const isolatedRestore = new AsyncLocalStorage<ReadonlySet<object>>()
+
+/** Replaying a deletion journal into a quarantined database must not wake live consumers. */
+export function withoutCommitEffectsForRestore<T>(targets: readonly Pool[], work: () => T): T {
+  return isolatedRestore.run(new Set(targets.map(commitExecutor)), work)
+}
 
 const reset = (state: State) => { state.active = false; state.effects.clear(); state.savepoints = [] }
 const run = (effect: Effect) => {
@@ -73,7 +79,8 @@ export function observeCommitEffects(client: PoolClient, scope: object = client)
 }
 
 export function observePoolCommits(pool: Pool) {
-  if (pools.has(pool)) return
+  // Request-routed proxies expose an already observed physical executor.
+  if (pools.has(pool) || (pool as Pool & { [COMMIT_EXECUTOR]?: unknown })[COMMIT_EXECUTOR]) return
   pools.add(pool)
   pool.on('connect', client => observeCommitEffects(client, pool))
   pool.on('acquire', client => observeCommitEffects(client, pool))
@@ -88,6 +95,8 @@ export function hasCommitEffect(client: PoolClient, key: string) {
 export function afterCommit(client: PoolClient, key: string, effect: Effect) {
   const state = (client as ObservedClient)[STATE]
   if (!state) throw new Error('Commit effects require an observed database client')
+  const restored = isolatedRestore.getStore()
+  if (restored?.has(state.scope) || restored?.has(client)) return
   // COMMIT can be issued after the originating request context has exited.
   const committed = AsyncLocalStorage.bind(effect)
   if (state.active) state.effects.set(key, committed)
@@ -102,8 +111,10 @@ export function afterDatabaseCommit(executor: object, key: string, effect: Effec
   const context = (executor as { [COMMIT_CONTEXT]?: ReturnType<typeof AsyncLocalStorage.snapshot> })[COMMIT_CONTEXT] ?? AsyncLocalStorage.snapshot()
   const committed = () => context(effect)
   if ((client as ObservedClient)[STATE]) afterCommit(client as PoolClient, key, committed)
-  else if (client instanceof Pool) run(committed) // The caller has awaited its autocommitted statement.
-  else throw new Error('Commit effects require an observed node-postgres executor')
+  else if (client instanceof Pool) {
+    // The caller has awaited its autocommitted statement.
+    if (!isolatedRestore.getStore()?.has(client)) run(committed)
+  } else throw new Error('Commit effects require an observed node-postgres executor')
 }
 
 /** A service retaining a bound query must retain its executor and request
