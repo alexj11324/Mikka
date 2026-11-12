@@ -1,6 +1,5 @@
 import { readFile, writeFile, rename } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
-import { Pool } from 'pg'
 
 import { requestOutcomes, WINDOW_MS } from './request-outcomes.mjs'
 export { requestOutcomes, WINDOW_MS } from './request-outcomes.mjs'
@@ -116,6 +115,7 @@ export async function notifyAlerts(alerts, { state = {}, sink, now = Date.now(),
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [logs, stateFile] = process.argv.slice(2)
   if (!logs || !stateFile || !process.env.OPS_DATABASE_URL || !process.env.OPS_INTERNAL_ALERT_SINK) throw Error('opsMonitorInputsRequired')
+  const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: process.env.OPS_DATABASE_URL, max: 1, connectionTimeoutMillis: 5_000 })
   let database
   try { database = await databaseSignals(pool) } catch { database = { databaseAvailable: 0 } } finally { await pool.end() }
