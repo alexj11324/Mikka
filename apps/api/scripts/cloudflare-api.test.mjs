@@ -62,6 +62,11 @@ test('ingress binds only the immutable account image with a private route and a 
   assert.equal(config.containers[0].max_instances, 1)
   assert.equal(config.containers[0].image, input.image)
   assert.equal(config.vars.MIKKA_DEPLOYMENT_ID, input.release)
+  assert.equal(config.ai, undefined)
+  const withAI = ingressConfig({ ...input, workersAi: true })
+  assert.deepEqual(withAI.ai, { binding: 'WORKERS_AI' })
+  assert.equal(withAI.vars.CLOUDFLARE_WORKERS_AI_ACCOUNT_ID, input.image.split('/')[1])
+  assert.throws(() => ingressConfig({ ...input, workersAi: 'untrusted' }))
   for (const changed of [{ release: 'main' }, { image: input.image.split('@')[0] + ':latest' }, { origin: 'https://user@app.example' }]) {
     assert.throws(() => ingressConfig({ ...input, ...changed }))
   }
