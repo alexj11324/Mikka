@@ -204,3 +204,49 @@ test('an unconfirmed custom answer keeps its editor when the live document settl
   assert.equal(editor?.value, 'original answer')
   assert.match(container.textContent ?? '', /没发出去/)
 })
+
+test('both chat lists refresh the existing answer row after a refusal without repainting it on composer input', async t => {
+  Object.assign(globalThis, {
+    requestAnimationFrame: browser.requestAnimationFrame.bind(browser), cancelAnimationFrame: browser.cancelAnimationFrame.bind(browser),
+    ResizeObserver: browser.ResizeObserver, HTMLElement: browser.HTMLElement,
+  })
+  const box = browser.HTMLElement.prototype
+  t.mock.method(box, 'getBoundingClientRect', function(this: HTMLElement) { return new browser.DOMRect(0, 0, 390, this.style.overflow === 'auto' ? 720 : 52) })
+  const { LegendList } = await import('@legendapp/list/react')
+  // Supply layout and a DOM host for the native keyboard shell. LegendList itself owns the row cache on both paths.
+  const KeyboardList = ({ data, keyExtractor, renderItem, extraData }: React.ComponentProps<typeof LegendList>) =>
+    createElement(LegendList, { data, keyExtractor, renderItem, extraData })
+  t.mock.module(require.resolve('@legendapp/list/keyboard'), { namedExports: { KeyboardAwareLegendList: KeyboardList } })
+  t.mock.module(require.resolve('react-native-keyboard-controller'), { namedExports: { KeyboardChatScrollView: view } })
+  t.mock.module(require.resolve('react-native-safe-area-context'), { namedExports: { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) } })
+  t.mock.module(new URL('../components/NavBar.tsx', import.meta.url).href, { namedExports: { underBar: {} } })
+  const { ChatMessageList: Web } = await import('../features/chat/components/chat-message-list.web')
+  const { ChatMessageList: Native } = await import('../features/chat/components/chat-message-list')
+  const { canAnswerCard, personalMessage } = await import('../lib/outbox')
+  const documentKey = 'stable-generated-question', transcript = [{ id: documentKey }]
+  const source = 'question:root', writes = [personalMessage('answer-1', 'saved words', [], { sourceCardId: source, chatKey: 'bot', context: 1, botId: null })]
+  const refused = writes.map(row => ({ ...row, phase: 'failed' as const, error: 'forbidden' }))
+  for (const [platform, List] of [['web', Web], ['native', Native]] as const) {
+    let drawn = 0
+    async function show(draft: string, outbox: typeof writes) {
+      await act(async () => root.render(createElement('section', null,
+        createElement('input', { value: draft, readOnly: true }),
+        createElement(List<typeof transcript[number]>, { key: platform, data: transcript, extraData: outbox, keyOf: message => message.id,
+          testID: 'list', scrollEnabled: true, bottomInset: 0, onAtLatestChange: () => {},
+          renderItem: () => {
+            drawn++
+            return createElement('button', { disabled: !canAnswerCard(outbox, source) }, 'Retry')
+          } }))))
+    }
+    await show('', writes)
+    const row = button('Retry')
+    assert.ok(row, platform)
+    assert.equal(row.disabled, true, platform)
+    const beforeTyping = drawn
+    await show('draft only', writes)
+    assert.equal(drawn, beforeTyping, `${platform} composer input repainted the transcript`)
+    await show('draft only', refused)
+    assert.equal(button('Retry'), row, `${platform} replaced the answer row`)
+    assert.equal(row.disabled, false, `${platform} kept the refused answer locked`)
+  }
+})

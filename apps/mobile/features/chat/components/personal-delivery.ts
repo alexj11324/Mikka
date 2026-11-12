@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useSyncExternalStore, type SetStateAction } from 'react'
+import { useCallback, useEffect, useMemo, useSyncExternalStore, type SetStateAction } from 'react'
 import { useChatDeliveryState } from '../../../../../lib/hooks/chat-delivery-state'
 import { apiCache } from '@/lib/api-cache'
 import { conversationJournal } from '@/lib/config'
@@ -99,5 +99,6 @@ export function usePersonalDelivery(scope: string | null, received: Set<string>,
     try { conversationJournal.forget(scope, [id]) } catch { /* The superseded command was refused by the server. */ }
     update(current => current.filter(row => row.id !== id))
   }
-  return { rows: rows.filter(item => !received.has(item.id)), read, start, discard }
+  const visible = useMemo(() => rows.filter(item => !received.has(item.id)), [rows, received])
+  return { rows: visible, read, start, discard }
 }

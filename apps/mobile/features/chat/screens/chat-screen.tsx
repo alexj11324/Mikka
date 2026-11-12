@@ -183,6 +183,8 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
   const latestReply = items.reduce((last, item, index) => item.from === 'coordinator' && item.text ? index : item.from === 'person' ? -1 : last, -1)
   // A card is answered once the person has written after it (here or anywhere else).
   const lastMine = items.reduce((last, item, index) => item.from === 'person' ? index : last, -1)
+  const rowState = useMemo(() => ({ data, outbox, selection, working, lastMine, latestReply }),
+    [data, outbox, selection, working, lastMine, latestReply])
   const proactive = items.some((item, index) => item.from === 'coordinator' && items[index - 1]?.from === 'event')
 
   // iOS asks once; the moment is the first message the Coordinator sent on its own, not app launch.
@@ -329,7 +331,7 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
           if (down && endsSelection(down, { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY, at: Date.now() }, selectionRect.current)) setSelection(null)
         } : undefined}>
         {/* The system scroll: momentum, and a bounce at both ends even while the chat is shorter than the screen. */}
-        <ChatMessageList ref={list} testID="bot-chat-scroll" data={items} scrollEnabled onScrollUnderBar={underBar.onScroll} bottomInset={composerHeight} onAtLatestChange={setAtLatest}
+        <ChatMessageList ref={list} testID="bot-chat-scroll" data={items} extraData={rowState} scrollEnabled onScrollUnderBar={underBar.onScroll} bottomInset={composerHeight} onAtLatestChange={setAtLatest}
           keyOf={item => generatedCardDocument(item) ?? item.streamId ?? (item.pending ? `pending-${item.position}` : String(item.position))} renderItem={renderItem} anchorIndex={anchorIndex}
           onStartReached={data?.historyBefore ? () => void loadOlder() : undefined}
           header={loadingOlder ? <View style={styles.older}><Spinner size={16} /></View> : null}

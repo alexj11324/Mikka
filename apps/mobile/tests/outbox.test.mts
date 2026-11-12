@@ -91,6 +91,9 @@ test('personal delivery keeps acknowledged messages until an authorized read and
     let result!: Promise<boolean> | false
     await act(async () => { result = held.start(first); assert.equal(result, held.start(first)) })
     assert.equal(held.rows[0].phase,'sending')
+    const pendingRows = held.rows
+    await render()
+    assert.equal(held.rows, pendingRows, 'a composer render must preserve the transcript row invalidation input')
     assert.equal(requests.length,1)
     assert.equal(journal.readPersonal(scope)[0].submissionId,'p1')
     await act(async () => { requests[0].resolve(); assert.equal(await result,true) })
