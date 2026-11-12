@@ -7225,9 +7225,15 @@
     "deleteTeam": "删除团队",
     "deleteConfirm": "输入 {name} 以确认",
     "deleteTitle": "删除团队「{name}」？",
-    "deleteImpact": "将一并删除 {tasks} 个任务和 {projects} 个项目。与其他团队共享的项目只会取消关联。",
-    "deleteCounting": "正在统计将被删除的内容…",
+    "deleteImpact": "此团队关联了 {tasks} 个任务和 {projects} 个项目。永久删除仅适用于没有关联对象和执行历史的空团队。",
+    "deleteCounting": "正在检查团队关联和执行历史…",
     "deleting": "正在删除…",
+    "ungroup": "解除分组…",
+    "ungroupTitle": "解除「{name}」团队分组？",
+    "ungroupImpact": "{tasks} 个任务将成为此工作区的未分组任务，{projects} 个项目将移除此团队关联。任务、项目及其历史记录都会保留。",
+    "ungroupConfirm": "解除分组",
+    "ungroupPending": "正在解除分组…",
+    "teamUngrouped": "已解除「{name}」团队分组。",
     "teamDeleted": "已删除团队「{name}」。"
   },
   "HostedSettings": {
