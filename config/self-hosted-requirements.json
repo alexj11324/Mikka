@@ -81,6 +81,20 @@
     "test": "tests/mobile-handoff.test.ts",
     "suite": "test:desktop-auth"
   },
+  "app/api/organization-invitations/accept/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Accept one Organization Member invitation only for a verified matching email. Never admit the account to attached Workspaces or Projects.",
+    "test": "tests/organization-invitations.db.test.ts",
+    "suite": "test:organization-invitations-db"
+  },
+  "app/api/organizations/[organizationId]/invitations/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Let an active Organization member invite ordinary members, and revoke only their own pending invitations. Administrator access is explicitly scoped.",
+    "test": "tests/organization-invitations.db.test.ts",
+    "suite": "test:organization-invitations-db"
+  },
   "app/api/organizations/[organizationId]/api-keys/[keyId]/route.ts": {
     "mode": "built-in",
     "environment": [],
