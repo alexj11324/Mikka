@@ -16,7 +16,7 @@ test('Telegram /link resolves stable and historical task identity inside the cur
   const anchor = await seedIssue(connection, viewer, workspace.id, { registered: true })
   const outside = await seedIssue(connection, foreignOwner, foreign.id, { registered: true })
   const telegramUserId = randomUUID(), threadId = `telegram-task-link-${randomUUID()}`, botId = randomUUID()
-  await connection.query('insert into telegram_links("userId","telegramUserId") values($1,$2)', [viewer, telegramUserId])
+  await connection.query('insert into telegram_links("userId","telegramUserId","telegramUserName","linkedAt") values($1,$2,\'fixture-viewer\',\'2026-11-12T00:00:00Z\')', [viewer, telegramUserId])
   await connection.query('insert into telegram_conversations("threadId","userId","issueId") values($1,$2,$3)', [threadId, viewer, anchor])
 
   // Only the transport's already-selected Coordinator binding and translated
@@ -49,6 +49,30 @@ test('Telegram /link resolves stable and historical task identity inside the cur
     return JSON.parse(posts[0]) as { key: string; issue?: string; title?: string }
   }
   const canonical = await identifier(current)
+
+  await t.test('configured Telegram status reads only the requested account link', async () => {
+    const { readTelegramIntegrationStatus } = await import('../lib/telegram/connection-status')
+    const keys = ['TELEGRAM_BOT_USERNAME', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_WEBHOOK_SECRET_TOKEN'] as const
+    const previous = keys.map(key => process.env[key])
+    try {
+      keys.forEach(key => { delete process.env[key] })
+      const linked = { connected: true, telegramUserName: 'fixture-viewer', linkedAt: '2026-11-12T00:00:00.000Z' }
+      assert.deepEqual(await readTelegramIntegrationStatus(viewer), { configured: false, botUsername: null, ...linked })
+      Object.assign(process.env, { TELEGRAM_BOT_USERNAME: '@fixture_bot', TELEGRAM_BOT_TOKEN: 'fixture-only-token', TELEGRAM_WEBHOOK_SECRET_TOKEN: 'fixture-only-webhook' })
+      assert.deepEqual(await readTelegramIntegrationStatus(viewer), { configured: true, botUsername: 'fixture_bot', ...linked })
+      assert.deepEqual(await readTelegramIntegrationStatus(foreignOwner), {
+        configured: true, botUsername: 'fixture_bot', connected: false, telegramUserName: null, linkedAt: null,
+      })
+      for (const key of keys) {
+        const configured = process.env[key]!
+        delete process.env[key]
+        assert.equal((await readTelegramIntegrationStatus(viewer)).configured, false, key)
+        process.env[key] = configured
+      }
+    } finally {
+      keys.forEach((key, index) => { if (previous[index] === undefined) delete process.env[key]; else process.env[key] = previous[index] })
+    }
+  })
 
   await t.test('canonical Workspace identifiers resolve another creator\'s ungrouped task', async () => {
     assert.match(canonical, /^W[0-9A-F]{12,32}-[1-9]\d*$/)

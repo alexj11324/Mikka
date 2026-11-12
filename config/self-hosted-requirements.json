@@ -1204,5 +1204,44 @@
     "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
     "test": "lib/coding-workspace/terminal/http.test.ts",
     "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/agent-runs.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read messages for already-authorized runs from PostgreSQL. Retry identities are projected only from the reader's own stored submission events.",
+    "test": "tests/team-visibility.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "lib/composio-account-state.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Project stored account status and enabled switches locally; expired accounts require reconnection and an enabled usable account keeps its toolkit active.",
+    "test": "tests/mobile-plugin-connections.test.ts",
+    "suite": "test:mobile"
+  },
+  "lib/hooks/chat-delivery-state.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Journal immutable browser commands before preflight, retain failed or interrupted sends, and retry the same command without a hosted service.",
+    "test": "scripts/thread-composer.test.tsx",
+    "suite": "test:groups"
+  },
+  "lib/mobile-plugin-connections.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "Read the current account from the installation-configured Composio, GitHub, Linear and Telegram integrations. Unconfigured providers contribute no connected toolkit; a paused Linear service stays paused and partial failures retain confirmed results.",
+    "test": "tests/mobile-plugin-connections.test.ts",
+    "suite": "test:mobile"
+  },
+  "lib/telegram/connection-status.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "TELEGRAM_BOT_USERNAME",
+      "TELEGRAM_BOT_TOKEN",
+      "TELEGRAM_WEBHOOK_SECRET_TOKEN"
+    ],
+    "behavior": "Read only the requested account's Telegram link from the installation database. Report the bot configured only when all three operator inputs exist; normalize its public username and keep unlinked accounts disconnected.",
+    "test": "tests/telegram-task-link.db.test.ts",
+    "suite": "test:task-identity-db"
   }
 }
