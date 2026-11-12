@@ -4,6 +4,8 @@ import { act, type ReactNode } from 'react'
 import { Window } from 'happy-dom'
 import { NextIntlClientProvider } from 'next-intl'
 import messages from '../messages/en.json'
+import { TaskPresentationsContext } from '../hooks/use-task-collection'
+import { taskPresentation } from '../lib/task-presentation'
 import { withoutPartialCitation, type CitationSource } from '../lib/coordinator/citations'
 import type { AgentCitations } from '../components/workspace/agent-citations'
 import { ReplyBubbles } from '../components/workspace/agent-text-bubble'
@@ -359,16 +361,23 @@ test('a task and its thread in one reply: the task is its state icon and code, t
   const chips = () => [...view.container.querySelectorAll('[data-slot="inline-citation-trigger"]')]
   const text = () => view.container.textContent ?? ''
   const ownThread: CitationSource = { ...thread, issue: { id: TASK, number: 1, identifier: 'MIK-1', title: 'Release checklist' } }
+  const presentations = {
+    [TASK]: taskPresentation({ status: 'doing', metadata: { pullRequests: [] } },
+      { runId: THREAD, status: 'running', outcome: null }, null, () => false),
+  }
+  const renderReply = (children: ReactNode) => view.render(
+    <TaskPresentationsContext value={presentations}>{children}</TaskPresentationsContext>,
+  )
   try {
-    await view.render(<CoordinatorReply text={`[[issue:${TASK}]] 的线程 [[run:${THREAD}]] 在等你。`} citations={{ ...base, sources: { ...known, [THREAD]: ownThread } }} />)
+    await renderReply(<CoordinatorReply text={`[[issue:${TASK}]] 的线程 [[run:${THREAD}]] 在等你。`} citations={{ ...base, sources: { ...known, [THREAD]: ownThread } }} />)
     assert.equal(chips().length, 2, 'the task and the thread each stay their own object')
     assert.equal(text(), 'MIK-1 的线程 Release checklist 在等你。', 'the code once, the title once: never 「MIK-1 MIK-1 …」')
     assert.equal(view.container.querySelector('[data-citation-covered]'), null)
-    assert.ok(chips()[0].querySelector('[data-task-state]'), 'the task leads with its state icon')
+    assert.equal(chips()[0].querySelector('[data-task-state]')?.getAttribute('data-task-state'), 'running', 'the task leads with its projected state icon')
     assert.equal(chips()[1].querySelector('svg'), null, 'the thread has no icon')
     // A task with no code is its title; the thread still names its task's title.
     const unnumbered = { [TASK]: { ...issue(TASK, 'Release checklist'), identifier: null }, [THREAD]: ownThread }
-    await view.render(<CoordinatorReply text={`[[issue:${TASK}]]的线程 [[run:${THREAD}]] 在等你。`} citations={{ ...base, sources: unnumbered }} />)
+    await renderReply(<CoordinatorReply text={`[[issue:${TASK}]]的线程 [[run:${THREAD}]] 在等你。`} citations={{ ...base, sources: unnumbered }} />)
     assert.equal(chips().length, 2)
     assert.equal(text(), 'Release checklist的线程 Release checklist 在等你。')
     assert.doesNotMatch(text(), MARKUP)
