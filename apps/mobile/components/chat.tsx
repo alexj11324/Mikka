@@ -86,7 +86,7 @@ export function useChatPhotos(): (messageId: string | undefined, count: number |
  * A pending message keeps its words and its retry action. Missing receipts say
  * 未确认; only a known server refusal says 未发送.
  */
-export function OutgoingBubble({ text, photos, failed, unconfirmed = false, onRetry }: { text: string; photos?: string[]; failed: boolean; unconfirmed?: boolean; onRetry: () => void }) {
+export function OutgoingBubble({ text, photos, failed, unconfirmed = false, error, onRetry }: { text: string; photos?: string[]; failed: boolean; unconfirmed?: boolean; error?: string; onRetry: () => void }) {
   return (
     <Pressable accessibilityRole={failed ? 'button' : undefined} accessibilityHint={failed ? '重试' : undefined} disabled={!failed} onPress={onRetry} style={styles.outgoing}>
       <View style={[{ alignItems: 'flex-end', gap: 4 }, !failed && { opacity: 0.6 }]}>
@@ -100,7 +100,7 @@ export function OutgoingBubble({ text, photos, failed, unconfirmed = false, onRe
       {failed ? (
         <View style={styles.retryRow}>
           <CircleAlert size={14} color={colors.danger} strokeWidth={2.2} />
-          <Text style={styles.retry}>{unconfirmed ? '发送未确认 · 重试' : '未发送 · 重试'}</Text>
+          <Text style={styles.retry}>{unconfirmed ? '发送未确认 · 重试' : error ? `${error} · 重试` : '未发送 · 重试'}</Text>
         </View>
       ) : null}
     </Pressable>

@@ -1,38 +1,17 @@
 'use client'
 
-import { useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { checkPageBuildBeforeAction } from '@/lib/app-build'
 import { useActionError } from '@/lib/use-action-error'
 import { prepareThreadReply } from '@/lib/thread-submission-input'
 import { useViewState } from './view-state'
 
-export type ChatSubmission = { id: string; text: string; at: number }
-export type ChatDelivery<T extends ChatSubmission> = T & { phase: 'sending' | 'accepted' | 'failed'; error?: string; storedId?: string }
-const inFlight = new Set<string>()
+import { useChatDeliveryState, type ChatDelivery, type ChatSubmission } from './chat-delivery-state'
+export type { ChatDelivery, ChatSubmission } from './chat-delivery-state'
 
-/** All chat entries journal the immutable command before starting asynchronous preflight or transport. */
 export function useChatDelivery<T extends ChatSubmission>(scope: string, uncertain: string) {
   const [rows, setRows] = useViewState<ChatDelivery<T>[]>(`chat-send:${scope}`, [])
-  // A page reload may interrupt the response. Only the originating command can recover its result.
-  useEffect(() => {
-    const interrupted = rows.filter(row => row.phase === 'sending' && !inFlight.has(row.id))
-    if (interrupted.length) setRows(current => current.map(row => interrupted.some(item => item.id === row.id) && row.phase === 'sending' ? { ...row, phase: 'failed', error: uncertain } : row))
-  }, [rows, setRows, uncertain])
-  function begin(command: T) {
-    if (inFlight.has(command.id)) return false
-    inFlight.add(command.id)
-    setRows(current => current.some(row => row.id === command.id)
-      ? current.map(row => row.id === command.id ? { ...row, phase: 'sending', error: undefined } : row)
-      : [...current, { ...command, phase: 'sending' }])
-    return true
-  }
-  function finish(id: string, result: { error: string } | { storedId?: string }) {
-    inFlight.delete(id)
-    setRows(current => current.map(row => row.id !== id ? row : 'error' in result
-      ? { ...row, phase: 'failed', error: result.error } : { ...row, phase: 'accepted', storedId: result.storedId }))
-  }
-  return { rows, setRows, begin, finish }
+  return useChatDeliveryState(rows, setRows, uncertain)
 }
 
 type BoundThreadReply = Pick<ChatSubmission, 'id' | 'text'> & { runId: string; expectedOwnerId?: string; expectedWorkspaceId?: string }
