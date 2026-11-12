@@ -63,7 +63,7 @@ export async function readContainerWindow({ application, environment, now, read,
       if (previous && (previous.at !== row.timestamp || previous.event.message !== message)) fail('container_log_id_conflict')
       found.set(row.$metadata.id, { at: row.timestamp, event: record })
     }
-    records += rows.length
+    records += completionGrace ? rows.filter(row => row.timestamp < now).length : rows.length
   }
   await visit(start, through)
   const rows = [...found.values()]

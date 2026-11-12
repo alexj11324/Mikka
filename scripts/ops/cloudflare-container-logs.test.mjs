@@ -100,6 +100,7 @@ test('one native observation window retains the login/chat/API deadlines and thr
   assert.deepEqual(health.requests.login, { total: 2, successful: 1, timedOut: 0, rateLimited: 1, successRatio: .5, p95Ms: 11000 })
   assert.deepEqual(health.requests.chat, { total: 1, successful: 0, timedOut: 1, rateLimited: 0, successRatio: 0, p95Ms: null })
   assert.equal(health.status, 'observed')
+  assert.equal(result.outcomes.records, rows.filter(row => row.timestamp < now).length)
   assert.equal(health.requests.api.total, 2)
   assert.equal(health.requests.api.successful, 2)
   assert.deepEqual(health.alerts.map(a => a.id).sort(), ['api-request-latency','chat-request-success','login-request-latency','login-request-success'])

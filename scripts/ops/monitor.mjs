@@ -115,7 +115,7 @@ export function internalSink(raw) {
 }
 
 /** A failed delivery never advances lastSent, so retries cannot silently suppress a page. */
-export async function notifyAlerts(alerts, { state = {}, assessed, sink, now = Date.now(), fetchImpl = fetch }) {
+export async function notifyAlerts(alerts, { state = {}, assessed = /** @type {string[] | undefined} */ (undefined), sink, now = Date.now(), fetchImpl = fetch }) {
   const target = internalSink(sink), next = structuredClone(state), deliveries = []
   const current = new Map(alerts.map(alert => [alert.id, alert]))
   // A partial source may resolve only alert IDs it could actually evaluate.
