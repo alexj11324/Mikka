@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { DESKTOP_RPC_VERSION } from '../../../lib/desktop-rpc/wire'
+import { saveProfileName } from '../lib/profile-name'
 import { PreferenceWrites } from '../lib/preference-writes.ts'
 import { ApiCache } from '../lib/api-cache.ts'
 
@@ -85,4 +87,30 @@ test('account preferences stay pending through a workspace switch but never thro
   cache.setIdentity('account B')
   assert.equal(await writer.save({ memory: true }), false)
   assert.equal(confirmed.memory, false)
+})
+
+test('the native profile uses the same registered account action as Web and accepts its saved name', async () => {
+  const pending = deferred<{ version: number; ok: boolean; result: { name: string } }>()
+  const write = saveProfileName(' Name ', async (path, init) => {
+    assert.equal(path, '/api/rpc')
+    assert.deepEqual(init, {
+      method: 'POST', body: { version: DESKTOP_RPC_VERSION, action: 'account.updateDisplayName', args: [' Name '] },
+    })
+    return pending.promise
+  })
+  pending.resolve({ version: DESKTOP_RPC_VERSION, ok: true, result: { name: 'Name' } })
+  assert.equal(await write, 'Name')
+})
+
+test('refusals, unconfirmed responses and transport failures never return a saved name', async () => {
+  for (const receipt of [
+    null, { ok: true, result: { name: 'Name' } },
+    { version: DESKTOP_RPC_VERSION, ok: false, result: { name: 'Name' } },
+    { version: DESKTOP_RPC_VERSION, ok: true, result: { error: 'validationNameRequired' } },
+    { version: DESKTOP_RPC_VERSION, ok: true, result: {} },
+    { version: DESKTOP_RPC_VERSION, ok: true, result: { name: '   ' } },
+  ]) {
+    await assert.rejects(saveProfileName('Name', async () => receipt))
+  }
+  await assert.rejects(saveProfileName('Name', async () => { throw new Error('offline') }), /offline/)
 })
