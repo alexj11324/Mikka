@@ -6,6 +6,7 @@ import { useLiveBotChatList, useLiveGroupList } from '@/hooks/use-live-lists'
 import type { BotView } from '@/app/actions/bots'
 import type { Thread } from '@/app/actions/task-runs'
 import type { listIssues } from '@/app/actions/issues'
+import type { TaskPresentation } from '@/lib/task-presentation'
 import { CachedGroupAvatar } from './group-avatar'
 import { botWorkTree, type BotWorkTask } from './bot-work-tree'
 import { BotAvatar, CoordinatorAvatar } from './bot-avatar'
@@ -45,11 +46,11 @@ function useChatRows({ bots, workspaceId, active, userId }: { bots: BotView[]; w
 export type ChatNavEntry = { id: string; kind: 'coordinator' | 'bot' | 'group'; name: string; unread: boolean; current: boolean; target: ChatTarget; avatar: ReactNode; work?: BotWorkTask[] }
 
 /** The bot list's rows as data: what the hosted App Shell lists under Bots and 群聊, with the same unread dots. */
-export function useChatNav({ bots, workspaceId, active, userId, threads = [], issues = [] }: { bots: BotView[]; workspaceId: string | null; active: ChatTarget | null; userId: string; threads?: Thread[]; issues?: Issue[] }): { entries: ChatNavEntry[]; reloadGroups: () => Promise<unknown> } {
+export function useChatNav({ bots, workspaceId, active, userId, threads = [], issues = [], presentations }: { bots: BotView[]; workspaceId: string | null; active: ChatTarget | null; userId: string; threads?: Thread[]; issues?: Issue[]; presentations: Readonly<Record<string, TaskPresentation>> }): { entries: ChatNavEntry[]; reloadGroups: () => Promise<unknown> } {
   const i18nText = useTranslations()
   const { rows, unread, reloadGroups } = useChatRows({ bots, workspaceId, active, userId })
   const coordinatorId = bots.find(bot => bot.coordinator)?.id
-  const work = botWorkTree(workspaceId, bots.map(bot => bot.id), threads, issues)
+  const work = botWorkTree(workspaceId, bots.map(bot => bot.id), threads, issues, presentations)
   const coordinator: ChatNavEntry = { id: 'coordinator', kind: 'coordinator', name: i18nText('Nav.coordinator'), unread: unread('coordinator'), current: active?.kind === 'coordinator', target: { kind: 'coordinator' }, avatar: <CoordinatorAvatar size="row" />, work: coordinatorId ? work.get(coordinatorId) ?? [] : [] }
   const entries = [coordinator, ...rows.map((row): ChatNavEntry => row.kind === 'group'
     ? { id: row.group.id, kind: 'group', name: row.group.title || i18nText('Nav.untitledConversation'), unread: unread(row.group.id), current: active?.kind === 'group' && active.id === row.group.id, target: { kind: 'group', id: row.group.id, title: row.group.title, workspaceId: row.group.workspaceId }, avatar: <CachedGroupAvatar id={row.group.id} title={row.group.title || i18nText('Nav.untitledConversation')} /> }
