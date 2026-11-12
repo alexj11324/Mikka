@@ -12,7 +12,7 @@ test('Task responsibility: actual actions, MCP compatibility, tenant denial and 
   const { agentActor } = await import('../lib/activity-actor')
   const { tokenWorkspace } = await import('../lib/tokens/principal')
   const { updateIssueMetadata } = await import('../app/actions/issue-metadata')
-  const { getIssue, pollIssues } = await import('../app/actions/issues')
+  const { getIssue, moveIssue, pollIssues } = await import('../app/actions/issues')
   const { updateIssue } = await import('../lib/mcp/actions')
   const { getIssue: readToolIssue, listIssues: listToolIssues } = await import('../lib/mcp/tools')
   const { AgentProfileStore } = await import('../lib/factory/agent-profile-store')
@@ -46,6 +46,27 @@ test('Task responsibility: actual actions, MCP compatibility, tenant denial and 
     assert.deepEqual(await snapshot(), before, 'refusal changes no task, history, invitation or approval')
   }
   try {
+    await t.test('Board unblocks and moves a Task in the same revision read by Task detail', async () => {
+      const flag = await save({ block: { blocked: true, runId: null } })
+      assert.ok('issue' in flag && flag.issue, JSON.stringify(flag))
+      const revision = flag.issue.revision
+      const status = flag.issue.status === 'done' ? 'todo' : 'done'
+      const block = { blocked: false, runId: null }
+      const move = () => scoped(() => moveIssue({ id: taskId, revision, status, block }))
+      const moved = await move()
+      assert.ok('issue' in moved && moved.issue, JSON.stringify(moved))
+      assert.equal(moved.issue.revision, revision + 1)
+      const detail = await scoped(() => getIssue(taskId))
+      assert.ok('issue' in detail && detail.issue)
+      assert.equal(detail.issue.status, status)
+      assert.deepEqual(detail.issue.metadata.block, block)
+      const history = await pool.query('SELECT revision,status,content FROM issue_versions WHERE "issueId"=$1 AND revision>$2', [taskId, revision])
+      assert.equal(history.rowCount, 1)
+      assert.equal(history.rows[0].status, status)
+      assert.deepEqual(readIssueMetadata(history.rows[0].content).block, block)
+      await unchanged(move, 'issueStale')
+    })
+
     await t.test('human assignee and Agent Delegate coexist through the real metadata action', async () => {
       const result = await save({ assignee: { kind: 'member', id: member }, delegate: { kind: 'agent', id: ownAgent } })
       assert.ok('issue' in result && result.issue, JSON.stringify(result))

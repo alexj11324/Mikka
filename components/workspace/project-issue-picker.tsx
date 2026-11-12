@@ -18,7 +18,10 @@ export function ProjectIssuePicker({ project, projects, issues, onClose, onSaved
   const t = useTranslations('Projects.issuePicker')
   const common = useTranslations('Common')
   const translateError = useActionError()
-  const [selected, setSelected] = useState(() => project.issueIds.filter(id => issues.some(issue => issue.id === id)))
+  // The picker shows one page of Tasks but the command replaces the complete membership.
+  // Keep the revision that the user started editing when a live update refreshes the Project.
+  const [baseRevision] = useState(project.revision)
+  const [selected, setSelected] = useState(() => project.issueIds)
   const [query, setQuery] = useState('')
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
@@ -29,7 +32,7 @@ export function ProjectIssuePicker({ project, projects, issues, onClose, onSaved
     if (flight.current) return
     flight.current = true; setPending(true); setError('')
     try {
-      const result = await setProjectIssues({ id: project.id, revision: project.revision, issueIds: selected, ...(confirmAccess ? { confirmAccess } : {}) })
+      const result = await setProjectIssues({ id: project.id, revision: baseRevision, workspaceId: project.workspaceId, issueIds: selected, ...(confirmAccess ? { confirmAccess } : {}) })
       // Linking changes who can read these tasks: nothing was written, and the
       // same set replays once the person confirms (ALE-26).
       if (result.error && 'confirmable' in result && result.confirmable) setAccessChange({ tasks: Number(result.params?.tasks ?? selected.length) })

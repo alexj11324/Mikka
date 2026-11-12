@@ -24,7 +24,8 @@ import { requireIssueAccess, requireIssueAccessWithoutBody, requireUser } from '
 import { checklistView, issueAttrsContent, issueChecklistChecked, issueChecklistTotal } from '@/lib/issue-summary-columns'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import type { JSONContent } from '@tiptap/react'
-import { readIssueMetadata } from '@/lib/issue-metadata'
+import { blockFlagSchema, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
+import type { BlockFlag } from '@/lib/task-blocked'
 import { issueView, taskAssignees, taskIdentifiers } from '@/lib/task-identifier-server'
 import { projectViewsForTasks } from '@/lib/project-access'
 import { projectDb, projects, projectTasks } from '@/lib/db/projects'
@@ -286,7 +287,13 @@ async function readIssue(id: string) {
   })
 }
 
-export async function saveIssue(input: { id?: string; revision?: number; workspaceId?: string; title: string; content: JSONContent; status: string; priority: string }): Promise<ActionResult<{ issue: IssueView }>> {
+type SaveIssueInput = { id?: string; revision?: number; workspaceId?: string; title: string; content: JSONContent; status: string; priority: string }
+
+export async function saveIssue(input: SaveIssueInput) {
+  return persistIssue(input)
+}
+
+async function persistIssue(input: SaveIssueInput, block?: BlockFlag): Promise<ActionResult<{ issue: IssueView }>> {
   return runAction(async () => {
     const user = await requireUser()
     const userId = user.id
@@ -320,7 +327,8 @@ export async function saveIssue(input: { id?: string; revision?: number; workspa
         const [latest] = await tx.select().from(issues).where(and(eq(issues.id, id), eq(issues.userId, ownerId))).for('update')
         if (!latest) return { error: 'issueNotFound' }
         requireLockedIssueScope(latest, userId, observedScopeVersion!, context.workspace.id)
-        ;[issue] = await tx.update(issues).set({ ...parsed.data, content: latest.content, revision: input.revision! + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, ownerId), eq(issues.revision, input.revision!))).returning()
+        const content = block ? withIssueMetadata(latest.content, { ...readIssueMetadata(latest.content), block }) : latest.content
+        ;[issue] = await tx.update(issues).set({ ...parsed.data, content, revision: input.revision! + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, ownerId), eq(issues.revision, input.revision!))).returning()
         const changed = issue && coordinator && issueStatusEvent(latest, issue, coordinator)
         if (changed) {
           await recordCoordinatorEvent(tx, changed)
@@ -373,14 +381,14 @@ export async function promoteIssueToTeam(input: { requestId: string; issueId: st
   })
 }
 
-export async function moveIssue(input: { id: string; status: string; revision: number }): Promise<ActionResult<{ issue: IssueView }>> {
+export async function moveIssue(input: { id: string; status: string; revision: number; block?: BlockFlag }): Promise<ActionResult<{ issue: IssueView }>> {
   return runAction(async () => {
-    const parsed = z.object({ id: z.uuid(), status: inputSchema.shape.status, revision: z.number().int().positive() }).safeParse(input)
+    const parsed = z.object({ id: z.uuid(), status: inputSchema.shape.status, revision: z.number().int().positive(), block: blockFlagSchema.optional() }).safeParse(input)
     if (!parsed.success) return { error: 'issueMoveInvalid' }
     const issue = await readIssue(parsed.data.id)
     if (issue.revision !== parsed.data.revision) return { error: 'issueStale' }
-    if (issue.status === parsed.data.status) return { issue }
-    return saveIssue({ ...issue, workspaceId: issue.workspaceId ?? undefined, status: parsed.data.status })
+    if (issue.status === parsed.data.status && !parsed.data.block) return { issue }
+    return persistIssue({ ...issue, workspaceId: issue.workspaceId ?? undefined, status: parsed.data.status }, parsed.data.block)
   })
 }
 
