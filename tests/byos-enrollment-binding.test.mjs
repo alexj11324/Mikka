@@ -14,6 +14,9 @@ import { SubscriptionWorkerClient } from '../packages/daemon/src/subscription-wo
 import { SubscriptionRepository } from '../lib/subscription-repository.ts'
 import { SubscriptionService } from '../lib/subscription-service.ts'
 import { subscriptionHTTP } from '../lib/subscription-http.ts'
+import { acquireAccountDeletionLock } from '../lib/account/deletion-lock.ts'
+import { cleanupAccountSubscriptions } from '../lib/account/subscription-cleanup.ts'
+import { withDatabaseClient } from '../lib/db/index.ts'
 import { enrollmentBindHTTP } from '../lib/subscription-enrollment-bind.ts'
 
 test('authenticated binding migrates one escrow through actual canonical publication and recovers projection failure', { timeout: 30000 }, async () => {
@@ -126,4 +129,47 @@ test('source cleanup migration backfills legacy published transfers and replays 
     assert.equal(rows.length,2)
     for(const row of rows){assert.equal(row.copies,2);assert.equal(row.sourceCreationState,'unknown');assert.equal(row.canonicalPublishedAt?.toISOString(),row.boundAt?.toISOString())}
   } finally {await client.query('rollback');await client.query('set search_path to public');await client.query(`drop schema if exists ${schema} cascade`);client.release();await pool.end()}
+})
+
+test('the deletion lease drains the owner connection through the installed custody worker while the Workspace stays frozen', async () => {
+  const databaseUrl = process.env.MIKKA_BYOS_TEST_DATABASE_URL
+  assert.ok(databaseUrl && new URL(databaseUrl).hostname === '127.0.0.1' && new URL(databaseUrl).pathname.endsWith('_e2e'))
+  const pool = new Pool({ connectionString: databaseUrl })
+  const id = randomUUID(), owner = randomUUID(), workspace = randomUUID(), connection = randomUUID()
+  const environment = {
+    MIKKA_BYOS_ENABLED: '1',
+    MIKKA_BYOS_INFISICAL_ORIGIN: 'https://127.0.0.1:1',
+    MIKKA_BYOS_INFISICAL_PROJECT: 'fixture-no-remote-references',
+    MIKKA_BYOS_INFISICAL_ENVIRONMENT: 'test',
+    MIKKA_BYOS_INFISICAL_PATH: '/grant',
+    MIKKA_BYOS_ACCESS_INFISICAL_PATH: '/access',
+    MIKKA_BYOS_INFISICAL_TOKEN: 'fixture-custody',
+  }
+  const previous = new Map(Object.keys(environment).map(key => [key, process.env[key]]))
+  const lock = await acquireAccountDeletionLock(pool, id)
+  try {
+    Object.assign(process.env, environment)
+    await pool.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",provider,state,"credentialVersion")
+      VALUES($1,$2,$3,'codex','reconnect_required',1)`, [connection, owner, workspace])
+    await pool.query(`INSERT INTO account_deletion_jobs(id,"subjectUserId","subjectEmailHash",stage,plan)
+      VALUES($1,$2,repeat('0',64),'external_pending',$3)`, [id, owner, JSON.stringify({solo:[workspace]})])
+    await pool.query('INSERT INTO account_deletion_guards("subjectId","jobId") VALUES($1,$2)', [owner, id])
+    await pool.query('INSERT INTO account_deletion_workspace_guards("workspaceId","jobId") VALUES($1,$2)', [workspace, id])
+    await assert.rejects(pool.query('UPDATE byos_connections SET paused=true WHERE id=$1',[connection]), { code: '55000' })
+    const report = await withDatabaseClient(lock.client, () =>
+      cleanupAccountSubscriptions(owner, pool, undefined, { id, client: lock.client }))
+    assert.deepEqual(report.blockedReasons, [])
+    assert.deepEqual(report.warnings, ['subscription_upstream_revocation_not_supported_revoke_at_provider'])
+    const { rows: [row] } = await pool.query('SELECT state,epoch,"removedAt" IS NOT NULL AS removed FROM byos_connections WHERE id=$1', [connection])
+    assert.deepEqual(row, { state: 'disconnected', epoch: '2', removed: true })
+    await assert.rejects(pool.query('UPDATE byos_connections SET paused=true WHERE id=$1',[connection]), { code: '55000' })
+  } finally {
+    for (const [key, value] of previous) { if (value === undefined) delete process.env[key]; else process.env[key] = value }
+    await lock.close()
+    await pool.query('DELETE FROM account_deletion_workspace_guards WHERE "workspaceId"=$1 AND "jobId"=$2',[workspace,id])
+    await pool.query('DELETE FROM account_deletion_guards WHERE "subjectId"=$1 AND "jobId"=$2',[owner,id])
+    await pool.query('DELETE FROM account_deletion_jobs WHERE id=$1 AND "subjectUserId"=$2',[id,owner])
+    await pool.query('DELETE FROM byos_connections WHERE id=$1 AND "ownerId"=$2',[connection,owner])
+    await pool.end()
+  }
 })
