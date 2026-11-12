@@ -26,7 +26,7 @@ async function readOwnerBody(id, bodyHash, prefix, api) {
   return row.body.slice(prefix.length)
 }
 
-function parseRecord(raw) {
+export function parsePromotionRecord(raw) {
   const record = JSON.parse(raw)
   requireProof(record && Object.keys(record).join('|') === receiptFields.join('|') && JSON.stringify(record) === raw
     && record.schema === 'mikka.cloudflare-promotion.v1' && record.outcome === 'promoted', 'receiptShape')
@@ -44,6 +44,29 @@ async function publicRead(url, accept, fetchImpl) {
     headers: { accept, 'cache-control': 'no-cache' } })
   requireProof(response.status === 200, 'publicUnavailable')
   return response
+}
+
+// The original publisher may use its Vercel credentials only while the public app
+// and release DNS agree it is still the active origin. An incomplete cutover fails closed.
+export async function readWebAuthority(fetchImpl = fetch) {
+  const [dns, version] = await Promise.all([
+    publicRead(anchorUrl, 'application/dns-json', fetchImpl).then(response => response.json()),
+    publicRead(PRODUCTION_VERSION_URL, 'application/json', fetchImpl),
+  ])
+  const answers = dns.Answer ?? []
+  const name = value => value?.replace(/\.$/, '').toLowerCase()
+  requireProof(!dns.TC && Array.isArray(answers) && dns.Question?.length === 1
+    && name(dns.Question[0].name) === anchorName && dns.Question[0].type === 16, 'dnsAuthority')
+  const { build } = await version.json()
+  requireProof(present(build, sha), 'productionSource')
+  const gateway = version.headers.get('x-mikka-gateway-version-sha256')
+  if ([0, 3].includes(dns.Status) && answers.length === 0 && version.headers.get('x-vercel-id') && !gateway) {
+    return { provider: 'vercel', sha: build }
+  }
+  requireProof(dns.Status === 0 && answers.length === 1 && name(answers[0].name) === anchorName
+    && answers[0].type === 16 && /^"mikka-release-v1=sha256:[a-f0-9]{64}"$/.test(answers[0].data)
+    && !version.headers.has('x-vercel-id') && version.headers.has('cf-ray') && present(gateway, hash), 'originUnconfirmed')
+  return { provider: 'cloudflare', sha: build }
 }
 
 async function liveProof(record, raw, fetchImpl) {
@@ -73,7 +96,7 @@ export async function verifyPromotedWeb({ env = process.env, fetchImpl = fetch, 
     && present(env.GITHUB_RUN_ID, decimal) && present(env.GITHUB_RUN_ATTEMPT, decimal), 'dispatch')
   const api = { token: env.GITHUB_TOKEN, fetchImpl }
   const raw = await readOwnerBody(pin[1], pin[2], 'MIKKA_CLOUDFLARE_WEB_PROMOTION_V1\n', api)
-  const record = parseRecord(raw)
+  const record = parsePromotionRecord(raw)
   requireProof(record.product === env.GITHUB_SHA && record.approvalComment !== pin[1], 'dispatchSource')
   const [approvalBody, run] = await Promise.all([
     readOwnerBody(record.approvalComment, record.approvalSha256, 'MIKKA_CUTOVER_ACCEPTANCE_V1', api),

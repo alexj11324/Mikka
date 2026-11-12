@@ -7,6 +7,9 @@ on:
       - 'scripts/suggestions-cron/**'
       - 'scripts/device-gateway/deploy.mjs'
       - 'scripts/release/ci-gate.mjs'
+      - 'scripts/device-gateway/select-release.mjs'
+      - 'scripts/release/cloudflare-promoted-web.mjs'
+      - 'scripts/release/cloudflare-promoted-web.test.mjs'
       - '.github/workflows/suggestions-cron.yml'
   pull_request:
     paths: *minute_paths
@@ -21,9 +24,12 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      publish: ${{ steps.select.outputs.publish }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          fetch-depth: ${{ github.event_name == 'pull_request' && 1 || 0 }}
           persist-credentials: false
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -32,9 +38,15 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: node --test scripts/suggestions-cron/deploy.test.mjs cloudflare/suggestions-cron/src/index.test.mjs
+      - name: Select changed Worker and confirm the legacy production origin
+        id: select
+        if: github.event_name != 'pull_request'
+        env:
+          RELEASE_BEFORE: ${{ github.event.before }}
+        run: node scripts/device-gateway/select-release.mjs cron
   deploy:
     needs: test
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && needs.test.outputs.publish == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
