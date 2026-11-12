@@ -14,7 +14,7 @@ import { useRefresh } from '@/lib/useApi'
 import { colors, LIST_INSET, ROW_SURFACE_INSET, SPACE } from '@/lib/theme'
 import { ReviewBar } from '../components/review-bar'
 import { useReview } from '../components/use-review'
-import { CANNOT_MERGE, CANNOT_SEND, checksLine, denial, sourceLine, toggleCheck, type ReviewCheck, type ReviewRead } from '../model/review'
+import { CANNOT_MERGE, CANNOT_SEND, VERSIONED_READ_ONLY, usesVersionedReview, checksLine, denial, sourceLine, toggleCheck, type ReviewCheck, type ReviewRead } from '../model/review'
 import { batchHref, fileHref, noteHref } from '../model/routes'
 
 const MONO = Platform.select({ ios: 'Menlo', default: 'monospace' })
@@ -33,7 +33,7 @@ export function ReviewScreen() {
   const refresh = useRefresh(r.reload)
   const [open, setOpen] = useState(false)
   const review = r.review
-  const blocked = r.permissions && !r.permissions.canSend ? denial(r.permissions.reasons.send, CANNOT_SEND) : undefined
+  const blocked = r.permissions && !r.permissions.canSend ? denial(r.permissions.reasons.send, CANNOT_SEND) : r.versioned ? VERSIONED_READ_ONLY : undefined
 
   return (
     <View style={styles.screen}>
@@ -64,11 +64,12 @@ function Top({ review, checks: list, open, onToggle, attached, onAttach, merged,
   const { checks } = review.summary
   const Chevron = open ? ChevronUp : ChevronDown
   const { permissions } = review.summary
+  const versioned = usesVersionedReview(review.summary)
   const failed = list.filter(check => check.status === 'failed')
   const others = list.filter(check => check.status !== 'failed')
   return (
     <View style={styles.top}>
-      {list.length ? (
+      {checks && list.length ? (
         <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={checksLine(checks)} onPress={onToggle} style={({ pressed }) => [styles.checks, pressed && { opacity: 0.6 }]}>
           {checks.failed ? <TriangleAlert size={18} color={colors.danger} strokeWidth={2} /> : <CircleCheck size={18} color={colors.success} strokeWidth={2} />}
           <Text style={styles.checksText}>{checksLine(checks)}</Text>
@@ -86,25 +87,25 @@ function Top({ review, checks: list, open, onToggle, attached, onAttach, merged,
                   <Text style={styles.checkName}>{check.name}</Text>
                 </View>
                 {check.logExcerpt ? <Text style={styles.log} numberOfLines={6} selectable>{check.logExcerpt}</Text> : null}
-                <Pressable accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => { tap(); onAttach(check) }} hitSlop={6} style={({ pressed }) => [styles.attach, pressed && { opacity: 0.6 }]}>
+                {!versioned && permissions.canSend && <Pressable accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => { tap(); onAttach(check) }} hitSlop={6} style={({ pressed }) => [styles.attach, pressed && { opacity: 0.6 }]}>
                   <Paperclip size={15} color={colors.accent} strokeWidth={2} />
                   <Text style={styles.attachText}>{on ? '已附到评论' : '附到评论'}</Text>
-                </Pressable>
+                </Pressable>}
               </View>
             )
           })}
-          {others.length ? <Text style={styles.passed}>{others.map(check => check.name).join(' · ')}</Text> : null}
+          {others.length ? <Text style={styles.passed}>{others.map(check => check.status === 'neutral' ? `${check.name}（中性）` : check.name).join(' · ')}</Text> : null}
         </View>
       ) : null}
       {merged ? (
         <View style={styles.state}><GitMerge size={18} color={colors.merged} strokeWidth={2} /><Text style={styles.stateText}>已合并</Text></View>
       ) : review.diff.empty ? null : !review.summary.pr ? (
-        <View style={styles.state}><CircleDot size={18} color={colors.orange} strokeWidth={2} /><Text style={styles.stateText}>运行中 · 还没开 PR</Text>{review.diff.live ? <Text style={styles.live}>实时</Text> : null}</View>
+        <View style={styles.state}><CircleDot size={18} color={colors.orange} strokeWidth={2} /><Text style={styles.stateText}>{review.summary.running ? '运行中 · 还没开 PR' : '还没开 PR'}</Text>{review.diff.live ? <Text style={styles.live}>实时</Text> : null}</View>
       ) : (
         <View style={{ gap: 6 }}>
-          <CardButton label="批准合并" primary hollow busy={merging} disabled={!permissions.canMerge} onPress={onMerge}
+          <CardButton label="批准合并" primary hollow busy={merging} disabled={versioned || !permissions.canMerge} onPress={onMerge}
             icon={<GitPullRequest size={17} color={permissions.canMerge ? colors.onInk : colors.ink} strokeWidth={2} />} />
-          {!permissions.canMerge ? <Text style={styles.reason}>{denial(permissions.reasons.merge, CANNOT_MERGE)}</Text> : null}
+          {!permissions.canMerge || versioned ? <Text style={styles.reason}>{permissions.canMerge ? VERSIONED_READ_ONLY : denial(permissions.reasons.merge, CANNOT_MERGE)}</Text> : null}
         </View>
       )}
     </View>
@@ -114,13 +115,14 @@ function Top({ review, checks: list, open, onToggle, attached, onAttach, merged,
 /** The changed files: name, folder and comment count, +/−; a file too big to send at once loads on its own page. */
 function Files({ review, onOpen }: { review: ReviewRead; onOpen: (path: string) => void }) {
   const { summary } = review
+  if (review.diff.availability === 'unavailable') return <Text style={styles.empty}>当前改动不可用</Text>
   if (review.diff.empty || !review.diff.files.length) return <Text style={styles.empty}>没有改动</Text>
   return (
     <View>
       <View style={styles.filesHead}>
-        <Text style={styles.filesHeadText}>{summary.files} 个文件</Text>
-        <Text style={[styles.filesHeadText, { color: colors.success }]}>+{summary.additions}</Text>
-        <Text style={[styles.filesHeadText, { color: colors.danger }]}>−{summary.deletions}</Text>
+        {summary.files !== null && <Text style={styles.filesHeadText}>{summary.files} 个文件</Text>}
+        {summary.additions !== null && <Text style={[styles.filesHeadText, { color: colors.success }]}>+{summary.additions}</Text>}
+        {summary.deletions !== null && <Text style={[styles.filesHeadText, { color: colors.danger }]}>−{summary.deletions}</Text>}
       </View>
       {review.diff.files.map(file => {
         const slash = file.path.lastIndexOf('/')
@@ -128,7 +130,7 @@ function Files({ review, onOpen }: { review: ReviewRead; onOpen: (path: string) 
         const folder = slash > 0 ? file.path.slice(0, slash) : ''
         const meta = [folder, file.comments ? `${file.comments} 条评论` : null].filter(Boolean).join(' · ')
         return (
-          <Pressable key={file.path} accessibilityRole="button" accessibilityLabel={`${file.path}，+${file.additions} −${file.deletions}${file.tooLarge ? '，改动太大，点开加载' : ''}`} onPress={() => onOpen(file.path)}
+          <Pressable key={file.path} accessibilityRole="button" accessibilityLabel={`${file.path}${file.additions !== null && file.deletions !== null ? `，+${file.additions} −${file.deletions}` : ''}${file.tooLarge ? '，改动太大，点开加载' : ''}`} onPress={() => onOpen(file.path)}
             style={({ pressed }) => [styles.file, pressed && { backgroundColor: colors.pressed }]}>
             <FileCode2 size={20} color={colors.secondary} strokeWidth={1.8} />
             <View style={styles.fileText}>

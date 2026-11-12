@@ -15,7 +15,7 @@ import { ActionFailureError } from '@/lib/action-error'
 import { db, pool, withDatabaseClient } from '@/lib/db'
 import { nativeRunBinding } from '@/lib/computer/native-run-binding'
 import type { RunModel } from '@/lib/computer/run-model'
-import { agents, agentRuns, bots, deviceRepos, devices, issues, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
+import { agents, agentRuns, bots, coordinatorEvents, deviceRepos, devices, issues, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runWaitingDeviceId } from '@/lib/run-waiting-for'
@@ -78,7 +78,7 @@ export interface RunDetail {
   decisionWarnings?: ProjectDecisionWarning[]
   run: RunView
   chunks: Record<string, unknown>[]
-  messages: { id: string; text: string; createdAt: Date }[]
+  messages: { id: string; text: string; createdAt: Date; submissionId?: string | null }[]
 }
 
 export const runViewColumns = {
@@ -406,6 +406,15 @@ export async function visibleRuns(reader: IssueReader, input: { issueId?: string
   })
 }
 
+/** The caller has authorized these run IDs. Only the reader's own sends include a retry identity. */
+export function readRunMessages(userId: string, runIds: string[]) {
+  return db.select({ id: runMessages.id, text: runMessages.text, createdAt: runMessages.createdAt,
+    submissionId: sql<string | null>`${coordinatorEvents.payload}#>>'{threadSubmission,requestId}'` })
+    .from(runMessages).leftJoin(coordinatorEvents, and(eq(coordinatorEvents.id, runMessages.id),
+      eq(coordinatorEvents.userId, userId), eq(coordinatorEvents.kind, 'user_message')))
+    .where(inArray(runMessages.runId, runIds)).orderBy(asc(runMessages.createdAt))
+}
+
 export async function readRun(userId: string, runId: string): Promise<RunDetail | null> {
   const [run] = await visibleRuns(userId, { runIds: [runId], limit: 1 })
   if (!run) return null
@@ -413,8 +422,7 @@ export async function readRun(userId: string, runId: string): Promise<RunDetail 
   if (!run.agentId) return { run, chunks: [], messages: [] }
   const chunks = await db.select({ chunk: runChunks.chunk }).from(runChunks)
     .where(eq(runChunks.runId, run.id)).orderBy(asc(runChunks.seq))
-  const messages = await db.select({ id: runMessages.id, text: runMessages.text, createdAt: runMessages.createdAt })
-    .from(runMessages).where(eq(runMessages.runId, run.id)).orderBy(asc(runMessages.createdAt))
+  const messages = await readRunMessages(userId, [run.id])
   const decisionWarnings = await runDecisionWarnings(pool, userId, run.id)
   return { run, chunks: chunks.map(row => row.chunk), messages, decisionWarnings }
 }

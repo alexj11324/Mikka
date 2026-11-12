@@ -160,7 +160,7 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
     await t.test('real Factory storage honors browser selection and token pin; denied routing creates no rows or events', async () => {
       const { createFactoryStore } = await import('../lib/factory/store')
       const { factoryAuthorize } = await import('../lib/factory/runtime')
-      const store = createFactoryStore(app, factoryAuthorize, botA)
+      const store = createFactoryStore(pool, factoryAuthorize, botA)
       const sourceEventId = randomUUID()
       await app.query('INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1,$2,$3,\'user_message\',$4,\'{"text":"Isolated task request"}\')', [sourceEventId, owner, botA, sourceEventId])
       const session = { id: owner, [enterprisePrincipal]: { kind: 'session' as const, sessionId: `fixture-${suffix}` } }

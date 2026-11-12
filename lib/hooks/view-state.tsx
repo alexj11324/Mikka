@@ -7,6 +7,7 @@ import { CLEAR_VIEW_STATE_EVENT, VIEW_STATE_PREFIX } from '../chat-drafts'
 function createViewStore(scope: string | null) {
   const values = new Map<string, unknown>()
   const listeners = new Set<() => void>()
+  const generations = new Map<string, number>()
   let active = true
   const storageKey = (key: string) => `${VIEW_STATE_PREFIX}v1:${scope}:${key}`
   return {
@@ -21,8 +22,13 @@ function createViewStore(scope: string | null) {
       }
       return values.has(key) ? values.get(key) as T : fallback
     },
-    set<T,>(key: string, value: T) {
-      if (!active) return
+    generation(key: string) { return generations.get(key) ?? 0 },
+    reset<T,>(key: string, value: T) {
+      generations.set(key, this.generation(key) + 1)
+      this.set(key, value)
+    },
+    set<T,>(key: string, value: T, generation?: number) {
+      if (!active || (generation !== undefined && generation !== this.generation(key))) return
       values.set(key, value)
       if (scope) {
         try { window.sessionStorage.setItem(storageKey(key), JSON.stringify(value)) } catch { /* storage unavailable */ }
@@ -54,12 +60,14 @@ function useViewStore() {
 }
 
 /** A confirmed loss of group membership also retires this tab's saved drafts. */
-export function useForgetGroupDrafts() {
+export function useForgetGroupDrafts(ownerId: string, workspaceId: string | null) {
   const store = useViewStore()
   return useCallback((id: string) => {
-    store.set(`group:${id}:draft`, '')
-    store.set(`group:${id}:pending`, [])
-  }, [store])
+    if (!workspaceId) return
+    store.reset(`group:${id}:draft`, '')
+    store.reset(`group:${id}:pending`, [])
+    store.reset(`chat-send:group:${ownerId}:${workspaceId}:${id}`, [])
+  }, [store, ownerId, workspaceId])
 }
 
 /** A keyed state cell: changing objects reads that object's state immediately. */
@@ -70,9 +78,11 @@ export function useViewState<T,>(key: string, initial: T): [T, Dispatch<SetState
   const fallback = initialRef.current.value
   const getSnapshot = useCallback(() => store.get(key, fallback), [store, key, fallback])
   const value = useSyncExternalStore(store.subscribe, getSnapshot, () => fallback)
+  // A late completion belongs to the membership under which this cell was opened.
+  const generation = useMemo(() => store.generation(key), [store, key])
   const setValue = useCallback<Dispatch<SetStateAction<T>>>(next => {
-    store.set(key, typeof next === 'function' ? (next as (previous: T) => T)(store.get(key, fallback)) : next)
-  }, [store, key, fallback])
+    store.set(key, typeof next === 'function' ? (next as (previous: T) => T)(store.get(key, fallback)) : next, generation)
+  }, [store, key, fallback, generation])
   return [value, setValue]
 }
 

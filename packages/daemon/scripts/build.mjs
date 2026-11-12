@@ -17,7 +17,7 @@ const entryPoints = {
   mikka: 'bin/mikka.ts', main: 'src/main.ts', cli: 'src/cli.ts',
   client: 'src/rpc/client.ts', env: 'src/env.ts', paths: 'src/paths.ts',
   'http-link': 'src/server-link-http.ts', login: 'src/login.ts', log: 'src/log.ts',
-  sandbox: 'src/agents/sandbox.ts', coordinator: 'src/coordinator/index.ts',
+  sandbox: 'src/agents/sandbox.ts',
 }
 await build({
   absWorkingDir: root, entryPoints, outdir: out, bundle: true,

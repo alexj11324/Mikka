@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AppState } from 'react-native'
 import { api, ApiError, onWorkspaceChange } from '@/lib/api'
 import { apiCache as cache } from './api-cache'
-import { needsForegroundRead } from './api-read-state'
+import { needsForegroundRead, withholdsCachedRead } from './api-read-state'
 import { live, useLive, type LiveSpec } from './live'
 import { presenceScope } from './presence-scope'
 
@@ -25,8 +25,8 @@ export const clearApiCache = () => { cache.clear(); presenceScope.clear(); live.
  * starts from the path's last answer, when there is one. It never polls: data
  * that changes on its own uses useLiveApi (decision 2026-11-05-0200-no-new-polling).
  */
-export function useApi<T>(path: string | null) {
-  return useApiRead<T>(path, api, false)
+export function useApi<T>(path: string | null, options?: { read: (path: string) => Promise<T> }) {
+  return useApiRead<T>(path, options?.read ?? api, false)
 }
 
 /**
@@ -48,21 +48,24 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
   const [loading, setLoading] = useState(Boolean(path))
   const request = useRef(0)
   const context = cache.context()
+  const revision = path ? cache.revision(path) : 0
   const setData = useCallback((next: T | null | ((current: T | null) => T | null)) => {
     cache.commit(context, () => {
+      if (path && cache.revision(path) !== revision) return
       // A saved mutation is newer than a read already in flight.
       request.current++; pending.current = null; setLoading(false); setError(null); failed.current = false
       setStored(current => {
         let value = current
         cache.commit(context, () => {
+          if (path && cache.revision(path) !== revision) return
           value = typeof next === 'function' ? (next as (current: T | null) => T | null)(current) : next
           if (path && value !== null) cache.set(path, value, context)
         })
         return value
       })
     })
-  }, [path, context])
-  const alive = useRef(true)
+  }, [path, context, revision])
+  const activePath = useRef(path)
   const loadedAt = useRef(0)
   // When the last successful read started (performance clock): a pushed deadline counts from it.
   const [requestedAt, setRequestedAt] = useState<number | null>(null)
@@ -70,11 +73,12 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
   const pending = useRef<{ context: number; path: string; ticket: number; promise: Promise<void> } | null>(null)
 
   const load = useCallback((): Promise<void> => {
-    if (!path) return Promise.resolve()
+    if (!path || activePath.current !== path) return Promise.resolve()
     const context = cache.context()
     if (pending.current?.context === context && pending.current.path === path) return pending.current.promise
+    const readRevision = cache.revision(path)
     const ticket = ++request.current
-    const accept = (apply: () => void) => cache.commit(context, () => { if (alive.current && ticket === request.current) apply() })
+    const accept = (apply: () => void) => cache.commit(context, () => { if (activePath.current === path && ticket === request.current && cache.revision(path) === readRevision) apply() })
     accept(() => setLoading(true))
     const started = typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now()
     const promise = (async () => {
@@ -82,7 +86,14 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
         const next = await read(path)
         accept(() => { cache.set(path, next, context); setStored(next); setError(null); failed.current = false; loadedAt.current = Date.now(); setRequestedAt(started) })
       } catch (failure) {
-        accept(() => { setError(failure as Error); failed.current = true })
+        accept(() => {
+          if (failure instanceof ApiError && withholdsCachedRead(failure.status)) {
+            cache.revoke(path, context, failure)
+          } else {
+            setError(failure as Error)
+            failed.current = true
+          }
+        })
       } finally {
         accept(() => setLoading(false))
         if (pending.current?.ticket === ticket) pending.current = null
@@ -92,15 +103,37 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
     return promise
   }, [path, read])
 
+  // A post-write read must start after the acknowledgement, even when a previous snapshot is in flight.
+  const reloadAfterWrite = useCallback(async () => {
+    if (!path) return
+    const reading = pending.current
+    if (reading?.path === path && reading.context === context) await reading.promise
+    if (activePath.current === path && context === cache.context() && revision === cache.revision(path)) await load()
+  }, [context, load, path, revision])
+
   useEffect(() => {
-    alive.current = true
+    if (!path) return
+    return cache.onRevoked(path, reason => {
+      request.current++
+      pending.current = null
+      loadedAt.current = 0
+      failed.current = true
+      setStored(null)
+      setRequestedAt(null)
+      setLoading(false)
+      setError(reason)
+    })
+  }, [path])
+
+  useEffect(() => {
+    activePath.current = path
     setSource({ path, context: cache.context() })
     setStored(path ? cache.get<T>(path) : null)
     setError(null)
     loadedAt.current = 0; failed.current = false; pending.current = null; setRequestedAt(null)
     setLoading(Boolean(path))
     void load()
-    return () => { alive.current = false; request.current++ }
+    return () => { activePath.current = null; request.current++ }
   }, [load, path])
 
   useEffect(() => onWorkspaceChange(() => {
@@ -123,7 +156,7 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
   }, [load, path, pushed])
 
   const sameSource = source.path === path && source.context === context
-  return { data: sameSource ? data : path ? cache.get<T>(path) : null, error: sameSource ? error : null, loading: sameSource ? loading : Boolean(path), reload: load, setData, requestedAt: sameSource ? requestedAt : null }
+  return { data: sameSource ? data : path ? cache.get<T>(path) : null, error: sameSource ? error : null, loading: sameSource ? loading : Boolean(path), reload: load, reloadAfterWrite, setData, requestedAt: sameSource ? requestedAt : null }
 }
 
 /** Pull to refresh for a list (the system's RefreshControl): reloads and shows the spinner until the data is back. */

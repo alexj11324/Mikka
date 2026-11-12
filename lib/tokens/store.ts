@@ -6,6 +6,7 @@ import { recordAudit } from '@/lib/audit/record'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { checkExpiry, createTokenInput, DEFAULT_API_SCOPES, generatePersonalAccessToken, hashPersonalAccessToken, isLegacyToken, LEGACY_SCOPE, legacyTokenInput, PAT_ACTIVE_LIMIT, PAT_SHAPE, publicTokenScopes, revokeTokenInput, rotateTokenInput, type ApiScope, type TokenScope } from './format'
+import { reviewSessionsRevoked } from '../coding-workspace/review-sessions'
 
 /** A token as listed. Never carries the hash or the plaintext. */
 export interface PersonalAccessTokenView {
@@ -133,6 +134,7 @@ export async function revokePersonalAccessToken(userId: string, workspaceId: str
       .where(and(eq(personalAccessTokens.id, id), eq(personalAccessTokens.userId, userId), eq(personalAccessTokens.workspaceId, workspaceId), isNull(personalAccessTokens.revokedAt)))
       .returning({ id: personalAccessTokens.id, name: personalAccessTokens.name })
     if (!revoked) throw new WorkspaceError('tokenNotFound')
+    reviewSessionsRevoked(tx, { credentialKind: 'pat', credentialId: revoked.id }, 'credential_revoked')
     if (audit) {
       const { actorName, ...request } = audit
       await recordAudit(tx, { workspaceId, actor: { type: 'user', id: userId, name: actorName }, action: 'token.revoked', target: { type: 'token', id, label: revoked.name }, ...request })

@@ -44,8 +44,8 @@ export type IssueDiscussions = {
   readOnly?: boolean
   threads: import("@/components/blocks/rich-text-editor-4/components/rich-text-comments").ThreadRecord[]
   anchors: import("@/components/blocks/rich-text-editor-4/components/rich-text-comments").CommentAnchor[]
-  onComment: (body: string) => void | false
-  onReply: (id: string, body: string) => void | false
+  onComment: (body: string, operationId?: string) => void | false
+  onReply: (id: string, body: string, operationId?: string) => void | false
   onResolve: (id: string, resolved: boolean) => void
   /** Selects the text a discussion is about. */
   onSelect: (id: string) => void
@@ -171,14 +171,16 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
 
   const discussions: Omit<IssueDiscussions, 'issueId'> = {
     author, readOnly: !editable, threads: threadList, anchors,
-    onComment: body => {
+    onComment: (body, operationId) => {
       if (!editable) return false
+      const id = `discussion-${operationId ?? crypto.randomUUID()}`
+      if (threadStore.getSnapshot()[id]) return
       const now = new Date().toISOString()
-      addThread(threadDoc, { id: `discussion-${crypto.randomUUID()}`, author, authorUserId, createdAt: now, messages: [{ author, authorUserId, body, at: now }] }, 'issue-discussion')
+      addThread(threadDoc, { id, author, authorUserId, createdAt: now, messages: [{ author, authorUserId, body, at: now }] }, 'issue-discussion')
     },
-    onReply: (id, body) => {
+    onReply: (id, body, operationId) => {
       if (!editable) return false
-      replyToThread(threadDoc, id, { author, authorUserId, body, at: new Date().toISOString() })
+      if (!replyToThread(threadDoc, id, { author, authorUserId, body, at: new Date().toISOString(), id: operationId })) return false
     },
     onResolve: (id, resolved) => { if (editable) setThreadResolved(threadDoc, id, resolved) },
     onSelect: id => {

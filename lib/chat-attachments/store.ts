@@ -14,6 +14,7 @@ import {
   type ChatFileScope,
 } from '@mikka/protocol/chat-attachments'
 import { pool } from '@/lib/db'
+import { chatStorageCleanupOwner } from '@/lib/account-deletions-due'
 import { armDueTimerAfterCommit, armDueTimerSoon } from '@/lib/due-timer'
 import { workspacePool } from '@/lib/workspace-db'
 import {
@@ -436,17 +437,19 @@ export async function validateChatFiles(
 
 /** Bounded cleanup of cancelled/abandoned uploads, expired PUT grants and deleted-chat objects. */
 export async function cleanupChatFiles() {
+  const availableDraft = chatStorageCleanupOwner('chat_attachments')
+  const availableRetirement = chatStorageCleanupOwner('chat_attachment_retirements')
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
     await client.query(
-      `DELETE FROM chat_attachments WHERE id IN (SELECT id FROM chat_attachments WHERE "usedAt" IS NULL AND ("removedAt" IS NOT NULL OR "createdAt"<now()-interval '1 day') AND ("uploadExpiresAt" IS NULL OR "uploadExpiresAt"<now()) LIMIT 50 FOR UPDATE SKIP LOCKED)`,
+      `DELETE FROM chat_attachments WHERE id IN (SELECT id FROM chat_attachments WHERE "usedAt" IS NULL AND ("removedAt" IS NOT NULL OR "createdAt"<now()-interval '1 day') AND ("uploadExpiresAt" IS NULL OR "uploadExpiresAt"<now()) AND ${availableDraft} LIMIT 50 FOR UPDATE SKIP LOCKED)`,
     )
     await client.query(
-      `INSERT INTO chat_attachment_retirements("storageKey","userId") SELECT "uploadKey","userId" FROM chat_attachments WHERE "uploadKey" IS NOT NULL AND "uploadExpiresAt"<now() ON CONFLICT DO NOTHING`,
+      `INSERT INTO chat_attachment_retirements("storageKey","userId") SELECT "uploadKey","userId" FROM chat_attachments WHERE "uploadKey" IS NOT NULL AND "uploadExpiresAt"<now() AND ${availableDraft} ON CONFLICT DO NOTHING`,
     )
     await client.query(
-      'UPDATE chat_attachments SET "uploadKey"=NULL,"uploadExpiresAt"=NULL WHERE "uploadExpiresAt"<now()',
+      `UPDATE chat_attachments SET "uploadKey"=NULL,"uploadExpiresAt"=NULL WHERE "uploadExpiresAt"<now() AND ${availableDraft}`,
     )
     await client.query('COMMIT')
   } catch (error) {
@@ -457,7 +460,7 @@ export async function cleanupChatFiles() {
   }
   const retired = (
     await pool.query<{ storageKey: string }>(
-      'SELECT "storageKey" FROM chat_attachment_retirements WHERE "notBefore"<=now() ORDER BY "notBefore" LIMIT 50',
+      `SELECT "storageKey" FROM chat_attachment_retirements WHERE "notBefore"<=now() AND ${availableRetirement} ORDER BY "notBefore" LIMIT 50`,
     )
   ).rows
   let removed = 0

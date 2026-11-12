@@ -1,6 +1,8 @@
 'use client'
 
-import useSWR from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
+import type { DecisionReceipt } from './use-decision-submission'
+import { webSelectionVersion } from '@/lib/web-connection/selection'
 import { withBasePath } from '@/lib/base-path'
 import { getIssue } from '@/app/actions/issues'
 import { ReadResponseError } from '@/lib/swr/retry'
@@ -14,8 +16,9 @@ export type FactoryQuestionItem = {
   /** context · decision · permission · external */
   type: string
   question: string
+  recordedAnswer?: string
   options: { label: string; value: string }[]
-  reference: unknown
+  reference: { questionRevision?: number; [key: string]: unknown }
   /** The task's title, read from its Factory task. */
   task: string
   /** The Mikka task (issue) it works on, when it has one. */
@@ -43,6 +46,58 @@ async function readQuestions(): Promise<FactoryQuestionItem[]> {
   return questions.map(question => ({ ...question, task: tasks.get(question.taskId)?.title ?? '', issueId: tasks.get(question.taskId)?.issueId ?? null }))
 }
 
+const answerable = (status: string) => status === 'open' || status === 'waiting_user'
+
+export function factoryQuestionUnavailable(status: string): string | undefined {
+  if (answerable(status)) return
+  return status === 'expired' ? 'factoryQuestionExpired' : 'factoryQuestionClosed'
+}
+
+// An identical retry from another entry or after reload must address the same answer on this revision.
+async function operationId(question: FactoryQuestionItem, text: string) {
+  const revision = question.reference.questionRevision
+  const payload = JSON.stringify(['mikka.factory.answer', question.questionId, revision, text])
+  const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload))).slice(0, 16)
+  hash[6] = (hash[6] & 0x0f) | 0x80
+  hash[8] = (hash[8] & 0x3f) | 0x80
+  const hex = Array.from(hash, byte => byte.toString(16).padStart(2, '0')).join('')
+  return [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join('-')
+}
+
+async function submitQuestion(question: FactoryQuestionItem, text: string, attempt: { selection: number; answerId: string; readOnly: boolean }): Promise<DecisionReceipt> {
+  const { selection, answerId } = attempt
+  const path = withBasePath(`/api/factory/questions/${question.questionId}`)
+  const changed = (): DecisionReceipt => ({ status: 'unavailable', error: 'decisionAccountChanged' })
+  if (selection !== webSelectionVersion()) return changed()
+  let body: { questionId?: string; continuationRunId?: string; error?: string } | null = null
+  if (!attempt.readOnly) {
+    const response = await fetch(path, {
+      method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ reference: question.reference, answerId, text }),
+    }).catch(() => null)
+    body = response ? await response.json().catch(() => null) : null
+    if (selection !== webSelectionVersion()) return changed()
+    if (response?.ok && body?.questionId === question.questionId && typeof body.continuationRunId === 'string' && body.continuationRunId) return { status: 'accepted' }
+    if (response && [401, 403, 404].includes(response.status)) return { status: 'unavailable', error: body?.error ?? 'decisionUnavailable' }
+    if (response && response.status >= 400 && response.status < 500 && response.status !== 409) return { status: 'failed', error: body?.error ?? 'actionFailed' }
+  }
+
+  // A refused revision or missing acknowledgement is reconciled with this same actor's authorized read.
+  const reread = await fetch(path, { credentials: 'same-origin', cache: 'no-store' }).catch(() => null)
+  const current = await reread?.json().catch(() => null)
+  if (selection !== webSelectionVersion()) return changed()
+  if (reread?.ok && current?.id === question.questionId) {
+    if (current.answerId === answerId && current.continuationRunId) return { status: 'accepted' }
+    const closed = factoryQuestionUnavailable(current.status)
+    if (current.answerId || closed) return { status: 'unavailable', error: closed ?? 'factoryQuestionClosed' }
+    if (current.reference?.questionRevision !== question.reference.questionRevision)
+      return { status: 'unavailable', error: 'factoryQuestionChanged' }
+    return { status: 'failed', error: body?.error ?? 'decisionRetry' }
+  }
+  if (reread && [401, 403, 404].includes(reread.status)) return { status: 'unavailable', error: current?.error ?? 'decisionUnavailable' }
+  return { status: 'uncertain', error: 'decisionUnconfirmed' }
+}
+
 /**
  * The `version` 收件箱 reads its questions at: the live thread list's ids and states, so a task that moves reads them
  * again. The rail's count (hooks/use-inbox-count.ts) passes the same one and shares the read.
@@ -56,17 +111,27 @@ export function factoryQuestionsVersion(threads: readonly { id: string; status: 
  * changes when they may have (the chat's own version, the task list), and a change reads them again.
  */
 export function useFactoryQuestions(version: unknown, enabled = true) {
+  const { cache } = useSWRConfig()
   const { data, error, mutate } = useSWR(enabled ? ['factory-questions', version] : null, readQuestions, { revalidateOnFocus: false, keepPreviousData: true })
-  /** Answers with `text` (the option's label or the person's own words); null when it went, else the error code. */
-  async function answer(question: FactoryQuestionItem, text: string): Promise<string | null> {
-    const response = await fetch(withBasePath(`/api/factory/questions/${question.questionId}`), {
-      method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ reference: question.reference, answerId: crypto.randomUUID(), text }),
-    }).catch(() => null)
-    await mutate()
-    if (response?.ok) return null
-    const body = await response?.json().catch(() => null) as { error?: string } | null
-    return body?.error ?? 'actionFailed'
+  async function submitAnswer(question: FactoryQuestionItem, text: string): Promise<DecisionReceipt> {
+    const unavailable = factoryQuestionUnavailable(question.status)
+    if (unavailable) return { status: 'unavailable', error: unavailable }
+    const selection = webSelectionVersion()
+    const operation = await operationId(question, text)
+    // Share only the operation ID across entries using this account's SWR cache.
+    const key = JSON.stringify(['unconfirmed-factory-answer', selection, question.questionId, question.reference.questionRevision])
+    const previous = cache.get(key)?.data as string | undefined
+    // A different answer must first read the ledger. It cannot replace an unknown operation in the same click.
+    const result = await submitQuestion(question, text, { selection, answerId: operation, readOnly: Boolean(previous && previous !== operation) })
+    if (result.status === 'uncertain') cache.set(key, { data: previous ?? operation })
+    else cache.delete(key)
+    if (result.status === 'accepted') await mutate()
+    return result
   }
-  return { questions: data ?? [], error: error ?? null, reload: () => mutate(), answer }
+  // The preceding hosted release still uses the error-or-null callback.
+  async function answer(question: FactoryQuestionItem, text: string): Promise<string | null> {
+    const result = await submitAnswer(question, text)
+    return result.status === 'accepted' ? null : result.error
+  }
+  return { questions: data ?? [], loading: enabled && data === undefined && !error, error: error ?? null, reload: () => mutate(), answer, submitAnswer }
 }

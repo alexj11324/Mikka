@@ -155,6 +155,7 @@ beforeEach(() => {
   modelOptions.length = 0
   captured.length = 0
   selfHostedAdmissions.length = 0
+  workersAiAdmissions.length = 0
   selfHostedConfig = null
   selfHostedTransport = undefined
   gatewayCalls = 0
@@ -417,12 +418,19 @@ test('server-owned billing adapter reuses the full route and settles in its own 
   assert.equal(settlements.length, 0)
 })
 
-test('Workers AI fallback enforces its own route before reserve and before send and meters both SDK paths', async t => {
-  const keys = ['MIKKA_HOSTED_MODEL_FALLBACK','CLOUDFLARE_WORKERS_AI_TOKEN','CLOUDFLARE_WORKERS_AI_ACCOUNT_ID','ZEROCAT_API_KEY','ZEROCAT_BASE_URL'] as const
+for (const nativeBinding of [false, true]) test('Workers AI authorizes the account before reserve and before send, native binding=' + nativeBinding, async t => {
+  const keys = ['MIKKA_HOSTED_MODEL_FALLBACK','MIKKA_WORKERS_AI_CAPABILITY','CLOUDFLARE_WORKERS_AI_TOKEN','CLOUDFLARE_WORKERS_AI_ACCOUNT_ID','ZEROCAT_API_KEY','ZEROCAT_BASE_URL'] as const
   const saved = new Map(keys.map(key => [key,process.env[key]]))
   t.after(() => { for (const [key,value] of saved) if (value === undefined) delete process.env[key]; else process.env[key]=value })
   process.env.MIKKA_HOSTED_MODEL_FALLBACK='cloudflare-workers-ai'
-  process.env.CLOUDFLARE_WORKERS_AI_TOKEN='account-model-test'
+  const key = nativeBinding ? crypto.randomUUID() + crypto.randomUUID() : 'account-model-test'
+  if (nativeBinding) {
+    process.env.MIKKA_WORKERS_AI_CAPABILITY = key
+    delete process.env.CLOUDFLARE_WORKERS_AI_TOKEN
+  } else {
+    delete process.env.MIKKA_WORKERS_AI_CAPABILITY
+    process.env.CLOUDFLARE_WORKERS_AI_TOKEN = key
+  }
   process.env.CLOUDFLARE_WORKERS_AI_ACCOUNT_ID='a'.repeat(32)
   delete process.env.ZEROCAT_API_KEY
   delete process.env.ZEROCAT_BASE_URL
@@ -432,8 +440,8 @@ test('Workers AI fallback enforces its own route before reserve and before send 
   const streamed = await selected.doStream(args)
   await streamed.stream.pipeTo(new WritableStream())
   const endpoint = 'https://api.cloudflare.com/client/v4/accounts/'+'a'.repeat(32)+'/ai/v1'
-  assert.equal(selfHostedTransport?.baseURL,endpoint)
-  assert.equal(selfHostedTransport?.apiKey,'account-model-test')
+  assert.equal(selfHostedTransport?.baseURL,nativeBinding ? 'https://workers-ai.internal/v1' : endpoint)
+  assert.equal(selfHostedTransport?.apiKey,key)
   assert.equal(workersAiAdmissions.length,4)
   assert.deepEqual(workersAiAdmissions[0],[{workspaceId:'w',ownerId:'owner'},COORDINATOR_MODEL,endpoint,false])
   assert.deepEqual(workersAiAdmissions[1],[{workspaceId:'w',ownerId:'owner'},COORDINATOR_MODEL,endpoint,undefined])
@@ -443,6 +451,7 @@ test('Workers AI fallback enforces its own route before reserve and before send 
   await assert.rejects(Promise.resolve(selected.doGenerate(args)),/modelRouteDenied/)
   assert.equal(settlements.at(-1)?.cost,0)
   delete process.env.CLOUDFLARE_WORKERS_AI_TOKEN
+  delete process.env.MIKKA_WORKERS_AI_CAPABILITY
   await assert.rejects(hostedModel('w',COORDINATOR_MODEL),/modelRouteDenied/)
   await assert.rejects(hostedModel('w','other/vendor'),/modelRouteDenied/)
 })

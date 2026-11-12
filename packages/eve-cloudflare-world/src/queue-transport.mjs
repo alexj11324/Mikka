@@ -25,11 +25,12 @@ async function persistEnvelope(env, envelope) {
   const digest = await bodyDigest(envelope.body)
   const key = 'eve-queue/' + digest
   await env.EVE_QUEUE_PAYLOADS.put(key, envelope.body, { sha256: digest })
-  return { revision: envelope.revision, dueAt: envelope.dueAt, key }
+  return { revision: envelope.revision, dueAt: envelope.dueAt, key, ...(envelope.control && { control: true }) }
 }
 
 export async function publish(env, envelope) {
-  await env.EVE_QUEUE.send(envelope, { contentType: 'json', delaySeconds: delayUntil(envelope.dueAt) })
+  const queue = envelope.control ? env.EVE_CONTROL_QUEUE : env.EVE_QUEUE
+  await queue.send(envelope, { contentType: 'json', delaySeconds: delayUntil(envelope.dueAt) })
 }
 
 function objectKey(key) { return typeof key === 'string' && /^eve-queue\/[0-9a-f]{64}$/.test(key) }
@@ -40,6 +41,10 @@ export async function publishQueueRequest(request, env) {
   const revision = url.searchParams.get('release')
   const delay = Number(url.searchParams.get('delay') ?? '0')
   if (!validRelease(revision) || !Number.isSafeInteger(delay) || delay < 0) return new Response(null, { status: 400 })
+  const control = url.searchParams.get('control')
+  if (control !== null && control !== '1') return new Response(null, { status: 400 })
+  if (control && env.WORLD_WORKLOAD === 'business') return new Response(null, { status: 403 })
+  if (control && !env.EVE_CONTROL_QUEUE) return new Response(null, { status: 503 })
   const dueAt = Date.now() + delay * 1000
   if (!Number.isSafeInteger(dueAt)) return new Response(null, { status: 400 })
   // Keep the pinned revision even when its binding is temporarily absent during
@@ -49,7 +54,7 @@ export async function publishQueueRequest(request, env) {
   try { meta = JSON.parse(body) } catch { return new Response(null, { status: 400 }) }
   if (typeof meta?.messageId !== 'string' || typeof meta.queueName !== 'string' ||
       (meta.idempotencyKey !== undefined && typeof meta.idempotencyKey !== 'string')) return new Response(null, { status: 400 })
-  const envelope = await persistEnvelope(env, { revision, dueAt, body })
+  const envelope = await persistEnvelope(env, { revision, dueAt, body, ...(control && {control:true}) })
   if (meta.idempotencyKey) {
     const claim = env.EVE_CLAIMS.getByName('claim:' + meta.queueName + ':' + meta.idempotencyKey)
     const messageId = await claim.publishKeyed(meta.messageId, envelope, url.searchParams.get('continuation') === 'true')

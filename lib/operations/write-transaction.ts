@@ -78,10 +78,10 @@ export async function writeTransaction<T>(pool: Pick<Pool, 'connect'>, work: (cl
       lease = await waitForMailboxGuard(pending, controller.signal)
       lease.signal?.addEventListener('abort', abort, { once: true })
       if (lease.signal?.aborted) abort()
-      await waitForMailboxGuard(lease.check(), controller.signal)
+      await waitForMailboxGuard(lease.check(tx), controller.signal)
     }
     if (options.guardedWork) result = await waitForMailboxGuard(options.guardedWork(tx, result, lease, controller.signal), controller.signal)
-    if (lease && options.guardedWork) await waitForMailboxGuard(lease.check(), controller.signal)
+    if (lease && options.guardedWork) await waitForMailboxGuard(lease.check(tx), controller.signal)
     if (options.authorizeCommit) await waitForMailboxGuard(options.authorizeCommit(tx), controller.signal)
     check()
     // No awaited host work between the final check and dispatching COMMIT.

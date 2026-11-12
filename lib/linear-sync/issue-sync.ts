@@ -1,6 +1,7 @@
 import { defaultModelAvailable } from '@/lib/default-model'
 import 'server-only'
 import { issueListChanged } from '../live/lists'
+import { reviewTaskChanged } from '../coding-workspace/review-sessions'
 import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { z } from 'zod'
@@ -153,6 +154,7 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
       title: remote.title, content: latestIncoming, status: nextStatus, priority: nextPriority,
       revision: nextRevision, updatedAt: new Date(),
     }).where(eq(issues.id, latest.id)).returning()
+    reviewTaskChanged(tx, latest, saved)
     const changeEvent = saved && coordinator && issueStatusEvent(latest, saved, coordinator)
     if (changeEvent) {
       await recordCoordinatorEvent(tx, changeEvent)

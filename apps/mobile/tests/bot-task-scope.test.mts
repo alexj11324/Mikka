@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createRequire } from 'node:module'
 import { mock, test } from 'node:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -19,7 +20,8 @@ mock.module('react-native', { namedExports: {
   FlatList: ({ data }: { data: { kind: string; task?: { id: string } }[] }) => data.flatMap(row => row.task ? [row.task.id + ' '] : []).join(''),
 } })
 mock.module('react-native-safe-area-context', { namedExports: { useSafeAreaInsets: () => ({ bottom: 0 }) } })
-mock.module('lucide-react-native', { namedExports: { ChevronDown: none, ChevronRight: none } })
+// The TSX screen loads the native icon leaf through its CommonJS entry.
+mock.module(createRequire(import.meta.url).resolve('lucide-react-native'), { namedExports: { ChevronDown: none, ChevronRight: none } })
 stub('components/NavBar.tsx', { NavBar: none, underBar: {} })
 stub('components/Text.tsx', { Text: none })
 stub('components/icons.tsx', { Spinner: none })

@@ -4,6 +4,8 @@ import { z } from 'zod'
 import { repositoryBindingMatches } from '@mikka/protocol/repository'
 import { WorkspaceReviewError } from '@mikka/protocol/coding-workspace-review'
 import type { ReviewResources } from '../../code-review/contract'
+import { hostedTaskEnabled } from '../../cloud-computer/sponsored-task'
+import { ReviewAuthorityError, taskReviewAuthority } from '../review-authority'
 import { readRunChain } from '../../run-chain'
 import { assertCurrentTaskReview, currentTaskReview } from './context'
 import type { TaskReviewHttpInput, TaskReviewHttpResult } from './http'
@@ -41,6 +43,19 @@ export async function readTaskReviewResources(input: TaskReviewHttpInput): Promi
     if (!input.deps.external) throw new WorkspaceReviewError('workspace_review_github_unavailable')
     await input.deps.external.verify(context.scope, selected)
   }
+  let interactiveTerminalAvailable = false
+  if (input.actor.userId === context.scope.identity.ownerId && hostedTaskEnabled(context.scope.identity.workspaceId)) {
+    try {
+      const authority = await taskReviewAuthority(input.request,input.taskId,{
+        runId:context.scope.identity.runId,workspaceId:context.scope.identity.workspaceId,
+      })
+      interactiveTerminalAvailable = Boolean(authority.nativeExitedProof && authority.sponsoredPlacement &&
+        (authority.machineStatus === 'running' ||
+         (authority.machineStatus === 'paused' && authority.sponsoredPlacement.checkpoint)))
+    } catch (error) {
+      if (!(error instanceof ReviewAuthorityError)) throw error
+    }
+  }
   return { context, render: async (tx, scope) => {
     await assertCurrentTaskReview(tx, input.actor, context)
     if ((await summarySnapshot(tx, scope))?.id !== selected?.id) throw new WorkspaceReviewError('workspace_snapshot_outdated')
@@ -50,8 +65,7 @@ export async function readTaskReviewResources(input: TaskReviewHttpInput): Promi
       workspace: { runId, repoId, workspaceId },
       run: { id: runId, threadId: chain?.rootRunId ?? runId, status: scope.status },
       previewUrl: selected ? await previewForRun(tx, { taskId: input.taskId, ownerId, runId, repositoryKey }) : null,
-      // The native backend exposes run logs; it has no interactive PTY endpoint.
-      interactiveTerminalAvailable: false, live: { workspaceId },
+      interactiveTerminalAvailable, live: { workspaceId },
     }
     return { body }
   } }

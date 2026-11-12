@@ -1083,6 +1083,11 @@ export function createFactoryStore(
             'UPDATE factory_attempts SET "runId"=$2,"sessionId"=$3 WHERE id=$1',
             [attempt.id, run.id, run.sessionId],
           );
+          if (["review", "verify", "monitor"].includes(task.stage)) {
+            // Binding changes this run's role, not the Task executor's role.
+            // Its durable fence is SQL-atomic; push close only after commits.
+            await (await import('../coding-workspace/review-sessions')).reviewRunBecameChecker(tx, run.id);
+          }
           task.status = "running";
         } else if (change.action === "candidate") {
           if (

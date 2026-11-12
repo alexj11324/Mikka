@@ -4,24 +4,14 @@ import { createHash, randomBytes } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { telegramConversations, telegramLinkTokens, telegramLinks } from '@/lib/db/schema'
+import { readTelegramIntegrationStatus } from '@/lib/telegram/connection-status'
 import { requireUser } from '@/lib/issue-access'
 
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex')
 const botUsername = () => process.env.TELEGRAM_BOT_USERNAME?.replace(/^@/, '')
 
 export async function getTelegramIntegrationStatus() {
-  const user = await requireUser()
-  const [link] = await db.select({
-    telegramUserName: telegramLinks.telegramUserName,
-    linkedAt: telegramLinks.linkedAt,
-  }).from(telegramLinks).where(eq(telegramLinks.userId, user.id)).limit(1)
-  return {
-    configured: !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_WEBHOOK_SECRET_TOKEN && botUsername()),
-    botUsername: botUsername() ?? null,
-    connected: !!link,
-    telegramUserName: link?.telegramUserName ?? null,
-    linkedAt: link?.linkedAt.toISOString() ?? null,
-  }
+  return readTelegramIntegrationStatus((await requireUser()).id)
 }
 
 export async function createTelegramConnectLink() {
