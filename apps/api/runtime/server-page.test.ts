@@ -26,7 +26,7 @@ test('the retired option cannot select an alternate workbench; cloud serves its 
 
 test('authentication documents keep their flows and server marker in both locales', async () => {
   for (const locale of ['', '/en']) for (const path of ['/sign-in?web=1&web_state=opaque', '/sign-up', '/device?user_code=TEST',
-    '/forgot-password', '/reset-password?token=opaque', '/verify-email?token=opaque', '/oauth/consent', '/workspaces/new', `/invite/${'a'.repeat(64)}`]) {
+    '/forgot-password', '/reset-password?token=opaque', '/verify-email?token=opaque', '/oauth/consent', '/workspaces/new', `/invite/${'a'.repeat(64)}`, `/organization-invite/${'b'.repeat(64)}`]) {
     const response = await serverPageResponse(request(`/mikka${locale}${path}`), html, async () => { throw new Error('AUTH_MUST_RETAIN_EXISTING_FORM') }, {})
     assert.equal(response.status, 200)
     assert.match(await response.text(), /data-mikka-server-page="authentication"/)

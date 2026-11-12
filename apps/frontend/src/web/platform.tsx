@@ -10,6 +10,7 @@ import { PostHogAnalytics } from '@/components/posthog-analytics'
 import { posthogConfig } from '@/lib/posthog-config'
 import { authClient, cloudAuthClient } from '@/lib/auth-client'
 import { withBasePath } from '@/lib/base-path'
+import { serverDocumentKind } from '@/lib/server-pages'
 import { bridgeFromWindow } from '@/lib/platform/detect'
 import { navigate, useLocation, withoutLocale } from '../../../desktop/src/renderer/location'
 import type { DesktopSession } from '../../../desktop/src/renderer/host'
@@ -21,8 +22,12 @@ import { currentWebServers, subscribeWebServers } from '@/lib/web-connection/bro
 export { authenticatedReturn } from './auth-routing'
 export const platform = 'web' as const
 
+/** Organization invitation acceptance needs only the current account session.
+ * Never load Workspace bootstrap or its member-scoped data on a public invitation page. */
 export function bootstrapScope(location: URL): BootstrapScope {
-  return typeof window !== 'undefined' && !bridgeFromWindow(window) && isDesktopHandoffPage(location)
+  const organizationInvite = serverDocumentKind() === 'authentication'
+    && /^\/organization-invite\/[a-f0-9]{64}$/.test(withoutLocale(location.pathname))
+  return typeof window !== 'undefined' && !bridgeFromWindow(window) && (isDesktopHandoffPage(location) || organizationInvite)
     ? 'authentication' : 'workspace'
 }
 

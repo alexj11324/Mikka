@@ -17,6 +17,7 @@ test('allows supported local destinations with validated settings context', () =
   assert.equal(safeAuthReturn(`/settings/members?workspace=${workspaceId}&invite=1`), `/settings/members?workspace=${workspaceId}&invite=1`)
   assert.equal(safeAuthReturn(`/?issue=${issueId}`), `/?issue=${issueId}`)
   assert.equal(safeAuthReturn(`/invite/${'a'.repeat(64)}`), `/invite/${'a'.repeat(64)}`)
+  assert.equal(safeAuthReturn(`/organization-invite/${'b'.repeat(64)}`), `/organization-invite/${'b'.repeat(64)}`)
   assert.equal(safeAuthReturn('/devices'), '/settings?section=devices')
   assert.equal(safeAuthReturn('/device'), '/device')
   assert.equal(safeAuthReturn('/device?user_code=ABCD-EFGH'), '/device?user_code=ABCD-EFGH')
@@ -26,6 +27,10 @@ test('allows supported local destinations with validated settings context', () =
 })
 
 test('rejects external redirects, unsupported settings state, and malformed context', () => {
+  assert.equal(safeAuthReturn('/organization-invite/' + 'b'.repeat(63)), '/')
+  assert.equal(safeAuthReturn('/organization-invite/' + 'B'.repeat(64)), '/')
+  assert.equal(safeAuthReturn('/organization-invite/' + 'b'.repeat(64) + '?next=https://attacker.example'), '/')
+  assert.equal(safeAuthReturn('/organization-invite/' + 'b'.repeat(64) + '/extra'), '/')
   assert.equal(safeAuthReturn('/w/design-team?next=https://attacker.example'), '/')
   assert.equal(safeAuthReturn('/w/a'), '/')
   assert.equal(safeAuthReturn('//attacker.example'), '/')

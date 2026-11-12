@@ -96,7 +96,7 @@ stub('components/blocks/auth-19/components/auth.tsx', { Auth: Pass })
 stub('components/blocks/auth-19/components/auth-card.tsx', { AuthCard: Pass })
 stub('components/workspace/workspace-loading.tsx', { WorkspaceLoading: Empty })
 stub('components/workspace/create-workspace-form.tsx', { CreateWorkspaceForm: Empty })
-stub('components/workspace/invitation-card.tsx', { InvitationCard: Empty })
+stub('components/workspace/invitation-card.tsx', { InvitationCard: Empty, OrganizationInvitationCard: Empty })
 stub('components/device-authorization.tsx', { DeviceAuthorization: Empty })
 mock.module(at('components/app-shell/not-found.tsx'), { defaultExport: Empty })
 

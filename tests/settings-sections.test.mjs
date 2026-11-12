@@ -51,10 +51,15 @@ test('cloud server settings require the explicit server administrator capability
   assert.deepEqual(visibleSettingsSections({ admin: true, cloudAdmin: true }).map(s => s.id), SETTINGS_SECTIONS.filter(s => !UNBUILT.includes(s.id) && !LAYER_ONLY.includes(s.id)).map(s => s.id))
 })
 
-test('组织 shows only when a UI layer draws it, and never in a personal workspace', () => {
-  for (const admin of [false, true]) assert.equal(visibleSettingsSections({ admin }).some(s => s.id === 'organization'), false)
+test('组织 requires the official UI layer, including Organization-only personal members without team permissions', () => {
+  for (const admin of [false, true]) {
+    assert.equal(visibleSettingsSections({ admin }).some(s => s.id === 'organization'), false)
+    assert.equal(visibleSettingsSections({ admin, personal: true }).some(s => s.id === 'organization'), false)
+    assert.equal(visibleSettingsSections({ admin, organization: true, personal: true }).some(s => s.id === 'organization'), true)
+  }
   assert.equal(visibleSettingsSections({ admin: true, organization: true }).some(s => s.id === 'organization'), true)
-  assert.equal(visibleSettingsSections({ admin: true, organization: true, personal: true }).some(s => s.id === 'organization'), false)
+  const personalMember = visibleSettingsSections({ admin: false, organization: true, personal: true }).map(s => s.id)
+  for (const teamOnly of ['members', 'teams', 'permissions', 'audit']) assert.equal(personalMember.includes(teamOnly), false, teamOnly)
   assert.deepEqual(visibleSettingsSections({ admin: true, cloudAdmin: true, organization: true }).map(s => s.id), SETTINGS_SECTIONS.filter(s => !UNBUILT.includes(s.id)).map(s => s.id))
 })
 
