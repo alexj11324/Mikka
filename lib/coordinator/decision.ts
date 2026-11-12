@@ -1,5 +1,6 @@
 /** Existing vision-capable decision model and existing budgeted Gateway route. */
-export const DECISION_MODEL = process.env.DECISION_MODEL?.trim() || 'openai/gpt-6-luna-decisions'
+export const STANDARD_DECISION_MODEL = 'openai/gpt-6-luna-decisions'
+export const DECISION_MODEL = process.env.DECISION_MODEL?.trim() || STANDARD_DECISION_MODEL
 export const DECISIONS_URL = process.env.DECISIONS_URL?.trim() || 'https://ai-gateway.vercel.sh/v1/decisions'
 
 export type DecisionQuestion =

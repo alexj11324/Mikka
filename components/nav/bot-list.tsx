@@ -1,29 +1,14 @@
 'use client'
 
-import { useViewScroll } from '@/lib/hooks/view-state'
-import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
-import { Bot, PanelLeft, Plus, Users } from 'lucide-react'
 import { useLiveBotChatList, useLiveGroupList } from '@/hooks/use-live-lists'
 import type { BotView } from '@/app/actions/bots'
 import type { Thread } from '@/app/actions/task-runs'
 import type { listIssues } from '@/app/actions/issues'
-import { botAttention } from '@/lib/bot-mood'
-import { MikkaMark } from '@/components/brand/mikka-mark'
-import { Button } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { NewGroupDialog } from './new-group-dialog'
-import { CachedGroupAvatar, GroupPillAvatar } from './group-avatar'
+import { CachedGroupAvatar } from './group-avatar'
 import { botWorkTree, type BotWorkTask } from './bot-work-tree'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar'
-import { WorkspaceMenu } from '@/components/workspace-menu'
-import { cn } from '@/lib/utils'
-import { useResizableWidth } from '@/hooks/use-resizable-width'
-import { ResizeHandle } from '@/components/ui/resizable-pane'
-import { chatPreview } from '@/lib/agent-history'
-import { RAIL_ITEMS, type RailDestination } from './icon-rail'
-import { BotAvatar, CoordinatorAvatar, type BotMood } from './bot-avatar'
+import { BotAvatar, CoordinatorAvatar } from './bot-avatar'
 
 /**
  * What the center column shows: the Coordinator, a bot's chat (both on the
@@ -33,35 +18,9 @@ export type ChatTarget = { kind: 'coordinator' } | { kind: 'bot'; botId: string 
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 
-type ListProps = {
-  bots: BotView[]
-  /** The workspace whose group chats are listed with the bots (R-01). */
-  workspaceId: string | null
-  threads: Thread[]
-  /** The tasks the threads work on: a closed task or merged PR settles a thread, as in the right column. */
-  issues: Issue[]
-  active: ChatTarget | null
-  onOpen: (target: ChatTarget) => void
-  onNewBot: () => void
-  rail: RailDestination | null
-  onRail: (destination: RailDestination) => void
-  user: { id: string; name: string; email: string; image?: string | null }
-  onSettings: (href?: string) => void
-  onSignOut: () => void
-  signingOut: boolean
-  onBeforeChange?: (action: () => Promise<void>) => void
-  /** Only on a phone, where the list's sheet is the way off a full page (the board, 建议…); desktop keeps those pages to the rail (MIK-45). */
-  phoneOnly?: boolean
-}
-
-// Linear's sidebar range; the width is remembered on this device.
-const LIST_WIDTH = { storageKey: 'mikka:bot-list-width', min: 208, max: 400, initial: 256, edge: 'end' } as const
-// A click on the edge folds the list after this long, unless it turns out to be a double-click.
-const DOUBLE_CLICK_MS = 250
-
 /** The list's rows and unread dots: the Coordinator, then bots and group chats, most recent first. Shared with the frame's nav. */
 function useChatRows({ bots, workspaceId, active, userId }: { bots: BotView[]; workspaceId: string | null; active: ChatTarget | null; userId: string }) {
-  // Each bot's latest line gives its row the preview and its place in the list. The
+  // Each bot's latest line gives its row its place in the list. The
   // Coordinator is one of these bots: its row reads the same summary, never its whole chat.
   const { data: chatList } = useLiveBotChatList(userId)
   const chats = chatList?.items ?? {}
@@ -79,7 +38,7 @@ function useChatRows({ bots, workspaceId, active, userId }: { bots: BotView[]; w
   if (coordinator?.at) latest.coordinator = coordinator.at
   const activeId = active?.kind === 'coordinator' ? 'coordinator' : active?.kind === 'bot' ? active.botId : active?.kind === 'group' ? active.id : null
   const unread = useUnread(activeId, latest)
-  return { chats, groups, reloadGroups, rows, coordinator, unread }
+  return { reloadGroups, rows, unread }
 }
 
 /** One row of the chat list as data, for a frame that draws its own navigation (RailProps.chats). */
@@ -126,120 +85,4 @@ function useUnread(activeId: string | null, latest: Record<string, string>) {
     })
   }, [activeId, activeLatest])
   return (id: string) => !!seen && id !== activeId && !!latest[id] && latest[id] > (seen.at[id] ?? seen.since)
-}
-
-/** Hover is one overlay step, the current bot the next one up, so a hovered row never looks selected (R-38). */
-const ROW_FILL = 'hover:bg-control active:bg-control data-active:bg-control-hover data-active:hover:bg-control-hover'
-
-function Row({ name, preview, avatar, current, unread, onClick, label }: { name: string; preview: ReactNode; avatar: ReactNode; current: boolean; unread: boolean; onClick: () => void; label: string }) {
-  return <SidebarMenuItem><SidebarMenuButton size="lg" isActive={current} aria-current={current ? 'page' : undefined} aria-label={label} onClick={onClick} className={cn('h-13 gap-2.5 rounded-xl px-2.5', ROW_FILL)}>
-    {/* Nothing is drawn on an avatar (decision 2026-11-01-2230). */}
-    <span className="shrink-0">{avatar}</span>
-    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-      <span className="truncate text-sm font-semibold">{name}</span>
-      {preview && <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">{preview}</span>}
-    </span>
-    {unread && <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-sidebar-primary" />}
-  </SidebarMenuButton></SidebarMenuItem>
-}
-
-/**
- * The bot list beside the icon rail (Figma 188:3115): the Coordinator pinned
- * on top, then one row per bot or group chat (R-01) with its avatar, its name
- * and the latest line of its chat, most recent first. Threads (the work a bot does) live in the
- * right column, never here. It collapses off canvas; the rail stays.
- */
-export function BotList({ phoneOnly = false, ...props }: ListProps) {
-  const { isMobile } = useSidebar()
-  return phoneOnly && !isMobile ? null : <BotListBody {...props} />
-}
-
-function BotListBody({ bots, workspaceId, threads, issues, active, onOpen, onNewBot, rail, onRail, user, onSettings, onSignOut, signingOut, onBeforeChange }: Omit<ListProps, 'phoneOnly'>) {
-  const i18nText = useTranslations()
-  const { toggleSidebar, setOpenMobile, open, openMobile, isMobile } = useSidebar()
-  const { chats, reloadGroups, rows, coordinator, unread } = useChatRows({ bots, workspaceId, active, userId: user.id })
-  const [creatingGroupIn, setCreatingGroupIn] = useState<string | null>(null)
-  useEffect(() => { setCreatingGroupIn(null) }, [workspaceId])
-  /** One plain line of a message; a card that shows no words reads as the card placeholder. */
-  const previewOf = (text: string | null | undefined) => {
-    if (!text) return null
-    const line = chatPreview(text) ?? i18nText('Nav.cardPreview')
-    return line ? <span className="truncate">{line}</span> : null
-  }
-  const resize = useResizableWidth(LIST_WIDTH)
-  const { width, dragging, endedDrag } = resize
-  const foldTimer = useRef<number | undefined>(undefined)
-  useEffect(() => () => window.clearTimeout(foldTimer.current), [])
-  // Enter or a click folds the list; a double-click resets its width instead.
-  function onEdgeClick(event: ReactMouseEvent) {
-    window.clearTimeout(foldTimer.current)
-    if (endedDrag() || event.detail > 1) return
-    if (event.detail === 0) toggleSidebar()
-    else foldTimer.current = window.setTimeout(toggleSidebar, DOUBLE_CLICK_MS)
-  }
-  const listRef = useRef<HTMLDivElement>(null)
-  const scroll = useViewScroll<HTMLDivElement>('bot-list')
-  // The inner list keeps its full width while the column folds, so rows never squeeze.
-  // The desktop column mounts again after the window was phone-sized, so it takes the width again then too.
-  useLayoutEffect(() => { listRef.current?.style.setProperty('--bot-list-width', `${width}px`) }, [width, isMobile])
-  function choose(target: ChatTarget) { onOpen(target); setOpenMobile(false) }
-  const groupDialog = workspaceId && <NewGroupDialog key={workspaceId} workspaceId={workspaceId} bots={bots}
-    open={creatingGroupIn === workspaceId} onOpenChange={next => setCreatingGroupIn(next ? workspaceId : null)}
-    onCreated={group => { setCreatingGroupIn(null); void reloadGroups().catch(() => {}); choose({ kind: 'group', ...group }) }}
-    onNewBot={() => { setCreatingGroupIn(null); onNewBot() }}
-    onReviewGroups={() => { setCreatingGroupIn(null); void reloadGroups().catch(() => {}); if (isMobile) setOpenMobile(true) }} />
-  const body = <>
-    <SidebarHeader className="px-3 pt-3 pb-1">
-      <div className="flex h-8 items-center gap-1 pl-1">
-        <MikkaMark />
-        <span className="sr-only">Mikka</span>
-        <div className="ml-auto flex items-center gap-1">
-          {!isMobile && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={i18nText('Nav.collapseList')} aria-expanded={isMobile ? openMobile : open} onClick={toggleSidebar} />}><PanelLeft data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Nav.collapseList')}</TooltipContent></Tooltip>}
-          <DropdownMenu>
-            <Tooltip><TooltipTrigger render={<DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={i18nText('Nav.create')} />} />}><Plus data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Nav.create')}</TooltipContent></Tooltip>
-            <DropdownMenuContent align="end"><DropdownMenuGroup>
-              <DropdownMenuItem onClick={() => { setOpenMobile(false); onNewBot() }}><Bot aria-hidden="true" />{i18nText('Nav.newBot')}</DropdownMenuItem>
-              <DropdownMenuItem disabled={!workspaceId} onClick={() => { setOpenMobile(false); setCreatingGroupIn(workspaceId) }}><Users aria-hidden="true" />{i18nText('Nav.newGroup')}</DropdownMenuItem>
-            </DropdownMenuGroup></DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-    </SidebarHeader>
-    <SidebarContent ref={scroll}>
-      <SidebarGroup className="px-2 pt-1"><SidebarMenu aria-label={i18nText('Nav.bots')} className="gap-0.5">
-        <Row name={i18nText('Nav.coordinator')} label={coordinator?.working ? i18nText('Nav.coordinatorWorking') : i18nText('Nav.coordinator')} current={active?.kind === 'coordinator'} unread={unread('coordinator')} onClick={() => choose({ kind: 'coordinator' })}
-          avatar={<CoordinatorAvatar mood={coordinator?.working ? 'thinking' : 'idle'} />}
-          preview={previewOf(coordinator?.line)} />
-        {rows.map(row => {
-          if (row.kind === 'group') {
-            const { group } = row
-            const title = group.title || i18nText('Nav.untitledConversation')
-            return <Row key={group.id} name={title} label={title} current={active?.kind === 'group' && active.id === group.id} unread={unread(group.id)} onClick={() => choose({ kind: 'group', id: group.id, title: group.title, workspaceId: group.workspaceId })}
-              // The members' bloubs, as the group's own pill draws them (same members read, shared with the pill and 详情).
-              avatar={<span aria-hidden="true" className="flex size-8.5 items-center justify-center"><GroupPillAvatar id={group.id} title={title} /></span>}
-              preview={previewOf(group.lastMessage?.body)} />
-          }
-          const { bot } = row
-          const chat = chats[bot.id]
-          const mood: BotMood = botAttention(threads, bot.id, chat?.working ?? false, id => issues.find(issue => issue.id === id))
-          return <Row key={bot.id} name={bot.name} label={bot.name} current={active?.kind === 'bot' && active.botId === bot.id} unread={unread(bot.id)} onClick={() => choose({ kind: 'bot', botId: bot.id })}
-            avatar={<BotAvatar id={bot.id} color={bot.color} shape={bot.shape} mood={mood} />}
-            preview={previewOf(chat?.line)} />
-        })}
-      </SidebarMenu></SidebarGroup>
-    </SidebarContent>
-    {/* Phones have no rail; its destinations (主页 back to the last chat from a full page) and the account menu move here. */}
-    {isMobile && <SidebarFooter>
-      <SidebarMenu>{RAIL_ITEMS.map(item => <SidebarMenuItem key={item.id}><SidebarMenuButton isActive={rail === item.id} onClick={() => { onRail(item.id); setOpenMobile(false) }}><item.icon /><span>{i18nText(item.label)}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu>
-      <SidebarMenu><SidebarMenuItem><WorkspaceMenu user={user} onSettings={onSettings} onSignOut={onSignOut} signingOut={signingOut} onBeforeChange={onBeforeChange} /></SidebarMenuItem></SidebarMenu>
-    </SidebarFooter>}
-  </>
-  if (isMobile) return <><Sidebar collapsible="offcanvas" mobileTitle={i18nText('Nav.sidebarTitle')} mobileDescription={i18nText('Nav.sidebarDescription')} mobileCloseLabel={i18nText('Common.close')}>{body}</Sidebar>{groupDialog}</>
-  // On desktop the list is the first column inside the card; it folds to nothing and the rail stays.
-  // R-37: folding and unfolding are instant, no motion (decision 2026-11-01-2320); dragging the edge follows the pointer.
-  return <><div ref={listRef} data-slot="bot-list" data-state={open ? 'expanded' : 'collapsed'} inert={!open} className={cn('relative hidden shrink-0 overflow-hidden md:block in-data-desktop-translucent:bg-shell-material', open ? 'w-(--bot-list-width) border-r' : 'w-0 border-r-0', dragging && 'select-none')}>
-    <Sidebar collapsible="none" className="w-[var(--bot-list-width,16rem)] bg-transparent">{body}</Sidebar>
-    {/* Comma's edge strip with a hairline on hover: drag it or use the arrow keys to resize the list, double-click it to reset, click it to fold the list. */}
-    <ResizeHandle resize={resize} label={i18nText('Nav.resizeList')} title={i18nText('Nav.collapseList')} edge="end" onClick={onEdgeClick} />
-  </div>{groupDialog}</>
 }

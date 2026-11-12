@@ -17,7 +17,7 @@ import { getCreditBilling, readCardVerification } from '@/lib/billing/verificati
 import { modelOrderKey, readModelOrder } from '@/components/settings/model-order-settings'
 import { creditBillingKey } from '@/components/billing/balance-section'
 import { cardVerificationKey } from '@/components/billing/free-allowance-section'
-import { computerPolicyKey, readComputerPolicy } from '@/components/settings/computer-policy-settings'
+import { computerPolicyKey, readComputerPolicy } from '@/hooks/settings/use-team-permissions'
 import { connectedAppsKey, readConnectedApps } from '@/components/plugins/connected-apps'
 import { currentMonth } from '@/lib/usage/month'
 import { settingsRead } from '@/lib/settings-read'

@@ -181,10 +181,34 @@ test('Project v2: split database migration, canonical relationships and live ten
       assert.equal((await actAs(member, () => actions.listProjectEvents(project, alpha))).length, 1)
     })
 
+    await t.test('Project history attributes each event to its actor in this workspace for every authorized viewer', async () => {
+      await workspace.query('UPDATE mikka_workspace_members SET name=$3 WHERE "workspaceId"=$1 AND "userId"=$2', [alpha, owner, 'Alpha author'])
+      await workspace.query('UPDATE mikka_workspace_members SET name=$3 WHERE "workspaceId"=$1 AND "userId"=$2', [beta, owner, 'Other workspace name'])
+      const missingActorEvent = randomUUID()
+      await workspace.query(`INSERT INTO workspace_project_events(id,"projectId","userId",message) VALUES($1,$2,$3,'Prior change')`, [missingActorEvent, project, outsider])
+      for (const viewer of [owner, member]) {
+        const history = await actAs(viewer, () => actions.listProjectEvents(project, alpha))
+        assert.equal(history.length, 2)
+        assert.equal(history.find(event => event.message === 'Existing history')?.actorName, 'Alpha author')
+        assert.equal(history.find(event => event.id === missingActorEvent)?.actorName, null)
+      }
+      await assert.rejects(actAs(outsider, () => actions.listProjectEvents(project, alpha)))
+    })
+
     const draft = { name: 'Same display name', summary: '', description: '', status: 'planned' as const, priority: 'none' as const, lead: '', team: 'Any display text', startDate: '', targetDate: '', properties: { ...properties, members: [] }, workspaceId: alpha }
     const created = await actAs(member, () => actions.saveProject({ ...draft, leadUserId: owner, memberIds: [owner, member] }))
     assert.ok('project' in created, JSON.stringify(created))
     const createdId = created.project.id
+
+    await t.test('task Project options retain every visible project UUID and the selected tenant', async () => {
+      const { getIssuePropertyOptions } = await import('../app/actions/issue-metadata')
+      const choices = await actAs(member, () => getIssuePropertyOptions(initialTasks[0]))
+      assert.deepEqual(choices.projectRecords.filter(item => item.name === 'Same display name').map(item => item.id).sort(),
+        [project, empty, createdId].sort())
+      assert.equal(choices.projects.filter(name => name === 'Same display name').length, 1, 'legacy names remain readable')
+      await assert.rejects(actAs(outsider, () => getIssuePropertyOptions(initialTasks[0])))
+      await assert.rejects(actAs({ id: owner, [tokenWorkspace]: beta }, () => getIssuePropertyOptions(initialTasks[0])))
+    })
 
     await t.test('upgraded database rejects old inserts and canonical legacy-only writes without altering evidence', async () => {
       const before = (await workspace.query('SELECT to_jsonb(p) AS snapshot FROM workspace_projects p WHERE id=$1', [project])).rows[0].snapshot
@@ -242,6 +266,27 @@ test('Project v2: split database migration, canonical relationships and live ten
       const unchanged = (await accessibleProjects(member, projectDb, alpha)).find(row => row.id === createdId)!
       assert.equal(unchanged.revision, 1)
       assert.equal(unchanged.leadUserId, owner)
+    })
+
+    await t.test('Project viewers share the stored people and receive their own current write permission', async () => {
+      const { changeResourceAccess } = await import('../lib/resource-access/store')
+      const reference = { kind: 'project' as const, id: createdId, workspaceId: alpha }
+      const policy = async () => (await application.query('select revision from resource_access_policies where kind=$1 and id=$2', ['project', createdId])).rows[0]
+      await changeResourceAccess(member, reference, { expectedRevision: (await policy()).revision, visibility: 'private', confirmExpansion: true,
+        grants: [{ subjectId: owner, capabilities: ['canReadContent'], expiresAt: null }] })
+      try {
+        for (const [viewer, canEdit] of [[owner, false], [member, true]] as const) {
+          const [view] = await accessibleProjects(viewer, projectDb, alpha, createdId)
+          assert.equal(view.canEditProperties, canEdit)
+          assert.equal(view.leadUserId, owner)
+          assert.deepEqual(view.memberIds.toSorted(), [member, owner].sort())
+        }
+        const refused = await actAs(owner, () => actions.updateProjectProperties({ id: createdId, workspaceId: alpha, revision: 1, changes: { memberIds: [owner] } }))
+        assert.ok('error' in refused)
+        assert.deepEqual((await accessibleProjects(member, projectDb, alpha, createdId))[0].memberIds.toSorted(), [member, owner].sort())
+      } finally {
+        await changeResourceAccess(member, reference, { expectedRevision: (await policy()).revision, visibility: 'shared', grants: [], confirmExpansion: true })
+      }
     })
 
     await t.test('more than 100 tasks and a different optional Team are allowed in the same tenant', async () => {

@@ -113,9 +113,9 @@ test('detail and activity revalidate current access while returning only changed
     assert.equal(changedHistory.delta, true)
     assert.deepEqual(changedHistory.items.map(row => row.id), [newVersion])
     const combined = mergeList(snapshot.items, changedHistory)
-    assert.equal(combined.length, 50, 'the oldest row leaves the fifty-version window')
+    assert.equal(combined.length, 51, 'the creation stays beside the fifty-version window')
+    assert.ok(combined.some(version => version.revision === 1))
     assert.equal(combined[0].id, newVersion)
-    assert.ok(!combined.some(row => row.revision === 1))
     const fullSummary = successful(await read(() => pollIssueVersionSummaries(id)))
     assert.ok(fullSummary.snapshot && !('unchanged' in fullSummary.snapshot))
     assert.deepEqual(combined, fullSummary.snapshot.items)
@@ -124,6 +124,15 @@ test('detail and activity revalidate current access while returning only changed
     const actorChanged = successful(await read(() => pollIssueVersionSummaries(id, changedHistory.version, changedHistory.positions)))
     assert.ok(actorChanged.snapshot && !('unchanged' in actorChanged.snapshot))
     assert.equal(actorChanged.snapshot.items[0].actor?.name, 'Renamed activity actor', 'profile-dependent summaries invalidate without a new version')
+
+    await pool.query('insert into issue_versions(id,"issueId","userId",revision,title,content,status,priority) values($1,$2,$3,52,$4,$5,$6,$7)',
+      [randomUUID(), id, owner, 'Another change', JSON.stringify(changedBody), 'done', 'normal'])
+    const paged = successful(await read(() => pollIssueVersionSummaries(id, changedHistory.version, changedHistory.positions)))
+    assert.ok(paged.snapshot && !('unchanged' in paged.snapshot))
+    const window = mergeList(combined, paged.snapshot)
+    assert.equal(window.length, 51)
+    assert.equal(window.at(-1)?.revision, 1)
+    assert.ok(!window.some(row => row.revision === 2))
 
     assert.equal((await actAs(stranger, () => pollIssue(id, bodyChanged.version))).error, 'issueNotFound')
     assert.equal((await actAs(stranger, () => pollIssueVersionSummaries(id, snapshot.version, snapshot.positions))).error, 'issueNotFound')
@@ -144,6 +153,28 @@ test('detail and activity revalidate current access while returning only changed
     assert.equal(promotion.issue.workspaceId, workspaceId)
     const shared = successful(await readShared(() => pollIssue(sharedId)))
     assert.ok(shared.issue)
+    await t.test('an explicit read-only grant invalidates an editable cursor and supplies the persisted discussion without seeding the document', async () => {
+      assert.equal(shared.issue?.canSteer, true)
+      const { loadIssueDocument, upsertLinearComment, encodedIssueDocument } = await import('../lib/linear-sync/document')
+      const doc = loadIssueDocument(null, createdShared.issue!.content)
+      upsertLinearComment(doc, { threadId: 'discussion-existing', messageId: 'first', author: 'Owner', authorUserId: owner, body: 'Existing discussion', at: new Date().toISOString() })
+      const state = encodedIssueDocument(doc)
+      doc.destroy()
+      await pool.query('insert into issue_documents("issueId","userId",state) values ($1,$2,$3)', [sharedId, owner, state])
+      await pool.query("update resource_access_policies set visibility='private' where kind='task' and id=$1", [sharedId])
+      await pool.query("insert into resource_access_grants(\"resourceKind\",\"resourceId\",\"subjectKind\",\"subjectId\",capabilities) values('task',$1,'account',$2,ARRAY['canReadContent'])", [sharedId, stranger])
+      try {
+        const next = successful(await readShared(() => pollIssue(sharedId, shared.version)))
+        assert.equal(next.issue?.canSteer, false)
+        assert.equal(next.issue?.readOnlyDiscussions?.[0].messages[0].body, 'Existing discussion')
+        assert.equal(successful(await readShared(() => pollIssue(sharedId, next.version))).unchanged, true)
+        assert.ok((await readShared(() => saveIssue({ id: sharedId, revision: next.issue!.revision, title: 'Not allowed', status: 'todo', priority: 'normal', content }))).error)
+        assert.equal((await pool.query('select state from issue_documents where "issueId"=$1', [sharedId])).rows[0].state, state)
+      } finally {
+        await pool.query("delete from resource_access_grants where \"resourceKind\"='task' and \"resourceId\"=$1", [sharedId])
+        await pool.query("update resource_access_policies set visibility='shared' where kind='task' and id=$1", [sharedId])
+      }
+    })
     const sharedHistory = successful(await readShared(() => pollIssueVersionSummaries(sharedId)))
     assert.ok(sharedHistory.snapshot && !('unchanged' in sharedHistory.snapshot))
     const sharedSnapshot = sharedHistory.snapshot

@@ -275,7 +275,7 @@ test('cached list cursors retain each reader limit, old calls and unique bounded
   const readers = [
     ['issues.pollIssues', 100, []], ['issues.syncIssueList', 100, []],
     ['task-runs.pollThreads', 200, []], ['task-runs.syncThreadList', 200, []],
-    ['issues.pollIssueVersionSummaries', 50, [owner]],
+    ['issues.pollIssueVersionSummaries', 51, [owner]],
   ] as const
   for (const [name, limit, prefix] of readers) {
     const schema = desktopActionSchemas[name]

@@ -287,6 +287,17 @@ export async function runAcceptance(env = process.env) {
     const webRead = await (await webRequest('/mikka/api/desktop/rpc', { method: 'POST', body: sessionRpc })).json()
     check(webRead.ok === true && webRead.result?.user?.id === session.user.id
       && webRead.result?.session?.id === webSession.session.id, 'WEB_BEARER_RPC')
+    // Use a real bearer session to reach protocol negotiation after auth.
+    for (const client of [0, 1, 2]) {
+      const accepted = client <= 1
+      const response = await webRequest('/mikka/api/desktop/rpc', { method: 'POST',
+        headers: { 'x-mikka-desktop-protocol': String(client) },
+        body: { ...sessionRpc, version: client }, expected: [accepted ? 200 : 426] })
+      const reply = await response.json()
+      check(accepted ? reply.version === client && reply.result?.user?.id === session.user.id :
+        reply.error?.code === 'desktop_client_update_required', 'CLIENT_PROTOCOL_' + client)
+    }
+    report.checks.desktopProtocol = { previous: 0, current: 1, rejected: 2, rejectedStatus: 426 }
     await officialRequest('/mikka/api/desktop/rpc', { method: 'POST', body: sessionRpc, expected: [401] })
     for (const [path, body, bearer] of [
       ['/mikka/api/web/begin', { state, challenge, callback: official.callback }, undefined],

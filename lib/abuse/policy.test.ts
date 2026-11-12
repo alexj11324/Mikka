@@ -14,6 +14,16 @@ import {
   disposableEmail,
   verifyTurnstile,
 } from './signup'
+test('an explicit production deployment retains signup verification without Vercel platform variables', async () => {
+  const production = { MIKKA_DEPLOYMENT_STAGE: 'production', VERCEL_ENV: 'preview' }
+  await assert.rejects(verifyTurnstile(undefined, production), /SIGNUP_VERIFICATION_UNAVAILABLE/)
+  const verified = (hostname: string) => (async () => new Response(JSON.stringify({ success: true, hostname }))) as typeof fetch
+  await assert.rejects(verifyTurnstile('fixture', { ...production, TURNSTILE_SECRET_KEY: 'fixture' }, verified('foreign.example')), /TURNSTILE_INVALID/)
+  await verifyTurnstile('fixture', { ...production, TURNSTILE_SECRET_KEY: 'fixture' }, verified('app.aspectlylabs.com'))
+  await verifyTurnstile(undefined, { MIKKA_DEPLOYMENT_STAGE: 'development', VERCEL_ENV: 'production' })
+  await assert.rejects(verifyTurnstile(undefined, { MIKKA_DEPLOYMENT_STAGE: 'prod' }), /MIKKA_DEPLOYMENT_STAGE_INVALID/)
+})
+
 test('fixed $1 allowance, invalid caps never mean unlimited', () => {
   assert.equal(FREE_ALLOWANCE_MICRO_USD, 1e6)
   for (const value of ['', undefined, '0', '-1', 'NaN', 'Infinity', '1.2'])
@@ -102,6 +112,11 @@ test('signup IP uses the trusted Vercel header and finite overrides never mean u
   })
   assert.equal(signupClientIP(headers, { VERCEL: '1' }), '203.0.113.7')
   assert.equal(signupClientIP(headers, {}), 'local')
+  headers.set('x-mikka-edge-ip', '2001:db8::1')
+  assert.equal(signupClientIP(headers, { MIKKA_API_INGRESS: 'cloudflare' }), '2001:db8::1')
+  assert.equal(signupClientIP(headers, {}), 'local')
+  headers.set('x-mikka-edge-ip', 'not-an-address')
+  assert.equal(signupClientIP(headers, { MIKKA_API_INGRESS: 'cloudflare' }), 'local')
   assert.equal(signupLimits({ MIKKA_SIGNUP_IP_HOURLY: '0' }).signupIp, 5)
   assert.equal(signupLimits({ MIKKA_SIGNUP_IP_HOURLY: '1000' }).signupIp, 1000)
 })

@@ -216,9 +216,21 @@ export async function factoryRequestSource(
   if (!factoryRoutingEnabled())
     throw new FactoryError("factoryRoutingUnavailable");
   const { rows } = await pool.query(
-    `SELECT e.id,e."createdAt",e.payload->>'text' AS text FROM coordinator_events e WHERE e."userId"=$1 AND e."botId" IS NOT DISTINCT FROM $2::uuid AND e.kind='user_message' AND e."issueId" IS NULL AND ($3::uuid IS NULL OR e.id=$3) AND ($2::uuid IS NULL OR EXISTS (SELECT 1 FROM bots b WHERE b.id=$2 AND b."ownerId"=$1)) ORDER BY e."createdAt" DESC,e.id DESC LIMIT 20`,
+    `SELECT e.id,e."createdAt",e.payload->>'text' AS text, c."taskId" AS "commandTaskId", c."workspaceId" AS "commandWorkspaceId"
+      FROM coordinator_events e LEFT JOIN task_creation_receipts c ON c."taskId"=e."issueId"
+        AND c."userId"=e."userId" AND c."requestId"::text=e.payload->>'taskCreationRequestId'
+        AND e.payload#>>'{taskCommand,intent}'='create_and_dispatch'
+      WHERE e."userId"=$1 AND e."botId" IS NOT DISTINCT FROM $2::uuid AND e.kind='user_message'
+      AND (e."issueId" IS NULL OR ($3::uuid IS NOT NULL AND c."taskId" IS NOT NULL AND e."deliveredAt" IS NOT NULL)) AND ($3::uuid IS NULL OR e.id=$3) AND ($2::uuid IS NULL OR EXISTS (SELECT 1 FROM bots b WHERE b.id=$2 AND b."ownerId"=$1)) ORDER BY e."createdAt" DESC,e.id DESC LIMIT 20`,
     [userId, botId, sourceEventId ?? null],
   );
+  const command = rows[0]
+  if (command?.commandTaskId) {
+    const { withTaskWorkspace } = await import('../task-workspace')
+    const { issueForUser } = await import('../issue-access')
+    const visible = await withTaskWorkspace(userId, command.commandWorkspaceId, () => issueForUser(userId, command.commandTaskId, false, undefined, { withoutBody: true }))
+    if (!visible || visible.workspaceId !== command.commandWorkspaceId) throw new FactoryError('factorySourceMismatch')
+  }
   if (sourceEventId && rows.length !== 1)
     throw new FactoryError("factorySourceMismatch");
   return rows;

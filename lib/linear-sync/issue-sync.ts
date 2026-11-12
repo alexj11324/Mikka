@@ -23,6 +23,7 @@ import { linearDescriptionChanged, shouldApplyLinearSnapshot } from './sync-guar
 import { reserveLinearPublication, requireCurrentPublication, withCurrentPublication, withPublicationWriter, RetiredPublicationError, type Publication, type OutboxFence } from './publication'
 import { systemActor } from '@/lib/activity-actor'
 import { withTaskWorkspace, type TaskWorkspace } from '@/lib/task-workspace'
+import { registerTaskResourceAccess } from '@/lib/task-resource-registration'
 import { taskAssignees } from '@/lib/task-identifier-server'
 
 type IssueRow = typeof issues.$inferSelect
@@ -251,6 +252,7 @@ export async function createAppIssueFromLinear(team: TeamRow, remote: LinearIssu
         status: issueStatusForLinearType(remote.state?.type ?? '', 'todo', remote.state?.name), priority: issuePriorityForLinear(remote.priority),
         revision: 1, createdAt: now, updatedAt: now,
       }).returning()
+      await registerTaskResourceAccess(tx, { id, ownerId: team.ownerId, workspaceId: workspace.id, workspaceKind: workspace.kind })
       const doc = loadIssueDocument(null, content)
       try {
         const state = encodedIssueDocument(doc)

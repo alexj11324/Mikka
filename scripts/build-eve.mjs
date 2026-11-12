@@ -8,6 +8,8 @@ export async function buildEve({ root = process.cwd(), env = process.env, execut
   if (!/^[a-f0-9]{40}$/.test(revision)) throw new Error('EVE_BUILD_REVISION_REQUIRED')
   const preset = env.NITRO_PRESET || (env.VERCEL ? 'vercel' : 'node-server')
   if (!['node-server', 'vercel'].includes(preset)) throw new Error('EVE_BUILD_PRESET_INVALID')
+  const cloudflare = env.MIKKA_EVE_WORKFLOW_WORLD === 'cloudflare'
+  if (cloudflare && preset !== 'node-server') throw new Error('EVE_CLOUDFLARE_NODE_HOST_REQUIRED')
   const eve = JSON.parse(await readFile(join(root, 'node_modules/eve/package.json'), 'utf8')).version
   if (eve !== '1.0.0-rc.9') throw new Error('EVE_BUILD_VERSION_MISMATCH')
   const childEnv = { ...env, NITRO_PRESET: preset, EVE_PUBLIC_ROUTE_PREFIX: '/mikka/api/agents' }
@@ -19,7 +21,7 @@ export async function buildEve({ root = process.cwd(), env = process.env, execut
     cwd: join(root, 'apps/eve'), stdio: 'inherit', env: childEnv,
   })
   const output = join(root, 'apps/eve', preset === 'vercel' ? '.vercel/output' : '.output')
-  await writeFile(join(output, 'mikka-eve-build.json'), `${JSON.stringify({ version: 1, eve, revision, preset })}\n`)
+  await writeFile(join(output, 'mikka-eve-build.json'), `${JSON.stringify({ version: 1, eve, revision, preset, ...(cloudflare ? { world: '@mikka/eve-cloudflare-world', worldVersion: '5.1.0' } : {}) })}\n`)
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await buildEve()

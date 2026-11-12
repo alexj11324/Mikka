@@ -1,6 +1,7 @@
 import 'server-only'
 import { AwsClient } from 'aws4fetch'
 import { isCloudEdition } from '@/lib/edition'
+import { deploymentStage } from '../deployment-stage.mjs'
 
 // Artifact files use an administrator-owned S3-compatible bucket (including R2).
 // Each version is immutable. Community installations without a bucket retain
@@ -26,9 +27,10 @@ function objectStorageConfig(): ObjectStorageConfig | null {
 
 /** Where files go: R2, or the database row when no bucket is configured outside production. */
 export function artifactStorage(): 'r2' | 'inline' {
+  const stage = deploymentStage() ?? (process.env.NODE_ENV === 'production' ? 'production' : undefined)
   // Keep the existing persisted 'r2' discriminator for every S3 transport.
   if (objectStorageConfig()) return 'r2'
-  if (isCloudEdition() && process.env.VERCEL_ENV === 'production') throw new Error('Object storage is not configured')
+  if (isCloudEdition() && stage === 'production') throw new Error('Object storage is not configured')
   return 'inline'
 }
 
@@ -64,12 +66,19 @@ export async function getArtifactObjectStream(key: string, signal: AbortSignal):
   return response.body
 }
 
+export class ObjectStorageReadError extends Error {
+  constructor(readonly code: number) {
+    super(`Object storage get failed: ${code}`)
+    this.name = 'ObjectStorageReadError'
+  }
+}
+
 /** The object's bytes, for binary files such as run captures. */
 export async function getArtifactObjectBytes(key: string): Promise<Uint8Array<ArrayBuffer>> {
   const config = objectStorageConfig()
   if (!config) throw new Error('Object storage is not configured')
   const response = await config.client.fetch(objectUrl(config, key), { redirect: 'error' })
-  if (!response.ok) throw new Error(`Object storage get failed: ${response.status}`)
+  if (!response.ok) throw new ObjectStorageReadError(response.status)
   return new Uint8Array(await response.arrayBuffer())
 }
 

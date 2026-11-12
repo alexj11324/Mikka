@@ -1,0 +1,700 @@
+{
+  "app/actions/issues.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Workspace task commands authorize the current actor and use PostgreSQL to create a task once or recover its dispatch receipt.",
+    "test": "tests/task-create-only.db.test.ts",
+    "suite": "test:coordinator-issue-create-db"
+  },
+  "app/api/drive/volumes/[volumeId]/blobs/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Upload bytes under the authenticated owner and record admission for the selected workspace before a manifest may reference them.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "app/api/drive/volumes/[volumeId]/entries/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Commit a bounded set of file changes against the expected head digest. Stale writes and references to blobs outside the selected workspace fail.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "app/api/drive/volumes/[volumeId]/files/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read bytes from the selected head or immutable version after workspace and owner authorization, and return them as an attachment.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "app/api/drive/volumes/[volumeId]/restore/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Restore an authorized prior version through a new manifest commit, retaining its history.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "app/api/drive/volumes/[volumeId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the head of an authorized private volume in the requested workspace.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "app/api/drive/volumes/[volumeId]/versions/[versionId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read one immutable version belonging to the authorized volume.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "app/api/drive/volumes/[volumeId]/versions/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List the versions of the authorized volume using the installation database.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "app/api/drive/volumes/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List and create the current owner's private volumes within an authorized workspace.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "app/api/internal/github/workflow-result/route.ts": {
+    "mode": "optional-cloud",
+    "environment": [
+      "MIKKA_EDITION"
+    ],
+    "behavior": "Community installations return 404 before loading GitHub App configuration. The hosted receiver verifies its signed, bounded delivery before recording the result.",
+    "test": "app/api/webhooks/github/route.test.ts",
+    "suite": "test:suggestions"
+  },
+  "app/api/tasks/[taskId]/attachments/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List, upload, download and delete task files under the task ACL using the installation database and configured attachment storage.",
+    "test": "tests/team-issue-create.db.test.ts",
+    "suite": "test:scope-detachment-db"
+  },
+  "app/api/workspaces/[workspaceId]/service-identities/[identityId]/projects/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Workspace administrators can read and change explicit Project grants only on Projects they can manage.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "app/api/workspaces/[workspaceId]/service-identities/[identityId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Workspace administrators can read, rename, disable or restore a service identity with revision checks.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "app/api/workspaces/[workspaceId]/service-identities/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Workspace administrators can list service identities and create them idempotently in their current Workspace.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "apps/api/runtime/http-policy.mjs": {
+    "mode": "built-in",
+    "environment": [
+      "NODE_ENV",
+      "MIKKA_LEGACY_APP_HOST",
+      "BETTER_AUTH_URL",
+      "MIKKA_EDITION"
+    ],
+    "behavior": "Preserve machine routes, request authority and response headers while selecting an HTML page only for document navigation.",
+    "test": "apps/api/runtime/http-policy.test.mjs"
+  },
+  "apps/api/scripts/dedupe-functions.mjs": {
+    "mode": "optional-cloud",
+    "environment": [],
+    "behavior": "The Vercel packaging step deduplicates byte-identical function trees only when deployment configuration and resolved dependencies agree. Compose uses the Node server target.",
+    "test": "apps/api/scripts/dedupe-functions.test.mjs"
+  },
+  "apps/api/scripts/finalize-build.mjs": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_BUILD_BYOS_WORKER",
+      "NEXT_PUBLIC_MIKKA_BUILD",
+      "VERCEL_DEPLOYMENT_ID",
+      "MIKKA_TEST_DEPLOYMENT_SHA",
+      "VERCEL_ENV",
+      "MIKKA_UI_OVERLAY_SHA",
+      "MIKKA_EDITION"
+    ],
+    "behavior": "Package the Node server and verified runtime resources for self-hosted operation. Official builds additionally record deployment and UI source identity.",
+    "test": "apps/api/scripts/finalize-build.test.mjs"
+  },
+  "apps/eve/agent/agent.ts": {
+    "mode": "optional-cloud",
+    "environment": [
+      "MIKKA_EVE_WORKFLOW_WORLD"
+    ],
+    "behavior": "The official Eve host opts into its private Cloudflare World explicitly. Leaving the selector unset preserves the normal workflow selection.",
+    "test": "cloudflare/eve-runtime/test/config.test.mjs"
+  },
+  "drizzle/20261112030502_task_attachments.sql": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "Create PostgreSQL task attachment metadata and enqueue storage retirement on delete, including task cascades.",
+    "test": "tests/team-issue-create.db.test.ts",
+    "suite": "test:scope-detachment-db"
+  },
+  "drizzle/20261112030504_freeze_schedule_request_origin.sql": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "The PostgreSQL migration retains distinct schedule request identities when their original bot or workspace is removed.",
+    "test": "lib/schedules/request-identity.db.test.ts",
+    "suite": "test:schedules-db"
+  },
+  "drizzle/20261112030505_task_creation_receipts.sql": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "Persist idempotent task creation receipts in PostgreSQL so a retry recovers the original task.",
+    "test": "tests/task-create-only.db.test.ts",
+    "suite": "test:coordinator-issue-create-db"
+  },
+  "drizzle/20261112030506_drive_blob_workspace_admission.sql": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "Record PostgreSQL blob admissions by owner, digest and workspace to prevent cross-tenant reuse by digest alone.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "drizzle/20261112030507_scope_personal_drive_names_by_workspace.sql": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "Keep personal volume names unique within their workspace while allowing the same owner to use a name in a different workspace.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "drizzle/20261112030508_workspace_service_identities.sql": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Store service identities and idempotent creation receipts in the configured Workspace PostgreSQL database.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "lib/abuse/workers-ai.ts": {
+    "mode": "optional-cloud",
+    "environment": [
+      "CLOUDFLARE_WORKERS_AI_ACCOUNT_ID",
+      "CLOUDFLARE_WORKERS_AI_TOKEN"
+    ],
+    "behavior": "Only an explicitly selected managed Workers AI model uses the Cloudflare account and token and the model route refuses missing configuration before provider I/O.",
+    "test": "lib/abuse/model.test.ts",
+    "suite": "test:abuse"
+  },
+  "lib/activity-actor-view.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Present local history with stable user, agent and system identities, including deleted actors.",
+    "test": "lib/activity-actor-view.test.ts",
+    "suite": "test:issues"
+  },
+  "lib/artifacts/storage.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "S3_ENDPOINT",
+      "S3_BUCKET",
+      "S3_ACCESS_KEY_ID",
+      "S3_SECRET_ACCESS_KEY",
+      "S3_REGION",
+      "R2_ACCOUNT_ID",
+      "CLOUDFLARE_ACCOUNT_ID",
+      "R2_ACCESS_KEY_ID",
+      "R2_SECRET_ACCESS_KEY",
+      "R2_ARTIFACTS_BUCKET",
+      "NODE_ENV",
+      "MIKKA_EDITION",
+      "MIKKA_DEPLOYMENT_STAGE",
+      "VERCEL_ENV"
+    ],
+    "behavior": "Community installations retain file bytes in PostgreSQL when no object store is configured; an operator may use an S3-compatible bucket.",
+    "test": "lib/artifacts/storage.test.ts",
+    "suite": "test:self-hosted-byok"
+  },
+  "lib/audit/events.ts": {
+    "mode": "built-in",
+    "environment": [
+      "VERCEL",
+      "MIKKA_API_INGRESS"
+    ],
+    "behavior": "Validate audit events locally. Forwarded location metadata is read only from a recognized deployment ingress.",
+    "test": "lib/audit/events.test.ts",
+    "suite": "test:audit"
+  },
+  "lib/board-filters.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Resolve saved board project names to the installation's visible project IDs and retain UUID filters across renames.",
+    "test": "lib/board-filters.test.ts",
+    "suite": "test:issues"
+  },
+  "lib/cloud-computer/sponsored-lifecycle.ts": {
+    "mode": "optional-cloud",
+    "environment": [
+      "MIKKA_CLOUD_WORKER_URL"
+    ],
+    "behavior": "Only a sponsored task with an authorized grant starts its Cloudflare machine. The handoff requires a configured HTTPS worker artifact origin and ordinary self-hosted tasks do not provision this service.",
+    "test": "apps/api/scripts/cloudflare-api.test.mjs"
+  },
+  "lib/cloud-computer/sponsored-task.ts": {
+    "mode": "optional-cloud",
+    "environment": [
+      "MIKKA_CLOUDFLARE_TASK_WORKSPACES",
+      "MIKKA_TASK_MACHINE_BRIDGE_TOKEN"
+    ],
+    "behavior": "A sponsored machine requires the workspace allowlist and a private bridge token. Unconfigured workspaces cannot acquire the machine grant.",
+    "test": "apps/api/scripts/cloudflare-api.test.mjs"
+  },
+  "lib/coordinator/ci-suite-transport.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Only a committed CI suite notification bound to the finished run can bypass paid semantic triage. The transport grants no GitHub authority.",
+    "test": "lib/coordinator/ci-suite-transport.test.mjs"
+  },
+  "lib/coordinator/decision-provider.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "AI_GATEWAY_API_KEY",
+      "DECISIONS_API_KEY",
+      "DECISIONS_BILLING_PROFILE",
+      "OPENAI_DECISIONS_API_KEY"
+    ],
+    "behavior": "The native decision route requires an explicit billing profile, matching model and operator key. Unconfigured or disallowed routes cannot reserve or send a provider request.",
+    "test": "lib/coordinator/native-decision.test.ts",
+    "suite": "test:coordinator-events"
+  },
+  "lib/coordinator/decision.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "DECISIONS_URL",
+      "DECISION_MODEL"
+    ],
+    "behavior": "The Coordinator allows an operator-selected decision endpoint and model. Requests use the existing credential and budget policy for that route.",
+    "test": "lib/coordinator/native-decision.test.ts",
+    "suite": "test:coordinator-events"
+  },
+  "lib/db/direct-session.ts": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL",
+      "MIKKA_DATABASE_URL_UNPOOLED"
+    ],
+    "behavior": "Dedicated connections preserve session locks and use the external installation's direct URL or its bundled PostgreSQL connection.",
+    "test": "scripts/postgres-connection.test.mjs"
+  },
+  "lib/db/request-scope.ts": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL",
+      "NODE_ENV",
+      "VERCEL_ENV"
+    ],
+    "behavior": "Background work uses the selected installation database and starts its own transaction instead of reusing a request lease.",
+    "test": "tests/background-database-boundary.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "lib/db/transaction-boundary.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Independent background work receives a separate transaction boundary, including for previously open project and workspace leases.",
+    "test": "tests/background-database-boundary.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "lib/default-model-config.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "AI_GATEWAY_API_KEY",
+      "CLOUDFLARE_WORKERS_AI_ACCOUNT_ID",
+      "CLOUDFLARE_WORKERS_AI_TOKEN",
+      "MIKKA_DEFAULT_MODEL_API_KEY",
+      "MIKKA_DEFAULT_MODEL_BASE_URL",
+      "MIKKA_DEFAULT_MODEL_ID",
+      "MIKKA_EDITION",
+      "MIKKA_HOSTED_MODEL_FALLBACK",
+      "VERCEL",
+      "VERCEL_OIDC_TOKEN",
+      "ZEROCAT_API_KEY",
+      "ZEROCAT_BASE_URL"
+    ],
+    "behavior": "Community installations may configure their own complete model endpoint, key and model ID. An incomplete private route is unavailable and optional hosted provider configurations are evaluated separately.",
+    "test": "lib/default-model-config.test.ts",
+    "suite": "test:self-hosted-byok"
+  },
+  "lib/deployment-stage.mjs": {
+    "mode": "operator-configured",
+    "environment": [
+      "MIKKA_DEPLOYMENT_ENVIRONMENT",
+      "MIKKA_DEPLOYMENT_STAGE",
+      "VERCEL_ENV"
+    ],
+    "behavior": "The application stage is optional on local Compose. Explicit production, preview or development stages take precedence over a provider's stage and invalid values fail validation.",
+    "test": "lib/deployment-stage.test.mjs"
+  },
+  "lib/device-removal.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Toggle scheduling only for an existing local device owned by the requesting user; return an error if no device changed.",
+    "test": "lib/device-enrollment.db.test.ts",
+    "suite": "test:device-enrollment-db"
+  },
+  "lib/drive/client.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the installed same-origin Drive API, scope caches by workspace and account, and upload bytes before publishing the manifest.",
+    "test": "lib/drive/client.test.ts",
+    "suite": "test:drive"
+  },
+  "lib/drive/server.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Authorize workspace-scoped Drive requests and update versioned manifests in PostgreSQL. File bytes use the installation's existing artifact storage configuration, with inline database storage when no bucket is configured.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "lib/eve/cloudflare-task-bridge.ts": {
+    "mode": "optional-cloud",
+    "environment": [
+      "MIKKA_TASK_MACHINE_BRIDGE_TOKEN"
+    ],
+    "behavior": "Only a private task host with a bridge token and a database-verified grant can open or release a sponsored Cloudflare task machine. Community Compose does not install this bridge.",
+    "test": "apps/api/scripts/cloudflare-api.test.mjs"
+  },
+  "lib/eve/cloudflare-task-connection.ts": {
+    "mode": "optional-cloud",
+    "environment": [],
+    "behavior": "The Cloudflare sandbox adapter requires an injected workspace binding and a scoped grant. Ordinary Compose installations do not supply the private binding.",
+    "test": "apps/api/scripts/cloudflare-api.test.mjs"
+  },
+  "lib/eve/product-rpc.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_SECRET",
+      "BETTER_AUTH_URL",
+      "MIKKA_APP_ORIGIN",
+      "MIKKA_EVE_HOST",
+      "MIKKA_EVE_PRODUCT_TOKEN"
+    ],
+    "behavior": "Self-hosted Eve calls the configured application origin or local server with its signed scope. The private product capability is sent only to the paired Cloudflare service and that deployment refuses to call without it.",
+    "test": "lib/eve/product-tool.test.ts",
+    "suite": "test:eve"
+  },
+  "lib/factory/evidence-folder-index.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Counts visible Factory evidence inside the existing PostgreSQL snapshot, scoped to the owner, workspace and visible Factory IDs.",
+    "test": "tests/task-presentation.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "lib/github/ci-suite-event.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "A configured GitHub App projects verified completed check suites into bounded notifications and validates the associated pull-request head.",
+    "test": "lib/github/ci-suite-event.test.ts",
+    "suite": "test:github"
+  },
+  "lib/github/ci-suite-wake.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "For a configured GitHub App, use the installation PostgreSQL publication and run records to enqueue a Coordinator wake only for an ended run on the same repository and pull-request head.",
+    "test": "lib/github/publication-webhook.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "lib/github/comment-mention.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Recognizes mentions on GitHub pull requests and returns delivery identities without retaining comment text. The caller may supply its configured GitHub App slug.",
+    "test": "lib/github/comment-mention.test.ts",
+    "suite": "test:github"
+  },
+  "lib/github/workflow-result-store.ts": {
+    "mode": "optional-cloud",
+    "environment": [],
+    "behavior": "Only the authenticated hosted CI receipt route writes these PostgreSQL records. Repeated or stale attempts cannot overwrite the latest authorized result.",
+    "test": "lib/github/publication-webhook.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "lib/github/workflow-result.ts": {
+    "mode": "optional-cloud",
+    "environment": [],
+    "behavior": "Community installations return HTTP 404 for the internal CI receipt route. Hosted receipts require a valid domain-separated HMAC, a fresh timestamp and a bounded payload.",
+    "test": "app/api/webhooks/github/route.test.ts",
+    "suite": "test:suggestions"
+  },
+  "lib/governance/http.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Governance mutations recheck the Workspace-scoped session and validate request origin and JSON before applying a change.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "lib/governance/service-identities.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Manage the Workspace service identity registry under a current administrator membership lease.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "lib/governance/service-project-access.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Replace explicit service grants through existing Project access policies, with confirmation and concurrent-change checks.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "lib/hooks/use-task-continuation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Paged task lists fetch the next authorized cursor on demand and discard previous pages when the current view changes.",
+    "test": "hooks/use-task-cards.test.tsx",
+    "suite": "test:thread-changes"
+  },
+  "lib/issue-threads.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Conversation roots and continuations disclose only the status and content allowed for the current workspace reader.",
+    "test": "lib/issue-threads.test.ts",
+    "suite": "test:issues"
+  },
+  "lib/linear-sync/markdown.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Converts Mikka task content to and from Linear Markdown locally and escapes plain text for comments.",
+    "test": "lib/linear-sync/markdown.test.ts",
+    "suite": "test:linear-sync"
+  },
+  "lib/linear-sync/run-comment.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Formats localized run comments, derives repeatable comment IDs, and builds task links from the installation origin and base path supplied by the caller.",
+    "test": "lib/linear-sync/run-comment.test.ts",
+    "suite": "test:linear-sync"
+  },
+  "lib/platform/public-origin.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Links and daemon commands follow the selected installation's HTTP origin and base path. Unsafe backend addresses and out-of-scope service paths are rejected.",
+    "test": "lib/platform/public-origin.test.ts",
+    "suite": "test:platform"
+  },
+  "lib/renderer-actions.mjs": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Expose only the release-bound action names and renderer identity needed by the selected installation. Reject invalid or duplicate actions and keep private build inputs, server modules and unused exports out of the public contract.",
+    "test": "apps/api/scripts/cloudflare-web.test.mjs"
+  },
+  "lib/run-app-mcp.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A run can use an installed toolkit only through the authorized account, tool list and scoped run token.",
+    "test": "lib/run-app-mcp.test.ts",
+    "suite": "test:integrations"
+  },
+  "lib/slack/api.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "SLACK_BOT_TOKEN"
+    ],
+    "behavior": "An enabled Slack integration supplies its bot token to post a completion to the bound channel and thread. The client classifies Slack errors and retry timing without exposing the token.",
+    "test": "lib/slack/api.test.ts",
+    "suite": "test:slack"
+  },
+  "lib/slack/completion-message.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Formats a localized completion from the visible task label and status, escapes Slack mentions, and builds a link using the caller's installation origin and base path.",
+    "test": "lib/slack/completion-message.test.ts",
+    "suite": "test:slack"
+  },
+  "lib/task-activity-timeline.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Web and native clients use the same chronological task history, discussion and run facts.",
+    "test": "apps/mobile/tests/task-groups.test.mts",
+    "suite": "test:mobile"
+  },
+  "lib/task-activity-versions.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The content-authorized reader retrieves recent task history and the original PostgreSQL creation revision.",
+    "test": "tests/mobile-tasks.db.test.ts",
+    "suite": "test:workspace-admin-db"
+  },
+  "lib/task-attachments/contract.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Task attachments enforce file size and count limits when the authorized caller uploads to this installation.",
+    "test": "tests/team-issue-create.db.test.ts",
+    "suite": "test:scope-detachment-db"
+  },
+  "lib/task-attachments/store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Attachment metadata is scoped to the task in PostgreSQL. File bytes use the local database fallback or the configured object store.",
+    "test": "tests/team-issue-create.db.test.ts",
+    "suite": "test:scope-detachment-db"
+  },
+  "lib/task-collection.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The client groups the authorized task presentations and keeps waiting tasks associated with their actual Bot.",
+    "test": "hooks/use-bot-tasks.test.ts",
+    "suite": "test:lib-units"
+  },
+  "lib/task-create-command.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validate create-only and dispatch requests with the current workspace, task scope and request ID.",
+    "test": "tests/task-create-only.db.test.ts",
+    "suite": "test:coordinator-issue-create-db"
+  },
+  "lib/task-create-form.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The shared task form preserves its create or dispatch intent and accepts the matching server receipt.",
+    "test": "apps/mobile/tests/eve-client.test.mts",
+    "suite": "test:mobile"
+  },
+  "lib/task-create-only.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "An authorized create-only request persists a task once in PostgreSQL without starting a run or calling a model.",
+    "test": "tests/task-create-only.db.test.ts",
+    "suite": "test:coordinator-issue-create-db"
+  },
+  "lib/task-create-scope.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Creation authorizes the selected team or project UUID and preserves that scope on retry.",
+    "test": "tests/task-create-only.db.test.ts",
+    "suite": "test:coordinator-issue-create-db"
+  },
+  "lib/task-creation-receipt.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "PostgreSQL records the task returned for an idempotent create request and returns its original identity on retry.",
+    "test": "tests/task-create-only.db.test.ts",
+    "suite": "test:coordinator-issue-create-db"
+  },
+  "lib/task-discussion.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A typed discussion carries the author, creation time, resolution state and messages into the shared activity view.",
+    "test": "apps/mobile/tests/task-groups.test.mts",
+    "suite": "test:mobile"
+  },
+  "lib/task-dispatch-lock.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "An independent PostgreSQL pool takes a transaction-scoped advisory lock for each task, leaving application connections available for admission.",
+    "test": "tests/thread-dispatch-concurrency.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "lib/task-dispatch-receipt.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "An authorized caller can recover its accepted dispatch receipt with the original task and destination.",
+    "test": "tests/task-create-only.db.test.ts",
+    "suite": "test:coordinator-issue-create-db"
+  },
+  "lib/task-factory-events.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Only visible Factory events and their immutable evidence revisions appear on a task.",
+    "test": "lib/task-factory-events.test.ts",
+    "suite": "test:factory-activity"
+  },
+  "lib/task-list-page.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Cursor pages preserve database precision and traverse each authorized task exactly once.",
+    "test": "tests/task-list-pages.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "lib/task-presentation-batch.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Native and Web readers request at most 200 distinct tasks per page and reject a workspace mismatch.",
+    "test": "apps/mobile/tests/server-api.test.mts",
+    "suite": "test:mobile"
+  },
+  "lib/task-project-options.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Project choices preserve their authorized record IDs, including when names are duplicated or a project is renamed.",
+    "test": "scripts/issue-metadata.test.mjs"
+  },
+  "lib/task-resource-registration.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Task resource registration persists its workspace and privacy defaults under the authorized PostgreSQL transaction.",
+    "test": "tests/task-resource-registration.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "lib/task-workspace.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Workspace membership is checked against the current transaction boundary before granting task access.",
+    "test": "tests/factory-workspace-admission.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "lib/ui-overlay.mjs": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_UI_OVERLAY_DIR",
+      "MIKKA_UI_OVERLAY_SHA"
+    ],
+    "behavior": "The public build resolves checked-in slot defaults; an optional official UI overlay must be valid and provide its required slots.",
+    "test": "lib/ui-overlay.test.mjs"
+  },
+  "lib/workers-ai-config.ts": {
+    "mode": "optional-cloud",
+    "environment": [
+      "CLOUDFLARE_WORKERS_AI_ACCOUNT_ID",
+      "MIKKA_HOSTED_MODEL_FALLBACK"
+    ],
+    "behavior": "The Workers AI route must be explicitly selected and the account ID must be valid and ordinary local installs do not need a Cloudflare account.",
+    "test": "lib/abuse/model.test.ts",
+    "suite": "test:abuse"
+  },
+  "lib/workspace-db.ts": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL",
+      "MIKKA_DATABASE_URL",
+      "NODE_ENV",
+      "VERCEL_ENV"
+    ],
+    "behavior": "Workspace reads and transactions use the configured PostgreSQL connection with scoped leases and savepoint rollback.",
+    "test": "lib/workspace-db.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "services/credential-broker/server.mjs": {
+    "mode": "optional-cloud",
+    "environment": [
+      "PORT"
+    ],
+    "behavior": "The standalone broker is outside the standard Compose stack. When deployed separately its listen port is configurable and credential handlers enforce caller identity.",
+    "test": "services/credential-broker/server.test.mjs",
+    "suite": "test:self-hosted-broker"
+  }
+}

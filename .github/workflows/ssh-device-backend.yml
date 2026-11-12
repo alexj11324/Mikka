@@ -1,6 +1,7 @@
 name: SSH device backend
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths:
       - 'apps/desktop/**'
       - 'packages/daemon/**'
@@ -14,8 +15,15 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+
+concurrency:
+  group: ssh-device-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   ssh:
+    # Skip expensive PR proof while drafting; main/manual runs are unaffected.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:

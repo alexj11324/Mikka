@@ -6,13 +6,11 @@ import { useTranslations } from 'next-intl'
 import { ArrowLeft, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { RightColumn } from '@/components/workspace/thread-column'
-import { ThreadResults } from '@/components/nav/context-panel'
 import { issueIdentifier } from '@/components/workspace/issue-properties'
-import { closeTask, openThread, toggleAllThreads } from '@/components/workspace/workspace-navigation'
+import { closeTask, toggleAllThreads } from '@/components/workspace/workspace-navigation'
 import type { TaskColumnProps } from '@/components/slots/task-column-contract'
 
-export function TaskColumn({ issueId, issue, threads, overList = false }: TaskColumnProps) {
-  const own = threads.filter(thread => thread.issueId === issueId)
+export function TaskColumn({ children, issue, overList = false }: TaskColumnProps) {
   const t = useTranslations('Shell.panel')
   const title = issue ? [issueIdentifier(issue), issue.title].filter(Boolean).join(' ') : ''
   return <RightColumn slot="task-column">
@@ -21,8 +19,6 @@ export function TaskColumn({ issueId, issue, threads, overList = false }: TaskCo
       <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{title}</h2>
       {overList && <Button variant="ghost" size="icon-sm" aria-label={t('closeAllThreads')} onClick={() => toggleAllThreads(false)}><X data-icon="inline-start" /></Button>}
     </header>
-    <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-      <ThreadResults stateKey={`task-column:${issueId}`} threads={own} shown={own} issues={issue ? [issue] : []} onOpenThread={thread => openThread(thread.runId)} />
-    </div>
+    <div className="min-h-0 flex-1">{children}</div>
   </RightColumn>
 }

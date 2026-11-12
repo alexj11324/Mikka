@@ -12,8 +12,7 @@ import {
   validateInvitationEmails,
 } from '@/lib/invitation-csv'
 import { useActionError } from '@/lib/use-action-error'
-import { publicAppOrigin } from '@/lib/platform/public-origin'
-import { withBasePath } from '@/lib/base-path'
+import { publicServiceLink } from '@/lib/platform/public-origin'
 
 export type InviteLink = { email: string; url: string }
 /** An address of the batch that got no link, and why (ALE-28). */
@@ -90,7 +89,7 @@ export function useInviteMembers(workspaceId: string | undefined, onCreated: () 
     if (!workspaceId) return null
     const result = await createWorkspaceInvitation({ workspaceId, emails: list, role: asRole })
     if (!result.ok) { setError(translateError(result.error)); return null }
-    const created = result.data.map(link => ({ email: link.email, url: new URL(withBasePath(link.path), publicAppOrigin()).href }))
+    const created = result.data.map(link => ({ email: link.email, url: publicServiceLink(link.path) }))
     if (!replacing) {
       setLinks(created)
       // One answer per address: a batch that skipped some still returns its links.

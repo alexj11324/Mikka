@@ -204,6 +204,30 @@ export function threadProfile(value: unknown): ThreadProfile | null {
 /** A run that is part of the task's conversation: implement or plan. A read without kinds counts every run. */
 export const isConversationRun = (thread: { kind?: string }) => !thread.kind || thread.kind === 'implement' || thread.kind === 'plan'
 
+/** Pick from a viewer's authorized conversation heads. The mobile detail and Web root selector
+ * use the same ordering, including when an older root received the most recent continuation. */
+export function latestConversationRun(runs: readonly { runId: string; kind?: string; createdAt: Date | string }[]): string | null {
+  let latest: { runId: string; time: number } | null = null
+  for (const run of runs) {
+    if (!isConversationRun(run)) continue
+    const time = new Date(run.createdAt).getTime()
+    if (!latest || time > latest.time || (time === latest.time && run.runId > latest.runId)) latest = { runId: run.runId, time }
+  }
+  return latest?.runId ?? null
+}
+
+/** A teammate's redacted root is activity metadata. A Factory check is readable evidence.
+ * Opening either never changes where a reply goes. */
+export function taskConversationRoots<T extends Pick<IssueThread, 'id' | 'kind' | 'detail' | 'attempts' | 'latestRunId'> & { createdAt: Date | string }>(threads: readonly T[]) {
+  const readable = threads.filter(thread => thread.detail !== null).sort((a, b) =>
+    new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime() || a.id.localeCompare(b.id))
+  const latestId = latestConversationRun(readable.map(thread => ({
+    runId: thread.latestRunId, kind: thread.kind,
+    createdAt: thread.attempts.find(attempt => attempt.runId === thread.latestRunId)?.createdAt ?? thread.createdAt,
+  })))
+  return { readable, reply: readable.find(thread => thread.latestRunId === latestId) ?? null }
+}
+
 /**
  * One conversation per task (decision 2026-11-09-0045): consecutive threads by the same Agent and the
  * same custom Agent 配置 are one stretch (Alex, 2026-11-10: the Profile is who does the work).

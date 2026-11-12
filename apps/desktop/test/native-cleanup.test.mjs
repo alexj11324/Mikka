@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { fork } from 'node:child_process'
 import { once } from 'node:events'
-import { lstat, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -133,6 +133,19 @@ test('an already closed socket still waits for the recorded daemon process to fi
     assert.deepEqual(await stopLocalDaemons([profile]), { profilesStopped: true })
     assert.ok(performance.now() - started >= 200)
   })
+})
+
+test('PID removal before the production lock release cannot fail or authorize cleanup early', async t => {
+  const profile = await mkdtemp('/tmp/mikka-drain-')
+  t.after(() => rm(profile, { recursive: true, force: true }))
+  const lock = join(profile, 'daemon.lock')
+  await mkdir(lock)
+  const result = stopLocalDaemons([profile])
+  const pending = Symbol('pending')
+  // The production release removes daemon.pid before awaiting lock removal.
+  assert.equal(await Promise.race([result, new Promise(resolve => setTimeout(resolve, 200, pending))]), pending)
+  await rm(lock, { recursive: true })
+  assert.deepEqual(await result, { profilesStopped: true })
 })
 
 test('a refused socket without its daemon PID cannot authorize database cleanup', async t => {

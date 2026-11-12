@@ -1,7 +1,7 @@
 import { spawnSync, execFileSync } from 'node:child_process'
 import assert from 'node:assert/strict'
 import { createHash, createPrivateKey } from 'node:crypto'
-import { appendFileSync, chmodSync, mkdirSync, lstatSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync, lstatSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { releaseIdentity, waitForReleaseChecks } from './ci-gate.mjs'
@@ -33,28 +33,91 @@ export function requireAscInputs(env) {
   }
 }
 
-export function validateNativeBuild(parsed, { sourceSha, buildId, driverSha, expectedProfile = 'production', archiveProof }, app) {
+const NATIVE_WORKFLOW = '.github/workflows/mobile-native.yml'
+const OFFICIAL_PROFILE = 'hosted-production'
+
+function requireArchiveProof(archive, sourceSha) {
+  assert.ok(archive?.sourceSha === sourceSha && SHA.test(archive.overlaySha ?? '') &&
+    /^[a-f0-9]{64}$/.test(archive.archiveDigest ?? '') && Number.isSafeInteger(archive.overlayFiles) &&
+    Number.isSafeInteger(archive.files) && archive.overlayFiles > 0 && archive.files >= archive.overlayFiles &&
+    archive.profile === OFFICIAL_PROFILE && archive.stage === 'eas build:inspect archive', 'hostedBuildArchiveProofRequired')
+}
+
+function readOriginalReports(runId, name, env) {
+  const directory = mkdtempSync(join(env.RUNNER_TEMP, 'mikka-native-proof-'))
+  try {
+    execFileSync('gh', ['run', 'download', String(runId), '--repo', env.GITHUB_REPOSITORY, '--name', name, '--dir', directory], { stdio: 'ignore' })
+    const read = file => existsSync(join(directory, file)) ? JSON.parse(readFileSync(join(directory, file), 'utf8')) : null
+    return { build: read('build.json'), archive: read('archive.json') }
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+}
+
+export function recoverOriginalBuild(source, env, {
+  api = (path, paged = false) => JSON.parse(execFileSync('gh', ['api', ...(paged ? ['--paginate', '--slurp'] : []), path], { encoding: 'utf8' })),
+  readReports = (id, name) => readOriginalReports(id, name, env),
+} = {}) {
+  const { repository, runId } = source.identity
+  const { sourceSha, buildId } = source
+  assert.ok(UUID.test(buildId) && SHA.test(sourceSha), 'nativeOriginalBuildProofRequired')
+  const path = '/repos/' + repository + '/actions'
+  const name = 'mobile-native-' + sourceSha
+  const workflow = api(path + '/workflows/mobile-native.yml')
+  assert.ok(workflow.path === NATIVE_WORKFLOW && Number.isSafeInteger(workflow.id), 'nativeOriginWorkflowRequired')
+  const pages = api(path + '/artifacts?name=' + name + '&per_page=100', true)
+  for (const artifact of pages.flatMap(page => page.artifacts)) {
+    const origin = artifact.workflow_run
+    if (artifact.name !== name || artifact.expired !== false || !Number.isSafeInteger(origin?.id) ||
+        origin.repository_id !== 1427517699 || origin.head_repository_id !== 1427517699 ||
+        origin.head_sha !== sourceSha || origin.head_branch !== 'main' || String(origin.id) === String(runId)) continue
+    const run = api(path + '/runs/' + origin.id)
+    if (run.id !== origin.id || run.workflow_id !== workflow.id || run.path !== NATIVE_WORKFLOW ||
+        run.repository?.full_name !== repository || run.repository.id !== origin.repository_id ||
+        run.head_repository?.id !== origin.head_repository_id || run.head_sha !== sourceSha ||
+        run.head_branch !== 'main' || !['push', 'workflow_dispatch'].includes(run.event) || run.status !== 'completed') continue
+    // The build can succeed even when the following TestFlight submission fails.
+    // A later recovery run is not the original build producer.
+    const jobs = api(path + '/runs/' + origin.id + '/jobs?filter=all&per_page=100', true).flatMap(page => page.jobs)
+    const produced = jobs.some(job => ['Require the complete protected UI in the EAS archive', 'Build iOS with existing signing credentials',
+      'Verify the completed build and commit'].every(name => job.steps?.some(step => step.name === name && step.conclusion === 'success')))
+    if (!produced) continue
+    const { build, archive } = readReports(origin.id, name)
+    if (build?.id !== buildId || !archive || build.originalRunId) continue
+    assert.ok(build.driverSha === sourceSha && build.gitCommitHash === sourceSha && build.status === 'FINISHED' &&
+      build.platform === 'IOS' && build.buildProfile === OFFICIAL_PROFILE && typeof build.fingerprint === 'string' &&
+      build.fingerprint.length > 0 && build.runtimeVersion === build.fingerprint, 'nativeOriginalBuildIdentityMismatch')
+    requireArchiveProof(archive, sourceSha)
+    assert.deepEqual(build.archiveProof, archive, 'nativeOriginalArchiveMismatch')
+    return { originalRunId: origin.id, buildId, sourceSha, fingerprint: build.fingerprint, archiveProof: archive }
+  }
+  throw Error('nativeOriginalBuildProofRequired')
+}
+
+export function validateNativeBuild(parsed, { sourceSha, buildId, driverSha, archiveProof, recovery }, app) {
   const builds = Array.isArray(parsed) ? parsed : [parsed]
   const build = builds.find(item => item?.platform === 'IOS')
   if (!build || !UUID.test(build.id ?? '') || build.status !== 'FINISHED' ||
       build.gitCommitHash !== sourceSha || (buildId && build.id !== buildId) ||
       build.app?.id !== app.extra?.eas?.projectId || build.appIdentifier !== app.ios?.bundleIdentifier ||
-      !['production', 'hosted-production'].includes(expectedProfile) || build.buildProfile !== expectedProfile || build.distribution !== 'STORE' || build.isForIosSimulator === true) {
+      build.buildProfile !== OFFICIAL_PROFILE || build.distribution !== 'STORE' || build.isForIosSimulator === true) {
     throw Error('nativeBuildIdentityMismatch')
   }
-  if (!build.runtime?.version || !build.fingerprint?.hash ||
+  if (typeof build.runtime?.version !== 'string' || !build.runtime.version ||
+      typeof build.fingerprint?.hash !== 'string' || !build.fingerprint.hash ||
       (app.runtimeVersion?.policy === 'fingerprint' && build.runtime.version !== build.fingerprint.hash)) {
     throw Error('nativeBuildRuntimeUnverified')
   }
-  if (expectedProfile === 'hosted-production') {
-    assert.ok(archiveProof?.sourceSha === sourceSha && SHA.test(archiveProof.overlaySha ?? '') &&
-      /^[a-f0-9]{64}$/.test(archiveProof.archiveDigest ?? '') && archiveProof.overlayFiles > 0 &&
-      archiveProof.files >= archiveProof.overlayFiles, 'hostedBuildArchiveProofRequired')
+  requireArchiveProof(archiveProof, sourceSha)
+  if (buildId) {
+    assert.ok(Number.isSafeInteger(recovery?.originalRunId) && recovery?.buildId === build.id && recovery.sourceSha === sourceSha &&
+      recovery.fingerprint === build.fingerprint.hash, 'nativeOriginalBuildIdentityMismatch')
+    assert.deepEqual(recovery.archiveProof, archiveProof, 'nativeOriginalArchiveMismatch')
   }
   const fields = ['id', 'platform', 'status', 'gitCommitHash', 'appVersion', 'appBuildVersion', 'buildProfile', 'createdAt', 'completedAt']
   return { ...Object.fromEntries(fields.map(key => [key, build[key] ?? null])), driverSha,
     runtimeVersion: build.runtime.version, fingerprint: build.fingerprint.hash,
-    ...(expectedProfile === 'hosted-production' ? { archiveProof } : {}) }
+    archiveProof, ...(buildId ? { originalRunId: recovery.originalRunId } : {}) }
 }
 
 // These file classes are excluded by .easignore and must never cross the upload boundary.
@@ -99,9 +162,11 @@ export function verifyHostedArchive({ archive, overlay, trackedFiles, sourceSha,
   uploaded.sort()
   assert.ok(uploaded.length === expected.length && uploaded.every((path, index) => path === expected[index]),
     'nativeArchiveOverlayTrackedSetMismatch')
-  const profile = JSON.parse(readFileSync(join(archive, 'apps/mobile/eas.json'), 'utf8')).build['hosted-production']
-  assert.equal(profile.extends, 'production')
-  assert.equal(profile.env.MIKKA_MOBILE_OVERLAY_DIR, '.hosted-ui/mobile')
+  const profiles = JSON.parse(readFileSync(join(archive, 'apps/mobile/eas.json'), 'utf8')).build
+  assert.equal(profiles[OFFICIAL_PROFILE]?.extends, 'production')
+  for (const name of ['production', OFFICIAL_PROFILE]) {
+    assert.equal(profiles[name]?.env?.MIKKA_MOBILE_OVERLAY_DIR, '.hosted-ui/mobile', 'officialStoreOverlayRequired')
+  }
   return { sourceSha, overlaySha, archiveDigest: digest.digest('hex'), files, overlayFiles: expected.length,
     stage: 'eas build:inspect archive', profile: 'hosted-production' }
 }
@@ -146,9 +211,13 @@ async function main(mode) {
     mkdirSync('mobile-native-report', { recursive: true })
     writeFileSync('mobile-native-report/checks.json', JSON.stringify({
       driverSha: source.identity.sha, sourceSha: source.sourceSha, driverChecks, sourceChecks,
-      ...(source.buildId ? { existingBuildRecovery: 'production-profile-only' } : {}),
+      ...(source.buildId ? { existingBuildRecovery: 'original-hosted-archive' } : {}),
     }, null, 2) + '\n')
     appendFileSync(env.GITHUB_OUTPUT, `commit=${source.sourceSha}\nbuild_id=${source.buildId}\n`)
+  } else if (mode === 'recover') {
+    const proof = recoverOriginalBuild(selectNativeSource(env), env)
+    writeFileSync('mobile-native-report/archive.json', JSON.stringify(proof.archiveProof, null, 2) + '\n')
+    writeFileSync(join(env.RUNNER_TEMP, 'mikka-native-origin.json'), JSON.stringify(proof))
   } else if (mode === 'archive') {
     const identity = releaseIdentity(env)
     assert.match(env.OVERLAY_SHA ?? '', SHA)
@@ -167,8 +236,9 @@ async function main(mode) {
     const parsed = JSON.parse(readFileSync(join(env.RUNNER_TEMP, 'mikka-native-build.json'), 'utf8'))
     const app = JSON.parse(readFileSync('apps/mobile/app.json', 'utf8')).expo
     const report = validateNativeBuild(parsed, { sourceSha: env.NATIVE_SOURCE_SHA,
-      buildId: env.EXISTING_BUILD_ID, driverSha: env.GITHUB_SHA, expectedProfile: env.NATIVE_BUILD_PROFILE ?? 'production',
-      archiveProof: env.NATIVE_BUILD_PROFILE === 'hosted-production' ? JSON.parse(readFileSync('mobile-native-report/archive.json', 'utf8')) : undefined }, app)
+      buildId: env.EXISTING_BUILD_ID, driverSha: env.GITHUB_SHA,
+      recovery: env.EXISTING_BUILD_ID ? JSON.parse(readFileSync(join(env.RUNNER_TEMP, 'mikka-native-origin.json'), 'utf8')) : undefined,
+      archiveProof: JSON.parse(readFileSync('mobile-native-report/archive.json', 'utf8')) }, app)
     mkdirSync('mobile-native-report', { recursive: true })
     writeFileSync('mobile-native-report/build.json', JSON.stringify(report, null, 2) + '\n')
     appendFileSync(env.GITHUB_OUTPUT, `id=${report.id}\n`)

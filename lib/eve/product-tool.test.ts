@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
+import { randomBytes } from 'node:crypto'
 import test from 'node:test'
 import type { ApprovalConfiguration } from 'eve/tools/approval'
 import { createProductTool } from './product-tool'
-import type { productRpc, ProductOperation } from './product-rpc'
+import { productRpc, type ProductOperation } from './product-rpc'
+import { internalEveScope } from './auth'
 import { scopeAuth, type EveScope } from './scope'
 
 const scope = {ownerId:'owner',botId:'10000000-0000-4000-8000-000000000001',workspaceId:'10000000-0000-4000-8000-000000000002',surface:'web' as const}
@@ -40,4 +42,36 @@ test('native approval accepts only original scoped owner and copies no token cap
   assert.deepEqual(requests,[{...binding,operation:'execute',name:definition.name,input,callId:'call_1',approvalResponder:owner}])
   assert.equal(await tool.execute!(input as never,{callId:'call_2',abortSignal:new AbortController().signal} as never),'sent')
   assert.equal(Object.hasOwn(requests[1],'approvalResponder'),false)
+})
+
+test('self-hosted product RPC uses the configured server and reserves the private capability for Cloudflare', async t => {
+  t.mock.property(process, 'env', {
+    ...process.env,
+    MIKKA_EDITION: 'community',
+    MIKKA_EVE_HOST: 'local',
+    MIKKA_APP_ORIGIN: 'https://mikka-installation.example.invalid',
+    BETTER_AUTH_URL: 'https://login.example.invalid',
+    BETTER_AUTH_SECRET: randomBytes(32).toString('hex'),
+    MIKKA_EVE_PRODUCT_TOKEN: randomBytes(32).toString('hex'),
+  })
+  const calls: Request[] = []
+  t.mock.method(globalThis, 'fetch', async (url: URL, options: RequestInit) => {
+    calls.push(new Request(url, options))
+    return Response.json({ accepted: true })
+  })
+  const operation: ProductOperation = { ...binding, operation: 'prepare' }
+  assert.deepEqual(await productRpc(scope, operation), { accepted: true })
+  assert.equal(calls.length, 1)
+  const [request] = calls
+  assert.equal(request.method, 'POST')
+  assert.equal(request.url, 'https://mikka-installation.example.invalid/mikka/api/internal/eve/tools')
+  assert.equal(request.redirect, 'error')
+  assert.deepEqual(internalEveScope(request.headers.get('authorization')), scope)
+  assert.equal(request.headers.has('x-mikka-product-capability'), false)
+  assert.deepEqual(await request.json(), operation)
+
+  process.env.MIKKA_EVE_HOST = 'cloudflare'
+  delete process.env.MIKKA_EVE_PRODUCT_TOKEN
+  await assert.rejects(productRpc(scope, operation), { message: 'agentToolUnavailable' })
+  assert.equal(calls.length, 1)
 })
