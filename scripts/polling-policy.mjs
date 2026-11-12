@@ -5,6 +5,7 @@
 // a replaced one must leave the list.
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
+import ts from 'typescript'
 
 export const pollingMessage = '不要新增轮询；数据变化用 live push（`hooks/use-live-key.tsx` / `lib/live/*`），见 #1212；确实只是界面计时器或外部 API 才加入 allowlist 并写明原因。'
 
@@ -77,11 +78,31 @@ const rules = [
   { rule: 'polling/refresh-interval', pattern: /[{,]\s*(?:refreshInterval|refetchInterval)\s*(?=[,}])/g },
   { rule: 'polling/set-interval', pattern: /\bsetInterval\s*\(/g },
   { rule: 'polling/poll-constant', pattern: /\b[A-Z][A-Z0-9_]*(?:_POLL_MS|POLL_INTERVAL[A-Z0-9_]*|_EVERY_MS)\s*=(?!=)/g },
-  // Polling helpers of our own: mobile useApi with an interval. (The daemon's
-  // gate.watch is push-driven; its fallback timer counts in tool-approval.ts.)
-  { rule: 'polling/helper', skip: definition, pattern: /\buseApi\b(?:<[^\n(]*?>)?\((?:[^()]|\([^()]*\))*?,\s*(?!0\s*\)|undefined\s*\)|null\s*\))[^\s)]/g },
+  // The daemon's gate.watch is push-driven; its fallback timer counts in tool-approval.ts.
   { rule: 'polling/helper', skip: definition, pattern: /\bpollUntil\(/g },
 ]
+
+// Mobile useApi's second argument is a reader, not the retired interval.
+// Parse calls so commas in the path expression and reader callbacks cannot be
+// mistaken for an interval. Typechecking the application still requires a reader.
+function useApiIntervals(file, source) {
+  if (!/\buseApi\b/.test(source)) return []
+  const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
+  const options = { noLib: true, noResolve: true, allowJs: true }
+  const checker = ts.createProgram([file], options, {
+    ...ts.createCompilerHost(options), getSourceFile: name => name === file ? ast : undefined,
+  }).getTypeChecker()
+  const found = []
+  const interval = type => type.isUnion() ? type.types.some(interval)
+    : Boolean(type.flags & ts.TypeFlags.NumberLike) && !(type.isNumberLiteral() && type.value === 0)
+  function visit(node) {
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'useApi'
+        && node.arguments[1] && interval(checker.getTypeAtLocation(node.arguments[1]))) found.push(node.getStart(ast))
+    ts.forEachChild(node, visit)
+  }
+  visit(ast)
+  return found
+}
 
 /** Where a loop body ends: a braced block, or the rest of its single-statement line. */
 function loopBody(source, from) {
@@ -132,6 +153,7 @@ export function findPolling(file, source) {
     }
   }
   for (const index of sleepLoops(source)) found.push(at(file, source, index, 'polling/sleep-loop'))
+  for (const index of useApiIntervals(file, source)) found.push(at(file, source, index, 'polling/helper'))
   return found.sort((a, b) => a.line - b.line || a.column - b.column)
 }
 
