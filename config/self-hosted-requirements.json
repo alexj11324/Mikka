@@ -337,6 +337,13 @@
     "behavior": "A sponsored machine requires the workspace allowlist and a private bridge token. Unconfigured workspaces cannot acquire the machine grant.",
     "test": "apps/api/scripts/cloudflare-api.test.mjs"
   },
+  "lib/code-review/read-contract.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read authorized Task Review summaries and immutable checkpoint file data from the selected installation, preserving unknown counts and the server-provided permission reasons.",
+    "test": "lib/code-review/client.test.ts",
+    "suite": "test:thread-changes"
+  },
   "lib/coordinator/ci-suite-transport.ts": {
     "mode": "built-in",
     "environment": [],
