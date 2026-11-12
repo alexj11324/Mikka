@@ -6,6 +6,8 @@ import type { Sandbox } from 'e2b'
 import { CodedError, type CodedErrorOptions } from '@mikka/protocol/coded-error'
 import { connectComputer, computerGone, computerState } from '@/lib/computer/e2b-provider'
 import { authTrustedOrigins } from '@/lib/auth-config'
+import { cloudflareReview, reviewReply, type CloudflareReview } from '../cloudflare-review'
+import type { ReviewSessionLease } from '../review-sessions'
 import type { TaskReviewAuthority } from '../review-authority'
 
 const ROOT = '/run/mikka-preview'
@@ -27,8 +29,8 @@ type Binding = {
 }
 export type PreviewUnavailable = { running: false; state: 'unavailable'; code: 'no_loopback_server'; observedAt: number }
 export type PreparedPreview = {
-  running: true; sandbox: Sandbox; binding: Binding; gatewayPort: number; port: number; expiresAt: string
-}
+  running:true; binding:Binding; port:number; expiresAt:string
+} & ({sandbox:Sandbox;gatewayPort:number;cloudflare?:undefined} | {cloudflare:CloudflareReview;origin:string})
 export type PreviewRevokeTarget = { runId: string; ownerId: string; workspaceId: string; sandboxId: string }
 type Json = Record<string, unknown>
 type Connector = typeof connectComputer
@@ -106,7 +108,7 @@ async function control(sandbox: Sandbox, message: Json): Promise<Json> {
   }
 }
 
-export async function prepareRunPreview(authority: TaskReviewAuthority, options: { expiresAt?: string; port?: number } = {}, connect: Connector = connectComputer, state: StateReader = computerState): Promise<PreparedPreview | PreviewUnavailable> {
+export async function prepareRunPreview(authority: TaskReviewAuthority, options: { expiresAt?: string; port?: number; lease?: ReviewSessionLease } = {}, connect: Connector = connectComputer, state: StateReader = computerState): Promise<PreparedPreview | PreviewUnavailable> {
   if (authority.machineKind !== 'cloud' || !authority.sandboxId || authority.machineEpoch === null)
     throw new PreviewRuntimeError('configuration', 404)
   if (options.port !== undefined && (!Number.isInteger(options.port) || options.port < 1024 || options.port > 65535))
@@ -121,6 +123,19 @@ export async function prepareRunPreview(authority: TaskReviewAuthority, options:
     epoch: authority.machineEpoch, worktreePath: authority.worktreePath, expiresAt: expires / 1000,
   }
   try {
+    if (authority.sponsoredPlacement) {
+      const review = cloudflareReview(authority,options.lease,'preview')
+      const reply = await reviewReply(review,'preview-prepare',{port:options.port})
+      if (reply.running === false && reply.code === 'no_loopback_server')
+        return {running:false,state:'unavailable',code:'no_loopback_server',observedAt:Date.now()}
+      if (reply.running !== true || typeof reply.port !== 'number' || !Number.isInteger(reply.port) ||
+          reply.port < 1024 || reply.port > 65535 || typeof reply.origin !== 'string' ||
+          typeof reply.expiresAt !== 'number' || reply.expiresAt > binding.expiresAt + 1 || reply.expiresAt <= Date.now()/1000)
+        throw new PreviewRuntimeError('protocol')
+      const origin = new URL(reply.origin)
+      if (origin.origin !== reply.origin || origin.protocol !== 'https:') throw new PreviewRuntimeError('protocol')
+      return {running:true,cloudflare:review,origin:origin.origin,port:reply.port,binding,expiresAt:new Date(reply.expiresAt*1000).toISOString()}
+    }
     // E2B connect() can resume a VM. Only the explicit authorized resume path
     // may do that; discovery never wakes a parked machine as a side effect.
     if (await state(authority.workspaceId, authority.sandboxId) !== 'running') throw new PreviewRuntimeError('scope_changed', 409)
@@ -148,14 +163,17 @@ export async function prepareRunPreview(authority: TaskReviewAuthority, options:
 export async function issueRunPreview(prepared: PreparedPreview, parentOrigin: string, lease: { id: string; expiresAt: string }) {
   const expires = Date.parse(lease.expiresAt)
   if (!Number.isFinite(expires) || expires <= Date.now() || expires > Date.parse(prepared.expiresAt)) throw new PreviewRuntimeError('scope_changed', 403)
-  const host = prepared.sandbox.getHost(prepared.gatewayPort)
+  const host = prepared.cloudflare ? new URL(prepared.origin).host : prepared.sandbox.getHost(prepared.gatewayPort)
   const origin = new URL(`https://${host}`)
   const parent = new URL(parentOrigin)
   if (origin.host !== host || origin.username || origin.password || origin.pathname !== '/' || parent.origin === origin.origin
     || !authTrustedOrigins(process.env).includes(parentOrigin) || parent.origin !== parentOrigin)
     throw new PreviewRuntimeError('configuration')
-  const reply = await control(prepared.sandbox, { operation: 'issue', binding: { ...prepared.binding, expiresAt: expires / 1000 },
+  if (prepared.cloudflare && prepared.cloudflare.scope.leaseId !== lease.id) throw new PreviewRuntimeError('scope_changed',403)
+  const reply = prepared.cloudflare ? await reviewReply(prepared.cloudflare,'preview-issue',{parentOrigin,expiresAt:expires})
+    : await control(prepared.sandbox, { operation: 'issue', binding: { ...prepared.binding, expiresAt: expires / 1000 },
     gatewayPort: prepared.gatewayPort, origin: origin.origin, parentOrigin: parent.origin, leaseId: lease.id })
+  if (prepared.cloudflare && reply.origin !== prepared.origin) throw new PreviewRuntimeError('protocol')
   if (typeof reply.ticket !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(reply.ticket) || typeof reply.expiresAt !== 'number' || reply.expiresAt * 1000 > expires)
     throw new PreviewRuntimeError('protocol')
   const url = new URL('/__mikka/preview/open', origin)
