@@ -11,6 +11,7 @@ import { MAX_IMAGES, pickImages, pickText, pickChatFile, uploadPickedFile, paste
 import { withChatFiles, CHAT_FILE_MAX_COUNT, type ChatFileScope } from '@mikka/protocol/chat-attachments'
 import { api } from '@/lib/api'
 import { tap } from '@/lib/haptics'
+import { mobileMessages } from '@/lib/messages'
 import { colors, font, plainColor } from '@/lib/theme'
 import { ChatAttachmentCard, ChatAttachmentPlus, useAttachmentCard } from './chat-attachment-card'
 import { cardAnchor } from '@/features/chat/model/chat-attachment-card'
@@ -104,7 +105,12 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
     try {
       if (attachmentScope && files.length >= CHAT_FILE_MAX_COUNT) { setProblem('最多添加 10 个文件'); return }
       if (source === 'file') {
-        if (attachmentScope) { const item = await pickChatFile(); if (item) void upload(item); return }
+        if (attachmentScope) {
+          const item = await pickChatFile()
+          if (typeof item === 'string') setProblem(mobileMessages.Shell.attachments.errors[item])
+          else if (item) void upload(item)
+          return
+        }
         const file = await pickText()
         if (file === 'notText') setProblem('只能发文本文件')
         else if (file === 'tooLong') setProblem('文件太长')
