@@ -2,6 +2,7 @@ import 'server-only'
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db, pool } from '@/lib/db'
+import { captureDatabaseQuery } from '@/lib/db/commit-effects'
 import { issueListScopesBeforeChange, issueListScopeChanged } from '@/lib/live/lists'
 import { issues, issueVersions, teamIssuePromotions } from '@/lib/db/schema'
 import { workspaceDb } from '@/lib/workspace-db'
@@ -40,8 +41,8 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
   const { requestId, issueId, revision, teamId, expectedTeamId } = parsed.data
   let promotionStarted = false
   const reviewIds = new Set<string>()
-  const fenceReview = async () => {
-    for (const id of await markReviewSessionsRevoked(pool, { taskId: issueId }, 'task_changed')) reviewIds.add(id)
+  const fenceReview = async (database: Pick<typeof pool, 'query'>) => {
+    for (const id of await markReviewSessionsRevoked(database, { taskId: issueId }, 'task_changed')) reviewIds.add(id)
   }
   try {
     await withTeamWorkspace(userId, teamId, async workspace => {
@@ -78,7 +79,7 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
       })
       if (completed && !receipt) throw new PromotionError('teamIssueChanged')
       if (!receipt) {
-        if (current?.teamId !== teamId || current?.workspaceId !== team.workspaceId) await fenceReview()
+        if (current?.teamId !== teamId || current?.workspaceId !== team.workspaceId) await fenceReview(pool)
         await workspace.insert(teamIssues).values({ issueId, teamId, workspaceId: team.workspaceId, userId }).onConflictDoUpdate({ target: teamIssues.issueId, set: { teamId, workspaceId: team.workspaceId } })
         await workspace.insert(teamIssuePromotionReceipts).values({ requestId, issueId, teamId, workspaceId: team.workspaceId, ownerId: userId })
       }
@@ -100,7 +101,7 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
         const previousLists = await issueListScopesBeforeChange(issue)
         // Both promotion stages own the relation lock. Capture a grant made
         // between them, then close only these IDs outside the outer WS locks.
-        await fenceReview()
+        await fenceReview(captureDatabaseQuery(tx))
         const [saved] = await tx.update(issues).set({ linearSyncPolicy: 'disabled', linearSyncBlocked: true, scopeSetBy: 'user', scopeConfidence: null, revision: issue.revision + 1, updatedAt: new Date() }).where(eq(issues.id, issueId)).returning()
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId, userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...actor })
         await tx.update(teamIssuePromotions).set({ status: 'complete' }).where(eq(teamIssuePromotions.requestId, requestId))

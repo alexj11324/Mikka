@@ -109,8 +109,14 @@ export function afterDatabaseCommit(executor: object, key: string, effect: Effec
 /** A service retaining a bound query must retain its executor and request
  * context at the same instant. Later callbacks cannot guess its transaction,
  * database or device authority from the query function. */
-export function captureDatabaseQuery(executor: Pick<Pool | PoolClient, 'query'>) {
-  return { query: AsyncLocalStorage.bind(executor.query.bind(executor)),
+type AppTransaction = Parameters<Parameters<typeof import('./request-scope').db.transaction>[0]>[0]
+export function captureDatabaseQuery(executor: Pick<Pool | PoolClient, 'query'> | AppTransaction) {
+  // Keep the actual authority-wrapped session client. COMMIT_EXECUTOR names
+  // the observer for notifications and must never be used to run queries.
+  const direct = executor as Pick<Pool | PoolClient, 'query'>
+  const target = typeof direct.query === 'function' ? direct
+    : (executor as unknown as {session:{client:PoolClient}}).session.client
+  return { query: AsyncLocalStorage.bind(target.query.bind(target)),
     [COMMIT_EXECUTOR]: commitExecutor(executor), [COMMIT_CONTEXT]: AsyncLocalStorage.snapshot() }
 }
 
