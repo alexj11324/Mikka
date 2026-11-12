@@ -20,7 +20,7 @@ test('Organization invitations grant only a verified Member without inheriting W
   const check = new Pool({ connectionString: target, max: 2 })
   const { workspaceDb, workspacePool } = await import('../lib/workspace-db')
   const { pool: appPool } = await import('../lib/db')
-  const { organizations, organizationMembers, organizationInvitations, organizationWorkspaces } = await import('../lib/db/governance-schema')
+  const { organizationMembers, organizationInvitations, organizationWorkspaces } = await import('../lib/db/governance-schema')
   const { workspaceMembers } = await import('../lib/db/workspace-schema')
   const organization = await import('../lib/governance/organizations')
   const invite = await import('../lib/governance/organization-invitations')

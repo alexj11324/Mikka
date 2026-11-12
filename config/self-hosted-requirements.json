@@ -317,6 +317,15 @@
     "test": "lib/artifacts/storage.test.ts",
     "suite": "test:self-hosted-byok"
   },
+  "drizzle/20261112061146_organization_member_invitations.sql": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Persist hashed single-use Organization Member invitations in the Workspace PostgreSQL database; accepting one never writes Workspace or Project grants.",
+    "test": "tests/organization-invitations.db.test.ts",
+    "suite": "test:organization-invitations-db"
+  },
   "lib/audit/events.ts": {
     "mode": "built-in",
     "environment": [
@@ -378,6 +387,15 @@
     "behavior": "The Coordinator allows an operator-selected decision endpoint and model. Requests use the existing credential and budget policy for that route.",
     "test": "lib/coordinator/native-decision.test.ts",
     "suite": "test:coordinator-events"
+  },
+  "lib/db/governance-schema.ts": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Use canonical Workspace database schema for Organization invitations and member-only admission, without a second ACL fact source.",
+    "test": "tests/organization-invitations.db.test.ts",
+    "suite": "test:organization-invitations-db"
   },
   "lib/db/direct-session.ts": {
     "mode": "built-in",
