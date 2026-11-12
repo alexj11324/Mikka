@@ -137,7 +137,7 @@ function useSearchPalette({ open, onOpenChange, onOpenChangeComplete, bots, sess
   const coordinatorShown = shown(coordinatorValue)
 
   const failed = search.sources.filter(source => search.state[source].status === 'error' || search.state[source].error)
-  const authLost = failed.some(source => search.state[source].error === 'authRequired')
+  const authLost = search.authRequired || failed.some(source => search.state[source].error === 'authRequired')
   const resultCount = (coordinatorShown ? 1 : 0) + botRows.length + historyRows.length + groupRows.length + taskRows.length + threadRows.length + projectRows.length + actions.length + reviewRows.length
   const announce = search.searching ? t('search.searching')
     : search.query.kind === 'tooLong' ? t('search.tooLong')
@@ -189,12 +189,12 @@ function useSearchPalette({ open, onOpenChange, onOpenChangeComplete, bots, sess
       select: () => { for (const source of failed) search.retry(source) },
     }] } satisfies SearchSection] : []),
   ]
-  const sections = listed.filter(section => section.rows.length > 0)
+  const sections = authLost ? [] : listed.filter(section => section.rows.length > 0)
 
   return {
     open, onOpenChange, onOpenChangeComplete, query, onQueryChange: setQuery, maxLength: QUERY_MAX_LENGTH, sections,
-    searching: search.searching, announce: text ? announce : '',
-    empty: !search.searching && resultCount === 0 ? (search.query.kind === 'tooLong' ? t('search.tooLong') : t('searchEmpty')) : null,
+    searching: search.searching, announce: text && !authLost ? announce : '',
+    empty: !authLost && !search.searching && resultCount === 0 ? (search.query.kind === 'tooLong' ? t('search.tooLong') : t('searchEmpty')) : null,
     authError: authLost ? t('search.authRequired') : null,
   }
 }
