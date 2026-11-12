@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import test from 'node:test'
+import test, { mock } from 'node:test'
 import type { RunFailure } from '@mikka/protocol/run-failure'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 
@@ -10,7 +10,11 @@ const authorized = disposableDatabase()
 if (url && !authorized) throw new Error('Visibility DB tests require a loopback *_e2e database')
 if (process.env.REQUIRE_DB === '1' && !authorized) throw new Error('Visibility database tests cannot skip in required CI')
 
-test('real API/core visibility: immutable tenant, optional Team, provider scope and suspension', { skip: !authorized }, async () => {
+test('real API/core visibility: immutable tenant, optional Team, provider scope and suspension', { skip: !authorized }, async t => {
+  const intl = await import('next-intl/server')
+  const locale = mock.module('next-intl/server', { namedExports: { ...intl, getLocale: async () => 'en',
+    getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
+  t.after(() => locale.restore())
   const { Pool } = await import('pg')
   const { drizzle } = await import('drizzle-orm/node-postgres')
   const pool = new Pool({ connectionString: url, max: 2 })
@@ -24,6 +28,7 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
   const { readRun, visibleRuns, addRunMessage, requestRunStop } = await import('../lib/agent-runs')
   const tools = await import('../lib/mcp/tools')
   const actions = await import('../lib/mcp/actions')
+  const { listTeamMembers } = await import('../app/actions/teams')
   const { citationSources } = await import('../lib/coordinator/store')
   const { issuePropertyChoices } = await import('../lib/issue-property-choices')
   const { registeredTask } = await import('./helpers/registered-task')
@@ -62,6 +67,10 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
     assert.equal((await issueForUser(member,shared))?.id,shared)
     assert.equal(await issueForUser(member,foreignIssue),null)
     assert.equal((await issueForUser(member,unlinked))?.id,unlinked,'a Team is optional inside the authorized workspace')
+    const teamCount = (id: string, tenant: string) => scoped(id, tenant, () => listTeamMembers(team, tenant, true))
+    assert.equal((await teamCount(member, workspace)).taskCount, 1, 'a stale Team link from another tenant is not counted')
+    assert.equal((await scoped(member, workspace, () => listTeamMembers(team, workspace))).taskCount, undefined)
+    await assert.rejects(teamCount(foreign, otherWorkspace))
     // Exhaust the application pool as concurrent Factory transactions do.
     const scope = createRequestDatabaseScope(url!)
     await scope.run(async () => {
@@ -132,6 +141,7 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
     // Revoke after a successful read: no per-request/global positive cache.
     await pool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2',[workspace,member])
     assert.equal(await issueForUser(member,shared),null)
+    await assert.rejects(teamCount(member, workspace))
     assert.equal(await scoped(member, workspace, () => tools.getRun(member,sharedRun)),null)
     assert.deepEqual(await visibleRuns(member,{issueId:shared}),[])
     await pool.query('update mikka_workspace_members set status=\'active\' where "workspaceId"=$1 and "userId"=$2',[workspace,member])

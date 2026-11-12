@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { enterprisePrincipal, type EnterpriseReader } from '@/lib/enterprise/principal'
 import { requireWorkspace } from '@/lib/workspace-access'
+import { workspaceListChanged } from '@/lib/live/lists'
 import { workspaceDb } from '@/lib/workspace-db'
 import { enqueueOrganizationAudit } from './audit'
 import { GovernanceError } from './errors'
@@ -57,6 +58,7 @@ export function renameOrganizationApiKey(organizationId: string, actor: Enterpri
     if (!renamed) throw new GovernanceError('not_found')
     // Organization audit readers may have no membership in the credential's Workspace.
     await enqueueOrganizationAudit(tx, { organizationId, actorId: actor.id, action: 'organization.api_key_renamed' })
+    await workspaceListChanged(tx, key.workspaceId, ['workspace_settings'])
     return renamed
   })
 }

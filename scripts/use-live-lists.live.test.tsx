@@ -755,6 +755,42 @@ for (const moved of ['owner', 'workspace'] as const) test(`a delayed Bot roster 
   assert.ok(!JSON.stringify(cache.get(unstableSerialize(['bots', 'owner', team]))).includes('wrong roster'))
 })
 
+test('Board resume reads the committed Task projection inside the deduplication window and retains scope while paused', async (ctx) => {
+  let blocked = true
+  const calls: string[] = []
+  ctx.mock.module(new URL('../app/actions/task-domain.ts', import.meta.url).href, { namedExports: {
+    getTaskPresentations: async ({ workspaceId, issueIds }: { workspaceId: string; issueIds: string[] }) => {
+      calls.push(workspaceId)
+      return { version: 1, workspaceId, items: Object.fromEntries(issueIds.map(id => [id, { blockedReason: blocked ? 'flagged' : null }])) }
+    },
+  } })
+  const { useWorkspaceTaskPresentations } = await import('../hooks/use-task-collection')
+  function BoardRead({ workspace, enabled }: { workspace: string; enabled: boolean }) {
+    const { items } = useWorkspaceTaskPresentations('owner', workspace, null, [{ id: 'active', workspaceId: workspace }], enabled)
+    return <output data-kind="projection">{JSON.stringify(items)}</output>
+  }
+  async function show(workspace: string, enabled: boolean) {
+    await act(async () => root.render(<SWRConfig value={{ provider: () => cache, dedupingInterval: 60_000 }}>
+      <BoardRead workspace={workspace} enabled={enabled} />
+    </SWRConfig>))
+    await settled()
+  }
+  const projection = () => container.querySelector('[data-kind="projection"]')?.textContent
+  await show(team, true)
+  assert.deepEqual(calls, [team])
+  assert.match(projection() ?? '', /flagged/)
+  await show(team, false)
+  assert.match(projection() ?? '', /flagged/)
+  blocked = false
+  await show(team, true)
+  assert.deepEqual(calls, [team, team])
+  assert.doesNotMatch(projection() ?? '', /flagged/)
+  assert.match(projection() ?? '', /"blockedReason":null/)
+  await show(otherTeam, false)
+  assert.equal(projection(), '{}')
+  assert.deepEqual(calls, [team, team], 'paused reads for a new workspace reveal no previous projection')
+})
+
 test('leaving Settings catches up a roster event that arrived while its read was paused', async () => {
   function PausedRoster({ paused }: { paused: boolean }) { return <Items kind="roster" value={hooks.useLiveBotRoster('owner', team, paused)} /> }
   const renderPaused = async (paused: boolean) => {

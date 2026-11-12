@@ -306,6 +306,68 @@ test('merging and merged read from the merge ledger; merged opens the PR', async
   assert.equal([...document.querySelectorAll('a')].find(a => a.textContent?.includes('在 GitHub 打开'))?.getAttribute('href'), pr)
 })
 
+test('skill activation keeps one event across a lost response, remount, double click and an acknowledged result', async () => {
+  const binding = { taskId: 't1', issueId: 'issue-1', attemptId: 'a1', candidateId: 'c1', revision: 8 }
+  const candidate = { sha: 'a'.repeat(40), repository: 'o/r', environment: 'preview', scope: 'repo' }
+  ledger = { binding, approvals: [], publications: [] }
+  evidence = { binding, manifest: { candidate, artifacts: [] } }
+  const scope = `skill-activation-${crypto.randomUUID()}`
+  const open = async (key: string) => {
+    await act(async () => root.render(<ViewStateProvider scope={scope}><FactoryAcceptancePane key={key} task={task({ isSkillCandidate: true })} /></ViewStateProvider>))
+  }
+  const sent: { operation: string; input: { eventId: string } }[] = []
+  const original = globalThis.fetch
+  let release!: () => void
+  const gate = new Promise<void>(resolve => { release = resolve })
+  globalThis.fetch = (async (_url, options) => {
+    sent.push(JSON.parse(String(options?.body)))
+    if (sent.length === 1) throw new TypeError('connection lost')
+    await gate
+    return new Response(JSON.stringify({ approvalId: 'approved-once', publicationId: 'p1' }), { status: 200 })
+  }) as typeof fetch
+  try {
+    await open('first')
+    await act(async () => { button('启用')!.click() })
+    assert.equal(sent.length, 1)
+    assert.ok(container.textContent?.includes(lookup('FactoryAcceptance.error')))
+    await open('remounted')
+    assert.equal(sent.length, 1)
+    const enable = button('启用')!
+    await act(async () => { enable.click(); enable.click() })
+    assert.equal(enable.disabled, true)
+    assert.deepEqual(sent.map(request => request.operation), ['approve', 'approve'])
+    assert.deepEqual(sent[0], sent[1])
+    assert.ok(sent[0].input.eventId)
+    refreshFails = true
+    await act(async () => { release() })
+    assert.equal(sent.length, 2, 'the approval receipt already represents the publication')
+    assert.ok(!container.textContent?.includes(lookup('FactoryAcceptance.error')), 'a refresh failure cannot turn an acknowledged mutation into an action error')
+    assert.equal(ledgerReloads, 2)
+  } finally { release(); globalThis.fetch = original }
+})
+
+test('a claimed skill publication offers reconciliation for the same reservation', async () => {
+  const binding = { taskId: 't1', issueId: 'issue-1', attemptId: 'a1', candidateId: 'c1', revision: 8 }
+  const approval = { id: 'ap', candidateId: 'c1', candidate: { sha: 'a'.repeat(40), repository: 'o/r', environment: 'preview', scope: 'repo' }, revokedAt: null, createdAt: new Date().toISOString() }
+  for (const status of ['reserved', 'uncertain']) {
+    const request = { binding, eventId: 'original-reservation' }
+    ledger = { binding, approvals: [approval], publications: [{ id: 'pub', approvalId: 'ap', request, status }] }
+    await pane({ stage: 'publish', status: 'running', isSkillCandidate: true })
+    assert.equal(button('撤销批准'), undefined)
+    assert.equal(button('发布'), undefined)
+    const original = globalThis.fetch
+    const sent: unknown[] = []
+    globalThis.fetch = (async (_url, options) => {
+      sent.push(JSON.parse(String(options?.body)))
+      return new Response('{}', { status: 200 })
+    }) as typeof fetch
+    try {
+      await act(async () => { button(lookup('FactoryAcceptance.reconcile'))!.click() })
+      assert.deepEqual(sent, [{ operation: 'reconcile', input: { ...request, publicationId: 'pub' } }])
+    } finally { globalThis.fetch = original }
+  }
+})
+
 test('a skill: the pane hides 发布 when the active approval has no publishable environment', async () => {
   list = { data: { tasks: [task({ stage: 'publish', status: 'running', isSkillCandidate: true })] }, isLoading: false, mutate: async () => undefined }
   const approval = { id: 'a1', candidateId: 'c1', candidate: { sha: 'a'.repeat(40), repository: 'r', environment: 'staging', scope: 'x' }, action: 'deploy', target: 't', targetEnvironment: 'staging', expiresAt: new Date(Date.now() + 3600000).toISOString(), revokedAt: null, createdAt: new Date().toISOString() }

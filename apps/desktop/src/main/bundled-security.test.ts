@@ -129,6 +129,21 @@ test('service identity management forwards only its declared human-session metho
   }
 })
 
+test('organization overview and service key directory use their exact session routes', () => {
+  const org = 'ab81a708-013c-4e44-9ab2-a500bd59f381'
+  const key = 'ebb7878e-6918-4b68-9300-d956761b5011'
+  const overview = `/api/organizations/${org}`
+  const collection = overview + '/api-keys'
+  for (const method of ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) {
+    assert.equal(allowedApiPath(overview, method), method === 'GET')
+    assert.equal(allowedApiPath(collection, method), method === 'GET')
+    assert.equal(allowedApiPath(collection + '/' + key, method), method === 'PATCH')
+    for (const path of [overview.replace(org, 'unknown'), collection.replace(org, 'unknown'), collection + '/unknown', collection + '/' + key + '/revoke']) {
+      assert.equal(allowedApiPath(path, method), false)
+    }
+  }
+})
+
 test('billing metadata and commands have exact scoped routes and methods', () => {
   assert.equal(allowedApiPath('/api/organizations', 'GET'), true)
   for (const method of ['HEAD', 'POST', 'PATCH', 'DELETE', 'PUT', 'OPTIONS']) assert.equal(allowedApiPath('/api/organizations', method), false)

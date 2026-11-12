@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { resolve, relative, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { build } from 'vite'
@@ -48,8 +48,6 @@ export async function buildFrontend({ target = 'web', outdir = resolve(frontend,
   const result = { ...inventory, rendererBuild }
   await writeFile(resolve(outdir, 'renderer-build.js'), `export const rendererBuild = ${JSON.stringify(rendererBuild)};\n`)
   await writeFile(resolve(outdir, 'renderer-manifest.json'), `${JSON.stringify(result, null, 2)}\n`)
-  // Next served this source icon as metadata; retain it in the static build.
-  await cp(resolve(repository, 'app/icon.svg'), resolve(outdir, 'icon.svg'))
   if (target === 'desktop') {
     const directory = resolve(repository, 'apps/desktop/dist')
     await mkdir(directory, { recursive: true })
