@@ -337,6 +337,13 @@
     "behavior": "A sponsored machine requires the workspace allowlist and a private bridge token. Unconfigured workspaces cannot acquire the machine grant.",
     "test": "apps/api/scripts/cloudflare-api.test.mjs"
   },
+  "lib/code-review/read-contract.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read authorized Task Review summaries and immutable checkpoint file data from the selected installation, preserving unknown counts and the server-provided permission reasons.",
+    "test": "lib/code-review/client.test.ts",
+    "suite": "test:thread-changes"
+  },
   "lib/coordinator/ci-suite-transport.ts": {
     "mode": "built-in",
     "environment": [],
@@ -484,6 +491,13 @@
     "test": "tests/task-presentation.db.test.ts",
     "suite": "test:task-presentation-db"
   },
+  "lib/factory/review-change.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Send the existing rejection operation to the selected server using its original review binding and event ID.",
+    "test": "lib/factory/approval.db.test.ts",
+    "suite": "test:factory-approval-db"
+  },
   "lib/github/ci-suite-event.ts": {
     "mode": "operator-configured",
     "environment": [],
@@ -560,6 +574,20 @@
     "behavior": "Replace explicit grants only with Project management authority and list only active Projects the administrator may both read and share.",
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
+  },
+  "lib/group-submission.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Compute the same scoped message ID on the client and server. Existing PostgreSQL serialization and the current membership grant govern each retry.",
+    "test": "lib/group-conversations.test.ts",
+    "suite": "test:groups"
+  },
+  "lib/hooks/chat-delivery.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Store local send progress in the current account and workspace journal and reconcile the immutable command on acknowledgement.",
+    "test": "scripts/thread-composer.test.tsx",
+    "suite": "test:groups"
   },
   "lib/group-messages.ts": {
     "mode": "built-in",

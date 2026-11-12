@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { Pool, type PoolClient } from "pg";
+import { observePoolCommits } from "../../lib/db/commit-effects";
 import {
   createFactoryApprovalGates,
   createFactoryApprovals,
@@ -47,6 +48,7 @@ export async function factory194Fixture(connectionString: string) {
     max: 12,
     options: `-c search_path=${schema}`,
   });
+  observePoolCommits(pool);
   await pool.query(`
     CREATE TABLE issues (id uuid PRIMARY KEY,"userId" text,"workspaceId" uuid,"ownershipState" text NOT NULL DEFAULT 'pending',title text,content jsonb,revision integer,status text NOT NULL DEFAULT 'todo',scope text NOT NULL DEFAULT 'personal',"scopeVersion" integer NOT NULL DEFAULT 1);
     CREATE TABLE coordinator_events (id uuid PRIMARY KEY,"userId" text,"botId" uuid,"issueId" uuid,kind text,payload jsonb);

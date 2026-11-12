@@ -1,5 +1,7 @@
 import { ChatFileError } from '@/lib/chat-attachments/extract'
 import { splitChatFiles } from '@mikka/protocol/chat-attachments'
+import { isDeepStrictEqual } from 'node:util'
+import { groupSubmissionMessageId } from './group-submission'
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
@@ -11,7 +13,7 @@ import { groupChatChanged } from './live/groups'
 const member = z.object({ memberType: z.enum(['user', 'agent', 'bot']), memberId: z.string().min(1).max(256) }).strict()
 const create = z.object({ workspaceId: z.uuid(), title: z.string().trim().min(1).max(200), members: z.array(member).max(100).default([]), leadAgentId: z.uuid().nullable().optional(), leadBotId: z.uuid().nullable().optional() }).strict().refine(input => !input.leadAgentId || !input.leadBotId)
 const configure = z.union([z.object({ leadAgentId: z.uuid().nullable() }).strict(), z.object({ leadBotId: z.uuid().nullable() }).strict()])
-const message = z.object({ body: z.string().trim().min(1).max(32000), mentions: z.array(member).max(100).default([]), replyToId: z.uuid().nullable().optional() }).strict()
+const message = z.object({ requestId: z.uuid().optional(), expectedOwnerId: z.string().min(1).max(256).optional(), expectedWorkspaceId: z.uuid().optional(), body: z.string().trim().min(1).max(32000), mentions: z.array(member).max(100).default([]), replyToId: z.uuid().nullable().optional() }).strict()
 const read = z.object({ messageId: z.string().min(1).max(64) }).strict()
 export type Member = z.infer<typeof member>
 export type Directory = (workspaceId: string, userId: string, members: Member[]) => Promise<boolean>
@@ -199,6 +201,19 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
           ...(queueAgents ? { leadAgentId: group.leadAgentId ?? null, leadBotId: group.leadBotId ?? null, routingError: ['group_judgment_pending','group_lead_required'].includes(failed.rows[0]?.error) ? { code: 'group_judgment_pending' } : null, stopped: failed.rows[0]?.error === GROUP_TURN_STOPPED } : {}) }
       } else if (req.resource === 'messages' && req.method === 'POST') {
         const input = parse(message, req.body)
+        if (input.expectedOwnerId && input.expectedOwnerId !== userId ||
+          input.expectedWorkspaceId && input.expectedWorkspaceId !== group.workspaceId) return fail(403)
+        const id = input.requestId ? await groupSubmissionMessageId(userId, group.id, input.requestId) : randomUUID()
+        if (input.requestId) {
+          // The existing conversation lock serializes simultaneous attempts. Membership is checked above on every replay.
+          const { rows: [previous] } = await q(`SELECT * FROM conversation_messages WHERE id=$1 AND "conversationId"=$2 AND "authorType"='user' AND "authorId"=$3`, [id, group.id, userId])
+          if (previous) {
+            if (previous.body !== input.body || !isDeepStrictEqual(previous.mentions, input.mentions) ||
+              previous.replyToId !== (input.replyToId ?? null)) return fail(409)
+            await client.query('COMMIT')
+            return { status: 200, body: previous }
+          }
+        }
         if (splitChatFiles(input.body).files.length) {
           const { validateChatFiles } = await import('./chat-attachments/store')
           await validateChatFiles(userId, { kind: 'group', id: req.id! }, input.body, client)
@@ -216,7 +231,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
           if (!rowCount) return fail(422)
         }
         const { rows: positions } = await q('UPDATE conversations SET "lastPosition"="lastPosition"+1 WHERE id=$1 RETURNING "lastPosition"::text AS position', [req.id])
-        const id = randomUUID(), position = positions[0].position
+        const position = positions[0].position
         const { rows } = await q('INSERT INTO conversation_messages (id,"conversationId",position,"authorType","authorId",body,mentions,"replyToId") VALUES ($1,$2,$3,\'user\',$4,$5,$6,$7) RETURNING *', [id, req.id, position, userId, input.body, JSON.stringify(input.mentions), input.replyToId ?? null])
         await groupListChanged(client, group.id)
         await groupChatChanged(client, group.id)

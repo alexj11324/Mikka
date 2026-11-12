@@ -5,7 +5,7 @@ import type { Root } from 'react-dom/client'
 import { SWRConfig, type Cache } from 'swr'
 import { Window } from 'happy-dom'
 
-const question = { questionId: 'question-one', taskId: 'factory-one', runId: 'run-one', status: 'pending', type: 'decision', question: 'Which branch?', options: [{ label: 'Main', value: 'main' }], reference: { protocol: 'fixture', id: 'reference-one' } }
+const question = { questionId: 'question-one', taskId: 'factory-one', runId: 'run-one', status: 'waiting_user', type: 'decision', question: 'Which branch?', options: [{ label: 'Main', value: 'main' }], reference: { protocol: 'fixture', id: 'reference-one' } }
 let failure: number | Error | null, pending: boolean, taskFailure: boolean
 let afterAnswerFailure: boolean
 const requests: { path: string; init?: RequestInit }[] = []
@@ -21,7 +21,7 @@ before(async () => {
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input)
     requests.push({ path, init })
-    if (init?.method === 'POST') { pending = false; if (afterAnswerFailure) failure = 503; return Response.json({ answered: true }) }
+    if (init?.method === 'POST') { pending = false; if (afterAnswerFailure) failure = 503; return Response.json({ questionId: question.questionId, continuationRunId: 'run-next' }) }
     if (path.endsWith('/api/factory/questions')) {
       if (failure instanceof Error) throw failure
       if (failure) return Response.json({ error: 'unavailable' }, { status: failure })
@@ -99,4 +99,115 @@ test('a disabled question source reads nothing', async () => {
   assert.deepEqual(requests, [])
   assert.deepEqual(state.questions, [])
   assert.equal(state.error, null)
+})
+
+test('a lost POST acknowledgement reads the authorized question and recognizes only the same continuation', async () => {
+  await render()
+  const item = state.questions[0]
+  const original = globalThis.fetch
+  const ids: string[] = []
+  let committed = false
+  globalThis.fetch = async (path, init) => {
+    if (String(path).endsWith('/questions/question-one')) {
+      if (init?.method === 'POST') {
+        ids.push(JSON.parse(String(init.body)).answerId)
+        throw TypeError('response lost')
+      }
+      return Response.json(committed
+        ? { id: item.questionId, status: 'resuming', answerId: ids[0], continuationRunId: 'run-next' }
+        : { id: item.questionId, status: 'waiting_user', reference: item.reference, answerId: null })
+    }
+    return original(path, init)
+  }
+  try {
+    await act(async () => { assert.equal((await state.submitAnswer(item, 'Use main')).status, 'failed') })
+    committed = true
+    await act(async () => { assert.equal((await state.submitAnswer(item, 'Use main')).status, 'accepted') })
+    assert.equal(ids.length, 2)
+    assert.equal(ids[0], ids[1])
+  } finally { globalThis.fetch = original }
+})
+
+for (const scenario of [
+  { write: 403, read: 0, error: 'originRejected', expected: 'unavailable' },
+  { write: 401, read: 0, error: 'authRequired', expected: 'unavailable' },
+  { write: 404, read: 0, error: 'factoryNotFound', expected: 'unavailable' },
+  { write: 409, read: 200, error: 'factoryReplayMismatch', current: { status: 'resuming', answerId: 'another-actor' }, expected: 'unavailable' },
+  { write: 409, read: 200, error: 'factoryQuestionExpired', current: { status: 'expired' }, expected: 'unavailable' },
+  { write: 503, read: 200, error: 'actionFailed', current: { status: 'open' }, expected: 'failed' },
+  { write: 503, read: 503, error: 'actionFailed', expected: 'uncertain' },
+]) test(`HTTP ${scenario.write}, authoritative read ${scenario.read}: ${scenario.error} yields ${scenario.expected} without confirming or hiding the answer`, async () => {
+  await render()
+  const original = globalThis.fetch
+  const calls: string[] = []
+  globalThis.fetch = async (_path, init) => {
+    calls.push(init?.method || 'GET')
+    if (init?.method === 'POST') return Response.json({ error: scenario.error }, { status: scenario.write })
+    assert.notEqual(scenario.read, 0)
+    return Response.json({ id: question.questionId, ...scenario.current }, { status: scenario.read })
+  }
+  try {
+    await act(async () => {
+      const result = await state.submitAnswer(state.questions[0], 'Use main')
+      assert.equal(result.status, scenario.expected)
+    })
+    assert.deepEqual(calls, scenario.read ? ['POST', 'GET'] : ['POST'])
+    assert.equal(state.questions[0].questionId, question.questionId)
+  } finally { globalThis.fetch = original }
+})
+test('recovery states cannot resubmit an already answered question', async () => {
+  await render()
+  const before = requests.length
+  for (const status of ['resuming', 'blocked', 'expired', 'cancelled']) {
+    const result = await state.submitAnswer({ ...state.questions[0], status }, 'Again')
+    assert.equal(result.status, 'unavailable')
+  }
+  assert.equal(requests.length, before)
+})
+test('losing a response while switching accounts cannot send the question ID to the newly selected server', async () => {
+  const { installWebSelection } = await import('@/lib/web-connection/selection')
+  let version = 0
+  installWebSelection(() => ({ version, account: null }))
+  const original = globalThis.fetch
+  await render()
+  const methods: string[] = []
+  globalThis.fetch = async (_path, init) => {
+    methods.push(init?.method ?? 'GET')
+    version++
+    throw TypeError('connection changed')
+  }
+  try {
+    const receipt = await state.submitAnswer(state.questions[0], 'Use main')
+    assert.deepEqual(receipt, {status:'unavailable',error:'decisionAccountChanged'})
+    assert.deepEqual(methods, ['POST'])
+  } finally { globalThis.fetch = original; installWebSelection(() => ({ version: 0, account: null })) }
+})
+
+test('with both the ACK and ledger offline, another entry cannot POST a changed answer until its authorized read settles', async () => {
+  await render()
+  const item = state.questions[0]
+  const original = globalThis.fetch
+  const calls: string[] = []
+  const bodies: string[] = []
+  let reachable = false
+  globalThis.fetch = async (path, init) => {
+    if (!String(path).endsWith('/questions/question-one')) return original(path, init)
+    calls.push(init?.method ?? 'GET')
+    if (init?.method === 'POST') {
+      bodies.push(JSON.parse(String(init.body)).text)
+      return reachable ? Response.json({ questionId: item.questionId, continuationRunId: 'next' }) : Response.json({}, { status: 503 })
+    }
+    return reachable ? Response.json({ id: item.questionId, status: 'open', reference: item.reference }) : Response.json({}, { status: 503 })
+  }
+  try {
+    assert.equal((await state.submitAnswer(item, 'Original')).status, 'uncertain')
+    await render('another-entry')
+    assert.equal((await state.submitAnswer(item, 'Different')).status, 'uncertain')
+    assert.deepEqual(calls, ['POST', 'GET', 'GET'])
+    reachable = true
+    assert.equal((await state.submitAnswer(item, 'Different')).status, 'failed')
+    assert.deepEqual(bodies, ['Original'])
+    await act(async () => { assert.equal((await state.submitAnswer(item, 'Different')).status, 'accepted') })
+    assert.deepEqual(bodies, ['Original', 'Different'])
+  } finally { globalThis.fetch = original }
 })

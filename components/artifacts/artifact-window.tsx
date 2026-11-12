@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useState } from 'react'
+import type { ReviewChangeTarget } from '@/lib/factory/review-change'
 import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
@@ -68,19 +69,16 @@ export function ArtifactWindow({ artifactId }: { artifactId: string }) {
   const review = useArtifactReview(detail?.acceptanceTaskId, { hasArtifact: true, runSucceeded: true })
   const reportTitle = detail?.issueKey && review.number ? tReview('windowTitle', { task: detail.issueKey, number: review.number }) : undefined
   // P2: 要求修改 in the report puts a chip in the thread's composer; sending it is the report's send-back.
-  const [changeRequest, setChangeRequest] = useState<string | null>(null)
-  const sendBack = useRef<((note: string) => Promise<boolean>) | null>(null)
-  const registerReject = useCallback((send: ((note: string) => Promise<boolean>) | null) => { sendBack.current = send }, [])
+  const [changeRequest, setChangeRequest] = useState<ReviewChangeTarget | null>(null)
   // Until the artifact says where it came from (or when it is not the person's), the reader shows its own loading or error.
   if (!detail || (botId && !threadMade && !bots && !botsError)) return <ArtifactViewer {...shared} quotes={[]} canQuote={false}
     bot={{ name: '', avatar: <Skeleton className="size-5 rounded-full" /> }} chat={() => null} />
   if (threadMade) return <ArtifactViewer {...shared} quotes={[]} canQuote={false} title={reportTitle}
     bot={{ name: thread ? thread.thread.detail?.name ?? tThreads('title') : '', avatar: null }}
     decision={detail.acceptanceTaskId && issueId ? ({ slots, ...view }) => <FactoryArtifactAcceptance taskId={detail.acceptanceTaskId!} issueId={issueId} artifactId={artifactId} {...view}
-      review={{ slots, onRequestChanges: setChangeRequest, registerReject }} /> : undefined}
+      review={{ slots, onRequestChanges: setChangeRequest }} /> : undefined}
     chat={() => <IssueThreadPanel issueId={issueId} runId={runId!} onClose={closeArtifact} onOpenThread={openThread} bare
-      changeRequest={changeRequest ? { label: changeRequest, onCancel: () => setChangeRequest(null),
-        onSend: async note => { const sent = await sendBack.current?.(note) ?? false; if (sent) setChangeRequest(null); return sent } } : undefined} />} />
+      changeRequest={changeRequest ? { ...changeRequest, onCancel: () => setChangeRequest(null) } : undefined} />} />
   // A bot that is gone, or a list that failed, falls back to the Coordinator.
   if (bot) return <ArtifactViewer {...shared} quotes={quotes}
     bot={{ name: bot.name, avatar: <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="pill" /> }}

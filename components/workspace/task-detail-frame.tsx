@@ -28,7 +28,7 @@ import { AgentSphere } from './issue-assignee-menu'
 import { useIssueThreads, type useAgentActivity } from './issue-threads'
 import { useSelectedTaskPresentation } from '@/hooks/use-selected-task-presentation'
 import { useActivityEvents } from './issue-activity-feed'
-import { useActivityDrafts } from './issue-activity'
+import { useActivityDrafts, type DiscussionSave } from './issue-activity'
 import type { IssueDiscussions } from './issue-editor'
 import { chronologicalActivity, taskDiscussionEvents } from '@/lib/task-activity-timeline'
 import type { ActivityVersion } from '@/lib/issue-activity'
@@ -60,6 +60,7 @@ export type FramedTaskProps = {
   titleField: TaskDetailFrameProps['titleField']
   saveError: TaskDetailFrameProps['saveError']
   syncNotice: string | null
+  discussionSave?: DiscussionSave
   /** The description editor with what goes under it, and 活动 drawn by `renderActivity`. */
   editor: (afterDescription: ReactNode, renderActivity: (discussions: IssueDiscussions) => ReactNode) => ReactNode
   acceptance: ReactNode
@@ -231,7 +232,10 @@ export function FramedTask(props: FramedTaskProps) {
   const subtaskRows = (connections.rows ?? []).filter(row => row.metadata.parentId === task.id).map(row => ({ id: row.id, title: row.title, createdAt: row.createdAt }))
   const eventsFor = useActivityEvents(props.historyFailed ? [] : props.versions, props.historyFailed ? [] : subtaskRows)
   const discussions = useRef<IssueDiscussions | null>(null)
-  const drafts = useActivityDrafts(task.id, body => discussions.current?.onComment(body), (id, body) => discussions.current?.onReply(id, body))
+  const drafts = useActivityDrafts(task.id,
+    (body, operationId) => discussions.current ? discussions.current.onComment(body, operationId) : false,
+    (id, body, operationId) => discussions.current ? discussions.current.onReply(id, body, operationId) : false,
+    props.discussionSave)
   const time = (at: string) => format.dateTime(new Date(at), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   const activityItems = (current: IssueDiscussions, expandReplies = false, additional: readonly TaskActivityItem[] = []): TaskActivityItem[] => {
     const anchors = new Map(current.anchors.map(anchor => [anchor.id, anchor.excerpt]))

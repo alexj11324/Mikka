@@ -49,9 +49,9 @@ beforeEach(() => {
 })
 afterEach(async () => { await act(async () => root.unmount()); container.remove() })
 after(() => browser.happyDOM.close())
-const render = async (allowCustom: boolean) => {
+const render = async (allowCustom: boolean, answer: (words: string) => Promise<boolean> = async words => { answers.push(words); return accepted }) => {
   const value = `root = BeQuestions("测试背景", [{id:"start", title:"先做什么？", options:[{value:"a", label:"整理收件箱"}, {value:"b", label:"查看日程"}], allowCustom:${allowCustom}}])`
-  await act(async () => root.render(createElement(OpenUIReply, { text: value, live: true, answer: async words => { answers.push(words); return accepted }, sources: {}, onOpen: () => {} })))
+  await act(async () => root.render(createElement(OpenUIReply, { text: value, live: true, answer, sources: {}, onOpen: () => {} })))
 }
 const button = (label: string) => [...container.querySelectorAll('button')].find(button => button.textContent === label)!
 
@@ -89,4 +89,24 @@ test('a single-choice card without custom input still sends its option directly'
   const option = [...container.querySelectorAll('button')].find(button => button.textContent?.includes('查看日程'))!
   await act(async () => option.click())
   assert.deepEqual(answers, ['查看日程'])
+})
+
+test('a slow native reply choice rejects simultaneous taps and permits retry after the transport throws', async () => {
+  let reject!: (cause: Error) => void
+  const attempted: string[] = []
+  await render(false, async words => {
+    attempted.push(words)
+    if (attempted.length === 1) return new Promise<boolean>((_, fail) => { reject = fail })
+    return true
+  })
+  const option = [...container.querySelectorAll('button')].find(row => row.textContent?.includes('查看日程'))!
+  await act(async () => { option.click(); option.click() })
+  assert.deepEqual(attempted, ['查看日程'])
+  assert.equal(option.disabled, true)
+  await act(async () => reject(new Error('connection lost')))
+  assert.match(container.textContent ?? '', /没发出去/)
+  assert.equal(option.disabled, false)
+  await act(async () => option.click())
+  assert.deepEqual(attempted, ['查看日程', '查看日程'])
+  assert.equal(option.disabled, true)
 })
