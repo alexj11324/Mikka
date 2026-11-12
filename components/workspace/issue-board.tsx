@@ -39,6 +39,7 @@ export function useIssueBoardSaves({ issues, blocks, newestRuns, onUpdated, onBu
 }) {
   const t = useTranslations('Board')
   const tIssue = useTranslations('Issue')
+  const tDetail = useTranslations('IssueDetail')
   const translateError = useActionError()
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const [columns, setColumns] = useState<Columns>(() => groupIssues(issues, blocks))
@@ -68,11 +69,11 @@ export function useIssueBoardSaves({ issues, blocks, newestRuns, onUpdated, onBu
     onBusyChange(true)
     setMessage(t('savingProperties'))
     try {
-      const moved = patch.status && patch.status !== issue.status ? await moveIssue({ id: issue.id, status: patch.status, revision: issue.revision })
-        : patch.priority ? await changeIssuePriority({ id: issue.id, priority: patch.priority, revision: issue.revision }) : null
-      // 受阻 by hand is the task's flag, saved after its status so one move is one card change.
-      const result = !patch.block ? moved! : moved && !('issue' in moved && moved.issue) ? moved
-        : await updateIssueMetadata({ id: issue.id, revision: moved && 'issue' in moved && moved.issue ? moved.issue.revision : issue.revision, patch: { block: patch.block } })
+      const result = patch.status
+        ? await moveIssue({ id: issue.id, status: patch.status, revision: issue.revision, block: patch.block })
+        : patch.priority
+          ? await changeIssuePriority({ id: issue.id, priority: patch.priority, revision: issue.revision })
+          : await updateIssueMetadata({ id: issue.id, revision: issue.revision, patch: { block: patch.block } })
       if (!('issue' in result) || !result.issue) {
         setColumns(rollback)
         const errorMessage = translateError(result.error)
@@ -126,19 +127,42 @@ export function useIssueBoardSaves({ issues, blocks, newestRuns, onUpdated, onBu
 
   async function remove(issue: Issue) {
     if (saving.current) return
-    const previous = columns
+    saving.current = true
+    setPending(true)
+    onBusyChange(true)
     setMotion(issue.id, 'leave')
-    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) await new Promise(resolve => window.setTimeout(resolve, CARD_MOTION_MS))
-    setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.filter(item => item.id !== issue.id)])))
-    setMotion(issue.id, null)
-    const result = await setIssueDeleted({ id: issue.id, revision: issue.revision }).catch(() => null)
-    if (!result || !('issue' in result)) {
-      setColumns(previous)
-      toast.error(result ? translateError(result.error) : t('deleteFailed'))
-      return
+    try {
+      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) await new Promise(resolve => window.setTimeout(resolve, CARD_MOTION_MS))
+      const result = await setIssueDeleted({ id: issue.id, revision: issue.revision })
+      if (result.error) {
+        toast.error(translateError(result.error))
+        return
+      }
+      setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.filter(item => item.id !== issue.id)])))
+      let restoring = false
+      async function restore() {
+        if (restoring) return
+        restoring = true
+        try {
+          const restored = await setIssueDeleted({ id: issue.id, restore: true })
+          if (restored.error) toast.error(translateError(restored.error))
+        } catch {
+          toast.error(tDetail('restoreViaLinkFailed'))
+        } finally {
+          restoring = false
+          void onUpdated().catch(() => {})
+        }
+      }
+      toast(t('deleted', { title: issue.title }), { action: { label: t('undo'), onClick: () => { void restore() } } })
+    } catch {
+      toast.error(t('deleteFailed'))
+    } finally {
+      setMotion(issue.id, null)
+      saving.current = false
+      setPending(false)
+      onBusyChange(false)
+      void onUpdated().catch(() => {})
     }
-    toast(t('deleted', { title: issue.title }), { action: { label: t('undo'), onClick: () => { void setIssueDeleted({ id: issue.id, restore: true }).then(() => onUpdated()) } } })
-    void onUpdated().catch(() => {})
   }
 
   function commit(next: Columns, meta: KanbanCommitMeta<Issue>) {
