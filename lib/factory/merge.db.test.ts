@@ -653,14 +653,13 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
         CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
         CREATE TABLE device_tokens (id uuid PRIMARY KEY,"boundDeviceId" uuid,"revokedAt" timestamptz);
         CREATE TABLE suggestion_executions ("runId" uuid,status text,"endedAt" timestamptz);
-        CREATE TABLE coding_review_sessions (id uuid PRIMARY KEY, "taskId" uuid, "runId" uuid, "ownerId" text,
-          "workspaceId" uuid, "sandboxId" text, "machineEpoch" bigint, "machineOperationId" uuid,
-          "expiresAt" timestamptz, "revokedAt" timestamptz, "retryAt" timestamptz, reason text);
         CREATE TABLE thread_machines ("runId" uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"issueId" uuid,
           "sandboxId" text,"snapshotId" text NOT NULL,state text,"deviceId" uuid,epoch integer NOT NULL DEFAULT 1,"operationId" uuid,
           "workerLeaseId" uuid,"workerLeaseUntil" timestamptz,"lastActiveAt" timestamptz NOT NULL DEFAULT now(),
           "runningSince" timestamptz,"computeSeconds" bigint NOT NULL DEFAULT 0,
           "lifecycleAt" timestamptz DEFAULT now(),lifecycle jsonb NOT NULL DEFAULT '{}');
+        CREATE TABLE coding_review_sessions ("runId" uuid,"taskId" uuid,"ownerId" text,"workspaceId" uuid,
+          "sandboxId" text,"machineEpoch" bigint,"machineOperationId" uuid,"revokedAt" timestamptz,"expiresAt" timestamptz);
         CREATE TABLE IF NOT EXISTS mikka_workspaces (id uuid PRIMARY KEY,"userId" text,kind text);
         CREATE TABLE IF NOT EXISTS mikka_workspace_members ("workspaceId" uuid,"userId" text,status text);
         CREATE TABLE IF NOT EXISTS mikka_team_issues ("issueId" uuid,"workspaceId" uuid);
