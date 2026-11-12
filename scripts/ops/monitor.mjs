@@ -7,7 +7,11 @@ export const REQUEST_DEADLINE_MS = 120_000
 const groupFor = route => route === '/api/auth/[...all]' ? 'login' : route === '/api/coordinator/messages' ? 'chat' : 'api'
 
 /** Completed 4xx remain failures: this SLI measures the user's successful request, not server availability. */
-export function requestSlis(lines, now = Date.now()) {
+export function requestSlis(lines, now = Date.now(), {
+  from = now - WINDOW_MS, until = now - REQUEST_DEADLINE_MS + 1,
+} = {}) {
+  if (!Number.isSafeInteger(from) || !Number.isSafeInteger(until) || from >= until ||
+    until > now - REQUEST_DEADLINE_MS + 1) throw Error('opsIncompleteRequestWindow')
   const starts = new Map(), ends = new Map()
   for (const line of lines) {
     let entry
@@ -21,11 +25,12 @@ export function requestSlis(lines, now = Date.now()) {
   for (const [id, start] of starts) {
     const at = Date.parse(start.timestamp)
     // Grace for unfinished requests; overdue starts stay in the denominator.
-    if (at < now - WINDOW_MS || at > now - REQUEST_DEADLINE_MS) continue
+    if (at < from || at >= until) continue
     const group = groupFor(start.route), end = ends.get(id)
     const metric = result[group] ??= { total: 0, successful: 0, timedOut: 0, rateLimited: 0, durations: [] }
     metric.total++
-    if (!end || !Number.isFinite(end.durationMs) || end.durationMs > REQUEST_DEADLINE_MS) metric.timedOut++
+    if (!end || end.route !== start.route || Date.parse(end.timestamp) < at || Date.parse(end.timestamp) > now ||
+      !Number.isFinite(end.durationMs) || end.durationMs < 0 || end.durationMs > REQUEST_DEADLINE_MS) metric.timedOut++
     else {
       metric.durations.push(end.durationMs)
       if (end.status >= 200 && end.status < 400) metric.successful++
@@ -67,9 +72,32 @@ export async function databaseSignals(pool, now = new Date()) {
   } finally { client.release() }
 }
 
+const alertRecord = (id, value, action) => ({ id, value, owner: 'repository-maintainers', runbook: 'docs/operations/observability.md', action })
+
+/** No eligible starts means no success assessment. Timed-out requests count as
+ * failures and cannot supply a latency sample for a recovery notification. */
+export function requestAlertAssessment(requests) {
+  const assessed = [], alerts = []
+  for (const [group, metric] of Object.entries(requests)) {
+    if (metric.total > 0) {
+      const id = group + '-request-success'
+      assessed.push(id)
+      if (metric.successRatio < .99) alerts.push(alertRecord(id, metric.successRatio,
+        'Inspect status classes, worker and dependency health; investigate 429 and timeouts without copying request data.'))
+    }
+    if (Number.isFinite(metric.p95Ms)) {
+      const id = group + '-request-latency'
+      assessed.push(id)
+      if (metric.p95Ms > 10_000) alerts.push(alertRecord(id, metric.p95Ms,
+        'Check request latency and database/worker saturation; API response time does not prove stream or run completion.'))
+    }
+  }
+  return { assessed, alerts }
+}
+
 export function actionableAlerts({ requests, database }) {
   const alerts = []
-  const add = (id, value, action) => alerts.push({ id, value, owner: 'repository-maintainers', runbook: 'docs/operations/observability.md', action })
+  const add = (id, value, action) => alerts.push(alertRecord(id, value, action))
   if (database.databaseAvailable !== 1) add('database-unavailable', 1, 'Check database connectivity and pool saturation; keep uncertain actions quarantined.')
   else {
     for (const key of ['staleWake', 'expiredRunLease', 'uncertainEffect', 'staleEffect', 'overdueSecretCleanup'])
@@ -77,11 +105,7 @@ export function actionableAlerts({ requests, database }) {
     for (const [total, successful, name] of [['dueTotal', 'dueSuccessful', 'due-on-time'], ['dispatchTotal', 'dispatchStarted', 'dispatch-start']])
       if (database[total] > 0 && database[successful] / database[total] < .99) add(name, database[successful] / database[total], 'Inspect worker heartbeat, lease and durable queue; failed and unfinished work remain in this denominator.')
   }
-  for (const [group, metric] of Object.entries(requests)) {
-    if (metric.total > 0 && metric.successRatio < .99) add(`${group}-request-success`, metric.successRatio, 'Inspect status classes, worker and dependency health; investigate 429 and timeouts without copying request data.')
-    if (metric.p95Ms > 10_000) add(`${group}-request-latency`, metric.p95Ms, 'Check request latency and database/worker saturation; API response time does not prove stream or run completion.')
-  }
-  return alerts
+  return [...alerts, ...requestAlertAssessment(requests).alerts]
 }
 
 export function internalSink(raw) {
@@ -91,10 +115,13 @@ export function internalSink(raw) {
 }
 
 /** A failed delivery never advances lastSent, so retries cannot silently suppress a page. */
-export async function notifyAlerts(alerts, { state = {}, sink, now = Date.now(), fetchImpl = fetch }) {
+export async function notifyAlerts(alerts, { state = {}, assessed = /** @type {string[] | undefined} */ (undefined), sink, now = Date.now(), fetchImpl = fetch }) {
   const target = internalSink(sink), next = structuredClone(state), deliveries = []
   const current = new Map(alerts.map(alert => [alert.id, alert]))
-  for (const id of new Set([...Object.keys(next), ...current.keys()])) {
+  // A partial source may resolve only alert IDs it could actually evaluate.
+  const considered = assessed === undefined ? new Set([...Object.keys(next), ...current.keys()]) : new Set(assessed)
+  if ([...current.keys()].some(id => !considered.has(id))) throw Error('opsAlertOutsideAssessment')
+  for (const id of considered) {
     const previous = next[id] ?? {}, active = current.has(id)
     if (!active && !previous.active) continue
     if (active && previous.active && now - (previous.lastSent ?? 0) < 30 * 60_000) continue

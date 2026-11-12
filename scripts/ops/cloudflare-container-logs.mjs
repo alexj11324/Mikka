@@ -1,5 +1,6 @@
 import { capacityWindow, legacyFilesystemBudget, routeWindow } from './cloudflare-capacity.mjs'
 import { run as egressReport } from './egress-monitor.mjs'
+import { REQUEST_DEADLINE_MS, requestSlis, requestAlertAssessment } from './monitor.mjs'
 import { WINDOW_MS } from './request-outcomes.mjs'
 import { run as outcomeReport } from './runtime-outcomes.mjs'
 
@@ -19,10 +20,10 @@ export function containerApplicationId(value) {
 
 /** A Container application has its own log stream. deploymentId in a
  * Container event identifies an instance, not a deployed product version. */
-export async function readContainerWindow({ application, environment, now, read }) {
+export async function readContainerWindow({ application, environment, now, read, completionGrace = false }) {
   const app = containerApplicationId(application)
   if (!['production', 'staging'].includes(environment) || !Number.isSafeInteger(now)) fail('container_window_invalid')
-  const start = now - WINDOW_MS, found = new Map()
+  const start = now - WINDOW_MS, through = now + (completionGrace ? REQUEST_DEADLINE_MS : 0), found = new Map()
   let pages = 0, records = 0
   async function visit(from, to) {
     if (++pages > maxQueries) fail('container_log_query_budget_exceeded')
@@ -47,33 +48,39 @@ export async function readContainerWindow({ application, environment, now, read 
         row.$metadata?.service !== app || row.$containers?.applicationId !== app ||
         !row.$metadata?.id || typeof row.$metadata.id !== 'string' ||
         !Number.isSafeInteger(row.timestamp) || row.timestamp < from || row.timestamp > to) fail('container_log_scope_mismatch')
-      if (row.timestamp === now) continue
+      if (row.timestamp === through) continue
       if (row.$metadata.truncated || row.$containers.truncated) fail('container_log_records_truncated')
       const value = row.source
       if (typeof value === 'string' && /api_request|db_sample/.test(value)) fail('container_log_record_malformed')
       if (!value || typeof value !== 'object' || !payloadKinds.has(value.msg)) continue
+      if (row.timestamp >= now && value.msg !== 'api_request') continue
       // Drop provider metadata, raw URLs, SQL, bodies and identities before
       // forwarding structured entries to the existing report consumers.
       const message = JSON.stringify(Object.fromEntries(fields.filter(key => Object.hasOwn(value, key))
         .map(key => [key, key === 'error' ? Boolean(value.error) : value[key]])))
       const record = { deploymentId: app, environment, message, truncated: row.$metadata.truncated === true }
       const previous = found.get(row.$metadata.id)
-      if (previous && (previous.message !== message || previous.truncated !== record.truncated)) fail('container_log_id_conflict')
-      found.set(row.$metadata.id, record)
+      if (previous && (previous.at !== row.timestamp || previous.event.message !== message)) fail('container_log_id_conflict')
+      found.set(row.$metadata.id, { at: row.timestamp, event: record })
     }
-    records += rows.length
+    records += completionGrace ? rows.filter(row => row.timestamp < now).length : rows.length
   }
-  await visit(start, now)
-  return { applicationId: app, environment, start, end: now, pages, records, events: [...found.values()] }
+  await visit(start, through)
+  const rows = [...found.values()]
+  return { applicationId: app, environment, start, end: now, pages, records,
+    events: rows.filter(row => row.at < now).map(row => row.event),
+    ...(completionGrace ? { requestEvents: rows.map(row => row.event) } : {}) }
 }
 
 /** The protected caller verifies the live release and returns its immutable
  * application identity on each side of the read. A source change discards
  * the complete window before it reaches either report or any alert sink. */
-export async function collectContainerReports({ target, read, capacity = undefined, neonToken, fetchImpl = fetch, now = Date.now() }) {
+export async function collectContainerReports({ target, read, capacity = undefined, neonToken, fetchImpl = fetch, now = Date.now(), observedAt = now }) {
   const before = await target()
   if (!/^[a-f0-9]{40}$/.test(before.source) || !uuid.test(before.apiVersion)) fail('container_release_invalid')
-  const window = await readContainerWindow({ application: before.application, environment: before.environment, read, now })
+  const mature = Boolean(capacity) && observedAt >= now + REQUEST_DEADLINE_MS
+  const window = await readContainerWindow({ application: before.application, environment: before.environment,
+    read, now, completionGrace: mature })
   const [outcomes, egress] = await Promise.all([
     outcomeReport({ now, containerWindow: window }),
     egressReport({ now, containerWindow: window, neonToken, fetchImpl }),
@@ -85,7 +92,15 @@ export async function collectContainerReports({ target, read, capacity = undefin
     const traffic=routeWindow(window.events,window.start,window.end)
     const fiveMinuteWindows=resources.windows.map(item=>({capacity:item,traffic:routeWindow(window.events,item.start,item.end),
       filesystem:legacyFilesystemBudget(window.events,item.start,item.end)}))
-    health={capacity:resources,traffic,fiveMinuteWindows}
+    // Starts use the same complete quarter as CPU. Its last two minutes may finish in the grace interval.
+    const through = window.end + REQUEST_DEADLINE_MS
+    const malformed = mature && routeWindow(window.requestEvents, window.start, through).malformed > 0
+    const requests = mature && !malformed ? requestSlis(window.requestEvents.map(event => event.message), through,
+      { from: window.start, until: window.end }) : {}
+    const status = !mature ? 'awaiting_deadline' : malformed ? 'malformed' : Object.keys(requests).length ? 'observed' : 'no_starts'
+    const requestHealth = { status, from: window.start, until: window.end, deadlineMs: REQUEST_DEADLINE_MS,
+      requests, ...requestAlertAssessment(requests) }
+    health={capacity:resources,traffic,fiveMinuteWindows,requestHealth}
   }
   const after = await target()
   if (before.source !== after.source || before.apiVersion !== after.apiVersion || before.environment !== after.environment ||

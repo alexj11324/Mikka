@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
 import test from 'node:test'
-import { actionableAlerts, internalSink, notifyAlerts, requestOutcomes, requestSlis, WINDOW_MS } from './monitor.mjs'
+import { actionableAlerts, internalSink, notifyAlerts, requestAlertAssessment, requestOutcomes, requestSlis, WINDOW_MS } from './monitor.mjs'
 import { withRequestLog } from '../../lib/request-log.ts'
 
 const now = Date.parse('2026-10-31T12:00:00Z')
@@ -71,6 +71,21 @@ test('real internal HTTP sink receives one firing and recovery; failed sink rema
     result = await notifyAlerts(alerts, { sink, now: now + 180_002, state: result.state })
     assert.equal(result.healthy, true)
     assert.deepEqual(Object.keys(received[0]).sort(), ['action', 'id', 'observedAt', 'owner', 'runbook', 'state', 'value', 'version'])
+    const failed = requestAlertAssessment({ login: { total: 1, successRatio: 0, p95Ms: 12000 } })
+    result = await notifyAlerts(failed.alerts, { state: result.state, assessed: failed.assessed, sink, now })
+    assert.equal(result.state['database-unavailable'].active, true)
+    assert.ok(result.deliveries.every(item => item.state === 'firing'))
+    const missing = requestAlertAssessment({})
+    result = await notifyAlerts(missing.alerts, { state: result.state, assessed: missing.assessed, sink, now })
+    assert.equal(result.deliveries.length, 0)
+    assert.equal(result.state['login-request-latency'].active, true)
+    const recovered = requestAlertAssessment({ login: { total: 100, successRatio: .99, p95Ms: 10000 } })
+    result = await notifyAlerts(recovered.alerts, { state: result.state, assessed: recovered.assessed, sink, now })
+    assert.deepEqual(result.deliveries.map(item => [item.id, item.state]), [
+      ['login-request-success', 'resolved'], ['login-request-latency', 'resolved'],
+    ])
+    assert.equal(result.state['database-unavailable'].active, true)
+    await assert.rejects(notifyAlerts(failed.alerts, { assessed: [], sink, now }), /OutsideAssessment/)
   } finally { await new Promise(resolve => server.close(resolve)) }
   for (const url of ['https://example.com/alerts', 'http://localhost/alerts', 'http://user:secret@127.0.0.1/alerts']) assert.throws(() => internalSink(url), /opsInternalSinkRequired/)
 })

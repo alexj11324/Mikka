@@ -70,3 +70,59 @@ test('provider faults have bounded statuses and no upstream details', async () =
     assert.equal(await result.text(),'')
   }
 })
+
+const tokenUsage = { prompt_tokens: 11, completion_tokens: 4, total_tokens: 15,
+  prompt_tokens_details: { cached_tokens: 2 }, neurons: 0.125 }
+const lastChoice = { choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] }
+const summary = { response: 'Already streamed café', usage: tokenUsage }
+const event = (value, ending = '\n') => 'data: ' + JSON.stringify(value) + ending + ending
+function fragmented(text, width = 5) {
+  const bytes = new TextEncoder().encode(text)
+  let index = 0
+  return new ReadableStream({ pull(controller) {
+    if (index === bytes.length) { controller.close(); return }
+    const end = Math.min(index + width, bytes.length)
+    controller.enqueue(bytes.subarray(index, end))
+    index = end
+  } })
+}
+async function adapted(body) {
+  return workersAiRequest(request({ ...input, stream: true }), { async run() {
+    return new Response(body, { headers: { 'content-type': 'text/event-stream' } })
+  } }, capability)
+}
+
+test('native Workers AI summary becomes an empty choices usage frame after a real finish', async () => {
+  for (const ending of ['\n', '\r\n', '\r']) {
+    const original = ': heartbeat' + ending + ending +
+      event({ choices: [{ index: 0, delta: { role: 'assistant', content: summary.response }, finish_reason: null }] }, ending) +
+      event(lastChoice, ending) + event({ choices: [], usage: tokenUsage }, ending)
+    const done = 'data: [DONE]' + ending + ending
+    const body = await adapted(fragmented(original + event(summary, ending) + done, 1))
+    assert.equal(await body.text(), original + event({ choices: [], usage: tokenUsage }, ending) + done)
+  }
+})
+
+test('early summaries, errors, malformed frames and unrelated provider extensions pass through', async () => {
+  const bad = [event(summary), event(lastChoice), event({ ...summary, error: { message: 'provider error' } }),
+    event({ ...summary, usage: { prompt_tokens: 5 } }), event({ response: 'only' }),
+    'data: {broken\n\n', ': comment\n\n', event({ choices: [], usage: null }),
+    'data: [DONE]\n\n', event(summary)].join('')
+  assert.equal(await (await adapted(fragmented(bad))).text(), bad)
+})
+
+test('oversize ordinary data passes through and downstream cancellation releases the native reader', async () => {
+  const huge = event({ choices: [{ delta: { content: 'a'.repeat(1024 * 1024 + 200) } }] })
+  const input = huge + event(lastChoice) + event(summary)
+  assert.equal(await (await adapted(fragmented(input, 7777))).text(), huge + event(lastChoice) + event({ choices: [], usage: tokenUsage }))
+  let stopped
+  const cancelled = new Promise(done => { stopped = done })
+  const inputStream = new ReadableStream({
+    start(controller) { controller.enqueue(new TextEncoder().encode(event({ choices: [{ delta: { content: 'first' } }] }))) },
+    cancel(reason) { stopped(reason) },
+  })
+  const reader = (await adapted(inputStream)).body.getReader()
+  assert.ok((await reader.read()).value.byteLength)
+  await reader.cancel('fixture stop')
+  assert.equal(await cancelled, 'fixture stop')
+})
