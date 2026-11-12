@@ -78,6 +78,45 @@
     "test": "tests/team-issue-create.db.test.ts",
     "suite": "test:scope-detachment-db"
   },
+  "app/api/tasks/[taskId]/review/preview/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "Issue a one-use link only after checking the installation origin and current checkout. A missing local dev server returns unavailable.",
+    "test": "lib/coding-workspace/preview/route.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "app/api/tasks/[taskId]/review/terminal/input/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_SECRET",
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
+    "test": "lib/coding-workspace/terminal/http.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "app/api/tasks/[taskId]/review/terminal/resize/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_SECRET",
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
+    "test": "lib/coding-workspace/terminal/http.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "app/api/tasks/[taskId]/review/terminal/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_SECRET",
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
+    "test": "lib/coding-workspace/terminal/http.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
   "apps/api/runtime/http-policy.mjs": {
     "mode": "built-in",
     "environment": [
@@ -183,6 +222,13 @@
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
+  "drizzle/20261112030508_coding_review_provider_receipts.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Existing PostgreSQL review leases retain their E2B placement. New sponsored leases record their immutable repository and independent human operation for cleanup.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
   "lib/abuse/workers-ai.ts": {
     "mode": "optional-cloud",
     "environment": [
@@ -255,7 +301,8 @@
       "MIKKA_TASK_MACHINE_BRIDGE_TOKEN"
     ],
     "behavior": "A sponsored machine requires the workspace allowlist and a private bridge token. Unconfigured workspaces cannot acquire the machine grant.",
-    "test": "apps/api/scripts/cloudflare-api.test.mjs"
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
   },
   "lib/cloud-computer/thread-machines.ts": {
     "mode": "built-in",
@@ -263,6 +310,25 @@
     "behavior": "Question recovery locks the current PostgreSQL task, owner, run and operation before reusing a retained machine. Self-hosted recovery uses its existing database and configured execution provider.",
     "test": "lib/factory/checks.db.test.ts",
     "suite": "test:factory-checks-db"
+  },
+  "lib/coding-workspace/cloudflare-review.ts": {
+    "mode": "optional-cloud",
+    "environment": [
+      "MIKKA_CLOUDFLARE_TASK_WORKSPACES",
+      "MIKKA_TASK_MACHINE_BRIDGE_TOKEN"
+    ],
+    "behavior": "A separately admitted sponsored checkout builds a bounded human lease. Local and owner-provided E2B review keep their existing transport.",
+    "test": "lib/coding-workspace/cloudflare-review.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/coding-workspace/preview/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "Issue a one-use link only after checking the installation origin and current checkout. A missing local dev server returns unavailable.",
+    "test": "lib/coding-workspace/preview/route.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
   },
   "lib/coding-workspace/preview/runtime.ts": {
     "mode": "operator-configured",
@@ -295,6 +361,16 @@
     "behavior": "Persist and fence terminal and preview leases in PostgreSQL. Preserve pending remote closes for the existing recovery timer.",
     "test": "lib/coding-workspace/review-authority.db.test.ts",
     "suite": "test:coding-workspace-db"
+  },
+  "lib/coding-workspace/terminal/http.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_SECRET",
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
+    "test": "lib/coding-workspace/terminal/http.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
   },
   "lib/coding-workspace/terminal/runtime.ts": {
     "mode": "operator-configured",
@@ -432,7 +508,7 @@
     "environment": [
       "MIKKA_TASK_MACHINE_BRIDGE_TOKEN"
     ],
-    "behavior": "Only a private task host with a bridge token and a database-verified grant can open or release a sponsored Cloudflare task machine. Community Compose does not install this bridge.",
+    "behavior": "The trusted host authenticates each fixed internal task operation, including human review. Community installations without the optional bridge cannot allocate a sponsored task.",
     "test": "apps/api/scripts/cloudflare-api.test.mjs"
   },
   "lib/eve/cloudflare-task-connection.ts": {
