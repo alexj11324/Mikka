@@ -43,11 +43,15 @@ export interface FactoryFlowView {
   pullRequest: { url: string; state: string } | null;
 }
 export interface FactoryAcceptanceMedia { captureId: string; kind: 'image' | 'video'; url: string; title: string; criterion: string | null; runId: string }
+function isHandoffStage(stage: FactoryTask['stage']): stage is typeof FACTORY_HANDOFF_STAGES[number] {
+  return FACTORY_HANDOFF_STAGES.some(value => value === stage)
+}
+
 export function publicFactoryStage(stage: FactoryTask['stage'], status: FactoryTask['status'], merged: boolean): FactoryPublicStage {
   if (status === 'cancelled' || status === 'revoked') return 'cancelled';
   if (merged) return 'completed';
   return stage === 'clarify' ? 'triage' : stage === 'execute' || stage === 'verify' ? 'implement' :
-    FACTORY_HANDOFF_STAGES.some(value => value === stage) ? 'handoff' : stage;
+    isHandoffStage(stage) ? 'handoff' : stage;
 }
 const iso = (value: Date | string) => new Date(value).toISOString();
 type FlowStateEvidence = { merged?: boolean; accepted?: boolean; createdAt?: Date | string; finishedAt?: Date | string | null; questionSince?: Date | string | null };
