@@ -197,7 +197,12 @@ export function openUIRootCount(text: string): number {
 export function parseOpenUI(text: string): Value | null {
   const document = readStatements(text)
   const root = document?.statements.get('root')
-  return document && root !== undefined ? resolve(root, document.statements) : null
+  try {
+    return document && root !== undefined ? resolve(root, document.statements) : null
+  } catch {
+    // Component-shaped objects with invalid props or args retain the text fallback.
+    return null
+  }
 }
 
 export const str = (value: Value | undefined) => typeof value === 'string' ? value : ''

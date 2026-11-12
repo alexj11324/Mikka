@@ -32,6 +32,8 @@ test('an approval and follow-ups get their named props', () => {
 test('not OpenUI, or broken OpenUI, is null', () => {
   assert.equal(parseOpenUI('普通的 **Markdown** 回复'), null)
   assert.equal(parseOpenUI('root = Stack([TextContent("没写完'), null)
+  assert.equal(parseOpenUI('root = {kind:"component"}'), null)
+  assert.equal(parseOpenUI('root = {kind:"component",name:"TextContent",props:{},args:"invalid"}'), null)
 })
 
 test('chips become the chat\'s citation tokens and links', () => {
