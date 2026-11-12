@@ -26,7 +26,7 @@ export function unsettled(list: readonly Outgoing[], text: string, images: reado
 }
 
 export function canAnswerCard(list: readonly Outgoing[], cardId: string) {
-  return list.every(item => item.phase === 'accepted' ? item.sourceCardId !== cardId : item.sourceCardId === cardId && item.phase !== 'sending')
+  return !list.some(item => item.sourceCardId === cardId && item.phase !== 'failed')
 }
 
 export const submissionBody = (item: Outgoing) => ({ text: item.text, botId: item.botId, submissionId: item.submissionId,

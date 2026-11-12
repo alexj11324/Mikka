@@ -12,6 +12,10 @@ export type ChatContinuation = { after: number; cursor: number; prefix: string }
 
 /** A bot chat as it is read and kept: the server adds where to continue from, and an update read says what it replaces. */
 export type ChatRead = Chat & {
+  /** The server includes the immutable submission ID on newly recorded personal messages. */
+  submissionIds?: true
+  /** Local receipts already acknowledged when an older server's successful snapshot started. */
+  acknowledgedBeforeRead?: string[]
   continuation?: ChatContinuation
   /** Older messages exist before this position. */
   historyBefore?: number | null
@@ -19,6 +23,14 @@ export type ChatRead = Chat & {
   after?: number
   /** The `cursor` the update read continued from. */
   baseCursor?: number
+}
+
+/** Old servers lack per-message receipts. A fresh authorized snapshot replaces only previously acknowledged local sends. */
+export function personalReadback(next: ChatRead, acknowledged: string[]): ChatRead {
+  if (next.submissionIds || next.items.some(item => item.from === 'person' && item.submissionId)) {
+    return { ...next, submissionIds: true, acknowledgedBeforeRead: undefined }
+  }
+  return { ...next, acknowledgedBeforeRead: acknowledged }
 }
 
 /** An older page of a bot chat (`&through=`). */

@@ -140,6 +140,16 @@ test('two mounted readers remove denied rows, ignore a late success, and retain 
     await act(async () => { void reads[1].reload(); requests[6].reject(new ApiError(404)) })
     assert.equal(apiCache.get(path), null)
     assert.equal(document.body.textContent, '')
+    let after!: Promise<void>
+    await act(async () => { void reads[1].reload(); after = reads[1].reloadAfterWrite() })
+    assert.equal(requests.length, 8, 'the overlapping pre-ACK read finishes first')
+    await act(async () => { requests[7].resolve('before acknowledgement') })
+    assert.equal(requests.length, 9)
+    await act(async () => { requests[8].resolve('after acknowledgement'); await after })
+    assert.equal(reads[1].data, 'after acknowledgement')
+    await act(async () => { void reads[1].reload(); after = reads[1].reloadAfterWrite(); requests[9].reject(new ApiError(403)); await after })
+    assert.equal(requests.length, 10, 'a revoked reader cannot start another post-write refresh')
+    assert.equal(reads[1].data, null)
   } finally {
     await act(async () => root.unmount())
     apiCache.setIdentity(null)

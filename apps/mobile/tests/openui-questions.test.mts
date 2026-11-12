@@ -30,6 +30,15 @@ mock.module(new URL('../lib/images.ts', import.meta.url).href, { namedExports: {
 mock.module(new URL('../lib/web.ts', import.meta.url).href, { namedExports: { openOnWeb: async () => {} } })
 mock.module(new URL('../lib/theme.ts', import.meta.url).href, { namedExports: { colors: {}, font: 'System', lift: {} } })
 
+type FreeFieldProps = { accessibilityLabel: string; value: string; disabled?: boolean; onChangeText: (value: string) => void; onSubmitEditing: () => void }
+const freeFields = new Map<string, FreeFieldProps>()
+mock.module(new URL('../components/beui/components/input/index.ts', import.meta.url).href, { namedExports: {
+  Input: (props: FreeFieldProps) => {
+    freeFields.set(props.accessibilityLabel, props)
+    return createElement('input', { 'aria-label': props.accessibilityLabel, value: props.value, disabled: props.disabled, readOnly: true })
+  },
+} })
+
 const browser = new Window({ url: 'https://fixture.invalid/' })
 let root: Root, container: HTMLDivElement
 let createRoot: typeof import('react-dom/client')['createRoot']
@@ -109,4 +118,45 @@ test('a slow native reply choice rejects simultaneous taps and permits retry aft
   await act(async () => option.click())
   assert.deepEqual(attempted, ['查看日程', '查看日程'])
   assert.equal(option.disabled, true)
+})
+
+test('two Eve requests retain independent drafts and send the addressed question once per acknowledgement', async () => {
+  const { EveInteractions } = await import('../features/chat/components/eve-interactions')
+  const left = '884dd24a-f4d1-4e5a-8cba-afbeadc20ebf', right = 'c3424412-e036-4476-9878-24490bfd3517'
+  const calls: unknown[] = []
+  let reject!: (failure: Error) => void
+  let accept!: () => void
+  const respond = (answers: unknown) => {
+    calls.push(answers)
+    return new Promise<void>((resolve, refuse) => { accept = resolve; reject = refuse })
+  }
+  const { emptySessionView, foldEvents } = await import('eve/events')
+  const request = (interactionId: string, prompt: string, line: number) => ({
+    type: 'interaction.opened',
+    data: { interactionId, subject: { kind: 'call', callId: 'fixture' }, request: { kind: 'question', prompt, allowFreeform: true, options: [{ id: 'choose', label: prompt + ' option' }] } },
+    meta: { position: { line, index: 0 }, at: new Date(0).toISOString() },
+  })
+  const view = foldEvents(emptySessionView(), [request(left, 'First', 0), request(right, 'Second', 1)])
+  const agent = { view, respond, status: 'idle' } as unknown as Parameters<typeof EveInteractions>[0]['agent']
+  await act(async () => root.render(createElement(EveInteractions, { agent })))
+
+  const field = (name: string) => freeFields.get(name)!
+  const sendButton = (name: string) => container.querySelector<HTMLInputElement>('input[aria-label="' + name + '"]')!.parentElement!.querySelector('button')!
+  assert.equal(sendButton('Second').disabled, true)
+  await act(async () => { field('First').onChangeText('retained'); field('Second').onChangeText('  second draft  ') })
+  await act(async () => { field('Second').onSubmitEditing(); sendButton('Second').click(); button('Second option').click() })
+  assert.deepEqual(calls, [[{ interactionId: right, text: 'second draft' }]])
+  assert.equal(field('Second').disabled, true)
+  assert.equal(field('First').disabled, false)
+  await act(async () => reject(Object.assign(new Error('refused'), { status: 403 })))
+  assert.equal(field('Second').value, '  second draft  ')
+  assert.equal(field('First').value, 'retained')
+  assert.ok(container.textContent?.includes((await import('../lib/messages')).mobileMessages.Coordinator.sendAccessDenied))
+  await act(async () => sendButton('Second').click())
+  assert.deepEqual(calls[1], calls[0])
+  await act(async () => accept())
+  assert.equal(sendButton('Second').disabled, true, 'receipt locks this request until its projection arrives')
+  await act(async () => button('First option').click())
+  assert.deepEqual(calls[2], [{ interactionId: left, optionId: 'choose' }])
+  await act(async () => accept())
 })

@@ -16,6 +16,14 @@ function subscribe(listener: () => void) {
 
 type Send = (text: string, submissionId: string, images?: readonly { dataUrl: string }[]) => Promise<unknown>
 
+export function acknowledgedPersonalMessages(scope: string | null): string[] {
+  if (!scope) return []
+  try {
+    const rows = apiCache.get<Outgoing[]>(scope) ?? conversationJournal.readPersonal(scope)
+    return rows.filter(row => row.phase === 'accepted').map(row => row.id)
+  } catch { return [] }
+}
+
 export function usePersonalDelivery(scope: string | null, received: Set<string>, send: Send, reload: () => Promise<void>) {
   const context = apiCache.context()
   const uncertain = copy.Coordinator.sendUncertain

@@ -103,6 +103,15 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
     return promise
   }, [path, read])
 
+  // A post-write read must start after the acknowledgement, even when a previous snapshot is in flight.
+  const reloadAfterWrite = useCallback(async () => {
+    if (!path) return
+    const revision = cache.revision(path)
+    const reading = pending.current
+    if (reading) await reading.promise
+    if (alive.current && context === cache.context() && revision === cache.revision(path)) await load()
+  }, [context, load, path])
+
   useEffect(() => {
     if (!path) return
     return cache.onRevoked(path, reason => {
@@ -148,7 +157,7 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
   }, [load, path, pushed])
 
   const sameSource = source.path === path && source.context === context
-  return { data: sameSource ? data : path ? cache.get<T>(path) : null, error: sameSource ? error : null, loading: sameSource ? loading : Boolean(path), reload: load, setData, requestedAt: sameSource ? requestedAt : null }
+  return { data: sameSource ? data : path ? cache.get<T>(path) : null, error: sameSource ? error : null, loading: sameSource ? loading : Boolean(path), reload: load, reloadAfterWrite, setData, requestedAt: sameSource ? requestedAt : null }
 }
 
 /** Pull to refresh for a list (the system's RefreshControl): reloads and shows the spinner until the data is back. */

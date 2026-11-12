@@ -3,7 +3,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Keyboard } from 'react-native'
 import { StyleSheet, View } from 'react-native'
 import { ChatMessageList, type ChatListHandle } from '@/features/chat/components/chat-message-list'
-import { chatHistoryPath, chatUpdatePath, mergeChatHistory, mergeChatRead, olderThrough, type ChatHistoryPage, type ChatRead } from '@/features/chat/model/chat-pages'
+import { chatHistoryPath, chatUpdatePath, mergeChatHistory, mergeChatRead, personalReadback, olderThrough, type ChatHistoryPage, type ChatRead } from '@/features/chat/model/chat-pages'
 import { latestOwnIndex } from '@/features/chat/model/chat-layout'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -30,7 +30,7 @@ import type { HeldMessage } from '@/lib/message-actions'
 import { plainText, quotable } from '@/lib/quote'
 import { canAnswerCard, outgoingKey, personalMessage, unsettled } from '@/lib/outbox'
 import { apiCache } from '@/lib/api-cache'
-import { usePersonalDelivery } from '@/features/chat/components/personal-delivery'
+import { acknowledgedPersonalMessages, usePersonalDelivery } from '@/features/chat/components/personal-delivery'
 import { askForPush, usePushState } from '@/lib/push-state'
 import { runName, type BotPage, type Chat, type CitationSource, type PendingAction } from '@/lib/types'
 import { ChatHeader } from '@/features/chat/components/chat-header'
@@ -53,8 +53,7 @@ import { listRef, UNRESOLVED_LIVE_ID } from '@/lib/live'
 import { pendingActionsDeadline } from '@/lib/live-client'
 import { useStop } from '@/lib/useStop'
 import { useEveChat } from '@/lib/eve-chat'
-import { activeTurn, openInteractions } from 'eve/events'
-import { parseAnswers } from 'eve/client'
+import { activeTurn } from 'eve/events'
 import { EveInteractions } from '@/features/chat/components/eve-interactions'
 import { eveChatItems } from '@/features/chat/model/eve-messages'
 import { StopFailed } from '@/components/StopFailed'
@@ -90,8 +89,16 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
   // The web's chat key (components/coordinator/coordinator-chat.tsx) on the person's home channel; a turn's lease
   // running out has no write, so the server names it as a deadline.
   // A push reads only what is new since the last read, and merges it into what is shown (#1408).
-  const readChat = useCallback(async (at: string) => mergeChatRead(apiCache.get<ChatRead>(at), await api<ChatRead>(chatUpdatePath(at, apiCache.get<ChatRead>(at)))), [])
-  const { data, error, reload, setData } = useLiveApi<ChatRead>(path, chat => ({
+  const personalScope = homeData?.user.id && home ? JSON.stringify(['personal-send', homeData.user.id, home, self]) : null
+  const readChat = useCallback(async (path: string) => {
+    const previous = apiCache.get<ChatRead>(path)
+    const acknowledged = acknowledgedPersonalMessages(personalScope)
+    const next = await api<ChatRead>(chatUpdatePath(path, previous))
+    const latest = apiCache.get<ChatRead>(path)
+    const merged = mergeChatRead(latest, next)
+    return merged === latest ? merged : personalReadback(merged, acknowledged)
+  }, [personalScope])
+  const { data, error, reload, reloadAfterWrite, setData } = useLiveApi<ChatRead>(path, chat => ({
     refs: [{ kind: 'bot_chat', id: chat?.botId && chat.live?.workspaceId ? chat.botId : UNRESOLVED_LIVE_ID, scope: chat?.live?.workspaceId ?? null }],
     minIntervalMs: 2_000, deadline: chat?.live?.deadline,
   }), readChat)
@@ -108,9 +115,9 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
     refs: [listRef('pending_actions', home)], deadline: pendingActionsDeadline(items),
   }))
   const apiContext = apiCache.context()
-  const scope = data && homeData?.user.id && home ? JSON.stringify(['personal-send', homeData.user.id, home, self]) : null
-  const received = useMemo(() => new Set(data?.items.flatMap(item => item.from === 'person' && item.submissionId ? [item.submissionId] : []) ?? []), [data?.items])
-  const personal = usePersonalDelivery(scope, received, agent.sendMessage, reload)
+  const scope = data ? personalScope : null
+  const received = useMemo(() => new Set([...(data?.acknowledgedBeforeRead ?? []), ...(data?.items.flatMap(item => item.from === 'person' && item.submissionId ? [item.submissionId] : []) ?? [])]), [data?.items, data?.acknowledgedBeforeRead])
+  const personal = usePersonalDelivery(scope, received, agent.sendMessage, reloadAfterWrite)
   const outbox = personal.rows
   const [text, setText] = useState(draft ?? '')
   const working = agent.status === 'busy' || outbox.some(item => item.phase === 'sending')
@@ -193,11 +200,6 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
     if (!scope || serviceUnavailable || agent.status === 'resuming') return false
     const pendingSends = personal.read().filter(item => !received.has(item.id))
     if (sourceCardId && !canAnswerCard(pendingSends, sourceCardId)) return false
-    const question = openInteractions(agent.view).find(item => item.request.allowFreeform && !item.answer)
-    if (question && typed.trim() && !attachments.length) {
-      try { await agent.respond(parseAnswers([{ interactionId: question.interactionId, text: typed.trim() }])); return true }
-      catch { return false }
-    }
     // While words are selected, what is typed answers them: it goes out quoting the selection.
     const words = selection && !quote && typed.trim() ? quotedMessage(selectionQuote(selection.selected, selection.text), typed) : typed
     setSelection(null)
@@ -208,7 +210,7 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
     if (working) sentWhileWorking.current.add(message)
     const context = apiCache.context()
     const targetBotId = data?.botId ?? botId
-    const held = unsettled(pendingSends, message, images, self, context, sourceCardId)
+    const held = sourceCardId ? unsettled(pendingSends, message, images, self, context, sourceCardId) : undefined
     const previous = sourceCardId ? pendingSends.find(item => item.sourceCardId === sourceCardId) : undefined
     // A lost acknowledgement may have committed. Only its original body and ID can be sent again.
     if (previous && !held && (previous.phase !== 'failed' || previous.error === mobileMessages.Coordinator.sendUncertain)) return false

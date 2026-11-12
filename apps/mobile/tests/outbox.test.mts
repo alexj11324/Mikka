@@ -35,8 +35,8 @@ test('only the originating choice can reopen an unsettled answer and transport k
   for (const state of ['failed', 'unconfirmed'] as const) {
     const saved = [{ ...draft[0], phase: 'failed' as const, error: state }]
     assert.equal(canAnswerCard(saved, 'card-a'), true)
-    assert.equal(canAnswerCard(saved, 'card-b'), false)
-    assert.equal(canAnswerCard([...saved, personalMessage('other', 'Another message', [], { botId: null, context: 3, chatKey: 'chat' })], 'card-a'), false)
+    assert.equal(canAnswerCard(saved, 'card-b'), true)
+    assert.equal(canAnswerCard([...saved, personalMessage('other', 'Another message', [], { botId: null, context: 3, chatKey: 'chat' })], 'card-a'), true)
     const same = unsettled(saved, 'Keep the original draft', [], 'chat', 3, 'card-a')!
     assert.equal(same.submissionId, 'op1')
     assert.equal(unsettled(saved, 'Keep the original draft', [], 'chat', 3), undefined)
