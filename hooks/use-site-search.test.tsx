@@ -31,8 +31,8 @@ test('search continuations serialize by source, deduplicate UUIDs and discard re
     return { source: 'groups', nextCursor, items: ids.map(id => ({ type: 'group', id, title: id, workspaceId: 'space' })) }
   }
   let search!: ReturnType<typeof useSiteSearch>
-  function Screen({ query }: { query: string }) {
-    search = useSiteSearch(query, 'space')
+  function Screen({ query, workspace = 'space' }: { query: string; workspace?: string }) {
+    search = useSiteSearch(query, workspace)
     return null
   }
   const ids = () => search.state.groups.items.map(item => item.id)
@@ -62,6 +62,9 @@ test('search continuations serialize by source, deduplicate UUIDs and discard re
     assert.deepEqual(search.state.history.items, [])
     await act(async () => reply('shared/tasks/first', 200, { source: 'tasks', items: [{ type: 'task', id: 'late' }], nextCursor: 'after' }))
     assert.deepEqual(search.state.tasks.items, [])
+    await act(async () => root.render(null))
+    await act(async () => root.render(<Screen query="" />))
+    assert.equal(search.authRequired, true, 'an empty reopened palette still knows the session expired')
     await act(async () => root.render(<Screen query="another" />))
     await act(async () => { await delay(230) })
     await act(async () => reply('another/groups/first', 403, { error: 'searchAccessDenied' }))
@@ -70,5 +73,21 @@ test('search continuations serialize by source, deduplicate UUIDs and discard re
     await act(async () => reply('another/history/first', 200, { source: 'history', items: [], nextCursor: null }))
     assert.equal(search.authRequired, false)
     assert.deepEqual(search.state.groups.items, [])
+    assert.equal(search.workspaceDenied, true, 'personal history cannot restore workspace membership')
+    await act(async () => reply('another/tasks/first', 403, { error: 'searchAccessDenied' }))
+    await act(async () => reply('another/tasks/first', 403, { error: 'searchAccessDenied' }))
+    assert.equal(search.serverTasks, true)
+    await act(async () => root.render(null))
+    await act(async () => root.render(<Screen query="" />))
+    assert.equal(search.workspaceDenied, true)
+    await act(async () => { await delay(230) })
+    await act(async () => reply('/tasks/first', 200, { source: 'tasks', items: [{ type: 'task', id: 'now-visible' }], nextCursor: null }))
+    assert.equal(search.workspaceDenied, false)
+    assert.equal(search.serverTasks, true, 'restored membership does not certify an old local title')
+    assert.deepEqual(search.state.tasks.items.map(item => item.id), ['now-visible'])
+    assert.ok(!calls.includes('/groups/first'), 'the unrequested source stays idle')
+    await act(async () => root.render(<Screen workspace="other" query="" />))
+    assert.equal(search.serverTasks, false)
+    assert.equal(search.workspaceDenied, false)
   } finally { await act(async () => root.unmount()) }
 })
