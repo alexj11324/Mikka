@@ -37,24 +37,26 @@ test('task review: current owner, session, tenant and immutable physical checkou
     await pool.query('INSERT INTO "session"(id,"userId",token,"expiresAt","createdAt","updatedAt") VALUES($1,$2,$1,now()+interval \'1 hour\',now(),now())', [sessionId, id])
     return { user: { id, name: id, email: `${id}@example.invalid`, image: null }, session: { id: sessionId } }
   }
-  const checkout = async (userId: string, workspaceId: string, taskId: string) => {
+  const checkout = async (userId: string, workspaceId: string, taskId: string, sponsored = false) => {
     const botId = await seedBot(pool, workspaceId, userId), agentId = await seedAgent(pool, userId)
     const deviceId = randomUUID(), repoId = randomUUID(), deviceTokenId = randomUUID(), runId = randomUUID()
-    const remoteKey = 'v2/github.com/mikka-ci/review-fixture', sandboxId = `synthetic-${randomUUID()}`, worktreePath = `/home/user/.mikka/worktrees/${runId}`
+    const remoteKey = 'v2/github.com/mikka-ci/review-fixture', sandboxId = sponsored ? 'a'.repeat(64) : `synthetic-${randomUUID()}`, worktreePath = sponsored ? `/workspace/worktrees/${runId}` : `/home/user/.mikka/worktrees/${runId}`
     await pool.query('INSERT INTO devices(id,"ownerId",name,kind,enabled,"lastSeenAt") VALUES($1,$2,\'Review fixture\',\'cloud\',true,now())', [deviceId, userId])
     await pool.query('INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl") VALUES($1,$2,$3,$4,\'https://github.com/mikka-ci/review-fixture.git\')', [repoId, deviceId, userId, remoteKey])
     await pool.query('INSERT INTO device_tokens(id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES($1::uuid,$2,$1::text,$3,$4,now()+interval \'1 hour\')', [deviceTokenId, userId, deviceId, workspaceId])
-    const definition = { executionIdentity: { workspaceId }, repositoryAdmission: { workspaceId, userId, issueId: taskId, deviceId, agentId, remoteKey } }
+    const definition = { executionIdentity:{workspaceId, ...(sponsored ? {billingAccount:{runtime:{kind:'cloudflare_sponsored'}}} : {})},
+      ...(sponsored ? {taskMachine:{provider:'cloudflare',payer:'mikka',ownerId:userId,workspaceId,taskId,botId,repositoryKey:remoteKey,
+        requestEventId:randomUUID()},projectExecution:{repositoryKey:remoteKey}} : {}), repositoryAdmission: { workspaceId, userId, issueId: taskId, deviceId, agentId, remoteKey } }
     await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","botId","deviceId","deviceRepoId","deviceTokenId","agentDefinition",
       "machineAuthority",status,"worktreePath","leaseExpiresAt","startedAt","sessionId")
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,true,'running',$10,now()+interval '5 minutes',now()-interval '1 minute','native-fixture')`,
     [runId, userId, taskId, agentId, botId, deviceId, repoId, deviceTokenId, JSON.stringify(definition), worktreePath])
     await pool.query('INSERT INTO computer_run_bindings("runId","botId","workspaceId","ownerId") VALUES($1,$2,$3,$4)', [runId, botId, workspaceId, userId])
     await pool.query(`INSERT INTO thread_machines("runId","workspaceId","ownerId","sandboxId","snapshotId","operationId",state,"deviceId","issueId","repoId","botId",epoch)
-      VALUES($1,$2,$3,$4,'synthetic', $5,'running',$6,$7,$8,$9,1)`, [runId, workspaceId, userId, sandboxId, randomUUID(), deviceId, taskId, repoId, botId])
+      VALUES($1,$2,$3,$4,$10,$5,'running',$6,$7,$8,$9,1)`, [runId, workspaceId, userId, sandboxId, randomUUID(), deviceId, taskId, repoId, botId, sponsored ? 'cloudflare-task-v1':'synthetic'])
     return { botId, agentId, deviceId, repoId, deviceTokenId, runId, remoteKey, sandboxId, worktreePath, definition }
   }
-  const fixture = async () => {
+  const fixture = async (sponsored = false) => {
     const userId = await seedUser(pool, 'review-owner'), peerId = await seedUser(pool, 'review-peer'), strangerId = await seedUser(pool, 'review-other')
     const { id: workspaceId } = await seedWorkspace(pool, userId, [{ userId, role: 'admin' }, { userId: peerId, role: 'member' }])
     const { id: otherWorkspaceId } = await seedWorkspace(pool, userId, [{ userId, role: 'admin' }])
@@ -63,7 +65,7 @@ test('task review: current owner, session, tenant and immutable physical checkou
     const taskId = randomUUID()
     await pool.query('INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope) VALUES($1,$2,$3,\'Review fixture\',\'{"type":"doc"}\',\'doing\',\'normal\',\'workspace\')', [taskId, userId, workspaceId])
     await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [taskId, teamId, workspaceId, userId])
-    return { userId, peerId, strangerId, workspaceId, otherWorkspaceId, teamId, taskId, ...await checkout(userId, workspaceId, taskId),
+    return { userId, peerId, strangerId, workspaceId, otherWorkspaceId, teamId, taskId, ...await checkout(userId, workspaceId, taskId, sponsored),
       session: await account(userId), peer: await account(peerId), stranger: await account(strangerId) }
   }
   type Fixture = Awaited<ReturnType<typeof fixture>>
@@ -98,6 +100,31 @@ test('task review: current owner, session, tenant and immutable physical checkou
     assert.match(authority.bindingId, /^[a-f0-9]{64}$/)
     assert.equal(authority.credential.id, f.session.session.id)
     assert.equal('token' in authority, false)
+  })
+  await t.test('sponsor review uses the frozen platform and repository, with distinct guest leases in one human operation',async()=>{
+    const f=await fixture(true), previous=[process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES,process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN]
+    process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES=f.workspaceId
+    process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN='synthetic-fixture-only'
+    try {
+      const {beginReviewSession}=await import('./review-sessions')
+      const a=await read(f)
+      assert.deepEqual(a.sponsoredPlacement,{operationId:a.machineOperationId,repositoryKey:f.remoteKey})
+      const open=(kind:'terminal'|'preview')=>resolve(pool,pool,f.session,f.taskId,{},(scope,client)=>beginReviewSession(scope,{kind},client))
+      const terminal=await open('terminal'),preview=await open('preview')
+      assert.ok(terminal.reviewOperationId)
+      assert.equal(terminal.reviewOperationId,preview.reviewOperationId)
+      assert.notEqual(terminal.id,preview.id)
+      assert.notEqual(terminal.reviewOperationId,a.machineOperationId)
+      const {rows}=await pool.query('SELECT provider,"repositoryKey","reviewOperationId" FROM coding_review_sessions WHERE "runId"=$1',[f.runId])
+      assert.equal(rows.length,2)
+      assert.ok(rows.every(row=>row.provider==='cloudflare' && row.repositoryKey===f.remoteKey && row.reviewOperationId===terminal.reviewOperationId))
+      await refused(read(f,f.peer),403,'not_owner_terminal')
+      await pool.query('UPDATE thread_machines SET "snapshotId"=$2 WHERE "runId"=$1',[f.runId,'synthetic'])
+      await refused(read(f),403,'review_scope_denied')
+    } finally {
+      for(const [i,key] of ['MIKKA_CLOUDFLARE_TASK_WORKSPACES','MIKKA_TASK_MACHINE_BRIDGE_TOKEN'].entries())
+        if(previous[i] === undefined) delete process.env[key]; else process.env[key]=previous[i]
+    }
   })
   await t.test('Team visibility is not shell/preview ownership', async () => {
     const f = await fixture()
