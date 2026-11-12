@@ -46,6 +46,8 @@ test('the native Task rendezvous is HTTPS, bounded, keeps the physical URL entit
   const launch = new URL(origin)
   launch.hash = new URLSearchParams({ mobileTask: ref, server: 'https://self.example/mikka' }).toString()
   assert.deepEqual(mobileTaskLaunch(launch), { ref, server: 'https://self.example/mikka' })
+  assert.equal(mobileTaskTarget('/?issue=' + BOT), '/?issue=' + BOT)
+  for (const other of ['/', '/settings', '/?section=coordinator', '/?section=plugins']) assert.equal(mobileTaskTarget(other), null)
   assert.equal(mobileTaskTarget('https://wrong.example/?issue=' + BOT), null)
   assert.equal(mobileTaskTarget('/?issue=' + BOT + '&token=outside'), null)
   for (const fragment of [

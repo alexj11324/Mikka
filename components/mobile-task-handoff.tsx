@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { switchWorkspace } from '@/app/actions/workspace'
 import { Auth } from '@/components/blocks/auth-19/components/auth'
 import { AuthCard } from '@/components/blocks/auth-19/components/auth-card'
+import { rememberMobileTask } from '@/components/workspace/workspace-navigation'
 import { Button } from '@/components/ui/button'
 import { FieldError } from '@/components/ui/field'
 import { withBasePath } from '@/lib/base-path'
@@ -57,7 +58,7 @@ export default function MobileTaskHandoff({ launch }: { launch: Launch }) {
       const query = new URLSearchParams(result.target.slice(2))
       query.set('workspace', result.workspaceId)
       if (!await showMobileTaskLocation(document, query, switchWorkspace, isCurrent)) throw Error()
-      window.history.replaceState({ ...window.history.state, mobileTask: { server, ref, ...result } }, '', window.location.href)
+      rememberMobileTask({ server, ref, ...result })
     } catch { setFailed(true) }
     finally { busy.current = false; setPending(false) }
   }, [cloud, directory, ref, server])

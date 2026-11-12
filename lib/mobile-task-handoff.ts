@@ -7,8 +7,9 @@ const reference = /^[A-Za-z0-9_-]{43}$/
 export const isTaskReference = (value: unknown): value is string => typeof value === 'string' && reference.test(value)
 
 export function mobileTaskTarget(value: unknown) {
-  if (typeof value !== 'string' || !value.startsWith('/?issue=') || mobileWebTarget(value) !== value) return null
-  return value
+  if (typeof value !== 'string' || mobileWebTarget(value) !== value) return null
+  const target = new URL(value, 'https://mikka.invalid')
+  return target.pathname === '/' && target.searchParams.has('issue') ? value : null
 }
 
 export function mobileTaskLaunch(location: URL) {
