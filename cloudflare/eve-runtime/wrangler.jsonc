@@ -6,6 +6,7 @@
   "compatibility_flags": ["nodejs_compat", "enable_request_signal"],
   "workers_dev": false,
   "preview_urls": false,
+  "ai": { "binding": "WORKERS_AI" },
   "observability": { "enabled": true },
   "durable_objects": {
     "bindings": [{ "name": "EVE_RUNTIME", "class_name": "EveRuntime" }]

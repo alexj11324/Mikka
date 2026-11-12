@@ -1,22 +1,26 @@
 import { DurableObject, WorkerEntrypoint } from 'cloudflare:workers'
 import { Files } from '@cloudflare/sandbox'
-import { machineGrant, sameGrant, workspaceName, liveUntil, MAX_RUN_MS, CHECKPOINT_TIME_MS } from './grant.mjs'
+import { startTaskImage, TaskStartError } from './start.mjs'
+import { machineGrant, sameGrant, workspaceName, liveUntil, verifyCheckpoint, MAX_RUN_MS, CHECKPOINT_TIME_MS } from './grant.mjs'
 import { TaskFiles } from './files.mjs'
 import { processOptions, taskProcess, stopTaskProcesses } from './process.mjs'
 import { TaskWorkspace } from './workspace.mjs'
+import { routeReviewBrowser, review, reviewBrowser } from './review-operations.mjs'
+import { captureReviewExit, prepareReviewGuest, restoreReviewExit } from './review-guest.mjs'
 
 export { DirectoryBackupGateway } from '@cloudflare/sandbox'
 
-// The Node API holds this service binding. HTTP is closed, including the
-// workers.dev hostname. Every operation travels with the frozen Mikka run.
+// Only the private Node binding controls compute. The isolated preview hostname
+// reaches the original guest gateway and cannot select a task operation.
 export default class TaskMachines extends WorkerEntrypoint {
-  fetch() { return new Response(null, { status: 404 }) }
+  fetch(request) { return routeReviewBrowser(request, this.env) }
   #endpoint(identity) {
     const grant = machineGrant(identity)
     return this.env.TASKS.getByName(workspaceName(grant))
   }
   open(identity) { return this.#endpoint(identity).open(identity) }
   park(identity) { return this.#endpoint(identity).park(identity) }
+  review(identity, op) { return this.#endpoint(identity).review(identity, op) }
   status(identity) { return this.#endpoint(identity).status(identity) }
   spawn(identity, options) { return this.#endpoint(identity).spawn(identity, options) }
   removePath(identity, path, options) { return this.#endpoint(identity).removePath(identity, path, options) }
@@ -66,22 +70,31 @@ export class TaskMachine extends DurableObject {
   async startImage(run) {
     const container = this.ctx.container
     if (!container) throw new Error('Task container unavailable')
-    container.start({ image: container.images.task, instance: 'standard-1', enableInternet: this.env.NATIVE_TASK_EGRESS === 'direct',
-      entrypoint: ['sleep', String(Math.max(1, Math.ceil(this.idleLimit(run) / 1000)))] })
-    await container.setInactivityTimeout(this.idleLimit(run))
+    await startTaskImage(container, { image: container.images.task, instance: 'standard-1',
+      enableInternet: this.env.NATIVE_TASK_EGRESS === 'direct',
+      entrypoint: ['sleep', String(Math.max(1, Math.ceil(this.idleLimit(run) / 1000)))] }, this.idleLimit(run))
   }
   async verifyScope(grant) {
     if (this.ctx.id.toString() !== this.env.TASKS.idFromName(workspaceName(grant)).toString()) {
       throw new Error('Task machine scope mismatch')
     }
   }
-  open(identity) {
+  open(identity) { return this.#openScoped(identity, null) }
+  review(identity, operation) {
+    return review(this, identity, operation, (grant, scope) => this.#openScoped(grant, scope))
+  }
+  reviewBrowser(alias, request) { return reviewBrowser(this, alias, request) }
+  #openScoped(identity, review) {
     const grant = machineGrant(identity)
     return this.exclusive(async () => {
       await this.verifyScope(grant)
       const store = this.ctx.storage, now = Date.now()
+      if (review && (await store.get('review-lease:' + review.leaseId))?.closed) throw Error('Task review lease expired')
       const prior = await store.get('run')
       if (prior && sameGrant(prior.grant, grant)) {
+        if (Boolean(prior.review) !== Boolean(review)) throw Error('Task machine run mismatch')
+        verifyCheckpoint(grant.requiredCheckpoint, this.ctx.id.toString(), prior.grant.requiredCheckpoint)
+        verifyCheckpoint(prior.grant.requiredCheckpoint, this.ctx.id.toString(), grant.requiredCheckpoint)
         if (prior.settledAt || prior.stoppedAt) throw new Error('Task machine run already settled')
         if (!this.ctx.container?.running || prior.state !== 'running') throw new Error('Task machine interrupted')
         // An expired lease cannot be revived even if its alarm is delayed.
@@ -100,10 +113,21 @@ export class TaskMachine extends DurableObject {
       if (await store.get('closed:' + grant.runId) || await store.get('closed-operation:' + grant.operationId)) {
         throw new Error('Task machine run already settled')
       }
+      if (grant.requiredCheckpoint) verifyCheckpoint(grant.requiredCheckpoint, this.ctx.id.toString(), await store.get('checkpoint'))
+      let witness
+      if (review) {
+        const proof = await store.get('reviewCheckpoint')
+        if (!prior?.stoppedAt || prior.grant.runId !== grant.runId ||
+            (prior.review?.sourceOperationId ?? prior.grant.operationId) !== review.sourceOperationId ||
+            !proof || !grant.requiredCheckpoint || proof.id !== grant.requiredCheckpoint.id || proof.sha256 !== grant.requiredCheckpoint.sha256 ||
+            proof.witness.runId !== grant.runId || proof.witness.deviceId !== review.deviceId ||
+            proof.witness.worktreePath !== review.worktreePath) throw Error('Original task review checkout unavailable')
+        witness = proof.witness
+      }
       const consumed = await store.get('spent:' + grant.runId) ?? 0
       const hardDeadline = now + Math.max(0, MAX_RUN_MS - consumed)
       const expiresAt = liveUntil(grant, now, hardDeadline)
-      const run = { state: 'starting', grant, hardDeadline, expiresAt, admittedAt: now, consumed }
+      const run = { state: 'starting', grant, hardDeadline, expiresAt, admittedAt: now, consumed, ...(review ? {review} : {}) }
       await store.setAlarm(expiresAt)
       await store.put('run', run)
       if (!await this.admission().acquire(this.ctx.id.toString())) {
@@ -114,15 +138,24 @@ export class TaskMachine extends DurableObject {
       }
       try {
         await this.startImage(run)
+        // The native product image must protect the kernel before importing
+        // task files, registering the daemon or granting its first process.
+        const reviewBoot = this.env.NATIVE_TASK_EGRESS === 'direct'
+          ? await prepareReviewGuest(this.ctx.container)
+          : undefined
         const restored = await this.workspace.restore()
-        if (restored && this.env.NATIVE_TASK_EGRESS === 'direct') await this.transferNativeHistory('restore')
+        if (review) {
+          if (!restored || !reviewBoot) throw Error('Original task review checkout unavailable')
+          await restoreReviewExit(this.ctx.container, witness)
+        } else if (restored && this.env.NATIVE_TASK_EGRESS === 'direct') await this.transferNativeHistory('restore')
         if (!restored) await new Files(this.ctx.container).mkdir('/workspace', { recursive: true })
-        await store.put('run', { ...run, restored, state: 'running' })
+        await store.put('run', { ...run, restored, ...(reviewBoot ? { reviewBoot } : {}), state: 'running' })
         return { state: 'running', restored, instanceId: this.ctx.id.toString() }
       } catch (error) {
         // No task operation has been authorized. Preserve the prior manifest
         // if cold restoration failed, and never admit an empty substitute.
-        await this.stop(run, 'start_failed', false)
+        const failed = error instanceof TaskStartError ? { ...run, startFailure: error.code } : run
+        await this.stop(failed, 'start_failed', false)
         throw error
       }
     })
@@ -149,6 +182,7 @@ export class TaskMachine extends DurableObject {
     const grant = machineGrant(identity)
     return this.exclusive(async () => {
       const run = await this.current(grant)
+      if (run.review) throw Error('Task workspace has an exclusive human reviewer')
       liveUntil(grant, Date.now(), Math.min(run.expiresAt, run.hardDeadline))
       if (run.state !== 'running' || !this.ctx.container?.running) throw new Error('Task machine is not running')
       if (await this.ctx.storage.get('nativeWriter')) throw new Error('Task workspace has an active native writer')
@@ -211,7 +245,7 @@ export class TaskMachine extends DurableObject {
     return this.exclusive(async () => this.stop(await this.current(grant), 'settled', true))
   }
   receipt(run) {
-    return { state: run.state, outcome: run.outcome, admittedAt: run.admittedAt, settledAt: run.settledAt,
+    return { state: run.state, outcome: run.outcome, ...(run.startFailure ? { startFailure: run.startFailure } : {}), admittedAt: run.admittedAt, settledAt: run.settledAt,
       stoppedAt: run.stoppedAt, checkpoint: run.checkpoint, instanceId: this.ctx.id.toString() }
   }
   async stop(run, outcome, save) {
@@ -223,9 +257,11 @@ export class TaskMachine extends DurableObject {
     }
     await store.setAlarm(Date.now() + 15_000)
     if (save && !run.checkpoint && container?.running) {
+      const witness = run.reviewBoot && run.outcome === 'settled'
+        ? await captureReviewExit(container, run.grant.runId).catch(() => null) : null
       const checkpoint = await store.get('nativeWriter') ? await this.saveNativeWorkspace(container) : await this.workspace.checkpoint()
       run = { ...run, checkpoint }
-      await store.put('run', run)
+      await store.put({run, reviewCheckpoint:witness ? {...checkpoint, witness} : null})
     }
     if (save && !run.checkpoint && !container?.running) {
       const saved = await store.get('checkpoint')
@@ -240,6 +276,11 @@ export class TaskMachine extends DurableObject {
     await store.put({ run: stopped, ['closed-operation:' + run.grant.operationId]: true,
       ['spent:' + run.grant.runId]: (run.consumed ?? 0) + Math.max(0, stopped.stoppedAt - run.admittedAt) })
     await this.workspace.prune()
+    for (const [key, lease] of await store.list({prefix:'review-lease:'})) {
+      if ((lease.discardAfter ?? lease.scope?.expiresAt ?? Infinity) >= Date.now()) continue
+      if (lease.preview) await store.delete('review-alias:' + lease.preview.alias)
+      await store.delete(key)
+    }
     await store.deleteAlarm()
     return this.receipt(stopped)
   }

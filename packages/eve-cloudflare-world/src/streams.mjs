@@ -17,9 +17,18 @@ export class EveWorldStream extends StreamDO {
   }
 
   async writeChunk(chunk) {
-    const index = await super.writeChunk(chunk)
-    this.#notifyReaders()
-    return index
+    try {
+      const index = await super.writeChunk(chunk)
+      this.#notifyReaders()
+      return index
+    } catch (error) {
+      // WDK can retry a terminal flush after another writer committed EOF.
+      // The first EOF remains authoritative for live reads and cursor replay.
+      if (error?.message !== 'Cannot write to a closed stream') throw error
+      const { done, tailIndex } = await super.getInfo()
+      if (!done) throw error
+      return tailIndex
+    }
   }
 
   async closeStream() {

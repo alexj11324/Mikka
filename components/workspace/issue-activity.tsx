@@ -1,7 +1,7 @@
 'use client'
 
 import { PersonAvatar } from '@/components/person-avatar'
-import { useRef, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { useFormatter, useTranslations } from 'next-intl'
 import { ArrowUp, Check } from 'lucide-react'
 import type { CommentAnchor, ThreadRecord } from '@/components/blocks/rich-text-editor-4/components/rich-text-comments'
@@ -60,19 +60,71 @@ export function IssueActivity({ issueId, author, threads, anchors, events, readO
   </section>
 }
 
-/** The comment being written and the reply open on one discussion, kept per task as the page's view state. */
-export function useActivityDrafts(issueId: string, onComment: (body: string) => void | false, onReply: (id: string, body: string) => void | false) {
-  const [body, setBody] = useViewState(`task:${issueId}:comment`, '')
-  const [replyTo, setReplyTo] = useViewState<string | null>(`task:${issueId}:reply-to`, null)
-  const [reply, setReply] = useViewState(`task:${issueId}:reply`, '')
-  function submit() {
-    if (!body.trim()) return
-    if (onComment(body.trim()) !== false) setBody('')
+export type DiscussionSave = { afterAcknowledged: (saved: () => void) => void; retry: () => void }
+
+/** Keep the operation identity with its editable draft, including a reload after a lost response. */
+function useDiscussionSubmission(key: string, persistence?: DiscussionSave) {
+  const [stored, setStored] = useViewState<string | null>(key, null)
+  const ref = useRef({ key, id: stored, watching: false, mounted: true })
+  if (ref.current.key !== key) ref.current = { key, id: stored, watching: false, mounted: true }
+  const current = ref.current
+  useLayoutEffect(() => {
+    current.mounted = true
+    return () => { current.mounted = false }
+  }, [current])
+
+  function reset() {
+    if (!current.id) return
+    current.id = null
+    current.watching = false
+    setStored(null)
   }
-  function sendReply(id: string) {
-    if (!reply.trim() || replyTo !== id) return
-    if (onReply(id, reply.trim()) === false) return
-    setReplyTo(null); setReply('')
+  function send(write: (id: string) => void | false, clear: () => void) {
+    if (current.watching) {
+      persistence?.retry()
+      return
+    }
+    const id = current.id ?? crypto.randomUUID()
+    if (write(id) === false) return
+    if (!persistence) { clear(); return }
+    current.id = id
+    current.watching = true
+    setStored(id)
+    persistence.afterAcknowledged(() => {
+      // Another edit, a different Task, or an unmounted composer owns its own draft.
+      if (!current.mounted || current.id !== id) return
+      reset()
+      clear()
+    })
+  }
+  return { reset, send }
+}
+
+/** The comment being written and the reply open on one discussion, kept per task as the page's view state. */
+export function useActivityDrafts(issueId: string, onComment: (body: string, operationId: string) => void | false, onReply: (id: string, body: string, operationId: string) => void | false, persistence?: DiscussionSave) {
+  const [body, writeBody] = useViewState(`task:${issueId}:comment`, '')
+  const [replyTo, writeReplyTo] = useViewState<string | null>(`task:${issueId}:reply-to`, null)
+  const [reply, writeReply] = useViewState(`task:${issueId}:reply`, '')
+  const comment = useDiscussionSubmission(`task:${issueId}:comment-operation`, persistence)
+  const response = useDiscussionSubmission(`task:${issueId}:reply-operation`, persistence)
+  function setBody(value: string) {
+    if (value !== body) comment.reset()
+    writeBody(value)
+  }
+  function setReplyTo(id: string | null) {
+    if (id !== replyTo) response.reset()
+    writeReplyTo(id)
+  }
+  function setReply(value: string) {
+    if (value !== reply) response.reset()
+    writeReply(value)
+  }
+  function submit() {
+    if (body.trim()) comment.send(id => onComment(body.trim(), id), () => writeBody(''))
+  }
+  function sendReply(threadId: string) {
+    if (!reply.trim() || replyTo !== threadId) return
+    response.send(id => onReply(threadId, reply.trim(), id), () => { writeReplyTo(null); writeReply('') })
   }
   return { body, setBody, replyTo, setReplyTo, reply, setReply, submit, sendReply }
 }

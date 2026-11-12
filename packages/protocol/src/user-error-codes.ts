@@ -8,6 +8,7 @@
 //
 // No imports: the CI guard loads this file directly with Node.
 export const USER_ERROR_CODES = {
+  review_scope_denied: ['sponsored_placement'],
   workspace_not_found: [],
   workspace_snapshot_unavailable: [],
   workspace_snapshot_outdated: [],

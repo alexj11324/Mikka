@@ -1042,6 +1042,7 @@
     "breadcrumb": "Current location",
     "openSearch": "Open global search",
     "listError": "Could not refresh the list. The previous results are kept.",
+    "taskStatesReadFailed": "Could not load task states. Try again.",
     "searchPlaceholder": "Search tasks…",
     "taskView": "Task view",
     "listView": "List view",
@@ -1152,6 +1153,18 @@
     "allStatuses": "All statuses"
   },
   "Errors": {
+    "decisionAccountChanged": "The active account changed. Reopen the question on its server.",
+    "decisionUnavailable": "You can no longer answer this question.",
+    "decisionRetry": "Your answer was not recorded. Try again.",
+    "decisionUnconfirmed": "Your answer could not be confirmed. Retry to check the same answer.",
+    "factoryQuestionChanged": "This question changed. Reopen it to see the current options.",
+    "factoryQuestionClosed": "This question is no longer accepting answers.",
+    "factoryQuestionExpired": "This question expired.",
+    "factoryNotFound": "This question is unavailable.",
+    "factoryStopped": "This task has stopped.",
+    "factoryHumanRequired": "Sign in again to answer.",
+    "originRejected": "This server did not authorize the request.",
+    "decisionOffline": "Reconnect to answer.",
     "projectRepositoryDenied": "This repository or target branch is not permitted by the workspace or project.",
     "projectEnvironmentUnavailable": "The selected environment or one of its required resources is unavailable for this run.",
     "projectResourceConflict": "These resource settings changed. Refresh and try again.",
@@ -3805,6 +3818,9 @@
       },
       "sources": "{count, plural, one {# source} other {# sources}}"
     },
+    "sendUpdateRequired": "Update the app before retrying. Your message is saved here.",
+    "sendAccessDenied": "Sending was refused. Check your access before retrying.",
+    "sendRateLimited": "Too many requests. Try again in a moment.",
     "sendUncertain": "Delivery not confirmed",
     "sendOffline": "No connection. Not sent",
     "lengthCount": "{count} / {max}",
@@ -5849,6 +5865,10 @@
     "chatUnavailable": "This Bot uses its owner’s personal chat model settings, which this request cannot access. Use your own Bot or ask its owner to start this chat. Task delegation checks your own execution resources separately."
   },
   "RunErrors": {
+    "review_scope_denied": {
+      "default": "You do not have access to review this task.",
+      "sponsored_placement": "The hosted workspace is no longer available for reviewing this task."
+    },
     "workspace_not_found": {
       "default": "This code workspace is unavailable to your account."
     },
@@ -6906,6 +6926,23 @@
     "noTasks": "No tasks"
   },
   "HostedInbox": {
+    "snoozed": "Snoozed",
+    "until": "Remind me at",
+    "done": "Done",
+    "decline": "Decline",
+    "reopen": "Reopen",
+    "more": "Load more",
+    "emptySnoozed": "Nothing snoozed",
+    "emptyDone": "Nothing done yet",
+    "emptyPending": "Nothing waiting on you",
+    "answered": "Answered",
+    "approved": "Approved",
+    "merged": "Merged",
+    "accepted": "Handed to the Coordinator",
+    "rejected": "Declined",
+    "actor": "Handled by",
+    "sourceError": "Couldn’t read the inbox.",
+    "invalidTime": "Choose a future time.",
     "open": "Open",
     "send": "Send",
     "handOver": "Hand to the Coordinator",

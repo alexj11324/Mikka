@@ -1,7 +1,8 @@
 import 'server-only'
 import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
+import { markReviewSessionsRevoked, drainRevokedReviewSessions } from '../coding-workspace/review-sessions'
 import { issues } from '@/lib/db/schema'
 import { projects } from '@/lib/db/project-schema'
 import { teamIssueCreateReceipts, teamIssuePromotionReceipts, teamIssues, teamLifecycleEvents, teamMembers, teamProjects, teams } from '@/lib/db/team-schema'
@@ -114,7 +115,8 @@ async function removeGroupingRows(tx: WorkspaceTransaction, team: typeof teams.$
 /** Explicit remove-grouping operation. Business objects and their histories stay. */
 export async function removeTeamGroupingData(actorId: string, teamId: string, confirmName: string): Promise<TeamGroupingRemoval> {
   const typed = z.string().max(200).parse(confirmName).trim()
-  return workspaceDb.transaction(async tx => {
+  let reviewIds: string[] = []
+  try { return await workspaceDb.transaction(async tx => {
     const team = await lockTeam(tx, actorId, teamId)
     if (typed !== team.name) throw new WorkspaceError('teamDeleteNameMismatch')
     const contents = await teamContents(tx, team)
@@ -124,9 +126,11 @@ export async function removeTeamGroupingData(actorId: string, teamId: string, co
       || contents.issueLinks.some(link => link.workspaceId !== team.workspaceId)
       || contents.projectLinks.some(link => link.workspaceId !== team.workspaceId)) throw new WorkspaceError('teamLifecycleConflict')
     const auditId = await recordLifecycle(tx, team, actorId, 'grouping_removed', contents)
+    if (contents.taskRows.length) reviewIds = await markReviewSessionsRevoked(pool,
+      { taskIds: contents.taskRows.map(task => task.id) }, 'task_changed')
     await removeGroupingRows(tx, team)
     return { removed: { teamId: team.id, tasks: contents.impact.tasks, projects: contents.impact.projects }, auditId }
-  })
+  }) } finally { await drainRevokedReviewSessions(pool, reviewIds) }
 }
 
 /**

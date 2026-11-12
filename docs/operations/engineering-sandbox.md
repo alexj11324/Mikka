@@ -17,6 +17,7 @@ gh workflow run engineering-sandbox.yml --repo "$CALLER_REPOSITORY" --ref main \
 | --- | --- |
 | `factory-handoff` | The factory handoff regression tests for owned device failover and recovery. |
 | `startup-timing` | The startup timing report regression tests for aligning and filtering dispatch, runtime and native CLI timing evidence. |
+| `eve-host-build` | Compile the approved public Node 24 Eve host offline, retain the bundle in R2 and exercise the restored host in a fresh, isolated VM. |
 | `postgres-policy` | Node 24 and pnpm 10.34.3 start a fresh unprivileged PostgreSQL 17 cluster, apply the selected revision’s real CLI-policy migration and verify its triggers and transaction rollback. |
 
 For self-hosting, set the Worker variables CALLER_REPOSITORY and
@@ -28,11 +29,11 @@ and runs only explicitly dispatched main jobs.
 Actions authenticates with its short-lived GitHub OIDC token. The Worker
 requires the upstream repository ID, trusted workflow path, main ref and event.
 The Worker obtains the declared public source files at the exact commit.
-The single-use Container has no GitHub token, Cloudflare token, application
-credentials or internet access. It runs the repository test on Node 24. Every
+No Container receives a GitHub token, Cloudflare token or application credentials.
+The two small regression profiles and PostgreSQL profile also disable internet access. It runs the repository test on Node 24. Every
 Actions run attempt and workload has a separate Container identity.
 
-At most two runs use compute at once. Each receives a ten-minute hard deadline
+At most two runs use compute at once. The two regression profiles and PostgreSQL profile receive a ten-minute hard deadline
 and a 30-second inactivity timeout. Completion, failure and cancellation save
 the result and explicitly destroy the Container. A Durable Object alarm
 releases an orphan at its deadline. On an object restart, the runner stops the interrupted immutable job and records its outcome. A stop failure keeps the capacity slot
@@ -66,3 +67,26 @@ reports the observed workload peak as `max.memory` and sampled CPU time as
 `sum.cpuTimeSec`. A short run can finish between workload samples. The
 account’s Analytics Read permission stays with the operator. The job receives
 no analytics token. [Cloudflare query examples](https://developers.cloudflare.com/analytics/graphql-api/tutorials/querying-container-metrics/)
+
+### Full Eve host qualification
+
+The optional `eve-host-build` profile compiles the reviewed public source using its existing
+`scripts/compile-cloudflare-eve-host.sh` and runs its compiled-host check. Configure
+`EVE_BUILD_REVISION` with the full commit, `EVE_BUILD_SOURCE_SHA256` with the verified SHA-256
+of that commit’s GitHub source archive, and an R2 binding named `EVE_BUILD_ARTIFACTS`.
+Give this binding its own engineering bucket. The request must match the configured revision
+before admission. An operator can calculate the archive digest with
+`curl -fL "https://codeload.github.com/alexj11324/Mikka/tar.gz/$SOURCE_SHA" | sha256sum`.
+Use a shell with `set -o pipefail` so an interrupted download fails the operation.
+
+A standard-3 instance has two vCPUs and 8 GiB of memory. The full job shares one
+15-minute deadline across both VMs and occupies one of the existing two engineering slots. The reviewed repository installs its frozen
+pnpm dependencies as UID 1000. Compilation runs in a separate Linux network namespace with
+no routes and all capabilities dropped. The compiler writes the compressed public host bundle
+(at most 512 MiB) to R2 with the expected SHA-256. The Worker checks its size and stops
+the compiler. A fresh standard-1 VM starts with internet disabled, verifies the R2 bytes
+again, and serves the restored host on private loopback. Its release mismatch and unsigned
+workflow callbacks must return 409 and 403 before the second VM stops. The receipt contains the archive key, digest, exact
+source and unprivileged host response. The engineering DO removes this run’s archive when
+its seven-day receipt retention ends. A cancelled job releases compute through the same
+stop path as the other profiles.

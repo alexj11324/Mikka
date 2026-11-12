@@ -8,12 +8,14 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
 import { afterAll, beforeAll, expect, test } from 'vitest'
+import { withSessionControlDelivery } from '../../../lib/eve/session-control-delivery.mjs'
 import { createNodeQueue } from '../src/node-queue.mjs'
 import { WORKFLOW_FLOW_ROUTE } from '@workflow/world/queue.js'
 
 const require = createRequire(import.meta.url)
 const { Miniflare, convertV4MiniflareOptions } = createRequire(realpathSync(require.resolve('wrangler/package.json')))('miniflare')
 const events = new EventEmitter()
+const suspended = new Map()
 const signingKey = randomBytes(32).toString('hex')
 const seen = []
 const revisions = ['aaa1111-10-1', 'bbb2222-11-1']
@@ -28,6 +30,7 @@ function host(revision) {
       seen.push(delivery)
       events.emit(message.id, delivery)
       if (message.once && seen.filter(x => x.message.id === message.id).length === 1) throw new Error('Transient handler failure')
+      if (suspended.has(message.id)) await suspended.get(message.id)
       handled = message.id
     })(request)
     if (response.ok && handled) events.emit('handled:' + handled)
@@ -43,8 +46,9 @@ beforeAll(async () => {
   runtime = new Miniflare(convertV4MiniflareOptions({ cf: false, host: '127.0.0.1', port: 0, resourcePersistencePath: directory, workers: [
     { ...common, name: 'broker', script: bundle.outputFiles[0].text,
       durableObjects: { EVE_CLAIMS: { className: 'EveQueueClaim', useSQLite: true } }, r2Buckets: ['EVE_QUEUE_PAYLOADS'],
-      queueProducers: { EVE_QUEUE: 'eve-world-test' },
-      queueConsumers: { 'eve-world-test': { maxBatchSize: 1, maxBatchTimeout: 0, maxRetries: 1, deadLetterQueue: 'eve-world-dead' } },
+      queueProducers: { EVE_QUEUE: 'eve-world-test', EVE_CONTROL_QUEUE: 'eve-world-control' },
+      queueConsumers: { 'eve-world-control': { maxBatchSize: 1, maxBatchTimeout: 0, maxRetries: 1, deadLetterQueue: 'eve-world-dead' },
+        'eve-world-test': { maxBatchSize: 1, maxBatchTimeout: 0, maxRetries: 1, deadLetterQueue: 'eve-world-dead' } },
       bindings: { EVE_RELEASES: { [revisions[0]]: 'OLD', [revisions[1]]: 'NEW' }, EVE_QUEUE_SIGNING_KEY: signingKey },
       serviceBindings: { OLD: host(revisions[0]), NEW: host(revisions[1]) } },
     { ...common, name: 'outbound', script: 'export default {fetch(request, env) {return env.PRIVATE.fetch(request)}}',
@@ -123,4 +127,43 @@ test('concurrent keyed producers receive the winning ID before the delayed nativ
   const again = await api(revisions[1]).queue(topic, { id: next }, { idempotencyKey: key })
   expect(again.messageId).not.toBe(published[0].messageId)
   await done
+})
+
+test('a scoped native cancel or end reaches its pinned executor while its regular queue is still occupied', async () => {
+  const sessionId = randomUUID()
+  const running = randomUUID()
+  const started = once(events, running)
+  const release = Promise.withResolvers()
+  suspended.set(running, release.promise)
+  const controls = []
+  const client = createNodeQueue({ deploymentId: revisions[1], signingKey, fetchBound(url, init) {
+    controls.push(new URL(url).searchParams.has('control'))
+    return outbound.fetch(url, init)
+  } })
+  try {
+    await client.queue(topic, { id: running })
+    await started
+    for (const action of ['cancel', 'end']) {
+      const id = randomUUID()
+      const delivered = once(events, id)
+      await withSessionControlDelivery({method:'POST', path:'/eve/v1/session/:sessionId/' + action}, sessionId, () =>
+        client.queue(topic, {id, runId:sessionId, hookResumeTiming:{}}, {deploymentId:revisions[0]}))
+      const [item] = await delivered
+      expect(item.revision).toBe(revisions[0])
+    }
+    expect(controls).toEqual([false, true, true])
+  } finally {
+    release.resolve()
+    suspended.delete(running)
+  }
+  const cancel = { method:'POST', path:'/eve/v1/session/:sessionId/cancel' }
+  for (const [route, message] of [
+    [cancel, {runId:randomUUID(), hookResumeTiming:{}}],
+    [cancel, {runId:sessionId}],
+    [{method:'GET', path:cancel.path}, {runId:sessionId, hookResumeTiming:{}}],
+    [{method:'POST', path:'/eve/v1/session/:sessionId'}, {runId:sessionId, hookResumeTiming:{}}],
+  ]) {
+    await withSessionControlDelivery(route, sessionId, () => client.queue(topic, {id:randomUUID(), ...message}))
+    expect(controls.at(-1)).toBe(false)
+  }
 })

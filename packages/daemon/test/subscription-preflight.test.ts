@@ -148,7 +148,7 @@ describe("daemon subscription capability", () => {
 
   it("startup removes an unchecked broker claim when the CLI is missing", async () => {
     const { daemon, lease, approval } = await daemonFor(join(tempDir(), "missing"))
-    expect(daemon.status().harnesses[0]).toMatchObject({ installed: true, subscriptionPreflight: "cli_missing" })
+    expect(daemon.status().harnesses[0]).toMatchObject({ installed: true, subscriptionPreflight: "cli_missing", coordinator:false })
     expect(daemon.status().harnesses[0].subscriptionBroker).toBeUndefined()
     expect(lease).not.toHaveBeenCalled()
     expect(approval).not.toHaveBeenCalled()

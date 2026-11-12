@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { after, before, beforeEach, mock, test } from 'node:test'
 import { Pool } from 'pg'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
+import { observePoolCommits } from '../db/commit-effects'
 import type { LiveScope } from '../live/scope'
 import type { LiveInvalidation } from '../live/events'
 import type { ComputerEventPage } from './event-page'
@@ -35,6 +36,7 @@ before(async () => {
   admin = new Pool({ connectionString: databaseURL })
   await admin.query(`CREATE SCHEMA ${schema}`)
   pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}`, max: 6 })
+  observePoolCommits(pool)
   observer = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}`, max: 2 })
   // The observer is a different real PostgreSQL connection. Holding COMMIT until
   // already-issued probes settle makes a mistakenly early notification reliably
@@ -63,7 +65,8 @@ before(async () => {
   await pool.query('INSERT INTO agent_kit_heads(owner_id,bot_id,workspace_id) VALUES($1,$2,$3)', [actor.userId, botId, actor.workspaceId])
   await pool.query('INSERT INTO workspace_computer_policies("workspaceId") VALUES($1)', [actor.workspaceId])
   await pool.query('INSERT INTO cloud_machines("workspaceId","ownerId","operationId","sandboxId",state,"runtimeReady") VALUES($1,$2,$3,$4,$5,true)', [actor.workspaceId, actor.userId, randomUUID(), 'fixture-machine', 'running'])
-  mock.module('@/lib/live/notify', { namedExports: {
+  const live = await import('../live/notify')
+  mock.module('@/lib/live/notify', { namedExports: { ...live,
     notifyLive(scope: LiveScope, events: LiveInvalidation[]) {
       const probe = readComputerEvents(observer, scope, '0').then(page => { notices.push({ scope, events, page }) })
       probes.push(probe)

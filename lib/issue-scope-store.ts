@@ -7,6 +7,7 @@ import { issues, issueVersions, linearIssueLinks, linearIssuePublications, linea
 import { activityActor } from '@/lib/activity-actor'
 import { issueView } from '@/lib/task-identifier-server'
 import type { TaskScope } from '@/lib/task-identifier'
+import { reviewTaskChanged } from './coding-workspace/review-sessions'
 import { issueForUser } from '@/lib/issue-access'
 import { ActionFailureError } from '@/lib/action-error'
 import { withTaskWorkspace } from '@/lib/task-workspace'
@@ -78,6 +79,7 @@ async function changeScopeTransaction(userId: string, input: { id: string; revis
     const previousLists = await issueListScopesBeforeChange(latest)
     const [saved] = await tx.update(issues).set({ linearSyncPolicy: 'disabled', linearSyncBlocked: true, scopeSetBy: 'user', scopeConfidence: null, revision: latest.revision + 1, updatedAt: new Date() })
       .where(and(eq(issues.id, latest.id), eq(issues.userId, userId), eq(issues.revision, input.revision))).returning()
+    reviewTaskChanged(tx, latest, saved)
     await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(userId) })
     await issueListScopeChanged(tx, saved.id, previousLists)
     return { issue: await issueView(saved, tx) }

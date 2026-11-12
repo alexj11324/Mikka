@@ -20,7 +20,7 @@ import { cardAnchor } from '@/features/chat/model/chat-attachment-card'
  * its left when the chat takes attachments (`attach`). It rides on the
  * keyboard (react-native-keyboard-controller) and grows to six lines. Picked
  * photos and files wait as thumbnails above the field; each can be removed.
- * The text and attachments stay until `onSend` resolves true (the server took
+ * The text and attachments stay until `onSend` resolves true (the sender took
  * them), so a failed send loses nothing. Controlled when `value` and
  * `onChangeText` are passed.
  */
@@ -57,6 +57,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
   const insets = useSafeAreaInsets()
   const [own, setOwn] = useState(initial)
   const [sending, setSending] = useState(false)
+  const sendLock = useRef(false)
   const [files, setFiles] = useState<Attachment[]>([])
   const [problem, setProblem] = useState<string | null>(null)
   const scopeKey = attachmentScope ? `${attachmentScope.kind}:${attachmentScope.id}` : ''
@@ -72,7 +73,8 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
   const sendBlocked = blocked || filesBlocked || empty || sendDisabled
   const quoted = (words: string) => quote ? `${quote.split('\n').map(line => `> ${line}`).join('\n')}\n\n${words}` : words
   const send = async () => {
-    if (sendBlocked) return
+    if (sendLock.current || sendBlocked) return
+    sendLock.current = true
     setSending(true)
     tap()
     try {
@@ -80,6 +82,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
       const ok = await onSend?.(withChatFiles(quoted(text.trim()), ready), files.filter(file => file.kind !== 'file'))
       if (ok !== false) { setText(''); setFiles([]); onClearQuote?.() }
     } finally {
+      sendLock.current = false
       setSending(false)
     }
   }

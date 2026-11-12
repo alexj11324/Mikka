@@ -1,12 +1,24 @@
+import { sql } from 'drizzle-orm'
+import { PgDialect } from 'drizzle-orm/pg-core'
+import { factoryAccepted, factoryMerged, factorySourceAllowed, FACTORY_HANDOFF_STAGES } from '../factory/public-flow'
+import { runAwaitingApproval } from '../task-state-query'
+import { runFailureBrief } from '../run-failure-projection'
+import { OPEN_TASK_PR_STATES, TASK_REVIEW_STATUS } from '../task-state'
 import type { Pool, PoolClient } from 'pg'
 import { randomUUID } from 'node:crypto'
 import { InboxError, isInboxId, type InboxCommand, type InboxSource, type InboxPage, type InboxEntry } from './contract'
+
+// Same parameter-free DB facts as the Task presentation reader, with the
+// physical agent_runs table left unaliased for its correlated subqueries.
+const dialect = new PgDialect()
+const approvalFact = dialect.sqlToQuery(sql`${runAwaitingApproval}`.inlineParams()).sql
+const failureFact = dialect.sqlToQuery(sql`${runFailureBrief}`.inlineParams()).sql
 
 export type Scope = { personal: boolean }
 export type InboxReader = Parameters<typeof import('../task-workspace').withTaskWorkspace>[0]
 export type Guard = <T>(reader: InboxReader, workspaceId: string, work: (scope: Scope) => Promise<T>) => Promise<T>
 export type Changed = (userId: string, workspaceId: string) => Promise<void>
-type SourceRow = InboxSource & { snoozedUntil: Date | null }
+type SourceRow = InboxSource & { snoozedUntil: Date | null; occurredAt: Date }
 const key = (type: string, id: string) => `${type}:${id}`
 
 /** The source's own authority is checked on every read/write. Snooze is per
@@ -14,42 +26,98 @@ const key = (type: string, id: string) => `${type}:${id}`
 export class InboxStore {
   constructor(readonly pool: Pool, readonly guard: Guard, readonly changed: Changed, readonly arm: () => Promise<void>, readonly now = () => new Date()) {}
 
+  // All Inbox views, counts and item commands share this authorized source.
+  // A teammate's pending handoff may be visible while only its owner can reply.
   private sourceQuery(userId: string, workspaceId: string, scope: Scope, type?: string, id?: string) {
     return { text: `
       WITH sources AS (
-        SELECT i.id,'task' AS type,'agent' AS source,i.title,i.id AS "issueId",i."userId" AS "ownerId",
-          (r."userId"=$1) AS "canReply",
-          CASE WHEN i.status IN ('done','canceled','duplicate') THEN false
-            WHEN EXISTS(SELECT 1 FROM factory_tasks f WHERE f."issueId"=i.id AND f.stage='approval' AND f.status IN ('pending','waiting')) THEN true
-            WHEN r.id IS NULL OR r.status IN ('queued','preparing','running','finishing','paused') THEN false
-            WHEN r.status='waiting_input' THEN true
-            WHEN EXISTS(SELECT 1 FROM jsonb_array_elements(coalesce(i.content->'attrs'->'mikka'->'pullRequests','[]'::jsonb)) pr WHERE pr->>'state'='merged') THEN false
-            WHEN r.outcome IN ('failed','blocked') THEN false
-            WHEN i.status='review' THEN true
-            WHEN EXISTS(SELECT 1 FROM jsonb_array_elements(coalesce(i.content->'attrs'->'mikka'->'pullRequests','[]'::jsonb)) pr WHERE pr->>'state' IN ('open','draft')) THEN true
-            WHEN r.outcome='needs_input' THEN true
-            WHEN r.outcome IN ('done','idle') THEN false
-            ELSE r.status<>'failed' END AS pending,
-          NULL::timestamptz AS "rejectedAt", NULL::text AS "rejectedBy", r.id AS "runId",
-          CASE WHEN r.status='waiting_input' THEN 'needsReply'
-            WHEN i.status='review' OR EXISTS(SELECT 1 FROM jsonb_array_elements(coalesce(i.content->'attrs'->'mikka'->'pullRequests','[]'::jsonb)) pr WHERE pr->>'state' IN ('open','draft')) OR EXISTS(SELECT 1 FROM factory_tasks f WHERE f."issueId"=i.id AND f.stage='approval' AND f.status IN ('pending','waiting')) THEN 'review'
-            WHEN r.outcome='needs_input' THEN 'needsReply'
-            ELSE 'confirm' END AS reason
-        FROM issues i LEFT JOIN LATERAL (SELECT id,"userId",status,outcome FROM agent_runs WHERE "issueId"=i.id ORDER BY "createdAt" DESC,id DESC LIMIT 1) r ON true
-        WHERE coalesce(i.content->'attrs'->'mikka',i.content->'attrs'->'orvilo')->>'deletedAt' IS NULL
-          AND i."workspaceId"=$2 AND i."ownershipState"='bound'
+        SELECT i.id,'task' AS type,'agent' AS source,i.title,i.id AS "issueId",i."userId" AS "ownerId", i."updatedAt" AS "occurredAt",
+          (r.id IS NOT NULL) AS "canReply",
+          attention.reason IS NOT NULL AS pending,
+          NULL::timestamptz AS "rejectedAt", NULL::text AS "rejectedBy", coalesce(r.id,shared.id) AS "runId",
+          coalesce(attention.reason, 'confirm') AS reason, questions.total AS "questionCount"
+        FROM issues i
+        LEFT JOIN LATERAL (
+          SELECT id,"userId",status,outcome,"pauseReason","stopReason","threadReplacedBy",
+                 (${approvalFact}) AS "awaitingApproval", (${failureFact}) AS failure
+          FROM agent_runs WHERE "issueId"=i.id AND "workspaceId"=i."workspaceId" AND "userId"=$1
+          ORDER BY "createdAt" DESC,id DESC LIMIT 1
+        ) r ON true
+        -- An authorized teammate may see an explicit request for a reply. Its
+        -- existence cannot replace the current reader's Task state or grant
+        -- access to the peer's private tool approvals or execution details.
+        LEFT JOIN LATERAL (
+          SELECT last.id FROM (
+            SELECT id,status,outcome,"threadReplacedBy" FROM agent_runs
+            WHERE r.id IS NULL AND "issueId"=i.id AND "workspaceId"=i."workspaceId" AND "userId"<>$1
+            ORDER BY "createdAt" DESC,id DESC LIMIT 1
+          ) last WHERE last."threadReplacedBy" IS NULL AND (last.status='waiting_input'
+            OR (last.status NOT IN ('queued','preparing','running','finishing','paused','failed') AND last.outcome='needs_input'))
+        ) shared ON true
+        CROSS JOIN LATERAL (SELECT coalesce(i.content->'attrs'->'mikka',i.content->'attrs'->'orvilo') AS metadata) issue
+        CROSS JOIN LATERAL (SELECT CASE WHEN jsonb_typeof(issue.metadata->'pullRequests')='array'
+          THEN issue.metadata->'pullRequests' ELSE '[]'::jsonb END AS items) pull_requests
+        LEFT JOIN LATERAL (
+          SELECT t.id,t.stage,t.status,t."candidateId",(${factorySourceAllowed}) AS allowed,
+                 (${factoryMerged} OR ${factoryAccepted}) AS completed
+          FROM factory_tasks t
+          LEFT JOIN factory_candidates candidate ON candidate.id=t."candidateId" AND candidate."taskId"=t.id
+          WHERE t."issueId"=i.id AND t."userId"=$1 AND t."workspaceId"=i."workspaceId"
+          ORDER BY t."updatedAt" DESC,t.id DESC LIMIT 1
+        ) factory ON true
+        CROSS JOIN LATERAL (SELECT count(*)::integer AS total FROM factory_questions q
+          WHERE q."taskId"=factory.id AND q."issueId"=i.id AND q."userId"=$1
+                AND factory.allowed AND NOT factory.completed AND factory.status NOT IN ('cancelled','revoked')
+                AND q."candidateId" IS NOT DISTINCT FROM factory."candidateId"
+                AND q.status IN ('open','waiting_user','blocked') AND q."answerId" IS NULL
+                AND (q."expiresAt" IS NULL OR q."expiresAt">now())) questions
+        CROSS JOIN LATERAL (SELECT CASE
+          WHEN i.status IN ('done','canceled','duplicate') THEN NULL
+          WHEN questions.total>0 THEN 'needsReply'
+          WHEN factory.allowed AND NOT factory.completed AND factory.status IN ('blocked','failed') THEN NULL
+          WHEN factory.allowed AND NOT factory.completed AND factory.status NOT IN ('cancelled','revoked')
+               AND factory.stage='clarify' AND factory.status='waiting' THEN 'needsReply'
+          WHEN factory.allowed AND NOT factory.completed AND factory.status NOT IN ('cancelled','revoked')
+               AND (factory.stage=ANY($8::text[]) OR (factory.stage='spec' AND factory.status='passed')) THEN 'review'
+          WHEN r."threadReplacedBy" IS NULL AND r.id IS NOT NULL AND
+               (r.outcome='blocked' OR r."stopReason" IN ('device_lost','quota_exhausted') OR r."pauseReason"='quota_exhausted'
+                OR r.failure->>'category' IN ('quota','subscription','api_key','access_denied') OR r.failure->>'code'='run_quota_exceeded'
+                OR (r.status='paused' AND r."pauseReason" IS DISTINCT FROM 'human_control')) THEN NULL
+          WHEN r."threadReplacedBy" IS NULL AND (r."awaitingApproval" OR (r.status='paused' AND r."pauseReason"='human_control')) THEN 'confirm'
+          WHEN r."threadReplacedBy" IS NULL AND r.status='waiting_input' THEN 'needsReply'
+          WHEN r."threadReplacedBy" IS NULL AND r.status IN ('queued','preparing','running','finishing','paused') THEN NULL
+          WHEN r."threadReplacedBy" IS NULL AND r.outcome='needs_input' THEN 'needsReply'
+          WHEN r."threadReplacedBy" IS NULL AND (r.status='failed' OR r.outcome='failed') THEN NULL
+          WHEN i.status=$6 OR EXISTS(SELECT 1 FROM jsonb_array_elements(pull_requests.items) pr WHERE pr->>'state'=ANY($7::text[])) THEN 'review'
+          WHEN r.id IS NULL AND shared.id IS NOT NULL THEN 'needsReply'
+          WHEN r.id IS NULL OR r."threadReplacedBy" IS NOT NULL OR r.outcome IN ('done','idle') THEN NULL
+          WHEN EXISTS(SELECT 1 FROM jsonb_array_elements(pull_requests.items) pr WHERE pr->>'state'='merged') THEN NULL
+          ELSE 'confirm' END AS reason) attention
+        WHERE issue.metadata->>'deletedAt' IS NULL AND i."workspaceId"=$2 AND i."ownershipState"='bound'
+          AND mikka_resource_acl_allowed('account', $1, i."workspaceId", 'task', i.id, 'canReadContent')
         UNION ALL
-        SELECT s.id,'suggestion',s.source,coalesce(s."actionTitle",s.title),NULL::uuid,s."userId",false,
-          (s."dismissedAt" IS NULL AND s."createdAt">now()-interval '7 days'),s."rejectedAt",s."rejectedBy",NULL::uuid,NULL::text FROM suggestions s
+        SELECT s.id,'suggestion',s.source,coalesce(s."actionTitle",s.title),NULL::uuid,s."userId",s."occurredAt",false,
+          (s."dismissedAt" IS NULL AND s."createdAt">now()-interval '7 days'),s."rejectedAt",s."rejectedBy",NULL::uuid,NULL::text,0 FROM suggestions s
         LEFT JOIN bots b ON b.id=s."botId" AND b."ownerId"=s."userId"
         WHERE s."userId"=$1 AND s.shown AND (b."workspaceId"=$2 OR (s."botId" IS NULL AND $3))
       ) SELECT s.*,z."snoozedUntil" FROM sources s LEFT JOIN inbox_snoozes z
         ON z."workspaceId"=$2 AND z."userId"=$1 AND z."itemType"=s.type AND z."itemId"=s.id
       WHERE ($4::text IS NULL OR s.type=$4) AND ($5::uuid IS NULL OR s.id=$5)
-      `, values: [userId, workspaceId, scope.personal, type ?? null, id ?? null] }
+      `, values: [userId, workspaceId, scope.personal, type ?? null, id ?? null, TASK_REVIEW_STATUS, OPEN_TASK_PR_STATES, FACTORY_HANDOFF_STAGES] }
   }
   private async sources(tx: Pick<PoolClient, 'query'>, userId: string, workspaceId: string, scope: Scope, type?: string, id?: string) {
     return (await tx.query<SourceRow>(this.sourceQuery(userId, workspaceId, scope, type, id))).rows
+  }
+
+  async pendingCount(reader: InboxReader, workspaceId: string): Promise<number> {
+    const userId = typeof reader === 'string' ? reader : reader.id
+    return this.guard(reader, workspaceId, async scope => {
+      const source = this.sourceQuery(userId, workspaceId, scope)
+      const { rows } = await this.pool.query<{ count: number }>(
+        `SELECT coalesce(sum(greatest("questionCount",1)),0)::integer AS count
+         FROM (${source.text}) eligible WHERE pending AND "snoozedUntil" IS NULL`, source.values)
+      return rows[0].count
+    })
   }
 
   async list(reader: InboxReader, workspaceId: string, tab: 'pending' | 'done' | 'snoozed', limit: number, cursor?: string): Promise<InboxPage> {
@@ -62,15 +130,15 @@ export class InboxStore {
         const status = done || !s.pending ? 'done' : snoozedUntil ? 'snoozed' : 'pending'
         const actions = status === 'done' ? s.rejectedAt ? ['undo_reject'] : []
           : [...(s.type === 'suggestion' ? ['accept', 'reject'] : ['open', ...(s.canReply ? ['reply'] : [])]), status === 'snoozed' ? 'reopen' : 'snooze']
-        return { id: s.id, type: s.type, source: s.source, title: s.title, issueId: s.issueId, ownerId: s.ownerId,
+        return { id: s.id, type: s.type, source: s.source, occurredAt: s.occurredAt.toISOString(), title: s.title, issueId: s.issueId, ownerId: s.ownerId,
           pending: s.pending, rejectedBy: s.rejectedBy ?? null, canReply: s.canReply ?? false, runId: s.runId ?? null, reason: s.reason ?? null, rejectedAt: s.rejectedAt?.toISOString() ?? null, status, snoozedUntil, actions }
       }
       if (tab !== 'done') {
         if (cursor && (!/^(task|suggestion):/.test(cursor) || !isInboxId(cursor.split(':')[1]))) throw new InboxError('inboxInvalid', 422)
         const { rows: items } = await this.pool.query<SourceRow>(`
           SELECT * FROM (${source.text}) eligible WHERE pending AND
-            CASE WHEN $6::text='snoozed' THEN "snoozedUntil" IS NOT NULL ELSE "snoozedUntil" IS NULL END
-            AND ($7::text IS NULL OR (type||':'||id)>$7) ORDER BY type,id LIMIT $8`, [...source.values, tab, cursor ?? null, limit + 1])
+            CASE WHEN $9::text='snoozed' THEN "snoozedUntil" IS NOT NULL ELSE "snoozedUntil" IS NULL END
+            AND ($10::text IS NULL OR (type||':'||id)>$10) ORDER BY type,id LIMIT $11`, [...source.values, tab, cursor ?? null, limit + 1])
         return { items: items.slice(0, limit).map(s => project(s)), nextCursor: items.length > limit ? key(items[limit - 1].type, items[limit - 1].id) : null, historySince: since }
       }
       let after: { at: string; id: string } | null = null
@@ -85,8 +153,8 @@ export class InboxStore {
         SELECT s.*,h.id AS "historyId",h.action,h."actorId",h."createdAt",h."runId" AS "completionRunId",
           to_char(h."createdAt" AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "cursorAt"
         FROM inbox_history h JOIN eligible s ON s.type=h."itemType" AND s.id=h."itemId"
-        WHERE ($6::timestamptz IS NULL OR (h."createdAt",h.id)<($6::timestamptz,$7::uuid))
-        ORDER BY h."createdAt" DESC,h.id DESC LIMIT $8`, [...source.values, after?.at ?? null, after?.id ?? null, limit + 1])
+        WHERE ($9::timestamptz IS NULL OR (h."createdAt",h.id)<($9::timestamptz,$10::uuid))
+        ORDER BY h."createdAt" DESC,h.id DESC LIMIT $11`, [...source.values, after?.at ?? null, after?.id ?? null, limit + 1])
       const page = rows.slice(0, limit)
       return { items: page.map(row => ({ ...project(row, true), completion: { id: row.historyId, action: row.action, actorId: row.actorId, at: row.createdAt.toISOString(), runId: row.completionRunId } })),
         nextCursor: rows.length > limit ? Buffer.from(JSON.stringify({ at: page.at(-1)!.cursorAt, id: page.at(-1)!.historyId })).toString('base64url') : null, historySince: since }

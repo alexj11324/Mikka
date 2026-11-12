@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { appendFile, lstat, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { verifyCreatedRef } from './verify-created-ref.mjs'
+import { publishEvidenceRef } from './verify-created-ref.mjs'
 import { githubEvidenceFailure } from './github-error.mjs'
 
 // Only a same-repository PR can publish. There is no update-ref, delete, force
@@ -38,22 +38,23 @@ for (const file of files) {
   if (file.endsWith('.png') && !bytes.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex'))) throw new Error('EVIDENCE_PNG_INVALID')
   contents.push({ file, bytes })
 }
-async function api(path, body, missing = false) {
+async function api(path, body) {
   const response = await fetch(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}/git${path}`, {
-    method: body === undefined ? 'GET' : 'POST', redirect: 'error', signal: AbortSignal.timeout(30_000),
+    method: body === undefined ? 'GET' : 'POST', redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(30_000),
     headers: { accept: 'application/vnd.github+json', authorization: `Bearer ${env.GITHUB_TOKEN}`,
       'content-type': 'application/json', 'x-github-api-version': '2022-11-28' },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   })
-  if (missing && response.status === 404) return null
-  if (!response.ok) {
+  if (response.status !== (body === undefined ? 200 : 201)) {
     const body = await response.json().catch(() => null)
-    throw new Error(`EVIDENCE_GITHUB_HTTP_${response.status}`, { cause: { endpoint: path,
-      requestId: response.headers.get('x-github-request-id'), ...githubEvidenceFailure(body, response.headers) } })
+    const cause = { endpoint: path, requestId: response.headers.get('x-github-request-id'), ...githubEvidenceFailure(body, response.headers) }
+    if (path === '/refs' && [409, 422].includes(response.status) && cause.category === 'reference_exists') {
+      throw new Error('EVIDENCE_BRANCH_ALREADY_EXISTS', { cause })
+    }
+    throw new Error(`EVIDENCE_GITHUB_HTTP_${response.status}`, { cause })
   }
   return response.json()
 }
-if (await api(`/ref/heads/${branch}`, undefined, true)) throw new Error('EVIDENCE_BRANCH_ALREADY_EXISTS')
 const entries = []
 for (const { file, bytes } of contents) {
   const blob = await api('/blobs', { content: bytes.toString('base64'), encoding: 'base64' })
@@ -63,8 +64,7 @@ for (const { file, bytes } of contents) {
 // workflow files. POST /refs creates a ref and refuses an existing name.
 const tree = await api('/trees', { tree: entries })
 const commit = await api('/commits', { message: `Synthetic self-hosting UI evidence for ${head}, run ${env.GITHUB_RUN_ID} [skip ci]`, tree: tree.sha, parents: [] })
-await api('/refs', { ref: `refs/heads/${branch}`, sha: commit.sha })
-await verifyCreatedRef(allowMissing => api(`/ref/heads/${branch}`, undefined, allowMissing), commit.sha)
+await publishEvidenceRef(api, branch, commit.sha)
 const fixedUrl = `${repositoryUrl}/tree/${commit.sha}`
 await appendFile(env.GITHUB_STEP_SUMMARY, `## Self-hosting UI evidence\n\n**Synthetic records · visual only · awaiting review.**\n\n${pictures.length} PNGs from source \`${head}\`.\n\n- [Evidence branch](${repositoryUrl}/tree/${branch})\n- [Immutable evidence commit and image gallery](${fixedUrl})\n- [HTML gallery](${repositoryUrl}/blob/${commit.sha}/index.html)\n- [Capture manifest](${repositoryUrl}/blob/${commit.sha}/evidence.json)\n\nNo OAuth, billing, discovery, push or native iOS acceptance is claimed.\n`)
 console.log(`Created ${branch} at ${commit.sha}; source ${head}; ${pictures.length} synthetic screenshots.`)

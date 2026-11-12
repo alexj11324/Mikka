@@ -81,6 +81,7 @@ export function useChatComposer({ ref, value, onChange, onSubmit, sending = fals
     stoppable,
     stop: onStop,
     canSend,
+    submit,
     /** The textarea cannot be edited (a reply is on its way and cannot be stopped). Not disabled, so focus stays. */
     readOnly: sending && !onStop && !editableWhileSending,
     attachDisabled: sending || disabled,
