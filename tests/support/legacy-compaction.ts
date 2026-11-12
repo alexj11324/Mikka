@@ -22,4 +22,3 @@ export function compactionCut(summary: string | null, messages: readonly StoredM
   }
   return cut
 }
-
