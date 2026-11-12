@@ -18,6 +18,7 @@ import { Item, ItemGroup, ItemSeparator } from '@/components/ui/item'
 import { Switch } from '@/components/ui/switch'
 import { useDeviceActions } from '@/components/devices/use-device-actions'
 import { cn } from '@/lib/utils'
+import { canRenameDevice, DEVICE_NAME_MAX } from '@/lib/device-name'
 import type { SettingsDevicesProps } from '@/components/slots/settings-devices-contract'
 import { AgentMarks, installedAgents, sandboxBlockedAgents } from './agent-marks'
 
@@ -184,7 +185,7 @@ function RenameDialog({ device, open, onOpenChange, onSave }: { device: DeviceVi
   const [saving, setSaving] = useState(false)
   useEffect(() => { if (open) setName(device.name) }, [open, device.name])
   const trimmed = name.trim()
-  const valid = trimmed.length > 0 && trimmed.length <= 60 && trimmed !== device.name
+  const valid = canRenameDevice(device.name, name)
   async function save() {
     if (!valid || saving) return
     setSaving(true)
@@ -197,7 +198,7 @@ function RenameDialog({ device, open, onOpenChange, onSave }: { device: DeviceVi
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor={`rename-${device.id}`} className="sr-only">{t('rename.label')}</FieldLabel>
-          <Input id={`rename-${device.id}`} autoFocus value={name} maxLength={60} onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void save() } }} />
+          <Input id={`rename-${device.id}`} autoFocus value={name} maxLength={DEVICE_NAME_MAX} onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void save() } }} />
         </Field>
       </FieldGroup>
       <DialogFooter>
