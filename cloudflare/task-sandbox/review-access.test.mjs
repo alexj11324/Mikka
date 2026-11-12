@@ -18,6 +18,9 @@ test('proxy keeps browser security signals and only the isolated session', async
     'sec-fetch-site':'cross-site','sec-fetch-dest':'iframe','sec-fetch-mode':'navigate','service-worker':'script'}
   const input=new Request(origin+'/path',{method:'POST',headers,body:'body'})
   const forwarded=previewRequest(input,origin)
+  assert.equal(forwarded.url, 'http://fixture.preview.example.test/path')
+  assert.equal(forwarded.headers.get('host'), 'fixture.preview.example.test')
+  assert.throws(() => previewRequest(new Request('http://fixture.preview.example.test/path'), origin))
   assert.equal(forwarded.headers.get('cookie'),session)
   for(const name of ['authorization','x-api-key','cf-access-jwt-assertion']) assert.equal(forwarded.headers.get(name),null)
   for(const name of ['sec-fetch-site','sec-fetch-dest','sec-fetch-mode','service-worker']) assert.equal(forwarded.headers.get(name),headers[name])

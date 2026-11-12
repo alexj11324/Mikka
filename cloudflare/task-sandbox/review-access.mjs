@@ -80,6 +80,9 @@ export function previewRequest(request, origin) {
     .filter(s => /^__Host-mikka_preview=[A-Za-z0-9_-]{43}$/.test(s))
   if (cookies.length === 1) headers.set('cookie', cookies[0])
   headers.set('host', source.hostname)
-  return new Request(request.url, { method:request.method, headers, redirect:'manual',
+  // The native port binding carries HTTP on Cloudflare's private connection.
+  // The original HTTPS host and Origin headers still bind the guest's ticket.
+  source.protocol = 'http:'
+  return new Request(source, { method:request.method, headers, redirect:'manual',
     ...(['GET','HEAD'].includes(request.method) ? {} : { body:request.body, duplex:'half' }) })
 }
