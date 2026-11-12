@@ -11,12 +11,13 @@ import { Link } from '@/i18n/navigation'
 import { endSession } from '@/lib/auth-client'
 import { useActionError } from '@/lib/use-action-error'
 import { withBasePath } from '@/lib/base-path'
+import { cn } from '@/lib/utils'
 import { serverDocumentKind } from '@/lib/server-pages'
 import { organizationApi, useOrganizationErrorText } from '@/hooks/settings/use-organization'
 
 function InvitationHomeLink({ serverOnly, primary = false }: { serverOnly: boolean; primary?: boolean }) {
   const t = useTranslations('Invite')
-  return <Link href="/" className={primary ? buttonVariants({ className: 'w-full' }) : 'text-sm text-muted-foreground underline underline-offset-4'}>
+  return <Link href="/" className={cn(primary ? buttonVariants({ className: 'w-full' }) : 'text-sm text-muted-foreground underline underline-offset-4')}>
     {t(serverOnly ? 'viewServerAndApps' : 'backToWorkspace')}
   </Link>
 }
