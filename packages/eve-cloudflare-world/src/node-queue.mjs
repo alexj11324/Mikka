@@ -1,5 +1,6 @@
 import { createCloudflareQueue } from '@fantasticfour/world-cloudflare'
 import { parseQueueName, WORKFLOW_FLOW_ROUTE } from '@workflow/world/queue.js'
+import { isSessionControlWake } from '../../../lib/eve/session-control-delivery.mjs'
 import { authenticateDelivery } from './queue-auth.mjs'
 import { validRelease } from './queue-transport.mjs'
 
@@ -7,7 +8,7 @@ import { validRelease } from './queue-transport.mjs'
  * the named WorldQueueService. The v5 executor owns all workflow processing. */
 export function createNodeQueue({ deploymentId, fetchBound, signingKey, verificationKey, workload = 'eve' }) {
   if (!validRelease(deploymentId)) throw new TypeError('Invalid Eve deployment id')
-  function forRevision(revision, continuation = false) {
+  function forRevision(revision, continuation = false, control = false) {
     if (!validRelease(revision)) throw new TypeError('Invalid target Eve deployment id')
     const request = async (path, init) => {
       const response = await fetchBound('https://world.internal' + path, init)
@@ -18,6 +19,7 @@ export function createNodeQueue({ deploymentId, fetchBound, signingKey, verifica
     const native = createCloudflareQueue({ nativeOnly: true, deploymentId: revision, env: {
       WORKFLOW_QUEUE: { async send(body, { delaySeconds = 0 } = {}) {
         const params = new URLSearchParams({ release: revision, delay: String(Math.ceil(delaySeconds)), continuation: String(continuation) })
+        if (control) params.set('control', '1')
         const result = await request('/world/queue/publish?' + params, { method: 'POST', body })
         receipt = await result.json()
       } },
@@ -55,7 +57,8 @@ export function createNodeQueue({ deploymentId, fetchBound, signingKey, verifica
     getDeploymentId: () => Promise.resolve(deploymentId),
     queue(queueName, message, opts) {
       parseQueueName(queueName)
-      return forRevision(opts?.deploymentId ?? deploymentId).queue(queueName, message, opts)
+      const control = workload === 'eve' && isSessionControlWake(message)
+      return forRevision(opts?.deploymentId ?? deploymentId, false, control).queue(queueName, message, opts)
     },
     createQueueHandler(prefix, handler) {
       const handle = local.createQueueHandler(prefix, async (message, meta) => {

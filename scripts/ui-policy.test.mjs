@@ -322,10 +322,13 @@ test('lint permits imported components but fails handwritten business UI without
     assert.equal(rawBlock.status, 1)
     assert.ok(rawBlock.report.diagnostics.some(d => d.file === 'components/blocks/example.tsx' && d.rule === 'interaction/use-button-component'))
 
-    unlinkSync(path.join(cwd, 'app/actions/issues.ts'))
-    const missingCommands = await execute()
-    assert.equal(missingCommands.status, 1)
-    assert.ok(missingCommands.report.diagnostics.some(d => d.file === 'app/actions/issues.ts' && d.rule === 'entity/contract-export'))
+    for (const file of contractFiles) unlinkSync(path.join(cwd, file))
+    const missingContracts = await execute()
+    assert.equal(missingContracts.status, 1)
+    const missingFiles = missingContracts.report.diagnostics
+      .filter(d => d.rule === 'entity/contract-export' || d.rule === 'entity/native-detail-route')
+      .map(d => d.file)
+    assert.deepEqual(new Set(missingFiles), contractFiles)
   } finally {
     console.error(`Retained UI policy fixture directory: ${cwd}`)
   }

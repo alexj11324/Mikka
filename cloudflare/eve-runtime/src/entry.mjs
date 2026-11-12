@@ -1,3 +1,4 @@
+import { workersAiRequest } from '../../workers-ai/binding.mjs'
 import { WorkerEntrypoint } from 'cloudflare:workers'
 import { getContainer } from '@cloudflare/containers'
 import { equalCapability, productRequest } from '../runtime/product.mjs'
@@ -11,6 +12,10 @@ const methods = new Map([
   ['/world/queue/publish', ['POST']], ['/world/queue/claim', ['POST']], ['/world/queue/release', ['POST']],
 ])
 const missing = () => new Response(null, { status: 404 })
+
+export class WorkersAiOutbound extends WorkerEntrypoint {
+  fetch(request) { return workersAiRequest(request, this.env.WORKERS_AI, this.ctx.props.capability) }
+}
 
 export class EveWorldOutbound extends WorkerEntrypoint {
   fetch(request) {

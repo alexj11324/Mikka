@@ -4,6 +4,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import { gzipSync } from 'node:zlib'
 import { mock, test } from 'node:test'
 import { Pool } from 'pg'
+import { observePoolCommits } from '../lib/db/commit-effects'
 import { orderMigrations } from '../scripts/migration-order.mjs'
 import { isE2eTarget, E2E_DB_RULE } from './helpers/e2e-target.mjs'
 import { dropTestDatabase } from './support/drop-test-database'
@@ -21,10 +22,13 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
   await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
   const target = new URL(url!); target.pathname = `/${database}`
   const pool = new Pool({ connectionString: target.toString(), max: 8 })
+  observePoolCommits(pool)
   let appPool: Pool | undefined, workspacePool: Pool | undefined
   let machines: Awaited<ReturnType<typeof fakeThreadMachines>> | undefined
-  const previous = { MIKKA_DATABASE_URL: process.env.MIKKA_DATABASE_URL, DATABASE_URL: process.env.DATABASE_URL, WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY }
-  Object.assign(process.env, { MIKKA_DATABASE_URL: target.toString(), DATABASE_URL: target.toString(), WORKSPACE_SECRETS_KEY: randomBytes(32).toString('hex') })
+  const scoped = { MIKKA_DATABASE_URL: target.toString(), DATABASE_URL: target.toString(),
+    MIKKA_DATABASE_URL_UNPOOLED: target.toString(), DATABASE_URL_UNPOOLED: target.toString(), WORKSPACE_SECRETS_KEY: randomBytes(32).toString('hex') }
+  const previous = Object.fromEntries(Object.keys(scoped).map(name => [name, process.env[name]]))
+  Object.assign(process.env, scoped)
   try {
     const directory = new URL('../drizzle/', import.meta.url)
     for (const migration of orderMigrations((await readdir(directory)).filter(name => name.endsWith('.sql')))) await pool.query(await readFile(new URL(migration, directory), 'utf8'))
@@ -258,6 +262,7 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
     })
   } finally {
     machines?.restore(); mock.restoreAll()
+    await (await import('../lib/builtin-gateway/runtime')).builtinGateway()?.stop()
     for (const [name, value] of Object.entries(previous)) { if (value === undefined) delete process.env[name]; else process.env[name] = value }
     await dropTestDatabase(admin, database, pool, appPool, workspacePool)
     await admin.end()

@@ -23,7 +23,7 @@ const MACHINE_RECHECK = '10 minutes'
 export const OUTCOME_RETRY_AT_SQL = `("outcomeAt" + greatest(interval '1 hour', "outcomeAt" - coalesce("finishedAt", "updatedAt")))`
 
 /** The run-recovery sweeps (lib/run-recovery.ts), as RUN_RECOVERY_DUE_SQL labels each due time. */
-export const RUN_RECOVERY_SWEEPS = ['leases', 'machines', 'outcomes', 'taskMachines', 'sandboxKills', 'groupTurns', 'tasks'] as const
+export const RUN_RECOVERY_SWEEPS = ['leases', 'machines', 'outcomes', 'reviewSessions', 'taskMachines', 'sandboxKills', 'groupTurns', 'tasks'] as const
 export type RunRecoverySweep = typeof RUN_RECOVERY_SWEEPS[number]
 
 /** Each run-recovery due time, as rows of `at` and the `sweep` that does it; parameters $1-$4 come from runRecoveryDueParams. */
@@ -40,6 +40,8 @@ export const RUN_RECOVERY_DUE_SQL = `
     -- judgePendingOutcomes: an ended run is judged at once, and again OUTCOME_RETRY_AT_SQL after an unanswered try.
     UNION ALL SELECT min(coalesce(${OUTCOME_RETRY_AT_SQL} + interval '1 millisecond', now())), 'outcomes' FROM agent_runs
       WHERE outcome IS NULL AND status = ANY($3::text[]) AND coalesce("finishedAt", "updatedAt") > now() - make_interval(days => ${OUTCOME_WINDOW_DAYS})
+    -- Human review expiry and unacknowledged close retries share this timer.
+    UNION ALL SELECT min(coalesce("retryAt","expiresAt")), 'reviewSessions' FROM coding_review_sessions
     -- Every task machine has a persisted lifecycle deadline independent of a per-run Workflow.
     UNION ALL SELECT min(${THREAD_MACHINE_DUE_AT_SQL}), 'taskMachines'
       FROM thread_machines m JOIN agent_runs r ON r.id=m."runId" AND r."userId"=m."ownerId"

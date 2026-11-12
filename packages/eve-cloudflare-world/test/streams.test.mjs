@@ -132,6 +132,17 @@ test('zero-byte chunks keep their durable cursor without breaking the byte strea
   expect((await info('/chunks', run)).data).toEqual([{ index: 0, bytes: [] }, { index: 1, bytes: [5] }])
 })
 
+test('retrying terminal bytes after the first EOF preserves the committed stream', async () => {
+  const run = 'terminal-retry'
+  await write(run, new Uint8Array([41]))
+  await request('/close', run, 'events', { method: 'POST' })
+  await write(run, new Uint8Array([41]))
+  await request('/close', run, 'events', { method: 'POST' })
+  expect(await info('/info', run)).toEqual({ tailIndex: 0, done: true })
+  expect((await info('/chunks', run)).data).toEqual([{ index: 0, bytes: [41] }])
+  expect(Array.from(new Uint8Array(await (await request('/read', run, 'events')).arrayBuffer()))).toEqual([41])
+})
+
 test('a fresh workerd replays persisted bytes at the requested offset and resumes paginated reads', async () => {
   const run = 'run-restart'
   await write(run, new Uint8Array([19]))

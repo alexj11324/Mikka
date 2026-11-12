@@ -25,6 +25,9 @@ export function orderMigrations(names) {
 
 // Earlier branch and deployment names are aliases only for identical SQL.
 export const MIGRATION_EQUIVALENTS = {
+  '20261109143100_coding_review_sessions.sql': ['20261108230400_coding_review_sessions.sql'],
+  '20261109143101_coding_review_task_workspace.sql': ['20261108230500_coding_review_task_workspace.sql'],
+  '20261109143102_coding_review_task_thread.sql': ['20261108230600_coding_review_task_thread.sql'],
   '20261112030506_drive_blob_workspace_admission.sql': ['20261112030502_drive_blob_workspace_admission.sql'],
   '20261112030507_scope_personal_drive_names_by_workspace.sql': ['20261112030505_scope_personal_drive_names_by_workspace.sql'],
   '20261112030505_task_creation_receipts.sql': ['20261112030502_task_creation_receipts.sql'],
@@ -72,6 +75,9 @@ export const MIGRATION_EQUIVALENTS = {
   '20261027164515_workspace_computer_policy.sql': ['20261027040514_workspace_computer_policy.sql', '20261027000700_workspace_computer_policy.sql'],
 }
 const EQUIVALENT_SQL_SHA256 = {
+  '20261109143100_coding_review_sessions.sql': '6245019af41d4a7252044ddb0b3d65985713cc35d596228b9211a17683f1d5ea',
+  '20261109143101_coding_review_task_workspace.sql': '2a6f57fd3a6921851127460f81f4c3736b81ddaa6c2c751d76c50210eba8a196',
+  '20261109143102_coding_review_task_thread.sql': '1692ff238bbb1f783afe42bf07590445dd5ddd597588a6d982041837c93558d8',
   '20261112030506_drive_blob_workspace_admission.sql': '556a765112dafd61fdaf922d4ff78a2fb133d02d47ece04fd9fc5d9847c42b53',
   '20261112030507_scope_personal_drive_names_by_workspace.sql': 'c46c75385e55cf5cca5770330c1da2ba763955efe8596e96b6d7dd3abd95c21d',
   '20261112030505_task_creation_receipts.sql': 'd9d0692cb505330c864b70c3a2f6cec69da1ca6090d44f619874f034902f60da',

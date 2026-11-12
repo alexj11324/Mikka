@@ -268,7 +268,8 @@
     "mode": "optional-cloud",
     "environment": [
       "CLOUDFLARE_WORKERS_AI_ACCOUNT_ID",
-      "CLOUDFLARE_WORKERS_AI_TOKEN"
+      "CLOUDFLARE_WORKERS_AI_TOKEN",
+      "MIKKA_WORKERS_AI_CAPABILITY"
     ],
     "behavior": "Only an explicitly selected managed Workers AI model uses the Cloudflare account and token and the model route refuses missing configuration before provider I/O.",
     "test": "lib/abuse/model.test.ts",
@@ -410,6 +411,7 @@
       "MIKKA_DEFAULT_MODEL_ID",
       "MIKKA_EDITION",
       "MIKKA_HOSTED_MODEL_FALLBACK",
+      "MIKKA_WORKERS_AI_CAPABILITY",
       "VERCEL",
       "VERCEL_OIDC_TOKEN",
       "ZEROCAT_API_KEY",
@@ -655,7 +657,7 @@
   "lib/renderer-actions.mjs": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Expose only the release-bound action names and renderer identity needed by the selected installation. Reject invalid or duplicate actions and keep private build inputs, server modules and unused exports out of the public contract.",
+    "behavior": "Read the published web action manifest for the selected deployment. When the legacy manifest returns HTTP 404, use the release action contract with the same deployment pin and validate its compiler inventory.",
     "test": "apps/api/scripts/cloudflare-web.test.mjs"
   },
   "lib/run-app-mcp.ts": {
@@ -840,9 +842,11 @@
     "mode": "optional-cloud",
     "environment": [
       "CLOUDFLARE_WORKERS_AI_ACCOUNT_ID",
-      "MIKKA_HOSTED_MODEL_FALLBACK"
+      "CLOUDFLARE_WORKERS_AI_TOKEN",
+      "MIKKA_HOSTED_MODEL_FALLBACK",
+      "MIKKA_WORKERS_AI_CAPABILITY"
     ],
-    "behavior": "The Workers AI route must be explicitly selected and the account ID must be valid and ordinary local installs do not need a Cloudflare account.",
+    "behavior": "A hosted Cloudflare container authorizes its fixed account with an instance-scoped service binding. Operators can also configure a model-specific REST token. Community installations can use their own configured model.",
     "test": "lib/abuse/model.test.ts",
     "suite": "test:abuse"
   },
@@ -1027,5 +1031,102 @@
     "behavior": "Read the selected workspace Inbox and submit authorized lifecycle commands through the connected installation, preserving the server receipt and opaque pagination cursor.",
     "test": "lib/inbox/workspace.test.ts",
     "suite": "test:factory"
+  },
+  "drizzle/20261109143100_coding_review_sessions.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Create the PostgreSQL human-review lease table, pending revocations and source-change triggers in the installation database.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
+  "drizzle/20261109143101_coding_review_task_workspace.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Fence a review when its Task changes workspace or loses its original stored ownership.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
+  "drizzle/20261109143102_coding_review_task_thread.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Invalidate existing leases for an actual replacement Task run after the Factory binding transaction finishes.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
+  "lib/cloud-computer/thread-machines.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Question recovery locks the current PostgreSQL task, owner, run and operation before reusing a retained machine. Self-hosted recovery uses its existing database and configured execution provider.",
+    "test": "lib/factory/checks.db.test.ts",
+    "suite": "test:factory-checks-db"
+  },
+  "lib/coding-workspace/preview/runtime.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "The configured application origin issues a one-use URL only after the existing owner-provided E2B guest acknowledges the scoped preview; an unavailable guest stays unavailable.",
+    "test": "lib/coding-workspace/preview/runtime.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/coding-workspace/review-authority.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the authenticated installation workspace, current Task, native run and checkout from PostgreSQL, and reject a changed owner or credential.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
+  "lib/coding-workspace/review-machine.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "HTTPS_PROXY"
+    ],
+    "behavior": "An active lease can reconnect to its existing E2B sandbox using that owner’s stored provider key and optional HTTPS proxy; no device credential is reissued.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
+  "lib/coding-workspace/review-sessions.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Persist and fence terminal and preview leases in PostgreSQL. Preserve pending remote closes for the existing recovery timer.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
+  "lib/coding-workspace/terminal/runtime.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_SECRET",
+      "HTTPS_PROXY"
+    ],
+    "behavior": "Use the installation auth secret to derive an instance-specific terminal key. The owner’s E2B credential permits the same guest to open or close the signed gateway.",
+    "test": "lib/coding-workspace/terminal/runtime.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/coding-workspace/terminal/test-fixture.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Supplies disposable locally generated wire identities to the signed terminal contract tests.",
+    "test": "lib/coding-workspace/terminal/wire.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/coding-workspace/terminal/wire.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Bind a short-lived terminal action to its local installation key, current boot, lease and body digest.",
+    "test": "lib/coding-workspace/terminal/wire.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/eve/session-control-delivery.mjs": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Propagate only a verified native cancel or end request to its own session wake, across asynchronous calls from the official Eve channel.",
+    "test": "lib/eve/session-control-delivery.test.mjs"
+  },
+  "lib/task-thread-run.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Select the Task run using the installation’s PostgreSQL relations, excluding group chat and late-bound Factory checker runs.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
   }
 }

@@ -184,6 +184,84 @@ test('version recovers from a stale overlay, unavailable backend and invalid doc
   assert.deepEqual(await (await release.fetch(request('/mikka/api/version'), env)).json(), value)
 })
 
+test('rejected or stalled cold version reads free the upstream and an independent request can recover', async t => {
+  const source = 'a'.repeat(40), overlay = 'b'.repeat(40)
+  const value = { build: source, overlaySha: overlay, minMobileBuild: 0, mobileUpdateUrl: '', minDesktopVersion: null }
+  let cancelled = false
+  const env = { RELEASE_SHA: source, OVERLAY_SHA: overlay, API: { fetch: async () => new Response(new ReadableStream({
+    cancel() { cancelled = true },
+  }), { status: 502 }) } }
+  const get = (e, init) => release.fetch(request('/mikka/api/version', init), e)
+  const bad = await get(env)
+  assert.equal(bad.status, 502)
+  assert.equal(cancelled, true)
+  assert.equal(bad.headers.get('cache-control'), 'no-store')
+  env.API.fetch = async () => new Response(new ReadableStream({
+    start(controller) { controller.error(new Error('upstream body already closed')) },
+  }), { status: 429 })
+  assert.equal((await get(env)).status, 429)
+
+  const deadline = new AbortController()
+  const timeout = t.mock.method(AbortSignal, 'timeout', ms => {
+    assert.equal(ms, 5_000)
+    return deadline.signal
+  })
+  const pending = () => {
+    const started = Promise.withResolvers()
+    env.API.fetch = req => {
+      started.resolve()
+      return new Promise((_, reject) => req.signal.addEventListener('abort', () => reject(req.signal.reason), { once: true }))
+    }
+    return started.promise
+  }
+  const route = request('/mikka/api/version')
+  const ready = pending(), slow = release.fetch(route, env)
+  await ready
+  deadline.abort(new DOMException('Timed out', 'TimeoutError'))
+  const failed = await slow
+  assert.equal(route.signal.aborted, false)
+  assert.equal(failed.status, 503)
+  assert.deepEqual(await failed.json(), { error: 'deploymentVersionUnavailable' })
+  timeout.mock.restore()
+
+  const caller = new AbortController()
+  const active = pending(), disconnected = get(env, { signal: caller.signal })
+  await active
+  caller.abort()
+  await assert.rejects(disconnected, { name: 'AbortError' })
+  env.API.fetch = async () => Response.json(value)
+  assert.deepEqual(await (await get(env)).json(), value)
+  env.API.fetch = () => assert.fail('unexpected upstream read')
+  assert.equal((await get(env, { method: 'HEAD' })).status, 200)
+})
+
+test('separate version bindings do not share cached values and private requests keep caller scope', async () => {
+  const publicFields = { build: 'a'.repeat(40), overlaySha: 'b'.repeat(40), minMobileBuild: 0, minDesktopVersion: null }
+  const scope = mobileUpdateUrl => ({
+    RELEASE_SHA: publicFields.build, OVERLAY_SHA: publicFields.overlaySha,
+    API: { async fetch(req) {
+      if (req.method === 'GET' && new URL(req.url).pathname === '/mikka/api/version') {
+        assert.equal(req.headers.get('authorization'), null)
+        assert.equal(req.headers.get('cookie'), null)
+        return Response.json({ ...publicFields, mobileUpdateUrl })
+      }
+      return new Response(req.headers.get('authorization'), { status: 202, headers: { 'cache-control': 'private, no-store' } })
+    } },
+  })
+  const first = scope('itms-beta://first'), second = scope('itms-beta://second')
+  for (const [env, link, tenant] of [[first, 'itms-beta://first', 'A'], [second, 'itms-beta://second', 'B'], [first, 'itms-beta://first', 'C']]) {
+    const headers = { authorization: 'Bearer scope-' + tenant, cookie: 'workspace=' + tenant }
+    const result = await release.fetch(request('/mikka/api/version', { headers }), env)
+    assert.equal((await result.json()).mobileUpdateUrl, link)
+    for (const path of ['/mikka/api/rpc', '/mikka/api/version']) {
+      const reply = await release.fetch(request(path, { method: 'POST', headers, body: 'opaque' }), env)
+      assert.equal(reply.status, 202)
+      assert.equal(reply.headers.get('cache-control'), 'private, no-store')
+      assert.equal(await reply.text(), headers.authorization)
+    }
+  }
+})
+
 test('published actions retain the compiler evidence and use the same deployment pin on the private-manifest 404', async () => {
   const compiled = { version: 1, target: 'web', rendererBuild: 'b'.repeat(64),
     usedActions: ['issues.pollIssue'], modules: { issues: ['pollIssue', 'unused'] } }

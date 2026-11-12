@@ -81,6 +81,9 @@ export async function openOwnedCloudflareTaskMachine(pool:Pool, actor:TaskMachin
     if (opened.state !== 'running' || typeof opened.instanceId !== 'string' || !/^[0-9a-f]{64}$/.test(opened.instanceId)) {
       throw Error('Cloudflare did not acknowledge the task machine')
     }
+    if (initial.requiredCheckpoint && (opened.restored !== true || opened.instanceId !== initial.requiredCheckpoint.instanceId)) {
+      throw Error('Original task checkpoint is unavailable')
+    }
     // The authorized grant never crosses the public API. Cleanup may release
     // the original lease after membership or the Run was revoked.
     const connection = cloudflareTaskConnection({
@@ -97,9 +100,15 @@ export async function openOwnedCloudflareTaskMachine(pool:Pool, actor:TaskMachin
 export async function releaseOwnedCloudflareTaskMachine(db:Pick<PoolClient,'query'>, actor:TaskMachineActor, runId:string, operationId:string) {
   const grant = await releaseGrant(db, actor, runId, operationId)
   const status = await (await post('status', { grant })).json()
-  if (status.state === 'absent' || status.state === 'stopped') return
-  const receipt = await (await post('park', { grant })).json()
+  if (status.state === 'absent') return null
+  const receipt = status.state === 'stopped' ? status : await (await post('park', { grant })).json()
   if (receipt.state !== 'stopped' || !receipt.stoppedAt) throw Error('Cloudflare task stop unconfirmed')
+  if (receipt.outcome !== 'settled' || typeof receipt.instanceId !== 'string' ||
+      typeof receipt.checkpoint?.id !== 'string' || typeof receipt.checkpoint.sha256 !== 'string' ||
+      !/^[0-9a-f]{64}$/.test(receipt.instanceId) ||
+      !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/.test(receipt.checkpoint?.id) ||
+      !/^[0-9a-f]{64}$/.test(receipt.checkpoint?.sha256)) return null
+  return {instanceId:receipt.instanceId as string,id:receipt.checkpoint.id as string,sha256:receipt.checkpoint.sha256 as string}
 }
 
 export function confirmOwnedTaskMachine(pool:Pool,actor:TaskMachineActor,runId:string) {

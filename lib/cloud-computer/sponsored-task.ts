@@ -23,6 +23,7 @@ type BoundRun = ResourceRun & {
   id: string
   botId: string
   operationId: string
+  requiredCheckpoint: TaskMachineGrant['requiredCheckpoint'] | null
   until: Date | null
   repoPath: string
   remoteUrl: string
@@ -50,7 +51,7 @@ export async function verifySponsoredChoice(query: Query, placement: SponsoredTa
 }
 
 const bindingSql = `SELECT r.id,r."userId",r."workspaceId",r."issueId",r."botId",r."agentId",r."deviceId",
-      r."deviceRepoId",r."baseBranch",r."agentDefinition",m."operationId",
+      r."deviceRepoId",r."baseBranch",r."agentDefinition",m."operationId",m.lifecycle->'sponsoredRestore' AS "requiredCheckpoint",
       COALESCE((m.lifecycle->>'sponsoredUntil')::timestamptz,m."workerLeaseUntil") AS until,repo."repoPath",repo."remoteUrl"
     FROM agent_runs r
     JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId" AND b."workspaceId"=r."workspaceId" AND b."botId"=r."botId"
@@ -88,6 +89,7 @@ function frozenGrant(run: BoundRun | undefined, actor: TaskMachineActor): TaskMa
     runId: run.id,
     operationId: run.operationId,
     expiresAt: run.until?.getTime() ?? 0,
+    ...(run.requiredCheckpoint ? { requiredCheckpoint:run.requiredCheckpoint } : {}),
   }
 }
 

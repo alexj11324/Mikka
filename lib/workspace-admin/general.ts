@@ -14,6 +14,7 @@ import { deleteWorkspaceRows } from '@/lib/workspace-rows'
 import { teardownWorkspaceMachines } from '@/lib/cloud-computer/workspace-teardown'
 import { parseWorkspaceIcon } from './icon'
 import { ownerListChanged, workspaceListChanged, workspaceListScopesBeforeChange, workspaceListScopeChanged } from '../live/lists'
+import { markReviewSessionsRevoked, drainRevokedReviewSessions } from '../coding-workspace/review-sessions'
 
 export type MainTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -248,7 +249,8 @@ async function deleteAppData(tx: MainTransaction, workspaceId: string, teamIds: 
 export async function deleteWorkspaceData(actorId: string, workspaceId: string, confirmName: string): Promise<WorkspaceDeletion> {
   z.uuid().parse(workspaceId)
   const typed = z.string().max(200).parse(confirmName).trim()
-  return workspaceDb.transaction(async tx => {
+  let reviewIds: string[] = []
+  try { return await workspaceDb.transaction(async tx => {
     const { workspace } = await requireWorkspace(tx, workspaceId, actorId, true)
     // Every account keeps its one personal workspace (decision 2026-11-01-2310); only a team workspace is deleted.
     if (workspace.kind === 'personal') throw new WorkspaceError('workspacePersonalDelete')
@@ -261,6 +263,9 @@ export async function deleteWorkspaceData(actorId: string, workspaceId: string, 
     // The machines' sandboxes are killed before their rows go, so no refused deletion may follow: the billing check runs first too.
     const [billing] = await db.select({ status: workspaceBilling.status }).from(workspaceBilling).where(eq(workspaceBilling.workspaceId, workspaceId)).limit(1)
     if (billing?.status && (BILLING_LIVE_STATUSES as readonly string[]).includes(billing.status)) throw new WorkspaceError('workspaceHasActiveSubscription')
+    reviewIds = await markReviewSessionsRevoked(pool, { workspaceId }, 'membership_changed')
+    // The existing VM teardown retains its kill/retry protocol here. Human
+    // gateway close uses the captured IDs after the outer WS transaction.
     await teardownWorkspaceMachines(pool, workspaceId)
     const app = await db.transaction(main => deleteAppData(main, workspaceId, teamIds))
 
@@ -288,5 +293,5 @@ export async function deleteWorkspaceData(actorId: string, workspaceId: string, 
       deleted: { ...app, projects: deletedProjects, teams: deletedTeams, invitations, members },
       nextWorkspaceId: next?.id ?? null,
     }
-  })
+  }) } finally { await drainRevokedReviewSessions(pool, reviewIds) }
 }

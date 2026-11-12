@@ -62,6 +62,11 @@ test('ingress binds only the immutable account image with a private route and a 
   assert.equal(config.containers[0].max_instances, 1)
   assert.equal(config.containers[0].image, input.image)
   assert.equal(config.vars.MIKKA_DEPLOYMENT_ID, input.release)
+  assert.equal(config.ai, undefined)
+  const withAI = ingressConfig({ ...input, workersAi: true })
+  assert.deepEqual(withAI.ai, { binding: 'WORKERS_AI' })
+  assert.equal(withAI.vars.CLOUDFLARE_WORKERS_AI_ACCOUNT_ID, input.image.split('/')[1])
+  assert.throws(() => ingressConfig({ ...input, workersAi: 'untrusted' }))
   for (const changed of [{ release: 'main' }, { image: input.image.split('@')[0] + ':latest' }, { origin: 'https://user@app.example' }]) {
     assert.throws(() => ingressConfig({ ...input, ...changed }))
   }
@@ -140,17 +145,20 @@ test('the private API receives its sign-in and product bindings without inheriti
   const origin = 'https://app.example'
   const allowed = {
     SLACK_APP_ID: 'AEXAMPLE', SLACK_CLIENT_ID: 'client-fixture', SLACK_CLIENT_SECRET: 'oauth-fixture',
-    WORKSPACE_SECRETS_KEY: 'sealing-fixture',
     GOOGLE_CLIENT_ID: 'google', GOOGLE_CLIENT_SECRET: 'google-credential',
     GITHUB_CLIENT_ID: 'github', GITHUB_CLIENT_SECRET: 'github-credential', GITHUB_WEBHOOK_SECRET: 'existing-hook',
     BETTER_AUTH_SECRET: 'auth', TURNSTILE_SECRET_KEY: 'signup-verification', MIKKA_CLOUDFLARE_TASK_WORKSPACES: 'sponsor',
     MIKKA_DEPLOYMENT_ID: id, MIKKA_WORKFLOW_QUEUE_PUBLIC_KEY: 'public-verification-key',
     OPENAI_DECISIONS_API_KEY: 'decisions', CLOUDFLARE_WORKERS_AI_TOKEN: 'models',
+    DEVICE_GATEWAY_URL: 'https://gateway.example', DEVICE_GATEWAY_PUSH_SECRET: 'device-signing',
+    WORKSPACE_SECRETS_KEY: 'workspace-sealing',
+    COMPOSIO_API_KEY: 'integrations', COMPOSIO_WEBHOOK_SECRET: 'hook-verification',
+    COMPOSIO_CALLBACK_VERIFIER_URL: origin + '/mikka/api/integrations/composio/callback',
   }
   const unexpected = {
     SLACK_SIGNING_SECRET: 'event-signing', SLACK_BOT_TOKEN: 'tenant-token', SLACK_USER_BINDINGS: 'tenant-map',
     GITHUB_APP_PRIVATE_KEY: 'app-signing', AWS_ACCESS_KEY_ID: 'aws', AWS_SECRET_ACCESS_KEY: 'aws-secret',
-    CREDENTIAL_BROKER_ROLE_ARN: 'broker', EVE_QUEUE_SIGNING_KEY: 'world-signing',
+    CREDENTIAL_MASTER_KEY: 'self-hosted-vault', CREDENTIAL_BROKER_ROLE_ARN: 'broker', EVE_QUEUE_SIGNING_KEY: 'world-signing',
     INFISICAL_CLIENT_SECRET: 'deploy', CLOUDFLARE_API_TOKEN: 'deploy', VERCEL_OIDC_TOKEN: 'legacy',
     NODE_OPTIONS: '--inspect', BETTER_AUTH_URL: 'https://incorrect.example', MIKKA_API_INGRESS: 'other',
     STRIPE_WEBHOOK_SECRET: {}, SMTP_URL: '', TASK_MACHINE: { destroy() {} },

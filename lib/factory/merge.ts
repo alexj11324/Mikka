@@ -4,6 +4,7 @@ import { issueListChanged } from '../live/lists';
 import { documentChanged } from '../live/panels';
 import { issueRelationsChanged } from '../live/issue-detail';
 import { userActor } from '../activity-actor';
+import { reviewSessionsRevoked } from '../coding-workspace/review-sessions';
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { bindingSchema, FactoryError, type FactoryActor, type FactoryBinding } from "./approval-contract";
@@ -247,6 +248,7 @@ export function createFactoryMerges(
     ) SELECT "issueId" AS id FROM history`,
     [task.id, task.userId, task.issueId, task.candidateId, activity.actorType, activity.actorId]);
     if (rows.length) {
+      reviewSessionsRevoked(tx, { taskId: task.issueId }, 'task_changed');
       await issueListChanged(tx, task.issueId);
       await documentChanged(tx, task.issueId);
       await issueRelationsChanged(tx, [task.issueId]);
