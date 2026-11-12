@@ -745,6 +745,24 @@ test('task review: current owner, session, tenant and immutable physical checkou
     assert.equal((await readReviewSession(await read(f), { kind: 'terminal' }, pool))?.id, current.lease.id)
     assert.equal(closeCalls.length, 0)
   })
+  await leaseTest('a committed stop closes its human review lease when Factory routing is disabled', async () => {
+    const { afterRunEnded } = await import('../run-completion-effects')
+    const stopped = await fixture(), peer = await fixture()
+    const signed = await grant(stopped), independent = await grant(peer)
+    const routing = process.env.MIKKA_FACTORY_ROUTING_ENABLED
+    process.env.MIKKA_FACTORY_ROUTING_ENABLED = '0'
+    try {
+      await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [stopped.runId])
+      assert.ok((await leaseRow(signed.lease.id)).revokedAt)
+      assert.equal(await afterRunEnded(stopped.userId, stopped.runId), 0)
+      assert.deepEqual(closeCalls.map(call => call.ids), [[signed.lease.id]])
+      assert.equal(await leaseRow(signed.lease.id), undefined)
+      assert.equal((await leaseRow(independent.lease.id)).revokedAt, null)
+    } finally {
+      if (routing === undefined) delete process.env.MIKKA_FACTORY_ROUTING_ENABLED
+      else process.env.MIKKA_FACTORY_ROUTING_ENABLED = routing
+    }
+  })
   const sourceFences: Array<[string, (f: Fixture) => Promise<unknown>]> = [
     ['session delete', f => pool.query('DELETE FROM "session" WHERE id=$1', [f.session.session.id])],
     ['session expiry shortening', f => pool.query('UPDATE "session" SET "expiresAt"=now()-interval \'1 second\' WHERE id=$1', [f.session.session.id])],

@@ -65,6 +65,21 @@ test('the safety-net check names exactly the jobs with work already due', { skip
     await clear()
   })
 
+  await t.test('a lost review close wakes only recovery even with Factory disabled', async () => {
+    const id = randomUUID()
+    const withoutFactory = () => reconcileDue(pool, { factoryLifecycle: false, workspace: pool })
+    await pool.query(`INSERT INTO coding_review_sessions
+      (id,kind,"taskId","runId","ownerId","workspaceId","deviceId","repoId","deviceTokenId","bindingId","sandboxId",
+       "machineEpoch","machineOperationId","credentialKind","credentialId","expiresAt")
+      VALUES ($1,'terminal',$1,$1,'owner',$1,$1,$1,$1,$2,'fixture',0,$1,'session','credential',now()+interval '4 minutes')`,
+    [id, 'a'.repeat(64)])
+    assert.deepEqual(await withoutFactory(), none)
+    await pool.query(`UPDATE coding_review_sessions SET "revokedAt"=now(),reason='run_control',"retryAt"=now() WHERE id=$1`, [id])
+    assert.deepEqual(await withoutFactory(), { ...none, recovery: true })
+    await clear()
+    assert.deepEqual(await withoutFactory(), none)
+  })
+
   await t.test('run recovery is due for an expired lease, not for a live one', async () => {
     const run = (lease: string) => pool.query(`INSERT INTO agent_runs (id,"userId","agentId",kind,status,"leaseExpiresAt") VALUES ($1,'owner',$2,'local','running',${lease})`, [randomUUID(), randomUUID()])
     await run(`now()+interval '5 minutes'`)
