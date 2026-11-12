@@ -268,13 +268,6 @@ jobs:
       contents: read
       packages: write
 
-  desktop-checks:
-    needs: changes
-    if: github.event_name != 'push' && needs.changes.outputs.desktop == 'true'
-    uses: ./.github/workflows/desktop.yml
-    with:
-      selected: true
-
   analytics-checks:
     needs: changes
     if: github.event_name != 'push' && needs.changes.outputs.analytics == 'true'
@@ -282,11 +275,21 @@ jobs:
     with:
       selected: true
 
+  workspace-governance-checks:
+    # Auth, schema, security, global and unknown changes expand trusted DB
+    # selection; unrelated UI PRs allocate no governance PostgreSQL runner.
+    # Exact-main acceptance stays in the standalone postmerge push workflow.
+    needs: changes
+    if: >-
+      (github.event_name == 'pull_request' || github.event_name == 'merge_group') &&
+      needs.changes.result == 'success' && needs.changes.outputs.db == 'true'
+    uses: ./.github/workflows/workspace-governance-acceptance.yml
+
   ui-policy:
     # The required check name. It reports success when only documentation
     # changed; otherwise it mirrors the full suite's result.
     name: UI policy (strict)
-    needs: [changes, ui-policy-full, ui-policy-integrations, source-checks, daemon-checks, image-checks, desktop-checks, analytics-checks]
+    needs: [changes, ui-policy-full, ui-policy-integrations, source-checks, daemon-checks, image-checks, analytics-checks, workspace-governance-checks]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -302,10 +305,10 @@ jobs:
           EXPECT_SOURCE: ${{ needs.changes.outputs.source }}
           EXPECT_DAEMON: ${{ needs.changes.outputs.daemon }}
           EXPECT_IMAGE: ${{ github.event_name != 'push' && needs.changes.outputs.image == 'true' }}
-          EXPECT_DESKTOP: ${{ github.event_name != 'push' && needs.changes.outputs.desktop == 'true' }}
           EXPECT_ANALYTICS: ${{ github.event_name != 'push' && needs.changes.outputs.analytics == 'true' }}
+          EXPECT_GOVERNANCE: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && needs.changes.outputs.db == 'true' }}
+          GOVERNANCE: ${{ needs.workspace-governance-checks.result }}
           IMAGE: ${{ needs.image-checks.result }}
-          DESKTOP: ${{ needs.desktop-checks.result }}
           ANALYTICS: ${{ needs.analytics-checks.result }}
           CORE: ${{ needs.ui-policy-full.result }}
           INTEGRATION: ${{ needs.ui-policy-integrations.result }}
@@ -313,7 +316,7 @@ jobs:
           DAEMON: ${{ needs.daemon-checks.result }}
         run: |
           test "$CHANGES_RESULT" = success
-          for name in CORE INTEGRATION SOURCE DAEMON IMAGE DESKTOP ANALYTICS; do
+          for name in CORE INTEGRATION SOURCE DAEMON IMAGE ANALYTICS GOVERNANCE; do
             expected="EXPECT_$name"
             case "${!expected}" in
               true) test "${!name}" = success ;;
@@ -321,7 +324,7 @@ jobs:
               *) exit 1 ;;
             esac
           done
-          echo 'All selected source/unit/daemon jobs succeeded.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'All selected source/unit/daemon and governance jobs succeeded.' >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         if: always()

@@ -102,6 +102,7 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
     const { parseSearchParams, searchIssues } = await import('../lib/issue-search')
     const { documentLiveTargets, runLiveTargets } = await import('../lib/live/panels')
     const { factoryLiveTargets } = await import('../lib/live/factory')
+    const { registeredTask } = await import('./helpers/registered-task')
 
     await t.test('pending resources never inherit the creator personal workspace', async () => {
       for (const id of [conflict, unresolved, malformed, removed]) {
@@ -110,9 +111,11 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
       }
       assert.equal(await runOutsideToken({ id: owner, [tokenWorkspace]: beta }, runConflict), true)
     })
-    await app.query('INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope) VALUES($1,$2,$3,\'No Team required\',\'{"type":"doc"}\',\'todo\',\'normal\',\'personal\')', [teamless, owner, alpha])
+    await registeredTask(app, owner, alpha, teamless, client =>
+      client.query('INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope) VALUES($1,$2,$3,\'No Team required\',\'{"type":"doc"}\',\'todo\',\'normal\',\'personal\')', [teamless, owner, alpha]))
     const alternate = randomUUID()
-    await app.query('INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope) VALUES($1,$2,$3,\'No Team required elsewhere\',\'{"type":"doc"}\',\'todo\',\'normal\',\'personal\')', [alternate, owner, beta])
+    await registeredTask(app, owner, beta, alternate, client =>
+      client.query('INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope) VALUES($1,$2,$3,\'No Team required elsewhere\',\'{"type":"doc"}\',\'todo\',\'normal\',\'personal\')', [alternate, owner, beta]))
     await t.test('members can read a tenant task without a Team; selected/PAT tenant has no owner bypass', async () => {
       assert.equal((await issueForUser(member, teamless))?.id, teamless)
       assert.equal(await issueForUser(stranger, teamless), null)

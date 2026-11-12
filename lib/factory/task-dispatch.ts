@@ -131,7 +131,7 @@ export async function queueFactoryTask(pool: Pool, userId: string, input: {
     const dispatch = createFactoryDispatch(pool, runtime.store, input.queue)
     const result = await dispatch(userId, { binding: factoryBinding(task), agentId: input.agentId, deviceRepoId: input.deviceRepoId, ...(input.note ? { note: input.note } : {}) }, tx)
     if (input.previousRunId) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1 AND "userId"=$3', [result.runId, input.previousRunId, userId])
-    await tx.query('INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)', [task.id, receiptId, JSON.stringify({ key, digest }), JSON.stringify({ runId: result.runId })])
+    await tx.query('INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)', [task.id, receiptId, JSON.stringify({ key, digest, sourceEventId }), JSON.stringify({ runId: result.runId })])
     if (!existing) {
       await tx.query('COMMIT')
       await notifyQueuedLocalRun(tx, userId, result.runId)

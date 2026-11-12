@@ -11,6 +11,32 @@ import { createCapturePosterBinary, POSTER_BINARY_ARCHIVE, POSTER_BINARY_MANIFES
 
 const exec = promisify(execFile)
 
+test('final packaging retains every route but does not duplicate equivalent API implementations and resources', { timeout: 120_000 }, async t => {
+  const root = process.cwd(), cache = join(root, '.output')
+  await mkdir(cache, { recursive: true })
+  const output = await mkdtemp(join(cache, 'function-dedupe-'))
+  t.after(() => rm(output, { recursive: true, force: true }))
+  await writeFile(join(output, 'config.json'), JSON.stringify({ version: 3, routes: [
+    { src: '/mikka/api/a', dest: '/a' }, { src: '/mikka/api/b', dest: '/b' },
+  ] }))
+  const configuration = { runtime: 'nodejs24.x', handler: 'index.mjs', maxDuration: 120, supportsCancellation: true }
+  for (const name of ['a', 'b']) {
+    const directory = join(output, 'functions', name + '.func')
+    await mkdir(directory, { recursive: true })
+    await writeFile(join(directory, 'index.mjs'), 'export default null\n')
+    await writeFile(join(directory, '.vc-config.json'), JSON.stringify(configuration))
+  }
+  const result = await finalizeBuild({ root, output, preset: 'vercel', revision: process.env.MIKKA_TEST_DEPLOYMENT_SHA || 'a'.repeat(40) })
+  assert.equal(result.functions.length, 1)
+  assert.ok((await lstat(join(output, 'functions/b.func'))).isSymbolicLink())
+  assert.equal((JSON.parse(await readFile(join(output, 'config.json')))).routes.length, 2)
+  for (const name of ['a', 'b']) {
+    const directory = join(output, 'functions', name + '.func')
+    assert.deepEqual(JSON.parse(await readFile(join(directory, '.vc-config.json'))), { ...configuration, handler: 'mikka-entry.mjs' })
+    for (const resource of result.resources) assert.equal(createHash('sha256').update(await readFile(join(directory, resource.path))).digest('hex'), resource.sha256)
+  }
+})
+
 test('actual packaged bootstrap patches pg before application import and preserves Vercel function contract', async () => {
   const cache = join(process.cwd(), 'node_modules/.cache')
   await mkdir(cache, { recursive: true })

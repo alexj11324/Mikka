@@ -4,7 +4,7 @@
  */
 import { createHash, randomUUID } from 'node:crypto'
 import { runWorktreeIdentity, workspaceReadResult } from '@mikka/protocol/coding-workspace'
-import { runCloudStartup, startupFailure } from './cloud-startup.mjs'
+import { runCloudStartup, startupFailure, validatePersonalOptions } from './cloud-startup.mjs'
 
 const ORIGIN = 'https://app.aspectlylabs.com'
 const REPOSITORY = 'alexj11324/Mikka-handoff'
@@ -39,6 +39,15 @@ async function drainRequests(promises) {
 export function readOptions(env = process.env) {
   const options = { sourceCommit: env.EXPECTED_SOURCE_SHA, workerSha: env.EXPECTED_WORKER_SHA, workerSourceCommit: env.EXPECTED_WORKER_SOURCE_SHA }
   check(Object.values(options).every(value => SHA.test(value ?? '')), 'options_invalid')
+  if (env.MIKKA_ACCEPTANCE_WORKSPACE_KIND) {
+    check(['personal', 'team'].includes(env.MIKKA_ACCEPTANCE_WORKSPACE_KIND), 'options_invalid')
+    if (env.MIKKA_ACCEPTANCE_WORKSPACE_KIND === 'personal') {
+      Object.assign(options, { workspaceKind: 'personal', workspace: env.MIKKA_ACCEPTANCE_WORKSPACE_ID,
+        operation: env.MIKKA_ACCEPTANCE_OPERATION ?? 'readiness', harness: env.MIKKA_ACCEPTANCE_HARNESS ?? 'both',
+        deviceId: env.MIKKA_ACCEPTANCE_DEVICE_ID, agentId: env.MIKKA_ACCEPTANCE_AGENT_ID,
+        origin: env.MIKKA_ACCEPTANCE_BASE_URL ?? ORIGIN })
+    }
+  }
   return options
 }
 
@@ -290,12 +299,13 @@ export function createWorkspaceProbe(options, { client, record, scope, now = Dat
     async createIssue(input) {
       try {
         active()
+        const content = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: this.instructions }] }] }
+        if (scope.workspaceKind === 'personal') return await rpc('issue_create', 'issues.saveIssue', [{ ...input, content }])
         const teams = await rpc('teams', 'teams.listTeams', [])
         check(Array.isArray(teams), 'team_unavailable')
         const team = teams.find(team => UUID.test(team?.id ?? '') && team.workspaceId === scope.workspaceId)
         check(team, 'team_unavailable')
         evidence.teamId = team.id
-        const content = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: this.instructions }] }] }
         return await rpc('issue_create', 'issues.createIssueForTeam', [{ ...input, content, requestId: randomUUID(), teamId: team.id }])
       } catch (error) { return rememberFailure(error) }
     },
@@ -362,7 +372,8 @@ function caseReport(sample) {
   const safeFailure = CODES.has(proof?.failure) ? proof.failure : sample.status === 'failed' ? 'execution_unproved' : 'acceptance_failed'
   const cleanup = sample.cleanup
   const passed = sample.status === 'execution_proved_awaiting_server_timing' && sample.replyVerifiedAfterTool === true
-    && sample.execution?.credentialType === 'subscription' && sample.execution?.sharedScope?.verified === true
+    && sample.execution?.credentialType === 'subscription' && (sample.execution?.sharedScope?.verified === true
+      || sample.workspaceKind === 'personal' && sample.execution?.personalScope?.verified === true)
     && sample.execution?.harness === sample.harness && sample.execution?.model === MODELS[sample.harness]
     && proof?.status === 'passed' && cleanup?.status === 'passed' && cleanup.taskDeleted === true
   // proof is constructed only above from schema-checked responses. Project its
@@ -392,15 +403,22 @@ function caseReport(sample) {
 export async function runCodingWorkspaceAcceptance(options, { env = process.env, runStartup = runCloudStartup,
   fetchImpl = fetch, WebSocketImpl = globalThis.WebSocket, now = Date.now, signal } = {}) {
   check(options && SHA.test(options.sourceCommit ?? '') && SHA.test(options.workerSha ?? '') && SHA.test(options.workerSourceCommit ?? ''), 'options_invalid')
+  check(options.workspaceKind === undefined || ['personal', 'team'].includes(options.workspaceKind), 'options_invalid')
+  if (options.workspaceKind === 'personal') validatePersonalOptions({ ...options, mode: 'candidate',
+    runs: options.harness && options.harness !== 'both' ? 1 : 2, expectedBuild: options.sourceCommit, revision: options.sourceCommit })
   const controller = new AbortController(), onAbort = () => controller.abort()
   signal?.addEventListener('abort', onAbort, { once: true })
   if (signal?.aborted) controller.abort()
   process.once('SIGTERM', onAbort); process.once('SIGINT', onAbort)
   const startedAt = iso(now())
+  const origin = options.workspaceKind === 'personal' ? options.origin ?? ORIGIN : ORIGIN
+  const harnesses = options.workspaceKind === 'personal' && options.harness && options.harness !== 'both' ? [options.harness] : Object.keys(MODELS)
   let report
   try {
     check(!controller.signal.aborted, 'acceptance_aborted')
-    report = await runStartup({ origin: ORIGIN, runs: 2, harness: 'both', mode: 'candidate', strategy: 'derived',
+    report = await runStartup({ origin, runs: harnesses.length, harness: harnesses.length === 2 ? 'both' : harnesses[0], mode: 'candidate', strategy: 'derived',
+      ...(options.workspaceKind === 'personal' ? { workspaceKind: 'personal', workspace: options.workspace,
+        operation: options.operation ?? 'readiness', deviceId: options.deviceId, agentId: options.agentId } : {}),
       revision: options.sourceCommit, expectedBuild: options.sourceCommit, timeoutMs: 240000, maxStartupMs: 60000,
       runtimeEvidence: 'optional', officialTiming: 'disabled', titlePrefix: '测试 1721 Files' }, {
       env, fetchImpl, WebSocketImpl, now,
@@ -408,7 +426,7 @@ export async function runCodingWorkspaceAcceptance(options, { env = process.env,
       createCaseProbe: context => createWorkspaceProbe(options, { ...context, signal: controller.signal }),
     })
   } catch (error) {
-    return { schemaVersion: 1, issue: 1721, origin: ORIGIN, repository: REPOSITORY,
+    return { schemaVersion: 1, issue: 1721, origin, repository: REPOSITORY,
       sourceCommit: options.sourceCommit, workerSha: options.workerSha, workerSourceCommit: options.workerSourceCommit, startedAt, finishedAt: iso(now()),
       status: 'failed', failure: errorCode(error), startupFailure: startupFailure(error), samples: [], cleanup: { status: 'failed' } }
   } finally {
@@ -419,11 +437,19 @@ export async function runCodingWorkspaceAcceptance(options, { env = process.env,
   const cleanup = { status: !report.cleanup?.errors?.length && report.cleanup?.workspaceRestored === true ? 'passed' : 'failed',
     workspaceRestored: report.cleanup?.workspaceRestored === true,
     errors: (report.cleanup?.errors ?? []).map(error => startupFailure({ message: error.code }, 'cleanup')) }
+  if (options.workspaceKind === 'personal' && options.operation !== 'execute') return {
+    schemaVersion: 1, issue: 1721, origin, repository: REPOSITORY, sourceCommit: options.sourceCommit,
+    startedAt, finishedAt: iso(now()), status: report.status, executionVerified: false,
+    ...(report.failure ? { failure: report.failure } : {}), readiness: report.readiness ?? null, samples: [], cleanup,
+  }
   const passed = report.status === 'candidate_subscription_proved' && report.build === options.sourceCommit && report.revision === options.sourceCommit
-    && samples.length === 2 && same(samples.map(sample => sample.harness).sort(), Object.keys(MODELS).sort())
+    && samples.length === harnesses.length && same(samples.map(sample => sample.harness).sort(), [...harnesses].sort())
     && samples.every(sample => sample.status === 'passed') && cleanup.status === 'passed'
-  return { schemaVersion: 1, issue: 1721, origin: ORIGIN, repository: REPOSITORY,
+  return { schemaVersion: 1, issue: 1721, origin, repository: REPOSITORY,
     sourceCommit: options.sourceCommit, workerSha: options.workerSha, workerSourceCommit: options.workerSourceCommit,
-    startedAt, finishedAt: iso(now()), status: passed ? 'passed' : 'failed',
+    startedAt, finishedAt: iso(now()), status: passed ? options.workspaceKind === 'personal' ? 'partial' : 'passed' : 'failed',
+    ...(options.workspaceKind === 'personal' ? { requiredHarnesses: Object.keys(MODELS),
+      executionVerified: passed,
+      verifiedHarnesses: samples.filter(sample => sample.status === 'passed').map(sample => sample.harness) } : {}),
     ...(passed ? {} : { failure: 'acceptance_failed' }), samples, cleanup }
 }

@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import { db, withDatabaseTransaction } from '@/lib/db'
 import { coordinatorEvents, devices, issueToolCalls } from '@/lib/db/schema'
+import { dispatchTaskIntent } from '@/lib/task-create-command'
 import { taskDestinationSchema } from '@/lib/task-destination'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { collectIssueEffects, runIssueEffect, type IssueEffect } from '@/lib/issue-effects'
@@ -26,6 +27,7 @@ function canonical(value: unknown): unknown {
 export async function idempotentIssueMutation<T extends { id: string } & Record<string, unknown>>(
   userId: string, operation: 'create_issue' | 'update_issue', toolCallId: string, input: unknown, mutate: () => Promise<T>, taskEvent?: { eventId: string; botId: string | null },
   chatRequest?: { eventId: string; botId: string | null; teamId: string | null },
+  readCommandTask?: (issueId: string) => Promise<T>,
 ): Promise<T> {
   if (!toolCallId || toolCallId.length > 200) throw new IssueToolCallConflict()
   let identity: unknown = taskEvent ? { input, taskEvent } : input
@@ -48,17 +50,29 @@ export async function idempotentIssueMutation<T extends { id: string } & Record<
     if (chatRequest) {
       const [source] = await tx.select().from(coordinatorEvents).where(and(eq(coordinatorEvents.id, chatRequest.eventId),
         eq(coordinatorEvents.userId, userId), chatRequest.botId ? eq(coordinatorEvents.botId, chatRequest.botId) : isNull(coordinatorEvents.botId))).for('update')
-      if (!source || source.kind !== 'user_message' || !source.deliveredAt || source.payload.taskDestination !== undefined || source.payload.source === 'schedule_due') throw new IssueToolCallConflict()
+      if (!source || source.kind !== 'user_message' || !source.deliveredAt || source.payload.taskDestination !== undefined || source.payload.taskCommand !== undefined || source.payload.source === 'schedule_due') throw new IssueToolCallConflict()
     }
     let event: typeof coordinatorEvents.$inferSelect | undefined
     if (taskEvent) {
       if (operation !== 'create_issue') throw new IssueToolCallConflict()
       ;[event] = await tx.select().from(coordinatorEvents).where(and(eq(coordinatorEvents.id, taskEvent.eventId), eq(coordinatorEvents.userId, userId), taskEvent.botId ? eq(coordinatorEvents.botId, taskEvent.botId) : isNull(coordinatorEvents.botId))).for('update')
       const destination = taskDestinationSchema.safeParse(event?.payload.taskDestination)
-      if (!event || event.kind !== 'user_message' || !event.deliveredAt || !destination.success) throw new IssueToolCallConflict()
-      if (destination.data.kind === 'device') {
+      if (!event || event.kind !== 'user_message' || !event.deliveredAt) throw new IssueToolCallConflict()
+      const command = dispatchTaskIntent.optional().parse(event.payload.taskCommand)
+      if (!destination.success && (!command || event.payload.taskDestination !== undefined)) throw new IssueToolCallConflict()
+      if (destination.success && destination.data.kind === 'device') {
         const [device] = await tx.select({ id: devices.id }).from(devices).where(and(eq(devices.id, destination.data.deviceId), eq(devices.ownerId, userId), eq(devices.kind, 'local'), eq(devices.enabled, true))).for('update')
         if (!device) throw new IssueToolCallConflict()
+      }
+      if (command) {
+        // A versioned human form already created the Task. A model's tool ID
+        // and proposed title cannot replace its identity or frozen receipt.
+        if (!event.issueId || !readCommandTask) throw new IssueToolCallConflict()
+        const proof = await tx.execute(sql`select 1 from task_creation_receipts
+          where "userId"=${userId} and "workspaceId"=${workspaceId} and "taskId"=${event.issueId}
+          and "requestId"::text=${String(event.payload.taskCreationRequestId)}`)
+        if (!proof.rowCount) throw new IssueToolCallConflict()
+        return { result: await readCommandTask(event.issueId), effects: [] }
       }
     }
     if (event?.issueId) {

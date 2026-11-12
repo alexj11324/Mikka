@@ -98,6 +98,7 @@ export async function probeServer(input: unknown, options: { fetch: Fetcher; app
     if (response.status === 426 || code === 'desktop_client_update_required') return { status: 'app_update_required', minimum: text(body?.minDesktopVersion, 100) }
     const discovery = response.ok ? parseDiscovery(body) : null
     if (discovery) {
+      if (address.pathname !== '/' && discovery.basePath !== path) return { status: 'not_mikka' }
       const [min, max] = discovery.protocol
       if (max < DESKTOP_PROTOCOL) return { status: 'server_update_required', version: discovery.version }
       if (min > DESKTOP_PROTOCOL) return { status: 'app_update_required', minimum: discovery.minDesktopVersion }

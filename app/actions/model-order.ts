@@ -30,7 +30,9 @@ async function readModelOrder(workspaceId?: string): Promise<SettingsActionResul
     // A subscription never asked for its models has no candidates yet: ask it before reading the list.
     await new ExecutionSettings(pool).ensureCatalogues(target)
     // After that write: the view's repeated key, policy and device reads run once.
-    return orderView(readOnce(pool), target)
+    const view=await orderView(readOnce(pool),target)
+    const {hostedTaskEnabled}=await import('@/lib/cloud-computer/sponsored-task')
+    return hostedTaskEnabled(target.workspaceId) ? {...view,sponsoredTasksAvailable:true as const} : view
   })
 }
 

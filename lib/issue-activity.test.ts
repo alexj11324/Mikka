@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { JSONContent } from '@tiptap/core'
-import { activityTimeline, deriveIssueActivity, groupActivityByMinute } from './issue-activity'
+import { activityTimeline, deriveIssueActivity, groupActivityByMinute, type ActivityVersion } from './issue-activity'
 
 function content(assignee: { id: string; name: string } | null): JSONContent {
   return {
@@ -176,4 +176,15 @@ test('keeps same-time rows in a stable order and splits a minute group around a 
   assert.deepEqual(once[0]?.type === 'events' && once[0].events.map(item => item.id), ['e1', 'e2'])
   const split = activityTimeline([event('e1', '10'), event('e2', '50')], [{ id: 't', createdAt: '2026-11-04T20:49:30.000Z' }])
   assert.deepEqual(split.map(row => row.id), ['e1', 'thread-t', 'e2'])
+})
+
+test('a missing revision window cannot reassign creation or skipped changes to another actor', () => {
+  const sample = (revision: number, title: string): ActivityVersion => ({
+    id: 'v' + revision, revision, title, status: 'todo', priority: 'normal', content: content(null),
+    createdAt: new Date(revision * 1000), actorType: 'user', actorId: 'actor-' + revision,
+  })
+  const recent = [sample(80, 'From the missing page'), sample(81, 'Actual edit')]
+  assert.deepEqual(deriveIssueActivity(recent, []).map(event => event.id), ['title-v81'])
+  assert.deepEqual(deriveIssueActivity([sample(1, 'Created'), ...recent], []).map(event => event.id),
+    ['created-v1', 'title-v81'])
 })

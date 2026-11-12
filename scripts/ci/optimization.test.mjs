@@ -25,9 +25,12 @@ test('Desktop platform caches warm on changed main install inputs without duplic
 
 test('selected specialty calls reuse the parent decision; direct dispatch still runs trusted selection', () => {
   const parent = workflow('ui-policy')
-  for (const [name, lane] of [['desktop', 'desktop'], ['analytics-ssr', 'analytics'], ['self-hosted-image', 'image']]) {
+  const automatic = [['analytics-ssr', 'analytics'], ['self-hosted-image', 'image']]
+  for (const [, lane] of automatic) assert.equal(parent.jobs[`${lane}-checks`].with.selected, true)
+  assert.equal(parent.jobs['desktop-checks'], undefined)
+  assert.ok(Object.hasOwn(workflow('desktop').on, 'workflow_dispatch'), 'Desktop acceptance remains available manually')
+  for (const [name, lane] of [...automatic, ['desktop', 'desktop']]) {
     const w = workflow(name)
-    assert.equal(parent.jobs[`${lane}-checks`].with.selected, true)
     assert.equal(w.on.workflow_call.inputs.selected.default, false)
     assert.equal(evaluate(w.jobs.changes.if, { inputs: { selected: true } }), false)
     assert.equal(evaluate(w.jobs.changes.if, { inputs: { selected: false } }), true)

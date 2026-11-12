@@ -11,8 +11,6 @@ import { SettingsFrame } from '@ui-slot/settings-frame'
 import type { RailDestination } from '@/components/nav/icon-rail'
 import { SettingsView } from './settings-view'
 import { resolveSettingsSection } from '@/lib/settings-sections'
-import { TeamDirectory } from '@/components/teams/team-directory'
-import { MembersSettings } from '@/components/workspace/members-settings'
 import { pushSettingsHistory, requestShellBrowser, requestShellSearch } from '@/lib/settings-navigation'
 import { workspaceLink } from '@/components/workspace/workspace-navigation'
 
@@ -38,7 +36,7 @@ export function SettingsRouteContent({ user, defaultWorkspaceId, googleEnabled =
   const params = useSearchParams()
   const workspaceId = params.get('workspace') ?? defaultWorkspaceId
   const section = resolveSettingsSection(pathname, params.get('section'))
-  return <SettingsView user={user} userKey={user.id} googleEnabled={googleEnabled} activeSection={section} workspaceId={workspaceId} inviteInitially={params.get('invite') === '1'} selectedTeamId={params.get('team') ?? undefined} onRail={onRail} onSignOut={onSignOut} signingOut={signingOut} accountError={accountError}>{section === 'teams' && <TeamDirectory key={workspaceId ?? 'default'} workspaceId={workspaceId} />}{section === 'members' && <MembersSettings key={`${workspaceId ?? 'default'}-${params.get('invite') ?? ''}`} workspaceId={workspaceId} inviteInitially={params.get('invite') === '1'} embedded />}</SettingsView>
+  return <SettingsView user={user} userKey={user.id} googleEnabled={googleEnabled} activeSection={section} workspaceId={workspaceId} inviteInitially={params.get('invite') === '1'} selectedTeamId={params.get('team') ?? undefined} onRail={onRail} onSignOut={onSignOut} signingOut={signingOut} accountError={accountError} />
 }
 
 export function SettingsShell({ user, defaultWorkspaceId, googleEnabled = false, onRail: onRailOverride, onSearch: onSearchOverride, onBrowser: onBrowserOverride }: { user: { id: string; name: string; email: string; image?: string | null }; defaultWorkspaceId?: string; googleEnabled?: boolean; onRail?: (destination: RailDestination) => void; onSearch?: () => void; onBrowser?: () => void }) {

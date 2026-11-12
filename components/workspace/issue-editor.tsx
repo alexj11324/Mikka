@@ -41,15 +41,16 @@ export { createEditorExtensions, createDocumentSeed } from './issue-editor-schem
 export type IssueDiscussions = {
   issueId: string
   author: string
+  readOnly?: boolean
   threads: import("@/components/blocks/rich-text-editor-4/components/rich-text-comments").ThreadRecord[]
   anchors: import("@/components/blocks/rich-text-editor-4/components/rich-text-comments").CommentAnchor[]
-  onComment: (body: string) => void
-  onReply: (id: string, body: string) => void
+  onComment: (body: string) => void | false
+  onReply: (id: string, body: string) => void | false
   onResolve: (id: string, resolved: boolean) => void
   /** Selects the text a discussion is about. */
   onSelect: (id: string) => void
 }
-export function IssueEditor({ issueId, content, onChange, sharedDoc, author: authorProp, authorId: authorUserId, syncLabel: syncLabelProp, replacement, onReplacementApplied, compact = false, layout = 'document', activity, afterDescription, label: labelProp, disabled = false, renderActivity }: { issueId?: string; content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; authorId?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; onReplacementApplied?: (success: boolean) => void; persisted?: boolean; compact?: boolean; layout?: 'document' | 'issue' | 'description'; activity?: ReactNode; afterDescription?: ReactNode; label?: string; disabled?: boolean; /** Draws 活动 in place of IssueActivity, with the same discussions and actions (task-detail slot). */ renderActivity?: (activity: IssueDiscussions) => ReactNode }) {
+export function IssueEditor({ issueId, content, onChange, sharedDoc, author: authorProp, authorId: authorUserId, syncLabel: syncLabelProp, replacement, onReplacementApplied, compact = false, layout = 'document', activity, afterDescription, label: labelProp, disabled = false, readOnlyDiscussions, renderActivity }: { issueId?: string; content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; authorId?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; onReplacementApplied?: (success: boolean) => void; persisted?: boolean; compact?: boolean; layout?: 'document' | 'issue' | 'description'; activity?: ReactNode; afterDescription?: ReactNode; label?: string; disabled?: boolean; readOnlyDiscussions?: IssueDiscussions['threads']; /** Draws 活动 in place of IssueActivity, with the same discussions and actions (task-detail slot). */ renderActivity?: (activity: IssueDiscussions) => ReactNode }) {
   const t = useTranslations('Editor')
   const tCommon = useTranslations('Common')
   const author = authorProp ?? t('draftAuthor')
@@ -150,7 +151,7 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
     setLinkOpen(true)
   }
   function addComment() {
-    if (!editor || !comment.trim()) return
+    if (!editable || !editor || !comment.trim()) return
     if (!canAnchorComment(editor, threadStore.isOpen)) { setCommentError(t('selectionRequired')); return }
     const id = crypto.randomUUID()
     const now = new Date().toISOString()
@@ -160,22 +161,26 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
     setCommentError("")
   }
   function submitReply(id: string) {
-    if (!reply.trim()) return
+    if (!editable || !reply.trim()) return
     replyToThread(threadDoc, id, { author, authorUserId, body: reply.trim(), at: new Date().toISOString() })
     setReply("")
     setReplyId(null)
   }
-  const threadList = Object.values(threads)
+  const threadList = readOnlyDiscussions ?? Object.values(threads)
   const openCount = threadList.filter(thread => !thread.resolved).length
 
   const discussions: Omit<IssueDiscussions, 'issueId'> = {
-    author, threads: threadList, anchors,
+    author, readOnly: !editable, threads: threadList, anchors,
     onComment: body => {
+      if (!editable) return false
       const now = new Date().toISOString()
       addThread(threadDoc, { id: `discussion-${crypto.randomUUID()}`, author, authorUserId, createdAt: now, messages: [{ author, authorUserId, body, at: now }] }, 'issue-discussion')
     },
-    onReply: (id, body) => { replyToThread(threadDoc, id, { author, authorUserId, body, at: new Date().toISOString() }) },
-    onResolve: (id, resolved) => { setThreadResolved(threadDoc, id, resolved) },
+    onReply: (id, body) => {
+      if (!editable) return false
+      replyToThread(threadDoc, id, { author, authorUserId, body, at: new Date().toISOString() })
+    },
+    onResolve: (id, resolved) => { if (editable) setThreadResolved(threadDoc, id, resolved) },
     onSelect: id => {
       if (!editor) return
       let from: number | undefined
@@ -184,6 +189,10 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
       if (from !== undefined) editor.chain().focus().setTextSelection({ from, to }).scrollIntoView().run()
     },
   }
+
+  if (layout === 'description' && disabled) return <section aria-label={t('editorAria', { label })}>
+    <RichTextContent editor={editor} className={cn('min-h-28 px-4 py-2 sm:pl-16', RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE)} />
+  </section>
 
   if (compact || layout === 'description' || layout === 'issue') return <TooltipProvider delay={300}>
     <section aria-label={t('editorAria', { label })} className="flex min-w-0 flex-col gap-2">
@@ -195,7 +204,7 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
           {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /><RichTextBlockGutter editor={editor} editable={editable} scrollerRef={pageRef} gap={layout === 'description' ? 12 : undefined} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
         </div>
       </div>
-      {layout === 'issue' && !compact && <>{(hasSelection || panel === 'comments') && <div className="flex justify-end pb-2">
+      {layout === 'issue' && !compact && editable && <>{(hasSelection || panel === 'comments') && <div className="flex justify-end pb-2">
         <Button variant="ghost" size="xs" onClick={() => setPanel(panel === 'comments' ? '' : 'comments')} aria-expanded={panel === 'comments'}><MessageSquare data-icon="inline-start" />{t('selectionComment')}</Button>
       </div>}
       {panel === 'comments' && <div className="flex flex-col gap-3 rounded-lg border p-4">

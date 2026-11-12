@@ -265,6 +265,22 @@ test('sampler IDs satisfy the installed 10% sampler, while invalid live configur
   assert.throws(() => createSessionClient('https://user:password@example.com'), /startup_origin_invalid/)
 })
 
+test('product canary pins both native subscriptions, exact production destination and source before session sign-in', async () => {
+  const args=['--task-provider','cloudflare','--runs','2','--mode','acceptance','--harness','both','--expected-build','build-pin','--revision','a'.repeat(40)]
+  const selected=options(args)
+  assert.equal(selected.taskProvider,'cloudflare')
+  assert.equal(selected.runs,2)
+  for (const extra of [['--origin','https://another.example'],['--harness','codex'],['--runs','3'],
+    ['--runtime-evidence','optional'],['--official-timing','disabled'],['--mode','baseline']]) {
+    assert.throws(()=>options([...args,...extra]),/startup_/)
+  }
+  let called=false
+  await assert.rejects(runCloudStartup({...selected,origin:'https://another.example'},{
+    env:{},fetchImpl:async()=>{called=true;throw Error('unexpected request')},
+  }),/startup_option_invalid/)
+  assert.equal(called,false)
+})
+
 test('startup failure projection is closed, preserves only bounded HTTP status, and unwraps native abort classes', () => {
   assert.equal(Object.isFrozen(STARTUP_FAILURE_CODES), true)
   assert.equal(Object.isFrozen(STARTUP_FAILURE_PHASES), true)

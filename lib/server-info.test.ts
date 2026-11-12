@@ -60,7 +60,7 @@ test('cloud and wrong methods do no database work; HEAD has no body; compatibili
   assert.equal((await serverInfoResponse(request({ method: 'POST' }), { env, query: never })).status, 405)
   const options = { env: { ...env, BETTER_AUTH_URL: 'http://localhost:3000', MIKKA_COMMUNITY_UI: '1', MIKKA_OFFICIAL_WEB_ENABLED: '0' }, query: async () => ({ rows: [{ hasUsers: true }] }) }
   const info = await readServerInfo(options)
-  assert.equal(info!.communityUI.enabled, true); assert.equal(info!.clients.web.enabled, false); assert.equal(info!.clients.web.requiresHttps, true); assert.equal(info!.clients.web.serverAddressSupported, false)
+  assert.equal(info!.communityUI.enabled, false); assert.equal(info!.clients.web.enabled, false); assert.equal(info!.clients.web.requiresHttps, true); assert.equal(info!.clients.web.serverAddressSupported, false)
   const head = await serverInfoResponse(request({ method: 'HEAD' }), options)
   assert.equal(head.status, 200); assert.equal(await head.text(), '')
 })

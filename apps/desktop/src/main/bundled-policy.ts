@@ -14,6 +14,17 @@ export const RENDERER_CSP = [
 const ID = '[A-Za-z0-9_-]{1,128}'
 const FACTORY_FLOW = /^\/api\/factory\/tasks\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/flow$/i
 const BILLING_MANAGEMENT = /^\/api\/(?:workspaces|organizations)\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/billing$/i
+const DRIVE_VOLUME_ID = 'vol_[0-9A-HJKMNP-TV-Z]{26}'
+const DRIVE_VERSION_ID = 'vver_[0-9A-HJKMNP-TV-Z]{26}'
+const DRIVE_ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
+  [/^\/api\/drive\/volumes$/, ['GET', 'POST']],
+  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}$`), ['GET']],
+  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/(?:files|versions)$`), ['GET']],
+  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/versions/${DRIVE_VERSION_ID}$`), ['GET']],
+  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/blobs$`), ['POST']],
+  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/entries$`), ['PATCH']],
+  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/restore$`), ['POST']],
+]
 const UUID = '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89aAbB][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}'
 const SERVICE_IDENTITY_DIRECTORY = `/api/workspaces/${UUID}/service-identities`
 const SERVICE_IDENTITY_ROUTES: ReadonlyArray<readonly [RegExp, string]> = [
@@ -68,6 +79,7 @@ export function normalizedRendererPath(value: string): string | null {
 }
 
 export function allowedApiPath(path: string, method: string): boolean {
+  if (path.startsWith('/api/drive/')) return DRIVE_ROUTES.some(([pattern, methods]) => pattern.test(path) && methods.includes(method))
   if (path === '/api/settings/issue-prefix' || path === '/api/settings/environments') return method === 'GET'
   // This human approval/read surface has exactly its declared methods. Do not
   // inherit the wider CRUD family or the generic asset HEAD allowance.

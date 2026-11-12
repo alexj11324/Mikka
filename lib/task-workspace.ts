@@ -13,6 +13,7 @@ import * as workspaceDatabase from '@/lib/workspace-db'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { filterEnterpriseWorkspaceLinks, filterEnterpriseWorkspaces } from '@/lib/enterprise/access'
 import { enterprisePrincipal, type EnterprisePrincipal } from '@/lib/enterprise/principal'
+import { currentTransactionBoundary } from '@/lib/db/transaction-boundary'
 
 const { workspaceDb } = workspaceDatabase
 // Short aliases keep the repeated fresh membership/Org SELECT bounded on the
@@ -29,11 +30,21 @@ type HeldTaskWorkspace = {
   userId: string; workspaceId: string; kind: TaskWorkspace['kind']; organizationId: string | null; tx: WorkspaceTransaction; active: boolean;
   changedOrganizationWorkspaces: Set<string> | null;
   workspaceTransactionKey: object | null;
+  boundary: object | undefined;
   parent?: HeldTaskWorkspace;
 }
 const taskWorkspaceLease = new AsyncLocalStorage<HeldTaskWorkspace>()
+/** Creation defaults may use only the kind pinned by the current WS owner. */
+export function requireTaskWorkspaceLease(reader: Reader, workspaceId: string): TaskWorkspace {
+  const scope = taskReaderScope(reader)
+  const held = taskWorkspaceLease.getStore()
+  if (!held || !leaseActive(held) || held.userId !== scope.userId || held.workspaceId !== workspaceId
+    || scope.workspaceId && scope.workspaceId !== workspaceId) throw new ActionFailureError('workspaceAccessDenied')
+  return { id: held.workspaceId, kind: held.kind }
+}
 function leaseActive(lease: HeldTaskWorkspace): boolean {
   return lease.active
+    && lease.boundary === currentTransactionBoundary()
     && (!lease.workspaceTransactionKey || workspaceDatabase.workspaceTransactionKey?.() === lease.workspaceTransactionKey)
     && (!lease.parent || leaseActive(lease.parent))
 }
@@ -158,6 +169,7 @@ export async function withTaskWorkspace<T>(reader: Reader, workspaceId: string, 
     const lease: HeldTaskWorkspace = { userId: scope.userId, workspaceId, kind: workspace.kind, organizationId: member.organizationId, tx, active: true,
       changedOrganizationWorkspaces,
       workspaceTransactionKey: workspaceDatabase.workspaceTransactionKey?.() ?? null,
+      boundary: currentTransactionBoundary(),
       ...(parent && leaseActive(parent) ? { parent } : {}) }
     try { return await taskWorkspaceLease.run(lease, () => work(workspace, tx)) }
     finally { lease.active = false }

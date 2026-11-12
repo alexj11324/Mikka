@@ -554,6 +554,9 @@ test('a message to an ended thread runs it again in the same thread; only its ow
         const route = { ...task.route }; delete route.flowVersion
         const legacy = await createLegacyFactoryStore(pool, factoryAuthorize, b.botId).route(b.id, route)
         assert.equal(legacy.task.id, task.id)
+        const dispatchReceipt = await pool.query(`SELECT result->>'runId' AS "runId" FROM factory_events
+          WHERE "taskId"=$1 AND request ? 'digest' AND request ? 'sourceEventId'`, [task.id])
+        assert.deepEqual(dispatchReceipt.rows, [{ runId: initial.runId }])
         task.route = legacy.task.route
       }
       assert.equal(task.route.flowVersion, legacyReview ? undefined : 2)

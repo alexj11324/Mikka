@@ -22,6 +22,22 @@ x-application: &application
   MIKKA_DEFAULT_MODEL_API_KEY: synthetic-selfhost-only
   MIKKA_DEFAULT_MODEL_ID: selfhost-ci
 services:
+  dependency-postgres:
+    image: postgres:17
+    profiles: [dependency-tests]
+    environment:
+      POSTGRES_USER: e2e
+      POSTGRES_DB: self_hosted_e2e
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Generate a disposable database password}
+      POSTGRES_INITDB_ARGS: --set=max_locks_per_transaction=512
+    ports:
+      - '127.0.0.1::5432'
+    networks: [dependency-tests]
+    healthcheck:
+      test: [CMD, pg_isready, -U, e2e, -d, self_hosted_e2e]
+      interval: 2s
+      timeout: 3s
+      retries: 30
   app:
     environment: *application
     depends_on:
@@ -78,5 +94,7 @@ services:
       interval: 3s
       timeout: 3s
       retries: 20
+networks:
+  dependency-tests:
 volumes:
   replica-data:
