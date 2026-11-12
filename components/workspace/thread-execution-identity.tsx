@@ -102,6 +102,7 @@ export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadE
       const key = labels.apiKeys[binding.id]
       return <Line><KeyRound aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />{t('apiKey', { owner: owner(binding.ownerId), provider: key ? keyProvider(key.provider, key.name) : t('unknown') })}{key?.last4 && <Quiet>····{key.last4}</Quiet>}{shared}</Line>
     }
+    if (binding.kind === 'cloudflare_sponsored') return <Line><Cloud aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />{t('sponsoredCloudflare')}</Line>
     if (binding.kind === 'e2b') return <Line><Cloud aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />{t('e2bKey', { owner: owner(binding.ownerId) })}{labels.e2b && labels.people[binding.ownerId]?.you && <Quiet>····{labels.e2b.last4}</Quiet>}{shared}</Line>
     return <Line><Plug aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />{labels.mcp[binding.id]?.name ?? t('unknown')}{shared}</Line>
   }
@@ -112,7 +113,7 @@ export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadE
       ? t('costModelSubscription', { owner: owner(model.ownerId), provider: labels.subscriptions[model.resourceId]?.provider === 'codex' ? 'ChatGPT' : 'Claude' })
       : model.kind === 'api_key' ? t('costModelApiKey', { owner: owner(model.ownerId), provider: labels.apiKeys[model.resourceId] ? keyProvider(labels.apiKeys[model.resourceId].provider, labels.apiKeys[model.resourceId].name) : t('unknown') })
       : t('costModelLogin')
-    const runtimePart = runtime.kind === 'e2b' ? t('costRuntimeE2b', { owner: owner(runtime.ownerId, true) })
+    const runtimePart = runtime.kind === 'cloudflare_sponsored' ? t('costRuntimeCloudflare') : runtime.kind === 'e2b' ? t('costRuntimeE2b', { owner: owner(runtime.ownerId, true) })
       : t('costRuntimeDevice', { owner: owner(runtime.ownerId, true), device: deviceName(runtime.resourceId) })
     const mikka = model.amount === 'metered' || runtime.amount === 'metered' ? t('costMikkaMetered') : t('costMikkaFree')
     return t('costSentence', { model: modelPart, runtime: runtimePart, mikka })

@@ -5,6 +5,7 @@ import React, { act, type ReactNode } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
 import messages from '../messages/en.json'
+import { Input } from '../components/ui/input'
 import { Textarea } from '../components/ui/textarea'
 
 // Exercise the real read owners and Sonner action buttons. The only reads are
@@ -42,7 +43,7 @@ stub('app/actions/agents.ts', {
   retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null,
   sendIssueThreadReply: async () => { throw new Error('This read test must not send') }, stopRun: async () => ({}),
 })
-stub('hooks/use-live-key.tsx', { useLiveKey: Empty, useLiveKeys: Empty, watchPageVisibility: () => () => {} })
+stub('hooks/use-live-key.tsx', { useLiveKey: Empty, useLiveKeys: Empty, useLiveScope: () => null, watchPageVisibility: () => () => {} })
 stub('components/artifacts/artifact-card.tsx', { ArtifactKindIcon: Empty, ArtifactAuthorAvatar: Empty })
 stub('components/artifacts/artifact-share.tsx', { ArtifactShare: Empty })
 stub('components/artifacts/selection-actions.tsx', { SelectionActions: Empty })
@@ -65,9 +66,7 @@ const issue = { id: 'issue', userId: 'owner', title: 'Retained task', content: {
 stub('app/actions/issues.ts', { pollIssue: () => read('task', { viewerId: 'owner', version: '1', issue }), pollIssueVersionSummaries: async () => ({ viewerId: 'owner', snapshot: { version: '1', items: [] } }), listIssueVersions: async () => [], saveIssue: async () => { throw new Error('This read test must not save') } })
 stub('app/actions/issue-operations.ts', { getDeletedIssue: async () => null, listIssueConnections: async () => [], setIssueDeleted: async () => { throw new Error('This read test must not delete') } })
 stub('components/workspace/issue-editor.tsx', { createDocumentSeed: () => null, IssueEditor: Empty })
-stub('components/workspace/issue-detail-header.tsx', { IssueDetailHeader: Empty })
-stub('components/workspace/issue-detail-actions.tsx', { IssueDetailActions: Empty })
-for (const [file, name] of [['issue-description-history', 'IssueDescriptionHistory'], ['issue-relations', 'IssueRelations'], ['issue-members', 'IssueMembers'], ['issue-detail-properties', 'IssueDetailProperties'], ['issue-activity-feed', 'IssueActivityFeed']]) stub(`components/workspace/${file}.tsx`, { [name]: Empty })
+for (const [file, name] of [['issue-description-history', 'IssueDescriptionHistory'], ['issue-relations', 'IssueRelations'], ['issue-members', 'IssueMembers'], ['issue-activity-feed', 'IssueActivityFeed']]) stub(`components/workspace/${file}.tsx`, { [name]: Empty })
 const groupMessages = await import('../lib/group-messages')
 stub('lib/group-messages.ts', { ...groupMessages, fetchGroupMessages: () => read('group', { messages: [{ id: 'message', conversationId: 'group', position: '1', authorType: 'user', authorId: 'owner', body: 'Retained group message', mentions: [], replyToId: null, createdAt: '2026-11-07T00:00:00Z' }], nextBefore: null }) })
 stub('app/actions/link-preview.ts', { getLinkPreview: async () => null })
@@ -76,7 +75,8 @@ stub('components/nav/group-avatar.tsx', { GroupAvatar: Empty, groupMembersKey: (
 stub('components/nav/letter-avatar.tsx', { LetterAvatar: Empty })
 stub('components/nav/bot-avatar.tsx', { BotAvatar: Empty, CoordinatorAvatar: Empty })
 // The task page's layer frame (docs/ui-overlay.md task-detail); this test reads through the open-source layout.
-stub('components/workspace/task-detail-frame.tsx', { FramedTask: Empty })
+stub('components/workspace/task-detail-frame.tsx', { FramedTask: ({ titleField }: import('../components/workspace/task-detail-frame').FramedTaskProps) => <Input id="task-title" value={titleField.value} readOnly /> })
+stub('components/slots/task-conversation.tsx', { TaskConversation: ({ issueId, runId }: { issueId: string; runId: string }) => <ol data-task-conversation={issueId}><li>{runId}</li></ol> })
 stub('components/workspace/message-reactions.tsx', { MessageReactions: Empty, useMessageReactions: () => ({}) })
 
 const Workspace = () => <main data-fixture-workspace="">Retained workspace</main>

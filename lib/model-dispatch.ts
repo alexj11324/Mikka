@@ -47,7 +47,7 @@ export async function modelNotAllowed(pool: Pool, scope: OrderScope, asked?: { h
 }
 
 export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { botId: string | null }, asked?: { harness: OrderEntry['harness']; model?: string } | null, location?: RunLocation, deviceId?: string, dependencies: {
-  cloudPurpose?: 'task' | 'desktop'; refreshQuota?: RefreshOrderQuota
+  cloudPurpose?: import('./cloud-template-models').CloudModelPurpose; refreshQuota?: RefreshOrderQuota
   /** Host-only placement constraint: the Agent is already chosen, but its model still follows preferences. */
   harness?: OrderEntry['harness']
   /** Host-only continuation fence: a task never cycles through failed entries again. */
@@ -107,7 +107,7 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
     && dependencies.bindSubscription === false && dependencies.skipCatalogueRefresh === true && !dependencies.routing
   const states = await credentialStates(pool, scope, entries, candidates, undefined, { refresh: dependencies.refreshQuota, probe: dependencies.probeQuota, ...(deferStaleQuota ? { deferStaleQuota: true } : {}) })
   const devices = places !== 'cloudOnly' ? (await poolDevices(pool, scope.ownerId)).filter(device => !deviceId || device.id === deviceId) : []
-  const ready = places !== 'local' && await cloudReady(pool, { ownerId: scope.ownerId, workspaceId: scope.workspaceId, botId: scope.botId, harness: entries[0]?.harness ?? 'claude_code' })
+  const ready = places !== 'local' && await cloudReady(pool, { ownerId: scope.ownerId, workspaceId: scope.workspaceId, botId: scope.botId, harness: entries[0]?.harness ?? 'claude_code' }, dependencies.cloudPurpose)
   // Deferring a positive old allowance does not establish failure or permit a
   // later source. Keep the dispatch spending fence through that pending entry.
   const pendingAt = deferStaleQuota ? entries.findIndex(entry => states.get(entry.id)?.quotaCheckPending) : -1
@@ -120,7 +120,7 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   if (canRoute && dependencies.routing) {
     const harnesses = [...new Set(entries.map(entry => entry.harness))]
     const readiness = new Map(await Promise.all(harnesses.map(async harness => [harness,
-      harness === entries[0]?.harness ? ready : places !== 'local' && await cloudReady(pool, { ...scope, harness })] as const)))
+      harness === entries[0]?.harness ? ready : places !== 'local' && await cloudReady(pool, { ...scope, harness }, dependencies.cloudPurpose)] as const)))
     const { rows: agents } = devices.length ? await pool.query<{ id: string; deviceId: string; harness: string }>(
       'SELECT id,"deviceId",harness FROM agents WHERE "userId"=$1 AND "deviceId"=ANY($2::uuid[]) AND ($3::text IS NULL OR id::text=$3)',
       [scope.ownerId, devices.map(device => device.id), dependencies.agentId ?? null]) : { rows: [] }

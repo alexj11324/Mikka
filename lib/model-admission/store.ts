@@ -82,6 +82,10 @@ export class ModelAdmissionStore {
     options: { signal?: AbortSignal; auditAllowed?: boolean } = {}) {
     return this.admit(scope, model, { provider: 'zerocat', endpoint }, options)
   }
+  workersAi(scope: { workspaceId: string; ownerId?: string }, model: string, endpoint: string,
+    options: { signal?: AbortSignal; auditAllowed?: boolean } = {}) {
+    return this.admit(scope, model, { provider: 'cloudflare-workers-ai', endpoint }, options)
+  }
   subscription(scope: { workspaceId: string; ownerId?: string }, model: string, route: string,
     options: { signal?: AbortSignal; auditAllowed?: boolean } = {}) {
     return this.admit(scope, model, subscriptionModelRoute(route), options)
@@ -109,7 +113,7 @@ export class ModelAdmissionStore {
         if (options.auditAllowed !== false) await withDatabaseClient(tx, () => recordAudit(db, {
           workspaceId: scope.workspaceId, actor: { type: 'user', id: identity.ownerId, name: identity.ownerId },
           action: 'model.admitted', metadata: { revision: current.revision, provider: admission.provider, model: admission.model,
-            endpoint: admission.endpoint, dataRegion: admission.dataRegion },
+            endpoint: admission.provider === 'cloudflare-workers-ai' ? 'https://api.cloudflare.com' : admission.endpoint, dataRegion: admission.dataRegion },
         }))
         return { admission }
       } catch (error) {

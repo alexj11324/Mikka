@@ -101,6 +101,10 @@ test('deferred heartbeat work cannot retain a token lock after its request; owne
   const target = new URL(url!)
   target.searchParams.set('application_name', applicationName)
   const source = new Pool({ connectionString: target.toString(), max: 2 })
+  const sourceClientsClosed: Promise<void>[] = []
+  source.on('connect', client => {
+    sourceClientsClosed.push(new Promise(resolve => client.once('end', resolve)))
+  })
   let scheduled!: () => unknown, release!: () => void, ready!: () => void
   const gate = new Promise<void>(resolve => { release = resolve })
   const began = new Promise<void>(resolve => { ready = resolve })
@@ -117,10 +121,13 @@ test('deferred heartbeat work cannot retain a token lock after its request; owne
     release()
     await pending?.catch(() => undefined)
     for (const timer of timers) clearTimeout(timer)
-    // Only this test's dedicated source/fence connections, including a leak
-    // in the old implementation; no shared application/other-test backend.
+    // pg-pool can resolve end() before each client has finished closing its socket.
     await source.end()
-    await admin!.query('SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name=$1 AND pid<>pg_backend_pid()', [applicationName])
+    await Promise.all(sourceClientsClosed)
+    // A failed assertion can leave the old implementation's dedicated fence in a transaction.
+    await admin!.query(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+      WHERE application_name=$1 AND pid<>pg_backend_pid()
+      AND state IN ('idle in transaction', 'idle in transaction (aborted)')`, [applicationName])
   })
   await withDeviceUnitFence({ tokenId: f.tokenId, userId: f.owner }, async () => {
     afterJob('after:factory-dispatch-recovery', async () => {

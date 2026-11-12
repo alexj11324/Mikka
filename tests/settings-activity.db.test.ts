@@ -273,7 +273,7 @@ dbTest('devices: rename is owner-only and survives re-register; removal waits fo
   const devicesNow = await deviceActions.listDevices()
   assert.ok(!devicesNow.some(device => device.id === deviceId))
   assert.deepEqual(await deviceActions.renameDevice(deviceId, 'Back'), { error: 'deviceNotFound', params: undefined })
-  assert.deepEqual(await deviceActions.setDeviceEnabled({ deviceId, enabled: true }), { success: true })
+  assert.deepEqual(await deviceActions.setDeviceEnabled({ deviceId, enabled: true }), { error: 'deviceNotFound', params: undefined })
   assert.equal((await pool.query('SELECT enabled FROM devices WHERE id=$1', [deviceId])).rows[0].enabled, false, 'a removed device cannot be re-enabled')
 
   // Another credential of the same person is untouched and cannot revive the tombstone.

@@ -1,6 +1,4 @@
-// What the bot-overview slot receives (docs/ui-overlay.md): the body of a chat's 概览 when it is a tab of the
-// conversation's work area (FRAME_OWNS_PANEL), the bot and then 详情 / 任务 / PR / 电脑 (R-02). Everything it shows
-// and does is Mikka's, from ContextPanel (components/nav/context-panel.tsx) and components/nav/bot-overview.tsx.
+// Bot Overview receives the same scoped data and commands in a frame tab, column or sheet.
 import type { ReactNode } from 'react'
 
 export type BotOverviewTab = 'details' | 'threads' | 'prs' | 'computer'

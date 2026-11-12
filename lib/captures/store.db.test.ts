@@ -319,6 +319,7 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     const names = ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_ARTIFACTS_BUCKET'] as const
     const previous = Object.fromEntries(names.map(name => [name, process.env[name]]))
     const objects = new Map<string, Uint8Array>()
+    let readFailure: 'denied' | 'offline' | null = null
     try {
       Object.assign(process.env, { R2_ACCOUNT_ID: 'synthetic', R2_ACCESS_KEY_ID: 'synthetic', R2_SECRET_ACCESS_KEY: 'synthetic', R2_ARTIFACTS_BUCKET: 'test' })
       globalThis.fetch = async (input, init) => {
@@ -332,12 +333,25 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
           return new Response(null, { status: 200 })
         }
         if (request.method === 'DELETE') { objects.delete(key); return new Response(null, { status: 204 }) }
+        if (readFailure === 'denied') return new Response(null, { status: 403 })
+        if (readFailure === 'offline') throw new TypeError('fetch failed')
         const bytes = objects.get(key)
         return bytes ? new Response(new Uint8Array(bytes)) : new Response(null, { status: 404 })
       }
       const r2 = await store.beginUpload(local, { title: 'R2', contentType: 'image/png', size: PNG.length, sha256: sha(PNG) })
       assert.ok(!('error' in r2) && r2.upload.target === 'storage')
+      const { captureFailure } = await import('./device')
+      const missing = await store.completeUpload(local, r2.captureId)
+      assert.ok('error' in missing)
+      assert.equal(captureFailure(missing).status, 404)
       await fetch(r2.upload.url, { method: 'PUT', headers: r2.upload.headers, body: PNG })
+      for (const failure of ['denied', 'offline'] as const) {
+        readFailure = failure
+        const deferred = await store.completeUpload(local, r2.captureId)
+        assert.ok('error' in deferred)
+        assert.equal(captureFailure(deferred).status, 503, `${failure} must preserve the daemon's pending upload`)
+      }
+      readFailure = null
       const verified = await store.completeUpload(local, r2.captureId)
       assert.ok(!('error' in verified))
       await fetch(r2.upload.url, { method: 'PUT', headers: r2.upload.headers, body: swapped })

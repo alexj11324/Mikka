@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, mkdirSync, copyFileSync, readFileSync, rmSync,
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { requireAscInputs, selectNativeSource, validateNativeBuild, withAscProfile, verifyHostedArchive, excludedFromNativeArchive } from './mobile-native.mjs'
+import { requireAscInputs, selectNativeSource, validateNativeBuild, withAscProfile, verifyHostedArchive, excludedFromNativeArchive, recoverOriginalBuild } from './mobile-native.mjs'
 
 const SOURCE = 'e'.repeat(40)
 const DRIVER = 'd'.repeat(40)
@@ -15,10 +15,13 @@ const baseEnv = { GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REF: 'refs/heads
 const app = { extra: { eas: { projectId: PROJECT } }, ios: { bundleIdentifier: 'com.aspectlylabs.mikka' },
   runtimeVersion: { policy: 'fingerprint' } }
 const build = { id: BUILD, platform: 'IOS', status: 'FINISHED', gitCommitHash: SOURCE,
-  app: { id: PROJECT }, appIdentifier: app.ios.bundleIdentifier, buildProfile: 'production',
+  app: { id: PROJECT }, appIdentifier: app.ios.bundleIdentifier, buildProfile: 'hosted-production',
   distribution: 'STORE', isForIosSimulator: false, runtime: { version: RUNTIME }, fingerprint: { hash: RUNTIME },
   artifacts: { buildUrl: 'https://example.invalid/private-download' } }
-const identity = { sourceSha: SOURCE, buildId: BUILD, driverSha: DRIVER }
+const archiveProof = { sourceSha: SOURCE, overlaySha: 'a'.repeat(40), archiveDigest: 'b'.repeat(64), files: 10,
+  overlayFiles: 3, profile: 'hosted-production', stage: 'eas build:inspect archive' }
+const recovery = { originalRunId: 432, buildId: BUILD, sourceSha: SOURCE, fingerprint: RUNTIME, archiveProof }
+const identity = { sourceSha: SOURCE, buildId: BUILD, driverSha: DRIVER, archiveProof, recovery }
 
 test('new build retains the actual main workflow identity', () => {
   const source = selectNativeSource(baseEnv)
@@ -131,14 +134,77 @@ test('invalid P8 error does not reveal its contents or alter the checkout', () =
 })
 
 
-test('official profile requires a matching archive proof and never accepts it as the public profile', () => {
-  const archiveProof = { sourceSha: SOURCE, overlaySha: 'a'.repeat(40), archiveDigest: 'b'.repeat(64), files: 10, overlayFiles: 3 }
-  const hosted = { ...build, buildProfile: 'hosted-production' }
-  assert.throws(() => validateNativeBuild(hosted, identity, app), /nativeBuildIdentityMismatch/)
-  assert.throws(() => validateNativeBuild(hosted, { ...identity, expectedProfile: 'hosted-production' }, app), /hostedBuildArchiveProofRequired/)
-  assert.throws(() => validateNativeBuild(hosted, { ...identity, expectedProfile: 'hosted-production', archiveProof: { ...archiveProof, sourceSha: DRIVER } }, app), /hostedBuildArchiveProofRequired/)
-  const report = validateNativeBuild(hosted, { ...identity, expectedProfile: 'hosted-production', archiveProof }, app)
-  assert.deepEqual(report.archiveProof, archiveProof)
+test('a new store binary always requires the official profile and complete archive proof', () => {
+  const fresh = { sourceSha: SOURCE, driverSha: SOURCE, buildId: '', archiveProof }
+  assert.throws(() => validateNativeBuild({ ...build, buildProfile: 'production' }, fresh, app), /nativeBuildIdentityMismatch/)
+  for (const patch of [undefined, { ...archiveProof, sourceSha: DRIVER }, { ...archiveProof, profile: 'production' },
+    { ...archiveProof, overlayFiles: 0 }]) {
+    assert.throws(() => validateNativeBuild(build, { ...fresh, archiveProof: patch }, app), /hostedBuildArchiveProofRequired/)
+  }
+  assert.deepEqual(validateNativeBuild(build, fresh, app).archiveProof, archiveProof)
+})
+
+function recoveryFixture() {
+  const repository = { full_name: baseEnv.GITHUB_REPOSITORY, id: 1427517699 }
+  const workflow = { id: 71, path: '.github/workflows/mobile-native.yml' }
+  const origin = { id: 432, repository_id: repository.id, head_repository_id: repository.id, head_sha: SOURCE, head_branch: 'main' }
+  const artifact = { name: 'mobile-native-' + SOURCE, expired: false, workflow_run: origin }
+  const run = { id: origin.id, workflow_id: workflow.id, path: workflow.path, repository, head_repository: repository,
+    head_sha: SOURCE, head_branch: 'main', event: 'workflow_dispatch', status: 'completed', conclusion: 'failure' }
+  const steps = ['Require the complete protected UI in the EAS archive', 'Build iOS with existing signing credentials',
+    'Verify the completed build and commit'].map(name => ({ name, conclusion: 'success' }))
+  const reports = { build: { ...build, driverSha: SOURCE, runtimeVersion: RUNTIME, fingerprint: RUNTIME, archiveProof }, archive: { ...archiveProof } }
+  const source = selectNativeSource({ ...baseEnv, EXPECTED_BUILD_COMMIT: SOURCE, EXISTING_BUILD_ID: BUILD }, () => true)
+  const calls = []
+  function recover(otherBuildFirst = false) {
+    return recoverOriginalBuild(source, baseEnv, {
+      api(path, paged) {
+        const root = '/repos/alexj11324/Mikka/actions'
+        if (path === root + '/workflows/mobile-native.yml') return workflow
+        if (path === root + '/artifacts?name=' + artifact.name + '&per_page=100' && paged) return [{ artifacts: otherBuildFirst ? [{ ...artifact, workflow_run: { ...origin, id: 431 } }] : [] }, { artifacts: [artifact] }]
+        if (otherBuildFirst && path === root + '/runs/431') return { ...run, id: 431 }
+        if (path === root + '/runs/432') return run
+        if ([431, 432].some(id => path === root + '/runs/' + id + '/jobs?filter=all&per_page=100') && paged) return [{ jobs: [{ steps }] }]
+        throw Error('unexpected GitHub request')
+      },
+      readReports(id, name) { calls.push([id, name]); return id === 431 ? { ...reports, build: { ...reports.build, id: PROJECT } } : reports },
+    })
+  }
+  return { workflow, run, artifact, origin, steps, reports, calls, recover }
+}
+
+test('recovery finds the original build on later pages, even after a failed submission, and binds the current EAS fingerprint', () => {
+  const f = recoveryFixture()
+  const original = f.recover(true)
+  assert.deepEqual(original, recovery)
+  assert.deepEqual(f.calls, [[431, 'mobile-native-' + SOURCE], [432, 'mobile-native-' + SOURCE]])
+  const result = validateNativeBuild(build, { ...identity, recovery: original }, app)
+  assert.equal(result.originalRunId, 432)
+  assert.equal(result.archiveProof.overlaySha, archiveProof.overlaySha)
+  const laterRuntime = 'e'.repeat(40)
+  assert.throws(() => validateNativeBuild({ ...build, runtime: { version: laterRuntime }, fingerprint: { hash: laterRuntime } }, identity, app), /nativeOriginalBuildIdentityMismatch/)
+  assert.throws(() => validateNativeBuild(build, { ...identity, recovery: undefined }, app), /nativeOriginalBuildIdentityMismatch/)
+})
+
+test('foreign, stale, incomplete and recovery-only runs never supply original archive evidence', () => {
+  for (const alter of [
+    f => { f.artifact.expired = true }, f => { f.origin.head_repository_id++ }, f => { f.origin.id = Number(baseEnv.GITHUB_RUN_ID) },
+    f => { f.run.workflow_id++ }, f => { f.run.path = '.github/workflows/other.yml' }, f => { f.run.head_branch = 'release' },
+    f => { f.run.head_sha = DRIVER }, f => { f.run.event = 'pull_request_target' }, f => { f.run.head_repository = { id: 9 } },
+    f => { f.steps[1].conclusion = 'skipped' }, f => { f.reports.archive = null }, f => { f.reports.build.id = PROJECT },
+    f => { f.reports.build.originalRunId = 99 },
+  ]) {
+    const f = recoveryFixture(); alter(f)
+    assert.throws(f.recover, /nativeOriginalBuildProofRequired/)
+  }
+  for (const patch of [{ gitCommitHash: DRIVER }, { driverSha: DRIVER }, { buildProfile: 'production' }, { fingerprint: DRIVER }]) {
+    const f = recoveryFixture(); Object.assign(f.reports.build, patch)
+    assert.throws(f.recover, /nativeOriginalBuildIdentityMismatch/)
+  }
+  for (const patch of [{ overlaySha: DRIVER }, { archiveDigest: '3'.repeat(64) }]) {
+    const f = recoveryFixture(); Object.assign(f.reports.archive, patch)
+    assert.throws(f.recover, /nativeOriginalArchiveMismatch/)
+  }
 })
 
 test('archive preserves transitive tracked UI bytes and rejects missing, extra, changed or excluded files', () => {
@@ -154,10 +220,13 @@ test('archive preserves transitive tracked UI bytes and rejects missing, extra, 
       write(overlay, file, `synthetic ${file}`)
       write(archive, `.hosted-ui/${file}`, `synthetic ${file}`)
     }
-    write(archive, 'apps/mobile/eas.json', JSON.stringify({ build: { 'hosted-production': {
-      extends: 'production', env: { MIKKA_MOBILE_OVERLAY_DIR: '.hosted-ui/mobile' },
-    } } }))
+    const profiles = { production: { env: { MIKKA_MOBILE_OVERLAY_DIR: '.hosted-ui/mobile' } },
+      'hosted-production': { extends: 'production', env: { MIKKA_MOBILE_OVERLAY_DIR: '.hosted-ui/mobile' } } }
+    write(archive, 'apps/mobile/eas.json', JSON.stringify({ build: profiles }))
     const check = () => verifyHostedArchive({ archive, overlay, trackedFiles: [...files, 'docs/private.md'], sourceSha: SOURCE, overlaySha: DRIVER })
+    write(archive, 'apps/mobile/eas.json', JSON.stringify({ build: { ...profiles, production: {} } }))
+    assert.throws(check, /officialStoreOverlayRequired/)
+    write(archive, 'apps/mobile/eas.json', JSON.stringify({ build: profiles }))
     const proof = check()
     assert.equal(proof.overlayFiles, 2)
     assert.equal(proof.files, 3)
@@ -188,13 +257,16 @@ test('archive preserves transitive tracked UI bytes and rejects missing, extra, 
 test('official packaging keeps public profiles and ignored paths while adding the complete protected checkout', () => {
   const root = new URL('../../', import.meta.url)
   const eas = JSON.parse(readFileSync(new URL('apps/mobile/eas.json', root), 'utf8'))
-  assert.equal(eas.build.production.env, undefined)
+  assert.equal(eas.build.production.env.MIKKA_MOBILE_OVERLAY_DIR, '.hosted-ui/mobile')
   assert.equal(eas.build['hosted-production'].extends, 'production')
   assert.equal(eas.build['hosted-production'].env.MIKKA_MOBILE_OVERLAY_DIR, '.hosted-ui/mobile')
   const ignore = readFileSync(new URL('.easignore', root), 'utf8')
   assert.ok(ignore.startsWith(readFileSync(new URL('.gitignore', root), 'utf8')))
   assert.ok(ignore.includes('!/.hosted-ui/**'))
   const workflow = readFileSync(new URL('.github/workflows/mobile-native.yml', root), 'utf8')
+  assert.ok(workflow.indexOf('mobile-native.mjs recover') > workflow.indexOf('mobile-native.mjs source'))
+  assert.ok(workflow.indexOf('mobile-native.mjs recover') < workflow.indexOf('Read existing EXPO_TOKEN'))
+  assert.ok(!workflow.includes('NATIVE_BUILD_PROFILE'))
   assert.ok(workflow.indexOf('mobile-native.mjs source') < workflow.indexOf('Read existing HOSTED_UI_READ_KEY'))
   assert.ok(workflow.indexOf('mobile-native.mjs archive') < workflow.indexOf('build --platform ios --profile hosted-production'))
   assert.ok(workflow.includes('ssh-key: ${{ env.HOSTED_UI_READ_KEY }}'))

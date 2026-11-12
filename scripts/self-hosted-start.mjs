@@ -4,6 +4,7 @@ import { link, mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { Pool } from 'pg'
+import { sessionDatabaseURL } from './postgres-connection.mjs'
 
 const generatedKeys = ['BETTER_AUTH_SECRET', 'WORKSPACE_SECRETS_KEY', 'CREDENTIAL_MASTER_KEY', 'DEVICE_GATEWAY_PUSH_SECRET', 'CRON_SECRET']
 
@@ -56,10 +57,18 @@ export function selfHostedEnvironment(env, root) {
   return env
 }
 
+/** Startup's cross-replica migration advisory lock owns a PostgreSQL session.
+ * PgBouncer transaction pooling cannot preserve that session; use the
+ * explicitly configured unpooled endpoint, or Neon's verified direct host.
+ * Do not mutate the pooled URL used by normal application queries. */
+export function migrationLockConnectionString(env) {
+  return sessionDatabaseURL(env.MIKKA_DATABASE_URL, env)
+}
+
 async function migrate(root, env) {
   // One startup owns DDL, including the two logical databases, while another
   // replica waits. The lock belongs to this connection and dies with it.
-  const pool = new Pool({ connectionString: env.MIKKA_DATABASE_URL, max: 1, connectionTimeoutMillis: 10_000 })
+  const pool = new Pool({ connectionString: migrationLockConnectionString(env), max: 1, connectionTimeoutMillis: 10_000 })
   const connection = await pool.connect()
   try {
     await connection.query("SET lock_timeout = '120s'")

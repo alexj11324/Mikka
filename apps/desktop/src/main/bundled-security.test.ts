@@ -70,6 +70,29 @@ test('path policy rejects traversal, encoded delimiters, absolute targets and un
   assert.equal(safeAppNext('/\\evil.test'), '/')
 })
 
+test('private Drive forwarding has exact identifiers, paths and HTTP methods', () => {
+  const volume = 'vol_01ARZ3NDEKTSV4RRFFQ69G5FAV', version = 'vver_01ARZ3NDEKTSV4RRFFQ69G5FAW'
+  const routes: [string, string[]][] = [
+    ['/api/drive/volumes', ['GET', 'POST']],
+    [`/api/drive/volumes/${volume}`, ['GET']],
+    [`/api/drive/volumes/${volume}/files`, ['GET']],
+    [`/api/drive/volumes/${volume}/versions`, ['GET']],
+    [`/api/drive/volumes/${volume}/versions/${version}`, ['GET']],
+    [`/api/drive/volumes/${volume}/blobs`, ['POST']],
+    [`/api/drive/volumes/${volume}/entries`, ['PATCH']],
+    [`/api/drive/volumes/${volume}/restore`, ['POST']],
+  ]
+  for (const [path, methods] of routes) {
+    for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']) {
+      assert.equal(allowedApiPath(path, method), methods.includes(method), `${method} ${path}`)
+    }
+  }
+  for (const path of ['/api/drive/admin', '/api/drive/volumes/not-a-volume', `/api/drive/volumes/${volume}/files/extra`,
+    `/api/drive/volumes/${volume}/versions/not-a-version`, `/api/drive/volumes/${volume}/shares`, `/api/drive/volumes/${volume}/delete`]) {
+    for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']) assert.equal(allowedApiPath(path, method), false, `${method} ${path}`)
+  }
+})
+
 test('renderer CSP has no remote code, eval, inline scripts, external fetch, workers or object', () => {
   assert.match(RENDERER_CSP, /script-src 'self';/)
   assert.doesNotMatch(RENDERER_CSP, /unsafe-eval|script-src[^;]*unsafe-inline/)
@@ -86,6 +109,24 @@ test('Factory flow accepts only a strict UUID and its two declared methods', () 
     for (const method of ['GET', 'POST']) assert.equal(allowedApiPath(`/api/factory/tasks/${id}/flow`, method), false)
   }
   assert.equal(allowedApiPath(`${path}/extra`, 'GET'), false)
+})
+
+test('service identity management forwards only its declared human-session methods and UUID paths', () => {
+  const workspace = 'ab81a708-013c-4e44-9ab2-a500bd59f381'
+  const identity = 'ebb7878e-6918-4b68-9300-d956761b5011'
+  const directory = `/api/workspaces/${workspace}/service-identities`
+  const item = `${directory}/${identity}`
+  const methods = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+  const governance = `/api/workspaces/${workspace}/governance`
+  for (const method of methods) assert.equal(allowedApiPath(governance, method), method === 'GET', method)
+  const routes = [[directory, 'POST'], [item, 'PATCH'], [item + '/projects', 'PUT'], [item + '/credential', 'POST']]
+  for (const [path, mutation] of routes) {
+    for (const method of methods) assert.equal(allowedApiPath(path, method), method === 'GET' || method === mutation, `${method} ${path}`)
+  }
+  for (const path of [governance.replace(workspace, 'unknown'), governance + '/usage', directory.replace(workspace, 'unknown'), directory + '/bad-id', item + '/unknown',
+    item + '/credential/rotate', item + '/projects/', '/api/service-identity/projects']) {
+    for (const method of methods) assert.equal(allowedApiPath(path, method), false, `${method} ${path}`)
+  }
 })
 
 test('billing metadata and commands have exact scoped routes and methods', () => {
@@ -493,4 +534,10 @@ test('desktop forwards eve protocol headers and fences NDJSON bytes at account/w
   source.enqueue(new TextEncoder().encode('{"previousOwner":true}\n'))
   assert.equal((await reader.read()).done, true)
   assert.equal(cancelled, true)
+})
+
+test('run environment settings forwarding permits only the exact read route', () => {
+  assert.equal(allowedApiPath('/api/settings/environments', 'GET'), true)
+  assert.equal(allowedApiPath('/api/settings/environments/extra', 'GET'), false)
+  for (const method of ['HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) assert.equal(allowedApiPath('/api/settings/environments', method), false)
 })

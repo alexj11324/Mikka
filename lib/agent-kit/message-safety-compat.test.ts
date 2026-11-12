@@ -22,7 +22,7 @@ stub('../coordinator/store.ts', { loadConversation: async () => conversation, lo
 stub('../profile/memory.ts', { memoryForBotPrompt: async () => '' })
 stub('../coordinator/bot-instructions.ts', { botInstructions: async (_owner: string, _bot: string | null, base: string) => base })
 stub('../coordinator/personal-instructions.ts', { withPersonalInstructions: async (_owner: string, base: string) => base, withPersonalInstructionText: async (_owner: string, base: string) => base })
-stub('../db/index.ts', { db: null, pool: null, withDatabaseClient: () => { throw Error('No database transaction in prompt fixture') } })
+stub('../db/index.ts', { db: null, pool: null, withDatabaseClient: () => { throw Error('No database transaction in prompt fixture') }, withDatabaseTransaction: () => { throw Error('No database transaction in prompt fixture') } })
 stub('../issue-visibility.ts', { issueVisibility: () => { throw Error('No database in pure test') } })
 stub('../agent-runs.ts', { addRunMessage: async (...args: unknown[]) => { forwarded.push(args) }, queueRun: () => {}, queueFactoryRun: () => { throw Error('No Factory dispatch in prompt fixture') }, readRun: () => {}, requestRunStop: () => {}, visibleRuns: () => {} })
 stub('../search/index.ts', { webSearch: () => {} })

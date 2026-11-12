@@ -79,14 +79,17 @@ export function createMikkaSlackChannel(dependencies: SlackChannelDependencies =
     routes: native.routes.map(route => route.transport === 'websocket' ? route : ({
       ...route,
       async handler(request, args) {
-        const current = config(), routing = slackRouting(env())
-        if (!current || !routing) return new Response('Slack is not configured', { status: 503 })
+        const channelEnv = env()
+        const signingSecret = channelEnv.SLACK_SIGNING_SECRET
+        if (!signingSecret) return new Response('Slack is not configured', { status: 503 })
         const raw = await request.clone().text()
-        if (!validSlackSignature(raw, request.headers.get('x-slack-request-timestamp'), request.headers.get('x-slack-signature'), current.SLACK_SIGNING_SECRET)) return new Response('Invalid signature', { status: 401 })
+        if (!validSlackSignature(raw, request.headers.get('x-slack-request-timestamp'), request.headers.get('x-slack-signature'), signingSecret)) return new Response('Invalid signature', { status: 401 })
         let payload: unknown
         try { payload = request.headers.get('content-type')?.includes('application/x-www-form-urlencoded') ? JSON.parse(new URLSearchParams(raw).get('payload') ?? 'null') : JSON.parse(raw) }
         catch { return new Response('Invalid JSON', { status: 400 }) }
         if (payload && typeof payload === 'object' && 'type' in payload && payload.type === 'url_verification' && 'challenge' in payload && typeof payload.challenge === 'string') return Response.json({ challenge: payload.challenge })
+        const current = slackConfig(channelEnv), routing = slackRouting(channelEnv)
+        if (!current || !routing) return new Response('Slack is not configured', { status: 503 })
         const identity = slackInboundIdentity(current, payload)
         if (!identity) return new Response(null, { status: 204 })
         const scope = await resolveScope(identity.ownerId, routing.workspaces[identity.channelId] ?? null)

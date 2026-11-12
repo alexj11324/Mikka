@@ -1,4 +1,6 @@
-import { saveEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
+import { saveEnvironmentInput, projectDefaultEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
+import { createOnlyCommand, dispatchReceiptInput } from '@/lib/task-create-command'
+import { taskListPageInput } from '@/lib/task-list-page'
 import { taskPresentationsInput } from '@/lib/task-presentation-input'
 import { z } from 'zod'
 import { projectInput, projectPatch } from '@/lib/project-input'
@@ -104,6 +106,7 @@ export const desktopActionSchemas = {
   'teams.restoreTeam': oneId,
   'teams.removeTeamGrouping': tuple(uuid, text(120)),
   'project-resources.listProjectResources': tuple(uuid, uuid.optional()),
+  'project-resources.setProjectDefaultEnvironment': tuple(projectDefaultEnvironmentInput),
   'project-resources.saveEnvironment': tuple(saveEnvironmentInput),
   'project-resources.saveProjectResources': tuple(projectResourcesInput),
   'project-resources.saveWorkspaceRepositoryPolicy': tuple(workspaceRepositoryPolicyInput),
@@ -200,14 +203,17 @@ export const desktopActionSchemas = {
   'issues.pollIssues': tuple(version.optional(), listPositions(100).optional()),
   'issues.syncIssueList': tuple(version.optional(), listPositions(100).optional()),
   'issues.listWorkspaceIssues': oneId,
+  'issues.listWorkspaceTaskPage': tuple(taskListPageInput),
   'issues.getIssue': oneId,
   'issues.pollIssue': tuple(uuid, version.optional()),
-  'issues.saveIssue': tuple(object({ id: uuid.optional(), revision: positive.optional(), title: text(200).trim().min(1), content: document, status: z.enum(ISSUE_STATUS_CODES), priority: z.enum(ISSUE_PRIORITY_CODES) })),
+  'issues.createTaskOnly': tuple(createOnlyCommand),
+  'issues.getDispatchedTaskReceipt': tuple(dispatchReceiptInput),
+  'issues.saveIssue': tuple(object({ id: uuid.optional(), revision: positive.optional(), workspaceId: uuid.optional(), title: text(200).trim().min(1), content: document, status: z.enum(ISSUE_STATUS_CODES), priority: z.enum(ISSUE_PRIORITY_CODES) })),
   'issues.promoteIssueToTeam': tuple(object({ requestId: uuid, issueId: uuid, revision: positive, teamId: uuid, expectedTeamId: uuid.nullable() })),
   'issues.moveIssue': tuple(object({ id: uuid, status: z.enum(ISSUE_STATUS_CODES), revision: positive })),
   'issues.changeIssuePriority': tuple(object({ id: uuid, priority: z.enum(ISSUE_PRIORITY_CODES), revision: positive })),
   'issues.listIssueVersions': oneId,
-  'issues.pollIssueVersionSummaries': tuple(uuid, version.optional(), listPositions(50).optional()),
+  'issues.pollIssueVersionSummaries': tuple(uuid, version.optional(), listPositions(51).optional()),
   'issues.setIssueScope': tuple(object({ id: uuid, revision: positive, scope: z.enum(['personal', 'workspace']) })),
   'linear-sync.getLinearIntegrationState': none,
   'linear-sync.getLinearBoardSync': none,

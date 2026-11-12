@@ -17,6 +17,18 @@ or resume; an ordinary member gets `scheduleAdminRequired`. Legacy rows keep
 schedule creator's original chat. If its Bot is deleted, `bot_id` becomes null
 and the result falls back to the creator's Coordinator chat.
 
+Request deduplication uses a frozen internal `request_origin` rather than the
+mutable `bot_id`. Two Bots can use the same SDK tool-call ID; removing either
+Bot preserves its schedule without merging their request keys. The internal
+origin is omitted from tool responses. Current authorization and result routing
+continue to use `bot_id` and the existing workspace checks.
+
+The migration preserves all existing schedule fields. A row whose Bot has
+already become null gets `retained:<schedule-id>` because its original Bot
+cannot be recovered. New null-origin database writes use `coordinator`.
+Creation still requires a Workspace; retaining a request key grants no Bot,
+Workspace or result-reading authority.
+
 The clock supports explicit UTC-offset one-shot times, intervals anchored at an
 explicit future start, daily IANA local times, and five-field cron expressions
 (minute hour day-of-month month day-of-week) in the definition's IANA timezone.

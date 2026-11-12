@@ -11,18 +11,38 @@ import { underBar } from '@/components/NavBar'
 import { displayTitle } from '@/lib/display-title'
 import { shortWhen } from '@/lib/clock'
 import type { Task, TaskGroup } from '@/lib/types'
+import { ApiError } from '@/lib/api'
+import { useTaskContinuation } from '../../../../../lib/hooks/use-task-continuation'
+import type { TaskListPageInput } from '../../../../../lib/task-list-page'
 import { useLiveApi, useRefresh } from '@/lib/useApi'
 import { tasksLive } from '@/lib/live-keys'
 import { useHome } from '@/lib/home'
 import { tap } from '@/lib/haptics'
 import { colors, LIST_INSET, ROW_SURFACE_INSET, SPACE } from '@/lib/theme'
 import { rowState, taskListRows, type TaskFilter, type TaskListRow } from '../model/task-groups'
+import { readPresentedTasks } from '../model/task-presentation-read'
 import { BOARD_LABEL, GROUP_LABEL, STATE_LABEL, TaskGroupIcon, TaskStateIcon } from './task-icons'
 
 /** The person's tasks (GET /api/mobile/tasks), read again when a task or one of its threads changes (the live channel). */
-export function useTasks(enabled = true) {
+export function useTasks(enabled = true, botId?: string | null) {
   const home = useHome().data
-  return useLiveApi<{ tasks: Task[] }>(enabled ? '/api/mobile/tasks' : null, () => tasksLive(home?.live?.workspaceId, home?.workspace.id))
+  const selected = home?.workspace.id
+  // Omitting botId opens workspace Tasks. A Bot route with no resolved identity has no collection yet.
+  const path = botId === undefined ? '/api/mobile/tasks'
+    : botId && selected ? '/api/mobile/tasks?' + new URLSearchParams({ workspaceId: selected, dispatchedBy: botId }) : null
+  const list = useLiveApi<{ tasks: Task[]; workspaceId: string; next?: TaskListPageInput['after'] | null }>(enabled ? path : null,
+    list => tasksLive(home?.live?.workspaceId, list?.workspaceId ?? home?.workspace.id, list?.tasks.map(task => task.id)), readPresentedTasks)
+  const paging = useTaskContinuation(list.data?.tasks ?? [], list.data, list.data?.next ?? null, async after => {
+    const workspaceId = list.data!.workspaceId
+    const params = new URLSearchParams({ workspaceId, after: after.id, updatedAt: after.updatedAt, ...(botId ? { dispatchedBy: botId } : {}) })
+    const page = await readPresentedTasks('/api/mobile/tasks?' + params).catch(async error => {
+      if (error instanceof ApiError && error.status === 409) await list.reload()
+      throw error
+    })
+    if (page.workspaceId !== workspaceId) throw new Error('workspaceAccessDenied')
+    return { items: page.tasks, next: page.next ?? null }
+  })
+  return { ...list, paging }
 }
 
 /**
@@ -30,12 +50,12 @@ export function useTasks(enabled = true) {
  * 待办 · 已完成, each under a grey rounded bar with its count that folds it; 已完成 starts folded. `bot` keeps one
  * bot's tasks (its 资料 page).
  */
-export function TaskList({ filter = 'all', bot, bottom = 24 }: { filter?: TaskFilter; bot?: string; bottom?: number }) {
+export function TaskList({ filter = 'all', bot, bottom = 24 }: { filter?: TaskFilter; bot?: string | null; bottom?: number }) {
   const insets = useSafeAreaInsets()
-  const { data, error, loading, reload } = useTasks()
+  const { data, error, loading, reload, paging } = useTasks(true, bot)
   const refresh = useRefresh(reload)
   const [toggled, setToggled] = useState<ReadonlySet<TaskGroup>>(new Set())
-  const tasks = bot ? (data?.tasks ?? []).filter(task => task.bot?.id === bot) : data?.tasks ?? []
+  const tasks = bot === undefined ? paging.items : paging.items.filter(task => bot && (task.dispatchedBy === bot || task.bot?.id === bot))
   const rows = taskListRows(tasks, toggled, filter)
   const toggle = (id: TaskGroup) => setToggled(current => {
     const next = new Set(current)
@@ -51,6 +71,10 @@ export function TaskList({ filter = 'all', bot, bottom = 24 }: { filter?: TaskFi
       refreshControl={<RefreshControl {...refresh} />}
       contentContainerStyle={{ paddingBottom: insets.bottom + bottom }}
       ListHeaderComponent={<ReadNotice error={error} hasData={Boolean(data)} label={mobileMessages.Nav.tasks} onRetry={reload} />}
+      ListFooterComponent={paging.hasMore ? <Pressable accessibilityRole="button" disabled={paging.loading}
+        onPress={() => void paging.loadMore()} style={styles.center}>
+        <Text>{paging.failed ? mobileMessages.Common.retry : mobileMessages.HostedTasks.loadMore}</Text>
+      </Pressable> : undefined}
       ListEmptyComponent={loading && !data ? <View style={styles.center}><Spinner /></View> : error ? undefined : <Text style={styles.empty}>{mobileMessages.MobileCore.noTasks}</Text>}
       renderItem={({ item }) => item.kind === 'section'
         ? <TaskGroupBar id={item.id} count={item.count} folded={item.folded} onToggle={() => toggle(item.id)} />

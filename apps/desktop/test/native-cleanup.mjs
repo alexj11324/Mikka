@@ -119,14 +119,16 @@ async function recordedPid(directory) {
   return pid
 }
 
-async function proveNotRunning(directory, pid, refused = false) {
+async function shutdownState(directory, pid, refused = false) {
   // The production lock publishes this PID before device state is read. Its
   // socket disappears before final flush, so absence/refusal alone is unsafe.
-  if (pid !== null) return processStopped(pid)
+  if (pid !== null) return await processStopped(pid) ? 'stopped' : 'running'
   let locked = false
   try { await lstat(join(directory, 'daemon.lock')); locked = true } catch (error) { if (error.code !== 'ENOENT') throw error }
-  if (refused || locked) throw new Error('NATIVE_DAEMON_STOP_UNPROVEN')
-  return true
+  // acquireLock publishes the PID after obtaining the lock. Release removes
+  // the PID before awaiting lock removal. Either brief window looks exactly
+  // like a stale unowned lock until this same profile changes.
+  return refused || locked ? 'unproven' : 'stopped'
 }
 
 async function socketExists(socketPath) {
@@ -163,7 +165,9 @@ export async function stopLocalDaemons(profiles) {
     const deadline = Date.now() + 20_000
     let pid = await recordedPid(directory)
     const socketPath = join(directory, 'daemon.sock')
+    let unproven = false
     while (true) {
+      if (Date.now() >= deadline) throw new Error(unproven ? 'NATIVE_DAEMON_STOP_UNPROVEN' : 'NATIVE_DAEMON_EXIT_TIMEOUT')
       const currentPid = await recordedPid(directory)
       if (currentPid !== null) { assertDaemonPid(currentPid, pid); pid ??= currentPid }
       let client
@@ -205,8 +209,10 @@ export async function stopLocalDaemons(profiles) {
       // observing the exact profile within the existing exit budget so a late
       // listener receives the normal authenticated drain request.
       pid ??= await recordedPid(directory)
-      if (await proveNotRunning(directory, pid, refused)) break
-      await new Promise(resolve => setTimeout(resolve, remainingTime(deadline, 100)))
+      const state = await shutdownState(directory, pid, refused)
+      if (state === 'stopped') break
+      unproven = state === 'unproven'
+      await new Promise(resolve => setTimeout(resolve, Math.max(0, Math.min(deadline - Date.now(), 100))))
     }
   }
   return { profilesStopped: true }

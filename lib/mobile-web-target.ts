@@ -1,6 +1,8 @@
+import { readTaskEvidenceTarget, taskEvidenceHref } from './task-factory-events'
 import { desktopWebTarget } from './desktop-web-target'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+export const mobileMembersPage = '/settings/members'
 /** A plugin's id, as the web's ?app= takes it (TOOLKIT_SLUG in lib/composio-accounts.ts). */
 const APP = /^[a-z][a-z0-9_]{0,63}$/
 
@@ -12,15 +14,20 @@ const APP = /^[a-z][a-z0-9_]{0,63}$/
  * Paths are without the base path.
  */
 export function mobileWebTarget(value: string | null): string {
-  const desktop = desktopWebTarget(value)
-  if (desktop) return desktop
   if (!value || !value.startsWith('/') || value.startsWith('//')) return '/'
   const url = new URL(value, 'https://mikka.invalid')
+  const evidence = readTaskEvidenceTarget(url.searchParams)
+  if (evidence && url.pathname === '/' && url.origin === 'https://mikka.invalid' && !url.hash && [...url.searchParams].length === 3)
+    return taskEvidenceHref(evidence.issueId, evidence.factoryTaskId, evidence.receiptId)!
+  const desktop = desktopWebTarget(value)
+  if (desktop) return desktop
   if (url.origin === 'https://mikka.invalid' && url.pathname === '/settings' && !url.search && !url.hash) return '/settings'
   // Recovery stays within existing settings sections and one validated
   // workspace. The settings APIs still authorize that workspace normally.
   const settingsSection = url.searchParams.get('section')
   const settingsWorkspace = url.searchParams.get('workspace')
+  if (settingsWorkspace && UUID.test(settingsWorkspace) && value === `${mobileMembersPage}?workspace=${settingsWorkspace}`)
+    return `${mobileMembersPage}?workspace=${settingsWorkspace.toLowerCase()}`
   const settingsKeys = [...url.searchParams.keys()]
   if (url.origin === 'https://mikka.invalid' && url.pathname === '/settings' && !url.hash && settingsKeys.every(key => key === 'section' || key === 'workspace') && settingsKeys.length === (settingsWorkspace ? 2 : 1) && (!settingsWorkspace || UUID.test(settingsWorkspace)) && (settingsSection === 'computers' || settingsSection === 'models' || settingsSection === 'billing')) return `/settings?section=${settingsSection}${settingsWorkspace ? `&workspace=${settingsWorkspace.toLowerCase()}` : ''}`
   // An HTML artifact's page (资料库 on a bot's page): the viewer's sandboxed frame.

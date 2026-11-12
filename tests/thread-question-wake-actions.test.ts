@@ -75,7 +75,11 @@ before(async () => {
   stub('../lib/issue-access.ts', { requireIssueAccess: async () => ({ issue: { id: ISSUE, userId: OWNER, workspaceId: WORKSPACE }, user: { id: viewer } }) })
   stub('../lib/device-link.ts', { issueDeviceToken: () => assert.fail('no device token') })
   stub('../lib/device-presence.ts', { deviceOnlineStates: () => assert.fail('no device selection') })
-  stub('../lib/device-removal.ts', { removeOwnedDevice: () => assert.fail('no device removal'), renameOwnedDevice: () => assert.fail('no rename') })
+  stub('../lib/device-removal.ts', {
+    removeOwnedDevice: () => assert.fail('no device removal'),
+    renameOwnedDevice: () => assert.fail('no rename'),
+    setOwnedDeviceEnabled: () => assert.fail('no device scheduling change'),
+  })
   stub('../lib/device-management.ts', { enqueueDeviceCommand: () => assert.fail('no device command') })
   stub('../lib/ssh.ts', { listSshHosts: () => [] })
   stub('../lib/coordinator/store.ts', { citationSources: () => ({}) })

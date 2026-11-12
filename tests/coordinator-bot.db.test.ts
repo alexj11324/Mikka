@@ -21,7 +21,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 4 })
   const { pool: appPool } = await import('../lib/db')
-  const { workspacePool } = await import('../lib/workspace-db')
+  const { workspaceDb, workspacePool } = await import('../lib/workspace-db')
   const { withFactoryBackgroundWorkspace } = await import('../lib/factory/background-workspace')
   const { observePoolCommits } = await import('../lib/db/commit-effects')
   observePoolCommits(pool)
@@ -62,6 +62,23 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     const workspaceId = await seedPersonalWorkspace(pool, id)
     return { id, workspaceId }
   }
+  await t.test('personal Workspace and active membership use the Workspace database transaction', async () => {
+    const p = await person('coordinator-workspace-target')
+    const visible = randomUUID()
+    // Only the leased Workspace connection can see these temporary directory tables.
+    // The application pool still has the original active personal Workspace for this owner.
+    await workspaceDb.transaction(async () => {
+      await workspacePool.query('CREATE TEMP TABLE mikka_workspaces(id uuid, "userId" text, kind text) ON COMMIT DROP')
+      await workspacePool.query('CREATE TEMP TABLE mikka_workspace_members("workspaceId" uuid, "userId" text, status text) ON COMMIT DROP')
+      await workspacePool.query("INSERT INTO mikka_workspaces VALUES ($1,$2,'personal')", [visible, p.id])
+      await workspacePool.query("INSERT INTO mikka_workspace_members VALUES ($1,$2,'active')", [visible, p.id])
+      assert.equal(await bots.personalWorkspaceId(p.id), visible)
+      await assert.rejects(bots.coordinatorBot(p.id, p.workspaceId, { backfill: false }), /workspaceAccessDenied/)
+    })
+    assert.equal(await bots.personalWorkspaceId(p.id), p.workspaceId)
+    const verified = await bots.coordinatorBot(p.id, p.workspaceId, { backfill: false })
+    assert.ok((await appPool.query('SELECT 1 FROM coordinator_bots WHERE "ownerId"=$1 AND "botId"=$2', [p.id, verified.botId])).rowCount)
+  })
   const messageRows = (userId: string) => pool.query<{ botId: string | null; position: number; text: string }>(
     `SELECT "botId",position,message->>'content' AS text FROM coordinator_messages WHERE "userId"=$1 ORDER BY "botId" NULLS FIRST,position`, [userId])
   const sourceEvent = async (userId: string, payload: Record<string, unknown> = { text: 'Synthetic owner request' }) => {

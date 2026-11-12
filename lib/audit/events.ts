@@ -39,6 +39,12 @@ export const AUDIT_ACTIONS = {
   'env.updated': 'secret',
   'env.deleted': 'secret',
   // 安全
+  'service_identity.created': 'security',
+  'service_identity.renamed': 'security',
+  'service_identity.disabled': 'security',
+  'service_identity.restored': 'security',
+  'service_identity.credential_rotated': 'security',
+  'service_identity.credential_revoked': 'security',
   'token.created': 'security',
   'token.revoked': 'security',
   'token.rotated': 'security',
@@ -93,9 +99,9 @@ export const AUDIT_METADATA = {
   'agent.policy_changed': z.object({ scope: z.enum(['workspace','team','project']), revision: z.string().regex(/^[a-f0-9]{64}$/) }).strict(),
   'model.policy_changed': z.object({ revision: z.string().regex(/^[a-f0-9]{64}$/), configured: z.boolean() }).strict(),
   'model.admitted': z.object({ revision: z.string().regex(/^[a-f0-9]{64}$/),
-    provider: z.enum(['vercel-gateway', 'openai-subscription', 'anthropic-subscription']),
+    provider: z.enum(['vercel-gateway', 'zerocat', 'cloudflare-workers-ai', 'openai-subscription', 'anthropic-subscription']),
     model: z.string().max(128).regex(/^[A-Za-z0-9./_:-]+$/),
-    endpoint: z.enum(['https://ai-gateway.vercel.sh/v4/ai', 'https://chatgpt.com/backend-api/codex/responses', 'https://api.anthropic.com/v1/messages']),
+    endpoint: z.enum(['https://ai-gateway.vercel.sh/v4/ai', 'https://zero.cat/v1', 'https://api.cloudflare.com', 'https://chatgpt.com/backend-api/codex/responses', 'https://api.anthropic.com/v1/messages']),
     dataRegion: z.literal('unknown') }).strict(),
   'model.denied': z.object({ revision: z.string().regex(/^[a-f0-9]{64}$/),
     reason: z.enum(['modelRouteDenied', 'modelPolicyRevoked', 'modelRegionUnverified', 'modelPrincipalUnavailable', 'modelPolicyInvalid']) }).strict(),
@@ -108,6 +114,12 @@ export const AUDIT_METADATA = {
   'env.created': z.object({ scope }).partial().strict(),
   'env.updated': z.object({ scope }).partial().strict(),
   'env.deleted': z.object({ scope }).partial().strict(),
+  'service_identity.created': none,
+  'service_identity.renamed': none,
+  'service_identity.disabled': none,
+  'service_identity.restored': none,
+  'service_identity.credential_rotated': z.object({ organizationId: z.uuid().optional() }).strict(),
+  'service_identity.credential_revoked': none,
   'token.created': z.object({
     tokenName: label,
     expiresAt: z.string().datetime({ offset: true }).nullable(),
@@ -287,6 +299,12 @@ const regionCode = (value: string | null | undefined) => { const v = value?.trim
  * x-real-ip is deliberately not read.
  */
 export function auditRequestContext(headers: Pick<Headers, 'get'>, env: Readonly<Record<string, string | undefined>> = process.env as Readonly<Record<string, string | undefined>>): { ip: string | null; geoCity: string | null; geoCountry: string | null; geoRegion: string | null } {
+  if (env.MIKKA_API_INGRESS === 'cloudflare') {
+    // Only the private release ingress sets this header; it first removes any
+    // caller-supplied value. A non-IP or missing edge observation stays unknown.
+    const ip = headers.get('x-mikka-edge-ip')
+    return { ip: ip && isIP(ip) ? ip : null, geoCity: null, geoCountry: null, geoRegion: null }
+  }
   if (env.VERCEL !== '1') return { ip: null, geoCity: null, geoCountry: null, geoRegion: null }
   const forwarded = headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null
   let city = headers.get('x-vercel-ip-city')

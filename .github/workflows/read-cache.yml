@@ -2,6 +2,7 @@ name: Read cache API acceptance
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths:
       - 'apps/api/**'
       - 'apps/frontend/**'
@@ -35,6 +36,8 @@ concurrency:
 
 jobs:
   read-cache:
+    # Draft-only work is exercised locally; ready_for_review runs CI.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     name: Read cache API and CLI
     runs-on: ubuntu-22.04
     timeout-minutes: 20
@@ -54,9 +57,8 @@ jobs:
           --health-retries 10
     env:
       CI: 'true'
-      # Read-manifest discovery starts from the compiled compatibility UI.
-      # Backend-only defaults are exercised by self-hosted-image.yml.
-      MIKKA_COMMUNITY_UI: '1'
+      # Read-cache acceptance discovers actions published by the Web client.
+      MIKKA_EDITION: cloud
       E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
@@ -92,7 +94,7 @@ jobs:
       - name: Bind the isolated database and application to this checkout
         run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
       - name: Build this isolated application for production-mode acceptance
-        run: pnpm build:app
+        run: pnpm build:app --public-test-fixture
       - name: Accept real incremental Server Actions and Settings GET
         run: node scripts/acceptance/run-read-cache.mjs
       - name: Check the public evidence for authentication material

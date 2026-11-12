@@ -4,8 +4,10 @@ import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { db, pool, withDatabaseClient } from '@/lib/db'
 import { issues } from '@/lib/db/schema'
+import { readTaskDispatches } from '@/lib/task-dispatches'
 import { teamIssues } from '@/lib/db/team-schema'
 import { readFactoryFlowStates } from '@/lib/factory/public-flow'
+import { factoryEvidenceFolderCounts } from '@/lib/factory/evidence-folder-index'
 import { factoryScopeAllows } from '@/lib/factory/scope'
 import { FactoryError } from '@/lib/factory/contract'
 import type { FactoryTask } from '@/lib/factory/store'
@@ -92,6 +94,16 @@ async function readPresentationBatch(user: Reader, input: TaskPresentationsInput
         const visible = tasks.filter(readable)
         if (!visible.length) return {}
         const ids = visible.map(task => task.id)
+        const dispatchByIssue = new Map<string, NonNullable<TaskPresentation['botDispatches']>>()
+        if (parsed.includeBotDispatches) {
+          const dispatches = await readTaskDispatches(reader.id, workspaceId, ids)
+          for (const { issueId, ...dispatch } of dispatches) {
+            if (!issueId) continue
+            const bots = dispatchByIssue.get(issueId)
+            if (bots) bots.push(dispatch)
+            else dispatchByIssue.set(issueId, [dispatch])
+          }
+        }
         const byId = new Map(visible.map(task => [task.id, task]))
         const status = new Map(rows.filter(readable).map(task => [task.id, task.status]))
         const identifiers = new Map(rows.filter(readable).map(task => [task.id, task.identifier]))
@@ -113,11 +125,17 @@ async function readPresentationBatch(user: Reader, input: TaskPresentationsInput
         if (requireFactoryAccess && authorized.length !== factories.length) throw new FactoryError('factoryNotFound')
         const flows = await readFactoryFlowStates(client, authorized)
         const flowByIssue = new Map(authorized.map(task => [task.issueId, flows.get(task.id)]))
-        return Object.fromEntries(visible.map(task => [task.id, taskPresentation({
+        const factoryByIssue = new Map(authorized.map(task => [task.issueId, task.id]))
+        const counts = parsed.folderStoredIds ? await factoryEvidenceFolderCounts(client, workspaceId, reader.id,
+          authorized.map(task => task.id), parsed.folderStoredIds) : undefined
+        return Object.fromEntries(visible.map(task => [task.id, { ...taskPresentation({
           status: z.enum(ISSUE_STATUS_CODES).parse(task.status), metadata: task.metadata,
         }, runByIssue.get(task.id), flowByIssue.get(task.id) ?? null,
         id => !['done', 'canceled', 'duplicate'].includes(status.get(id) ?? 'todo'),
-        { schedule: task.schedule, blockerIdentifier: id => identifiers.get(id) ?? null })]))
+        { schedule: task.schedule, blockerIdentifier: id => identifiers.get(id) ?? null }),
+        ...(parsed.includeBotDispatches ? { botDispatches: dispatchByIssue.get(task.id) ?? [] } : {}),
+        ...((parsed.includeFactoryIdentity || counts) && factoryByIssue.has(task.id) ? { factoryTaskId: factoryByIssue.get(task.id) } : {}),
+        ...(counts?.has(factoryByIssue.get(task.id) ?? '') ? { factoryExtraCount: counts.get(factoryByIssue.get(task.id)!) } : {}) }]))
       })
       await client.query('COMMIT')
       return { version: 1, workspaceId, items }

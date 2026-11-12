@@ -1,5 +1,6 @@
 import { useMemo, useSyncExternalStore } from 'react'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
+import { mobileTaskLocation } from '@/lib/web-connection/mobile-task-location'
 import { serverDocumentKind, serverPageKind } from '@/lib/server-pages'
 
 export type Locale = 'zh-CN' | 'en'
@@ -33,7 +34,7 @@ const subscribe = (changed: () => void) => {
     window.removeEventListener('hashchange', changed)
   }
 }
-const snapshot = () => window.location.href
+const snapshot = () => mobileTaskLocation(window.location.href)
 
 export function useLocation() {
   const href = useSyncExternalStore(subscribe, snapshot, snapshot)

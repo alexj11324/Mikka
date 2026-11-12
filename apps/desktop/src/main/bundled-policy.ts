@@ -14,6 +14,26 @@ export const RENDERER_CSP = [
 const ID = '[A-Za-z0-9_-]{1,128}'
 const FACTORY_FLOW = /^\/api\/factory\/tasks\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/flow$/i
 const BILLING_MANAGEMENT = /^\/api\/(?:workspaces|organizations)\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/billing$/i
+const DRIVE_VOLUME_ID = 'vol_[0-9A-HJKMNP-TV-Z]{26}'
+const DRIVE_VERSION_ID = 'vver_[0-9A-HJKMNP-TV-Z]{26}'
+const DRIVE_ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
+  [/^\/api\/drive\/volumes$/, ['GET', 'POST']],
+  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}$`), ['GET']],
+  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/(?:files|versions)$`), ['GET']],
+  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/versions/${DRIVE_VERSION_ID}$`), ['GET']],
+  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/blobs$`), ['POST']],
+  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/entries$`), ['PATCH']],
+  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/restore$`), ['POST']],
+]
+const UUID = '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89aAbB][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}'
+const WORKSPACE_GOVERNANCE = new RegExp(`^/api/workspaces/${UUID}/governance$`)
+const SERVICE_IDENTITY_DIRECTORY = `/api/workspaces/${UUID}/service-identities`
+const SERVICE_IDENTITY_ROUTES: ReadonlyArray<readonly [RegExp, string]> = [
+  [new RegExp(`^${SERVICE_IDENTITY_DIRECTORY}$`), 'POST'],
+  [new RegExp(`^${SERVICE_IDENTITY_DIRECTORY}/${UUID}$`), 'PATCH'],
+  [new RegExp(`^${SERVICE_IDENTITY_DIRECTORY}/${UUID}/projects$`), 'PUT'],
+  [new RegExp(`^${SERVICE_IDENTITY_DIRECTORY}/${UUID}/credential$`), 'POST'],
+]
 /** Route families are enumerated; there is deliberately no generic /api/* forwarding. */
 const ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   [/^\/api\/agents\/eve\/v1\/session$/, ['POST']],
@@ -25,7 +45,7 @@ const ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   [/^\/api\/version$/, ['GET']], [/^\/api\/auth\/device$/, ['GET']],
   [/^\/api\/auth\/device\/(approve|deny)$/, ['POST']],
   [/^\/api\/(workspace|workspace\/switcher|search|issues\/search|skills|skills\/search|teams\/directory)$/, ['GET']],
-  [/^\/api\/settings\/(?:password|sessions|preferences|saved-logins|workspace-general|transfer-targets|deletion-impact|app-policy|share-policy|secrets|e2b-key|usage|billing|credit-billing|card-verification|audit|model-order|bots|workspace-bots|api-keys)$/, ['GET']],
+  [/^\/api\/settings\/(?:password|sessions|preferences|saved-logins|workspace-general|transfer-targets|deletion-impact|app-policy|share-policy|secrets|e2b-key|usage|billing|credit-billing|card-verification|audit|model-order|bots|workspace-bots|api-keys|environments)$/, ['GET']],
   [/^\/api\/agent-cli-policy$/, ['GET', 'POST']],
   [/^\/api\/(bots|conversations|subscriptions|subscriptions\/usage|pending-actions|approved-writes|suggestions|computer\/events|agent\/sessions\/active)$/, ['GET', 'POST']],
   [/^\/api\/(coordinator\/(?:runtime|messages|attention))$/, ['GET', 'POST', 'DELETE']],
@@ -60,12 +80,16 @@ export function normalizedRendererPath(value: string): string | null {
 }
 
 export function allowedApiPath(path: string, method: string): boolean {
-  if (path === '/api/settings/issue-prefix') return method === 'GET'
+  if (path.startsWith('/api/drive/')) return DRIVE_ROUTES.some(([pattern, methods]) => pattern.test(path) && methods.includes(method))
+  if (path === '/api/settings/issue-prefix' || path === '/api/settings/environments') return method === 'GET'
   // This human approval/read surface has exactly its declared methods. Do not
   // inherit the wider CRUD family or the generic asset HEAD allowance.
   if (FACTORY_FLOW.test(path)) return method === 'GET' || method === 'POST'
   if (BILLING_MANAGEMENT.test(path)) return method === 'GET' || method === 'POST'
-  if (path === '/api/organizations') return method === 'GET'
+  if (path.startsWith('/api/workspaces/') && path.includes('/service-identities')) {
+    return SERVICE_IDENTITY_ROUTES.some(([route, mutation]) => route.test(path) && (method === 'GET' || method === mutation))
+  }
+  if (WORKSPACE_GOVERNANCE.test(path) || path === '/api/organizations') return method === 'GET'
   // Viewer grants are capabilities and must be obtained through owner-bound IPC.
   if (/^\/api\/bots\/[^/]+\/(?:computer\/(?:viewer|takeover)|subagents\/[^/]+\/viewer)$/.test(path)) return false
   return ROUTES.some(([pattern, methods]) => pattern.test(path) && methods.includes(method === 'HEAD' ? 'GET' : method))

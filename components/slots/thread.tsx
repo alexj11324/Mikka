@@ -1,6 +1,6 @@
-// The default thread slot (docs/ui-overlay.md): none. A Bot's chat draws its own rows (CoordinatorChat); a layer that
-// draws a conversation as one screen exports `ThreadScreen` here.
-import type { ComponentType } from 'react'
 import type { ThreadScreenProps } from './thread-contract'
 
-export const ThreadScreen: ComponentType<ThreadScreenProps> | null = null
+/** Full conversation is an official client renderer. The server imports only its contract. */
+export function ThreadScreen(_props: ThreadScreenProps): never {
+  throw new Error('Required official UI slot thread.ThreadScreen is unavailable')
+}

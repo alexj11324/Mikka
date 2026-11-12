@@ -167,6 +167,8 @@ export interface DaemonOptions {
   anonymousClaudeCandidate?: AnonymousClaudeCandidate; anonymousCodexCandidate?: AnonymousCodexCandidate
   /** Linux-only operator mode; no native/local credential source is opened. */
   hostedSubscriptions?: boolean
+  /** Private task-image entry only. Registration has completed on the server. */
+  taskRegistered?: () => void
   /** Trusted acceptance launcher only; opt in to persisted run/CLI diagnostics. */
   collectCliTiming?: boolean
   /** Only the trusted E2B runner is allowed to select its isolated socket. */
@@ -367,8 +369,8 @@ export class Daemon {
       this.options.retainResources,
       runId => this.journal.get(runId)?.assignment.traceContext,
     )
-    this.worktrees = new WorktreeManager(paths.worktrees, this.options.retainResources)
-    this.repositories = new RepositoryCache(paths.repos, undefined, this.options.retainResources)
+    this.worktrees = new WorktreeManager(this.options.taskRegistered ? '/workspace/worktrees' : paths.worktrees, this.options.retainResources)
+    this.repositories = new RepositoryCache(this.options.taskRegistered ? '/workspace/repos' : paths.repos, undefined, this.options.retainResources)
     // Hosted subscriptions start their CLIs through the hosted runner.
     this.sandbox = this.options.hostedSubscriptions ? null : await this.createAgentSandbox()
     // Before its first gateway session, too (runControlPush in the constructor).
@@ -1395,6 +1397,7 @@ export class Daemon {
     const computerBroker = this.localComputerBroker ?? this.cloudComputerBroker ?? this.options.computerBroker
     if (computerBroker && !this.options.link.syncComputerReviews) throw new Error("Computer review transport unavailable")
     this.registered = true
+    if (this.options.hostedSubscriptions && !this.stopped) this.options.taskRegistered?.()
     if (this.options.hostedSubscriptions && this.options.e2bContainerRuntime && workspaceId && !this.stopped) {
       try { writeCloudRegistration(this.paths.dataDir, deviceId, workspaceId, credential) }
       catch { this.log.warn({ event: 'cloud_registration_notice_failed' }, 'Cloud registration notification unavailable') }

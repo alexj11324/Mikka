@@ -20,12 +20,12 @@ export const modelRoutingEvidenceSchema = z.discriminatedUnion('version', [
 
 const reference = z.string().min(1).max(200)
 const resource = z.object({
-  kind: z.enum(['device', 'api_key', 'subscription', 'e2b', 'mcp']),
+  kind: z.enum(['device', 'api_key', 'subscription', 'e2b', 'cloudflare_sponsored', 'mcp']),
   id: reference, ownerId: reference, access: z.enum(['owner', 'workspace_share']),
   revision: z.string().max(200).optional(),
 })
 const account = z.object({
-  kind: z.enum(['api_key', 'subscription', 'native_login', 'local_device', 'e2b']),
+  kind: z.enum(['api_key', 'subscription', 'native_login', 'local_device', 'e2b', 'cloudflare_sponsored']),
   ownerId: reference, resourceId: reference,
   amount: z.enum(['provider_unknown', 'metered', 'not_applicable']),
 })

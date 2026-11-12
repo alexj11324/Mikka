@@ -1,7 +1,33 @@
 {
+  "ServerStatus": {
+    "title": "Mikka 服务器",
+    "address": "服务器地址",
+    "version": "版本",
+    "web": "打开 Mikka 网页版",
+    "desktop": "下载 Mikka 桌面版",
+    "iosUnavailable": "要连接 iOS 客户端，请先在服务器上配置其登录来源。",
+    "ios": "在 Mikka iOS 客户端的登录页选择此服务器地址。",
+    "create": "创建首个账号",
+    "ready": "就绪",
+    "unavailable": "不可用",
+    "configuration": "配置",
+    "database": "数据库",
+    "authentication": "认证"
+  },
   "MobileTaskSchedule": {
     "daily": "每天 {time}",
     "interval": "每 {minutes} 分钟"
+  },
+  "TaskAttachments": {
+    "title": "附件",
+    "add": "添加文件",
+    "empty": "暂无附件",
+    "remove": "移除 {name}",
+    "failed": "附件修改未保存。",
+    "downloadFailed": "附件下载失败。",
+    "readFailed": "附件加载失败。",
+    "size": "请选择不超过 3 MiB 的非空文件。",
+    "limit": "每个任务最多 10 个文件。"
   },
   "Common": {
     "privacyPolicy": "隐私政策",
@@ -1485,6 +1511,48 @@
       "restoreFailed": "恢复失败。"
     }
   },
+  "ServiceIdentities": {
+    "title": "服务身份",
+    "empty": "暂无服务身份。",
+    "name": "身份名称",
+    "more": "加载更多身份",
+    "manage": "管理{name}",
+    "active": "已启用",
+    "disabled": "已停用",
+    "rename": "重命名",
+    "disable": "停用",
+    "restore": "恢复",
+    "confirmDisable": "停用{name}并使其密钥失效？",
+    "confirmRestore": "恢复{name}？",
+    "failed": "操作失败。请刷新查看当前设置。",
+    "conflict": "其他管理员已修改设置。请刷新后再保存。",
+    "denied": "你已无权访问这些设置。",
+    "back": "返回服务身份列表",
+    "projects": "项目访问权限",
+    "noProjects": "暂无可选项目。",
+    "confirmProjects": "授予此身份读取所选项目的权限？",
+    "unavailableProject": "先前已授权的项目",
+    "credential": "服务密钥",
+    "unconfigured": "尚未签发密钥",
+    "configured": "已签发密钥",
+    "expires": "密钥于{date}到期",
+    "expiration": "到期时间（可选）",
+    "issue": "签发密钥",
+    "rotate": "轮换密钥",
+    "revoke": "撤销密钥",
+    "keyScope": "密钥范围",
+    "workspaceScope": "当前工作区",
+    "organizationScope": "组织 · {name}",
+    "detachment": "此工作区与组织解除关联时，密钥即被撤销。",
+    "scopeChanged": "原选组织已不可用。请选择当前关联的组织或此工作区。",
+    "confirmRotate": "签发新密钥并使现有密钥失效？",
+    "confirmRevoke": "撤销此服务密钥？",
+    "keyValue": "新服务密钥",
+    "copyNow": "请立即复制，此密钥仅显示一次。",
+    "dismissKey": "完成",
+    "confirm": "确认",
+    "reload": "刷新设置"
+  },
   "Members": {
     "accessTitle": "任务访问权限",
     "membersCount": "{count} 位成员",
@@ -1775,6 +1843,9 @@
       "leadUnset": "未指定",
       "leadNone": "未指定负责人",
       "currentAccount": "当前账号",
+      "directoryUnavailable": "无法读取成员目录",
+      "unavailablePerson": "原成员",
+      "inactivePerson": "{name}（已暂停）",
       "memberCurrentAccount": "当前可访问账号",
       "dependencyCount": "{count} 个依赖"
     },
@@ -1881,6 +1952,9 @@
       "cloud": {
         "title": "Mikka 云服务",
         "keywords": "cloud Mikka 云服务 自托管 self-hosted"
+      },
+      "environments": {
+        "title": "运行环境"
       }
     },
     "appearance": {
@@ -2567,6 +2641,14 @@
         "integration": {
           "permission_changed": "把 {integration} 改为{to}"
         },
+        "service_identity": {
+          "credential_rotated": "已签发或轮换服务身份凭据",
+          "credential_revoked": "已撤销服务身份凭据",
+          "created": "创建了服务身份 {target}",
+          "renamed": "重命名了服务身份 {target}",
+          "disabled": "停用了服务身份 {target}",
+          "restored": "恢复了服务身份 {target}"
+        },
         "secret": {
           "created": "添加了密钥 {target}",
           "replaced": "更新了密钥 {target}",
@@ -2739,7 +2821,8 @@
         "subscription": "模型订阅",
         "native_login": "设备上的模型账户",
         "local_device": "个人设备",
-        "e2b": "个人 E2B 账户"
+        "e2b": "个人 E2B 账户",
+        "cloudflare_sponsored": "Mikka Cloudflare 账户"
       },
       "accountAmounts": {
         "provider_unknown": "由供应商计费/金额未知",
@@ -3208,6 +3291,32 @@
       "pushContent": "推送内容",
       "pushFull": "完整",
       "pushReminder": "只提醒"
+    },
+    "environments": {
+      "archive": "归档",
+      "title": "运行环境",
+      "add": "添加环境",
+      "empty": "暂无运行环境。",
+      "version": "版本 {revision}",
+      "editNamed": "编辑 {name}",
+      "archiveNamed": "归档 {name}？",
+      "edit": "编辑环境",
+      "projectDefaults": "项目默认环境",
+      "none": "无默认环境",
+      "archived": "已归档环境",
+      "defaultFor": "{name} 的默认环境",
+      "name": "名称",
+      "runtime": "运行位置",
+      "setup": "准备命令",
+      "invalid": "请检查环境设置。",
+      "runtimes": {
+        "any": "任意位置",
+        "local": "本地",
+        "cloud": "云端"
+      },
+      "restore": "恢复",
+      "copyFiles": "复制到工作树的文件，每行一个",
+      "approveSetup": "新工作树启动时运行这些准备步骤"
     }
   },
   "TelegramBot": {
@@ -4305,6 +4414,8 @@
       "costModelSubscription": "模型费用由{owner} {provider} 订阅承担",
       "costModelApiKey": "模型费用由{owner} {provider} API key 承担",
       "costModelLogin": "模型用电脑上已登录的 Agent 账号运行",
+      "sponsoredCloudflare": "Mikka 付费的 Cloudflare 任务机器",
+      "costRuntimeCloudflare": "此任务的 Cloudflare 机器费用由 Mikka 支付",
       "costRuntimeE2b": "云电脑费用由{owner} E2B 账号承担",
       "costRuntimeDevice": "电脑是{owner} {device}",
       "costMikkaFree": "Mikka 不收费",
@@ -4368,7 +4479,8 @@
         "subscription": "订阅",
         "native_login": "本机登录",
         "local_device": "本地电脑",
-        "e2b": "E2B"
+        "e2b": "E2B",
+        "cloudflare_sponsored": "Mikka Cloudflare 账户"
       },
       "amounts": {
         "provider_unknown": "外部费用未知",
@@ -4743,6 +4855,11 @@
       "noneToday": "今天还没有新的建议。"
     },
     "newTaskDialog": {
+      "intent": "创建方式",
+      "backlogTitlePlaceholder": "标题（可选，默认为首行）",
+      "createOnly": "仅创建",
+      "createAndDispatch": "创建并派发",
+      "sponsoredCloud": "Cloudflare 编程机器 · Mikka 付费",
       "title": "新建任务",
       "description": "用一句话描述要做的事，会自动建好任务。",
       "label": "任务描述",
@@ -5793,6 +5910,11 @@
       "default": "任务未能完成，请查看错误详情或重试。"
     },
     "governance_denied": {
+      "service_projects_changed": "项目授权已变更，请重新加载后再替换。",
+      "service_identity_disabled": "请先恢复此服务身份，再授予新的项目访问权限。",
+      "service_projects_confirmation": "请确认允许此服务身份读取所选项目。",
+      "service_identity_changed": "此服务身份已变更，请重新加载再更新。",
+      "service_identity_request_reused": "此请求已用于创建其他名称的服务身份。",
       "plan_changed": "套餐已变更，请重新核对当前权益后再应用。",
       "default": "治理操作未完成，请重试。",
       "access_denied": "你没有管理此组织或工作区的权限。",
@@ -6191,7 +6313,7 @@
       "memberNote": "只有工作区管理员能把此工作区绑定到组织。",
       "body": "绑定后，组织的登录要求和资源策略会作用于此工作区；席位按组织内全部工作区的活跃成员去重计算。工作区的成员、任务和资源仍各自独立。",
       "bodyTitle": "绑定后会发生什么",
-        "bindLabel": "绑定到已有组织",
+      "bindLabel": "绑定到已有组织",
       "bindNote": "需要你同时是该组织的所有者或管理员，以及此工作区的管理员。",
       "bind": "绑定",
       "createLabel": "新建组织",
@@ -6716,6 +6838,7 @@
     "moreMany": "{first}、{second} 等 {count, number} 个"
   },
   "HostedTasks": {
+    "loadMore": "加载更多任务",
     "open": "打开任务",
     "status": "状态",
     "factoryStage": "Factory 阶段",
@@ -7043,6 +7166,7 @@
   },
   "CodeReview": {
     "summary": {
+      "fileCount": "{count} 个文件",
       "pr": "PR #{number}",
       "files": "{count} 个文件 +{additions} −{deletions}",
       "failed": "⚠ {count} 项检查失败",
@@ -7143,5 +7267,33 @@
     "content": "内容",
     "readFailed": "{label}加载失败。",
     "refreshFailed": "{label}更新失败，仍显示上次内容。"
+  },
+  "PersonalFiles": {
+    "overviewSub": "个人保存的文件和任务交付的成果。",
+    "folders": "文件夹",
+    "overviewEmpty": "还没有文件。",
+    "createFolder": "新建文件夹",
+    "folderName": "文件夹名称",
+    "folderNameTaken": "已有同名文件夹，请换一个名称。",
+    "create": "创建",
+    "personalFolder": "我的文件 · {name}",
+    "back": "Artifact",
+    "file": "文件",
+    "empty": "文件夹中暂无文件。",
+    "upload": "上传文件",
+    "history": "版本历史",
+    "currentVersion": "当前版本",
+    "version": "版本 {seq} · {count} 个文件 · {date}",
+    "moreVersions": "更多版本",
+    "moreFolders": "更多文件夹",
+    "restore": "恢复版本",
+    "restoreTitle": "恢复此版本？",
+    "replace": "替换文件",
+    "replaceTitle": "替换同名文件？",
+    "conflict": "文件已更新，请查看最新版本后重试。",
+    "tooLarge": "文件过大。",
+    "accessUnavailable": "当前账号已无法访问这些文件。",
+    "saveUnconfirmed": "无法确认修改结果，请刷新文件夹后再试。",
+    "loadError": "无法加载个人文件。"
   }
 }

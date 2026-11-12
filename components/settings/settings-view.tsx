@@ -1,7 +1,7 @@
 'use client'
 
 import { BotPermissionsSettings } from './bot-permissions'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
@@ -10,14 +10,16 @@ import { ApiAndSubscriptions } from '@ui-slot/settings-models'
 import { SecurityAndSignIn } from '@ui-slot/settings-security'
 import { PreferencesSettings } from '@ui-slot/settings-preferences'
 import { WorkspaceGeneral } from '@ui-slot/settings-general'
-import * as membersSlot from '@ui-slot/settings-members'
+import { MembersScreen } from '@ui-slot/settings-members'
 import { SettingsContent } from '@/components/ui/settings-layout'
 import { SettingsSidebar } from './settings-sidebar'
-import { MembersPanel } from '@/components/settings/members-panel'
 import { PluginsView } from '@/components/plugins/plugins-view'
 import { TeamPermissionsSettings } from '@/components/settings/team-permissions-settings'
 import { PaymentDesignationSettings } from '@/components/settings/payment-designation-settings'
+import { WebServerControl } from '@/components/settings/web-server-control'
+import { DesktopServerSettings } from '@/components/settings/desktop-server-settings'
 import { AccountSettings } from '@/components/settings/account-settings'
+import { EnvironmentsSettings } from './environments-settings'
 import { CloudSettings } from '@/components/settings/cloud-settings'
 
 import { PrivacySettings } from '@/components/settings/privacy-settings'
@@ -56,12 +58,11 @@ interface SettingsViewProps {
   inviteInitially?: boolean
   workspaceId?: string
   selectedTeamId?: string
-  children?: ReactNode
   linearNotice?: 'connected' | 'error' | null
   preview?: boolean
 }
 
-export function SettingsView({ user, userKey, googleEnabled = false, onRail, onSignOut, signingOut, accountError, activeSection, initialSection, inviteInitially = false, workspaceId, selectedTeamId, children, linearNotice = null, preview = false }: SettingsViewProps) {
+export function SettingsView({ user, userKey, googleEnabled = false, onRail, onSignOut, signingOut, accountError, activeSection, initialSection, inviteInitially = false, workspaceId, selectedTeamId, linearNotice = null, preview = false }: SettingsViewProps) {
   const t = useTranslations('Settings')
   const [localSection, setSection] = useState<SettingsSectionId>(activeSection ?? initialSection ?? 'preferences')
   const { data: workspace, error: workspaceError } = useWorkspace(userKey ?? user.email, workspaceId)
@@ -89,6 +90,7 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   const { cache, mutate } = useSWRConfig()
   // Settings opened without ?workspace= still has one: the default the API resolved.
   const resolvedWorkspaceId = workspaceId ?? workspace?.workspace.id
+  const mismatchedWorkspace = Boolean(workspaceId && workspace && workspaceId !== workspace.workspace.id)
   const roleKnown = workspace !== undefined
   // Read only the open section. Pointer/focus intent warms the next section.
   useEffect(() => {
@@ -97,9 +99,6 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   }, [preview, roleKnown, resolvedWorkspaceId, section, cache, mutate])
   const title = t(`sections.${section}.title`)
   const routedBody = section === 'members' || section === 'teams'
-  // A UI layer may draw 成员 and 团队 as one page with two tabs (slot settings-members); otherwise each keeps its own.
-  const MembersScreen = membersSlot.MembersScreen ?? null
-  const LayerMembers = MembersScreen && routedBody && !preview ? MembersScreen : null
   const openSection = (next: SettingsSectionId) => {
     const href = settingsHref(next, workspaceId)
     if (!activeSection) setSection(next)
@@ -116,7 +115,12 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
     <SettingsContentFrame parent={t('title')} title={title}>
 
       {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
-      {LayerMembers ? <SettingsContent className="gap-6 max-md:pt-1">{team && resolvedWorkspaceId ? <LayerMembers key={resolvedWorkspaceId} section={section === 'teams' ? 'teams' : 'members'} workspaceId={resolvedWorkspaceId} inviteInitially={inviteInitially} onSection={openSection} /> : workspaceError ? <FieldError>{t('workspaceUnavailable')}</FieldError> : <p role="status" className="text-sm text-muted-foreground">{t('workspaceLoading')}</p>}</SettingsContent> : routedBody ? section === 'members' ? <SettingsContent className="gap-6 max-md:pt-1">{team && workspaceId && !preview && <GovernancePlan workspaceId={workspaceId} />}{children ?? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} />}</SettingsContent> : children : <SettingsContent key={section} className={cn('gap-6 max-md:pt-1', enter)}>
+      {routedBody ? <SettingsContent className="gap-6 max-md:pt-1">
+        {preview || workspaceError || mismatchedWorkspace ? <FieldError>{t('workspaceUnavailable')}</FieldError> : team && resolvedWorkspaceId ? <>
+          {section === 'members' && <GovernancePlan workspaceId={resolvedWorkspaceId} />}
+          <MembersScreen key={resolvedWorkspaceId} section={section} workspaceId={resolvedWorkspaceId} inviteInitially={inviteInitially} onSection={openSection} />
+        </> : <p role="status" className="text-sm text-muted-foreground">{t('workspaceLoading')}</p>}
+      </SettingsContent> : <SettingsContent key={section} className={cn('gap-6 max-md:pt-1', enter)}>
         {section === 'computers' ? <DevicesSettings workspaceId={resolvedWorkspaceId} /> : <h1 className="text-xl font-semibold max-md:sr-only">{title}</h1>}
         <SectionBody t={t} section={section} user={user} userKey={userKey} googleEnabled={googleEnabled} workspaceId={resolvedWorkspaceId} workspaceName={workspace?.workspace.name} personal={personal} team={team} admin={admin} community={community} workspaceError={Boolean(workspaceError) || (workspace !== undefined && !resolvedWorkspaceId)} linearNotice={linearNotice} preview={preview} onSignOut={onSignOut} signingOut={signingOut} onSection={next => { if (!activeSection || !pushSettingsHistory(settingsHref(next, workspaceId), workspaceId)) setSection(next) }} />
       </SettingsContent>}
@@ -130,10 +134,11 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     ? preview || workspaceError ? <FieldError>{t('workspaceUnavailable')}</FieldError> : <p role="status" className="text-sm text-muted-foreground">{t('workspaceLoading')}</p>
     : null
   switch (section) {
-    case 'account': return <><AccountSettings user={user} onSignOut={onSignOut} signingOut={signingOut} />{community && userKey && <CloudSettings personal userKey={userKey} workspaceId={workspaceId} />}</>
+    case 'account': return <><AccountSettings user={user} onSignOut={onSignOut} signingOut={signingOut} /><WebServerControl settings /><DesktopServerSettings />{community && userKey && <CloudSettings personal userKey={userKey} workspaceId={workspaceId} />}</>
     case 'cloud': return userKey ? <CloudSettings userKey={userKey} workspaceId={workspaceId} /> : null
     case 'security': return <SecurityAndSignIn googleEnabled={googleEnabled} />
 
+    case 'environments': return workspaceId && !preview ? <EnvironmentsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'privacy': return <PrivacySettings />
     case 'logins':
     case 'secrets': return <SecretsPage side={section === 'logins' ? 'mine' : 'workspace'} onSide={side => onSection(side === 'mine' ? 'logins' : 'secrets')} workspaceId={workspaceId && !preview ? workspaceId : undefined} workspaceName={workspaceName} waiting={waiting} />
