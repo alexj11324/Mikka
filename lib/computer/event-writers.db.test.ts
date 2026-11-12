@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { after, before, beforeEach, mock, test } from 'node:test'
 import { Pool } from 'pg'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
+import { observePoolCommits } from '../db/commit-effects'
 import type { LiveScope } from '../live/scope'
 import type { LiveInvalidation } from '../live/events'
 import type { ComputerEventPage } from './event-page'
@@ -35,6 +36,7 @@ before(async () => {
   admin = new Pool({ connectionString: databaseURL })
   await admin.query(`CREATE SCHEMA ${schema}`)
   pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}`, max: 6 })
+  observePoolCommits(pool)
   observer = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}`, max: 2 })
   // The observer is a different real PostgreSQL connection. Holding COMMIT until
   // already-issued probes settle makes a mistakenly early notification reliably
