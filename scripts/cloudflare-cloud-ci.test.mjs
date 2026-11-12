@@ -44,6 +44,7 @@ test('public checkout invokes the pinned compiler and rejects provenance or chec
   try {
     const publicRoot = join(directory, 'public')
     const publicSource = await repository(publicRoot, 'alexj11324/Mikka', { '.gitignore': '/.mikka-cloud/\n' })
+    git(publicRoot, 'remote', 'set-url', 'origin', 'https://x-access-token:private-sentinel@github.com/ALEXJ11324/mikka.git')
     const privateRoot = join(publicRoot, '.mikka-cloud')
     const privateSource = await repository(privateRoot, 'alexj11324/mikka-cloud', {
       'scripts/cloudflare-ci.mjs': `export async function runCi({ env, verify, publicRoot, publicSource }) {

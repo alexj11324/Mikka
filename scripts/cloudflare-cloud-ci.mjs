@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import { mkdir, realpath } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { hasGitHubOrigin } from './cloudflare-source.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const repository = 'alexj11324/Mikka'
@@ -15,8 +16,7 @@ const gitWithEnv = (cwd, env, args) => execFileSync('git', args, {
 }).trim()
 
 function hasOrigin(directory, expected) {
-  return [`https://github.com/${expected}.git`, `https://github.com/${expected}`, `git@github.com:${expected}.git`]
-    .includes(git(directory, 'remote', 'get-url', 'origin'))
+  return hasGitHubOrigin(git(directory, 'remote', 'get-url', 'origin'), expected)
 }
 
 export function sourceContext(env, publicSource) {

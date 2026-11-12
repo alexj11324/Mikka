@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { hasGitHubOrigin } from './cloudflare-source.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SHA = /^[a-f0-9]{40}$/
@@ -99,7 +100,7 @@ export async function runCi({ env = process.env, verify = false } = {}) {
   const context = sourceContext(env, publicSha, env.MIKKA_CF_RELEASE_OVERLAY_SHA)
   if (verify) return verifyReceipt(context)
   git(['diff', '--quiet', 'HEAD', '--'])
-  if (!/^(?:https:\/\/github.com\/|git@github.com:)alexj11324\/Mikka(?:\.git)?$/.test(git(['remote', 'get-url', 'origin']))) fail('CI_PUBLIC_REPOSITORY_REQUIRED')
+  if (!hasGitHubOrigin(git(['remote', 'get-url', 'origin']), 'alexj11324/Mikka')) fail('CI_PUBLIC_REPOSITORY_REQUIRED')
   const overlay = join(root, '.hosted-ui')
   await withOverlayKey(env, async keyEnv => {
     command('git', ['init', '--quiet', overlay], { env: keyEnv })

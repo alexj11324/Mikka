@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
+import { hasGitHubOrigin } from './cloudflare-source.mjs'
 import { childEnvironment, sourceContext, validateReceipt } from './cloudflare-ci.mjs'
 
 const publicSha = 'a'.repeat(40)
@@ -44,4 +45,32 @@ test('release compilation occurs once in the public native publisher', async () 
   assert.ok(source.includes("if (target === 'renderers') definitions.push("))
   assert.ok(!source.includes('.hosted-ui/scripts/*.test.mjs'))
   assert.ok(!source.includes('git@github.com:alexj11324/Mikka.git'))
+})
+
+
+test('GitHub origins normalize authenticated HTTPS and SSH repository names without logging credentials', () => {
+  for (const origin of [
+    'https://github.com/alexj11324/Mikka.git',
+    'https://x-access-token:private-sentinel@github.com/ALEXJ11324/mikka.git',
+    'https://private-sentinel@GITHUB.COM/alexj11324/Mikka/',
+    'git@github.com:alexj11324/Mikka.git',
+    'ssh://git@github.com/alexj11324/mikka.git',
+  ]) assert.equal(hasGitHubOrigin(origin, 'alexj11324/Mikka'), true)
+  const output = []
+  const original = console.error
+  console.error = value => output.push(value)
+  try {
+    for (const origin of [
+      'https://private-sentinel@github.com/other/Mikka.git',
+      'https://private-sentinel@github.com.example/alexj11324/Mikka.git',
+      'http://github.com/alexj11324/Mikka.git',
+      'https://github.com:8443/alexj11324/Mikka.git',
+      'file:///private-sentinel/alexj11324/Mikka',
+      'private-sentinel',
+    ]) assert.equal(hasGitHubOrigin(origin, 'alexj11324/Mikka'), false)
+  } finally {
+    console.error = original
+  }
+  assert.equal(output.length, 6)
+  assert.ok(output.every(line => !line.includes('private-sentinel')))
 })
