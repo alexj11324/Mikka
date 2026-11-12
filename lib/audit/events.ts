@@ -118,7 +118,7 @@ export const AUDIT_METADATA = {
   'service_identity.renamed': none,
   'service_identity.disabled': none,
   'service_identity.restored': none,
-  'service_identity.credential_rotated': none,
+  'service_identity.credential_rotated': z.object({ organizationId: z.uuid().optional() }).strict(),
   'service_identity.credential_revoked': none,
   'token.created': z.object({
     tokenName: label,

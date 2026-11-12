@@ -13,10 +13,12 @@ import { checkExpiry } from '@/lib/tokens/format'
 import { workspaceDb } from '@/lib/workspace-db'
 import type { WorkspaceTransaction } from '@/lib/workspace-access'
 import { GovernanceError } from './errors'
+import { requireOrganizationAdmin } from './organizations'
 import { recordServiceIdentityChange, withServiceIdentityAdmin } from './service-identities'
 
 const credentialInput = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('rotate'), revision: z.number().int().positive(), expiresAt: z.iso.datetime({ offset: true }).nullable().optional() }).strict(),
+  z.object({ action: z.literal('rotate'), revision: z.number().int().positive(),
+    expiresAt: z.iso.datetime({ offset: true }).nullable().optional(), organizationId: z.uuid().toLowerCase().optional() }).strict(),
   z.object({ action: z.literal('revoke'), revision: z.number().int().positive() }).strict(),
 ])
 type CredentialState = { enabled: boolean; revision: number; configured: boolean; expiresAt: string | Date | null }
@@ -32,25 +34,40 @@ export function manageServiceCredential(workspaceId: string, actor: EnterpriseRe
     const { rows: [state] } = await workspace.execute<CredentialState>(sql`SELECT ${stateColumns} FROM mikka_workspace_service_identities
       WHERE "workspaceId"=${workspaceId}::uuid AND id=${id}::uuid FOR UPDATE`)
     if (!state) throw new GovernanceError('not_found')
-    if (!change) return state
+    if (!change) {
+      const { rows: [binding] } = await workspace.execute<{ organizationId: string }>(sql`SELECT b."organizationId"
+        FROM mikka_service_key_organization_bindings b JOIN mikka_workspace_service_identities i
+          ON i.id=b."identityId" AND i."workspaceId"=b."workspaceId" AND i."credentialHash"=b."credentialHash"
+        WHERE i.id=${id}::uuid AND i."workspaceId"=${workspaceId}::uuid`)
+      return binding ? { ...state, organizationId: binding.organizationId } : state
+    }
     if (state.revision !== change.revision) throw new GovernanceError('service_identity_changed')
     if (change.action === 'revoke' && !state.configured) return state
     if (change.action === 'rotate' && !state.enabled) throw new GovernanceError('service_identity_disabled')
     let expiry: Date | null = null
+    const organizationId = change.action === 'rotate' ? change.organizationId : undefined
     if (change.action === 'rotate') {
       try { expiry = checkExpiry(change.expiresAt, new Date()) } catch (cause) { throw new GovernanceError('invalid_request', cause) }
-    }
-    if (change.action === 'rotate') {
+      if (organizationId) await requireOrganizationAdmin(workspace, organizationId, actor.id)
       const link = await organizationLink(workspace, workspaceId)
+      if (organizationId && link?.organizationId !== organizationId) throw new GovernanceError('access_denied')
       if (link && (link.archived || !await writeTransaction(pool, app => serviceOrganizationAllowed(app, link.organizationId))))
         throw new GovernanceError('access_denied')
     }
-    const token = change.action === 'rotate' ? 'mksvc_' + randomBytes(32).toString('base64url') : null
+    // The scoped format cannot authenticate on an older server that only recognizes the Workspace format.
+    const prefix = organizationId ? 'mksvc_org_' : 'mksvc_'
+    const token = change.action === 'rotate' ? prefix + randomBytes(32).toString('base64url') : null
+    const hash = token && digest(token)
     const { rows: [updated] } = await workspace.execute<CredentialState>(sql`UPDATE mikka_workspace_service_identities
-      SET "credentialHash"=${token && digest(token)}, "credentialExpiresAt"=${expiry?.toISOString() ?? null}::timestamptz, revision=revision+1
+      SET "credentialHash"=${hash}, "credentialExpiresAt"=${expiry?.toISOString() ?? null}::timestamptz, revision=revision+1
       WHERE "workspaceId"=${workspaceId}::uuid AND id=${id}::uuid RETURNING ${stateColumns}`)
-    await recordServiceIdentityChange(workspace, { id, workspaceId }, actor.id, actorName, token ? 'credential_rotated' : 'credential_revoked')
-    return token ? { ...updated, token } : updated
+    // Update the canonical hash first so removal of the previous scope cannot invalidate its replacement.
+    await workspace.execute(sql`DELETE FROM mikka_service_key_organization_bindings WHERE "identityId"=${id}::uuid`)
+    if (organizationId) await workspace.execute(sql`INSERT INTO mikka_service_key_organization_bindings
+      ("identityId","workspaceId","organizationId","credentialHash") VALUES
+      (${id}::uuid,${workspaceId}::uuid,${organizationId}::uuid,${hash})`)
+    await recordServiceIdentityChange(workspace, { id, workspaceId }, actor.id, actorName, token ? 'credential_rotated' : 'credential_revoked', organizationId)
+    return token ? { ...updated, ...(organizationId && { organizationId }), token } : updated
   })
 }
 
@@ -78,8 +95,9 @@ async function serviceOrganizationAllowed(tx: PoolClient, organizationId: string
 type ProjectRead = { after: string | null } | { projectId: string }
 
 export async function readServiceCredentialProjects(header: string | null, read: ProjectRead) {
-  const token = /^Bearer (mksvc_[A-Za-z0-9_-]{43})$/.exec(header ?? '')?.[1]
-  if (!token) return null
+  const bearer = /^Bearer (mksvc_(org_)?[A-Za-z0-9_-]{43})$/.exec(header ?? '')
+  if (!bearer) return null
+  const [, token, organizationBound] = bearer
   const cursor = 'after' in read ? z.uuid().nullable().parse(read.after) : null
   const projectId = 'projectId' in read ? z.uuid().parse(read.projectId) : null
   const hash = digest(token)
@@ -97,6 +115,13 @@ export async function readServiceCredentialProjects(header: string | null, read:
     if (!valid) return null
     const link = await organizationLink(workspace, workspaceId)
     if (link?.archived) return null
+    if (organizationBound) {
+      if (!link) return null
+      const binding = await workspace.execute(sql`SELECT 1 FROM mikka_service_key_organization_bindings
+        WHERE "identityId"=${id}::uuid AND "workspaceId"=${workspaceId}::uuid
+          AND "organizationId"=${link.organizationId}::uuid AND "credentialHash"=${hash} FOR SHARE`)
+      if (!binding.rowCount) return null
+    }
     return writeTransaction(pool, async app => {
       if (link && !await serviceOrganizationAllowed(app, link.organizationId)) return null
       const { rows } = await app.query<{ id: string; visibility: string }>(`SELECT p.id,p.visibility FROM resource_access_policies p
