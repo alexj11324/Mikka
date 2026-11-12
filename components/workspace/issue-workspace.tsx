@@ -166,7 +166,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const { data: groupList, isValidating: readingGroups, error: groupListError, mutate: retryGroupList } = useLiveGroupList(user.id, groupsWorkspace)
   const listedGroup = groupList?.find(group => group.id === groupId)
   const groupRequest = listedGroup ? { id: listedGroup.id, title: listedGroup.title, workspaceId: listedGroup.workspaceId } : null
-  const forgetGroupDrafts = useForgetGroupDrafts()
+  const forgetGroupDrafts = useForgetGroupDrafts(user.id, groupsWorkspace)
   const notifyOtherGroupTabs = useGroupMembershipLoss(user.id, groupsWorkspace, groupList, id => {
     forgetGroupDrafts(id)
     void forgetGroupReads(clearCache, id)
