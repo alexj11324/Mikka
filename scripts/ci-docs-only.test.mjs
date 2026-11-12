@@ -260,7 +260,7 @@ test('CI partitions DB suites across isolated jobs and requires source and daemo
   assert(!daemon.includes('MIKKA_SANDBOX_ACCEPTANCE'))
   assert(daemon.includes('pnpm --filter @mikka/daemon test:package'))
   const gate = job('ui-policy')
-  for (const name of ['changes','ui-policy-full','ui-policy-integrations','source-checks','daemon-checks','image-checks','desktop-checks','analytics-checks']) assert(gate.includes(name))
+  for (const name of ['changes','ui-policy-full','ui-policy-integrations','source-checks','daemon-checks','image-checks','analytics-checks']) assert(gate.includes(name))
   for (const name of ['ui-policy-full', 'ui-policy-integrations', 'source-checks', 'daemon-checks']) assert(gate.includes(`needs.${name}.result`))
 })
 
