@@ -264,6 +264,13 @@
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "drizzle/20261112070028_handoff_owned_chat_retirements.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Leave an attachment retirement to the active account deletion job only when that transaction already owns its object key and outstanding grant deadline.",
+    "test": "lib/chat-attachments/store.db.test.ts",
+    "suite": "test:chat-attachments-db"
+  },
   "lib/abuse/workers-ai.ts": {
     "mode": "optional-cloud",
     "environment": [
@@ -274,6 +281,13 @@
     "behavior": "Only an explicitly selected managed Workers AI model uses the Cloudflare account and token and the model route refuses missing configuration before provider I/O.",
     "test": "lib/abuse/model.test.ts",
     "suite": "test:abuse"
+  },
+  "lib/account-deletions-due.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Schedule shared attachment cleanup independently of active account deletion jobs and keep residual work eligible after an account deletion completes.",
+    "test": "lib/account-deletions-due.db.test.ts",
+    "suite": "test:account-db"
   },
   "lib/account/cloud-cleanup.ts": {
     "mode": "built-in",
