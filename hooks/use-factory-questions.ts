@@ -16,6 +16,7 @@ export type FactoryQuestionItem = {
   /** context · decision · permission · external */
   type: string
   question: string
+  recordedAnswer?: string
   options: { label: string; value: string }[]
   reference: { questionRevision?: number; [key: string]: unknown }
   /** The task's title, read from its Factory task. */

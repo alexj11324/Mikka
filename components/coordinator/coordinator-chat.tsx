@@ -620,7 +620,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
           notices={<>{notices}{factory.error && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1">{actionError()}</AlertTitle><Button variant="ghost" size="sm" onClick={() => { void factory.reload() }}>{tCommon('retry')}</Button></Alert>}</>}
           questions={factory.questions.map(question => {
             const reason = factoryQuestionUnavailable(question.status)
-            return { id: question.questionId, revision: question.reference.questionRevision, question: question.question, task: question.task, unavailable: reason ? actionError(reason) : undefined, taskId: question.issueId ?? undefined,
+            return { id: question.questionId, revision: question.reference.questionRevision, question: question.question, task: question.task, recordedAnswer: question.recordedAnswer, unavailable: reason ? actionError(reason) : undefined, taskId: question.issueId ?? undefined,
             kind: question.type === 'permission' ? 'approval' : question.options.length ? 'decision' : 'question', ...(question.options.length ? { options: question.options.map(option => ({ id: option.value, title: option.label })) } : {}) }
           })}
           onAnswer={async (id, text) => {

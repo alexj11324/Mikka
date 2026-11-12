@@ -37,6 +37,7 @@ const plain = ({ children }: { children?: ReactNode }) => <div>{children}</div>
 const nothing = () => null
 const artifactChat = { activeArtifactId: 'fixture-artifact', quote: null, clearQuote: nothing, openArtifact: nothing }
 mock.module(new URL('../../hooks/use-factory-questions.ts', import.meta.url).href, { namedExports: {
+  factoryQuestionUnavailable: () => null,
   useFactoryQuestions: () => ({ questions: [], error: null, reload: nothing }),
 } })
 mock.module(new URL('../slots/thread.tsx', import.meta.url).href, { namedExports: {

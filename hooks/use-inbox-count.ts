@@ -15,5 +15,5 @@ export function useInboxCount(threads: Thread[], groups: CollectionGroups, enabl
   const version = useMemo(() => factoryQuestionsVersion(threads), [threads])
   const { questions } = useFactoryQuestions(version, enabled)
   const suggestions = useSuggestionCount(enabled)
-  return useMemo(() => enabled ? questions.length + waitingTasks(groups, questions).length + suggestions : 0, [enabled, groups, questions, suggestions])
+  return useMemo(() => enabled ? questions.filter(question => !question.recordedAnswer).length + waitingTasks(groups, questions).length + suggestions : 0, [enabled, groups, questions, suggestions])
 }

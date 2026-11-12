@@ -73,6 +73,7 @@ export type ThreadEntry =
 export type ThreadQuestion = {
   revision?: number
   unavailable?: string
+  recordedAnswer?: string
   id: string
   question: string
   /** The task it belongs to, in words. */
