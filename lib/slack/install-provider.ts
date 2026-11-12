@@ -121,19 +121,21 @@ async function conversations(token: string, user: string | undefined, send: type
     seen = new Set<string>()
   let cursor = ''
   do {
-    const result = await post(
-      'users.conversations',
-      new URLSearchParams({
-        types: 'public_channel,private_channel',
-        exclude_archived: 'true',
-        limit: '200',
-        ...(user ? { user } : {}),
-        ...(cursor ? { cursor } : {}),
-      }),
-      'Bearer ' + token,
-      send,
+    const query = new URLSearchParams({
+      types: 'public_channel,private_channel',
+      exclude_archived: 'true',
+      limit: '200',
+      ...(user ? { user } : {}),
+      ...(cursor ? { cursor } : {}),
+    })
+    const response = await send('https://slack.com/api/users.conversations?' + query, {
+      method: 'GET',
+      redirect: 'error',
+      headers: { authorization: 'Bearer ' + token },
       signal,
-    )
+    })
+    if (!response.ok) throw new Error('slackProviderUnavailable')
+    const result = object(await response.json())
     if (result.ok !== true || !Array.isArray(result.channels)) throw new Error('slackProviderUnavailable')
     for (const item of result.channels) {
       const channel = object(item)

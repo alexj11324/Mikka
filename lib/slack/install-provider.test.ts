@@ -35,8 +35,9 @@ test('OAuth and channel visibility use fixed Slack methods with the proper ident
   const server = createServer(async (req, res) => {
     let raw = ''
     for await (const chunk of req) raw += chunk
-    const fields = new URLSearchParams(raw),
-      op = req.url!.split('/').at(-1)
+    const requestUrl = new URL(req.url!, 'http://localhost'),
+      op = requestUrl.pathname.split('/').at(-1)
+    const fields = req.method === 'GET' ? requestUrl.searchParams : new URLSearchParams(raw)
     requests.push(String(op))
     let data: Record<string, unknown> = { ok: false }
     if (
@@ -58,7 +59,7 @@ test('OAuth and channel visibility use fixed Slack methods with the proper ident
       if (op === 'auth.test')
         data = { ok: true, team_id: wrongTeam ? 'TWRONG' : 'TTEAM', user_id: 'UBOT', bot_id: 'BBOT' }
       if (op === 'apps.uninstall') data = { ok: fields.get('client_secret') === secret }
-      if (op === 'users.conversations') {
+      if (op === 'users.conversations' && req.method === 'GET' && !raw && !req.url?.includes(token)) {
         const user = fields.get('user')
         const ids = user === 'UA' ? ['CBOTH', 'CHUMAN'] : ['CBOTH', 'CBOT', 'CEXTERNAL']
         data = {
@@ -83,7 +84,7 @@ test('OAuth and channel visibility use fixed Slack methods with the proper ident
     const target = new URL(String(input))
     assert.equal(target.origin, 'https://slack.com')
     assert.equal(options?.redirect, 'error')
-    return fetch('http://127.0.0.1:' + addr.port + target.pathname, options)
+    return fetch('http://127.0.0.1:' + addr.port + target.pathname + target.search, options)
   }
   const grant = await redeemSlackCode(platform, 'test-code', send)
   assert.equal(grant.slackUserId, 'UA')
