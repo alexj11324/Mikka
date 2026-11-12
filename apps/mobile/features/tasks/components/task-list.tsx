@@ -12,6 +12,8 @@ import { displayTitle } from '@/lib/display-title'
 import { shortWhen } from '@/lib/clock'
 import type { Task, TaskGroup } from '@/lib/types'
 import { ApiError } from '@/lib/api'
+import { apiCache } from '@/lib/api-cache'
+import { withholdsCachedRead } from '@/lib/api-read-state'
 import { useTaskContinuation } from '../../../../../lib/hooks/use-task-continuation'
 import type { TaskListPageInput } from '../../../../../lib/task-list-page'
 import { useLiveApi, useRefresh } from '@/lib/useApi'
@@ -34,9 +36,16 @@ export function useTasks(enabled = true, botId?: string | null) {
     list => tasksLive(home?.live?.workspaceId, list?.workspaceId ?? home?.workspace.id, list?.tasks.map(task => task.id)), readPresentedTasks)
   const paging = useTaskContinuation(list.data?.tasks ?? [], list.data, list.data?.next ?? null, async after => {
     const workspaceId = list.data!.workspaceId
+    const context = apiCache.context()
+    const revision = path && apiCache.revision(path)
     const params = new URLSearchParams({ workspaceId, after: after.id, updatedAt: after.updatedAt, ...(botId ? { dispatchedBy: botId } : {}) })
     const page = await readPresentedTasks('/api/mobile/tasks?' + params).catch(async error => {
-      if (error instanceof ApiError && error.status === 409) await list.reload()
+      if (error instanceof ApiError) {
+        if (error.status === 409) await list.reload()
+        if (path && revision === apiCache.revision(path) && withholdsCachedRead(error.status)) {
+          apiCache.revoke(path, context, error)
+        }
+      }
       throw error
     })
     if (page.workspaceId !== workspaceId) throw new Error('workspaceAccessDenied')
@@ -71,16 +80,22 @@ export function TaskList({ filter = 'all', bot, bottom = 24 }: { filter?: TaskFi
       refreshControl={<RefreshControl {...refresh} />}
       contentContainerStyle={{ paddingBottom: insets.bottom + bottom }}
       ListHeaderComponent={<ReadNotice error={error} hasData={Boolean(data)} label={mobileMessages.Nav.tasks} onRetry={reload} />}
-      ListFooterComponent={paging.hasMore ? <Pressable accessibilityRole="button" disabled={paging.loading}
-        onPress={() => void paging.loadMore()} style={styles.center}>
-        <Text>{paging.failed ? mobileMessages.Common.retry : mobileMessages.HostedTasks.loadMore}</Text>
-      </Pressable> : undefined}
+      ListFooterComponent={<TaskListContinuation paging={paging} />}
       ListEmptyComponent={loading && !data ? <View style={styles.center}><Spinner /></View> : error ? undefined : <Text style={styles.empty}>{mobileMessages.MobileCore.noTasks}</Text>}
       renderItem={({ item }) => item.kind === 'section'
         ? <TaskGroupBar id={item.id} count={item.count} folded={item.folded} onToggle={() => toggle(item.id)} />
         : <TaskRowView task={item.task} />}
     />
   )
+}
+
+/** Tasks and Search continue the same authorized collection on an explicit tap. */
+export function TaskListContinuation({ paging }: { paging: ReturnType<typeof useTasks>['paging'] }) {
+  if (!paging.hasMore) return null
+  return <Pressable accessibilityRole="button" accessibilityState={{ busy: paging.loading, disabled: paging.loading }}
+    disabled={paging.loading} onPress={() => void paging.loadMore()} style={styles.center}>
+    <Text>{paging.loading ? mobileMessages.Shell.search.loadingMore : paging.failed ? mobileMessages.Common.retry : mobileMessages.HostedTasks.loadMore}</Text>
+  </Pressable>
 }
 
 /** A group's header (Comma 15): its icon, name and count in the secondary colour on the page, no fill (Alex 2026-11-08:

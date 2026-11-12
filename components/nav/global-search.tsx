@@ -102,7 +102,7 @@ function useSearchPalette({ open, onOpenChange, onOpenChangeComplete, bots, sess
   // The Coordinator has its own entry above; its bot row is not listed again.
   const botRows = bots.filter(bot => !bot.coordinator && shown(bot.name))
   const historyRows = mergeById(
-    sessions.filter(session => shown(`${sessionName(session.title)} ${session.preview ?? ''}`)),
+    search.serverHistory ? [] : sessions.filter(session => shown(`${sessionName(session.title)} ${session.preview ?? ''}`)),
     search.state.history.items.filter((item): item is HistoryHit => item.type === 'history'),
   )
   const groupRows = search.state.groups.items.filter((item): item is GroupHit => item.type === 'group')
@@ -117,11 +117,16 @@ function useSearchPalette({ open, onOpenChange, onOpenChangeComplete, bots, sess
   }, [issues, remoteTasks, workspaceId])
   const extra = useWorkspaceTaskPresentations(scope?.ownerId ?? '', workspaceId ?? undefined, null, extraTasks, open && !!scope?.ownerId && scope.workspaceId === workspaceId)
   const taskRows: (Issue | TaskHit)[] = mergeById(
-    issues.filter(issue => shown(`${issue.identifier ?? ''} ${issue.title}`)),
+    search.serverTasks ? [] : issues.filter(issue => shown(`${issue.identifier ?? ''} ${issue.title}`)),
     remoteTasks,
   )
-  const threadRows = onThread ? threadSearchHits(threads, text, thread => threadName(thread, issues, tNav('untitledConversation')), new Set(taskRows.map(row => row.id))) : []
-  const projectRows = projects.filter(project => shown(`${project.name} ${project.summary}`))
+  const taskIds = new Set(taskRows.map(row => row.id))
+  // Threads have an owner-wide reader. Keep its standalone rows, but do
+  // not enrich them from Task metadata withheld by the workspace source.
+  const deniedTasks = search.workspaceDenied ? new Set(issues.filter(issue => issue.workspaceId === workspaceId).map(issue => issue.id)) : null
+  const visibleThreads = deniedTasks ? threads.filter(thread => !thread.issueId || !deniedTasks.has(thread.issueId)) : threads
+  const threadRows = onThread ? threadSearchHits(visibleThreads, text, thread => threadName(thread, search.serverTasks ? [] : issues, tNav('untitledConversation')), taskIds) : []
+  const projectRows = search.workspaceDenied ? [] : projects.filter(project => shown(`${project.name} ${project.summary}`))
   const actions = [
     // i18n-ignore: bilingual search keywords, not rendered
     { value: '新建任务 create issue new task', icon: Plus, label: t('newTask'), run: onCreateIssue },
@@ -131,13 +136,13 @@ function useSearchPalette({ open, onOpenChange, onOpenChangeComplete, bots, sess
     { value: '新建 bot create new bot', icon: Bot, label: t('newBot.title'), run: onNewBot },
   ].filter(action => shown(`${action.value} ${action.label}`))
   // 「审阅 #N」 (#1732): the current task's, and with a query any matching task that has a pull request.
-  const reviewRows = onReview ? issues.filter(issue => issue.id === reviewTaskId || (text && issue.metadata.pullRequests?.length))
+  const reviewRows = onReview ? issues.filter(issue => (!search.serverTasks || taskIds.has(issue.id)) && (issue.id === reviewTaskId || (text && issue.metadata.pullRequests?.length)))
     .map(issue => ({ id: issue.id, label: t('reviewTask', { identifier: issue.identifier ?? issue.title }), value: `review ${issue.id} ${issue.identifier ?? ''} ${issue.title}` }))
     .filter(row => shown(`${row.value} ${row.label}`)) : []
   const coordinatorShown = shown(coordinatorValue)
 
   const failed = search.sources.filter(source => search.state[source].status === 'error' || search.state[source].error)
-  const authLost = failed.some(source => search.state[source].error === 'authRequired')
+  const authLost = search.authRequired || failed.some(source => search.state[source].error === 'authRequired')
   const resultCount = (coordinatorShown ? 1 : 0) + botRows.length + historyRows.length + groupRows.length + taskRows.length + threadRows.length + projectRows.length + actions.length + reviewRows.length
   const announce = search.searching ? t('search.searching')
     : search.query.kind === 'tooLong' ? t('search.tooLong')
@@ -189,12 +194,12 @@ function useSearchPalette({ open, onOpenChange, onOpenChangeComplete, bots, sess
       select: () => { for (const source of failed) search.retry(source) },
     }] } satisfies SearchSection] : []),
   ]
-  const sections = listed.filter(section => section.rows.length > 0)
+  const sections = authLost ? [] : listed.filter(section => section.rows.length > 0)
 
   return {
     open, onOpenChange, onOpenChangeComplete, query, onQueryChange: setQuery, maxLength: QUERY_MAX_LENGTH, sections,
-    searching: search.searching, announce: text ? announce : '',
-    empty: !search.searching && resultCount === 0 ? (search.query.kind === 'tooLong' ? t('search.tooLong') : t('searchEmpty')) : null,
+    searching: search.searching, announce: text && !authLost ? announce : '',
+    empty: !authLost && !search.searching && resultCount === 0 ? (search.query.kind === 'tooLong' ? t('search.tooLong') : t('searchEmpty')) : null,
     authError: authLost ? t('search.authRequired') : null,
   }
 }
