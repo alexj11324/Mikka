@@ -183,6 +183,24 @@
     "behavior": "The official Eve host opts into its private Cloudflare World explicitly. Leaving the selector unset preserves the normal workflow selection.",
     "test": "cloudflare/eve-runtime/test/config.test.mjs"
   },
+  "drizzle/20261112090913_account_subscription_custody.sql": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "Allow an existing owner-bound custody worker to revoke a frozen subscription only while its coordinator retains the exclusive deletion session. Preserve unsettled custody and ordinary write refusals.",
+    "test": "lib/account/deletion-lock.db.test.ts",
+    "suite": "test:account-db"
+  },
+  "drizzle/20261112090914_workspace_subscription_custody.sql": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Retain Workspace insert and update fences after fresh consolidated migration ordering. Separate Workspace stores do not acquire BYOS objects.",
+    "test": "lib/account/deletion-lock.db.test.ts",
+    "suite": "test:account-db"
+  },
   "drizzle/20261112030502_task_attachments.sql": {
     "mode": "built-in",
     "environment": [
