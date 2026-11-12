@@ -158,3 +158,34 @@ for (const outcome of ['complete', 'cancel'] as const) test(`authenticated Node 
     if (outcome === 'cancel') { assert.equal(streamCancelled, true); assert.equal(requestAborted, true) }
   } finally { releaseAfter.resolve(); if (controller && !streamEnded) controller.close(); await server.close() }
 })
+
+test('the official Web client can send its original Eve submission id to a selected installation', async () => {
+  const path = '/api/agents/eve/v1/session/example/turn'
+  const key = 'x-mikka-submission-id'
+  const id = '6cc33831-9282-49fa-8780-86b9b33aa097'
+  const transport = createWebTransport({ env: {}, authenticate: async incoming => {
+    assert.deepEqual([...incoming], [['authorization', authorization]])
+    return { user: { id: 'owner' }, session: { id: 'session' } }
+  }, scope: (_, work) => work() })
+  const route = fixture(path, 'POST', async request => {
+    assert.equal(request.headers.get(key), id)
+    assert.equal(request.headers.get('cookie'), null)
+    return Response.json({ accepted: id })
+  })
+  const server = await nodeApplication(createApiHandler([route], () => ({ run: work => work(), finish: () => {} }), transport))
+  try {
+    const preflight = (route: string, header: string) => fetch(server.origin + '/mikka' + route, { method: 'OPTIONS', headers: {
+      origin: officialOrigin, 'access-control-request-method': 'POST', 'access-control-request-headers': 'authorization,content-type,' + header,
+    } })
+    const accepted = await preflight(path, key)
+    assert.equal(accepted.status, 204)
+    assert.equal(accepted.headers.get('access-control-allow-origin'), officialOrigin)
+    assert.ok(accepted.headers.get('access-control-allow-headers')?.split(', ').includes(key))
+    assert.equal(accepted.headers.has('access-control-allow-credentials'), false)
+    assert.equal((await preflight(path, 'x-mikka-session-cache')).status, 403)
+    assert.equal((await preflight('/api/desktop/rpc', key)).status, 403)
+    const post = (headers: Record<string, string>) => fetch(server.origin + '/mikka' + path, { method: 'POST', headers: { origin: officialOrigin, [key]: id, ...headers } })
+    assert.equal((await post({})).status, 401)
+    assert.deepEqual(await (await post({ authorization })).json(), { accepted: id })
+  } finally { await server.close() }
+})

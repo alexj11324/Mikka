@@ -81,9 +81,11 @@ export function createWebTransport(options: {
     if (method === 'OPTIONS') {
       const requestedMethod = request.headers.get('access-control-request-method')
       const requestedHeaders = (request.headers.get('access-control-request-headers') ?? '').toLowerCase().split(',').map(value => value.trim()).filter(Boolean)
-      if (!requestedMethod || !methods.includes(requestedMethod) || requestedHeaders.some(value => !allowedHeaders.includes(value))) return corsResponse(rejected(403, 'web_connection_preflight_refused'), origin)
+      // Eve uses this immutable key to recognize a retried chat turn.
+      const headers = route.startsWith('/api/agents/') ? [...allowedHeaders, 'x-mikka-submission-id'] : allowedHeaders
+      if (!requestedMethod || !methods.includes(requestedMethod) || requestedHeaders.some(value => !headers.includes(value))) return corsResponse(rejected(403, 'web_connection_preflight_refused'), origin)
       return corsResponse(new Response(null, { status: 204, headers: {
-        'access-control-allow-methods': methods.join(', '), 'access-control-allow-headers': allowedHeaders.join(', '),
+        'access-control-allow-methods': methods.join(', '), 'access-control-allow-headers': headers.join(', '),
       } }), origin)
     }
     if (!methods.includes(method)) return corsResponse(rejected(405, 'web_connection_method_refused'), origin)
