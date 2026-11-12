@@ -366,7 +366,7 @@
     ],
     "behavior": "Self-hosted Eve calls the configured application origin or local server with its signed scope. The private product capability is sent only to the paired Cloudflare service and that deployment refuses to call without it.",
     "test": "lib/eve/product-tool.test.ts",
-    "suite": "test:eve"
+    "suite": "test:eve-product-tool"
   },
   "lib/factory/evidence-folder-index.ts": {
     "mode": "built-in",
