@@ -591,7 +591,7 @@
         "GET",
         "PUT"
       ],
-      "sourceHash": "cea72e01b9b56bc51e6d5c3cc9041c192c1f423a958c25653726de73a4591858"
+      "sourceHash": "3d936d8ce9110e30a77c537e60a3d09b9d65998f5a6d91dd39bb3fd93350b2fe"
     },
     {
       "path": "/mikka/api/credentials",
@@ -2753,7 +2753,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "559e9f4c322587e50099625e875750a3644d78f508a848154984428c5c78cc47"
+      "sourceHash": "1859c50d5222173907720d2d3f3681eb44b73064751b6ad8cb59d1e567497c13"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/fs/requests",

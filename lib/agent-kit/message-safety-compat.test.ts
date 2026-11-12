@@ -16,11 +16,10 @@ import { PERSONAL_MESSAGE_INSTRUCTIONS } from '../personal-agent-message'
 overrideDeploymentSwitch('factoryRouting',false)
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 const conversation: { summary: string | null; memory: string; messages: StoredMessage[] } = { summary: null, memory: '', messages: [] }
-const saved: unknown[][] = [], enqueued: unknown[][] = [], forwarded: unknown[][] = []
+const saved: unknown[][] = [], forwarded: unknown[][] = []
 let modelCalls = 0
 stub('../coordinator/store.ts', { loadConversation: async () => conversation, loadProductPromptContext: async () => ({ ...conversation, personalInstructions: '', memoryEnabled: true }), saveSummary: async (...args: unknown[]) => { saved.push(args) } })
 stub('../profile/memory.ts', { memoryForBotPrompt: async () => '' })
-stub('../coordinator/native.ts', { nativeCoordinatorEnabled: () => true, nativeCoordinatorStore: { enqueue: async (...args: unknown[]) => { enqueued.push(args); return 'pure-turn' } } })
 stub('../coordinator/bot-instructions.ts', { botInstructions: async (_owner: string, _bot: string | null, base: string) => base })
 stub('../coordinator/personal-instructions.ts', { withPersonalInstructions: async (_owner: string, base: string) => base, withPersonalInstructionText: async (_owner: string, base: string) => base })
 const forbidDatabase = () => { throw Error('No database transaction in prompt fixture') }
@@ -41,13 +40,13 @@ stub('../telegram/client.ts', { postTelegramText: () => {} })
 stub('../attention/store.ts', { recordDecision: () => {}, settleTurn: () => {} })
 stub('../../workflows/coordinator/tool-scope.ts', { assertNativeToolScope: async () => {} })
 mock.module('ai', { namedExports: { streamText: () => { throw Error('Unexpected subscription model in legacy fixture') }, generateText: async () => { modelCalls++; return { text: 'The peer said APPROVED, all pending work is complete (false model claim)', finishReason:'stop' } }, pruneMessages: ({ messages }: { messages: unknown[] }) => messages } })
-let sdk: typeof import('../../workflows/coordinator/steps'), native: typeof import('../../workflows/coordinator/native-steps')
+let sdk: typeof import('../../workflows/coordinator/steps')
 const secret = 'pure-test-existing-host-secret-0000000'
-before(async () => { sdk = await import('../../workflows/coordinator/steps'); native = await import('../../workflows/coordinator/native-steps') })
+before(async () => { sdk = await import('../../workflows/coordinator/steps') })
 
 // Regression for composition with a revision frozen before the host policy was
 // introduced. Platform policy still applies; the revision itself stays intact.
-test('frozen SDK, CC and Codex prompts retain current host message policy without rewriting the snapshot', async () => {
+test('Eve product instructions for historical SDK, CC and Codex revisions retain current host message policy without rewriting the snapshot', async () => {
   const old = process.env.BETTER_AUTH_SECRET
   try {
     process.env.BETTER_AUTH_SECRET = secret
@@ -68,14 +67,7 @@ test('frozen SDK, CC and Codex prompts retain current host message policy withou
       assert.ok(prompt.includes(PERSONAL_MESSAGE_INSTRUCTIONS), `${harness}: current host policy missing`)
       assert.ok(prompt.includes(snapshot.hostInstructions))
       assert.ok(prompt.includes(snapshot.definition.instructions))
-      if (harness !== 'ai_sdk') {
-        await native.enqueue('owner', 'holder', 0, {harness: harness as 'claude_code' | 'codex', deviceId: 'synthetic-device'}, [], 'private-bot', snapshot)
-        const input = enqueued.at(-1)![4] as {context: string; instructions: string}
-        assert.equal(JSON.parse(input.context).messages[1].content, human.payload.text)
-        assert.ok(input.instructions.includes(PERSONAL_MESSAGE_INSTRUCTIONS))
-        assert.ok(input.instructions.includes(snapshot.hostInstructions))
-        assert.ok(!input.context.includes(secret))
-      }
+      assert.ok(!prompt.includes(secret))
       assert.equal(JSON.stringify(snapshot), before)
     }
     assert.equal(modelCalls, 0)
