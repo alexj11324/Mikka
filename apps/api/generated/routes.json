@@ -1975,7 +1975,16 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "72272482c9c9bec8fe2d970113747a0b5da9fc6e29353407315846802509f0fb"
+      "sourceHash": "3b54f651f26e84dcf89b0200cc356daad193de27798f11cb4d2f7f2fd2d7fa19"
+    },
+    {
+      "path": "/mikka/api/service-identity/projects/[projectId]",
+      "template": "/api/service-identity/projects/[projectId]",
+      "source": "app/api/service-identity/projects/[projectId]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "85d6af82886f281bc3eda4f5f8daf16bf2e0d9370da2e681ebde563f7be3dae5"
     },
     {
       "path": "/mikka/api/settings/[read]",
