@@ -71,6 +71,13 @@
     "test": "app/api/webhooks/github/route.test.ts",
     "suite": "test:suggestions"
   },
+  "app/api/service-identity/projects/[projectId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read one live, explicitly granted Project and return its permitted repository and branch metadata without exposing local filesystem aliases.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
   "app/api/service-identity/projects/route.ts": {
     "mode": "built-in",
     "environment": [],
@@ -480,7 +487,7 @@
   "lib/governance/service-credentials.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Issue, rotate or revoke dedicated credentials and read only Projects explicitly granted to their service identity.",
+    "behavior": "Issue, rotate or revoke dedicated credentials and authorize Project lists and details using the live Workspace identity, organization policy and recursive Project ACL.",
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },
