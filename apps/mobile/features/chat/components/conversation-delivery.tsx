@@ -6,14 +6,15 @@ import { api, apiConnection, ApiError } from '@/lib/api'
 import { apiCache } from '@/lib/api-cache'
 import { useHome } from '@/lib/home'
 import { sendFailureState } from '@/lib/outbox'
-import { threadSendErrorLine } from '@/lib/thread-send-error'
-import { submitConversation, type ConversationCommand, type ConversationTarget } from '@/lib/conversation-submission'
+import { conversationJournal } from '@/lib/config'
+import { mobileMessages as copy } from '@/lib/messages'
+import { sameConversationCommand, submitConversation, type ConversationCommand, type ConversationTarget } from '@/lib/conversation-submission'
 import { groupSubmissionMessageId } from '../../../../../lib/group-submission'
 import { useChatDeliveryState, type ChatDelivery } from '../../../../../lib/hooks/chat-delivery-state'
 
 type Row = ChatDelivery<ConversationCommand>
 const empty: Row[] = []
-const uncertain = '发送未确认'
+const uncertain = copy.Coordinator.sendUncertain
 const listeners = new Set<() => void>()
 function subscribe(listener: () => void) {
   listeners.add(listener)
@@ -32,7 +33,16 @@ export function useConversationDelivery(target: ConversationTarget | null, recei
   const context = apiCache.context()
   const key = JSON.stringify(['conversation-send', owner, workspace, target?.kind,
     target?.kind === 'thread' ? target.issueId ?? target.id : target?.id])
-  const read = useCallback(() => apiCache.context() === context ? apiCache.get<Row[]>(key) ?? empty : empty, [context, key])
+  const authorized = Boolean(owner && workspace && target)
+  const read = useCallback(() => {
+    if (!authorized || apiCache.context() !== context) return empty
+    const cached = apiCache.get<Row[]>(key)
+    if (cached) return cached
+    let saved: Row[] = empty
+    try { saved = conversationJournal.read(key).map(row => ({ ...row, phase: 'failed', error: uncertain })) } catch { /* A write will check durable storage before transport. */ }
+    apiCache.set(key, saved, context)
+    return saved
+  }, [authorized, context, key])
   const rows = useSyncExternalStore(subscribe, read, () => empty)
   const update = useCallback((next: SetStateAction<Row[]>) => {
     apiCache.commit(context, () => {
@@ -43,10 +53,12 @@ export function useConversationDelivery(target: ConversationTarget | null, recei
   const journal = useChatDeliveryState(rows, update, uncertain)
   const visible = rows.filter(row => !received.includes(row.storedId ?? row.id))
   useEffect(() => {
-    if (rows.some(row => received.includes(row.storedId ?? row.id))) {
+    const shown = rows.filter(row => received.includes(row.storedId ?? row.id))
+    if (shown.length) {
+      try { conversationJournal.forget(key, shown.map(row => row.id)) } catch { /* Readback remains authoritative. */ }
       update(current => current.filter(row => !received.includes(row.storedId ?? row.id)))
     }
-  }, [rows, received, update])
+  }, [rows, received, update, key])
 
   async function deliver(command: ConversationCommand) {
     if (!target || owner !== command.expectedOwnerId || workspace !== command.expectedWorkspaceId ||
@@ -58,12 +70,18 @@ export function useConversationDelivery(target: ConversationTarget | null, recei
         : command.id
       if (apiCache.context() !== context) throw new Error('submissionUnconfirmed')
       update(current => current.map(row => row.id === command.id ? { ...row, storedId } : row))
+      try { conversationJournal.remember(key, { ...command, storedId }) }
+      catch { journal.finish(command.id, { error: copy.Workspace.detail.autosaveFailed }); return }
       await submitConversation(command, (path, init) => api(path, init, connection), storedId)
       journal.finish(command.id, { storedId })
+      if (apiCache.context() === context) {
+        try { conversationJournal.forget(key, [command.id]) } catch { /* The next authorized read also retires this ID. */ }
+      }
     } catch (failure) {
       const error = failure as { code?: string; status?: number } | null
-      const line = sendFailureState(error) === 'unconfirmed' ? uncertain : error?.status === 429 ? '发送过于频繁，请稍后重试。'
-        : error?.status && [401, 403, 404].includes(error.status) ? '此会话已无法访问。' : threadSendErrorLine(error?.code ?? null)
+      const messages: Record<string, string> = copy.Errors
+      const line = sendFailureState(error) === 'unconfirmed' ? uncertain : error?.status === 429 ? copy.Coordinator.sendRateLimited
+        : error?.status && [401, 403, 404].includes(error.status) ? copy.Coordinator.sendAccessDenied : messages[error?.code ?? ''] ?? copy.GroupChat.notSent
       journal.finish(command.id, { error: line })
       return
     }
@@ -72,7 +90,7 @@ export function useConversationDelivery(target: ConversationTarget | null, recei
 
   function send(text: string, mentions: ConversationCommand['mentions'] = []) {
     if (!target || !owner || !workspace || !text.trim()) return false
-    const previous = read().find(row => row.phase !== 'accepted' && row.text === text)
+    const previous = read().find(row => row.phase !== 'accepted' && sameConversationCommand(row, target, text, mentions))
     void deliver(previous ?? { target, id: uuid.v4(), text, at: Date.now(), expectedOwnerId: owner, expectedWorkspaceId: workspace, mentions })
     return true
   }

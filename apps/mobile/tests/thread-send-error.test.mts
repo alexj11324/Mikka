@@ -13,7 +13,8 @@ test('no code, or one the app does not know, keeps the retry line', () => {
   assert.equal(threadSendErrorLine('somethingNew'), '没发出去，再试一次。')
 })
 
-import { submitConversation, type ConversationCommand } from '../lib/conversation-submission'
+import { createConversationJournal } from '../lib/conversation-journal'
+import { sameConversationCommand, submitConversation, type ConversationCommand } from '../lib/conversation-submission'
 import { groupSubmissionMessageId } from '../../../lib/group-submission'
 
 const actor = { expectedOwnerId: 'reader', expectedWorkspaceId: 'workspace' }
@@ -39,3 +40,32 @@ for (const target of [{ kind: 'group', id: 'group' }, { kind: 'thread', id: 'sol
     await assert.rejects(submitConversation(command, async () => ({ id: 'different' }), storedId), /submissionUnconfirmed/)
   })
 }
+
+test('the pending original survives a fresh app instance only for its own session and scope', () => {
+  const values = new Map<string, string>()
+  const disk = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value) } }
+  const command = { target: { kind: 'thread' as const, id: 'old', issueId: 'task' }, id: 'one', text: 'next', at: 1, mentions: [], ...actor, storedId: 'one' }
+  const origin = createConversationJournal(disk)
+  origin.bind('account', 'session')
+  origin.remember('ws1/task', command)
+  const reopened = createConversationJournal(disk)
+  reopened.bind('account', 'session')
+  assert.deepEqual(reopened.read('ws1/task'), [command])
+  assert.deepEqual(reopened.read('ws2/task'), [])
+  assert.equal(sameConversationCommand(command, { ...command.target, id: 'new' }, command.text, []), false)
+  assert.equal(sameConversationCommand(command, command.target, command.text, []), true)
+  reopened.bind('other', 'session')
+  assert.deepEqual(reopened.read('ws1/task'), [])
+  reopened.bind('account', 'different-session')
+  assert.deepEqual(reopened.read('ws1/task'), [])
+  reopened.remember('ws1/task', command)
+  reopened.bind('account', null)
+  assert.ok(![...values.values()].some(value => value.includes('"text":"next"')))
+})
+
+test('an unsaved command does not claim durable recovery', () => {
+  const inaccessible = createConversationJournal({ getItem: () => null, setItem() {} })
+  inaccessible.bind('account', 'session')
+  assert.throws(() => inaccessible.remember('ws/task', { target: { kind: 'group', id: 'one' }, id: 'one',
+    at: 1, text: 'keep', mentions: [], ...actor, storedId: 'row' }), /draftNotSaved/)
+})
