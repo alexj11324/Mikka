@@ -1,5 +1,5 @@
 import { writeFile } from 'node:fs/promises'
-import { AUDIENCE, validJob } from '../cloudflare/engineering-sandbox/jobs.mjs'
+import { AUDIENCE, EVE_DEADLINE_MS, validJob } from '../cloudflare/engineering-sandbox/jobs.mjs'
 
 // This client runs in the repository's trusted Actions workflow. Candidate files
 // execute only in the Container. No Cloudflare admin token is needed to run a job.
@@ -22,7 +22,7 @@ async function request(path, job) {
   const response = await fetch(url, {
     method: path === '/receipt' ? 'GET' : 'POST', redirect: 'error',
     headers: { authorization: 'Bearer ' + value, 'content-type': 'application/json' },
-    body: job ? JSON.stringify(job) : undefined, signal: AbortSignal.timeout(11 * 60_000),
+    body: job ? JSON.stringify(job) : undefined, signal: AbortSignal.timeout(workload === 'eve-host-build' ? EVE_DEADLINE_MS + 60_000 : 11 * 60_000),
   })
   if (!response.ok) throw new Error('Engineering sandbox ' + path + ' HTTP ' + response.status)
   return response.json()

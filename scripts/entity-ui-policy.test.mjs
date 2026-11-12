@@ -46,3 +46,28 @@ test('an unregistered mobile entity route and a false Task re-export cannot bypa
   assert.equal(auditEntityDetail('hooks/use-detail.ts', 'export function useTaskPanelController() {}')[0].rule, 'entity/detail-source')
   assert.equal(auditEntityDetail('lib/task-flow.ts', 'function TaskDetailController() {}')[0].rule, 'entity/detail-source')
 })
+
+test('Inbox, Factory question and composer have one registered web hook owner', () => {
+  const read = file => readFileSync(file, 'utf8')
+  assert.deepEqual(verifyEntityContracts(read), [])
+  for (const [file, source] of [
+    ['components/workspace/inbox-counter.tsx', 'function useInboxCount() {}'],
+    ['hooks/use-other-questions.ts', 'export function useFactoryQuestions() {}'],
+    ['hooks/use-other-questions.ts', 'export function factoryQuestionsVersion() {}'],
+    ['components/slots/composer-clone.tsx', "export { useChatComposer } from '@/hooks/use-chat-composer'"],
+  ]) {
+    const diagnostics = auditEntityDetail(file, source)
+    assert.equal(diagnostics[0]?.rule, 'entity/shared-hook-owner', file)
+  }
+  assert.deepEqual(auditEntityDetail('hooks/use-inbox-count.ts', 'export function useInboxCount() {}'), [])
+  // Native screens may have platform-specific state adapters, not a second web owner.
+  assert.deepEqual(auditEntityDetail('apps/mobile/features/inbox/use-count.ts', 'export function useInboxCount() {}'), [])
+  for (const [file, name] of [
+    ['hooks/use-inbox-count.ts', 'useInboxCount'],
+    ['hooks/use-factory-questions.ts', 'useFactoryQuestions'],
+    ['hooks/use-chat-composer.ts', 'useChatComposer'],
+  ]) {
+    const missing = verifyEntityContracts(path => path === file ? `export type ${name} = never` : read(path))
+    assert.ok(missing.some(d => d.file === file && d.message.includes(name)), file)
+  }
+})

@@ -17,13 +17,13 @@ export interface ProfileRow {
   /** Closed ids (drizzle/20261110070000_agent_profile_marks.sql); null reads as the derived default. */
   icon?: ProfileGlyph | null; color?: ProfileColor | null
 }
-export interface ProfileMembership { check(): Promise<void>; close(): Promise<void> }
+export interface ProfileMembership { check(appExecutor?: Pick<PoolClient, 'query'>): Promise<void>; close(): Promise<void> }
 export async function acquireProfileMembership(scope: AgentProfileScope): Promise<ProfileMembership> {
   try {
     const borrowed = borrowTaskWorkspaceMembership(scope.ownerId, scope.workspaceId)
     if (borrowed) return {
-      async check() {
-        try { await borrowed.check() }
+      async check(appExecutor) {
+        try { await borrowed.check(appExecutor) }
         catch (cause) { throw new AgentProfileError('agentProfileScopeNotFound', 404, { cause }) }
       },
       close: () => borrowed.close(),
@@ -72,7 +72,7 @@ export class AgentProfileStore {
       if (!(await client.query('SELECT id FROM "user" WHERE id=$1 FOR KEY SHARE', [scope.ownerId])).rowCount) throw new AgentProfileError('agentProfileScopeNotFound', 404)
       member = await (this.deps.membership ?? acquireProfileMembership)(scope)
       const result = await operation(client)
-      await member.check(); await client.query('COMMIT'); return result
+      await member.check(client); await client.query('COMMIT'); return result
     } catch (error) { await client.query('ROLLBACK').catch(() => {}); throw error }
     finally { await member?.close(); client.release() }
   }

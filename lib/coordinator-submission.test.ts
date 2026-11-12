@@ -285,7 +285,7 @@ test('matching captured workspaces keep one trusted resolution and immutable ret
   assert.deepEqual(botResolutions, [{ botId: null, workspaceId: PROFILE_WORKSPACE }])
   const saved = structuredClone([...current.rows.values()])
   assert.equal(saved.length, 1); assert.equal(saved[0].botId, COORDINATOR_BOT)
-  assert.deepEqual(saved[0].payload, { text: 'captured task', source: 'person' }, 'the client expectation does not become persisted authority')
+  assert.deepEqual(saved[0].payload, { text: 'captured task', source: 'person', submissionId }, 'the client expectation does not become persisted authority')
   workspaceReads = 0; botResolutions.length = 0
   actionWorkspace = CHAT_HOME
   try {
@@ -669,7 +669,7 @@ test('a task title makes the message a task submission with the normal gates and
   const send = (title = 'Fix login redirect') => sendCoordinatorMessage('do the task', null, null, submissionId, undefined, undefined, undefined, undefined, undefined, undefined, title)
   try {
     assert.deepEqual(await send(), { queued: true })
-    assert.deepEqual([...current.rows.values()][0].payload, { text: 'do the task', source: 'person', taskTitle: 'Fix login redirect' })
+    assert.deepEqual([...current.rows.values()][0].payload, { text: 'do the task', source: 'person', submissionId, taskTitle: 'Fix login redirect' })
     assert.deepEqual(await send(), { queued: true })
     assert.equal(current.rows.size, 1)
     for (const invalid of ['', '   ', 'x'.repeat(61), 'two\nlines']) assert.deepEqual(await send(invalid), { error: 'validationGeneric', params: undefined })
@@ -688,7 +688,7 @@ test('the task-form Default choice needs no custom row and retains normal submis
   const send = (profileId = 'default') => sendCoordinatorMessage('do the task', null, null, submissionId, undefined, undefined, undefined, undefined, profileId)
   try {
     assert.deepEqual(await send(), { queued: true })
-    assert.deepEqual([...current.rows.values()][0].payload, { text: 'do the task', source: 'person', profileId: 'default' })
+    assert.deepEqual([...current.rows.values()][0].payload, { text: 'do the task', source: 'person', submissionId, profileId: 'default' })
     assert.deepEqual(await send(), { queued: true })
     assert.equal(current.rows.size, 1)
     const wakes = callbacks.length

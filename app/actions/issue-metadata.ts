@@ -21,6 +21,7 @@ import { assigneeSchema, delegateSchema, blockFlagSchema, labelSchema, pullReque
 import { scheduleIssueEffect } from '@/lib/issue-effects'
 import { activityActor } from '@/lib/activity-actor'
 import { requireCurrentIssueWorkspace, requireLockedIssueScope, withIssueWorkspace } from '@/lib/issue-scope-authorization'
+import { reviewTaskChanged } from '@/lib/coding-workspace/review-sessions'
 
 const patchSchema = z.object({
   // R-60 keeps the UI human-only; the verified legacy MCP contract remains supported.
@@ -131,6 +132,7 @@ export async function updateIssueMetadata(input: { id: string; revision: number;
         next.pullRequests = [...new Map(next.pullRequests.map(pr => [pr.url.replace(/\/$/, ''), { ...pr, url: pr.url.replace(/\/$/, '') }])).values()]
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, next), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId), eq(issues.revision, latest.revision))).returning()
         if (!saved) return { error: 'issueOutdated' }
+        reviewTaskChanged(tx, latest, saved)
         // Invitation bookkeeping follows every validation and the revision
         // fence. An invalid delegate must not leave a partial invitation.
         if (parsed.data.inviteEmail && assignee?.kind === 'member' && assignee.id !== issue.userId) {

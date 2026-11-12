@@ -5,6 +5,7 @@ import { ActionFailureError } from '../action-error'
 import { authenticateEveRequest, internalEveScope } from './auth'
 import { assertSessionScope, conversationAddress, registerSession, scopeFromAuth, scopeAuth, type EveScope } from './scope'
 import { priorHistory } from './history'
+import { withSessionControlDelivery } from './session-control-delivery.mjs'
 import { forwardEveRequest } from './forward-request'
 
 const body = z.object({ message: z.unknown().optional(), operationId: z.string().optional(), clientContext: z.unknown().optional() }).passthrough()
@@ -81,7 +82,7 @@ export function mikkaEveChannel() {
           payload.idempotencyKey = z.uuid().parse(request.headers.get('x-mikka-submission-id'))
           forwarded = forwardEveRequest(request,request.url,JSON.stringify(payload))
         }
-        const response = await admit(forwarded, () => route.handler(forwarded,args))
+        const response = await admit(forwarded, () => withSessionControlDelivery(route, sessionId, () => route.handler(forwarded,args)))
         if (response.ok) await (await import('./submission')).commitEveIngress(forwarded)
         if (response.ok && response.body && request.method === 'GET' && route.path.endsWith('/stream')) {
           const [{credentialChatFingerprints},{maskEveStream}] = await Promise.all([import('../credentials/chat-guard'),import('./stream-mask')])

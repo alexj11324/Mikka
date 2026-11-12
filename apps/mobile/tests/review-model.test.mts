@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { addComment, batchIsEmpty, batchLine, checksLine, editComment, EMPTY_BATCH, lineNumber, parsePatch, removeComment, sendBody, sourceLine, summaryLabel, summaryParts, toggleCheck, type ReviewSummary } from '../features/review/model/review.ts'
+import { addComment, batchIsEmpty, batchLine, checksLine, editComment, EMPTY_BATCH, lineNumber, parsePatch, removeComment, sendBody, sourceLine, summaryLabel, summaryParts, toggleCheck, usesVersionedReview, type ReviewSummary } from '../features/review/model/review.ts'
 
 const pr = (state: 'open' | 'merged') => ({ number: 1471, state, url: 'https://github.com/o/r/pull/1471' })
 const permissions = { canMerge: true, canSend: true, canTerminal: true, reasons: {} }
@@ -56,4 +56,15 @@ test('a unified patch becomes numbered hunks; file headers and the trailing newl
     ['ctx', 20, 20, 'const a = 1'], ['del', 21, undefined, 'const b = 2'], ['add', undefined, 21, 'const b = 3'], ['add', undefined, 22, 'const c = 4'], ['ctx', 22, 23, 'const d = 5'],
   ])
   assert.deepEqual(parsePatch(null), [])
+})
+
+test('a real checkpoint can be read without line counts, a check observation, or a writable review protocol', () => {
+  const checkpoint = summary({ pr: null, additions: null, deletions: null, files: 1, checks: null,
+    reviewRef: { snapshotId: 'retained', sourceVersion: 'version' }, permissions: { ...permissions, canMerge: false, reasons: { merge: 'review_unavailable' } } })
+  assert.equal(summaryLabel(checkpoint), '1 个文件')
+  assert.equal(summaryParts(checkpoint).failed, false)
+  assert.equal(checksLine(checkpoint.checks), '尚无检查数据')
+  assert.equal(checksLine({ passed: 0, pending: 0, failed: 0, neutral: 2 }), '2 项中性')
+  assert.equal(usesVersionedReview(checkpoint), true)
+  assert.equal(usesVersionedReview(summary()), false)
 })

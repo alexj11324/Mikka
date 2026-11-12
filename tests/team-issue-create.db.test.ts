@@ -64,28 +64,31 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
   // Inject at the actual PostgreSQL commit boundary. workspaceDb deliberately
   // owns transaction dispatch, so replacing its method does not reach the
   // pinned client used by an authoritative workspace transaction.
-  function injectWorkspaceCommit(requestId: string, hooks: { beforeReceiptRead?: () => void; afterCommit?: () => void | Promise<void> }) {
+  function injectWorkspaceCommit(receiptTable: 'team_issue_create_receipts' | 'team_issue_promotion_receipts',
+    requestId: string, hooks: { beforeReceiptRead?: () => void; afterCommit: () => void | Promise<void> }) {
+    const receiptInsert = 'insert into "' + receiptTable + '" '
+    const receiptRead = new RegExp('\\bfrom\\s+"' + receiptTable + '"', 'i')
     const originals = new Map<PoolClient, PoolClient['query']>()
     const acquire = (client: PoolClient) => {
       if (originals.has(client)) return
       const original = client.query
       originals.set(client, original)
-      let matchesRequest = false
+      let writesReceipt = false
       client.query = ((...args: unknown[]) => {
         const statement = args[0]
         const text = typeof statement === 'string' ? statement : statement && typeof statement === 'object' && 'text' in statement && typeof statement.text === 'string' ? statement.text : ''
-        if (/^\s*(?:begin|rollback)\b/i.test(text)) matchesRequest = false
-        const configValues = typeof statement === 'object' && statement && 'values' in statement ? statement.values : undefined
-        const parameters = Array.isArray(args[1]) ? args[1] : configValues
-        if (/\bfrom "team_issue_(?:create|promotion)_receipts"/i.test(text) && Array.isArray(parameters) && parameters.includes(requestId)) {
-          matchesRequest = true
-          hooks.beforeReceiptRead?.()
+        if (/^\s*(?:begin|rollback)(?:\s|$)/i.test(text)) writesReceipt = false
+        const parameters = Array.isArray(args[1]) ? args[1]
+          : statement && typeof statement === 'object' && 'values' in statement ? statement.values : undefined
+        if (Array.isArray(parameters) && parameters.includes(requestId)) {
+          if (receiptRead.test(text)) hooks.beforeReceiptRead?.()
+          if (text.trimStart().toLowerCase().startsWith(receiptInsert)) writesReceipt = true
         }
         const result: unknown = Reflect.apply(original, client, args)
-        if (!matchesRequest || !/^\s*commit\b/i.test(text)) return result
-        matchesRequest = false
+        if (!writesReceipt || !/^\s*commit(?:\s|$)/i.test(text)) return result
+        writesReceipt = false
         assert.ok(result && typeof result === 'object' && 'then' in result && typeof result.then === 'function', 'Drizzle COMMIT must use the promise query API')
-        return Promise.resolve(result).then(async value => { await hooks.afterCommit?.(); return value })
+        return Promise.resolve(result).then(async value => { await hooks.afterCommit(); return value })
       }) as PoolClient['query']
     }
     workspacePool.on('acquire', acquire)
@@ -420,7 +423,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     assert.ok('issue' in created && created.issue);const id=created.issue.id
     const request={requestId:randomUUID(),issueId:id,revision:created.issue.revision,teamId,expectedTeamId:null}
     let mode:'lost'|'unavailable'|'normal'='lost'
-    const restore=injectWorkspaceCommit(request.requestId, {
+    const restore=injectWorkspaceCommit('team_issue_promotion_receipts', request.requestId, {
       beforeReceiptRead:()=>{if(mode==='unavailable') throw new Error('synthetic unavailable')},
       afterCommit:()=>{if(mode==='lost'){mode='unavailable';throw new Error('synthetic lost response')}},
     })
@@ -459,7 +462,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     assert.ok('issue' in created && created.issue);const id=created.issue.id
     const request={requestId:randomUUID(),issueId:id,revision:created.issue.revision,teamId,expectedTeamId:null}
     let first=true
-    const restore=injectWorkspaceCommit(request.requestId, {afterCommit:async()=>{if(first){first=false;await workspace.query('update mikka_workspace_members set status=\'inactive\' where "workspaceId"=$1 and "userId"=$2',[workspaceId,revoked])}}})
+    const restore=injectWorkspaceCommit('team_issue_promotion_receipts', request.requestId, {afterCommit:async()=>{if(first){first=false;await workspace.query('update mikka_workspace_members set status=\'inactive\' where "workspaceId"=$1 and "userId"=$2',[workspaceId,revoked])}}})
     try {
       assert.deepEqual(await promoteIssueToTeam(request),{error:'teamIssueAccessDenied',requestId:request.requestId})
       assert.deepEqual((await app.query('select scope,"linearSyncBlocked" from issues where id=$1',[id])).rows[0],{scope:'workspace',linearSyncBlocked:true})
@@ -680,7 +683,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     // Throw only after this request’s real association transaction has committed.
     // The next attempt simulates an unavailable workspace recheck without
     // changing or deleting a fixture; restoring normal commits permits recovery.
-    const restore=injectWorkspaceCommit(value.requestId, {
+    const restore=injectWorkspaceCommit('team_issue_create_receipts', value.requestId, {
       beforeReceiptRead:()=>{if(mode==='unavailable') throw new Error('synthetic workspace recheck unavailable')},
       afterCommit:()=>{if(mode==='lost') {mode='unavailable';throw new Error('synthetic lost commit response')}},
     })
@@ -721,7 +724,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     await app.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,\'Synthetic\',$2,true,now(),now())',[lostOwner,`${lostOwner}@example.invalid`])
     await workspace.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,\'Synthetic\',$3,\'member\',\'active\')',[workspaceId,lostOwner,`${lostOwner}@example.invalid`])
     let once=true
-    const restore=injectWorkspaceCommit(value.requestId, {afterCommit:()=>{
+    const restore=injectWorkspaceCommit('team_issue_create_receipts', value.requestId, {afterCommit:()=>{
       if(once) {once=false;throw new Error('synthetic lost commit response')}
     }})
     try {
@@ -744,7 +747,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
   await scopeSubtest(t, 'revocation between association and completion revokes creator access without moving the task',async()=>{
     const revoke=await workspace.connect(),value=input(raceTeam)
     let associationCommitted=false,issueId:string|undefined
-    const restore=injectWorkspaceCommit(value.requestId, {afterCommit:async()=>{
+    const restore=injectWorkspaceCommit('team_issue_create_receipts', value.requestId, {afterCommit:async()=>{
       if(associationCommitted) return
       associationCommitted=true
       // The real association COMMIT has released its locks, but its promise
@@ -765,6 +768,15 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
       await revoke.query('commit')
     }})
     try {
+      // The pool also commits work belonging to other requests. Its COMMIT
+      // must never consume the revocation intended for this association.
+      const unrelated = await workspacePool.connect()
+      try {
+        await unrelated.query('BEGIN')
+        await unrelated.query('SELECT 1')
+        await unrelated.query('COMMIT')
+      } finally { unrelated.release() }
+      assert.equal(associationCommitted, false)
       assert.deepEqual(await query(racer,value),{error:'teamIssueAccessDenied',requestId:value.requestId})
       assert.ok(associationCommitted);assert.ok(issueId)
       const row=(await app.query('select i.id,i."workspaceId",i."ownershipState",i.scope,i."linearSyncBlocked",i.revision,r.status from issues i join team_issue_create_requests r on r."issueId"=i.id where r."requestId"=$1',[value.requestId])).rows[0]

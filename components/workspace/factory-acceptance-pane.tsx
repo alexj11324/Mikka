@@ -23,6 +23,7 @@ import { PullRequestIcon } from './pull-request-icon'
 import { ShortSha, shortSha } from './short-sha'
 import { FieldError } from '@/components/ui/field'
 import { RunErrorDetails } from './run-error-text'
+import { sendReviewChange, type ReviewChangeTarget } from '@/lib/factory/review-change'
 import { RequestError, request } from '@/lib/factory/browser-request'
 import { isFlowV2, useFactoryFlow } from './factory-flow'
 import { artifactReviewKind, pullNumberOf } from '@/lib/factory/artifact-review'
@@ -350,30 +351,13 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
     deciding.current = true
     dispatchReject({ type: 'submit' })
     try {
-      await request(`/api/factory/tasks/${task.id}/approval`, { operation: 'reject', input: { binding: ledger.binding, eventId: crypto.randomUUID(), candidateId: ledger.binding.candidateId, note: reject.note.trim() } })
+      await sendReviewChange(ledger.binding, crypto.randomUUID(), reject.note.trim())
       dispatchReject({ type: 'succeed' })
     } catch { dispatchReject({ type: 'fail' }) }
     finally { await reloadDecision(); deciding.current = false }
   }
 
-  /** P2: the note typed in the thread's composer, sent as the existing send-back; the fix run follows on the same PR. */
-  async function requestChanges(note: string) {
-    if (!ledger?.binding.candidateId || !reportCurrent || deciding.current || !note.trim()) return false
-    deciding.current = true
-    try {
-      await request(`/api/factory/tasks/${task.id}/approval`, { operation: 'reject', input: { binding: ledger.binding, eventId: crypto.randomUUID(), candidateId: ledger.binding.candidateId, note: note.trim() } })
-      return true
-    } catch { return false }
-    finally { await reloadDecision(); deciding.current = false }
-  }
-  const requestChangesRef = useRef(requestChanges)
-  requestChangesRef.current = requestChanges
-  const register = artifact?.registerReject
-  useEffect(() => {
-    if (!register) return
-    register(note => requestChangesRef.current(note))
-    return () => register(null)
-  }, [register])
+
 
   const readText = useCallback(async (name: string) => {
     const value = await request(`/api/factory/tasks/${task.id}/approval?artifact=${encodeURIComponent(name)}`)
@@ -396,7 +380,7 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
     const unverified = flow?.acceptance?.counts.unverified ?? 0
     const unverifiedNames = criteria.filter(group => group.passed === null).map(group => group.title).filter(Boolean).join('、')
     const merged = ledger.merges?.filter(merge => merge.status === 'merged').at(-1)
-    const ask = () => artifact.onRequestChanges(number ? tReview('changeRequestChip', { number }) : tReview('changeRequestLabel'))
+    const ask = () => { if (ledger?.binding.candidateId) artifact.onRequestChanges({ label: number ? tReview('changeRequestChip', { number }) : tReview('changeRequestLabel'), binding: ledger.binding }) }
     const failedChecks = results.filter(row => row.status === 'failed')
     const actions = <>
       {(kind === 'review' || kind === 'refused' || kind === 'merging') && canRequest && <Button size="sm" variant="secondary" disabled={busy || kind === 'merging'} onClick={ask}>{tReview('changeRequestLabel')}</Button>}
@@ -482,7 +466,6 @@ export type ArtifactReviewSlots = {
   artifactId: string
   slots: ArtifactDecisionSlots
   /** Puts 要求修改 in the thread's composer, as a chip with this label (P2). */
-  onRequestChanges: (label: string) => void
+  onRequestChanges: (target: ReviewChangeTarget) => void
   /** The pane hands the window its send-back, so the composer can send the note with it. */
-  registerReject: (send: ((note: string) => Promise<boolean>) | null) => void
 }

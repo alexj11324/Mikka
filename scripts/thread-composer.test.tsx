@@ -20,6 +20,8 @@ const at = (path: string) => new URL(`../${path}`, import.meta.url).href
 let thread: Record<string, unknown> | null
 let draftText = ''
 let pageChecks = 0
+let buildGate: Promise<boolean> | undefined
+let postReply = async (_request: { requestId: string; text: string }) => ({ sent: true })
 let acceptance: FactoryTask | null = null
 const browser = new Window({ url: 'https://mikka.example/en' })
 for (const key of ['window', 'document', 'navigator', 'location', 'customElements', 'HTMLElement', 'Element', 'Node', 'CSS', 'MutationObserver', 'ResizeObserver'] as const) Object.defineProperty(globalThis, key, { configurable: true, value: key === 'window' ? browser : browser[key] })
@@ -51,13 +53,13 @@ mock.module(at('lib/hooks/view-state.tsx'), { namedExports: {
   ...actualViewState,
   useViewState: <T,>(key: string, initial: T) => actualViewState.useViewState(key, key.endsWith(':draft') ? draftText as T : initial),
 } })
-mock.module(at('lib/app-build.ts'), { namedExports: { ...actualAppBuild, checkPageBuildBeforeAction: async () => { pageChecks++; return true } } })
+mock.module(at('lib/app-build.ts'), { namedExports: { ...actualAppBuild, checkPageBuildBeforeAction: async () => { pageChecks++; return buildGate ?? true } } })
 mock.module(at('app/actions/agents.ts'), { namedExports: { retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null, getThreadName: async () => null, listIssueThreads: async () => null, pollIssueThreads: async () => null, getIssueThread: async () => {
   issueReads++
   if (readHold) await readHold
   if (readFailure) throw readFailure
   return { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: [], chunksAppend: false }
-}, getThreadChanges: async () => ({ state: 'none' }), getThreadInstructions: async () => '', getThreadMachine: async () => null, sendIssueThreadMessage: async () => {}, sendIssueThreadReply: async () => { replyCalls++; return { sent: true } }, stopRun: async () => ({}) } })
+}, getThreadChanges: async () => ({ state: 'none' }), getThreadInstructions: async () => '', getThreadMachine: async () => null, sendIssueThreadMessage: async () => {}, sendIssueThreadReply: async (request: { requestId: string; text: string }) => { replyCalls++; return postReply(request) }, stopRun: async () => ({}) } })
 mock.module(at('app/actions/artifacts.ts'), { namedExports: { listRunArtifacts: async () => [] } })
 mock.module(at('components/workspace/factory-acceptance.tsx'), { namedExports: {
   useThreadAcceptance: (issueId: string | null, runId: string) =>
@@ -91,7 +93,7 @@ before(async () => { ({ createRoot } = await import('react-dom/client')); ({ Iss
 const base = { id: 'run-1', issueId: 'issue-1', status: 'succeeded', outcome: null, question: null, continuation: null, stopping: false, ownedByCurrentUser: true,
   createdAt: new Date(0), finishedAt: new Date(0), latestRunId: 'run-1', prompt: 'Fix it', stopRequestedAt: null, replyAvailable: true, retryAvailable: true, quota: null, feedbackEligible: false,
   detail: { name: 'ZHIX-2 Fix it', agentName: 'Claude Code', harness: 'claude_code', summary: null } }
-beforeEach(() => { thread = { ...base }; acceptance = null; composer = null; replyCalls = 0; draftText = ''; pageChecks = 0; liveRead = false; readFailure = null; readHold = null; changesRead = null; issueReads = 0; notices.clear(); browser.sessionStorage.clear() })
+beforeEach(() => { buildGate = undefined; postReply = async () => ({ sent: true }); thread = { ...base }; acceptance = null; composer = null; replyCalls = 0; draftText = ''; pageChecks = 0; liveRead = false; readFailure = null; readHold = null; changesRead = null; issueReads = 0; notices.clear(); browser.sessionStorage.clear() })
 afterEach(async () => { if (root) { await act(async () => root!.unmount()); root = null; container.remove() } })
 after(() => browser.close())
 const render = (props: Partial<Parameters<typeof IssueThreadPanel>[0]> = {}) => renderToStaticMarkup(<IntlProvider locale="en" timeZone="UTC" messages={messages}>
@@ -406,3 +408,135 @@ for (const scenario of retainedPanelStates) {
     assert.equal(replyCalls, 0)
   })
 }
+
+test('Thread releases the draft before version preflight and retries an unknown ACK using the same immutable command', async () => {
+  const runId = crypto.randomUUID()
+  thread = { ...base, id: runId, latestRunId: runId }
+  let release!: (value: boolean) => void
+  buildGate = new Promise(resolve => { release = resolve })
+  const writes: { requestId: string; text: string }[] = []
+  postReply = async request => {
+    writes.push(request)
+    if (writes.length === 1) throw new TypeError('connection closed after write')
+    return { sent: true }
+  }
+  await renderLive('owner:workspace', { runId })
+  await act(async () => composer!.onChange('same words'))
+  await act(async () => { composer!.onSubmit(); composer!.onSubmit() })
+  assert.equal(composer!.value, '')
+  assert.equal(container.querySelectorAll('[data-delivery-phase="sending"]').length, 1)
+  assert.equal(replyCalls, 0)
+  await act(async () => composer!.onChange('next draft'))
+  await act(async () => release(true))
+  const failed = container.querySelector<HTMLElement>('[data-delivery-phase="failed"]')
+  assert.match(failed?.textContent ?? '', /same words/)
+  const retry = [...failed!.querySelectorAll('button')].find(button => button.textContent === 'Retry')
+  assert.ok(retry, 'the retry belongs to this failed message')
+  await act(async () => retry.click())
+  assert.equal(writes.length, 2)
+  assert.equal(writes[0].requestId, writes[1].requestId)
+  assert.equal(writes[1].text, 'same words')
+  assert.equal(composer!.value, 'next draft')
+  assert.equal(container.querySelectorAll('[data-delivery-phase="accepted"]').length, 1)
+})
+
+test('Review retries the original candidate and event in place after the approval response is lost', async t => {
+  const runId = crypto.randomUUID()
+  thread = { ...base, id: runId, latestRunId: runId }
+  const binding = { taskId: crypto.randomUUID(), issueId: crypto.randomUUID(), attemptId: crypto.randomUUID(), candidateId: crypto.randomUUID(), revision: 3 }
+  const calls: { url: string; operation: string; input: { eventId: string; note: string; binding: typeof binding } }[] = []
+  const originalFetch = globalThis.fetch
+  t.mock.method(globalThis, 'fetch', async (url: RequestInfo | URL, options?: RequestInit) => {
+    if (!String(url).endsWith('/api/factory/tasks/' + binding.taskId + '/approval')) return originalFetch(url, options)
+    const body = JSON.parse(String(options?.body))
+    calls.push({ url: String(url), ...body })
+    if (calls.length === 1) throw new TypeError('response lost after the ledger committed')
+    return Response.json({ replayed: true })
+  })
+  let release!: (ok: boolean) => void
+  let canceled = 0
+  buildGate = new Promise(resolve => { release = resolve })
+  await renderLive('owner:workspace', { runId, changeRequest: { binding, label: 'Request changes', onCancel: () => { canceled++ } } })
+  await act(async () => composer!.onChange('Fix the original candidate'))
+  await act(async () => { composer!.onSubmit(); composer!.onSubmit() })
+  assert.equal(composer!.value, '')
+  assert.equal(canceled, 1)
+  assert.equal(calls.length, 0)
+  assert.equal(container.querySelectorAll('[data-delivery-phase="sending"]').length, 1)
+  await act(async () => release(true))
+  await renderLive('owner:workspace', { runId })
+  await act(async () => composer!.onChange('Separate next draft'))
+  const failed = container.querySelector('[data-delivery-phase="failed"]')
+  assert.match(failed?.textContent ?? '', /Fix the original candidate/)
+  const retry = [...failed!.querySelectorAll('button')].find(button => button.textContent === 'Retry')
+  assert.ok(retry)
+  await act(async () => retry.click())
+  assert.equal(replyCalls, 0, 'a Review command must reach its candidate ledger')
+  assert.equal(calls.length, 2)
+  assert.deepEqual(calls[0], calls[1])
+  assert.equal(calls[1].operation, 'reject')
+  assert.equal(calls[1].url.endsWith('/api/factory/tasks/' + binding.taskId + '/approval'), true)
+  assert.match(calls[1].input.eventId, /^[\da-f-]{36}$/i)
+  assert.deepEqual(calls[1].input.binding, binding)
+  assert.equal(calls[1].input.note, 'Fix the original candidate')
+  assert.equal(composer!.value, 'Separate next draft')
+  assert.equal(container.querySelectorAll('[data-delivery-phase="accepted"]').length, 1)
+})
+
+test('Inbox waiting replies keep the original thread, viewer, workspace and request ID across an unknown result and remount', async () => {
+  const { useInboxThreadReply } = await import('../lib/hooks/chat-delivery')
+  const issueId = crypto.randomUUID(), runId = crypto.randomUUID(), laterRunId = crypto.randomUUID()
+  const viewer = { ownerId: crypto.randomUUID(), workspaceId: crypto.randomUUID() }
+  let submit!: ReturnType<typeof useInboxThreadReply>
+  function InboxReply({ current }: { current: typeof viewer | null }) {
+    submit = useInboxThreadReply(current)
+    return null
+  }
+  container = browser.document.createElement('div') as unknown as HTMLDivElement
+  document.body.append(container)
+  root = createRoot(container)
+  const renderInbox = (current: typeof viewer | null, visible = true) => act(async () => root!.render(
+    <actualViewState.ViewStateProvider scope={current ? current.ownerId + ':' + current.workspaceId : 'no-scope'}>
+      <IntlProvider locale="en" timeZone="UTC" messages={messages}>{visible && <InboxReply current={current} />}</IntlProvider>
+    </actualViewState.ViewStateProvider>,
+  ))
+  const calls: unknown[] = []
+  postReply = async request => {
+    calls.push(request)
+    if (calls.length === 1) throw new TypeError('lost response')
+    return { sent: true }
+  }
+  await renderInbox(null)
+  assert.equal((await submit(issueId, runId, 'Original answer')).status, 'unavailable')
+  buildGate = Promise.resolve(false)
+  thread = { ...base, id: runId, latestRunId: runId }
+  await renderLive(viewer.ownerId + ':' + viewer.workspaceId, { issueId, runId })
+  await act(async () => composer!.onChange('Draft on an old build'))
+  await act(async () => { composer!.onSubmit() })
+  const reason = container.querySelector('[data-delivery-phase="failed"] [role="alert"]')?.firstChild?.textContent
+  assert.equal(reason, messages.Coordinator.sendUpdateRequired)
+  await renderInbox(viewer)
+  await act(async () => { assert.deepEqual(await submit(issueId, runId, 'Draft on an old build'), { status: 'failed', error: reason }) })
+  assert.equal(calls.length, 0)
+  buildGate = undefined
+  await act(async () => { assert.equal((await submit(issueId, runId, 'Original answer')).status, 'uncertain') })
+  await act(async () => { assert.equal((await submit(issueId, runId, 'Independent answer')).status, 'accepted') })
+  await renderInbox(viewer, false)
+  await renderInbox(viewer)
+  await act(async () => { assert.equal((await submit(issueId, laterRunId, 'Original answer')).status, 'accepted') })
+  assert.equal(calls.length, 3)
+  assert.deepEqual(calls[0], calls[2])
+  assert.notEqual((calls[1] as { requestId: string }).requestId, (calls[0] as { requestId: string }).requestId)
+  const original = calls[2] as { requestId: string }
+  assert.match(original.requestId, /^[\da-f-]{36}$/i)
+  assert.deepEqual(original, { issueId, runId, text: 'Original answer', requestId: original.requestId,
+    expectedOwnerId: viewer.ownerId, expectedWorkspaceId: viewer.workspaceId })
+  await act(async () => { assert.equal((await submit(issueId, laterRunId, 'Original answer')).status, 'accepted') })
+  assert.notEqual((calls[3] as { requestId: string }).requestId, original.requestId, 'an acknowledged answer must not consume a later independent answer')
+  const { DesktopTransportError } = await import('../apps/desktop/src/renderer/read-batch')
+  for (const [status, expected] of [[401, messages.Errors.authRequired], [403, messages.Coordinator.sendAccessDenied],
+    [426, messages.Coordinator.sendUpdateRequired], [429, messages.Coordinator.sendRateLimited]] as const) {
+    postReply = async () => { throw new DesktopTransportError('desktop_rpc_request_rejected', { status }) }
+    await act(async () => { assert.deepEqual(await submit(issueId, runId, 'Denied ' + status), { status: 'failed', error: expected }) })
+  }
+})

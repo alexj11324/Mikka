@@ -29,8 +29,9 @@ export function hostConfiguration(env) {
     if (!/^[A-Z][A-Z0-9_]*$/.test(name) || typeof value !== 'string') return invalid()
     // Eve verifies Slack events. OAuth exchange and installation grant decryption live in the business API.
     if (name.startsWith('SLACK_') && name !== 'SLACK_APP_ID' && name !== 'SLACK_SIGNING_SECRET') return invalid()
-    if (['VERCEL', 'VERCEL_ENV', 'VERCEL_URL', 'VERCEL_DEPLOYMENT_ID',
-      'EVE_QUEUE_SIGNING_KEY', 'WORLD_QUEUE_ED25519_PRIVATE_KEY', 'WORKFLOW_POSTGRES_URL', 'MIKKA_EVE_WORLD_TOKEN', 'MIKKA_EVE_PRODUCT_TOKEN',
+    if (name === 'MIKKA_HOSTED_MODEL_FALLBACK' && value !== 'cloudflare-workers-ai') return invalid()
+    if (['VERCEL', 'VERCEL_ENV', 'VERCEL_URL', 'VERCEL_DEPLOYMENT_ID', 'VERCEL_OIDC_TOKEN', 'AI_GATEWAY_API_KEY',
+      'EVE_QUEUE_SIGNING_KEY', 'WORLD_QUEUE_ED25519_PRIVATE_KEY', 'WORKFLOW_POSTGRES_URL', 'MIKKA_EVE_WORLD_TOKEN', 'MIKKA_EVE_PRODUCT_TOKEN', 'MIKKA_WORKERS_AI_CAPABILITY',
       'WORKFLOW_DEPLOYMENT_ID', 'MIKKA_DEPLOYMENT_ID', 'NODE_EXTRA_CA_CERTS', 'MIKKA_EVE_ORIGIN', 'WORKFLOW_TARGET_WORLD', 'WORKFLOW_LOCAL_DATA_DIR',
       'WORKFLOW_LOCAL_BASE_URL', 'MIKKA_EVE_WORKFLOW_WORLD', 'MIKKA_EVE_HOST',
       'WORKSPACE_SECRETS_KEY'].includes(name)) return invalid()
@@ -45,7 +46,7 @@ export function hostConfiguration(env) {
     releaseId: env.EVE_RELEASE_ID, sourceSha: env.EVE_SOURCE_SHA, uiSha: env.EVE_UI_SHA,
     publicOrigin, policy: env.EVE_HOST_POLICY, warmUntil,
     runtimeEnv: {
-      ...runtime, NODE_ENV: 'production', MIKKA_EVE_HOST: 'cloudflare',
+      ...runtime, NODE_ENV: 'production', MIKKA_EVE_HOST: 'cloudflare', MIKKA_HOSTED_MODEL_FALLBACK: 'cloudflare-workers-ai',
       MIKKA_EVE_WORKFLOW_WORLD: 'cloudflare', MIKKA_WORKFLOW_QUEUE_PUBLIC_KEY: env.WORLD_QUEUE_PUBLIC_KEY,
       MIKKA_DEPLOYMENT_ID: env.EVE_RELEASE_ID, WORKFLOW_DEPLOYMENT_ID: env.EVE_RELEASE_ID, MIKKA_EVE_PUBLIC_ORIGIN: publicOrigin,
       MIKKA_BUILD_REVISION: env.EVE_SOURCE_SHA, MIKKA_UI_OVERLAY_SHA: env.EVE_UI_SHA,

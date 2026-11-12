@@ -11,7 +11,7 @@ mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async (op
 } } } } })
 // Only the external scheduler transport is replaced; every ACL, entitlement,
 // transaction, policy change, usage read and audit write uses real PostgreSQL.
-mock.module('@/lib/due-timer', { namedExports: { armDueTimerAfterCommit: () => {} } })
+mock.module('@/lib/due-timer', { namedExports: { armDueTimerAfterCommit: () => {}, armDueTimerSoon: (kind: string) => assert.equal(kind, 'run-recovery') } })
 
 test('Team governance HTTP handlers enforce actual entitlements and workspace boundaries', { skip: !dbUrl, timeout: 120_000 }, async t => {
   const previousEdition = process.env.MIKKA_EDITION

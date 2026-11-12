@@ -18,6 +18,8 @@ import { enqueueWorkspaceAudit } from '@/lib/audit/delivery'
 import { ensurePersonalWorkspace } from '@/lib/personal-workspace'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { ownerWorkspaceListsChanged, workspaceListChanged, workspaceListScopesBeforeChange, workspaceListScopeChanged } from '@/lib/live/lists'
+import { pool } from '@/lib/db'
+import { markReviewSessionsRevoked, drainRevokedReviewSessions } from '@/lib/coding-workspace/review-sessions'
 
 import { acceptHumanInvitation, updateHumanMembership } from '@/lib/governance/member-admission'
 import { drainMemberLifecycleOutbox } from '@/lib/governance/member-outbox'
@@ -185,9 +187,11 @@ async function updateWorkspaceMemberBody(input: { workspaceId: string; userId: s
     z.string().min(1).max(200).parse(input.userId)
     if (input.transferTo !== undefined && status !== 'suspended') throw new WorkspaceError('validationGeneric')
     const request = auditRequestContext(await headers())
-    const previous = await workspaceDb.transaction(async tx => {
+    let reviewIds: string[] = []
+    let previous: string
+    try { previous = await workspaceDb.transaction(async tx => {
       await requireWorkspace(tx, input.workspaceId, user.id, true)
-      const [target] = await tx.select().from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), eq(workspaceMembers.userId, input.userId))).limit(1)
+      const [target] = await tx.select().from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), eq(workspaceMembers.userId, input.userId))).for('update').limit(1)
       if (!target) throw new WorkspaceError('workspaceMemberNotFound')
       if (target.role === 'admin' && target.status === 'active' && (role !== 'admin' || status !== 'active')) {
         const others = await tx.select({ id: workspaceMembers.userId }).from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), ne(workspaceMembers.userId, input.userId), eq(workspaceMembers.role, 'admin'), eq(workspaceMembers.status, 'active'))).limit(1)
@@ -196,12 +200,15 @@ async function updateWorkspaceMemberBody(input: { workspaceId: string; userId: s
       const base = { workspaceId: input.workspaceId, actor: { type: 'user' as const, id: user.id, name: user.name }, target: { type: 'member', id: target.userId, label: target.name || target.email }, ...request }
       if (target.role !== role) await enqueueWorkspaceAudit(tx, { ...base, action: 'member.role_changed', metadata: { oldRole: target.role, newRole: role } })
       if (target.status !== status) await enqueueWorkspaceAudit(tx, { ...base, action: status === 'suspended' ? 'member.suspended' : 'member.reactivated' })
+      if (target.status !== 'suspended' && status === 'suspended') {
+        reviewIds = await markReviewSessionsRevoked(pool, { workspaceId: input.workspaceId, ownerId: input.userId }, 'membership_changed')
+      }
       if (input.transferTo !== undefined) await transferOnSuspend(tx, input.workspaceId, input.userId, input.transferTo)
       const before = await workspaceListScopesBeforeChange(tx, input.workspaceId)
       await updateHumanMembership(tx, { workspaceId: input.workspaceId, userId: input.userId, role, status })
       if (target.role !== role || target.status !== status) await workspaceListScopeChanged(tx, input.workspaceId, before)
       return target.status
-    })
+    }) } finally { await drainRevokedReviewSessions(pool, reviewIds) }
     // §8.3: a suspended member's share and bots leave with them; reactivation brings their bots back.
     if (previous !== status) await drainMemberLifecycleOutbox(input.workspaceId, input.userId)
   })

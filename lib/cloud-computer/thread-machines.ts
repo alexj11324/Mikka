@@ -28,6 +28,7 @@ import type { Actor } from './subagents'
 import { afterRunEnded } from '@/lib/run-completion-effects'
 import { armDueTimerAfterCommit, armDueTimerSoon } from '@/lib/due-timer'
 import { afterDatabaseCommit } from '@/lib/db/commit-effects'
+import { THREAD_MACHINE_BUDGET_MS } from './thread-lifecycle'
 import { logThreadLifecycle } from './thread-lifecycle-log'
 import { secretMaskerFor } from '@/lib/secrets/runtime'
 import { readWorkerTail, saveWorkerTail, workerCommand, logRuntimeRefreshFailure, type RuntimeRefreshPhase } from './thread-worker-logs'
@@ -80,7 +81,7 @@ export class RetainedTaskMachineUnavailable extends ComputerError {
 }
 
 type FailedThreadStart = Readonly<{ userId: string; workspaceId: string; runId: string; leaseId: string }>
-export type ThreadMachineFence = Readonly<{ epoch: number; sandboxId: string | null; requireClosedTask?: boolean; requireArchived?: boolean; suspendAfterStop?: boolean }>
+export type ThreadMachineFence = Readonly<{ epoch: number; sandboxId: string | null; requireClosedTask?: boolean; requireArchived?: boolean; suspendAfterStop?: boolean; revokeReview?: boolean }>
 // Only this module can attest the lease that actually failed. Keep the proof
 // off the original error: callers retain ComputerError semantics, and neither
 // public error fields nor serialized/replayed errors can authorize cleanup.
@@ -328,6 +329,11 @@ async function retainThreadMachineForHandoffLocked(client: PoolClient, actor: Ac
       AND (lifecycle->>'phase' IS DISTINCT FROM 'handoff' OR lifecycle->>'handoffRunId'=$4::text)
       FOR UPDATE`, [runId, actor.userId, actor.workspaceId, nextRunId])
     if (!machine) return false
+    const reviews = await client.query('SELECT 1 FROM coding_review_sessions WHERE "runId"=$1 LIMIT 1', [runId])
+    if (reviews.rowCount) {
+      await (await import('../coding-workspace/review-sessions')).fenceReviewSessions(client, { runIds: [runId] }, 'machine_changed')
+      return false
+    }
     const { rows: [placement] } = await client.query(`SELECT source."repoPath" AS "sourcePath",source."remoteUrl" AS "sourceRemote",
       target."repoPath" AS "targetPath",target."remoteUrl" AS "targetRemote",COALESCE(n."agentDefinition"->>'harness',a.harness) AS harness
       FROM agent_runs n JOIN agents a ON a.id=n."agentId" AND a."userId"=n."userId"
@@ -375,10 +381,26 @@ export async function parkThreadMachine(pool: Pool, actor: Actor, runId: string,
   let intent: { sandboxId: string; epoch: number; failures: number } | undefined
   const locked = async () => {
     const run = (await client.query('SELECT status,"leaseExpiresAt","stopRequestedAt","stopReason","startedAt","sessionId","deviceTokenId","pauseReason",report FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])).rows[0]
-    const machine = (await client.query(`SELECT "sandboxId","snapshotId","operationId","deviceId","issueId","computeSeconds",state,epoch,"workerLeaseUntil",lifecycle FROM thread_machines
+    const machine = (await client.query(`SELECT "sandboxId","snapshotId","operationId","deviceId","issueId","computeSeconds","runningSince",state,epoch,"workerLeaseUntil",lifecycle FROM thread_machines
       WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 FOR UPDATE`, [runId, actor.userId, actor.workspaceId])).rows[0]
     if (!machine?.sandboxId || machine.state === 'ended') return null
     if (expectedFence && (machine.epoch !== expectedFence.epoch || machine.sandboxId !== expectedFence.sandboxId)) return null
+    if (expectedFence?.revokeReview) await (await import('../coding-workspace/review-sessions'))
+      .fenceReviewSessions(client, { runIds: [runId] }, 'machine_changed')
+    else if (['succeeded', 'failed'].includes(run?.status) && !run.stopRequestedAt && run.stopReason !== 'device_lost'
+      && run.report?.safePoint?.session === 'exited'
+      && Number(machine.computeSeconds) * 1_000 + (machine.state === 'running' && machine.runningSince
+        ? Math.max(0, Date.now() - new Date(machine.runningSince).getTime()) : 0) < THREAD_MACHINE_BUDGET_MS) {
+      const held = (await client.query<{ until: Date | null }>(`SELECT max(s."expiresAt") AS until FROM coding_review_sessions s
+        JOIN issues i ON i.id=s."taskId" WHERE s."runId"=$1 AND s."ownerId"=$2 AND s."workspaceId"=$3
+          AND s."sandboxId"=$4 AND s."machineEpoch"=$5 AND s."machineOperationId"=$6
+          AND s."revokedAt" IS NULL AND s."expiresAt">clock_timestamp()
+          AND i."ownershipState"='bound' AND i."workspaceId"=s."workspaceId"
+          AND i.status NOT IN ('done','canceled','duplicate')
+          AND coalesce(i.content->'attrs'->'mikka',i.content->'attrs'->'orvilo')->>'deletedAt' IS NULL`,
+      [runId, actor.userId, actor.workspaceId, machine.sandboxId, machine.epoch, machine.operationId])).rows[0]?.until
+      if (held) return { ...machine, reviewHeldUntil: held.getTime() }
+    }
     // A status alone is not a safe point. A live claim or bootstrap remains
     // responsible for commands and checkpoint upload until it acknowledges end.
     const terminal = ['succeeded', 'failed', 'stopped', 'cancelled'].includes(run?.status)
@@ -417,14 +439,19 @@ export async function parkThreadMachine(pool: Pool, actor: Actor, runId: string,
       if (machine.state !== 'paused') {
         const tail = machine.snapshotId === hostedSnapshot ? null : await readTail(machine.sandboxId)
         if (tail) await saveWorkerTail(client, runId, tail, await secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId })).catch(() => undefined)
-        if (machine.snapshotId === hostedSnapshot) await releaseOwnedCloudflareTaskMachine(client,actor,runId,machine.operationId)
+        if (machine.snapshotId === hostedSnapshot) {
+          const checkpoint = await releaseOwnedCloudflareTaskMachine(client, actor, runId, machine.operationId)
+          if (checkpoint && checkpoint.instanceId === machine.sandboxId)
+            await client.query(`UPDATE thread_machines SET lifecycle=lifecycle||jsonb_build_object('sponsoredPreparedCheckpoint',$4::jsonb)
+              WHERE "runId"=$1 AND epoch=$2 AND "sandboxId"=$3 AND "operationId"=$5`,
+            [runId, machine.epoch, machine.sandboxId, JSON.stringify(checkpoint), machine.operationId])
+        }
         else await pause(machine.sandboxId)
       }
     }
     // An already paused provider/row still needs token revocation after a lost
     // response. Both the run and machine stay locked through this commit.
     const parked = await client.query(`UPDATE thread_machines SET state='paused',"lastActiveAt"=now(),
-      "sandboxId"=CASE WHEN "snapshotId"='cloudflare-task-v1' THEN NULL ELSE "sandboxId" END,
       "computeSeconds"="computeSeconds"+COALESCE(GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,0),"runningSince"=NULL,
       "workerLeaseId"=NULL,"workerLeaseUntil"=NULL,
       lifecycle=lifecycle||jsonb_build_object('phase','paused','owner','run-recovery','failures',0,'pausedAt',COALESCE(lifecycle->'pausedAt',to_jsonb(floor(extract(epoch FROM clock_timestamp())*1000)::bigint)))
@@ -502,7 +529,7 @@ type QuestionRuntimeUpgrade = { taskId: string; attemptId: string; requestEpoch:
 
 /** Maintenance uses the existing answer/recovery receipt for every stage. Lock
  * the task/question before the run, matching answer, claim and cancellation. */
-async function lockQuestionRuntimeUpgrade(tx: PoolClient, actor: Actor, runId: string, questionId: string, expected?: QuestionRuntimeUpgrade): Promise<QuestionRuntimeUpgrade> {
+export async function lockQuestionRuntimeUpgrade(tx: PoolClient, actor: Actor, runId: string, questionId: string, expected?: QuestionRuntimeUpgrade): Promise<QuestionRuntimeUpgrade> {
   const unavailable = (): never => { throw new ComputerError(409, 'Original question runtime is no longer current') }
   const { rows: [identity] } = await tx.query('SELECT "taskId" FROM factory_questions WHERE id=$1 AND "userId"=$2 AND "continuationRunId"=$3', [questionId, actor.userId, runId])
   if (!identity) return unavailable()
@@ -1322,7 +1349,8 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
   if (action === 'resume') return ensureThreadMachine(pool, actor, runId)
   if (!machine.sandboxId) throw new ComputerError(409, 'Thread machine has not started')
   if (action === 'pause') {
-    await parkThreadMachine(pool, actor, runId, undefined, undefined, undefined, expectedFence)
+    await parkThreadMachine(pool, actor, runId, undefined, undefined, undefined, { ...expectedFence,
+      epoch: expectedFence?.epoch ?? machine.epoch, sandboxId: expectedFence?.sandboxId ?? machine.sandboxId, revokeReview: true })
   }
   return { runId, state: action === 'pause' ? 'paused' : machine.state }
 }

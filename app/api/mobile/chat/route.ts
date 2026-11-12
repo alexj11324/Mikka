@@ -75,14 +75,14 @@ async function handleGET(request: Request) {
       // The app shows a failed welcome through `failure`; the empty Bot item is no message (nor unread, nor reactable).
       const chat = { ...view, items: view.items.filter(item => !item.welcome) }
       const working = enabled && chat.working
-      return json({ ...chat, enabled, working, failure: enabled ? chatFailure({ working, error: chat.error, cause: chat.cause, failureDetails: chat.failureDetails, items: chat.items }) : null, reactions: await reactionsOf(user.id, chat.items) })
+      return json({ ...chat, submissionIds: true, enabled, working, failure: enabled ? chatFailure({ working, error: chat.error, cause: chat.cause, failureDetails: chat.failureDetails, items: chat.items }) : null, reactions: await reactionsOf(user.id, chat.items) })
     }
     if (read.kind === 'history') return history(user.id, await coordinatorHistory(bot.data, read.through, CHAT_FIRST_PAGE))
     const polled = await pollCoordinatorChat(bot.data, undefined, read.kind === 'update' ? read.continuation : undefined)
     // Without a known version the poll always returns the chat itself.
     if ('unchanged' in polled) throw new Error('chatUnchangedWithoutVersion')
     const chat = { ...polled, items: polled.items.filter(item => !item.welcome) }
-    return json({ ...chat, failure: chat.enabled ? chatFailure(chat) : null, reactions: await reactionsOf(user.id, chat.items) })
+    return json({ ...chat, submissionIds: true, failure: chat.enabled ? chatFailure(chat) : null, reactions: await reactionsOf(user.id, chat.items) })
   } catch (error) {
     if (error instanceof ActionFailureError) return json({ error: error.code }, 404)
     throw error

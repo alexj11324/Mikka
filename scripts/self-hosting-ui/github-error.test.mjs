@@ -32,3 +32,11 @@ test('non-JSON or unexpected GitHub errors keep no response text', () => {
     assert.ok(!JSON.stringify(githubEvidenceFailure(body, new Headers())).includes('private-token'))
   }
 })
+
+test('recognizes a ref collision without misclassifying other validation or conflict errors', () => {
+  const classify = body => githubEvidenceFailure(body, new Headers()).category
+  assert.equal(classify({ message: 'Reference already exists' }), 'reference_exists')
+  assert.equal(classify({ message: 'Validation Failed', errors: [{ resource: 'Reference', field: 'ref', code: 'already_exists' }] }), 'reference_exists')
+  assert.equal(classify({ message: 'Validation Failed', errors: [{ resource: 'Commit', field: 'sha', code: 'invalid' }] }), 'validation_failed')
+  assert.equal(classify({ message: 'Git Repository is empty.' }), 'unknown')
+})

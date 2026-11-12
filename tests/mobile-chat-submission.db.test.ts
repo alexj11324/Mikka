@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
 import { tokenWorkspace } from '../lib/tokens/principal'
 import { dbUrl, seedBot, seedUser, seedWorkspace } from './support/workspace-admin-db'
-import { marked, queued, sendFailureState, submissionBody, unsettled } from '../apps/mobile/lib/outbox'
+import { personalMessage, sendFailureState, submissionBody, unsettled } from '../apps/mobile/lib/outbox'
+import { mobileMessages } from '../apps/mobile/lib/messages'
 
 mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
 
@@ -40,15 +41,17 @@ test('mobile chat response-loss retries use the real immutable submission ledger
     if (token) principal[tokenWorkspace] = workspace.id; else delete principal[tokenWorkspace]
     const text = `accepted-but-response-lost-${randomUUID()}`, submissionId = randomUUID()
     const images = [{ uri: 'file:///fixture.jpg', dataUrl: 'data:image/jpeg;base64,/9j/' }]
-    const original = queued([], submissionId, text, images, { botId, context: 1 })[0]
+    const original = personalMessage(submissionId, text, images, { botId, chatKey: botId, context: 1 })
     const body = submissionBody(original)
     const committed = await post(body)
     assert.equal(committed.status, 202)
     // The server committed, but the phone lost the receipt. A retry carries the exact same identity.
     assert.equal(await count(text), 1)
-    const pending = marked([original], original.key, sendFailureState(new Error('response lost after database commit')))
-    const retry = unsettled(pending, text, images, botId, 1)!
-    assert.equal(retry.state, 'unconfirmed')
+    assert.equal(sendFailureState(new Error('response lost after database commit')), 'unconfirmed')
+    const retry = unsettled([{ ...original, phase: 'failed', error: mobileMessages.Coordinator.sendUncertain }], text, images, botId, 1)!
+    assert.equal(retry.phase, 'failed')
+    assert.equal(retry.error, mobileMessages.Coordinator.sendUncertain)
+    assert.deepEqual(submissionBody(retry), body)
     assert.equal(retry.submissionId, submissionId)
     const retried = await post(submissionBody(retry))
     assert.equal(retried.status, 202)

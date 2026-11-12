@@ -12,6 +12,8 @@ import { displayTitle } from '@/lib/display-title'
 import { shortWhen } from '@/lib/clock'
 import type { Task, TaskGroup } from '@/lib/types'
 import { ApiError } from '@/lib/api'
+import { apiCache } from '@/lib/api-cache'
+import { withholdsCachedRead } from '@/lib/api-read-state'
 import { useTaskContinuation } from '../../../../../lib/hooks/use-task-continuation'
 import type { TaskListPageInput } from '../../../../../lib/task-list-page'
 import { useLiveApi, useRefresh } from '@/lib/useApi'
@@ -34,9 +36,16 @@ export function useTasks(enabled = true, botId?: string | null) {
     list => tasksLive(home?.live?.workspaceId, list?.workspaceId ?? home?.workspace.id, list?.tasks.map(task => task.id)), readPresentedTasks)
   const paging = useTaskContinuation(list.data?.tasks ?? [], list.data, list.data?.next ?? null, async after => {
     const workspaceId = list.data!.workspaceId
+    const context = apiCache.context()
+    const revision = path && apiCache.revision(path)
     const params = new URLSearchParams({ workspaceId, after: after.id, updatedAt: after.updatedAt, ...(botId ? { dispatchedBy: botId } : {}) })
     const page = await readPresentedTasks('/api/mobile/tasks?' + params).catch(async error => {
-      if (error instanceof ApiError && error.status === 409) await list.reload()
+      if (error instanceof ApiError) {
+        if (error.status === 409) await list.reload()
+        if (path && revision === apiCache.revision(path) && withholdsCachedRead(error.status)) {
+          apiCache.revoke(path, context, error)
+        }
+      }
       throw error
     })
     if (page.workspaceId !== workspaceId) throw new Error('workspaceAccessDenied')

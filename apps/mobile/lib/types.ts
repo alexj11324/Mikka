@@ -44,6 +44,8 @@ export interface RunSource {
 export type CitationSource = IssueSource | RunSource
 
 export interface ChatItem {
+  /** Personal message identity on the authorized transcript. Older servers may omit it. */
+  submissionId?: string
   /** eve mirror identity; native replay is hidden once this historical row arrives. */
   streamId?: string
   id?: string
@@ -172,7 +174,7 @@ export type ThreadItem =
 
 /** A thread paused because its subscription ran out (the web's ThreadQuotaPausedCard). */
 export interface ThreadPaused { runId: string; subscription: 'claude' | 'codex'; plan: string | null; resetsAt: string | null; keyReady: boolean }
-export interface ThreadDetail { /** Each run's live channel (lib/live/panels.ts threadLiveReferences); absent from a server older than it. */ live?: { runs: { id: string; workspaceId: string | null }[] }; thread: Thread; active: boolean; /** Generating or running, not waiting for an answer: only then does the composer's button stop. */ working?: boolean; paused?: ThreadPaused | null; summary: string | null; error: string | null; items: ThreadItem[] }
+export interface ThreadDetail { issueId?: string | null; canReply?: boolean; confirmedSubmissionIds?: string[]; /** Each run's live channel (lib/live/panels.ts threadLiveReferences); absent from a server older than it. */ live?: { runs: { id: string; workspaceId: string | null }[] }; thread: Thread; active: boolean; /** Generating or running, not waiting for an answer: only then does the composer's button stop. */ working?: boolean; paused?: ThreadPaused | null; summary: string | null; error: string | null; items: ThreadItem[] }
 
 export interface Suggestion { id: string; source: Source; action: string; title: string; url: string | null; actor: string | null; occurredAt: string }
 export interface Suggestions { groups: { source: Source; items: Suggestion[] }[] }
@@ -298,7 +300,7 @@ export interface StoreCatalog {
 }
 
 /** The person's connected accounts (GET /api/integrations/composio). */
-export interface ComposioAccounts { configured: boolean; accounts: { id: string; toolkit: string; status: string; alias: string | null; email: string | null }[] }
+export interface ComposioAccounts { configured: boolean; accounts: { id: string; toolkit: string; status: string; enabled?: boolean; alias: string | null; email: string | null }[] }
 
 /** 插件 › 技能: one page of skills.sh (GET /api/skills/search). */
 export interface SkillsPage { data: { id: string; name: string; source: string; installs: number; url: string }[]; hasMore: boolean }

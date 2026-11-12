@@ -1,3 +1,4 @@
+import { conversationAccessDenied, useConversationDelivery } from '@/features/chat/components/conversation-delivery'
 import { mobileMessages } from '@/lib/messages'
 import { useCallback, useRef, useState, type ReactNode } from 'react'
 import { Platform, Pressable, StyleSheet, View } from 'react-native'
@@ -22,7 +23,6 @@ import { api, ApiError } from '@/lib/api'
 import { useHome } from '@/lib/home'
 import { tasksLive, threadLive } from '@/lib/live-keys'
 import { composerStops } from '@/lib/stop'
-import { threadSendErrorLine } from '@/lib/thread-send-error'
 import { runErrorLine } from '@/lib/run-error'
 import type { TaskDetail, ThreadDetail, ThreadItem } from '@/lib/types'
 import { useLiveApi } from '@/lib/useApi'
@@ -65,27 +65,12 @@ export function TaskConversationScreen() {
   const segments = data ? conversationSegments(data.detail.activity, new Map(Object.entries(data.threads))) : []
   const newest = data && conversationReplyRun(data.detail.task, data.detail.activity)
   const live = newest ? data?.threads[newest] ?? null : null
-  const [sending, setSending] = useState(false)
-  const [sendFailed, setSendFailed] = useState<string | null>(null)
+  const canSend = Boolean(newest && live && live.canReply !== false && !conversationAccessDenied(error))
+  const delivery = useConversationDelivery(newest && canSend ? { kind: 'thread', id: newest, issueId: id } : null,
+    Object.values(data?.threads ?? {}).flatMap(thread => thread.confirmedSubmissionIds ?? []), reload)
   const stopper = useStop(() => api(`/api/mobile/threads/${newest}/stop`, { method: 'POST' }).catch(failure => {
     if (!(failure instanceof ApiError && failure.status === 409)) throw failure
   }), Boolean(live?.active), reload)
-
-  const send = async (text: string) => {
-    if (!newest) return false
-    setSending(true)
-    setSendFailed(null)
-    try {
-      await api(`/api/mobile/threads/${newest}`, { method: 'POST', body: { text } })
-      await reload()
-      return true
-    } catch (failure) {
-      setSendFailed(threadSendErrorLine(failure instanceof ApiError && failure.status < 500 ? failure.code : null))
-      return false
-    } finally {
-      setSending(false)
-    }
-  }
 
   const task = data?.detail.task
   const agent = currentAgent(segments)
@@ -132,13 +117,13 @@ export function TaskConversationScreen() {
             {segment.error && !(data?.threads[segment.attempt.runId]?.active) && !segment.items.some(item => item.kind === 'error') ? <AttemptError raw={segment.error} /> : null}
           </View>
         ))}
-        {sendFailed ? <Text style={styles.error}>{sendFailed}</Text> : null}
+        {delivery.bubbles}
         {live?.paused ? <ThreadQuotaPaused key={live.paused.runId} paused={live.paused} onContinued={() => reload()} /> : null}
         {stopper.stuck ? <StopFailed busy={stopper.sending} onRetry={() => void stopper.stop()} /> : null}
       </KeyboardChatScrollView>
       <OfflineBanner top={insets.top + 66} />
       {/* R-10: the conversation ends in the composer; a message to an ended attempt runs it again (R-81). */}
-      {live && newest ? <Composer placeholder={mobileMessages.MobileCore.messageTask} onSend={send} disabled={sending} attach attachmentScope={{ kind: 'thread', id: newest }}
+      {live && newest ? <Composer placeholder={mobileMessages.MobileCore.messageTask} onSend={text => delivery.send(text)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'thread', id: newest }}
         onStop={composerStops(live) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
     </View>
   )
