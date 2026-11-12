@@ -32,6 +32,20 @@ test('platform credentials and deployment identity remain distinct from customer
   assert.deepEqual(validateHostBuild(build, host, selected.runtimeEnv), host)
 })
 
+test('only platform Slack event verification enters the shared Eve runtime', () => {
+  const selected = hostConfiguration({ ...environment(),
+    EVE_ENV_SLACK_APP_ID: 'AEXAMPLE', EVE_ENV_SLACK_SIGNING_SECRET: 'event-fixture',
+  })
+  assert.equal(selected.runtimeEnv.SLACK_APP_ID, 'AEXAMPLE')
+  assert.equal(selected.runtimeEnv.SLACK_SIGNING_SECRET, 'event-fixture')
+  for (const name of ['SLACK_CLIENT_ID', 'SLACK_CLIENT_SECRET', 'SLACK_APP_ACCESS_TOKEN',
+    'SLACK_BOT_TOKEN', 'SLACK_TEAM_ID', 'SLACK_BOT_USER_ID', 'SLACK_USER_BINDINGS',
+    'SLACK_WATCHED_CHANNELS', 'SLACK_CHANNEL_WORKSPACES', 'WORKSPACE_SECRETS_KEY']) {
+    assert.throws(() => hostConfiguration({ ...environment(), ['EVE_ENV_' + name]: 'private-fixture' }),
+      { message: 'CF_EVE_HOST_CONFIGURATION_INVALID' }, name)
+  }
+})
+
 test('missing durable storage, unsafe origins or incompatible hosting fail without disclosing values', () => {
   for (const change of [
     { WORLD_QUEUE_PUBLIC_KEY: '' }, { WORLD_SERVICE: undefined },
