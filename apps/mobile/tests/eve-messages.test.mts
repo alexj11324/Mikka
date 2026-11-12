@@ -57,9 +57,9 @@ test('the same generated answer keeps its command on settlement without conflati
   const source = sourceOf(second, 'root.0')
   assert.equal(sourceOf(mirror, 'root.0'), source)
   const sending = personalMessage('first-command', 'same', [], { sourceCardId: source, chatKey: 'coordinator', context: 1, botId: null })
-  assert.equal(canAnswerCard([sending], sourceOf(mirror, 'root.0')), false)
-  assert.equal(canAnswerCard([sending], sourceOf(first, 'root.0')), true)
-  assert.equal(canAnswerCard([sending], sourceOf(mirror, 'root.1')), true)
+  assert.equal(canAnswerCard(true, [sending], sourceOf(mirror, 'root.0')), false)
+  assert.equal(canAnswerCard(true, [sending], sourceOf(first, 'root.0')), true)
+  assert.equal(canAnswerCard(true, [sending], sourceOf(mirror, 'root.1')), true)
   assert.notEqual(sourceOf({ ...mirror, streamId: 'eve:wrun_other:turn_1' }, 'root.0'), source)
   // Legacy history can have an opaque stream id, only a row id, or only its immutable position.
   const older = { ...mirror, streamId: undefined }

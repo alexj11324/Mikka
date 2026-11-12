@@ -235,7 +235,7 @@ test('both chat lists refresh the existing answer row after a refusal without re
           testID: 'list', scrollEnabled: true, bottomInset: 0, onAtLatestChange: () => {},
           renderItem: () => {
             drawn++
-            return createElement('button', { disabled: !canAnswerCard(outbox, source) }, 'Retry')
+            return createElement('button', { disabled: !canAnswerCard(true, outbox, source) }, 'Retry')
           } }))))
     }
     await show('', writes)

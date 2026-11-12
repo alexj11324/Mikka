@@ -30,13 +30,15 @@ test('transport failures stay unconfirmed while known validation/auth refusals a
 
 test('only the originating choice can reopen an unsettled answer and transport keeps its immutable body', () => {
   const draft = [personalMessage('op1', 'Keep the original draft', [], { sourceCardId: 'card-a', chatKey: 'chat', context: 3, botId: null })]
-  assert.equal(canAnswerCard([], 'card-a'), true)
-  assert.equal(canAnswerCard(draft, 'card-a'), false)
+  assert.equal(canAnswerCard(false, [], 'card-a'), false, 'a historical question cannot accept an answer while the conversation is unavailable')
+  assert.equal(canAnswerCard(true, [], 'card-a'), true)
+  assert.equal(canAnswerCard(true, draft, 'card-a'), false)
   for (const state of ['failed', 'unconfirmed'] as const) {
     const saved = [{ ...draft[0], phase: 'failed' as const, error: state }]
-    assert.equal(canAnswerCard(saved, 'card-a'), true)
-    assert.equal(canAnswerCard(saved, 'card-b'), true)
-    assert.equal(canAnswerCard([...saved, personalMessage('other', 'Another message', [], { botId: null, context: 3, chatKey: 'chat' })], 'card-a'), true)
+    assert.equal(canAnswerCard(false, saved, 'card-a'), false, 'a previous refusal cannot enable a retry before the conversation is writable')
+    assert.equal(canAnswerCard(true, saved, 'card-a'), true)
+    assert.equal(canAnswerCard(true, saved, 'card-b'), true)
+    assert.equal(canAnswerCard(true, [...saved, personalMessage('other', 'Another message', [], { botId: null, context: 3, chatKey: 'chat' })], 'card-a'), true)
     const same = unsettled(saved, 'Keep the original draft', [], 'chat', 3, 'card-a')!
     assert.equal(same.submissionId, 'op1')
     assert.equal(unsettled(saved, 'Keep the original draft', [], 'chat', 3), undefined)
