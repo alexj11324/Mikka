@@ -60,7 +60,7 @@ export function createConversationJournal(storage: Storage) {
       if (saved && saved.session !== session) clear(account, saved)
     },
     read(scope: string): Saved[] {
-      return read(scope).filter(entry => !personal(entry))
+      return read(scope).filter((entry): entry is Saved => !personal(entry))
     },
     readPersonal(scope: string): Outgoing[] {
       return read(scope).filter(personal)

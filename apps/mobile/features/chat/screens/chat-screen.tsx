@@ -334,7 +334,7 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
           header={loadingOlder ? <View style={styles.older}><Spinner size={16} /></View> : null}
           footer={<>
         {outbox.map(item => item.phase === 'accepted'
-          ? <MyBubble key={item.id} text={item.text} photos={item.images.map(image => image.uri)} />
+          ? <MyBubble key={item.id} text={item.text} photos={item.images.map(image => ({ uri: image.uri }))} />
           : <OutgoingBubble key={item.id} text={item.text} photos={item.images.map(image => image.uri)} failed={item.phase === 'failed'} unconfirmed={item.error === mobileMessages.Coordinator.sendUncertain} error={item.error} onRetry={() => { void personal.start(item) }} />)}
         {working ? <WaitingLine since={outbox.length ? null : waitingSince(items)} /> : null}
         {stopper.stuck ? <StopFailed busy={stopper.sending} onRetry={() => void stopper.stop()} /> : null}
