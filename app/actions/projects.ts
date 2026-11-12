@@ -58,7 +58,19 @@ async function readProject(tx: ProjectTransaction | typeof projectDb, reader: Pa
 async function projectsInContext(workspaceId?: string) {
   return withDatabaseOperation('/actions/projects/list', async () => {
     const context = await projectContext(workspaceId)
-    return (await accessibleProjects(context.user, projectDb, context.workspaceId)).toSorted((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+    const rows = await accessibleProjects(context.user, projectDb, context.workspaceId)
+    const taskIds = [...new Set(rows.flatMap(row => row.issueIds))]
+    const statuses = new Map<string, string>()
+    for (let offset = 0; offset < taskIds.length; offset += batchSize) {
+      const visible = await db.select({ id: issues.id, status: issues.status }).from(issues)
+        .where(and(inArray(issues.id, taskIds.slice(offset, offset + batchSize)),
+          issueVisibilityPredicate(context.user.id, { allowedIds: [], workspaceIds: [context.workspaceId] })))
+      for (const task of visible) statuses.set(task.id, task.status)
+    }
+    return rows.map(project => {
+      const visible = project.issueIds.filter(id => statuses.has(id))
+      return { ...project, taskCounts: { total: visible.length, done: visible.filter(id => statuses.get(id) === 'done').length } }
+    }).toSorted((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
   })
 }
 
