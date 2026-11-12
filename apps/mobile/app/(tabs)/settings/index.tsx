@@ -15,6 +15,7 @@ import { Text } from '@/components/Text'
 import { Group } from '@/components/ui'
 import { authClient } from '@/lib/auth'
 import { clearApiCache } from '@/lib/useApi'
+import { usePluginConnections } from '@/features/plugins/use-plugin-connections'
 import { useSettings } from '@/lib/settings'
 import { versionLabel } from '@/lib/updates'
 import { colors } from '@/lib/theme'
@@ -39,6 +40,7 @@ export default function SettingsScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const { data, error, reload } = useSettings()
+  const connections = usePluginConnections()
   const leaving = useRef(false)
   const [signingOut, setSigningOut] = useState(false)
   const [signOutFailed, setSignOutFailed] = useState(false)
@@ -71,6 +73,7 @@ export default function SettingsScreen() {
       ) : !data ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : (
         <ScrollView {...underBar} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}>
           <ReadNotice error={error} hasData label="设置" onRetry={reload} />
+          <ReadNotice error={connections.error} hasData={Boolean(connections.snapshot?.toolkits.length)} label="连接状态" onRetry={connections.reload} />
           <PushRow proactive={data.preferences.proactive} />
           <PreferenceSaveNotice />
           <Group>
@@ -84,7 +87,7 @@ export default function SettingsScreen() {
           <Group>
             <Row icon={icon('bell.fill', Bell, '#FF3B30')} label="通知" value={data.preferences.proactive ? '开' : '关'} onPress={() => router.push('/settings/notifications')} />
             <Row icon={icon('book.fill', BookOpen, '#AF52DE')} label="记忆" onPress={() => router.push('/settings/memory')} />
-            <Row icon={icon('puzzlepiece.extension.fill', Blocks, '#34C759')} label="已连接的 App" value={String(data.apps.filter(app => app.connected).length || '')} onPress={() => router.push('/settings/plugins')} />
+            <Row icon={icon('puzzlepiece.extension.fill', Blocks, '#34C759')} label="已连接的 App" value={connections.error ? '连接状态未知' : connections.snapshot ? String(connections.snapshot.toolkits.length) : undefined} onPress={() => router.push('/settings/plugins')} />
           </Group>
           <Group>
             <Row icon={icon('globe', Globe, '#5856D6')} label="语言" value="简体中文" trailing={Platform.OS === 'web' ? null : <Symbol name="arrow.up.right" size={13} color={colors.tertiary} web={<ArrowUpRight size={16} color={colors.tertiary} strokeWidth={2} />} />}

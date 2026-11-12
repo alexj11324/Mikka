@@ -9,7 +9,8 @@ import { Segmented } from '@/components/Segmented'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { api } from '@/lib/api'
-import type { ComposioAccounts, SkillsPage, StoreCatalog } from '@/lib/types'
+import { usePluginConnections } from '../use-plugin-connections'
+import type { SkillsPage, StoreCatalog } from '@/lib/types'
 import { useApi, useRefresh } from '@/lib/useApi'
 import { openOnWeb } from '@/lib/web'
 import { colors, GROUP_INSET } from '@/lib/theme'
@@ -58,11 +59,11 @@ function Header({ tab, setTab }: { tab: Tab; setTab: (tab: Tab) => void }) {
 
 function Apps({ query, header }: { query: string; header: ReactElement }) {
   const catalog = useApi<StoreCatalog>('/api/integrations/composio/catalog')
-  const accounts = useApi<ComposioAccounts>('/api/integrations/composio')
-  const reload = async () => { await Promise.all([catalog.reload(), accounts.reload()]) }
+  const connections = usePluginConnections()
+  const reload = async () => { await Promise.all([catalog.reload(), connections.reload()]) }
   const refresh = useRefresh(reload)
-  const connected = new Set((accounts.data?.accounts ?? []).map(account => account.toolkit))
-  const byId = new Map<string, Entry>((catalog.data?.apps ?? []).map(app => [app.id, app]))
+  const connected = useMemo(() => new Set(connections.snapshot?.toolkits ?? []), [connections.snapshot])
+  const byId = new Map<string, Entry>([...OWN, ...(catalog.data?.apps ?? [])].map(app => [app.id, app]))
   const entries = (ids: readonly string[]): Entry[] => ids.flatMap(id => { const app = byId.get(id); return app ? [app] : [] })
   const needle = query.trim().toLowerCase()
 
@@ -71,13 +72,13 @@ function Apps({ query, header }: { query: string; header: ReactElement }) {
       const hits = [...OWN, ...(catalog.data?.apps ?? []) as Entry[]].filter(app => app.name.toLowerCase().includes(needle) || app.id.includes(needle) || app.description.toLowerCase().includes(needle))
       return [{ title: '', items: hits }]
     }
-    const mine = [...connected].flatMap(id => byId.get(id) ?? []) as Entry[]
+    const mine: Entry[] = [...connected].map(id => byId.get(id) ?? { id, name: id, description: '', iconUrl: null })
     return [
       { title: '已连接', items: mine },
-      { title: '热门', items: [...OWN, ...entries(catalog.data?.popular ?? []).filter(app => !connected.has(app.id))] },
+      { title: '热门', items: [...OWN, ...entries(catalog.data?.popular ?? [])].filter(app => !connected.has(app.id)) },
       { title: '新品推荐', items: entries(catalog.data?.latest ?? []).filter(app => !connected.has(app.id)) },
     ].filter(section => section.items.length)
-  }, [needle, catalog.data, accounts.data])
+  }, [needle, catalog.data, connected])
 
   // Open the app's page on the web, signed in; its 连接 or 管理 happens there.
   const open = async (id: string) => {
@@ -97,7 +98,7 @@ function Apps({ query, header }: { query: string; header: ReactElement }) {
       keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="handled"
       refreshControl={<RefreshControl {...refresh} />}
-      ListHeaderComponent={<>{header}<ReadNotice error={catalog.error || accounts.error} hasData={Boolean(catalog.error ? catalog.data : accounts.data)} label={catalog.error ? "应用目录" : "连接状态"} onRetry={reload} /></>}
+      ListHeaderComponent={<>{header}<ReadNotice error={catalog.error || connections.error} hasData={Boolean(catalog.error ? catalog.data : connections.snapshot?.toolkits.length)} label={catalog.error ? "应用目录" : "连接状态"} onRetry={reload} /></>}
       contentContainerStyle={styles.list}
       ListEmptyComponent={catalog.loading ? <View style={styles.center}><Spinner /></View>
         : <Text style={styles.note}>{catalog.error ? '应用加载失败' : needle ? `没有找到「${query.trim()}」` : catalog.data?.configured === false ? '应用商店未配置' : '没有应用'}</Text>}
@@ -105,7 +106,7 @@ function Apps({ query, header }: { query: string; header: ReactElement }) {
         <GroupRow place={row.place} label={`${row.item.name}${connected.has(row.item.id) ? '，已连接' : ''}`} onPress={() => void open(row.item.id)}>
           <AppIcon entry={row.item} />
           <Text style={styles.name} numberOfLines={1}>{row.item.name}</Text>
-          {connected.has(row.item.id) ? <View style={styles.connected} /> : !row.item.own && accounts.error ? <Text style={styles.state}>连接状态未知</Text> : null}
+          {connected.has(row.item.id) ? <View style={styles.connected} /> : (connections.error && (!connections.snapshot || connections.snapshot.failed.some(failure => failure.source === (row.item.own ? row.item.id : 'composio')))) ? <Text style={styles.state}>连接状态未知</Text> : null}
           <Symbol name="chevron.right" size={13} color={colors.tertiary} />
         </GroupRow>
       )}

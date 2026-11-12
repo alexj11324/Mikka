@@ -11,6 +11,7 @@ import { listOrganizations } from '@/lib/governance/organizations'
 import { enterprisePrincipal } from '@/lib/enterprise/principal'
 import { isCloudEdition } from '@/lib/edition'
 import { mobileMembersPage } from '@/lib/mobile-web-target'
+import { mobilePluginConnections } from '@/lib/mobile-plugin-connections'
 import { json, mobileUser, unauthorized } from '@/lib/mobile-api'
 
 export const dynamic = 'force-dynamic'
@@ -41,6 +42,8 @@ async function handleGET(request: Request) {
   const user = await mobileUser(request)
   noteLogUser(user?.id)
   if (!user) return unauthorized()
+  const view = new URL(request.url).searchParams.get('view')
+  if (view === 'pluginConnections') return json(await mobilePluginConnections(user.id, request.headers))
   // 记忆 is the memory of the Coordinator of the workspace the app has open.
   const coordinator = await openChatBotId(user, null)
   const [context, preferences, [session], apps] = await Promise.all([
@@ -48,7 +51,7 @@ async function handleGET(request: Request) {
     readPreferences(user.id),
     db.select({ memory: coordinatorSessions.memory }).from(coordinatorSessions)
       .where(and(eq(coordinatorSessions.userId, user.id), eq(coordinatorSessions.botId, coordinator))).limit(1),
-    connectedApps(user.id),
+    view === 'profile' ? [] : connectedApps(user.id),
   ])
   const organization = context.role === 'admin' ? null : (await listOrganizations(user.id)).find(item => item.role === 'owner' || item.role === 'admin')
   return json({
