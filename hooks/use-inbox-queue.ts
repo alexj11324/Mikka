@@ -14,7 +14,7 @@ export function useInboxQueue(ownerId: string | undefined, workspaceId: string |
     if (!ownerId || !workspaceId || (index > 0 && !previous?.nextCursor)) return null
     return ['inbox-queue', version, ownerId, workspaceId, tab, index ? previous!.nextCursor : null] as const
   }
-  const read = useSWRInfinite<InboxPage>(getKey, ([, selected, , workspace, list, cursor]) => readInboxPage(workspace, list, cursor, selected), {
+  const read = useSWRInfinite<InboxPage, Error, typeof getKey>(getKey, ([, selected, , workspace, list, cursor]) => readInboxPage(workspace, list, cursor, selected), {
     revalidateOnFocus: false, shouldRetryOnError: false,
   })
   useLiveKeys(ownerId && workspaceId ? [
