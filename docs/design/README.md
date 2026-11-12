@@ -23,6 +23,8 @@ says which source wins when two disagree, and where each kind of rule lives.
 8. [`../review-checklist.md`](../review-checklist.md): run it before you show UI
    to anyone.
 
+Full-product UX, discoverability, missing buttons/actions, status/role/permission parity and error-recovery audits start at [`ux-quality-audit.md`](ux-quality-audit.md) and `.claude/skills/mikka-ux-quality-audit/SKILL.md`. They do not supersede this design-source priority, as-shipped paid components or the existing issue owners.
+
 New feature? Copy [`spec-template.md`](spec-template.md) first.
 
 ## When sources disagree
