@@ -219,10 +219,12 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
           const objects = await accountStorageKeys(client, job.subjectUserId, retained)
           const notBefore = !options.deleteObject && artifactStorage() === 'inline' ? (options.now?.() ?? new Date()) : objects.notBefore
           assertHeld()
-          await deleteMainAccountData(client, job.subjectUserId, retained)
+          // Capture the object handoff before DELETE triggers run. Both the receipt and
+          // the row removals still become visible together at the existing APP commit.
           await client.query('UPDATE account_deletion_jobs SET stage=\'main_deleted\',plan=$4,"pendingObjects"=$2,"storageNotBefore"=$3,"blockedReasons"=\'[]\',"updatedAt"=now() WHERE id=$1',
             [id, JSON.stringify(objects.keys), notBefore, JSON.stringify(retained)])
           assertHeld()
+          await deleteMainAccountData(client, job.subjectUserId, retained)
           return retained
         })
         assertHeld()

@@ -153,13 +153,59 @@ test(
         store.completeChatFile(owner, first.id, changed),
       ])
       assert.deepEqual(published, replay)
+      // Exercise the ordinary account deletion entry point with a completed R2-backed file.
+      // The tested owner has a separate workspace; the earlier live file must survive it.
+      const departed = await seedUser(database, 'attachment-delete-owner')
+      const personal = await seedWorkspace(database, departed, [{ userId: departed, role: 'admin' }])
+      const privateBot = await seedBot(database, personal.id, departed)
+      const owned = await store.beginChatFile(departed, { kind: 'bot', id: privateBot }, {
+        name: 'private.txt', mediaType: 'text/plain', size: data.length,
+      })
+      await store.completeChatFile(departed, owned.id, data)
+      const ownedKey = (await store.readChatFile(departed, owned.id)).storageKey!
+      assert.deepEqual(Buffer.from(await storage.getArtifactObjectBytes(ownedKey)), data)
+      await assert.rejects(store.readChatFile(owner, owned.id), { code: 'notFound' })
+      const blockedDraft = await store.beginChatFile(departed, { kind: 'bot', id: privateBot }, {
+        name: 'expired.txt', mediaType: 'text/plain', size: data.length,
+      })
+      await store.completeChatFile(departed, blockedDraft.id, data)
+      await store.removeChatFile(departed, blockedDraft.id)
+      await store.removeChatFile(owner, abandoned.id)
+      await database.query(`UPDATE chat_attachments SET "uploadExpiresAt"=now()-interval '1 second' WHERE id=ANY($1::uuid[])`, [[blockedDraft.id, abandoned.id]])
+      const { requestAccountDeletion } = await import('@/lib/account/deletion-jobs')
+      const { deleteAccount } = await import('@/lib/account/delete')
+      const email = departed + '@example.invalid'
+      await requestAccountDeletion(departed, email)
+      await assert.rejects(database.query('SELECT mikka_account_assert_writable($1)', [departed]), { code: '55000' })
+      await store.cleanupChatFiles()
+      assert.equal((await database.query('SELECT 1 FROM chat_attachments WHERE id=$1', [blockedDraft.id])).rowCount, 1)
+      await assert.rejects(storage.getArtifactObjectBytes(readKey(abandoned.id, data)), { code: 404 })
+      // The isolated subject has no external integrations; use the original S3 deletion transport.
+      const cleanup = { externalCleanup: async () => [], deleteObject: storage.deleteArtifactObject }
+      const abort = 'qa_erasure_' + randomUUID().replaceAll('-', '')
+      await database.query(`CREATE FUNCTION ${abort}() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN RAISE EXCEPTION 'synthetic final account deletion failure'; END $$`)
+      try {
+        await database.query(`CREATE TRIGGER ${abort} AFTER DELETE ON "user"
+          FOR EACH ROW WHEN (OLD.id='${departed}') EXECUTE FUNCTION ${abort}()`)
+        await assert.rejects(deleteAccount(departed, email, cleanup), { code: 'P0001' })
+        const retained = await database.query('SELECT state, "storageKey" FROM chat_attachments WHERE id=$1', [owned.id])
+        assert.deepEqual(retained.rows[0], { state: 'ready', storageKey: ownedKey })
+        const job = await database.query('SELECT stage, "pendingObjects" FROM account_deletion_jobs WHERE "subjectUserId"=$1', [departed])
+        assert.notEqual(job.rows[0].stage, 'main_deleted')
+        assert.deepEqual(job.rows[0].pendingObjects, [])
+        assert.deepEqual(Buffer.from(await storage.getArtifactObjectBytes(ownedKey)), data)
+      } finally {
+        await database.query(`DROP TRIGGER IF EXISTS ${abort} ON "user"`)
+        await database.query(`DROP FUNCTION ${abort}()`)
+      }
+      assert.equal((await deleteAccount(departed, email, cleanup)).ok, true)
+      assert.equal((await database.query('SELECT 1 FROM "user" WHERE id=$1', [departed])).rowCount, 0)
+      await assert.rejects(storage.getArtifactObjectBytes(ownedKey), { code: 404 })
+      assert.deepEqual(Buffer.from(await storage.getArtifactObjectBytes(readKey(first.id, changed))), changed)
       await assert.rejects(storage.getArtifactObjectBytes(readKey(first.id, data)), { code: 404 })
       assert.deepEqual(Buffer.from(await store.chatFileBytes(await store.readChatFile(owner, first.id))), changed)
       await assert.rejects(store.readChatFile(peer, first.id), { code: 'notFound' })
-      await store.removeChatFile(owner, abandoned.id)
-      await database.query(`UPDATE chat_attachments SET "uploadExpiresAt"=now()-interval '1 second' WHERE id=$1`, [abandoned.id])
-      await store.cleanupChatFiles()
-      await assert.rejects(storage.getArtifactObjectBytes(readKey(abandoned.id, data)), { code: 404 })
       assert.deepEqual(Buffer.from(await storage.getArtifactObjectBytes(readKey(first.id, changed))), changed)
       await store.removeChatFile(owner, first.id)
       await database.query(`UPDATE chat_attachments SET "uploadExpiresAt"=now()-interval '1 second' WHERE id=$1`, [first.id])
