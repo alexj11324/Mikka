@@ -25,6 +25,7 @@ export interface SlackChannelDependencies {
   api?: SlackChannelConfig['api']
   binding?: (app: string, team: string, sender: string) => Promise<SlackBinding | null>
   token?: (scope: SlackGrantScope) => Promise<string>
+  memberRemoved?: (app: string, team: string, member: string, eventAt: number) => Promise<void>
   revoked?: (app: string, team: string, bot: string | null, eventAt: number) => Promise<void>
   recordSource?: (scope: SlackScope, message: SlackMessage) => Promise<string>
 }
@@ -68,6 +69,12 @@ export function createMikkaSlackChannel(dependencies: SlackChannelDependencies =
     (async (app, team, bot, eventAt) => {
       const [{ pool }, { providerRevoked }] = await Promise.all([import('../db'), import('./installation-store')])
       await providerRevoked(pool, app, team, bot, eventAt)
+    })
+  const memberRemoved =
+    dependencies.memberRemoved ??
+    (async (app, team, member, eventAt) => {
+      const [{ pool }, { providerMemberRemoved }] = await Promise.all([import('../db'), import('./installation-store')])
+      await providerMemberRemoved(pool, app, team, member, eventAt)
     })
   const token = dependencies.token ?? nativeSlackToken
   const join =
@@ -202,7 +209,8 @@ export function createMikkaSlackChannel(dependencies: SlackChannelDependencies =
               if (!app) return new Response(null, { status: 503 })
               const removal = signedRevocation(app, payload)
               if (removal) {
-                for (const bot of removal.bots ?? [null]) await revoked(app, removal.team, bot, removal.eventAt)
+                if (removal.member) await memberRemoved(app, removal.team, removal.member, removal.eventAt)
+                else for (const bot of removal.bots ?? [null]) await revoked(app, removal.team, bot, removal.eventAt)
                 return new Response(null, { status: 204 })
               }
               const identity = signedCoordinates(app, payload)

@@ -67,6 +67,12 @@ export function signedRevocation(app: string, input: unknown) {
     p.event_time <= 0
   )
     return null
+  if (event.type === 'user_change') {
+    const user = record(event.user)
+    return user.deleted === true && user.team_id === team && slackUserId(user.id)
+      ? { team, member: user.id, eventAt: p.event_time }
+      : null
+  }
   if (event.type === 'app_uninstalled') return { team, bots: null, eventAt: p.event_time }
   const bots = record(event.tokens).bot
   return event.type === 'tokens_revoked' && Array.isArray(bots) && bots.every(slackUserId)

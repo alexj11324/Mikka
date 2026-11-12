@@ -9,6 +9,7 @@ import {
   installationCredential,
   installationStatus,
   providerRevoked,
+  providerMemberRemoved,
   signedSender,
   startInstall,
   unlinkMember,
@@ -93,6 +94,14 @@ test(
       ws.id,
       b,
     ])
+    await providerMemberRemoved(sql, app, team, 'UB', 1)
+    assert.ok(await signedSender(sql, app, team, 'UB'))
+    await providerMemberRemoved(sql, app, 'TOTHER', 'UB', Math.ceil(Date.now() / 1000))
+    assert.ok(await signedSender(sql, app, team, 'UB'))
+    await providerMemberRemoved(sql, app, team, 'UB', Math.ceil(Date.now() / 1000))
+    assert.equal(await signedSender(sql, app, team, 'UB'), null)
+    assert.equal((await signedSender(sql, app, team, 'UA'))?.ownerId, a)
+    await acceptInstall(sql, b, ws.id, { ...grant, slackUserId: 'UB' }, env)
     await unlinkMember(sql, app, b, ws.id)
     assert.equal(await signedSender(sql, app, team, 'UB'), null)
     assert.equal((await signedSender(sql, app, team, 'UA'))?.ownerId, a)

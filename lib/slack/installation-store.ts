@@ -100,7 +100,7 @@ export function acceptInstall(pool: Database, owner: string, workspace: string, 
     )
     if (!member.rowCount) {
       const same = await client.query(
-        'SELECT 1 FROM mikka_slack_members WHERE installation_id=$1 AND user_id=$2 AND slack_user_id=$3',
+        'UPDATE mikka_slack_members SET linked_at=now() WHERE installation_id=$1 AND user_id=$2 AND slack_user_id=$3 RETURNING 1',
         [row.id, owner, grant.slackUserId],
       )
       if (!same.rowCount) throw new Error('slackInstallationConflict')
@@ -256,5 +256,19 @@ export async function providerRevoked(pool: Database, app: string, team: string,
     'DELETE FROM mikka_slack_installations WHERE app_id=$1 AND team_id=$2 AND ($3::text IS NULL OR bot_user_id=$3)' +
       " AND date_trunc('second',installed_at)<=to_timestamp($4)",
     [app, team, bot, eventAt],
+  )
+}
+
+export async function providerMemberRemoved(
+  pool: Database,
+  app: string,
+  team: string,
+  member: string,
+  eventAt: number,
+) {
+  await pool.query(
+    'DELETE FROM mikka_slack_members m USING mikka_slack_installations i WHERE i.id=m.installation_id' +
+      " AND i.app_id=$1 AND i.team_id=$2 AND m.slack_user_id=$3 AND date_trunc('second',m.linked_at)<=to_timestamp($4)",
+    [app, team, member, eventAt],
   )
 }

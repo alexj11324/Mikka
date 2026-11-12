@@ -136,3 +136,20 @@ test('signed workspace/installation boundaries and provider uninstall scope', ()
   assert.deepEqual(signedRevocation('AAPP', revoke), { team: 'TTEAM', bots: ['UBOT'], eventAt: revoke.event_time })
   assert.equal(signedRevocation('AOTHER', revoke), null)
 })
+
+test('signed Slack member removal belongs to the same team and requires deactivation', () => {
+  const update = {
+    api_app_id: 'AAPP',
+    team_id: 'TTEAM',
+    type: 'event_callback',
+    event_time: 1870000000,
+    event: { type: 'user_change', user: { id: 'UMEMBER', team_id: 'TTEAM', deleted: true } },
+  }
+  assert.deepEqual(signedRevocation('AAPP', update), { team: 'TTEAM', member: 'UMEMBER', eventAt: 1870000000 })
+  for (const user of [
+    { id: 'UMEMBER', team_id: 'TOTHER', deleted: true },
+    { id: 'UMEMBER', team_id: 'TTEAM', deleted: false },
+  ]) {
+    assert.equal(signedRevocation('AAPP', { ...update, event: { ...update.event, user } }), null)
+  }
+})
