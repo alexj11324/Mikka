@@ -43,10 +43,18 @@ export async function setIssueTeam(input: { issueId: string; teamId: string | nu
       const destination = input.teamId ? await requireActiveTeam(tx, input.teamId, user.id, false, workspace.id) : null
       if (destination && (workspace.kind === 'personal' || destination.workspaceId !== workspace.id)) throw new ActionFailureError('workspaceAccessDenied')
       // Project collaboration Teams are independent of the task's optional grouping.
-      return withResourceAccess(user, { kind: 'task', id: issue.id, workspaceId: workspace.id }, 'canSteer', async (_policy, app) => {
+      const resource = { kind: 'task' as const, id: issue.id, workspaceId: workspace.id }
+      const changing = (current?.teamId ?? null) !== (destination?.id ?? null)
+      if (changing) {
+        // The Workspace relation lock blocks new grants. Commit the exact APP
+        // lease fence before the fallible grouping write, using the same pool slot.
+        reviewIds = await withResourceAccess(user, resource, 'canSteer', (_policy, app) =>
+          markReviewSessionsRevoked(captureDatabaseQuery(app), { taskId: issue.id }, 'task_changed'))
+      }
+      // Revalidate and hold APP authority through the actual write.
+      return withResourceAccess(user, resource, 'canSteer', async (_policy, app) => {
         const previousLists = await issueListScopesBeforeChange(issue)
-        if ((current?.teamId ?? null) !== (destination?.id ?? null)) {
-          reviewIds = await markReviewSessionsRevoked(captureDatabaseQuery(app), { taskId: issue.id }, 'task_changed')
+        if (changing) {
           const stopped = await app.execute<StoppedPolicyRun>(runPolicyStopSQL({ kind: 'task', issueId: issue.id }))
           notifyStoppedPolicyRuns(app, stopped.rows)
         }
