@@ -16,6 +16,7 @@ export class InboxError extends Error {
 export type InboxSource = { id: string; type: 'task' | 'suggestion'; source: string; title: string; issueId: string | null; ownerId: string; pending: boolean; rejectedAt?: Date | null; rejectedBy?: string | null; canReply?: boolean; runId?: string | null; reason?: 'needsReply' | 'confirm' | 'review' | null }
 
 export type InboxEntry = Omit<InboxSource, 'rejectedAt'> & {
+  occurredAt: string;
   rejectedAt: string | null; status: 'pending' | 'snoozed' | 'done'; snoozedUntil: string | null; actions: string[];
   completion?: { id: string; action: string; actorId: string; at: string; runId: string | null }
 }
