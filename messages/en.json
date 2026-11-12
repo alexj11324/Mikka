@@ -7225,9 +7225,15 @@
     "deleteTeam": "Delete team",
     "deleteConfirm": "Type {name} to confirm",
     "deleteTitle": "Delete {name}?",
-    "deleteImpact": "{tasks, plural, one {# task} other {# tasks}} and {projects, plural, one {# project} other {# projects}} go with it. A project shared with another team only loses the link.",
-    "deleteCounting": "Counting what goes with it…",
+    "deleteImpact": "{tasks, plural, one {# task} other {# tasks}} and {projects, plural, one {# project} other {# projects}} are linked to this team. Permanent deletion requires an empty team with no execution history.",
+    "deleteCounting": "Checking team links and execution history…",
     "deleting": "Deleting…",
+    "ungroup": "Remove grouping…",
+    "ungroupTitle": "Remove {name} as a team grouping?",
+    "ungroupImpact": "{tasks, plural, one {# task becomes} other {# tasks become}} ungrouped in this workspace. {projects, plural, one {# project loses} other {# projects lose}} this team link. The tasks, projects and their history are kept.",
+    "ungroupConfirm": "Remove grouping",
+    "ungroupPending": "Removing grouping…",
+    "teamUngrouped": "{name} grouping removed.",
     "teamDeleted": "{name} deleted."
   },
   "HostedSettings": {
