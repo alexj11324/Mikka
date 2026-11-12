@@ -4,7 +4,7 @@ import useSWR, { unstable_serialize } from 'swr'
 import { useTranslations } from 'next-intl'
 import { withBasePath } from '@/lib/base-path'
 import { GovernanceRequestError, governanceKey, type GovernanceDetail } from '@/hooks/settings/use-workspace-governance'
-import { useLiveKey } from '@/hooks/use-live-key'
+import { useLiveKey, useLiveKeys } from '@/hooks/use-live-key'
 
 /**
  * Enterprise v1 (#1608 P2, #1642 「Claude 界面交接」): the Organization a Shared
@@ -140,7 +140,23 @@ export function useOrganizationPolicy(organizationId: string | null | undefined)
   return useSWR(organizationId ? policyKey(organizationId) : null, ([, id]) => request<ResourcePolicyState>(org(id, '/policy')), swr)
 }
 
+export function useOrganizationServiceKeys(organizationId: string, after: string | undefined, workspaceIds: readonly string[]) {
+  const key = ['organization-service-keys', organizationId, after ?? ''] as const
+  const result = useSWR(key, () => organizationApi.serviceKeys(organizationId, after), swr)
+  const subscriptions = workspaceIds.map(id => ({ kind: 'workspace_settings' as const, id, workspaceId: id }))
+  useLiveKeys(subscriptions, [unstable_serialize(key)], undefined, { minIntervalMs: 2_000 })
+  return result
+}
+
+export type OrganizationServiceKey = {
+  id: string; name: string | null; workspaceId: string; serviceIdentityId: string; serviceIdentityName: string; expiresAt: string | null
+}
+
 export const organizationApi = {
+  serviceKeys: (id: string, after?: string) => request<{ keys: OrganizationServiceKey[]; nextCursor: string | null }>(
+    org(id, '/api-keys') + (after ? '?' + new URLSearchParams({ after }) : '')),
+  nameServiceKey: (id: string, keyId: string, name: string) =>
+    send<{ id: string; name: string }>(org(id, '/api-keys/' + encodeURIComponent(keyId)), 'PATCH', { name }),
   create: (name: string) => send<OrganizationListItem>('/api/organizations', 'POST', { name }),
   rename: (id: string, name: string) => send<{ organization: OrganizationSummary['organization'] }>(org(id), 'PATCH', { name }),
   /** Owner only; needs every workspace unbound and every provider and SCIM connection closed first. */
