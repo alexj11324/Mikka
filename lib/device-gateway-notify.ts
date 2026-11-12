@@ -87,8 +87,18 @@ const ACTIVE_RUN_STATUSES = ['preparing', 'running', 'paused', 'waiting_input', 
 export async function notifyRunControl(database: {
   query: (text: string, values: unknown[]) => Promise<{ rows: { deviceId: string }[] }>
 }, target: RunControlTarget) {
-  if (!gatewayConfig()) return
   if ('runIds' in target && target.runIds.length === 0) return
+  // Human capabilities use the run's root gateway independently of the
+  // daemon's optional device gateway. Close them before notifying execution.
+  try {
+    const { revokeReviewSessions } = await import('./coding-workspace/review-sessions')
+    await revokeReviewSessions(database as Pick<Pool, 'query'>, target, 'run_control')
+  } catch {
+    const { armDueTimerSoon } = await import('./due-timer')
+    armDueTimerSoon('run-recovery')
+    console.warn('[device-gateway] review control notification deferred')
+  }
+  if (!gatewayConfig()) return
   const [where, values]: [string, unknown[]] = 'runIds' in target ? ['r.id=ANY($1::uuid[])', [[...target.runIds]]]
     : 'userId' in target ? ['r."userId"=$1 AND r.status=ANY($2::text[])', [target.userId, ACTIVE_RUN_STATUSES]]
       : ['r."botId" IN (SELECT id FROM bots WHERE "workspaceId"=$1) AND r.status=ANY($2::text[])', [target.workspaceId, ACTIVE_RUN_STATUSES]]

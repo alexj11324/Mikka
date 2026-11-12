@@ -153,6 +153,15 @@ export async function afterRunEnded(userId: string, runId: string, reconcileFor:
   if (!deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return 0
   try {
     const { pool } = await import('./db')
+    // Normal native completion retains a review lease; stop/lost scope must
+    // close it even when Factory is disabled. A failed close stays due.
+    try {
+      const { reconcileReviewSessions } = await import('./coding-workspace/review-sessions')
+      await reconcileReviewSessions(pool, { runIds: [runId] })
+    } catch {
+      armDueTimerSoon('run-recovery')
+      console.warn('Run review close deferred', { code: 'review_close_unacknowledged' })
+    }
     return await reconcileFactoryAfterCompletion(pool, userId, runId, reconcileFor)
   } catch (error) {
     console.warn('factory run-end reconcile deferred to Coordinator fallback', { runId, error: error instanceof Error ? error.constructor.name : typeof error })
