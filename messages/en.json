@@ -65,6 +65,12 @@
   },
   "Issue": {
     "scope": {
+      "workspaceUnavailable": "Workspace unavailable",
+      "linearSync": "Linear sync",
+      "linearEnabled": "Enabled",
+      "disableLinear": "Turn off Linear sync",
+      "disableLinkedLinear": "Turn off sync and archive the linked Linear issue",
+      "linearDisabled": "Linear sync turned off.",
       "label": "Scope",
       "workspace": "Workspace",
       "personal": "Personal",
