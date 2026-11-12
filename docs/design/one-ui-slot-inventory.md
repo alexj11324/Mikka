@@ -4,7 +4,9 @@ This inventory records the Web and Desktop application at [public b753107a](http
 
 The consumer column links direct production imports at the audited revision. A public adapter delegates to another component. A null contract can still activate a full alternate view in its caller, including search, task detail and thread. A presentation component renders part of a page. A workbench view composes an interactive business surface. Each decision concerns the binding and its callers. The shared APIs, protected component libraries, authentication pages and explicit imports by the official layer have separate owners.
 
-At this baseline both a missing hosted file in a configured layer and an entirely absent layer can select the public default. A self-host installation can reach the workspace with the legacy UI switch. The table records migration decisions. Runtime acceptance and removal are tracked in [#1972](https://github.com/alexj11324/Mikka/issues/1972) and [#1973](https://github.com/alexj11324/Mikka/issues/1973).
+At this baseline both a missing hosted file in a configured layer and an entirely absent layer could select the public default. A self-host installation could reach the workspace with the legacy UI switch. The table records migration decisions. Runtime acceptance and removal are tracked in [#1972](https://github.com/alexj11324/Mikka/issues/1972) and [#1973](https://github.com/alexj11324/Mikka/issues/1973).
+
+The official layer subsequently added SSO sign-in, governance and organization settings to the three slots originally served by public no-content contracts. A version-pinned Web or Desktop build now requires all 51 provider files and their 75 named exports. The public server keeps its sign-in and handoff pages. [Official provider integration](https://github.com/alexj11324/mikka-hosted-ui/pull/106)
 
 | Slot and providers | Public implementation | Production imports | Decision |
 | --- | --- | --- | --- |
