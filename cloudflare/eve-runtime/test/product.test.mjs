@@ -27,3 +27,17 @@ test('a missing immutable binding, wrong principal, wrong capability, or unrelat
     assert.equal(productRequest(r, undefined, origin, 'private-local').status, 404)
   }
 })
+
+test('only the native Slack credential endpoint forwards a present grant proof', async () => {
+  const url = endpoint.replace('/tools', '/slack-credential')
+  const api = { async fetch(forwarded) {
+    assert.equal(forwarded.url, origin + '/mikka/api/internal/eve/slack-credential')
+    assert.equal(forwarded.headers.get('x-mikka-slack-grant'), 'scoped-proof')
+    assert.equal(forwarded.headers.has('cookie'), false)
+    return new Response(null, { status: 204 })
+  } }
+  assert.equal(productRequest(request(url), api, origin, 'private-local').status, 403)
+  assert.equal((await productRequest(request(url, 'POST', { 'x-mikka-slack-grant': 'scoped-proof' }), api, origin, 'private-local')).status, 204)
+  const tool = { fetch(forwarded) { assert.equal(forwarded.headers.has('x-mikka-slack-grant'), false); return new Response() } }
+  await productRequest(request(endpoint, 'POST', { 'x-mikka-slack-grant': 'scoped-proof' }), tool, origin, 'private-local')
+})
