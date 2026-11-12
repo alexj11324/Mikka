@@ -129,6 +129,8 @@ export async function acceptOrganizationInvitation(input: unknown, user: { id: s
     const [candidate] = await tx.select({ organizationId: organizationInvitations.organizationId })
       .from(organizationInvitations).where(eq(organizationInvitations.tokenHash, tokenHash)).limit(1)
     if (!candidate) throw new GovernanceError('invalid_request')
+    // Acquire the account deletion guard before Organization row locks (global lock order).
+    await assertOrganizationAccountWritable(tx, user.id)
     const [organization] = await tx.select({ archivedAt: organizations.archivedAt }).from(organizations)
       .where(eq(organizations.id, candidate.organizationId)).for('update').limit(1)
     if (!organization || organization.archivedAt) throw new GovernanceError('invalid_request')
@@ -142,7 +144,6 @@ export async function acceptOrganizationInvitation(input: unknown, user: { id: s
       .where(and(eq(organizationMembers.organizationId, candidate.organizationId),
         eq(organizationMembers.userId, invitation.createdBy), eq(organizationMembers.status, 'active'))).limit(1)
     if (!issuer) throw new GovernanceError('invalid_request')
-    await assertOrganizationAccountWritable(tx, user.id)
     const [existing] = await tx.select({ status: organizationMembers.status })
       .from(organizationMembers).where(and(eq(organizationMembers.organizationId, candidate.organizationId),
         eq(organizationMembers.userId, user.id))).limit(1)
