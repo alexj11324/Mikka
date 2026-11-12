@@ -43,8 +43,9 @@ async function requireActiveOrganizationMember(tx: WorkspaceTransaction, organiz
 export async function issueOrganizationInvitations(organizationId: string, actorId: string, input: unknown) {
   const emails = emailsFromInput(input)
   return workspaceDb.transaction(async tx => {
-    await requireActiveOrganizationMember(tx, organizationId, actorId)
+    // Account deletion guards precede the Organization row lock (same order as member admission).
     await assertOrganizationAccountWritable(tx, actorId)
+    await requireActiveOrganizationMember(tx, organizationId, actorId)
     const members = new Set((await tx.select({ email: organizationMembers.email }).from(organizationMembers)
       .where(eq(organizationMembers.organizationId, organizationId))).map(row => row.email.toLowerCase()))
     const existing = new Map((await tx.select().from(organizationInvitations)
