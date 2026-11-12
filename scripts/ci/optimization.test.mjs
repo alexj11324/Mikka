@@ -27,7 +27,12 @@ test('selected specialty calls reuse the parent decision; direct dispatch still 
   const parent = workflow('ui-policy')
   for (const [name, lane] of [['desktop', 'desktop'], ['analytics-ssr', 'analytics'], ['self-hosted-image', 'image']]) {
     const w = workflow(name)
-    assert.equal(parent.jobs[`${lane}-checks`].with.selected, true)
+    if (name === 'desktop') {
+      assert.deepEqual(Object.keys(w.on).sort(), ['workflow_call', 'workflow_dispatch'])
+      assert.equal(Object.values(parent.jobs).some(job => job.uses === './.github/workflows/desktop.yml'), false)
+    } else {
+      assert.equal(parent.jobs[`${lane}-checks`].with.selected, true)
+    }
     assert.equal(w.on.workflow_call.inputs.selected.default, false)
     assert.equal(evaluate(w.jobs.changes.if, { inputs: { selected: true } }), false)
     assert.equal(evaluate(w.jobs.changes.if, { inputs: { selected: false } }), true)
