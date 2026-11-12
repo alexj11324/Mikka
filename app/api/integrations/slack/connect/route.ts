@@ -4,7 +4,7 @@ import { withBasePath } from '@/lib/base-path'
 import { pool } from '@/lib/db'
 import { withRequestLog } from '@/lib/request-log'
 import { withTaskWorkspace } from '@/lib/task-workspace'
-import { authorizeSlack, installPlatform, SLACK_CALLBACK_PATH, SLACK_STATE_COOKIE } from '@/lib/slack/install-provider'
+import { authorizeSlack, installPlatform, SLACK_CALLBACK_PATH, SLACK_INSTALL_RETURN_PATH, SLACK_STATE_COOKIE } from '@/lib/slack/install-provider'
 import { consumeInstall, startInstall } from '@/lib/slack/installation-store'
 
 export const runtime = 'nodejs'
@@ -13,7 +13,7 @@ async function handle(request: Request) {
   const url = new URL(request.url),
     intent = url.searchParams.get('intent') ?? ''
   const platform = installPlatform()
-  const back = new URL(withBasePath('/?section=plugins&app=slack&installation=failed'), url.origin)
+  const back = new URL(SLACK_INSTALL_RETURN_PATH, url.origin)
   if (!platform || !/^[A-Za-z0-9_-]{43}$/.test(intent)) return NextResponse.redirect(back)
   const session = await auth.api.getSession({ headers: request.headers })
   if (!session?.user) {

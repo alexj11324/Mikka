@@ -1354,7 +1354,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "d4252184fe8405c5e0acf3afaa5cb359b7317ca86b5383a8bae6e4cd8079b8c7"
+      "sourceHash": "356ae7ce8260750148587eb0642713baea2374e602f1d05418af8edcde00e166"
     },
     {
       "path": "/mikka/api/integrations/slack/connect",
@@ -1363,7 +1363,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "7093051f3253725ad4f505bea6a4efe72697f1d0cc8b4b2c69e769b11a84d92d"
+      "sourceHash": "27330814a0184633ca4960260c2316a8d864b70064beb40aa5ee4de447939aed"
     },
     {
       "path": "/mikka/api/internal/eve/slack-credential",
