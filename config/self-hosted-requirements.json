@@ -648,6 +648,13 @@
     "test": "lib/mobile-web-target.test.ts",
     "suite": "test:mobile"
   },
+  "lib/openui-lang.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Parse generated reply documents locally and count their root assignments so a streamed answer retains its identity when the same turn is read from storage.",
+    "test": "lib/openui-lang.test.ts",
+    "suite": "test:mobile"
+  },
   "lib/mobile-web-target.ts": {
     "mode": "built-in",
     "environment": [],

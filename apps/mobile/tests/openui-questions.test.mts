@@ -30,6 +30,15 @@ mock.module(new URL('../lib/images.ts', import.meta.url).href, { namedExports: {
 mock.module(new URL('../lib/web.ts', import.meta.url).href, { namedExports: { openOnWeb: async () => {} } })
 mock.module(new URL('../lib/theme.ts', import.meta.url).href, { namedExports: { colors: {}, font: 'System', lift: {} } })
 
+type FreeFieldProps = { accessibilityLabel: string; value: string; disabled?: boolean; onChangeText: (value: string) => void; onSubmitEditing: () => void }
+const freeFields = new Map<string, FreeFieldProps>()
+mock.module(new URL('../components/beui/components/input/index.ts', import.meta.url).href, { namedExports: {
+  Input: (props: FreeFieldProps) => {
+    freeFields.set(props.accessibilityLabel, props)
+    return createElement('input', { 'aria-label': props.accessibilityLabel, value: props.value, disabled: props.disabled, readOnly: true })
+  },
+} })
+
 const browser = new Window({ url: 'https://fixture.invalid/' })
 let root: Root, container: HTMLDivElement
 let createRoot: typeof import('react-dom/client')['createRoot']
@@ -109,4 +118,135 @@ test('a slow native reply choice rejects simultaneous taps and permits retry aft
   await act(async () => option.click())
   assert.deepEqual(attempted, ['查看日程', '查看日程'])
   assert.equal(option.disabled, true)
+})
+
+test('two Eve requests retain independent drafts and send the addressed question once per acknowledgement', async () => {
+  const { EveInteractions } = await import('../features/chat/components/eve-interactions')
+  const left = '884dd24a-f4d1-4e5a-8cba-afbeadc20ebf', right = 'c3424412-e036-4476-9878-24490bfd3517'
+  const calls: unknown[] = []
+  let reject!: (failure: Error) => void
+  let accept!: () => void
+  const respond = (answers: unknown) => {
+    calls.push(answers)
+    return new Promise<void>((resolve, refuse) => { accept = resolve; reject = refuse })
+  }
+  const { emptySessionView, foldEvents } = await import('eve/events')
+  const request = (interactionId: string, prompt: string, line: number) => ({
+    type: 'interaction.opened',
+    data: { interactionId, subject: { kind: 'call', callId: 'fixture' }, request: { kind: 'question', prompt, allowFreeform: true, options: [{ id: 'choose', label: prompt + ' option' }] } },
+    meta: { position: { line, index: 0 }, at: new Date(0).toISOString() },
+  })
+  const view = foldEvents(emptySessionView(), [request(left, 'First', 0), request(right, 'Second', 1)])
+  const agent = { view, respond, status: 'idle' } as unknown as Parameters<typeof EveInteractions>[0]['agent']
+  await act(async () => root.render(createElement(EveInteractions, { agent })))
+
+  const field = (name: string) => freeFields.get(name)!
+  const sendButton = (name: string) => container.querySelector<HTMLInputElement>('input[aria-label="' + name + '"]')!.parentElement!.querySelector('button')!
+  assert.equal(sendButton('Second').disabled, true)
+  await act(async () => { field('First').onChangeText('retained'); field('Second').onChangeText('  second draft  ') })
+  await act(async () => { field('Second').onSubmitEditing(); sendButton('Second').click(); button('Second option').click() })
+  assert.deepEqual(calls, [[{ interactionId: right, text: 'second draft' }]])
+  assert.equal(field('Second').disabled, true)
+  assert.equal(field('First').disabled, false)
+  await act(async () => reject(Object.assign(new Error('refused'), { status: 403 })))
+  assert.equal(field('Second').value, '  second draft  ')
+  assert.equal(field('First').value, 'retained')
+  assert.ok(container.textContent?.includes((await import('../lib/messages')).mobileMessages.Coordinator.sendAccessDenied))
+  await act(async () => sendButton('Second').click())
+  assert.deepEqual(calls[1], calls[0])
+  await act(async () => accept())
+  assert.equal(sendButton('Second').disabled, true, 'receipt locks this request until its projection arrives')
+  await act(async () => button('First option').click())
+  assert.deepEqual(calls[2], [{ interactionId: left, optionId: 'choose' }])
+  await act(async () => accept())
+})
+
+test('a settled native tree locks only its previously clicked generated control', async () => {
+  const locked = new Set<string>(), writes: string[] = []
+  const answer = async (_text: string, child: string) => {
+    writes.push(child); locked.add(child)
+    return true
+  }
+  const program = 'root = BeCard("Plan", [BeButton("First", "same"), BeButton("Second", "same")])'
+  async function show(rowKey: string) {
+    await act(async () => root.render(createElement(OpenUIReply, { key: rowKey, text: program, live: true,
+      canAnswer: child => !locked.has(child), answer, sources: {}, onOpen: () => {} })))
+  }
+  await show('SDK')
+  await act(async () => { button('First').click(); button('First').click() })
+  await show('history')
+  assert.equal(button('First').disabled, true)
+  assert.equal(button('Second').disabled, false)
+  await act(async () => button('Second').click())
+  assert.deepEqual(writes, ['root.0', 'root.1'])
+})
+
+test('an unconfirmed custom answer keeps its editor when the live document settles', async () => {
+  const { eveChatItems, generatedCardDocument } = await import('../features/chat/model/eve-messages')
+  const program = 'root = BeQuestions("context", [{id:"q", title:"Reply?", options:[], allowCustom:true}])'
+  const agent = { messages: [{ id: 'turn_1:assistant', role: 'assistant' as const, metadata: { turnId: 'turn_1' },
+    parts: [{ type: 'text' as const, text: program }] }], events: [], session: { sessionId: 'wrun_bot' } }
+  const [stream] = eveChatItems(agent, [])
+  const saved = { ...stream, cardDocument: undefined, streamId: 'eve:wrun_bot:turn_1' }
+  let refuse!: () => void
+  const answer = () => new Promise<boolean>(resolve => { refuse = () => resolve(false) })
+  async function show(row: typeof stream) {
+    await act(async () => root.render(createElement(OpenUIReply, { key: generatedCardDocument(row), text: row.text,
+      live: true, answer, sources: {}, onOpen: () => {} })))
+  }
+  await show(stream)
+  await act(async () => edit('original answer'))
+  await act(async () => button('提交回答并继续').click())
+  const editor = container.querySelector('input')
+  await show(saved)
+  assert.equal(container.querySelector('input'), editor)
+  await act(async () => refuse())
+  assert.equal(editor?.value, 'original answer')
+  assert.match(container.textContent ?? '', /没发出去/)
+})
+
+test('both chat lists refresh the existing answer row after a refusal without repainting it on composer input', async t => {
+  Object.assign(globalThis, {
+    requestAnimationFrame: browser.requestAnimationFrame.bind(browser), cancelAnimationFrame: browser.cancelAnimationFrame.bind(browser),
+    ResizeObserver: browser.ResizeObserver, HTMLElement: browser.HTMLElement,
+  })
+  const box = browser.HTMLElement.prototype
+  t.mock.method(box, 'getBoundingClientRect', function(this: HTMLElement) { return new browser.DOMRect(0, 0, 390, this.style.overflow === 'auto' ? 720 : 52) })
+  const { LegendList } = await import('@legendapp/list/react')
+  // Supply layout and a DOM host for the native keyboard shell. LegendList itself owns the row cache on both paths.
+  const KeyboardList = ({ data, keyExtractor, renderItem, extraData }: React.ComponentProps<typeof LegendList>) =>
+    createElement(LegendList, { data, keyExtractor, renderItem, extraData })
+  t.mock.module(require.resolve('@legendapp/list/keyboard'), { namedExports: { KeyboardAwareLegendList: KeyboardList } })
+  t.mock.module(require.resolve('react-native-keyboard-controller'), { namedExports: { KeyboardChatScrollView: view } })
+  t.mock.module(require.resolve('react-native-safe-area-context'), { namedExports: { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) } })
+  t.mock.module(new URL('../components/NavBar.tsx', import.meta.url).href, { namedExports: { underBar: {} } })
+  const { ChatMessageList: Web } = await import('../features/chat/components/chat-message-list.web')
+  const { ChatMessageList: Native } = await import('../features/chat/components/chat-message-list')
+  const { canAnswerCard, personalMessage } = await import('../lib/outbox')
+  const documentKey = 'stable-generated-question', transcript = [{ id: documentKey }]
+  const source = 'question:root', writes = [personalMessage('answer-1', 'saved words', [], { sourceCardId: source, chatKey: 'bot', context: 1, botId: null })]
+  const refused = writes.map(row => ({ ...row, phase: 'failed' as const, error: 'forbidden' }))
+  for (const [platform, List] of [['web', Web], ['native', Native]] as const) {
+    let drawn = 0
+    async function show(draft: string, outbox: typeof writes) {
+      await act(async () => root.render(createElement('section', null,
+        createElement('input', { value: draft, readOnly: true }),
+        createElement(List<typeof transcript[number]>, { key: platform, data: transcript, extraData: outbox, keyOf: message => message.id,
+          testID: 'list', scrollEnabled: true, bottomInset: 0, onAtLatestChange: () => {},
+          renderItem: () => {
+            drawn++
+            return createElement('button', { disabled: !canAnswerCard(outbox, source) }, 'Retry')
+          } }))))
+    }
+    await show('', writes)
+    const row = button('Retry')
+    assert.ok(row, platform)
+    assert.equal(row.disabled, true, platform)
+    const beforeTyping = drawn
+    await show('draft only', writes)
+    assert.equal(drawn, beforeTyping, `${platform} composer input repainted the transcript`)
+    await show('draft only', refused)
+    assert.equal(button('Retry'), row, `${platform} replaced the answer row`)
+    assert.equal(row.disabled, false, `${platform} kept the refused answer locked`)
+  }
 })

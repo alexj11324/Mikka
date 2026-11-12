@@ -22,7 +22,8 @@ interface CardContext {
   live: boolean
   /** What the person wrote next, if anything: a choice card marks the option it names. */
   reply?: string
-  answer: (text: string) => Promise<boolean>
+  canAnswer?: (child: string) => boolean
+  answer: (text: string, child: string) => Promise<boolean>
   sources: Record<string, CitationSource>
   onOpen: (source: CitationSource) => void
 }
@@ -43,7 +44,7 @@ export function OpenUIReply({ text, ...context }: CardContext & { text: string }
     <Context.Provider value={context}>
       <View style={styles.reply}>
         {prose ? <Words text={prose} /> : null}
-        {root === null ? <PlainCard text={looseText(text)} /> : <Node value={root} />}
+        {root === null ? <PlainCard text={looseText(text)} /> : <Node value={root} path="root" />}
       </View>
     </Context.Provider>
   )
@@ -55,23 +56,23 @@ function looseText(text: string) {
     .filter(part => /[^\x00-\x7f]|\s/.test(part)).join('\n')
 }
 
-function Node({ value }: { value: Value | undefined }) {
-  if (Array.isArray(value)) return <>{value.map((item, index) => <Node key={index} value={item} />)}</>
+function Node({ value, path }: { value: Value | undefined; path: string }) {
+  if (Array.isArray(value)) return <>{value.map((item, index) => <Node key={index} value={item} path={`${path}.${index}`} />)}</>
   if (typeof value === 'string') return value.trim() ? <Words text={value} /> : null
   if (!isComponent(value)) return null
   switch (value.name) {
-    case 'Stack': case 'BeResponse': return <View style={styles.stack}><Node value={value.props.children} /></View>
+    case 'Stack': case 'BeResponse': return <View style={styles.stack}><Node value={value.props.children} path={path} /></View>
     case 'TextContent': return <Words text={str(value.props.text)} />
     case 'InlineText': return <Words text={inlineMarkdown(value.props.parts)} />
     case 'TaskChip': case 'RunChip': case 'SourceChip': return <Words text={inlineMarkdown(value)} />
-    case 'BeCard': return <Card value={value} />
-    case 'BeQuestions': return <Questions value={value} />
-    case 'BeApproval': return <Approval value={value} />
-    case 'BeFollowUps': return <FollowUps value={value} />
-    case 'BeButton': return <PromptButton value={value} />
+    case 'BeCard': return <Card value={value} path={path} />
+    case 'BeQuestions': return <Questions value={value} path={path} />
+    case 'BeApproval': return <Approval value={value} path={path} />
+    case 'BeFollowUps': return <FollowUps value={value} path={path} />
+    case 'BeButton': return <PromptButton value={value} path={path} />
     // One column: the web's grid only goes to two from 26rem, wider than a phone's reply.
-    case 'BeCardGrid': return <View style={styles.stack}><Node value={value.props.children} /></View>
-    case 'BeImageCard': return <ImageCard value={value} />
+    case 'BeCardGrid': return <View style={styles.stack}><Node value={value.props.children} path={path} /></View>
+    case 'BeImageCard': return <ImageCard value={value} path={path} />
     case 'BeImage': return <Figure value={value} />
     default: return <PlainCard text={openUIText(value)} />
   }
@@ -84,7 +85,7 @@ function Words({ text }: { text: string }) {
   return <BotBubble><Markdown text={text} sources={sources} onOpen={onOpen} /></BotBubble>
 }
 
-function Card({ value }: { value: Component }) {
+function Card({ value, path }: { value: Component; path: string }) {
   const { sources, onOpen } = useCard()
   const description = str(value.props.description)
   return (
@@ -97,22 +98,23 @@ function Card({ value }: { value: Component }) {
           const text = child.name === 'TextContent' ? str(child.props.text) : inlineMarkdown(child.props.parts)
           return <Markdown key={index} text={text} sources={sources} onOpen={onOpen} />
         }
-        return <Fragment key={index}><Node value={child} /></Fragment>
+        return <Fragment key={index}><Node value={child} path={`${path}.${index}`} /></Fragment>
       })}
     </ChatCard>
   )
 }
 
 /** Sending an answer from a card: one at a time, kept on failure so it can be tapped again. */
-function useAnswer() {
-  const { live, answer } = useCard()
+function useAnswer(path: string) {
+  const card = useCard()
+  const live = card.live && (card.canAnswer?.(path) ?? true)
   const [, update] = useReducer((value: number) => value + 1, 0)
   const [operation] = useState(() => createDecisionSubmission(update))
   const result = operation.state('reply')
   const state = result.status === 'accepted' ? 'sent' : result.status === 'submitting' ? 'sending' : result.status === 'idle' ? 'idle' : 'failed'
   const send = async (text: string) => {
     if (!live) return
-    await operation.submit('reply', async () => await answer(text)
+    await operation.submit('reply', async () => await card.answer(text, path)
       ? { status: 'accepted' }
       : { status: 'failed', error: 'messageNotSent' }, 'messageNotSent')
   }
@@ -149,10 +151,10 @@ const SETUP_PAGES: Record<string, string> = {
   e2bKey: '/settings?section=models', cloudKeySettings: '/settings?section=models',
 }
 
-function Questions({ value }: { value: Component }) {
+function Questions({ value, path }: { value: Component; path: string }) {
   const questions = questionsOf(value)
   const { reply } = useCard()
-  const { send, state, open } = useAnswer()
+  const { send, state, open } = useAnswer(path)
   const [picked, setPicked] = useState<Record<string, string[]>>({})
   const [custom, setCustom] = useState<Record<string, string>>({})
   if (!questions.length) return null
@@ -229,8 +231,8 @@ function Questions({ value }: { value: Component }) {
 }
 
 /** BeApproval: agree, revise or reject a proposed plan; the reply carries the plan, as the web sends it. */
-function Approval({ value }: { value: Component }) {
-  const { send, state, open } = useAnswer()
+function Approval({ value, path }: { value: Component; path: string }) {
+  const { send, state, open } = useAnswer(path)
   const [decision, setDecision] = useState<string | null>(null)
   const title = str(value.props.title)
   const description = str(value.props.description)
@@ -255,9 +257,9 @@ function Approval({ value }: { value: Component }) {
 }
 
 /** BeFollowUps, the next steps a proactive message offers (R-20 card): each row sends its prompt. */
-function FollowUps({ value }: { value: Component }) {
+function FollowUps({ value, path }: { value: Component; path: string }) {
   const items = arr(value.props.items).map(item => ({ label: str(obj(item).label), prompt: str(obj(item).prompt) || str(obj(item).label) })).filter(item => item.label)
-  const { send, state, open } = useAnswer()
+  const { send, state, open } = useAnswer(path)
   const [picked, setPicked] = useState<string | null>(null)
   if (!items.length) return null
   return (
@@ -275,8 +277,8 @@ function FollowUps({ value }: { value: Component }) {
   )
 }
 
-function PromptButton({ value }: { value: Component }) {
-  const { send, state, open } = useAnswer()
+function PromptButton({ value, path }: { value: Component; path: string }) {
+  const { send, state, open } = useAnswer(path)
   const label = str(value.props.label)
   return (
     <View style={{ alignItems: 'flex-start', gap: 6 }}>
@@ -310,13 +312,13 @@ function Credit({ image }: { image: FoundImage }) {
  * BeImageCard (web: agent-image-card.tsx): picture, title, description, tags,
  * and 继续了解 sending the card's prompt. The credit folds under 图片来源与许可.
  */
-function ImageCard({ value }: { value: Component }) {
+function ImageCard({ value, path }: { value: Component; path: string }) {
   const title = str(value.props.title)
   const description = str(value.props.description)
   const tags = arr(value.props.tags).map(str).filter(Boolean).slice(0, 3)
   const prompt = str(value.props.prompt)
   const image = useImage(str(value.props.query))
-  const { send, state, open } = useAnswer()
+  const { send, state, open } = useAnswer(path)
   const [credit, setCredit] = useState(false)
   return (
     <ChatCard>

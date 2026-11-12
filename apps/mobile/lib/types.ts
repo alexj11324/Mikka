@@ -44,6 +44,8 @@ export interface RunSource {
 export type CitationSource = IssueSource | RunSource
 
 export interface ChatItem {
+  /** Personal message identity on the authorized transcript. Older servers may omit it. */
+  submissionId?: string
   /** eve mirror identity; native replay is hidden once this historical row arrives. */
   streamId?: string
   id?: string

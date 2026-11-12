@@ -116,8 +116,8 @@ test('two mounted readers remove denied rows, ignore a late success, and retain 
   mock.module(module('live'), { namedExports: { live: { reset: noop }, useLive: noop } })
   const { useApi } = await import('../lib/useApi.ts')
   const reads: Array<ReturnType<typeof useApi<string>>> = []
-  function Reader({ index }: { index: number }) {
-    reads[index] = useApi<string>(path)
+  function Reader({ index, route = path }: { index: number; route?: string }) {
+    reads[index] = useApi<string>(route)
     return createElement('span', null, reads[index].data)
   }
   const root = createRoot(document.body)
@@ -140,6 +140,23 @@ test('two mounted readers remove denied rows, ignore a late success, and retain 
     await act(async () => { void reads[1].reload(); requests[6].reject(new ApiError(404)) })
     assert.equal(apiCache.get(path), null)
     assert.equal(document.body.textContent, '')
+    let after!: Promise<void>
+    await act(async () => { void reads[1].reload(); after = reads[1].reloadAfterWrite() })
+    assert.equal(requests.length, 8, 'the overlapping pre-ACK read finishes first')
+    await act(async () => { requests[7].resolve('before acknowledgement') })
+    assert.equal(requests.length, 9)
+    await act(async () => { requests[8].resolve('after acknowledgement'); await after })
+    assert.equal(reads[1].data, 'after acknowledgement')
+    await act(async () => { void reads[1].reload(); after = reads[1].reloadAfterWrite(); requests[9].reject(new ApiError(403)); await after })
+    assert.equal(requests.length, 10, 'a revoked reader cannot start another post-write refresh')
+    assert.equal(reads[1].data, null)
+    const previousRouteWrite = reads[1].reloadAfterWrite
+    await act(async () => root.render(createElement(Fragment, null, createElement(Reader, { index: 0 }),
+      createElement(Reader, { index: 1, route: '/api/mobile/chat?bot=next' }))))
+    await act(async () => { requests[10].resolve('current bot') })
+    await act(async () => { void previousRouteWrite() })
+    assert.equal(requests.length, 11, 'a late ACK must not read a previous route into the current chat')
+    assert.equal(reads[1].data, 'current bot')
   } finally {
     await act(async () => root.unmount())
     apiCache.setIdentity(null)
