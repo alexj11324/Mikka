@@ -160,3 +160,47 @@ test('two Eve requests retain independent drafts and send the addressed question
   assert.deepEqual(calls[2], [{ interactionId: left, optionId: 'choose' }])
   await act(async () => accept())
 })
+
+test('a settled native tree locks only its previously clicked generated control', async () => {
+  const locked = new Set<string>(), writes: string[] = []
+  const answer = async (_text: string, child: string) => {
+    writes.push(child); locked.add(child)
+    return true
+  }
+  const program = 'root = BeCard("Plan", [BeButton("First", "same"), BeButton("Second", "same")])'
+  async function show(rowKey: string) {
+    await act(async () => root.render(createElement(OpenUIReply, { key: rowKey, text: program, live: true,
+      canAnswer: child => !locked.has(child), answer, sources: {}, onOpen: () => {} })))
+  }
+  await show('SDK')
+  await act(async () => { button('First').click(); button('First').click() })
+  await show('history')
+  assert.equal(button('First').disabled, true)
+  assert.equal(button('Second').disabled, false)
+  await act(async () => button('Second').click())
+  assert.deepEqual(writes, ['root.0', 'root.1'])
+})
+
+test('an unconfirmed custom answer keeps its editor when the live document settles', async () => {
+  const { eveChatItems, generatedCardDocument } = await import('../features/chat/model/eve-messages')
+  const program = 'root = BeQuestions("context", [{id:"q", title:"Reply?", options:[], allowCustom:true}])'
+  const agent = { messages: [{ id: 'turn_1:assistant', role: 'assistant' as const, metadata: { turnId: 'turn_1' },
+    parts: [{ type: 'text' as const, text: program }] }], events: [], session: { sessionId: 'wrun_bot' } }
+  const [stream] = eveChatItems(agent, [])
+  const saved = { ...stream, cardDocument: undefined, streamId: 'eve:wrun_bot:turn_1' }
+  let refuse!: () => void
+  const answer = () => new Promise<boolean>(resolve => { refuse = () => resolve(false) })
+  async function show(row: typeof stream) {
+    await act(async () => root.render(createElement(OpenUIReply, { key: generatedCardDocument(row), text: row.text,
+      live: true, answer, sources: {}, onOpen: () => {} })))
+  }
+  await show(stream)
+  await act(async () => edit('original answer'))
+  await act(async () => button('提交回答并继续').click())
+  const editor = container.querySelector('input')
+  await show(saved)
+  assert.equal(container.querySelector('input'), editor)
+  await act(async () => refuse())
+  assert.equal(editor?.value, 'original answer')
+  assert.match(container.textContent ?? '', /没发出去/)
+})

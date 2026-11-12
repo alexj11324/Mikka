@@ -25,7 +25,6 @@ import { api } from '@/lib/api'
 import { outgoing, type Attachment } from '@/lib/attachments'
 import { shortWhen } from '@/lib/clock'
 import { separatorLabel, startsGroup } from '@/lib/chat-time'
-import { isOpenUI } from '@/lib/openui'
 import type { HeldMessage } from '@/lib/message-actions'
 import { plainText, quotable } from '@/lib/quote'
 import { canAnswerCard, outgoingKey, personalMessage, unsettled } from '@/lib/outbox'
@@ -55,7 +54,7 @@ import { useStop } from '@/lib/useStop'
 import { useEveChat } from '@/lib/eve-chat'
 import { activeTurn } from 'eve/events'
 import { EveInteractions } from '@/features/chat/components/eve-interactions'
-import { eveChatItems } from '@/features/chat/model/eve-messages'
+import { eveChatItems, generatedCardDocument } from '@/features/chat/model/eve-messages'
 import { StopFailed } from '@/components/StopFailed'
 import { ReadNotice } from '@/components/ReadNotice'
 import { ChatScrollToLatest } from '@/components/ChatScrollToLatest'
@@ -266,9 +265,9 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
   const renderItem = (item: Chat['items'][number], index: number) => {
     // A centred time above each group: the first message, one 15 minutes after the last, or one on a new day.
     const separator = startsGroup(item.createdAt, items[index - 1]?.createdAt) ? separatorLabel(item.createdAt) : null
+    const cardDocument = generatedCardDocument(item)
     const question = item.from === 'event' ? questionCard(item.line, sources) : null
     const selected = selection?.key === item.position ? selection : null
-    const cardId = item.streamId ?? item.id ?? `position:${item.position}`
     return (
       <Arrival animate={arrived(item.position)}>
         {separator ? <TimeSeparator label={separator} /> : null}
@@ -286,8 +285,8 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
         ) : null}
         {item.from === 'coordinator' && item.text ? (
           <MessageRow onSelect={selected ? undefined : () => toggleSelection(item.position, item.text)}>
-            {isOpenUI(item.text)
-              ? <OpenUIReply text={item.text} live={index > lastMine && canAnswerCard(outbox, cardId)} reply={items.slice(index + 1).find(next => next.from === 'person')?.text} answer={message => send(message, [], cardId)} sources={sources} onOpen={open} />
+            {cardDocument
+              ? <OpenUIReply text={item.text} live={index > lastMine} canAnswer={child => canAnswerCard(outbox, `${cardDocument}:${child}`)} reply={items.slice(index + 1).find(next => next.from === 'person')?.text} answer={(message, child) => send(message, [], `${cardDocument}:${child}`)} sources={sources} onOpen={open} />
               : <BotBubble>{selected
                 ? <ChatSelectableText text={selected.text} onSelect={onSelected} onRect={rect => { selectionRect.current = rect }} />
                 : <Markdown text={item.text} sources={sources} onOpen={open} />}</BotBubble>}
@@ -331,7 +330,7 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
         } : undefined}>
         {/* The system scroll: momentum, and a bounce at both ends even while the chat is shorter than the screen. */}
         <ChatMessageList ref={list} testID="bot-chat-scroll" data={items} scrollEnabled onScrollUnderBar={underBar.onScroll} bottomInset={composerHeight} onAtLatestChange={setAtLatest}
-          keyOf={item => item.streamId ?? (item.pending ? `pending-${item.position}` : String(item.position))} renderItem={renderItem} anchorIndex={anchorIndex}
+          keyOf={item => generatedCardDocument(item) ?? item.streamId ?? (item.pending ? `pending-${item.position}` : String(item.position))} renderItem={renderItem} anchorIndex={anchorIndex}
           onStartReached={data?.historyBefore ? () => void loadOlder() : undefined}
           header={loadingOlder ? <View style={styles.older}><Spinner size={16} /></View> : null}
           footer={<>
