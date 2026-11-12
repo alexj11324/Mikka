@@ -115,8 +115,9 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
   }))
   const apiContext = apiCache.context()
   const scope = data ? personalScope : null
+  const canSend = Boolean(scope) && !serviceUnavailable && agent.status !== 'resuming'
   const received = useMemo(() => new Set([...(data?.acknowledgedBeforeRead ?? []), ...(data?.items.flatMap(item => item.from === 'person' && item.submissionId ? [item.submissionId] : []) ?? [])]), [data?.items, data?.acknowledgedBeforeRead])
-  const personal = usePersonalDelivery(scope, received, agent.sendMessage, reloadAfterWrite)
+  const personal = usePersonalDelivery(scope, canSend, received, agent.sendMessage, reloadAfterWrite)
   const outbox = personal.rows
   const [text, setText] = useState(draft ?? '')
   const working = agent.status === 'busy' || outbox.some(item => item.phase === 'sending')
@@ -183,8 +184,8 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
   const latestReply = items.reduce((last, item, index) => item.from === 'coordinator' && item.text ? index : item.from === 'person' ? -1 : last, -1)
   // A card is answered once the person has written after it (here or anywhere else).
   const lastMine = items.reduce((last, item, index) => item.from === 'person' ? index : last, -1)
-  const rowState = useMemo(() => ({ data, outbox, selection, working, lastMine, latestReply }),
-    [data, outbox, selection, working, lastMine, latestReply])
+  const rowState = useMemo(() => ({ data, outbox, selection, working, lastMine, latestReply, canSend }),
+    [data, outbox, selection, working, lastMine, latestReply, canSend])
   const proactive = items.some((item, index) => item.from === 'coordinator' && items[index - 1]?.from === 'event')
 
   // iOS asks once; the moment is the first message the Coordinator sent on its own, not app launch.
@@ -198,9 +199,9 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
   }
 
   const send = async (typed: string, attachments: Attachment[] = [], sourceCardId?: string) => {
-    if (!scope || serviceUnavailable || agent.status === 'resuming') return false
+    if (!canSend) return false
     const pendingSends = personal.read().filter(item => !received.has(item.id))
-    if (sourceCardId && !canAnswerCard(pendingSends, sourceCardId)) return false
+    if (sourceCardId && !canAnswerCard(canSend, pendingSends, sourceCardId)) return false
     // While words are selected, what is typed answers them: it goes out quoting the selection.
     const words = selection && !quote && typed.trim() ? quotedMessage(selectionQuote(selection.selected, selection.text), typed) : typed
     setSelection(null)
@@ -288,7 +289,7 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
         {item.from === 'coordinator' && item.text ? (
           <MessageRow onSelect={selected ? undefined : () => toggleSelection(item.position, item.text)}>
             {cardDocument
-              ? <OpenUIReply text={item.text} live={index > lastMine} canAnswer={child => canAnswerCard(outbox, `${cardDocument}:${child}`)} reply={items.slice(index + 1).find(next => next.from === 'person')?.text} answer={(message, child) => send(message, [], `${cardDocument}:${child}`)} sources={sources} onOpen={open} />
+              ? <OpenUIReply text={item.text} live={index > lastMine} canAnswer={child => canAnswerCard(canSend, outbox, `${cardDocument}:${child}`)} reply={items.slice(index + 1).find(next => next.from === 'person')?.text} answer={(message, child) => send(message, [], `${cardDocument}:${child}`)} sources={sources} onOpen={open} />
               : <BotBubble>{selected
                 ? <ChatSelectableText text={selected.text} onSelect={onSelected} onRect={rect => { selectionRect.current = rect }} />
                 : <Markdown text={item.text} sources={sources} onOpen={open} />}</BotBubble>}
@@ -338,7 +339,7 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
           footer={<>
         {outbox.map(item => item.phase === 'accepted'
           ? <MyBubble key={item.id} text={item.text} photos={item.images.map(image => ({ uri: image.uri }))} />
-          : <OutgoingBubble key={item.id} text={item.text} photos={item.images.map(image => image.uri)} failed={item.phase === 'failed'} unconfirmed={item.error === mobileMessages.Coordinator.sendUncertain} error={item.error} onRetry={() => { void personal.start(item) }} />)}
+          : <OutgoingBubble key={item.id} text={item.text} photos={item.images.map(image => image.uri)} failed={item.phase === 'failed'} unconfirmed={item.error === mobileMessages.Coordinator.sendUncertain} error={item.error} onRetry={canSend ? () => { void personal.start(item) } : undefined} />)}
         {working ? <WaitingLine since={outbox.length ? null : waitingSince(items)} /> : null}
         {stopper.stuck ? <StopFailed busy={stopper.sending} onRetry={() => void stopper.stop()} /> : null}
         {!data && !error ? <View style={styles.loading}><Spinner /></View> : null}
@@ -352,7 +353,7 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
       </View>
       <ChatScrollToLatest visible={!atLatest} bottom={composerHeight + 12} onPress={() => list.current?.toLatest()} />
       <OfflineBanner top={insets.top + 66} />
-      <Composer value={text} sendDisabled={serviceUnavailable || agent.status === 'resuming'} onChangeText={setText} placeholder={selection ? mobileMessages.MobileCore.replySelection : name ? mobileMessages.Nav.messageBot.replace('{name}', name) : mobileMessages.MobileCore.message} onSend={send} attach attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : botId ? { kind: 'bot', id: botId } : undefined} overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
+      <Composer value={text} sendDisabled={!canSend} onChangeText={setText} placeholder={selection ? mobileMessages.MobileCore.replySelection : name ? mobileMessages.Nav.messageBot.replace('{name}', name) : mobileMessages.MobileCore.message} onSend={send} attach attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : botId ? { kind: 'bot', id: botId } : undefined} overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
         quote={quote} onClearQuote={() => setQuote(null)} accessory={typeof composerAccessory === 'function' ? composerAccessory(working) : composerAccessory} notice={<>{serviceUnavailable ? <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.serviceNotice}><Text style={styles.serviceMessage}>对话服务尚未启用，暂时无法回复。</Text><GlassButton label="重试" busy={serviceRefresh.refreshing} onPress={() => void serviceRefresh.onRefresh()} /></View> : null}{composerNotice}<EveInteractions agent={agent} />{reactionFailure ? <View accessibilityRole="alert" style={styles.reactionNotice}><Text style={styles.error}>回应没保存。</Text><GlassButton label="重试" onPress={() => void react(reactionFailure.id, reactionFailure.emoji)} /></View> : null}
           <ChatQueueCard items={queue} busy={stopper.sending} onSendNow={agent.status === 'busy' ? () => void stopper.stop() : undefined} />
           <ChatSelectionBar visible={Boolean(selection)} disabled={serviceUnavailable} onAction={selectionAction} /></>} onStop={(agent.status === 'busy' || activeTurn(agent.view) !== undefined) && agent.status !== 'resuming' && !stopper.sending ? () => void stopper.stop() : undefined} />

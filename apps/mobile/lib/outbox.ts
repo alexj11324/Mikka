@@ -25,8 +25,8 @@ export function unsettled(list: readonly Outgoing[], text: string, images: reado
     && item.images.length === images.length && item.images.every((image, index) => image.dataUrl === images[index].dataUrl))
 }
 
-export function canAnswerCard(list: readonly Outgoing[], cardId: string) {
-  return !list.some(item => item.sourceCardId === cardId && item.phase !== 'failed')
+export function canAnswerCard(canSend: boolean, list: readonly Outgoing[], cardId: string) {
+  return canSend && !list.some(item => item.sourceCardId === cardId && item.phase !== 'failed')
 }
 
 export const submissionBody = (item: Outgoing) => ({ text: item.text, botId: item.botId, submissionId: item.submissionId,

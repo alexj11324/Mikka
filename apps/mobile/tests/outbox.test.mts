@@ -30,13 +30,15 @@ test('transport failures stay unconfirmed while known validation/auth refusals a
 
 test('only the originating choice can reopen an unsettled answer and transport keeps its immutable body', () => {
   const draft = [personalMessage('op1', 'Keep the original draft', [], { sourceCardId: 'card-a', chatKey: 'chat', context: 3, botId: null })]
-  assert.equal(canAnswerCard([], 'card-a'), true)
-  assert.equal(canAnswerCard(draft, 'card-a'), false)
+  assert.equal(canAnswerCard(false, [], 'card-a'), false, 'a historical question cannot accept an answer while the conversation is unavailable')
+  assert.equal(canAnswerCard(true, [], 'card-a'), true)
+  assert.equal(canAnswerCard(true, draft, 'card-a'), false)
   for (const state of ['failed', 'unconfirmed'] as const) {
     const saved = [{ ...draft[0], phase: 'failed' as const, error: state }]
-    assert.equal(canAnswerCard(saved, 'card-a'), true)
-    assert.equal(canAnswerCard(saved, 'card-b'), true)
-    assert.equal(canAnswerCard([...saved, personalMessage('other', 'Another message', [], { botId: null, context: 3, chatKey: 'chat' })], 'card-a'), true)
+    assert.equal(canAnswerCard(false, saved, 'card-a'), false, 'a previous refusal cannot enable a retry before the conversation is writable')
+    assert.equal(canAnswerCard(true, saved, 'card-a'), true)
+    assert.equal(canAnswerCard(true, saved, 'card-b'), true)
+    assert.equal(canAnswerCard(true, [...saved, personalMessage('other', 'Another message', [], { botId: null, context: 3, chatKey: 'chat' })], 'card-a'), true)
     const same = unsettled(saved, 'Keep the original draft', [], 'chat', 3, 'card-a')!
     assert.equal(same.submissionId, 'op1')
     assert.equal(unsettled(saved, 'Keep the original draft', [], 'chat', 3), undefined)
@@ -74,9 +76,10 @@ test('personal delivery keeps acknowledged messages until an authorized read and
   let reads = 0
   const reload = async () => { reads++; throw new Error('transcript unavailable') }
   let scope: string | null = 'owner-workspace-coordinator'
+  let canSend = true
   let received = new Set<string>()
   let held!: ReturnType<typeof usePersonalDelivery>
-  function Probe() { held = usePersonalDelivery(scope, received, send, reload); return null }
+  function Probe() { held = usePersonalDelivery(scope, canSend, received, send, reload); return null }
   let root = createRoot(document.body)
   const render = () => act(async () => { root.render(createElement(Probe)) })
   const separateScreen = async () => {
@@ -112,6 +115,13 @@ test('personal delivery keeps acknowledged messages until an authorized read and
     const restored=held.rows[0]
     assert.equal(restored.submissionId,'p2')
     assert.equal(restored.text,'same body')
+    canSend = false
+    await render()
+    assert.equal(held.start(held.rows[0]), false, 'the receipt cannot retry a disabled conversation')
+    assert.equal(requests.length, 2)
+    assert.equal(held.rows[0].phase, 'failed')
+    assert.equal(journal.readPersonal(scope)[0].submissionId, restored.submissionId)
+    canSend = true
     scope=null
     await render()
     assert.equal(held.start(restored),false)
