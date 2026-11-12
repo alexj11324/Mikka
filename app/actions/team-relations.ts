@@ -15,6 +15,7 @@ import { ActionFailureError } from '@/lib/action-error'
 import { issueListScopesBeforeChange, issueListScopeChanged } from '@/lib/live/lists'
 import { markReviewSessionsRevoked, drainRevokedReviewSessions } from '@/lib/coding-workspace/review-sessions'
 import { pool } from '@/lib/db'
+import { captureDatabaseQuery } from '@/lib/db/commit-effects'
 import { notifyStoppedPolicyRuns, runPolicyStopSQL, type StoppedPolicyRun } from '@/lib/run-policy-stop'
 
 async function result<T>(operation: () => Promise<T>) {
@@ -45,7 +46,7 @@ export async function setIssueTeam(input: { issueId: string; teamId: string | nu
       return withResourceAccess(user, { kind: 'task', id: issue.id, workspaceId: workspace.id }, 'canSteer', async (_policy, app) => {
         const previousLists = await issueListScopesBeforeChange(issue)
         if ((current?.teamId ?? null) !== (destination?.id ?? null)) {
-          reviewIds = await markReviewSessionsRevoked(pool, { taskId: issue.id }, 'task_changed')
+          reviewIds = await markReviewSessionsRevoked(captureDatabaseQuery(app), { taskId: issue.id }, 'task_changed')
           const stopped = await app.execute<StoppedPolicyRun>(runPolicyStopSQL({ kind: 'task', issueId: issue.id }))
           notifyStoppedPolicyRuns(app, stopped.rows)
         }
