@@ -5,6 +5,7 @@
 // a replaced one must leave the list.
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
+import ts from 'typescript'
 
 export const pollingMessage = '不要新增轮询；数据变化用 live push（`hooks/use-live-key.tsx` / `lib/live/*`），见 #1212；确实只是界面计时器或外部 API 才加入 allowlist 并写明原因。'
 
@@ -78,9 +79,6 @@ const rules = [
   { rule: 'polling/refresh-interval', pattern: /[{,]\s*(?:refreshInterval|refetchInterval)\s*(?=[,}])/g },
   { rule: 'polling/set-interval', pattern: /\bsetInterval\s*\(/g },
   { rule: 'polling/poll-constant', pattern: /\b[A-Z][A-Z0-9_]*(?:_POLL_MS|POLL_INTERVAL[A-Z0-9_]*|_EVERY_MS)\s*=(?!=)/g },
-  // Polling helpers of our own: mobile useApi with an interval. (The daemon's
-  // gate.watch is push-driven; its fallback timer counts in tool-approval.ts.)
-  { rule: 'polling/helper', skip: definition, pattern: /\buseApi\b(?:<[^\n(]*?>)?\((?:[^()]|\([^()]*\))*?,\s*(?!0\s*\)|undefined\s*\)|null\s*\))[^\s)]/g },
   { rule: 'polling/helper', skip: definition, pattern: /\bpollUntil\(/g },
 ]
 
@@ -118,6 +116,28 @@ function sleepLoops(source) {
   return found
 }
 
+// The one-shot mobile API accepts a named decoder. The old positional interval
+// and any unrecognized options still fail, even with nested calls in the path.
+function mobilePollingCalls(file, source) {
+  if (!source.includes('useApi')) return []
+  const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const positions = []
+  function visit(node) {
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'useApi' && node.arguments.length > 1) {
+      const option = node.arguments[1]
+      const disabled = option.kind === ts.SyntaxKind.NullKeyword ||
+        (ts.isIdentifier(option) && option.text === 'undefined') || (ts.isNumericLiteral(option) && Number(option.text) === 0)
+      const property = ts.isObjectLiteralExpression(option) && option.properties.length === 1 ? option.properties[0] : null
+      const reader = property && ts.isPropertyAssignment(property) && ts.isIdentifier(property.name) &&
+        property.name.text === 'read' && ts.isIdentifier(property.initializer)
+      if (node.arguments.length !== 2 || !(disabled || reader)) positions.push(node.expression.getStart(tree))
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(tree)
+  return positions
+}
+
 function at(file, source, index, rule) {
   const before = source.slice(0, index)
   return { file, line: before.split('\n').length, column: index - before.lastIndexOf('\n'), rule, message: pollingMessage }
@@ -132,6 +152,7 @@ export function findPolling(file, source) {
       found.push(at(file, source, match.index, rule))
     }
   }
+  for (const index of mobilePollingCalls(file, source)) found.push(at(file, source, index, 'polling/helper'))
   for (const index of sleepLoops(source)) found.push(at(file, source, index, 'polling/sleep-loop'))
   return found.sort((a, b) => a.line - b.line || a.column - b.column)
 }
