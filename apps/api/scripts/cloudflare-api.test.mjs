@@ -141,6 +141,9 @@ test('the private API receives its sign-in and product bindings without inheriti
   const allowed = {
     SLACK_APP_ID: 'AEXAMPLE', SLACK_CLIENT_ID: 'client-fixture', SLACK_CLIENT_SECRET: 'oauth-fixture',
     WORKSPACE_SECRETS_KEY: 'sealing-fixture',
+    E2B_BYO_COMPUTER_TEMPLATE: 'desktop-release', E2B_CLAUDE_TEMPLATE: 'claude-release', E2B_CODEX_TEMPLATE: 'codex-release',
+    MIKKA_CLOUD_TEMPLATE_MODELS: 'verified-catalogue', MIKKA_CLOUD_WORKER_SHA: 'a'.repeat(40),
+    MIKKA_CLOUD_WORKER_SOURCE_COMMIT: 'b'.repeat(40), MIKKA_CLOUD_RUNTIME_PREVIOUS: 'previous-verified-catalogue',
     GOOGLE_CLIENT_ID: 'google', GOOGLE_CLIENT_SECRET: 'google-credential',
     GITHUB_CLIENT_ID: 'github', GITHUB_CLIENT_SECRET: 'github-credential', GITHUB_WEBHOOK_SECRET: 'existing-hook',
     BETTER_AUTH_SECRET: 'auth', TURNSTILE_SECRET_KEY: 'signup-verification', MIKKA_CLOUDFLARE_TASK_WORKSPACES: 'sponsor',
@@ -152,6 +155,7 @@ test('the private API receives its sign-in and product bindings without inheriti
     GITHUB_APP_PRIVATE_KEY: 'app-signing', AWS_ACCESS_KEY_ID: 'aws', AWS_SECRET_ACCESS_KEY: 'aws-secret',
     CREDENTIAL_BROKER_ROLE_ARN: 'broker', EVE_QUEUE_SIGNING_KEY: 'world-signing',
     INFISICAL_CLIENT_SECRET: 'deploy', CLOUDFLARE_API_TOKEN: 'deploy', VERCEL_OIDC_TOKEN: 'legacy',
+    E2B_API_KEY: 'platform-only', VERCEL_TEAM_TOKEN: 'release-only',
     NODE_OPTIONS: '--inspect', BETTER_AUTH_URL: 'https://incorrect.example', MIKKA_API_INGRESS: 'other',
     STRIPE_WEBHOOK_SECRET: {}, SMTP_URL: '', TASK_MACHINE: { destroy() {} },
   }
