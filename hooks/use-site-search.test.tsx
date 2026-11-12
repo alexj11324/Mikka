@@ -61,7 +61,7 @@ test('search continuations serialize by source, deduplicate UUIDs and discard re
     assert.deepEqual(ids(), [])
     assert.deepEqual(search.state.history.items, [])
     await act(async () => reply('shared/tasks/first', 200, { source: 'tasks', items: [{ type: 'task', id: 'late' }], nextCursor: 'after' }))
-    assert.deepEqual(search.state.tasks.items, [])
+    assert.equal(search.state.tasks.items.length, 0)
     await act(async () => root.render(null))
     await act(async () => root.render(<Screen query="" />))
     assert.equal(search.authRequired, true, 'an empty reopened palette still knows the session expired')
