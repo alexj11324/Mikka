@@ -25,8 +25,8 @@ export const clearApiCache = () => { cache.clear(); presenceScope.clear(); live.
  * starts from the path's last answer, when there is one. It never polls: data
  * that changes on its own uses useLiveApi (decision 2026-11-05-0200-no-new-polling).
  */
-export function useApi<T>(path: string | null) {
-  return useApiRead<T>(path, api, false)
+export function useApi<T>(path: string | null, read: (path: string) => Promise<T> = api) {
+  return useApiRead<T>(path, read, false)
 }
 
 /**
