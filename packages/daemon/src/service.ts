@@ -47,19 +47,29 @@ export async function installLaunchAgent(domain: string, file: string, content: 
     if (error.code === 'ENOENT') return undefined
     throw error
   })
-  if (previous === content) {
-    const registered = await run('launchctl', ['print', target]).then(() => true, () => false)
-    if (registered) {
-      // Reuse the existing registration: bootout is asynchronous on macOS.
-      await run('launchctl', ['kickstart', '-k', target])
-    } else {
-      await run('launchctl', ['bootstrap', domain, file])
-    }
+  const registered = await run('launchctl', ['print', target]).then(() => true, (error: unknown) => {
+    // launchctl print returns 113 for a service missing from this domain.
+    if (error instanceof Error && 'code' in error && error.code === 113) return false
+    throw error
+  })
+  if (registered && previous === content) {
+    // Reuse the existing registration: bootout is asynchronous on macOS.
+    await run('launchctl', ['kickstart', '-k', target])
     return
   }
-  await writeFile(file, content, { mode: 0o600 })
-  await run('launchctl', ['bootout', target]).catch(() => undefined)
-  await run('launchctl', ['bootstrap', domain, file])
+  if (registered) await run('launchctl', ['bootout', target])
+  if (previous !== content) await writeFile(file, content, { mode: 0o600 })
+  try {
+    await run('launchctl', ['bootstrap', domain, file])
+  } catch (error) {
+    // An old registration can still be draining. A retry must not mistake
+    // the unaccepted new arguments on disk for the currently loaded ones.
+    if (previous !== content) {
+      if (previous === undefined) await rm(file, { force: true })
+      else await writeFile(file, previous, { mode: 0o600 })
+    }
+    throw error
+  }
 }
 
 /** Let the service manager launch the replacement, preserving the same account/config. */
