@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import { db } from '@/lib/db'
 import { issueListChanged } from '@/lib/live/lists'
+import { reviewTaskChanged } from '@/lib/coding-workspace/review-sessions'
 import { issueRelationsChanged, relationIds } from '@/lib/live/issue-detail'
 import { issues, issueMembers, issueVersions } from '@/lib/db/schema'
 import { requireIssueAccess, requireIssueAccessWithoutBody } from '@/lib/issue-access'
@@ -140,6 +141,7 @@ export async function updateIssueRelation(input: z.input<typeof relationSchema>)
         for (const [id, patch] of patches) {
           const row = rows.find(row => row.id === id)!
           const [saved] = await tx.update(issues).set({ content: withIssueMetadata(row.content, patch.metadata), status: patch.status ?? row.status, revision: row.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, issue.userId))).returning()
+          reviewTaskChanged(tx, row, saved)
           await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: issue.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(user.id) })
           await issueListChanged(tx, saved.id)
           if (id === current.id) savedCurrent = saved
@@ -295,6 +297,7 @@ export async function setIssueDeleted(input: { id: string; revision?: number; re
         const metadata = readIssueMetadata(latest.content)
         if (input.restore && metadata.deletedAt && Date.now() - new Date(metadata.deletedAt).getTime() > 30 * 86400000) return { error: 'issueRestoreWindow' }
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, { ...metadata, deletedAt: input.restore ? null : new Date().toISOString() }), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, user.id))).returning()
+        reviewTaskChanged(tx, latest, saved)
         await issueListChanged(tx, saved.id, true)
         await issueRelationsChanged(tx, [saved.id])
         return { issue: await issueView(saved, tx) }

@@ -48,6 +48,7 @@ export const OWNER_COLUMNS = ['userId', 'ownerId', 'owner_id', 'user_id'] as con
 
 /** Tables the main transaction must not touch, and why. */
 const SKIPPED = new Map<string, string>([
+  ['coding_review_sessions', 'revoked capability close target; removed only after gateway close or VM-gone acknowledgement'],
   // Workspace tables live in the workspace database (lib/workspace-db.ts), handled below under their own lock.
   ...[workspaces, workspaceMembers, workspaceInvitations, teams, teamMembers, teamIssues, teamProjects, teamIssueCreateReceipts, teamIssuePromotionReceipts, projects, projectEvents, projectMembers, projectTasks]
     .map(table => [getTableName(table as Table), 'workspace database'] as [string, string]),
