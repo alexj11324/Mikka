@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { DiffFileMetadata, DiffFilePatch, DiffSnapshot } from '@mikka/protocol/coding-workspace-review'
-import { reviewReference, taskReviewDiff, taskReviewFile } from './projection'
+import { getReviewSummary, getReviewDiff, getReviewFile } from '../../code-review/client'
+import { projectTaskReviewSummary, reviewReference, taskReviewDiff, taskReviewFile } from './projection'
 
 const snapshotId = '20000000-0000-4000-8000-000000000001'
 const sourceVersion = 'a'.repeat(64)
@@ -182,4 +183,41 @@ test('snapshot references preserve both immutable identities across time, pages 
   const otherSnapshot = { ...first, id: '20000000-0000-4000-8000-000000000006' }
   assert.notDeepEqual(reviewReference(otherSnapshot), reference, 'matching content cannot replace snapshot identity')
   assert.deepEqual(Object.keys(reviewReference(first)).sort(), ['snapshotId', 'sourceVersion'])
+})
+
+test('Task and Review page readers consume the actual authorized checkpoint projection', async t => {
+  const source = snapshot('checkpoint')
+  source.revision.headSha = null
+  const actor = { userId: source.identity.ownerId, workspaceId: source.identity.workspaceId, credential: { kind: 'session' as const, id: 'session' } }
+  const scope = { identity: source.identity, taskId: source.taskId, status: 'completed', stopped: true, boardId: 'board' }
+  const summary = projectTaskReviewSummary(actor, scope, source, undefined, null)
+  const teammate = projectTaskReviewSummary({ ...actor, userId: 'viewer' }, scope, source, undefined, null)
+  const file = taskReviewFile(metadata(), { comments: 0 })
+  const diff = taskReviewDiff(source, [file], { ...idle, reclaimed: true })
+  let reply: unknown = summary
+  const requests = t.mock.method(globalThis, 'fetch', async () => Response.json(reply))
+  const read = await getReviewSummary(source.taskId!)
+  assert.ok(read)
+  assert.equal(read.files, 1)
+  assert.equal(read.additions, null)
+  assert.equal(read.deletions, null)
+  assert.equal(read.checks, null)
+  assert.equal(read.permissions.reasons.merge, 'review_unavailable')
+  assert.equal(read.permissions.canSend, true)
+  assert.deepEqual(read.reviewRef, reviewReference(source))
+  reply = teammate
+  const other = await getReviewSummary(source.taskId!)
+  assert.ok(other)
+  assert.equal(other.permissions.canSend, false)
+  assert.equal(other.permissions.reasons.send, 'not_owner_send')
+  reply = { summary, diff }
+  const opened = await getReviewDiff(source.taskId!)
+  assert.ok(opened)
+  assert.equal(opened.diff.head, null)
+  assert.equal(opened.diff.files[0].additions, null)
+  assert.equal(opened.diff.files[0].fileVersion, metadata().fileVersion)
+  const loaded = taskReviewFile(metadata(), { patch: patchFor(metadata()), comments: 0 })
+  reply = { reviewRef: reviewReference(source), file: loaded, comments: [] }
+  assert.equal((await getReviewFile(source.taskId!, file.path, reviewReference(source))).file.patch, patchText)
+  assert.equal(requests.mock.callCount(), 4)
 })

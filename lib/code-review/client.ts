@@ -2,6 +2,7 @@
 // response to lib/code-review/contract.ts and maps a 403 with a known reason to a typed denial; anything else
 // that is not the expected shape throws ReviewRequestError.
 import { z } from 'zod'
+import { diffSnapshot, reviewedFileChange, taskReviewRef, type TaskReviewRef } from '@mikka/protocol/coding-workspace-review'
 import { withBasePath } from '@/lib/base-path'
 import {
   REVIEW_DENIAL_REASONS,
@@ -19,7 +20,7 @@ import {
 
 const task = (taskId: string) => `/api/tasks/${encodeURIComponent(taskId)}/review`
 
-/** The review endpoints. Proposed; confirm against #1722 before the backend lands. */
+/** Task-scoped reads and actions documented in docs/coding-workspace-task-review-api.md. */
 export const REVIEW_ENDPOINTS = {
   /** GET ?cursor=&commit= → { summary, diff } */
   review: task,
@@ -48,11 +49,19 @@ const reason = z.enum(REVIEW_DENIAL_REASONS)
 
 const summarySchema = z.object({
   taskId: z.string().min(1),
-  pr: z.object({ number: z.number().int().positive(), state: z.enum(['open', 'changes_requested', 'approved', 'merged', 'closed']), url: z.string().url() }).nullable(),
-  files: count,
-  additions: count,
-  deletions: count,
-  checks: z.object({ failed: count, passed: count, pending: count }),
+  pr: z.object({ number: z.number().int().positive(), state: z.enum(['open', 'changes_requested', 'approved', 'merged', 'closed']), url: z.string().url(), observedAt: z.iso.datetime().optional() }).nullable(),
+  reviewRef: taskReviewRef.nullable().optional(),
+  countsKnown: z.boolean().optional(),
+  reclaimed: z.boolean().optional(),
+  mergeTarget: z.object({
+    reviewRef: taskReviewRef,
+    binding: z.object({ taskId: z.string().min(1), issueId: z.string().min(1), attemptId: z.string().min(1), revision: count, candidateId: z.string().min(1) }),
+    expectedHeadSha: z.string().regex(/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/),
+  }).nullable().optional(),
+  files: count.nullable(),
+  additions: count.nullable(),
+  deletions: count.nullable(),
+  checks: z.object({ failed: count, passed: count, pending: count, total: count.optional(), neutral: count.optional(), sha: z.string().optional(), observedAt: z.iso.datetime().optional(), fingerprint: z.string().optional() }).nullable(),
   running: z.boolean(),
   branch: z.string().min(1).optional(),
   permissions: z.object({
@@ -62,34 +71,50 @@ const summarySchema = z.object({
     reasons: z.object({ merge: reason.optional(), send: reason.optional(), terminal: reason.optional() }).default({}),
   }),
   live: z.object({ workspaceId: z.string().min(1) }).optional(),
-}) satisfies z.ZodType<ReviewSummary>
+}).refine(summary => summary.countsKnown === undefined || summary.reviewRef !== undefined, { message: 'Versioned summary lacks its reference field' }) satisfies z.ZodType<ReviewSummary>
 
 const fileSchema = z.object({
   path: z.string().min(1),
   previousPath: z.string().min(1).optional(),
-  status: z.enum(['added', 'modified', 'deleted', 'renamed']),
-  additions: count,
-  deletions: count,
+  status: z.enum(['added', 'modified', 'deleted', 'renamed', 'unavailable']),
+  additions: count.nullable(),
+  deletions: count.nullable(),
+  countsKnown: z.boolean().optional(),
+  fileVersion: reviewedFileChange.shape.fileVersion.optional(),
+  format: z.enum(['unloaded', 'text', 'binary', 'too_large', 'unavailable']).optional(),
   viewed: z.boolean().optional(),
   patch: z.string().nullable(),
   tooLarge: z.boolean().optional(),
   comments: count.default(0),
 }) satisfies z.ZodType<ReviewFile>
 const sentCommentSchema = z.object({ id: z.string().min(1), path: z.string().min(1), line: z.number().int().positive(), side: z.enum(['old', 'new']), body: z.string(), author: z.string(), sentAt: z.string().min(1) })
-const fileReadSchema = z.object({ file: fileSchema, comments: z.array(sentCommentSchema).default([]) }) satisfies z.ZodType<ReviewFileRead>
+const fileReadSchema = z.object({ reviewRef: taskReviewRef.optional(), file: fileSchema, comments: z.array(sentCommentSchema).default([]), nextCommentsCursor: z.string().min(1).optional() }) satisfies z.ZodType<ReviewFileRead>
 
 const diffSchema = z.object({
-  source: z.object({ kind: z.enum(['machine', 'checkpoint', 'pr']), at: z.string().min(1), reclaimed: z.boolean() }),
+  source: z.object({ kind: z.enum(['machine', 'checkpoint', 'commit', 'pr']), at: z.string().min(1), reclaimed: z.boolean(), stale: z.boolean().optional() }),
   live: z.boolean(),
-  base: z.string(),
-  head: z.string(),
+  base: z.string().nullable(),
+  head: z.string().nullable(),
+  reviewRef: taskReviewRef.nullable().optional(),
+  availability: diffSnapshot.shape.availability.optional(),
+  reason: diffSnapshot.shape.reason.optional(),
+  boardRevision: count.nullable().optional(),
   files: z.array(fileSchema),
   empty: z.boolean(),
   nextCursor: z.string().min(1).optional(),
 }) satisfies z.ZodType<ReviewDiff>
 
 const readSchema = z.object({ summary: summarySchema, diff: diffSchema }) satisfies z.ZodType<ReviewRead>
-const checksSchema = z.array(z.object({ id: z.string().min(1), name: z.string().min(1), status: z.enum(['failed', 'passed', 'pending']), logExcerpt: z.string().optional(), logUrl: z.string().url().optional() })) satisfies z.ZodType<ReviewCheck[]>
+const checksSchema = z.array(z.object({ id: z.string().min(1), name: z.string().min(1), status: z.enum(['failed', 'passed', 'pending', 'neutral']), logExcerpt: z.string().optional(), logUrl: z.string().url().optional() })) satisfies z.ZodType<ReviewCheck[]>
+const checkObservationSchema = z.discriminatedUnion('state', [
+  z.object({ state: z.literal('complete'), reviewRef: taskReviewRef, checks: checksSchema }),
+  z.object({ state: z.literal('not_applicable'), reviewRef: taskReviewRef, counts: z.null(), checks: z.array(z.never()).length(0) }),
+])
+function requireReference(requested: TaskReviewRef, returned: TaskReviewRef | null | undefined, reply: Reply) {
+  if (returned?.snapshotId !== requested.snapshotId || returned.sourceVersion !== requested.sourceVersion)
+    throw new ReviewRequestError(reply.status, reply.body, { cause: new Error('Review reference changed') })
+}
+
 const sentSchema = z.object({ messageId: z.string().min(1), attempt: z.number().int().positive() })
 const mergedSchema = z.object({ merged: z.literal(true) })
 // Error bodies carry their code in `error` (both clients read it); a 403 repeats it as `reason`.
@@ -131,23 +156,37 @@ function query(path: string, params: Record<string, string | undefined>) {
 }
 
 /** The summary line's data (R0, R0b, R6), with this viewer's permissions. */
-export async function getReviewSummary(taskId: string): Promise<ReviewSummary> {
-  return parse(summarySchema, await request(REVIEW_ENDPOINTS.summary(taskId)))
+export async function getReviewSummary(taskId: string): Promise<ReviewSummary | null> {
+  return parse(summarySchema.nullable(), await request(REVIEW_ENDPOINTS.summary(taskId)))
 }
 
 /** The review page: the summary and the whole PR's diff, a page of files at a time; `commit` is 按提交筛选. */
-export async function getReviewDiff(taskId: string, options: { cursor?: string; commit?: string } = {}): Promise<ReviewRead> {
-  return parse(readSchema, await request(query(REVIEW_ENDPOINTS.review(taskId), { cursor: options.cursor, commit: options.commit })))
+export async function getReviewDiff(taskId: string, options: { cursor?: string; commit?: string; reference?: TaskReviewRef } = {}): Promise<ReviewRead | null> {
+  const reply = await request(query(REVIEW_ENDPOINTS.review(taskId), { cursor: options.cursor, commit: options.commit, ...options.reference }))
+  const read = parse(readSchema.nullable(), reply)
+  // A filtered commit gets a new revision. A requested page of the same source must keep its exact identity.
+  if (options.reference && !options.commit) requireReference(options.reference, read?.diff.reviewRef, reply)
+  return read
 }
 
 /** One file's patch, for a file paged out or too large to load with the rest (R12 「按文件加载」). */
-export async function getReviewFile(taskId: string, path: string): Promise<ReviewFileRead> {
-  return parse(fileReadSchema, await request(query(REVIEW_ENDPOINTS.file(taskId), { path })))
+export async function getReviewFile(taskId: string, path: string, reference?: TaskReviewRef): Promise<ReviewFileRead> {
+  const reply = await request(query(REVIEW_ENDPOINTS.file(taskId), { path, ...reference }))
+  const read = parse(fileReadSchema, reply)
+  if (reference) {
+    requireReference(reference, read.reviewRef, reply)
+    if (read.file.path !== path) throw new ReviewRequestError(reply.status, reply.body)
+  }
+  return read
 }
 
 /** The checks behind the check summary (R1b). */
-export async function getReviewChecks(taskId: string): Promise<ReviewCheck[]> {
-  return parse(checksSchema, await request(REVIEW_ENDPOINTS.checks(taskId)))
+export async function getReviewChecks(taskId: string, reference?: TaskReviewRef): Promise<ReviewCheck[]> {
+  const reply = await request(query(REVIEW_ENDPOINTS.checks(taskId), { ...reference }))
+  if (!reference) return parse(checksSchema, reply)
+  const observation = parse(checkObservationSchema, reply)
+  requireReference(reference, observation.reviewRef, reply)
+  return observation.checks
 }
 
 /** 发给 Agent. Local comment ids stay on this device; the server gets path, line, side and body. */
