@@ -1042,6 +1042,7 @@
     "breadcrumb": "当前位置",
     "openSearch": "打开全局搜索",
     "listError": "列表更新失败，已保留上次结果。",
+    "taskStatesReadFailed": "无法加载任务状态，请重试。",
     "searchPlaceholder": "搜索任务…",
     "taskView": "任务视图",
     "listView": "列表视图",

@@ -315,7 +315,7 @@ const pages: Record<string, () => Promise<ReactNode>> = {
     const { TaskPresentationsContext } = await import('../hooks/use-task-collection')
     const failed = taskPresentation({ status: 'doing', metadata: { pullRequests: [] } }, { runId: RUN, status: 'failed', outcome: null }, null, () => false)
     return <TaskPresentationsContext.Provider value={{ [ISSUE]: failed }}>
-      <BoardPage issues={boardIssues as never} userId={OWNER} onOpen={noop} onUpdated={async () => {}} onBusyChange={noop} />
+      <BoardPage presentationRead={{ isLoading: false, mutate: async () => undefined }} issues={boardIssues as never} userId={OWNER} onOpen={noop} onUpdated={async () => {}} onBusyChange={noop} />
     </TaskPresentationsContext.Provider>
   },
   // A task with a running thread open on the right, its relations and its members (the members dialog's body).
