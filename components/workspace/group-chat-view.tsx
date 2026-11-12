@@ -9,6 +9,7 @@ import { ChatComposer } from '@/components/coordinator/chat-composer'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { CHAT_SURFACE, ChatMessage } from '@ui-slot/chat-message'
 import { Button } from '@/components/ui/button'
+import { GroupLeaveAction } from './group-leave-action'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { ConversationPill } from '@/components/nav/conversation-pill'
@@ -22,7 +23,7 @@ import { AgentMarkdown } from '@/components/workspace/agent-markdown'
 import { MessageReactions, useMessageReactions } from '@/components/workspace/message-reactions'
 import { cn } from '@/lib/utils'
 import { mentionsIn } from '@/lib/group-mentions'
-import { authorRuns, chronological, fetchGroupMessages, mergeGroupPoll, newestGroupPosition, GroupMessagesRequestError, postGroupMessage, stopGroupReply, type GroupMessagePage } from '@/lib/group-messages'
+import { authorRuns, chronological, fetchGroupMessages, mergeGroupPoll, mayLeaveGroup, newestGroupPosition, GroupMessagesRequestError, postGroupMessage, stopGroupReply, type GroupMessagePage } from '@/lib/group-messages'
 import { toast } from 'sonner'
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { useChatDelivery, type ChatSubmission } from '@/lib/hooks/chat-delivery'
@@ -51,8 +52,9 @@ export type GroupChatRequest = { id: string; title: string; workspaceId: string 
  * timer reads it (#1212). Names and bot avatars come from the
  * group's member list, then the workspace's members and the person's agents.
  */
-export function GroupChatView({ group, userId, people }: {
+export function GroupChatView({ group, userId, people, onLeft }: {
   group: GroupChatRequest
+  onLeft?: (id: string) => void
   userId: string
   /** Display names of the group's workspace members, when that workspace is the loaded one. */
   people: Map<string, string>
@@ -68,6 +70,7 @@ export function GroupChatView({ group, userId, people }: {
   const delivery = useChatDelivery<GroupSend>(`group:${userId}:${group.workspaceId}:${group.id}`, feedback('sendUncertain'))
   const submittedDraft = useRef<string | null>(null)
   const [accessRejected, setAccessRejected] = useState(false)
+  const departed = useRef(false)
   const shown = useRef<{ id: string; page: GroupMessagePage } | null>(null)
   const { data: pages, error, size, setSize, isValidating, mutate } = useSWRInfinite<GroupMessagePage>(
     pageKey(group.id),
@@ -114,17 +117,18 @@ export function GroupChatView({ group, userId, people }: {
     return () => { toast.dismiss(id) }
   }, [backgroundFailed, userId, group.id, t, mutate])
   const deliver = async (item: GroupSend, release?: () => void) => {
-    if (blockingCode || accessRejected || refused || !delivery.begin(item)) return
+    if (departed.current || blockingCode || accessRejected || refused || !delivery.begin(item)) return
     release?.()
     try {
       if (navigator.onLine === false) { delivery.finish(item.id, { error: feedback('sendOffline') }); return }
       if (!await checkPageBuildBeforeAction()) { delivery.finish(item.id, { error: feedback('sendUpdateRequired') }); return }
+      if (departed.current) { delivery.finish(item.id, {}); return }
       void groupSubmissionMessageId(userId, group.id, item.id).then(storedId => {
         delivery.setRows(current => current.map(row => row.id === item.id && !row.storedId ? { ...row, storedId } : row))
       }).catch(() => undefined)
       const sent = await postGroupMessage(group.id, item.text, item.mentions, fetch, { requestId: item.id, expectedOwnerId: userId, expectedWorkspaceId: group.workspaceId })
       delivery.finish(item.id, { storedId: sent.id })
-      void mutate().catch(() => undefined)
+      if (!departed.current) void mutate().catch(() => undefined)
     } catch (error) {
       const status = error instanceof GroupMessagesRequestError ? error.status : undefined
       const reason = status === 429 ? feedback('sendRateLimited') : status && [401, 403, 404].includes(status) ? feedback('sendAccessDenied')
@@ -166,7 +170,17 @@ export function GroupChatView({ group, userId, people }: {
 
   return <section aria-label={group.title || t('untitled')} data-testid="group-chat" className={cn('relative flex min-h-0 w-full flex-1 flex-col', CHAT_SURFACE)}>
     <ConversationPill name={group.title || t('untitled')} avatar={<GroupAvatar title={group.title || t('untitled')} members={members} />} />
-    <div aria-hidden="true" className="hidden h-14 shrink-0 md:block" />
+    {onLeft && !refused && !accessRejected && mayLeaveGroup(members, userId)
+      ? <div className="flex h-14 shrink-0 items-center justify-end px-4">
+          <GroupLeaveAction group={group} userId={userId} onLeft={() => {
+            departed.current = true
+            shown.current = null
+            delivery.setRows([])
+            setDraft('')
+            onLeft(group.id)
+          }} />
+        </div>
+      : <div aria-hidden="true" className="hidden h-14 shrink-0 md:block" />}
     <div ref={scroller} onScroll={event => { const node = event.currentTarget; const next = node.scrollHeight - node.scrollTop - node.clientHeight < 56; if (next !== following) setFollowing(next) }} className="min-h-0 flex-1 overflow-y-auto scroll-fade-y">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pb-6">
         {blockingCode === 'not_found' ? <p role="alert" className="py-6 text-sm">{t('notFound')}</p>
