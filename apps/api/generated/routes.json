@@ -2239,6 +2239,16 @@
       "sourceHash": "b283a00faede7c965072945e12cd2debfe772a4d90bb8c6974bdab1391809e7b"
     },
     {
+      "path": "/mikka/api/tasks/[taskId]/review/preview",
+      "template": "/api/tasks/[taskId]/review/preview",
+      "source": "app/api/tasks/[taskId]/review/preview/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 60,
+      "sourceHash": "f2b218f06bf253350184b7955ab3d309058c847d83770bbd0ae7806d1aef901f"
+    },
+    {
       "path": "/mikka/api/tasks/[taskId]/review/resources",
       "template": "/api/tasks/[taskId]/review/resources",
       "source": "app/api/tasks/[taskId]/review/resources/route.ts",
@@ -2275,6 +2285,35 @@
         "GET"
       ],
       "sourceHash": "59bec6f7becb90729a54c638359079e5a5e3bca1136571a66dcb2a3d68dd39c8"
+    },
+    {
+      "path": "/mikka/api/tasks/[taskId]/review/terminal",
+      "template": "/api/tasks/[taskId]/review/terminal",
+      "source": "app/api/tasks/[taskId]/review/terminal/route.ts",
+      "methods": [
+        "DELETE",
+        "GET"
+      ],
+      "maxDuration": 300,
+      "sourceHash": "4c2d71bf10f657767a8734f5388073d9fa7c3e70a5d07ec526e48062ab5120b7"
+    },
+    {
+      "path": "/mikka/api/tasks/[taskId]/review/terminal/input",
+      "template": "/api/tasks/[taskId]/review/terminal/input",
+      "source": "app/api/tasks/[taskId]/review/terminal/input/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "2710e179023bc99f1876c379855ddbdcdf3aadb82ffe9eb587de66568837260c"
+    },
+    {
+      "path": "/mikka/api/tasks/[taskId]/review/terminal/resize",
+      "template": "/api/tasks/[taskId]/review/terminal/resize",
+      "source": "app/api/tasks/[taskId]/review/terminal/resize/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "23664251f424f345186c6bd0023719023316f5b8542e44bc986edd151bdb1d65"
     },
     {
       "path": "/mikka/api/teams/directory",

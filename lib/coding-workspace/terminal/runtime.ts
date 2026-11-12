@@ -5,6 +5,8 @@ import { join } from 'node:path'
 import { Sandbox, SandboxNotFoundError } from 'e2b'
 import { TerminalError } from '@mikka/protocol/coding-terminal'
 import { e2bApiKey, withE2BErrors } from '@/lib/secrets/e2b-runtime'
+import { cloudflareReview, reviewReply, reviewRequest } from '../cloudflare-review'
+import type { ReviewSessionLease } from '../review-sessions'
 import type { TaskReviewAuthority } from '../review-authority'
 import { terminalKey, signTerminalTicket, terminalResponseError, type TerminalPrepared, type TerminalTarget } from './wire'
 
@@ -91,10 +93,22 @@ async function verifyRuntime(sandbox: Sandbox, signal?: AbortSignal) {
     throw new TerminalError('terminal_unsupported', { detail: 'runtime_version' })
 }
 
+async function sponsoredTerminal(scope:TaskReviewAuthority & {sandboxId:string}, lease:ReviewSessionLease | null | undefined,
+  action:'terminal-prepare'|'terminal-existing', signal?:AbortSignal):Promise<TerminalPrepared> {
+  const review = cloudflareReview(scope,lease,'terminal')
+  const key = terminalKey(scope,process.env.BETTER_AUTH_SECRET)
+  const current = await reviewReply(review,action,{key:key.toString('base64')},signal)
+  if (typeof current.boot !== 'string' || !/^[a-f0-9-]{36}$/.test(current.boot) ||
+      typeof current.version !== 'string' || !/^[a-f0-9]{64}$/.test(current.version))
+    throw new TerminalError('terminal_unsupported',{detail:'runtime_version'})
+  return {cloudflare:review,origin:'http://task-machine.internal',boot:current.boot,key,bindingId:scope.bindingId}
+}
+
 /** Prepare before the final database fence. No shell or task is started. */
-export async function prepareTerminal(scope: TaskReviewAuthority, signal?: AbortSignal): Promise<TerminalPrepared> {
+export async function prepareTerminal(scope: TaskReviewAuthority, signal?: AbortSignal, lease?:ReviewSessionLease): Promise<TerminalPrepared> {
   cloud(scope)
   try {
+    if (scope.sponsoredPlacement) return await sponsoredTerminal(scope,lease,'terminal-prepare',signal)
     const target = { runId: scope.runId, ownerId: scope.ownerId, workspaceId: scope.workspaceId, sandboxId: scope.sandboxId }
     const { origin, config } = await endpoint(target, signal)
     const source = await readFile(join(process.cwd(), 'scripts/e2b/terminal-gateway.py'), 'utf8')
@@ -130,9 +144,10 @@ export async function prepareTerminal(scope: TaskReviewAuthority, signal?: Abort
 }
 
 /** Existing data-plane only, for input/resize/close. Never install or reopen. */
-export async function existingTerminal(scope: TaskReviewAuthority, signal?: AbortSignal): Promise<TerminalPrepared> {
+export async function existingTerminal(scope: TaskReviewAuthority, signal?: AbortSignal, lease?:ReviewSessionLease | null): Promise<TerminalPrepared> {
   cloud(scope)
   try {
+    if (scope.sponsoredPlacement) return await sponsoredTerminal(scope,lease,'terminal-existing',signal)
     const target = { runId: scope.runId, ownerId: scope.ownerId, workspaceId: scope.workspaceId, sandboxId: scope.sandboxId }
     const { origin } = await endpoint(target, signal)
     const key = terminalKey(target, process.env.BETTER_AUTH_SECRET)
@@ -148,10 +163,13 @@ export async function existingTerminal(scope: TaskReviewAuthority, signal?: Abor
 
 export async function terminalRequest(prepared: TerminalPrepared, operation: 'stream' | 'input' | 'resize' | 'close', ticket: string, body = '', signal?: AbortSignal) {
   try {
-    const response = await fetch(`${prepared.origin}/${operation}`, { method: operation === 'stream' ? 'GET' : 'POST',
+    const deadline = AbortSignal.timeout(operation === 'stream' ? 300_000 : 15_000)
+    const cancel = signal ? AbortSignal.any([signal,deadline]) : deadline
+    const response = prepared.cloudflare ? await reviewRequest(prepared.cloudflare,operation,{ticket,body},cancel)
+      : await fetch(`${prepared.origin}/${operation}`, { method: operation === 'stream' ? 'GET' : 'POST',
       headers: { authorization: `Bearer ${ticket}`, ...(operation === 'stream' ? { accept: 'text/event-stream' } : { 'content-type': 'application/json' }) },
       ...(operation === 'stream' ? {} : { body }), cache: 'no-store', redirect: 'error',
-      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(operation === 'stream' ? 300_000 : 15_000)]) : AbortSignal.timeout(operation === 'stream' ? 300_000 : 15_000),
+      signal:cancel,
     })
     if (!response.ok) throw await terminalResponseError(response)
     if (operation === 'stream' && (!response.body || !response.headers.get('content-type')?.startsWith('text/event-stream')))

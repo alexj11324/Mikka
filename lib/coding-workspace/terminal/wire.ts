@@ -1,11 +1,13 @@
 import { createHash, createHmac, randomUUID } from 'node:crypto'
 import { TerminalError, TERMINAL_STATUS } from '@mikka/protocol/coding-terminal'
+import type { CloudflareReview } from '../cloudflare-review'
+import type { ReviewSessionLease } from '../review-sessions'
 import type { TaskReviewAuthority } from '../review-authority'
 
 export type TerminalOperation = 'stream' | 'input' | 'resize' | 'close' | 'revoke' | 'inspect'
-export type TerminalLease = { id: string; expiresAt: string }
+export type TerminalLease = ReviewSessionLease
 export type TerminalTarget = { runId: string; ownerId: string; workspaceId: string; sandboxId: string }
-export type TerminalPrepared = { origin: string; boot: string; key: Buffer; bindingId: string }
+export type TerminalPrepared = { cloudflare?: CloudflareReview; origin: string; boot: string; key: Buffer; bindingId: string }
 
 /** Instance-specific key. The app secret itself never leaves the server. */
 export function terminalKey(target: Pick<TerminalTarget, 'ownerId' | 'workspaceId' | 'sandboxId'>, secret: string | undefined) {
