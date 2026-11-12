@@ -31,6 +31,7 @@ export function useSiteSearch(query: string, workspaceId: string | null) {
   const key = q === null ? '' : JSON.stringify([q, workspaceId])
   const [pages, setState] = useState<Record<ListedSource, SourceState>>(IDLE_SOURCES)
   const [pageKey, setPageKey] = useState('')
+  const [authRequired, setAuthRequired] = useState(false)
   const state = key === pageKey ? pages : IDLE_SOURCES
   const run = useRef<SearchRun | null>(null)
 
@@ -41,12 +42,14 @@ export function useSiteSearch(query: string, workspaceId: string | null) {
     setState(current => ({ ...current, [source]: cursor ? { ...current[source], loadingMore: true, error: null } : { ...IDLE, status: 'loading' } }))
     fetchSiteSearchPage({ source, q: query, workspaceId, cursor, signal: controller.signal }).then(page => {
       if (controller.signal.aborted) return
+      setAuthRequired(false)
       setState(current => ({ ...current, [source]: { status: 'ready', items: mergeById(cursor ? current[source].items : [], page.items), nextCursor: page.nextCursor, loadingMore: false, error: null } }))
     }, (error: unknown) => {
       if (controller.signal.aborted) return
       const code = error instanceof SiteSearchRequestError ? error.code : 'searchUnavailable'
       if (code === 'authRequired') {
         controller.abort()
+        setAuthRequired(true)
         setState({ ...IDLE_SOURCES, [source]: { ...IDLE, status: 'error', error: code } })
         return
       }
@@ -87,5 +90,5 @@ export function useSiteSearch(query: string, workspaceId: string | null) {
   }, [state, q, key, load])
 
   const searching = sources.some(source => state[source].status === 'loading')
-  return { query: parsed, state, sources, searching, more, retry }
+  return { query: parsed, state, sources, searching, authRequired, more, retry }
 }

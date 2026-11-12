@@ -56,6 +56,7 @@ test('search continuations serialize by source, deduplicate UUIDs and discard re
     await more()
     await act(async () => reply('shared/groups/last', 401, { error: 'authRequired' }))
     assert.equal(search.state.groups.error, 'authRequired')
+    assert.equal(search.authRequired, true)
     assert.equal(search.state.groups.nextCursor, null)
     assert.deepEqual(ids(), [])
     assert.deepEqual(search.state.history.items, [])
@@ -66,6 +67,8 @@ test('search continuations serialize by source, deduplicate UUIDs and discard re
     await act(async () => reply('another/groups/first', 403, { error: 'searchAccessDenied' }))
     await act(async () => reply('another/groups/first', 403, { error: 'searchAccessDenied' }))
     assert.equal(search.state.groups.error, 'searchAccessDenied')
+    await act(async () => reply('another/history/first', 200, { source: 'history', items: [], nextCursor: null }))
+    assert.equal(search.authRequired, false)
     assert.deepEqual(search.state.groups.items, [])
   } finally { await act(async () => root.unmount()) }
 })
