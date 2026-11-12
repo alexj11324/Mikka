@@ -281,6 +281,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/ops/runtime-monitor-owner.mjs
+      - name: Record verified Cloudflare runtime handoff ${{ steps.runtime.outputs.milestone }}
+        if: steps.runtime.outputs.runtime == 'cloudflare'
+        run: echo 'The verified migration milestone selected Cloudflare runtime attribution.'
       - name: Read the existing Vercel token through Infisical workload identity
         if: steps.runtime.outputs.runtime != 'cloudflare'
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18

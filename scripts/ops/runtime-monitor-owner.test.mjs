@@ -17,6 +17,7 @@ function evaluate(change={}){
   return runtimeMonitorOwner({now:effective+900000,windowStart:change.start??effective,
     authority:async()=>({provider:change.provider??'cloudflare',sha:product}),
     promotion:async s=>{assert.equal(s,record.promotion);if(change.rollback)throw Error('rollback');return {product,verifiedAt:iso(first-1000)}},
+    verifiedPublisher:change.verifiedPublisher,
     read:async path=>{
       if(path==='/issues/1951')return {number:1951,url:issue,body:change.pin??pin}
       if(path==='/issues/comments/143')return {id:143,issue_url:issue,created_at:iso(last+1000),body,author_association:change.member??'COLLABORATOR',user:{login:'release-maintainer',id:6}}
@@ -25,8 +26,10 @@ function evaluate(change={}){
     }})
 }
 test('only an effective, write-authorized, complete milestone on the same still-serving release can retire Vercel reads',async()=>{
-  assert.deepEqual(await evaluate(),{runtime:'cloudflare',promotion:record.promotion,observedUntil:last,reason:'verified_handoff'})
-  for(const c of [{provider:'vercel'},{start:effective-1},{role:'read'},{id:7},{member:'CONTRIBUTOR'},
+  const positive=await evaluate()
+  assert.match(positive.milestone,/^143-[a-f0-9]{64}$/)
+  assert.deepEqual({...positive,milestone:undefined},{runtime:'cloudflare',promotion:record.promotion,milestone:undefined,observedUntil:last,reason:'verified_handoff'})
+  for(const c of [{verifiedPublisher:async()=>false},{provider:'vercel'},{start:effective-1},{role:'read'},{id:7},{member:'CONTRIBUTOR'},
     {digest:'3'.repeat(64)},{pin:''},{rollback:true},{m:{effectiveAt:iso(last)}},{m:{firstQuarter:iso(first+900000)}},
     {m:{evidence:{...evidence,pressureDelivery:{url:'https://other.invalid/',sha256:hash}}}}])
     assert.equal((await evaluate(c)).runtime,'vercel')

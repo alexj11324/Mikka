@@ -16,7 +16,7 @@ const fixed=(condition,code)=>{if(!condition)throw Error('runtimeMonitor:'+code)
 // An untrusted comment, changing the milestone body or traffic rollback keeps
 // the Vercel runtime checks active. The Neon/PostHog owner never changes here.
 export async function runtimeMonitorOwner({token=process.env.GITHUB_TOKEN,fetchImpl=fetch,now=Date.now(),windowStart=now-900000,
-  authority=readWebAuthority,promotion=readServingPromotion,read=githubRead}={}){
+  authority=readWebAuthority,promotion=readServingPromotion,read=githubRead,verifiedPublisher}={}){
   try {
     const origin=await authority(fetchImpl)
     if(origin.provider!=='cloudflare')return {runtime:'vercel',reason:'serving_vercel'}
@@ -29,8 +29,15 @@ export async function runtimeMonitorOwner({token=process.env.GITHUB_TOKEN,fetchI
     fixed(String(comment.id)===id&&comment.issue_url===issue&&digest(comment.body)===hash,'milestone')
     fixed(['OWNER','MEMBER','COLLABORATOR'].includes(comment.author_association)&&
       /^[a-zA-Z0-9-]{1,39}$/.test(comment.user?.login)&&Number.isSafeInteger(comment.user.id),'maintainer')
-    const role=await read('/collaborators/'+comment.user.login+'/permission',api)
-    fixed(role.user?.id===comment.user.id&&approvedRoles.has(role.permission),'maintainer')
+    const milestone=id+'-'+hash
+    if(verifiedPublisher){
+      // A consumer without public-repository credentials can recheck the
+      // original public scheduled job's own successful verification of this pin.
+      fixed(await verifiedPublisher(milestone),'publisher')
+    }else{
+      const role=await read('/collaborators/'+comment.user.login+'/permission',api)
+      fixed(role.user?.id===comment.user.id&&approvedRoles.has(role.permission),'maintainer')
+    }
     const prefix='MIKKA_RUNTIME_MONITOR_MILESTONE_V1\n'
     fixed(comment.body.startsWith(prefix),'schema')
     const raw=comment.body.slice(prefix.length),m=JSON.parse(raw)
@@ -52,11 +59,11 @@ export async function runtimeMonitorOwner({token=process.env.GITHUB_TOKEN,fetchI
     const serving=await promotion(m.promotion,{...api,now})
     fixed(serving.product===origin.sha&&Date.parse(serving.verifiedAt)<=from,'promotion')
     if(!Number.isSafeInteger(windowStart)||windowStart<effective)return {runtime:'vercel',reason:'handoff_not_effective'}
-    return {runtime:'cloudflare',promotion:m.promotion,observedUntil:until,reason:'verified_handoff'}
+    return {runtime:'cloudflare',promotion:m.promotion,milestone,observedUntil:until,reason:'verified_handoff'}
   }catch{return {runtime:'vercel',reason:'handoff_unverified'}}
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   const result=await runtimeMonitorOwner()
   console.log('Runtime source: '+result.runtime+' ('+result.reason+')')
-  if(process.env.GITHUB_OUTPUT)await appendFile(process.env.GITHUB_OUTPUT,'runtime='+result.runtime+'\n')
+  if(process.env.GITHUB_OUTPUT)await appendFile(process.env.GITHUB_OUTPUT,'runtime='+result.runtime+'\nmilestone='+(result.milestone??'')+'\n')
 }
