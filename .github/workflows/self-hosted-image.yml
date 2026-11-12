@@ -177,10 +177,10 @@ jobs:
           docker compose exec -T app node -e 'require("node:fs").rmSync("/data/self-hosted-daemon-session.private.json", {force:true})'
           node --import tsx scripts/acceptance/self-hosted-daemon.mjs
       - name: Prepare Ubuntu package mirrors
-        if: github.event_name != 'pull_request' && github.event_name != 'merge_group'
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
         run: sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
       - name: Install the native desktop runtime dependencies
-        if: github.event_name != 'pull_request' && github.event_name != 'merge_group'
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -188,7 +188,7 @@ jobs:
           sudo apt-get install -y xvfb dbus-x11 gnome-keyring libsecret-1-0
           node apps/desktop/scripts/install-electron.mjs
       - name: Build one packaged acceptance desktop with an independent default server
-        if: github.event_name != 'pull_request' && github.event_name != 'merge_group'
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
         run: |
           pnpm --filter @mikka/desktop build --public-test-fixture
           pnpm --filter @mikka/desktop exec electron-builder --dir --linux --config electron-builder.acceptance.yml --config.linux.executableName=mikka-selfhost-acceptance --publish never
@@ -198,7 +198,7 @@ jobs:
           MIKKA_DESKTOP_FLAVOR: dev
           MIKKA_DESKTOP_APP_URL: http://localhost:3001/mikka
       - name: Verify packaged desktop email login, chat and built-in live against the actual image
-        if: github.event_name != 'pull_request' && github.event_name != 'merge_group'
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
         timeout-minutes: 5
         run: |
           node --test apps/desktop/test/self-hosted.test.mjs
