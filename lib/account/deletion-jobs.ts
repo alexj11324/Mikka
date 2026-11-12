@@ -352,7 +352,7 @@ export async function applyAccountDeletionManifest(manifest: AccountDeletionMani
       return retained
     })
     // Managed custody cleanup completed in the current journal; its warnings preserve upstream exceptions. Restore replays only local deletion against explicit isolated targets.
-    await withoutCommitEffectsForRestore(() => resumeAccountDeletion(source.id, {
+    await withoutCommitEffectsForRestore([options.mainPool, options.workspacePool], () => resumeAccountDeletion(source.id, {
       ...options,
       externalCleanup: async () => ({ blockedReasons: [], warnings: source.warnings ?? [] }),
       deleteObject: options.deleteObject ?? (async () => { throw new Error('accountDeletionRestoreObjectTargetRequired') }),

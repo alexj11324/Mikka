@@ -9,11 +9,11 @@ export const COMMIT_EXECUTOR = Symbol.for('mikka.database.commitExecutor')
 const COMMIT_CONTEXT = Symbol.for('mikka.database.commitContext')
 type ObservedClient = PoolClient & { [STATE]?: State }
 const pools = new WeakSet<Pool>()
-const isolatedRestore = new AsyncLocalStorage<boolean>()
+const isolatedRestore = new AsyncLocalStorage<ReadonlySet<object>>()
 
 /** Replaying a deletion journal into a quarantined database must not wake live consumers. */
-export function withoutCommitEffectsForRestore<T>(work: () => T): T {
-  return isolatedRestore.run(true, work)
+export function withoutCommitEffectsForRestore<T>(targets: readonly Pool[], work: () => T): T {
+  return isolatedRestore.run(new Set(targets.map(commitExecutor)), work)
 }
 
 const reset = (state: State) => { state.active = false; state.effects.clear(); state.savepoints = [] }
@@ -95,7 +95,8 @@ export function hasCommitEffect(client: PoolClient, key: string) {
 export function afterCommit(client: PoolClient, key: string, effect: Effect) {
   const state = (client as ObservedClient)[STATE]
   if (!state) throw new Error('Commit effects require an observed database client')
-  if (isolatedRestore.getStore()) return
+  const restored = isolatedRestore.getStore()
+  if (restored?.has(state.scope) || restored?.has(client)) return
   // COMMIT can be issued after the originating request context has exited.
   const committed = AsyncLocalStorage.bind(effect)
   if (state.active) state.effects.set(key, committed)
@@ -112,9 +113,8 @@ export function afterDatabaseCommit(executor: object, key: string, effect: Effec
   if ((client as ObservedClient)[STATE]) afterCommit(client as PoolClient, key, committed)
   else if (client instanceof Pool) {
     // The caller has awaited its autocommitted statement.
-    if (!isolatedRestore.getStore()) run(committed)
-  }
-  else throw new Error('Commit effects require an observed node-postgres executor')
+    if (!isolatedRestore.getStore()?.has(client)) run(committed)
+  } else throw new Error('Commit effects require an observed node-postgres executor')
 }
 
 /** A service retaining a bound query must retain its executor and request

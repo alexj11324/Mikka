@@ -41,7 +41,9 @@ test('the isolation-checked recovery CLI replays the deletion journal from a rea
       OPS_POSTGRES_CONTAINER: container, OPS_POSTGRES_URL: 'postgresql://postgres@' + address + '/postgres',
     }, timeout: 180_000, maxBuffer: 4 * 1024 * 1024,
   })
-  const report = JSON.parse(result.trim().split('\n').at(-1))
+  const evidence = result.split('\n').find(line => line.startsWith('{"evidenceDirectory":'))
+  assert.ok(evidence, 'the recovery driver must emit its own acceptance receipt')
+  const report = JSON.parse(evidence)
   assert.equal(report.state, 'quarantined')
   assert.ok(report.deniedFailures.includes('pending-deletion-journal'))
   console.info('PG17 recovery CLI', { restoreDurationMs: report.restoreDurationMs, deniedFailures: report.deniedFailures })

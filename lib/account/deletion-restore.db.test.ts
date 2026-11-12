@@ -93,10 +93,15 @@ test('current deletion journal replays only into explicit isolated restore targe
     } finally { client.release() }
     afterDatabaseCommit(database, 'changed', () => { sent.push(tenant + ':autocommit') })
   }
+  let checkedOtherTarget = false
   const blocked = assert.rejects(applyAccountDeletionManifest(manifest, { mainPool: restored, workspacePool: restored, deleteObject: async object => {
     removed.push(object)
     assert.throws(() => afterDatabaseCommit({}, 'unknown', () => {}), /observed node-postgres executor/)
     await publishChange(restored, 'restore')
+    if (!checkedOtherTarget) {
+      checkedOtherTarget = true
+      await publishChange(source, 'other-target')
+    }
     restoreStarted.resolve()
     await permitRetry.promise
     throw new Error('object unavailable')
@@ -106,7 +111,7 @@ test('current deletion journal replays only into explicit isolated restore targe
     await publishChange(source, 'source')
   } finally { permitRetry.resolve() }
   await blocked
-  assert.deepEqual(sent, ['source', 'source:autocommit'])
+  assert.deepEqual(sent, ['other-target', 'other-target:autocommit', 'source', 'source:autocommit'])
   assert.equal((await restored.query('SELECT stage FROM account_deletion_jobs WHERE id=$1', [request.id])).rows[0].stage, 'storage_pending')
   assert.deepEqual(await applyAccountDeletionManifest(manifest, { mainPool: restored, workspacePool: restored, deleteObject: async object => { removed.push(object) } }), { applied: 1 })
   assert.deepEqual(removed, [key, key], 'reapplying a manifest must retain object references whose DB pointers are already deleted')
