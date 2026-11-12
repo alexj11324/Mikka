@@ -60,6 +60,8 @@ async function requestPage(url: string, signal: AbortSignal | undefined, fetcher
     if (signal?.aborted) throw error
     throw new SiteSearchRequestError('searchUnavailable', 0)
   }
+  if (response.status === 401) throw new SiteSearchRequestError('authRequired', 401)
+  if (response.status === 403) throw new SiteSearchRequestError('searchAccessDenied', 403)
   const body = await response.json().catch(() => null) as { error?: unknown } | SiteSearchPage | null
   if (response.ok && body && 'items' in body && Array.isArray(body.items)) return body
   const code = body && 'error' in body && typeof body.error === 'string' && KNOWN_ERRORS.has(body.error) ? body.error : null

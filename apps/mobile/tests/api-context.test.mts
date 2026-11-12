@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
-import { ApiCache } from '../lib/api-cache.ts'
+import test, { mock } from 'node:test'
+import { withholdsCachedRead } from '../lib/api-read-state.ts'
+import { ApiCache, apiCache } from '../lib/api-cache.ts'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -60,4 +61,88 @@ test('a direct account switch fences responses even if an older sign-out has not
   const context = cache.context()
   cache.setIdentity('account B')
   assert.equal(cache.context(), context, 'the same signed-in identity keeps its cache')
+})
+
+test('a confirmed denial retires only the requested path across mounted readers and prefetches', async () => {
+  const cache = new ApiCache(), path = '/api/mobile/tasks'
+  cache.setIdentity('member')
+  const context = cache.context(), result = deferred<string>()
+  const loading = cache.prefetch(path, () => result.promise)
+  cache.set(path, 'tasks before decision', context)
+  cache.set('/api/mobile/home', 'separate permitted response', context)
+  const notifications: Error[] = []
+  const offTasks = cache.onRevoked(path, reason => notifications.push(reason))
+  const offSearch = cache.onRevoked(path, reason => notifications.push(reason))
+  const reason = new Error('workspaceAccessDenied')
+  cache.revoke(path, context, reason)
+  assert.deepEqual(notifications, [reason, reason])
+  assert.equal(cache.get(path), null)
+  assert.equal(cache.revision(path), 1)
+  assert.equal(cache.get('/api/mobile/home'), 'separate permitted response')
+  result.resolve('old response'); await loading
+  assert.equal(cache.get(path), null)
+  offTasks(); offSearch()
+  await cache.prefetch(path, async () => 'authorized again')
+  assert.equal(cache.get(path), 'authorized again')
+  cache.setIdentity('next member')
+  cache.set(path, 'next member tasks', cache.context())
+  cache.revoke(path, context, reason)
+  assert.equal(cache.get(path), 'next member tasks')
+  assert.equal(cache.revision(path), 0)
+})
+
+test('only explicit resource denials evict an already authorized response', () => {
+  assert.equal(withholdsCachedRead(403), true)
+  assert.equal(withholdsCachedRead(404), true)
+  for (const status of [0, 409, 429, 500, 502, 503, 504]) assert.equal(withholdsCachedRead(status), false)
+})
+
+test('two mounted readers remove denied rows, ignore a late success, and retain prior rows on 503', async () => {
+  const { Window } = await import('happy-dom')
+  const browser = new Window({ url: 'https://fixture.example' })
+  Object.assign(globalThis, { window: browser, document: browser.document, IS_REACT_ACT_ENVIRONMENT: true })
+  const { act, createElement, Fragment } = await import('react')
+  const { createRoot } = await import('react-dom/client')
+  const path = '/api/mobile/tasks'
+  class ApiError extends Error {
+    constructor(readonly status: number) { super(String(status)) }
+  }
+  const noop = () => {}
+  const requests: Array<{ resolve: (value: string) => void; reject: (error: Error) => void }> = []
+  const read = () => new Promise<string>((resolve, reject) => requests.push({ resolve, reject }))
+  const module = (name: string) => new URL('../lib/' + name + '.ts', import.meta.url).href
+  mock.module('react-native', { namedExports: { AppState: { addEventListener: () => ({ remove: noop }) } } })
+  mock.module(module('api'), { namedExports: { api: read, ApiError, onWorkspaceChange: () => noop } })
+  mock.module(module('live'), { namedExports: { live: { reset: noop }, useLive: noop } })
+  const { useApi } = await import('../lib/useApi.ts')
+  const reads: Array<ReturnType<typeof useApi<string>>> = []
+  function Reader({ index }: { index: number }) {
+    reads[index] = useApi<string>(path)
+    return createElement('span', null, reads[index].data)
+  }
+  const root = createRoot(document.body)
+  apiCache.setIdentity('member')
+  try {
+    await act(async () => root.render(createElement(Fragment, null, createElement(Reader, { index: 0 }), createElement(Reader, { index: 1 }))))
+    assert.equal(requests.length, 2)
+    await act(async () => { requests[0].resolve('allowed'); requests[1].resolve('allowed') })
+    assert.deepEqual(reads.map(r => r.data), ['allowed', 'allowed'])
+    await act(async () => { void reads[0].reload(); requests[2].reject(new ApiError(503)) })
+    assert.deepEqual(reads.map(r => r.data), ['allowed', 'allowed'])
+    const oldSetter = reads[1].setData
+    await act(async () => { void reads[0].reload(); void reads[1].reload(); requests[3].reject(new ApiError(403)) })
+    assert.deepEqual(reads.map(r => r.data), [null, null])
+    assert.equal(apiCache.get(path), null)
+    await act(async () => { oldSetter('stale mutation'); requests[4].resolve('stale read') })
+    assert.equal(document.body.textContent, '')
+    await act(async () => { void reads[1].reload(); requests[5].resolve('authorized again') })
+    assert.equal(reads[1].data, 'authorized again')
+    await act(async () => { void reads[1].reload(); requests[6].reject(new ApiError(404)) })
+    assert.equal(apiCache.get(path), null)
+    assert.equal(document.body.textContent, '')
+  } finally {
+    await act(async () => root.unmount())
+    apiCache.setIdentity(null)
+    await browser.happyDOM.close()
+  }
 })
