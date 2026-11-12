@@ -75,7 +75,7 @@ export async function readContainerWindow({ application, environment, now, read,
 /** The protected caller verifies the live release and returns its immutable
  * application identity on each side of the read. A source change discards
  * the complete window before it reaches either report or any alert sink. */
-export async function collectContainerReports({ target, read, capacity = undefined, neonToken, fetchImpl = fetch, now = Date.now(), observedAt = now }) {
+export async function collectContainerReports({ target, read, capacity = undefined, neonToken, includeProviderUsage = true, fetchImpl = fetch, now = Date.now(), observedAt = now }) {
   const before = await target()
   if (!/^[a-f0-9]{40}$/.test(before.source) || !uuid.test(before.apiVersion)) fail('container_release_invalid')
   const mature = Boolean(capacity) && observedAt >= now + REQUEST_DEADLINE_MS
@@ -83,7 +83,7 @@ export async function collectContainerReports({ target, read, capacity = undefin
     read, now, completionGrace: mature })
   const [outcomes, egress] = await Promise.all([
     outcomeReport({ now, containerWindow: window }),
-    egressReport({ now, containerWindow: window, neonToken, fetchImpl }),
+    egressReport({ now, containerWindow: window, neonToken, includeProviderUsage, fetchImpl }),
   ])
   let health
   if(capacity){

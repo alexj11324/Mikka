@@ -263,6 +263,7 @@ jobs:
     timeout-minutes: 3
     permissions:
       contents: read
+      issues: read
       id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -274,8 +275,14 @@ jobs:
           node-version: 24
       - name: Verify egress collector contracts
         if: always()
-        run: node --test scripts/ops/egress-monitor.test.mjs
+        run: node --test scripts/ops/egress-monitor.test.mjs scripts/ops/runtime-monitor-owner.test.mjs
+      - name: Resolve the current runtime monitor owner
+        id: runtime
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/ops/runtime-monitor-owner.mjs
       - name: Read the existing Vercel token through Infisical workload identity
+        if: steps.runtime.outputs.runtime != 'cloudflare'
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
         with:
           method: oidc
@@ -288,9 +295,10 @@ jobs:
           recursive: false
           include-imports: false
       - name: Compare fixed production deployment windows
+        if: steps.runtime.outputs.runtime != 'cloudflare'
         run: DEPLOYMENT_COMPARISON_CHECKER_SHA="$(git rev-parse HEAD)" node scripts/ops/deployment-regression.mjs
       - name: Collect production request outcomes
-        if: always()
+        if: always() && steps.runtime.outputs.runtime != 'cloudflare'
         run: node scripts/ops/runtime-outcomes.mjs
       - name: Read only the Neon usage key for the egress collector
         if: always()
@@ -320,7 +328,14 @@ jobs:
           include-imports: false
       - name: Collect database egress and publish aggregate health
         if: always()
-        run: node scripts/ops/egress-monitor.mjs
+        env:
+          RUNTIME_OWNER: ${{ steps.runtime.outputs.runtime }}
+        run: |
+          if [[ "$RUNTIME_OWNER" == cloudflare ]]; then
+            node scripts/ops/egress-monitor.mjs --provider-only
+          else
+            node scripts/ops/egress-monitor.mjs
+          fi
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

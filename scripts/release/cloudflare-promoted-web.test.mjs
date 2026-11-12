@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import { verifyPromotedWeb, verifyDesktopPromotedWeb } from './cloudflare-promoted-web.mjs'
+import { verifyPromotedWeb, verifyDesktopPromotedWeb, readServingPromotion } from './cloudflare-promoted-web.mjs'
 
 const digest = value => createHash('sha256').update(value).digest('hex')
 const product = 'abc1234'.padEnd(40, '5'), overlay = 'c'.repeat(40), releasePin = 'abc1234-902-1'
@@ -61,7 +61,8 @@ function fixture(change = {}) {
     return new Response(change.shell ?? '<script type="module" src="/mikka/assets/entry-123.js?dpl=' + releasePin + '"></script>')
   }
   const options = { env, fetchImpl, now: () => verified + (change.elapsed ?? 3600000) }
-  return { verify: () => verifyPromotedWeb(options), desktop: () => verifyDesktopPromotedWeb(options), calls }
+  return { verify: () => verifyPromotedWeb(options), desktop: () => verifyDesktopPromotedWeb(options),
+    observe: () => readServingPromotion(env.CLOUDFLARE_RECEIPT,{token:env.GITHUB_TOKEN,fetchImpl,now:options.now()}),calls }
 }
 
 test('revalidates the live promoted Web on the original dispatch after 3976 seconds of native work', async () => {
@@ -151,4 +152,16 @@ test('both publication modes share the paid builder and subscriptions, while Clo
   assert.match(child, /id: release[\s\S]*node scripts\/e2b\/runtime-report\.mjs reference\n          node scripts\/release\/cloudflare-promoted-web\.mjs/)
   assert.match(child, /  publish:\n    needs: \[validate, await-web, subscriptions\]\n    if: github\.event\.inputs\.cloudflare_receipt == ''/)
   for (const source of [parent, child]) assert.match(source, /if: github\.event\.inputs\.cloudflare_receipt == ''\n        run: node scripts\/release\/web-deploy\.mjs await-web/)
+})
+
+test('read-only monitor witness rechecks an older actual promotion without authorizing publication', async () => {
+  const historical=fixture({elapsed:100*86400000})
+  assert.equal((await historical.observe()).product,product)
+  assert.ok(!historical.calls.some(path=>path.includes('/actions/runs/')))
+  await assert.rejects(historical.verify(),/approvalWindow/)
+  for(const changed of [{headers:{'x-vercel-id':'old'}},{version:{overlaySha:'1'.repeat(40)}},
+    {shell:'<script src="/unrelated.js"></script>'},{approval:{decision:'rejected'}},
+    {approval:{until:iso(-10000)}},{post:{author_association:'MEMBER'}}]){
+    await assert.rejects(fixture(changed).observe())
+  }
 })
