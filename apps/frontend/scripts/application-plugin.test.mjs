@@ -109,14 +109,20 @@ test('official namespace consumers cannot silently render an alternate task deta
   const dir = await mkdtemp(join(repository, '.hosted-test-'))
   t.after(() => rm(dir, { recursive: true, force: true }))
   await mkdir(join(dir, 'slots'))
-  for (const name of UI_SLOTS) {
-    if (PUBLIC_CONTRACT_SLOTS.has(name)) continue
+  async function writeProvider(name) {
     const exports = UI_SLOT_EXPORTS[name].map(value => `export const ${value} = true`)
     await writeFile(join(dir, 'slots', name + '.tsx'), exports.join('\n'))
   }
-  const before = process.env.MIKKA_UI_OVERLAY_DIR
+  for (const name of UI_SLOTS) await writeProvider(name)
+  const before = { MIKKA_UI_OVERLAY_DIR: process.env.MIKKA_UI_OVERLAY_DIR, MIKKA_UI_OVERLAY_SHA: process.env.MIKKA_UI_OVERLAY_SHA }
   process.env.MIKKA_UI_OVERLAY_DIR = dir
-  t.after(() => { if (before === undefined) delete process.env.MIKKA_UI_OVERLAY_DIR; else process.env.MIKKA_UI_OVERLAY_DIR = before })
+  process.env.MIKKA_UI_OVERLAY_SHA = 'a'.repeat(40)
+  t.after(() => {
+    for (const [key, value] of Object.entries(before)) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  })
   const consumer = 'import * as slot from "@ui-slot/task-detail"; export const detail = slot.TaskDetailFrame ?? "alternate"'
   await writeFile(join(dir, 'slots/task-detail.tsx'), 'export {}')
   for (const target of ['web', 'desktop']) await assert.rejects(compile(consumer, target), /MISSING_EXPORT|not exported/)
@@ -125,6 +131,13 @@ test('official namespace consumers cannot silently render an alternate task deta
 
   const entry = 'import "mikka:frontend-runtime"; export const ready = true'
   const platformRuntime = ['apps/frontend/src/web/runtime.ts', 'apps/desktop/src/renderer/installed-startup.ts'].map(file => resolve(repository, file))
+  for (const name of PUBLIC_CONTRACT_SLOTS) {
+    await rm(join(dir, 'slots', name + '.tsx'))
+    for (const target of ['web', 'desktop']) {
+      await assert.rejects(compile(entry, target, platformRuntime), { message: 'UI_OVERLAY_SLOT_REQUIRED: ' + name })
+    }
+    await writeProvider(name)
+  }
   const unusedProvider = join(dir, 'slots/settings-usage.tsx')
   await writeFile(unusedProvider, 'export type UsagePage = string')
   for (const target of ['web', 'desktop']) await assert.rejects(compile(entry, target, platformRuntime), /MISSING_EXPORT|not exported/)
