@@ -26,64 +26,8 @@ const DRIVE_ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/restore$`), ['POST']],
 ]
 const UUID = '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89aAbB][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}'
-const ORGANIZATION_OVERVIEW_OR_KEYS = new RegExp(`^/api/organizations/${UUID}(?:/api-keys)?import { resolve, sep } from 'node:path'
-
-export const RENDERER_ORIGIN = 'mikka://app'
-export const RENDERER_URL = `${RENDERER_ORIGIN}/mikka`
-
-/** No remote scripts, eval, workers or remote websocket connections. */
-export const RENDERER_CSP = [
-  "default-src 'none'", "script-src 'self'", "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https:", "font-src 'self' data:", "connect-src 'self'",
-  "media-src 'self' blob:", "frame-src 'self' https:", "object-src 'none'", "base-uri 'none'",
-  "form-action 'none'", "frame-ancestors 'none'", "worker-src 'none'",
-].join('; ')
-
-const ID = '[A-Za-z0-9_-]{1,128}'
-const FACTORY_FLOW = /^\/api\/factory\/tasks\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/flow$/i
-const BILLING_MANAGEMENT = /^\/api\/(?:workspaces|organizations)\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/billing$/i
-const DRIVE_VOLUME_ID = 'vol_[0-9A-HJKMNP-TV-Z]{26}'
-const DRIVE_VERSION_ID = 'vver_[0-9A-HJKMNP-TV-Z]{26}'
-const DRIVE_ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
-  [/^\/api\/drive\/volumes$/, ['GET', 'POST']],
-  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}$`), ['GET']],
-  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/(?:files|versions)$`), ['GET']],
-  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/versions/${DRIVE_VERSION_ID}$`), ['GET']],
-  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/blobs$`), ['POST']],
-  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/entries$`), ['PATCH']],
-  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/restore$`), ['POST']],
-]
-const UUID = '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89aAbB][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}'
-)
-const ORGANIZATION_KEY = new RegExp(`^/api/organizations/${UUID}/api-keys/${UUID}import { resolve, sep } from 'node:path'
-
-export const RENDERER_ORIGIN = 'mikka://app'
-export const RENDERER_URL = `${RENDERER_ORIGIN}/mikka`
-
-/** No remote scripts, eval, workers or remote websocket connections. */
-export const RENDERER_CSP = [
-  "default-src 'none'", "script-src 'self'", "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https:", "font-src 'self' data:", "connect-src 'self'",
-  "media-src 'self' blob:", "frame-src 'self' https:", "object-src 'none'", "base-uri 'none'",
-  "form-action 'none'", "frame-ancestors 'none'", "worker-src 'none'",
-].join('; ')
-
-const ID = '[A-Za-z0-9_-]{1,128}'
-const FACTORY_FLOW = /^\/api\/factory\/tasks\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/flow$/i
-const BILLING_MANAGEMENT = /^\/api\/(?:workspaces|organizations)\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/billing$/i
-const DRIVE_VOLUME_ID = 'vol_[0-9A-HJKMNP-TV-Z]{26}'
-const DRIVE_VERSION_ID = 'vver_[0-9A-HJKMNP-TV-Z]{26}'
-const DRIVE_ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
-  [/^\/api\/drive\/volumes$/, ['GET', 'POST']],
-  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}$`), ['GET']],
-  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/(?:files|versions)$`), ['GET']],
-  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/versions/${DRIVE_VERSION_ID}$`), ['GET']],
-  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/blobs$`), ['POST']],
-  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/entries$`), ['PATCH']],
-  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/restore$`), ['POST']],
-]
-const UUID = '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89aAbB][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}'
-)
+const ORGANIZATION_OVERVIEW_OR_KEYS = new RegExp(`^/api/organizations/${UUID}(?:/api-keys)?$`)
+const ORGANIZATION_KEY = new RegExp(`^/api/organizations/${UUID}/api-keys/${UUID}$`)
 const WORKSPACE_GOVERNANCE = new RegExp(`^/api/workspaces/${UUID}/governance$`)
 const SERVICE_IDENTITY_DIRECTORY = `/api/workspaces/${UUID}/service-identities`
 const SERVICE_IDENTITY_ROUTES: ReadonlyArray<readonly [RegExp, string]> = [
