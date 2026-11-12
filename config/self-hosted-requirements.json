@@ -1020,5 +1020,12 @@
     "behavior": "Team home reads the complete authorized Task count from this server using the existing authenticated Team directory request and PostgreSQL.",
     "test": "tests/team-visibility.db.test.ts",
     "suite": "test:visibility-db"
+  },
+  "lib/inbox/client.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the selected workspace Inbox and submit authorized lifecycle commands through the connected installation, preserving the server receipt and opaque pagination cursor.",
+    "test": "lib/inbox/workspace.test.ts",
+    "suite": "test:factory"
   }
 }

@@ -26,5 +26,9 @@ export function createDecisionSubmission(update: () => void) {
     update()
     return receipt.status === 'accepted'
   }
-  return { state, submit }
+  /** Release a completed projection only when an authoritative list no longer contains the row. */
+  function forgetAccepted(key: string) {
+    if (state(key).status === 'accepted') states.delete(key)
+  }
+  return { state, submit, forgetAccepted }
 }

@@ -6,7 +6,7 @@ export type Scope = { personal: boolean }
 export type InboxReader = Parameters<typeof import('../task-workspace').withTaskWorkspace>[0]
 export type Guard = <T>(reader: InboxReader, workspaceId: string, work: (scope: Scope) => Promise<T>) => Promise<T>
 export type Changed = (userId: string, workspaceId: string) => Promise<void>
-type SourceRow = InboxSource & { snoozedUntil: Date | null }
+type SourceRow = InboxSource & { snoozedUntil: Date | null; occurredAt: Date }
 const key = (type: string, id: string) => `${type}:${id}`
 
 /** The source's own authority is checked on every read/write. Snooze is per
@@ -17,9 +17,10 @@ export class InboxStore {
   private sourceQuery(userId: string, workspaceId: string, scope: Scope, type?: string, id?: string) {
     return { text: `
       WITH sources AS (
-        SELECT i.id,'task' AS type,'agent' AS source,i.title,i.id AS "issueId",i."userId" AS "ownerId",
+        SELECT i.id,'task' AS type,'agent' AS source,i.title,i.id AS "issueId",i."userId" AS "ownerId", i."updatedAt" AS "occurredAt",
           (r."userId"=$1) AS "canReply",
           CASE WHEN i.status IN ('done','canceled','duplicate') THEN false
+            WHEN questions.total>0 THEN true
             WHEN EXISTS(SELECT 1 FROM factory_tasks f WHERE f."issueId"=i.id AND f.stage='approval' AND f.status IN ('pending','waiting')) THEN true
             WHEN r.id IS NULL OR r.status IN ('queued','preparing','running','finishing','paused') THEN false
             WHEN r.status='waiting_input' THEN true
@@ -34,13 +35,18 @@ export class InboxStore {
           CASE WHEN r.status='waiting_input' THEN 'needsReply'
             WHEN i.status='review' OR EXISTS(SELECT 1 FROM jsonb_array_elements(coalesce(i.content->'attrs'->'mikka'->'pullRequests','[]'::jsonb)) pr WHERE pr->>'state' IN ('open','draft')) OR EXISTS(SELECT 1 FROM factory_tasks f WHERE f."issueId"=i.id AND f.stage='approval' AND f.status IN ('pending','waiting')) THEN 'review'
             WHEN r.outcome='needs_input' THEN 'needsReply'
-            ELSE 'confirm' END AS reason
+            ELSE 'confirm' END AS reason, questions.total AS "questionCount"
         FROM issues i LEFT JOIN LATERAL (SELECT id,"userId",status,outcome FROM agent_runs WHERE "issueId"=i.id ORDER BY "createdAt" DESC,id DESC LIMIT 1) r ON true
+        CROSS JOIN LATERAL (SELECT count(*)::integer AS total FROM factory_questions q JOIN factory_tasks f ON f.id=q."taskId"
+          WHERE q."issueId"=i.id AND q."userId"=$1 AND f."userId"=$1 AND f."issueId"=i.id
+                AND f.status NOT IN ('cancelled','revoked') AND f."candidateId" IS NOT DISTINCT FROM q."candidateId"
+                AND q.status IN ('open','waiting_user','blocked') AND q."answerId" IS NULL
+                AND (q."expiresAt" IS NULL OR q."expiresAt">now())) questions
         WHERE coalesce(i.content->'attrs'->'mikka',i.content->'attrs'->'orvilo')->>'deletedAt' IS NULL
           AND i."workspaceId"=$2 AND i."ownershipState"='bound'
         UNION ALL
-        SELECT s.id,'suggestion',s.source,coalesce(s."actionTitle",s.title),NULL::uuid,s."userId",false,
-          (s."dismissedAt" IS NULL AND s."createdAt">now()-interval '7 days'),s."rejectedAt",s."rejectedBy",NULL::uuid,NULL::text FROM suggestions s
+        SELECT s.id,'suggestion',s.source,coalesce(s."actionTitle",s.title),NULL::uuid,s."userId",s."occurredAt",false,
+          (s."dismissedAt" IS NULL AND s."createdAt">now()-interval '7 days'),s."rejectedAt",s."rejectedBy",NULL::uuid,NULL::text,0 FROM suggestions s
         LEFT JOIN bots b ON b.id=s."botId" AND b."ownerId"=s."userId"
         WHERE s."userId"=$1 AND s.shown AND (b."workspaceId"=$2 OR (s."botId" IS NULL AND $3))
       ) SELECT s.*,z."snoozedUntil" FROM sources s LEFT JOIN inbox_snoozes z
@@ -50,6 +56,17 @@ export class InboxStore {
   }
   private async sources(tx: Pick<PoolClient, 'query'>, userId: string, workspaceId: string, scope: Scope, type?: string, id?: string) {
     return (await tx.query<SourceRow>(this.sourceQuery(userId, workspaceId, scope, type, id))).rows
+  }
+
+  async pendingCount(reader: InboxReader, workspaceId: string): Promise<number> {
+    const userId = typeof reader === 'string' ? reader : reader.id
+    return this.guard(reader, workspaceId, async scope => {
+      const source = this.sourceQuery(userId, workspaceId, scope)
+      const { rows } = await this.pool.query<{ count: number }>(
+        `SELECT coalesce(sum(greatest("questionCount",1)),0)::integer AS count
+         FROM (${source.text}) eligible WHERE pending AND "snoozedUntil" IS NULL`, source.values)
+      return rows[0].count
+    })
   }
 
   async list(reader: InboxReader, workspaceId: string, tab: 'pending' | 'done' | 'snoozed', limit: number, cursor?: string): Promise<InboxPage> {
@@ -62,7 +79,7 @@ export class InboxStore {
         const status = done || !s.pending ? 'done' : snoozedUntil ? 'snoozed' : 'pending'
         const actions = status === 'done' ? s.rejectedAt ? ['undo_reject'] : []
           : [...(s.type === 'suggestion' ? ['accept', 'reject'] : ['open', ...(s.canReply ? ['reply'] : [])]), status === 'snoozed' ? 'reopen' : 'snooze']
-        return { id: s.id, type: s.type, source: s.source, title: s.title, issueId: s.issueId, ownerId: s.ownerId,
+        return { id: s.id, type: s.type, source: s.source, occurredAt: s.occurredAt.toISOString(), title: s.title, issueId: s.issueId, ownerId: s.ownerId,
           pending: s.pending, rejectedBy: s.rejectedBy ?? null, canReply: s.canReply ?? false, runId: s.runId ?? null, reason: s.reason ?? null, rejectedAt: s.rejectedAt?.toISOString() ?? null, status, snoozedUntil, actions }
       }
       if (tab !== 'done') {

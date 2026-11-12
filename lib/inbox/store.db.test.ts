@@ -142,6 +142,8 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
     }
     assert.equal((await list()).items.length, 0)
     assert.equal((await list(owner, workspace, 'snoozed')).items.length, 2)
+    assert.equal(await store.pendingCount(owner, workspace), 0, 'badge excludes both snoozed rows')
+    assert.equal(await store.pendingCount(peer, workspace), 1, 'badge respects viewer scope')
     assert.equal((await list(peer)).items.length, 1, 'personal snooze never hides a teammate task')
     assert.equal(await store.nextDue(), due.getTime())
     const before = pushes.length
@@ -191,6 +193,11 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
       VALUES($1,$2,'approval',1,1,'pending',$3,'fixture')`, [attempt, task, run])
     await pool.query(`INSERT INTO factory_questions(id,"userId","issueId","taskId","attemptId",stage,"originRunId","originSessionId","originRevision","waitingBinding",kind,question,request,status,reason,"sourceEventId")
       VALUES($1,$2,$3,$4,$5,'execute',$6,'synthetic',1,'{}','context','fixture','{}','waiting_user','fixture',$7)`, [question, owner, issue, task, attempt, run, randomUUID()])
+    await pool.query(`UPDATE factory_tasks SET stage='execute' WHERE id=$1`, [task])
+    await pool.query(`UPDATE agent_runs SET status='running' WHERE id=$1`, [run])
+    assert.ok((await list(owner, workspace, 'pending')).items.some(item => item.id === issue), 'a waiting Factory question is a snoozable Inbox Task even while its run is active')
+    assert.ok(!(await list(peer, workspace, 'pending')).items.some(item => item.id === issue), 'a private question cannot make the Task pending for another member')
+    await pool.query(`UPDATE factory_tasks SET stage='approval' WHERE id=$1`, [task])
     await pool.query(`UPDATE factory_questions SET "answerId"=$2,"answerSource"='human',"answeredAt"=now() WHERE id=$1`, [question, answer])
     await pool.query(`INSERT INTO run_messages(id,"runId","userId",text) VALUES($1,$2,$3,'answer')`, [answer, run, owner])
     await pool.query(`INSERT INTO factory_approvals(id,"taskId","candidateId","attemptId","userId","eventId",request,candidate,action,target,evidence,"approvedRevision","publishAttemptId","publishRevision","expiresAt","principalId")
