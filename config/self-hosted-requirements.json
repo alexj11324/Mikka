@@ -337,6 +337,13 @@
     "behavior": "A sponsored machine requires the workspace allowlist and a private bridge token. Unconfigured workspaces cannot acquire the machine grant.",
     "test": "apps/api/scripts/cloudflare-api.test.mjs"
   },
+  "lib/code-review/read-contract.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read authorized Task Review summaries and immutable checkpoint file data from the selected installation, preserving unknown counts and the server-provided permission reasons.",
+    "test": "lib/code-review/client.test.ts",
+    "suite": "test:thread-changes"
+  },
   "lib/coordinator/ci-suite-transport.ts": {
     "mode": "built-in",
     "environment": [],
@@ -582,12 +589,26 @@
     "test": "scripts/thread-composer.test.tsx",
     "suite": "test:groups"
   },
+  "lib/group-messages.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the installation's authenticated same-origin group API for reading, sending and voluntarily leaving. A departed member loses message and member caches; a later read remains unauthorized.",
+    "test": "lib/group-messages.test.ts",
+    "suite": "test:issue-search"
+  },
   "lib/hooks/use-task-continuation.ts": {
     "mode": "built-in",
     "environment": [],
     "behavior": "Paged task lists fetch the next authorized cursor on demand and discard previous pages when the current view changes.",
     "test": "hooks/use-task-cards.test.tsx",
     "suite": "test:thread-changes"
+  },
+  "lib/hooks/view-state.tsx": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Keep per-window browsing state in sessionStorage and retire revoked conversation drafts when the authorized group changes; no hosted service is needed.",
+    "test": "lib/hooks/view-state.test.tsx",
+    "suite": "test:view-state"
   },
   "lib/issue-threads.ts": {
     "mode": "built-in",

@@ -31,7 +31,6 @@ export function coordinatorSendFailure(error: unknown): SubmitOutcome {
   if (error.status === 401) return { kind: 'authRequired' }
   if (error.code === 'submissionConflict') return { kind: 'conflict' }
   if (error.status === 429) return { kind: 'rejected', error: 'rateLimited' }
-  if (error.status === 403 && !ACTION_ERROR_CODES.some(code => code === error.code)) return { kind: 'rejected', error: 'workspaceAccessDenied' }
   if (error.status >= 500) return { kind: 'uncertain' }
   return { kind: 'rejected', error: ACTION_ERROR_CODES.find(code => code === error.code) ?? 'generic' }
 }

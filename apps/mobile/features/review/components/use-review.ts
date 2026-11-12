@@ -5,8 +5,8 @@ import { tasksLive } from '@/lib/live-keys'
 import { useLiveApi } from '@/lib/useApi'
 import { tap, warn } from '@/lib/haptics'
 import { batchKey, clearBatch, useBatch } from '../model/batch-store'
-import { batchIsEmpty, batchLine, denial, isMerged, type ReviewCheck, type ReviewRead } from '../model/review'
-import { checksPath, merge, reviewPath, sendToAgent, type ActionResult } from '../model/review-api'
+import { batchIsEmpty, batchLine, denial, EMPTY_BATCH, isMerged, usesVersionedReview, type ReviewCheck, type ReviewRead } from '../model/review'
+import { checksPath, merge, readChecksPath, readReviewPath, reviewPath, sendToAgent, type ActionResult } from '../model/review-api'
 
 /** A refusal (403) in the person's words, from the contract's reason code (R11). */
 function refused(result: ActionResult, fallback: string) {
@@ -23,28 +23,34 @@ function refused(result: ActionResult, fallback: string) {
 export function useReview(taskId: string) {
   const home = useHome().data
   const live = () => tasksLive(home?.live?.workspaceId, home?.workspace.id)
-  const read = useLiveApi<ReviewRead>(taskId ? reviewPath(taskId) : null, live)
-  const checksRead = useLiveApi<ReviewCheck[]>(taskId ? checksPath(taskId) : null, live)
-  const [batch, setBatch] = useBatch(taskId)
+  const read = useLiveApi<ReviewRead | null>(taskId ? reviewPath(taskId) : null, live, readReviewPath)
+  const review = read.data
+  const versioned = review ? usesVersionedReview(review.summary) : false
+  const reference = review?.summary.reviewRef
+  const checksRead = useLiveApi<ReviewCheck[]>(taskId && review && reference !== null && (!versioned || review.summary.checks) ? checksPath(taskId, reference) : null, live, readChecksPath)
+  const [localBatch, updateBatch, batchScope] = useBatch(taskId)
+  const batch = versioned ? EMPTY_BATCH : localBatch
   const [sending, setSending] = useState(false)
   const [merging, setMerging] = useState(false)
-  const review = read.data
   const checks = checksRead.data ?? []
   const permissions = review?.summary.permissions
   const merged = review ? isMerged(review.summary) : false
-  const canSend = Boolean(permissions?.canSend) && !merged && !batchIsEmpty(batch) && !sending
+  const setBatch = useCallback((next: Parameters<typeof updateBatch>[0]) => {
+    if (permissions?.canSend && !versioned && !merged) updateBatch(next)
+  }, [permissions?.canSend, versioned, merged, updateBatch])
+  const canSend = !!batchScope && !versioned && Boolean(permissions?.canSend) && !merged && !batchIsEmpty(batch) && !sending
   const { reload } = read
   const reloadChecks = checksRead.reload
   const reloadAll = useCallback(() => Promise.all([reload(), reloadChecks()]).then(() => undefined), [reload, reloadChecks])
 
   const send = useCallback(async () => {
-    if (!canSend) return
+    if (!canSend || !batchScope) return
     setSending(true)
     try {
-      const result = await sendToAgent(taskId, batch, batchKey(taskId))
+      const result = await sendToAgent(taskId, batch, batchKey(batchScope))
       if (refused(result, '没能发给 Agent')) return
       tap()
-      clearBatch(taskId)
+      clearBatch(batchScope)
       void reloadAll()
     } catch {
       warn()
@@ -52,12 +58,12 @@ export function useReview(taskId: string) {
     } finally {
       setSending(false)
     }
-  }, [batch, canSend, reloadAll, taskId])
+  }, [batch, batchScope, canSend, reloadAll, taskId])
 
   const approve = useCallback(async () => {
-    if (!review || !permissions?.canMerge || merging) return
-    const failed = review.summary.checks.failed
-    const confirm = (run: () => void) => Alert.alert(`还有 ${failed || 1} 项检查失败，确定合并？`, undefined, [
+    if (!review || versioned || !permissions?.canMerge || merging) return
+    const failed = review.summary.checks?.failed
+    const confirm = (run: () => void) => Alert.alert(failed ? `还有 ${failed} 项检查失败，确定合并？` : '检查未通过，确定合并？', undefined, [
       { text: '取消', style: 'cancel' },
       { text: '仍然合并', style: 'destructive', onPress: run },
     ])
@@ -77,12 +83,12 @@ export function useReview(taskId: string) {
       }
     }
     // The server asks again for a failing check (409 needs_confirm); the app asks first so it is one step.
-    if (failed > 0) confirm(() => void run(true))
+    if (failed && failed > 0) confirm(() => void run(true))
     else await run(false)
-  }, [merging, permissions, reloadAll, review, taskId])
+  }, [merging, permissions, reloadAll, review, taskId, versioned])
 
   return {
-    ...read, reload: reloadAll, review, checks, permissions, batch, setBatch,
+    ...read, reload: reloadAll, review, checks, permissions, versioned, batch, setBatch,
     line: review ? batchLine(batch, checks) : null, canSend, send, sending, approve, merging, merged,
   }
 }

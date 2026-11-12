@@ -71,16 +71,22 @@ export function TaskList({ filter = 'all', bot, bottom = 24 }: { filter?: TaskFi
       refreshControl={<RefreshControl {...refresh} />}
       contentContainerStyle={{ paddingBottom: insets.bottom + bottom }}
       ListHeaderComponent={<ReadNotice error={error} hasData={Boolean(data)} label={mobileMessages.Nav.tasks} onRetry={reload} />}
-      ListFooterComponent={paging.hasMore ? <Pressable accessibilityRole="button" disabled={paging.loading}
-        onPress={() => void paging.loadMore()} style={styles.center}>
-        <Text>{paging.failed ? mobileMessages.Common.retry : mobileMessages.HostedTasks.loadMore}</Text>
-      </Pressable> : undefined}
+      ListFooterComponent={<TaskListContinuation paging={paging} />}
       ListEmptyComponent={loading && !data ? <View style={styles.center}><Spinner /></View> : error ? undefined : <Text style={styles.empty}>{mobileMessages.MobileCore.noTasks}</Text>}
       renderItem={({ item }) => item.kind === 'section'
         ? <TaskGroupBar id={item.id} count={item.count} folded={item.folded} onToggle={() => toggle(item.id)} />
         : <TaskRowView task={item.task} />}
     />
   )
+}
+
+/** Tasks and Search continue the same authorized collection on an explicit tap. */
+export function TaskListContinuation({ paging }: { paging: ReturnType<typeof useTasks>['paging'] }) {
+  if (!paging.hasMore) return null
+  return <Pressable accessibilityRole="button" accessibilityState={{ busy: paging.loading, disabled: paging.loading }}
+    disabled={paging.loading} onPress={() => void paging.loadMore()} style={styles.center}>
+    <Text>{paging.loading ? mobileMessages.Shell.search.loadingMore : paging.failed ? mobileMessages.Common.retry : mobileMessages.HostedTasks.loadMore}</Text>
+  </Pressable>
 }
 
 /** A group's header (Comma 15): its icon, name and count in the secondary colour on the page, no fill (Alex 2026-11-08:
