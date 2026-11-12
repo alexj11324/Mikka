@@ -63,6 +63,12 @@ function Apps({ query, header }: { query: string; header: ReactElement }) {
   const reload = async () => { await Promise.all([catalog.reload(), connections.reload()]) }
   const refresh = useRefresh(reload)
   const connected = useMemo(() => new Set(connections.snapshot?.toolkits ?? []), [connections.snapshot])
+  const stateText = (entry: Entry) => {
+    if (connected.has(entry.id)) return '已连接'
+    if (connections.snapshot?.paused?.includes(entry.id)) return '同步已暂停'
+    if (connections.error && (!connections.snapshot || connections.snapshot.failed.some(failure => failure.source === (entry.own ? entry.id : 'composio')))) return '连接状态未知'
+    return null
+  }
   const byId = new Map<string, Entry>([...OWN, ...(catalog.data?.apps ?? [])].map(app => [app.id, app]))
   const entries = (ids: readonly string[]): Entry[] => ids.flatMap(id => { const app = byId.get(id); return app ? [app] : [] })
   const needle = query.trim().toLowerCase()
@@ -103,10 +109,10 @@ function Apps({ query, header }: { query: string; header: ReactElement }) {
       ListEmptyComponent={catalog.loading ? <View style={styles.center}><Spinner /></View>
         : <Text style={styles.note}>{catalog.error ? '应用加载失败' : needle ? `没有找到「${query.trim()}」` : catalog.data?.configured === false ? '应用商店未配置' : '没有应用'}</Text>}
       renderItem={({ item: row }) => 'title' in row ? <ListSectionHeader title={row.title} grouped /> : (
-        <GroupRow place={row.place} label={`${row.item.name}${connected.has(row.item.id) ? '，已连接' : ''}`} onPress={() => void open(row.item.id)}>
+        <GroupRow place={row.place} label={[row.item.name, stateText(row.item)].filter(Boolean).join('，')} onPress={() => void open(row.item.id)}>
           <AppIcon entry={row.item} />
           <Text style={styles.name} numberOfLines={1}>{row.item.name}</Text>
-          {connected.has(row.item.id) ? <View style={styles.connected} /> : (connections.error && (!connections.snapshot || connections.snapshot.failed.some(failure => failure.source === (row.item.own ? row.item.id : 'composio')))) ? <Text style={styles.state}>连接状态未知</Text> : null}
+          {connected.has(row.item.id) ? <View style={styles.connected} /> : stateText(row.item) ? <Text style={styles.state}>{stateText(row.item)}</Text> : null}
           <Symbol name="chevron.right" size={13} color={colors.tertiary} />
         </GroupRow>
       )}

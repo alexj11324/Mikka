@@ -22,11 +22,12 @@ async function github(userId: string, headers: Headers) {
 
 async function linear(userId: string) {
   const state = await linearSyncState()
-  if (state === 'unavailable') throw new Error('linear_status_unavailable')
-  if (state !== 'enabled' || !linearOAuthConfigured()) return []
+  // R-40 leaves a paused service visible without reading the person's connection table.
+  if (state !== 'enabled') return 'paused'
+  if (!linearOAuthConfigured()) return 'notConnected'
   const [row] = await db.select({ id: linearConnections.userId }).from(linearConnections)
     .where(and(eq(linearConnections.userId, userId), isNull(linearConnections.revokedAt))).limit(1)
-  return row ? ['linear'] : []
+  return row ? 'connected' : 'notConnected'
 }
 
 async function composioAccounts(userId: string) {
@@ -41,8 +42,13 @@ async function composioAccounts(userId: string) {
 
 export async function mobilePluginConnections(userId: string, headers: Headers) {
   const sources = ['composio', 'github', 'linear', 'telegram'] as const
+  const paused: string[] = []
   const reads = await Promise.allSettled([
-    composioAccounts(userId), github(userId, headers), linear(userId),
+    composioAccounts(userId), github(userId, headers),
+    linear(userId).then(state => {
+      if (state === 'paused') paused.push('linear')
+      return state === 'connected' ? ['linear'] : []
+    }),
     readTelegramIntegrationStatus(userId).then(state => state.configured && state.connected ? ['telegram'] : []),
   ])
   const toolkits = new Set<string>()
@@ -51,5 +57,5 @@ export async function mobilePluginConnections(userId: string, headers: Headers) 
     if (read.status === 'fulfilled') for (const id of read.value) toolkits.add(id)
     else failed.push({ source: sources[index], reason: read.reason instanceof GitHubAccessError ? read.reason.code : read.reason instanceof Error ? read.reason.name : 'unknown' })
   })
-  return { toolkits: [...toolkits], failed }
+  return { toolkits: [...toolkits], paused, failed }
 }

@@ -15,10 +15,11 @@ export function usePluginConnections() {
   const directory = useApi<PluginConnections | Settings>(focused ? '/api/mobile/settings?view=pluginConnections' : null)
   const legacy = directory.data && 'apps' in directory.data ? directory.data : null
   const accounts = useApi<ComposioAccounts>(focused && legacy ? '/api/integrations/composio' : null)
+  const linear = useApi<{ enabled: boolean }>(focused && legacy ? '/api/integrations/linear/status' : null)
   const snapshot = useMemo(() => {
     if (directory.data && 'toolkits' in directory.data) return directory.data
-    return legacy ? legacyPluginConnections(legacy, accounts.data) : null
-  }, [directory.data, legacy, accounts.data])
+    return legacy ? legacyPluginConnections(legacy, accounts.data, linear.data) : null
+  }, [directory.data, legacy, accounts.data, linear.data])
   return { snapshot, error: directory.error || accounts.error || Boolean(snapshot?.failed.length),
-    reload: async () => { await Promise.all([directory.reload(), accounts.reload()]) } }
+    reload: async () => { await Promise.all([directory.reload(), accounts.reload(), linear.reload()]) } }
 }
