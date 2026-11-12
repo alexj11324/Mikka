@@ -65,6 +65,8 @@ export function useIssueBoardSaves({ issues, blocks, newestRuns, onUpdated, onBu
   async function persist(issue: Issue, patch: { status?: string; priority?: string; block?: BlockFlag }, rollback: Columns) {
     if (saving.current) return false
     saving.current = true
+    const errorToastId = `board-change:${issue.id}`
+    toast.dismiss(errorToastId)
     setPending(true)
     onBusyChange(true)
     setMessage(t('savingProperties'))
@@ -78,7 +80,7 @@ export function useIssueBoardSaves({ issues, blocks, newestRuns, onUpdated, onBu
         setColumns(rollback)
         const errorMessage = translateError(result.error)
         setMessage(errorMessage)
-        toast.error(errorMessage)
+        toast.error(errorMessage, { id: errorToastId })
         return false
       }
       const savedIssue = result.issue
@@ -89,7 +91,7 @@ export function useIssueBoardSaves({ issues, blocks, newestRuns, onUpdated, onBu
       setColumns(rollback)
       const errorMessage = t('moveRollback')
       setMessage(errorMessage)
-      toast.error(errorMessage)
+      toast.error(errorMessage, { id: errorToastId })
       return false
     } finally {
       saving.current = false
