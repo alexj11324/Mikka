@@ -6,6 +6,7 @@
 //
 // Serves the exported apps/mobile web bundle, answers its API with the fixtures below, and writes light and dark
 // frames of the Bot tab, the 任务 tab, a task's detail and an attempt's thread at 393 × 852.
+import assert from 'node:assert/strict'
 import { createReadStream, existsSync, mkdirSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { extname, join } from 'node:path'
@@ -121,6 +122,9 @@ function apiResponse(url) {
   const path = new URL(url).pathname
   if (path.endsWith('/api/auth/get-session')) return json(session)
   if (path === '/api/version') return json({})
+  if (path === '/api/conversations') return json({ conversations: [] })
+  if (path === '/api/mobile/chat') return json({ botId: new URL(url).searchParams.get('bot') ?? COORDINATOR,
+    enabled: true, working: false, items: [], sources: {}, artifacts: {}, live: { workspaceId: WORKSPACE } })
   if (path === '/api/mobile/home') return json(home)
   if (path === '/api/mobile/task-presentations') return json({ version: 1, workspaceId: WORKSPACE, items: Object.fromEntries(tasks.map(task =>
     [task.id, { version: 1, state: task.state, group: task.group, reason: task.reason, blockedBy: task.blockedBy ?? null, primaryStatus: task.status }])) })
@@ -191,6 +195,12 @@ async function run() {
       await page.getByText('活动').waitFor({ timeout: 20_000 })
       await page.waitForTimeout(500)
       await page.screenshot({ path: join(outDir, `${theme}-3-task.png`) })
+      const properties = page.getByRole('button', { name: '状态和优先级（网页版）', exact: true })
+      await properties.focus()
+      const [webTask] = await Promise.all([context.waitForEvent('page'), properties.press('Enter')])
+      await webTask.waitForLoadState('domcontentloaded')
+      assert.equal(webTask.url(), `${origin}/?issue=${TASK}`)
+      await webTask.close()
       // 活动's second row is the next Agent, named without a verb; it opens the conversation at its first run.
       await page.getByText('Claude Code', { exact: true }).last().click()
       await page.getByPlaceholder('给这个任务发消息').waitFor({ timeout: 20_000 })
@@ -211,7 +221,7 @@ async function run() {
     await browser.close()
     server.close()
   }
-  if (problems.length) console.log([...new Set(problems)].join('\n'))
+  assert.deepEqual([...new Set(problems)], [], 'unexpected page errors or fixture requests')
   console.log(`screenshots in ${outDir}`)
 }
 

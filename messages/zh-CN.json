@@ -7325,6 +7325,7 @@
     "priority": "{priority}优先级",
     "noPriority": "无",
     "activity": "活动",
+    "taskPropertiesOnWeb": "状态和优先级（网页版）",
     "comment": "+ 评论",
     "conversation": {
       "fix": "修复",

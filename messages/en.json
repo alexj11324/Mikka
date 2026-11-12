@@ -7325,6 +7325,7 @@
     "priority": "{priority} priority",
     "noPriority": "No",
     "activity": "Activity",
+    "taskPropertiesOnWeb": "Status and priority (web)",
     "comment": "+ Comment",
     "conversation": {
       "fix": "Fix",
