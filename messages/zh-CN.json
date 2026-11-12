@@ -6431,6 +6431,11 @@
       "notMemberNote": "组织角色不授予访问"
     },
     "invitations": {
+      "joinTitle": "加入组织",
+      "invalidToken": "邀请链接无效",
+      "joined": "已作为普通成员加入组织，工作区权限不变。",
+      "openOrganization": "打开组织设置",
+      "accept": "加入组织",
       "organizationSelect": "组织",
       "noOrganizations": "暂未加入组织",
       "statusPending": "待接受",

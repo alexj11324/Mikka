@@ -6431,6 +6431,11 @@
       "notMemberNote": "Organization roles don't grant access"
     },
     "invitations": {
+      "joinTitle": "Join Organization",
+      "invalidToken": "Invalid invitation link",
+      "joined": "You joined the Organization as a Member. Workspace access is unchanged.",
+      "openOrganization": "Open Organization settings",
+      "accept": "Join Organization",
       "organizationSelect": "Organization",
       "noOrganizations": "No Organizations",
       "statusPending": "Pending",

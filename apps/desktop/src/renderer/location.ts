@@ -93,7 +93,7 @@ export function isClientRoute(url: URL) {
   if (serverDocumentKind() && !serverPageKind(url)) return false
   const path = withoutLocale(url.pathname)
   return ['/', '/dashboard', '/devices', '/device', '/settings', '/settings/teams', '/settings/members', '/workspaces/new', '/sign-in', '/sign-up', '/forgot-password', '/reset-password', '/verify-email', '/oauth/consent'].includes(path)
-    || /^\/(?:invite|a|w)\/[^/]+$/.test(path)
+    || /^\/(?:invite|organization-invite|a|w)\/[^/]+$/.test(path)
 }
 
 export function navigate(href: Href, replace = false, options?: { scroll?: boolean; locale?: string }, localized = false) {
