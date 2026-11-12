@@ -129,8 +129,10 @@ async function normalDeploymentGate({ env, fetchImpl }) {
 }
 
 export async function runMobileDaemonProof({ env = process.env, event, attestation, fetchImpl = fetch, now = Date.now,
-  wait = delay, clientLoader = repositoryClient, deploymentGate = normalDeploymentGate, socketFactory, recoveryAnchor } = {}) {
+  wait = delay, clientLoader = repositoryClient, deploymentGate = normalDeploymentGate, socketFactory, recoveryAnchor,
+  releaseWitness } = {}) {
   const core = env.MIKKA_ACCEPTANCE_TARGET_MODE === CORE_MODE
+  const deployed = env.MIKKA_ACCEPTANCE_TARGET_MODE === 'deployed-target'
   const report = { version: 1, scope: 'production-mobile-and-source-daemon-http', status: 'fail',
     applicationSha: SHA.test(env.APPLICATION_SHA ?? '') ? env.APPLICATION_SHA : null,
     runnerSha: SHA.test(env.GITHUB_SHA ?? '') ? env.GITHUB_SHA : null,
@@ -171,6 +173,23 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     ...(cleanupResponse?.phase === phase ? { http: cleanupResponse.http } : {}) })
   }
   const verifyDeployment = async () => {
+    if (releaseWitness) {
+      check(!core && !deployed && SHA.test(releaseWitness.source) && SHA.test(releaseWitness.overlay)
+        && SHA.test(releaseWitness.driver) && ['vercel','cloudflare'].includes(releaseWitness.provider),
+      'configuration_invalid')
+      const response = await fetchImpl(ORIGIN + BASE + '/api/version', {
+        redirect: 'error', cache: 'no-store', headers: { 'cache-control': 'no-store' }, signal: AbortSignal.timeout(15_000),
+      })
+      check(response.ok && !response.redirected, 'deployment_mismatch')
+      const version = await response.json()
+      check(version.build === releaseWitness.source && version.overlaySha === releaseWitness.overlay
+        && (releaseWitness.provider === 'vercel' ? response.headers.has('x-vercel-id')
+          : !response.headers.has('x-vercel-id') && response.headers.has('cf-ray')), 'deployment_mismatch')
+      Object.assign(report, { targetMode:'release-witness', applicationSha:version.build,
+        overlaySha:version.overlaySha, provider:releaseWitness.provider, driverRevision:releaseWitness.driver })
+      report.client.sourceRevision = releaseWitness.driver
+      return
+    }
     if (core) {
       targetProof = await assertCoreProductionTarget({ env, event, attestation: targetProof, fetchImpl, now })
       Object.assign(report, { targetMode: CORE_MODE, applicationSha: targetProof.applicationSha,
@@ -319,7 +338,11 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
   }
 
   try {
-    proofConfiguration(env, event)
+    if (releaseWitness) {
+      check(isSmokeAccountEmail(env.SMOKE_OWNER_EMAIL) && Boolean(env.SMOKE_OWNER_PASSWORD), 'configuration_invalid')
+    } else {
+      proofConfiguration(env, event)
+    }
     phase = 'deployment'
     await verifyDeployment()
     report.checks.deployment = true
@@ -557,7 +580,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     jar.clear()
     credential = undefined
   }
-  if ((core || env.MIKKA_ACCEPTANCE_TARGET_MODE === 'deployed-target') && report.checks.deployment) {
+  if ((core || deployed || releaseWitness) && report.checks.deployment) {
     // Failure attribution needs an actual after-observation too. This never
     // suppresses the original business or cleanup errors, nor repeats a mutation.
     try {
@@ -575,7 +598,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
   if (primaryPassed && !report.errors.length) {
     try {
       phase = 'final-deployment'
-      if (!core && env.MIKKA_ACCEPTANCE_TARGET_MODE !== 'deployed-target') {
+      if (!core && !deployed && !releaseWitness) {
         await verifyDeployment()
         report.checks.finalDeployment = true
       }

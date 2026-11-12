@@ -592,3 +592,46 @@ test('acceptance during a pending document flush cannot pair the newer revision 
     await act(async () => { await pending?.catch(() => false) })
   }
 })
+
+test('discussion draft ACK clears only its submitted edit, keeps the original operation for retry, and respects Task changes', async () => {
+  const { useActivityDrafts } = await import('../components/workspace/issue-activity')
+  const { ViewStateProvider } = await import('../lib/hooks/view-state')
+  const acknowledgements: (() => void)[] = []
+  const commands: { task: string; body: string; id: string }[] = []
+  let retries = 0
+  let draft: ReturnType<typeof useActivityDrafts>
+  function Composer({ task, reader = false }: { task: string; reader?: boolean }) {
+    draft = useActivityDrafts(task, () => false, (_thread, body, id) => {
+      if (reader) return false
+      commands.push({ task, body, id })
+    }, { afterAcknowledged: ack => acknowledgements.push(ack), retry: () => { retries++ } })
+    return null
+  }
+  const open = (task: string, reader = false) => act(async () => {
+    root.render(<ViewStateProvider scope="discussion-test"><Composer key={task + reader} task={task} reader={reader} /></ViewStateProvider>)
+  })
+  await open('first')
+  await act(async () => { draft.setReplyTo('thread'); draft.setReply('original') })
+  await act(async () => { draft.sendReply('thread'); draft.sendReply('thread') })
+  assert.equal(commands.length, 1)
+  assert.equal(retries, 1)
+  assert.equal(draft!.reply, 'original')
+  await act(async () => { draft.setReply('later edit') })
+  await act(async () => { acknowledgements.shift()!() })
+  assert.equal(draft!.reply, 'later edit')
+  await act(async () => { draft.sendReply('thread') })
+  assert.notEqual(commands[0].id, commands[1].id)
+  await open('second')
+  await act(async () => { draft.setReplyTo('other-thread'); draft.setReply('other Task') })
+  await act(async () => { acknowledgements.shift()!() })
+  assert.equal(draft!.reply, 'other Task')
+  await open('first', true)
+  await act(async () => { draft.sendReply('thread') })
+  assert.equal(commands.length, 2)
+  await open('first')
+  assert.equal(draft!.reply, 'later edit')
+  await act(async () => { draft.sendReply('thread') })
+  assert.equal(commands[1].id, commands[2].id, 'a reopened draft reuses its Yjs operation identity')
+  await act(async () => { acknowledgements.shift()!() })
+  assert.equal(draft!.reply, '')
+})

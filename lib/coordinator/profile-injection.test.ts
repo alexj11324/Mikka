@@ -12,8 +12,8 @@ const read = (path: string) => readFileSync(new URL(`../../${path}`, import.meta
 const store = read('lib/profile/store.ts')
 const prompt = read('lib/profile/prompt.ts')
 const action = read('app/actions/memory.ts')
+const memory = read('lib/profile/memory.ts')
 const steps = read('workflows/coordinator/steps.ts')
-const nativeSteps = read('workflows/coordinator/native-steps.ts')
 
 const bodyOf = (source: string, name: string) => {
   const start = source.indexOf(`export async function ${name}`)
@@ -21,7 +21,7 @@ const bodyOf = (source: string, name: string) => {
   return source.slice(start, start + 1_200)
 }
 
-test('记忆 and the agent prompt read the same rows through the same filter', () => {
+test('记忆 and the agent prompt retain owned fact sources and the active-only model filter', () => {
   for (const name of ['listFacts', 'profilePromptSection']) {
     const body = bodyOf(store, name)
     assert.match(body, /from\(userFacts\)/, `${name} reads user_facts`)
@@ -29,7 +29,10 @@ test('记忆 and the agent prompt read the same rows through the same filter', (
   }
   // The settings page has no read of its own: it goes through the store.
   assert.match(action, /from '@\/lib\/profile\/store'/)
-  assert.match(action, /\blistFacts\b/)
+  assert.match(action, /readMemoryView\(user, context\.workspace\.id, context\.choices\)/)
+  assert.match(memory, /withTaskWorkspace\(reader, workspaceId/)
+  assert.match(memory, /from\(userFacts\)\.where\(eq\(userFacts\.userId, userId\)\)/)
+  assert.match(memory, /visible\.filter\(row => row\.state === 'active'\)/)
   assert.doesNotMatch(action, /user_facts/, '记忆 must not query user_facts itself')
 })
 
@@ -42,21 +45,19 @@ test('what is stated and what is listed come from one composer', () => {
 })
 
 test('every turn path that builds a system prompt injects the section', () => {
-  for (const [name, source] of [['hosted', steps], ['native', nativeSteps]] as const) {
+  for (const [name, source] of [['Eve product instructions', steps]] as const) {
     assert.match(source, /profilePromptSection\(userId, await usedRepositoriesForBot\(userId, botId\)\)/,
       `the ${name} turn states the person's facts`)
     assert.match(source, /promptWithCachedContext\(/, `the ${name} turn builds a prompt`)
   }
   const hostedCall = steps.split('\n').find(line => line.includes('promptWithCachedContext('))!
   assert.match(hostedCall.trim(), /,\s*profile\)$/, 'the section is the tail argument promptWithCachedContext places after the memory')
-  const nativeCall = nativeSteps.split('\n').find(line => line.includes('promptWithCachedContext('))!
-  assert.match(nativeCall.trim(), /,\s*profile\)\.instructions,?$/, 'likewise for the native runtime')
 })
 
 test('the section reaches the model only when 记忆 is on', () => {
-  // conversationWithMemory empties `memory` with the switch off, and both paths
+  // conversationWithMemory empties `memory` with the switch off, and the Eve instruction path
   // gate the section on that same value rather than reading a second switch.
-  for (const source of [steps, nativeSteps]) {
+  for (const source of [steps]) {
     assert.match(source, /const profile = memory \?[\s\S]{0,200}?profilePromptSection/, 'the section follows the memory switch')
   }
 })

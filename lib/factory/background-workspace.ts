@@ -83,7 +83,7 @@ async function inWorkspace<T>(userId: string, workspaceId: string, work: () => P
   try {
     const borrowed = borrowTaskWorkspaceMembership(userId, workspaceId)
     if (borrowed) {
-      try { await borrowed.check(); return await run() }
+      try { await borrowed.check(existing); return await run() }
       finally { await borrowed.close() }
     }
     // A transaction owner must acquire WS first. Never repair an inverted

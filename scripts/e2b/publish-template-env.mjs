@@ -182,12 +182,18 @@ export async function currentWorkerSha({ token, fetchImpl = fetch }) {
   return runtimeConfigurationSha(Object.fromEntries(pairs))
 }
 
-export async function publish({ token, githubToken, templates, sourceSha, sourceCommit, models, releaseEvidence, fetchImpl = fetch, log = console.log }) {
-  if (!token) fail('vercel_token_unavailable')
-  if (!/^[0-9a-f]{40}$/.test(sourceCommit ?? '')) fail('official_source_commit_invalid')
+/** Both hosting platforms consume the same accepted templates and model catalogue. */
+export function verifiedRuntimeEnvironment({ releaseEvidence, templates, sourceSha, sourceCommit, models }) {
   assertReleaseEvidence({ releaseEvidence, templates, sourceSha, sourceCommit, models })
   const env = pairEnv({ templates, sourceSha, sourceCommit, models })
   env.push({ key: 'MIKKA_CLOUD_WORKER_SOURCE_COMMIT', value: sourceCommit, type: 'plain', target: ['production'] })
+  return env
+}
+
+export async function publish({ token, githubToken, templates, sourceSha, sourceCommit, models, releaseEvidence, fetchImpl = fetch, log = console.log }) {
+  if (!token) fail('vercel_token_unavailable')
+  if (!/^[0-9a-f]{40}$/.test(sourceCommit ?? '')) fail('official_source_commit_invalid')
+  const env = verifiedRuntimeEnvironment({ releaseEvidence, templates, sourceSha, sourceCommit, models })
   await assertCurrentMain({ expectedBuild: sourceCommit, token: githubToken, fetchImpl })
   await assertProductionSource({ expectedBuild: sourceCommit, token, fetchImpl })
   const call = (path, options = {}) => api(path, { token, fetchImpl, ...options })

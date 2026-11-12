@@ -73,7 +73,7 @@ export async function productionSha({ token, fetchImpl = fetch }) {
   return SHA.test(sha ?? '') ? sha : ''
 }
 
-async function githubRead(path, { token, fetchImpl, timeoutMs = 20_000 }) {
+export async function githubRead(path, { token, fetchImpl, timeoutMs = 20_000 }) {
   if (!token) throw Error('webDeploy:githubTokenRequired')
   let response
   try {
@@ -149,6 +149,7 @@ export async function waitForWebDeployment({ expectedBuild, allowDescendant = fa
   if (!token) throw Error('webDeploy:githubTokenRequired')
   if (expectedOverlay && !SHA.test(expectedOverlay)) throw Error('webDeploy:overlayShaRequired')
   const started = now(), remaining = () => maxWaitMs - (now() - started)
+  let checkedPublisher = false
   while (remaining() > 0) {
     let webBuild = expectedBuild
     if (allowDescendant === true) {
@@ -172,6 +173,14 @@ export async function waitForWebDeployment({ expectedBuild, allowDescendant = fa
       && run.path === WEB_WORKFLOW && run.repository?.full_name === REPOSITORY && run.head_repository?.full_name === REPOSITORY
       && ['push', 'workflow_dispatch'].includes(run.event)).sort((a, b) => b.id - a.id)
     const run = runs[0]
+    if (!run && !allowDescendant && !checkedPublisher) {
+      const publisher = await githubRead('/actions/workflows/web-deploy.yml', {
+        token, fetchImpl, timeoutMs: Math.min(20_000, remaining()),
+      })
+      if (publisher.path !== WEB_WORKFLOW || typeof publisher.state !== 'string') throw Error('webDeploy:invalidWebPublisher')
+      if (publisher.state !== 'active') throw Error('webDeploy:matchingWebPublisherInactive')
+      checkedPublisher = true
+    }
     if (run?.status === 'completed') {
       if (run.conclusion !== 'success') throw Error(`webDeploy:matchingWebRunFailed:${run.id}`)
       if (!Number.isSafeInteger(run.id) || run.id <= 0 || !Number.isSafeInteger(run.run_attempt) || run.run_attempt <= 0) {

@@ -5,6 +5,15 @@ import { APPLICATION_BASELINE, ARTIFACT_COMPATIBILITY, orderMigrations, alreadyA
 import { planMigration } from './migration-steps.mjs'
 import { createHash } from 'node:crypto'
 
+test('review receipt history matches its own exact PostgreSQL bytes and ledger', () => {
+  const name = '20261112030511_coding_review_provider_receipts.sql', prior = '20261112030508_coding_review_provider_receipts.sql'
+  const sql = readFileSync(new URL('../drizzle/' + name, import.meta.url), 'utf8')
+  assert.equal(planMigration(name, sql).target, 'MIKKA_DATABASE_URL')
+  assert.equal(alreadyApplied(name, new Set([prior]), sql), true)
+  assert.equal(alreadyApplied(name, new Set(['20261112030508_workspace_service_identities.sql']), sql), false)
+  assert.throws(() => alreadyApplied(name, new Set([prior]), sql + '\n-- changed'), /content changed/)
+})
+
 test('the service identity ledger distinguishes other migrations at the original timestamp', () => {
   const name = '20261112030508_workspace_service_identities.sql'
   const original = '20261112030505_workspace_service_identities.sql'

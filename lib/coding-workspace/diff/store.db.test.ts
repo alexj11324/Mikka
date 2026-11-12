@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { gunzipSync } from 'node:zlib'
 import { Pool } from 'pg'
+import { observePoolCommits } from '../../db/commit-effects'
 import { runAssignmentSchema } from '@mikka/protocol'
 import { runCheckpointReceiptSchema, SOURCE_DAEMON_VERSION, type RunCheckpoint } from '@mikka/protocol/device'
 import { CLIENT_VERSION_HEADER } from '@mikka/protocol/version'
@@ -43,6 +44,7 @@ test('retained Diff snapshots, review authority and deletion on PostgreSQL 17', 
   await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
   const target = new URL(url!); target.pathname = `/${database}`
   const pool = new Pool({ connectionString: target.toString(), max: 8, connectionTimeoutMillis: 5000 })
+  observePoolCommits(pool)
   const root = await mkdtemp(join(tmpdir(), 'mikka-diff-store-db-'))
   const environment = {
     MIKKA_DATABASE_URL: target.toString(), DATABASE_URL: target.toString(), ORVILO_DATABASE_URL: target.toString(), E2E_DATABASE_URL: target.toString(),

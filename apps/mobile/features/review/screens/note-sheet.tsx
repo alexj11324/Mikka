@@ -12,12 +12,12 @@ import { useBatch } from '../model/batch-store'
 export function NoteSheet() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
-  const [batch, setBatch] = useBatch(id)
+  const [batch, setBatch, scope] = useBatch(id)
   return (
     <>
       <NavBar sheet fade={false} title="修改意见" right={{ icon: 'checkmark', label: '完成', web: <Check size={20} color={colors.ink} />, onPress: () => router.back() }} />
       <ScrollView style={styles.screen} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
-        <TextInput value={batch.note} onChangeText={note => setBatch(current => ({ ...current, note }))} placeholder="写修改意见…" placeholderTextColor={colors.secondary}
+        <TextInput editable={!!scope} value={batch.note} onChangeText={note => setBatch(current => ({ ...current, note }))} placeholder="写修改意见…" placeholderTextColor={colors.secondary}
           multiline autoFocus accessibilityLabel="修改意见" style={styles.input} />
       </ScrollView>
     </>

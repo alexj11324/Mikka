@@ -25,6 +25,7 @@ import {
 import { Pool } from "pg";
 import { assertE2eTarget } from "../../tests/helpers/e2e-target.mjs";
 import { createRequestDatabaseScope } from "../db";
+import { observePoolCommits } from "../db/commit-effects";
 import { hostedBillingScope } from "../abuse/context";
 import { HostedUsageStore } from "../abuse/store";
 import { exerciseFactoryRecoveryEntry } from "../../tests/support/factory-recovery-entry-fixture";
@@ -91,9 +92,10 @@ test(
     if (process.env.GITHUB_ACTIONS === "true") {
       assert.equal(process.env.CI, "true");
       assert.equal(target.hostname, "127.0.0.1");
-      assert.equal(target.port, "5432");
+      // The image job maps its dedicated PG17 service to a random loopback port.
+      assert.equal(target.port, process.env.MIKKA_TEST_DB_PORT ?? "5432");
       assert.equal(target.username, "e2e");
-      assert.equal(target.pathname, "/mikka_e2e");
+      assert.match(target.pathname, /^\/[A-Za-z0-9_]+_e2e$/);
     }
     const admin = new Pool({ connectionString: url });
     const database = `factory193_consumers_${randomUUID().replaceAll("-", "")}_e2e`;
@@ -122,6 +124,7 @@ test(
         max: 12,
         options: "-c statement_timeout=15000 -c lock_timeout=5000",
       });
+      observePoolCommits(pool);
       const db = pool;
       modelDatabase = createRequestDatabaseScope(isolated.toString());
       closeWorkspaceDatabase = await bindFixtureWorkspaceDatabase(db);
@@ -1620,7 +1623,8 @@ test(
         );
       for (const phase of ['review', 'verify'] as const) for (const machineState of ['running', 'paused'] as const)
         for (const kind of ['repository', 'deliverable'] as const)
-        await t.test(kind + ' ' + phase + ' question continuation keeps its owned ' + machineState + ' VM, issue, candidate and original session without a parent runtime', async () => {
+        for (const hosted of (kind === 'repository' && phase === 'review' && machineState === 'paused' ? [false,true] : [false]))
+        await t.test((hosted ? 'Cloudflare ' : '') + kind + ' ' + phase + ' question continuation keeps its owned ' + machineState + ' VM, issue, candidate and original session without a parent runtime', async () => {
           const pending = await pendingReview(kind);
           let origin = await start(pending.task);
           if (phase === 'verify') {
@@ -1643,17 +1647,24 @@ test(
             assert.ok(!oldPrompt.includes(outputChunkId));
           }
           const childDevice = randomUUID(), childRepo = randomUUID(), connectionId = randomUUID(), credentialId = randomUUID();
-          const nativeSession = 'original-question-' + origin.runId, sandboxId = 'retained-question-' + origin.runId;
+          const nativeSession = 'original-question-' + origin.runId;
+          const sandboxId = hosted ? 'c'.repeat(64) : 'retained-question-' + origin.runId, originalOperation = randomUUID();
           await db.query("INSERT INTO devices(id,\"ownerId\",name,kind,enabled,\"lastSeenAt\",harnesses) VALUES($1,'owner','Retained task','cloud',true,now()-interval '1 hour','[{\"harness\":\"codex\",\"installed\":true}]')", [childDevice]);
           await db.query("INSERT INTO device_repos(id,\"deviceId\",\"userId\",\"repoPath\",\"remoteUrl\",\"baseBranch\",\"verifyCommand\") VALUES($1,$2,'owner','/retained','/fixture/repo','main',$3)", [childRepo, childDevice, command]);
           await db.query("INSERT INTO byos_connections(id,\"ownerId\",\"workspaceId\",state,epoch,provider,\"secretName\",\"providerSubject\",\"secretDigest\") VALUES($1,'owner',$2,'connected',1,'codex','synthetic-retained-question-' || $1::uuid::text,'synthetic-subject',repeat('a',64))", [connectionId, billingWorkspaceId]);
           await db.query("INSERT INTO byos_bindings(id,\"ownerId\",\"workspaceId\",\"consumerId\",\"connectionId\",\"connectionRevision\",route,\"modelId\") VALUES($1,'owner',$2,$3,$4,1,'codex_cli','fixture-model')", [credentialId, billingWorkspaceId, agentId, connectionId]);
           const definition = freezeWorkerDefinition({ harness: 'codex', instructions: 'Frozen fixture', prompt: 'Original check', parent: null, executionId: null, model: 'fixture-model', subscription: { id: credentialId, modelId: 'fixture-model', route: 'codex_cli' } });
+          const retainedRepository = 'v2/github.com/owner/recovery-fixture';
+          if (hosted) await db.query('UPDATE device_repos SET "repoPath"=$2 WHERE id=$1',[childRepo,retainedRepository]);
+          if (hosted) Object.assign(definition,{taskMachine:{provider:'cloudflare',payer:'mikka',ownerId:'owner',
+            taskId:pending.task.issueId,workspaceId:billingWorkspaceId,botId:coordinatorBot,repositoryKey:retainedRepository,requestEventId:randomUUID()}});
           await db.query("UPDATE agent_runs SET \"deviceId\"=$2,\"deviceRepoId\"=$3,\"agentDefinition\"=$4,status='stopped',\"stopReason\"='asked_human',\"sessionId\"=$5,report=$6 WHERE id=$1",
             [origin.runId, childDevice, childRepo, JSON.stringify(definition), nativeSession, JSON.stringify({ question: { questionId: randomUUID(), kind: 'decision', question: 'Which acceptance path?', options: ['A', 'B'] } })]);
           await db.query('INSERT INTO computer_run_bindings("runId","botId","workspaceId","ownerId") VALUES($1,$2,$3,\'owner\')', [origin.runId, coordinatorBot, billingWorkspaceId]);
           await db.query('INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state,"sandboxId","deviceId","repoId") VALUES($1,$2,\'owner\',$3,$4,\'codex\',$5,$6,$7,$8,$9)',
             [origin.runId, billingWorkspaceId, coordinatorBot, pending.task.issueId, randomUUID(), machineState, sandboxId, childDevice, childRepo]);
+          if (hosted) await db.query(`UPDATE thread_machines SET "snapshotId"='cloudflare-task-v1',"operationId"=$2,"sandboxId"=NULL,
+            lifecycle=jsonb_build_object('sponsoredInstanceId',$3::text,'sponsoredRepositoryKey',$4::text) WHERE "runId"=$1`, [origin.runId,originalOperation,sandboxId,retainedRepository]);
           // This is the task-device reassignment normally performed when the
           // first check VM is created. No parent metadata or provider is mocked.
           await db.query("UPDATE factory_attempts SET output=jsonb_set(jsonb_set(output,'{check,deviceRepoId}',to_jsonb($2::text)),'{check,environment}',to_jsonb($3::text)) WHERE id=$1",
@@ -1683,6 +1694,18 @@ test(
           } finally {
             await db.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [childDevice, JSON.stringify([{ harness: 'codex', installed: true }])]);
           }
+          if (hosted) {
+            const setRepository = (key: string) => db.query(`UPDATE thread_machines SET lifecycle=
+              jsonb_set(lifecycle,'{sponsoredRepositoryKey}',to_jsonb($2::text)) WHERE "runId"=$1`,[origin.runId,key]);
+            await setRepository('v2/github.com/owner/other');
+            try {
+              await assert.rejects(cloudQuestions.answer({ source: 'human', userId: 'owner', sessionId: browserSessionId }, answer),
+                (error: unknown) => error instanceof FactoryError && error.code === 'factoryQuestionContinuationUnavailable');
+              assert.deepEqual((await db.query('SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY id',[pending.task.issueId])).rows,runsBefore);
+            } finally {
+              await setRepository(retainedRepository);
+            }
+          }
           const resumed = await cloudQuestions.answer({ source: 'human', userId: 'owner', sessionId: browserSessionId }, answer);
           const run = (await db.query('SELECT * FROM agent_runs WHERE id=$1', [resumed.continuationRunId])).rows[0];
           assert.equal(run.issueId, pending.task.issueId);
@@ -1703,6 +1726,10 @@ test(
           assert.deepEqual((await db.query('SELECT to_jsonb(c) AS candidate FROM factory_candidates c WHERE id=$1', [pending.task.candidateId])).rows, beforeCandidate);
           assert.deepEqual((await db.query('SELECT state,"sandboxId" FROM thread_machines WHERE "runId"=$1', [origin.runId])).rows[0], { state: 'ended', sandboxId: null });
           assert.deepEqual((await db.query('SELECT state,"sandboxId","deviceId","repoId" FROM thread_machines WHERE "runId"=$1', [run.id])).rows[0], { state: machineState, sandboxId, deviceId: childDevice, repoId: childRepo });
+          if (hosted) {
+            const retained = (await db.query('SELECT lifecycle FROM thread_machines WHERE "runId"=$1',[run.id])).rows[0].lifecycle;
+            assert.deepEqual(retained,{sponsoredRepositoryKey:retainedRepository,sponsoredInstanceId:sandboxId,sponsoredPreviousRun:origin.runId,sponsoredPreviousOperation:originalOperation});
+          }
           await factoryResourceWorkspace(db)('owner', pending.task.id, async () => {
             const tx = await db.connect();
             try {

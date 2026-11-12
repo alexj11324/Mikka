@@ -44,7 +44,8 @@ mock.module('react-native', { namedExports: {
       h(Fragment, { key: i }, list.renderItem({ item })))) : list.ListEmptyComponent, list.ListFooterComponent),
 } })
 mock.module('react-native-safe-area-context', { namedExports: { useSafeAreaInsets: () => ({ bottom: 0 }) } })
-mock.module('lucide-react-native', { namedExports: { ChevronDown: none, ChevronRight: none } })
+// Match the native icon entry required by the TSX screen, not its ESM sibling.
+mock.module(nativeRequire.resolve('lucide-react-native'), { namedExports: { ChevronDown: none, ChevronRight: none } })
 stub('components/NavBar.tsx', { underBar: {}, NavBar: ({ search }: { search: { onChange: typeof typeQuery } }) => { typeQuery = search.onChange; return null } })
 stub('components/ChatList.tsx', { useChatRows: () => chats, ChatRowView: none, rowKey: none })
 stub('components/Text.tsx', { Text: ({ children }: { children: ReactNode }) => h('span', null, children) })

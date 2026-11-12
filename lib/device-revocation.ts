@@ -4,6 +4,7 @@ import { runChanged } from './live/panels'
 import { runListChanged } from './live/lists'
 import { runControlChanged } from './device-gateway-notify'
 import { DEVICE_WORK_CHANNEL, notifyChannel } from './db/listen'
+import { reviewSessionsRevoked } from './coding-workspace/review-sessions'
 
 /** Account-scoped tokens can act as several devices. Stop only runs whose
  * authenticated claim recorded this token, without guessing legacy ownership. */
@@ -25,10 +26,11 @@ export async function revokeDeviceCredential(database: Pick<Pool, 'connect'>, ow
       runControlChanged(client, { runIds: stopped.rows.map(row => row.id) })
       await client.query(`UPDATE run_tokens SET "revokedAt"=COALESCE("revokedAt",clock_timestamp())
         WHERE "runId" IN (SELECT id FROM agent_runs WHERE "deviceTokenId"=$1 AND "userId"=$2)`, [tokenId, ownerId])
-      await client.query(`INSERT INTO device_credential_revocations ("tokenId","ownerId","actorId","revokedAt") VALUES($1,$2,$2,$3)`, [tokenId, ownerId, token.revokedAt])
+      await client.query(`INSERT INTO device_credential_revocations ("tokenId","ownerId","actorId","revokedAt") VALUES($1,$2,$2,$3) ON CONFLICT ("tokenId") DO NOTHING`, [tokenId, ownerId, token.revokedAt])
       // A commands long poll on this credential re-checks on COMMIT and fails at once.
       await notifyChannel(client, DEVICE_WORK_CHANNEL, [`token:${tokenId}`])
     }
+    reviewSessionsRevoked(client, { deviceTokenId: tokenId }, 'credential_revoked')
     const legacy = (await client.query(`SELECT count(*)::int AS count FROM agent_runs WHERE "userId"=$1
       AND "deviceTokenId" IS NULL AND status IN ('preparing','running','waiting_input','finishing')`, [ownerId])).rows[0].count as number
     await client.query('COMMIT')

@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
+import { once } from 'node:events'
+import { createServer } from 'node:http'
 import { test } from 'node:test'
 import { Pool } from 'pg'
 import { withChatFiles, type ChatFileScope } from '@mikka/protocol/chat-attachments'
@@ -83,6 +85,172 @@ test(
       )
       return file
     }
+    await t.test('R2 keeps a recoverable owner through a rolled-back publication, retry and cleanup', async (t) => {
+      const objects = new Map<string, Buffer>()
+      const server = createServer(async (request, response) => {
+        const path = request.url!
+        if (!request.headers.authorization?.startsWith('AWS4-HMAC-SHA256 ')) {
+          response.writeHead(403).end()
+        } else if (request.method === 'PUT') {
+          const chunks: Buffer[] = []
+          for await (const chunk of request) chunks.push(Buffer.from(chunk))
+          objects.set(path, Buffer.concat(chunks))
+          response.writeHead(200).end()
+        } else if (request.method === 'DELETE') {
+          objects.delete(path)
+          response.writeHead(204).end()
+        } else {
+          response.writeHead(objects.has(path) ? 200 : 404).end(objects.get(path))
+        }
+      })
+      server.listen(0, '127.0.0.1')
+      await once(server, 'listening')
+      const env = {
+        S3_ENDPOINT: `http://127.0.0.1:${(server.address() as { port: number }).port}`,
+        S3_BUCKET: 'chat-attachment-test',
+        S3_ACCESS_KEY_ID: 'local-attachment',
+        S3_SECRET_ACCESS_KEY: randomUUID(),
+      }
+      const before = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]))
+      Object.assign(process.env, env)
+      t.after(() => {
+        server.closeAllConnections()
+        server.close()
+        for (const [key, value] of Object.entries(before)) {
+          if (value === undefined) delete process.env[key]
+          else process.env[key] = value
+        }
+      })
+      const storage = await import('@/lib/artifacts/storage')
+      const data = Buffer.from('initial body')
+      const changed = Buffer.from('changed body')
+      const start = () => store.beginChatFile(owner, { kind: 'bot', id: bot }, {
+        name: 'receipt.txt', mediaType: 'text/plain', size: data.length,
+      })
+      const first = await start()
+      const abandoned = await start()
+      const readKey = (id: string, bytes: Buffer) =>
+        `chat-files/${owner}/${id}/${createHash('sha256').update(bytes).digest('hex')}`
+      // Fail the metadata write in PostgreSQL after the actual signed HTTP PUT.
+      const constraint = 'attachment_qa_' + randomUUID().replaceAll('-', '')
+      await database.query(`ALTER TABLE chat_attachments ADD CONSTRAINT ${constraint}
+        CHECK (id NOT IN ('${first.id}', '${abandoned.id}') OR state <> 'ready') NOT VALID`)
+      try {
+        await assert.rejects(store.completeChatFile(peer, first.id, data), { code: 'notFound' })
+        for (const { id } of [first, abandoned]) {
+          await assert.rejects(store.completeChatFile(owner, id, data), { code: '23514' })
+          const key = readKey(id, data)
+          const saved = await database.query('SELECT state,"storageKey" FROM chat_attachments WHERE id=$1', [id])
+          assert.deepEqual(saved.rows[0], { state: 'uploading', storageKey: key })
+          assert.deepEqual(Buffer.from(await storage.getArtifactObjectBytes(key)), data)
+          await assert.rejects(store.readChatFile(owner, id), { code: 'notFound' })
+        }
+      } finally {
+        await database.query(`ALTER TABLE chat_attachments DROP CONSTRAINT ${constraint}`)
+      }
+      const [published, replay] = await Promise.all([
+        store.completeChatFile(owner, first.id, changed),
+        store.completeChatFile(owner, first.id, changed),
+      ])
+      assert.deepEqual(published, replay)
+      await t.test('the account job erases only its own uploaded files and retries after a transactional rollback', async (t) => {
+        const departed = await seedUser(database, 'attachment-delete-owner')
+        const personal = await seedWorkspace(database, departed, [{ userId: departed, role: 'admin' }])
+        const privateBot = await seedBot(database, personal.id, departed)
+        const owned = await store.beginChatFile(departed, { kind: 'bot', id: privateBot }, {
+          name: 'private.txt', mediaType: 'text/plain', size: data.length,
+        })
+        await store.completeChatFile(departed, owned.id, data)
+        const ownedKey = (await store.readChatFile(departed, owned.id)).storageKey!
+        assert.deepEqual(Buffer.from(await storage.getArtifactObjectBytes(ownedKey)), data)
+        await assert.rejects(store.readChatFile(owner, owned.id), { code: 'notFound' })
+        const blockedDraft = await store.beginChatFile(departed, { kind: 'bot', id: privateBot }, {
+          name: 'expired.txt', mediaType: 'text/plain', size: data.length,
+        })
+        await store.completeChatFile(departed, blockedDraft.id, data)
+        await store.removeChatFile(departed, blockedDraft.id)
+        await store.removeChatFile(owner, abandoned.id)
+        await database.query(`UPDATE chat_attachments SET "uploadExpiresAt"=now()-interval '1 second' WHERE id=ANY($1::uuid[])`, [[blockedDraft.id, abandoned.id]])
+        const { requestAccountDeletion } = await import('@/lib/account/deletion-jobs')
+        const { deleteAccount } = await import('@/lib/account/delete')
+        const email = departed + '@example.invalid'
+        await requestAccountDeletion(departed, email)
+        await assert.rejects(database.query('SELECT mikka_account_assert_writable($1)', [departed]), { code: '55000' })
+        await store.cleanupChatFiles()
+        assert.equal((await database.query('SELECT 1 FROM chat_attachments WHERE id=$1', [blockedDraft.id])).rowCount, 1)
+        await assert.rejects(storage.getArtifactObjectBytes(readKey(abandoned.id, data)), { code: 404 })
+        await t.test('direct writes, uncaptured keys, longer grants and other owners retain their original fences', async () => {
+          const guardProbe = await database.connect()
+          try {
+            await guardProbe.query('BEGIN')
+            await guardProbe.query(`UPDATE account_deletion_jobs SET stage='main_deleted',
+              "pendingObjects"=jsonb_build_array($2::text), "storageNotBefore"=now()
+              WHERE "subjectUserId"=$1`, [departed, ownedKey])
+            await guardProbe.query('SAVEPOINT direct_insert')
+            await assert.rejects(guardProbe.query(`INSERT INTO chat_attachment_retirements("storageKey","userId")
+              VALUES ($1,$2)`, [ownedKey, departed]), { code: '55000' })
+            await guardProbe.query('ROLLBACK TO SAVEPOINT direct_insert')
+            await guardProbe.query('SAVEPOINT unknown_key')
+            await assert.rejects(guardProbe.query('DELETE FROM chat_attachments WHERE id=$1', [blockedDraft.id]), { code: '55000' })
+            await guardProbe.query('ROLLBACK TO SAVEPOINT unknown_key')
+            // Emulate only the nested INSERT of the older upload-retirement trigger:
+            // the protected attachment itself must stay immutable after its account freezes.
+            await guardProbe.query('CREATE TEMP TABLE late_retirement_probe (key text, owner text) ON COMMIT DROP')
+            await guardProbe.query(`CREATE FUNCTION pg_temp.emit_late_retirement() RETURNS trigger LANGUAGE plpgsql AS $$
+              BEGIN
+                INSERT INTO chat_attachment_retirements("storageKey","userId","notBefore")
+                  VALUES (NEW.key, NEW.owner, now()+interval '1 hour');
+                RETURN NEW;
+              END $$`)
+            await guardProbe.query(`CREATE TRIGGER late_retirement AFTER INSERT ON late_retirement_probe
+              FOR EACH ROW EXECUTE FUNCTION pg_temp.emit_late_retirement()`)
+            await guardProbe.query('SAVEPOINT late_grant')
+            await assert.rejects(guardProbe.query('INSERT INTO late_retirement_probe VALUES ($1,$2)', [ownedKey, departed]), { code: '55000' })
+            await guardProbe.query('ROLLBACK TO SAVEPOINT late_grant')
+            const otherKey = readKey(first.id, changed)
+            await guardProbe.query(`UPDATE account_deletion_jobs SET "pendingObjects"="pendingObjects" || to_jsonb($2::text)
+              WHERE "subjectUserId"=$1`, [departed, otherKey])
+            await guardProbe.query('DELETE FROM chat_attachments WHERE id=$1', [first.id])
+            const other = await guardProbe.query('SELECT "userId" FROM chat_attachment_retirements WHERE "storageKey"=$1', [otherKey])
+            assert.deepEqual(other.rows, [{ userId: owner }])
+          } finally {
+            await guardProbe.query('ROLLBACK')
+            guardProbe.release()
+          }
+        })
+        // The isolated subject has no external integrations; use the original S3 deletion transport.
+        const cleanup = { externalCleanup: async () => [], deleteObject: storage.deleteArtifactObject }
+        const abort = 'qa_erasure_' + randomUUID().replaceAll('-', '')
+        await database.query(`CREATE FUNCTION ${abort}() RETURNS trigger LANGUAGE plpgsql AS $$
+          BEGIN RAISE EXCEPTION 'synthetic final account deletion failure'; END $$`)
+        try {
+          await database.query(`CREATE TRIGGER ${abort} AFTER DELETE ON "user"
+            FOR EACH ROW WHEN (OLD.id='${departed}') EXECUTE FUNCTION ${abort}()`)
+          await assert.rejects(deleteAccount(departed, email, cleanup), { code: 'P0001' })
+          const retained = await database.query('SELECT state, "storageKey" FROM chat_attachments WHERE id=$1', [owned.id])
+          assert.deepEqual(retained.rows[0], { state: 'ready', storageKey: ownedKey })
+          const job = await database.query('SELECT stage, "pendingObjects" FROM account_deletion_jobs WHERE "subjectUserId"=$1', [departed])
+          assert.notEqual(job.rows[0].stage, 'main_deleted')
+          assert.deepEqual(job.rows[0].pendingObjects, [])
+          assert.deepEqual(Buffer.from(await storage.getArtifactObjectBytes(ownedKey)), data)
+        } finally {
+          await database.query(`DROP TRIGGER IF EXISTS ${abort} ON "user"`)
+          await database.query(`DROP FUNCTION ${abort}()`)
+        }
+        assert.equal((await deleteAccount(departed, email, cleanup)).ok, true)
+        assert.equal((await database.query('SELECT 1 FROM "user" WHERE id=$1', [departed])).rowCount, 0)
+        await assert.rejects(storage.getArtifactObjectBytes(ownedKey), { code: 404 })
+        assert.deepEqual(Buffer.from(await storage.getArtifactObjectBytes(readKey(first.id, changed))), changed)
+      })
+      await assert.rejects(storage.getArtifactObjectBytes(readKey(first.id, data)), { code: 404 })
+      assert.deepEqual(Buffer.from(await store.chatFileBytes(await store.readChatFile(owner, first.id))), changed)
+      await assert.rejects(store.readChatFile(peer, first.id), { code: 'notFound' })
+      assert.deepEqual(Buffer.from(await storage.getArtifactObjectBytes(readKey(first.id, changed))), changed)
+      await store.removeChatFile(owner, first.id)
+      await database.query(`UPDATE chat_attachments SET "uploadExpiresAt"=now()-interval '1 second' WHERE id=$1`, [first.id])
+      await store.cleanupChatFiles()
+      await assert.rejects(storage.getArtifactObjectBytes(readKey(first.id, changed)), { code: 404 })
+    })
     await t.test(
       'same-origin chunks reject gaps, altered retries and other owners while allowing exact repeats',
       async () => {

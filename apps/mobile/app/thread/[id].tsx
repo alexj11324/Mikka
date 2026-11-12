@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { conversationAccessDenied, useConversationDelivery } from '@/features/chat/components/conversation-delivery'
 import { StyleSheet, View } from 'react-native'
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -20,7 +20,6 @@ import { StopFailed } from '@/components/StopFailed'
 import { ThreadQuotaPaused } from '@/components/ThreadQuotaPaused'
 import { useStop } from '@/lib/useStop'
 import { composerStops } from '@/lib/stop'
-import { threadSendErrorLine } from '@/lib/thread-send-error'
 import type { ThreadDetail } from '@/lib/types'
 import { useLiveApi } from '@/lib/useApi'
 import { threadLive } from '@/lib/live-keys'
@@ -37,30 +36,14 @@ export default function ThreadScreen() {
   // Read again when one of its runs writes text or changes state (the web's thread and run keys); an
   // ended thread changes only when it runs again. Each read is the whole conversation.
   const { data, error, reload } = useLiveApi<ThreadDetail>(`/api/mobile/threads/${id}`, current => threadLive(current, id))
-  const [sending, setSending] = useState(false)
-  // What to say when a message was not sent: the server's reason when it gave one (threadReplaced…).
-  const [sendFailed, setSendFailed] = useState<string | null>(null)
+  const canSend = Boolean(data && data.canReply !== false && !conversationAccessDenied(error))
+  const delivery = useConversationDelivery(canSend ? { kind: 'thread', id, issueId: data?.issueId ?? null } : null,
+    data?.confirmedSubmissionIds ?? [], reload)
   const thread = data?.thread
   // 停止 a working thread, as on the web; a thread that ended meanwhile (409) has nothing left to stop.
   const stopper = useStop(() => api(`/api/mobile/threads/${id}/stop`, { method: 'POST' }).catch(failure => {
     if (!(failure instanceof ApiError && failure.status === 409)) throw failure
   }), Boolean(data?.active), reload)
-
-  const send = async (text: string) => {
-    setSending(true)
-    setSendFailed(null)
-    try {
-      await api(`/api/mobile/threads/${id}`, { method: 'POST', body: { text } })
-      await reload()
-      return true
-    } catch (failure) {
-      // The composer keeps the words, so sending again is one tap.
-      setSendFailed(threadSendErrorLine(failure instanceof ApiError && failure.status < 500 ? failure.code : null))
-      return false
-    } finally {
-      setSending(false)
-    }
-  }
 
   return (
     <View style={styles.screen}>
@@ -95,14 +78,14 @@ export default function ThreadScreen() {
             case 'person': return <View key={item.id} style={{ marginVertical: 4 }}><MyBubble text={item.text} /></View>
           }
         })}
-        {sendFailed ? <Text style={styles.error}>{sendFailed}</Text> : null}
+        {delivery.bubbles}
         {data?.paused ? <ThreadQuotaPaused key={data.paused.runId} paused={data.paused} onContinued={async runId => { if (runId !== id) router.replace(`/thread/${runId}`); await reload() }} /> : null}
         {stopper.stuck ? <StopFailed busy={stopper.sending} onRetry={() => void stopper.stop()} /> : null}
         {data && !data.active && data.error && !data.items.some(item => item.kind === 'error') ? <Text style={styles.error}>{data.error}</Text> : null}
       </KeyboardChatScrollView>
       <OfflineBanner top={insets.top + 66} />
       {/* R-10: a thread ends in the composer, finished or not; a message to an ended thread runs it again (R-81). */}
-      {data ? <Composer placeholder="给这个线程发消息" onSend={send} disabled={sending} attach attachmentScope={{ kind: 'thread', id }} onStop={composerStops(data) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
+      {data ? <Composer placeholder="给这个线程发消息" onSend={text => delivery.send(text)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'thread', id }} onStop={composerStops(data) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
     </View>
   )
 }

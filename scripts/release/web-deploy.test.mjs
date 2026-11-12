@@ -131,7 +131,7 @@ const buildJob = overrides => ({ name: 'deploy', head_sha: SHA, status: 'complet
   steps: ['Build (runs migrations last, as the Vercel build did)', 'Upload the prebuilt output to production',
     'Verify the public production version before releasing the deployment queue'].map(name => ({ name, status: 'completed', conclusion: 'success' })), ...overrides })
 
-function webFixture({ main = () => SHA, runs = () => [webRun()], job = buildJob(), version = () => SHA, overlay = () => undefined, budget = 500 } = {}) {
+function webFixture({ main = () => SHA, runs = () => [webRun()], publisher = 'active', job = buildJob(), version = () => SHA, overlay = () => undefined, budget = 500 } = {}) {
   let elapsed = 0
   const calls = []
   const fetchImpl = async (input, init = {}) => {
@@ -141,6 +141,7 @@ function webFixture({ main = () => SHA, runs = () => [webRun()], job = buildJob(
     if (url.origin === 'https://api.github.com') {
       assert.equal(init.headers.authorization, 'Bearer read-only-fixture')
       if (url.pathname.endsWith('/git/ref/heads/main')) return Response.json({ object: { type: 'commit', sha: main(elapsed) } })
+      if (url.pathname.endsWith('/actions/workflows/web-deploy.yml')) return Response.json({ path: '.github/workflows/web-deploy.yml', state: publisher })
       if (url.pathname.endsWith('/actions/workflows/web-deploy.yml/runs')) {
         assert.equal(url.searchParams.get('head_sha'), SHA)
         assert.equal(url.searchParams.get('branch'), 'main')
@@ -157,6 +158,19 @@ function webFixture({ main = () => SHA, runs = () => [webRun()], job = buildJob(
   return { calls, run: extra => waitForWebDeployment({ expectedBuild: SHA, token: 'read-only-fixture', fetchImpl,
     now: () => elapsed, wait: async ms => { elapsed += ms }, intervalMs: 100, maxWaitMs: budget, ...extra }), elapsed: () => elapsed }
 }
+
+test('a frozen publisher without a matching build cannot start paid template work', async () => {
+  const f = webFixture({ runs: () => [], publisher: 'disabled_manually' })
+  await assert.rejects(f.run(), /matchingWebPublisherInactive/)
+  assert.equal(f.elapsed(), 0)
+  assert.equal(f.calls.some(call => call.origin !== 'https://api.github.com'), false)
+})
+
+test('a qualified published build remains valid after future publication is frozen', async () => {
+  const f = webFixture({ publisher: 'disabled_manually' })
+  assert.equal((await f.run()).publicBuild, SHA)
+  assert.equal(f.calls.some(call => call.path.endsWith('/workflows/web-deploy.yml')), false)
+})
 
 test('waits for a GitHub build while Vercel still only serves the older READY source', async () => {
   const fixture = webFixture({ runs: elapsed => [webRun(elapsed < 200 ? { status: 'in_progress', conclusion: null } : {})],
@@ -413,7 +427,11 @@ test('both release paths use one non-cancelling pending queue, and the Web wait 
   assert.match(e2b, /uses: \.\/\.github\/workflows\/web-deploy\.yml/)
   assert.match(e2b, /runtime-refresh: true/)
   assert.match(e2b, /workflow_dispatch:\n    inputs:\n      runtime-refresh:\n        description: [^\n]+\n        type: boolean\n        default: false/)
-  assert.match(e2b, /release:\n    needs: \[test, check\]\n    if: needs\.check\.outputs\.changed == 'true'/)
+  const webReady = e2b.slice(e2b.indexOf('\n  web-ready:'), e2b.indexOf('\n  release:'))
+  assert.match(webReady, /needs: check\n    if: needs\.check\.outputs\.changed == 'true'/)
+  assert.match(webReady, /node scripts\/release\/web-deploy\.mjs await-web/)
+  assert.doesNotMatch(webReady, /id-token:|Infisical|web-deploy-production|e2b-official-runtime-release/)
+  assert.match(e2b, /release:\n    needs: \[test, check, web-ready\]\n    if: needs\.check\.outputs\.changed == 'true'/)
   assert.match(e2b, /runtime-worker-sha: \$\{\{ needs\.validate\.outputs\.source-sha \}\}/)
   assert.match(e2b, /runtime-template-models-sha256: \$\{\{ needs\.validate\.outputs\.template-models-sha256 \}\}/)
   const checkJob = e2b.slice(e2b.indexOf('\n  check:'), e2b.indexOf('\n  release:'))

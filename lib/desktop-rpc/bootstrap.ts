@@ -1,5 +1,6 @@
 import 'server-only'
 import { headers } from 'next/headers'
+import { withFreshSession } from '@/lib/fresh-session'
 import { auth, googleEnabled, githubSignInEnabled } from '@/lib/auth'
 import { emailSignInEnabled } from '@/lib/email-sign-in'
 import { onboardingDone } from '@/lib/onboarding'
@@ -25,7 +26,8 @@ export async function desktopSession() {
 }
 
 export async function desktopBootstrap(workspaceId?: string): Promise<DesktopBootstrap> {
-  const session = await desktopSession()
+  // The renderer shows this profile. A signed session may still contain a name edited on another device.
+  const session = await withFreshSession(desktopSession)
   if (!session) throw new ActionFailureError('authRequired')
   const [config, onboarding, cacheWorkspace] = await Promise.all([desktopConfig(session.user.id), onboardingDone(session.user.id).then(done => !done).catch(() => false),
     authorizedCacheWorkspace({ id: session.user.id, [enterprisePrincipal]: { kind: 'session', sessionId: session.session.id } }, workspaceId),

@@ -1,8 +1,10 @@
+import '../tests/support/server-only.mjs'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
+import { observePoolCommits } from './db/commit-effects'
 import { groupDirectory } from './group-conversations-directory'
 import { handleGroup, type GroupRequest } from './group-conversations-store'
 import { disposableDatabase } from '../tests/helpers/e2e-target.mjs'
@@ -47,6 +49,7 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
   await pool.query(`CREATE SCHEMA "${reverseSchema}"`)
   console.log(`Retaining synthetic group test schema ${reverseSchema} at ${new Date().toISOString()}`)
   const scoped = new Pool({ connectionString: dbURL, max: 16, options: `-c search_path=${schema}` })
+  observePoolCommits(scoped)
   try {
     const migration = await readFile(new URL('../drizzle/20261023213851_group_conversations.sql', import.meta.url), 'utf8')
     await Promise.all([scoped.query(migration), scoped.query(migration)])
@@ -185,6 +188,17 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
     await scoped.query('UPDATE conversations SET "lastPosition"=9007199254740992 WHERE id=$1', [id])
     assert.equal(((await send('big')).body as typeof firstMessage).position, '9007199254740993')
     assert.equal(((await run({})).body as typeof list).conversations[0].lastMessage.position, '9007199254740993')
+    const separate = await run({ method: 'POST', body: JSON.stringify({ workspaceId, title: 'Idempotent sends', members: [] }) })
+    assert.equal(separate.status, 201)
+    const replay = (body: string, extra: Record<string, unknown>) => run({ id: (separate.body as { id: string }).id, resource: 'messages', method: 'POST', body: JSON.stringify({ body, ...extra }) })
+    const cmd = { requestId: randomUUID(), expectedWorkspaceId: workspaceId, expectedOwnerId: 'owner' }
+    // A single immutable operation can race or lose every response; it advances the group only once.
+    const attempts = await Promise.all(Array.from({ length: 8 }, () => replay('same id, one group message', cmd)))
+    assert.deepEqual(attempts.map(attempt => attempt.status).sort(), [200, 200, 200, 200, 200, 200, 200, 201])
+    assert.equal(new Set(attempts.map(attempt => (attempt.body as { id: string }).id)).size, 1)
+    assert.equal((await replay('changed content', cmd)).status, 409)
+    assert.equal((await replay('same id, one group message', { ...cmd, expectedOwnerId: 'member' })).status, 403)
+    assert.equal((await replay('same id, one group message', { ...cmd, expectedWorkspaceId: randomUUID() })).status, 403)
   } finally {
     await scoped.end()
     await pool.end()

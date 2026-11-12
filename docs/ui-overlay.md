@@ -22,7 +22,7 @@ checkout or credentials. See the [self-hosting guide](self-hosting.md).
 | Binding | Public server and compile-time contracts | Official Web and Desktop |
 | --- | --- | --- |
 | `MIKKA_UI_OVERLAY_DIR` | unset | path of the `mikka-hosted-ui` checkout, inside this repository (CI uses `.hosted-ui/`, which is gitignored) |
-| `@ui-slot/<name>` | `components/slots/<name>.tsx` | `$MIKKA_UI_OVERLAY_DIR/slots/<name>.tsx` for every required provider. Only `auth-sso`, `settings-governance` and `settings-organization` can use their public no-content contracts |
+| `@ui-slot/<name>` | `components/slots/<name>.tsx` | `$MIKKA_UI_OVERLAY_DIR/slots/<name>.tsx` for all 51 slots in an official release |
 | `@hosted/*` | does not resolve | `$MIKKA_UI_OVERLAY_DIR/*` |
 
 `lib/ui-overlay.mjs` decides this once. The shared Vite plugin
@@ -37,8 +37,9 @@ Official release builds pin `MIKKA_UI_OVERLAY_DIR` and the matching 40-character
 `MIKKA_UI_OVERLAY_SHA`. The directory must be inside the public checkout and
 resolves React and shared application modules from its `node_modules`. An invalid
 checkout, missing required provider, or missing required export fails the official
-build. The [slot inventory](design/one-ui-slot-inventory.md) identifies the three
-public no-content contracts and the required providers.
+build. Unpinned development layers may use the public no-content contracts for
+`auth-sso`, `settings-governance` and `settings-organization`. The
+[slot inventory](design/one-ui-slot-inventory.md) records their original consumers.
 
 ## Slots
 

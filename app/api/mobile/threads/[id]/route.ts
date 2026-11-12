@@ -1,9 +1,9 @@
 import { asc, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 import { db, pool } from '@/lib/db'
-import { agentRuns, runChunks, runMessages } from '@/lib/db/schema'
+import { agentRuns, runChunks } from '@/lib/db/schema'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
-import { readRun } from '@/lib/agent-runs'
+import { readRun, readRunMessages } from '@/lib/agent-runs'
 import { readRunChain } from '@/lib/run-chain'
 import { sendThreadMessage } from '@/lib/thread-continue'
 import { ActionFailureError } from '@/lib/action-error'
@@ -37,8 +37,7 @@ async function handleGET(request: Request, { params }: Params) {
   const chunks = chainChunks(await db.select({ runId: runChunks.runId, chunk: runChunks.chunk, at: runChunks.createdAt }).from(runChunks)
     .innerJoin(agentRuns, eq(agentRuns.id, runChunks.runId))
     .where(inArray(runChunks.runId, runIds)).orderBy(asc(agentRuns.createdAt), asc(runChunks.seq)))
-  const messages = runIds.length > 1 ? await db.select({ id: runMessages.id, text: runMessages.text, createdAt: runMessages.createdAt }).from(runMessages)
-    .where(inArray(runMessages.runId, runIds)).orderBy(asc(runMessages.createdAt)) : detail.messages
+  const messages = runIds.length > 1 ? await readRunMessages(user.id, runIds) : detail.messages
   const items = threadItems(
     detail.run.agentId ? chunks : [],
     messages.map(message => ({ id: message.id, text: message.text, author: user.name, mine: true, at: message.createdAt })),
@@ -50,7 +49,7 @@ async function handleGET(request: Request, { params }: Params) {
     // Where each run's thread and run keys arrive (the web's thread panel listens to the same).
     threadLiveReferences(pool, workspacePool, runIds, user.id),
   ])
-  return json({ live: { runs }, thread, active: runIsActive(live), working: runIsWorking(live), paused, summary: detail.run.report && typeof detail.run.report.summary === 'string' ? detail.run.report.summary : null, error: detail.run.error, items })
+  return json({ issueId: detail.run.issueId, canReply: Boolean(detail.run.agentId), confirmedSubmissionIds: messages.flatMap(message => message.submissionId ? [message.submissionId] : []), live: { runs }, thread, active: runIsActive(live), working: runIsWorking(live), paused, summary: detail.run.report && typeof detail.run.report.summary === 'string' ? detail.run.report.summary : null, error: detail.run.error, items })
 }
 
 /** `POST /api/mobile/threads/:id` with `{ text }`: a message to the thread; the daemon delivers it, or an ended thread runs again. */

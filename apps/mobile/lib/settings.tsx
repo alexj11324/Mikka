@@ -10,7 +10,7 @@ const SettingsContext = createContext<SettingsState | null>(null)
 
 /** Settings load once; switches show confirmed values while pending intentions are explicit. */
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const state = useApi<Settings>('/api/mobile/settings')
+  const state = useApi<Settings>('/api/mobile/settings?view=profile')
   const identity = apiCache.account()
   const currentState = useRef(state)
   currentState.current = state

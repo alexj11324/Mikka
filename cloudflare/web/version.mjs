@@ -20,8 +20,12 @@ export async function publicVersion(request, env) {
   const url = new URL(versionPath, request.url)
   let value
   try {
-    const upstream = await env.API.fetch(new Request(url, { redirect: 'manual', signal: request.signal }))
+    // Bound cold discovery to the existing web client's version-read budget.
+    const signal = AbortSignal.any([request.signal, AbortSignal.timeout(5_000)])
+    const upstream = await env.API.fetch(new Request(url, { redirect: 'manual', signal }))
     if (upstream.status !== 200 || !upstream.headers.get('content-type')?.includes('application/json')) {
+      // A broken error body does not change an already observed HTTP status.
+      await upstream.body?.cancel().catch(() => {})
       return failure('deploymentVersionUnavailable', upstream.status >= 400 ? upstream.status : 503)
     }
     value = await upstream.json()

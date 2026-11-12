@@ -5,6 +5,7 @@ type SandboxProcess = Awaited<ReturnType<SandboxConnection['spawn']>>
 export type TaskMachineGrant = Readonly<{
   ownerId:string; workspaceId:string; taskId:string; repositoryKey:string
   runId:string; operationId:string; expiresAt:number
+  requiredCheckpoint?: { instanceId:string; id:string; sha256:string }
 }>
 
 type SpawnOptions = Parameters<SandboxConnection['spawn']>[0]

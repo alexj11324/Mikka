@@ -11,7 +11,7 @@ export type SubmitOutcome =
   | { kind: 'authRequired' }
   // The server holds a different body under this id. Terminal: never resent, never given a new id.
   | { kind: 'conflict' }
-  | { kind: 'rejected'; error: ActionErrorCode | 'originRejected' | 'failed' }
+  | { kind: 'rejected'; error: ActionErrorCode | 'originRejected' | 'failed' | 'rateLimited' }
   // Another submission of this composer is still in flight.
   | { kind: 'busy' }
 
@@ -30,6 +30,7 @@ export function coordinatorSendFailure(error: unknown): SubmitOutcome {
   if (!ClientError.is(error)) return { kind: 'uncertain' }
   if (error.status === 401) return { kind: 'authRequired' }
   if (error.code === 'submissionConflict') return { kind: 'conflict' }
+  if (error.status === 429) return { kind: 'rejected', error: 'rateLimited' }
   if (error.status >= 500) return { kind: 'uncertain' }
   return { kind: 'rejected', error: ACTION_ERROR_CODES.find(code => code === error.code) ?? 'generic' }
 }

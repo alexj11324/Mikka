@@ -5,7 +5,7 @@ import type { MessagePart } from 'eve/client'
 import { eveClientOptions } from './eve-client'
 
 /** Native clients consume the same eve protocol as web; auth headers resolve before each request. */
-export function useEveChat(botId: string | null, enabled: boolean, revalidate: () => Promise<void>) {
+export function useEveChat(botId: string | null, enabled: boolean, revalidate: () => Promise<void>, expectedOwnerId?: string, expectedWorkspaceId?: string | null) {
   // The root/account and ChatScreen/workspace boundaries remount this binding on identity changes.
   const agent = useEveAgent({
     ...eveClientOptions(botId),
@@ -23,8 +23,8 @@ export function useEveChat(botId: string | null, enabled: boolean, revalidate: (
   }, [enabled, prewarm, resume])
   const sendMessage = useCallback(async (text: string, submissionId: string, images?: readonly { dataUrl: string }[]) => {
     const content: MessagePart[] = [{ type: 'text', text }, ...(images ?? []).map(image => ({ type: 'file' as const, mediaType: /^data:([^;,]+)/.exec(image.dataUrl)?.[1] ?? 'image/jpeg', data: image.dataUrl }))]
-    return send(content, { headers: { 'x-mikka-submission-id': submissionId } })
-  }, [send])
+    return send(content, { headers: { 'x-mikka-submission-id': submissionId }, ...(expectedOwnerId && expectedWorkspaceId ? { clientContext: { expectedOwnerId, expectedWorkspaceId, botId } } : {}) })
+  }, [send, expectedOwnerId, expectedWorkspaceId, botId])
   return { ...agent, sendMessage }
 }
 

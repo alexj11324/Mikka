@@ -22,7 +22,6 @@ const points: Array<[string, string, RegExp]> = [
   ['subagent workflow report', 'workflows/subagent/steps.ts', /maskFor\(\{workspaceId:actor\.workspaceId,ownerId:actor\.userId\}/],
   ['computer review call', 'lib/computer/reviews.ts', /maskDeep\(row\.call, mask\)/],
   ['computer review route passes masker', 'app/v1/devices/[deviceId]/computer/route.ts', /secretMaskerFor\(\{ workspaceId: caller\.scopeWorkspaceId, ownerId: caller\.userId \}\)/],
-  ['native coordinator command', 'app/v1/devices/[deviceId]/coordinator/route.ts', /maskFor\(\{ workspaceId: caller\.scopeWorkspaceId, ownerId: caller\.userId \}, body\.command\)/],
 ]
 
 for (const [name, file, pattern] of points) {

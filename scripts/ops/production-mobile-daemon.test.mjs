@@ -273,6 +273,36 @@ function noSensitiveReport(report) {
     assert.equal(value.includes(secret), false, 'closed report must omit identities, credentials and raw error')
 }
 
+test('externally pinned source, overlay and provider bracket the same authenticated device cleanup', async () => {
+  for (const provider of ['vercel', 'cloudflare']) {
+    for (const mismatch of [null, 'source-before', 'provider-before', 'overlay-after']) {
+      const f = fixture()
+      const releaseWitness = { provider, source:'a'.repeat(40), overlay:'b'.repeat(40), driver:'c'.repeat(40) }
+      const env = {SMOKE_OWNER_EMAIL:ENV.SMOKE_OWNER_EMAIL, SMOKE_OWNER_PASSWORD:ENV.SMOKE_OWNER_PASSWORD}
+      let reads = 0
+      const report = await f.run({ env, releaseWitness, fetchImpl:async (url, init) => {
+        if (new URL(url).pathname !== '/mikka/api/version') return f.fetchImpl(url, init)
+        reads++
+        assert.equal(init.redirect, 'error')
+        const expected = mismatch === 'provider-before' ? provider !== 'vercel' : provider === 'vercel'
+        return response({build:mismatch === 'source-before' ? 'd'.repeat(40) : releaseWitness.source,
+          overlaySha:mismatch === 'overlay-after' && reads === 2 ? 'e'.repeat(40) : releaseWitness.overlay},
+        200, expected ? {'x-vercel-id':'fixture'} : {'cf-ray':'fixture'})
+      } })
+      assert.equal(report.status, mismatch ? 'fail' : 'pass')
+      if (mismatch?.endsWith('before')) {
+        assert.equal(reads, 1)
+        assert.equal(f.requests.length, 0)
+      } else {
+        assert.equal(reads, 2)
+        assert.ok(Object.values(report.cleanup).every(Boolean))
+        assert.equal(report.client.sourceRevision, releaseWitness.driver)
+      }
+      noSensitiveReport(report)
+    }
+  }
+})
+
 test('real source HTTP client proves mobile owner, enroll, disabled heartbeat, revoke and normal offline removal', async () => {
   const f = fixture()
   const report = await f.run()

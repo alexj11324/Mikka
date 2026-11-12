@@ -6,7 +6,7 @@ import type { ReadCacheState } from '@/lib/swr/persistent-cache'
 import { Window } from 'happy-dom'
 import * as live from '@/hooks/use-live-key'
 import * as groupMessages from '@/lib/group-messages'
-import { ViewStateProvider } from '@/lib/hooks/view-state'
+import { ViewStateProvider, useForgetGroupDrafts, useViewState } from '@/lib/hooks/view-state'
 import { useGroupMembershipLoss } from './group-membership-cache'
 import { Textarea } from '@/components/ui/textarea'
 
@@ -154,6 +154,45 @@ test('a second open tab retires only memberships removed by a same-scope list re
   assert.deepEqual(removed, ['one'], 'changing Workspace cannot revoke the previous scope')
 })
 
+
+test('an authenticated peer membership loss clears its draft and send journal and fences previous setters after a rejoin', async () => {
+  const legacyKey = 'group:one:pending'
+  const firstKey = 'chat-send:group:owner:workspace:one'
+  const secondKey = 'chat-send:group:owner:workspace:two'
+  let write!: (text: string) => void
+  let snapshot!: { draft: string; legacy: string[]; first: string[]; second: string[] }
+  function Cells() {
+    const [draft, setDraft] = useViewState('group:one:draft', '')
+    const [legacy, setLegacy] = useViewState<string[]>(legacyKey, [])
+    const [first, setFirst] = useViewState<string[]>(firstKey, [])
+    const [second, setSecond] = useViewState<string[]>(secondKey, [])
+    snapshot = { draft, legacy, first, second }
+    write = text => { setDraft(text); setLegacy([text]); setFirst([text]); setSecond(['other group']) }
+    return null
+  }
+  function Peer({ ids, visit }: { ids?: string[]; visit: number }) {
+    const forget = useForgetGroupDrafts('owner', 'workspace')
+    const groups = ids?.map(id => ({ id, title: id, workspaceId: 'workspace', createdAt: '', lastMessage: null }))
+    useGroupMembershipLoss('owner', 'workspace', groups, forget, async () => {})
+    return <Cells key={visit} />
+  }
+  const show = (ids: string[] | undefined, visit = 1) => act(async () => {
+    root.render(<ViewStateProvider scope="owner:workspace"><Peer ids={ids} visit={visit} /></ViewStateProvider>)
+  })
+  await show(['one', 'two'])
+  await act(async () => write('unknown result'))
+  const previousMembership = write
+  await show(undefined)
+  assert.deepEqual(snapshot.first, ['unknown result'])
+  await show(['two'])
+  assert.deepEqual(snapshot, { draft: '', legacy: [], first: [], second: ['other group'] })
+  await act(async () => previousMembership('late receipt'))
+  assert.deepEqual(snapshot, { draft: '', legacy: [], first: [], second: ['other group'] })
+  await show(['one', 'two'], 2)
+  await act(async () => write('after rejoin'))
+  await act(async () => previousMembership('old connection'))
+  assert.deepEqual(snapshot, { draft: 'after rejoin', legacy: ['after rejoin'], first: ['after rejoin'], second: ['other group'] })
+})
 
 test('a confirmed local departure wakes only peer tabs of the same account and workspace', { timeout: 3_000 }, async () => {
   const { BroadcastChannel } = await import('node:worker_threads')
