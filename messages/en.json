@@ -6431,6 +6431,11 @@
       "notMemberNote": "Organization roles don't grant access"
     },
     "invitations": {
+      "organizationSelect": "Organization",
+      "noOrganizations": "No Organizations",
+      "statusPending": "Pending",
+      "statusAccepted": "Accepted",
+      "statusRevoked": "Revoked",
       "description": "Organization members can invite another Member. No workspace access is granted.",
       "title": "Invite Organization members",
       "label": "Email addresses",
