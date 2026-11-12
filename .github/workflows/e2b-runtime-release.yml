@@ -11,6 +11,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      issues: read
       actions: read
     outputs:
       skip: ${{ steps.history.outputs.skip }}
@@ -25,6 +26,12 @@ jobs:
         run: node scripts/release/web-deploy.mjs main
         env:
           GITHUB_TOKEN: ${{ github.token }}
+      - name: Recheck the promoted Cloudflare Web after entering the release queue
+        if: github.event.inputs.cloudflare_receipt != ''
+        run: node scripts/release/cloudflare-promoted-web.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CLOUDFLARE_RECEIPT: ${{ github.event.inputs.cloudflare_receipt }}
       - name: Recheck failures after entering the serialized release queue
         id: history
         run: node scripts/e2b/runtime-inputs.mjs recheck
@@ -47,6 +54,7 @@ jobs:
     timeout-minutes: 95
     permissions:
       contents: read
+      issues: read
       actions: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -55,7 +63,14 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
+      - name: Recheck the promoted Cloudflare Web after the real candidate build
+        if: github.event.inputs.cloudflare_receipt != ''
+        run: node scripts/release/cloudflare-promoted-web.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CLOUDFLARE_RECEIPT: ${{ github.event.inputs.cloudflare_receipt }}
       - name: Await this source's actual Web build and public version
+        if: github.event.inputs.cloudflare_receipt == ''
         run: node scripts/release/web-deploy.mjs await-web
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -69,6 +84,8 @@ jobs:
       queue: max
     permissions:
       contents: read
+      issues: read
+      actions: read
       id-token: write
     outputs:
       release-artifact-id: ${{ steps.release.outputs.artifact-id }}
@@ -153,6 +170,12 @@ jobs:
             ${{ runner.temp }}/accepted.json
           if-no-files-found: warn
           retention-days: 7
+      - name: Recheck the promoted Cloudflare Web before making accepted templates public
+        if: github.event.inputs.cloudflare_receipt != ''
+        run: node scripts/release/cloudflare-promoted-web.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CLOUDFLARE_RECEIPT: ${{ github.event.inputs.cloudflare_receipt }}
       - name: Make only fully accepted candidates public
         id: publish
         run: |
@@ -204,8 +227,19 @@ jobs:
           path: ${{ runner.temp }}/release.json
           if-no-files-found: error
           retention-days: 7
+      - name: Verify the Cloudflare release evidence and final public Web
+        if: github.event.inputs.cloudflare_receipt != ''
+        run: |
+          node scripts/e2b/runtime-report.mjs reference
+          node scripts/release/cloudflare-promoted-web.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CLOUDFLARE_RECEIPT: ${{ github.event.inputs.cloudflare_receipt }}
+          RUNTIME_REPORT_ARTIFACT_ID: ${{ steps.release.outputs.artifact-id }}
+          RUNTIME_REPORT_SHA256: ${{ steps.publish.outputs.release-sha256 }}
   publish:
     needs: [validate, await-web, subscriptions]
+    if: github.event.inputs.cloudflare_receipt == ''
     permissions:
       contents: read
       id-token: write

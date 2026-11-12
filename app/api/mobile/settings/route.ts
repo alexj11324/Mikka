@@ -2,7 +2,7 @@ import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { and, eq, isNull } from 'drizzle-orm'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
 import { db } from '@/lib/db'
-import { coordinatorSessions, linearConnections } from '@/lib/db/schema'
+import { coordinatorSessions, linearConnections, users } from '@/lib/db/schema'
 import { COMPOSIO_TOOLKITS, getComposio, isComposioToolkit } from '@/lib/composio'
 import { listComposioPages } from '@/lib/composio-pagination'
 import { readPreferences } from '@/lib/preferences'
@@ -43,17 +43,20 @@ async function handleGET(request: Request) {
   if (!user) return unauthorized()
   // 记忆 is the memory of the Coordinator of the workspace the app has open.
   const coordinator = await openChatBotId(user, null)
-  const [context, preferences, [session], apps] = await Promise.all([
+  const [context, preferences, [profile], apps] = await Promise.all([
     loadWorkspaceContext(undefined, user),
     readPreferences(user.id),
-    db.select({ memory: coordinatorSessions.memory }).from(coordinatorSessions)
-      .where(and(eq(coordinatorSessions.userId, user.id), eq(coordinatorSessions.botId, coordinator))).limit(1),
+    db.select({ id: users.id, name: users.name, email: users.email, image: users.image, memory: coordinatorSessions.memory })
+      .from(users)
+      .leftJoin(coordinatorSessions, and(eq(coordinatorSessions.userId, users.id), eq(coordinatorSessions.botId, coordinator)))
+      .where(eq(users.id, user.id)).limit(1),
     connectedApps(user.id),
   ])
+  if (!profile) return unauthorized()
   const organization = context.role === 'admin' ? null : (await listOrganizations(user.id)).find(item => item.role === 'owner' || item.role === 'admin')
   return json({
     billingScope: context.role === 'admin' ? { kind: 'workspace', id: context.workspace.id } : organization ? { kind: 'organization', id: organization.id } : null,
-    user: { id: user.id, name: user.name, email: user.email, image: user.image ?? null },
+    user: { id: profile.id, name: profile.name, email: profile.email, image: profile.image },
     workspace: {
       ...context.workspace,
       ...(isCloudEdition() && user[enterprisePrincipal]?.kind === 'session' && context.workspace.kind === 'team' && context.role === 'admin' && {
@@ -63,7 +66,7 @@ async function handleGET(request: Request) {
     workspaces: context.choices,
     preferences,
     // The session's updatedAt moves with every turn, so the memory carries no 更新于 time.
-    memory: session?.memory ?? '',
+    memory: profile.memory ?? '',
     apps,
   })
 }
