@@ -15,6 +15,41 @@ const services = () => ({
   ASSETS: { fetch: r => new Response(new URL(r.url).pathname === '/index.html' ? '<html lang="zh-CN">app</html>' : 'asset') },
 })
 
+test('the real sign-in shell declares shipped PNG, ICO and Apple icons', async () => {
+  const shell = await readFile(new URL('../../frontend/index.html', import.meta.url), 'utf8')
+  const icons = [...shell.matchAll(/<link\b[^>]*rel="(?:icon|apple-touch-icon)"[^>]*href="([^"]+)"[^>]*>/g)]
+    .map(match => match[1])
+  assert.equal(icons.length, 5)
+  assert.ok(icons.every(path => path.startsWith('/mikka/') && /\.(?:png|ico)$/.test(path)))
+  assert.doesNotMatch(shell, /icon\.svg/)
+  assert.match(shell, /<meta name="robots" content="noindex,nofollow"/)
+  const env = services()
+  env.ASSETS.fetch = async req => {
+    const path = new URL(req.url).pathname
+    if (path === '/index.html') return new Response(shell)
+    const content = await readFile(new URL(`../../../public${path}`, import.meta.url))
+    return new Response(content, { headers: { 'content-type': path.endsWith('.png') ? 'image/png' : 'image/x-icon' } })
+  }
+  const page = await release.fetch(request('/mikka/en/sign-in'), env)
+  assert.equal(page.status, 200)
+  assert.match(await page.text(), /<html lang="en"/)
+  for (const path of icons) {
+    const response = await release.fetch(request(path), env)
+    assert.equal(response.status, 200, path)
+    assert.equal(response.headers.get('cache-control'), 'public, max-age=0, must-revalidate')
+    const bytes = Buffer.from(await response.arrayBuffer())
+    if (path.endsWith('.png')) {
+      assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a')
+      const size = path.endsWith('apple-icon.png') ? 180 : Number(/-(\d+)\.png$/.exec(path)[1])
+      assert.equal(bytes.readUInt32BE(16), size)
+      assert.equal(bytes.readUInt32BE(20), size)
+    } else {
+      assert.equal(bytes.readUInt32LE(0), 65536)
+      assert.equal(bytes.readUInt16LE(4), 3)
+    }
+  }
+})
+
 test('official pages preserve localization, credential referrer policy, raw-index denial and GitHub setup', async () => {
   const env = services()
   const localized = await release.fetch(request('/mikka/en/sign-in', { headers: { 'sec-fetch-dest': 'document' } }), env)
@@ -40,7 +75,7 @@ test('assets drop credentials, keep conditional requests, and only cache success
     assert.equal(url.search, '')
     return new Response(null, { status: url.pathname.endsWith('missing.js') ? 404 : 304 })
   }
-  for (const [path, cache] of [['/mikka/assets/hash.js?dpl=test','public, max-age=31536000, immutable'], ['/mikka/icon.svg','public, max-age=0, must-revalidate'], ['/mikka/assets/missing.js','no-store']]) {
+  for (const [path, cache] of [['/mikka/assets/hash.js?dpl=test','public, max-age=31536000, immutable'], ['/mikka/brand/mikka-app-icon-48.png','public, max-age=0, must-revalidate'], ['/mikka/assets/missing.js','no-store']]) {
     const response = await release.fetch(request(path, { headers: { authorization: 'fixture', cookie: 'fixture', 'if-none-match': '"hash"' } }), env)
     assert.equal(response.headers.get('cache-control'), cache)
   }
