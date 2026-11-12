@@ -1,3 +1,4 @@
+import { bindWorkersAi, configureWorkersAi, workersAiRequest } from '../../workers-ai/binding.mjs'
 import { WorkerEntrypoint } from 'cloudflare:workers'
 import { Container, getContainer } from '@cloudflare/containers'
 import { apiRequest } from './request.mjs'
@@ -26,9 +27,11 @@ export class BusinessApi extends Container {
       this.envVars.MIKKA_BUSINESS_WORLD_TOKEN = token
     }
     if (env.TASK_MACHINE) configureTaskBridge(this, ctx)
+    if (env.WORKERS_AI) configureWorkersAi(this, ctx, env.CLOUDFLARE_WORKERS_AI_ACCOUNT_ID)
   }
 
   async configurePrivateHttps() {
+    if (this.env.WORKERS_AI) await bindWorkersAi(this.ctx, this.envVars)
     if (this.env.EVE_SERVICE) await this.ctx.container.interceptOutboundHttps('eve.internal', this.ctx.exports.EveOutbound)
     if (this.env.BUSINESS_WORLD) await this.ctx.container.interceptOutboundHttps('world.internal',
       this.ctx.exports.BusinessWorldOutbound({ props: { capability: this.envVars.MIKKA_BUSINESS_WORLD_TOKEN } }))
@@ -43,6 +46,10 @@ export class BusinessApi extends Container {
     await this.configurePrivateHttps()
     return super.startAndWaitForPorts(...args)
   }
+}
+
+export class WorkersAiOutbound extends WorkerEntrypoint {
+  fetch(request) { return workersAiRequest(request, this.env.WORKERS_AI, this.ctx.props.capability) }
 }
 
 export class EveOutbound extends WorkerEntrypoint {

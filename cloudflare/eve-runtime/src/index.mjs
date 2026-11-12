@@ -1,3 +1,4 @@
+import { bindWorkersAi, configureWorkersAi } from '../../workers-ai/binding.mjs'
 import { Container, getContainer } from '@cloudflare/containers'
 import { hostConfiguration, nativeRequest } from '../runtime/config.mjs'
 import { mayRestart, restartPlan, stoppedHost } from '../runtime/restarts.mjs'
@@ -30,10 +31,12 @@ export class EveRuntime extends Container {
     }
     this.envVars = { ...this.configuration.runtimeEnv, MIKKA_EVE_WORLD_TOKEN: capability, MIKKA_EVE_PRODUCT_TOKEN: productCapability,
       NODE_EXTRA_CA_CERTS: '/etc/cloudflare/certs/cloudflare-containers-ca.crt' }
+    if (env.WORKERS_AI) configureWorkersAi(this, ctx, env.CLOUDFLARE_WORKERS_AI_ACCOUNT_ID)
     this.labels = { component: 'eve-runtime', release: this.configuration.releaseId }
   }
 
   async bindOutboundServices() {
+    if (this.envVars.MIKKA_WORKERS_AI_CAPABILITY) await bindWorkersAi(this.ctx, this.envVars)
     await this.ctx.container.interceptOutboundHttps('world.internal',
       this.ctx.exports.EveWorldOutbound({ props: { capability: this.envVars.MIKKA_EVE_WORLD_TOKEN } }))
     await this.ctx.container.interceptOutboundHttps('product.internal',
