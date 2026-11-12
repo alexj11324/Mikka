@@ -64,6 +64,11 @@ for (const [name, source, rule] of [
   ['for (;;) awaiting setTimeout', "for (;;) {\n  if (await ready()) return\n  await new Promise(resolve => setTimeout(resolve, 500))\n}", 'polling/sleep-loop'],
   ['long counted loop awaiting delay', "for (let step = 0; step < 1440; step++) { await tick(); await delay(30_000) }", 'polling/sleep-loop'],
   ['mobile useApi with an interval', "const page = useApi<Page>(`/api/x/${id}`, 15_000)", 'polling/helper'],
+  ['mobile useApi with a computed interval', "useApi<Page>(filePath(id, file), nextDelay())", 'polling/helper'],
+  ['mobile useApi with an interval variable', "useApi<Page>(path, delayMs)", 'polling/helper'],
+  ['mobile useApi with an extra interval option', "useApi(path, { read: decode, interval: 5000 })", 'polling/helper'],
+  ['mobile useApi with an uninspected spread', "useApi(path, { ...settings, read: decode })", 'polling/helper'],
+  ['mobile useApi with an extra interval argument', "useApi(path, { read: decode }, 5000)", 'polling/helper'],
   ['pollUntil', "await pollUntil(() => read(), value => value.ok)", 'polling/helper'],
 ]) test(`rejects ${name}`, () => assert.ok(rules(source).includes(rule), `${source} -> ${rules(source)}`))
 
@@ -78,6 +83,8 @@ for (const [name, source] of [
   ['for…of with a delay', "for (const step of steps) { await wait(100); show(step) }"],
   ['a loop with no delay', "while (queue.length) await handle(queue.shift())"],
   ['mobile useApi without an interval', "const page = useApi<Page>(`/api/x/${id}`)"],
+  ['mobile useApi with a named reader', "useApi<ReviewFileRead>(enabled ? filePath(id, path, ref) : null, { read: readFilePath })"],
+  ['mobile useApi with a single constructed path', "useApi<Result>(filePath(id, canonicalPath(path, ref)))"],
   ['useApi definition', "export function useApi<T>(path: string | null, every = 0) {}"],
   ['a non-polling constant', "const FRESH_FOR_MS = 60_000"],
 ]) test(`allows ${name}`, () => assert.deepEqual(rules(source), [], source))
