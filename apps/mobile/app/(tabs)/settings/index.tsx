@@ -73,7 +73,7 @@ export default function SettingsScreen() {
       ) : !data ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : (
         <ScrollView {...underBar} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}>
           <ReadNotice error={error} hasData label="设置" onRetry={reload} />
-          <ReadNotice error={connections.error} hasData={Boolean(connections.snapshot?.toolkits.length)} label="连接状态" onRetry={connections.reload} />
+          <ReadNotice error={connections.error} hasData={Boolean(connections.snapshot?.toolkits.length)} label={connections.noticeLabel} onRetry={connections.reload} />
           <PushRow proactive={data.preferences.proactive} />
           <PreferenceSaveNotice />
           <Group>

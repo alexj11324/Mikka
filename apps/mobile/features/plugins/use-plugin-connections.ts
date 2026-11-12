@@ -20,6 +20,9 @@ export function usePluginConnections() {
     if (directory.data && 'toolkits' in directory.data) return directory.data
     return legacy ? legacyPluginConnections(legacy, accounts.data, linear.data) : null
   }, [directory.data, legacy, accounts.data, linear.data])
-  return { snapshot, error: directory.error || accounts.error || Boolean(snapshot?.failed.length),
+  const providerNames = { composio: 'Composio', github: 'GitHub', linear: 'Linear', telegram: 'Telegram' }
+  const failedProviders = snapshot?.failed.map(failure => providerNames[failure.source]) ?? []
+  const noticeLabel = failedProviders.length ? `${failedProviders.join('、')} 连接状态` : '连接状态'
+  return { snapshot, noticeLabel, error: directory.error || accounts.error || Boolean(snapshot?.failed.length),
     reload: async () => { await Promise.all([directory.reload(), accounts.reload(), linear.reload()]) } }
 }
