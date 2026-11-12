@@ -224,6 +224,51 @@ test('registered service identity routes enforce a fresh Workspace admin through
     const issued = await request({ cookie, origin }, first.id, 'POST', credential, scoped)
     assert.equal(issued.status, 200)
     assert.equal(issued.body.organizationId, firstOrg)
+    const directory = async (organizationId: string, headers: Record<string, string>, suffix = '', input?: unknown) => {
+      const response = await fetch(origin + '/mikka/api/organizations/' + organizationId + '/api-keys' + suffix, {
+        method: input === undefined ? 'GET' : 'PATCH', headers: { 'content-type': 'application/json', ...headers },
+        ...(input === undefined ? {} : { body: JSON.stringify(input) }),
+      })
+      return { status: response.status, body: await response.json() }
+    }
+    const listing = await directory(firstOrg, { cookie })
+    const key = listing.body.keys[0]
+    assert.ok(key.id !== created.body.id)
+    assert.deepEqual(listing, { status: 200, body: { keys: [{ id: key.id, name: null, workspaceId: first.id,
+      serviceIdentityId: created.body.id, serviceIdentityName: 'Organization reporter', expiresAt: null }], nextCursor: null } })
+    const path = '/' + key.id
+    await t.test('the app-only directory lists and names a single current credential under both live roles', async () => {
+      const name = 'Nightly project report'
+      assert.deepEqual((await directory(firstOrg, { cookie }, '?after=' + key.id)).body.keys, [])
+      assert.equal((await directory(firstOrg, { cookie }, '?after=invalid')).status, 400)
+      assert.deepEqual((await directory(otherOrg, { cookie })).body.keys, [])
+      assert.equal((await directory(otherOrg, { cookie, origin }, path, { name })).status, 404)
+      assert.deepEqual((await directory(firstOrg, { cookie: memberCookie })).body.keys, [])
+      assert.equal((await directory(firstOrg, { cookie: memberCookie, origin }, path, { name })).status, 404)
+      for (const [bearer, expectedStatus] of [[issued.body.token, 401], [admin.token, 403]] as const) {
+        assert.equal((await directory(firstOrg, { cookie, authorization: 'Bearer ' + bearer })).status, expectedStatus)
+        assert.equal((await directory(firstOrg, { cookie, origin, authorization: 'Bearer ' + bearer }, path, { name })).status, expectedStatus)
+      }
+      assert.equal((await directory(firstOrg, { cookie }, path, { name })).status, 403)
+      assert.equal((await directory(firstOrg, { cookie, origin }, path, { name: '  ' })).status, 400)
+      assert.equal((await directory(firstOrg, { cookie, origin }, path, { name, token: 'invalid' })).status, 400)
+      assert.deepEqual(await directory(firstOrg, { cookie, origin }, path, { name }), { status: 200, body: { id: key.id, name } })
+      assert.deepEqual((await directory(firstOrg, { cookie })).body.keys, [{ ...key, name }])
+      assert.equal((await request({ cookie }, first.id, 'GET', credential)).body.revision, issued.body.revision)
+      assert.equal(await projectRead(issued.body.token), 200)
+      const audit = await pool.query('SELECT "targetId",metadata FROM mikka_organization_audit_events WHERE "organizationId"=$1 AND action=$2', [firstOrg, 'organization.api_key_renamed'])
+      assert.deepEqual(audit.rows, [{ targetId: key.id, metadata: { workspaceId: first.id } }])
+
+      await pool.query(`UPDATE mikka_workspace_members SET role='admin' WHERE "workspaceId"=$1 AND "userId"=$2`, [first.id, member])
+      assert.deepEqual((await directory(firstOrg, { cookie: memberCookie })).body.keys, [{ ...key, name }])
+      await orgRequest('PATCH', '/' + firstOrg + '/members', { userId: member, role: 'member' })
+      assert.equal((await directory(firstOrg, { cookie: memberCookie })).status, 403)
+      assert.equal((await directory(firstOrg, { cookie: memberCookie, origin }, path, { name })).status, 403)
+      await orgRequest('PATCH', '/' + firstOrg + '/members', { userId: member, role: 'admin' })
+      await pool.query(`UPDATE mikka_workspace_members SET role='member' WHERE "workspaceId"=$1 AND "userId"=$2`, [first.id, member])
+      assert.deepEqual((await directory(firstOrg, { cookie: memberCookie })).body.keys, [])
+      assert.equal((await directory(firstOrg, { cookie: memberCookie, origin }, path, { name })).status, 404)
+    })
     const { rows: audit } = await pool.query(`SELECT payload->'metadata' AS metadata FROM workspace_audit_outbox
       WHERE "workspaceId"=$1 AND payload->>'targetId'=$2 AND payload->>'action'='service_identity.credential_rotated'`, [first.id, created.body.id])
     assert.deepEqual(audit, [{ metadata: { organizationId: firstOrg } }])
@@ -234,6 +279,7 @@ test('registered service identity routes enforce a fresh Workspace admin through
 
     await attachment(firstOrg, 'DELETE')
     assert.equal(await projectRead(issued.body.token), 401)
+    assert.deepEqual((await directory(firstOrg, { cookie })).body.keys, [])
     const detached = await request({ cookie }, first.id, 'GET', credential)
     assert.equal(detached.body.configured, false)
     assert.equal(detached.body.revision, 3)
@@ -245,9 +291,15 @@ test('registered service identity routes enforce a fresh Workspace admin through
     const rebound = await request({ cookie, origin }, first.id, 'POST', credential, { ...scoped, revision: 3 })
     assert.equal(rebound.status, 200)
     assert.equal(await projectRead(rebound.body.token), 200)
+    const [replacement] = (await directory(firstOrg, { cookie })).body.keys
+    assert.notEqual(replacement.id, key.id)
+    assert.equal(replacement.name, null)
+    assert.equal((await directory(firstOrg, { cookie, origin }, path, { name: 'Stale attempt' })).status, 404)
     const workspaceOnly = await request({ cookie, origin }, first.id, 'POST', credential, { action: 'rotate', revision: 4 })
     assert.equal(workspaceOnly.status, 200)
     assert.equal(await projectRead(rebound.body.token), 401)
+    assert.deepEqual((await directory(firstOrg, { cookie })).body.keys, [])
+    assert.equal((await directory(firstOrg, { cookie, origin }, '/' + replacement.id, { name: 'Replaced key' })).status, 404)
     assert.equal((await request({ cookie }, first.id, 'GET', credential)).body.organizationId, undefined)
     await attachment(firstOrg, 'DELETE')
     assert.equal(await projectRead(workspaceOnly.body.token, '/' + project), 200)
