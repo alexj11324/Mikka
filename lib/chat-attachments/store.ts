@@ -224,6 +224,27 @@ export async function uploadChatFilePart(
   }
 }
 
+async function lockChatFileForCompletion(
+  client: PoolClient,
+  userId: string,
+  id: string,
+  tokenWorkspaceId?: string,
+) {
+  const row = (
+    await client.query<FileRow>(
+      `SELECT ${columns} FROM chat_attachments WHERE id=$1 AND "userId"=$2 FOR UPDATE`,
+      [id, userId],
+    )
+  ).rows[0]
+  if (!row || row.removedAt) throw new ChatFileError('notFound')
+  const workspaceId = await authorizeFileScope(userId, fileScope(row), client)
+  if (tokenWorkspaceId && workspaceId !== tokenWorkspaceId) throw new ChatFileError('notFound')
+  await client.query('SELECT mikka_account_assert_writable($1)', [userId])
+  if (row.state !== 'ready' && (!row.uploadExpiresAt || row.uploadExpiresAt.getTime() < Date.now()))
+    throw new ChatFileError('unavailable')
+  return { row, workspaceId }
+}
+
 /** Freeze the uploaded object under a new immutable key before making it readable. */
 export async function completeChatFile(
   userId: string,
@@ -235,22 +256,11 @@ export async function completeChatFile(
   let stage = 'read'
   try {
     await client.query('BEGIN')
-    const row = (
-      await client.query<FileRow>(
-        `SELECT ${columns} FROM chat_attachments WHERE id=$1 AND "userId"=$2 FOR UPDATE`,
-        [id, userId],
-      )
-    ).rows[0]
-    if (!row || row.removedAt) throw new ChatFileError('notFound')
-    const workspaceId = await authorizeFileScope(userId, fileScope(row), client)
-    if (tokenWorkspaceId && workspaceId !== tokenWorkspaceId) throw new ChatFileError('notFound')
-    await client.query('SELECT mikka_account_assert_writable($1)', [userId])
+    let { row, workspaceId } = await lockChatFileForCompletion(client, userId, id, tokenWorkspaceId)
     if (row.state === 'ready') {
       await client.query('COMMIT')
       return publicFile(row)
     }
-    if (!row.uploadExpiresAt || row.uploadExpiresAt.getTime() < Date.now())
-      throw new ChatFileError('unavailable')
     const bytes =
       inline ??
       row.inlineData ??
@@ -261,6 +271,25 @@ export async function completeChatFile(
           )
         : undefined)
     if (!bytes || bytes.length !== row.size) throw new ChatFileError('unreadable')
+    const hash = createHash('sha256').update(bytes).digest('hex')
+    const key = artifactStorage() === 'r2' ? `chat-files/${userId}/${id}/${hash}` : null
+    if (key !== row.storageKey) {
+      // Keep the final object discoverable to the existing draft/account cleanup trigger,
+      // including when the process disappears after PUT but before the ready row commits.
+      // An earlier unpublished attempt used a different body; only its locked draft owns it.
+      if (row.storageKey) await deleteArtifactObject(row.storageKey)
+      await client.query('UPDATE chat_attachments SET "storageKey"=$2 WHERE id=$1', [id, key])
+      await client.query('COMMIT')
+      await client.query('BEGIN')
+      const fresh = await lockChatFileForCompletion(client, userId, id, tokenWorkspaceId)
+      row = fresh.row
+      workspaceId = fresh.workspaceId
+      if (row.state === 'ready') {
+        await client.query('COMMIT')
+        return publicFile(row)
+      }
+      if (row.storageKey !== key) throw new ChatFileError('unavailable')
+    }
     stage = 'extract'
     const extracted = await extractChatFile(row.name, row.mediaType, bytes)
     let { text } = extracted
@@ -271,8 +300,6 @@ export async function completeChatFile(
       text = await transcribeChatAudio(userId, workspaceId, bytes, client)
       if (text.length > CHAT_FILE_MAX_TEXT) throw new ChatFileError('tooLong')
     }
-    const hash = createHash('sha256').update(bytes).digest('hex')
-    const key = artifactStorage() === 'r2' ? `chat-files/${userId}/${id}/${hash}` : null
     stage = 'store'
     if (key) await putArtifactObject(key, new Uint8Array(bytes), mediaType)
     stage = 'commit'
