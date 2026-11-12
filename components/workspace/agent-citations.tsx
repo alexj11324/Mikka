@@ -13,8 +13,8 @@ import { SourceAvatar, SourcesList, SourcesSummary, sourceTileClassName, type St
 import { Claude } from '@/components/ui/svgs/claude'
 import { Mikka } from '@/components/ui/svgs/mikka'
 import { OpenAI } from '@/components/ui/svgs/openai'
-import { localTaskState } from '@/hooks/use-bot-tasks'
-import { taskStateOf } from '@/lib/task-state'
+import { useTaskCards } from '@/hooks/use-task-cards'
+import { TaskPresentationsContext } from '@/hooks/use-task-collection'
 import { ISSUE_PRIORITIES } from '@/components/workspace/issue-properties'
 import { TaskStateIcon, useTaskStateLabel } from '@/components/workspace/task-state-icon'
 import { ThreadStatus } from '@/components/workspace/thread-status-icon'
@@ -122,28 +122,21 @@ export function PendingCitation() {
 }
 
 /**
- * A task mentioned in a reply (decision 2026-11-10): a compact chip with the task's own state icon (taskStateOf for a
- * run, localTaskState without one; never a run's result or a thread group) and its code, as 「◐ ALEX-45」; its
- * title when it has no code. The title, state and priority are in the hover card.
+ * A task mentioned in a reply shows its code or title and its authorized state.
+ * Older citations outside the workspace list share the mounted cards' batch.
  */
 export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (id: string) => void }) {
   const t = useTranslations('Coordinator.citation')
   const tIssue = useTranslations('Issue')
   const stateLabel = useTaskStateLabel()
-  const issueState = { status: issue.status, metadata: { pullRequests: issue.pullRequests ?? [] } }
-  // The canonical task state also knows that an open PR waits for review; the
-  // legacy attempt-only slot is used only when there is no run to project.
-  const outcome = issue.run && (issue.run.outcome === 'done' || issue.run.outcome === 'blocked'
-    || issue.run.outcome === 'needs_input' || issue.run.outcome === 'failed' || issue.run.outcome === 'idle')
-    ? issue.run.outcome : null
-  const { state, reason } = issue.run
-    ? taskStateOf(issueState, { runId: '', status: issue.run.status, outcome })
-    : localTaskState(issueState)
+  const resident = useContext(TaskPresentationsContext)[issue.id]
+  const cards = useTaskCards(resident ? [] : [issue.id])
+  const presentation = resident ?? cards[issue.id]
   const priority = ISSUE_PRIORITIES.find(item => item.value === issue.priority)
   const identifier = issue.identifier
-  const icon = <TaskStateIcon state={state} />
+  const icon = presentation && <TaskStateIcon state={presentation.state} />
   return <InlineCitation>
-    <InlineCitationTrigger variant="object" aria-label={t('openIssue', { title: issue.title })} data-focus-id={issue.id} data-task-chip={state} onClick={() => onOpen(issue.id)}>
+    <InlineCitationTrigger variant="object" aria-label={t('openIssue', { title: issue.title })} data-focus-id={issue.id} data-task-chip={presentation?.state ?? ''} onClick={() => onOpen(issue.id)}>
       {identifier
         // A code never breaks: the icon and the code are one unit.
         ? <InlineCitationLabel><span data-slot="chip-head" className="whitespace-nowrap"><span data-slot="chip-icon" className="me-1 inline-flex align-[-0.125em]">{icon}</span>{identifier}</span></InlineCitationLabel>
@@ -154,7 +147,7 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
         <InlineCitationSource><Mikka />{identifier ? `Mikka · ${identifier}` : 'Mikka'}</InlineCitationSource>
         <InlineCitationTitle>{issue.title}</InlineCitationTitle>
         <InlineCitationMeta>
-          <span data-task-state-label={state}><TaskStateIcon state={state} />{stateLabel(state, reason)}</span>
+          {presentation && <span data-task-state-label={presentation.state}>{icon}{stateLabel(presentation.state, presentation.reason)}</span>}
           {priority && <span><priority.icon {...priority.iconProps} />{tIssue(`priority.${priority.value}`)}</span>}
         </InlineCitationMeta>
       </InlineCitationBody>

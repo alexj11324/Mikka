@@ -358,6 +358,11 @@ function here() {
   return `${window.location.pathname}${window.location.search}${window.location.hash}`
 }
 
+/** Remember the confirmed Task for this opaque mobile history entry without putting its coordinates in the URL. */
+export function rememberMobileTask(task: { server: string; ref: string; target: string; workspaceId: string; userId: string }) {
+  window.history.replaceState({ ...window.history.state, mobileTask: task }, '', here())
+}
+
 /** Opens a thread in the right column beside what is in the centre (R-82), or in the chat's work area (setWorkAreaOpener). */
 export function openThread(runId: string) {
   if (toWorkArea({ thread: runId })) return

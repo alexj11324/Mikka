@@ -8,6 +8,8 @@ export type TaskPresentation = TaskStateView & {
   version: 1
   /** Opt-in list context for opening the authorized Factory on user selection. */
   factoryTaskId?: string
+  /** Reader-owned Bots with a verified dispatch in this Task’s workspace. */
+  botDispatches?: { botId: string; runId: string; name: string; harness: string | null }[]
   factoryExtraCount?: number
   review?: ReviewLineSummary
   primaryStatus: IssueStatus

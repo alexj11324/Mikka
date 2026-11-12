@@ -4,11 +4,11 @@ import { join } from 'node:path'
 import { expect } from '@playwright/test'
 import { observedAction, publishedActions, rpcReadResult } from '../../../scripts/acceptance/read-action-transport.mjs'
 
-export async function selectWorkspaceMenuItem(page, item) {
+export async function selectWorkspaceMenuItem(page, item, timeout = 45_000) {
   // A switch assigns the locale home URL after its action finishes. The old URL
   // and ready DOM are not proof that the new document has loaded. An already
   // selected item is a product no-op and only closes its menu.
-  const moved = await item.getAttribute('aria-current') === 'true' ? undefined : page.waitForEvent('domcontentloaded')
+  const moved = await item.getAttribute('aria-checked') === 'true' ? undefined : page.waitForEvent('domcontentloaded', { timeout })
   void moved?.catch(() => {})
   await item.click()
   await moved
@@ -16,7 +16,7 @@ export async function selectWorkspaceMenuItem(page, item) {
 
 export async function selectParityWorkspace(page, { menuName, workspaceName, basePath }) {
   await page.getByRole('button', { name: menuName, exact: true }).first().click()
-  await selectWorkspaceMenuItem(page, page.getByRole('menuitem', { name: workspaceName, exact: false }))
+  await selectWorkspaceMenuItem(page, page.getByRole('menuitemradio', { name: workspaceName, exact: true }))
   await page.waitForURL(url => url.pathname === `${basePath}/en` || url.pathname === `${basePath}/en/`)
   await page.getByRole('button', { name: menuName, exact: true }).first().waitFor()
 }
@@ -98,40 +98,29 @@ export function pageReadRequirements(name) {
 
 export async function pageReady(page, name, fixture, messages, observed = {}) {
   const text = value => page.getByText(value, { exact: true }).first().waitFor()
-  const threadRows = async root => {
-    const resolved = root.getByRole('button', { name: messages.Shell.threads.group.resolved.replace('{count}', '1'), exact: true })
-    await expect(resolved).toHaveAttribute('aria-expanded', /^(?:true|false)$/, { timeout: 45_000 })
-    if (await resolved.getAttribute('aria-expanded') === 'false') await resolved.click()
-    await expect(resolved).toHaveAttribute('aria-expanded', 'true')
-    // A thread row is named by its task: the immutable identifier issued by APP, then its title.
-    await root.getByRole('button', { name: `${fixture.issueIdentifier} ${fixture.issueTitle}`, exact: true }).waitFor()
-    await root.getByText('The review is complete. Conversations, task details and artifacts are ready.', { exact: false }).waitFor()
-  }
+  const taskRow = root => root.getByRole('button').filter({ hasText: fixture.issueIdentifier }).filter({ hasText: fixture.issueTitle })
   if (name === 'workspace-link') {
-    // The deep link can show the restored chat before the bot roster and its
-    // summaries arrive. Those reads also supply the Coordinator ID that makes
-    // its Computer tab available; capture the actual completed workspace.
-    const bots = page.getByRole('list', { name: messages.Nav.bots, exact: true })
-    await bots.getByRole('button', { name: messages.Nav.coordinator, exact: true }).getByText('Review the desktop workspace, including conversations, tasks, artifacts and settings.', { exact: true }).waitFor()
-    await bots.getByRole('button', { name: fixture.botName, exact: true }).getByText('The review is complete. The task and its artifacts are ready for you.', { exact: true }).waitFor()
-    await bots.getByRole('button', { name: fixture.groupName, exact: true }).getByText('The desktop review is ready. Please check the task and its artifacts.', { exact: true }).waitFor()
-    const overview = page.getByRole('complementary', { name: messages.Shell.panel.label, exact: true })
-    await overview.getByRole('heading', { name: messages.Nav.coordinator, exact: true }).waitFor()
-    await overview.getByRole('tab', { name: messages.Shell.panel.computer, exact: true }).waitFor()
-    // A restored chat conservatively retains a history cursor. Complete this
-    // two-message fixture through the ordinary UI before comparing its layout.
-    const conversation = page.getByRole('region', { name: messages.Coordinator.conversation, exact: true })
+    const nav = page.getByRole('navigation', { name: 'Main menu', exact: true })
+    for (const name of [messages.Nav.coordinator, fixture.botName, fixture.groupName]) {
+      await nav.getByRole('button', { name, exact: true }).first().waitFor()
+    }
+    const conversation = page.getByRole('log', { name: messages.Nav.coordinator, exact: true })
     const earlier = conversation.getByRole('button', { name: messages.Common.loadMore, exact: true })
     if (await earlier.isVisible()) await earlier.click()
     await earlier.waitFor({ state: 'hidden' })
     await conversation.getByText('What should we review today?', { exact: true }).waitFor()
     await conversation.getByText('Review the desktop workspace, including conversations, tasks, artifacts and settings.', { exact: true }).waitFor()
-  } else if (name === 'all-threads' || name === 'bot-thread-list') {
-    await threadRows(page.getByRole('region', { name: messages.Shell.panel.allThreads, exact: true }))
+  } else if (name === 'all-threads') {
+    await taskRow(page.getByRole('region', { name: messages.Shell.panel.allTasks, exact: true })).waitFor()
+    await page.waitForURL(url => url.searchParams.get('section') === 'tasks' && !url.searchParams.has('threads'))
+  } else if (name === 'bot-thread-list') {
+    await page.getByRole('log', { name: fixture.botName, exact: true }).getByText('The review is complete. The task and its artifacts are ready for you.', { exact: true }).waitFor()
+    await taskRow(page.getByRole('navigation', { name: 'Main menu', exact: true })).waitFor()
   } else if (name === 'projects' || name === 'team-projects') {
     await text(messages.Projects.emptyTitle)
   } else if (name === 'plugins') {
-    const apps = page.getByRole('tabpanel', { name: messages.Plugins.appsTab, exact: true })
+    const apps = page.getByRole('main').filter({ has: page.getByRole('heading', { name: messages.Nav.plugins, level: 1, exact: true }) }).last()
+    await apps.getByRole('tab', { name: 'All', selected: true, exact: true }).waitFor()
     await apps.getByRole('heading', { name: messages.Plugins.popular, exact: true }).waitFor()
     for (const name of [messages.Settings.integrations.github, messages.Settings.linear.title, messages.Settings.telegram.title]) {
       await apps.getByRole('link', { name: messages.Settings.integrations.openApp.replace('{name}', name), exact: true }).waitFor()
@@ -140,9 +129,10 @@ export async function pageReady(page, name, fixture, messages, observed = {}) {
     // An unreadable Linear flag is not a read failure either: no alert in any case.
     await expect(apps.getByRole('alert')).toHaveCount(0)
   } else if (name === 'suggestions') {
-    await text(messages.SuggestionsPage.empty)
-    await page.getByRole('button', { name: messages.SuggestionsPage.connect, exact: true }).waitFor()
-    await page.getByRole('region', { name: messages.Coordinator.conversation, exact: true }).getByText('Review the desktop workspace, including conversations, tasks, artifacts and settings.', { exact: true }).waitFor()
+    await page.getByRole('listbox').getByText('Nothing waiting on you', { exact: true }).waitFor()
+    const inbox = page.getByRole('region', { name: messages.Nav.inbox, exact: true })
+    await inbox.getByRole('heading', { name: "You're all caught up", exact: true }).waitFor()
+    await inbox.getByRole('button', { name: 'View tasks', exact: true }).waitFor()
   } else if (name === 'artifact-library') {
     await text(fixture.artifactTitle)
     await text(fixture.htmlTitle)
@@ -159,40 +149,46 @@ export async function pageReady(page, name, fixture, messages, observed = {}) {
   } else if (name === 'task' || name === 'task-thread') {
     // The nested thread has the same accessible name. Only the task region
     // contains the editable title, so its independent reads gate this capture.
-    const task = page.getByRole('region', { name: fixture.issueTitle, exact: true }).filter({ has: page.locator('#task-title') })
+    const title = page.getByRole('textbox', { name: messages.Workspace.detail.titleLabel, exact: true })
+    const task = page.getByRole('region', { name: fixture.issueTitle, exact: true }).filter({ has: title })
     await expect(task).toHaveAttribute('aria-busy', 'false', { timeout: 45_000 })
-    await task.locator('#task-title:not([readonly])').waitFor()
+    await expect(task.getByRole('textbox', { name: messages.Workspace.detail.titleLabel, exact: true })).toBeEditable({ timeout: 45_000 })
     await task.getByText('Review conversations, task details, artifacts and workspace settings in the desktop app.', { exact: true }).waitFor()
     // Activity versions are a separate read from the task's editable fields.
     // The fixture's creation event must finish rendering before comparison.
-    await task.getByText(messages.Workspace.detail.createdTask, { exact: true }).waitFor()
+    const activity = task.getByRole('region', { name: messages.Workspace.activity.title, exact: true })
+    await activity.getByRole('listitem').filter({ hasText: messages.Workspace.detail.createdTask }).waitFor()
     if (name === 'task-thread') {
       // 活动's Agent rows have no loading placeholder. The selected row, named
       // after its Agent (one row per Agent stretch), proves that read is
       // rendered; the scoped reply proves the right pane.
-      await task.getByRole('button', { name: messages.IssueThreads.open.replace('{name}', fixture.agentLabel), exact: true, pressed: true }).waitFor()
-      await task.getByRole('list', { name: messages.IssueThreads.conversation, exact: true }).getByText('The review is complete. Conversations, task details and artifacts are ready.', { exact: true }).waitFor()
+      await activity.getByRole('button', { name: messages.IssueDetail.frame.openThread.replace('{name}', fixture.agentLabel), exact: true, pressed: true }).waitFor()
+      await task.getByRole('log', { name: fixture.botName, exact: true }).getByText('The review is complete. Conversations, task details and artifacts are ready.', { exact: true }).waitFor()
     }
   } else if (name === 'new-task') {
     const dialog = page.getByRole('dialog', { name: messages.Shell.newTaskDialog.title, exact: true })
-    await expect(dialog.getByRole('combobox', { name: messages.Shell.newTaskDialog.device, exact: true })).toContainText(`${messages.Shell.newTaskDialog.workspaceDefault} ·`, { timeout: 45_000 })
-    await dialog.getByRole('combobox', { name: messages.Shell.newTaskDialog.bot, exact: true }).waitFor()
-    await expect(dialog.getByRole('combobox', { name: messages.Settings.agentProfiles.taskProfile, exact: true })).toBeEnabled({ timeout: 45_000 })
+    const labels = messages.Shell.newTaskDialog
+    await expect(dialog.getByRole('combobox', { name: labels.intent, exact: true })).toContainText(labels.createAndDispatch)
+    const device = dialog.getByRole('button', { name: new RegExp('^' + labels.device + ': ' + labels.workspaceDefault) })
+    await expect(device).toContainText(labels.workspaceDefault + ' ·', { timeout: 45_000 })
+    await dialog.getByRole('button', { name: labels.bot + ': ' + messages.Nav.coordinator, exact: true }).waitFor()
+    await expect(dialog.getByRole('button', { name: messages.Settings.agentProfiles.automaticShort, exact: true })).toBeEnabled({ timeout: 45_000 })
     await expect(dialog.getByRole('textbox', { name: messages.Shell.newTaskDialog.label, exact: true })).toBeEditable()
     await expect(dialog.getByRole('alert')).toHaveCount(0)
   } else if (/^(?:bot|coordinator)-(?:details|threads|prs|computer)$/.test(name)) {
     const bot = name.startsWith('bot-')
     const tab = name.slice(name.indexOf('-') + 1)
-    const panel = page.getByRole('complementary', { name: messages.Shell.panel.label, exact: true }).getByRole('tabpanel', { name: messages.Shell.panel[tab], exact: true })
+    const panel = page.getByRole('tabpanel', { name: messages.Shell.panel.overview, exact: true }).getByRole('tabpanel', { name: messages.Shell.panel[tab === 'threads' ? 'tasks' : tab], exact: true })
     if (tab === 'details') {
       if (bot) {
-        await panel.getByRole('textbox', { name: messages.Shell.panel.publicRole.label, exact: true }).waitFor()
+        const role = panel.getByRole('region', { name: messages.Shell.panel.publicRole.label, exact: true })
+        await expect(role.getByRole('textbox')).toHaveValue('Reviews application changes and reports results.', { timeout: 45_000 })
         await panel.getByText(fixture.artifactTitle, { exact: true }).waitFor()
         await panel.getByText(fixture.htmlTitle, { exact: true }).waitFor()
       } else await panel.getByText(messages.Shell.panel.noLibrary, { exact: true }).waitFor()
     } else if (tab === 'threads') {
-      if (bot) await threadRows(panel)
-      else await panel.getByText(messages.Shell.threads.empty, { exact: true }).waitFor()
+      if (bot) await taskRow(panel).waitFor()
+      else await panel.getByText(messages.Shell.panel.noTasks, { exact: true }).waitFor()
     } else if (tab === 'prs') await panel.getByText(messages.Shell.panel.noPullRequests, { exact: true }).waitFor()
     else await panel.getByRole('button', { name: messages.Computer.addE2BKey, exact: true }).waitFor()
   }

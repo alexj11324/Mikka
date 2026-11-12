@@ -91,6 +91,11 @@ async function launch(mode) {
   for (const name of initialWorkspaceMenuNames) initialSurface = initialSurface.or(page.getByRole('button', { name, exact: true }))
   await initialSurface.first().waitFor()
   const base = mode === 'bundled' ? 'mikka://app/mikka' : `${environment.origin}${environment.basePath}`
+  const fingerprint = await page.evaluate(async url => (await import(url)).rendererBuild, `${base}/renderer-build.js`)
+  assert.match(fingerprint, /^[a-f0-9]{64}$/, 'A packaged comparison needs the actual renderer fingerprint')
+  report.nativeRendererBuilds ??= {}
+  if (report.nativeRendererBuilds[mode]) assert.equal(report.nativeRendererBuilds[mode], fingerprint)
+  report.nativeRendererBuilds[mode] = fingerprint
   if (mode === 'bundled') await page.waitForFunction(() => Boolean(window.mikka?.bundled))
   else assert.equal(new URL(page.url()).origin, environment.origin, 'Hosted comparison must use the attested backend')
   stage = `viewport-${mode}`
@@ -123,8 +128,14 @@ async function go(target, suffix = '/') {
   await target.page.goto(href, { waitUntil: 'domcontentloaded', timeout: 60_000 })
   // The artifact opens a real modal, which correctly hides the background
   // workspace control from the accessibility tree. Wait for that surface.
-  if (new URL(href).searchParams.has('artifact')) await target.page.getByRole('dialog').waitFor()
-  else await target.page.getByRole('button', { name: messages.Nav.workspaceMenu, exact: true }).first().waitFor()
+  const url = new URL(href)
+  if (url.searchParams.has('artifact')) {
+    await target.page.getByRole('dialog').waitFor()
+  } else if (/^\/settings(?:[/?]|$)/.test(suffix)) {
+    await target.page.getByRole('button', { name: messages.HostedSettings.back, exact: true }).first().waitFor()
+  } else {
+    await target.page.getByRole('button', { name: messages.Nav.workspaceMenu, exact: true }).first().waitFor()
+  }
 }
 
 async function theme(target, value) {
@@ -280,57 +291,69 @@ async function selectFixtureWorkspace(target) {
 }
 
 async function coordinatorReady(page) {
-  await page.getByRole('region', { name: messages.Coordinator.conversation, exact: true }).getByText('Review the desktop workspace, including conversations, tasks, artifacts and settings.', { exact: true }).waitFor()
+  await page.getByRole('log', { name: messages.Nav.coordinator, exact: true }).getByText('Review the desktop workspace, including conversations, tasks, artifacts and settings.', { exact: true }).waitFor()
 }
 
 function screens(fixture) {
   const route = (name, path, ready) => ({ name, open: async target => { await go(target, path); if (ready) await ready(target.page) } })
   const text = value => page => page.getByText(value, { exact: true }).first().waitFor()
+  const overview = page => page.getByRole('tabpanel', { name: messages.Shell.panel.overview, exact: true })
+  const panelHeading = (page, bot) => bot
+    ? overview(page).getByRole('heading', { level: 2 }).filter({ has: page.getByText(fixture.botName, { exact: true }) })
+    : overview(page).getByRole('heading', { name: messages.Nav.coordinator, exact: true })
+  const panelLabel = tab => messages.Shell.panel[tab === 'threads' ? 'tasks' : tab]
   const panel = (bot, tab) => ({
     name: `${bot ? 'bot' : 'coordinator'}-${tab}`,
     open: async target => {
       await go(target, bot ? `/?bot=${fixture.bot}` : '/')
-      // Before the real roster arrives, a bot URL briefly renders the
-      // Coordinator's panel. Wait for the requested conversation before
-      // acting; a registered tab alone can still belong to that placeholder.
-      await target.page.getByRole('list', { name: messages.Nav.bots, exact: true }).getByRole('button', { name: fixture.botName, exact: true }).waitFor()
-      const overview = target.page.getByRole('complementary', { name: messages.Shell.panel.label, exact: true })
-      await overview.getByRole('heading', { name: bot ? fixture.botName : messages.Nav.coordinator, exact: true }).waitFor()
-      await overview.getByRole('tablist', { name: messages.Shell.panel.tabs, exact: true }).locator('[role="tab"][aria-selected="true"][aria-controls]').waitFor()
-      await overview.getByRole('tab', { name: messages.Shell.panel[tab], exact: true }).click()
-      await overview.getByRole('tab', { name: messages.Shell.panel[tab], exact: true, selected: true }).waitFor()
-      await overview.getByRole('tabpanel', { name: messages.Shell.panel[tab], exact: true }).waitFor()
+      const page = target.page
+      const name = bot ? fixture.botName : messages.Nav.coordinator
+      const response = bot ? 'The review is complete. The task and its artifacts are ready for you.'
+        : 'Review the desktop workspace, including conversations, tasks, artifacts and settings.'
+      await page.getByRole('log', { name, exact: true }).getByText(response, { exact: true }).waitFor()
+      const opener = page.getByRole('button', { name: 'Open artifacts', exact: true })
+      if (await opener.getAttribute('tabindex') === '0') await opener.click()
+      const area = page.getByRole('complementary', { name: 'Artifacts', exact: true }).and(page.locator('aside:not([inert])'))
+      const tabs = area.getByRole('tablist', { name: 'Artifacts', exact: true })
+      await tabs.waitFor()
+      const overviewTab = tabs.getByRole('tab', { name: messages.Shell.panel.overview, exact: true })
+      if (await overviewTab.count()) await overviewTab.click()
+      else {
+        const newTab = tabs.getByRole('tab', { name: 'New tab', exact: true })
+        if (await newTab.count()) await newTab.click()
+        else await area.getByRole('button', { name: 'New tab', exact: true }).click()
+        await area.getByRole('region', { name: 'Tools', exact: true })
+          .getByRole('button', { name: messages.Shell.panel.overview, exact: true }).click()
+      }
+      const content = overview(page)
+      await panelHeading(page, bot).waitFor()
+      await content.getByRole('tab', { name: panelLabel(tab), exact: true }).click()
+      await content.getByRole('tabpanel', { name: panelLabel(tab), exact: true }).waitFor()
     },
     check: async target => {
-      const overview = target.page.getByRole('complementary', { name: messages.Shell.panel.label, exact: true })
-      const heading = overview.getByRole('heading', { name: bot ? fixture.botName : messages.Nav.coordinator, exact: true })
-      assert.equal(await heading.count(), 1, 'Captured panel must belong to the requested conversation')
-      assert.equal(await heading.isVisible(), true, 'Captured conversation heading must be visible')
-      assert.equal(await overview.getByRole('tab', { name: messages.Shell.panel[tab], exact: true }).getAttribute('aria-selected'), 'true', 'Captured panel must still be the requested tab')
+      const content = overview(target.page)
+      assert.equal(await panelHeading(target.page, bot).isVisible(), true, 'Capture must show the requested conversation')
+      assert.equal(await content.getByRole('tab', { name: panelLabel(tab), exact: true, selected: true }).isVisible(), true, 'Capture must show the requested panel')
     },
   })
   const taskView = view => ({
     name: view,
     open: async target => {
       await go(target, '/?section=all-issues')
-      const layout = target.page.getByRole('group', { name: messages.Shell.board.viewLabel, exact: true })
-      // The initial HTML selects Board while the browser preference is still
-      // restoring. Wait for registration and that existing preference's commit
-      // before selecting a view once; never replace the saved preference here.
-      await layout.locator('button[tabindex="0"]').waitFor()
+      const layout = target.page.getByRole('radiogroup', { name: messages.Shell.board.viewLabel, exact: true })
       const saved = await target.page.evaluate(() => {
         try { return JSON.parse(localStorage.getItem('mikka:board-v2') ?? 'null')?.view ?? null }
         catch { return null }
       })
-      assert.ok(saved === null || saved === 'board' || saved === 'list', 'Board fixture preference must be a known layout')
-      const initial = messages.Shell.board[saved === 'list' ? 'viewList' : 'viewBoard']
-      await layout.getByRole('button', { name: initial, exact: true, pressed: true }).waitFor()
-      const label = messages.Shell.board[view === 'board' ? 'viewBoard' : 'viewList']
-      await layout.getByRole('button', { name: label, exact: true }).click()
-      await layout.getByRole('button', { name: label, exact: true, pressed: true }).waitFor()
+      assert.ok(saved === null || saved === 'board' || saved === 'list', 'Board preference must name a supported layout')
+      const label = value => value === 'list' ? 'List' : messages.Nav.board
+      await layout.getByRole('radio', { name: label(saved), checked: true, exact: true }).waitFor()
+      await layout.getByRole('radio', { name: label(view), exact: true }).click()
+      await layout.getByRole('radio', { name: label(view), checked: true, exact: true }).waitFor()
       await target.page.getByText(fixture.issueTitle, { exact: true }).first().waitFor()
     },
-    check: async target => assert.equal(await target.page.getByRole('button', { name: messages.Shell.board[view === 'board' ? 'viewBoard' : 'viewList'], exact: true }).getAttribute('aria-pressed'), 'true', 'Captured task layout must still be the requested view'),
+    check: async target => assert.equal(await target.page.getByRole('radiogroup', { name: messages.Shell.board.viewLabel, exact: true })
+      .getByRole('radio', { name: view === 'board' ? messages.Nav.board : 'List', checked: true, exact: true }).isVisible(), true),
   })
   const matrix = [
     { name: 'workspace-link', open: async target => {
@@ -346,7 +369,13 @@ function screens(fixture) {
     route('task', `/?issue=${fixture.issue}`, page => page.getByRole('region', { name: fixture.issueTitle, exact: true }).waitFor()),
     route('task-thread', `/?issue=${fixture.issue}&thread=${fixture.run}`, text('The review is complete. Conversations, task details and artifacts are ready.')),
     route('all-threads', '/?threads=all'),
-    route('bot-thread-list', `/?bot=${fixture.bot}&threads=${fixture.bot}`),
+    route('bot-thread-list', `/?bot=${fixture.bot}`, async page => {
+      const nav = page.getByRole('navigation', { name: 'Main menu', exact: true })
+      const toggle = nav.getByRole('button', { name: fixture.botName, exact: true }).and(nav.locator('[aria-expanded]'))
+      await toggle.waitFor()
+      if (await toggle.getAttribute('aria-expanded') === 'false') await toggle.click()
+      await nav.getByRole('button', { name: fixture.botName, exact: true, expanded: true }).waitFor()
+    }),
     route('thread', `/?bot=${fixture.bot}&thread=${fixture.run}`, text('The review is complete. Conversations, task details and artifacts are ready.')),
     taskView('board'),
     taskView('list'),
@@ -361,14 +390,19 @@ function screens(fixture) {
     route('team-projects', `/?section=team-projects&team=${fixture.team}`),
     route('plugins', '/?section=plugins'),
     route('suggestions', '/?section=suggestions'),
-    route('artifact-library', '/?section=artifacts', text(fixture.artifactTitle)),
+    route('artifact-library', '/?section=artifacts', async page => {
+      const folder = page.getByRole('button').filter({ hasText: fixture.issueIdentifier }).filter({ hasText: fixture.issueTitle })
+      await folder.click()
+    }),
     route('artifact-markdown', `/?artifact=${fixture.markdown}`, page => page.getByRole('dialog').getByText('Desktop review', { exact: true }).waitFor()),
     route('artifact-html', `/?artifact=${fixture.html}`, page => page.getByRole('dialog').locator('iframe').waitFor()),
     { name: 'new-task', open: async target => {
-      await go(target)
-      await target.page.getByRole('button', { name: messages.Shell.searchLabel, exact: true }).click()
-      await target.page.getByRole('dialog', { name: messages.Shell.searchLabel, exact: true }).getByRole('option', { name: messages.Shell.newTask, exact: true }).click()
-      await target.page.getByRole('dialog', { name: messages.Shell.newTaskDialog.title, exact: true }).waitFor()
+      await go(target, '/?section=tasks')
+      const page = target.page
+      await page.getByRole('button', { name: /^New task(?: C)?$/ }).click()
+      const dialog = page.getByRole('dialog', { name: messages.Shell.newTaskDialog.title, exact: true })
+      await dialog.getByRole('combobox', { name: messages.Shell.newTaskDialog.intent, exact: true }).click()
+      await page.getByRole('option', { name: messages.Shell.newTaskDialog.createAndDispatch, exact: true }).click()
     } },
     // This parity environment is the cloud edition (desktop.yml). The Mikka
     // cloud connection page exists only for community server administrators;
@@ -383,9 +417,10 @@ function screens(fixture) {
           // unmodified web baseline predates the cold infinite-read repair.
           await go(target, `/settings?workspace=${fixture.workspace}&section=general`)
           await target.page.getByRole('textbox', { name: messages.Settings.workspaceForm.name, exact: true }).waitFor()
-          await target.page.getByRole('link', { name: section.title, exact: true }).click()
+          await target.page.getByRole('button', { name: section.title, exact: true }).click()
         } else await go(target, ['members', 'teams'].includes(id) ? `/settings/${id}?workspace=${fixture.workspace}` : `/settings?workspace=${fixture.workspace}&section=${id}`)
-        await target.page.getByRole('heading', { name: section.title, exact: true }).first().waitFor()
+        const heading = ['members', 'teams'].includes(id) ? messages.HostedMembers.title : id === 'connections' ? messages.HostedConnections.appsTitle : section.title
+        await target.page.getByRole('main').last().getByRole('heading', { name: heading, level: 1, exact: true }).waitFor()
       },
     })),
   ]

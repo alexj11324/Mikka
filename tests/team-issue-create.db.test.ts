@@ -64,18 +64,26 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
   // Inject at the actual PostgreSQL commit boundary. workspaceDb deliberately
   // owns transaction dispatch, so replacing its method does not reach the
   // pinned client used by an authoritative workspace transaction.
-  function injectWorkspaceCommit(hooks: { beforeBegin?: () => void; afterCommit?: () => void | Promise<void> }) {
+  function injectWorkspaceCommit(requestId: string, hooks: { beforeReceiptRead?: () => void; afterCommit?: () => void | Promise<void> }) {
     const originals = new Map<PoolClient, PoolClient['query']>()
     const acquire = (client: PoolClient) => {
       if (originals.has(client)) return
       const original = client.query
       originals.set(client, original)
+      let matchesRequest = false
       client.query = ((...args: unknown[]) => {
         const statement = args[0]
         const text = typeof statement === 'string' ? statement : statement && typeof statement === 'object' && 'text' in statement && typeof statement.text === 'string' ? statement.text : ''
-        if (/^\s*begin(?:\s|$)/i.test(text)) hooks.beforeBegin?.()
+        if (/^\s*(?:begin|rollback)\b/i.test(text)) matchesRequest = false
+        const configValues = typeof statement === 'object' && statement && 'values' in statement ? statement.values : undefined
+        const parameters = Array.isArray(args[1]) ? args[1] : configValues
+        if (/\bfrom "team_issue_(?:create|promotion)_receipts"/i.test(text) && Array.isArray(parameters) && parameters.includes(requestId)) {
+          matchesRequest = true
+          hooks.beforeReceiptRead?.()
+        }
         const result: unknown = Reflect.apply(original, client, args)
-        if (!/^\s*commit(?:\s|$)/i.test(text)) return result
+        if (!matchesRequest || !/^\s*commit\b/i.test(text)) return result
+        matchesRequest = false
         assert.ok(result && typeof result === 'object' && 'then' in result && typeof result.then === 'function', 'Drizzle COMMIT must use the promise query API')
         return Promise.resolve(result).then(async value => { await hooks.afterCommit?.(); return value })
       }) as PoolClient['query']
@@ -412,8 +420,8 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     assert.ok('issue' in created && created.issue);const id=created.issue.id
     const request={requestId:randomUUID(),issueId:id,revision:created.issue.revision,teamId,expectedTeamId:null}
     let mode:'lost'|'unavailable'|'normal'='lost'
-    const restore=injectWorkspaceCommit({
-      beforeBegin:()=>{if(mode==='unavailable') throw new Error('synthetic unavailable')},
+    const restore=injectWorkspaceCommit(request.requestId, {
+      beforeReceiptRead:()=>{if(mode==='unavailable') throw new Error('synthetic unavailable')},
       afterCommit:()=>{if(mode==='lost'){mode='unavailable';throw new Error('synthetic lost response')}},
     })
     try {
@@ -451,7 +459,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     assert.ok('issue' in created && created.issue);const id=created.issue.id
     const request={requestId:randomUUID(),issueId:id,revision:created.issue.revision,teamId,expectedTeamId:null}
     let first=true
-    const restore=injectWorkspaceCommit({afterCommit:async()=>{if(first){first=false;await workspace.query('update mikka_workspace_members set status=\'inactive\' where "workspaceId"=$1 and "userId"=$2',[workspaceId,revoked])}}})
+    const restore=injectWorkspaceCommit(request.requestId, {afterCommit:async()=>{if(first){first=false;await workspace.query('update mikka_workspace_members set status=\'inactive\' where "workspaceId"=$1 and "userId"=$2',[workspaceId,revoked])}}})
     try {
       assert.deepEqual(await promoteIssueToTeam(request),{error:'teamIssueAccessDenied',requestId:request.requestId})
       assert.deepEqual((await app.query('select scope,"linearSyncBlocked" from issues where id=$1',[id])).rows[0],{scope:'workspace',linearSyncBlocked:true})
@@ -669,11 +677,11 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
   await scopeSubtest(t, 'lost workspace commit response retries one request and preserves workspace visibility throughout completion',async()=>{
     const value=input(teamId)
     let mode:'lost'|'unavailable'|'normal'='lost'
-    // Throw only after the real first workspace transaction has committed.
+    // Throw only after this request’s real association transaction has committed.
     // The next attempt simulates an unavailable workspace recheck without
     // changing or deleting a fixture; restoring normal commits permits recovery.
-    const restore=injectWorkspaceCommit({
-      beforeBegin:()=>{if(mode==='unavailable') throw new Error('synthetic workspace recheck unavailable')},
+    const restore=injectWorkspaceCommit(value.requestId, {
+      beforeReceiptRead:()=>{if(mode==='unavailable') throw new Error('synthetic workspace recheck unavailable')},
       afterCommit:()=>{if(mode==='lost') {mode='unavailable';throw new Error('synthetic lost commit response')}},
     })
     try {
@@ -713,10 +721,17 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     await app.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,\'Synthetic\',$2,true,now(),now())',[lostOwner,`${lostOwner}@example.invalid`])
     await workspace.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,\'Synthetic\',$3,\'member\',\'active\')',[workspaceId,lostOwner,`${lostOwner}@example.invalid`])
     let once=true
-    const restore=injectWorkspaceCommit({afterCommit:()=>{
+    const restore=injectWorkspaceCommit(value.requestId, {afterCommit:()=>{
       if(once) {once=false;throw new Error('synthetic lost commit response')}
     }})
     try {
+      // A live notification may commit on this pool before the association does.
+      const other = await workspacePool.connect()
+      try {
+        await other.query('BEGIN')
+        await other.query('SELECT 1')
+        await other.query('COMMIT')
+      } finally { other.release() }
       assert.deepEqual(await query(lostOwner,value),{error:'teamIssueRetry',requestId:value.requestId})
       const row=(await app.query('select i.id,i.scope from issues i join team_issue_create_requests r on r."issueId"=i.id where r."requestId"=$1',[value.requestId])).rows[0]
       await workspace.query('update mikka_workspace_members set status=\'inactive\' where "workspaceId"=$1 and "userId"=$2',[workspaceId,lostOwner])
@@ -729,7 +744,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
   await scopeSubtest(t, 'revocation between association and completion revokes creator access without moving the task',async()=>{
     const revoke=await workspace.connect(),value=input(raceTeam)
     let associationCommitted=false,issueId:string|undefined
-    const restore=injectWorkspaceCommit({afterCommit:async()=>{
+    const restore=injectWorkspaceCommit(value.requestId, {afterCommit:async()=>{
       if(associationCommitted) return
       associationCommitted=true
       // The real association COMMIT has released its locks, but its promise
