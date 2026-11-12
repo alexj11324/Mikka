@@ -35,6 +35,15 @@ test('Telegram /link resolves stable and historical task identity inside the cur
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
   t.after(async () => { mock.restoreAll(); await Promise.all([connection.end(), appPool.end(), workspacePool.end()]) })
+  await t.test('plugin status reads the verified Telegram link for the current user only', async () => {
+    const { readTelegramIntegrationStatus } = await import('../lib/telegram/connection-status')
+    const own = await readTelegramIntegrationStatus(viewer)
+    const other = await readTelegramIntegrationStatus(foreignOwner)
+    assert.equal(own.connected, true)
+    assert.ok(own.linkedAt)
+    assert.equal(other.connected, false)
+    assert.equal(other.linkedAt, null)
+  })
   const identifier = async (issueId: string) => (await connection.query<{ issuedIdentifier: string }>('select "issuedIdentifier" from issues where id=$1', [issueId])).rows[0].issuedIdentifier
   const conversation = async () => (await connection.query('select * from telegram_conversations where "threadId"=$1', [threadId])).rows[0]
   const reset = () => connection.query('update telegram_conversations set "issueId"=$2 where "threadId"=$1', [threadId, anchor])

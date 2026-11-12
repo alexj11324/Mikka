@@ -346,6 +346,13 @@
     "test": "lib/code-review/client.test.ts",
     "suite": "test:thread-changes"
   },
+  "lib/composio-account-state.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Combine the account statuses already visible to the person and the provider enablement flag into one toolkit state for Web and native clients.",
+    "test": "tests/mobile-plugin-connections.test.ts",
+    "suite": "test:mobile"
+  },
   "lib/coordinator/ci-suite-transport.ts": {
     "mode": "built-in",
     "environment": [],
@@ -634,6 +641,13 @@
     "test": "lib/linear-sync/run-comment.test.ts",
     "suite": "test:linear-sync"
   },
+  "lib/mobile-plugin-connections.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "Read provider connections for the signed-in user on this installation. An unconfigured provider contributes no account, a failed provider is unknown, and a paused global Linear sync never reads a user binding.",
+    "test": "tests/mobile-plugin-connections.test.ts",
+    "suite": "test:mobile"
+  },
   "lib/mobile-task-handoff.ts": {
     "mode": "built-in",
     "environment": [],
@@ -822,6 +836,17 @@
     "behavior": "Workspace membership is checked against the current transaction boundary before granting task access.",
     "test": "tests/factory-workspace-admission.db.test.ts",
     "suite": "test:visibility-db"
+  },
+  "lib/telegram/connection-status.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "TELEGRAM_BOT_USERNAME",
+      "TELEGRAM_BOT_TOKEN",
+      "TELEGRAM_WEBHOOK_SECRET_TOKEN"
+    ],
+    "behavior": "Report whether Telegram is configured on this installation and look up only the current user in its PostgreSQL verified-link table.",
+    "test": "tests/telegram-task-link.db.test.ts",
+    "suite": "test:task-identity-db"
   },
   "lib/ui-overlay.mjs": {
     "mode": "built-in",
