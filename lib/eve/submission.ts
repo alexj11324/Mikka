@@ -16,7 +16,7 @@ const notes = z.array(z.object({n:z.number().int().positive(),kind:z.enum(['elem
 export const eveProductContext = z.object({
   taskCommand:dispatchTaskIntent.optional(),confirmTaskAccess:z.boolean().optional(),quote:quote.nullish(),notes:notes.nullish(),taskDestination:taskDestinationSchema.optional(),
   profileId:agentProfileReferenceSchema.optional(),taskTitle:taskTitleInputSchema.optional(),
-  expectedWorkspaceId:z.uuid().optional(),retryOf:z.number().int().positive().optional(),botId:z.uuid().nullish(),
+  expectedOwnerId:z.string().min(1).max(256).optional(),expectedWorkspaceId:z.uuid().optional(),retryOf:z.number().int().positive().optional(),botId:z.uuid().nullish(),
 }).strict()
 
 const ingress = new WeakMap<Request, { scope:EveScope; eventId:string }>()
@@ -24,7 +24,7 @@ export async function acceptEveMessage(scope:EveScope,message:MessageContent,con
   await assertEveScope(scope)
   const product = eveProductContext.parse(context ?? {})
   const retry=product.retryOf?await (await import('./retry-source')).loadEveRetrySource(scope,product.retryOf):null
-  if (product.expectedWorkspaceId && product.expectedWorkspaceId !== scope.workspaceId || product.botId && product.botId !== scope.botId) throw new Error('workspaceAccessDenied')
+  if (product.expectedOwnerId && product.expectedOwnerId !== scope.ownerId || product.expectedWorkspaceId && product.expectedWorkspaceId !== scope.workspaceId || product.botId && product.botId !== scope.botId) throw new Error('workspaceAccessDenied')
   const rawText = typeof message === 'string' ? message : message.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
   const images = typeof message === 'string' ? [] : message.flatMap(part => part.type === 'file' && typeof part.data === 'string' && part.data.startsWith('data:image/') ? [{dataUrl:part.data}] : [])
   const input = personalSubmissionInput.parse({ text:rawText,images:images.length ? images : undefined,submissionId:request.headers.get('x-mikka-submission-id') ?? undefined })

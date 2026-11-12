@@ -44,7 +44,10 @@ mock.module(new URL('../slots/thread.tsx', import.meta.url).href, { namedExports
     composer = props.composer
     const { entries } = props
     return <div data-official-thread="">
-    {entries?.map(entry => entry.role === 'bot' && <div key={entry.id}>{entry.parts.map((part, i) =>
+    {entries?.map(entry => entry.role === 'person' ? <div key={entry.id} data-testid={entry.status === 'failed' ? 'failed-message' : 'local-message'}>
+      {entry.text}{entry.attachments?.map(item => <span key={item.id}>{item.name}</span>)}{entry.deliveryMessage}
+      {entry.onRetry && <Button onClick={entry.onRetry}>Retry</Button>}
+    </div> : <div key={entry.id}>{entry.parts.map((part, i) =>
       part.kind === 'error' ? <span key={i}>{part.text}{part.actions}</span> : null)}</div>)}
   </div>
   },
@@ -89,6 +92,7 @@ mock.module(new URL('./chat-composer.tsx', import.meta.url).href, { namedExports
 } } })
 mock.module(new URL('../ui/message-scroller.tsx', import.meta.url).href, { namedExports: Object.fromEntries([
   ...['MessageScroller', 'MessageScrollerContent', 'MessageScrollerItem', 'MessageScrollerProvider', 'MessageScrollerViewport'].map(name => [name, plain]),
+  ['MessageScrollerItem', ({ children, 'data-testid': testId }: { children?: ReactNode; 'data-testid'?: string }) => <div data-testid={testId}>{children}</div>],
   ['MessageScrollerButton', nothing], ['useMessageScroller', () => ({ scrollToEnd: () => { scrollRequests++ } })],
 ]) })
 mock.module(new URL('../workspace/agent-interaction.tsx', import.meta.url).href, { namedExports: { AgentInteractionContext: createContext({}) } })
@@ -249,8 +253,9 @@ for (const valid of [false, true]) test(`retrying a historical failure ${valid ?
     assert.equal(container.querySelector('[data-message-failure="past"]'), null)
   } else {
     assert.match(container.textContent ?? '', /retry this original message/)
-    assert.ok(container.querySelector('[data-message-failure="past"]'))
-    assert.equal(container.querySelector('[data-testid="failed-message"]'), null)
+    assert.equal(container.querySelectorAll('[data-message-failure="past"]').length, 0)
+    assert.equal(container.querySelectorAll('[data-testid="failed-message"]').length, 1)
+    assert.match(container.querySelector('[data-testid="failed-message"]')!.textContent ?? '', /retry this original message/)
   }
 })
 
@@ -262,12 +267,15 @@ for (const valid of [true, false]) test(`parallel sends during a pending version
   await act(async () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />))
   await act(async () => composer.onChange('one immutable draft'))
   await act(async () => { composer.onSubmit(); composer.onSubmit() })
+  assert.equal(composer.value, '')
+  assert.match(container.querySelector('[data-testid="local-message"]')?.textContent ?? '', /one immutable draft/)
   assert.equal(probes, 1)
   assert.equal(submissions, 0)
   await act(async () => finish(valid))
   assert.equal(submissions, valid ? 1 : 0)
   if (!valid) {
-    assert.equal(composer.value, 'one immutable draft')
+    assert.equal(composer.value, '')
+    assert.match(container.querySelector('[data-testid="failed-message"]')?.textContent ?? '', /one immutable draft/)
     assert.equal(removedNotes, 0)
   }
   // The lock is released on both the stale early return and a completed send.
@@ -277,20 +285,21 @@ for (const valid of [true, false]) test(`parallel sends during a pending version
   assert.equal(submissions, valid ? 2 : 1)
 })
 
-test('a stale send leaves the composer draft, attached text and browser notes intact', async () => {
+test('a stale send moves its original text and attachments to the retry bubble and preserves browser notes', async () => {
   currentBuild = false
   await act(async () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />))
   const draft = 'keep my draft\n\n[attached.txt]\nattached content'
   await act(async () => composer.onChange(draft))
   await act(async () => composer.onSubmit())
   assert.equal(submissions, 0)
-  assert.equal(composer.value, draft)
+  assert.equal(composer.value, '')
+  assert.match(container.querySelector('[data-testid="failed-message"]')?.textContent ?? '', /attached content/)
   assert.equal(removedNotes, 0)
   assert.match(container.textContent ?? '', /keep this note/)
-  assert.equal(container.querySelector('[data-testid="failed-message"]'), null)
+  assert.ok(container.querySelector('[data-testid="failed-message"] button'))
 })
 
-test('a stale send does not clear an artifact quote', async () => {
+test('a stale send keeps the immutable artifact quote on the pending message', async () => {
   currentBuild = false
   let cleared = 0
   const embedded = { quote: { artifactId: 'fixture-artifact', version: 1, kind: 'text' as const, text: 'keep this quote', label: 'fixture' }, clearQuote: () => { cleared++ }, openArtifact: nothing, activeArtifactId: 'fixture-artifact' }
@@ -298,8 +307,9 @@ test('a stale send does not clear an artifact quote', async () => {
   await act(async () => composer.onChange('keep the quote attached'))
   await act(async () => composer.onSubmit())
   assert.equal(submissions, 0)
-  assert.equal(cleared, 0)
-  assert.equal(composer.value, 'keep the quote attached')
+  assert.equal(cleared, 1)
+  assert.match(container.querySelector('[data-testid="failed-message"]')?.textContent ?? '', /fixture/)
+  assert.equal(composer.value, '')
 })
 
 test('required refresh raised before VersionGuard mounts still shows a prompt without document reload', async () => {

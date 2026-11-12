@@ -3766,6 +3766,9 @@
       },
       "sources": "{count} 个来源"
     },
+    "sendUpdateRequired": "请刷新客户端后重试。消息已保存在这里。",
+    "sendAccessDenied": "发送被拒绝，请核对访问权限后重试。",
+    "sendRateLimited": "请求过于频繁，请稍后重试。",
     "sendUncertain": "未确认送达",
     "sendOffline": "没有网络，未发送",
     "lengthCount": "{count} / {max}",

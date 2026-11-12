@@ -48,6 +48,7 @@ export type ThreadEntry =
     attachments?: { id: string; name: string; meta?: string }[]
     /** queued: written offline · sending · failed: shows 重试 (onRetry). */
     status?: 'sent' | 'sending' | 'failed'
+    deliveryMessage?: string
     onRetry?: () => void
     /** Copy and reactions. */
     actions?: ReactNode

@@ -53,6 +53,7 @@ export const readAppVersion = createAppVersionReader()
 /** Leave inputs untouched when an explicit action would target an old build.
  * Unknown versions keep the existing request/error path; they are not stale. */
 export async function checkPageBuildBeforeAction(): Promise<boolean> {
+  if (pageNeedsRefresh()) return false
   if (!APP_BUILD || typeof window === 'undefined') return true
   const version = await readAppVersion()
   if (!isStaleBuild(APP_BUILD, version?.build)) return true
