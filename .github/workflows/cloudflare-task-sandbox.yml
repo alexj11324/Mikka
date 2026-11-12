@@ -57,11 +57,14 @@ jobs:
             '
       - name: Verify the product image isolates every review listener before restoring a task
         run: |
-          docker run --rm --network none --cap-add NET_ADMIN --entrypoint sh mikka-task-sandbox -ec '
+          docker run --rm --network none --cap-add NET_ADMIN \
+            --mount "type=bind,source=$PWD/cloudflare/task-sandbox/review-guest-image.test.py,target=/opt/mikka/review-guest-image.test.py,readonly" \
+            --entrypoint sh mikka-task-sandbox -ec '
             export PYTHONDONTWRITEBYTECODE=1
             python3 -I /opt/mikka/runtime/ingress-v1/guard.py prepare-cloudflare
             python3 -I /opt/mikka/task-sandbox/workspace-control-install.py --cloudflare-task
             test "$(stat -c %u:%g:%a /run/mikka-review-control/machine.lock)" = 0:1000:660
             python3 -I /opt/mikka/runtime/ingress-v1/guard.py verify
             python3 -c "import sys;sys.path[:0]=[\"/opt/mikka/preview\",\"/opt/mikka/runtime/preview-python-3.14.0\"];import aiohttp,preview_firewall;assert aiohttp.__version__ == \"3.14.0\""
+            python3 -I /opt/mikka/review-guest-image.test.py
           '
