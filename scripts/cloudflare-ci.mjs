@@ -30,6 +30,7 @@ export function sourceContext(env, publicSha, privateSha) {
   if (env.WORKERS_CI !== '1' || env.CF_PAGES === '1') fail('CI_CLOUDFLARE_CONTEXT_REQUIRED')
   if (env.WORKERS_CI_COMMIT_SHA !== publicSha) fail('CI_PUBLIC_SOURCE_MISMATCH')
   if (env.MIKKA_CF_RELEASE_OVERLAY_SHA !== privateSha) fail('CI_OVERLAY_SOURCE_MISMATCH')
+  // oxlint-disable-next-line no-control-regex -- Reject control bytes in provider branch metadata.
   if (!env.WORKERS_CI_BRANCH || env.WORKERS_CI_BRANCH.startsWith('-') || /[\s\x00-\x1f]/.test(env.WORKERS_CI_BRANCH)) fail('CI_BRANCH_REQUIRED')
   if (!UUID.test(env.WORKERS_CI_BUILD_UUID ?? '')) fail('CI_BUILD_ID_REQUIRED')
   return { provider: 'cloudflare-workers-builds', publicSha, privateSha, branch: env.WORKERS_CI_BRANCH, buildId: env.WORKERS_CI_BUILD_UUID }
@@ -40,6 +41,7 @@ export function childEnvironment(env, publicSha, privateSha) {
   const names = ['PATH', 'HOME', 'USER', 'LOGNAME', 'SHELL', 'TMPDIR', 'XDG_RUNTIME_DIR', 'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'all_proxy', 'no_proxy', 'NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE']
   return {
     ...Object.fromEntries(names.filter(name => env[name] !== undefined).map(name => [name, env[name]])),
+    // oxlint-disable-next-line no-control-regex -- Restrict Docker access to a local socket without control bytes.
     ...(/^unix:\/\/\/[^\s\x00-\x1f\x7f]+$/.test(env.DOCKER_HOST ?? '') ? { DOCKER_HOST: env.DOCKER_HOST } : {}),
     CI: 'true', NODE_OPTIONS: '--max-old-space-size=6144', ELECTRON_SKIP_BINARY_DOWNLOAD: '1',
     MIKKA_BUILD_REVISION: publicSha, NEXT_PUBLIC_MIKKA_BUILD: publicSha,

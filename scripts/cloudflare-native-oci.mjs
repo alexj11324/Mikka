@@ -57,6 +57,7 @@ export function buildEnvironment(env, publicSha, privateSha, id) {
 }
 
 export function redactOutput(value, env) {
+  // oxlint-disable-next-line no-control-regex -- Strip ANSI escape sequences from subprocess diagnostics.
   let output = String(value ?? '').replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '')
   output = output
     .replace(/-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----/g, '[REDACTED]')
@@ -70,6 +71,7 @@ export function redactOutput(value, env) {
     && typeof value === 'string' && value).flatMap(([, value]) => [value, encodeURIComponent(value), JSON.stringify(value).slice(1, -1)])
     .sort((a, b) => b.length - a.length)
   for (const value of values) output = output.split(value).join('[REDACTED]')
+  // oxlint-disable-next-line no-control-regex -- Remove nonprinting bytes from subprocess diagnostics.
   return output.replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '').slice(-6000)
 }
 
