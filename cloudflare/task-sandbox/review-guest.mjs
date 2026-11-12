@@ -20,3 +20,19 @@ export async function prepareReviewGuest(container) {
   if ((await install.output()).exitCode !== 0) throw Error('Task workspace control unavailable')
   return { bootId: proof.bootId, sourceSha256: proof.sourceSha256 }
 }
+
+const witnessPath = '/opt/mikka/task-sandbox/review-checkpoint.py'
+
+export async function captureReviewExit(container, runId) {
+  const process = await container.exec(['/usr/bin/python3', '-I', witnessPath, 'capture', runId], {user:'0:0'})
+  const {exitCode, stdout} = await process.output()
+  if (exitCode !== 0 || stdout.byteLength > 8192) return null
+  const witness = JSON.parse(new TextDecoder().decode(stdout))
+  return witness?.runId === runId ? witness : null
+}
+export async function restoreReviewExit(container, witness) {
+  const proc = await container.exec(['/usr/bin/python3', '-I', witnessPath, 'restore', witness.runId], {
+    user:'0:0', stdin:new Response(JSON.stringify(witness)).body,
+  })
+  if ((await proc.output()).exitCode !== 0) throw Error('Original task review checkout unavailable')
+}
