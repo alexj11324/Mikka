@@ -68,3 +68,42 @@ test('scope, provider omissions and truncated rows cannot turn into a healthy ze
     await assert.rejects(collectContainerReports({ target:()=>i++ ? {...scope,...changed} : scope, read:()=>page(raw), now }), /release_changed/)
   }
 })
+
+test('one native observation window retains the login/chat/API deadlines and thresholds', async () => {
+  const rows = []
+  const add = (route, invocationId, offset, status, durationMs) => {
+    const at = start + offset
+    rows.push(event('api_request_started', rows.length + 1, at, { route, invocationId }))
+    if (status !== null) rows.push(event('api_request', rows.length + 1, at + durationMs,
+      { route, invocationId, status, durationMs }))
+  }
+  add('/api/auth/[...all]', 'login-ok', 1000, 200, 11000)
+  add('/api/auth/[...all]', 'login-limited', 2000, 429, 5)
+  add('/api/coordinator/messages', 'chat-timeout', 3000, null, 0)
+  add('/api/other', 'api-ok', 4000, 204, 13)
+  add('/api/other', 'last-minute', WINDOW_MS - 30000, 200, 60000)
+  add('/api/other', 'next-window', WINDOW_MS + 1000, 200, 10)
+  let logs = 0, metrics = 0
+  const result = await collectContainerReports({
+    target: () => scope, read: ({timeframe}) => {
+      assert.deepEqual(timeframe, { from: start, to: now + 120000 })
+      logs++; return page(rows)
+    }, now, observedAt: now + 120000,
+    capacity: { account: 'a'.repeat(32), read: () => {
+      metrics++
+      return { data: { viewer: { accounts: [{ usage: [], memory: [] }] } } }
+    } },
+  })
+  assert.equal(logs, 1)
+  assert.equal(metrics, 1)
+  const health = result.health.requestHealth
+  assert.deepEqual(health.requests.login, { total: 2, successful: 1, timedOut: 0, rateLimited: 1, successRatio: .5, p95Ms: 11000 })
+  assert.deepEqual(health.requests.chat, { total: 1, successful: 0, timedOut: 1, rateLimited: 0, successRatio: 0, p95Ms: null })
+  assert.equal(health.status, 'observed')
+  assert.equal(result.outcomes.records, rows.filter(row => row.timestamp < now).length)
+  assert.equal(health.requests.api.total, 2)
+  assert.equal(health.requests.api.successful, 2)
+  assert.deepEqual(health.alerts.map(a => a.id).sort(), ['api-request-latency','chat-request-success','login-request-latency','login-request-success'])
+  assert.ok(!health.assessed.includes('chat-request-latency'))
+  assert.deepEqual(health.assessed.filter(id => id.startsWith('api-')).sort(), ['api-request-latency','api-request-success'])
+})
