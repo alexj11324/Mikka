@@ -2540,6 +2540,36 @@
       "sourceHash": "0509851de5373ea456b2ce596f004b70e9f22b849e371315e61f60d2ec55ddd0"
     },
     {
+      "path": "/mikka/api/workspaces/[workspaceId]/service-identities",
+      "template": "/api/workspaces/[workspaceId]/service-identities",
+      "source": "app/api/workspaces/[workspaceId]/service-identities/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "sourceHash": "5ee8bcb8dc59996a48b511517ee13b5fe874c64e64fa8983f01716e8b7a59d19"
+    },
+    {
+      "path": "/mikka/api/workspaces/[workspaceId]/service-identities/[identityId]",
+      "template": "/api/workspaces/[workspaceId]/service-identities/[identityId]",
+      "source": "app/api/workspaces/[workspaceId]/service-identities/[identityId]/route.ts",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "sourceHash": "599bf0c6c520951250fc3602bfe1a6ee9beb8784502147c5ff01bda1638d8983"
+    },
+    {
+      "path": "/mikka/api/workspaces/[workspaceId]/service-identities/[identityId]/projects",
+      "template": "/api/workspaces/[workspaceId]/service-identities/[identityId]/projects",
+      "source": "app/api/workspaces/[workspaceId]/service-identities/[identityId]/projects/route.ts",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "sourceHash": "5aee0fcbc517f0a953914b6acc61bdf13bc7f0c1656dc48336c4d43282e40e39"
+    },
+    {
       "path": "/mikka/api/workspaces/[workspaceId]/skills",
       "template": "/api/workspaces/[workspaceId]/skills",
       "source": "app/api/workspaces/[workspaceId]/skills/route.ts",
