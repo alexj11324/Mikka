@@ -7,7 +7,7 @@ import { waitingTasks, type CollectionGroups } from '@/lib/task-collection'
 import { factoryQuestionsVersion, useFactoryQuestions } from './use-factory-questions'
 
 /**
- * The count on 收件箱: exactly what its list holds (inboxSelection), from the same reads in the current workspace:
+ * The count on 收件箱: exactly what its list holds, from the same reads in the current workspace:
  * its live thread and task lists, its pending Factory questions and its suggestions (their read-only count, so the
  * badge writes no briefing and wakes nothing). `enabled` false (a frame that shows no count) reads nothing and counts 0.
  */
