@@ -12,6 +12,7 @@ export const runtime = 'nodejs'
 const shape = z
   .object({
     installationId: z.uuid(),
+    linkId: z.uuid(),
     teamId: z.string().refine(slackTeamId),
     slackUserId: z.string().refine(slackUserId),
   })
@@ -41,6 +42,7 @@ async function handle(request: Request) {
         team: input.data.teamId,
         sender: input.data.slackUserId,
         installationId: input.data.installationId,
+        linkId: input.data.linkId,
       }),
     )
     return Response.json({ token }, { headers: { 'Cache-Control': 'private, no-store' } })

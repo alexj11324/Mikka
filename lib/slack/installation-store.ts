@@ -24,6 +24,7 @@ type Installation = {
 }
 export type SlackBinding = {
   installationId: string
+  linkId: string
   ownerId: string
   workspaceId: string
   teamId: string
@@ -124,7 +125,7 @@ export async function signedSender(
   sender: string,
 ): Promise<SlackBinding | null> {
   const { rows } = await pool.query<SlackBinding>(
-    'SELECT i.id AS "installationId",i.workspace_id AS "workspaceId",i.team_id AS "teamId",i.bot_user_id AS "botUserId",' +
+    'SELECT i.id AS "installationId",m.link_id AS "linkId",i.workspace_id AS "workspaceId",i.team_id AS "teamId",i.bot_user_id AS "botUserId",' +
       'm.user_id AS "ownerId",m.slack_user_id AS "slackUserId",m.watched_channels AS watched FROM mikka_slack_installations i' +
       ' JOIN mikka_slack_members m ON m.installation_id=i.id WHERE i.app_id=$1 AND i.team_id=$2 AND m.slack_user_id=$3' +
       ' AND i.bot_user_id<>m.slack_user_id AND NOT i.revoking AND m.enabled',
@@ -174,6 +175,7 @@ type CredentialUse = {
   team?: string
   sender?: string
   installationId?: string
+  linkId?: string
 }
 export function installationCredential(
   pool: Database,
@@ -184,7 +186,7 @@ export function installationCredential(
     const { rows } = await client.query<Installation>(
       'SELECT i.* FROM mikka_slack_installations i JOIN mikka_slack_members m ON m.installation_id=i.id' +
         ' WHERE i.app_id=$1 AND i.workspace_id=$2 AND m.user_id=$3 AND ($4::text IS NULL OR i.team_id=$4)' +
-        ' AND ($5::text IS NULL OR m.slack_user_id=$5) AND ($6::uuid IS NULL OR i.id=$6) AND ($7 OR m.enabled) AND NOT i.revoking FOR UPDATE OF i',
+        ' AND ($5::text IS NULL OR m.slack_user_id=$5) AND ($6::uuid IS NULL OR i.id=$6) AND ($7 OR (m.enabled AND m.link_id=$8::uuid)) AND NOT i.revoking FOR UPDATE OF i',
       [
         input.app,
         input.workspace,
@@ -193,6 +195,7 @@ export function installationCredential(
         input.sender ?? null,
         input.installationId ?? null,
         options.settings === true,
+        input.linkId ?? null,
       ],
     )
     const row = rows[0]

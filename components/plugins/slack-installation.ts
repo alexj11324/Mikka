@@ -51,16 +51,17 @@ export function useSlackInstallation(viewer: string, workspace: string) {
     try {
       const response = await fetch(withBasePath(route), {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-mikka-viewer': viewer },
-        body: JSON.stringify({ ...operation, workspaceId: workspace }),
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...operation, viewerId: viewer, workspaceId: workspace }),
       })
       if (!response.ok) throw new Error('slackActionFailed')
       if (operation.operation === 'connect') {
         const { intent } = (await response.json()) as { intent?: string }
         if (typeof intent !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(intent)) throw new Error('slackActionFailed')
         const path = route + '/connect?intent=' + encodeURIComponent(intent)
-        const handoff = await openPathInBrowser(publicServiceLink(path))
-        if (handoff === 'browser') window.location.assign(withBasePath(path))
+        const target = publicServiceLink(path)
+        const handoff = await openPathInBrowser(target)
+        if (handoff === 'browser') window.location.assign(target)
         else if (handoff === 'desktop') setNotice('handoff')
         else throw new Error('slackActionFailed')
       } else {

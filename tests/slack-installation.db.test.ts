@@ -65,12 +65,21 @@ test(
     const secret = (await sql.query('SELECT bot_secret FROM mikka_slack_installations WHERE id=$1', [id])).rows[0]
       .bot_secret
     assert.ok(secret.ciphertext && !JSON.stringify(secret).includes(grant.credential.token))
-    const asA = { app, workspace: ws.id, owner: a, team, sender: grant.slackUserId, installationId: id }
+    const asA = {
+      linkId: (await signedSender(sql, app, team, 'UA'))!.linkId,
+      app,
+      workspace: ws.id,
+      owner: a,
+      team,
+      sender: grant.slackUserId,
+      installationId: id,
+    }
     assert.equal(await installationCredential(sql, asA, { env }), grant.credential.token)
     for (const changed of [
       { owner: c },
       { workspace: ws2.id },
       { sender: 'UNOT' },
+      { linkId: randomUUID() },
       { team: 'TOTHER' },
       { installationId: randomUUID() },
     ])
@@ -94,6 +103,7 @@ test(
       ws.id,
       b,
     ])
+    const oldMember = (await signedSender(sql, app, team, 'UB'))!
     await providerMemberRemoved(sql, app, team, 'UB', 1)
     assert.ok(await signedSender(sql, app, team, 'UB'))
     await providerMemberRemoved(sql, app, 'TOTHER', 'UB', Math.ceil(Date.now() / 1000))
@@ -102,6 +112,16 @@ test(
     assert.equal(await signedSender(sql, app, team, 'UB'), null)
     assert.equal((await signedSender(sql, app, team, 'UA'))?.ownerId, a)
     await acceptInstall(sql, b, ws.id, { ...grant, slackUserId: 'UB' }, env)
+    const newMember = (await signedSender(sql, app, team, 'UB'))!
+    assert.notEqual(oldMember.linkId, newMember.linkId)
+    await assert.rejects(
+      installationCredential(sql, { ...asA, owner: b, sender: 'UB', linkId: oldMember.linkId }, { env }),
+      /slackInstallNotAuthorized/,
+    )
+    assert.equal(
+      await installationCredential(sql, { ...asA, owner: b, sender: 'UB', linkId: newMember.linkId }, { env }),
+      grant.credential.token,
+    )
     await unlinkMember(sql, app, b, ws.id)
     assert.equal(await signedSender(sql, app, team, 'UB'), null)
     assert.equal((await signedSender(sql, app, team, 'UA'))?.ownerId, a)

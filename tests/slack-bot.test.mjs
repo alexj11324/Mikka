@@ -12,6 +12,7 @@ const env = {
   SLACK_WATCHED_CHANNELS: '["C123"]',
 }
 const workspaceId = '00000000-0000-4000-8000-000000000001'
+const linkId = '00000000-0000-4000-8000-000000000007'
 const installationId = '00000000-0000-4000-8000-000000000004'
 const botId = '00000000-0000-4000-8000-000000000002'
 const event = (id, text, patch = {}) => ({
@@ -32,7 +33,7 @@ function harness({ respond = false, failure = false, channelEnv = env } = {}) {
   const channel = createMikkaSlackChannel({
     env: () => channelEnv,
     binding: async (app, team, sender) => app==='A123' && team==='T123' && ['U456','U789'].includes(sender)
-      ? { installationId, ownerId:sender==='U456'?'owner-a':'owner-b',workspaceId,teamId:team,slackUserId:sender,botUserId:'U123',watched:['C123'] } : null,
+      ? { installationId, linkId, ownerId:sender==='U456'?'owner-a':'owner-b',workspaceId,teamId:team,slackUserId:sender,botUserId:'U123',watched:['C123'] } : null,
     token: async scope => { assert.equal(scope.installationId,installationId); return 'unit-only-bot-token' },
     resolveScope: async (ownerId, selected) => { scopes.push([ownerId, selected]); return { ownerId, botId, workspaceId } },
     shouldJoin: async (scope, text) => { classifications.push([scope, text]); if (failure) throw new Error('provider unavailable'); return respond },
@@ -130,8 +131,8 @@ test('direct mention uses native eve delivery, bounded identity and stable webho
   const { options, address } = h.sends[0]
   assert.equal(options.idempotencyKey, 'slack:T123:Ev1')
   assert.equal(options.auth.principalId, 'owner-a')
-  assert.deepEqual(options.auth.attributes, { botId, workspaceId, surface: 'slack', slackUserId: 'U456', teamId:'T123',installationId, sourceEventId: '00000000-0000-4000-8000-000000000003' })
-  assert.deepEqual(JSON.parse(address), ['owner-a', workspaceId, 'C123:1700000000.000001'])
+  assert.deepEqual(options.auth.attributes, { botId, workspaceId, surface: 'slack', slackUserId: 'U456', teamId:'T123',installationId, linkId, sourceEventId: '00000000-0000-4000-8000-000000000003' })
+  assert.deepEqual(JSON.parse(address), ['owner-a', workspaceId, linkId, 'C123:1700000000.000001'])
   assert.equal(options.history, undefined)
   await h.post(payload)
   assert.equal(h.sends.length, 1, 'native eve rejects repeated provider event ids')
@@ -145,7 +146,7 @@ test('relevant ambient input joins only its thread and each bound owner has a di
   assert.equal(h.classifications.length, 2)
   assert.equal(h.sends[0].options.state.quiet, true)
   assert.notEqual(h.sends[0].address, h.sends[1].address)
-  assert.equal(JSON.parse(h.sends[0].address)[2], 'C123:1700000000.999999')
+  assert.equal(JSON.parse(h.sends[0].address)[3], 'C123:1700000000.999999')
   assert.equal(h.sends[1].options.auth.principalId, 'owner-b')
 })
 

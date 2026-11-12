@@ -26,11 +26,13 @@ export function installPlatform(env: NodeJS.ProcessEnv = process.env) {
     clientId = env.SLACK_CLIENT_ID,
     secret = env.SLACK_CLIENT_SECRET
   if (!appId || !/^A[A-Z0-9]+$/.test(appId) || !clientId || !secret || !env.BETTER_AUTH_URL) return null
+  if (!URL.canParse(env.BETTER_AUTH_URL)) return null
   const base = new URL(env.BETTER_AUTH_URL)
   if (
     base.username ||
     base.password ||
-    (base.protocol !== 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(base.hostname))
+    (base.protocol !== 'https:' &&
+      !(base.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(base.hostname)))
   )
     return null
   return { appId, clientId, secret, redirect: new URL(SLACK_CALLBACK_PATH, base.origin).href }

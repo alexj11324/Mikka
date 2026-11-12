@@ -2,7 +2,7 @@ import { internalEveAuthorization } from '../eve/auth'
 import { slackGrantProof } from './grant-proof'
 import type { EveScope } from '../eve/scope'
 
-export type SlackGrantScope = EveScope & { installationId: string; teamId: string; slackUserId: string }
+export type SlackGrantScope = EveScope & { installationId: string; linkId: string; teamId: string; slackUserId: string }
 
 /** Uncached native credential callback. Only the business service opens the workspace ciphertext. */
 export async function nativeSlackToken(scope: SlackGrantScope) {
@@ -30,6 +30,7 @@ export async function nativeSlackToken(scope: SlackGrantScope) {
     },
     body: JSON.stringify({
       installationId: scope.installationId,
+      linkId: scope.linkId,
       teamId: scope.teamId,
       slackUserId: scope.slackUserId,
     }),

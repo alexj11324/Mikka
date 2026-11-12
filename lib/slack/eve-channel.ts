@@ -7,7 +7,6 @@ import {
 } from 'eve/channels/slack'
 import type { RouteHandlerArgs } from 'eve/channels'
 import type { SlackChannelState } from 'eve/channels/slack'
-import { slackAddress } from './eve-routing'
 import { signedCoordinates, signedRevocation } from './installed-routing'
 import { activeSlackGrant, slackRequest } from './channel-scope'
 import { nativeSlackToken, type SlackGrantScope } from './channel-grant'
@@ -51,6 +50,7 @@ const authFor = (grant: SlackGrantScope) => ({
     slackUserId: grant.slackUserId,
     teamId: grant.teamId,
     installationId: grant.installationId,
+    linkId: grant.linkId,
   },
 })
 
@@ -101,6 +101,7 @@ export function createMikkaSlackChannel(dependencies: SlackChannelDependencies =
       !latest ||
       latest.ownerId !== grant.ownerId ||
       latest.workspaceId !== grant.workspaceId ||
+      latest.linkId !== grant.linkId ||
       latest.installationId !== grant.installationId
     )
       return null
@@ -159,6 +160,7 @@ export function createMikkaSlackChannel(dependencies: SlackChannelDependencies =
       if (
         !fresh ||
         fresh.ownerId !== grant.ownerId ||
+        fresh.linkId !== grant.linkId ||
         fresh.installationId !== grant.installationId ||
         fresh.workspaceId !== grant.workspaceId
       )
@@ -238,13 +240,16 @@ export function createMikkaSlackChannel(dependencies: SlackChannelDependencies =
                 ...scope,
                 surface: 'slack',
                 installationId: installed.installationId,
+                linkId: installed.linkId,
                 teamId: installed.teamId,
                 slackUserId: installed.slackUserId,
               }
+              const addressFor = (address: string) =>
+                JSON.stringify([scope.ownerId, scope.workspaceId, grant.linkId, address])
               const scoped: RouteHandlerArgs<SlackChannelState> = {
                 ...args,
                 from(address) {
-                  const source = args.from(slackAddress(scope.ownerId, scope.workspaceId, address))
+                  const source = args.from(addressFor(address))
                   return {
                     ...source,
                     send: (message, options) =>
@@ -254,8 +259,7 @@ export function createMikkaSlackChannel(dependencies: SlackChannelDependencies =
                       }),
                   }
                 },
-                resolveSession: (address) =>
-                  args.resolveSession(slackAddress(scope.ownerId, scope.workspaceId, address)),
+                resolveSession: (address) => args.resolveSession(addressFor(address)),
               }
               return slackRequest.run(grant, () => route.handler(request, scoped))
             },

@@ -9,6 +9,7 @@ import type { SlackGrantScope } from './channel-grant'
 const installation = eveScopeSchema.extend({
   surface: z.literal('slack'),
   installationId: z.uuid(),
+  linkId: z.uuid(),
   teamId: z.string().refine(slackTeamId),
   slackUserId: z.string().refine(slackUserId),
 })

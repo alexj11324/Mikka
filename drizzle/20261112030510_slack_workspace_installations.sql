@@ -29,6 +29,7 @@ CREATE TABLE mikka_slack_members (
   installation_id uuid NOT NULL REFERENCES mikka_slack_installations(id) ON DELETE CASCADE,
   user_id text NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
   slack_user_id text NOT NULL,
+  link_id uuid NOT NULL DEFAULT gen_random_uuid(),
   linked_at timestamptz NOT NULL DEFAULT now(),
   enabled boolean NOT NULL DEFAULT true,
   watched_channels text[] NOT NULL DEFAULT '{}',

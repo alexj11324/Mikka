@@ -103,12 +103,17 @@ test('separate credential proof cannot be reused with changed sender, installati
   const previous = process.env.BETTER_AUTH_SECRET
   process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex')
   try {
-    const grant = { installationId: randomUUID(), teamId: 'TTEAM', slackUserId: 'UMEMBER' },
+    const grant = { installationId: randomUUID(), linkId: randomUUID(), teamId: 'TTEAM', slackUserId: 'UMEMBER' },
       auth = 'Bearer ' + randomBytes(32).toString('base64url')
     const proof = slackGrantProof(auth, grant)
     assert.ok(validSlackGrantProof(auth, grant, proof))
     assert.equal(validSlackGrantProof(auth, grant, null), false)
-    for (const patch of [{ installationId: randomUUID() }, { teamId: 'TOTHER' }, { slackUserId: 'UOTHER' }])
+    for (const patch of [
+      { installationId: randomUUID() },
+      { linkId: randomUUID() },
+      { teamId: 'TOTHER' },
+      { slackUserId: 'UOTHER' },
+    ])
       assert.equal(validSlackGrantProof(auth, { ...grant, ...patch }, proof), false)
     assert.equal(validSlackGrantProof(auth + 'x', grant, proof), false)
   } finally {

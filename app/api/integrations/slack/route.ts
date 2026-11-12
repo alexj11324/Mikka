@@ -21,14 +21,15 @@ export const runtime = 'nodejs'
 const route = '/api/integrations/slack'
 const reply = (value: unknown, status = 200) =>
   NextResponse.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } })
+const coordinates = { workspaceId: z.uuid(), viewerId: z.string().min(1).max(256) }
 const body = z.discriminatedUnion('operation', [
-  z.object({ operation: z.literal('connect'), workspaceId: z.uuid() }).strict(),
-  z.object({ operation: z.literal('unlink'), workspaceId: z.uuid() }).strict(),
-  z.object({ operation: z.literal('uninstall'), workspaceId: z.uuid() }).strict(),
+  z.object({ operation: z.literal('connect'), ...coordinates }).strict(),
+  z.object({ operation: z.literal('unlink'), ...coordinates }).strict(),
+  z.object({ operation: z.literal('uninstall'), ...coordinates }).strict(),
   z
     .object({
       operation: z.literal('configure'),
-      workspaceId: z.uuid(),
+      ...coordinates,
       enabled: z.boolean(),
       watched: z.array(z.string().refine(selectableSlackChannel)).max(100),
     })
@@ -42,14 +43,14 @@ async function handle(request: Request) {
   const mutating = request.method === 'POST'
   if (
     mutating &&
-    (request.headers.get('origin') !== url.origin ||
-      request.headers.get('sec-fetch-site') === 'cross-site' ||
-      request.headers.get('x-mikka-viewer') !== session.user.id)
+    (request.headers.get('origin') !== url.origin || request.headers.get('sec-fetch-site') === 'cross-site')
   )
     return reply({ error: 'originRejected' }, 403)
   const input = mutating ? body.safeParse(await request.json().catch(() => null)) : null
   if (input && !input.success) return reply({ error: 'validationGeneric' }, 400)
   const operation = input?.success ? input.data : null
+  if (operation && (operation.viewerId !== session.user.id || session.tokenId))
+    return reply({ error: 'originRejected' }, 403)
   const workspace = operation?.workspaceId ?? url.searchParams.get('workspaceId')
   if (!workspace || !z.uuid().safeParse(workspace).success) return reply({ error: 'validationGeneric' }, 400)
   try {
