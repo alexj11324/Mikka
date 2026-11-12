@@ -123,7 +123,10 @@ import { assertMailboxRunAuthority, mailboxNoticeText, type RunMailbox } from '.
 import { daemonTracer, runIdHash, type DaemonStartupTiming, type SpanHandle } from '../tracing'
 import { runDiagnosticsEnabled, runRuntimeTimings, type RunRuntimeObservation, type RunRuntimeTiming } from '../run-runtime-timing'
 
+import type { WorkspaceControl } from './workspace-control'
+
 export interface SupervisorDeps {
+  acquireWorkspaceControl?(assignment: RunAssignment, signal: AbortSignal, onLost: () => void): Promise<WorkspaceControl>
   /** Trusted candidate launcher opt-in, shared with the official CLI collector. */
   collectCliTiming?: boolean
   downloadChatFile?(assignment: RunAssignment, id: string, signal: AbortSignal): Promise<ChatFileDownload>
@@ -222,6 +225,7 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 interface ActiveRun {
+  workspaceControl?: WorkspaceControl
   secretBridge?: TaskSecretBridge
   runtimeTiming?: RunRuntimeObservation
   github?: PreparedRunGitHub
@@ -1491,6 +1495,8 @@ export class RunSupervisor {
           try { run.github?.close() }
           catch { this.deps.log.warn('GitHub credential cleanup failed') }
           finally {
+            await run.workspaceControl?.release(Boolean(run.sessionExited && !this.stopping))
+              .catch(() => this.deps.log.warn('Workspace control cleanup failed'))
             clearTimeout(run.cancelTimer); run.runtimeTiming?.close(); this.active.delete(runId)
             // Start draining all three telemetry queues before an idle cloud VM
             // can pause; the completed run never waits for the collector.
@@ -1507,6 +1513,14 @@ export class RunSupervisor {
     } })
     let entry = this.deps.journal.get(runId) as JournalEntry
     const { assignment } = entry
+    if (this.deps.acquireWorkspaceControl) {
+      const signal = AbortSignal.any([this.stopController.signal, run.abort.signal])
+      run.workspaceControl = await this.deps.acquireWorkspaceControl(assignment, signal, () => {
+        this.forceStop(runId, run, 'device_lost')
+        run.abort.abort()
+      })
+      signal.throwIfAborted()
+    }
     if ((assignment.policySnapshotRequired || assignment.policySnapshot) && !this.deps.verifyRunPolicy) throw new Error('Run policy verification unavailable')
     // Claim already authorized this exact remote and, where needed, handed
     // over its GitHub credential. Only a new hosted task can read ahead: local
@@ -1715,6 +1729,7 @@ export class RunSupervisor {
         repo.path,
         await this.startPoint(runId, repo, assignment),
       )))
+    run.workspaceControl?.setWorktree(worktree)
     if (!entry.worktree) {
       // A continued worktree was bootstrapped by the run that made it.
       // The commit checkpoints diff against: a continued worktree keeps the

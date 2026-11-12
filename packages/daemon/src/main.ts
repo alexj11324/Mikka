@@ -79,6 +79,7 @@ import { createLocalSubscriptionRunner } from "./subscription-local-runner"
 import { preflightLocalSubscription } from "./subscription-preflight"
 import { logCodedError } from "@mikka/protocol/coded-error"
 import { isSafeId } from "./ids"
+import { acquireCloudWorkspaceControl } from './runs/workspace-control'
 import { acquireLock } from "./lock"
 import { closeLogger, createLogger, type Logger } from "./log"
 import { Outbox } from "./outbox"
@@ -510,6 +511,9 @@ export class Daemon {
         : this.realAdapters()),
     ]))
     this.supervisor = new RunSupervisor({
+      acquireWorkspaceControl: this.options.taskRegistered
+        ? (assignment, signal, onLost) => acquireCloudWorkspaceControl({ runId: assignment.runId, deviceId: assignment.deviceId, signal, onLost })
+        : undefined,
       collectCliTiming: this.options.collectCliTiming,
       journal: this.journal,
       adapterStateDir: this.paths.adapterState,
