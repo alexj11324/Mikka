@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { mock, test } from 'node:test'
-import { act, createElement } from 'react'
+import { act } from 'react'
 import { Window } from 'happy-dom'
 import type { DirectoryTeam, TeamDirectoryState } from './use-team-directory'
 
@@ -40,7 +40,7 @@ test('strict deletion and explicit ungroup use separate intents, impact receipts
   let directory: TeamDirectoryState
   function Directory() { directory = useTeamDirectory(current); return null }
   try {
-    await act(async () => root.render(createElement(Directory)))
+    await act(async () => root.render(<Directory />))
     await act(async () => { void directory.askDelete(chosen); void directory.askRemoveGrouping(other) })
     await act(async () => { reads.get(other.id)!(result(other.id, false)); reads.get(chosen.id)!(result(chosen.id, true)) })
     assert.equal(directory!.deletion?.team.id, other.id)
