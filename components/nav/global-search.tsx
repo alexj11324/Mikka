@@ -121,8 +121,11 @@ function useSearchPalette({ open, onOpenChange, onOpenChangeComplete, bots, sess
     remoteTasks,
   )
   const taskIds = new Set(taskRows.map(row => row.id))
-  const allowedThreads = search.serverTasks ? threads.filter(thread => thread.issueId && taskIds.has(thread.issueId)) : threads
-  const threadRows = onThread ? threadSearchHits(allowedThreads, text, thread => threadName(thread, issues, tNav('untitledConversation')), taskIds) : []
+  // Threads have an owner-wide reader. Keep its standalone rows, but do
+  // not enrich them from Task metadata withheld by the workspace source.
+  const deniedTasks = search.workspaceDenied ? new Set(issues.filter(issue => issue.workspaceId === workspaceId).map(issue => issue.id)) : null
+  const visibleThreads = deniedTasks ? threads.filter(thread => !thread.issueId || !deniedTasks.has(thread.issueId)) : threads
+  const threadRows = onThread ? threadSearchHits(visibleThreads, text, thread => threadName(thread, search.serverTasks ? [] : issues, tNav('untitledConversation')), taskIds) : []
   const projectRows = search.workspaceDenied ? [] : projects.filter(project => shown(`${project.name} ${project.summary}`))
   const actions = [
     // i18n-ignore: bilingual search keywords, not rendered

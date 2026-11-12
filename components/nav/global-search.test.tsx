@@ -41,10 +41,11 @@ test('local and remote Search hits use the same authorized task projection and p
   const root = createRoot(document.body)
   const issue = { id: local, title: 'Same', status: 'done', workspaceId, metadata: {}, identifier: null } as React.ComponentProps<typeof GlobalSearch>['issues'][number]
   const noop = () => {}
+  const thread = { id: 'owner-thread', issueId: null, prompt: 'Same', lastReply: null } as NonNullable<React.ComponentProps<typeof GlobalSearch>['threads']>[number]
   try {
     const render = () => act(async () => root.render(<SWRConfig value={{ provider: () => new Map(), shouldRetryOnError: false }}>
       <TaskPresentationsContext value={{ [local]: projection }}><GlobalSearch open onOpenChange={noop} workspaceId={workspaceId}
-        bots={[]} sessions={[]} issues={[issue]} projects={[]} onChat={noop} onNewBot={noop} onIssue={id => { selected.push(id); return true }} onProject={noop} onCreateIssue={noop} /></TaskPresentationsContext>
+        bots={[]} sessions={[]} issues={[issue]} projects={[]} threads={[thread]} onThread={noop} onChat={noop} onNewBot={noop} onIssue={id => { selected.push(id); return true }} onProject={noop} onCreateIssue={noop} /></TaskPresentationsContext>
     </SWRConfig>))
     await render()
     const rows = palette.sections.find(section => section.id === 'tasks')!.rows
