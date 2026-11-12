@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readContainerWindow, collectContainerReports } from './cloudflare-container-logs.mjs'
-import { publish } from './egress-monitor.mjs'
+import { publish, publishRuntimeAttribution } from './egress-monitor.mjs'
 import { WINDOW_MS } from './request-outcomes.mjs'
 
 const id = 'd2364de7-f356-4fd6-b73f-604064ef68ff'
@@ -106,4 +106,37 @@ test('one native observation window retains the login/chat/API deadlines and thr
   assert.deepEqual(health.alerts.map(a => a.id).sort(), ['api-request-latency','chat-request-success','login-request-latency','login-request-success'])
   assert.ok(!health.assessed.includes('chat-request-latency'))
   assert.deepEqual(health.assessed.filter(id => id.startsWith('api-')).sort(), ['api-request-latency','api-request-success'])
+})
+
+test('a separately scheduled runtime reader leaves provider accounting and its publisher to their owner', async () => {
+  let calls = 0
+  const unexpected = () => { calls++; throw Error('unexpected external accounting request') }
+  const result = await collectContainerReports({ target: () => ({...scope, environment:'production'}),
+    read: () => page(raw), now, includeProviderUsage:false, neonToken:'must-not-be-consumed', fetchImpl:unexpected })
+  assert.equal(calls, 0)
+  assert.equal(result.outcomes.status, 'pass')
+  assert.equal(result.egress.runtime.queries[0].estimatedBytes, 1200)
+  assert.equal(result.egress.status, 'not_requested')
+  assert.equal(result.egress.collectionScope, 'runtime')
+  assert.equal(result.egress.neon, undefined)
+  await assert.rejects(publish(result.egress, 'must-not-be-consumed', unexpected), /provider_snapshot_not_collected/)
+  assert.equal(calls, 0)
+})
+
+test('the retained runtime-only stream sends query/route details exactly once per logical quarter and never sends provider spend',async()=>{
+  const result=await collectContainerReports({target:()=>({...scope,environment:'production'}),read:()=>page(raw),
+    now,includeProviderUsage:false})
+  const calls=[]
+  const send=async(url,options)=>{assert.equal(url,'https://us.i.posthog.com/batch/');calls.push(JSON.parse(options.body));return Response.json({})}
+  const post='55-'+'f'.repeat(64)
+  assert.equal(await publishRuntimeAttribution(result.egress,post,'existing-project-ingest',send),2)
+  await publishRuntimeAttribution(result.egress,post,'existing-project-ingest',send)
+  assert.deepEqual(calls[0],calls[1])
+  const batch=calls[0].batch
+  assert.deepEqual(batch.map(e=>e.event),['mikka_ops_query_sample','mikka_ops_route_requests'])
+  assert.ok(batch.every(e=>/^[a-f0-9-]{36}$/.test(e.uuid)))
+  assert.equal(new Set(batch.map(e=>e.uuid)).size,2)
+  assert.ok(batch.every(e=>!Object.hasOwn(e.properties,'provider_healthy')))
+  for(const change of [{collectionScope:'provider'},{environment:'staging'},{neon:{}},{windowStart:'not-a-quarter'}])
+    await assert.rejects(publishRuntimeAttribution({...result.egress,...change},post,'key',()=>assert.fail()))
 })

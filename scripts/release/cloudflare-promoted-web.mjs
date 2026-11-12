@@ -91,6 +91,25 @@ async function liveProof(record, raw, fetchImpl) {
     && url.searchParams.getAll('dpl').length === 1 && url.searchParams.get('dpl') === record.releasePin, 'servedClientPin')
 }
 
+/** Re-read the original release decision at its issuance and the currently
+ * served gateway, shell and DNS. This read-only check grants no release rights. */
+export async function readServingPromotion(pin, {token, fetchImpl=fetch, now=Date.now()}={}) {
+  const match=/^([1-9][0-9]{0,15})-([a-f0-9]{64})$/.exec(pin)
+  requireProof(match,'ownerComment')
+  const api={token,fetchImpl}
+  const raw=await readOwnerBody(match[1],match[2],'MIKKA_CLOUDFLARE_WEB_PROMOTION_V1\n',api)
+  const record=parsePromotionRecord(raw)
+  const approvalBody=await readOwnerBody(record.approvalComment,record.approvalSha256,'MIKKA_CUTOVER_ACCEPTANCE_V1',api)
+  requireProof(/^\r?\n/.test(approvalBody),'approvalMarker')
+  const approval=JSON.parse(approvalBody),issued=Date.parse(record.verifiedAt)
+  requireProof(record.approvalComment!==match[1] && approval.decision==='approved' && approval.product===record.product &&
+    approval.overlay===record.overlay && approval.evidence?.inventoryAndRollback?.sha256===record.inventorySha256 &&
+    /^https:\/\/github\.com\/alexj11324\/mikka-cloud\/issues\/4#issuecomment-[1-9][0-9]*$/.test(approval.evidence.inventoryAndRollback.url) &&
+    Date.parse(approval.from)<=issued && issued<Date.parse(approval.until) && issued<=now,'approval')
+  await liveProof(record,raw,fetchImpl)
+  return record
+}
+
 export function verifyPromotedWeb(options) {
   return verifyPromotion(runtimeWorkflow, options)
 }
