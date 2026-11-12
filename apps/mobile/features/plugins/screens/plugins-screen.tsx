@@ -104,7 +104,7 @@ function Apps({ query, header }: { query: string; header: ReactElement }) {
       keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="handled"
       refreshControl={<RefreshControl {...refresh} />}
-      ListHeaderComponent={<>{header}<ReadNotice error={catalog.error || connections.error} hasData={Boolean(catalog.error ? catalog.data : connections.snapshot?.toolkits.length)} label={catalog.error ? "应用目录" : connections.noticeLabel} onRetry={reload} /></>}
+      ListHeaderComponent={<>{header}<ReadNotice error={catalog.error || connections.error} hasData={catalog.error ? Boolean(catalog.data) : connections.hasRetainedData} label={catalog.error ? "应用目录" : connections.noticeLabel} onRetry={reload} /></>}
       contentContainerStyle={styles.list}
       ListEmptyComponent={catalog.loading ? <View style={styles.center}><Spinner /></View>
         : <Text style={styles.note}>{catalog.error ? '应用加载失败' : needle ? `没有找到「${query.trim()}」` : catalog.data?.configured === false ? '应用商店未配置' : '没有应用'}</Text>}

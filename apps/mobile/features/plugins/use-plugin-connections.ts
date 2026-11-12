@@ -23,6 +23,7 @@ export function usePluginConnections() {
   const providerNames = { composio: 'Composio', github: 'GitHub', linear: 'Linear', telegram: 'Telegram' }
   const failedProviders = snapshot?.failed.map(failure => providerNames[failure.source]) ?? []
   const noticeLabel = failedProviders.length ? `${failedProviders.join('、')} 连接状态` : '连接状态'
-  return { snapshot, noticeLabel, error: directory.error || accounts.error || Boolean(snapshot?.failed.length),
+  const hasRetainedData = Boolean((directory.error || accounts.error) && snapshot)
+  return { snapshot, noticeLabel, hasRetainedData, error: directory.error || accounts.error || Boolean(snapshot?.failed.length),
     reload: async () => { await Promise.all([directory.reload(), accounts.reload(), linear.reload()]) } }
 }
