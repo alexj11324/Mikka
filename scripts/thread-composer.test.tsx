@@ -508,18 +508,29 @@ test('Inbox waiting replies keep the original thread, viewer, workspace and requ
   }
   await renderInbox(null)
   assert.equal((await submit(issueId, runId, 'Original answer')).status, 'unavailable')
-  assert.equal(calls.length, 0)
+  buildGate = Promise.resolve(false)
+  thread = { ...base, id: runId, latestRunId: runId }
+  await renderLive(viewer.ownerId + ':' + viewer.workspaceId, { issueId, runId })
+  await act(async () => composer!.onChange('Draft on an old build'))
+  await act(async () => { composer!.onSubmit() })
+  const reason = container.querySelector('[data-delivery-phase="failed"] [role="alert"]')?.firstChild?.textContent
+  assert.equal(reason, messages.Coordinator.sendUpdateRequired)
   await renderInbox(viewer)
+  await act(async () => { assert.deepEqual(await submit(issueId, runId, 'Draft on an old build'), { status: 'failed', error: reason }) })
+  assert.equal(calls.length, 0)
+  buildGate = undefined
   await act(async () => { assert.equal((await submit(issueId, runId, 'Original answer')).status, 'uncertain') })
+  await act(async () => { assert.equal((await submit(issueId, runId, 'Independent answer')).status, 'accepted') })
   await renderInbox(viewer, false)
   await renderInbox(viewer)
   await act(async () => { assert.equal((await submit(issueId, laterRunId, 'Original answer')).status, 'accepted') })
-  assert.equal(calls.length, 2)
-  assert.deepEqual(calls[0], calls[1])
-  const original = calls[1] as { requestId: string }
+  assert.equal(calls.length, 3)
+  assert.deepEqual(calls[0], calls[2])
+  assert.notEqual((calls[1] as { requestId: string }).requestId, (calls[0] as { requestId: string }).requestId)
+  const original = calls[2] as { requestId: string }
   assert.match(original.requestId, /^[\da-f-]{36}$/i)
   assert.deepEqual(original, { issueId, runId, text: 'Original answer', requestId: original.requestId,
     expectedOwnerId: viewer.ownerId, expectedWorkspaceId: viewer.workspaceId })
   await act(async () => { assert.equal((await submit(issueId, laterRunId, 'Original answer')).status, 'accepted') })
-  assert.notEqual((calls[2] as { requestId: string }).requestId, original.requestId, 'an acknowledged answer must not consume a later independent answer')
+  assert.notEqual((calls[3] as { requestId: string }).requestId, original.requestId, 'an acknowledged answer must not consume a later independent answer')
 })
