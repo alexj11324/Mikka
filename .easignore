@@ -89,6 +89,10 @@ next-env.d.ts
 # Native Eve session data for the default self-hosted service.
 /.cache/eve-workflow/
 
+# Cloudflare build receipts and release artifacts.
+/.cloudflare-ci/
+/.mikka-cloud/
+
 # EAS replaces all nested .gitignore files. Preserve the mobile and e2b exclusions.
 /apps/mobile/.expo/
 /apps/mobile/dist/
