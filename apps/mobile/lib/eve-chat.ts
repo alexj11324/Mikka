@@ -21,9 +21,9 @@ export function useEveChat(botId: string | null, enabled: boolean, revalidate: (
     void prewarm().then(() => mounted ? resume() : undefined).catch(() => undefined)
     return () => { mounted = false }
   }, [enabled, prewarm, resume])
-  const sendMessage = useCallback(async (text: string, submissionId: string, images?: readonly { dataUrl: string }[]) => {
+  const sendMessage = useCallback(async (text: string, submissionId: string, images?: readonly { dataUrl: string }[], turnPolicy?: 'queue' | 'steer') => {
     const content: MessagePart[] = [{ type: 'text', text }, ...(images ?? []).map(image => ({ type: 'file' as const, mediaType: /^data:([^;,]+)/.exec(image.dataUrl)?.[1] ?? 'image/jpeg', data: image.dataUrl }))]
-    return send(content, { headers: { 'x-mikka-submission-id': submissionId }, ...(expectedOwnerId && expectedWorkspaceId ? { clientContext: { expectedOwnerId, expectedWorkspaceId, botId } } : {}) })
+    return send(content, { ...(turnPolicy ? { turnPolicy } : {}), headers: { 'x-mikka-submission-id': submissionId }, ...(expectedOwnerId && expectedWorkspaceId ? { clientContext: { expectedOwnerId, expectedWorkspaceId, botId } } : {}) })
   }, [send, expectedOwnerId, expectedWorkspaceId, botId])
   return { ...agent, sendMessage }
 }
