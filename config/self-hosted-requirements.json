@@ -206,6 +206,13 @@
     "test": "lib/account/deletion-lock.db.test.ts",
     "suite": "test:account-db"
   },
+  "drizzle/20261113165037_inbox_conversations.sql": {
+    "mode": "built-in",
+    "environment": ["MIKKA_DATABASE_URL"],
+    "behavior": "Use the installation PostgreSQL database for per-user Inbox dismissals and standalone conversation snoozes. An authorized new run or changed cause can request attention again.",
+    "test": "lib/inbox/store.db.test.ts",
+    "suite": "test:inbox-db"
+  },
   "drizzle/20261112090914_workspace_subscription_custody.sql": {
     "mode": "built-in",
     "environment": [
@@ -649,6 +656,18 @@
     "behavior": "Read only current, explicitly bound service keys visible under both admin roles and rename by the ID of a single issuance.",
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
+  },
+  "lib/governance/organization-invitation-mail.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "MIKKA_ORG_INVITE_EMAIL_ENABLED",
+      "MIKKA_EMAIL_FROM",
+      "SMTP_URL",
+      "RESEND_API_KEY"
+    ],
+    "behavior": "Organization invitation email is an explicit opt-in side effect after the Member-only invitation is committed. The canonical application origin anchors bearer links, and provider failure preserves the manual invite without granting Workspace access.",
+    "test": "lib/governance/organization-invitation-mail.test.ts",
+    "suite": "test:governance"
   },
   "lib/governance/organization-invitations.ts": {
     "mode": "built-in",
@@ -1165,6 +1184,20 @@
     "test": "tests/team-visibility.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "lib/inbox/store.ts": {
+    "mode": "built-in",
+    "environment": ["MIKKA_DATABASE_URL"],
+    "behavior": "Read the same authorized pending requests for board cards, inbox rows and badge counts in the selected workspace.",
+    "test": "lib/inbox/store.db.test.ts",
+    "suite": "test:inbox-db"
+  },
+  "lib/task-presentation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Project the viewer's pending Inbox reason into the board's Agent activity mark while preserving the underlying task lifecycle.",
+    "test": "lib/task-presentation.test.ts",
+    "suite": "test:issues"
+  },
   "lib/inbox/client.ts": {
     "mode": "built-in",
     "environment": [],
@@ -1402,6 +1435,13 @@
     "environment": [],
     "behavior": "Render the selected model while the installation saves the selection and reconcile the acknowledged choice.",
     "test": "lib/bot-model-menu-view.test.ts",
+    "suite": "test:issues"
+  },
+  "lib/thread-groups.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Compute the bot overview from visible task, conversation and pull request rows, counting each handoff once.",
+    "test": "lib/thread-groups.test.ts",
     "suite": "test:issues"
   },
   "lib/conversation-title-schedule.ts": {
