@@ -1,8 +1,13 @@
 import 'server-only'
 import { createHash } from 'node:crypto'
 import { withBasePath } from '@/lib/base-path'
-import { deliverMail, type MailMessage } from '@/lib/mail-delivery'
+import { deliverMail, mailConfigured, type MailMessage } from '@/lib/mail-delivery'
 import type { OrganizationInvitationOutcome } from './organization-invitations'
+
+/** Existing auth mail credentials alone must not opt a deployment into invitation mail costs. */
+export function organizationInvitationMailEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  return env.MIKKA_ORG_INVITE_EMAIL_ENABLED === 'true' && mailConfigured(env)
+}
 
 /** The configured app origin is authoritative; never use the request Host for bearer links. */
 export function organizationInvitationMail(
