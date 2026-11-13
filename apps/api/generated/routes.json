@@ -1628,7 +1628,7 @@
         "GET",
         "POST"
       ],
-      "sourceHash": "7930331d4bd4c6a12ff68e85011e0c36d87e888b97831f091c4d9d6e9b32c95c"
+      "sourceHash": "9f656861a1eb3cf672634320940c809cb0ad7d2a15358fec98e3cffe969d6c6c"
     },
     {
       "path": "/mikka/api/mobile/threads/[id]/continue",
@@ -2746,7 +2746,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "734b0665e530fa61dfc3f9b76e282b12e8170d411a2290741b6f4be700858743"
+      "sourceHash": "de1f57db9a24cf145560196e9d668ceda9643d69fd100946231244fee0caa80f"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/commands/ack",
@@ -2755,7 +2755,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "7b1ec357e64d0b05651e4d0752314a629df47caf6d71e00fb81be5032111dba4"
+      "sourceHash": "fa7794a40bac92ad2482923bf743bcdf0a813f5cd9a595a6cf029b378acd47c2"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/computer",
