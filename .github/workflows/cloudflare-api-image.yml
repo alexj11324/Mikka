@@ -6,6 +6,7 @@ on:
       - 'scripts/cloudflare-ci*'
       - 'scripts/cloudflare-native-oci*'
       - 'scripts/cloudflare-runtime-release*'
+      - 'scripts/load-cloudflare-api-receipt*'
       - 'lib/deployment-id.mjs'
   workflow_dispatch:
     inputs:
@@ -28,7 +29,7 @@ jobs:
         with:
           node-version: 24
       - name: Verify public API and runtime provenance without credentials
-        run: node --test scripts/cloudflare-ci.test.mjs scripts/cloudflare-native-oci.test.mjs scripts/cloudflare-runtime-release.test.mjs lib/deployment-id.test.mjs
+        run: node --test scripts/cloudflare-ci.test.mjs scripts/cloudflare-native-oci.test.mjs scripts/cloudflare-runtime-release.test.mjs scripts/load-cloudflare-api-receipt.test.mjs lib/deployment-id.test.mjs
   publish:
     if: github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor_id == '183887963' && github.triggering_actor == 'alexj11324'
     runs-on: ubuntu-latest
