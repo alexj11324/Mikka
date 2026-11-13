@@ -1,7 +1,7 @@
 import {Client,type ClientSession,type SessionStreamEvent} from 'eve/client'
 import type {Delivery} from 'eve/sessions'
 import {z} from 'zod'
-import {internalEveAuthorization} from './auth'
+import {internalEveHeaders} from './auth'
 import {eveInternalOrigin} from './server-client'
 import type {EveScope} from './scope'
 import type {EvaluationPlan} from './evaluation-store'
@@ -54,7 +54,7 @@ async function endEvaluationSession(session:ClientSession) {
 export async function runEveEvaluation(scope:EveScope,bindingId:string,plan:EvaluationPlan,signal:AbortSignal) {
   const base=new URL(eveInternalOrigin())
   base.pathname=base.pathname.replace(/\/$/,'')+'/mikka/evaluations'
-  const client=new Client({baseUrl:base.toString(),headers:()=>({authorization:internalEveAuthorization(scope),'x-mikka-evaluation-id':bindingId})})
+  const client=new Client({baseUrl:base.toString(),headers:()=>({...internalEveHeaders(scope),'x-mikka-evaluation-id':bindingId})})
   let session:ClientSession|undefined,trace:EvalTrace|undefined,failure:{error:unknown}|undefined
   try {
     session=(await client.sessions.create({signal})).session

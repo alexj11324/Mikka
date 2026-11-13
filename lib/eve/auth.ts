@@ -28,8 +28,27 @@ export function internalEveScope(header: string | null, now = Date.now()): EveSc
   } catch { return null }
 }
 
+/** Cloudflare carries the existing Eve principal through private service bindings.
+ * The public ingress removes both headers; only a binding entrypoint can stamp
+ * the trusted header. Other hosts retain their existing transport contract. */
+export function internalEveHeaders(scope: EveScope): Record<string, string> {
+  if (process.env.MIKKA_API_INGRESS === 'cloudflare' || process.env.MIKKA_EVE_HOST === 'cloudflare') {
+    return { 'x-mikka-eve-scope': JSON.stringify(eveScopeSchema.parse(scope)) }
+  }
+  return { authorization: internalEveAuthorization(scope) }
+}
+export function internalEveRequestScope(request: Request): EveScope | null {
+  if (process.env.MIKKA_API_INGRESS === 'cloudflare' || process.env.MIKKA_EVE_HOST === 'cloudflare') {
+    try {
+      const parsed = eveScopeSchema.safeParse(JSON.parse(request.headers.get('x-mikka-eve-binding-scope') ?? 'null'))
+      return parsed.success ? parsed.data : null
+    } catch { return null }
+  }
+  return internalEveScope(request.headers.get('authorization'))
+}
+
 export async function authenticateEveRequest(request: Request): Promise<EveAuthResult | null> {
-  const internal = internalEveScope(request.headers.get('authorization'))
+  const internal = internalEveRequestScope(request)
   if (internal) return {...scopeAuth(await assertEveScope(internal)),allowAgentInfo:true}
   if (request.method !== 'GET' && request.method !== 'HEAD' && !request.headers.has('authorization')) {
     if (request.headers.get('sec-fetch-site') === 'cross-site') return null
