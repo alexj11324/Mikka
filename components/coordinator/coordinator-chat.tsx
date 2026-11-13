@@ -65,6 +65,7 @@ import { PendingActions } from './pending-actions'
 import { SubagentLoginNeeds } from './subagent-login-needs'
 import { UnreadDivider } from '@/components/chat/unread-divider'
 import { UnreadPill } from '@/components/chat/unread-pill'
+import { VisibleReadEnd } from '@/components/workspace/visible-read-end'
 import { MESSAGE_POSITION_ATTR, useUnreadIndicators } from '@/lib/hooks/use-unread-indicators'
 import { useArrivals } from '@/lib/hooks/use-arrivals'
 import { openArtifact as openArtifactWindow } from '@/components/workspace/workspace-navigation'
@@ -576,6 +577,8 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
       const artifacts = item.artifacts.flatMap(id => data?.artifacts[id] ? [{ id, name: data.artifacts[id].title }] : [])
       if (artifacts.length) parts.push({ kind: 'artifacts', items: artifacts, onOpen: openArtifact })
       if (item.failure) parts.push(item.position === failedAt ? liveFailurePart : { kind: 'error', text: t('failedTitle'), actions: <FailureReason retry={item.welcome} failure={item.failure} botId={botId} sending={sending} onResend={() => { void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate()) }} /> })
+      if (!live && item.position === unreadItems.findLast(row => row.reportable)?.position)
+        parts.push({ kind: 'text', text: '', node: <VisibleReadEnd onSeen={unread.reportEnd} /> })
       entries.push({ id: key, role: 'bot', at, parts, streaming, ...(item.stopped ? { stopped: true } : {}),
         actions: item.text && !streaming ? <MessageActions className={cn('items-start', REPLY_ACTIONS)}>
           <CopyAction text={replyCopyText(item.text)} />

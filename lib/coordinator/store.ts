@@ -12,7 +12,8 @@ import { taskReviewSummaries } from '../coding-workspace/task-review/summaries'
 import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
+import { botUnreadCounts } from '@/lib/conversation-reads-store'
 import { agentRuns, bots, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { citedIds, namedCitations, type CitationName, type CitationSource } from '@/lib/coordinator/citations'
@@ -540,6 +541,7 @@ export async function chatVersionState(userId: string, limit = 200, botId: strin
 }
 
 export interface BotChatSummary {
+  unreadCount?: number
   /** The latest reply or message, with cited threads and tasks written as their names; null before the first. */
   line: string | null
   at: string | null
@@ -594,6 +596,9 @@ export async function botChatSnapshot(reader: IssueReader) {
   for (const line of lines) {
     const text = line.text && line.from === 'coordinator' ? namedCitations(line.text, sources) : line.text
     result[line.botId] = { ...(result[line.botId] ?? { working: false }), line: text || null, at: line.at }
+  }
+  for (const [botId, count] of await botUnreadCounts(pool, userId, botIds)) {
+    if (count) result[botId] = { ...(result[botId] ?? { line: null, at: null, working: false }), unreadCount: count }
   }
   return { items: result, expiries, observedAt: now.getTime() }
 }
