@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import { once } from 'node:events'
+import { createServer } from 'node:http'
 import test from 'node:test'
 import { createBrokerServer } from './server.mjs'
+import vercelFill from './api/fill.js'
 
 test('compiled broker over HTTP serves liveness, enforces caller identity and hides preview probes', async t => {
   const server = createBrokerServer()
@@ -26,4 +28,29 @@ test('compiled broker over HTTP serves liveness, enforces caller identity and hi
   const malformed = await fetch(origin + '/api/fill', { method: 'POST', headers: { authorization: 'Bearer invalid' } })
   assert.equal(malformed.status, 403)
   assert.equal((await malformed.json()).error, 'credential_denied')
+})
+
+test('compiled Cloudflare private fill retains input checks and the Vercel entrypoint still requires identity', async t => {
+  const savedRuntime = process.env.CREDENTIAL_RUNTIME, savedEnvironment = process.env.CREDENTIAL_ENVIRONMENT
+  t.after(() => {
+    if (savedRuntime === undefined) delete process.env.CREDENTIAL_RUNTIME
+    else process.env.CREDENTIAL_RUNTIME = savedRuntime
+    if (savedEnvironment === undefined) delete process.env.CREDENTIAL_ENVIRONMENT
+    else process.env.CREDENTIAL_ENVIRONMENT = savedEnvironment
+  })
+  process.env.CREDENTIAL_RUNTIME = 'cloudflare'
+  const server = createBrokerServer(), vercel = createServer(vercelFill)
+  server.listen(0, '127.0.0.1'); vercel.listen(0, '127.0.0.1')
+  await Promise.all([once(server, 'listening'), once(vercel, 'listening')])
+  t.after(() => Promise.all([server, vercel].map(instance => new Promise(done => instance.close(done)))))
+  const origin = 'http://127.0.0.1:' + server.address().port
+  for (const environment of ['preview', 'production']) {
+    process.env.CREDENTIAL_ENVIRONMENT = environment
+    const denied = await fetch(origin + '/api/fill', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+    assert.equal(denied.status, 404)
+    assert.deepEqual(await denied.json(), { error: 'credential_denied' })
+    assert.equal((await fetch(origin + '/api/oidc', { method: 'POST' })).status, 404)
+    const legacy = await fetch('http://127.0.0.1:' + vercel.address().port, { method: 'POST' })
+    assert.equal(legacy.status, 403)
+  }
 })
