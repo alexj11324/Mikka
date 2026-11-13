@@ -54,7 +54,7 @@ test('private ingress keeps authority, body, cookies and upgrades while replacin
   assert.equal(upgrade.headers.get('x-mikka-edge-ip'), null)
 })
 
-test('ingress binds only the immutable account image with a private route and a bounded staging pool', () => {
+test('ingress maps the selected image with a private route and a bounded staging pool', () => {
   const input = { release: id, origin: 'https://app.example', image: 'registry.cloudflare.com/' + 'e'.repeat(32) + '/mikka-api@sha256:' + '3'.repeat(64) }
   const config = ingressConfig(input)
   assert.equal(config.workers_dev, false)
@@ -66,10 +66,26 @@ test('ingress binds only the immutable account image with a private route and a 
   const withAI = ingressConfig({ ...input, workersAi: true })
   assert.deepEqual(withAI.ai, { binding: 'WORKERS_AI' })
   assert.equal(withAI.vars.CLOUDFLARE_WORKERS_AI_ACCOUNT_ID, input.image.split('/')[1])
-  assert.throws(() => ingressConfig({ ...input, workersAi: 'untrusted' }))
-  for (const changed of [{ release: 'main' }, { image: input.image.split('@')[0] + ':latest' }, { origin: 'https://user@app.example' }]) {
-    assert.throws(() => ingressConfig({ ...input, ...changed }))
-  }
+})
+
+test('ingress maps custom deployment metadata and underscore service names', () => {
+  const input = { release: 'custom_release_v2', image: 'registry.example.test/team/api:release_2',
+    origin: 'http://localhost:4310', taskMachine: 'task_service', eveService: 'eve_service',
+    businessWorld: 'business_world', credentialIdentityService: 'identity_service',
+    credentialBrokerService: 'broker_service', workersAi: 'enabled' }
+  const config = ingressConfig(input)
+  assert.equal(config.name, 'mikka-api-' + input.release)
+  assert.equal(config.containers[0].image, input.image)
+  assert.deepEqual(config.vars, { PUBLIC_ORIGIN: input.origin, MIKKA_DEPLOYMENT_ID: input.release,
+    CLOUDFLARE_WORKERS_AI_ACCOUNT_ID: 'team' })
+  assert.deepEqual(config.ai, { binding: 'WORKERS_AI' })
+  assert.deepEqual(config.services, [
+    { binding: 'TASK_MACHINE', service: input.taskMachine },
+    { binding: 'EVE_SERVICE', service: input.eveService, entrypoint: 'EveService' },
+    { binding: 'BUSINESS_WORLD', service: input.businessWorld, entrypoint: 'BusinessWorldService' },
+    { binding: 'CREDENTIAL_IDENTITY', service: input.credentialIdentityService, entrypoint: 'AppIdentity' },
+    { binding: 'CREDENTIAL_BROKER', service: input.credentialBrokerService, entrypoint: 'CredentialBroker' },
+  ])
 })
 
 import { configureTaskBridge, taskMachine } from '../../../cloudflare/api/ingress/task-machine.mjs'

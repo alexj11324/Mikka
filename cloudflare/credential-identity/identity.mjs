@@ -5,7 +5,7 @@ function configuration(env) {
   const issuer = new URL(env.ISSUER_URL)
   if (typeof env.ISSUER_URL !== 'string' || issuer.protocol !== 'https:' ||
       ![issuer.origin, `${issuer.origin}/`].includes(env.ISSUER_URL) ||
-      !['preview', 'production'].includes(env.CREDENTIAL_ENVIRONMENT) ||
+      typeof env.CREDENTIAL_ENVIRONMENT !== 'string' || !env.CREDENTIAL_ENVIRONMENT ||
       typeof env.SIGNING_KEY_ID !== 'string' || !env.SIGNING_KEY_ID.trim()) {
     throw new Error('Invalid identity configuration')
   }
