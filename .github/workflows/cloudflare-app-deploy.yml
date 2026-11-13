@@ -10,7 +10,7 @@ on:
         description: Reviewed deployment phase; never compiles product source
         type: choice
         required: true
-        options: [stage-all, stage-verify, stage-worlds, stage-task, stage-eve, stage-api, stage-web, stage-sessions, production-reserve, production-eve, production-worlds-prepare, production-api, production-worlds-register, production-web, production-verify, gateway-prepare]
+        options: [stage-all, stage-verify, stage-worlds, stage-task, stage-eve, stage-api, stage-web, stage-sessions, production-reserve, production-eve, production-worlds-prepare, production-api, production-worlds-register, production-web, production-verify, gateway-prepare, gateway-observe]
       qualification_run:
         description: Original public Cloud Services qualification run
         type: string
@@ -29,6 +29,8 @@ permissions:
 jobs:
   deploy-application:
     if: github.repository_id == '1427517699' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor_id == '183887963'
+    outputs:
+      serving-release: ${{ steps.apply.outputs.serving-release }}
     runs-on: ubuntu-latest
     environment: cloudflare-runtime-release
     timeout-minutes: 45
@@ -162,7 +164,18 @@ jobs:
           recursive: false
           include-imports: false
       - name: Deploy the reviewed public artifacts and verify the selected phase
+        id: apply
         working-directory: operations
         env:
           GH_TOKEN: ${{ steps.source-token.outputs.token }}
         run: node operations/public-release.mjs
+
+  serving-release:
+    needs: deploy-application
+    if: inputs.phase == 'gateway-observe' && needs.deploy-application.outputs.serving-release != ''
+    name: Serving release ${{ needs.deploy-application.outputs.serving-release }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Record the verified serving identifiers
+        run: echo 'The release identity is recorded in this run attempt.'

@@ -59,12 +59,16 @@ retry reason. It rechecks the live version after building and validates both
 official subscriptions before publishing template IDs.
 
 After a Cloudflare promotion, dispatch the same official runtime workflow on
-current main with its retry reason and `cloudflare_receipt`. The value is
-`<comment-id>-<sha256-of-entire-comment-body>` for the post-promotion record
-on #1954. Dispatch within ten minutes of its verification. The original owner
-acceptance window must cover the complete run. The workflow verifies the
-owner's source and inventory approval, the public DNS TXT commitment, the
-serving gateway version, and the deployment pin in the live sign-in page.
+current main with its retry reason and `cloudflare_receipt`. For a Cloudflare-to-Cloudflare
+promotion, run the existing Cloudflare application deployment workflow with phase
+`gateway-observe` on the reviewed operations commit containing the prepared
+checklist. The observer only reads the provider and canonical application.
+Use `actions:RUN_ID:ATTEMPT` from that successful observation in the consumer
+dispatch. Its original job identifies the 100% gateway version, product, overlay
+and Web client pin. Each signing or publication gate rechecks the live gateway
+fingerprint, product, overlay, pinned client and current product main.
+The first Vercel-to-Cloudflare transition keeps its historical issue #1954
+comment/body hash, approval window and DNS TXT verification.
 The same release produces the immutable template report for the private
 Cloudflare API deployment. The legacy Web publisher runs only on the original
 release path with an empty Cloudflare receipt.

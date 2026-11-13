@@ -65,22 +65,30 @@ export async function readWebAuthority(fetchImpl = fetch) {
   if ([0, 3].includes(dns.Status) && answers.length === 0 && version.headers.get('x-vercel-id') && !gateway) {
     return { provider: 'vercel', sha: build }
   }
-  requireProof(dns.Status === 0 && answers.length === 1 && name(answers[0].name) === anchorName
+  const absent = [0, 3].includes(dns.Status) && answers.length === 0
+  const historical = dns.Status === 0 && answers.length === 1 && name(answers[0].name) === anchorName
     && answers[0].type === 16 && /^"mikka-release-v1=sha256:[a-f0-9]{64}"$/.test(answers[0].data)
-    && !version.headers.has('x-vercel-id') && version.headers.has('cf-ray') && present(gateway, hash), 'originUnconfirmed')
+  requireProof((absent || historical) && !version.headers.has('x-vercel-id')
+    && version.headers.has('cf-ray') && present(gateway, hash), 'originUnconfirmed')
   return { provider: 'cloudflare', sha: build }
 }
 
 async function liveProof(record, raw, fetchImpl) {
-  const [dns, version, shell] = await Promise.all([
+  const [dns] = await Promise.all([
     publicRead(anchorUrl, 'application/dns-json', fetchImpl).then(r => r.json()),
-    publicRead(PRODUCTION_VERSION_URL, 'application/json', fetchImpl),
-    publicRead(new URL('/mikka/en/sign-in', PRODUCTION_VERSION_URL).href, 'text/html', fetchImpl),
+    liveServingRelease(record, fetchImpl),
   ])
   const answers = dns.Answer
   requireProof(dns.Status === 0 && !dns.TC && Array.isArray(answers) && answers.length === 1 && answers[0].type === 16
     && answers[0].name?.replace(/\.$/, '').toLowerCase() === anchorName
     && answers[0].data === '"mikka-release-v1=sha256:' + digest(raw) + '"', 'dnsAnchor')
+}
+
+async function liveServingRelease(record, fetchImpl) {
+  const [version, shell] = await Promise.all([
+    publicRead(PRODUCTION_VERSION_URL, 'application/json', fetchImpl),
+    publicRead(new URL('/mikka/en/sign-in', PRODUCTION_VERSION_URL).href, 'text/html', fetchImpl),
+  ])
   requireProof(!version.headers.has('x-vercel-id') && version.headers.has('cf-ray')
     && version.headers.get('x-mikka-gateway-version-sha256') === record.gatewayVersionSha256, 'gatewayVersion')
   const body = await version.json()
@@ -91,9 +99,39 @@ async function liveProof(record, raw, fetchImpl) {
     && url.searchParams.getAll('dpl').length === 1 && url.searchParams.get('dpl') === record.releasePin, 'servedClientPin')
 }
 
+// The protected gateway observer publishes four non-secret identifiers in a
+// terminal job name. GitHub scopes job metadata to the exact original attempt.
+const observationRef = /^actions:([1-9][0-9]{0,15}):([1-9][0-9]{0,15})$/
+async function servingObservation(ref, api) {
+  const [, runId, attempt] = ref
+  const path = '/actions/runs/' + runId + '/attempts/' + attempt
+  const [run, listing] = await Promise.all([githubRead(path, api), githubRead(path + '/jobs?per_page=100', api)])
+  requireProof([run.repository, run.head_repository].every(r => r?.id === 1427517699 && r.full_name === repository && r.fork === false)
+    && run.path === '.github/workflows/cloudflare-app-deploy.yml' && run.head_branch === 'main' && present(run.head_sha, sha)
+    && run.event === 'workflow_dispatch' && run.status === 'completed' && run.conclusion === 'success'
+    && run.actor?.id === ownerId && run.triggering_actor?.id === ownerId
+    && String(run.id) === runId && String(run.run_attempt) === attempt, 'observationRun')
+  requireProof(Array.isArray(listing.jobs) && listing.total_count === listing.jobs.length, 'observationJobs')
+  const completed = job => job.status === 'completed' && job.conclusion === 'success' && job.head_sha === run.head_sha
+    && String(job.run_id) === runId && String(job.run_attempt) === attempt
+  const jobs = listing.jobs.filter(job => job.name?.startsWith('Serving release '))
+  const drivers = listing.jobs.filter(job => job.name === 'deploy-application')
+  requireProof(jobs.length === 1 && drivers.length === 1 && completed(jobs[0]) && completed(drivers[0]), 'observationJobs')
+  const fields = /^Serving release ([a-f0-9]{40}) ([a-f0-9]{40}) ([a-f0-9]{7,12}-[1-9][0-9]*-[1-9][0-9]*) ([a-f0-9]{64})$/.exec(jobs[0].name)
+  requireProof(fields && fields[1].startsWith(fields[3].split('-')[0]) && isValidDeploymentId(fields[3]), 'observationIdentity')
+  requireProof(Number.isFinite(Date.parse(jobs[0].completed_at)), 'observationTime')
+  return { product: fields[1], overlay: fields[2], releasePin: fields[3], gatewayVersionSha256: fields[4], verifiedAt: jobs[0].completed_at }
+}
+
 /** Re-read the original release decision at its issuance and the currently
  * served gateway, shell and DNS. This read-only check grants no release rights. */
 export async function readServingPromotion(pin, {token, fetchImpl=fetch, now=Date.now()}={}) {
+  const observed = observationRef.exec(pin)
+  if (observed) {
+    const record = await servingObservation(observed, { token, fetchImpl })
+    await liveServingRelease(record, fetchImpl)
+    return record
+  }
   const match=/^([1-9][0-9]{0,15})-([a-f0-9]{64})$/.exec(pin)
   requireProof(match,'ownerComment')
   const api={token,fetchImpl}
@@ -120,41 +158,52 @@ export function verifyDesktopPromotedWeb(options) {
 
 async function verifyPromotion(workflow, { env = process.env, fetchImpl = fetch, now = Date.now } = {}) {
   const pin = /^([1-9][0-9]*)-([a-f0-9]{64})$/.exec(env.CLOUDFLARE_RECEIPT ?? '')
-  requireProof(pin && env.GITHUB_REPOSITORY === repository && env.GITHUB_REF === 'refs/heads/main'
+  const observed = observationRef.exec(env.CLOUDFLARE_RECEIPT ?? '')
+  requireProof((pin || observed) && env.GITHUB_REPOSITORY === repository && env.GITHUB_REF === 'refs/heads/main'
     && env.GITHUB_EVENT_NAME === 'workflow_dispatch' && present(env.GITHUB_SHA, sha)
     && present(env.GITHUB_RUN_ID, decimal) && present(env.GITHUB_RUN_ATTEMPT, decimal), 'dispatch')
   const api = { token: env.GITHUB_TOKEN, fetchImpl }
-  const raw = await readOwnerBody(pin[1], pin[2], 'MIKKA_CLOUDFLARE_WEB_PROMOTION_V1\n', api)
-  const record = parsePromotionRecord(raw)
-  requireProof(record.approvalComment !== pin[1] && (workflow === desktopWorkflow || record.product === env.GITHUB_SHA), 'dispatchSource')
-  const [approvalBody, run] = await Promise.all([
-    readOwnerBody(record.approvalComment, record.approvalSha256, 'MIKKA_CUTOVER_ACCEPTANCE_V1', api),
-    githubRead('/actions/runs/' + env.GITHUB_RUN_ID + '/attempts/' + env.GITHUB_RUN_ATTEMPT, api),
-  ])
-  requireProof(/^\r?\n/.test(approvalBody), 'approvalMarker')
-  const approval = JSON.parse(approvalBody)
-  const inventory = approval.evidence?.inventoryAndRollback
-  requireProof(approval.decision === 'approved' && approval.product === record.product && approval.overlay === record.overlay
-    && inventory?.sha256 === record.inventorySha256
-    && /^https:\/\/github\.com\/alexj11324\/mikka-cloud\/issues\/4#issuecomment-[1-9][0-9]*$/.test(inventory?.url), 'approval')
+  let record, raw, until, approval
+  if (observed) {
+    record = await servingObservation(observed, api)
+  } else {
+    raw = await readOwnerBody(pin[1], pin[2], 'MIKKA_CLOUDFLARE_WEB_PROMOTION_V1\n', api)
+    record = parsePromotionRecord(raw)
+    requireProof(record.approvalComment !== pin[1], 'dispatchSource')
+  }
+  requireProof(workflow === desktopWorkflow || record.product === env.GITHUB_SHA, 'dispatchSource')
+  const run = await githubRead('/actions/runs/' + env.GITHUB_RUN_ID + '/attempts/' + env.GITHUB_RUN_ATTEMPT, api)
   requireProof(run.repository?.full_name === repository && run.event === 'workflow_dispatch' && run.path === workflow
     && run.head_sha === env.GITHUB_SHA && run.head_branch === 'main' && String(run.id) === env.GITHUB_RUN_ID
     && String(run.run_attempt) === env.GITHUB_RUN_ATTEMPT, 'runIdentity')
-  const verified = Date.parse(record.verifiedAt), started = Date.parse(run.run_started_at)
-  // GitHub timestamps are second-precision. Bind freshness to this original attempt so
-  // a long native validation can finish without accepting a new dispatch on an old anchor.
-  requireProof(started >= Math.floor(verified / 1000) * 1000 && started <= verified + 600_000
-    && started <= now() && verified <= now(), 'staleDispatch')
-  const from = Date.parse(approval.from), until = Date.parse(approval.until)
-  requireProof(from <= verified && now() < until, 'approvalWindow')
+  if (observed) {
+    requireProof(run.actor?.id === ownerId && run.triggering_actor?.id === ownerId, 'dispatchActor')
+  } else {
+    const approvalBody = await readOwnerBody(record.approvalComment, record.approvalSha256, 'MIKKA_CUTOVER_ACCEPTANCE_V1', api)
+    requireProof(/^\r?\n/.test(approvalBody), 'approvalMarker')
+    approval = JSON.parse(approvalBody)
+    const inventory = approval.evidence?.inventoryAndRollback
+    requireProof(approval.decision === 'approved' && approval.product === record.product && approval.overlay === record.overlay
+      && inventory?.sha256 === record.inventorySha256
+      && /^https:\/\/github\.com\/alexj11324\/mikka-cloud\/issues\/4#issuecomment-[1-9][0-9]*$/.test(inventory?.url), 'approval')
+    const verified = Date.parse(record.verifiedAt), started = Date.parse(run.run_started_at)
+    // GitHub timestamps are second-precision. Bind freshness to this original attempt so
+    // a long native validation can finish without accepting a new dispatch on an old anchor.
+    requireProof(started >= Math.floor(verified / 1000) * 1000 && started <= verified + 600_000
+      && started <= now() && verified <= now(), 'staleDispatch')
+    const from = Date.parse(approval.from)
+    until = Date.parse(approval.until)
+    requireProof(from <= verified && now() < until, 'approvalWindow')
+  }
   if (workflow === desktopWorkflow) {
     const expectedOverlay = env.MIKKA_UI_OVERLAY_SHA || env.EXPECTED_UI_OVERLAY_SHA
     requireProof(!expectedOverlay || expectedOverlay === record.overlay, 'desktopOverlay')
     requireProof(await containsDesktopSource({ ...api, expectedBuild: env.GITHUB_SHA, publicCommit: record.product }), 'desktopSource')
   }
-  await liveProof(record, raw, fetchImpl)
+  if (observed) await liveServingRelease(record, fetchImpl)
+  else await liveProof(record, raw, fetchImpl)
   await assertCurrentMain({ ...api, expectedBuild: record.product })
-  requireProof(now() < until, 'approvalWindow')
+  if (!observed) requireProof(now() < until, 'approvalWindow')
   const result = { product: record.product, releasePin: record.releasePin }
   return workflow === desktopWorkflow ? { ...result, overlay: record.overlay } : result
 }

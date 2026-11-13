@@ -116,15 +116,19 @@ export async function driveResponse(request: Request, operation: Operation, para
         return json({ sha256: blob.sha256, sizeBytes: blob.sizeBytes }, 201)
       }
       const path = z.string().refine(isDrivePath).parse(search.get('path'))
-      const selected = await readDriveVersion(pool, actor, volume.id, search.has('versionId') ? versionId.parse(search.get('versionId')) : volume.headVersionId)
-      const entry = selected.manifest.find(item => item.path === path)
-      if (!entry) throw new DriveError('drive_not_found', 404)
-      const { rows: [blob] } = await pool.query<{ inlineContent: Buffer | null; sizeBytes: number }>(
-        `SELECT "inlineContent","sizeBytes" FROM drive_blobs WHERE "ownerId"=$1 AND sha256=$2`, [actor.ownerId, entry.sha256])
-      if (!blob || blob.sizeBytes !== entry.sizeBytes) throw new DriveError('drive_not_found', 404)
-      if (blob.inlineContent && driveSha256(driveBytes(blob.inlineContent)) !== entry.sha256) throw new DriveError('drive_blob_size_mismatch', 422)
-      const content = blob.inlineContent ? driveBytes(blob.inlineContent) : await readDriveBlobObject(actor.ownerId, entry.sha256, request.signal)
-      return new Response(content, { headers: { ...headers, 'Content-Type': 'application/octet-stream', 'Content-Length': String(entry.sizeBytes),
+      const selectedVersion = search.has('versionId') ? versionId.parse(search.get('versionId')) : volume.headVersionId
+      const { rows: [blob] } = await pool.query<{ sha256: string; inlineContent: Buffer | null; sizeBytes: number }>(
+        `SELECT b.sha256, b."inlineContent", b."sizeBytes"
+         FROM drive_volume_versions v JOIN drive_volumes d ON d.id = v."volumeId"
+         CROSS JOIN LATERAL jsonb_array_elements(v.manifest) AS entry
+         JOIN drive_blobs b ON b.sha256 = entry->>'sha256' AND d."ownerId" = b."ownerId"
+         WHERE v.id = $1 AND v."volumeId" = $2 AND d."ownerId" = $3
+           AND entry->>'path' = $4 AND entry->'sizeBytes' = to_jsonb(b."sizeBytes")
+         LIMIT 1`, [selectedVersion, volume.id, actor.ownerId, path])
+      if (!blob) throw new DriveError('drive_not_found', 404)
+      if (blob.inlineContent && driveSha256(driveBytes(blob.inlineContent)) !== blob.sha256) throw new DriveError('drive_blob_size_mismatch', 422)
+      const content = blob.inlineContent ? driveBytes(blob.inlineContent) : await readDriveBlobObject(actor.ownerId, blob.sha256, request.signal)
+      return new Response(content, { headers: { ...headers, 'Content-Type': 'application/octet-stream', 'Content-Length': String(blob.sizeBytes),
         'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(path.split('/').at(-1)!)}` } })
     })
     // Both the file mutation and its membership lease have finished. The
