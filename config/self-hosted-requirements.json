@@ -1172,6 +1172,20 @@
     "test": "tests/team-visibility.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "lib/inbox/store.ts": {
+    "mode": "built-in",
+    "environment": ["MIKKA_DATABASE_URL"],
+    "behavior": "Read the same authorized pending requests for board cards, inbox rows and badge counts in the selected workspace.",
+    "test": "lib/inbox/store.db.test.ts",
+    "suite": "test:inbox-db"
+  },
+  "lib/task-presentation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Project the viewer's pending Inbox reason into the board's Agent activity mark while preserving the underlying task lifecycle.",
+    "test": "lib/task-presentation.test.ts",
+    "suite": "test:issues"
+  },
   "lib/inbox/client.ts": {
     "mode": "built-in",
     "environment": [],
