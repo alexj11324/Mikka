@@ -29,6 +29,7 @@ let scopedTeamFixture = false
 let workspaceTasksPending = false
 let scopedTasksPending = false
 let scopedTeamPageMutations = 0
+let probeEmbeddedAck = false
 let acknowledgeNewTask: ((id: string) => void) | null = null
 const workspace = () => ({ currentUserId: user.id, workspace: { id: workspaceId, name: 'Fixture', kind: 'team' }, members: [], role: 'admin' })
 const emptyList = { data: { items: [] }, mutate: refreshed }
@@ -88,7 +89,7 @@ for (const [file, names] of [
   ['./thread-column.tsx', ['ThreadColumn']], ['./task-column.tsx', ['TaskColumn']],
   ['../plugins/plugins-view.tsx', ['PluginsPage']], ['../suggestions/suggestion-feed.tsx', ['SuggestionFeed', 'SuggestionsRefresh', 'useSuggestionCount']],
   ['../artifacts/artifact-library.tsx', ['ArtifactLibrary']], ['./legacy-chat-archive.tsx', ['LegacyChatArchive']],
-] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, name === 'useSuggestionCount' ? () => 0 : name === 'BoardPage' ? () => <section data-team-board-visible="" /> : empty])) })
+] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, name === 'useSuggestionCount' ? () => 0 : name === 'BoardPage' ? () => <section data-team-board-visible="">{probeEmbeddedAck && <EmbeddedSaveProbe />}</section> : empty])) })
 // The Team detail fixture exercises acknowledged save/delete callbacks, not a fake list mutation.
 mock.module(new URL('./task-detail.tsx', import.meta.url).href, { namedExports: {
   TaskDetail: ({ id, onSaved, onDeleted }: { id: string; onSaved: (id: string) => void; onDeleted: () => void }) =>
@@ -121,6 +122,11 @@ mock.module('@/components/nav/icon-rail', { namedExports: { IconRail: ({ onSetti
 let useBrowserNotes: typeof import('../browser/browser-notes')['useBrowserNotes']
 let useBrowserNotesComposer: typeof import('../browser/browser-notes')['useBrowserNotesComposer']
 let useConversationPanels: typeof import('../coordinator/conversation-panels')['useConversationPanels']
+let EmbeddedTaskLifecycleContext: typeof import('../coordinator/conversation-panels')['EmbeddedTaskLifecycle']
+function EmbeddedSaveProbe() {
+  const lifecycle = React.useContext(EmbeddedTaskLifecycleContext)
+  return <Button data-embedded-save-ack="" onClick={() => lifecycle?.onSaved('8055a7ae-204f-4045-8780-66b9c93ce232')}>save embedded Task</Button>
+}
 let notes: ReturnType<typeof useBrowserNotes>
 let ComputerConversation: typeof import('../computer/computer-agents')['ComputerConversation']
 let useConversationThread: typeof import('../computer/computer-agents')['useConversationThread']
@@ -170,7 +176,7 @@ before(async () => {
   Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true })
   ;({ createRoot } = await import('react-dom/client'))
   ;({ useBrowserNotes, useBrowserNotesComposer } = await import('../browser/browser-notes'))
-  ;({ useConversationPanels } = await import('../coordinator/conversation-panels'))
+  ;({ useConversationPanels, EmbeddedTaskLifecycle: EmbeddedTaskLifecycleContext } = await import('../coordinator/conversation-panels'))
   ;({ closeReview } = await import('@/hooks/code-review/use-review-page'))
   ;({ ComputerConversation, useConversationThread, useRegisterComputerThread } = await import('../computer/computer-agents'))
   ;({ IssueWorkspace } = await import('./issue-workspace'))
@@ -198,7 +204,7 @@ beforeEach(() => {
   groupList = []
   groupListError = undefined
   groupListRetries = 0
-  scopedTeamFixture = false; workspaceTasksPending = false; scopedTasksPending = false; scopedTeamPageMutations = 0; acknowledgeNewTask = null
+  scopedTeamFixture = false; workspaceTasksPending = false; scopedTasksPending = false; scopedTeamPageMutations = 0; acknowledgeNewTask = null; probeEmbeddedAck = false
   browser.history.replaceState({}, '', '/?workspace=workspace-one')
   browser.localStorage.clear(); browser.sessionStorage.clear()
   notes = null; railMounts = 0; composerMounts = 0; composerUnmounts = 0
@@ -297,6 +303,17 @@ test('a Team detail ACK refreshes its own authorized list after save and deletio
   assert.ok(remove)
   await act(async () => { remove.click() })
   assert.equal(scopedTeamPageMutations, 2, 'an acknowledged deletion must retire the Team page too')
+})
+
+test('an embedded Task save ACK invalidates the same Team page as the full Task detail', async () => {
+  scopedTeamFixture = true
+  probeEmbeddedAck = true
+  browser.history.replaceState({}, '', `/?workspace=${workspaceId}&team=${teamIssuesId}&section=team-issues`)
+  await render({ initialSection: 'team-issues' })
+  const save = container.querySelector<HTMLButtonElement>('[data-embedded-save-ack]')
+  assert.ok(save, 'the embedded Task lifecycle must remain reachable from the official Team frame')
+  await act(async () => { save.click() })
+  assert.equal(scopedTeamPageMutations, 1, 'a successful embedded Task save must invalidate the authorized Team page')
 })
 
 test('a new Team task ACK invalidates the scoped first page before opening its detail', async () => {
