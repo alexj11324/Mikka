@@ -160,7 +160,7 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
   }, [queueCheck])
   const queue = queuedItems(allItems, agent.status === 'busy', now, sentWhileWorking.current)
   const items = queue.length ? allItems.filter(item => !queue.includes(item)) : allItems
-  const lastMessage = items.findLast(item => item.from !== 'event' && !item.pending && !item.welcome)
+  const lastMessage = items.findLast(item => item.from !== 'event' && !item.pending && item.position > 0)
   const lastId = lastMessage?.id ?? (lastMessage ? String(lastMessage.position) : null)
   const acknowledged = useRef<string | null>(null)
   useFocusEffect(useCallback(() => {
