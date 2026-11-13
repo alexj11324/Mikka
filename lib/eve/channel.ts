@@ -98,9 +98,12 @@ export function mikkaEveChannel() {
       const input = z.object({eventId:z.uuid()}).strict().parse(await request.json())
       const { deliverEveEvent } = await import('./submission')
       const {pool} = await import('../db')
-      const event = (await pool.query('SELECT payload FROM coordinator_events WHERE id=$1 AND "userId"=$2 AND "botId"=$3',[input.eventId,scope.ownerId,scope.botId])).rows[0]
+      const event = (await pool.query<{ scheduled: boolean }>(
+        `SELECT coalesce(payload->>'source' = 'schedule_due', false) AS scheduled FROM coordinator_events WHERE id=$1 AND "userId"=$2 AND "botId"=$3`,
+        [input.eventId, scope.ownerId, scope.botId],
+      )).rows[0]
       if (!event) return Response.json({ok:false,error:'notFound'},{status:404})
-      const session = event.payload?.source === 'schedule_due'
+      const session = event.scheduled
         ? (await args.from(conversationAddress(scope)+':schedule:'+input.eventId).create({auth:scopeAuth(scope)})).session
         : await sessionFor(args,scope)
       await registerSession(scope,session.id)

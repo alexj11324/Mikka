@@ -30,13 +30,15 @@ test('eve sessions keep Bot, Workspace, owner and surface authorization after im
       t.mock.property(process, 'env', { ...process.env, MIKKA_API_INGRESS: '', MIKKA_EVE_HOST: '', BETTER_AUTH_SECRET: randomUUID() })
       for (const scheduled of [false, true]) {
         const eventId = randomUUID(), id = 'wrun_' + randomUUID()
+        const report = 'r'.repeat(8192)
         await pool.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload,tier,"deliveredAt")
-          VALUES($1,$2,$3,'run_report',$4,$5,'attention',now())`, [eventId, ownerId, botId, eventId, scheduled ? {source:'schedule_due'} : {}])
+          VALUES($1,$2,$3,'run_report',$4,$5,'attention',now())`, [eventId, ownerId, botId, eventId, scheduled ? {source:'schedule_due', text:report} : {text:report}])
         const queries = t.mock.method(pool, 'query')
         try {
           const session = {
             id,
-            async send(_message: unknown, options: {idempotencyKey: string}) {
+            async send(message: string, options: {idempotencyKey: string}) {
+              assert.ok(message.includes(report), 'delivery includes the complete stored report')
               await assertSessionScope(scope, id)
               assert.equal(options.idempotencyKey, 'mikka-event:' + eventId)
               return { sessionId: id, deliveryId: eventId }
@@ -53,6 +55,13 @@ test('eve sessions keep Bot, Workspace, owner and surface authorization after im
           }), args)
           assert.equal(response.status, 200)
           assert.deepEqual(await response.json(), {ok:true, sessionId:id, deliveryId:eventId})
+          const eventReads = queries.mock.calls.filter(call => /SELECT .* FROM coordinator_events WHERE id=/i.test(String(call.arguments[0])))
+          const rows = await Promise.all(eventReads.map(async call => {
+            const result = await (call.result as unknown as Promise<{rows: unknown[]}>)
+            return JSON.stringify(result.rows)
+          }))
+          assert.equal(rows.filter(row => row.includes(report)).length, 1, 'read the full report only for delivery')
+          t.diagnostic(`Event query result bytes (${scheduled ? 'scheduled' : 'ordinary'}): ${rows.map(row => Buffer.byteLength(row)).join(', ')}`)
           const registrations = queries.mock.calls.filter(call => String(call.arguments[0]).includes('INSERT INTO eve_sessions'))
           assert.equal(registrations.length, 1, scheduled ? 'scheduled ingress' : 'ordinary ingress')
         } finally {
