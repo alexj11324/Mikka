@@ -1,4 +1,4 @@
-import { filterRun } from './records.mjs'
+import { filterHook, filterRun } from './records.mjs'
 import {
   EntityConflictError, HookConflictError, HookNotFoundError,
   RunExpiredError, TooEarlyError, WorkflowRunNotFoundError, WorkflowWorldError,
@@ -12,12 +12,6 @@ function filterStep(step, options) {
   return options?.resolveData === 'none' ? { ...step, input: undefined, output: undefined } : step
 }
 
-function filterHook(hook, options) {
-  if (options?.resolveData !== 'none') return hook
-  const { metadata, ...rest } = hook
-  return rest
-}
-
 function requireRun(run, runId, options) {
   if (!run) throw new WorkflowRunNotFoundError(runId)
   // Node and Worker releases roll independently; an older Worker can still return a full run.
@@ -26,7 +20,7 @@ function requireRun(run, runId, options) {
 
 function requireHook(hook, id, options) {
   if (!hook) throw new HookNotFoundError(id)
-  return filterHook(hook, options)
+  return filterHook(hook, options?.resolveData)
 }
 
 async function page(promise, fn) {
@@ -54,9 +48,9 @@ export function createAdmissionStorage(authority) {
         page(authority.steps(runId, pagination), step => filterStep(step, { resolveData })),
     },
     hooks: {
-      get: async (id, options) => requireHook(await authority.hook(id), id, options),
-      getByToken: async (token, options) => requireHook(await authority.hookByToken(token), token, options),
-      list: (options = {}) => page(authority.hooks(options), hook => filterHook(hook, options)),
+      get: async (id, options) => requireHook(await authority.hook(id, options?.resolveData), id, options),
+      getByToken: async (token, options) => requireHook(await authority.hookByToken(token, options?.resolveData), token, options),
+      list: (options = {}) => page(authority.hooks(options), hook => filterHook(hook, options?.resolveData)),
     },
     events: {
       async create(runId, request, options = {}) {
@@ -74,7 +68,7 @@ export function createAdmissionStorage(authority) {
           if (receipt.event) receipt.event = stripEventDataRefs(receipt.event, options.resolveData ?? 'all')
           if (receipt.run) receipt.run = filterRun(receipt.run, options.resolveData)
           if (receipt.step) receipt.step = filterStep(receipt.step, options)
-          if (receipt.hook) receipt.hook = filterHook(receipt.hook, options)
+          if (receipt.hook) receipt.hook = filterHook(receipt.hook, options.resolveData)
           return receipt
         }
         switch (result.code) {
@@ -91,14 +85,14 @@ export function createAdmissionStorage(authority) {
       },
       async get(runId, id, options = {}) {
         const slot = eventIdToSlot(id)
-        const event = slot === null ? null : await authority.event(runId, slot)
+        const event = slot === null ? null : await authority.event(runId, slot, options.resolveData)
         if (!event) throw new WorkflowWorldError('Workflow event not found', { status: 404 })
         return stripEventDataRefs(event, options.resolveData ?? 'all')
       },
       list: ({ runId, pagination, resolveData = 'all' }) =>
-        page(authority.events(runId, pagination), event => stripEventDataRefs(event, resolveData)),
+        page(authority.events(runId, pagination, undefined, resolveData), event => stripEventDataRefs(event, resolveData)),
       listByCorrelationId: ({ runId, correlationId, pagination, resolveData = 'all' }) =>
-        page(authority.events(runId, pagination, correlationId), event => stripEventDataRefs(event, resolveData)),
+        page(authority.events(runId, pagination, correlationId, resolveData), event => stripEventDataRefs(event, resolveData)),
     },
   }
 }

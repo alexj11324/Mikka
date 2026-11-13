@@ -10,3 +10,9 @@ export function filterRun(run, resolveData) {
   const { dynamicWorkflowCode, ...rest } = run
   return { ...rest, input: undefined, output: undefined }
 }
+
+export function filterHook(hook, resolveData) {
+  if (!hook || resolveData !== 'none') return hook
+  const { metadata, ...rest } = hook
+  return rest
+}
