@@ -20,6 +20,47 @@ test('eve sessions keep Bot, Workspace, owner and surface authorization after im
     for(const owner of [ownerId,other])await pool.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role)VALUES($1,$2,'Owner',$3,'admin')`,[workspaceId,owner,owner+'@example.invalid'])
     for(const [id,owner]of [[botId,ownerId],[otherBot,other]])await pool.query('INSERT INTO bots(id,"ownerId","workspaceId",name)VALUES($1,$2,$3,\'Eve bot fixture\')',[id,owner,workspaceId])
     await registerSession(scope,sessionId)
+    await t.test('event ingress registers its session once before native delivery', async t => {
+      const { mikkaEveChannel } = await import('./channel')
+      const { internalEveAuthorization } = await import('./auth')
+      const { conversationAddress } = await import('./scope')
+      const { routes } = mikkaEveChannel()
+      const route = routes.find(route => route.transport !== 'websocket' && route.path === '/eve/v1/mikka/events')
+      assert.ok(route && route.transport !== 'websocket')
+      t.mock.property(process, 'env', { ...process.env, MIKKA_API_INGRESS: '', MIKKA_EVE_HOST: '', BETTER_AUTH_SECRET: randomUUID() })
+      for (const scheduled of [false, true]) {
+        const eventId = randomUUID(), id = 'wrun_' + randomUUID()
+        await pool.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload,tier,"deliveredAt")
+          VALUES($1,$2,$3,'run_report',$4,$5,'attention',now())`, [eventId, ownerId, botId, eventId, scheduled ? {source:'schedule_due'} : {}])
+        const queries = t.mock.method(pool, 'query')
+        try {
+          const session = {
+            id,
+            async send(_message: unknown, options: {idempotencyKey: string}) {
+              await assertSessionScope(scope, id)
+              assert.equal(options.idempotencyKey, 'mikka-event:' + eventId)
+              return { sessionId: id, deliveryId: eventId }
+            },
+          }
+          const args = {
+            from(address: string) {
+              assert.equal(address, conversationAddress(scope) + (scheduled ? ':schedule:' + eventId : ''))
+              return { create: async () => ({session}) }
+            },
+          } as unknown as Parameters<typeof route.handler>[1]
+          const response = await route.handler(new Request('https://app.example/eve/v1/mikka/events', {
+            method: 'POST', headers: {authorization:internalEveAuthorization(scope)}, body:JSON.stringify({eventId}),
+          }), args)
+          assert.equal(response.status, 200)
+          assert.deepEqual(await response.json(), {ok:true, sessionId:id, deliveryId:eventId})
+          const registrations = queries.mock.calls.filter(call => String(call.arguments[0]).includes('INSERT INTO eve_sessions'))
+          assert.equal(registrations.length, 1, scheduled ? 'scheduled ingress' : 'ordinary ingress')
+        } finally {
+          queries.mock.restore()
+          await pool.query('DELETE FROM coordinator_events WHERE id=$1', [eventId])
+        }
+      }
+    })
     await t.test('known ids grant no cross-owner, cross-Bot or cross-surface access',async()=>{
       await assertSessionScope(scope,sessionId)
       for(const foreign of [{...scope,ownerId:other},{...scope,ownerId:other,botId:otherBot},{...scope,workspaceId:randomUUID()},{...scope,surface:'slack' as const}])await assert.rejects(assertSessionScope(foreign,sessionId))

@@ -12,7 +12,6 @@ const body = z.object({ message: z.unknown().optional(), operationId: z.string()
 
 async function sessionFor(args: RouteHandlerArgs, scope: EveScope) {
   const result = await args.from(conversationAddress(scope)).create({ auth: scopeAuth(scope), history: await priorHistory(scope) })
-  await registerSession(scope, result.session.id)
   return result.session
 }
 
@@ -54,6 +53,7 @@ export function mikkaEveChannel() {
         if (route.method === 'POST' && route.path === '/eve/v1/session') {
           const input = body.parse(await request.clone().json().catch(() => ({})))
           const session = await sessionFor(args,scope)
+          await registerSession(scope,session.id)
           if (input.message === undefined) return Response.json({ ok:true, sessionId:session.id })
           const { operationId: _operation, ...payload } = input
           const submission = request.headers.get('x-mikka-submission-id')
