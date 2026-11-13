@@ -49,6 +49,17 @@ const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, normal: 2, l
 const COMPLETED_DAYS: Record<Completed, number> = { all: Infinity, week: 7, month: 30 }
 const FILTER_FIELDS: FilterField[] = ['status', 'priority', 'assignee', 'creator', 'labels', 'project', 'agentState']
 
+const VIEW_EVENT = 'mikka:board-view'
+
+/** Opens the board in a view from outside it (an old 任务 link opens the list): saved as the person's choice, and applied to a board already on screen. */
+export function showBoardView(view: 'board' | 'list') {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(SETTINGS_KEY) ?? 'null')
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...stored, view }))
+  } catch { /* storage unavailable */ }
+  window.dispatchEvent(new CustomEvent(VIEW_EVENT, { detail: view }))
+}
+
 /** Browser preferences remain durable; named filters belong to the authenticated view scope. */
 function useBoardSettings() {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
@@ -63,6 +74,9 @@ function useBoardSettings() {
         if (legacyFilters !== undefined) window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(preferences))
       }
     } catch { /* storage unavailable */ }
+    const show = (event: Event) => { const view = (event as CustomEvent<'board' | 'list'>).detail; setSettings(current => ({ ...current, view })) }
+    window.addEventListener(VIEW_EVENT, show)
+    return () => window.removeEventListener(VIEW_EVENT, show)
   }, [])
   function update(patch: Partial<typeof DEFAULT_SETTINGS>) {
     setSettings(current => {
