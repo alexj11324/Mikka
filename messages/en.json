@@ -4807,11 +4807,22 @@
         "label": "Public role",
         "hint": "Group chats use this role to choose the bot. Tools still require authorization.",
         "placeholder": "Responsibilities in group chats; leave empty to clear",
-        "count": "{count} / {max}",
         "tooLong": "Public role can be at most {max} characters",
         "loadError": "Public role failed to load",
         "saveError": "Save not confirmed. Your draft is kept.",
-        "saved": "Saved"
+        "saved": "Saved",
+        "add": "Add a public role",
+        "edit": "Edit public role"
+      },
+      "glance": {
+        "running": "{count} in progress",
+        "waiting": "{count} waiting on you",
+        "idle": "Nothing in progress",
+        "prReview": "{count} waiting for review",
+        "prRunning": "{count} in progress",
+        "prNone": "No open PRs",
+        "computerScreen": "View screen",
+        "computerMissing": "Needs an E2B API key"
       },
       "threads": "Threads",
       "tasks": "Tasks",
@@ -6501,7 +6512,7 @@
       "revoked": "Invitation revoked",
       "expired": "Expired",
       "expires": "Expires {date}",
-      "sent": "New invitation links are shown once. Deliver them privately; they are not sent by email yet.",
+      "sent": "Invitation links are shown only once. Copy and share them securely. Configured email delivery is attempted separately and is not confirmed by this response.",
       "copy": "Copy link",
       "copyFailed": "Could not copy the invitation link.",
       "failed": "Invitation request failed."
@@ -7002,6 +7013,20 @@
     "noTasks": "No tasks"
   },
   "HostedInbox": {
+    "dismiss": "Dismiss",
+    "dismissed": "Dismissed",
+    "reason": {
+      "needsReply": "Open the conversation to answer.",
+      "confirm": "Open the conversation to review the request.",
+      "review": "Open the task to review the changes.",
+      "offline": "Reconnect the device, then resume the run.",
+      "quota": "Check the model quota, then resume the run.",
+      "api_key": "Update the model credential, then retry.",
+      "access_denied": "Check the execution identity’s permissions, then retry.",
+      "subscription": "Reconnect the model subscription, then retry.",
+      "blocked": "Open the run to resolve the blocker.",
+      "failed": "Review the run error, then retry."
+    },
     "snoozed": "Snoozed",
     "until": "Remind me at",
     "done": "Done",

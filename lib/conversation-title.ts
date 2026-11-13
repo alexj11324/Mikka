@@ -44,6 +44,8 @@ export function manualConversationTitle(raw: string): string | null {
  */
 export const WRITE_CONVERSATION_TITLE = `UPDATE agent_runs SET title=$1, "titleSource"=$2
   WHERE id=ANY($3::uuid[]) AND "userId"=$4 AND ($5::boolean OR "titleSource" IS DISTINCT FROM 'manual')
+    AND EXISTS (SELECT 1 FROM mikka_workspace_members m WHERE m."workspaceId"=agent_runs."workspaceId"
+      AND m."userId"=agent_runs."userId" AND m.status='active')
     AND (title IS DISTINCT FROM $1 OR "titleSource" IS DISTINCT FROM $2)
   RETURNING id`
 
