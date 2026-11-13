@@ -10,7 +10,11 @@ on:
         description: Reviewed deployment phase; never compiles product source
         type: choice
         required: true
-        options: [stage-all, stage-verify, stage-worlds, stage-task, stage-eve, stage-api, stage-web, stage-sessions, production-reserve, production-eve, production-worlds-prepare, production-api, production-worlds-register, production-web, production-verify, gateway-prepare]
+        options: [stage-all, stage-verify, stage-worlds, stage-task, stage-eve, stage-api, stage-web, stage-sessions, production-reserve, production-eve, production-worlds-prepare, production-api, production-worlds-register, production-web, production-verify, production-migrate-database, gateway-prepare]
+      database_window:
+        description: Existing reviewed database migration window; used only by production-migrate-database
+        type: string
+        required: false
       qualification_run:
         description: Original public Cloud Services qualification run
         type: string
@@ -47,6 +51,7 @@ jobs:
       MIKKA_OPERATIONS_CI_RUN_ATTEMPT: ${{ inputs.qualification_attempt }}
       MIKKA_OPERATIONS_CI_ARTIFACT_ID: ${{ inputs.qualification_artifact }}
       MIKKA_DEPLOYMENT_PHASE: ${{ inputs.phase }}
+      DATABASE_WINDOW: ${{ inputs.database_window }}
       CLOUDFLARE_ACCOUNT_ID: d8f6630c7869111a5139bc5ed4d24ace
     steps:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
