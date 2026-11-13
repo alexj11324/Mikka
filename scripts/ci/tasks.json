@@ -205,7 +205,7 @@
     "env": {}
   },
   "core-43": {
-    "command": "pnpm test:coordinator-issue-tools",
+    "command": "pnpm test:coordinator-issue-mutations",
     "kind": "core",
     "env": {}
   },
