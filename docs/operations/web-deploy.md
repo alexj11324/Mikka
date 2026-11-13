@@ -1,4 +1,8 @@
-# Production web deploy
+# Web deployment: current source contract and legacy compatibility
+
+**Current build ownership:** Official product code and build entry belong to public `Mikka`. A trusted build checks out the exact private UI Overlay under `.hosted-ui` using a limited read-only identity; untrusted public PRs receive neither UI secret nor customer config. See [build source of truth](build-source-of-truth.md).
+
+**Migration status (2026-11-12):** Cloudflare CI builds run, but an interim CF-native OCI publisher is currently launched from the private UI repository. It is not the permanent source-of-truth or evidence of a deployed new product. The current Vercel traffic route and rollback must remain until #1954 authorizes real Cloudflare production cutover.
 
 Company-hosted deployment and credential operations are maintained in the
 [private operations repository](https://github.com/alexj11324/mikka-cloud/blob/main/docs/operations/web-deploy.md).

@@ -537,6 +537,15 @@
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
+  "lib/credentials/runtime-identity.ts": {
+    "mode": "optional-cloud",
+    "environment": [
+      "CREDENTIAL_RUNTIME",
+      "CREDENTIAL_ENVIRONMENT"
+    ],
+    "behavior": "Community installations leave Cloudflare runtime selection unset. Configured Cloudflare runtimes require an explicit environment and obtain a bounded identity token through the private service binding.",
+    "test": "lib/credentials/runtime-identity.test.mjs"
+  },
   "lib/enterprise/live-store.ts": {
     "mode": "built-in",
     "environment": [],
@@ -978,9 +987,21 @@
   "services/credential-broker/server.mjs": {
     "mode": "optional-cloud",
     "environment": [
-      "PORT"
+      "PORT",
+      "CREDENTIAL_RUNTIME"
     ],
-    "behavior": "The standalone broker is outside the standard Compose stack. When deployed separately its listen port is configurable and credential handlers enforce caller identity.",
+    "behavior": "The standalone broker is outside the standard Compose stack. Its configured runtime selects the private Cloudflare fill transport or the authenticated Vercel handlers, and its listen port is configurable.",
+    "test": "services/credential-broker/server.test.mjs",
+    "suite": "test:self-hosted-broker"
+  },
+  "services/credential-broker/src/fill.ts": {
+    "mode": "optional-cloud",
+    "environment": [
+      "MIKKA_DATABASE_URL",
+      "CREDENTIAL_RUNTIME",
+      "CREDENTIAL_ENVIRONMENT"
+    ],
+    "behavior": "The separately deployed broker uses its configured PostgreSQL database for credential leases. The Vercel handler verifies caller identity, and the private Cloudflare transport requires an explicit runtime environment before validating the bounded lease request.",
     "test": "services/credential-broker/server.test.mjs",
     "suite": "test:self-hosted-broker"
   },

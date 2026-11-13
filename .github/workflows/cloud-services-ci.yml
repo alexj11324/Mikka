@@ -1,0 +1,48 @@
+name: Cloud Services qualification
+on:
+  workflow_dispatch:
+    inputs:
+      cloud_source_sha:
+        description: Pinned Cloud Services source commit SHA
+        type: string
+        required: true
+permissions:
+  contents: read
+jobs:
+  qualify:
+    if: github.repository == 'alexj11324/Mikka' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: cloudflare-runtime-release
+    env:
+      MIKKA_CLOUD_SOURCE_SHA: ${{ inputs.cloud_source_sha }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.22.1
+      - name: Prepare the qualification toolchain
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.34.3 --activate
+          docker version
+      - name: Qualify the pinned Cloud Services source
+        env:
+          MIKKA_CLOUD_READ_TOKEN: ${{ secrets.MIKKA_CLOUD_READ_TOKEN }}
+        run: node scripts/cloudflare-cloud-ci.mjs build
+      - name: Verify the Cloud Services qualification
+        run: node scripts/cloudflare-cloud-ci.mjs verify
+      - name: Publish the qualified Cloud Services artifact
+        env:
+          CF_RUNTIME_REGISTRY_USERNAME: ${{ vars.CF_RUNTIME_REGISTRY_USERNAME }}
+          CF_RUNTIME_REGISTRY_PASSWORD: ${{ secrets.CF_RUNTIME_REGISTRY_PASSWORD }}
+        run: node scripts/cloudflare-cloud-ci.mjs publish
+      - name: Upload the qualification receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cloud-services-ci-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/cloud-services-ci-receipt/receipt.json
+          if-no-files-found: error
+          retention-days: 1

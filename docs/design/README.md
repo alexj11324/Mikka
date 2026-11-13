@@ -16,9 +16,7 @@ says which source wins when two disagree, and where each kind of rule lives.
    which products set the precedent.
 5. [`orchestration.md`](orchestration.md): models, Agents, machines,
    scheduling, credentials in runs and who pays.
-6. [`decisions/`](decisions/README.md) (one file per decision) and the frozen
-   [`decisions.md`](decisions.md): what Alex decided, when, and what it
-   replaced. Check it before you reopen a question.
+6. [`decisions/`](decisions/README.md): read the **applicable latest, non-superseded** decision when a behavior is disputed. The frozen [`decisions.md`](decisions.md) is historical context, **not** a live instruction source.
 7. The accepted Figma frames for your feature (listed in `decisions/` or `decisions.md`).
 8. [`../review-checklist.md`](../review-checklist.md): run it before you show UI
    to anyone.
@@ -32,7 +30,7 @@ source is now out of date and who owns it.
 
 | # | Source | Decides |
 | --- | --- | --- |
-| 1 | Alex's latest explicit decision, once it is in `decisions/` (or the frozen `decisions.md`) | Anything it names |
+| 1 | Alex's latest explicit decision, reflected in current `AGENTS.md`, active design rules and current source | Anything it names; historical decision records never override a later decision |
 | 2 | `glossary.md` | Words and the bot / chat / thread model |
 | 3 | `rules.md` | Product and visual rules |
 | 4 | A Figma draft Alex is reviewing now | Layout: what goes where, sizes, order, grouping |
@@ -46,7 +44,7 @@ change ([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-as-shipped.md)).
 
 Notes:
 
-- A Figma frame counts only if `decisions/` or `decisions.md` lists it as accepted. Frames on
+- A Figma frame counts only if an active decision or the approved current design lists it as accepted. Frames on
   the 「归档」 page, or marked 已废弃, never count.
 - Figma decides layout, not look. Comma decides the look of Mikka's own UI. Old Figma frames use
   zinc greys; the tokens in `rules.md` win.

@@ -5,6 +5,7 @@ import { apiRequest } from './request.mjs'
 import { applicationEnvironment } from './environment.mjs'
 import { configureTaskBridge, taskMachine } from './task-machine.mjs'
 import { businessWorkflowDelivery, businessWorldRequest, eveServiceRequest, publicWorkflowDispatch } from './services.mjs'
+import { brokerRequest, identityRequest } from '../../credential-identity/transport.mjs'
 export { ContainerProxy } from '@cloudflare/containers'
 
 export class BusinessApi extends Container {
@@ -15,7 +16,15 @@ export class BusinessApi extends Container {
   constructor(ctx, env) {
     super(ctx, env)
     this.envVars = applicationEnvironment(env)
-    if (env.EVE_SERVICE || env.BUSINESS_WORLD) this.envVars.NODE_EXTRA_CA_CERTS = '/etc/cloudflare/certs/cloudflare-containers-ca.crt'
+    if (env.EVE_SERVICE || env.BUSINESS_WORLD || env.CREDENTIAL_IDENTITY) this.envVars.NODE_EXTRA_CA_CERTS = '/etc/cloudflare/certs/cloudflare-containers-ca.crt'
+    if (env.CREDENTIAL_IDENTITY || env.CREDENTIAL_BROKER) {
+      if (!env.CREDENTIAL_IDENTITY || !env.CREDENTIAL_BROKER) throw new Error('CREDENTIAL_API_CONFIGURATION_INVALID')
+      this.envVars.CREDENTIAL_RUNTIME = 'cloudflare'
+      for (const name of ['CREDENTIAL_ENVIRONMENT', 'CREDENTIAL_APP_ROLE_ARN', 'CREDENTIAL_KMS_KEY_ARN', 'AWS_REGION']) {
+        if (typeof env[name] !== 'string' || !env[name]) throw new Error('CREDENTIAL_API_CONFIGURATION_INVALID')
+        this.envVars[name] = env[name]
+      }
+    }
     if (env.EVE_SERVICE) this.envVars.MIKKA_EVE_ORIGIN = 'https://eve.internal'
     if (env.BUSINESS_WORLD) {
       this.envVars.WORKFLOW_TARGET_WORLD = '/app/world-business.mjs'
@@ -31,6 +40,8 @@ export class BusinessApi extends Container {
   }
 
   async configurePrivateHttps() {
+    if (this.env.CREDENTIAL_IDENTITY) await this.ctx.container.interceptOutboundHttps('identity.internal', this.ctx.exports.CredentialIdentityOutbound)
+    if (this.env.CREDENTIAL_BROKER) await this.ctx.container.interceptOutboundHttps('broker.internal', this.ctx.exports.CredentialBrokerOutbound)
     if (this.env.WORKERS_AI) await bindWorkersAi(this.ctx, this.envVars)
     if (this.env.EVE_SERVICE) await this.ctx.container.interceptOutboundHttps('eve.internal', this.ctx.exports.EveOutbound)
     if (this.env.BUSINESS_WORLD) await this.ctx.container.interceptOutboundHttps('world.internal',
@@ -50,6 +61,16 @@ export class BusinessApi extends Container {
 
 export class WorkersAiOutbound extends WorkerEntrypoint {
   fetch(request) { return workersAiRequest(request, this.env.WORKERS_AI, this.ctx.props.capability) }
+}
+
+export class CredentialIdentityOutbound extends WorkerEntrypoint {
+  fetch(request) { return identityRequest(request, this.env.CREDENTIAL_IDENTITY) }
+}
+
+export class CredentialBrokerOutbound extends WorkerEntrypoint {
+  fetch(request) {
+    return brokerRequest(request, forwarded => this.env.CREDENTIAL_BROKER.fetch(forwarded))
+  }
 }
 
 export class EveOutbound extends WorkerEntrypoint {

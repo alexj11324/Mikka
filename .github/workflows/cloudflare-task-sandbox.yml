@@ -1,5 +1,23 @@
 name: Cloudflare task workspace
 on:
+  workflow_dispatch:
+    inputs:
+      api_run_id:
+        description: Accepted API publication run ID
+        type: string
+        required: true
+      api_run_attempt:
+        description: Accepted API publication run attempt
+        type: string
+        required: true
+      api_image_digest:
+        description: Accepted API image digest
+        type: string
+        required: true
+      overlay_sha:
+        description: Accepted UI Overlay commit SHA
+        type: string
+        required: true
   pull_request:
     paths: &task_workspace_paths
       - 'cloudflare/task-sandbox/**'
@@ -26,6 +44,7 @@ permissions:
   contents: read
 jobs:
   workspace:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -68,3 +87,82 @@ jobs:
             python3 -c "import sys;sys.path[:0]=[\"/opt/mikka/preview\",\"/opt/mikka/runtime/preview-python-3.14.0\"];import aiohttp,preview_firewall;assert aiohttp.__version__ == \"3.14.0\""
             python3 -I /opt/mikka/review-guest-image.test.py
           '
+  publish:
+    if: github.repository == 'alexj11324/Mikka' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: cloudflare-runtime-release
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Prepare the source-bound runtime release
+        env:
+          API_RUN_ID: ${{ inputs.api_run_id }}
+          API_RUN_ATTEMPT: ${{ inputs.api_run_attempt }}
+          API_IMAGE_DIGEST: ${{ inputs.api_image_digest }}
+          OVERLAY_SHA: ${{ inputs.overlay_sha }}
+          MIKKA_API_RECEIPT: ${{ secrets.MIKKA_API_RECEIPT }}
+          CF_RUNTIME_REGISTRY_USERNAME: ${{ vars.CF_RUNTIME_REGISTRY_USERNAME }}
+          CF_RUNTIME_REGISTRY_PASSWORD: ${{ secrets.CF_RUNTIME_REGISTRY_PASSWORD }}
+        run: node scripts/cloudflare-runtime-release.mjs prepare task
+      - run: npm ci --ignore-scripts --prefix cloudflare/task-sandbox
+      - run: node --test cloudflare/task-sandbox/*.test.mjs
+      - run: python3 cloudflare/task-sandbox/native-history.test.py
+      - name: Verify the task image and both repository-pinned official CLIs offline
+        run: |
+          docker build --platform linux/amd64 -f cloudflare/task-sandbox/Dockerfile --label "org.opencontainers.image.revision=$MIKKA_BUILD_REVISION" --label "com.mikka.overlay=$MIKKA_UI_OVERLAY_SHA" --label "com.mikka.release=$MIKKA_DEPLOYMENT_ID" -t mikka-task-sandbox .
+          image_id=$(docker image inspect --format '{{.Id}}' mikka-task-sandbox)
+          echo "RUNTIME_TESTED_IMAGE_ID=$image_id" >> "$GITHUB_ENV"
+          docker run --rm --network none --cap-drop ALL --security-opt=no-new-privileges \
+            --user 1000:1000 --entrypoint sh mikka-task-sandbox -ec '
+              test -w /workspace
+              test -x /usr/local/bin/sandbox-shim
+              test -x /usr/bin/unshare
+              test -x /usr/bin/setpriv
+              /usr/bin/python3 -I -c "import ast, os, signal, sys; assert os.pidfd_open and signal.pidfd_send_signal; [ast.parse(open(p).read()) for p in sys.argv[1:]]" /opt/mikka/task-sandbox/*.py
+              test -s /opt/mikka/worker/packages/daemon/dist/cloud/cloud-worker.js
+              test -r /opt/mikka/worker/.mikka-original-cli.json
+              node --version
+              git --version
+              claude --version
+              codex --version
+            '
+      - name: Verify the product image isolates every review listener before restoring a task
+        run: |
+          docker run --rm --network none --cap-add NET_ADMIN \
+            --mount "type=bind,source=$PWD/cloudflare/task-sandbox/review-guest-image.test.py,target=/opt/mikka/review-guest-image.test.py,readonly" \
+            --entrypoint sh mikka-task-sandbox -ec '
+            export PYTHONDONTWRITEBYTECODE=1
+            python3 -I /opt/mikka/runtime/ingress-v1/guard.py prepare-cloudflare
+            python3 -I /opt/mikka/task-sandbox/workspace-control-install.py --cloudflare-task
+            test "$(stat -c %u:%g:%a /run/mikka-review-control/machine.lock)" = 0:1000:660
+            python3 -I /opt/mikka/runtime/ingress-v1/guard.py verify
+            python3 -c "import sys;sys.path[:0]=[\"/opt/mikka/preview\",\"/opt/mikka/runtime/preview-python-3.14.0\"];import aiohttp,preview_firewall;assert aiohttp.__version__ == \"3.14.0\""
+            python3 -I /opt/mikka/review-guest-image.test.py
+          '
+      - name: Tag the verified task runtime for release
+        run: docker tag mikka-task-sandbox "mikka-native-task:$MIKKA_DEPLOYMENT_ID"
+      - name: Publish the verified runtime image
+        env:
+          API_RUN_ID: ${{ inputs.api_run_id }}
+          API_RUN_ATTEMPT: ${{ inputs.api_run_attempt }}
+          API_IMAGE_DIGEST: ${{ inputs.api_image_digest }}
+          OVERLAY_SHA: ${{ inputs.overlay_sha }}
+          MIKKA_API_RECEIPT: ${{ secrets.MIKKA_API_RECEIPT }}
+          CF_RUNTIME_REGISTRY_USERNAME: ${{ vars.CF_RUNTIME_REGISTRY_USERNAME }}
+          CF_RUNTIME_REGISTRY_PASSWORD: ${{ secrets.CF_RUNTIME_REGISTRY_PASSWORD }}
+        run: node scripts/cloudflare-runtime-release.mjs publish task
+      - name: Upload the runtime OCI receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: runtime-task-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/runtime-task-receipt.json
+          if-no-files-found: error
+          retention-days: 1
+      - name: Remove the temporary Registry credentials
+        if: always()
+        run: node scripts/cloudflare-runtime-release.mjs cleanup
