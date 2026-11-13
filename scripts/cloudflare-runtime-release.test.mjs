@@ -154,7 +154,10 @@ test('runtime workflow callers pass genuine API run identity and keep the Regist
     assert.ok(workflow.includes('API_RUN_ATTEMPT: ${{ inputs.api_run_attempt }}'))
     assert.ok(workflow.includes('node scripts/load-cloudflare-api-receipt.mjs'))
     assert.ok(!workflow.includes('secrets.MIKKA_API_RECEIPT'))
-    assert.ok(workflow.includes('CF_RUNTIME_REGISTRY_USERNAME: ${{ vars.CF_RUNTIME_REGISTRY_USERNAME }}'))
+    assert.ok(workflow.includes('CF_RUNTIME_REGISTRY_USERNAME: ${{ steps.registry-read.outputs.username }}'))
+    assert.ok(workflow.includes('CF_RUNTIME_REGISTRY_USERNAME: ${{ steps.registry.outputs.username }}'))
+    assert.ok(!workflow.includes('secrets.CF_RUNTIME_REGISTRY_PASSWORD'))
+    assert.ok(workflow.includes("github.actor_id == '183887963' && github.triggering_actor == 'alexj11324'"))
     assert.ok(!workflow.includes('api_build_uuid'))
     assert.ok(!workflow.includes('secrets.CF_RUNTIME_REGISTRY_USERNAME'))
   }

@@ -74,10 +74,15 @@ jobs:
         run: node scripts/cloudflare-cloud-ci.mjs build
       - name: Verify the Cloud Services qualification
         run: node scripts/cloudflare-cloud-ci.mjs verify
+      - name: Issue a short-lived Registry publication credential
+        id: registry
+        uses: ./.github/actions/cloudflare-registry-credentials
+        with:
+          mode: publish
       - name: Publish the qualified Cloud Services artifact
         env:
-          CF_RUNTIME_REGISTRY_USERNAME: ${{ vars.CF_RUNTIME_REGISTRY_USERNAME }}
-          CF_RUNTIME_REGISTRY_PASSWORD: ${{ secrets.CF_RUNTIME_REGISTRY_PASSWORD }}
+          CF_RUNTIME_REGISTRY_USERNAME: ${{ steps.registry.outputs.username }}
+          CF_RUNTIME_REGISTRY_PASSWORD: ${{ steps.registry.outputs.password }}
         run: node scripts/cloudflare-cloud-ci.mjs publish
       - name: Upload the qualification receipt
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

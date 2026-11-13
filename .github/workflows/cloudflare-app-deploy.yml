@@ -10,7 +10,7 @@ on:
         description: Reviewed deployment phase; never compiles product source
         type: choice
         required: true
-        options: [stage-all, stage-verify, stage-worlds, stage-task, stage-eve, stage-api, stage-web, stage-sessions, production-reserve, production-eve, production-worlds-prepare, production-api, production-worlds-register, production-web, production-verify]
+        options: [stage-all, stage-verify, stage-worlds, stage-task, stage-eve, stage-api, stage-web, stage-sessions, production-reserve, production-eve, production-worlds-prepare, production-api, production-worlds-register, production-web, production-verify, gateway-prepare]
       qualification_run:
         description: Original public Cloud Services qualification run
         type: string
@@ -165,6 +165,4 @@ jobs:
         working-directory: operations
         env:
           GH_TOKEN: ${{ steps.source-token.outputs.token }}
-          CF_RUNTIME_REGISTRY_USERNAME: ${{ vars.CF_RUNTIME_REGISTRY_USERNAME }}
-          CF_RUNTIME_REGISTRY_PASSWORD: ${{ secrets.CF_RUNTIME_REGISTRY_PASSWORD }}
         run: node operations/public-release.mjs
