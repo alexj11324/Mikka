@@ -27,7 +27,7 @@ type Props = {
 
 /** Both entry points use the workspace's owned Bots and the same persistent message transport. */
 export function NewGroupDialog({ purpose, open, onOpenChange, workspaceId, bots, onCreated, onNewBot, onReviewGroups }: Props) {
-  const t = useTranslations(purpose ? 'Shell.newConversation' : 'Shell.newGroup')
+  const t = useTranslations(purpose ? 'Shell.createConversation' : 'Shell.newGroup')
   const common = useTranslations('Common')
   const [title, setTitle] = useState('')
   const [picked, setPicked] = useState<string[]>([])

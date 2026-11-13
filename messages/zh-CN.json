@@ -145,7 +145,7 @@
     }
   },
   "Nav": {
-    "newConversation": "新建对话",
+    "startConversation": "新建对话",
     "switchLanguage": "切换语言",
     "workspaceAll": "{name} 全部任务",
     "tagline": "任务与文档",
@@ -4732,7 +4732,7 @@
       "create": "创建",
       "creating": "正在创建…"
     },
-    "newConversation": {
+    "createConversation": {
       "title": "新建对话",
       "name": "对话名称",
       "bots": "选择 Bot（首选 Bot 负责回复）",

@@ -145,7 +145,7 @@
     }
   },
   "Nav": {
-    "newConversation": "New conversation",
+    "startConversation": "New conversation",
     "switchLanguage": "Switch language",
     "workspaceAll": "{name} — all tasks",
     "tagline": "Tasks and documents",
@@ -4732,7 +4732,7 @@
       "create": "Create",
       "creating": "Creating…"
     },
-    "newConversation": {
+    "createConversation": {
       "title": "New conversation",
       "name": "Conversation name",
       "bots": "Choose Bots (first selected leads)",
