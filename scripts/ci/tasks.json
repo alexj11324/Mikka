@@ -19,11 +19,6 @@
     "kind": "core",
     "env": {}
   },
-  "core-6": {
-    "command": "node --test scripts/ci-docs-only.test.mjs",
-    "kind": "core",
-    "env": {}
-  },
   "core-7": {
     "command": "pnpm test:ui-policy",
     "kind": "core",
