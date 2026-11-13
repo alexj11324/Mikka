@@ -14,7 +14,7 @@ import type { LucideIcon, LucideProps } from 'lucide-react'
 
 /** Drawn where a lucide icon is, so it takes the same props; lucide's own sizing props are not SVG attributes. */
 function statusIcon(name: string, draw: () => React.ReactNode): LucideIcon {
-  const Icon = forwardRef<SVGSVGElement, LucideProps>(({ size: _size, absoluteStrokeWidth: _absolute, strokeWidth: _strokeWidth, ...props }, ref) =>
+  const Icon = forwardRef<SVGSVGElement, LucideProps>(({ size: _size, absoluteStrokeWidth: _absolute, ...props }, ref) =>
     <svg ref={ref} viewBox="0 0 12 12" width="24" height="24" fill="none" aria-hidden="true" {...props}>{draw()}</svg>)
   Icon.displayName = name
   return Icon
