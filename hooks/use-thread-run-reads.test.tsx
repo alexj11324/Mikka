@@ -9,6 +9,7 @@ mock.module(new URL('../app/actions/artifacts.ts', import.meta.url).href, { name
   listRunArtifacts: async (runId: string) => { calls.push('artifacts:' + runId); return [{ title: 'artifacts-' + epoch }] },
 } })
 mock.module(new URL('../app/actions/agents.ts', import.meta.url).href, { namedExports: {
+  getThreadChanges: async () => ({ state: 'none' }),
   getThreadMachine: async (issueId: string, runId: string) => { calls.push('machine:' + issueId + ':' + runId); return { name: 'machine-' + epoch } },
 } })
 
