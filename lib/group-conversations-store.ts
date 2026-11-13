@@ -75,7 +75,8 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         FROM conversations c JOIN conversation_members cm ON cm."conversationId"=c.id AND cm."memberType"='user' AND cm."memberId"=$1 AND cm."leftAt" IS NULL
         LEFT JOIN conversation_reads r ON r."conversationId"=c.id::text AND r."userId"=$1
         LEFT JOIN LATERAL (SELECT to_jsonb(m) || jsonb_build_object('position', m.position::text) AS message FROM conversation_messages m WHERE m."conversationId"=c.id ORDER BY position DESC LIMIT 1) last ON true
-        WHERE c.kind='group' AND ($2::uuid IS NULL OR c."workspaceId"=$2) ORDER BY c."createdAt" DESC,c.id DESC`, [userId, req.workspaceId ?? null])
+        WHERE c.kind='group' AND (c."creationPurpose"<>'conversation' OR c."createdBy"=$1)
+          AND ($2::uuid IS NULL OR c."workspaceId"=$2) ORDER BY c."createdAt" DESC,c.id DESC`, [userId, req.workspaceId ?? null])
       const accessible = []
       for (const row of rows) if (await directory(row.workspaceId, userId, [])) accessible.push(row)
       result = { conversations: accessible, viewerId: userId, workspaceId: req.workspaceId ?? null }

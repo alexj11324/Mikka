@@ -218,6 +218,47 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     assert.equal((await conversationSidebar(pool, 'other', workspaceId))[bot], undefined)
     assert.deepEqual((await conversationDirectory(pool, 'other', workspaceId, named)).items, [])
     assert.deepEqual((await conversationDirectory(pool, 'owner', foreignWorkspace, named)).items, [])
+    const { standaloneOrganization, renameStandalone, regenerateStandalone } = await import('@/lib/standalone-chat-controls')
+    const change = (field: 'pinned' | 'archived', value: boolean) => standaloneOrganization(pool, id, 'owner', workspaceId, { field, value })
+    assert.deepEqual(await change('pinned', true), { pinned: true, archived: false })
+    assert.equal((await conversationDirectory(pool, 'owner', workspaceId, named)).items[0].id, id)
+    assert.deepEqual(await change('archived', true), { pinned: true, archived: true })
+    assert.deepEqual((await conversationDirectory(pool, 'owner', workspaceId, named)).items.map(row => row.id), [multiId])
+    assert.deepEqual((await conversationDirectory(pool, 'owner', workspaceId, { ...named, archived: true })).items.map(row => row.id), [id])
+    assert.deepEqual(await change('archived', false), { pinned: true, archived: false })
+    assert.deepEqual(await change('pinned', false), { pinned: false, archived: false })
+    assert.equal(await renameStandalone(pool, id, 'other', workspaceId, 'unowned'), undefined)
+    assert.equal(await standaloneOrganization(pool, id, 'owner', foreignWorkspace), null)
+    const revised = await regenerateStandalone(pool, id, 'owner', workspaceId, async (actor, body, scope) => {
+      assert.equal(actor, 'owner')
+      assert.equal(scope, workspaceId)
+      assert.equal(body.body, 'Keep this first message')
+      return 'Generated chat'
+    })
+    assert.deepEqual(revised, { title: 'Generated chat', regenerated: true })
+    await regenerateStandalone(pool, id, 'owner', workspaceId, async () => {
+      await renameStandalone(pool, id, 'owner', workspaceId, 'Manual chat')
+      return 'Stale answer'
+    })
+    assert.deepEqual(await regenerateStandalone(pool, id, 'owner', workspaceId, async () => null), { title: 'Manual chat', regenerated: false })
+    assert.equal(await regenerateStandalone(pool, id, 'other', workspaceId, async () => { throw Error('unauthorized model call') }), null)
+    // The sidebar, header and archive filter use the same idle clock for a named chat.
+    await pool.query(`UPDATE user_preferences SET "archiveIdleAfterDays"=3 WHERE "userId"='owner'`)
+    await pool.query(`UPDATE conversations SET "createdAt"=now()-interval '10 days',"conversationRestoredAt"=NULL WHERE id=$1`, [id])
+    await pool.query(`UPDATE conversation_messages SET "createdAt"=now()-interval '10 days' WHERE "conversationId"=$1`, [id])
+    await pool.query(`UPDATE group_turns SET status='complete' WHERE "conversationId"=$1`, [id])
+    const visibleInSidebar = async () => (await conversationSidebar(pool,'owner',workspaceId))[bot]?.items.some(row => row.id === id) ?? false
+    assert.deepEqual(await standaloneOrganization(pool,id,'owner',workspaceId), {archived:true,pinned:false})
+    assert.equal(await visibleInSidebar(), false)
+    assert.deepEqual(await change('pinned',true), {archived:false,pinned:true})
+    assert.equal(await visibleInSidebar(), true)
+    assert.deepEqual(await change('archived',true), {archived:true,pinned:true})
+    assert.equal(await visibleInSidebar(), false)
+    assert.deepEqual(await change('archived',false), {archived:false,pinned:true})
+    assert.deepEqual(await change('pinned',false), {archived:false,pinned:false})
+    assert.equal(await visibleInSidebar(), true)
+
+
     assert.deepEqual((await pool.query(`SELECT "botId" FROM coordinator_bots WHERE "ownerId"='owner' AND "workspaceId"=$1`, [workspaceId])).rows, [{ botId: bot }])
 
     // Regenerate is the person asking for a generated title again.

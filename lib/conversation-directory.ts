@@ -65,11 +65,12 @@ function conversationQuery() {
   ), named_chats AS (
     SELECT 'chat'::text AS kind,c.id,c.title,NULL::text AS "agentName",NULL::text AS harness,
       NULL::uuid AS "issueId",NULL::text AS identifier,NULL::text AS "taskTitle",NULL::text AS status,
-      NULL::text AS "runStatus",false AS pinned,activity.touched,NULL::text AS source, c.title AS asked,
+      NULL::text AS "runStatus",(c."conversationPinnedAt" IS NOT NULL) AS pinned,activity.touched,NULL::text AS source, c.title AS asked,
       CASE WHEN turn.status IN ('running','queued') THEN 'working' WHEN turn.status='failed' THEN 'failed' ELSE 'idle' END AS state,
       to_char(activity.touched AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at,
-      (coalesce(pref."archiveIdleAfterDays",30)>0 AND coalesce(turn.status,'idle') NOT IN ('running','queued','failed')
-        AND activity.touched<now()-coalesce(pref."archiveIdleAfterDays",30)*interval '1 day') AS archived
+      (c."conversationArchivedAt" IS NOT NULL OR (c."conversationPinnedAt" IS NULL AND coalesce(pref."archiveIdleAfterDays",30)>0
+        AND coalesce(turn.status,'idle') NOT IN ('running','queued','failed')
+        AND greatest(activity.touched,c."conversationRestoredAt")<now()-coalesce(pref."archiveIdleAfterDays",30)*interval '1 day')) AS archived
     FROM conversations c JOIN conversation_members cm ON cm."conversationId"=c.id AND cm."memberType"='user'
       AND cm."memberId"=${owner} AND cm."leftAt" IS NULL
     JOIN mikka_workspace_members wm ON wm."userId"=${owner} AND wm."workspaceId"=c."workspaceId" AND wm.status='active'
@@ -79,6 +80,13 @@ function conversationQuery() {
     CROSS JOIN LATERAL (SELECT greatest(c."createdAt",last."createdAt") AS touched) activity
     WHERE c."workspaceId"=${workspace} AND c."createdBy"=${owner} AND c."creationPurpose"='conversation' AND c.kind='group'
   )`
+}
+
+export async function effectiveStandaloneOrganization(database: RunChainQueryable, owner: string, workspace: string, id: string) {
+  const result = await database.query(conversationQuery() + ' SELECT archived,pinned FROM named_chats WHERE id=$' + (facts.params.length+4),
+    [...facts.params,owner,workspace,RUN_CHAIN_MAX_DEPTH,id])
+  const row=result.rows[0]
+  return row ? { archived:Boolean(row.archived), pinned:Boolean(row.pinned) } : null
 }
 
 export async function effectiveConversationArchive(database: RunChainQueryable, userId: string, workspaceId: string, rootId: string) {
