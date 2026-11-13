@@ -713,7 +713,8 @@ export class Daemon {
           // within the protocol bound even when input and notices arrive together.
           const ids = [...this.unacked].slice(0, 500)
           const refused = [...this.refusedSteers].slice(0, 500)
-          await link.ackCommands(deviceId, ids, refused)
+          if (refused.length) await link.ackCommands(deviceId, ids, refused)
+          else await link.ackCommands(deviceId, ids)
           for (const id of ids) this.unacked.delete(id)
           for (const id of refused) this.refusedSteers.delete(id)
         }
@@ -820,7 +821,8 @@ export class Daemon {
     while ((this.unacked.size > 0 || this.refusedSteers.size > 0) && !signal.aborted) {
       const ids = [...this.unacked].slice(0, 500)
       const refused = [...this.refusedSteers].slice(0, 500)
-      await this.options.link.ackCommands(deviceId, ids, refused)
+      if (refused.length) await this.options.link.ackCommands(deviceId, ids, refused)
+      else await this.options.link.ackCommands(deviceId, ids)
       for (const id of ids) this.unacked.delete(id)
       for (const id of refused) this.refusedSteers.delete(id)
     }
