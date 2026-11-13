@@ -150,6 +150,8 @@ MIKKA_EMAIL_FROM=Mikka <mikka@example.com>
 SMTP_URL=smtps://username:password@smtp.example.com:465
 ```
 
+Organization invitation links remain available for manual sharing by default. Only enable best-effort invitation email with `MIKKA_ORG_INVITE_EMAIL_ENABLED=true` after configuring the sender and the canonical application origin, and after approving mail usage. This does not send invitations to an attached Workspace or Project, does not guarantee mailbox delivery, and does not replace the one-time copyable link.
+
 Use your own Google or GitHub OAuth clients. Register callbacks on your exact origin:
 
 | Provider | Environment | Callback |

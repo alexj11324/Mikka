@@ -10,10 +10,9 @@ const space = `[${whitespace}]`
 const markdownPrefix = `^(?:#{1,6}${space}+|>${space}*|[-*+]${space}+|[0-9]+[.)]${space}+)+`
 const markdownMarks = '(\\*\\*|__|' + String.fromCharCode(96) + '|~~)'
 
-/** Exactly threadName's first meaningful plain line, before its agent-name fallback.
- * A character count in UTF-8 PostgreSQL is the code-point count used by Array.from. */
+/** A bounded first meaningful line. projectIssueThreads applies the shared six-word / CJK limit. */
 const title = sql<string | null>`(
-  select case when char_length(clean.line)>60 then left(clean.line,59)||'…' else clean.line end
+  select left(clean.line,400)
   from string_to_table(${runTaskPrompt}, E'\\n') with ordinality as raw(line, position)
   cross join lateral (select btrim(regexp_replace(
     regexp_replace(btrim(raw.line, ${whitespace}), ${markdownPrefix}, ''),
@@ -34,7 +33,7 @@ const summary = sql<string | null>`coalesce(
 export function issueThreadListText(viewerId: string) {
   return {
     failureDetails: runFailureBrief,
-    name: sql<string>`case when ${agentRuns.userId}=${viewerId} then coalesce(${title}, ${runBotName}) else '' end`,
+    name: sql<string>`case when ${agentRuns.userId}=${viewerId} then coalesce(${agentRuns.title}, ${title}, ${runBotName}) else '' end`,
     summary: sql<string | null>`case when ${agentRuns.userId}=${viewerId} then ${summary} end`,
   }
 }

@@ -4795,11 +4795,22 @@
         "label": "公开职责",
         "hint": "群聊按此公开职责选择 Bot；工具仍需授权。",
         "placeholder": "在群聊中负责的工作；留空可清除",
-        "count": "{count} / {max}",
         "tooLong": "公开职责最多 {max} 个字",
         "loadError": "公开职责加载失败",
         "saveError": "保存未确认，修改已保留。",
-        "saved": "已保存"
+        "saved": "已保存",
+        "add": "添加公开职责",
+        "edit": "编辑公开职责"
+      },
+      "glance": {
+        "running": "{count} 个进行中",
+        "waiting": "{count} 个等你处理",
+        "idle": "没有进行中的任务",
+        "prReview": "{count} 个等待审查",
+        "prRunning": "{count} 个进行中",
+        "prNone": "没有打开的 PR",
+        "computerScreen": "查看屏幕",
+        "computerMissing": "需要 E2B API Key"
       },
       "threads": "线程",
       "tasks": "任务",
@@ -6489,7 +6500,7 @@
       "revoked": "已撤销邀请",
       "expired": "已过期",
       "expires": "到期时间：{date}",
-      "sent": "邀请链接仅显示一次，需私下发送；当前尚未通过邮件自动投递。",
+      "sent": "邀请链接仅显示一次，请安全复制与分享。已配置的邮件投递会另行尝试，但此响应不代表邮件已送达。",
       "copy": "复制链接",
       "copyFailed": "未能复制邀请链接。",
       "failed": "无法创建邀请。"
@@ -6990,6 +7001,20 @@
     "noTasks": "没有任务"
   },
   "HostedInbox": {
+    "dismiss": "忽略",
+    "dismissed": "已忽略",
+    "reason": {
+      "needsReply": "打开对话回答问题。",
+      "confirm": "打开对话审核请求。",
+      "review": "打开任务审查更改。",
+      "offline": "重新连接设备后继续运行。",
+      "quota": "检查模型额度后继续运行。",
+      "api_key": "更新模型凭据后重试。",
+      "access_denied": "检查执行身份的权限后重试。",
+      "subscription": "重新连接模型订阅后重试。",
+      "blocked": "打开运行记录处理阻碍。",
+      "failed": "查看运行错误后重试。"
+    },
     "snoozed": "稍后处理",
     "until": "提醒时间",
     "done": "已完成",
