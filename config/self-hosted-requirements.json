@@ -962,6 +962,13 @@
     "test": "lib/inbox/store.db.test.ts",
     "suite": "test:inbox-db"
   },
+  "lib/task-work-read.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Task work exposes only the current member's authorized Factory receipts for the same task and workspace.",
+    "test": "lib/task-work-read.test.ts",
+    "suite": "test:factory-activity"
+  },
   "lib/task-workspace.ts": {
     "mode": "built-in",
     "environment": [],

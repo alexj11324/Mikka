@@ -1,6 +1,6 @@
 'use client'
 
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useMessages, useTranslations } from 'next-intl'
 import { ChevronRight, GitPullRequest, MessagesSquare } from 'lucide-react'
 import type { FactoryActivityView } from '@/lib/factory/activity'
 import { type IssueThread, threadQuestionView } from '@/lib/issue-threads'
@@ -32,17 +32,17 @@ export function TaskWorkSection({ threads, pulls, factory, open }: {
 }) {
   const t = useTranslations('IssueDetail.work')
   const tThread = useTranslations('IssueThreads')
-  const tGroup = useTranslations('GroupTask')
+  const messages = useMessages()
   const format = useFormatter()
-  const states = t.raw('states') as Record<string, string>
+  const states: Record<string, string> = messages.IssueDetail.work.states
   const resultLabel = useRunResultLabel()
   const conversations = threads
   const linked = linkedPulls(pulls, factory)
   const progress = taskFactoryProgress(presentedFactoryEvents(factory?.events, factory?.task.id))
   if (!conversations.length && !linked.length && !progress.length) return null
   const byRun = new Map(conversations.flatMap(thread => [thread.id, ...thread.attempts.map(attempt => attempt.runId)].map(id => [id, thread] as const)))
-  const labelStage = (stage: string) => (tGroup.raw('stage') as Record<string, string>)[stage] ?? stage
-  const labelStatus = (status: string) => (tGroup.raw('status') as Record<string, string>)[status] ?? status
+  const labelStage = (stage: string) => (messages.GroupTask.stage as Record<string, string>)[stage] ?? stage
+  const labelStatus = (status: string) => (messages.GroupTask.status as Record<string, string>)[status] ?? status
   return <section aria-label={t('heading')} className="my-4 space-y-1" data-slot="task-work">
     <h2 className="mb-2 text-sm font-semibold">{t('heading')}</h2>
     {conversations.map(thread => {
