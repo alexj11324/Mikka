@@ -10,6 +10,7 @@ import { withFactoryBackgroundWorkspace } from './factory/background-workspace'
 type QueueRow = {
   id: string
   requestId: string
+  requestedRunId: string
   runId: string
   rootRunId: string
   userId: string
@@ -23,38 +24,39 @@ type QueueRow = {
 
 const isActive = (status?: string) => UNFINISHED_RUN_STATUSES.some(value => value === status)
 
-export async function readQueuedReplyReceipt(pool: Pool, userId: string, chain: RunChain, text: string, requestId: string) {
-  const id = factoryEventId('thread-queue', JSON.stringify([userId, requestId]))
+export async function readQueuedReplyReceipt(pool: Pool, userId: string, chain: RunChain, text: string, requestId: string, requestedRunId: string) {
+  const id = factoryEventId('thread-queue', JSON.stringify([userId, requestId.toLowerCase()]))
   const { rows: [row] } = await pool.query<QueueRow>('SELECT * FROM thread_queued_messages WHERE id=$1 AND "userId"=$2', [id, userId])
   if (!row) return null
   return withFactoryBackgroundWorkspace(pool, userId, { kind: 'run', id: row.runId }, async () => {
-    if (row.text !== text || row.rootRunId !== chain.rootRunId) throw new ActionFailureError('submissionConflict')
+    if (row.text !== text || row.rootRunId !== chain.rootRunId || row.requestedRunId !== requestedRunId) throw new ActionFailureError('submissionConflict')
     return { runId: row.runId, continued: false }
   })
 }
 
-export async function queueThreadReply(pool: Pool, userId: string, chain: RunChain, text: string, requestId: string) {
-  const id = factoryEventId('thread-queue', JSON.stringify([userId, requestId]))
+export async function queueThreadReply(pool: Pool, userId: string, chain: RunChain, text: string, requestId: string, requestedRunId: string) {
+  const id = factoryEventId('thread-queue', JSON.stringify([userId, requestId.toLowerCase()]))
   return withFactoryBackgroundWorkspace(pool, userId, { kind: 'run', id: chain.latestRunId }, async () => {
     const client = await pool.connect()
     try {
       await client.query('BEGIN')
+      const dispatchId = factoryEventId('thread-submission', JSON.stringify([userId, requestId.toLowerCase()]))
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))', [dispatchId])
       const { rows: [run] } = await client.query<{ status: string; workspaceId: string; stopRequestedAt: Date | null; issueId: string | null; deviceRepoId: string | null }>(
         'SELECT status,"workspaceId","stopRequestedAt","issueId","deviceRepoId" FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [chain.latestRunId, userId])
       if (!run) throw new ActionFailureError('runNotFound')
       // A replay can arrive after the original anchor finished. Match its
       // immutable request first, so it does not start a second execution.
-      const dispatchId = factoryEventId('thread-submission', JSON.stringify([userId, requestId]))
       const previous = await client.query('SELECT id FROM coordinator_events WHERE id=$1 AND "userId"=$2', [dispatchId, userId])
       if (previous.rowCount) throw new ActionFailureError('submissionConflict')
       const { rows: [saved] } = await client.query<QueueRow>(
         'SELECT * FROM thread_queued_messages WHERE id=$1 AND "userId"=$2', [id, userId])
-      if (saved && (saved.rootRunId !== chain.rootRunId || saved.workspaceId !== run.workspaceId || saved.text !== text))
+      if (saved && (saved.rootRunId !== chain.rootRunId || saved.workspaceId !== run.workspaceId || saved.text !== text || saved.requestedRunId !== requestedRunId))
         throw new ActionFailureError('submissionConflict')
       if (!saved && (!run.issueId || !run.deviceRepoId)) throw new ActionFailureError('threadDeliveryUnavailable')
       if (!saved && (!isActive(run.status) || run.stopRequestedAt)) throw new ActionFailureError('threadStopping')
-      if (!saved) await client.query(`INSERT INTO thread_queued_messages(id,"userId","workspaceId","rootRunId","runId",text,"requestId")
-        VALUES($1,$2,$3,$4,$5,$6,$7)`, [id, userId, run.workspaceId, chain.rootRunId, chain.latestRunId, text, requestId])
+      if (!saved) await client.query(`INSERT INTO thread_queued_messages(id,"userId","workspaceId","rootRunId","runId",text,"requestId","requestedRunId")
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, [id, userId, run.workspaceId, chain.rootRunId, chain.latestRunId, text, requestId, requestedRunId])
       await client.query('COMMIT')
       if (!saved) await runChanged(pool, chain.latestRunId)
       return { runId: saved?.runId ?? chain.latestRunId, continued: false }

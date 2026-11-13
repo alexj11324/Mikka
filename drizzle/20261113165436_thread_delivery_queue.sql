@@ -3,6 +3,7 @@
 CREATE TABLE IF NOT EXISTS thread_queued_messages (
   id uuid PRIMARY KEY,
   "requestId" uuid NOT NULL,
+  "requestedRunId" uuid NOT NULL,
   "userId" text NOT NULL,
   "workspaceId" uuid NOT NULL,
   "rootRunId" uuid NOT NULL,
@@ -15,6 +16,8 @@ CREATE TABLE IF NOT EXISTS thread_queued_messages (
   "createdAt" timestamptz NOT NULL DEFAULT clock_timestamp(),
   "failureCode" text,
   FOREIGN KEY ("rootRunId","userId") REFERENCES agent_runs(id,"userId") ON DELETE CASCADE,
+  UNIQUE ("userId", "requestId"),
+  FOREIGN KEY ("requestedRunId","userId") REFERENCES agent_runs(id,"userId") ON DELETE CASCADE,
   FOREIGN KEY ("runId","userId") REFERENCES agent_runs(id,"userId") ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS thread_queued_messages_pending

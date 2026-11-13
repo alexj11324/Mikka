@@ -38,9 +38,9 @@ export async function sendThreadMessage(userId: string, runId: string, text: str
   const active = UNFINISHED_RUN_STATUSES.some(status => status === chain.attempts.at(-1)?.status)
   if (delivery === 'queue' && requestId) {
     const { queueThreadReply, readQueuedReplyReceipt } = await import('./thread-delivery-queue')
-    const receipt = await readQueuedReplyReceipt(pool, userId, chain, parsed.data.text, requestId)
+    const receipt = await readQueuedReplyReceipt(pool, userId, chain, parsed.data.text, requestId, parsed.data.runId)
     if (receipt) return receipt
-    if (active) return queueThreadReply(pool, userId, chain, parsed.data.text, requestId)
+    if (active) return queueThreadReply(pool, userId, chain, parsed.data.text, requestId, parsed.data.runId)
   }
   if (delivery && !requestId) throw new ActionFailureError('validationGeneric')
   if (parsed.data.requestId) {

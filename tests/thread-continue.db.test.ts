@@ -447,6 +447,8 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     const req = randomUUID()
     await Promise.all([push('Later, one.',req), push('Later, one.',req)])
     await assert.rejects(push('Changed.',req), { code: 'submissionConflict' })
+    await assert.rejects(sendThreadMessage(owner.id, run, 'Later, one.', 'user', req, 'interrupt'), { code: 'submissionConflict' })
+    assert.deepEqual(await sendThreadMessage(owner.id, run, 'Later, one.', 'user', req.toUpperCase(), 'queue'), { runId: run, continued: false })
     await push('Later, two.')
     const view = await threadDeliveryView(appPool, owner.id, run, run)
     assert.deepEqual(view.queued.map(row => row.text), ['Later, one.', 'Later, two.'])
@@ -467,6 +469,24 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     assert.equal(await deliverQueuedThreadReply(appPool, owner.id, run), true)
     assert.equal((await pool.query('SELECT status FROM thread_queued_messages WHERE id=$1',[view.queued[1].id])).rows[0].status, 'sent')
     assert.equal((await pool.query('SELECT COUNT(*)::int AS n FROM run_messages WHERE "userId"=$1 AND text=$2', [owner.id, 'Later, two.'])).rows[0].n, 1)
+  })
+
+  await t.test('concurrent immediate and queued requests with the same ID commit one intent', async () => {
+    const owner = await person()
+    const initial = await steps.dispatchRun(owner.id, { issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }
+    const requestId = randomUUID(), text = 'Same client request from two windows.'
+    const results = await Promise.allSettled([
+      sendThreadMessage(owner.id, initial.runId, text, 'user', requestId, 'queue'),
+      sendThreadMessage(owner.id, initial.runId, text, 'user', requestId),
+    ])
+    assert.equal(results.filter(result => result.status === 'fulfilled').length, 1)
+    const rejected = results.find(result => result.status === 'rejected')
+    assert.equal(rejected?.reason.code, 'submissionConflict')
+    const { rows: [counts] } = await pool.query(`SELECT
+      (SELECT count(*) FROM coordinator_events WHERE "userId"=$1 AND payload#>>'{threadSubmission,requestId}'=$2::text)
+      + (SELECT count(*) FROM thread_queued_messages WHERE "userId"=$1 AND "requestId"=$2::uuid) AS total`,
+    [owner.id, requestId])
+    assert.equal(Number(counts.total), 1)
   })
 
   await t.test('an ordinary owned live message is acknowledged once even after its run ends', async () => {
