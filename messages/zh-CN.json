@@ -4379,6 +4379,10 @@
     "copyFailed": "复制失败"
   },
   "ConversationDirectory": {
+    "archiveIdle": "闲置对话自动归档",
+    "archiveDays": "{days} 天",
+    "archiveOff": "关闭",
+    "viewAll": "查看全部",
     "title": "对话",
     "search": "搜索对话",
     "all": "全部",

@@ -8,7 +8,7 @@ import { orderMigrations } from '../scripts/migration-order.mjs'
 import { dropTestDatabase } from './support/drop-test-database'
 import { groupDirectory } from '../lib/group-conversations-directory'
 import { handleGroup, type GroupRequest } from '../lib/group-conversations-store'
-import { conversationDirectory } from '../lib/conversation-directory'
+import { conversationDirectory, conversationSidebar } from '../lib/conversation-directory'
 import { conversationOrganization } from '../lib/conversation-organization'
 import { nameConversation, renameConversationTitle } from '../lib/conversation-title-server'
 
@@ -130,6 +130,34 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
 
     const unlinked = await run({ prompt: 'Needle question' })
     await pool.query(`UPDATE agent_runs SET "issueId"=NULL, "createdAt"=now()-interval '60 days' WHERE id=$1`, [unlinked])
+    const botId=randomUUID(), otherBot=randomUUID()
+    for (const id of [botId,otherBot]) await pool.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1::uuid,'owner',$2,$3)`,[id,workspaceId,'QA '+id])
+    const historical=Array.from({length:50},()=>randomUUID())
+    await pool.query(`INSERT INTO agent_runs(id,"userId","workspaceId","agentId","botId",status,prompt,"createdAt","updatedAt")
+      SELECT id,'owner',$2,$3,$4,CASE n WHEN 3 THEN 'waiting_input' WHEN 4 THEN 'running' ELSE 'succeeded' END,
+        'sidebar '||n,now()-n*interval '1 day',now()-n*interval '1 day'
+      FROM unnest($1::uuid[]) WITH ORDINALITY input(id,n)`,[historical,workspaceId,agentId,botId])
+    // The old pin, an explicit question and a live Run outrank newer idle rows.
+    await organize(historical[48],'pinned',true)
+    await organize(historical[0],'archived',true)
+    const sidebar=async()=> (await conversationSidebar(pool,'owner',workspaceId))[botId]
+    const firstPage=await sidebar()
+    assert.equal(firstPage.items.length,8); assert.equal(firstPage.more,true)
+    assert.deepEqual(firstPage.items.slice(0,3).map(row=>row.id),[historical[48],historical[2],historical[3]])
+    assert.ok(!firstPage.items.some(row=>row.id===historical[0]))
+    const filtered=async(archived=false)=>(await conversationDirectory(pool,'owner',workspaceId,{botId,archived})).items
+    assert.ok((await filtered(true)).some(row=>row.id===historical[49]),'a 50-day idle row is automatically archived')
+    assert.equal((await conversationOrganization(pool,'owner',workspaceId,historical[49]))?.archived,true)
+    await organize(historical[49],'archived',false)
+    assert.ok((await filtered()).some(row=>row.id===historical[49]),'restore restarts the idle clock')
+    await pool.query(`INSERT INTO user_preferences ("userId","archiveIdleAfterDays") VALUES ('owner',0)
+      ON CONFLICT ("userId") DO UPDATE SET "archiveIdleAfterDays"=0`)
+    assert.equal((await filtered()).length,49,'off keeps all 49 manually unarchived rows')
+    assert.equal((await conversationDirectory(pool,'owner',workspaceId,{botId:otherBot})).items.length,0)
+    assert.deepEqual(await conversationSidebar(pool,'other',workspaceId),{})
+    await pool.query(`UPDATE user_preferences SET "archiveIdleAfterDays"=3 WHERE "userId"='owner'`)
+    assert.equal((await sidebar()).more,false,'three days hides old idle work but preserves pinned/live/restored rows')
+    await pool.query(`UPDATE user_preferences SET "archiveIdleAfterDays"=30 WHERE "userId"='owner'`)
     const search = { search: 'needle' }
     const directory = await conversationDirectory(pool, 'owner', workspaceId, search)
     assert.deepEqual(directory.items.map(row => [row.id, row.issueId, row.title, row.state]), [[unlinked, null, 'Needle question', 'working']])
@@ -144,9 +172,9 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     assert.deepEqual((await conversationDirectory(pool, 'owner', workspaceId, search)).items, [])
     assert.equal((await conversationDirectory(pool, 'owner', workspaceId, { ...search, archived: true })).items[0].id, unlinked)
 
-    const bot = randomUUID(), secondBot = randomUUID(), otherBot = randomUUID()
+    const bot = randomUUID(), secondBot = randomUUID(), unownedChatBot = randomUUID()
     await pool.query(`INSERT INTO bots (id,"ownerId","workspaceId",name)
-      VALUES ($1,'owner',$4,'Coordinator'), ($2,'owner',$4,'Writer'), ($3,'other',$4,'Private')`, [bot, secondBot, otherBot, workspaceId])
+      VALUES ($1,'owner',$4,'Coordinator'), ($2,'owner',$4,'Writer'), ($3,'other',$4,'Private')`, [bot, secondBot, unownedChatBot, workspaceId])
     await pool.query(`INSERT INTO coordinator_bots ("ownerId","workspaceId","botId") VALUES ('owner',$1,$2)`, [workspaceId, bot])
     const authorized = groupDirectory({
       async activeUsers(space, ids) {
@@ -164,7 +192,7 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
       purpose: 'conversation', workspaceId: space, title: 'Named independent chat', leadBotId: ids[0],
       members: ids.map(memberId => ({ memberType: 'bot', memberId })),
     }) })
-    for (const bad of [await createChat([otherBot]), await createChat([bot], foreignWorkspace)]) assert.equal(bad.status, 404)
+    for (const bad of [await createChat([unownedChatBot]), await createChat([bot], foreignWorkspace)]) assert.equal(bad.status, 404)
     const simple = await createChat([bot]), multi = await createChat([bot, secondBot])
     assert.equal(simple.status, 201)
     assert.equal(multi.status, 201)
@@ -182,6 +210,8 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     assert.deepEqual(new Set(namedPage.items.map(row => row.id)), new Set([id, multiId]))
     assert.ok(namedPage.items.every(row => row.kind === 'chat' && row.issueId === null))
     assert.deepEqual((await conversationDirectory(pool, 'owner', workspaceId, { ...named, botId: secondBot })).items.map(row => row.id), [multiId])
+    assert.deepEqual((await conversationSidebar(pool, 'owner', workspaceId))[secondBot].items.map(row => [row.kind, row.id]), [['chat', multiId]])
+    assert.equal((await conversationSidebar(pool, 'other', workspaceId))[bot], undefined)
     assert.deepEqual((await conversationDirectory(pool, 'other', workspaceId, named)).items, [])
     assert.deepEqual((await conversationDirectory(pool, 'owner', foreignWorkspace, named)).items, [])
     assert.deepEqual((await pool.query(`SELECT "botId" FROM coordinator_bots WHERE "ownerId"='owner' AND "workspaceId"=$1`, [workspaceId])).rows, [{ botId: bot }])
