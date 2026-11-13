@@ -98,11 +98,12 @@ async function deliver(message, env) {
       entry.key ? entry.key.slice('eve-queue/'.length) : await bodyDigest(entry.body), business ? 'business' : 'eve'),
     body: body?.body ?? entry.body, duplex: 'half',
   }))
-  try {
-    if (!response.ok || response.headers.get('x-mikka-eve-release') !== entry.revision) {
-      throw new Error('Pinned Eve deployment did not acknowledge delivery')
-    }
-  } finally { await response.body?.cancel() }
+  // The executor returns its acknowledgement after handling the delivery.
+  // Discarding its unused body cannot change that outcome.
+  await response.body?.cancel().catch(() => {})
+  if (!response.ok || response.headers.get('x-mikka-eve-release') !== entry.revision) {
+    throw new Error('Pinned Eve deployment did not acknowledge delivery')
+  }
 }
 
 /** A failed message retains its original envelope for Cloudflare's bounded

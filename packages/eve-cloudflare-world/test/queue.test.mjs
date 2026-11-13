@@ -10,6 +10,7 @@ import { build } from 'esbuild'
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import { withSessionControlDelivery } from '../../../lib/eve/session-control-delivery.mjs'
 import { createNodeQueue } from '../src/node-queue.mjs'
+import { consumeWorldQueue } from '../src/queue-transport.mjs'
 import { WORKFLOW_FLOW_ROUTE } from '@workflow/world/queue.js'
 
 const require = createRequire(import.meta.url)
@@ -79,6 +80,29 @@ test('a delayed previous-revision message reaches only its signed Node executor 
   expect(seen.filter(x => x.message.id === id).map(x => [x.revision, x.meta.messageId, x.meta.attempt])).toEqual([
     [revisions[0], messageId, 1], [revisions[0], messageId, 2],
   ])
+})
+
+test('a response-body reset cannot change the pinned executor acknowledgement', async () => {
+  const revision = revisions[1]
+  for (const [status, returnedRevision, accepted] of [
+    [200, revision, true], [503, revision, false], [200, revisions[0], false],
+  ]) {
+    const outcome = []
+    const message = {
+      body: { revision, dueAt: 0, body: '{}' },
+      attempts: 2,
+      ack() { outcome.push('ack') },
+      retry(options) { outcome.push(options) },
+    }
+    const env = { EVE_RELEASES: { [revision]: 'TARGET' }, EVE_QUEUE_SIGNING_KEY: signingKey,
+      TARGET: { fetch() {
+        const body = new ReadableStream({ start(controller) { controller.error(new Error('response reset')) } })
+        return new Response(body, { status, headers: { 'x-mikka-eve-release': returnedRevision } })
+      } },
+    }
+    await consumeWorldQueue({ messages: [message] }, env)
+    expect(outcome).toEqual(accepted ? ['ack'] : [{ delaySeconds: 2 }])
+  }
 })
 
 test('a payload larger than the native queue message limit is preserved through R2', async () => {
