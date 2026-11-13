@@ -6,6 +6,8 @@ on:
       - '.github/workflows/cloud-services-ci.yml'
       - 'scripts/cloudflare-ci*'
       - 'scripts/cloudflare-cloud-ci*'
+      - 'scripts/cloudflare-registry-credentials*'
+      - '.github/actions/cloudflare-registry-credentials/**'
       - 'scripts/cloudflare-native-oci*'
       - 'scripts/cloudflare-runtime-release*'
       - 'scripts/load-cloudflare-api-receipt*'
@@ -31,8 +33,11 @@ jobs:
         with:
           node-version: 24
       - name: Verify public API and runtime provenance without credentials
-        run: node --test scripts/cloudflare-ci.test.mjs scripts/cloudflare-native-oci.test.mjs scripts/cloudflare-cloud-ci.test.mjs scripts/cloudflare-runtime-release.test.mjs scripts/load-cloudflare-api-receipt.test.mjs lib/deployment-id.test.mjs
+        run: node --test scripts/cloudflare-ci.test.mjs scripts/cloudflare-native-oci.test.mjs scripts/cloudflare-cloud-ci.test.mjs scripts/cloudflare-runtime-release.test.mjs scripts/cloudflare-registry-credentials.test.mjs scripts/load-cloudflare-api-receipt.test.mjs lib/deployment-id.test.mjs
   publish:
+    permissions:
+      contents: read
+      id-token: write
     if: github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor_id == '183887963' && github.triggering_actor == 'alexj11324'
     runs-on: ubuntu-latest
     environment: cloudflare-runtime-release
@@ -62,11 +67,16 @@ jobs:
           API_PUBLIC_BUILD_SETTINGS: ${{ secrets.API_PUBLIC_BUILD_SETTINGS }}
           HOSTED_UI_READ_KEY: ${{ secrets.HOSTED_UI_READ_KEY }}
         run: node scripts/cloudflare-native-oci.mjs prepare
+      - name: Issue a short-lived Registry publication credential
+        id: registry
+        uses: ./.github/actions/cloudflare-registry-credentials
+        with:
+          mode: publish
       - name: Verify the source checkout and publish the API image
         env:
           HOSTED_UI_READ_KEY: ${{ secrets.HOSTED_UI_READ_KEY }}
-          CF_RUNTIME_REGISTRY_USERNAME: ${{ vars.CF_RUNTIME_REGISTRY_USERNAME }}
-          CF_RUNTIME_REGISTRY_PASSWORD: ${{ secrets.CF_RUNTIME_REGISTRY_PASSWORD }}
+          CF_RUNTIME_REGISTRY_USERNAME: ${{ steps.registry.outputs.username }}
+          CF_RUNTIME_REGISTRY_PASSWORD: ${{ steps.registry.outputs.password }}
         run: |
           node scripts/cloudflare-ci.mjs verify
           node scripts/cloudflare-native-oci.mjs publish
