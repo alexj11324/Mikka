@@ -55,8 +55,7 @@ export function useCoordinatorSubmit(agent?: Pick<UseEveAgentReturn, 'send'>) {
       await acceptTaskDelivery(operation, async () => {
         if (agent) await agent.send(trimmed, options)
         else {
-          const { session } = await coordinatorAgentClient(context?.botId ?? null).sessions.create()
-          await session.send(trimmed, options)
+          await coordinatorAgentClient(context?.botId ?? null).sessions.create({ message: trimmed, ...options })
         }
       })
       let task: DispatchedTaskReceipt | null = null
