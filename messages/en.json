@@ -6457,7 +6457,7 @@
       "revoked": "Invitation revoked",
       "expired": "Expired",
       "expires": "Expires {date}",
-      "sent": "New invitation links are shown once. Deliver them privately; they are not sent by email yet.",
+      "sent": "Invitation links are shown only once. Copy and share them securely. Configured email delivery is attempted separately and is not confirmed by this response.",
       "copy": "Copy link",
       "copyFailed": "Could not copy the invitation link.",
       "failed": "Invitation request failed."
