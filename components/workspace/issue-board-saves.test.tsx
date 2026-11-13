@@ -22,7 +22,7 @@ mock.module('@/app/actions/issue-metadata', { namedExports: { updateIssueMetadat
 mock.module('@/components/blocks/kanban-board-1/components/kanban-board', { namedExports: { KanbanBoard: () => null } })
 
 const window = new Window()
-let root: Root, host: HTMLDivElement
+let root: Root
 let useSaves: typeof import('./issue-board')['useIssueBoardSaves']
 let saves: ReturnType<typeof useSaves>
 before(async () => {
@@ -33,10 +33,9 @@ before(async () => {
 beforeEach(async () => {
   read.mock.resetCalls(); move.mock.resetCalls(); refresh.mock.resetCalls(); error.mock.resetCalls()
   read.mock.mockImplementation(lost); move.mock.mockImplementation(lost)
-  host = document.createElement('div'); document.body.append(host)
-  root = (await import('react-dom/client')).createRoot(host)
+  root = (await import('react-dom/client')).createRoot(document.body)
 })
-afterEach(async () => { await act(async () => root.unmount()); host.remove() })
+afterEach(async () => { await act(async () => root.unmount()) })
 after(() => window.happyDOM.close())
 async function mount(blocked = false) {
   const blocks = new Map<string, TaskBlock>(blocked ? [[task.id, { reason: 'run' }]] : [])
@@ -60,7 +59,7 @@ test('a dropped reply reads back one committed status without a second write or 
   assert.deepEqual(read.mock.calls.map(call => call.arguments), [[task.id]])
   assert.equal(move.mock.callCount(), 1); assert.equal(refresh.mock.callCount(), 1)
   assert.equal(saves.columns.todo[0].revision, 7); assert.equal(saves.columns.doing.length, 0)
-  assert.equal(host.textContent, 'changeVerified'); assert.equal(error.mock.callCount(), 0)
+  assert.equal(document.body.textContent, 'changeVerified'); assert.equal(error.mock.callCount(), 0)
 })
 
 for (const [name, readback] of Object.entries({
@@ -73,7 +72,7 @@ for (const [name, readback] of Object.entries({
   await mount()
   assert.equal(await drop('todo'), false)
   assert.equal(move.mock.callCount(), 1); assert.equal(refresh.mock.callCount(), 1)
-  assert.equal(error.mock.calls[0].arguments[0], 'saveUnconfirmed'); assert.equal(host.textContent, 'saveUnconfirmed')
+  assert.equal(error.mock.calls[0].arguments[0], 'saveUnconfirmed'); assert.equal(document.body.textContent, 'saveUnconfirmed')
 })
 
 test('leaving Blocked requires both the status and the cleared block for this run', async () => {
