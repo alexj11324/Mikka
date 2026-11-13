@@ -61,6 +61,13 @@ test('eve sessions keep Bot, Workspace, owner and surface authorization after im
         }
       }
     })
+    await t.test('a message composed under a different browser account is refused before its input is persisted', async () => {
+      const { acceptEveMessage } = await import('./submission')
+      const request = new Request('https://mikka.example.invalid/eve/v1/session/' + sessionId)
+      await assert.rejects(acceptEveMessage(scope, 'Wrong account', { expectedOwnerId: other }, request), /workspaceAccessDenied/)
+      const messages = await pool.query('SELECT 1 FROM coordinator_messages WHERE "userId"=$1 AND "botId"=$2', [ownerId, botId])
+      assert.equal(messages.rowCount, 0)
+    })
     await t.test('known ids grant no cross-owner, cross-Bot or cross-surface access',async()=>{
       await assertSessionScope(scope,sessionId)
       for(const foreign of [{...scope,ownerId:other},{...scope,ownerId:other,botId:otherBot},{...scope,workspaceId:randomUUID()},{...scope,surface:'slack' as const}])await assert.rejects(assertSessionScope(foreign,sessionId))

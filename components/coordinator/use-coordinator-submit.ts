@@ -37,13 +37,20 @@ export function useCoordinatorSubmit(agent?: Pick<UseEveAgentReturn, 'send'>) {
   const submit = useCallback(async (text: string, context?: CoordinatorMessageContext, requestId?: string): Promise<SubmitOutcome> => {
     const trimmed = text.trim()
     if (!trimmed || trimmed.length > 10_000) return { kind: 'rejected', error: 'messageRequired' }
-    // The cookie's current account owns the operation key, including after an account switch in another tab.
-    const { data, error } = await authClient.getSession({ query: { disableCookieCache: true } })
-    if (error) return { kind: 'uncertain' }
-    if (!data?.user.id || context?.expectedOwnerId && context.expectedOwnerId !== data.user.id) return { kind: 'authRequired' }
+    // Mounted chat sends its captured owner with the message. Eve checks that owner
+    // against the authenticated caller before admission. Receipt-only retries and
+    // callers without a captured owner still need the current browser identity.
+    const capturedOwner = agent && !context?.taskCommand ? context?.expectedOwnerId : undefined
+    let ownerId = capturedOwner
+    if (!ownerId) {
+      const { data, error } = await authClient.getSession({ query: { disableCookieCache: true } })
+      if (error) return { kind: 'uncertain' }
+      if (!data?.user.id || context?.expectedOwnerId && context.expectedOwnerId !== data.user.id) return { kind: 'authRequired' }
+      ownerId = data.user.id
+    }
     // The confirmation replays one refused command. It is not a new message.
     const { confirmTaskAccess: _confirmation, ...immutable } = context ?? {}
-    const body = JSON.stringify([data.user.id, requestId ?? null, trimmed, context ? immutable : null])
+    const body = JSON.stringify([ownerId, requestId ?? null, trimmed, context ? immutable : null])
     // Another message may be sent before this one's uncertain result is retried.
     // Retain each unresolved key; the native server remains the dedupe authority.
     let operation = operations.current.get(body)
@@ -70,7 +77,15 @@ export function useCoordinatorSubmit(agent?: Pick<UseEveAgentReturn, 'send'>) {
       return { kind: 'accepted', enabled: true, sourceEventId: task?.dispatch.sourceEventId ?? null, replayed: false, ...(task ? { task } : {}) }
     } catch (error) {
       if (operation.delivered) return { kind: 'uncertain' }
-      const outcome = coordinatorSendFailure(error)
+      let outcome = coordinatorSendFailure(error)
+      // Eve can mask a scope refusal as a transport failure. Resolve the original
+      // signed-out/account-switch result on that failure path, keeping the operation id.
+      if (capturedOwner && outcome.kind === 'uncertain') {
+        try {
+          const session = await authClient.getSession({ query: { disableCookieCache: true } })
+          if (!session.error && session.data?.user.id !== capturedOwner) outcome = { kind: 'authRequired' }
+        } catch { /* A failed identity read leaves delivery uncertain. */ }
+      }
       if (outcome.kind === 'conflict') operations.current.set(body, { ...operation, conflict: true })
       else if (outcome.kind !== 'uncertain' && outcome.kind !== 'authRequired' && !(outcome.kind === 'rejected' && outcome.error === 'accessChangeConfirmationRequired')) operations.current.delete(body)
       return outcome
