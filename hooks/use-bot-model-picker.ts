@@ -1,9 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import useSWR from 'swr'
+import { toast } from 'sonner'
 import { useTranslations } from 'next-intl'
 import { chooseBotModel, getBotModelMenu, refreshBotModelMenuAction } from '@/app/actions/execution-settings'
+import { previewBotModelChoice } from '@/lib/bot-model-optimistic'
 import { HOSTED_CHOICE, type BotModelMenu, type BotModelMenuGroup, type BotModelMenuOption } from '@/lib/bot-model-menu-view'
 
 export type ModelPickerT = ReturnType<typeof useTranslations<'Coordinator.modelPicker'>>
@@ -73,6 +75,8 @@ export function useBotModelPicker(botId: string | null) {
   const [refreshFailed, setRefreshFailed] = useState(false)
   const [open, setOpenState] = useState(false)
   const [last, setLast] = useState<ChipModel | null>(null)
+  const [saving, setSaving] = useState(false)
+  const pendingSave = useRef<Promise<boolean> | null>(null)
 
   /** 刷新模型列表: the menu keeps what it shows until the new list arrives, and stays open. */
   async function refresh() {
@@ -85,7 +89,7 @@ export function useBotModelPicker(botId: string | null) {
   }
 
   useEffect(() => {
-    const listener = (event: Event) => { if ((event as CustomEvent<string>).detail === (botId ?? 'coordinator')) { setOpenState(true); void refresh() } }
+    const listener = (event: Event) => { if ((event as CustomEvent<string>).detail === (botId ?? 'coordinator')) setOpenState(true) }
     window.addEventListener(OPEN_EVENT, listener)
     return () => window.removeEventListener(OPEN_EVENT, listener)
   })
@@ -100,18 +104,40 @@ export function useBotModelPicker(botId: string | null) {
     } catch { /* storage unavailable: the chip waits for the menu */ }
   }, [botId, shown, menu.error])
 
-  async function choose(id: string) {
+  async function choose(id: string): Promise<boolean> {
+    // A previous save must settle before another write; otherwise late server
+    // responses can overwrite the model the user picked most recently.
+    if (pendingSave.current) await pendingSave.current
     const current = menu.data?.current
-    if (!current || (id === current.id && current.chosen)) return
+    if (!current || (id === current.id && current.chosen)) return Boolean(current)
+    const optimistic = menu.data && previewBotModelChoice(menu.data, id)
+    if (!optimistic) return false
     setFailed(false)
-    try {
-      // A pick that is not saved comes back as `{ error }`: failing here rolls the chip back and shows 未保存.
-      await menu.mutate(async () => {
-        const { error, ...saved } = await chooseBotModel(botId, id)
-        if (error) throw new Error(error)
-        return saved as BotModelMenu
-      }, { rollbackOnError: true, populateCache: true, revalidate: false })
-    } catch { setFailed(true) }
+    setSaving(true)
+    const work = (async () => {
+      try {
+        // The preview is visible at the click. It is marked "checking" until
+        // the authoritative server result arrives; failures roll it back.
+        await menu.mutate(async () => {
+          const { error, ...saved } = await chooseBotModel(botId, id)
+          if (error) throw new Error(error)
+          return saved as BotModelMenu
+        }, { optimisticData: optimistic, rollbackOnError: true, populateCache: true, revalidate: false })
+        return true
+      } catch {
+        setFailed(true)
+        toast.error(t('notSaved'))
+        return false
+      }
+    })()
+    pendingSave.current = work
+    void work.finally(() => {
+      if (pendingSave.current === work) {
+        pendingSave.current = null
+        setSaving(false)
+      }
+    })
+    return work
   }
 
   /** What a person reads for an option: the hosted model's name, or the provider's id (callers format it). */
@@ -130,8 +156,12 @@ export function useBotModelPicker(botId: string | null) {
     last: menu.data || menu.error ? null : last,
     open,
     /** Opening the menu refreshes it. */
-    setOpen(next: boolean) { setOpenState(next); if (next) void refresh() },
+    // Model catalogue refresh is explicit; opening a cached menu must not
+    // start an up-to-eight-second subscription discovery on the click path.
+    setOpen(next: boolean) { setOpenState(next) },
     choose,
+    saving,
+    waitForSave: () => pendingSave.current ?? Promise.resolve(true),
     /** Choosing the item that is already current only saves when it was not chosen yet (it was the default). */
     chooseItem(id: string) { if (current && id === current.id && !current.chosen) void choose(id) },
     refresh,
