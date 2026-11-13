@@ -20,12 +20,13 @@ export const POST = freshSessionRoute(async (request: Request, context: Context)
   const session = await organizationSession(request, organizationId)
   // Persist the invitation and audit record before any external mail side effect.
   const result = await issueOrganizationInvitations(organizationId, session.user.id, await governanceJson(request))
-  if (appOrigin && organizationInvitationMailEnabled() && result.outcomes.some(outcome => outcome.created)) {
+  const trustedOrigin = appOrigin
+  if (trustedOrigin && organizationInvitationMailEnabled() && result.outcomes.some(outcome => outcome.created)) {
     // A provider failure must not revoke a valid invite or lose the manual one-time link.
     // The configured origin, not a caller-controlled Host header, anchors every bearer URL.
     afterJob('after:organization-invitation-mail', async () => {
       try {
-        const delivery = await sendOrganizationInvitationEmails(result.outcomes, appOrigin)
+        const delivery = await sendOrganizationInvitationEmails(result.outcomes, trustedOrigin)
         if (delivery.failed) console.error('organization_invitation_mail_delivery_failed', { count: delivery.failed })
       } catch {
         console.error('organization_invitation_mail_delivery_unavailable')
