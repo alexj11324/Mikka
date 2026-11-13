@@ -73,7 +73,7 @@ test('both trusted environments issue independently verifiable fixed role identi
 
 test('public discovery and JWKS contain only configured public metadata and never access the private binding', async () => {
   const { env } = fixture()
-  Object.defineProperty(env, 'SIGNING_KEY', { get() { assert.fail('Private binding accessed') } })
+  Object.defineProperty(env, 'SIGNING_KEY', { get() { return assert.fail('Private binding accessed') } })
   for (const [path, expected] of [
     ['/.well-known/openid-configuration', {
       issuer: 'https://identity.example.test',
