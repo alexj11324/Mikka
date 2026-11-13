@@ -169,9 +169,8 @@ function startRun(storage, runId, request, now) {
   return { ok: true, run, ...(event ? { event } : {}), replayed: Boolean(prior) }
 }
 
-function changeHook(storage, run, request, now, params) {
+function changeHook(storage, runId, request, now, params) {
   const { eventType, eventData, correlationId: hookId, specVersion } = request
-  const { runId } = run
   if (eventType === 'hook_created') {
     if (hookId === startHookId(runId) || eventData.tokenRetentionUntil?.getTime() > now + MAX_RETENTION_MS) return fail(400, 'INVALID_HOOK')
     const prior = readHookById(storage, hookId, now)
@@ -180,9 +179,9 @@ function changeHook(storage, run, request, now, params) {
     cleanReleasedToken(storage, token, now)
     const owner = readHookByToken(storage, token, now)
     if (owner) {
-      const victim = readRun(storage, owner.runId)
-      const compatible = victim.specVersion >= SPEC_VERSION_SUPPORTS_HOOK_FORCE_CLAIM
-      if (!eventData.force || !compatible) {
+      const victim = eventData.force ? readRun(storage, owner.runId) : undefined
+      const compatible = victim && victim.specVersion >= SPEC_VERSION_SUPPORTS_HOOK_FORCE_CLAIM
+      if (!compatible) {
         const conflict = { token, conflictingRunId: owner.runId, ...(eventData.force ? { forceDeclined: 'victim-spec-version' } : {}) }
         return { ok: true, event: appendEvent(storage, runId, { eventType: 'hook_conflict', correlationId: hookId, specVersion, eventData: conflict }, now) }
       }
@@ -217,21 +216,26 @@ export function applyWorldEvent(storage, runId, request, now = Date.now(), param
   const event = parsed.data
   return storage.transactionSync(() => {
     if (event.eventType === 'run_created' || event.eventType === 'run_started') return startRun(storage, runId, event, now)
+    if (['hook_created', 'hook_disposed', 'hook_received'].includes(event.eventType)) {
+      const run = first(storage.sql.exec('SELECT status FROM world_runs WHERE run_id=?', runId))
+      if (!run) return fail(404, 'RUN_NOT_FOUND')
+      if (event.eventType === 'hook_received' && params?.resumeId) {
+        const prior = first(storage.sql.exec('SELECT hook_id,digest,slot FROM world_hook_resumes WHERE run_id=? AND resume_id=?', runId, params.resumeId))
+        if (prior) {
+          if (prior.hook_id !== event.correlationId || (prior.digest && params.resumePayloadDigest && prior.digest !== params.resumePayloadDigest)) {
+            return fail(409, 'ENTITY_CONFLICT')
+          }
+          return { ok: true, event: readEvent(storage, runId, prior.slot) }
+        }
+      }
+      if (isTerminalWorkflowRunStatus(run.status)) return fail(410, 'RUN_EXPIRED')
+      return changeHook(storage, runId, event, now, params)
+    }
     const run = readRun(storage, runId)
     if (!run) return fail(404, 'RUN_NOT_FOUND')
-    if (event.eventType === 'hook_received' && params?.resumeId) {
-      const prior = first(storage.sql.exec('SELECT hook_id,digest,slot FROM world_hook_resumes WHERE run_id=? AND resume_id=?', runId, params.resumeId))
-      if (prior) {
-        if (prior.hook_id !== event.correlationId || (prior.digest && params.resumePayloadDigest && prior.digest !== params.resumePayloadDigest)) {
-          return fail(409, 'ENTITY_CONFLICT')
-        }
-        return { ok: true, event: readEvent(storage, runId, prior.slot) }
-      }
-    }
     if (isStepEventType(event.eventType)) return changeStep(storage, run, event, now, appendEvent)
     if (event.eventType === 'wait_created' || event.eventType === 'wait_completed') return changeWait(storage, run, event, now, appendEvent)
     if (isTerminalWorkflowRunStatus(run.status)) return fail(410, 'RUN_EXPIRED')
-    if (['hook_created', 'hook_disposed', 'hook_received'].includes(event.eventType)) return changeHook(storage, run, event, now, params)
     if (event.eventType === 'attr_set') {
       try {
         validateAttributeChanges(event.eventData.changes, { existingKeys: Object.keys(run.attributes ?? {}),
