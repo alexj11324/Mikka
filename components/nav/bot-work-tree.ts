@@ -1,3 +1,4 @@
+import { pullRequestsState } from '@/lib/pull-request-appearance'
 import type { Thread } from '@/app/actions/task-runs'
 import type { listIssues } from '@/app/actions/issues'
 import { conversationIndicatorOf, type RunIndicator, type TaskReason, type TaskState } from '@/lib/task-state'
@@ -7,7 +8,7 @@ import { compactTaskTitle, conversationTitle } from '@/lib/short-title'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 export type BotWorkRun = { id: string; name: string; harness: string | null }
-export type BotWorkTask = { id: string; issueId: string | null; name: string; fullName: string; /** The task's status field; null for a run that has no task. */ status: string | null; /** What a conversation with no task is doing, for its one mark; null for a task row, whose one icon is its status. */ activity: RunIndicator | null; state: TaskState | null; reason: TaskReason | null; runs: BotWorkRun[] }
+export type BotWorkTask = { pullState?: Thread['pullState']; id: string; issueId: string | null; name: string; fullName: string; /** The task's status field; null for a run that has no task. */ status: string | null; /** What a conversation with no task is doing, for its one mark; null for a task row, whose one icon is its status. */ activity: RunIndicator | null; state: TaskState | null; reason: TaskReason | null; runs: BotWorkRun[] }
 
 type Dispatch = NonNullable<TaskPresentation['botDispatches']>[number]
 const taskRow = (issue: Issue, presentation: TaskPresentation, dispatch: Dispatch): BotWorkTask => ({
@@ -65,9 +66,12 @@ export function botWorkTree(workspaceId: string | null, botIds: readonly string[
       if (!rows.has(issue.id)) rows.set(issue.id, taskRow(issue, projected, dispatch))
     }
   }
+  const runStates = new Map(threads.map(run => [run.id, run.pullState]))
   const createdAt = new Map(threads.map(run => [run.id, run.createdAt]))
   for (const [botId, rows] of grouped) {
     for (const row of rows.values()) {
+      const pulls = row.runs.flatMap(run => { const state = runStates.get(run.id); return state ? [{ state }] : [] })
+      if (pulls.length) row.pullState = pullRequestsState(pulls)
       const [latest, ...older] = row.runs
       row.runs = [latest, ...older.sort((a, b) => (createdAt.get(b.id) ?? '').localeCompare(createdAt.get(a.id) ?? '') || b.id.localeCompare(a.id))]
     }

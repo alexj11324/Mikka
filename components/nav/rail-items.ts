@@ -1,18 +1,19 @@
 import type { ComponentType } from 'react'
 import type { ChatNavEntry, ChatTarget } from './bot-list'
-import { Columns3, House, Lightbulb } from 'lucide-react'
+import { Columns3, GitPullRequest, House, Lightbulb } from 'lucide-react'
 import { ArtifactIcon } from '@/components/icons/artifact-icon'
 import { ArtifactFilled, Columns3Filled, HouseFilled, LightbulbFilled, PlugCircle, PlugCircleFilled } from '@/components/icons/rail-filled-icons'
 
-export type RailDestination = 'chats' | 'suggestions' | 'board' | 'plugins' | 'artifacts'
+export type RailDestination = 'chats' | 'pulls' | 'suggestions' | 'board' | 'plugins' | 'artifacts'
 
 /** A lucide icon or one of ours drawn the same way (components/icons). */
 type RailIcon = ComponentType<{ className?: string; 'data-icon'?: string }>
 
 // 主页 (the bot chats), 建议, the board, plugins, Artifact. `selectedIcon` is the solid twin shown on the current item.
-export const RAIL_ITEMS: { id: RailDestination; icon: RailIcon; selectedIcon: RailIcon; label: 'Nav.home' | 'Nav.suggestions' | 'Nav.board' | 'Nav.plugins' | 'Nav.artifacts' }[] = [
+export const RAIL_ITEMS: { id: RailDestination; icon: RailIcon; selectedIcon: RailIcon; label: 'ArtifactsPage.category.pullRequests' | 'Nav.home' | 'Nav.suggestions' | 'Nav.board' | 'Nav.plugins' | 'Nav.artifacts' }[] = [
   { id: 'chats', icon: House, selectedIcon: HouseFilled, label: 'Nav.home' },
   { id: 'suggestions', icon: Lightbulb, selectedIcon: LightbulbFilled, label: 'Nav.suggestions' },
+  { id: 'pulls', icon: GitPullRequest, selectedIcon: GitPullRequest, label: 'ArtifactsPage.category.pullRequests' },
   { id: 'board', icon: Columns3, selectedIcon: Columns3Filled, label: 'Nav.board' },
   { id: 'plugins', icon: PlugCircle, selectedIcon: PlugCircleFilled, label: 'Nav.plugins' },
   { id: 'artifacts', icon: ArtifactIcon, selectedIcon: ArtifactFilled, label: 'Nav.artifacts' },

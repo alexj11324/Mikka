@@ -13,3 +13,8 @@ export const PULL_REQUEST_ICONS = {
   merged: GitMerge,
   closed: GitPullRequestClosed,
 } as const
+
+/** A group shows an open PR first, then draft, then merged. */
+export function pullRequestsState(pulls: readonly { state: keyof typeof PULL_REQUEST_COLORS }[]) {
+  return (['open', 'draft', 'merged', 'closed'] as const).find(state => pulls.some(pr => pr.state === state)) ?? 'closed'
+}

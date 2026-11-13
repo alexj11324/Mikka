@@ -42,6 +42,14 @@ test('historical dispatch and current dispatch share the workspace projection ev
   assert.equal(tree.has('unrelated'), false)
 })
 
+test('a bot work row summarizes PR states only across its authorized dispatches', () => {
+  const task = issue('a')
+  const runs = [{ ...run('1', 'a'), pullState: 'merged' as const }, { ...run('2', 'a'), pullState: 'open' as const }]
+  const tree = botWorkTree('workspace', ['bot'], runs, [task], { a: present(task, ['bot']) })
+  assert.equal(tree.get('bot')?.[0].pullState, 'open')
+  assert.equal(botWorkTree('other', ['bot'], runs, [task], { a: present(task, ['bot']) }).size, 0)
+})
+
 test('a missing projection, an out-of-workspace issue or an unauthorized Bot cannot enter the tree', () => {
   const a = issue('a'), foreign = { ...issue('foreign'), workspaceId: 'another' }
   const runs = [run('a-run', 'a'), run('foreign-run', 'foreign'), run('other', null, 'another-bot'), run('null-bot', null, null)]

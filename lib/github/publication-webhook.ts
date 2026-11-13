@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { pool } from '@/lib/db'
 import { factoryCommitted } from '@/lib/live/factory'
 import { pullRequestStatusChanged } from '@/lib/live/pull-requests'
-import { issueListChanged } from '@/lib/live/lists'
+import { issueListChanged, runListChanged } from '@/lib/live/lists'
 import { ADVANCE_MERGED_TASKS } from '@/lib/task-status-advance'
 import { reviewCheckEvent } from './review-checks'
 
@@ -119,7 +119,7 @@ export async function refreshPublishedPullRequest(event: string, payload: unknow
     ...(pr.changed_files === undefined ? {} : { changedFiles: pr.changed_files }),
     ...(pr.head ? { headSha: pr.head.sha.toLowerCase(), ...(pr.head.ref ? { branch: pr.head.ref } : {}) } : {}),
     ...(pr.updated_at ? { githubUpdatedAt: new Date(pr.updated_at).toISOString() } : {}) })
-  const { rows } = await database.query<{ id: string | null; issueId: string | null; changed: boolean }>(`WITH matched AS (
+  const { rows } = await database.query<{ id: string | null; issueId: string | null; runId: string; changed: boolean }>(`WITH matched AS (
       SELECT "runId","userId","issueId" FROM run_publications WHERE "pullRequest"->>'url'=$1
         AND (NOT $2::jsonb ? 'githubUpdatedAt' OR coalesce("pullRequest"->>'githubUpdatedAt','')<=$2::jsonb->>'githubUpdatedAt')
         AND ($3::text IS NULL OR "pullRequest"->>'headSha' IS NULL OR "pullRequest"->>'headSha' IN ($3,$2::jsonb->>'headSha'))
@@ -136,13 +136,15 @@ export async function refreshPublishedPullRequest(event: string, payload: unknow
         AND ($3::text IS NULL OR "pullRequest"->>'headSha' IS NULL OR "pullRequest"->>'headSha' IN ($3,$2::jsonb->>'headSha'))
         AND ($3::text IS NOT NULL OR "pullRequest"->>'headSha' IS NULL OR NOT $2::jsonb ? 'headSha' OR "pullRequest"->>'headSha'=$2::jsonb->>'headSha'
           OR coalesce("pullRequest"->>'githubUpdatedAt','')<coalesce($2::jsonb->>'githubUpdatedAt','~')) RETURNING "runId"
-    ) SELECT DISTINCT t.id,p."issueId",(s."runId" IS NOT NULL) AS changed FROM matched p
+    ) SELECT DISTINCT t.id,p."issueId",p."runId",(s."runId" IS NOT NULL) AS changed FROM matched p
       LEFT JOIN saved s ON s."runId"=p."runId"
       LEFT JOIN factory_candidates c ON c."runId"=p."runId"
       LEFT JOIN factory_tasks t ON t.id=c."taskId" AND t."candidateId"=c.id AND t."userId"=p."userId"`,
     [url, patch, before])
   if (!rows.length) return
   const tasks = [...new Set(rows.flatMap(row => row.id && row.changed ? [row.id] : []))].map(id => ({ id }))
+  // Directory pages subscribe to their existing owner-scoped thread list. No PR payload is broadcast.
+  await Promise.all([...new Set(rows.filter(row => row.changed).map(row => row.runId))].map(id => runListChanged(database, id, true)))
   // The PR badge on each task it was delivered on asks GitHub again (#1212); the state itself never crosses.
   await pullRequestStatusChanged(database, rows.flatMap(row => row.issueId ? [row.issueId] : []))
   // 已完成 once the last PR Mikka delivered on a task is merged: forward only, and a status the person set since the
