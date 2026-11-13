@@ -105,6 +105,10 @@ export async function markRead(q: Queryable, userId: string, conversationId: str
       "lastReadMessageId" = case when excluded."lastReadPosition" > r."lastReadPosition" then excluded."lastReadMessageId" else r."lastReadMessageId" end,
       "updatedAt" = case when excluded."lastReadPosition" > r."lastReadPosition" then excluded."updatedAt" else r."updatedAt" end
     returning "lastReadPosition", "lastReadMessageId"`, [userId, conversationId, position, messageId])
+  if (botId) {
+    await q.query('UPDATE chat_preferences SET "markedUnread"=false, "updatedAt"=now() WHERE "userId"=$1 AND "chatKey"=$2 AND "markedUnread"', [userId, botId])
+    await (await import('./live/lists')).ownerListChanged(q, userId, ['bot_chat_list'])
+  }
   const row = rows[0]
   return { lastReadMessageId: row.lastReadMessageId, lastReadPosition: Number(row.lastReadPosition), unreadCount: await unreadCount(q, ownerId, Number(row.lastReadPosition), botId) }
 }
@@ -141,4 +145,29 @@ export async function handleRead(q: Queryable, request: ReadRequest): Promise<Re
   const message = await resolveMessage(q, ownerId, messageId, botId)
   if (!message) return { status: 422, body: { error: 'messageNotFound' } }
   return { status: 200, body: await markRead(q, request.userId, request.conversationId, ownerId, message.id, message.position, botId) }
+}
+
+/** Read every visible bot's own chat without one request per sidebar row. As
+ * in unreadCount, consecutive assistant rows count as one reply. A legacy
+ * Coordinator cursor belongs only to the bot that actually owns its message. */
+export async function botUnreadCounts(q: Queryable, userId: string, botIds: string[]) {
+  if (!botIds.length) return new Map<string, number>()
+  const { rows } = await q.query<{ id: string; count: number }>(`
+    with visible as (
+      select b.id, greatest(coalesce(r."lastReadPosition",0), coalesce(old_message.position,0)) as cursor,
+        coalesce(p."markedUnread",false) as marked
+      from bots b
+      left join conversation_reads r on r."userId"=$1 and r."conversationId"='bot:' || b.id::text
+      left join conversation_reads old on old."userId"=$1 and old."conversationId"='coordinator'
+      left join coordinator_messages old_message on old_message.id::text=old."lastReadMessageId"
+        and old_message."userId"=$1 and old_message."botId"=b.id
+      left join chat_preferences p on p."userId"=$1 and p."chatKey"=b.id::text
+      where b."ownerId"=$1 and b.id=any($2::uuid[])
+    )
+    select v.id, greatest(v.marked::integer, count(*) filter (where m.role='assistant' and m.prev is distinct from 'assistant' and m.position>v.cursor)::int) as count
+    from visible v left join lateral (
+      select position, message->>'role' as role, lag(message->>'role') over (order by position) as prev
+      from coordinator_messages where "userId"=$1 and "botId"=v.id and message->>'role' in ('user','assistant')
+    ) m on true group by v.id, v.marked`, [userId, botIds])
+  return new Map(rows.map(row => [row.id, row.count]))
 }

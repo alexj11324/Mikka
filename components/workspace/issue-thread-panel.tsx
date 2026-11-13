@@ -1,5 +1,7 @@
 'use client'
 
+import { ThreadReadEnd } from '@/components/workspace/thread-read-end'
+
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { PersonAvatar } from '@/components/person-avatar'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -315,6 +317,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     observer.observe(root, { childList: true, subtree: true })
     return () => observer.disconnect()
   }, [focusRunId, runId, joined])
+  const readEnd = data?.readReceipts?.some(row => row.unread) ? <ThreadReadEnd receipts={data.readReceipts} /> : null
   const transcriptBody = <>
       {error && !data ? <InlineLoadError message={readFailedMessage} retryLabel={retryLabel} onRetry={() => { void mutate() }} />
         : !data ? <div role="status" aria-label={t('loading')} data-thread-loading className="flex flex-col gap-3"><Skeleton className="h-5 w-40" /><Skeleton className="ml-auto h-12 w-3/4" /><Skeleton className="h-12 w-2/3" /></div>
@@ -374,6 +377,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
           {/* L3: the finishing message carries the thread's Artifact card. */}
           {!active && (view?.status ?? data.thread.status) === 'succeeded' && <ThreadArtifactCards runId={runId} />}
           {data.thread.feedbackEligible && <ThreadFeedback runId={runId} />}
+          {readEnd}
         </>}
   </>
   // A layer's thread screen (slot `thread`) draws the conversation from these rows: each part as Mikka renders it, the
@@ -419,8 +423,9 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       {modelFallback.map(item => <ThreadModelFallbackNotice key={item.runId} item={item} retry={item.state !== 'switched' && canRetry ? () => { void send(t('retry'), true) } : undefined} retrying={sending} />)}
       {!active && (view?.status ?? data.thread.status) === 'succeeded' && <ThreadArtifactCards runId={runId} />}
       {data.thread.feedbackEligible && <ThreadFeedback runId={runId} />}
+      {readEnd}
     </>
-    if (data.thread.quota?.switched.length || modelFallback.length || (!active && (view?.status ?? data.thread.status) === 'succeeded') || data.thread.feedbackEligible) bot('tail', [{ kind: 'text', text: '', node: tail }])
+    if (readEnd || data.thread.quota?.switched.length || modelFallback.length || (!active && (view?.status ?? data.thread.status) === 'succeeded') || data.thread.feedbackEligible) bot('tail', [{ kind: 'text', text: '', node: tail }])
     if (active && !items.length) bot('waiting', [], { streaming: true })
   }
   if (!readRejected) for (const row of localMessages) entries.push({ id: row.id, role: 'person', at: row.at, text: row.text,

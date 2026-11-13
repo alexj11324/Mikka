@@ -992,6 +992,8 @@ export const messageReactions = pgTable('message_reactions', {
 export const conversationReads = pgTable('conversation_reads', {
   userId: text('userId').notNull(), conversationId: text('conversationId').notNull(),
   lastReadPosition: integer('lastReadPosition').notNull().default(0), lastReadMessageId: text('lastReadMessageId'),
+  runReadAt: timestamp('runReadAt', { withTimezone: true }), manuallyUnread: boolean('manuallyUnread').notNull().default(false),
+  unreadRevision: integer('unreadRevision').notNull().default(0),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, t => [primaryKey({ columns: [t.userId, t.conversationId] })])
 export const conversationLinks = pgTable('conversation_links', {

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test, { after, before, type TestContext } from 'node:test'
 import { Pool } from 'pg'
-import { handleRead, originAllowed, requestHost, resolveMessage, type ReadRequest } from './conversation-reads-store'
+import { botUnreadCounts, handleRead, originAllowed, requestHost, resolveMessage, type ReadRequest } from './conversation-reads-store'
 
 // Pure checks always run. DB checks need a reachable MIKKA_DATABASE_URL whose
 // schema already has conversation_reads (applied by scripts/migrate.mjs; the
@@ -165,7 +165,9 @@ test("a bot's chat keeps its own read position and unread count", async t => {
   assert.equal((await handleRead(pool!, req({ conversationId: `bot:${randomUUID()}` }))).status, 404, 'no such bot')
   assert.deepEqual(await handleRead(pool!, req({ conversationId: writer })), { status: 200, body: { lastReadMessageId: null, lastReadPosition: null, unreadCount: 1 } })
   assert.equal((await post(ids.a3, { conversationId: writer })).status, 422, "a Coordinator message id in the bot's chat")
+  assert.deepEqual([...await botUnreadCounts(pool!, alice, [aliceBot, bobBot])], [[aliceBot, 1]])
   assert.deepEqual(await post('2', { conversationId: writer }), { status: 200, body: { lastReadMessageId: ids.w2, lastReadPosition: 2, unreadCount: 0 } }, "position 2 is the bot's own message 2")
+  assert.equal((await botUnreadCounts(pool!, alice, [aliceBot])).get(aliceBot), 0)
   const coordinator = await handleRead(pool!, req({}))
   assert.notEqual((coordinator.body as { lastReadMessageId: string | null }).lastReadMessageId, ids.w2, "reading the bot's chat leaves the Coordinator's alone")
 })
