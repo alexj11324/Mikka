@@ -83,7 +83,7 @@ test('Agent Kit evaluations run through compiled public Eve sessions with inert 
   let endStreamPath: string | undefined
   let teardownReads = 0
   const nativeFetch = globalThis.fetch
-  const requests = t.mock.method(globalThis, 'fetch', (input, init) => {
+  const requests = t.mock.method(globalThis, 'fetch', (input: RequestInfo | URL, init?: RequestInit) => {
     const path = new URL(input instanceof Request ? input.url : input.toString()).pathname
     if (init?.method === 'POST' && path.endsWith('/end')) endStreamPath = path.slice(0, -4) + '/stream'
     if (path === endStreamPath) teardownReads++
