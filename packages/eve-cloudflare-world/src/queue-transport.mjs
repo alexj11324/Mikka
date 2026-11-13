@@ -86,7 +86,11 @@ async function deliver(message, env) {
   const business = env.WORLD_WORKLOAD === 'business'
   const binding = env.WORLD_QUEUE_ED25519_PRIVATE_KEY
   const privateKey = typeof binding?.get === 'function' ? await binding.get() : binding
-  const material = typeof privateKey === 'string' && privateKey ? 'ed25519-pkcs8:' + privateKey : undefined
+  // Production Secrets Store already includes the key type; older staging
+  // bindings contain bare PKCS8 base64. Never prefix a typed key twice.
+  const material = typeof privateKey === 'string' && privateKey
+    ? privateKey.startsWith('ed25519-pkcs8:') ? privateKey : 'ed25519-pkcs8:' + privateKey
+    : undefined
   if (business && !material) throw new Error('Business workflow signer unavailable')
   const response = await target.fetch(new Request(new URL(WORKFLOW_FLOW_ROUTE, business ? 'https://business-workflow.internal' : 'https://eve.internal'), {
     method: 'POST', redirect: 'manual',
