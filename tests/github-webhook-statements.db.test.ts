@@ -5,7 +5,7 @@
 // The Decisions API is replaced by a judge that gives no answer: what a
 // notification costs after a model answers is the model path's own budget.
 import assert from 'node:assert/strict'
-import { createHmac, randomUUID } from 'node:crypto'
+import { createHmac, randomInt, randomUUID } from 'node:crypto'
 import { after, before, mock, test } from 'node:test'
 import pg from 'pg'
 import { isE2eTarget } from './helpers/e2e-target.mjs'
@@ -87,7 +87,9 @@ const pullRequest = (url: string, number: number, action: string, extra: Record<
 })
 
 test('one GitHub delivery stays within its statement budget', { skip: !valid, timeout: 120_000 }, async t => {
-  const owner = `gh-stmt-${randomUUID()}`, githubId = String(100_000 + Math.floor(Math.random() * 1_000_000))
+  const owner = `gh-stmt-${randomUUID()}`
+  // The preceding run-publication suite keeps its audit rows and GitHub accounts starting at 800001.
+  const githubId = randomInt(1_000_000_000_000, 2_000_000_000_000)
   const issueId = randomUUID(), agentId = randomUUID(), runId = randomUUID(), number = 1000 + Math.floor(Math.random() * 100_000)
   const delivered = `https://github.com/o/r/pull/${number}`, unrelated = `https://github.com/o/r/pull/${number + 1}`
   await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,'O',$2,true,now(),now())`, [owner, `${owner}@example.invalid`])
@@ -145,8 +147,11 @@ test('one GitHub delivery stays within its statement budget', { skip: !valid, ti
   const notices = Array.from({ length: 6 }, (_, n) => ({ title: `Notice ${n}`, excerpt: 'x'.repeat(1_500), occurredAt: '2026-11-04T00:00:00Z' }))
   for (let n = 0; n < 10; n++) await pool.query(`INSERT INTO attention_matters (id,"userId","matterKey",source,title,level,assessment,evidence,state)
     VALUES ($1,$2,$3,'github',$4,'normal',$5,$6,'quiet')`, [randomUUID(), owner, `github:o/r#${n}`, `Matter ${n}`, JSON.stringify({ cost: true, note: 'y'.repeat(500) }), JSON.stringify({ keys: [`github:o/r#${n}`], latest: notices[0], notices })])
-  const comment = await budget('issue_comment on the person\'s issue (judge gives no answer)', 'issue_comment',
-    { action: 'created', repository: { full_name: 'o/r' }, sender: { id: 2, login: 'other' }, issue: { number, user: { id: Number(githubId) }, title: 'Bug' }, comment: { id: Number(githubId), body: 'hi', created_at: '2026-11-05T00:00:00Z' } }, 8)
+  const commentPayload = { action: 'created', repository: { full_name: 'o/r' }, sender: { id: 2, login: 'other' }, issue: { number, user: { id: githubId }, title: 'Bug' }, comment: { id: githubId, body: 'hi', created_at: '2026-11-05T00:00:00Z' } }
+  const { githubWebhookNotifications } = await import('../lib/suggestions/sources')
+  const recipients = await githubWebhookNotifications('issue_comment', commentPayload)
+  assert.deepEqual(recipients.map(notification => notification.userId), [owner], 'the budget measures a single recipient')
+  const comment = await budget('issue_comment on the person\'s issue (judge gives no answer)', 'issue_comment', commentPayload, 8)
   // A full matter row (its evidence and assessment, tens of KB) is what made this route heavy; the judgment reads only its brief.
   assert.ok(comment.some(text => text.includes('"attention_matters"')), 'the judgment still reads the person\'s matters')
   assert.ok(comment.every(text => !text.includes('"assessment"')), 'no matter evidence or assessment is read')
