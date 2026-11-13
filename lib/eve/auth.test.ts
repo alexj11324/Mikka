@@ -32,3 +32,16 @@ test('Cloudflare accepts only binding provenance and rejects legacy bearer, cook
   }
   assert.deepEqual(internalEveRequestScope(request({'x-mikka-eve-binding-scope':JSON.stringify(scope)})), scope)
 })
+
+test('self-hosted Eve tolerates a small clock offset while keeping the strict expiry window', t => {
+  t.mock.property(process, 'env', { ...process.env, BETTER_AUTH_SECRET: 'synthetic-self-hosted-clock-fixture-key' })
+  const scope = { ownerId: 'owner', botId: '11111111-1111-4111-8111-111111111111', workspaceId: '22222222-2222-4222-8222-222222222222', surface: 'web' as const }
+  const issuedAt = 100_000
+  const header = internalEveAuthorization(scope, issuedAt)
+  for (const offset of [-1_000, -1, 0, 29_000, 58_999]) {
+    assert.deepEqual(internalEveScope(header, issuedAt + offset), scope, `verifier offset ${offset}ms`)
+  }
+  for (const offset of [-1_001, -2_000, 59_000, 59_001]) {
+    assert.equal(internalEveScope(header, issuedAt + offset), null, `verifier offset ${offset}ms`)
+  }
+})
