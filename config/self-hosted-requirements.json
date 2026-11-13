@@ -206,6 +206,13 @@
     "test": "lib/account/deletion-lock.db.test.ts",
     "suite": "test:account-db"
   },
+  "drizzle/20261113165037_inbox_conversations.sql": {
+    "mode": "built-in",
+    "environment": ["MIKKA_DATABASE_URL"],
+    "behavior": "Use the installation PostgreSQL database for per-user Inbox dismissals and standalone conversation snoozes. An authorized new run or changed cause can request attention again.",
+    "test": "lib/inbox/store.db.test.ts",
+    "suite": "test:inbox-db"
+  },
   "drizzle/20261112090914_workspace_subscription_custody.sql": {
     "mode": "built-in",
     "environment": [
@@ -552,6 +559,13 @@
     "behavior": "Hold the shared organization policy lock while admitting a service credential.",
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
+  },
+  "lib/eve/auth.ts": {
+    "mode": "operator-configured",
+    "environment": ["BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "MIKKA_APP_ORIGIN", "MIKKA_API_INGRESS", "MIKKA_EVE_HOST"],
+    "behavior": "Self-hosted installations retain their existing signed internal scope and configured application origin. Cloudflare uses private service binding provenance and rejects legacy internal token fallback.",
+    "test": "lib/eve/product-tool.test.ts",
+    "suite": "test:eve-product-tool"
   },
   "lib/eve/cloudflare-task-bridge.ts": {
     "mode": "optional-cloud",
@@ -1176,6 +1190,20 @@
     "behavior": "Team home reads the complete authorized Task count from this server using the existing authenticated Team directory request and PostgreSQL.",
     "test": "tests/team-visibility.db.test.ts",
     "suite": "test:visibility-db"
+  },
+  "lib/inbox/store.ts": {
+    "mode": "built-in",
+    "environment": ["MIKKA_DATABASE_URL"],
+    "behavior": "Read the same authorized pending requests for board cards, inbox rows and badge counts in the selected workspace.",
+    "test": "lib/inbox/store.db.test.ts",
+    "suite": "test:inbox-db"
+  },
+  "lib/task-presentation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Project the viewer's pending Inbox reason into the board's Agent activity mark while preserving the underlying task lifecycle.",
+    "test": "lib/task-presentation.test.ts",
+    "suite": "test:issues"
   },
   "lib/inbox/client.ts": {
     "mode": "built-in",

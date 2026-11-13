@@ -25,7 +25,7 @@ type Scope = { ownerId: string; botId: string; workspaceId: string; surface: 'we
 export interface EveProductGatewayServices {
   authorize(request: Request): Promise<Scope | null>
   assertSession(scope: Scope, sessionId: string): Promise<void>
-  run(scope: Scope, input: Input, signal: AbortSignal, authorization: string | null): Promise<unknown>
+  run(scope: Scope, input: Input, signal: AbortSignal, request: Request): Promise<unknown>
 }
 
 async function boundedBody(request: Request) {
@@ -54,7 +54,7 @@ export async function handleEveProductRequest(request: Request, services: EvePro
     const parsed = requestSchema.safeParse(await boundedBody(request))
     if (!parsed.success) return Response.json({ error: 'validationGeneric' }, { status: 400 })
     await services.assertSession(scope, parsed.data.sessionId)
-    const result = await services.run(scope, parsed.data, request.signal, request.headers.get('authorization'))
+    const result = await services.run(scope, parsed.data, request.signal, request)
     return Response.json(result, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (error) {
     // Raw tool/provider/SQL errors can contain credentials or user content.
@@ -66,14 +66,14 @@ export async function handleEveProductRequest(request: Request, services: EvePro
 
 const defaultServices: EveProductGatewayServices = {
   async authorize(request) {
-    const { internalEveScope } = await import('./auth')
-    return internalEveScope(request.headers.get('authorization'))
+    const { internalEveRequestScope } = await import('./auth')
+    return internalEveRequestScope(request)
   },
   async assertSession(scope, sessionId) {
     const { assertSessionScope } = await import('./scope')
     await assertSessionScope(scope, sessionId)
   },
-  async run(scope, input, signal, authorization) {
+  async run(scope, input, signal, request) {
     const { actAs } = await import('../acting-user')
     const { tokenWorkspace } = await import('../tokens/principal')
     return actAs({ id: scope.ownerId, [tokenWorkspace]: scope.workspaceId }, async () => {
@@ -118,7 +118,7 @@ const defaultServices: EveProductGatewayServices = {
       if (!checked.success) throw new Error('validationGeneric')
       signal.throwIfAborted()
       const { withEveProductAuthority } = await import('../enterprise/execution-authority')
-      const output = await withEveProductAuthority(authorization, input, async () => {
+      const output = await withEveProductAuthority(request, input, async () => {
         const call = { ...scope, sessionId: input.sessionId, turnId: input.turnId, executionId: input.executionId, sourceEventId, name: input.name, input: checked.value, callId: input.callId }
         const { reviewEveProductApproval, executeEveApprovedWrite } = await import('./product-approval')
         if (input.operation === 'approval') return reviewEveProductApproval(call, signal)

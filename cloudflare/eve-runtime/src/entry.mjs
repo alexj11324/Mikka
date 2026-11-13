@@ -62,6 +62,10 @@ export class EveService extends WorkerEntrypoint {
     for (const name of request.headers.keys()) {
       if (name.startsWith('x-forwarded-') || name.startsWith('x-vercel-') || name.startsWith('cf-')) headers.delete(name)
     }
+    headers.delete('x-mikka-eve-binding-scope')
+    const scope = headers.get('x-mikka-eve-scope')
+    headers.delete('x-mikka-eve-scope')
+    if (scope) headers.set('x-mikka-eve-binding-scope', scope)
     return forward(request, this.env, headers)
   }
 }

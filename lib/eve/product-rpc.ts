@@ -1,5 +1,5 @@
 import type { AgentExecution } from '../agent-kit/store'
-import { internalEveAuthorization } from './auth'
+import { internalEveHeaders } from './auth'
 import type { EveScope } from './scope'
 import type { ApprovalPrincipal } from './approval-principal'
 import type { TurnOutcome } from 'eve/events'
@@ -15,7 +15,7 @@ export async function productRpc<T>(scope:EveScope,operation:ProductOperation,si
   const capability = hosted ? process.env.MIKKA_EVE_PRODUCT_TOKEN : undefined
   if (hosted && !capability) throw new Error('agentToolUnavailable')
   const response = await fetch(new URL('/mikka/api/internal/eve/tools',origin),{
-    method:'POST',redirect:'error',headers:{authorization:internalEveAuthorization(scope),'content-type':'application/json',
+    method:'POST',redirect:'error',headers:{...internalEveHeaders(scope),'content-type':'application/json',
       ...(capability ? {'x-mikka-product-capability':capability} : {})},
     body:JSON.stringify(operation),signal,
   })

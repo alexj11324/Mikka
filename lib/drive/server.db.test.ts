@@ -113,6 +113,14 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
   const mismatch = await call(`/${volume.id}/entries`, { method: 'PATCH', body: { ...writeA, changes: [{ ...writeA.changes[0], path: 'another.txt' }] } })
   assert.equal(mismatch.status, 409)
   assert.equal((await mismatch.json()).error, 'drive_replay_mismatch')
+  const duplicatePath = await call(`/${volume.id}/entries`, { method: 'PATCH', body: {
+    expectedDigest: restoredBody.headDigest, mutationId: randomUUID(),
+    changes: [{ op: 'delete', path: 'same.txt' }, { op: 'delete', path: 'same.txt' }],
+  } })
+  assert.equal(duplicatePath.status, 422)
+  assert.equal(duplicatePath.headers.get('cache-control'), 'private, no-store')
+  assert.equal(duplicatePath.headers.get('x-content-type-options'), 'nosniff')
+  assert.deepEqual(await duplicatePath.json(), { error: 'drive_write_invalid' })
   for (const path of ['../escape', '/absolute', 'bad\\path', 'a//b']) {
     const invalid = await call(`/${volume.id}/entries`, { method: 'PATCH', body: { expectedDigest: restoredBody.headDigest, mutationId: randomUUID(), changes: [{ ...writeA.changes[0], path }] } })
     assert.equal(invalid.status, 400)
