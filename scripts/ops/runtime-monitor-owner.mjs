@@ -5,7 +5,7 @@ import { readServingPromotion, readWebAuthority } from '../release/cloudflare-pr
 import { githubRead } from '../release/web-deploy.mjs'
 
 const issue='https://api.github.com/repos/alexj11324/Mikka/issues/1951'
-const reference=/^[1-9][0-9]{0,15}-[a-f0-9]{64}$/
+const reference=/^(?:[1-9][0-9]{0,15}-[a-f0-9]{64}|actions:[1-9][0-9]{0,15}:[1-9][0-9]{0,15})$/
 const sha=/^[a-f0-9]{64}$/
 const digest=text=>createHash('sha256').update(text).digest('hex')
 const needed=['scheduledCadence','runtimeComparison','requestSlis','pressureDelivery','filesystemDelivery','queryAttribution']
