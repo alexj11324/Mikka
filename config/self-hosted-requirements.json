@@ -6,6 +6,13 @@
     "test": "tests/task-create-only.db.test.ts",
     "suite": "test:coordinator-issue-create-db"
   },
+  "app/api/conversations/read-state/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Record the personal read position or manual unread flag for visible runs in the selected workspace using the installation database.",
+    "test": "lib/thread-reads.db.test.ts",
+    "suite": "test:conversation-reads"
+  },
   "app/api/drive/volumes/[volumeId]/blobs/route.ts": {
     "mode": "built-in",
     "environment": [],
@@ -1382,5 +1389,40 @@
     "behavior": "Read only the requested account's Telegram link from the installation database. Report the bot configured only when all three operator inputs exist; normalize its public username and keep unlinked accounts disconnected.",
     "test": "tests/telegram-task-link.db.test.ts",
     "suite": "test:task-identity-db"
+  },
+  "drizzle/20261113164616_thread_read_watermarks.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Extend the installation’s existing per-user conversation read rows with a run activity timestamp and a revision for manual unread marks.",
+    "test": "lib/thread-reads.db.test.ts",
+    "suite": "test:conversation-reads"
+  },
+  "lib/conversation-reads-store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Compute Bot unread totals and retain per-workspace Coordinator positions using the installation database.",
+    "test": "lib/conversation-reads-store.test.ts",
+    "suite": "test:conversation-reads"
+  },
+  "lib/live/lists.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Notify only the reader in the current workspace of thread list changes using the existing live transport.",
+    "test": "lib/live/lists.db.test.ts",
+    "suite": "test:live-db"
+  },
+  "lib/thread-read-client.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Post same-origin reader acknowledgements to the installation’s own conversation read endpoint.",
+    "test": "lib/thread-reads.db.test.ts",
+    "suite": "test:conversation-reads"
+  },
+  "lib/thread-reads.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Persist scoped run read positions and manual marks in the existing PostgreSQL database.",
+    "test": "lib/thread-reads.db.test.ts",
+    "suite": "test:conversation-reads"
   }
 }

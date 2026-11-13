@@ -1,11 +1,8 @@
 import 'server-only'
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
-import { db, pool } from '@/lib/db'
 import { agentRuns, conversationReads, issues } from '@/lib/db/schema'
-import { withTaskWorkspace } from '@/lib/task-workspace'
 import { ActionFailureError } from '@/lib/action-error'
-import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
-import { ownerListChanged } from '@/lib/live/lists'
+import type { IssueReader } from '@/lib/issue-visibility'
 
 // Match the transcript's precision. A reply and the end of a run are things
 // a reader can see. Lease renewals, title changes and the owner's sends are not.
@@ -25,12 +22,14 @@ export type ThreadReadChange =
  * authorized run supplies a watermark; the client cannot create a future one. */
 export async function threadReadReceipts(userId: string, runIds: string[]) {
   if (!runIds.length) return []
+  const { db } = await import('@/lib/db')
   const result = await db.select({ id: agentRuns.id, activity: threadReadActivity.mapWith(agentRuns.finishedAt), revision: threadReadRevision, unread: threadUnread })
     .from(agentRuns).leftJoin(conversationReads, joinThreadRead(userId)).where(and(eq(agentRuns.userId, userId), inArray(agentRuns.id, runIds)))
   return result.map(({ id, activity, revision, unread }) => ({ id, through: activity?.toISOString() ?? null, revision, unread }))
 }
 
 export async function changeThreadRead(reader: IssueReader, workspaceId: string, change: ThreadReadChange) {
+  const { withTaskWorkspace } = await import('@/lib/task-workspace')
   try {
     return await withTaskWorkspace(reader, workspaceId, () => writeThreadRead(reader, workspaceId, change))
   } catch (error) {
@@ -40,7 +39,9 @@ export async function changeThreadRead(reader: IssueReader, workspaceId: string,
 }
 
 async function writeThreadRead(reader: IssueReader, workspaceId: string, change: ThreadReadChange) {
+  const { db, pool } = await import('@/lib/db')
   const userId = typeof reader === 'string' ? reader : reader.id
+  const { issueVisibility } = await import('@/lib/issue-visibility')
   const visibility = await issueVisibility(reader, false, workspaceId, db, { withTeamLinks: false })
   if (!visibility.workspaceIds.includes(workspaceId)) return false
   const visible = db.select({ key: threadReadKey.as('key'), activity: threadReadActivity.as('activity') })
@@ -69,6 +70,6 @@ async function writeThreadRead(reader: IssueReader, workspaceId: string, change:
        or (r."manuallyUnread" and ${revision})
     returning 1
   ) select exists(select 1 from visible) as found, exists(select 1 from applied) as changed`)
-  if (result.rows[0]?.changed) await ownerListChanged(pool, userId, ['thread_list'])
+  if (result.rows[0]?.changed) await (await import('@/lib/live/lists')).threadReadChanged(pool, userId, workspaceId)
   return change.action === 'readAll' || Boolean(result.rows[0]?.found)
 }

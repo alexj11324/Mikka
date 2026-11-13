@@ -188,6 +188,23 @@ test("the Coordinator conversation reads its bot's rows once the route names tha
     assert.deepEqual(await handleRead(pool!, carolReq({})), { status: 200, body: { lastReadMessageId: null, lastReadPosition: null, unreadCount: 1 } })
     assert.deepEqual(await handleRead(pool!, carolReq({ method: 'POST', body: JSON.stringify({ messageId: '1' }) })),
       { status: 200, body: { lastReadMessageId: message, lastReadPosition: 1, unreadCount: 0 } })
+    const second = randomUUID()
+    await pool!.query('insert into bots (id,"ownerId","workspaceId",name) values ($1,$2,$3,$4)', [second, carol, randomUUID(), 'Other workspace Coordinator'])
+    try {
+      const next = randomUUID()
+      await pool!.query('insert into coordinator_messages (id,"userId","botId",position,message) values ($1,$2,$3,1,$4)', [next, carol, second, { role: 'assistant', content: 'other reply' }])
+      // An installation upgraded with the old alias row must retain that
+      // cursor only for the bot whose message it points at.
+      await pool!.query('update conversation_reads set "conversationId"=$2 where "userId"=$1', [carol, 'coordinator'])
+      assert.deepEqual((await handleRead(pool!, carolReq({}))).body, { lastReadMessageId: message, lastReadPosition: 1, unreadCount: 0 })
+      const other = { coordinatorBot: async () => second }
+      assert.deepEqual(await handleRead(pool!, carolReq(other)), { status: 200, body: { lastReadMessageId: null, lastReadPosition: null, unreadCount: 1 } })
+      await handleRead(pool!, carolReq({ ...other, method: 'POST', body: JSON.stringify({ messageId: next }) }))
+      assert.deepEqual((await handleRead(pool!, carolReq({}))).body, { lastReadMessageId: message, lastReadPosition: 1, unreadCount: 0 })
+    } finally {
+      await pool!.query('delete from coordinator_messages where "botId"=$1', [second])
+      await pool!.query('delete from bots where id=$1', [second])
+    }
     // Another person's bot named as the Coordinator is refused like any foreign bot.
     assert.equal((await handleRead(pool!, carolReq({ coordinatorBot: async () => bobBot }))).status, 404)
   } finally {

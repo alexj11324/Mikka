@@ -86,7 +86,11 @@ async function unreadCount(q: Queryable, ownerId: string, after: number, botId: 
 
 async function current(q: Queryable, userId: string, conversationId: string, ownerId: string, botId: string | null): Promise<ConversationRead> {
   const { rows } = await q.query<{ lastReadPosition: number; lastReadMessageId: string | null }>(
-    'select "lastReadPosition", "lastReadMessageId" from conversation_reads where "userId" = $1 and "conversationId" = $2', [userId, conversationId])
+    `select "lastReadPosition", "lastReadMessageId" from conversation_reads
+      where "userId"=$1 and ("conversationId"=$2 or
+        ("conversationId"='coordinator' and exists (select 1 from coordinator_messages m
+          where m.id::text=conversation_reads."lastReadMessageId" and m."userId"=$1 and m."botId"=$3::uuid)))
+      order by "lastReadPosition" desc limit 1`, [userId, conversationId, botId])
   const row = rows[0]
   const position = row ? Number(row.lastReadPosition) : null
   return { lastReadMessageId: row?.lastReadMessageId ?? null, lastReadPosition: position, unreadCount: await unreadCount(q, ownerId, position ?? 0, botId) }
@@ -97,20 +101,20 @@ async function current(q: Queryable, userId: string, conversationId: string, own
  * message id and updatedAt change only when it does.
  */
 export async function markRead(q: Queryable, userId: string, conversationId: string, ownerId: string, messageId: string, position: number, botId: string | null = conversationBot(conversationId)): Promise<ConversationRead> {
-  const { rows } = await q.query<{ lastReadPosition: number; lastReadMessageId: string | null }>(`
+  const { rows } = await q.query(`
     insert into conversation_reads as r ("userId", "conversationId", "lastReadPosition", "lastReadMessageId", "updatedAt")
     values ($1, $2, $3, $4, now())
     on conflict ("userId", "conversationId") do update set
-      "lastReadPosition" = greatest(r."lastReadPosition", excluded."lastReadPosition"),
-      "lastReadMessageId" = case when excluded."lastReadPosition" > r."lastReadPosition" then excluded."lastReadMessageId" else r."lastReadMessageId" end,
-      "updatedAt" = case when excluded."lastReadPosition" > r."lastReadPosition" then excluded."updatedAt" else r."updatedAt" end
-    returning "lastReadPosition", "lastReadMessageId"`, [userId, conversationId, position, messageId])
+      "lastReadPosition" = excluded."lastReadPosition",
+      "lastReadMessageId" = excluded."lastReadMessageId",
+      "updatedAt" = now()
+    where excluded."lastReadPosition" > r."lastReadPosition"
+    returning 1`, [userId, conversationId, position, messageId])
   if (botId) {
-    await q.query('UPDATE chat_preferences SET "markedUnread"=false, "updatedAt"=now() WHERE "userId"=$1 AND "chatKey"=$2 AND "markedUnread"', [userId, botId])
-    await (await import('./live/lists')).ownerListChanged(q, userId, ['bot_chat_list'])
+    const cleared = await q.query('UPDATE chat_preferences SET "markedUnread"=false, "updatedAt"=now() WHERE "userId"=$1 AND "chatKey"=$2 AND "markedUnread" RETURNING 1', [userId, botId])
+    if (rows.length || cleared.rows.length) await (await import('./live/lists')).ownerListChanged(q, userId, ['bot_chat_list'])
   }
-  const row = rows[0]
-  return { lastReadMessageId: row.lastReadMessageId, lastReadPosition: Number(row.lastReadPosition), unreadCount: await unreadCount(q, ownerId, Number(row.lastReadPosition), botId) }
+  return current(q, userId, conversationId, ownerId, botId)
 }
 
 export interface ReadRequest {
@@ -135,7 +139,9 @@ export async function handleRead(q: Queryable, request: ReadRequest): Promise<Re
   if (!ownerId) return { status: 404, body: { error: 'conversationNotFound' } }
   const botId = conversationBot(request.conversationId) ?? (request.conversationId === COORDINATOR_CONVERSATION && request.coordinatorBot ? await request.coordinatorBot() : null)
   if (botId && !(await q.query('select 1 from bots where id = $1::uuid and "ownerId" = $2', [botId, ownerId])).rows.length) return { status: 404, body: { error: 'conversationNotFound' } }
-  if (request.method === 'GET') return { status: 200, body: await current(q, request.userId, request.conversationId, ownerId, botId) }
+  // The Coordinator alias resolves to a different bot in each workspace.
+  const key = botId ? `bot:${botId}` : request.conversationId
+  if (request.method === 'GET') return { status: 200, body: await current(q, request.userId, key, ownerId, botId) }
   let messageId: unknown
   try {
     messageId = (JSON.parse(request.body ?? '') as { messageId?: unknown } | null)?.messageId
@@ -144,7 +150,7 @@ export async function handleRead(q: Queryable, request: ReadRequest): Promise<Re
   }
   const message = await resolveMessage(q, ownerId, messageId, botId)
   if (!message) return { status: 422, body: { error: 'messageNotFound' } }
-  return { status: 200, body: await markRead(q, request.userId, request.conversationId, ownerId, message.id, message.position, botId) }
+  return { status: 200, body: await markRead(q, request.userId, key, ownerId, message.id, message.position, botId) }
 }
 
 /** Read every visible bot's own chat without one request per sidebar row. As
