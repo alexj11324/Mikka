@@ -389,6 +389,13 @@
     "test": "lib/board-filters.test.ts",
     "suite": "test:issues"
   },
+  "lib/bot-model-optimistic.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Preview only an existing authorized chat-model option while its write is pending; the server still owns validation, persistence, and rollback in both cloud and self-hosted editions.",
+    "test": "lib/bot-model-optimistic.test.ts",
+    "suite": "test:execution-rules"
+  },
   "lib/cloud-computer/sponsored-lifecycle.ts": {
     "mode": "optional-cloud",
     "environment": [
