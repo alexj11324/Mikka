@@ -126,7 +126,7 @@ export function threadTime(thread: { createdAt: Date; finishedAt: Date | null },
 export const ISSUE_THREAD_LIMIT = 20
 
 export interface IssueThreadRow {
-  id: string; issueId: string | null; userId: string; status: string; prompt: string
+  id: string; issueId: string | null; userId: string; status: string; prompt: string; title?: string | null
   report: unknown; error: string | null; failureDetails?: unknown; createdAt: Date; finishedAt: Date | null
   agentName: string; harness: string; ownerName?: string | null
   stopRequestedAt?: Date | null
@@ -185,7 +185,7 @@ export function projectIssueThreads(rows: readonly (IssueThreadRow | IssueThread
       stopping: runIsActive(row.status) && !!row.stopRequestedAt,
       ownerName: row.userId === viewerId ? null : row.ownerName ?? null,
       detail: canReadThread(row.userId, viewerId, memberIds)
-        ? { name: 'prompt' in row ? threadName(row.prompt, row.agentName) : row.name, agentName: row.agentName, harness: row.harness, ...('report' in row ? runSummaryView({ report: row.report, error: row.error }) : { summary: row.summary }), bot: row.botColor && row.botShape ? { color: row.botColor, shape: row.botShape } : null, ...(row.profile !== undefined ? { profile: threadProfile(row.profile) } : {}) }
+        ? { name: 'prompt' in row ? row.title || threadName(row.prompt, row.agentName) : conversationTitle({ name: row.name }) || row.agentName, agentName: row.agentName, harness: row.harness, ...('report' in row ? runSummaryView({ report: row.report, error: row.error }) : { summary: row.summary }), bot: row.botColor && row.botShape ? { color: row.botColor, shape: row.botShape } : null, ...(row.profile !== undefined ? { profile: threadProfile(row.profile) } : {}) }
         : null,
       rootRunId: row.id, latestRunId: row.id,
       attempts: [{ runId: row.id, attempt: 1, status: row.status, outcome: row.outcome ?? null, stopping: runIsActive(row.status) && !!row.stopRequestedAt, createdAt: row.createdAt, finishedAt: row.finishedAt }],

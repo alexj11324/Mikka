@@ -1,4 +1,5 @@
 import type { ReviewLineSummary } from './code-review/summary-text'
+import type { InboxSource } from './inbox/contract'
 import type { IssueStatus } from './issue-meta'
 import { taskBlock, type BlockIssue } from './task-blocked'
 import type { FactoryFlowView } from './factory/public-flow'
@@ -6,6 +7,8 @@ import { taskStateOf, type TaskStateContext, type TaskStateRun, type TaskStateVi
 
 export type TaskPresentation = TaskStateView & {
   version: 1
+  /** Missing on cached snapshots from before the Inbox attention projection. */
+  inboxReason?: InboxSource['reason']
   /** Opt-in list context for opening the authorized Factory on user selection. */
   factoryTaskId?: string
   /** Reader-owned Bots with a verified dispatch in this Task’s workspace. */
@@ -19,6 +22,21 @@ export type TaskPresentation = TaskStateView & {
   blockedReason: NonNullable<ReturnType<typeof taskBlock>>['reason'] | 'factory' | null
   completion: 'merged' | 'accepted' | null
 }
+/** Board attention is personal (including snooze and dismissal); task lifecycle is shared. */
+export function boardActivityState(task: TaskPresentation): TaskStateView {
+  if (task.inboxReason === undefined) return task
+  if (task.inboxReason === null) return task.group === 'pending' ? { ...task, state:'todo', reason:null, group:'todo' } : task
+  const common = { group: 'pending' as const, blockedBy: null }
+  switch (task.inboxReason) {
+    case 'needsReply': return { ...common, state:'waiting', reason:'needs_input' }
+    case 'confirm': return { ...common, state:'waiting', reason:'approval' }
+    case 'review': return { ...common, state:'waiting', reason:'pr_review' }
+    case 'offline': case 'quota': return { ...common, state:'blocked', reason:task.inboxReason }
+    case 'failed': return { ...common, state:'failed', reason:null }
+    default: return { ...common, state:'blocked', reason:'blocked' }
+  }
+}
+
 type PresentationContext = Pick<TaskStateContext, 'schedule'> & { blockerIdentifier?: (id: string) => string | null }
 
 /** This projection describes work; it does not authorize approval or change
