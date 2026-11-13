@@ -4395,17 +4395,12 @@
   },
   "IssueThreads": {
     "organization": {
-      "rename": "Rename conversation",
-      "regenerate": "Regenerate title",
       "archive": "Archive conversation",
       "unarchive": "Unarchive conversation",
       "pin": "Pin conversation",
       "unpin": "Unpin conversation",
-      "titleLabel": "Conversation title",
-      "titleUnavailable": "A new title could not be generated.",
       "unavailable": "This conversation is no longer available.",
-      "failed": "Could not save the conversation change.",
-      "invalidTitle": "Enter a conversation title."
+      "failed": "Could not save the conversation change."
     },
     "title": "Threads",
     "modelSwitched": "Switched to",
@@ -4606,7 +4601,14 @@
     },
     "errorDetails": "Details",
     "fullInstructions": "View full instructions",
-    "hideInstructions": "Hide full instructions"
+    "hideInstructions": "Hide full instructions",
+    "conversationTitle": {
+      "rename": "Rename",
+      "regenerate": "Regenerate title",
+      "label": "Title",
+      "renameFailed": "Title not saved",
+      "regenerateFailed": "Couldn't generate a new title"
+    }
   },
   "Computer": {
     "status": {
@@ -4983,9 +4985,6 @@
     "board": {
       "toolbar": "Board toolbar",
       "scopeLabel": "Task scope",
-      "scope": {
-        "all": "All"
-      },
       "filter": "Filter",
       "filterField": {
         "status": "Status",

@@ -59,7 +59,7 @@ import { noteChipText } from '@/lib/browser/note'
 import { PERSON_BUBBLE } from '@/components/slots/chat-message'
 import type { ChatSpeaker } from '@/components/slots/chat-message-contract'
 import { replySegments, type ReplySegment } from '@/lib/coordinator/reply-segments'
-import { runThreadName } from '@/lib/coordinator/citations'
+import { runThreadName, runTitle } from '@/lib/coordinator/citations'
 import { MessageReactions, useMessageReactions } from '@/components/workspace/message-reactions'
 import { PendingActions } from './pending-actions'
 import { SubagentLoginNeeds } from './subagent-login-needs'
@@ -432,7 +432,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
     thread: id => {
       const run = sources?.[id]
       if (run?.kind !== 'run') return { title: t('citation.run') }
-      return { title: run.issue?.identifier ? `${run.issue.identifier} › ${run.name || runThreadName(run)}` : runThreadName(run), issueId: run.issue?.id ?? null, name: runThreadName(run) }
+      return { title: run.issue?.identifier ? `${run.issue.identifier} › ${runTitle(run) || runThreadName(run)}` : runThreadName(run), issueId: run.issue?.id ?? null, name: runThreadName(run) }
     },
   }, name)
   const openIssue = work.work ? work.openTask : onOpenIssue
