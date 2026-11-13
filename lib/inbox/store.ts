@@ -109,14 +109,15 @@ export class InboxStore {
     return (await tx.query<SourceRow>(this.sourceQuery(userId, workspaceId, scope, type, id))).rows
   }
 
-  async pendingCount(reader: InboxReader, workspaceId: string): Promise<number> {
+  async pendingCounts(reader: InboxReader, workspaceId: string) {
     const userId = typeof reader === 'string' ? reader : reader.id
     return this.guard(reader, workspaceId, async scope => {
       const source = this.sourceQuery(userId, workspaceId, scope)
-      const { rows } = await this.pool.query<{ count: number }>(
-        `SELECT coalesce(sum(greatest("questionCount",1)),0)::integer AS count
+      const { rows } = await this.pool.query<{ count: number; suggestionCount: number }>(
+        `SELECT coalesce(sum(greatest("questionCount",1)) FILTER (WHERE type <> 'suggestion'), 0)::integer AS count,
+                (count(*) FILTER (WHERE type = 'suggestion'))::integer AS "suggestionCount"
          FROM (${source.text}) eligible WHERE pending AND "snoozedUntil" IS NULL`, source.values)
-      return rows[0].count
+      return rows[0]
     })
   }
 

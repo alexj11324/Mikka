@@ -50,6 +50,11 @@ remain at that shared boundary.
 `historySince` is the actual time the migration ran, not the example above.
 History starts at that instant; earlier handling is not backfilled.
 
+`GET /api/inbox?workspaceId=<uuid>&count=1` returns `count` for actionable
+rows and `suggestionCount` for suggestions. Both exclude snoozed entries and
+respect the same workspace and source permissions as the pending list. The
+sidebar displays `count`. Each pending Factory question counts once.
+
 `type` is `task` or `suggestion`. A task's `id` and `issueId` are its task UUID;
 `runId` identifies its latest attempt. Suggestions use their existing suggestion
 UUID. Task `source` is `agent`; suggestion `source` is its connected app. Task

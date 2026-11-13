@@ -98,6 +98,9 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
     assert.deepEqual(new Set((await list(owner, personal)).items.map(i => i.id)), new Set([privateIssue, suggestion]))
     const mine = await list()
     assert.deepEqual(new Set(mine.items.map(i => i.id)), new Set([issue, teamSuggestion]))
+    const counts = (viewer: string) => handleInbox(new Request(`https://mikka.test/api/inbox?workspaceId=${workspace}&count=1`), { id: viewer }, store).then(res => res.json())
+    assert.deepEqual(await counts(owner), { count: 1, suggestionCount: 1 })
+    assert.deepEqual(await counts(peer), { count: 1, suggestionCount: 0 })
     const shared = await list(peer)
     assert.deepEqual(shared.items.map(i => i.id), [issue])
     assert.ok(!shared.items[0].actions.includes('reply'))
@@ -162,14 +165,14 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
     }
     const includes = async (user: string, tab: 'pending' | 'snoozed' | 'done' = 'pending') =>
       (await ids(user, tab)).some(item => item.id === review)
-    const ownerCount = await store.pendingCount(owner, workspace)
+    const ownerCount = (await store.pendingCounts(owner, workspace)).count
     for (const [status, states] of [['review', []], ['todo', ['merged','draft']], ['todo', ['open']], ['todo', ['merged']], ['done', ['open']]] as const) {
       const pullRequests = states.map(state => ({ state, url: 'https://github.com/example/example/pull/1' }))
       await pool.query('UPDATE issues SET status=$2,content=$3 WHERE id=$1', [review, status, {attrs:{mikka:{pullRequests}}}])
       const waiting = taskStateOf({ status, metadata: { pullRequests } }).state === 'waiting'
       const row = (await ids(owner)).find(item => item.id === review)
       assert.equal(Boolean(row), waiting)
-      assert.equal(await store.pendingCount(owner, workspace), ownerCount - Number(!waiting))
+      assert.equal((await store.pendingCounts(owner, workspace)).count, ownerCount - Number(!waiting))
       if (row) {
         assert.equal(row.reason, 'review')
         assert.equal(row.runId, null)
@@ -177,12 +180,12 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
       }
     }
     await pool.query("UPDATE issues SET status='review' WHERE id=$1", [review])
-    const count = await store.pendingCount(peer, workspace)
+    const count = (await store.pendingCounts(peer, workspace)).count
     assert.equal(await includes(peer), false)
     await pool.query(`INSERT INTO resource_access_grants("resourceKind","resourceId","subjectKind","subjectId",capabilities)
       VALUES('project',$1,'account',$2,ARRAY['canReadContent'])`, [project,peer])
     assert.equal(await includes(peer), true)
-    assert.equal(await store.pendingCount(peer, workspace), count + 1)
+    assert.equal((await store.pendingCounts(peer, workspace)).count, count + 1)
     const until = new Date(now.getTime() + 60_000).toISOString()
     assert.equal((await store.command(peer, {workspaceId: workspace, type:'task', id:review, action:'snooze', until})).changed, true)
     assert.equal(await includes(peer, 'snoozed'), true)
@@ -234,8 +237,8 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
     }
     assert.equal((await list()).items.length, 0)
     assert.equal((await list(owner, workspace, 'snoozed')).items.length, 2)
-    assert.equal(await store.pendingCount(owner, workspace), 0, 'badge excludes both snoozed rows')
-    assert.equal(await store.pendingCount(peer, workspace), 1, 'badge respects viewer scope')
+    assert.equal((await store.pendingCounts(owner, workspace)).count, 0, 'badge excludes both snoozed rows')
+    assert.equal((await store.pendingCounts(peer, workspace)).count, 1, 'badge respects viewer scope')
     assert.equal((await list(peer)).items.length, 1, 'personal snooze never hides a teammate task')
     assert.equal(await store.nextDue(), due.getTime())
     const before = pushes.length
