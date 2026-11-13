@@ -117,3 +117,10 @@ test('a thread cited straight after its task is marked as that task\'s pair; any
   assert.deepEqual(after(`[[run:${RUN}]] [[issue:${ISSUE}]]`), [['run', null], ['issue', null]], 'the other order')
   assert.deepEqual(pairCitations(splitCitations(`看 [[issue:${ISSUE}]]   [[run:${RUN}]]。`)).map(part => part.type === 'text' ? part.text : part.type), ['看 ', 'citation', 'citation', '。'], 'the gap is the thread\'s to draw: one word gap')
 })
+
+test('the bounded fallback never ends inside a word', () => {
+  assert.equal(runTitle({ name: '排查登录回调里丢失的 workspace 前缀和查询参数', issue: null }), '排查登录回调里丢失的', 'a Latin word that does not fit is left out whole')
+  assert.equal(runTitle({ name: '升级 Next 到 16 并修复构建', issue: null }), '升级 Next 到 16', '12 characters, cut between words')
+  assert.equal(runTitle({ name: `Fix ${'a'.repeat(30)} ${'b'.repeat(40)} now`, issue: null }), `Fix ${'a'.repeat(30)}`, '60 characters, without half of the next word')
+  assert.equal(runTitle({ name: 'x'.repeat(200), issue: null }), 'x'.repeat(60), 'one unbroken word is still held to 60')
+})

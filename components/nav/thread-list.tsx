@@ -33,7 +33,7 @@ export const TWO_LINE_ROW = 'flex h-auto w-full flex-col items-stretch justify-s
 export function threadName(thread: Thread, issues: Issue[], fallback: string) {
   const issue = thread.issueId ? issues.find(item => item.id === thread.issueId) : undefined
   // The conversation's one short title (decision 2026-11-13-1405), after its task's code when it has a task.
-  const title = conversationTitle({ name: thread.prompt.split('\n').find(line => line.trim())?.trim(), issue })
+  const title = conversationTitle({ title: thread.title, name: thread.prompt.split('\n').find(line => line.trim())?.trim(), issue })
   return [issue && issueIdentifier(issue), title].filter(Boolean).join(' ') || fallback
 }
 

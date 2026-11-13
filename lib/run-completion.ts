@@ -7,6 +7,7 @@ import { db, pool, withDatabaseClient } from '@/lib/db'
 import { agentRuns, devices, issues, issueVersions, runTokens, type RunStatus } from '@/lib/db/schema'
 import { systemActor } from '@/lib/activity-actor'
 import { advancesTo, personChangedStatusSince } from '@/lib/task-status-advance'
+import { scheduleConversationTitle } from '@/lib/conversation-title-schedule'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { requireTaskWorkspace, withTaskWorkspace } from '@/lib/task-workspace'
 import { ActionFailureError } from '@/lib/action-error'
@@ -77,6 +78,8 @@ async function completeRunTransaction(userId: string, hint: { id: string; issueI
         failureDetails: completionFailureDetails(input, hint.id, { status, stopRequested: Boolean(run.run.stopRequestedAt), sensitiveText: [run.run.prompt, run.run.agentDefinition?.instructions ?? ''] }), finishedAt: new Date(), updatedAt: new Date() })
         .where(and(eq(agentRuns.id, hint.id), inArray(agentRuns.status, [...LIVE_STATUSES]))).returning({ id: agentRuns.id })
       if (!ended) return null
+      // Its real content is known now: the first run's end names the conversation again while its title is a generated one.
+      scheduleConversationTitle(tx, ended.id, run.run.userId, 'first_run_ended')
       await runListChanged(tx, ended.id)
       await runChanged(tx, ended.id)
       await tx.update(runTokens).set({ revokedAt: new Date() }).where(and(eq(runTokens.runId, ended.id), isNull(runTokens.revokedAt)))

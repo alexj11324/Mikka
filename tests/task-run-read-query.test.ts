@@ -29,7 +29,8 @@ const client = { query: async (config: { text: string; rowMode?: string }, param
   const text = config.text.replace(/\s+/g, ' ').trim()
   if (text.includes('select distinct on ("agent_runs"."issueId")')) {
     if (!taskRows) return { rows: [] }
-    const base = [ISSUE, RUN, 'Fixture issue', 'Codex', 'running', null, null]
+    // …, issueTitle, the conversation's stored title (none) and the opening of what it was asked, agentName, …
+    const base = [ISSUE, RUN, 'Fixture issue', null, '', 'Codex', 'running', null, null]
     if (text.includes('"latest_task_runs"')) {
       return { rows: [[...base, EXPIRY, ['codex'], ...Object.values(look)],
         [ISSUE.replace(/1$/, '4'), RUN.replace(/2$/, '5'), ...base.slice(2), EXPIRY, ['codex'], null, null, null, null]] }
@@ -41,7 +42,7 @@ const client = { query: async (config: { text: string; rowMode?: string }, param
   if (text.includes('string_agg(md5(to_jsonb(snapshot)::text)')) return { rows: [{ version: SIGNATURE, expiresAt: expiry }] }
   if (text.startsWith('select min(')) return { rows: [[expiry]] }
   if (text.includes('md5(to_jsonb(thread_list_expiry)::text)')) return { rows: threadRows ? [[RUN, ROW_SIGNATURE]] : [] }
-  if (text.includes('"thread_list_expiry"')) return { rows: [[RUN, null, 'Fixture agent', ISSUE, 'Fixture task', 'running',
+  if (text.includes('"thread_list_expiry"')) return { rows: [[RUN, null, 'Fixture agent', ISSUE, 'Fixture task', null, 'running',
     '2099-01-01T00:00:00.000Z', '2099-01-02T00:00:00.000Z', 'Fixture reply', null, null, null, null, null, false, 'codex', null, null]] }
   throw Error('Unexpected fixture query')
 } }

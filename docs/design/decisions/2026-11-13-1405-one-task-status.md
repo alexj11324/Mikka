@@ -64,14 +64,24 @@ One rule for every move (`lib/task-status-advance.ts`): forward only along 待�
 - Task titles are not restricted or rewritten by this.
 - In a reply, a task's chip directly followed by its own thread (nothing but spaces between) is one reference: the chip (status icon and code), one word gap, then the thread's short title as a link. Each keeps its own click target, and they are never two pills. When that thread's dispatch card sits right under the reply, the inline thread title is left out and the chip stays.
 
-### Decided, not built yet
+### The stored title
 
-Alex decided that a conversation owns a stored title of its own, as Capy's threads do (`PATCH …/jams/:id` rename, `POST …/regenerate-title`, `titleTriggers: pull_opened | first_run_ended`). The display helper (`conversationTitle`) already reads a stored title first. Still to build:
+A conversation owns its title, as Capy's threads do (`PATCH …/jams/:id` rename, `POST …/regenerate-title`, `titleTriggers: pull_opened | first_run_ended`).
 
-1. Storage on the chain's first run (`agent_runs.title`, `agent_runs.titleSource` `generated | manual`; additive, nullable, with the short-title check), shared by the runs that continue it ([2343](2026-11-10-2343-thread-attempt-is-a-run-in-a-chain.md)).
-2. A background small-model job in the pattern of `lib/short-title-schedule.ts`: a first title from the prompt, and a new one when the first run ends and when a PR is opened, only while the title is a generated one. Never on a render path, no bulk backfill.
-3. Rename and regenerate actions on the thread header's menu.
-4. Later: a configurable title prompt and triggers per workspace and person, with audit events; the iOS app.
+- **Storage.** `agent_runs.title` (60 characters, the task short title's check) and `agent_runs.titleSource` (`generated` or `manual`). A thread is a run and the runs that continue it ([2343](2026-11-10-2343-thread-attempt-is-a-run-in-a-chain.md)); chains have no row of their own, so every run of the chain carries the same title and a write covers the whole chain. No backfill: an older conversation keeps the bounded fallback.
+- **Generation.** The small model that writes a task's short title writes this one too, through the same call, admission, prompt, parsing and limits (`generateShortTitle`, `lib/short-title-server.ts`). It runs after the response as a background job, never on a render path and never blocking a run; a failure leaves the fallback. It reads only the recorded task range of the prompt, never the execution instructions around it.
+- **Triggers** (`lib/conversation-title.ts`):
+  - created: named from what it was asked. A run that continues a conversation takes that conversation's title without a model call.
+  - first run ended, and PR opened: named again from what it did and the PR's title, only while the title is a generated one.
+- **A person's rename wins.** `renameConversation` holds the typed title to the same bound, writes it on every run of the conversation and marks it `manual`; no trigger replaces it, and a rename that lands while the model is answering is kept. `regenerateConversationTitle` is the person asking for a generated title again, so it is the one path that replaces a manual one.
+- **The fallback** never ends inside a word: a Latin word or a number that does not fit is left out whole.
+- **Where it is read.** Thread links and their hover cards, thread rows, the thread header, waiting rows in 收件箱, the dispatch card, and the run list's name that desktop notifications use.
+
+Not built:
+
+- No rename or regenerate control on screen. The thread header (`components/slots/thread-header-contract.ts`) has no menu to put them in; the two server actions exist and are tested.
+- A configurable title prompt and triggers per workspace and person, with audit events.
+- The iOS app.
 
 ## Left for a follow-up
 

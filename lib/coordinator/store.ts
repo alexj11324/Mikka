@@ -281,13 +281,14 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
   // The prompt and tool count belong to the same authorized owner runs. One
   // bounded projection avoids opening a third APP connection beside tasks.
   const [ownedRuns, tasks] = await Promise.all([
-    ownIds.length ? db.select({ id: agentRuns.id, prompt: threadNamePrompt,
+    ownIds.length ? db.select({ id: agentRuns.id, prompt: threadNamePrompt, title: agentRuns.title,
       steps: sql<number>`(select count(*) from ${runChunks} c where c."runId" = agent_runs.id
         and c.chunk->>'type' = 'tool-input-available')`.mapWith(Number),
     }).from(agentRuns).where(and(inArray(agentRuns.id, ownIds), eq(agentRuns.userId, userId))) : [],
     issuesForUser(reader, runIssueIds, false, db, { projection: 'citation', withTeamLinks: false }),
   ])
   const prompts = new Map(ownedRuns.map(row => [row.id, row.prompt]))
+  const titles = new Map(ownedRuns.map(row => [row.id, row.title]))
   const steps = new Map(ownedRuns.map(row => [row.id, row.steps]))
   // Every cited and run task's display identifier in one lookup.
   const identifiers = await taskIdentifiers([
@@ -319,6 +320,7 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
     sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, outcome: row.outcome ?? null, stopReason: row.stopReason ?? null, group, issue,
       pullRequests,
       // A thread of a task with no recorded request is named by its task's short title (conversationTitle), not by its Agent.
+      title: titles.get(row.id) ?? null,
       name: threadName(prompts.get(row.id) ?? '', issue ? '' : row.agentName), summary: runSummaryText(row), steps: steps.get(row.id) ?? 0,
       createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null }
   }

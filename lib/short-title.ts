@@ -36,9 +36,20 @@ export function shortTitlePrompt(task: { title: string; body: string }): { instr
 const LEADING_KEY = /^\s*(?:\[\s*)?(?:[A-Za-z][A-Za-z0-9]*-\d+|#\d+)(?:\s*\])?\s*[:：\-–—·|]?\s*/
 const TRAILING_DATE = /\s*[-–—·|,，(（[]?\s*(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}(?:[ T]\d{1,2}:\d{2}(?::\d{2})?)?|\d{1,2}:\d{2})\s*[)）\]]?\s*$/
 
+const WORD_CHAR = /[A-Za-z0-9]/
+
+/** Where to cut `chars` at `max` without ending inside a Latin word or a number: back to that word's start, unless it is the whole text. */
+function cutBeforeWord(chars: string[], max: number): number {
+  if (chars.length <= max) return chars.length
+  if (!WORD_CHAR.test(chars[max - 1]!) || !WORD_CHAR.test(chars[max]!)) return max
+  let start = max
+  while (start > 0 && WORD_CHAR.test(chars[start - 1]!)) start--
+  return start > 0 ? start : max
+}
+
 function limitShortTitle(title: string, cjk: boolean): string {
-  const limited = cjk ? [...title].slice(0, SHORT_TITLE_CJK_MAX).join('') : title.split(' ').slice(0, SHORT_TITLE_WORDS_MAX).join(' ')
-  return [...limited].slice(0, SHORT_TITLE_CHARS_MAX).join('').trim()
+  const chars = [...(cjk ? title : title.split(' ').slice(0, SHORT_TITLE_WORDS_MAX).join(' '))]
+  return chars.slice(0, cutBeforeWord(chars, cjk ? SHORT_TITLE_CJK_MAX : SHORT_TITLE_CHARS_MAX)).join('').trim()
 }
 
 /** Cleans what the model wrote and holds it to the limit; null when nothing usable is left. */

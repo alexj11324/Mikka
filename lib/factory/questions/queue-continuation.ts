@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { scheduleConversationTitle } from '@/lib/conversation-title-schedule';
 import { hostedSnapshot } from '../../cloud-computer/sponsored-task';
 import { copyRunPrompt } from '../../run-prompt-copy';
 import type { Pool, PoolClient } from 'pg';
@@ -99,6 +100,8 @@ export async function queueCloudQuestionContinuation(
   // The answered question resumes the same entry. A legacy origin row keeps
   // the host recovery origin instead of inventing one.
   const entry = resolveRunOrigin({ sourceRun: origin, defaultOrigin: origin.source === 'mcp' ? 'api' : 'automation' });
+  // The conversation is named once this commits (decision 2026-11-13-1405); a run that continues one takes its title.
+  scheduleConversationTitle(tx, runId, userId, 'created')
   await tx.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",source,status,kind,"baseBranch",prompt,"agentDefinition",attempt,"promptTaskStart","promptTaskLength",origin,"originRef")
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'queued',$9,$10,$11,$12,$13,$14,$15,$16,$17)`, [runId,userId,origin.issueId,origin.agentId,origin.deviceId,origin.deviceRepoId,origin.botId,origin.source,origin.kind,origin.baseBranch,prompt,JSON.stringify(retryWorkerDefinition(origin.agentDefinition,prompt)),origin.attempt,copied.promptTaskStart,copied.promptTaskLength,
     entry.origin, entry.originRef ? JSON.stringify(entry.originRef) : null]);

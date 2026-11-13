@@ -16,6 +16,7 @@ import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { workspaceDb } from '@/lib/workspace-db'
 import { systemActor } from '@/lib/activity-actor'
 import { advancesTo, personChangedStatusSince } from '@/lib/task-status-advance'
+import { scheduleConversationTitle } from '@/lib/conversation-title-schedule'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runFinishedEvent } from '@/lib/coordinator-events'
 import { publicationBranch, publicationGate } from '@/lib/run-publication-policy'
@@ -117,6 +118,8 @@ async function finishResult(tx: Transaction, run: Run, publication?: { pullReque
       let content = task.content
       if (pr) {
         const found = metadata.pullRequests.some(existing => existing.url.replace(/\/$/, '') === pr.url)
+        // A PR opened: the conversation is named again from what it delivered, while its title is a generated one.
+        if (!found) scheduleConversationTitle(tx, run.id, run.userId, 'pull_opened')
         if (!found && metadata.pullRequests.length >= 10) throw new PublicationError('pull_request_limit')
         const pullRequests = found ? metadata.pullRequests.map(existing => existing.url.replace(/\/$/, '') === pr.url ? pr : existing) : [...metadata.pullRequests, pr]
         content = withIssueMetadata(task.content, { ...metadata, pullRequests })
