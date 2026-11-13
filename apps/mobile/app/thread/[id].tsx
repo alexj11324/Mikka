@@ -1,3 +1,4 @@
+import { useThreadDeliveryControls } from '@/features/chat/components/thread-delivery-controls'
 import { conversationAccessDenied, useConversationDelivery } from '@/features/chat/components/conversation-delivery'
 import { StyleSheet, View } from 'react-native'
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
@@ -37,8 +38,9 @@ export default function ThreadScreen() {
   // ended thread changes only when it runs again. Each read is the whole conversation.
   const { data, error, reload } = useLiveApi<ThreadDetail>(`/api/mobile/threads/${id}`, current => threadLive(current, id))
   const canSend = Boolean(data && data.canReply !== false && !conversationAccessDenied(error))
-  const delivery = useConversationDelivery(canSend ? { kind: 'thread', id, issueId: data?.issueId ?? null } : null,
-    data?.confirmedSubmissionIds ?? [], reload)
+  const controls = useThreadDeliveryControls(id, data?.issueId ?? null, canSend ? data?.delivery : undefined, reload)
+  const delivery = useConversationDelivery(canSend ? { kind: 'thread', id, issueId: data?.issueId ?? null, delivery: controls.mode } : null,
+    [...(data?.confirmedSubmissionIds ?? []), ...(data?.delivery?.queued.map(row => row.requestId) ?? [])], reload)
   const thread = data?.thread
   // 停止 a working thread, as on the web; a thread that ended meanwhile (409) has nothing left to stop.
   const stopper = useStop(() => api(`/api/mobile/threads/${id}/stop`, { method: 'POST' }).catch(failure => {
@@ -85,6 +87,7 @@ export default function ThreadScreen() {
       </KeyboardChatScrollView>
       <OfflineBanner top={insets.top + 66} />
       {/* R-10: a thread ends in the composer, finished or not; a message to an ended thread runs it again (R-81). */}
+      {controls.controls}
       {data ? <Composer placeholder="给这个线程发消息" onSend={text => delivery.send(text)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'thread', id }} onStop={composerStops(data) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
     </View>
   )

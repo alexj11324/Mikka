@@ -22,7 +22,7 @@ import { openRunPullRequest, PublicationError, type PublicationErrorCode, type P
 import { matchesRepositoryAdmission } from './repository-admission'
 import { mayCompleteIssue, withRunWorkspace } from './run-completion'
 import type { QuotaPlan } from './run-quota'
-import { lockFactoryCompletionTasks, lockCompletionSkillScopes, prepareRunCompletionEffects, reconcileFactoryAfterCompletion, settleRunCompletionEffects } from './run-completion-effects'
+import { lockFactoryCompletionTasks, lockCompletionSkillScopes, prepareRunCompletionEffects, reconcileFactoryAfterCompletion, settleRunCompletionEffects, wakeThreadDelivery } from './run-completion-effects'
 import { launchProviderContinuation, pendingProviderFallback, providerCompletion, recoverProviderFailure } from './run-provider-fallback'
 import { withProjectResourceLease } from './project-resources/store'
 
@@ -150,7 +150,10 @@ export async function persistRunCompletion(userId: string, runId: string, comple
       // resume this idempotent step after a process interruption.
       const continuation = result?.providerRunId ? await recoverProviderFailure(pool, userId, result.providerRunId) : null
       // After commit: hand the completed run to Factory review (BE-9).
-      if (result) await reconcileFactoryAfterCompletion(pool, userId, runId)
+      if (result) {
+        await reconcileFactoryAfterCompletion(pool, userId, runId)
+        await wakeThreadDelivery(userId, runId)
+      }
       await launchProviderContinuation(userId, continuation)
       return result
     }

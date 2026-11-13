@@ -1361,6 +1361,7 @@
     "accountSoleAdmin": "You’re the only admin of {workspaces}. Make another member an admin before deleting your account.",
     "accountLastOrganizationOwner": "Keep at least one active organization owner.",
     "runChainEnded": "This task has already stopped; there is nothing left to stop.",
+    "threadDeliveryUnavailable": "This conversation cannot use that delivery mode right now.",
     "threadStopping": "The thread is stopping",
     "secretNotFound": "That secret or variable no longer exists.",
     "secretNameReserved": "This name is reserved by the runtime (for example PATH, HOME, proxy, TLS, loader, git, E2B or MIKKA variables). Choose another name.",
@@ -4373,6 +4374,18 @@
     "copyFailed": "Couldn't copy"
   },
   "IssueThreads": {
+    "deliveryMode": "While the agent is working",
+    "deliveryModes": {
+      "queue": "Queue for the next turn",
+      "steer": "Steer this turn",
+      "interrupt": "Interrupt and replace"
+    },
+    "deliveryQueued": "Queued",
+    "deliverySending": "Sending",
+    "deliveryFailed": "Delivery failed",
+    "deliverySendNow": "Send now",
+    "deliveryCancel": "Cancel",
+    "deliveryTooLate": "The agent has already claimed this message.",
     "title": "Threads",
     "modelSwitched": "Switched to",
     "agent": "Bot",

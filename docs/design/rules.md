@@ -274,6 +274,8 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   every run oldest first; a 活动 row opens it at that Agent stretch, and
   replies go to the newest run
   ([2300](decisions/2026-11-07-2300-one-conversation-per-task.md)).
+  Replies typed during an active run default to the queue where a continuation is supported.
+  The owner may select a supported native steer or interrupt instead. See [#2257](https://github.com/alexj11324/Mikka/issues/2257).
   The server enforces this at every dispatch
   entry, not the prompt ([decision](decisions/2026-11-01-1330-one-thread-per-task.md)).
   The person may name where it runs (one of their computers, or the cloud);

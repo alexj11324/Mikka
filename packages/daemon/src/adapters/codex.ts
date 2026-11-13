@@ -1021,9 +1021,10 @@ export class CodexAdapter implements AgentAdapter {
           } catch (error) {
             // The request was for this turn only. A refusal (or a lost reply)
             // is never permission to execute the same input on a later turn.
-            const { category, rpcCode } = codexFailureInfo(error)
+            const failure = codexFailureInfo(error)
+            const { category, rpcCode } = failure
             const code = rpcCode === undefined ? "" : `, RPC ${rpcCode}`
-            throw new Error(`Codex could not steer the active turn (${category}${code})`)
+            throw new Error(`Codex could not steer the active turn (${category}${code})`, { cause: failure })
           }
         }
         if (ending) throw new Error("The Codex session already ended")

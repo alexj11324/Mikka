@@ -1361,6 +1361,7 @@
     "accountSoleAdmin": "你是工作区「{workspaces}」唯一的管理员。先把管理员身份转给其他成员，再删除账户。",
     "accountLastOrganizationOwner": "组织至少需要保留一位活跃所有者。",
     "runChainEnded": "这个任务已经停了，没有可停止的运行。",
+    "threadDeliveryUnavailable": "当前对话无法按这种方式投递消息。",
     "threadStopping": "线程正在停止",
     "secretNotFound": "该密钥或环境变量已不存在。",
     "secretNameReserved": "该名称为运行环境保留（例如 PATH、HOME、代理、TLS、加载器、git、E2B 或 MIKKA 相关变量），请换一个名称。",
@@ -4373,6 +4374,18 @@
     "copyFailed": "复制失败"
   },
   "IssueThreads": {
+    "deliveryMode": "运行时的发送方式",
+    "deliveryModes": {
+      "queue": "排到下一轮",
+      "steer": "插话到当前轮",
+      "interrupt": "打断并发送"
+    },
+    "deliveryQueued": "排队中",
+    "deliverySending": "正在发送",
+    "deliveryFailed": "投递失败",
+    "deliverySendNow": "立即发送",
+    "deliveryCancel": "取消",
+    "deliveryTooLate": "这条消息已经开始投递。",
     "title": "线程",
     "modelSwitched": "已改用",
     "agent": "Bot",

@@ -1,5 +1,7 @@
 'use client'
 
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import type { ThreadDeliveryMode } from '@/lib/thread-delivery'
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { PersonAvatar } from '@/components/person-avatar'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -168,7 +170,10 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const feedback = useTranslations('Coordinator')
   const deliveryLabels = useTranslations('HostedThread')
   const writer = useThreadReplyCommand()
-  const delivery = useChatDelivery<ChatSubmission & { review?: ReviewChangeTarget; runId: string; expectedOwnerId?: string; expectedWorkspaceId?: string }>(`thread:${runId}`, feedback('sendUncertain'))
+  const [deliveryMode, setDeliveryMode] = useViewState<ThreadDeliveryMode>('thread:delivery-mode', 'queue')
+  const modes = data?.delivery?.modes ?? []
+  const selectedMode = modes.includes(deliveryMode) ? deliveryMode : modes[0]
+  const delivery = useChatDelivery<ChatSubmission & { delivery?: ThreadDeliveryMode; review?: ReviewChangeTarget; runId: string; expectedOwnerId?: string; expectedWorkspaceId?: string }>(`thread:${runId}`, feedback('sendUncertain'))
   const sendLock = useRef(false)
   const [submission, setSubmission] = useViewState<ThreadReplySubmission | null>(`thread:${runId}:submission`, null)
   // Words picked from the agent's reply with 引用: they head the next message as quote lines.
@@ -202,7 +207,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const requestedAt = stopAttempt ?? (data?.thread.stopRequestedAt ? new Date(data.thread.stopRequestedAt).getTime() : null)
   const stopRequested = active && (requestedAt !== null || !!view?.stopping)
   const stopPending = stopRequested && !stopFailed
-  const confirmedIds = useMemo(() => new Set(data?.messages?.flatMap(message => message.submissionId ? [message.submissionId] : [])), [data?.messages])
+  const confirmedIds = useMemo(() => new Set([...(data?.messages?.flatMap(message => message.submissionId ? [message.submissionId] : []) ?? []), ...(data?.delivery?.queued.map(row => row.requestId) ?? [])]), [data?.messages, data?.delivery])
   const localMessages = delivery.rows.filter(row => !confirmedIds.has(row.id))
   useEffect(() => {
     if (delivery.rows.some(row => confirmedIds.has(row.id))) delivery.setRows(current => current.filter(row => !confirmedIds.has(row.id)))
@@ -250,7 +255,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     const words = previous?.text ?? (retry === undefined && !review ? withReplyQuote(text, replyQuote) : text)
     // Preserve an interrupted send from the previous client version when its unchanged draft is submitted.
     const saved = prepareThreadReply(submission, liveRunId, words)
-    const command = previous ?? { id: saved.requestId, runId: saved.runId, text: words, at: Date.now(), ...(review ? { review: { label: review.label, binding: review.binding } } : {}),
+    const command = previous ?? { ...(selectedMode && !retry && !review ? { delivery: selectedMode } : {}), id: saved.requestId, runId: saved.runId, text: words, at: Date.now(), ...(review ? { review: { label: review.label, binding: review.binding } } : {}),
       expectedOwnerId: data?.live?.viewerId, expectedWorkspaceId: data?.live?.runs.find(run => run.id === liveRunId)?.workspaceId ?? undefined }
     if (!retryOriginalSession && !delivery.begin(command)) return
     sendLock.current = true
@@ -431,6 +436,29 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   useEffect(() => { if (collect) collect(runId, entries) }, [collect, runId, data, active, canRetry, sending, view?.status, retryLabel, delivery.rows]) // eslint-disable-line react-hooks/exhaustive-deps
   if (collect) return null
   if (transcriptOnly) return <div data-attempt-section={runId} className="flex flex-col gap-3">{transcriptBody}</div>
+  async function updateQueue(messageId: string, action: 'cancel' | 'sendNow') {
+    try {
+      const { changeQueuedThreadReply } = await import('@/app/actions/agents')
+      const result = await changeQueuedThreadReply({ issueId, runId: liveRunId, messageId, action })
+      if (result.error) setSendFailed(actionError(result.error))
+      else if (result.status === 'tooLate') setSendFailed(t('deliveryTooLate'))
+      await mutate()
+    } catch { setSendFailed(feedback('sendUncertain')) }
+  }
+  const queueControls = <div className="flex flex-col gap-1 px-3">
+    {modes.length > 0 && <NativeSelect size="sm" aria-label={t('deliveryMode')} value={selectedMode} onChange={event => {
+      const next = modes.find(mode => mode === event.target.value)
+      if (next) setDeliveryMode(next)
+    }}>{modes.map(mode => <NativeSelectOption key={mode} value={mode}>{t(`deliveryModes.${mode}`)}</NativeSelectOption>)}</NativeSelect>}
+    {data?.delivery?.queued.map(row => <div key={row.id} className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
+      <span className="min-w-0 flex-1 break-words">{row.text}</span>
+      <span>{row.status === 'failed' ? row.failureCode ? actionError(row.failureCode) : t('deliveryFailed') : row.status === 'delivering' ? t('deliverySending') : t('deliveryQueued')}</span>
+      {row.status === 'queued' && <>
+        {modes.includes('steer') && <Button type="button" size="xs" variant="ghost" onClick={() => void updateQueue(row.id, 'sendNow')}>{t('deliverySendNow')}</Button>}
+        <Button type="button" size="xs" variant="ghost" onClick={() => void updateQueue(row.id, 'cancel')}>{t('deliveryCancel')}</Button>
+      </>}
+    </div>)}
+  </div>
   const conversation = !bare && detail ? <ThreadScreen botId={null} name={title} mark={author?.mark ?? null} entries={data ? [...beforeEntries ?? [], ...entries, ...afterEntries ?? []] : null}
     working={working} onStop={working && canStop ? () => { void stop() } : undefined}
     composer={{ ref: inputRef, label: replyBlocked ? t('checkEnded') : t('composer', { agent: harnessLabel(threadComposerHarness(detail.harness, liveRunId, modelFallback)) }), value: draft, onChange: setDraft, onSubmit: () => { void send() },
@@ -438,6 +466,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       running: working || (question === 'resuming' && !data?.thread.questionWake), thread: true }}
     pending={[...changeRequest ? [{ id: 'change-request', name: changeRequest.label, onRemove: changeRequest.onCancel }] : [], ...replyQuote ? [{ id: 'reply-quote', name: replyQuote, onRemove: () => setReplyQuote(null) }] : []]}
     notices={<>
+      {queueControls}
       {data?.thread.quota?.paused && <ThreadQuotaPausedCard paused={data.thread.quota.paused} onContinued={() => { void mutate(); void mutateCache(['issue-threads', issueId]) }} />}
       {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive-foreground">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}

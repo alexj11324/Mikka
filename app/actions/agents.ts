@@ -336,6 +336,7 @@ async function readThreadIssue(runId: string): Promise<{ issueId: string | null 
 }
 
 export interface IssueThreadDetail {
+  delivery?: import('@/lib/thread-delivery').ThreadDeliveryView
   /** Authorized scopes for every attempt; browser state never guesses them. */
   live?: { viewerId?: string; runs: import('@/lib/live/panels').ThreadLiveReference[]; issueWorkspaceId: string | null; questionDeadline: ThreadQuestionDeadline | null; revisions?: Record<string, number> }
   /** The owner sees the stop deadline too, so a reload does not reset the timeout. */
@@ -526,13 +527,15 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
   const { threadLiveReferences, documentLiveWorkspace } = await import('@/lib/live/panels')
   const { workspacePool } = await import('@/lib/workspace-db')
   const chainRunIds = chain ? chain.attempts.map(attempt => attempt.runId) : [row.id]
-  const [runs, issueWorkspaceId, context] = await Promise.all([
+  const [runs, issueWorkspaceId, context, delivery] = await Promise.all([
     threadLiveReferences(pool, workspacePool, runIds, user.id),
     row.issueId ? documentLiveWorkspace(pool, workspacePool, row.issueId, user.id) : null,
     // Over the whole chain and the whole brief, so a cursor read reports what a full one does.
     readContextUsage(chainRunIds, row.id),
+    row.userId === user.id ? (await import('@/lib/thread-delivery-queue')).threadDeliveryView(pool, user.id, chain?.rootRunId ?? row.id, thread.latestRunId) : undefined,
   ])
   return {
+    delivery,
     live: { viewerId: user.id, runs, issueWorkspaceId, questionDeadline, ...(Object.keys(revisions).length ? { revisions } : {}) },
     thread: { ...thread, failureDetails, questionWake, prompt: promptOmitted ? '' : prompt, ...(!promptOmitted && hasInstructions ? { hasInstructions: true as const } : {}), stopRequestedAt, replyAvailable, retryAvailable, quota, modelFallback: modelFallback?.notices ?? null, modelFallbackPending: modelFallback?.pending ?? false, error, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
@@ -585,7 +588,7 @@ function safeHttpUrl(value: string) {
 }
 
 /** Something a person says in a running thread; the daemon delivers it to the agent. */
-export async function sendIssueThreadMessage(input: { issueId: string | null; runId: string; text: string; requestId?: string; expectedOwnerId?: string; expectedWorkspaceId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<{ runId: string; continued: boolean }> {
+export async function sendIssueThreadMessage(input: { issueId: string | null; runId: string; text: string; requestId?: string; delivery?: import('@/lib/thread-delivery').ThreadDeliveryMode; expectedOwnerId?: string; expectedWorkspaceId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<{ runId: string; continued: boolean }> {
   const text = z.string().trim().min(1).max(10_000).safeParse(input.text)
   if (!text.success) throw new ActionFailureError('messageRequired')
   const { row, user } = await readableThread(input.issueId, input.runId, threadColumns)
@@ -597,6 +600,7 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
   if (input.expectedWorkspaceId && (await loadWorkspaceContext(undefined, session.user)).workspace.id !== input.expectedWorkspaceId) throw new ActionFailureError('workspaceAccessDenied')
   if(row.userId!==user.id)throw new ActionFailureError('runNotFound')
   if(input.retryOriginalSession!==undefined && input.retryOriginalSession!==true)throw new ActionFailureError('runInvalid')
+  if (input.delivery !== undefined && (!['queue','steer','interrupt'].includes(input.delivery) || !input.requestId || input.retryOriginalSession)) throw new ActionFailureError('validationGeneric')
   if(input.requestId!==undefined && !z.uuid().safeParse(input.requestId).success)throw new ActionFailureError('validationGeneric')
   if(input.requestId!==undefined && input.retryOriginalSession)throw new ActionFailureError('validationGeneric')
   if(input.questionWakeGeneration!==undefined && (!input.retryOriginalSession || !z.uuid().safeParse(input.questionWakeGeneration).success))throw new ActionFailureError('validationGeneric')
@@ -630,7 +634,7 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
     }
   }
   // A working thread gets it as a message; an ended one runs again in the same thread (R-81, lib/thread-continue.ts).
-  return sendThreadMessage(user.id,row.id,text.data,{source:'human',sessionId:session.session.id},input.requestId)
+  return sendThreadMessage(user.id,row.id,text.data,{source:'human',sessionId:session.session.id},input.requestId,input.delivery)
 }
 
 /**
@@ -639,8 +643,22 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
  * dispatch with no machine or model) returned as its code, so the thread says
  * why instead of 「发送失败」. Other failures still throw.
  */
-export async function sendIssueThreadReply(input: { issueId: string | null; runId: string; text: string; requestId?: string; expectedOwnerId?: string; expectedWorkspaceId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<ActionResult<{ sent: true; runId: string; continued: boolean }>> {
+export async function sendIssueThreadReply(input: { issueId: string | null; runId: string; text: string; requestId?: string; delivery?: import('@/lib/thread-delivery').ThreadDeliveryMode; expectedOwnerId?: string; expectedWorkspaceId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<ActionResult<{ sent: true; runId: string; continued: boolean }>> {
   return runAction(async () => { const result=await sendIssueThreadMessage(input); return { sent: true as const,...result } })
+}
+
+export async function changeQueuedThreadReply(input: { issueId: string | null; runId: string; messageId: string; action: 'cancel' | 'sendNow' }) {
+  return runAction(async () => {
+    if (!z.uuid().safeParse(input.messageId).success || !['cancel','sendNow'].includes(input.action)) throw new ActionFailureError('validationGeneric')
+    const { row, user } = await readableThread(input.issueId, input.runId, threadColumns)
+    const requestHeaders = await headers()
+    if (!desktopHumanSessionId() && (requestHeaders.has('authorization') || !requestHeaders.get('cookie'))) throw new ActionFailureError('authRequired')
+    const session = await auth.api.getSession({ headers: requestHeaders, query: { disableCookieCache: true } })
+    if (!session?.session?.id || session.user.id !== user.id || row.userId !== user.id) throw new ActionFailureError('runNotFound')
+    const { cancelQueuedThreadReply, deliverQueuedThreadReply } = await import('@/lib/thread-delivery-queue')
+    if (input.action === 'cancel') return { status: await cancelQueuedThreadReply(pool, user.id, row.id, input.messageId) }
+    return { status: await deliverQueuedThreadReply(pool, user.id, row.id, input.messageId) ? 'sent' as const : 'tooLate' as const }
+  })
 }
 
 /**

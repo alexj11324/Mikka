@@ -1,3 +1,4 @@
+import { useThreadDeliveryControls } from '@/features/chat/components/thread-delivery-controls'
 import { conversationAccessDenied, useConversationDelivery } from '@/features/chat/components/conversation-delivery'
 import { mobileMessages } from '@/lib/messages'
 import { useCallback, useRef, useState, type ReactNode } from 'react'
@@ -66,8 +67,9 @@ export function TaskConversationScreen() {
   const newest = data && conversationReplyRun(data.detail.task, data.detail.activity)
   const live = newest ? data?.threads[newest] ?? null : null
   const canSend = Boolean(newest && live && live.canReply !== false && !conversationAccessDenied(error))
-  const delivery = useConversationDelivery(newest && canSend ? { kind: 'thread', id: newest, issueId: id } : null,
-    Object.values(data?.threads ?? {}).flatMap(thread => thread.confirmedSubmissionIds ?? []), reload)
+  const controls = useThreadDeliveryControls(newest ?? null, id, canSend ? live?.delivery : undefined, reload)
+  const delivery = useConversationDelivery(newest && canSend ? { kind: 'thread', id: newest, issueId: id, delivery: controls.mode } : null,
+    Object.values(data?.threads ?? {}).flatMap(thread => [...(thread.confirmedSubmissionIds ?? []), ...(thread.delivery?.queued.map(row => row.requestId) ?? [])]), reload)
   const stopper = useStop(() => api(`/api/mobile/threads/${newest}/stop`, { method: 'POST' }).catch(failure => {
     if (!(failure instanceof ApiError && failure.status === 409)) throw failure
   }), Boolean(live?.active), reload)
@@ -123,6 +125,7 @@ export function TaskConversationScreen() {
       </KeyboardChatScrollView>
       <OfflineBanner top={insets.top + 66} />
       {/* R-10: the conversation ends in the composer; a message to an ended attempt runs it again (R-81). */}
+      {controls.controls}
       {live && newest ? <Composer placeholder={mobileMessages.MobileCore.messageTask} onSend={text => delivery.send(text)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'thread', id: newest }}
         onStop={composerStops(live) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
     </View>

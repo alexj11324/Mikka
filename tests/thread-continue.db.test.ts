@@ -438,6 +438,37 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     })
   })
 
+  await t.test('working thread queue persists owner input, fences cancellation and dispatches once after completion', async () => {
+    const { cancelQueuedThreadReply, deliverQueuedThreadReply, threadDeliveryView } = await import('../lib/thread-delivery-queue')
+    const owner = await person()
+    const initial = await steps.dispatchRun(owner.id, { issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }
+    const run = initial.runId
+    const push = (text: string, id = randomUUID()) => sendThreadMessage(owner.id, run, text, 'user', id, 'queue')
+    const req = randomUUID()
+    await Promise.all([push('Later, one.',req), push('Later, one.',req)])
+    await assert.rejects(push('Changed.',req), { code: 'submissionConflict' })
+    await push('Later, two.')
+    const view = await threadDeliveryView(appPool, owner.id, run, run)
+    assert.deepEqual(view.queued.map(row => row.text), ['Later, one.', 'Later, two.'])
+    assert.equal(await deliverQueuedThreadReply(appPool, owner.id, run), false)
+    await assert.rejects(cancelQueuedThreadReply(appPool, a.id, run, view.queued[0].id))
+    assert.equal(await cancelQueuedThreadReply(appPool, owner.id, run, view.queued[0].id), 'cancelled')
+    assert.equal(await cancelQueuedThreadReply(appPool, owner.id, run, view.queued[0].id), 'cancelled')
+    assert.equal((await pool.query('SELECT COUNT(*)::int AS n FROM run_messages WHERE "runId"=$1 AND text=ANY($2::text[])', [run,['Later, one.','Later, two.']])).rows[0].n, 0)
+    await end(run, 'succeeded')
+    await deliverQueuedThreadReply(appPool, owner.id, run)
+    assert.equal((await threadDeliveryView(appPool, owner.id, run, run)).queued.length, 0)
+    assert.equal(await cancelQueuedThreadReply(appPool, owner.id, run, view.queued[1].id), 'tooLate')
+    assert.equal(await deliverQueuedThreadReply(appPool, owner.id, run), false)
+    assert.equal((await pool.query('SELECT COUNT(*)::int AS n FROM run_messages WHERE "userId"=$1 AND text=$2', [owner.id, 'Later, two.'])).rows[0].n, 1)
+    // Crash after ordinary admission but before acknowledging the same queue
+    // entry. Replaying the old completion must recover its existing receipt.
+    await pool.query("UPDATE thread_queued_messages SET status='delivering' WHERE id=$1",[view.queued[1].id])
+    assert.equal(await deliverQueuedThreadReply(appPool, owner.id, run), true)
+    assert.equal((await pool.query('SELECT status FROM thread_queued_messages WHERE id=$1',[view.queued[1].id])).rows[0].status, 'sent')
+    assert.equal((await pool.query('SELECT COUNT(*)::int AS n FROM run_messages WHERE "userId"=$1 AND text=$2', [owner.id, 'Later, two.'])).rows[0].n, 1)
+  })
+
   await t.test('an ordinary owned live message is acknowledged once even after its run ends', async () => {
     const runId = randomUUID(), requestId = randomUUID(), text = 'One ordinary owner message.'
     await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId",status,prompt,"botId")
