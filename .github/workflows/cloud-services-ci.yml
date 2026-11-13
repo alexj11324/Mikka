@@ -13,6 +13,7 @@ jobs:
     if: github.repository == 'alexj11324/Mikka' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    environment: cloudflare-runtime-release
     env:
       MIKKA_CLOUD_SOURCE_SHA: ${{ inputs.cloud_source_sha }}
     steps:
@@ -33,6 +34,11 @@ jobs:
         run: node scripts/cloudflare-cloud-ci.mjs build
       - name: Verify the Cloud Services qualification
         run: node scripts/cloudflare-cloud-ci.mjs verify
+      - name: Publish the qualified Cloud Services artifact
+        env:
+          CF_RUNTIME_REGISTRY_USERNAME: ${{ vars.CF_RUNTIME_REGISTRY_USERNAME }}
+          CF_RUNTIME_REGISTRY_PASSWORD: ${{ secrets.CF_RUNTIME_REGISTRY_PASSWORD }}
+        run: node scripts/cloudflare-cloud-ci.mjs publish
       - name: Upload the qualification receipt
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:

@@ -15,7 +15,7 @@ const stages = [
   'submodule', 'install-private', 'install-public', 'browser-install', 'browser-platform', 'ops-python', 'ops-contracts',
   'typecheck-core', 'typecheck-models', 'typecheck-ui', 'postgres17-core-models-and-eve',
   'vercel-build', 'vercel-startup', 'browser-capture',
-  'node-build', 'artifact-check', 'docker-build', 'image-postgres-runtime', 'worker-dry-run',
+  'node-build', 'artifact-check', 'worker-dry-run', 'docker-build', 'image-postgres-runtime',
   'current-public-postgres17',
 ]
 const fail = code => { throw new Error(code) }
@@ -52,16 +52,36 @@ export function verifyPublicReceipt(receipt, context) {
   const { privateSource, ...publicContext } = context
   const innerContext = { ...publicContext, sha: privateSource }
   if (!exactKeys(receipt, ['version', 'context', 'publicMainCompatibilitySha', 'stages', 'artifactSha256',
-    'databaseIntegration', 'imageRuntimeExecutor', 'publication']) || receipt.version !== 1 || receipt.publication !== 'none' ||
+    'databaseIntegration', 'imageRuntimeExecutor', 'publication', 'qualifiedArtifact']) || receipt.version !== 1 || receipt.publication !== 'none' ||
       !exactKeys(receipt.context, Object.keys(innerContext)) || Object.keys(innerContext).some(key => receipt.context[key] !== innerContext[key])) fail('CLOUD_PUBLIC_CI_RECEIPT_SOURCE_MISMATCH')
   if (!fullSha.test(receipt.publicMainCompatibilitySha ?? '') || !/^[a-f0-9]{64}$/.test(receipt.artifactSha256 ?? '') ||
       receipt.databaseIntegration !== 'isolated-postgresql-17-core-models-and-eve' || receipt.imageRuntimeExecutor !== 'image-files-node24' ||
       !Array.isArray(receipt.stages) || receipt.stages.length !== stages.length ||
       stages.some((name, index) => !exactKeys(receipt.stages[index], ['name', 'exit']) || receipt.stages[index].name !== name || receipt.stages[index].exit !== 0)) fail('CLOUD_PUBLIC_CI_RECEIPT_INVALID')
+  verifyQualifiedArtifact(receipt.qualifiedArtifact, context)
   return receipt
 }
 
-export async function runCloudCi({ env = process.env, verify = false, publicRoot = root } = {}) {
+export function verifyQualifiedArtifact(artifact, context) {
+  if (!exactKeys(artifact, ['privateSource', 'modelSource', 'publicSource', 'runId', 'runAttempt', 'workerDigest', 'localImageId', 'manifestSha256']) ||
+      artifact.privateSource !== context.privateSource || artifact.publicSource !== context.publicSource ||
+      artifact.runId !== context.runId || artifact.runAttempt !== context.runAttempt || !fullSha.test(artifact.modelSource ?? '') ||
+      !/^sha256:[a-f0-9]{64}$/.test(artifact.localImageId ?? '') ||
+      ![artifact.workerDigest, artifact.manifestSha256].every(value => /^[a-f0-9]{64}$/.test(value ?? ''))) fail('CLOUD_PUBLIC_CI_ARTIFACT_INVALID')
+  return artifact
+}
+
+export function verifyPublishedArtifact(artifact, receipt, context) {
+  const { image, reference, registryDigest, ...qualified } = artifact ?? {}
+  verifyQualifiedArtifact(qualified, context)
+  if (Object.keys(qualified).some(key => qualified[key] !== receipt.qualifiedArtifact[key]) || image !== reference ||
+      !/^registry\.cloudflare\.com\/d8f6630c7869111a5139bc5ed4d24ace\/mikka-cloud-services@sha256:[a-f0-9]{64}$/.test(reference ?? '') ||
+      reference.split('@')[1] !== registryDigest) fail('CLOUD_PUBLIC_CI_PUBLICATION_INVALID')
+  return artifact
+}
+
+export async function runCloudCi({ env = process.env, verify = false, publish = false, publicRoot = root } = {}) {
+  verify ||= publish
   publicRoot = await realpath(publicRoot)
   if (git(publicRoot, 'rev-parse', '--show-toplevel') !== publicRoot || !hasOrigin(publicRoot, repository)) fail('CLOUD_PUBLIC_CI_REPOSITORY_REQUIRED')
   const context = sourceContext(env, git(publicRoot, 'rev-parse', 'HEAD'))
@@ -89,9 +109,15 @@ export async function runCloudCi({ env = process.env, verify = false, publicRoot
   if (git(publicRoot, 'rev-parse', 'HEAD') !== context.publicSource || git(privateRoot, 'rev-parse', 'HEAD') !== context.privateSource) fail('CLOUD_PUBLIC_CI_SOURCE_CHANGED')
   verifyPublicReceipt(receipt, context)
   console.log(JSON.stringify({ result: verify ? 'verified' : 'passed', context, publication: 'none' }))
-  if (verify) {
+  if (publish) {
     if (!env.RUNNER_TEMP) fail('CLOUD_PUBLIC_CI_RUNNER_TEMP_REQUIRED')
-    const artifact = { version: 1, context, receipt, publication: 'none' }
+    const { publishQualifiedCloud } = await import(pathToFileURL(resolve(privateRoot, 'scripts/cloudflare-ci-publish.mjs')).href)
+    const published = await publishQualifiedCloud({ env, publicRoot, publicSource: context.publicSource })
+    verifyPublicReceipt(published.receipt, context)
+    if (JSON.stringify(published.receipt) !== JSON.stringify(receipt)) fail('CLOUD_PUBLIC_CI_RECEIPT_CHANGED')
+    const cloudArtifact = verifyPublishedArtifact(published.cloudArtifact, receipt, context)
+    if (git(publicRoot, 'rev-parse', 'HEAD') !== context.publicSource || git(privateRoot, 'rev-parse', 'HEAD') !== context.privateSource) fail('CLOUD_PUBLIC_CI_SOURCE_CHANGED')
+    const artifact = { version: 1, context, receipt, cloudArtifact, publication: 'registry-only' }
     const artifactPath = resolve(env.RUNNER_TEMP, 'cloud-services-ci-receipt', 'receipt.json')
     await mkdir(dirname(artifactPath), { recursive: true })
     await writeFile(artifactPath, JSON.stringify(artifact) + '\n', { mode: 0o600 })
@@ -103,8 +129,8 @@ export async function runCloudCi({ env = process.env, verify = false, publicRoot
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const [action, ...extra] = process.argv.slice(2)
-    if (!['build', 'verify'].includes(action) || extra.length) fail('CLOUD_PUBLIC_CI_ARGUMENT_INVALID')
-    await runCloudCi({ verify: action === 'verify' })
+    if (!['build', 'verify', 'publish'].includes(action) || extra.length) fail('CLOUD_PUBLIC_CI_ARGUMENT_INVALID')
+    await runCloudCi({ verify: action !== 'build', publish: action === 'publish' })
   } catch (error) {
     console.error(/^CLOUD_PUBLIC_CI_[A-Z_]+$/.test(error?.message ?? '') ? error.message : 'CLOUD_PUBLIC_CI_FAILED')
     process.exitCode = 1

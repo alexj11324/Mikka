@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
-import { runCloudCi, sourceContext, verifyPublicReceipt } from './cloudflare-cloud-ci.mjs'
+import { runCloudCi, sourceContext, verifyPublicReceipt, verifyPublishedArtifact } from './cloudflare-cloud-ci.mjs'
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 const env = {
@@ -21,12 +21,17 @@ const stages = [
   'platform', 'github-source-download', 'submodule', 'install-private', 'install-public', 'browser-install',
   'browser-platform', 'ops-python', 'ops-contracts', 'typecheck-core', 'typecheck-models', 'typecheck-ui',
   'postgres17-core-models-and-eve', 'vercel-build', 'vercel-startup', 'browser-capture', 'node-build',
-  'artifact-check', 'docker-build', 'image-postgres-runtime', 'worker-dry-run', 'current-public-postgres17',
+  'artifact-check', 'worker-dry-run', 'docker-build', 'image-postgres-runtime', 'current-public-postgres17',
 ].map(name => ({ name, exit: 0 }))
+function qualifiedArtifact(context) {
+  return { privateSource: context.privateSource, modelSource: 'e'.repeat(40), publicSource: context.publicSource,
+    runId: context.runId, runAttempt: context.runAttempt, localImageId: 'sha256:' + 'f'.repeat(64),
+    workerDigest: '1'.repeat(64), manifestSha256: '2'.repeat(64) }
+}
 function receipt(context) {
   const { privateSource, ...shared } = context
   return {
-    version: 1, context: { ...shared, sha: privateSource }, publicMainCompatibilitySha: 'c'.repeat(40),
+    version: 1, qualifiedArtifact: qualifiedArtifact(context), context: { ...shared, sha: privateSource }, publicMainCompatibilitySha: 'c'.repeat(40),
     stages, artifactSha256: 'd'.repeat(64), databaseIntegration: 'isolated-postgresql-17-core-models-and-eve',
     imageRuntimeExecutor: 'image-files-node24', publication: 'none',
   }
@@ -95,7 +100,7 @@ async function repository(directory, origin, files) {
   return git(directory, 'rev-parse', 'HEAD')
 }
 
-test('pinned private helper receives original Actions context and only verify writes the receipt artifact', async t => {
+test('pinned private helper receives original Actions context and only publish writes the receipt artifact', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'mikka-public-cloud-ci-'))
   const logs = []
   t.mock.method(console, 'log', line => logs.push(line))
@@ -109,7 +114,7 @@ test('pinned private helper receives original Actions context and only verify wr
       export async function runCi({ env, verify, publicRoot, publicSource }) {
         if (!publicRoot || publicSource !== env.GITHUB_SHA || env.GITHUB_ACTIONS !== 'true' || env.WORKERS_CI) throw new Error('missing public owner')
         if (env.MIKKA_TEST_SOURCE_DRIFT) execFileSync('git', ['-c', 'user.name=CI Fixture', '-c', 'user.email=ci@example.test', 'commit', '--allow-empty', '-m', 'source drift'], { cwd: publicRoot, stdio: 'pipe' })
-        return { version: 1, publication: 'none', publicMainCompatibilitySha: '${'c'.repeat(40)}',
+        return { version: 1, qualifiedArtifact: { privateSource: env.MIKKA_CLOUD_SOURCE_SHA, modelSource: '${'e'.repeat(40)}', publicSource, runId: env.GITHUB_RUN_ID, runAttempt: env.GITHUB_RUN_ATTEMPT, localImageId: 'sha256:${'f'.repeat(64)}', workerDigest: '${'1'.repeat(64)}', manifestSha256: '${'2'.repeat(64)}' }, publication: 'none', publicMainCompatibilitySha: '${'c'.repeat(40)}',
           artifactSha256: '${'d'.repeat(64)}', databaseIntegration: 'isolated-postgresql-17-core-models-and-eve',
           imageRuntimeExecutor: 'image-files-node24', stages: ${JSON.stringify(stages)}, context: {
             provider: 'github-actions', repository: env.GITHUB_REPOSITORY, publicSource,
@@ -119,6 +124,12 @@ test('pinned private helper receives original Actions context and only verify wr
             buildId: env.MIKKA_TEST_RECEIPT_DRIFT ? 'private-build' : env.GITHUB_RUN_ID + '-' + env.GITHUB_RUN_ATTEMPT,
           } }
       }`,
+      'scripts/cloudflare-ci-publish.mjs': `export async function publishQualifiedCloud(options) {
+        const { runCi } = await import('./cloudflare-ci.mjs')
+        const receipt = await runCi(options)
+        const reference = 'registry.cloudflare.com/d8f6630c7869111a5139bc5ed4d24ace/mikka-cloud-services@sha256:${'3'.repeat(64)}'
+        return { receipt, cloudArtifact: { ...receipt.qualifiedArtifact, image: reference, reference, registryDigest: 'sha256:${'3'.repeat(64)}' } }
+      }`,
     })
     const buildEnv = { ...env, GITHUB_SHA: publicSource, GITHUB_WORKFLOW_SHA: publicSource,
       MIKKA_CLOUD_SOURCE_SHA: privateSource, RUNNER_TEMP: join(directory, 'runner') }
@@ -126,8 +137,12 @@ test('pinned private helper receives original Actions context and only verify wr
     await runCloudCi({ env: buildEnv, publicRoot })
     assert.equal(existsSync(artifactDirectory), false)
     assert.equal(logs.some(line => line.startsWith('MIKKA_GITHUB_CLOUD_CI_RECEIPT=')), false)
-    const result = await runCloudCi({ env: buildEnv, publicRoot, verify: true })
-    const artifact = { version: 1, context: result.context, receipt: result.receipt, publication: 'none' }
+    await runCloudCi({ env: buildEnv, publicRoot, verify: true })
+    assert.equal(existsSync(artifactDirectory), false)
+    const result = await runCloudCi({ env: buildEnv, publicRoot, verify: true, publish: true })
+    const reference = 'registry.cloudflare.com/d8f6630c7869111a5139bc5ed4d24ace/mikka-cloud-services@sha256:' + '3'.repeat(64)
+    const artifact = { version: 1, context: result.context, receipt: result.receipt,
+      cloudArtifact: { ...result.receipt.qualifiedArtifact, image: reference, reference, registryDigest: 'sha256:' + '3'.repeat(64) }, publication: 'registry-only' }
     assert.deepEqual(await readdir(artifactDirectory), ['receipt.json'])
     assert.deepEqual(JSON.parse(await readFile(join(artifactDirectory, 'receipt.json'), 'utf8')), artifact)
     const markers = logs.filter(line => line.startsWith('MIKKA_GITHUB_CLOUD_CI_RECEIPT='))
@@ -135,7 +150,7 @@ test('pinned private helper receives original Actions context and only verify wr
     assert.deepEqual(JSON.parse(markers[0].slice('MIKKA_GITHUB_CLOUD_CI_RECEIPT='.length)), artifact)
     assert.equal(logs.some(line => line.includes('private-sentinel')), false)
     await assert.rejects(runCloudCi({ env: { ...buildEnv, MIKKA_TEST_RECEIPT_DRIFT: '1' }, publicRoot }), /RECEIPT_SOURCE_MISMATCH/)
-    await assert.rejects(runCloudCi({ env: { ...buildEnv, RUNNER_TEMP: '' }, publicRoot, verify: true }), /RUNNER_TEMP_REQUIRED/)
+    await assert.rejects(runCloudCi({ env: { ...buildEnv, RUNNER_TEMP: '' }, publicRoot, verify: true, publish: true }), /RUNNER_TEMP_REQUIRED/)
     await assert.rejects(runCloudCi({ env: { ...buildEnv, MIKKA_CLOUD_SOURCE_SHA: 'c'.repeat(40) }, publicRoot }), /PRIVATE_SOURCE_MISMATCH/)
     await assert.rejects(runCloudCi({ env: { ...buildEnv, MIKKA_TEST_SOURCE_DRIFT: '1' }, publicRoot }), /SOURCE_CHANGED/)
     git(publicRoot, 'reset', '--hard', publicSource)
@@ -164,7 +179,11 @@ test('workflow uses public manual main qualification and uploads the single rece
   assert.match(workflow, /name: cloud-services-ci-receipt-\$\{\{ github.run_id }}-\$\{\{ github.run_attempt }}/)
   assert.match(workflow, /path: \$\{\{ runner.temp }}\/cloud-services-ci-receipt\/receipt.json\n          if-no-files-found: error/)
   assert.equal((workflow.match(/actions\/upload-artifact@/g) ?? []).length, 1)
-  assert.doesNotMatch(workflow, /pull_request:|push:|environment:|WORKERS_CI|create-github-app-token|CLOUDFLARE_API_TOKEN/)
+  assert.match(workflow, /environment: cloudflare-runtime-release/)
+  assert.match(workflow, /CF_RUNTIME_REGISTRY_USERNAME: \$\{\{ vars\.CF_RUNTIME_REGISTRY_USERNAME }}/)
+  assert.match(workflow, /name: Publish the qualified Cloud Services artifact[\s\S]*CF_RUNTIME_REGISTRY_USERNAME:[\s\S]*CF_RUNTIME_REGISTRY_PASSWORD:[\s\S]*run: node scripts\/cloudflare-cloud-ci.mjs publish/)
+  assert.ok(workflow.indexOf('name: Verify the Cloud Services qualification') < workflow.indexOf('name: Publish the qualified Cloud Services artifact'))
+  assert.doesNotMatch(workflow, /pull_request:|push:|WORKERS_CI|create-github-app-token|CLOUDFLARE_API_TOKEN/)
 })
 
 test('CLI reports fixed errors without raw failure values', () => {
@@ -173,4 +192,17 @@ test('CLI reports fixed errors without raw failure values', () => {
   assert.equal(result.status, 1)
   assert.equal(result.stderr.trim(), 'CLOUD_PUBLIC_CI_ARGUMENT_INVALID')
   assert.equal(result.stdout, '')
+})
+
+
+test('published metadata contains exactly the qualified sources, hashes and immutable Registry reference', () => {
+  const context = sourceContext(env, env.GITHUB_SHA)
+  const inner = receipt(context)
+  const reference = 'registry.cloudflare.com/d8f6630c7869111a5139bc5ed4d24ace/mikka-cloud-services@sha256:' + '3'.repeat(64)
+  const artifact = { ...inner.qualifiedArtifact, image: reference, reference, registryDigest: reference.split('@')[1] }
+  assert.equal(verifyPublishedArtifact(artifact, inner, context), artifact)
+  for (const key of Object.keys(artifact)) {
+    assert.throws(() => verifyPublishedArtifact({ ...artifact, [key]: 'changed' }, inner, context))
+  }
+  assert.throws(() => verifyPublishedArtifact({ ...artifact, privateLogs: 'hidden' }, inner, context))
 })
