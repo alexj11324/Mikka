@@ -7,16 +7,18 @@ import { readRunChain } from '@/lib/run-chain'
 import { conversationTitlePlan, manualConversationTitle, READ_CHAIN_TITLE, WRITE_CONVERSATION_TITLE, type ConversationTitleSource, type ConversationTitleTrigger } from './conversation-title'
 
 type Query = { query: (text: string, values?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> }
-type Generate = (ownerId: string, text: { title: string; body: string }) => Promise<string | null>
+type Generate = (ownerId: string, text: { title: string; body: string }, workspaceId: string) => Promise<string | null>
 
 /**
  * What the model names a conversation from: only the recorded task range of its prompt (lib/run-bot-name.ts; never
  * the execution instructions around it), what the run reported, and the title of a PR it delivered. $1 run, $2 owner.
  */
-const READ_RUN = `SELECT r."userId", r.title, r."titleSource",
+const READ_RUN = `SELECT r."userId", r."workspaceId", r.title, r."titleSource",
     left(ltrim(case when r."promptTaskStart">=0 and r."promptTaskLength" between 0 and length(r.prompt)-r."promptTaskStart"::int8 then substr(r.prompt,r."promptTaskStart"+1,r."promptTaskLength") else '' end, E' \\t\\r\\n'), 1200) AS asked,
     left(coalesce(r.report->>'summary',''), 800) AS summary
-  FROM agent_runs r WHERE r.id=$1 AND r."userId"=$2`
+  FROM agent_runs r WHERE r.id=$1 AND r."userId"=$2
+    AND EXISTS (SELECT 1 FROM mikka_workspace_members m WHERE m."workspaceId"=r."workspaceId"
+      AND m."userId"=r."userId" AND m.status='active')`
 const READ_PULL_REQUEST = `SELECT p."pullRequest"->>'title' AS title FROM run_publications p WHERE p."runId"=ANY($1::uuid[]) AND p."pullRequest"->>'title' IS NOT NULL ORDER BY p."updatedAt" DESC LIMIT 1`
 
 async function chainOf(database: Query, ownerId: string, runId: string) {
@@ -35,7 +37,7 @@ async function write(database: Query, ownerId: string, runIds: string[], title: 
  * Returns the title it wrote, or null. `generate` is the shared small-model call (short-title-server.ts).
  */
 export async function nameConversation(database: Query, runId: string, ownerId: string, trigger: ConversationTitleTrigger, generate: Generate): Promise<string | null> {
-  const run = (await database.query(READ_RUN, [runId, ownerId])).rows[0] as { title: string | null; titleSource: ConversationTitleSource | null; asked: string; summary: string } | undefined
+  const run = (await database.query(READ_RUN, [runId, ownerId])).rows[0] as { workspaceId: string; title: string | null; titleSource: ConversationTitleSource | null; asked: string; summary: string } | undefined
   if (!run) return null
   const runIds = await chainOf(database, ownerId, runId)
   const chain = ((await database.query(READ_CHAIN_TITLE, [runIds, ownerId])).rows[0] ?? { title: null, titleSource: null }) as { title: string | null; titleSource: ConversationTitleSource | null }
@@ -46,7 +48,7 @@ export async function nameConversation(database: Query, runId: string, ownerId: 
   if (!first) return null
   const pullRequest = trigger === 'created' ? undefined : (await database.query(READ_PULL_REQUEST, [runIds])).rows[0] as { title: string } | undefined
   const body = [rest.join('\n'), trigger === 'created' ? '' : run.summary, pullRequest?.title ? `Pull request: ${pullRequest.title}` : ''].filter(Boolean).join('\n\n')
-  const title = await generate(ownerId, { title: first, body })
+  const title = await generate(ownerId, { title: first, body }, run.workspaceId)
   if (!title) return null
   // Checked again in the statement: a rename that landed while the model was answering is kept.
   return await write(database, ownerId, runIds, title, 'generated', trigger === 'regenerate') ? title : null
