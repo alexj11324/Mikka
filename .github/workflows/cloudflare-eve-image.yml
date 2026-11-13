@@ -53,8 +53,8 @@ jobs:
       MIKKA_EVE_WORKFLOW_WORLD: cloudflare
       NODE_OPTIONS: --max-old-space-size=6144
       MIKKA_BUILD_REVISION: ${{ github.sha }}
-      # A public checkout builds its server authentication and status resources.
-      # Only the private release supplies both an official UI checkout and its SHA.
+      # Ordinary qualification builds the public server resources.
+      # Manual publication restores resources from the accepted official API image.
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
