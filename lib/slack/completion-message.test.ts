@@ -166,7 +166,9 @@ test('prompt, report, error, stop reason and failure details never reach the mes
 })
 
 test('a status outside the fixed four and a non-http link are refused', () => {
-  assert.throws(() => slackCompletionMessage({ ...base, status: 'provider_failure' as SlackRunStatus }), /unknown run status/)
+  for (const status of ['provider_failure', 'completed', 'paused', 'skipped']) {
+    assert.throws(() => slackCompletionMessage({ ...base, status: status as SlackRunStatus }), /unknown run status/, status)
+  }
   assert.throws(() => slackCompletionMessage({ ...base, deepLink: 'https://app.example.com/\nhttps://evil.example' }), /deep link/)
   assert.throws(() => slackCompletionMessage({ ...base, deepLink: 'javascript:alert(1)' }), /deep link/)
   assert.throws(() => slackCompletionMessage({ ...base, deepLink: '   ' }), /deep link/)
