@@ -156,8 +156,9 @@ test('the task process handshake requires the private host capability, binding a
   assert.equal((await send(url, { headers }, {})).status, 503)
 })
 
-test('the private API receives its sign-in and product bindings without inheriting deployment or broker authority', async () => {
+test('the private API receives its sign-in and product bindings without inheriting deployment or broker authority', async (t) => {
   const { applicationEnvironment } = await import('../../../cloudflare/api/ingress/environment.mjs')
+  const logs = ['log', 'info', 'warn', 'error', 'debug'].map(method => t.mock.method(console, method, () => {}))
   const origin = 'https://app.example'
   const allowed = {
     SLACK_APP_ID: 'AEXAMPLE', SLACK_CLIENT_ID: 'client-fixture', SLACK_CLIENT_SECRET: 'oauth-fixture',
@@ -168,7 +169,7 @@ test('the private API receives its sign-in and product bindings without inheriti
     GITHUB_CLIENT_ID: 'github', GITHUB_CLIENT_SECRET: 'github-credential', GITHUB_WEBHOOK_SECRET: 'existing-hook',
     BETTER_AUTH_SECRET: 'auth', TURNSTILE_SECRET_KEY: 'signup-verification', MIKKA_CLOUDFLARE_TASK_WORKSPACES: 'sponsor',
     MIKKA_DEPLOYMENT_ID: id, MIKKA_WORKFLOW_QUEUE_PUBLIC_KEY: 'public-verification-key',
-    OPENAI_DECISIONS_API_KEY: 'decisions', CLOUDFLARE_WORKERS_AI_TOKEN: 'models',
+    DECISIONS_API_KEY: 'decision-gateway-fixture', OPENAI_DECISIONS_API_KEY: 'decisions', CLOUDFLARE_WORKERS_AI_TOKEN: 'models',
     DEVICE_GATEWAY_URL: 'https://gateway.example', DEVICE_GATEWAY_PUSH_SECRET: 'device-signing',
     WORKSPACE_SECRETS_KEY: 'workspace-sealing',
     COMPOSIO_API_KEY: 'integrations', COMPOSIO_WEBHOOK_SECRET: 'hook-verification',
@@ -186,6 +187,7 @@ test('the private API receives its sign-in and product bindings without inheriti
   assert.deepEqual(applicationEnvironment({ PUBLIC_ORIGIN: origin, ...allowed, ...unexpected }), {
     BETTER_AUTH_URL: origin, MIKKA_API_INGRESS: 'cloudflare', ...allowed,
   })
+  for (const log of logs) assert.equal(log.mock.callCount(), 0)
 })
 
 test('private World calls require the instance capability and forward only WDK payload and media headers', async () => {
