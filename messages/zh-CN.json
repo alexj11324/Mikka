@@ -4378,6 +4378,19 @@
     "copyFailed": "复制失败"
   },
   "IssueThreads": {
+    "organization": {
+      "rename": "重命名对话",
+      "regenerate": "重新生成标题",
+      "archive": "归档对话",
+      "unarchive": "取消归档",
+      "pin": "置顶对话",
+      "unpin": "取消置顶",
+      "titleLabel": "对话标题",
+      "titleUnavailable": "暂时无法生成新标题。",
+      "unavailable": "此对话已不可用。",
+      "failed": "未能保存对话更改。",
+      "invalidTitle": "请输入对话标题。"
+    },
     "title": "线程",
     "modelSwitched": "已改用",
     "agent": "Bot",

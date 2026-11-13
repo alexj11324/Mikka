@@ -65,10 +65,10 @@ export async function writeConversationTitle(runId: string, ownerId: string, tri
 }
 
 /** A person renames the conversation: every run of it takes the title, and nothing generated replaces it. */
-export async function renameConversationTitle(database: Query, runId: string, ownerId: string, raw: string): Promise<string | null> {
+export async function renameConversationTitle(database: Query, runId: string, ownerId: string, raw: string, workspaceId: string): Promise<string | null> {
   const title = manualConversationTitle(raw)
   if (!title) return null
-  const owned = (await database.query('SELECT 1 FROM agent_runs WHERE id=$1 AND "userId"=$2', [runId, ownerId])).rows[0]
+  const owned = (await database.query('SELECT 1 FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "workspaceId"=$3', [runId, ownerId, workspaceId])).rows[0]
   if (!owned) return null
   await write(database, ownerId, await chainOf(database, ownerId, runId), title, 'manual', true)
   return title

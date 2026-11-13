@@ -4378,6 +4378,19 @@
     "copyFailed": "Couldn't copy"
   },
   "IssueThreads": {
+    "organization": {
+      "rename": "Rename conversation",
+      "regenerate": "Regenerate title",
+      "archive": "Archive conversation",
+      "unarchive": "Unarchive conversation",
+      "pin": "Pin conversation",
+      "unpin": "Unpin conversation",
+      "titleLabel": "Conversation title",
+      "titleUnavailable": "A new title could not be generated.",
+      "unavailable": "This conversation is no longer available.",
+      "failed": "Could not save the conversation change.",
+      "invalidTitle": "Enter a conversation title."
+    },
     "title": "Threads",
     "modelSwitched": "Switched to",
     "agent": "Bot",
