@@ -2,8 +2,12 @@ name: Cloudflare task workspace
 on:
   workflow_dispatch:
     inputs:
-      api_build_uuid:
-        description: Accepted API build UUID
+      api_run_id:
+        description: Accepted API publication run ID
+        type: string
+        required: true
+      api_run_attempt:
+        description: Accepted API publication run attempt
         type: string
         required: true
       api_image_digest:
@@ -97,10 +101,11 @@ jobs:
           node-version: 24
       - name: Prepare the source-bound runtime release
         env:
-          API_BUILD_UUID: ${{ inputs.api_build_uuid }}
+          API_RUN_ID: ${{ inputs.api_run_id }}
+          API_RUN_ATTEMPT: ${{ inputs.api_run_attempt }}
           API_IMAGE_DIGEST: ${{ inputs.api_image_digest }}
           OVERLAY_SHA: ${{ inputs.overlay_sha }}
-          MIKKA_CF_API_RECEIPT: ${{ secrets.MIKKA_CF_API_RECEIPT }}
+          MIKKA_API_RECEIPT: ${{ secrets.MIKKA_API_RECEIPT }}
           CF_RUNTIME_REGISTRY_USERNAME: ${{ secrets.CF_RUNTIME_REGISTRY_USERNAME }}
           CF_RUNTIME_REGISTRY_PASSWORD: ${{ secrets.CF_RUNTIME_REGISTRY_PASSWORD }}
         run: node scripts/cloudflare-runtime-release.mjs prepare task
@@ -143,10 +148,11 @@ jobs:
         run: docker tag mikka-task-sandbox "mikka-native-task:$MIKKA_DEPLOYMENT_ID"
       - name: Publish the verified runtime image
         env:
-          API_BUILD_UUID: ${{ inputs.api_build_uuid }}
+          API_RUN_ID: ${{ inputs.api_run_id }}
+          API_RUN_ATTEMPT: ${{ inputs.api_run_attempt }}
           API_IMAGE_DIGEST: ${{ inputs.api_image_digest }}
           OVERLAY_SHA: ${{ inputs.overlay_sha }}
-          MIKKA_CF_API_RECEIPT: ${{ secrets.MIKKA_CF_API_RECEIPT }}
+          MIKKA_API_RECEIPT: ${{ secrets.MIKKA_API_RECEIPT }}
           CF_RUNTIME_REGISTRY_USERNAME: ${{ secrets.CF_RUNTIME_REGISTRY_USERNAME }}
           CF_RUNTIME_REGISTRY_PASSWORD: ${{ secrets.CF_RUNTIME_REGISTRY_PASSWORD }}
         run: node scripts/cloudflare-runtime-release.mjs publish task
