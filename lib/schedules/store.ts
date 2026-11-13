@@ -25,7 +25,8 @@ const SCHEDULE_COLUMNS = 'id,owner_id,workspace_id,bot_id,visibility,source_even
 export const SCHEDULE_DUE_SQL=`SELECT min(next_at) AS at FROM user_schedules WHERE status='active'
     UNION ALL SELECT min(next_retry_at) FROM schedule_occurrences WHERE status='pending'
     UNION ALL SELECT min(lease_until) FROM schedule_occurrences WHERE status='running'
-    UNION ALL SELECT min(report_next_at) FROM schedule_occurrences WHERE status='failed' AND reported_at IS NULL`
+    UNION ALL SELECT min(report_next_at) FROM schedule_occurrences WHERE status='failed' AND reported_at IS NULL
+    UNION ALL SELECT min("snoozedUntil") FROM inbox_snoozes`
 export async function nextScheduleDue(executor:Pick<Pool,'query'>):Promise<number|null>{
   const {rows}=await executor.query<{at:string|null}>(`SELECT ceil(extract(epoch FROM min(at))*1000)::bigint::text AS at FROM (${SCHEDULE_DUE_SQL}) due`)
   return rows[0]?.at==null?null:Number(rows[0].at)

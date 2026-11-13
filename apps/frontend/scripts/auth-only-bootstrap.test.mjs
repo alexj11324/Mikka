@@ -33,7 +33,7 @@ const fixtureModules = new Map([
   ['@/components/blocks/auth-19/components/auth-card', `export const AuthCard = ${wrapper};`],
   ['@/components/workspace/workspace-loading', 'import { createElement } from "react"; export const WorkspaceLoading = () => createElement("div", { "data-loading": true });'],
   ['@/components/workspace/create-workspace-form', 'export const CreateWorkspaceForm = () => null;'],
-  ['@/components/workspace/invitation-card', `import { createElement } from 'react'; export const InvitationCard = () => null; export const OrganizationInvitationCard = () => createElement('div', { 'data-organization-invitation': true });`],
+  ['@/components/workspace/invitation-card', `import { createElement } from 'react'; export const InvitationCard = () => createElement('div', { 'data-workspace-invitation': true }); export const OrganizationInvitationCard = () => createElement('div', { 'data-organization-invitation': true });`],
   ['@/components/device-authorization', 'export const DeviceAuthorization = () => null;'],
   ['@/components/plugins/github-settings', 'export const GitHubSettings = () => null;'],
   ['@/components/app-shell/not-found', 'export default () => null;'],
@@ -144,12 +144,61 @@ test('a server authentication document preserves the PKCE identity-only boundary
   assert.equal(f.state.githubMounts, 0)
 })
 
-test('a server Organization invitation handoff retains the auth-only boundary', async t => {
-  const f = await fixture(t, { path: `/mikka/en/organization-invite/${'b'.repeat(64)}`, serverDocument: 'authentication' })
-  assert.ok(f.container.querySelector('[data-organization-invitation]'))
-  assert.equal(f.state.workspaceMounts, 0)
-  assert.equal(f.state.githubMounts, 0)
-  assert.deepEqual(f.state.requests.filter(item => item.action).map(item => item.action), ['desktop.session'])
+for (const [kind, prefix, card] of [
+  ['Organization', '/organization-invite/', '[data-organization-invitation]'],
+  ['Workspace', '/invite/', '[data-workspace-invitation]'],
+]) {
+  const invitation = prefix + 'b'.repeat(64)
+  test(kind + ' invitations reach the account handoff even when workspace bootstrap is unavailable', async t => {
+    const path = '/mikka/en' + invitation
+    for (const [label, serverDocument] of [['official Web', undefined], ['Server-only', 'authentication']]) {
+      await t.test(label, async t => {
+        const f = await fixture(t, { path, serverDocument,
+          fetch: request => request.action === 'desktop.bootstrap' ? new Response('', { status: 503 }) : undefined })
+        assert.ok(f.container.querySelector(card))
+        assert.equal(f.state.workspaceMounts, 0)
+        assert.equal(f.state.githubMounts, 0)
+        assert.deepEqual(f.state.requests.filter(item => item.action).map(item => item.action), ['desktop.session'])
+        assert.equal(f.state.requests.filter(item => item.path === '/mikka/api/desktop/config').length, 1)
+      })
+    }
+  })
+
+  test('a signed-out account can sign in or register and return to its ' + kind + ' invitation during a workspace outage', async t => {
+    for (const mode of ['sign-in', 'sign-up']) {
+      await t.test(mode, async t => {
+        let signedIn = false
+        const f = await fixture(t, { path: `/mikka/en${invitation}`, fetch: request => {
+          if (request.action === 'desktop.bootstrap') return new Response('', { status: 503 })
+          if (request.action === 'desktop.session' && !signedIn) return packet(null)
+        } })
+        assert.ok(f.container.querySelector(card))
+        await f.navigate(`/mikka/en/${mode}?next=${encodeURIComponent(invitation)}`)
+        assert.equal(f.container.querySelector('[data-auth]')?.getAttribute('data-owner'), 'signed-out')
+        signedIn = true
+        await f.owner(session('invited-member', 'new-session'))
+        await f.settle()
+        assert.equal(f.window.location.pathname, `/mikka/en${invitation}`)
+        assert.ok(f.container.querySelector(card))
+        assert.equal(f.state.workspaceMounts, 0)
+        assert.equal(f.state.requests.filter(item => item.action === 'desktop.bootstrap').length, 0)
+      })
+    }
+  })
+}
+
+test('ordinary and ambiguous sign-in returns keep the existing workspace bootstrap', async t => {
+  const next = encodeURIComponent(`/organization-invite/${'b'.repeat(64)}`)
+  for (const [label, search] of [['settings', '?next=%2Fsettings'], ['duplicate next', `?next=${next}&next=${next}`],
+    ['separate account flow', `?next=${next}&addAccount=1`], ['short invitation', '?next=%2Forganization-invite%2Fabc'],
+    ['malformed Workspace invitation', '?next=%2Finvite%2Fabc'],
+    ['ambiguous Workspace invitation', `?next=%2Finvite%2F${'a'.repeat(64)}&addAccount=1`]]) {
+    await t.test(label, async t => {
+      const f = await fixture(t, { path: `/mikka/en/sign-in${search}`, fetch: request =>
+        request.action === 'desktop.bootstrap' ? new Response('', { status: 503 }) : undefined })
+      assert.deepEqual(f.state.requests.filter(item => item.action).map(item => item.action), ['desktop.bootstrap'])
+    })
+  }
 })
 
 test('a signed-in server GitHub document renders only its handoff before and after intent cleanup', async t => {
