@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
+import { desktopActionSchemas } from './desktop-rpc/schemas'
 import { FactoryError } from './factory/contract'
 
 let visible = true
@@ -37,4 +38,13 @@ test('only a discovered, canonically authorized Factory for the same issue enter
   assert.equal((await read(reader, 'workspace', 'task')).factory,null)
   scopeMatches = true
   assert.deepEqual((await read(reader, 'workspace', 'task')).factory,{ ...activity, liveWorkspaceId:'workspace' })
+})
+
+
+test('Web and Desktop can request work while existing thread-only reads retain their wire shape', () => {
+  const id = '170f3967-5bdb-4d94-91b1-4aa2cd7d0728'
+  const schema = desktopActionSchemas['agents.pollIssueThreads']
+  assert.ok(schema.safeParse([id]).success)
+  assert.ok(schema.safeParse([id, true]).success)
+  assert.equal(schema.safeParse([id, 'true']).success, false)
 })
