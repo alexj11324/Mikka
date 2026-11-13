@@ -84,6 +84,8 @@ export function useBotModelPicker(botId: string | null) {
     setRefreshing(true)
     setRefreshFailed(false)
     try {
+      // A manual catalogue refresh must not race an in-flight model save.
+      if (pendingSave.current) await pendingSave.current
       await menu.mutate(() => refreshBotModelMenuAction(botId), { populateCache: true, revalidate: false })
     } catch { setRefreshFailed(true) } finally { setRefreshing(false) }
   }
@@ -98,11 +100,11 @@ export function useBotModelPicker(botId: string | null) {
   useEffect(() => {
     const key = lastChipKey(botId)
     try {
-      if (shown) window.localStorage.setItem(key, JSON.stringify({ id: shown.id, modelId: shown.modelId, provider: shown.provider }))
+      if (shown && !(saving && shown.availability === 'checking')) window.localStorage.setItem(key, JSON.stringify({ id: shown.id, modelId: shown.modelId, provider: shown.provider }))
       else if (menu.error) window.localStorage.removeItem(key)
       else setLast(readChip(window.localStorage.getItem(key)))
     } catch { /* storage unavailable: the chip waits for the menu */ }
-  }, [botId, shown, menu.error])
+  }, [botId, shown, menu.error, saving])
 
   async function choose(id: string): Promise<boolean> {
     // A previous save must settle before another write; otherwise late server
