@@ -65,8 +65,8 @@ export function ConversationDirectory({ ownerId, workspaceId, botId }: { ownerId
     {!error && !data && <p role="status">{t('loading')}</p>}
     {data && !rows.length && !more && !error && <p role="status">{t('empty')}</p>}
     <ul className="flex flex-col gap-1">
-      {rows.map(row => <li key={row.id}><Button type="button" variant="ghost" onClick={() => openThread(row.id)}
-        className="h-auto w-full flex-wrap items-center gap-x-3 gap-y-1 py-3 text-start focus-visible:outline-ring">
+      {rows.map(row => <li key={row.id} className="flex items-center gap-2"><Button type="button" variant="ghost" onClick={() => openThread(row.id)}
+        className="h-auto min-w-0 flex-1 flex-wrap justify-start gap-x-3 gap-y-1 py-3 text-start">
         <span className="min-w-0 flex-1 break-words font-medium">{row.title || t('untitled')}</span>
         {row.identifier && <bdi>{row.identifier}</bdi>}
         <span>{t(row.state)}</span><time dateTime={row.at}>{format.dateTime(new Date(row.at), { dateStyle: 'medium', timeStyle: 'short' })}</time>
