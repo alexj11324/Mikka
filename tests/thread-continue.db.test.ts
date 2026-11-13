@@ -509,7 +509,8 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,1,'{"type":"text-delta","id":"answer1","delta":"Original answer."}',now()-interval '1 minute')`,[randomUUID(),run])
     await pool.query(`INSERT INTO run_messages(id,"runId","userId",text,origin,"deliveredAt") VALUES($1,$2,$3,'LATER_MARKER','owner',now())`,[randomUUID(),run,owner.id])
     await end(run,'succeeded')
-    await pool.query(`UPDATE agent_runs SET "lastReply"='Original answer.' WHERE id=$1`,[run])
+    await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,2,'{"type":"text-delta","id":"later","delta":"Later answer."}',now()+interval '1 second')`,[randomUUID(),run])
+    await pool.query(`UPDATE agent_runs SET "lastReply"='Later answer.' WHERE id=$1`,[run])
     const pr='https://github.com/octo/repo/pull/18'
     await pool.query(`INSERT INTO run_publications("runId","userId","issueId","remoteUrl","remoteKey",status,"pullRequest")
       VALUES($1,$2,$3,'https://github.com/octo/repo','octo/repo','published',$4)

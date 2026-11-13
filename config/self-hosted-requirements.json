@@ -1,4 +1,53 @@
 {
+  "drizzle/20261113173501_thread_reply_versions.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Keep version inputs and their original and resulting run references in the installation database.",
+    "test": "tests/thread-continue.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "lib/thread-reply-versions.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read historical inputs and start immutable reply versions after rechecking conversation and workspace ownership in PostgreSQL.",
+    "test": "tests/thread-continue.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "app/actions/agents.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Authenticate the conversation owner to read, enqueue, cancel or version input through the installation PostgreSQL database.",
+    "test": "tests/thread-continue.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "drizzle/20261113165436_thread_delivery_queue.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Create the installation-local owner-scoped delivery queue and delivery receipt fields.",
+    "test": "tests/thread-continue.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "lib/run-completion-effects.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "After terminal run events, deliver the next pending conversation input using the same installation database.",
+    "test": "tests/thread-continue.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "lib/thread-delivery-queue.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Persist and serialize pending human input in PostgreSQL, checking the active run and the bound device before offering delivery actions.",
+    "test": "tests/thread-continue.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "lib/thread-delivery.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Define delivery choices and pending input returned by authenticated conversation reads.",
+    "test": "tests/thread-continue.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
   "app/actions/issues.ts": {
     "mode": "built-in",
     "environment": [],

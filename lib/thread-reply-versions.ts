@@ -29,9 +29,9 @@ async function versionAnchor(pool: Pool, userId: string, input: ReplyVersionInpu
       SELECT min(c."createdAt") AS time,string_agg(c.chunk->>'delta','' ORDER BY c.seq) AS text
       FROM run_chunks c WHERE c."runId"=$1 AND c.chunk->>'type'='text-delta' AND c.chunk->>'id'=$2
       HAVING count(*)>0)
-    SELECT answer.text AS "originalText", coalesce(m.text,CASE WHEN r."promptTaskLength">0 THEN substring(r.prompt FROM coalesce(r."promptTaskStart",0)+1 FOR r."promptTaskLength") END) AS "ownerInput",answer.time
+    SELECT answer.text AS "originalText", coalesce(m.text,CASE WHEN r."promptTaskLength">0 THEN substring(r.prompt FROM coalesce(r."promptTaskStart",0)+1 FOR r."promptTaskLength") END) AS "ownerInput",coalesce(m."createdAt", r."createdAt") AS time
     FROM answer JOIN agent_runs r ON r.id=$1 AND r."userId"=$3
-    LEFT JOIN LATERAL (SELECT text FROM run_messages WHERE "runId"=r.id AND "userId"=$3 AND origin='owner' AND "deliveredAt" IS NOT NULL AND failure IS NULL AND "createdAt"<=answer.time ORDER BY "createdAt" DESC,id DESC LIMIT 1) m ON true`,
+    LEFT JOIN LATERAL (SELECT text,"createdAt" FROM run_messages WHERE "runId"=r.id AND "userId"=$3 AND origin='owner' AND "deliveredAt" IS NOT NULL AND failure IS NULL AND "createdAt"<=answer.time ORDER BY "createdAt" DESC,id DESC LIMIT 1) m ON true`,
   [input.anchorRunId, input.anchorKey, userId])
   if (!row?.ownerInput || !row.originalText) throw new ActionFailureError('threadCannotContinue')
   return row
@@ -60,12 +60,20 @@ export async function createReplyVersion(pool: Pool, userId: string, runId: stri
         UNION ALL SELECT 'assistant',string_agg(c.chunk->>'delta','' ORDER BY c.seq),min(c."createdAt"),c."runId"::text||':'||coalesce(c.chunk->>'id','')
           FROM run_chunks c WHERE c."runId"=ANY($2::uuid[]) AND c.chunk->>'type'='text-delta' AND c."createdAt"<$3 GROUP BY c."runId",c.chunk->>'id'
         ) prefix ORDER BY at DESC,tie DESC LIMIT 24`, [userId,precedingRuns,anchor.time])
-      const context = history.reverse().map(row => ({ role:row.role, text:row.text })).filter(row => row.text)
-      const note = ['Restart at the selected conversation message. Earlier conversation text is context. Existing commits, pull requests and messages are retained. Inspect existing work before an external action.',
-        context.length ? JSON.stringify(context).slice(-3000) : '', text].filter(Boolean).join('\n\n')
-      // The writer's 10k limit applies to owner text. Preserve all of it,
-      // dropping historical context from the execution brief when necessary.
-      const executionNote = Array.from(note).length <= 10_000 ? note : text
+      const guidance = 'Restart at the selected conversation message. Earlier conversation text is context. Existing commits, pull requests and messages are retained. Inspect existing work before an external action.'
+      const budget = 10_000 - Array.from(text).length
+      let executionNote = text
+      if (budget >= guidance.length + 2) {
+        const context: { role: string; text: string }[] = []
+        const contextLimit = Math.min(3_000, budget - guidance.length - 4)
+        for (const row of history) {
+          if (!row.text) continue
+          const entry = { role: row.role, text: row.text }
+          if (JSON.stringify([entry, ...context]).length > contextLimit) break
+          context.unshift(entry)
+        }
+        executionNote = [guidance, ...(context.length ? [JSON.stringify(context)] : []), text].join('\n\n')
+      }
       const sourceId = factoryEventId('thread-submission',JSON.stringify([userId,id]))
       await pool.query(`INSERT INTO thread_reply_versions (id,"userId","workspaceId","rootRunId","anchorRunId","anchorKey","admissionRunId",operation,"originalText",text,"executionNote","sourceEventId")
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT DO NOTHING`,
@@ -90,8 +98,19 @@ export async function readReplyVersions(pool: Pool, userId: string, runId: strin
     if (!chain) throw new ActionFailureError('runNotFound')
     return (await pool.query<{ id:string; anchorRunId:string; anchorKey:string; originalText:string; text:string; resultRunId:string|null; output:string|null; pullRequest:string|null; originalOutput:string|null; originalPullRequest:string|null }>(`
       SELECT v.id,v."anchorRunId",v."anchorKey",v."originalText",v.text,r.id AS "resultRunId",r."lastReply" AS output,
-        p."pullRequest"->>'url' AS "pullRequest", source."lastReply" AS "originalOutput",prior."pullRequest"->>'url' AS "originalPullRequest"
+        p."pullRequest"->>'url' AS "pullRequest", CASE WHEN v.operation='rerun' THEN v."originalText" ELSE original.output END AS "originalOutput",prior."pullRequest"->>'url' AS "originalPullRequest"
         FROM thread_reply_versions v JOIN agent_runs source ON source.id=v."anchorRunId" AND source."workspaceId"=v."workspaceId" AND source."userId"=v."userId"
+      LEFT JOIN run_messages anchor ON v.operation='edit' AND anchor.id::text=v."anchorKey"
+        AND anchor."runId"=source.id AND anchor."userId"=v."userId"
+      LEFT JOIN LATERAL (
+        SELECT string_agg(c.chunk->>'delta','' ORDER BY c.seq) AS output
+        FROM run_chunks c WHERE c."runId"=source.id AND c.chunk->>'type'='text-delta'
+          AND c."createdAt">=anchor."createdAt" AND c."createdAt"<coalesce((
+            SELECT min(m."createdAt") FROM run_messages m WHERE m."runId"=source.id AND m."userId"=v."userId"
+              AND m.origin='owner' AND m."deliveredAt" IS NOT NULL AND m.failure IS NULL AND m."createdAt">anchor."createdAt"
+          ),'infinity'::timestamptz)
+        GROUP BY c.chunk->>'id' ORDER BY min(c.seq) LIMIT 1
+      ) original ON true
       LEFT JOIN run_publications prior ON prior."runId"=source.id AND prior."userId"=v."userId"
       JOIN agent_runs root ON root.id=v."rootRunId" AND root."userId"=v."userId" AND root."workspaceId"=v."workspaceId"
       LEFT JOIN agent_runs r ON r.id=v."resultRunId" AND r."userId"=v."userId" AND r."workspaceId"=v."workspaceId"
