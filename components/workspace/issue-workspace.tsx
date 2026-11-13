@@ -333,6 +333,11 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     return page
   })
   const teamPresentation = useWorkspaceTaskPresentations(user.id, listWorkspaceId, workspaceHome, teamPaging.items, Boolean(teamPageKey) && !listsPaused)
+  // The full Task detail and its embedded right-panel variant share one acknowledged refresh.
+  const refreshTaskPages = useCallback(() => {
+    void mutate()
+    if (section === 'team-issues' && teamPageKey) void teamFirst.mutate()
+  }, [mutate, section, teamPageKey, teamFirst.mutate])
   const visiblePresentations = useMemo(() => ({ ...presentation.items, ...teamPresentation.items }), [presentation.items, teamPresentation.items])
   const [pluginsVisit, setPluginsVisit] = useState(0)
   // True only while the detail was loaded directly and no section has been chosen since.
@@ -364,12 +369,12 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const flushDetail = useRef<(() => Promise<boolean>) | null>(null)
   const embeddedEditors = useRef(new Map<symbol, () => Promise<boolean>>())
   const embeddedLifecycle = useMemo(() => ({
-    onSaved: () => { void mutate() },
+    onSaved: () => { refreshTaskPages() },
     register: (owner: symbol, flush: (() => Promise<boolean>) | null) => {
       if (flush) embeddedEditors.current.set(owner, flush)
       else embeddedEditors.current.delete(owner)
     },
-  }), [mutate])
+  }), [refreshTaskPages])
   const leaving = useRef(false)
   const registerFlush = useCallback((flush: (() => Promise<boolean>) | null) => { flushDetail.current = flush }, [])
   /** Shows the task; the caller writes the address. */
@@ -527,13 +532,6 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     return true
   }
   const openFromList = (id: string) => open(id, true)
-  // Team Issues reads a separate authorized page. An acknowledged detail write
-  // must invalidate both lists; refreshing the global page alone leaves the
-  // Team board stale until a later live-key event.
-  const refreshTaskPages = useCallback(() => {
-    void mutate()
-    if (section === 'team-issues' && teamPageKey) void teamFirst.mutate()
-  }, [mutate, section, teamPageKey, teamFirst.mutate])
   function deleted() {
     flushDetail.current = null
     dirtyRef.current = false
