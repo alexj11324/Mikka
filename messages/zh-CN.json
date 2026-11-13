@@ -4949,9 +4949,7 @@
       "toolbar": "看板工具栏",
       "scopeLabel": "任务范围",
       "scope": {
-        "all": "全部",
-        "workspace": "工作区",
-        "personal": "个人"
+        "all": "全部"
       },
       "filter": "筛选",
       "filterField": {
@@ -5006,8 +5004,6 @@
       "inlineTitle": "任务标题",
       "discussPrefill": "我们聊聊 {id} {title}：",
       "card": {
-        "personal": "个人任务",
-        "personalHint": "个人任务 · 只有你能看到",
         "status": "状态",
         "priority": "优先级",
         "subtasks": "子任务",

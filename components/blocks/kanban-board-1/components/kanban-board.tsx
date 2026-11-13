@@ -5,7 +5,7 @@ import { displayTaskTitle } from '@/lib/short-title'
 import { useState, type ComponentProps, type ReactNode, type Ref } from 'react'
 import { ScrollArea as ScrollAreaPrimitive } from '@base-ui/react/scroll-area'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
-import { Box, CalendarDays, Circle, CircleStop, CircleUserRound, Ellipsis, EyeOff, Flag, Link2, ListChecks, Lock, MessageSquare, Tag, Trash2 } from 'lucide-react'
+import { Box, CalendarDays, Circle, CircleStop, CircleUserRound, Ellipsis, EyeOff, Flag, Link2, ListChecks, MessageSquare, Tag, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/reui/badge'
 import { Kanban, KanbanBoard as KanbanBoardPrimitive, KanbanColumn, KanbanColumnContent, KanbanItem, KanbanItemHandle, KanbanOverlay } from '@/components/reui/kanban'
@@ -93,8 +93,6 @@ export type CardContext = {
   blocks?: ReadonlyMap<string, TaskBlock>
   /** Cards the person just moved with the status menu (enter) or deleted (leave); others' changes are absent and snap (R-37). */
   motion?: ReadonlyMap<string, 'enter' | 'leave'>
-  /** A personal workspace: every task is the person's, so no card shows the private lock. */
-  personalWorkspace?: boolean
 }
 
 function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss, onBlockChange }: CardHandlers & {
@@ -144,7 +142,7 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
   ].filter(Boolean)
 
   const card = <BoardCard id={task.id} title={displayTaskTitle(task)} fullTitle={task.title} identifier={show('identifier') && task.identifier ? task.identifier : null} done={done} overlay={isOverlay}
-    personal={task.scope === 'personal' && !context.personalWorkspace ? <Tooltip><TooltipTrigger render={<span className="flex shrink-0" />}><Lock aria-label={tCard('personal')} className="size-3.5 text-muted-foreground" /></TooltipTrigger><TooltipContent>{tCard('personalHint')}</TooltipContent></Tooltip> : null}
+    personal={null}
     hasAssignee={Boolean(assigneeGroup)}
     assignee={show('assignee') ? <CardControlBoundary><IssueMetadataControls task={task} section="assignee" compact disabled={controlsDisabled} assigneeAvatar={assigneeGroup} request={request?.target === 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></CardControlBoundary> : null}
     status={<CardControlBoundary><div className="-ml-[3px] flex"><IssuePropertyMenu label={tIssue('statusLabel')} value={task.status} options={statusOptions} icon={Circle} iconOnly compact disabled={controlsDisabled} onChange={value => onStatusChange(task, value as IssueStatus)} /></div></CardControlBoundary>}

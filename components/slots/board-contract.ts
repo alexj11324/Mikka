@@ -38,7 +38,7 @@ export type BoardCardProps = {
   identifier: string | null
   /** Done, canceled or duplicate: a quieter title. */
   done: boolean
-  /** The lock for a personal task, with its tooltip; null for a workspace task. */
+  /** Always null: a card no longer marks 归属 (2026-11-13-1405). Kept so released layers compile. */
   personal: ReactNode
   /** The status menu (an icon button); its click never opens the task. */
   status: ReactNode
@@ -84,7 +84,7 @@ export type BoardScreenCard = {
 
 /**
  * The official BoardScreen renders the toolbar, columns and list. Mikka keeps the
- * filters, 显示 options, scope and view in BoardPage and every save in useIssueBoardSaves; the layer shows them and
+ * filters, 显示 options and view in BoardPage and every save in useIssueBoardSaves; the layer shows them and
  * calls back. The Coordinator sidebar stays beside it.
  */
 export type BoardScreenProps = {
@@ -93,7 +93,7 @@ export type BoardScreenProps = {
   cards: BoardScreenCard[]
   view: 'board' | 'list'
   onView: (view: 'board' | 'list') => void
-  /** 全部 / 工作区 / 个人 with their counts; one tab in a personal workspace. */
+  /** One tab, 全部 with its count: the board holds every task of its workspace (2026-11-13-1405). */
   scopes: { id: string; label: string; count: number }[]
   scope: string
   onScope: (id: string) => void
