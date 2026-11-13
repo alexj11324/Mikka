@@ -18,6 +18,14 @@ const api = { version: 1, provider: 'github-actions', repository: 'alexj11324/Mi
   image: 'registry.cloudflare.com/' + 'e'.repeat(32) + '/mikka-api@' + imageDigest,
   overlayCheckout: { repository: 'alexj11324/mikka-hosted-ui', requestedSha: overlaySha, actualSha: overlaySha },
   webRenderer: 'f'.repeat(64), workerDigest: 'sha256:' + '1'.repeat(64), webArchiveSha256: '2'.repeat(64), webArchiveBytes: 123,
+  workerBundles: {
+    apiIngress: { path: 'ingress.mjs', sha256: '1'.repeat(64), bytes: 120 },
+    eveRuntime: { path: 'workers/eve-runtime.mjs', sha256: '3'.repeat(64), bytes: 220 },
+    taskSandbox: { path: 'workers/task-sandbox.mjs', sha256: '4'.repeat(64), bytes: 320 },
+    web: { path: 'workers/web.mjs', sha256: '5'.repeat(64), bytes: 420 },
+    credentialIdentity: { path: 'workers/credential-identity.mjs', sha256: '6'.repeat(64), bytes: 520 },
+    credentialBroker: { path: 'workers/credential-broker.mjs', sha256: '7'.repeat(64), bytes: 620 },
+  },
   offlineVerification: 'buildkit-network-none', publication: 'registry-only', production: false }
 api.publicBuildSettings = { publicSha, privateSha: overlaySha, publication: 'registry-only', NEXT_PUBLIC_POSTHOG_KEY: 'public-analytics',
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_test_public', NEXT_PUBLIC_TURNSTILE_SITE_KEY: 'public-turnstile', NEXT_PUBLIC_COMPUTER_ENABLED: '1' }
@@ -57,6 +65,8 @@ test('prebuilt API resources require matching supplemental metadata and portable
   const app = { version: 1, revision: publicSha, overlaySha, deploymentId: release, preset: 'node-server', resources: [resource] }
   assert.deepEqual(verifyApiPayload(api, api, app), [resource])
   assert.throws(() => verifyApiPayload(api, { ...api, buildId: 'another' }, app))
+  assert.throws(() => verifyApiPayload(api, { ...api, workerBundles: { ...api.workerBundles,
+    web: { ...api.workerBundles.web, sha256: '0'.repeat(64) } } }, app))
   assert.throws(() => verifyApiPayload(api, api, { ...app, revision: overlaySha }))
   assert.throws(() => verifyApiPayload(api, api, { ...app, resources: [resource, resource] }))
   for (const path of ['../escape', '/etc/passwd', 'lib/../../escape', 'lib//resource', '.env', 'lib/.env.local', '.git/config', 'lib\\escape', 'lib/\0bad']) {
