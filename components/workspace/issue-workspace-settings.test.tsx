@@ -28,6 +28,7 @@ const teamIssuesId = '8055a7ae-204f-4045-8780-66b9c93ce229'
 let scopedTeamFixture = false
 let workspaceTasksPending = false
 let scopedTasksPending = false
+let scopedTeamPageMutations = 0
 const workspace = () => ({ currentUserId: user.id, workspace: { id: workspaceId, name: 'Fixture', kind: 'team' }, members: [], role: 'admin' })
 const emptyList = { data: { items: [] }, mutate: refreshed }
 const bot = { id: '3f0c9d2e-5b1a-4c7e-9f00-1a2b3c4d5e6f', name: 'Ada', coordinator: false }
@@ -44,7 +45,7 @@ mock.module('swr', { defaultExport: (key: unknown) => ({
     : Array.isArray(key) && key[0] === 'team-issues-page' ? { items: [], next: null }
     : [],
   isLoading: Array.isArray(key) && key[0] === 'team-issues-page' ? scopedTasksPending : false,
-  mutate: refreshed,
+  mutate: Array.isArray(key) && key[0] === 'team-issues-page' ? async () => { scopedTeamPageMutations++ } : refreshed,
 }), namedExports: { SWRConfig: swr.SWRConfig, unstable_serialize: swr.unstable_serialize, useSWRConfig: swr.useSWRConfig } })
 mock.module('@/lib/app-build', { namedExports: { APP_BUILD: '' } })
 mock.module('@/lib/auth-client', { namedExports: { endSession: async () => ({}), authClient: { getSession: async () => ({ data: { user } }), useSession: () => ({ data: null }) } } })
@@ -87,6 +88,11 @@ for (const [file, names] of [
   ['../plugins/plugins-view.tsx', ['PluginsPage']], ['../suggestions/suggestion-feed.tsx', ['SuggestionFeed', 'SuggestionsRefresh', 'useSuggestionCount']],
   ['../artifacts/artifact-library.tsx', ['ArtifactLibrary']], ['./legacy-chat-archive.tsx', ['LegacyChatArchive']],
 ] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, name === 'useSuggestionCount' ? () => 0 : name === 'BoardPage' ? () => <section data-team-board-visible="" /> : empty])) })
+// The Team detail fixture exercises acknowledged save/delete callbacks, not a fake list mutation.
+mock.module(new URL('./task-detail.tsx', import.meta.url).href, { namedExports: {
+  TaskDetail: ({ id, onSaved, onDeleted }: { id: string; onSaved: (id: string) => void; onDeleted: () => void }) =>
+    <section data-team-task-detail=""><Button data-detail-save="" onClick={() => onSaved(id)}>save task</Button><Button data-detail-delete="" onClick={onDeleted}>delete task</Button></section>,
+} })
 mock.module('./group-chat-view', { namedExports: {
   GroupChatView: ({ group }: { group: { id: string } }) => <section data-open-group={group.id} />,
 } })
@@ -188,7 +194,7 @@ beforeEach(() => {
   groupList = []
   groupListError = undefined
   groupListRetries = 0
-  scopedTeamFixture = false; workspaceTasksPending = false; scopedTasksPending = false
+  scopedTeamFixture = false; workspaceTasksPending = false; scopedTasksPending = false; scopedTeamPageMutations = 0
   browser.history.replaceState({}, '', '/?workspace=workspace-one')
   browser.localStorage.clear(); browser.sessionStorage.clear()
   notes = null; railMounts = 0; composerMounts = 0; composerUnmounts = 0
@@ -271,6 +277,22 @@ test('Team Issues first-page readiness is independent of the unrelated workspace
   await render({ initialSection: 'team-issues' })
   assert.equal(container.querySelector('[data-team-board-visible]'), null)
   assert.ok(container.querySelector('[role="status"][aria-label="Workspace.loadingEditor"]'))
+})
+
+test('a Team detail ACK refreshes its own authorized list after save and deletion', async () => {
+  scopedTeamFixture = true
+  const issueId = '8055a7ae-204f-4045-8780-66b9c93ce230'
+  browser.history.replaceState({}, '', `/?workspace=${workspaceId}&team=${teamIssuesId}&section=team-issues&issue=${issueId}`)
+  await render({ initialSection: 'team-issues', initialSelected: issueId })
+  await act(async () => { releaseChunk(); await Promise.resolve() })
+  const save = container.querySelector<HTMLButtonElement>('[data-detail-save]')
+  assert.ok(save, 'the Task detail must be reachable in the Team view')
+  await act(async () => { save.click() })
+  assert.equal(scopedTeamPageMutations, 1, 'the separate Team first page must be invalidated on a successful save')
+  const remove = container.querySelector<HTMLButtonElement>('[data-detail-delete]')
+  assert.ok(remove)
+  await act(async () => { remove.click() })
+  assert.equal(scopedTeamPageMutations, 2, 'an acknowledged deletion must retire the Team page too')
 })
 
 test('a group absent from stale rows offers retry until a successful membership read', async () => {
