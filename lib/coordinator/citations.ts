@@ -76,7 +76,8 @@ export function runTitle(run: Pick<RunSource, 'issue' | 'name' | 'title'>) {
 
 /**
  * Marks a `[[run:…]]` that directly follows an `[[issue:…]]` (nothing but spaces between): when that thread belongs to
- * that task, the two read as one reference, the task's chip and then the thread's title. The gap becomes one space.
+ * that task, the two read as one reference, the task's chip and then the thread's title. The gap between them is dropped here: the
+ * thread draws one word gap itself, so nothing is left behind when its title is left out beside its card.
  */
 export function pairCitations(parts: readonly CitationPart[]): (CitationPart & { after?: string })[] {
   const out: (CitationPart & { after?: string })[] = []
@@ -84,7 +85,7 @@ export function pairCitations(parts: readonly CitationPart[]): (CitationPart & {
     const gap = out.at(-1), before = gap?.type === 'text' && !gap.text.trim() && !gap.text.includes('\n') ? out.at(-2) : gap
     if (part.type === 'citation' && part.kind === 'run' && before?.type === 'citation' && before.kind === 'issue') {
       if (gap !== before) out.pop()
-      out.push({ type: 'text', text: ' ' }, { ...part, after: before.id })
+      out.push({ ...part, after: before.id })
     } else out.push(part)
   }
   return out

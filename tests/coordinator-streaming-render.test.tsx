@@ -402,7 +402,7 @@ test('a task chip straight before its own thread is one reference; with that thr
     await view.render(<CoordinatorReply text={`已派出 [[issue:${TASK}]]   [[run:${THREAD}]]，等它跑完。`} citations={{ ...base, sources }} carded={THREAD} />)
     assert.equal(chips().length, 1)
     assert.equal(view.container.querySelector('[data-thread-link]'), null, 'the inline thread title is dropped')
-    assert.equal(text(), '已派出 MIK-1 ，等它跑完。')
+    assert.equal(text(), '已派出 MIK-1，等它跑完。', 'no gap is left behind')
     // Words between them, or another task's thread, are not a pair: the link stays even beside a card.
     await view.render(<CoordinatorReply text={`[[issue:${TASK}]] 的线程 [[run:${THREAD}]] 在跑。`} citations={{ ...base, sources }} carded={THREAD} />)
     assert.equal(view.container.querySelectorAll('[data-thread-link]').length, 1)

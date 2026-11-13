@@ -115,5 +115,5 @@ test('a thread cited straight after its task is marked as that task\'s pair; any
   assert.deepEqual(after(`[[issue:${ISSUE}]] 的线程 [[run:${RUN}]]`), [['issue', null], ['run', null]], 'words between')
   assert.deepEqual(after(`[[issue:${ISSUE}]]\n[[run:${RUN}]]`), [['issue', null], ['run', null]], 'a line break between')
   assert.deepEqual(after(`[[run:${RUN}]] [[issue:${ISSUE}]]`), [['run', null], ['issue', null]], 'the other order')
-  assert.deepEqual(pairCitations(splitCitations(`看 [[issue:${ISSUE}]]   [[run:${RUN}]]。`)).map(part => part.type === 'text' ? part.text : part.type), ['看 ', 'citation', ' ', 'citation', '。'], 'one normal word gap')
+  assert.deepEqual(pairCitations(splitCitations(`看 [[issue:${ISSUE}]]   [[run:${RUN}]]。`)).map(part => part.type === 'text' ? part.text : part.type), ['看 ', 'citation', 'citation', '。'], 'the gap is the thread\'s to draw: one word gap')
 })

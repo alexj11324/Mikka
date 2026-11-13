@@ -174,7 +174,7 @@ export function CitationChip({ id, kind, after }: { id: string; kind: CitationKi
   // A thread named straight after its own task is one reference with it: the chip, then the thread's short title.
   const paired = !!after && source.issue?.id === after
   if (paired && citations.carded?.has(id)) return null
-  return <RunCitation run={source} paired={paired} />
+  return paired ? <>{' '}<RunCitation run={source} paired /></> : <RunCitation run={source} />
 }
 
 /** A cited web page as a chip with its link preview; a plain link outside a conversation that cites. */
