@@ -67,14 +67,38 @@ Collaboration and financial authority: [2026-11-10-0017](decisions/2026-11-10-00
 - **Attempt** is an internal data term only (`factory_attempts`, a run chain's
   runs). User-facing copy never says 「尝试」 or "attempt".
 
+## Task status (状态) and Agent mark
+
+A task has one status, its status field: 待整理, 待办, 进行中, 评审中, 已完成,
+已取消 or 重复. Every surface that shows a task shows that status, with the
+same icon and word
+([decision](decisions/2026-11-13-1405-one-task-status.md)). It advances with
+the work (Agent starts → 进行中, submitted or PR delivered → 评审中, PR merged
+or accepted → 已完成) and the person can always set it.
+
+The **Agent mark** is the small icon after the status icon that says what the
+task's Agent is doing: working, waiting for the person, or error. It is not a
+status and has no group, column or status word. What needs the person is
+listed in 收件箱.
+
+受阻 is a board column for a task the person flagged or one blocked by an open
+task. It is not a status either.
+
+A **conversation** (a thread: a run and the runs that continue it) is named by
+its own bounded short title, the same wherever it is named; a task keeps the
+title it was given, at any length.
+
+_Avoid_: 运行中 / 排队中 / 等待你 / 失败 as a task's status, a list grouped by
+them, 「任务状态」 for the Agent mark.
+
 ## Run result (运行结果)
 
 How one run came out, in one set of words on every surface that shows it: the
 task page's 活动 rows, the right column's 活动 rows and the task conversation
 (`hooks/use-run-result.ts`), and iOS (`MobileCore.attempts`). A 活动 row shows
 the result of its Agent stretch's latest run. It is the run's own result, never
-the task's status: task status, Factory stage, run result and the derived
-受阻 / 等你处理 are four different things (#1687).
+the task's status: task status, Factory stage and run result are different
+things (#1687).
 
 | Result | 中文 | English | When |
 | --- | --- | --- | --- |

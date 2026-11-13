@@ -83,13 +83,18 @@ source wins in a conflict is in [`README.md`](README.md).
   the user taps is their message but keeps its card shape, no blue bubble; the
   instruction under it is a blue bubble (R-55). This holds in every one-to-one
   chat, the board's Coordinator sidebar and the AI sidebar included.
-- **R-15** A task mentioned in chat is an inline chip: its state icon (R-52)
-  and its code, such as 「◐ ALEX-45」, with the title, state and priority in
-  the hover card; a task with no code shows its title. Internal object chips
+- **R-15** A task mentioned in chat is an inline chip: its status icon (R-52),
+  the Agent mark when there is one, and its code, such as 「◐ ALEX-45」, with
+  the title, status and priority in the hover card; a task with no code
+  shows its title. Internal object chips
   use the faint accent fill (`--object-chip`), rounded corners and accent
   text at the surrounding text's size and line height. A thread mentioned in
-  chat is its title in the link colour, with no icon, fill, accent or state
-  badge; the title never repeats the task's code. Every mention uses the same
+  chat is the conversation's own bounded short title in the link colour
+  (`conversationTitle`, [2026-11-13-1405](decisions/2026-11-13-1405-one-task-status.md)), with no icon, fill, accent or state badge;
+  it never repeats the task's code or borrows the task's title. A task's
+  chip directly followed by its own thread reads as one reference (chip, one
+  word gap, title); when that thread's card sits under the reply the inline
+  title is left out. Every mention uses the same
   chip, with cards deduplicated under R-66. A dispatch's card represents its
   task and opens that task. Web sources keep the unboxed source chip.
   An Artifact waiting for acceptance is a bordered card under the reply
@@ -313,36 +318,39 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   task, the task panel's ⋯ menu also lists the code tools 改动 · 文件 · 终端 ·
   预览, and its PR summary line opens the review page; these only open the
   review page, and the rest of the panel stays read-only.
-- **R-52** Every list holds tasks, grouped **等待你 · 进行中 · 待办 · 已完成**.
-  已完成 starts collapsed. Each row carries its own state's icon, independent
-  of the group header's icon
-  ([states](decisions/2026-11-07-2230-one-icon-per-task-state.md),
-  [attempts](decisions/2026-11-07-2300-one-conversation-per-task.md)).
-  - 等你处理 uses a hand, for a question, approval or PR review. 受阻 uses an
-    octagon for login, key, permission, quota or an offline device. 失败 uses
-    a triangle. These states appear in 等待你. The window-bar hand counts
-    only 等你处理 tasks.
-  - 运行中 uses a ring and 排队中 a clock, under 进行中. Open tasks without an
-    active attempt appear in 待办 with their board icon. Closed tasks use
-    their board icon under 已完成.
-  - A dependency or manual blocked flag supplies its reason in the grey line
-    and keeps the task's own state and icon. It does not acquire the hand.
-  - `agent_runs.outcome` supplies the ended attempt's judgement, based on
-    its reply, status, task and PRs (`lib/run-outcome-judge.ts`). A finished
-    process alone does not prove success. A missing judgement cannot mark
-    an unresolved task complete.
-  - Task icons use semantic colours. 等你处理 is blue, 受阻 / 运行中 /
-    排队中 / 进行中 orange, 评审中 blue, 失败 red, 完成 green, and
-    待办 / 暂不处理 / 已取消 / 重复 grey. The reason line stays secondary text. There are no status
-    dots, corner marks or badges
-    ([colours](decisions/2026-11-08-0130-task-state-icon-colours.md)).
-  - An attempt shows its own result icon, never the hand. Running uses the
-    ring, waiting for the person uses pause, finished a check, failed a
-    triangle, blocked an octagon, and replaced no icon.
-- **R-53** A task row shows its state icon, number, title and date, with a
-  grey line for the reason, dispatching bot and schedule when present. Raw
-  error codes stay under 详情 inside the relevant attempt. The former
-  thread-list last-reply preview is superseded by
+- **R-52** A task has one status, its status field (待整理, 待办, 进行中,
+  评审中, 已完成, 已取消, 重复), shown with the same icon and word on every
+  surface ([2026-11-13-1405](decisions/2026-11-13-1405-one-task-status.md)).
+  - Lists are a view of the board's tasks: rows sit under their status, in
+    the board's order; closed statuses start collapsed. Nothing is grouped by
+    what a run is doing.
+  - The **Agent mark** follows the status icon: a turning ring while the
+    task's Agent works, the hand when it waits for the person (a question,
+    an approval, a PR to review, a login, quota), a triangle when the run
+    failed. Its words are a tooltip and an accessible name. It is never a
+    status, a group, a column or a status filter. What needs the person is
+    in 收件箱.
+  - 受阻 is a board column, not a status: a task the person flagged or one a
+    dependency holds back. What a run says never moves a task there.
+  - The status advances with the work, forward only and never over a status
+    the person set since the work was asked for: Agent starts → 进行中;
+    submitted for review or PR delivered → 评审中; last delivered PR merged,
+    or accepted by the Factory → 已完成 (`lib/task-status-advance.ts`).
+  - Status icons take R-34's colours: 进行中 warning, 评审中 info, 已完成
+    success, the rest grey. The Agent mark is warning while working, info
+    when waiting, destructive on error. No status dots, corner marks or
+    badges.
+  - `agent_runs.outcome` supplies the ended run's judgement, based on its
+    reply, status, task and PRs (`lib/run-outcome-judge.ts`). A finished
+    process alone does not prove success.
+  - A run shows its own result icon where a run is listed (glossary: Run
+    result), never the hand. Running uses the ring, waiting for the person
+    uses pause, finished a check, failed a triangle, blocked an octagon, and
+    replaced no icon.
+- **R-53** A task row shows its status icon, the Agent mark when there is
+  one, number, title and date, with a grey line for the status, dispatching
+  bot and schedule when present. Raw error codes stay under 详情 inside the
+  relevant run. The former thread-list last-reply preview is superseded by
   [2045](decisions/2026-11-07-2045-tasks-only-threads-inside.md).
 - **R-54** The PR tab lists the PRs of the threads this bot dispatched, in groups 等待审查, 进行中, 已合并,
   with R-52's header style. Each row is the PR title and its number.
