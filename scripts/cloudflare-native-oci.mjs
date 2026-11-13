@@ -1,94 +1,68 @@
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { copyFile, mkdir, mkdtemp, readFile, rename, stat, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { buildDeploymentId } from '../lib/deployment-id.mjs'
 import { childEnvironment, sourceContext, validateReceipt, withOverlayKey } from './cloudflare-ci.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SHA = /^[a-f0-9]{40}$/
-const BUILD_ID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/
 const DIGEST = /^sha256:[a-f0-9]{64}$/
 const ACCOUNT = /^[a-f0-9]{32}$/
 const fail = code => { throw new Error(code) }
 const hash = value => createHash('sha256').update(value).digest('hex')
 const git = (cwd, ...args) => stdout('git', args, { cwd, stage: 'SOURCE_CHECKOUT', timeout: 30000 })
 
-export function releaseId(publicSha, buildUUID) {
-  if (!SHA.test(publicSha) || !BUILD_ID.test(buildUUID)) fail('CF_OCI_RELEASE_ID_INVALID')
-  const run = BigInt('0x' + buildUUID.replaceAll('-', '').slice(0, 12)).toString(10)
-  const id = publicSha.slice(0, 12) + '-' + run + '-1'
-  if (id.length > 32) fail('CF_OCI_RELEASE_ID_TOO_LONG')
-  return id
+export function releaseId(publicSha, runId, runAttempt) {
+  if (!SHA.test(publicSha) || !/^[1-9][0-9]*$/.test(runId ?? '') || !/^[1-9][0-9]*$/.test(runAttempt ?? '')) fail('CF_OCI_RELEASE_ID_INVALID')
+  return buildDeploymentId({ sha: publicSha, runId, runAttempt })
 }
 
-export function releaseSelection(env, receipt, { publish = false } = {}) {
-  const sourceSha = env.WORKERS_CI_COMMIT_SHA
-  const context = sourceContext(env, sourceSha, env.MIKKA_CF_RELEASE_OVERLAY_SHA)
-  if (context.provider !== 'cloudflare-workers-builds' || context.branch !== 'main'
-      || !BUILD_ID.test(context.buildId)) fail('CF_OCI_TRUSTED_MAIN_REQUIRED')
-  if (receipt?.version !== 1 || receipt.publication !== 'none' || receipt.target !== 'native-api'
-      || !SHA.test(receipt.publicSha ?? '') || !SHA.test(context.privateSha ?? '')
-      || receipt.publicSha !== context.publicSha
-      || receipt.context?.privateSha !== context.privateSha
-      || receipt.context?.buildId !== context.buildId
-      || receipt.context?.branch !== 'main') fail('CF_OCI_SOURCE_RECEIPT_MISMATCH')
-  if (env.MIKKA_CF_RELEASE_PUBLIC_SHA !== receipt.publicSha
-      || env.MIKKA_CF_RELEASE_OVERLAY_SHA !== context.privateSha) fail('CF_OCI_OPERATOR_SELECTION_MISMATCH')
-  if (publish && env.MIKKA_CF_RELEASE_MODE !== 'registry-only') fail('CF_OCI_EXPLICIT_PUBLICATION_REQUIRED')
-  return { context, publicSha: receipt.publicSha, privateSha: context.privateSha, id: releaseId(receipt.publicSha, context.buildId) }
+export function releaseSelection(env, receipt) {
+  const context = sourceContext(env, env.GITHUB_SHA, env.OVERLAY_SHA)
+  validateReceipt(receipt, context)
+  return { context, publicSha: context.publicSha, privateSha: context.privateSha,
+    id: releaseId(context.publicSha, context.runId, context.runAttempt) }
 }
 
 export function buildEnvironment(env, publicSha, privateSha, id) {
+  let settings
+  try { settings = JSON.parse(env.API_PUBLIC_BUILD_SETTINGS) }
+  catch { fail('CF_OCI_PUBLIC_BUILD_SETTINGS_REQUIRED') }
   const mandatory = ['NEXT_PUBLIC_POSTHOG_KEY', 'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY', 'NEXT_PUBLIC_TURNSTILE_SITE_KEY']
-  for (const key of mandatory) if (!env[key] || /[\r\n]/.test(env[key])) fail('CF_OCI_PUBLIC_BUILD_VALUE_REQUIRED')
-  if (!/^pk_(?:live|test)_/.test(env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)) fail('CF_OCI_STRIPE_PUBLIC_KEY_INVALID')
-  if (!['0', '1'].includes(env.NEXT_PUBLIC_COMPUTER_ENABLED)) fail('CF_OCI_COMPUTER_BUILD_SETTING_INVALID')
+  const names = [...mandatory, 'NEXT_PUBLIC_COMPUTER_ENABLED']
+  if (!settings || typeof settings !== 'object' || Array.isArray(settings) || Object.keys(settings).length !== names.length
+      || names.some(name => typeof settings[name] !== 'string')) fail('CF_OCI_PUBLIC_BUILD_SETTINGS_REQUIRED')
+  for (const key of mandatory) if (!settings[key] || /[\r\n]/.test(settings[key])) fail('CF_OCI_PUBLIC_BUILD_VALUE_REQUIRED')
+  if (!/^pk_(?:live|test)_/.test(settings.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)) fail('CF_OCI_STRIPE_PUBLIC_KEY_INVALID')
+  if (!['0', '1'].includes(settings.NEXT_PUBLIC_COMPUTER_ENABLED)) fail('CF_OCI_COMPUTER_BUILD_SETTING_INVALID')
   return {
     ...childEnvironment(env, publicSha, privateSha),
     MIKKA_EDITION: 'cloud', MIKKA_DEPLOYMENT_STAGE: 'production', MIKKA_DEPLOYMENT_ENVIRONMENT: 'production',
     MIKKA_BUILD_BYOS_WORKER: '1', NITRO_PRESET: 'node-server',
     MIKKA_UI_OVERLAY_DIR: '.hosted-ui',
-    MIKKA_DEPLOYMENT_ID: id, NEXT_PUBLIC_POSTHOG_KEY: env.NEXT_PUBLIC_POSTHOG_KEY,
-    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
-    NEXT_PUBLIC_TURNSTILE_SITE_KEY: env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
-    NEXT_PUBLIC_COMPUTER_ENABLED: env.NEXT_PUBLIC_COMPUTER_ENABLED,
+    MIKKA_DEPLOYMENT_ID: id, NEXT_PUBLIC_POSTHOG_KEY: settings.NEXT_PUBLIC_POSTHOG_KEY,
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: settings.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY: settings.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+    NEXT_PUBLIC_COMPUTER_ENABLED: settings.NEXT_PUBLIC_COMPUTER_ENABLED,
   }
-}
-
-export function redactOutput(value, env) {
-  // oxlint-disable-next-line no-control-regex -- Strip ANSI escape sequences from subprocess diagnostics.
-  let output = String(value ?? '').replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '')
-  output = output
-    .replace(/-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----/g, '[REDACTED]')
-    .replace(/\b(?:authorization|proxy-authorization|cookie|set-cookie)["']?\s*[:=]\s*[^\r\n]+/gi, '[REDACTED HEADER]')
-    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[REDACTED JWT]')
-    .replace(/(\b(?:[A-Za-z0-9_]*(?:token|secret|password|api[_-]?key|credential)[A-Za-z0-9_]*)["']?\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;}]+)/gi, '$1[REDACTED]')
-    .replace(/(\bNEXT_PUBLIC_COMPUTER_ENABLED["']?\s*(?:[:=,]|\b(?:was|is|expected|received)\b)\s*["']?)[01]\b/gi, '$1[REDACTED]')
-    .replace(/:\/\/[^\s/:@]+:[^\s/@]+@/g, '://[REDACTED]@')
-  const values = Object.entries(env).filter(([name, value]) => name !== 'NEXT_PUBLIC_COMPUTER_ENABLED'
-    && /NEXT_PUBLIC_|TOKEN|SECRET|PASSWORD|KEY|AUTH|COOKIE|CREDENTIAL/i.test(name)
-    && typeof value === 'string' && value).flatMap(([, value]) => [value, encodeURIComponent(value), JSON.stringify(value).slice(1, -1)])
-    .sort((a, b) => b.length - a.length)
-  for (const value of values) output = output.split(value).join('[REDACTED]')
-  // oxlint-disable-next-line no-control-regex -- Remove nonprinting bytes from subprocess diagnostics.
-  return output.replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '').slice(-6000)
 }
 
 export function command(bin, args, options = {}) {
   const { cwd = root, env = process.env, stage, ...rest } = options
   if (!/^[A-Z][A-Z0-9_]*$/.test(stage ?? '')) fail('CF_OCI_STAGE_REQUIRED')
+  const started = Date.now()
   console.log('MIKKA_CF_OCI_STAGE=' + JSON.stringify({ stage, status: 'started' }))
   let output
   try {
-    output = execFileSync(bin, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], timeout: 900000, maxBuffer: 16 * 1024 * 1024, ...rest })
+    output = execFileSync(bin, args, { cwd, env, timeout: 900000, maxBuffer: 16 * 1024 * 1024, ...rest, stdio: ['pipe', 'pipe', 'pipe'] })
   } catch (error) {
-    const detail = redactOutput(String(error.stdout ?? '') + '\n' + String(error.stderr ?? ''), { ...process.env, ...env })
-    console.error('MIKKA_CF_OCI_STAGE=' + JSON.stringify({ stage, status: 'failed', exit: error.status ?? null,
-      code: /^[A-Z0-9_]+$/.test(error.code ?? '') ? error.code : null, detail }))
+    console.error('MIKKA_CF_OCI_STAGE=' + JSON.stringify({ stage, status: 'failed', elapsedMs: Date.now() - started, exit: error.status ?? null,
+      code: /^[A-Z0-9_]+$/.test(error.code ?? '') ? error.code : null }))
     fail('CF_OCI_STAGE_' + stage + '_FAILED')
   }
-  console.log('MIKKA_CF_OCI_STAGE=' + JSON.stringify({ stage, status: 'passed' }))
+  console.log('MIKKA_CF_OCI_STAGE=' + JSON.stringify({ stage, status: 'passed', elapsedMs: Date.now() - started }))
   return output
 }
 
@@ -127,6 +101,10 @@ export function validatePrepared(record, selection) {
       || record.id !== selection.id || !DIGEST.test(record.localImageId ?? '')
       || record.offlineVerification !== 'buildkit-network-none'
       || !/^[a-f0-9]{64}$/.test(record.webRenderer ?? '')) fail('CF_OCI_PREPARED_MISMATCH')
+  for (const [name, value] of Object.entries(selection.context)) if (record.context?.[name] !== value) fail('CF_OCI_PREPARED_MISMATCH')
+  if (record.publicBuildSettings?.publicSha !== selection.publicSha || record.publicBuildSettings?.privateSha !== selection.privateSha
+      || record.publicBuildSettings?.publication !== 'registry-only'
+      || hash(JSON.stringify(record.publicBuildSettings)) !== record.publicBuildSettingsSha256) fail('CF_OCI_PUBLIC_BUILD_SETTINGS_MISMATCH')
   validateArtifacts(record)
   return record
 }
@@ -202,6 +180,10 @@ async function prepare() {
   const current = await currentRefs()
   assertCurrentRefs(selected, current)
   const env = buildEnvironment(process.env, selected.publicSha, selected.privateSha, selected.id)
+  const publicBuildSettings = { publicSha: selected.publicSha, privateSha: selected.privateSha, publication: 'registry-only',
+    NEXT_PUBLIC_POSTHOG_KEY: env.NEXT_PUBLIC_POSTHOG_KEY, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY: env.NEXT_PUBLIC_TURNSTILE_SITE_KEY, NEXT_PUBLIC_COMPUTER_ENABLED: env.NEXT_PUBLIC_COMPUTER_ENABLED }
+  const publicBuildSettingsSha256 = hash(JSON.stringify(publicBuildSettings))
   const work = root
   buildProduct(work, env)
   command('node', ['scripts/release/hosted-ui.mjs', 'audit', 'apps/frontend/dist/web'], { cwd: work, env, stage: 'WEB_AUDIT' })
@@ -224,7 +206,7 @@ async function prepare() {
   assertCurrentRefs(selected, await currentRefs())
   await readSelection(process.env)
   const result = { version: 1, context: selected.context, publicSha: selected.publicSha, privateSha: selected.privateSha,
-    id: selected.id, tag, localImageId: imageId, webRenderer: manifest.rendererBuild,
+    id: selected.id, tag, localImageId: imageId, webRenderer: manifest.rendererBuild, publicBuildSettings, publicBuildSettingsSha256,
     ...validateArtifacts(payload.metadata), offlineVerification: 'buildkit-network-none', publication: 'none' }
   await writeFile(join(root, '.cloudflare-ci/oci-prepared.json'), JSON.stringify(result) + '\n', { mode: 0o600 })
   console.log('MIKKA_CF_OCI_PREPARED=' + JSON.stringify({ publicSha: result.publicSha, privateSha: result.privateSha, buildId: selected.context.buildId,
@@ -232,27 +214,42 @@ async function prepare() {
     ...validateArtifacts(result), offlineVerification: result.offlineVerification, publication: 'none' }))
 }
 
+export function publicReceipt(receipt) {
+  const result = { ...receipt }
+  delete result.publicBuildSettings
+  return result
+}
+
 async function publish() {
   const { selected } = await readSelection(process.env)
-  releaseSelection(process.env, JSON.parse(await readFile(join(root, '.cloudflare-ci/receipt.json'), 'utf8')), { publish: true })
   const data = JSON.parse(await readFile(join(root, '.cloudflare-ci/oci-prepared.json'), 'utf8'))
   const record = validatePrepared(data, selected)
   if (!ACCOUNT.test(process.env.CLOUDFLARE_ACCOUNT_ID ?? '')) fail('CF_OCI_ACCOUNT_REQUIRED')
   assertCurrentRefs(selected, await currentRefs())
   const registry = 'registry.cloudflare.com/' + process.env.CLOUDFLARE_ACCOUNT_ID
-  const dockerEnv = childEnvironment(process.env, selected.publicSha, selected.privateSha)
-  command('docker', ['tag', record.localImageId, registry + '/' + record.tag], { env: dockerEnv, stage: 'REGISTRY_TAG' })
-  // Wrangler authenticates with the Cloudflare Workers Builds deploy token, not GitHub Actions/OIDC.
-  const publishEnv = { ...dockerEnv, CLOUDFLARE_API_TOKEN: process.env.CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID }
-  command('corepack', ['pnpm', 'exec', 'wrangler', 'containers', 'push', record.tag], { cwd: root, env: publishEnv, stage: 'REGISTRY_PUSH' })
-  const refs = stdout('docker', ['image', 'inspect', registry + '/' + record.tag, '--format', '{{range .RepoDigests}}{{println .}}{{end}}'], { env: dockerEnv, stage: 'REGISTRY_DIGEST' })
-  const verified = digestFromRepoDigests(refs, process.env.CLOUDFLARE_ACCOUNT_ID, selected.id)
-  assertCurrentRefs(selected, await currentRefs())
-  console.log('MIKKA_CF_OCI_RECEIPT=' + JSON.stringify({ version: 1, provider: selected.context.provider, ...verified,
-    overlayCheckout: { repository: 'alexj11324/mikka-hosted-ui', requestedSha: selected.privateSha, actualSha: selected.privateSha },
-    publicSha: selected.publicSha, privateSha: selected.privateSha, buildId: selected.context.buildId,
-    localImageId: record.localImageId, webRenderer: record.webRenderer,
-    ...validateArtifacts(record), offlineVerification: record.offlineVerification, publication: 'registry-only', production: false }))
+  if (!process.env.CF_RUNTIME_REGISTRY_USERNAME || !process.env.CF_RUNTIME_REGISTRY_PASSWORD
+      || !process.env.RUNNER_TEMP) fail('CF_OCI_REGISTRY_CREDENTIALS_REQUIRED')
+  const directory = await mkdtemp(join(process.env.RUNNER_TEMP, 'mikka-api-registry-'))
+  const dockerEnv = { ...childEnvironment(process.env, selected.publicSha, selected.privateSha), DOCKER_CONFIG: directory }
+  try {
+    command('docker', ['login', 'registry.cloudflare.com', '--username', process.env.CF_RUNTIME_REGISTRY_USERNAME, '--password-stdin'],
+      { env: dockerEnv, input: process.env.CF_RUNTIME_REGISTRY_PASSWORD, stdio: ['pipe', 'pipe', 'pipe'], stage: 'REGISTRY_LOGIN' })
+    command('docker', ['tag', record.localImageId, registry + '/' + record.tag], { env: dockerEnv, stage: 'REGISTRY_TAG' })
+    command('docker', ['push', registry + '/' + record.tag], { env: dockerEnv, stage: 'REGISTRY_PUSH' })
+    const refs = stdout('docker', ['image', 'inspect', registry + '/' + record.tag, '--format', '{{range .RepoDigests}}{{println .}}{{end}}'], { env: dockerEnv, stage: 'REGISTRY_DIGEST' })
+    const verified = digestFromRepoDigests(refs, process.env.CLOUDFLARE_ACCOUNT_ID, selected.id)
+    assertCurrentRefs(selected, await currentRefs())
+    const receipt = { version: 1, ...selected.context, ...verified,
+      overlayCheckout: { repository: 'alexj11324/mikka-hosted-ui', requestedSha: selected.privateSha, actualSha: selected.privateSha },
+      localImageId: record.localImageId, webRenderer: record.webRenderer,
+      ...validateArtifacts(record), publicBuildSettings: record.publicBuildSettings, publicBuildSettingsSha256: record.publicBuildSettingsSha256,
+      offlineVerification: record.offlineVerification, publication: 'registry-only', production: false }
+    await writeFile(join(root, '.cloudflare-ci/api-image-receipt.json'), JSON.stringify(receipt) + '\n', { mode: 0o600 })
+    console.log('MIKKA_GITHUB_API_OCI_RECEIPT=' + JSON.stringify(publicReceipt(receipt)))
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

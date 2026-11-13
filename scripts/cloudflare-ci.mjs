@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -8,11 +7,8 @@ import { hasGitHubOrigin } from './cloudflare-source.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SHA = /^[a-f0-9]{40}$/
-const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/
 const BASE_STAGES = ['public-install', 'private-install', 'script-tests']
-const RENDERER_STAGES = ['web-build', 'desktop-build', 'web-audit', 'desktop-audit']
 const fail = code => { throw new Error(code) }
-const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 
 function command(bin, args, { cwd = root, env = process.env, capture = false } = {}) {
   try {
@@ -27,13 +23,20 @@ const git = (args, cwd = root, env = process.env) => command('git', args, { cwd,
 
 export function sourceContext(env, publicSha, privateSha) {
   if (!SHA.test(publicSha ?? '') || !SHA.test(privateSha ?? '')) fail('CI_SOURCE_SHA_REQUIRED')
-  if (env.WORKERS_CI !== '1' || env.CF_PAGES === '1') fail('CI_CLOUDFLARE_CONTEXT_REQUIRED')
-  if (env.WORKERS_CI_COMMIT_SHA !== publicSha) fail('CI_PUBLIC_SOURCE_MISMATCH')
-  if (env.MIKKA_CF_RELEASE_OVERLAY_SHA !== privateSha) fail('CI_OVERLAY_SOURCE_MISMATCH')
-  // oxlint-disable-next-line no-control-regex -- Reject control bytes in provider branch metadata.
-  if (!env.WORKERS_CI_BRANCH || env.WORKERS_CI_BRANCH.startsWith('-') || /[\s\x00-\x1f]/.test(env.WORKERS_CI_BRANCH)) fail('CI_BRANCH_REQUIRED')
-  if (!UUID.test(env.WORKERS_CI_BUILD_UUID ?? '')) fail('CI_BUILD_ID_REQUIRED')
-  return { provider: 'cloudflare-workers-builds', publicSha, privateSha, branch: env.WORKERS_CI_BRANCH, buildId: env.WORKERS_CI_BUILD_UUID }
+  if (env.GITHUB_ACTIONS !== 'true' || env.GITHUB_REPOSITORY !== 'alexj11324/Mikka'
+      || env.GITHUB_REPOSITORY_ID !== '1427517699') fail('CI_PUBLIC_GITHUB_CONTEXT_REQUIRED')
+  if (env.GITHUB_EVENT_NAME !== 'workflow_dispatch' || env.GITHUB_REF !== 'refs/heads/main') fail('CI_MANUAL_MAIN_REQUIRED')
+  if (env.GITHUB_SHA !== publicSha || env.GITHUB_WORKFLOW_SHA !== publicSha) fail('CI_PUBLIC_SOURCE_MISMATCH')
+  if (env.GITHUB_WORKFLOW_REF !== 'alexj11324/Mikka/.github/workflows/cloudflare-api-image.yml@refs/heads/main') fail('CI_WORKFLOW_REQUIRED')
+  if (env.GITHUB_ACTOR_ID !== '183887963' || env.GITHUB_ACTOR !== 'alexj11324'
+      || env.GITHUB_TRIGGERING_ACTOR !== 'alexj11324') fail('CI_RELEASE_OWNER_REQUIRED')
+  if (env.OVERLAY_SHA !== privateSha) fail('CI_OVERLAY_SOURCE_MISMATCH')
+  for (const name of ['GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT']) if (!/^[1-9][0-9]*$/.test(env[name] ?? '')) fail('CI_BUILD_ID_REQUIRED')
+  return { provider: 'github-actions', repository: env.GITHUB_REPOSITORY, repositoryId: env.GITHUB_REPOSITORY_ID,
+    publicSha, privateSha, branch: 'main', ref: env.GITHUB_REF, workflowRef: env.GITHUB_WORKFLOW_REF,
+    workflowSha: env.GITHUB_WORKFLOW_SHA, runId: env.GITHUB_RUN_ID, runAttempt: env.GITHUB_RUN_ATTEMPT,
+    buildId: env.GITHUB_RUN_ID + '-' + env.GITHUB_RUN_ATTEMPT, actor: env.GITHUB_ACTOR,
+    actorId: env.GITHUB_ACTOR_ID, triggeringActor: env.GITHUB_TRIGGERING_ACTOR }
 }
 
 export function childEnvironment(env, publicSha, privateSha) {
@@ -67,39 +70,31 @@ export async function withOverlayKey(env, action) {
   }
 }
 
-export function validateReceipt(receipt, context, actualDigests) {
+export function validateReceipt(receipt, context) {
   if (receipt?.version !== 1 || receipt.publication !== 'none' || receipt.publicSha !== context.publicSha
       || receipt.privateSha !== context.privateSha || receipt.provider !== context.provider) fail('CI_RECEIPT_INVALID')
-  for (const name of ['provider', 'publicSha', 'privateSha', 'branch', 'buildId']) if (receipt.context?.[name] !== context[name]) fail('CI_RECEIPT_SOURCE_MISMATCH')
+  for (const [name, value] of Object.entries(context)) if (receipt.context?.[name] !== value) fail('CI_RECEIPT_SOURCE_MISMATCH')
   if (receipt.overlayCheckout?.repository !== 'alexj11324/mikka-hosted-ui'
       || receipt.overlayCheckout.requestedSha !== context.privateSha
       || receipt.overlayCheckout.actualSha !== context.privateSha) fail('CI_OVERLAY_RECEIPT_MISMATCH')
-  if (!['renderers', 'native-api'].includes(receipt.target)) fail('CI_BUILD_TARGET_INVALID')
-  const stages = receipt.target === 'native-api' ? BASE_STAGES : [...BASE_STAGES, ...RENDERER_STAGES]
-  if (receipt.stages?.length !== stages.length || receipt.stages.some((step, index) => step.name !== stages[index] || step.exit !== 0)) fail('CI_RECEIPT_GATE_INCOMPLETE')
-  if (receipt.target === 'renderers') for (const target of ['web', 'desktop']) {
-    const renderer = receipt.renderers?.[target]
-    if (!renderer || !/^[a-f0-9]{64}$/.test(renderer.rendererBuild ?? '') || !/^[a-f0-9]{64}$/.test(renderer.manifestSha256 ?? '')
-        || (actualDigests && renderer.manifestSha256 !== actualDigests[target])) fail('CI_RENDERER_RECEIPT_MISMATCH')
-  }
+  if (receipt.target !== 'native-api') fail('CI_BUILD_TARGET_INVALID')
+  if (receipt.stages?.length !== BASE_STAGES.length || receipt.stages.some((step, index) => step.name !== BASE_STAGES[index] || step.exit !== 0)) fail('CI_RECEIPT_GATE_INCOMPLETE')
   return receipt
 }
 
 async function verifyReceipt(context) {
   const receipt = JSON.parse(await readFile(join(root, '.cloudflare-ci/receipt.json'), 'utf8'))
-  const digests = receipt.target === 'renderers'
-    ? Object.fromEntries(await Promise.all(['web', 'desktop'].map(async target => [target, hash(await readFile(receipt.renderers[target].manifestPath))]))) : undefined
-  validateReceipt(receipt, context, digests)
+  validateReceipt(receipt, context)
   if (git(['rev-parse', 'HEAD']) !== receipt.publicSha || git(['rev-parse', 'HEAD'], join(root, '.hosted-ui')) !== context.privateSha) fail('CI_CHECKOUT_CHANGED')
   for (const directory of [root, join(root, '.hosted-ui')]) git(['diff', '--quiet', 'HEAD', '--'], directory)
-  console.log('MIKKA_CF_CI_RECEIPT=' + JSON.stringify({ ...receipt, renderers: Object.fromEntries(Object.entries(receipt.renderers).map(([target, value]) => [target, { rendererBuild: value.rendererBuild, manifestSha256: value.manifestSha256 }])) }))
+  console.log('MIKKA_GITHUB_API_SOURCE_RECEIPT=' + JSON.stringify(receipt))
   return receipt
 }
 
 export async function runCi({ env = process.env, verify = false } = {}) {
   if (!process.version.startsWith('v24.')) fail('CI_NODE_24_REQUIRED')
   const publicSha = git(['rev-parse', 'HEAD'])
-  const context = sourceContext(env, publicSha, env.MIKKA_CF_RELEASE_OVERLAY_SHA)
+  const context = sourceContext(env, publicSha, env.OVERLAY_SHA)
   if (verify) return verifyReceipt(context)
   git(['diff', '--quiet', 'HEAD', '--'])
   if (!hasGitHubOrigin(git(['remote', 'get-url', 'origin']), 'alexj11324/Mikka')) fail('CI_PUBLIC_REPOSITORY_REQUIRED')
@@ -114,38 +109,21 @@ export async function runCi({ env = process.env, verify = false } = {}) {
   for (const directory of [root, overlay]) {
     if (JSON.parse(await readFile(join(directory, 'package.json'), 'utf8')).packageManager !== 'pnpm@10.34.3') fail('CI_PNPM_PIN_MISMATCH')
   }
-  const target = env.MIKKA_CF_RELEASE_MODE === 'registry-only' ? 'native-api' : 'renderers'
   const definitions = [
     ['corepack', ['pnpm', 'install', '--frozen-lockfile']],
     ['corepack', ['pnpm', '--dir', '.hosted-ui', 'install', '--ignore-workspace', '--prod', '--ignore-scripts', '--frozen-lockfile']],
     ['node', ['--test', 'scripts/cloudflare-ci.test.mjs', 'scripts/cloudflare-native-oci.test.mjs', 'scripts/cloudflare-cloud-ci.test.mjs', 'scripts/cloudflare-runtime-release.test.mjs']],
   ]
-  if (target === 'renderers') definitions.push(
-    ['corepack', ['pnpm', '--filter', '@mikka/frontend', 'build']],
-    ['corepack', ['pnpm', '--filter', '@mikka/desktop', 'build']],
-    ['node', ['scripts/release/hosted-ui.mjs', 'audit', 'apps/frontend/dist/web']],
-    ['node', ['scripts/release/hosted-ui.mjs', 'audit', 'apps/desktop/dist']],
-  )
-  const names = [...BASE_STAGES, ...RENDERER_STAGES]
   const stages = []
   for (const [index, [bin, args]] of definitions.entries()) {
-    console.log(JSON.stringify({ stage: names[index], status: 'started' }))
+    console.log(JSON.stringify({ stage: BASE_STAGES[index], status: 'started' }))
     command(bin, args, { env: childEnv })
-    stages.push({ name: names[index], exit: 0 })
-    console.log(JSON.stringify({ stage: names[index], status: 'passed' }))
+    stages.push({ name: BASE_STAGES[index], exit: 0 })
+    console.log(JSON.stringify({ stage: BASE_STAGES[index], status: 'passed' }))
   }
-  const renderers = {}
-  if (target === 'renderers') for (const [name, path] of [['web', 'apps/frontend/dist/web/renderer-manifest.json'], ['desktop', 'apps/desktop/dist/renderer/renderer-manifest.json']]) {
-    const manifestPath = join(root, path)
-    const bytes = await readFile(manifestPath)
-    const manifest = JSON.parse(bytes)
-    if (manifest.serverPages || manifest.publicTestFixture || manifest.serverModules?.length || !manifest.inputs?.includes('.hosted-ui/slots/app-frame.tsx')) fail('CI_OFFICIAL_RENDERER_REQUIRED')
-    renderers[name] = { rendererBuild: manifest.rendererBuild, manifestSha256: hash(bytes), manifestPath }
-  }
-  if (target === 'renderers' && JSON.parse(await readFile(join(root, 'apps/desktop/dist/mikka-ui-overlay.json'), 'utf8')).overlaySha !== context.privateSha) fail('CI_DESKTOP_OVERLAY_MISMATCH')
   const receipt = { version: 1, context, publicSha, privateSha: context.privateSha, provider: context.provider,
     overlayCheckout: { repository: 'alexj11324/mikka-hosted-ui', requestedSha: context.privateSha, actualSha: context.privateSha },
-    workRoot: root, target, stages, renderers, node: process.version, packageManager: 'pnpm@10.34.3', publication: 'none' }
+    workRoot: root, target: 'native-api', stages, node: process.version, packageManager: 'pnpm@10.34.3', publication: 'none' }
   await mkdir(join(root, '.cloudflare-ci'), { recursive: true })
   await writeFile(join(root, '.cloudflare-ci/receipt.json'), JSON.stringify(receipt) + '\n', { mode: 0o600 })
   return verifyReceipt(context)

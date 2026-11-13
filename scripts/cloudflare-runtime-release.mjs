@@ -23,28 +23,48 @@ export function releaseIdentity(env, workload, api) {
   assert.equal(env.GITHUB_REF, 'refs/heads/main')
   assert.match(env.GITHUB_SHA ?? '', sha)
   assert.equal(env.GITHUB_WORKFLOW_SHA, env.GITHUB_SHA)
+  assert.equal(env.GITHUB_ACTOR, 'alexj11324')
+  assert.equal(env.GITHUB_ACTOR_ID, '183887963')
+  assert.equal(env.GITHUB_TRIGGERING_ACTOR, 'alexj11324')
   assert.equal(env.GITHUB_WORKFLOW_REF, 'alexj11324/Mikka/.github/workflows/' + workflows[workload] + '@refs/heads/main')
   for (const value of [env.GITHUB_RUN_ID, env.GITHUB_RUN_ATTEMPT]) assert.match(value ?? '', /^[1-9][0-9]*$/)
   assert.equal(api.version, 1)
-  assert.equal(api.provider, 'cloudflare-workers-builds')
+  assert.equal(api.provider, 'github-actions')
+  assert.equal(api.repository, 'alexj11324/Mikka')
+  assert.equal(api.repositoryId, '1427517699')
+  assert.equal(api.ref, 'refs/heads/main')
+  assert.equal(api.workflowRef, 'alexj11324/Mikka/.github/workflows/cloudflare-api-image.yml@refs/heads/main')
+  assert.equal(api.workflowSha, api.publicSha)
+  assert.equal(api.actor, 'alexj11324')
+  assert.equal(api.actorId, '183887963')
+  assert.equal(api.triggeringActor, 'alexj11324')
   assert.equal(api.publication, 'registry-only')
   assert.equal(api.production, false)
   assert.equal(api.publicSha, env.GITHUB_SHA)
   assert.equal(api.privateSha, env.OVERLAY_SHA)
   assert.match(api.privateSha, sha)
-  assert.equal(api.buildId, env.API_BUILD_UUID)
-  assert.equal(api.release, releaseId(api.publicSha, api.buildId))
+  for (const name of ['runId', 'runAttempt']) assert.match(api[name] ?? '', /^[1-9][0-9]*$/)
+  assert.equal(api.runId, env.API_RUN_ID)
+  assert.equal(api.runAttempt, env.API_RUN_ATTEMPT)
+  assert.equal(api.buildId, api.runId + '-' + api.runAttempt)
+  assert.equal(api.release, releaseId(api.publicSha, api.runId, api.runAttempt))
   assert.match(api.digest, digest)
   assert.equal(api.digest, env.API_IMAGE_DIGEST)
   assert.match(api.localImageId, digest)
   assert.match(api.webRenderer, /^[a-f0-9]{64}$/)
   validateArtifacts(api)
+  assert.match(api.publicBuildSettingsSha256 ?? '', /^[a-f0-9]{64}$/)
+  assert.equal(createHash('sha256').update(JSON.stringify(api.publicBuildSettings)).digest('hex'), api.publicBuildSettingsSha256)
+  assert.equal(api.publicBuildSettings.publicSha, api.publicSha)
+  assert.equal(api.publicBuildSettings.privateSha, api.privateSha)
+  assert.equal(api.publicBuildSettings.publication, 'registry-only')
   assert.match(api.image, /^registry\.cloudflare\.com\/[a-f0-9]{32}\/mikka-api@sha256:[a-f0-9]{64}$/)
   assert.equal(api.image.split('@')[1], api.digest)
   assert.deepEqual(api.overlayCheckout, { repository: 'alexj11324/mikka-hosted-ui', requestedSha: api.privateSha, actualSha: api.privateSha })
   assert.equal(api.offlineVerification, 'buildkit-network-none')
   return { version: 1, provider: 'github-actions', repository: env.GITHUB_REPOSITORY, workload,
-    publicSha: api.publicSha, overlaySha: api.privateSha, apiBuildId: api.buildId, apiImage: api.image,
+    publicSha: api.publicSha, overlaySha: api.privateSha, apiProvider: api.provider, apiRunId: api.runId,
+    apiRunAttempt: api.runAttempt, apiBuildId: api.buildId, apiImage: api.image,
     release: api.release, runId: env.GITHUB_RUN_ID, runAttempt: env.GITHUB_RUN_ATTEMPT }
 }
 
@@ -145,7 +165,7 @@ async function githubEnvironment(env, values) {
 }
 
 function identity(env, workload) {
-  const api = JSON.parse(env.MIKKA_CF_API_RECEIPT)
+  const api = JSON.parse(env.MIKKA_API_RECEIPT)
   const receipt = releaseIdentity(env, workload, api)
   const tools = { ...childEnvironment(env, receipt.publicSha, receipt.overlaySha), DOCKER_CONFIG: env.DOCKER_CONFIG }
   assert.equal(output('git', ['rev-parse', 'HEAD'], { env: tools, stage: 'RUNTIME_SOURCE' }), receipt.publicSha)

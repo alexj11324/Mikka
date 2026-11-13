@@ -123,7 +123,7 @@ jobs:
           API_IMAGE_DIGEST: ${{ inputs.api_image_digest }}
           OVERLAY_SHA: ${{ inputs.overlay_sha }}
           MIKKA_API_RECEIPT: ${{ secrets.MIKKA_API_RECEIPT }}
-          CF_RUNTIME_REGISTRY_USERNAME: ${{ secrets.CF_RUNTIME_REGISTRY_USERNAME }}
+          CF_RUNTIME_REGISTRY_USERNAME: ${{ vars.CF_RUNTIME_REGISTRY_USERNAME }}
           CF_RUNTIME_REGISTRY_PASSWORD: ${{ secrets.CF_RUNTIME_REGISTRY_PASSWORD }}
         run: node scripts/cloudflare-runtime-release.mjs prepare eve
       - name: Bundle the private World authority from the locked public source
@@ -168,7 +168,7 @@ jobs:
           API_IMAGE_DIGEST: ${{ inputs.api_image_digest }}
           OVERLAY_SHA: ${{ inputs.overlay_sha }}
           MIKKA_API_RECEIPT: ${{ secrets.MIKKA_API_RECEIPT }}
-          CF_RUNTIME_REGISTRY_USERNAME: ${{ secrets.CF_RUNTIME_REGISTRY_USERNAME }}
+          CF_RUNTIME_REGISTRY_USERNAME: ${{ vars.CF_RUNTIME_REGISTRY_USERNAME }}
           CF_RUNTIME_REGISTRY_PASSWORD: ${{ secrets.CF_RUNTIME_REGISTRY_PASSWORD }}
         run: node scripts/cloudflare-runtime-release.mjs publish eve
       - name: Upload the runtime OCI receipt
