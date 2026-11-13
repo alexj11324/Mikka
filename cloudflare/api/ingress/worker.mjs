@@ -18,7 +18,7 @@ export class BusinessApi extends Container {
     this.envVars = applicationEnvironment(env)
     if (env.EVE_SERVICE || env.BUSINESS_WORLD || env.CREDENTIAL_IDENTITY) this.envVars.NODE_EXTRA_CA_CERTS = '/etc/cloudflare/certs/cloudflare-containers-ca.crt'
     if (env.CREDENTIAL_IDENTITY || env.CREDENTIAL_BROKER) {
-      if (!env.CREDENTIAL_IDENTITY || !env.CREDENTIAL_BROKER || !['preview', 'production'].includes(env.CREDENTIAL_ENVIRONMENT)) throw new Error('CREDENTIAL_API_CONFIGURATION_INVALID')
+      if (!env.CREDENTIAL_IDENTITY || !env.CREDENTIAL_BROKER) throw new Error('CREDENTIAL_API_CONFIGURATION_INVALID')
       this.envVars.CREDENTIAL_RUNTIME = 'cloudflare'
       for (const name of ['CREDENTIAL_ENVIRONMENT', 'CREDENTIAL_APP_ROLE_ARN', 'CREDENTIAL_KMS_KEY_ARN', 'AWS_REGION']) {
         if (typeof env[name] !== 'string' || !env[name]) throw new Error('CREDENTIAL_API_CONFIGURATION_INVALID')

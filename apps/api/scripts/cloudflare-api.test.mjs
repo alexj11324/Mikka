@@ -54,7 +54,7 @@ test('private ingress keeps authority, body, cookies and upgrades while replacin
   assert.equal(upgrade.headers.get('x-mikka-edge-ip'), null)
 })
 
-test('ingress binds only the immutable account image with a private route and a bounded staging pool', () => {
+test('ingress maps the selected image with a private route and a bounded staging pool', () => {
   const input = { release: id, origin: 'https://app.example', image: 'registry.cloudflare.com/' + 'e'.repeat(32) + '/mikka-api@sha256:' + '3'.repeat(64) }
   const config = ingressConfig(input)
   assert.equal(config.workers_dev, false)
@@ -66,10 +66,26 @@ test('ingress binds only the immutable account image with a private route and a 
   const withAI = ingressConfig({ ...input, workersAi: true })
   assert.deepEqual(withAI.ai, { binding: 'WORKERS_AI' })
   assert.equal(withAI.vars.CLOUDFLARE_WORKERS_AI_ACCOUNT_ID, input.image.split('/')[1])
-  assert.throws(() => ingressConfig({ ...input, workersAi: 'untrusted' }))
-  for (const changed of [{ release: 'main' }, { image: input.image.split('@')[0] + ':latest' }, { origin: 'https://user@app.example' }]) {
-    assert.throws(() => ingressConfig({ ...input, ...changed }))
-  }
+})
+
+test('ingress maps custom deployment metadata and underscore service names', () => {
+  const input = { release: 'custom_release_v2', image: 'registry.example.test/team/api:release_2',
+    origin: 'http://localhost:4310', taskMachine: 'task_service', eveService: 'eve_service',
+    businessWorld: 'business_world', credentialIdentityService: 'identity_service',
+    credentialBrokerService: 'broker_service', workersAi: 'enabled' }
+  const config = ingressConfig(input)
+  assert.equal(config.name, 'mikka-api-' + input.release)
+  assert.equal(config.containers[0].image, input.image)
+  assert.deepEqual(config.vars, { PUBLIC_ORIGIN: input.origin, MIKKA_DEPLOYMENT_ID: input.release,
+    CLOUDFLARE_WORKERS_AI_ACCOUNT_ID: 'team' })
+  assert.deepEqual(config.ai, { binding: 'WORKERS_AI' })
+  assert.deepEqual(config.services, [
+    { binding: 'TASK_MACHINE', service: input.taskMachine },
+    { binding: 'EVE_SERVICE', service: input.eveService, entrypoint: 'EveService' },
+    { binding: 'BUSINESS_WORLD', service: input.businessWorld, entrypoint: 'BusinessWorldService' },
+    { binding: 'CREDENTIAL_IDENTITY', service: input.credentialIdentityService, entrypoint: 'AppIdentity' },
+    { binding: 'CREDENTIAL_BROKER', service: input.credentialBrokerService, entrypoint: 'CredentialBroker' },
+  ])
 })
 
 import { configureTaskBridge, taskMachine } from '../../../cloudflare/api/ingress/task-machine.mjs'
@@ -140,8 +156,9 @@ test('the task process handshake requires the private host capability, binding a
   assert.equal((await send(url, { headers }, {})).status, 503)
 })
 
-test('the private API receives its sign-in and product bindings without inheriting deployment or broker authority', async () => {
+test('the private API receives its sign-in and product bindings without inheriting deployment or broker authority', async (t) => {
   const { applicationEnvironment } = await import('../../../cloudflare/api/ingress/environment.mjs')
+  const logs = ['log', 'info', 'warn', 'error', 'debug'].map(method => t.mock.method(console, method, () => {}))
   const origin = 'https://app.example'
   const allowed = {
     SLACK_APP_ID: 'AEXAMPLE', SLACK_CLIENT_ID: 'client-fixture', SLACK_CLIENT_SECRET: 'oauth-fixture',
@@ -152,7 +169,7 @@ test('the private API receives its sign-in and product bindings without inheriti
     GITHUB_CLIENT_ID: 'github', GITHUB_CLIENT_SECRET: 'github-credential', GITHUB_WEBHOOK_SECRET: 'existing-hook',
     BETTER_AUTH_SECRET: 'auth', TURNSTILE_SECRET_KEY: 'signup-verification', MIKKA_CLOUDFLARE_TASK_WORKSPACES: 'sponsor',
     MIKKA_DEPLOYMENT_ID: id, MIKKA_WORKFLOW_QUEUE_PUBLIC_KEY: 'public-verification-key',
-    OPENAI_DECISIONS_API_KEY: 'decisions', CLOUDFLARE_WORKERS_AI_TOKEN: 'models',
+    DECISIONS_API_KEY: 'decision-gateway-fixture', OPENAI_DECISIONS_API_KEY: 'decisions', CLOUDFLARE_WORKERS_AI_TOKEN: 'models',
     DEVICE_GATEWAY_URL: 'https://gateway.example', DEVICE_GATEWAY_PUSH_SECRET: 'device-signing',
     WORKSPACE_SECRETS_KEY: 'workspace-sealing',
     COMPOSIO_API_KEY: 'integrations', COMPOSIO_WEBHOOK_SECRET: 'hook-verification',
@@ -170,6 +187,7 @@ test('the private API receives its sign-in and product bindings without inheriti
   assert.deepEqual(applicationEnvironment({ PUBLIC_ORIGIN: origin, ...allowed, ...unexpected }), {
     BETTER_AUTH_URL: origin, MIKKA_API_INGRESS: 'cloudflare', ...allowed,
   })
+  for (const log of logs) assert.equal(log.mock.callCount(), 0)
 })
 
 test('private World calls require the instance capability and forward only WDK payload and media headers', async () => {

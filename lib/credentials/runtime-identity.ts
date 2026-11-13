@@ -3,7 +3,7 @@ import { boundedJson } from '../../cloudflare/bounded-json.mjs'
 export function credentialRuntimeEnvironment(env: Record<string, string | undefined> = process.env) {
   if (env.CREDENTIAL_RUNTIME === undefined) return null
   const environment = env.CREDENTIAL_ENVIRONMENT
-  if (env.CREDENTIAL_RUNTIME !== 'cloudflare' || (environment !== 'preview' && environment !== 'production')) {
+  if (env.CREDENTIAL_RUNTIME !== 'cloudflare' || typeof environment !== 'string' || !environment) {
     throw new Error('CREDENTIAL_RUNTIME_INVALID')
   }
   return environment
