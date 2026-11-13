@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import { boardProjectFilters, personFilters } from '@/lib/board-filters'
+import { BOARD_FILTERS_KEY, LEGACY_BOARD_FILTERS_KEY, boardProjectFilters, migrateBoardFilters, personFilters } from '@/lib/board-filters'
 import { BoardScreenView } from './board-screen'
 import type { BoardMenuItem } from '@/components/slots/board-contract'
 import { ISSUE_PRIORITIES } from './issue-properties'
@@ -43,7 +43,8 @@ const WIDE = '(min-width: 80rem)'
 const ME = 'me'
 const NONE = 'none'
 const DEFAULT_DISPLAY: Display = { sort: 'priority', completed: 'week', showEmpty: true, properties: DEFAULT_CARD_PROPERTIES, hidden: DEFAULT_HIDDEN_COLUMNS }
-const DEFAULT_FILTERS: Filters = { assignee: [ME] }
+/** The Board shows every task of its workspace until the person filters it (2026-11-13-1405). */
+const NO_FILTERS: Filters = {}
 const DEFAULT_SETTINGS = { scope: 'all' as Scope, view: 'board' as 'board' | 'list', display: DEFAULT_DISPLAY }
 const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 }
 const COMPLETED_DAYS: Record<Completed, number> = { all: Infinity, week: 7, month: 30 }
@@ -112,7 +113,9 @@ export function BoardPage({ issues, userId, workspaceId, teamId, personalWorkspa
   const [settings, update] = useBoardSettings()
   const { view, display } = settings
   const scope: Scope = personalWorkspace ? 'all' : settings.scope
-  const [savedFilters, setFilters] = useViewState<Filters>('board:filters', DEFAULT_FILTERS)
+  const [legacyFilters] = useViewState<Filters | null>(LEGACY_BOARD_FILTERS_KEY, null)
+  const [storedFilters, setFilters] = useViewState<Filters | null>(BOARD_FILTERS_KEY, null)
+  const savedFilters = useMemo(() => storedFilters ?? migrateBoardFilters(legacyFilters) ?? NO_FILTERS, [storedFilters, legacyFilters])
   const projects = useMemo(() => new Map(issues.flatMap(issue => issue.projectId && issue.metadata.project
     ? [[issue.projectId, issue.metadata.project] as const] : [])), [issues])
   const filters = useMemo(() => {
