@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { citedIds, namedCitations, remarkCitations, runThreadName, runTitle, splitCitations, type CitationSource } from './citations'
+import { citedIds, namedCitations, pairCitations, remarkCitations, runThreadName, runTitle, splitCitations, type CitationSource } from './citations'
 
 const ISSUE = '3f6c1a52-8d0e-4b7a-9c3e-1f2a3b4c5d6e'
 const RUN = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
@@ -84,13 +84,36 @@ test('remarkCitations cuts a GFM autolink glued to Chinese text', () => {
   ])
 })
 
-test('runThreadName names a thread for its task, as the thread list does, else for what it was asked', () => {
-  assert.equal(runThreadName({ name: 'Speed up the home page', issue: { id: ISSUE, number: 12, identifier: 'MIK-12', title: '首页提速' } }), 'MIK-12 首页提速')
-  assert.equal(runThreadName({ name: 'Speed up the home page', issue: { id: ISSUE, number: null, identifier: null, title: '首页提速' } }), '首页提速')
-  assert.equal(runThreadName({ name: 'Speed up the home page', issue: null }), 'Speed up the home page')
+// A conversation is always named by its own bounded short title (decision 2026-11-13-1405); the task's title is the task's.
+const LONG_CJK = '修复登录后的工作区前缀和查询参数丢失问题并补充回归测试覆盖所有入口'
+const LONG_LATIN = 'Fix the workspace prefix and query parameters that are lost after sign in and add regression tests'
+
+test('runTitle is the conversation\'s own bounded short title: stored title, else what it was asked, else its task\'s short title', () => {
+  const task = { id: ISSUE, number: 12, identifier: 'MIK-12', title: LONG_CJK, shortTitle: '登录前缀修复' }
+  assert.equal(runTitle({ title: '回调参数排查', name: 'Speed up the home page', issue: task }), '回调参数排查', 'its stored title wins')
+  assert.equal(runTitle({ name: 'Speed up the home page', issue: task }), 'Speed up the home page', 'then what it was asked, never the task\'s title')
+  assert.equal(runTitle({ name: '', issue: task }), '登录前缀修复', 'an empty prompt falls back to the task\'s short title')
+  assert.equal(runTitle({ name: '', issue: { ...task, shortTitle: null } }), '修复登录后的工作区前缀和', 'a task without one is bounded the same way')
+  assert.equal(runTitle({ name: 'Check the logs', issue: null }), 'Check the logs', 'a standalone run')
+  assert.equal(runTitle({ name: LONG_CJK, issue: null }), '修复登录后的工作区前缀和', 'long CJK: 12 characters')
+  assert.equal([...runTitle({ name: LONG_CJK, issue: null })].length, 12)
+  assert.equal(runTitle({ name: LONG_LATIN, issue: null }), 'Fix the workspace prefix and query', 'long Latin: 6 words')
+  assert.ok(runTitle({ name: 'x'.repeat(200), issue: null }).length <= 60, '60 characters at most')
+  assert.equal(runTitle({ name: `${'修'.repeat(59)}…`, issue: null }), '修'.repeat(12), 'an already cut name is bounded again, without its ellipsis')
 })
 
-test('runTitle names a thread in a sentence by its task title without the code, else what it was asked (2026-11-10)', () => {
-  assert.equal(runTitle({ name: 'Speed up the home page', issue: { id: ISSUE, number: 12, identifier: 'MIK-12', title: '首页提速' } }), '首页提速')
-  assert.equal(runTitle({ name: 'Speed up the home page', issue: null }), 'Speed up the home page')
+test('runThreadName puts the task\'s code before the same conversation title', () => {
+  assert.equal(runThreadName({ name: 'Speed up the home page', issue: { id: ISSUE, number: 12, identifier: 'MIK-12', title: LONG_CJK } }), 'MIK-12 Speed up the home page')
+  assert.equal(runThreadName({ name: '', issue: { id: ISSUE, number: null, identifier: null, title: '首页提速' } }), '首页提速')
+  assert.equal(runThreadName({ name: LONG_LATIN, issue: null }), 'Fix the workspace prefix and query')
+})
+
+test('a thread cited straight after its task is marked as that task\'s pair; anything between them keeps them apart', () => {
+  const after = (text: string) => pairCitations(splitCitations(text)).flatMap(part => part.type === 'citation' ? [[part.kind, part.after ?? null]] : [])
+  assert.deepEqual(after(`[[issue:${ISSUE}]] [[run:${RUN}]]`), [['issue', null], ['run', ISSUE]])
+  assert.deepEqual(after(`[[issue:${ISSUE}]][[run:${RUN}]]`), [['issue', null], ['run', ISSUE]], 'no space at all')
+  assert.deepEqual(after(`[[issue:${ISSUE}]] 的线程 [[run:${RUN}]]`), [['issue', null], ['run', null]], 'words between')
+  assert.deepEqual(after(`[[issue:${ISSUE}]]\n[[run:${RUN}]]`), [['issue', null], ['run', null]], 'a line break between')
+  assert.deepEqual(after(`[[run:${RUN}]] [[issue:${ISSUE}]]`), [['run', null], ['issue', null]], 'the other order')
+  assert.deepEqual(pairCitations(splitCitations(`看 [[issue:${ISSUE}]]   [[run:${RUN}]]。`)).map(part => part.type === 'text' ? part.text : part.type), ['看 ', 'citation', ' ', 'citation', '。'], 'one normal word gap')
 })

@@ -66,6 +66,19 @@ export function displayTaskTitle(task: { title: string; shortTitle?: string | nu
   return task.shortTitle || task.title
 }
 
+/**
+ * A conversation's one name (a thread: a run and the runs that continue it), the same bounded short title wherever it
+ * is named (decision 2026-11-13-1405): its own stored title; until it has one, the bounded first line of what it was
+ * asked; and only when that is empty, its task's short title. A task's own title is not touched by this.
+ */
+export function conversationTitle(run: { title?: string | null; name?: string | null; issue?: { title: string; shortTitle?: string | null } | null }): string {
+  for (const own of [run.title, run.name]) {
+    const text = own?.replace(/…$/, '').trim()
+    if (text) return compactTaskTitle({ title: text })
+  }
+  return run.issue ? compactTaskTitle(run.issue) : ''
+}
+
 /** Compact navigation uses the existing generated title, with a bounded fallback while it is unavailable. */
 export function compactTaskTitle(task: { title: string; shortTitle?: string | null }): string {
   const title = displayTaskTitle(task).replace(/\s+/g, ' ').trim()

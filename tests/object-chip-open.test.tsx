@@ -136,7 +136,7 @@ test('a thread is its title as a link, no icon or badge, and opens the thread be
     const [taskChip, ...threadChips] = chips
     assert.equal(taskChip.textContent, 'ZHIX-4')
     // The task's title, without the code the task chip already carries; nothing else on it (decision 2026-11-10).
-    assert.deepEqual(threadChips.map(chip => chip.textContent), ['Rebuild the shell', 'Rebuild the shell', 'Rebuild the shell'])
+    assert.deepEqual(threadChips.map(chip => chip.textContent), ['Thread running', 'Thread failed', 'Thread succeeded'], 'each conversation by its own short title, not its task\'s')
     for (const chip of threadChips) {
       assert.equal(chip.querySelector('svg, [role="img"], [data-thread-attention]'), null, 'no icon, dot or badge')
       assert.match(chip.className, /text-object-chip-foreground/, 'thread titles use the existing citation link colour')
@@ -147,7 +147,7 @@ test('a thread is its title as a link, no icon or badge, and opens the thread be
       assert.equal(chip.getAttribute('role'), 'button')
       assert.equal(chip.getAttribute('tabindex'), '0')
     }
-    assert.equal(threadChips[0].getAttribute('aria-label'), 'Open thread: Rebuild the shell')
+    assert.equal(threadChips[0].getAttribute('aria-label'), 'Open thread: Thread running')
     await act(async () => { threadChips[1].click() })
     // The thread's address, written through the navigation module; the workspace shows it in the right column (R-80).
     assert.equal(new URL(browser.location.href).searchParams.get('thread'), RUNS.failed)

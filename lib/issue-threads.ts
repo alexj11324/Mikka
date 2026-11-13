@@ -3,6 +3,7 @@ import { runIsActive, runSummaryView } from './issue-run-conversation'
 import type { RunChain } from './run-chain'
 import { BUILTIN_AGENT_PROFILE_ID } from './factory/agent-profile-reference'
 import { resolveProfileMark, type ProfileMarkValue } from './factory/agent-profile-mark'
+import { conversationTitle } from './short-title'
 
 /**
  * A thread is one agent run on an issue, and its content is its owner's alone (R-62):
@@ -148,11 +149,13 @@ function plainLine(line: string) {
   return line.replace(/^(?:#{1,6}\s+|>\s*|[-*+]\s+|\d+[.)]\s+)+/, '').replace(/(\*\*|__|`|~~)/g, '').trim()
 }
 
-/** The thread's name: the first line of what it was asked to do, as plain text. */
+/**
+ * The thread's name until it has a stored title: the first line of what it was asked to do, as plain text, held to
+ * the short-title bound (lib/short-title.ts conversationTitle) so no surface shows a longer one.
+ */
 export function threadName(prompt: string, fallback: string) {
   const line = prompt.split('\n').map(part => plainLine(part.trim())).find(Boolean)
-  if (!line) return fallback
-  return Array.from(line).length > 60 ? `${Array.from(line).slice(0, 59).join('')}…` : line
+  return line ? conversationTitle({ name: line }) || fallback : fallback
 }
 
 /** Only a thread's owner, while still a collaborator, reads or joins it. */

@@ -6,7 +6,7 @@ import { Globe } from 'lucide-react'
 import { GitHubIcon } from '@/components/icons/brand-icons'
 import { useFormatter, useTranslations } from 'next-intl'
 import { getLinkPreview } from '@/app/actions/link-preview'
-import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource, runTitle } from '@/lib/coordinator/citations'
+import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource, runThreadName, runTitle } from '@/lib/coordinator/citations'
 import type { LinkPreview } from '@/lib/link-preview-parse'
 import { InlineCitation, InlineCitationBody, InlineCitationContent, InlineCitationDescription, InlineCitationFavicon, InlineCitationFooter, InlineCitationImage, InlineCitationLabel, InlineCitationMeta, InlineCitationSource, InlineCitationTitle, InlineCitationTrigger } from '@/components/ui/inline-citation'
 import { SourceAvatar, SourcesList, SourcesSummary, sourceTileClassName, type StreamingSource } from '@/components/ui/streaming-text'
@@ -35,11 +35,14 @@ export interface AgentCitations {
   /** A reply still arriving, or its cited issues and runs still being looked up: a chip not known yet holds its place. */
   pending?: boolean
   /**
-   * Tasks whose thread the same reply cites. No longer read when rendering (decision 2026-11-10): the task is always
-   * its own compact chip (state icon and code) and the thread its title, so neither repeats the other.
+   * Tasks whose thread the same reply cites. Not read when rendering: the task is always its own compact chip (status
+   * icon and code) and the thread its title, so neither repeats the other.
    */
   covered?: ReadonlySet<string>
-  /** Legacy reply metadata; references use the same compact task chip / thread link even beside a dispatch card. */
+  /**
+   * The threads whose dispatch card sits right under this reply. A thread cited straight after its own task's chip is
+   * left out of the words then: the chip and the card already say it (decision 2026-11-13-1405).
+   */
   carded?: ReadonlySet<string>
 }
 
@@ -89,11 +92,12 @@ export function useLinkPreviews(texts: readonly string[]): LinkPreviews {
 export function CitationAnchor({ href, children, className: _className, ...props }: ComponentProps<'a'>) {
   const citations = useAgentCitations()
   if (citations && href?.startsWith(CITATION_HREF)) {
-    const [kind, id] = href.slice(CITATION_HREF.length).split('/') as [CitationKind | 'any', string]
+    // `/after/<task id>` marks a thread cited right after a task (lib/coordinator/citations.ts pairCitations).
+    const [kind, id, , after] = href.slice(CITATION_HREF.length).split('/') as [CitationKind | 'any', string, string?, string?]
     const source = citations.sources[id]
     if (!source && citations.pending) return <PendingCitation />
     if (!source || (kind !== 'any' && kind !== source.kind)) return <>{children}</>
-    return <CitationChip id={id} kind={source.kind} />
+    return <CitationChip id={id} kind={source.kind} after={after} />
   }
   if (citations && href && /^https?:\/\//i.test(href)) return <WebCitation url={href} label={typeof children === 'string' && children !== href ? children : null} />
   return <a {...props} href={href} className="text-primary underline underline-offset-4" target="_blank" rel="noopener noreferrer">{children}</a>
@@ -161,14 +165,16 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
 }
 
 /** A cited issue or run by id, as a chip; the raw id when the conversation cannot show it. */
-export function CitationChip({ id, kind }: { id: string; kind: CitationKind }) {
+export function CitationChip({ id, kind, after }: { id: string; kind: CitationKind; after?: string }) {
   const citations = useAgentCitations()
   const source = citations?.sources[id]
   if (!source && citations?.pending) return <PendingCitation />
   if (!citations || source?.kind !== kind) return <>{id}</>
-  return source.kind === 'issue'
-    ? <IssueCitation issue={source} onOpen={citations.onOpenIssue} />
-    : <RunCitation run={source} />
+  if (source.kind === 'issue') return <IssueCitation issue={source} onOpen={citations.onOpenIssue} />
+  // A thread named straight after its own task is one reference with it: the chip, then the thread's short title.
+  const paired = !!after && source.issue?.id === after
+  if (paired && citations.carded?.has(id)) return null
+  return <RunCitation run={source} paired={paired} />
 }
 
 /** A cited web page as a chip with its link preview; a plain link outside a conversation that cites. */
@@ -185,22 +191,22 @@ export function WebCitation({ url, label }: { url: string; label: string | null 
 const runLinkClassName = 'mx-0 rounded-sm bg-transparent px-0 text-object-chip-foreground underline-offset-4 hover:bg-transparent hover:underline data-popup-open:bg-transparent data-popup-open:underline'
 
 /**
- * A thread mentioned in a reply: its title alone, as a link (its task's title without the code, since the task has
- * its own chip; else what it was asked). It opens the thread's conversation, never the task. The Agent, its coding
+ * A thread mentioned in a reply: its title alone, as a link: the conversation's one short title (runTitle), the same
+ * in its hover card. It opens the thread's conversation, never the task. The Agent, its coding
  * agent's mark, its state and time are in the hover card.
  */
-export function RunCitation({ run }: { run: RunSource }) {
+export function RunCitation({ run, paired = false }: { run: RunSource; paired?: boolean }) {
   const t = useTranslations('Coordinator.citation')
   const format = useFormatter()
   const HarnessIcon = run.harness === 'claude_code' ? Claude : OpenAI
   const harness = run.harness === 'claude_code' ? 'Claude Code' : 'Codex'
-  const issue = run.issue
   const title = runTitle(run)
   return <InlineCitation>
     <InlineCitationTrigger
       variant="object"
       className={runLinkClassName}
       data-thread-link=""
+      data-thread-pair={paired ? '' : undefined}
       aria-label={t('openThread', { name: title })}
       onClick={() => openThread(run.id)}
     >
@@ -209,7 +215,7 @@ export function RunCitation({ run }: { run: RunSource }) {
     <InlineCitationContent>
       <InlineCitationBody>
         <InlineCitationSource>{run.agentName} · <HarnessIcon />{harness}</InlineCitationSource>
-        <InlineCitationTitle>{issue ? `${issue.identifier ? `${issue.identifier} ` : ''}${issue.title}` : t('noIssue')}</InlineCitationTitle>
+        <InlineCitationTitle>{runThreadName(run) || t('noIssue')}</InlineCitationTitle>
         <InlineCitationMeta>
           <ThreadStatus status={run.status} outcome={run.outcome} />
           <span>{format.dateTime(new Date(run.finishedAt ?? run.createdAt), { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>

@@ -220,8 +220,9 @@ test('A task chip is boxed with its state icon and code; a thread is its title i
   const text = (chip: string) => chip.replace(/<[^>]+>/g, '')
   assert.match(text(taskChip), /^MIK-43/)
   assert.match(taskChip, /<svg/, 'a task chip has its state icon')
-  // A thread is the task's title without its code, so the code never repeats beside the task chip.
-  assert.match(text(runChip), /^Move the chat to OpenUI/)
+  // A thread is named by its own short title (what it was asked), never its task's title or code (2026-11-13-1405).
+  assert.match(text(runChip), /^Fix the shell/)
+  assert.doesNotMatch(text(runChip), /Move the chat to OpenUI/)
   assert.doesNotMatch(text(runChip), /MIK-43/)
   const sourceClass = sourceChip.match(/class="([^"]*)"/)?.[1] ?? ''
   assert.match(sourceChip, /data-variant="source"/)
@@ -262,7 +263,8 @@ test('saved OpenUI, citation markers and oldest bare UUID references all use the
     assert.match(runLink, /text-object-chip-foreground/)
     assert.match(runLink, /bg-transparent/)
     assert.doesNotMatch(runLink, /<svg|data-citation-carded/)
-    assert.ok(visible(runLink).startsWith(title))
+    assert.ok(visible(runLink).startsWith('修复登录后的工作区前缀和'), 'the conversation is named by a bounded short title')
+    assert.ok(!visible(runLink).includes(title), 'never the full 20-character sentence')
     assert.ok(visible(html).includes('已开始运行，等待回答。'), 'historical model prose stays verbatim')
   }
 })

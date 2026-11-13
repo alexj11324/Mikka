@@ -356,7 +356,7 @@ test('a quote cut at three lines is a button that opens the rest; one that fits 
   }
 })
 
-test('a task and its thread in one reply: the task is its state icon and code, the thread its title, said once (2026-11-10)', async () => {
+test('a task and its thread in one reply: the task is its status icon and code, the thread its own short title, said once', async () => {
   const view = await mount()
   const chips = () => [...view.container.querySelectorAll('[data-slot="inline-citation-trigger"]')]
   const text = () => view.container.textContent ?? ''
@@ -371,7 +371,7 @@ test('a task and its thread in one reply: the task is its state icon and code, t
   try {
     await renderReply(<CoordinatorReply text={`[[issue:${TASK}]] 的线程 [[run:${THREAD}]] 在等你。`} citations={{ ...base, sources: { ...known, [THREAD]: ownThread } }} />)
     assert.equal(chips().length, 2, 'the task and the thread each stay their own object')
-    assert.equal(text(), 'MIK-1 的线程 Release checklist 在等你。', 'the code once, the title once: never 「MIK-1 MIK-1 …」')
+    assert.equal(text(), 'MIK-1 的线程 Fix sign-in redirect 在等你。', 'the code once, the conversation\'s own title once: never 「MIK-1 MIK-1 …」')
     assert.equal(view.container.querySelector('[data-citation-covered]'), null)
     assert.equal(chips()[0].querySelector('[data-task-status]')?.getAttribute('data-task-status'), 'doing', 'the task leads with its status icon')
     assert.equal(chips()[0].querySelector('[data-run-indicator]')?.getAttribute('data-run-indicator'), 'working', 'its running Agent is a mark, not a status')
@@ -380,7 +380,35 @@ test('a task and its thread in one reply: the task is its state icon and code, t
     const unnumbered = { [TASK]: { ...issue(TASK, 'Release checklist'), identifier: null }, [THREAD]: ownThread }
     await renderReply(<CoordinatorReply text={`[[issue:${TASK}]]的线程 [[run:${THREAD}]] 在等你。`} citations={{ ...base, sources: unnumbered }} />)
     assert.equal(chips().length, 2)
-    assert.equal(text(), 'Release checklist的线程 Release checklist 在等你。')
+    assert.equal(text(), 'Release checklist的线程 Fix sign-in redirect 在等你。')
+    assert.doesNotMatch(text(), MARKUP)
+  } finally { await view.unmount() }
+})
+
+test('a task chip straight before its own thread is one reference; with that thread\'s card under the reply only the chip stays (2026-11-13-1405)', async () => {
+  const view = await mount()
+  const long = '修复登录后的工作区前缀和查询参数丢失问题并补充回归测试'
+  const ownThread: CitationSource = { ...thread, name: long, issue: { id: TASK, number: 1, identifier: 'MIK-1', title: long } }
+  const sources = { [TASK]: issue(TASK, long), [THREAD]: ownThread }
+  const chips = () => [...view.container.querySelectorAll('[data-slot="inline-citation-trigger"]')]
+  const text = () => view.container.textContent ?? ''
+  try {
+    await view.render(<CoordinatorReply text={`已派出 [[issue:${TASK}]]   [[run:${THREAD}]]，等它跑完。`} citations={{ ...base, sources }} />)
+    assert.equal(chips().length, 2, 'the chip and the title keep their own click targets')
+    assert.equal(text(), '已派出 MIK-1 修复登录后的工作区前缀和，等它跑完。', 'one normal gap, and the title is the bounded one')
+    assert.equal(chips()[1].getAttribute('data-thread-pair'), '', 'the thread is marked as its task\'s pair')
+    assert.doesNotMatch(chips()[1].className, /bg-object-chip( |$)/, 'never a second pill')
+    // The same pair with the thread's dispatch card right under the reply: the card names the thread.
+    await view.render(<CoordinatorReply text={`已派出 [[issue:${TASK}]]   [[run:${THREAD}]]，等它跑完。`} citations={{ ...base, sources }} carded={THREAD} />)
+    assert.equal(chips().length, 1)
+    assert.equal(view.container.querySelector('[data-thread-link]'), null, 'the inline thread title is dropped')
+    assert.equal(text(), '已派出 MIK-1 ，等它跑完。')
+    // Words between them, or another task's thread, are not a pair: the link stays even beside a card.
+    await view.render(<CoordinatorReply text={`[[issue:${TASK}]] 的线程 [[run:${THREAD}]] 在跑。`} citations={{ ...base, sources }} carded={THREAD} />)
+    assert.equal(view.container.querySelectorAll('[data-thread-link]').length, 1)
+    assert.equal(view.container.querySelector('[data-thread-pair]'), null)
+    await view.render(<CoordinatorReply text={`[[issue:${TASK}]] [[run:${THREAD}]]`} citations={{ ...base, sources: { ...sources, [THREAD]: { ...thread, issue: null } } }} carded={THREAD} />)
+    assert.equal(view.container.querySelectorAll('[data-thread-link]').length, 1, 'a thread of no task, or another task, is its own reference')
     assert.doesNotMatch(text(), MARKUP)
   } finally { await view.unmount() }
 })
@@ -393,9 +421,9 @@ test('a thread keeps its current text-link renderer when a dispatch card sits un
     assert.equal(view.container.querySelectorAll('[data-thread-link]').length, 1)
     assert.equal(view.container.querySelector('[data-thread-link]')?.textContent, 'Fix sign-in redirect')
     assert.equal(view.container.querySelector('[data-citation-carded]'), null)
-    // A thread of a task is named by the task's title, without its code.
+    // A thread of a task keeps its own short title; its task's title is the task's.
     await view.render(<CoordinatorReply text={`已派出线程 [[run:${THREAD}]]。`} citations={{ ...citations, sources: { ...known, [THREAD]: { ...thread, issue: { id: TASK, number: 1, identifier: 'MIK-1', title: 'Release checklist' } } } }} carded={THREAD} />)
-    assert.equal(view.container.querySelector('[data-thread-link]')?.textContent, 'Release checklist')
+    assert.equal(view.container.querySelector('[data-thread-link]')?.textContent, 'Fix sign-in redirect')
     await view.render(<CoordinatorReply text={`已派出线程 [[run:${THREAD}]]。`} citations={citations} />)
     assert.equal(view.container.querySelectorAll('[data-thread-link]').length, 1, 'with or without a card it is the same thread link')
   } finally { await view.unmount() }
