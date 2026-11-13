@@ -56,7 +56,7 @@ const PARENT = (child: string, parent: string) => `${parent}.id IN (${child}.ori
  * Every run in scope with its chain root. `scope` filters agent_runs aliased `r`;
  * parameters $1..$n belong to the caller, `depth` is the depth-cap placeholder.
  */
-function chainSql(scope: string, depth: string) {
+export function runChainSql(scope: string, depth: string) {
   return `
     runs AS (
       SELECT r.id, r."userId", r."issueId", r."workspaceId", r."createdAt", ${ORIGIN('r')} AS origin, r."retryOf", r."continuesRunId" FROM agent_runs r WHERE ${scope}
@@ -94,7 +94,7 @@ const selectAttempts = (ownerDetail = false) => `a."depthExceeded", a.root::text
  */
 export async function listIssueRunChains(q: RunChainQueryable, issueId: string, userIds: readonly string[], limit: number): Promise<RunChain[]> {
   const { rows } = await q.query(`
-    WITH RECURSIVE ${chainSql(`r."issueId" = $1 AND r."userId" = ANY($2::text[])
+    WITH RECURSIVE ${runChainSql(`r."issueId" = $1 AND r."userId" = ANY($2::text[])
       AND EXISTS (SELECT 1 FROM issues i WHERE i.id=r."issueId" AND i."ownershipState"='bound' AND i."workspaceId"=r."workspaceId")`, '$4')},
     roots AS (
       SELECT DISTINCT a.root, n."createdAt" FROM assigned a JOIN runs n ON n.id = a.root
@@ -157,7 +157,7 @@ function foldChains(rows: Record<string, unknown>[]): RunChain[] {
 function selectedChainSql() {
   return `start AS (
       SELECT "issueId","workspaceId" FROM agent_runs WHERE id = $1::uuid AND "userId" = $2 AND "workspaceId" IS NOT NULL
-    ), ${chainSql(`r."userId" = $2 AND EXISTS (SELECT 1 FROM start s WHERE r."issueId" IS NOT DISTINCT FROM s."issueId" AND r."workspaceId"=s."workspaceId")`, '$3')},
+    ), ${runChainSql(`r."userId" = $2 AND EXISTS (SELECT 1 FROM start s WHERE r."issueId" IS NOT DISTINCT FROM s."issueId" AND r."workspaceId"=s."workspaceId")`, '$3')},
     selected AS (
       SELECT * FROM assigned WHERE root = (SELECT root FROM assigned WHERE id = $1::uuid)
     )`
