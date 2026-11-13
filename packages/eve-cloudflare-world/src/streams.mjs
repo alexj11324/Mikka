@@ -70,9 +70,18 @@ async function liveChunks(stub, start, signal, subscriptionId) {
   let revision = 0
   let wake
   let closed = false
+  let released = false
   const changed = () => { revision++; wake?.() }
-  const disconnected = () => { closed = true; changed() }
+  const disconnected = (event) => {
+    // Node's explicit DELETE closes the tagged subscriber with 1000/Reader released.
+    // That is a clean cancellation, not a missing durable EOF. An unexpected
+    // WebSocket close must still fail the byte stream so Eve can recover.
+    if (event?.code === 1000 && event.reason === 'Reader released') released = true
+    closed = true
+    changed()
+  }
   const stop = () => {
+    released = true
     signal?.removeEventListener('abort', stop)
     disconnected()
     if (socket.readyState === WebSocket.OPEN) socket.close(1000, 'Reader closed')
@@ -110,6 +119,11 @@ async function liveChunks(stub, start, signal, subscriptionId) {
           }
           if (before === revision) await new Promise(resolve => { wake = resolve })
           wake = undefined
+        }
+        if (released) {
+          controller.close()
+          controller.byobRequest?.respond(0)
+          return
         }
         throw new Error('Cloudflare stream subscription closed before its durable end')
       } catch (error) {
