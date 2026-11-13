@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { organizationInvitationMail, sendOrganizationInvitationEmails } from './organization-invitation-mail'
+import { organizationInvitationMail, organizationInvitationMailEnabled, sendOrganizationInvitationEmails } from './organization-invitation-mail'
 import type { OrganizationInvitationOutcome } from './organization-invitations'
 
 function created(index: number): OrganizationInvitationOutcome {
@@ -13,6 +13,9 @@ function created(index: number): OrganizationInvitationOutcome {
 }
 
 test('organization invitation mail uses only the configured trusted origin and a hashed idempotency key', () => {
+  assert.equal(organizationInvitationMailEnabled({ RESEND_API_KEY: 'test' }), false)
+  assert.equal(organizationInvitationMailEnabled({ MIKKA_ORG_INVITE_EMAIL_ENABLED: 'true' }), false)
+  assert.equal(organizationInvitationMailEnabled({ MIKKA_ORG_INVITE_EMAIL_ENABLED: 'true', RESEND_API_KEY: 'test' }), true)
   const invite = created(1)
   if (!invite.created) throw new Error('bad fixture')
   const msg = organizationInvitationMail(invite, 'https://app.example.test')
