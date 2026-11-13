@@ -238,8 +238,8 @@ export function BoardPage({ issues, userId, workspaceId, teamId, presentationRea
   const refreshButton = <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={linearSynced ? t('synced') : t('refresh')} className={cn(linearSynced && 'text-success-foreground')} onClick={() => { void onUpdated() }} />}><RefreshCw /></TooltipTrigger><TooltipContent side="bottom">{linearSynced ? t('synced') : t('refresh')}</TooltipContent></Tooltip>
   const panelButton = <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', sidebar && 'xl:hidden')} aria-expanded={sheet} aria-label={t('expand')} aria-keyshortcuts="Control+j Meta+j" onClick={openPanel} />}><PanelRightOpen data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('expand')}<ShortcutKeys keys={['mod', 'J']} /></TooltipContent></Tooltip>
   // The template's own menus (the `board` slot's BoardScreen) carry the filters and the 显示 options.
-  // The template's one tab: all of the workspace's tasks, with the count the filters leave.
-  const scopes = [{ id: 'all', label: t('scope.all'), count: shown.length }]
+  // No tabs: the board holds every task of its workspace, and one tab that does nothing reads as a broken filter.
+  const scopes: { id: string; label: string; count: number }[] = []
   const filterItems: BoardMenuItem[] = [
     ...FILTER_FIELDS.map((field): BoardMenuItem => field === 'creator'
       ? { label: t(`filterField.${field}`), checked: filters.creator?.includes(ME) ?? false, onSelect: () => toggleFilter(field, ME) }

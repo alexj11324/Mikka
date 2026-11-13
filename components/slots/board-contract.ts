@@ -94,7 +94,7 @@ export type BoardScreenProps = {
   cards: BoardScreenCard[]
   view: 'board' | 'list'
   onView: (view: 'board' | 'list') => void
-  /** One tab, 全部 with its count: the board holds every task of its workspace (2026-11-13-1405). */
+  /** Empty: the board holds every task of its workspace, so there is nothing to switch between (2026-11-13-1405). A layer draws no tab for it. */
   scopes: { id: string; label: string; count: number }[]
   scope: string
   onScope: (id: string) => void

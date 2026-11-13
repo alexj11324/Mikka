@@ -48,7 +48,7 @@ The model is Linear's: an issue has one state, and what an agent is doing is bes
 
 - Tasks are on the board. It has two views, 看板 and 列表. The navigation has one item for it, and an old `?section=tasks` link opens the board in its list view.
 - The board shows every task of its workspace. There is no default filter; a filter is the person's choice. A stored copy of the old default is dropped, and any other saved filter is kept.
-- The board has no 全部 / 工作区 / 个人 segment and a card no 归属 lock. All of a workspace's tasks are on its board; personal work lives in the personal workspace.
+- The board has no 全部 / 工作区 / 个人 segment, no tab strip at all (a single tab that does nothing reads as a broken filter), and a card no 归属 lock. All of a workspace's tasks are on its board; personal work lives in the personal workspace.
 - A bot's own page still lists the tasks it dispatched. It is a filtered view of the same tasks: rows sit under their status in the board's order, with the status icon and the Agent mark.
 
 ## The status advances with the work
@@ -81,11 +81,11 @@ A conversation owns its title, as Capy's threads do (`PATCH …/jams/:id` rename
   - first run ended, and PR opened: named again from what it did and the PR's title, only while the title is a generated one.
 - **A person's rename wins.** `renameConversation` holds the typed title to the same bound, writes it on every run of the conversation and marks it `manual`; no trigger replaces it, and a rename that lands while the model is answering is kept. `regenerateConversationTitle` is the person asking for a generated title again, so it is the one path that replaces a manual one.
 - **The fallback** never ends inside a word: a Latin word or a number that does not fit is left out whole.
-- **Where it is read.** Thread links and their hover cards, thread rows, the thread header, waiting rows in 收件箱, the dispatch card, and the run list's name that desktop notifications use.
+- **On screen.** The thread header's ⋯ menu (`mikka-hosted-ui` `slots/thread-header.tsx`) has 重命名, which opens the title in the header's existing dialog, and 重新生成标题. They are offered to the conversation's owner, and the server checks again.
+- **Where it is read.** Thread links and their hover cards, thread rows, the thread header, the bot sidebar's row for a conversation with no task, the work-area tab, waiting rows in 收件箱, the dispatch card, and the run list's name that desktop notifications use.
 
 Not built:
 
-- No rename or regenerate control on screen. The thread header (`components/slots/thread-header-contract.ts`) has no menu to put them in; the two server actions exist and are tested.
 - A configurable title prompt and triggers per workspace and person, with audit events.
 - The iOS app.
 

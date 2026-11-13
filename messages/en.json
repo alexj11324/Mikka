@@ -4577,7 +4577,14 @@
     },
     "errorDetails": "Details",
     "fullInstructions": "View full instructions",
-    "hideInstructions": "Hide full instructions"
+    "hideInstructions": "Hide full instructions",
+    "conversationTitle": {
+      "rename": "Rename",
+      "regenerate": "Regenerate title",
+      "label": "Title",
+      "renameFailed": "Title not saved",
+      "regenerateFailed": "Couldn't generate a new title"
+    }
   },
   "Computer": {
     "status": {
@@ -4954,9 +4961,6 @@
     "board": {
       "toolbar": "Board toolbar",
       "scopeLabel": "Task scope",
-      "scope": {
-        "all": "All"
-      },
       "filter": "Filter",
       "filterField": {
         "status": "Status",

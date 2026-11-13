@@ -4577,7 +4577,14 @@
     },
     "errorDetails": "详情",
     "fullInstructions": "查看完整指令",
-    "hideInstructions": "隐藏完整指令"
+    "hideInstructions": "隐藏完整指令",
+    "conversationTitle": {
+      "rename": "重命名",
+      "regenerate": "重新生成标题",
+      "label": "标题",
+      "renameFailed": "标题未保存",
+      "regenerateFailed": "未能生成新标题"
+    }
   },
   "Computer": {
     "status": {
@@ -4954,9 +4961,6 @@
     "board": {
       "toolbar": "看板工具栏",
       "scopeLabel": "任务范围",
-      "scope": {
-        "all": "全部"
-      },
       "filter": "筛选",
       "filterField": {
         "status": "状态",

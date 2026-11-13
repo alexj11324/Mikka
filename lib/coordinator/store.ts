@@ -349,7 +349,7 @@ export async function citationNames(reader: IssueReader, texts: readonly string[
   ])
   for (const task of tasks) names[task.id] = { kind: 'issue', title: task.title }
   // A teammate's thread is named by its harness, as its bare projection (workspaceRunView) is.
-  for (const run of runs) names[run.id] = { kind: 'run', name: run.own ? threadName(run.promptHead ?? '', run.agentName) : threadName('', run.harness) }
+  for (const run of runs) names[run.id] = { kind: 'run', name: run.own ? run.title || threadName(run.promptHead ?? '', run.agentName) : threadName('', run.harness) }
   return names
 }
 
