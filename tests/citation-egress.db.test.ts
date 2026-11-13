@@ -65,7 +65,7 @@ test('a chat\'s cited runs show the same name, summary and task without reading 
       assert.deepEqual(source.issue, index === 3 ? null : { id: issueId, title: task.title, number: 12, identifier: source.issue?.identifier ?? null, status: 'doing', run: { status: 'waiting_input', outcome: null, stopReason: null } })
       assert.deepEqual(source.pullRequests, index === 3 ? [] : readIssueMetadata(task.content).pullRequests)
     }
-    assert.equal((sources[runs[0]] as { name: string }).name, 'Fix the login bug that drops a session when the token refre…')
+    assert.equal((sources[runs[0]] as { name: string }).name, 'Fix the login bug that drops')
     assert.equal((sources[runs[0]] as { summary: string }).summary, 'Fixed the race.')
 
     // A cited task carries its newest thread's status and outcome and its PRs, for its one state (localTaskState).
