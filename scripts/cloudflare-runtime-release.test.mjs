@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { createRequire } from 'node:module'
 import { createHash } from 'node:crypto'
 import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -178,7 +177,6 @@ test('the genuine main driver can compile the original accepted API source after
 
 
 test('runtime publication replaces the pull-only Docker login before invoking the publisher', async () => {
-  const { load } = createRequire(import.meta.url)('js-yaml')
   const work = await mkdtemp(join(tmpdir(), 'mikka-registry-publication-'))
   try {
     const bin = join(work, 'bin')
@@ -196,11 +194,14 @@ set -euo pipefail
 [[ "$(cat "$DOCKER_CONFIG/auth")" == "$CF_RUNTIME_REGISTRY_PASSWORD" ]]
 `, { mode: 0o700 })
     for (const name of ['cloudflare-eve-image.yml', 'cloudflare-task-sandbox.yml']) {
-      const workflow = load(await readFile(new URL('../.github/workflows/' + name, import.meta.url), 'utf8'))
-      const step = workflow.jobs.publish.steps.find(step => step.name === 'Publish the verified runtime image')
+      const workflow = await readFile(new URL('../.github/workflows/' + name, import.meta.url), 'utf8')
+      const step = workflow.split('      - name: Publish the verified runtime image\n')[1]?.split('\n      - ')[0]
       assert.ok(step)
+      const run = /\n {8}run: (.*)(?:\n|$)/.exec(step)
+      assert.ok(run)
+      const script = run[1] === '|' ? step.slice(run.index + run[0].length).replace(/^ {10}/gm, '') : run[1]
       await writeFile(join(work, 'auth'), 'expired-pull-only-fixture')
-      const child = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', step.run], {
+      const child = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', script], {
         env: { PATH: bin + ':' + process.env.PATH, DOCKER_CONFIG: work,
           CF_RUNTIME_REGISTRY_USERNAME: 'v1', CF_RUNTIME_REGISTRY_PASSWORD: 'fresh-push-pull-fixture' },
         encoding: 'utf8',
