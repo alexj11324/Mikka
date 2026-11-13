@@ -10,7 +10,7 @@ on:
         description: Reviewed deployment phase; never compiles product source
         type: choice
         required: true
-        options: [stage-verify, stage-worlds, stage-task, stage-eve, stage-api, stage-web, stage-sessions, production-reserve, production-eve, production-worlds-prepare, production-api, production-worlds-register, production-web, production-verify, traffic-prepare, traffic-promote]
+        options: [stage-all, stage-verify, stage-worlds, stage-task, stage-eve, stage-api, stage-web, stage-sessions, production-reserve, production-eve, production-worlds-prepare, production-api, production-worlds-register, production-web, production-verify, traffic-prepare, traffic-promote]
       qualification_run:
         description: Original public Cloud Services qualification run
         type: string
@@ -145,6 +145,9 @@ jobs:
           version: 10.34.3
       - name: Install deployment tools without rebuilding the product
         working-directory: operations
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install pinned product client and verification dependencies
+        working-directory: operations/product
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Install immutable image inspection tools
         run: sudo apt-get update -qq && sudo apt-get install -y -qq skopeo
