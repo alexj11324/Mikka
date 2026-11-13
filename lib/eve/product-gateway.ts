@@ -141,11 +141,7 @@ async function gatewayExecution(scope: Scope, input: Input): Promise<AgentExecut
     if (agentKitEnabled()) throw new Error('agentExecutionClosed')
     return null
   }
-  const { pool } = await import('../db')
-  const found = await pool.query(`SELECT 1 FROM agent_kit_executions WHERE id=$1 AND owner_id=$2 AND bot_key=$3 AND execution_key=$4 AND status='running'`,
-    [input.executionId, scope.ownerId, scope.botId, `${input.sessionId}:${input.turnId}:0`])
-  if (!found.rowCount) throw new Error('agentExecutionClosed')
-  return agentKitStore.readExecution(await agentScope(scope.ownerId, scope.botId), input.executionId)
+  return agentKitStore.readExecution(await agentScope(scope.ownerId, scope.botId), input.executionId, `${input.sessionId}:${input.turnId}:0`)
 }
 
 async function productTools(scope: Scope, execution: AgentExecution | null, sourceEventId: string | undefined, scheduledRead: import('../schedules/contract').ScheduledRead | null, taskEventId: string | undefined,entryOrigin:import('../run-origin').ResolvedRunOrigin): Promise<ToolSet> {

@@ -112,6 +112,35 @@ test('host settlement receipts preserve product publication across native RPC re
       await assert.rejects(finishEveTurn(scope,{...input,executionId:randomUUID()}),/agentExecutionClosed/)
       await assert.rejects(finishEveTurn({...scope,ownerId:'other-owner'},input))
     })
+    await t.test('the tool gateway reads one running snapshot bound to the native turn', async t => {
+      const { AgentKitStore } = await import('../agent-kit/store')
+      const { DEFAULT_AGENT_DEFINITION } = await import('../agent-kit/builtin')
+      const { handleEveProductRequest } = await import('./product-gateway')
+      const { internalEveAuthorization } = await import('./auth')
+      const { Client } = await import('pg')
+      const store = new AgentKitStore(pool)
+      const slack = { ...scope, surface: 'slack' as const }
+      const sessionId = 'wrun_' + randomUUID()
+      await registerSession(slack, sessionId)
+      const turnId = 'turn_gateway'
+      const execution = await store.beginExecution(slack, `${sessionId}:${turnId}:0`, 'Fixture policy', {harness:'codex',model:null}, DEFAULT_AGENT_DEFINITION)
+      const instructions = (turn: string) => handleEveProductRequest(new Request('https://app.example/mikka/api/internal/eve/tools', {
+        method: 'POST', headers: {authorization: internalEveAuthorization(slack)},
+        body: JSON.stringify({operation:'instructions',sessionId,turnId:turn,executionId:execution.id}),
+      }))
+      const queries = t.mock.method(Client.prototype, 'query')
+      const { createRequestDatabaseScope } = await import('../db')
+      const routed = createRequestDatabaseScope(process.env.E2E_DATABASE_URL!)
+      const response = await routed.run(() => instructions(turnId)).finally(() => routed.close())
+      assert.equal(response.status, 200)
+      assert.match((await response.json()).instructions, /Slack conversation/)
+      const reads = queries.mock.calls.filter(call => /from agent_kit_executions/i.test(String(call.arguments[0])))
+      assert.equal(reads.length, 1, 'retrieve and check the same execution row in one SQL statement')
+      assert.equal((await instructions('another_turn')).status, 404)
+      await store.finishExecution(slack, execution.id, 'completed')
+      assert.equal((await instructions(turnId)).status, 404)
+      assert.equal((await store.readExecution(slack, execution.id)).status, 'completed')
+    })
     await t.test('failed native turn marks only its owned source and never overwrites a newer session',async()=>{
       const {projectEveTurn,projectTurnState}=await import('./projection')
       const {emptySessionView,foldEvents}=await import('eve/events')
