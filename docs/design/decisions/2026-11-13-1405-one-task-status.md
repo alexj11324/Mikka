@@ -36,7 +36,7 @@ The model is Linear's: an issue has one state, and what an agent is doing is bes
 
 进行中, 评审中 and 已完成 are Orca's ConductorProgress, ConductorReview and ConductorDone shapes ([stablyai/orca](https://github.com/stablyai/orca) at `b18029ef`, MIT, © 2026 Lovecast Inc.; notice in `NOTICE`), drawn in `components/workspace/status-icons.tsx`. 待整理 and 待办 already matched Orca's defaults. Orca fills the ring with its page colour; ours leaves it open so it sits on any surface, and the check in 已完成 is cut in `--status-icon-surface` (the page background by default). Orca colours review green and done a muted tan; we keep R-34's colours so a status reads the same in its icon, its menu and its badge. The 受阻 column keeps its own icon ([2026-11-07-2300](2026-11-07-2300-one-conversation-per-task.md)).
 
-The official board's column heads and its card status line are affectUI's Kanban glyphs, which the block does not take as data; they stay as shipped ([2026-11-09-0050](2026-11-09-0050-paid-blocks-as-shipped.md)).
+**Exception to the as-shipped rule** ([2026-11-09-0050](2026-11-09-0050-paid-blocks-as-shipped.md)), approved by Alex on 2026-11-13: a paid block's own status glyph may be replaced by this shared icon, so one status has one icon everywhere. The exception is the glyph only; the block keeps its size, position, spacing and colour tokens for it. It applies to the Kanban's column heads (board and list), the Agent mark on its card and list-row status line, and the task card in the hosted thread. 受阻 and 已隐藏 are not statuses and keep the block's glyphs. Because the block's colour tokens stay, 进行中 is the block's purple on the board and R-34's warning colour in a chat chip: the shape is the same, the colour is the surface's.
 
 ## One entry
 

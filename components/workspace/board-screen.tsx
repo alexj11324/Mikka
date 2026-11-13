@@ -79,7 +79,7 @@ export function BoardScreenView({ issues, columns: visible, hidden, blocks, newe
         // A task blocked by a dependency or by hand names why. Otherwise the line is the Agent's mark (working, waiting
         // for the person, error) while 智能体状态 is on; the card's column is its status, so a closed task has no line.
         state: ownBlock ? { kind: 'blocked', label: blockLabel(tCard, ownBlock) }
-          : indicator && show('agentState') ? { kind: runMarkKind(indicator), label: runLabel(indicator) } : null,
+          : indicator && show('agentState') ? { kind: runMarkKind(indicator), label: runLabel(indicator), indicator } : null,
       })
     }
   }

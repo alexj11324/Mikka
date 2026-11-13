@@ -15,10 +15,14 @@ const STATUS_ICONS = new Map<string, LucideIcon>(ISSUE_STATUSES.map(status => [s
 const STATUS_TONES: Record<string, StatusTone> = { doing: 'warning', review: 'info', done: 'success' }
 export type TaskIconSize = 'sm' | 'md' | 'lg'
 
-/** A task's status icon: the status field's, in its colour. An unknown status draws the first one's shape, grey. */
-export function TaskStatusIcon({ status, size = 'sm' }: { status: string; size?: TaskIconSize }) {
+/**
+ * A task's status icon: the status field's, in its colour. An unknown status draws the first one's shape, grey.
+ * `plain` draws the shape alone, in the colour of where it sits: for a paid block's own status slot, which keeps its
+ * colour tokens (decision 2026-11-13-1405, the status-icon exception).
+ */
+export function TaskStatusIcon({ status, size = 'sm', plain = false }: { status: string; size?: TaskIconSize; plain?: boolean }) {
   const Icon = STATUS_ICONS.get(status) ?? ISSUE_STATUSES[0].icon
-  return <Icon aria-hidden="true" data-task-status={status} className={cn('shrink-0', size === 'lg' ? 'size-[18px]' : size === 'md' ? 'size-4' : 'size-3.5', statusIconTints[STATUS_TONES[status] ?? 'neutral'])} />
+  return <Icon aria-hidden="true" data-task-status={status} className={cn('shrink-0', size === 'lg' ? 'size-[18px]' : size === 'md' ? 'size-4' : 'size-3.5', !plain && statusIconTints[STATUS_TONES[status] ?? 'neutral'])} />
 }
 
 const RUN_MARKS: Record<RunIndicator, { icon: LucideIcon; tone: StatusTone }> = {
@@ -34,12 +38,12 @@ export function useRunIndicatorLabel() {
 }
 
 /** What the task's Agent is doing, as a small mark; nothing when no run is under way, waiting or failed. */
-export function TaskRunMark({ state, indicator = state ? runIndicatorOf(state) : null }: { state?: TaskState | 'idle' | null; indicator?: RunIndicator | null }) {
+export function TaskRunMark({ state, indicator = state ? runIndicatorOf(state) : null, plain = false }: { state?: TaskState | 'idle' | null; indicator?: RunIndicator | null; /** The shape alone, in the colour of where it sits (a paid block's slot). */ plain?: boolean }) {
   const label = useRunIndicatorLabel()
   if (!indicator) return null
   const mark = RUN_MARKS[indicator]
   return <span role="img" aria-label={label(indicator)} title={label(indicator)} data-run-indicator={indicator} className="inline-flex shrink-0">
-    <mark.icon aria-hidden="true" className={cn('size-3', statusIconTints[mark.tone], indicator === 'working' && 'motion-safe:animate-spin [animation-duration:1.6s]')} />
+    <mark.icon aria-hidden="true" className={cn('size-3', !plain && statusIconTints[mark.tone], indicator === 'working' && 'motion-safe:animate-spin [animation-duration:1.6s]')} />
   </span>
 }
 

@@ -6,6 +6,7 @@
 import type { ComponentType, ReactNode } from 'react'
 import type { AgentState, BoardColumn } from '@/components/blocks/kanban-board-1/components/data'
 import type { BlockReason } from '@/lib/task-blocked'
+import type { RunIndicator } from '@/lib/task-state'
 
 export type BoardColumnFrameProps = {
   status: BoardColumn
@@ -79,7 +80,7 @@ export type BoardScreenCard = {
   /** urgent, high, normal or low; null when the 优先级 property is off. */
   priority: string | null
   /** What the task's Agent is doing (working, waiting for the person, error) when Agent 活动 is on, or why the task sits in 受阻; with its words. Never the task's status: its column is. */
-  state: { kind: AgentState; label: string } | null
+  state: { kind: AgentState; label: string; /** Set when the line is the Agent's mark, so a layer can draw Mikka's shared mark for it; absent for a 受阻 reason. */ indicator?: RunIndicator } | null
 }
 
 /**
