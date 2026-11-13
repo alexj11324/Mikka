@@ -30,6 +30,7 @@ const workerBundles = {
   web: { path: 'workers/web.mjs', sha256: 'f'.repeat(64), bytes: 420 },
   credentialIdentity: { path: 'workers/credential-identity.mjs', sha256: '1'.repeat(64), bytes: 520 },
   credentialBroker: { path: 'workers/credential-broker.mjs', sha256: '2'.repeat(64), bytes: 620 },
+  appGateway: { path: 'workers/app-gateway.mjs', sha256: '3'.repeat(64), bytes: 720 },
 }
 
 test('publication requires the public main build and exact selected overlay', () => {

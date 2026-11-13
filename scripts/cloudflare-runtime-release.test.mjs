@@ -25,6 +25,7 @@ const api = { version: 1, provider: 'github-actions', repository: 'alexj11324/Mi
     web: { path: 'workers/web.mjs', sha256: '5'.repeat(64), bytes: 420 },
     credentialIdentity: { path: 'workers/credential-identity.mjs', sha256: '6'.repeat(64), bytes: 520 },
     credentialBroker: { path: 'workers/credential-broker.mjs', sha256: '7'.repeat(64), bytes: 620 },
+    appGateway: { path: 'workers/app-gateway.mjs', sha256: '8'.repeat(64), bytes: 720 },
   },
   offlineVerification: 'buildkit-network-none', publication: 'registry-only', production: false }
 api.publicBuildSettings = { publicSha, privateSha: overlaySha, publication: 'registry-only', NEXT_PUBLIC_POSTHOG_KEY: 'public-analytics',

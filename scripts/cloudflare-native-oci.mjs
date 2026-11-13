@@ -12,7 +12,8 @@ const DIGEST = /^sha256:[a-f0-9]{64}$/
 const ACCOUNT = /^[a-f0-9]{32}$/
 const WORKER_PATHS = { apiIngress: 'ingress.mjs', eveRuntime: 'workers/eve-runtime.mjs',
   taskSandbox: 'workers/task-sandbox.mjs', web: 'workers/web.mjs',
-  credentialIdentity: 'workers/credential-identity.mjs', credentialBroker: 'workers/credential-broker.mjs' }
+  credentialIdentity: 'workers/credential-identity.mjs', credentialBroker: 'workers/credential-broker.mjs',
+  appGateway: 'workers/app-gateway.mjs' }
 const fail = code => { throw new Error(code) }
 const hash = value => createHash('sha256').update(value).digest('hex')
 const git = (cwd, ...args) => stdout('git', args, { cwd, stage: 'SOURCE_CHECKOUT', timeout: 30000 })
@@ -138,7 +139,7 @@ async function prepareArtifacts(work, selected, env, webRenderer) {
   const output = await mkdtemp(join(root, '.cloudflare-ci/release-'))
   const artifacts = join(output, 'artifacts')
   await mkdir(artifacts)
-  const { prepareRelease } = await import(pathToFileURL(join(work, 'cloudflare/web/prepare.mjs')).href)
+  const { prepareRelease, gatewayConfig } = await import(pathToFileURL(join(work, 'cloudflare/web/prepare.mjs')).href)
   const build = join(work, 'apps/frontend/dist/web')
   const prepared = await prepareRelease({ id: selected.id, assets: build,
     api: 'mikka-api-staging-' + selected.id, cloud: 'mikka-cloud-services-staging',
@@ -168,6 +169,7 @@ async function prepareArtifacts(work, selected, env, webRenderer) {
     eveRuntime: { directory: 'cloudflare/eve-runtime', stage: 'EVE_WORKER_BUNDLE' },
     taskSandbox: { directory: 'cloudflare/task-sandbox', stage: 'TASK_WORKER_BUNDLE' },
     web: { config: prepared, stage: 'WEB_WORKER_BUNDLE' },
+    appGateway: { config: gatewayConfig({ current: selected.id, retained: [selected.id] }), stage: 'APP_GATEWAY_BUNDLE' },
     credentialIdentity: { config: { main: join(work, 'cloudflare/credential-identity/worker.mjs'),
       compatibility_date: '2026-11-11', compatibility_flags: ['nodejs_compat', 'enable_request_signal'] }, stage: 'CREDENTIAL_IDENTITY_BUNDLE' },
     credentialBroker: { config: { main: join(work, 'cloudflare/credential-broker/worker.mjs'),
