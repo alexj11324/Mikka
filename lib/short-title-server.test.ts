@@ -3,7 +3,7 @@ import { after, before, beforeEach, mock, test } from 'node:test'
 
 const saved = { gateway: process.env.AI_GATEWAY_API_KEY, zeroCat: process.env.ZEROCAT_API_KEY, url: process.env.ZEROCAT_BASE_URL }
 let allowed = true
-let task: { title: string; content: unknown; shortTitle: string | null } | null = null
+let task: { workspaceId: string | null; title: string; content: unknown; shortTitle: string | null } | null = null
 let landed = true
 let answer: () => Promise<{ text: string }> = async () => ({ text: '{"title":"登录回调修复"}' })
 const writes: unknown[] = [], pushed: unknown[][] = [], models: unknown[] = []
@@ -16,7 +16,6 @@ mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { db
   }),
 } } })
 mock.module(new URL('./live/lists.ts', import.meta.url).href, { namedExports: { issueListChanged: async (...args: unknown[]) => { pushed.push(args.slice(1)) } } })
-mock.module(new URL('./execution-settings.ts', import.meta.url).href, { namedExports: { executionWorkspace: async () => 'fixture-workspace' } })
 mock.module(new URL('./cloud-services/runtime.ts', import.meta.url).href, { namedExports: { cloudClient: { capability: async () => null } } })
 mock.module(new URL('./abuse/model.ts', import.meta.url).href, { namedExports: {
   admitHostedModel: async () => { if (!allowed) throw new Error('modelRouteDenied'); return null },
@@ -30,13 +29,20 @@ beforeEach(() => {
   process.env.AI_GATEWAY_API_KEY = 'synthetic-short-title-key'
   delete process.env.ZEROCAT_API_KEY; delete process.env.ZEROCAT_BASE_URL
   allowed = true; landed = true
-  task = { title: 'ALEX-1470: 登录回调在真机上失效，需要检查 OAuth proxy 回跳 2026-11-06', content: { type: 'doc', content: [] }, shortTitle: null }
+  task = { workspaceId: 'fixture-workspace', title: 'ALEX-1470: 登录回调在真机上失效，需要检查 OAuth proxy 回跳 2026-11-06', content: { type: 'doc', content: [] }, shortTitle: null }
   answer = async () => ({ text: '{"title":"登录回调修复"}' })
   writes.length = 0; pushed.length = 0; models.length = 0; generateText.mock.resetCalls()
 })
 after(() => {
   for (const [name, value] of [['AI_GATEWAY_API_KEY', saved.gateway], ['ZEROCAT_API_KEY', saved.zeroCat], ['ZEROCAT_BASE_URL', saved.url]] as const)
     if (value === undefined) delete process.env[name]; else process.env[name] = value
+})
+
+test('a task without its persisted workspace does not call a title provider', async () => {
+  task = { ...task!, workspaceId: null }
+  await writeShortTitle('task', 'owner')
+  assert.deepEqual(models, [])
+  assert.deepEqual(writes, [])
 })
 
 test('a new task gets one short title, written with the title it came from, and the title change is pushed', async () => {
