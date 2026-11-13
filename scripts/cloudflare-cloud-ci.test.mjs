@@ -172,7 +172,10 @@ test('workflow uses public manual main qualification and uploads the single rece
   assert.match(workflow, /node-version: 24\.22\.1/)
   assert.match(workflow, /corepack prepare pnpm@10\.34\.3 --activate/)
   assert.match(workflow, /MIKKA_CLOUD_SOURCE_SHA: \$\{\{ inputs.cloud_source_sha }}/)
-  assert.match(workflow, /MIKKA_CLOUD_READ_TOKEN: \$\{\{ secrets.MIKKA_CLOUD_READ_TOKEN }}/)
+  assert.match(workflow, /MIKKA_CLOUD_READ_TOKEN: \$\{\{ steps\.source-token\.outputs\.token }}/)
+  assert.match(workflow, /uses: actions\/create-github-app-token@[a-f0-9]{40}/)
+  assert.match(workflow, /repositories: mikka-cloud\n          permission-contents: read/)
+  assert.match(workflow, /id-token: write/)
   assert.match(workflow, /name: Qualify the pinned Cloud Services source[\s\S]*run: node scripts\/cloudflare-cloud-ci.mjs build/)
   assert.match(workflow, /name: Verify the Cloud Services qualification\n        run: node scripts\/cloudflare-cloud-ci.mjs verify/)
   assert.match(workflow, /name: Upload the qualification receipt/)
@@ -183,7 +186,7 @@ test('workflow uses public manual main qualification and uploads the single rece
   assert.match(workflow, /CF_RUNTIME_REGISTRY_USERNAME: \$\{\{ vars\.CF_RUNTIME_REGISTRY_USERNAME }}/)
   assert.match(workflow, /name: Publish the qualified Cloud Services artifact[\s\S]*CF_RUNTIME_REGISTRY_USERNAME:[\s\S]*CF_RUNTIME_REGISTRY_PASSWORD:[\s\S]*run: node scripts\/cloudflare-cloud-ci.mjs publish/)
   assert.ok(workflow.indexOf('name: Verify the Cloud Services qualification') < workflow.indexOf('name: Publish the qualified Cloud Services artifact'))
-  assert.doesNotMatch(workflow, /pull_request:|push:|WORKERS_CI|create-github-app-token|CLOUDFLARE_API_TOKEN/)
+  assert.doesNotMatch(workflow, /pull_request:|push:|WORKERS_CI|secrets\.MIKKA_CLOUD_READ_TOKEN|CLOUDFLARE_API_TOKEN|permission-contents: write/)
 })
 
 test('CLI reports fixed errors without raw failure values', () => {
