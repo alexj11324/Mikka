@@ -11,6 +11,7 @@ const first: SavedAccount = { id: '1', user: { id: 'owner-a', name: 'A', email: 
 const second: SavedAccount = { ...first, id: '2', server: { ...first.server, url: 'http://127.0.0.1:4100/team/mikka' }, user: { id: 'owner-b', name: 'B', email: 'b@example.invalid' } }
 let current = first
 const workspaces = new Map([['mikka_account_1_workspace', 'workspace-a'], ['mikka_account_2_workspace', 'workspace-b']])
+const turnBodies: { clientContext?: { taskCommand?: { intent?: string } } }[] = []
 const requests: { transport: 'expo' | 'browser'; url: string; headers: Headers; credentials: RequestCredentials | undefined }[] = []
 
 function response(transport: 'expo' | 'browser', input: RequestInfo | URL, init?: RequestInit) {
@@ -21,7 +22,9 @@ function response(transport: 'expo' | 'browser', input: RequestInfo | URL, init?
   // The native cookie-authenticated server enforces its canonical Origin on POSTs.
   if (transport === 'expo' && headers.get('origin') !== url.origin) return Response.json({ error: 'authRequired' }, { status: 401 })
   const sessionId = url.hostname === 'alpha.example' ? 'wrun_alpha' : 'wrun_beta'
-  return Response.json({ ok: true, sessionId, ...(url.pathname.endsWith('/session') ? {} : { deliveryId: 'delivery_fixture' }) })
+  const payload = JSON.parse(String(init?.body ?? '{}'))
+  if (payload.message !== undefined) turnBodies.push(payload)
+  return Response.json({ ok: true, sessionId, ...(payload.message !== undefined ? { deliveryId: 'delivery_fixture' } : {}) })
 }
 const originalFetch = globalThis.fetch
 // The real Eve platform adapter must choose Expo fetch on native and browser fetch on web.
@@ -103,7 +106,9 @@ test('native Task creation uses the shared manual command and re-reads an accept
   const dispatch = { ...draft, intent: 'create_and_dispatch' as const }
   await assert.rejects(submitMobileTask(dispatch, operation, connection), /receiptUnavailable/)
   assert.equal(await submitMobileTask(dispatch, operation, connection), 'task1')
-  assert.equal(requests.length, 2, 'one Eve session and one turn')
-  assert.equal(requests[1].headers.get('x-mikka-submission-id'), operation.id)
+  assert.equal(requests.length, 1, 'the initial Eve turn and session use one authorized request')
+  assert.equal(requests[0].headers.get('x-mikka-submission-id'), operation.id)
+  assert.ok(new URL(requests[0].url).pathname.endsWith('/session'))
+  assert.equal(turnBodies.at(-1)?.clientContext?.taskCommand?.intent, 'create_and_dispatch')
   assert.deepEqual(captured.slice(1).map(({ action, args }) => [action, args]), Array(2).fill(['issues.getDispatchedTaskReceipt', [{ workspaceId: 'workspace-a', botId: null, requestId: operation.id }]]))
 })
