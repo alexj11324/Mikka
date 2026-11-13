@@ -1,0 +1,67 @@
+{
+  "publicSha": "0a9f562a6de3b3b4c00f98b0686856650af1048e",
+  "privateSha": "59a540ee64cd27d1509877dda35795bc62e486f5",
+  "rendererBuild": "75c748994bae55b3c35cba30518d8afe5c9b1586c9ecea83f6382858713bddf6",
+  "states": [
+    {
+      "basename": "composer-desktop-light.png",
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "sha256": "252478de9db16130385471b3c34cea3621a00df1946e70e9d769af9527b42fbd",
+      "requested": "gpt-5",
+      "observed": "gpt-5.1",
+      "entityChoices": [
+        "task",
+        "thread",
+        "pr"
+      ],
+      "priorPrHref": "https://github.com/example/checkout/pull/2259"
+    },
+    {
+      "basename": "composer-desktop-dark.png",
+      "width": 1440,
+      "height": 900,
+      "theme": "dark",
+      "sha256": "31fc838978b1d8c9412002a9bad2d5a60c83e28b236c273fee635e956aaf080e",
+      "requested": "gpt-5",
+      "observed": "gpt-5.1",
+      "entityChoices": [
+        "task",
+        "thread",
+        "pr"
+      ],
+      "priorPrHref": "https://github.com/example/checkout/pull/2259"
+    },
+    {
+      "basename": "composer-mobile-light.png",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "sha256": "8faa84c1c561081fb63108fc00e30d536c82602dbad93c9921a508f11f2cc9c0",
+      "requested": "gpt-5",
+      "observed": "gpt-5.1",
+      "entityChoices": [
+        "task",
+        "thread",
+        "pr"
+      ],
+      "priorPrHref": "https://github.com/example/checkout/pull/2259"
+    },
+    {
+      "basename": "composer-mobile-dark.png",
+      "width": 390,
+      "height": 844,
+      "theme": "dark",
+      "sha256": "e5e7359c956197aabb2883696c4ac54067e522f0c157b27cfa443b9fa5fbbc8e",
+      "requested": "gpt-5",
+      "observed": "gpt-5.1",
+      "entityChoices": [
+        "task",
+        "thread",
+        "pr"
+      ],
+      "priorPrHref": "https://github.com/example/checkout/pull/2259"
+    }
+  ]
+}
