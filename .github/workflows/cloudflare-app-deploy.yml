@@ -121,6 +121,7 @@ jobs:
           ref: ${{ inputs.cloud_source_sha }}
           token: ${{ steps.source-token.outputs.token }}
           path: operations
+          fetch-depth: 0
           persist-credentials: false
       - name: Select the reviewed public application source
         id: product
