@@ -130,6 +130,11 @@ export async function queueFactoryTask(pool: Pool, userId: string, input: {
     await existing?.prepareAttempt?.(tx, task)
     const dispatch = createFactoryDispatch(pool, runtime.store, input.queue)
     const result = await dispatch(userId, { binding: factoryBinding(task), agentId: input.agentId, deviceRepoId: input.deviceRepoId, ...(input.note ? { note: input.note } : {}) }, tx)
+    if (input.previousRunId && sourceEventId && input.key === `thread:${input.previousRunId}:${sourceEventId}`)
+      await tx.query(`UPDATE thread_reply_versions v SET "resultRunId"=r.id FROM agent_runs r
+        WHERE v."sourceEventId"=$1 AND v."admissionRunId"=$2 AND v."userId"=$3 AND r.id=$4 AND r."userId"=v."userId"
+          AND r."workspaceId"=v."workspaceId" AND r."issueId"=$5 AND v."resultRunId" IS NULL`,
+      [sourceEventId,input.previousRunId,userId,result.runId,input.issueId])
     if (input.previousRunId) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1 AND "userId"=$3', [result.runId, input.previousRunId, userId])
     await tx.query('INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)', [task.id, receiptId, JSON.stringify({ key, digest, sourceEventId }), JSON.stringify({ runId: result.runId })])
     if (!existing) {

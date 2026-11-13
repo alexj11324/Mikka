@@ -1,3 +1,4 @@
+import { MobileReplyVersions } from '@/features/chat/components/thread-reply-versions'
 import { useThreadDeliveryControls } from '@/features/chat/components/thread-delivery-controls'
 import { conversationAccessDenied, useConversationDelivery } from '@/features/chat/components/conversation-delivery'
 import { mobileMessages } from '@/lib/messages'
@@ -114,7 +115,8 @@ export function TaskConversationScreen() {
               ? <ReviewCard flow={data?.detail.task.flow} running={data?.threads[segment.attempt.runId]?.active === true}>
                 {segment.items.map((item, at) => <Item key={item.id} item={item} live={data?.threads[segment.attempt.runId]?.active === true && at === segment.items.length - 1} />)}
               </ReviewCard>
-              : segment.items.map((item, at) => <Item key={item.id} item={item} live={data?.threads[segment.attempt.runId]?.active === true && at === segment.items.length - 1} />)}
+              : segment.items.map((item, at) => <View key={item.id}><Item item={item} live={data?.threads[segment.attempt.runId]?.active === true && at === segment.items.length - 1} />
+                {(item.kind==='person' || item.kind==='agent') && <MobileReplyVersions detail={data?.threads[segment.attempt.runId]} runId={segment.attempt.runId} itemId={item.id} text={item.text} reload={reload} working={!!live?.active} />}</View>)}
             {/* A failed attempt's cause stays inside it, in words, with the raw code under 详情 (2026-11-05-0330). */}
             {segment.error && !(data?.threads[segment.attempt.runId]?.active) && !segment.items.some(item => item.kind === 'error') ? <AttemptError raw={segment.error} /> : null}
           </View>

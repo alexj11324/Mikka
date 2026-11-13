@@ -16,6 +16,7 @@ import { RequestError } from '@/lib/factory/browser-request'
 import { useChatDelivery, useThreadReplyCommand, type ChatSubmission } from '@/lib/hooks/chat-delivery'
 import { prepareThreadReply, type ThreadReplySubmission } from '@/lib/thread-submission-input'
 import { mergeThreadChunks, runFailureText, runIsActive, runIsWorking, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
+import { ThreadReplyVersions } from './thread-reply-versions'
 import { ThreadSteps } from './thread-steps'
 import { ThreadExecutionIdentity } from './thread-execution-identity'
 import { ThreadRunPlace } from './thread-run-place'
@@ -320,6 +321,19 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     observer.observe(root, { childList: true, subtree: true })
     return () => observer.disconnect()
   }, [focusRunId, runId, joined])
+  const versionControl = (item: (typeof items)[number]) => {
+    if (!issueId || !data?.thread.ownedByCurrentUser || !['person','agent'].includes(item.kind)) return null
+    const base = {issueId,runId,canRun:!active && data.thread.replyAvailable && !question,refresh:()=>{void mutate()}}
+    if (item.kind === 'person' && item.mine) {
+      const source = data.messages.find(row=>row.id===item.id && row.editable)
+      return source?.sourceRunId ? <ThreadReplyVersions {...base} anchorRunId={source.sourceRunId} anchorKey={item.id} operation="edit" text={item.text} /> : null
+    }
+    if (item.kind !== 'agent') return null
+    const part = item.id.slice('text:'.length)
+    const nested = data.live?.runs.find(run=>part.startsWith(run.id+':'))
+    const sourceRunId = nested?.id ?? (data.chunkCursor?.runs===1 ? data.chunkCursor.runId : null)
+    return sourceRunId ? <ThreadReplyVersions {...base} anchorRunId={sourceRunId} anchorKey={nested ? part.slice(nested.id.length+1) : part} operation="rerun" text={item.text} /> : null
+  }
   const transcriptBody = <>
       {error && !data ? <InlineLoadError message={readFailedMessage} retryLabel={retryLabel} onRetry={() => { void mutate() }} />
         : !data ? <div role="status" aria-label={t('loading')} data-thread-loading className="flex flex-col gap-3"><Skeleton className="h-5 w-40" /><Skeleton className="ml-auto h-12 w-3/4" /><Skeleton className="h-12 w-2/3" /></div>
@@ -343,7 +357,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
             {items.map(item => <li key={item.id} data-thread-item={item.id} className="group/message flex flex-col gap-1">
               {item.kind === 'agent' && <>
                 <div {...{ [QUOTE_SOURCE_ATTR]: '' }} className={cn(BUBBLE, 'self-start whitespace-normal')}><AgentMarkdown text={item.text} isStreaming={active} /></div>
-                <MessageActions className={cn('self-start', HOVER_ACTIONS)}><CopyAction text={item.text} /></MessageActions>
+                <MessageActions className={cn('self-start', HOVER_ACTIONS)}><CopyAction text={item.text} />{versionControl(item)}</MessageActions>
               </>}
               {item.kind === 'steps' && <ThreadSteps stateKey={`thread:${runId}:steps:${item.id}`} steps={item.steps} />}
               {item.kind === 'error' && <FieldError className="text-xs">{item.text}</FieldError>}
@@ -356,7 +370,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
               {item.kind === 'computer' && <ComputerCard botId={item.botId} runId={item.runId} task={item.task} state={active ? 'working' : (view?.status ?? data.thread.status) === 'succeeded' ? 'done' : 'failed'} />}
               {item.kind === 'person' && (item.mine
                 // R-14: your own words are the blue bubble on the right.
-                ? <PersonBubble text={item.text} mine />
+                ? <><PersonBubble text={item.text} mine />{versionControl(item)}</>
                 // A teammate speaks from the left under their name, as in a group chat (R-13).
                 : <>
                   <span className="flex items-center gap-1.5 text-xs"><PersonAvatar name={item.author} image={item.image} /><span className="font-medium">{item.author}</span><span className="text-muted-foreground">{format.dateTime(new Date(item.at), { hour: '2-digit', minute: '2-digit' })}</span></span>
@@ -404,7 +418,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     if (!attempt && data.thread.prompt.trim()) { open = null; entries.push({ id: `${runId}:prompt`, role: 'person', at: at(data.thread.createdAt), text: data.thread.prompt.trim() }) }
     if (!attempt && data.thread.hasInstructions) bot('instructions', [{ kind: 'text', text: '', node: <ThreadInstructions issueId={issueId} runId={runId} mine={data.thread.ownedByCurrentUser} /> }])
     for (const item of items) {
-      if (item.kind === 'person') { open = null; entries.push({ id: `${runId}:${item.id}`, role: 'person', at: at(item.at), text: item.text }); continue }
+      if (item.kind === 'person') { open = null; entries.push({ id: `${runId}:${item.id}`, role: 'person', at: at(item.at), text: item.text, actions: versionControl(item) }); continue }
       const part: ThreadEntryPart = item.kind === 'agent' ? { kind: 'text', text: item.text, node: <div {...{ [QUOTE_SOURCE_ATTR]: '' }}><AgentMarkdown text={item.text} isStreaming={active} /></div> }
         : item.kind === 'steps' ? { kind: 'tools', id: `${runId}:${item.id}`, tools: item.steps.map(step => ({ id: step.id, label: step.name, status: step.failed ? 'failed' as const : 'done' as const,
           ...(step.ms !== undefined ? { ms: step.ms } : {}), ...(step.detail ? { note: step.detail } : {}), ...(step.output ? { detail: step.output.slice(0, 2000) } : {}) })) }
@@ -413,7 +427,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
           ? <ComputerCard botId={item.botId} runId={item.runId} task={item.task} state={active ? 'working' : (view?.status ?? data.thread.status) === 'succeeded' ? 'done' : 'failed'} />
           : <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground" data-slot="thread-stages">{item.stages.map((stage, index) => <span key={index} className={cn(!stage.ok && 'text-destructive-foreground')}>
             {t(`stages.${stage.stage}`)} {t('stages.duration', { seconds: (stage.ms / 1000).toFixed(1) })} {stage.ok ? '✓' : '✗'}</span>)}</p> }
-      bot(item.id, [part], { ...(item.kind === 'agent' ? { actions: <MessageActions className={cn('self-start', HOVER_ACTIONS)}><CopyAction text={item.text} /></MessageActions> } : {}), ...(active && item === items.at(-1) ? { streaming: true } : {}) })
+      bot(item.id, [part], { ...(item.kind === 'agent' ? { actions: <MessageActions className={cn('self-start', HOVER_ACTIONS)}><CopyAction text={item.text} />{versionControl(item)}</MessageActions> } : {}), ...(active && item === items.at(-1) ? { streaming: true } : {}) })
     }
     if (failure && !providerExplained) bot('failure', [{ kind: 'error', text: failureText.message ?? '', actions: <>
       {failureText.code && <RunErrorDetails code={failureText.code} />}
