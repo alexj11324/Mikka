@@ -2,6 +2,10 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import type { EveAuthResult } from 'eve/channels/eve'
 import { eveScopeSchema, scopeAuth, assertEveScope, type EveScope } from './scope'
 
+const MAX_REMAINING_MS = 60_000
+// Leave room for clock skew between self-hosted processes at issuance.
+const ISSUED_LIFETIME_MS = MAX_REMAINING_MS - 1_000
+
 function hostKey() {
   const key = process.env.BETTER_AUTH_SECRET
   if (!key || key.length < 32) throw new Error('authRequired')
@@ -9,7 +13,7 @@ function hostKey() {
 }
 /** Existing host key, domain-separated; never a user credential or model input. */
 export function internalEveAuthorization(scope: EveScope, now = Date.now()) {
-  const payload = Buffer.from(JSON.stringify({ ...scope, expires: now + 60_000 })).toString('base64url')
+  const payload = Buffer.from(JSON.stringify({ ...scope, expires: now + ISSUED_LIFETIME_MS })).toString('base64url')
   const signature = createHmac('sha256', hostKey()).update('mikka:eve:v1:' + payload).digest('base64url')
   return `Bearer mev_${payload}.${signature}`
 }
@@ -23,7 +27,7 @@ export function internalEveScope(header: string | null, now = Date.now()): EveSc
   if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) return null
   try {
     const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString())
-    if (!Number.isFinite(parsed.expires) || parsed.expires <= now || parsed.expires > now + 60_000) return null
+    if (!Number.isFinite(parsed.expires) || parsed.expires <= now || parsed.expires > now + MAX_REMAINING_MS) return null
     return eveScopeSchema.parse(parsed)
   } catch { return null }
 }
