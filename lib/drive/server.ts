@@ -51,16 +51,6 @@ async function body(request: Request) {
   return JSON.parse(new TextDecoder().decode(await bytes(request, 16 * 1024 * 1024))) as unknown
 }
 
-/** User volumes remain private to their owner within the selected tenant.
- * Project sharing is a separate capability and is never inferred from a name. */
-async function ownedVolume(ownerId: string, workspaceId: string, id: string | undefined) {
-  if (!isVolumeId(id)) throw new DriveError('drive_not_found', 404)
-  const found = await pool.query(`SELECT id FROM drive_volumes WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3
-    AND "driveScope"='user' AND "scopeId"=$2`, [id, ownerId, workspaceId])
-  if (!found.rowCount) throw new DriveError('drive_not_found', 404)
-  return readDriveVolume(pool, { ownerId }, id)
-}
-
 /** First HTTP surface over the existing volume, CAS and object-store implementation. */
 export async function driveResponse(request: Request, operation: Operation, params: Params = {}): Promise<Response> {
   const session = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true } })
@@ -85,7 +75,7 @@ export async function driveResponse(request: Request, operation: Operation, para
         const volumes = result.slice(0, limit)
         return json({ volumes, nextCursor: result.length > limit ? volumes.at(-1)!.id : null })
       }
-      const volume = await ownedVolume(actor.ownerId, workspaceId, params.volumeId)
+      const volume = await readDriveVolume(pool, { ownerId: actor.ownerId, workspaceId }, params.volumeId)
       if (operation === 'volume') {
         // Read an immutable manifest named by the head receipt, so a concurrent
         // write cannot mix an old digest with a newer mutable entry tree.
