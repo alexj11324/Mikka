@@ -158,22 +158,26 @@ export async function handleRead(q: Queryable, request: ReadRequest): Promise<Re
  * Coordinator cursor belongs only to the bot that actually owns its message. */
 export async function botUnreadCounts(q: Queryable, userId: string, botIds: string[]) {
   if (!botIds.length) return new Map<string, number>()
-  const { rows } = await q.query<{ id: string; count: number }>(`
+  const { rows: [row] } = await q.query<{ counts: (number | null)[] }>(`
     with visible as (
-      select b.id, greatest(coalesce(r."lastReadPosition",0), coalesce(old_message.position,0)) as cursor,
+      select b.id, requested.ordinality, greatest(coalesce(r."lastReadPosition",0), coalesce(old_message.position,0)) as cursor,
         coalesce(p."markedUnread",false) as marked
-      from bots b
+      from unnest($2::uuid[]) with ordinality requested(id,ordinality)
+      left join bots b on b.id=requested.id and b."ownerId"=$1
       left join conversation_reads r on r."userId"=$1 and r."conversationId"='bot:' || b.id::text
       left join conversation_reads old on old."userId"=$1 and old."conversationId"='coordinator'
       left join coordinator_messages old_message on old_message.id::text=old."lastReadMessageId"
         and old_message."userId"=$1 and old_message."botId"=b.id
       left join chat_preferences p on p."userId"=$1 and p."chatKey"=b.id::text
-      where b."ownerId"=$1 and b.id=any($2::uuid[])
-    )
-    select v.id, greatest(v.marked::integer, count(*) filter (where m.role='assistant' and m.prev is distinct from 'assistant' and m.position>v.cursor)::int) as count
-    from visible v left join lateral (
-      select position, message->>'role' as role, lag(message->>'role') over (order by position) as prev
-      from coordinator_messages where "userId"=$1 and "botId"=v.id and message->>'role' in ('user','assistant')
-    ) m on true group by v.id, v.marked`, [userId, botIds])
-  return new Map(rows.map(row => [row.id, row.count]))
+    ), totals as (
+      select v.ordinality, case when v.id is not null then greatest(v.marked::integer,
+        count(*) filter (where m.role='assistant' and m.prev is distinct from 'assistant' and m.position>v.cursor)::int) end as count
+      from visible v left join lateral (
+        select position, message->>'role' as role, lag(message->>'role') over (order by position) as prev
+        from coordinator_messages where "userId"=$1 and "botId"=v.id and message->>'role' in ('user','assistant')
+      ) m on true group by v.ordinality,v.id,v.marked
+    ) select array_agg(count order by ordinality) as counts from totals`, [userId, botIds])
+  // The caller already has the ordered IDs. Return one count per requested
+  // slot from PostgreSQL, without transferring every UUID a second time.
+  return new Map(row.counts.flatMap((count, index) => count === null ? [] : [[botIds[index], count] as const]))
 }
