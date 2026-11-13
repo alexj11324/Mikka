@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import { createRequire } from 'node:module'
 import { createHash } from 'node:crypto'
 import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -172,4 +174,39 @@ test('the genuine main driver can compile the original accepted API source after
   assert.equal(result.apiRunId,runId)
   assert.throws(()=>releaseIdentity({...env,RUNTIME_SOURCE_SHA:overlaySha},'eve',api))
   assert.throws(()=>releaseIdentity({...env,GITHUB_REF:'refs/tags/mikka-release-'+publicSha},'eve',api))
+})
+
+
+test('runtime publication replaces the pull-only Docker login before invoking the publisher', async () => {
+  const { load } = createRequire(import.meta.url)('js-yaml')
+  const work = await mkdtemp(join(tmpdir(), 'mikka-registry-publication-'))
+  try {
+    const bin = join(work, 'bin')
+    await mkdir(bin)
+    await writeFile(join(bin, 'docker'), `#!/bin/bash
+set -euo pipefail
+[[ "$*" == 'login registry.cloudflare.com --username v1 --password-stdin' ]]
+credential="$(cat)"
+[[ "$credential" == "$CF_RUNTIME_REGISTRY_PASSWORD" ]]
+printf '%s' "$credential" > "$DOCKER_CONFIG/auth"
+`, { mode: 0o700 })
+    await writeFile(join(bin, 'node'), `#!/bin/bash
+set -euo pipefail
+[[ "$1" == 'scripts/cloudflare-runtime-release.mjs' && "$2" == 'publish' ]]
+[[ "$(cat "$DOCKER_CONFIG/auth")" == "$CF_RUNTIME_REGISTRY_PASSWORD" ]]
+`, { mode: 0o700 })
+    for (const name of ['cloudflare-eve-image.yml', 'cloudflare-task-sandbox.yml']) {
+      const workflow = load(await readFile(new URL('../.github/workflows/' + name, import.meta.url), 'utf8'))
+      const step = workflow.jobs.publish.steps.find(step => step.name === 'Publish the verified runtime image')
+      assert.ok(step)
+      await writeFile(join(work, 'auth'), 'expired-pull-only-fixture')
+      const child = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', step.run], {
+        env: { PATH: bin + ':' + process.env.PATH, DOCKER_CONFIG: work,
+          CF_RUNTIME_REGISTRY_USERNAME: 'v1', CF_RUNTIME_REGISTRY_PASSWORD: 'fresh-push-pull-fixture' },
+        encoding: 'utf8',
+      })
+      assert.equal(child.status, 0, name + ': publication retained its read-only login')
+      assert.equal(child.stdout, '')
+    }
+  } finally { await rm(work, { recursive: true, force: true }) }
 })

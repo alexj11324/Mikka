@@ -201,7 +201,9 @@ jobs:
           OVERLAY_SHA: ${{ inputs.overlay_sha }}
           CF_RUNTIME_REGISTRY_USERNAME: ${{ steps.registry.outputs.username }}
           CF_RUNTIME_REGISTRY_PASSWORD: ${{ steps.registry.outputs.password }}
-        run: node scripts/cloudflare-runtime-release.mjs publish eve
+        run: |
+          printf '%s' "$CF_RUNTIME_REGISTRY_PASSWORD" | docker login registry.cloudflare.com --username "$CF_RUNTIME_REGISTRY_USERNAME" --password-stdin > /dev/null
+          node scripts/cloudflare-runtime-release.mjs publish eve
       - name: Upload the runtime OCI receipt
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
