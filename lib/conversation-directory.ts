@@ -1,7 +1,7 @@
 import 'server-only'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
-import { directoryInput, type DirectoryInput, type DirectoryState } from './conversation-directory-input'
+import { directoryInput, type DirectoryInput, type DirectoryState, type ConversationDirectoryPage } from './conversation-directory-input'
 import { runAwaitingApproval, runDeviceOffline } from './task-state-query'
 import { conversationReads, agentRuns } from './db/schema'
 import { joinThreadRead, threadUnread } from './thread-reads'
@@ -27,7 +27,7 @@ function directoryState(row: Row): DirectoryState {
 
 /** The detail reader allows the run owner in their active workspace; attached tasks also require current content access.
  * Resolve chains before paging, so a continued conversation appears only once and older task-free work remains reachable. */
-export async function conversationDirectory(database: RunChainQueryable, userId: string, workspaceId: string, raw: DirectoryInput) {
+export async function conversationDirectory(database: RunChainQueryable, userId: string, workspaceId: string, raw: DirectoryInput): Promise<ConversationDirectoryPage> {
   const input = directoryInput.parse(raw)
   const projection = sql`SELECT roots.id, roots.title, roots.asked, roots."agentName", roots.pinned, roots.at,
       roots."issueId", roots.identifier, roots."taskTitle",

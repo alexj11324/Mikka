@@ -16,10 +16,9 @@ import { mobileLocale, mobileMessages } from '@/lib/messages'
 import { colors, LIST_INSET } from '@/lib/theme'
 import { useLiveApi, useRefresh } from '@/lib/useApi'
 import { useTaskContinuation } from '../../../lib/hooks/use-task-continuation'
-import type { conversationDirectory } from '../../../lib/conversation-directory'
-import type { DirectoryInput } from '../../../lib/conversation-directory-input'
+import type { ConversationDirectoryPage, DirectoryInput } from '../../../lib/conversation-directory-input'
 
-type Page = Awaited<ReturnType<typeof conversationDirectory>> & { workspaceId: string }
+type Page = ConversationDirectoryPage & { workspaceId: string }
 const labels = mobileMessages.ConversationDirectory
 const states = ['all', 'working', 'waiting', 'idle', 'failed'] as const
 
