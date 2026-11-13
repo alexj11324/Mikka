@@ -31,8 +31,7 @@ on:
       - 'app/api/runs/[runId]/evidence/route.ts'
       # The wildcard also matches Next route brackets as literal directory names.
       - 'app/api/runs/**/evidence/route.ts'
-      - 'lib/computer/claude-startup-hint.ts'
-      - 'lib/computer/codex-startup-hint.ts'
+      - 'lib/computer/anonymous-startup-hint.ts'
       - 'scripts/acceptance/cloud-startup.mjs'
       - 'scripts/acceptance/cloud-startup.test.mjs'
       - 'scripts/acceptance/cloud-startup-evidence.mjs'
