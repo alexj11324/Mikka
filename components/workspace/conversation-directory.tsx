@@ -14,7 +14,7 @@ import { navigate, openThread } from './workspace-navigation'
 type Page = Awaited<ReturnType<typeof listConversations>>
 const states = ['all', 'working', 'waiting', 'idle', 'failed'] as const
 
-export function ConversationDirectory({ ownerId, workspaceId }: { ownerId: string; workspaceId: string | null }) {
+export function ConversationDirectory({ ownerId, workspaceId, revision = 0 }: { ownerId: string; workspaceId: string | null; revision?: number }) {
   const t = useTranslations('ConversationDirectory')
   const format = useFormatter()
   const [search, setSearch] = useState('')
@@ -22,7 +22,7 @@ export function ConversationDirectory({ ownerId, workspaceId }: { ownerId: strin
   const [archived, setArchived] = useState(false)
   const query = useDeferredValue(search.trim())
   const getKey = (index: number, previous: Page | null) => !workspaceId || (index > 0 && !previous?.cursor)
-    ? null : ['conversation-directory', ownerId, workspaceId, query, state, archived, previous?.cursor ?? null] as const
+    ? null : ['conversation-directory', ownerId, workspaceId, query, state, archived, previous?.cursor ?? null, revision] as const
   const { data, error, mutate, size, setSize, isValidating } = useSWRInfinite<Page, Error, typeof getKey>(getKey,
     ([, , , text, selected, showArchive, cursor]) => listConversations({ search: text, state: selected, archived: showArchive, cursor: cursor ?? undefined }),
     { revalidateOnFocus: false, shouldRetryOnError: false })
