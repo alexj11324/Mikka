@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import { AppState, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native'
 import { useFocusEffect } from 'expo-router'
 import { api } from '@/lib/api'
+import { onAppForeground } from '@/lib/useApi'
 import type { ThreadDetail } from '@/lib/types'
 
 /** Only the focused, foreground transcript acknowledges the replies its
@@ -26,8 +27,8 @@ export function useThreadReadEnd(receipts: ThreadDetail['readReceipts'], onScrol
   useFocusEffect(useCallback(() => {
     state.current.focused = true
     acknowledge()
-    const subscription = AppState.addEventListener('change', acknowledge)
-    return () => { state.current.focused = false; subscription.remove() }
+    const unwatch = onAppForeground(acknowledge)
+    return () => { state.current.focused = false; unwatch() }
   }, [acknowledge]))
   useEffect(() => {
     const frame = requestAnimationFrame(acknowledge)

@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef } from 'react'
+import { watchPageVisibility } from '@/lib/live/browser-runtime'
 
 /** Put this inside the last row that actually rendered. IntersectionObserver
  * handles every clipping ancestor, including the hosted scroll container. */
@@ -15,8 +16,8 @@ export function VisibleReadEnd({ onSeen }: { onSeen: () => void }) {
       acknowledge()
     }, { threshold: 1 })
     observer.observe(end)
-    document.addEventListener('visibilitychange', acknowledge)
-    return () => { observer.disconnect(); document.removeEventListener('visibilitychange', acknowledge) }
+    const unwatch = watchPageVisibility(acknowledge)
+    return () => { observer.disconnect(); unwatch() }
   }, [onSeen])
   return <span ref={ref} aria-hidden="true" className="block h-px" />
 }

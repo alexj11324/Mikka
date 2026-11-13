@@ -47,7 +47,7 @@ import { nextQueueCheck, queuedItems } from '@/features/chat/model/chat-queue'
 import { FailedReply } from '@/components/FailedReply'
 import { eventText, questionCard } from '@/lib/event-line'
 import { waitingLabel } from '@/lib/waiting'
-import { useLiveApi, useRefresh } from '@/lib/useApi'
+import { onAppForeground, useLiveApi, useRefresh } from '@/lib/useApi'
 import { listRef, UNRESOLVED_LIVE_ID } from '@/lib/live'
 import { pendingActionsDeadline } from '@/lib/live-client'
 import { useStop } from '@/lib/useStop'
@@ -172,8 +172,8 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
         .catch(() => { if (acknowledged.current === lastId) acknowledged.current = null })
     }
     const frame = requestAnimationFrame(acknowledge)
-    const subscription = AppState.addEventListener('change', acknowledge)
-    return () => { cancelAnimationFrame(frame); subscription.remove() }
+    const unwatch = onAppForeground(acknowledge)
+    return () => { cancelAnimationFrame(frame); unwatch() }
   }, [atLatest, data, error, lastId]))
   // 选择文本: one message's words are selectable where they are; capsules above the composer act on the selection.
   const [selection, setSelection] = useState<{ key: number; text: string; selected: string } | null>(null)
