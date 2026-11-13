@@ -20,6 +20,7 @@ export function createNodeWorld({ deploymentId, signingKey, verificationKey, fet
   methods.waitTerminal = async (runId, options) => {
     const url = new URL('https://world.internal/world/run-terminal')
     url.search = new URLSearchParams({ runId, timeoutMs: String(options.timeoutMs ?? 10_000) })
+    if (options.resolveData === 'none') url.searchParams.set('resolveData', 'none')
     const reply = await fetchBound(url, { signal: options.signal })
     if (!reply.ok) throw new Error('Private World terminal subscription failed: ' + reply.status)
     return decodeRecord(await reply.arrayBuffer())

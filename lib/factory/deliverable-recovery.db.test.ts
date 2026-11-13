@@ -27,7 +27,6 @@ import { factoryEventId } from './event-id'
 import { retainedDeliverableForRecovery, type ObserveRetainedDeliverable, type RetainedDeliverableScope, type RetainedDeliverableSnapshot } from './deliverable-recovery'
 import { readDeliverableSnapshotReceipt, resolveFactoryCandidateSha } from './deliverable-snapshot'
 import { createRetainedDeliverableObserver, type RetainedDeliverableRuntime } from '../cloud-computer/retained-deliverable'
-import { observePoolCommits } from '../db/commit-effects'
 
 const url = process.env.E2E_DATABASE_URL
 if (url) {
@@ -48,7 +47,6 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
   const target = new URL(url!)
   target.pathname = '/' + database
   const pool = new Pool({ connectionString: target.toString(), max: 8 })
-  observePoolCommits(pool)
   const closeWorkspace = await bindFixtureWorkspaceDatabase(pool)
   const flags = { routing: process.env.MIKKA_FACTORY_ROUTING_ENABLED, lifecycle: process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED }
   try {
