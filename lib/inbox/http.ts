@@ -3,7 +3,7 @@ import type { InboxReader, InboxStore } from './store'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 
 const headers = { 'Cache-Control': 'private, no-store' }
-export async function handleInbox(request: Request, user: Exclude<InboxReader, string> | null, store: Pick<InboxStore, 'list' | 'pendingCount' | 'command'>) {
+export async function handleInbox(request: Request, user: Exclude<InboxReader, string> | null, store: Pick<InboxStore, 'list' | 'pendingCounts' | 'command'>) {
   if (!user) return Response.json({ error: 'authRequired' }, { status: 401, headers })
   try {
     if (request.method === 'GET') {
@@ -13,7 +13,7 @@ export async function handleInbox(request: Request, user: Exclude<InboxReader, s
       if (user[tokenWorkspace] && user[tokenWorkspace] !== q.workspaceId) throw new InboxError('workspaceAccessDenied', 403)
       if (q.count) {
         if (q.tab !== 'pending' || q.cursor) throw new InboxError('inboxInvalid', 422)
-        return Response.json({ count: await store.pendingCount(user, q.workspaceId) }, { headers })
+        return Response.json(await store.pendingCounts(user, q.workspaceId), { headers })
       }
       const result = await store.list(user, q.workspaceId, q.tab, q.limit, q.cursor)
       return Response.json({ ...result, live: { workspaceId: q.workspaceId, keys: ['issue_list', 'pending_actions', 'thread_list', 'task_run_list', 'bot_chat_list', 'bot_chat', 'factory_task'] }, historyBackfilled: false }, { headers })
