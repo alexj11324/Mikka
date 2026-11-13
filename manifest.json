@@ -1,0 +1,96 @@
+{
+  "publicSha": "dafe89a3d7879c59676bd590876cb55f5d3f8acd",
+  "privateSha": "ce5a2bb877f63555b4501025db7cea2b1c37a226",
+  "rendererBuild": "2dc50bec7fe8d05b34de8d9aea3265a27cf5b305842beef69ff1d865cf5799a7",
+  "source": "Locally served production web assets, local Better Auth sign-in, source API handlers, PostgreSQL 17",
+  "states": [
+    {
+      "basename": "reads-desktop-light.png",
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "sha256": "6b70b086657ddd4d9050f534e09d5a4e8619a22eeec54c7e7edfec9ad04d4115",
+      "openedThread": true,
+      "requests": [
+        [
+          "readAll",
+          200
+        ],
+        [
+          "unread",
+          200
+        ],
+        [
+          "read",
+          200
+        ]
+      ]
+    },
+    {
+      "basename": "reads-desktop-dark.png",
+      "width": 1440,
+      "height": 900,
+      "theme": "dark",
+      "sha256": "b33ed1164a6369fc2daa83b3ba70c8c21069c797e04e8319014a4af7b9f0987e",
+      "openedThread": true,
+      "requests": [
+        [
+          "readAll",
+          200
+        ],
+        [
+          "unread",
+          200
+        ],
+        [
+          "read",
+          200
+        ]
+      ]
+    },
+    {
+      "basename": "reads-mobile-light.png",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "sha256": "48645c71f796f9fd4570a5275e19eaa1bfe493ca262d30f1bf2c596902870a60",
+      "openedThread": true,
+      "requests": [
+        [
+          "readAll",
+          200
+        ],
+        [
+          "unread",
+          200
+        ],
+        [
+          "read",
+          200
+        ]
+      ]
+    },
+    {
+      "basename": "reads-mobile-dark.png",
+      "width": 390,
+      "height": 844,
+      "theme": "dark",
+      "sha256": "dae8ec9f2c68c0aa63d120240763789ffa13efdbe615e189bb63e18d9a5aebfa",
+      "openedThread": true,
+      "requests": [
+        [
+          "readAll",
+          200
+        ],
+        [
+          "unread",
+          200
+        ],
+        [
+          "read",
+          200
+        ]
+      ]
+    }
+  ]
+}

@@ -1,6 +1,0 @@
-{
-  "name": "@mikka/cloudflare-api-ingress",
-  "private": true,
-  "type": "module",
-  "dependencies": { "@cloudflare/containers": "0.3.7" }
-}

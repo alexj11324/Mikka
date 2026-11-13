@@ -1,9 +1,0 @@
-// Current templates compile ahead of time; old task snapshots remain resumable.
-// No credential enters this command, its argv or environment.
-export const CLOUD_WORKER_COMMAND = 'cd /opt/mikka/worker/packages/daemon && { export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH; export HOME=/home/user; read -r preload_pid < /home/user/.mikka/preloaded.pid 2>/dev/null || preload_pid=; if test -n "$preload_pid" && test -r "/proc/$preload_pid/cmdline" && tr "\\0" "\\n" < "/proc/$preload_pid/cmdline" | grep -Fxq -- "--wait-bootstrap" && kill -0 "$preload_pid" 2>/dev/null; then kill -USR1 "$preload_pid"; elif test -f dist/cloud/cloud-worker.js; then node dist/cloud/cloud-worker.js; else ./node_modules/.bin/tsx bin/cloud-worker.ts; fi; }'
-
-export const CLOUD_PRELOADER_WAKE_RECEIPT = 'mikka-preloaded-worker-woken'
-/** Run as the ordinary user after atomic publication. A missing/stale PID or
- * a process that exits before the signal leaves the existing start fallback.
- * This acknowledges only the signal; registration still proves credential use. */
-export const CLOUD_PRELOADER_WAKE_COMMAND = `read -r preload_pid 2>/dev/null < /home/user/.mikka/preloaded.pid || preload_pid=; if test -n "$preload_pid" && test -r "/proc/$preload_pid/cmdline" && tr "\\0" "\\n" < "/proc/$preload_pid/cmdline" | grep -Fxq -- "--wait-bootstrap" && kill -0 "$preload_pid" 2>/dev/null && kill -USR1 "$preload_pid" 2>/dev/null; then printf "${CLOUD_PRELOADER_WAKE_RECEIPT}\\n"; fi`

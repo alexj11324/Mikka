@@ -1,5 +1,0 @@
-{
-  "desktop": ["claude_code", "codex"],
-  "claude": ["claude_code"],
-  "codex": ["codex"]
-}
