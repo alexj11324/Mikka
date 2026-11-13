@@ -243,3 +243,15 @@ test('the newest visible conversational continuation owns replies even after a p
   }
   assert.equal(taskConversationRoots([review, redacted]).reply, null)
 })
+
+test('only an authorized thread owner sees the runtime-observed model in the task work list', () => {
+  const members = new Set(['owner', 'peer'])
+  const { prompt, report, error, ...base } = make('root', 'owner')
+  const row = { ...base, name: 'Conversation', summary: 'Done', observedModel: 'served-v2' }
+  assert.equal(projectIssueThreads([row], 'issue', 'owner', members)[0].detail?.observedModel, 'served-v2')
+  assert.equal(projectIssueThreads([{ ...row, observedModel: null }], 'issue', 'owner', members)[0].detail?.observedModel, null)
+  const [peer] = projectIssueThreads([row], 'issue', 'peer', members)
+  assert.equal(peer.detail, null)
+  assert.equal(JSON.stringify(peer).includes('served-v2'), false)
+  assert.deepEqual(projectIssueThreads([row], 'issue', 'owner', new Set(['peer'])), [])
+})
