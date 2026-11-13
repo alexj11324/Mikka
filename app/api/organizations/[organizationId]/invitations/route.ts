@@ -24,14 +24,22 @@ export const POST = freshSessionRoute(async (request: Request, context: Context)
   if (trustedOrigin && organizationInvitationMailEnabled() && result.outcomes.some(outcome => outcome.created)) {
     // A provider failure must not revoke a valid invite or lose the manual one-time link.
     // The configured origin, not a caller-controlled Host header, anchors every bearer URL.
-    afterJob('after:organization-invitation-mail', async () => {
-      try {
-        const delivery = await sendOrganizationInvitationEmails(result.outcomes, trustedOrigin)
-        if (delivery.failed) console.error('organization_invitation_mail_delivery_failed', { count: delivery.failed })
-      } catch {
-        console.error('organization_invitation_mail_delivery_unavailable')
-      }
-    }, { orRun: true })
+    // Invitation creation has committed: a missing/degraded background scheduler
+    // must not turn the successful POST into a 500 and discard one-time links.
+    try {
+      afterJob('after:organization-invitation-mail', async () => {
+        try {
+          const delivery = await sendOrganizationInvitationEmails(result.outcomes, trustedOrigin)
+          if (delivery.failed) console.error('organization_invitation_mail_delivery_failed', { count: delivery.failed })
+        } catch {
+          console.error('organization_invitation_mail_delivery_unavailable')
+        }
+      }, { orRun: true })
+    } catch {
+      // The scheduling fallback itself may fail outside a supported waitUntil
+      // runtime. Never log the invite URL, recipient, token or provider error.
+      console.error('organization_invitation_mail_schedule_unavailable')
+    }
   }
   return result
 }))
