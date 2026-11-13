@@ -64,7 +64,7 @@ export async function publishQueueRequest(request, env) {
   return Response.json({ messageId: meta.messageId }, { status: 202 })
 }
 
-async function deliver(message, env) {
+async function deliver(message, env, ctx) {
   const entry = message.body
   if (!entry || !validRelease(entry.revision) || !Number.isSafeInteger(entry.dueAt)) throw new Error('Invalid World queue entry')
   if ((typeof entry.body === 'string') === objectKey(entry.key)) throw new Error('Invalid World queue body reference')
@@ -100,7 +100,10 @@ async function deliver(message, env) {
   }))
   // The executor returns its acknowledgement after handling the delivery.
   // Discarding its unused body cannot change that outcome.
-  await response.body?.cancel().catch(() => {})
+  if (response.body) {
+    const cleanup = response.body.cancel().catch(() => {})
+    ctx?.waitUntil(cleanup)
+  }
   if (!response.ok || response.headers.get('x-mikka-eve-release') !== entry.revision) {
     throw new Error('Pinned Eve deployment did not acknowledge delivery')
   }
@@ -108,10 +111,10 @@ async function deliver(message, env) {
 
 /** A failed message retains its original envelope for Cloudflare's bounded
  * retry and configured DLQ. No request URL or current deployment is a fallback. */
-export async function consumeWorldQueue(batch, env) {
+export async function consumeWorldQueue(batch, env, ctx) {
   await Promise.all(batch.messages.map(async message => {
     try {
-      await deliver(message, env)
+      await deliver(message, env, ctx)
       message.ack()
     } catch {
       message.retry({ delaySeconds: Math.min(60, 2 ** Math.min(6, message.attempts - 1)) })
