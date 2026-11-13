@@ -1,0 +1,72 @@
+name: Cloudflare World deployment
+on:
+  workflow_dispatch:
+    inputs:
+      cloud_source_sha:
+        description: Reviewed private operations commit containing the immutable World deployment plan
+        type: string
+        required: true
+permissions:
+  contents: read
+jobs:
+  deploy-worlds:
+    if: github.repository_id == '1427517699' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor_id == '183887963'
+    runs-on: ubuntu-latest
+    environment: cloudflare-runtime-release
+    timeout-minutes: 10
+    concurrency:
+      group: cloudflare-world-deployment
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    env:
+      MIKKA_CLOUD_SOURCE_SHA: ${{ inputs.cloud_source_sha }}
+      CLOUDFLARE_ACCOUNT_ID: d8f6630c7869111a5139bc5ed4d24ace
+    steps:
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Validate the reviewed operations source
+        run: node -e "if (!/^[a-f0-9]{40}$/.test(process.env.MIKKA_CLOUD_SOURCE_SHA || '')) process.exit(1)"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: alexj11324/mikka-cloud
+          ref: ${{ inputs.cloud_source_sha }}
+          token: ${{ secrets.MIKKA_CLOUD_READ_TOKEN }}
+          path: operations
+          persist-credentials: false
+      - name: Verify and retrieve the immutable public GitHub build
+        id: artifact
+        working-directory: operations
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node operations/business-api/deploy-world-artifact.mjs prepare
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: alexj11324/Mikka
+          ref: ${{ steps.artifact.outputs.source }}
+          path: operations/product
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 10.34.3
+      - name: Install deployment tools without rebuilding the product
+        working-directory: operations
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Read the existing Cloudflare deployment identity
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: CLOUDFLARE_API_TOKEN
+          recursive: false
+          include-imports: false
+      - name: Deploy the verified World modules and read back Cloudflare versions
+        working-directory: operations
+        run: node operations/business-api/deploy-world-artifact.mjs deploy
