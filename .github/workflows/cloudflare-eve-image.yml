@@ -101,6 +101,9 @@ jobs:
             --mount "type=bind,src=$PWD/cloudflare/eve-runtime/test/compiled-host.mjs,dst=/acceptance.mjs,readonly" \
             mikka-eve-qualification node /acceptance.mjs
   publish:
+    permissions:
+      contents: read
+      actions: read
     if: github.repository == 'alexj11324/Mikka' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: cloudflare-runtime-release
@@ -113,6 +116,25 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Read the verified original public API build receipt
+        id: api
+        env:
+          GH_TOKEN: ${{ github.token }}
+          API_RUN_ID: ${{ inputs.api_run_id }}
+          API_RUN_ATTEMPT: ${{ inputs.api_run_attempt }}
+          API_IMAGE_DIGEST: ${{ inputs.api_image_digest }}
+          OVERLAY_SHA: ${{ inputs.overlay_sha }}
+        run: node scripts/load-cloudflare-api-receipt.mjs
+      - name: Check out the original API product source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ steps.api.outputs.source }}
+          persist-credentials: false
+          fetch-depth: 0
       - uses: ./.github/actions/pnpm-install
         with:
           skip-electron: 'true'
@@ -122,7 +144,6 @@ jobs:
           API_RUN_ATTEMPT: ${{ inputs.api_run_attempt }}
           API_IMAGE_DIGEST: ${{ inputs.api_image_digest }}
           OVERLAY_SHA: ${{ inputs.overlay_sha }}
-          MIKKA_API_RECEIPT: ${{ secrets.MIKKA_API_RECEIPT }}
           CF_RUNTIME_REGISTRY_USERNAME: ${{ vars.CF_RUNTIME_REGISTRY_USERNAME }}
           CF_RUNTIME_REGISTRY_PASSWORD: ${{ secrets.CF_RUNTIME_REGISTRY_PASSWORD }}
         run: node scripts/cloudflare-runtime-release.mjs prepare eve
@@ -167,7 +188,6 @@ jobs:
           API_RUN_ATTEMPT: ${{ inputs.api_run_attempt }}
           API_IMAGE_DIGEST: ${{ inputs.api_image_digest }}
           OVERLAY_SHA: ${{ inputs.overlay_sha }}
-          MIKKA_API_RECEIPT: ${{ secrets.MIKKA_API_RECEIPT }}
           CF_RUNTIME_REGISTRY_USERNAME: ${{ vars.CF_RUNTIME_REGISTRY_USERNAME }}
           CF_RUNTIME_REGISTRY_PASSWORD: ${{ secrets.CF_RUNTIME_REGISTRY_PASSWORD }}
         run: node scripts/cloudflare-runtime-release.mjs publish eve

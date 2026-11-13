@@ -152,9 +152,21 @@ test('runtime workflow callers pass genuine API run identity and keep the Regist
     assert.ok(workflow.includes('api_run_attempt:'))
     assert.ok(workflow.includes('API_RUN_ID: ${{ inputs.api_run_id }}'))
     assert.ok(workflow.includes('API_RUN_ATTEMPT: ${{ inputs.api_run_attempt }}'))
-    assert.ok(workflow.includes('MIKKA_API_RECEIPT: ${{ secrets.MIKKA_API_RECEIPT }}'))
+    assert.ok(workflow.includes('node scripts/load-cloudflare-api-receipt.mjs'))
+    assert.ok(!workflow.includes('secrets.MIKKA_API_RECEIPT'))
     assert.ok(workflow.includes('CF_RUNTIME_REGISTRY_USERNAME: ${{ vars.CF_RUNTIME_REGISTRY_USERNAME }}'))
     assert.ok(!workflow.includes('api_build_uuid'))
     assert.ok(!workflow.includes('secrets.CF_RUNTIME_REGISTRY_USERNAME'))
   }
+})
+
+
+test('the genuine main driver can compile the original accepted API source after main advances', () => {
+  const driverSource = 'd'.repeat(40)
+  const result = releaseIdentity({...env,GITHUB_SHA:driverSource,GITHUB_WORKFLOW_SHA:driverSource,RUNTIME_SOURCE_SHA:publicSha},'eve',api)
+  assert.equal(result.publicSha,publicSha)
+  assert.equal(result.driverSource,driverSource)
+  assert.equal(result.apiRunId,runId)
+  assert.throws(()=>releaseIdentity({...env,RUNTIME_SOURCE_SHA:overlaySha},'eve',api))
+  assert.throws(()=>releaseIdentity({...env,GITHUB_REF:'refs/tags/mikka-release-'+publicSha},'eve',api))
 })

@@ -10,10 +10,13 @@ permissions:
   contents: read
 jobs:
   qualify:
-    if: github.repository == 'alexj11324/Mikka' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    if: github.repository == 'alexj11324/Mikka' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor_id == '183887963'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     environment: cloudflare-runtime-release
+    permissions:
+      contents: read
+      id-token: write
     env:
       MIKKA_CLOUD_SOURCE_SHA: ${{ inputs.cloud_source_sha }}
     steps:
@@ -28,9 +31,46 @@ jobs:
           corepack enable
           corepack prepare pnpm@10.34.3 --activate
           docker version
+      - name: Read the existing source App id
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /github
+          secret-name: GITHUB_APP_ID
+          recursive: false
+          include-imports: false
+      - name: Read the existing source App private key
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /github
+          secret-name: GITHUB_APP_PRIVATE_KEY
+          recursive: false
+          include-imports: false
+      - name: Mint a short-lived read-only operations checkout token
+        id: source-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        with:
+          app-id: ${{ env.GITHUB_APP_ID }}
+          private-key: ${{ env.GITHUB_APP_PRIVATE_KEY }}
+          owner: alexj11324
+          repositories: mikka-cloud
+          permission-contents: read
+      - name: Remove App credentials before loading private operations code
+        run: |
+          echo 'GITHUB_APP_ID=' >> "$GITHUB_ENV"
+          echo 'GITHUB_APP_PRIVATE_KEY=' >> "$GITHUB_ENV"
       - name: Qualify the pinned Cloud Services source
         env:
-          MIKKA_CLOUD_READ_TOKEN: ${{ secrets.MIKKA_CLOUD_READ_TOKEN }}
+          MIKKA_CLOUD_READ_TOKEN: ${{ steps.source-token.outputs.token }}
         run: node scripts/cloudflare-cloud-ci.mjs build
       - name: Verify the Cloud Services qualification
         run: node scripts/cloudflare-cloud-ci.mjs verify

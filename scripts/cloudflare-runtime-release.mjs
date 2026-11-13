@@ -26,7 +26,7 @@ export function releaseIdentity(env, workload, api) {
   assert.equal(env.GITHUB_ACTOR, 'alexj11324')
   assert.equal(env.GITHUB_ACTOR_ID, '183887963')
   assert.equal(env.GITHUB_TRIGGERING_ACTOR, 'alexj11324')
-  assert.equal(env.GITHUB_WORKFLOW_REF, 'alexj11324/Mikka/.github/workflows/' + workflows[workload] + '@refs/heads/main')
+  assert.equal(env.GITHUB_WORKFLOW_REF, 'alexj11324/Mikka/.github/workflows/' + workflows[workload] + '@' + env.GITHUB_REF)
   for (const value of [env.GITHUB_RUN_ID, env.GITHUB_RUN_ATTEMPT]) assert.match(value ?? '', /^[1-9][0-9]*$/)
   assert.equal(api.version, 1)
   assert.equal(api.provider, 'github-actions')
@@ -40,7 +40,8 @@ export function releaseIdentity(env, workload, api) {
   assert.equal(api.triggeringActor, 'alexj11324')
   assert.equal(api.publication, 'registry-only')
   assert.equal(api.production, false)
-  assert.equal(api.publicSha, env.GITHUB_SHA)
+  assert.equal(api.publicSha, env.RUNTIME_SOURCE_SHA ?? env.GITHUB_SHA)
+  assert.match(api.publicSha, sha)
   assert.equal(api.privateSha, env.OVERLAY_SHA)
   assert.match(api.privateSha, sha)
   for (const name of ['runId', 'runAttempt']) assert.match(api[name] ?? '', /^[1-9][0-9]*$/)
@@ -62,7 +63,7 @@ export function releaseIdentity(env, workload, api) {
   assert.equal(api.image.split('@')[1], api.digest)
   assert.deepEqual(api.overlayCheckout, { repository: 'alexj11324/mikka-hosted-ui', requestedSha: api.privateSha, actualSha: api.privateSha })
   assert.equal(api.offlineVerification, 'buildkit-network-none')
-  return { version: 1, provider: 'github-actions', repository: env.GITHUB_REPOSITORY, workload,
+  return { version: 1, provider: 'github-actions', repository: env.GITHUB_REPOSITORY, workload, driverSource:env.GITHUB_SHA,
     publicSha: api.publicSha, overlaySha: api.privateSha, apiProvider: api.provider, apiRunId: api.runId,
     apiRunAttempt: api.runAttempt, apiBuildId: api.buildId, apiImage: api.image,
     release: api.release, runId: env.GITHUB_RUN_ID, runAttempt: env.GITHUB_RUN_ATTEMPT }
@@ -171,8 +172,8 @@ function identity(env, workload) {
   assert.equal(output('git', ['rev-parse', 'HEAD'], { env: tools, stage: 'RUNTIME_SOURCE' }), receipt.publicSha)
   assert.ok(hasGitHubOrigin(output('git', ['remote', 'get-url', 'origin'], { env: tools, stage: 'RUNTIME_ORIGIN' }), 'alexj11324/Mikka'))
   assert.equal(output('git', ['diff', '--name-only', 'HEAD', '--'], { env: tools, stage: 'RUNTIME_CLEAN_SOURCE' }), '')
-  const main = output('git', ['ls-remote', 'origin', 'refs/heads/main'], { env: tools, stage: 'RUNTIME_MAIN_SOURCE' })
-  assert.equal(main.split(/\s+/)[0], receipt.publicSha, 'public main advanced')
+  output('git', ['fetch', '--no-tags', 'origin', 'main'], { env: tools, stage: 'RUNTIME_MAIN_HISTORY' })
+  output('git', ['merge-base', '--is-ancestor', receipt.publicSha, 'FETCH_HEAD'], { env: tools, stage: 'RUNTIME_REVIEWED_SOURCE' })
   return { api, receipt, tools }
 }
 
