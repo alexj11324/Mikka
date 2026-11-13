@@ -4771,11 +4771,22 @@
         "label": "Public role",
         "hint": "Group chats use this role to choose the bot. Tools still require authorization.",
         "placeholder": "Responsibilities in group chats; leave empty to clear",
-        "count": "{count} / {max}",
         "tooLong": "Public role can be at most {max} characters",
         "loadError": "Public role failed to load",
         "saveError": "Save not confirmed. Your draft is kept.",
-        "saved": "Saved"
+        "saved": "Saved",
+        "add": "Add a public role",
+        "edit": "Edit public role"
+      },
+      "glance": {
+        "running": "{count} in progress",
+        "waiting": "{count} waiting on you",
+        "idle": "Nothing in progress",
+        "prReview": "{count} waiting for review",
+        "prRunning": "{count} in progress",
+        "prNone": "No open PRs",
+        "computerScreen": "View screen",
+        "computerMissing": "Needs an E2B API key"
       },
       "threads": "Threads",
       "tasks": "Tasks",

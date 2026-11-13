@@ -45,6 +45,11 @@ export type BotOverviewProps = {
     /** The library; `onDelete` is set where the files are the person's own (asks first in the layer). */
     library: { items: BotOverviewItem[]; loadError: boolean; onDelete?: (item: BotOverviewItem) => Promise<void> }
   }
+  /**
+   * What the bot is doing, at a glance on 详情: its tasks by their newest thread (进行中, 等待你) and its PRs that are
+   * not merged (等待审查, 进行中). Counted before the search. A row opens the tab that lists them.
+   */
+  glance?: { running: number; waiting: number; pullRequests: { review: number; running: number } }
   /** 任务: the bot-tasks slot's list, rendered. */
   tasks: ReactNode
   /** PR: by 等待审查 / 进行中 / 已合并; `total` counts them before the search. */
