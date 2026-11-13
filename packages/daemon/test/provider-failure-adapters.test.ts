@@ -50,14 +50,15 @@ it("reports a refused Codex steer without queuing it or exposing native diagnost
     env: buildChildEnv(), log: createLogger({ level: "silent" }),
   })
   try {
-    await expect(session.send("REFUSE_STEER")).rejects.toThrow(
+    await expect(session.send("REFUSE_STEER", "steer")).rejects.toThrow(
       /^Codex could not steer the active turn \(rpc_refused, RPC -32000\)$/,
     )
-    await session.send("Finish this turn")
+    await session.send("Finish this turn", "steer")
     const output: AgentEvent[] = []
     for await (const event of session.events()) output.push(event)
     expect(output.at(-1)).toMatchObject({ type: "exit", outcome: "succeeded" })
     expect(output.filter(event => event.type === "chunk" && event.chunk.type === "data-usage")).toHaveLength(1)
+    await expect(session.send("Late steer", "steer")).rejects.toThrow(/ended|no longer active/)
   } finally { await session.cancel() }
 })
 

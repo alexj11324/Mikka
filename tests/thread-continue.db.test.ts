@@ -471,6 +471,35 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     assert.equal((await pool.query('SELECT COUNT(*)::int AS n FROM run_messages WHERE "userId"=$1 AND text=$2', [owner.id, 'Later, two.'])).rows[0].n, 1)
   })
 
+  await t.test('native steer requires current device support and exposes refused or acknowledged delivery on that same device', async () => {
+    const owner = await person()
+    const initial = await steps.dispatchRun(owner.id, { issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }
+    const run = initial.runId
+    const { rows: [row] } = await pool.query(`UPDATE agent_runs SET status='running',"agentDefinition"=coalesce("agentDefinition",'{}'::jsonb)||'{"harness":"codex"}'::jsonb WHERE id=$1 RETURNING "deviceId"`,[run])
+    const { threadDeliveryView } = await import('../lib/thread-delivery-queue')
+    const { deviceWork, ackCommands } = await import('../lib/device-link')
+    const view = () => threadDeliveryView(appPool, owner.id, run, run)
+    const submit = (text: string) => sendThreadMessage(owner.id, run, text, 'user', randomUUID(), 'steer')
+    assert.ok(!(await view()).modes.includes('steer'))
+    await assert.rejects(submit('Unsupported device.'), { code: 'threadDeliveryUnavailable' })
+    await pool.query(`UPDATE devices SET harnesses='[{"harness":"codex","installed":true,"activeTurnSteer":true}]' WHERE id=$1`, [row.deviceId])
+    assert.ok((await view()).modes.includes('steer'))
+    await submit('In this turn, once.')
+    const first = (await view()).queued.find(message => message.text === 'In this turn, once.')!
+    assert.equal(first.status,'delivering')
+    assert.ok(!(await deviceWork(row.deviceId, [])).commands.some(command => 'messageId' in command && command.messageId === first.id))
+    assert.ok((await deviceWork(row.deviceId, [], { activeTurnSteer:true })).commands.some(command => command.kind === 'steer' && command.messageId === first.id))
+    await ackCommands(randomUUID(), [], [first.id])
+    assert.equal((await view()).queued.find(message => message.id === first.id)?.status,'delivering')
+    await ackCommands(row.deviceId, [], [first.id])
+    assert.equal((await view()).queued.find(message => message.id === first.id)?.status,'failed')
+    assert.ok(!(await deviceWork(row.deviceId, [], { activeTurnSteer:true })).commands.some(command => 'messageId' in command && command.messageId === first.id))
+    await submit('Second native input.')
+    const second = (await view()).queued.find(message => message.text === 'Second native input.')!
+    await ackCommands(row.deviceId, [second.id])
+    assert.ok(!(await view()).queued.some(message => message.id === second.id))
+  })
+
   await t.test('concurrent immediate and queued requests with the same ID commit one intent', async () => {
     const owner = await person()
     const initial = await steps.dispatchRun(owner.id, { issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }

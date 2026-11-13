@@ -157,7 +157,8 @@ async function continueThread(userId: string, text: string, source: Source,
       // Cursor queues during a prompt; Claude SDK may defer or fold an input.
       // Only Codex exposes a native active-turn steer receipt.
       const { rows: [run] } = await pool.query(`SELECT coalesce(r."agentDefinition"->>'harness',a.harness) AS harness
-        FROM agent_runs r JOIN agents a ON a.id=r."agentId" WHERE r.id=$1 AND r."userId"=$2 AND r.status='running'
+        FROM agent_runs r JOIN agents a ON a.id=r."agentId" JOIN devices device ON device.id=r."deviceId" AND device."ownerId"=r."userId"
+        WHERE r.id=$1 AND r."userId"=$2 AND r.status='running' AND device.harnesses @> '[{"harness":"codex","installed":true,"activeTurnSteer":true}]'::jsonb
         AND r."stopRequestedAt" IS NULL`, [latest.runId, userId])
       if (run?.harness !== 'codex') throw new ActionFailureError('threadDeliveryUnavailable')
       await addRunMessage(userId, { runId: latest.runId, text }, source, sourceEventId)

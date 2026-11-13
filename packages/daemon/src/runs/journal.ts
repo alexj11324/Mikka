@@ -48,6 +48,8 @@ export interface JournalEntry {
   stopReason?: StopReason
   /** Fail closed on a crash in the external session-message delivery window. */
   questionResumeState?: "starting" | "accepted"
+  /** Only IDs and closed outcomes. A crash inside the native RPC is ambiguous. */
+  steerReceipts?: Record<string, "starting" | "accepted" | "refused">
   /** A durable help request still needs this worktree for its original session. */
   waitingQuestionId?: string
   /** The run was claimed with a model credential, which the journal file never holds. */

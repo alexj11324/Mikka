@@ -305,6 +305,7 @@ export class Daemon {
   private localComputerBroker: ComputerBroker | null = null
   /** Messages handed to an agent whose delivery the server has not taken yet. */
   private unacked = new Set<string>()
+  private refusedSteers = new Set<string>()
   /** Runs this daemon already started cancelling for a stop request. */
   private stopping = new Set<string>()
   /** Runs this daemon has ended, whose end the server may not have yet. */
@@ -651,6 +652,7 @@ export class Daemon {
       ...this.modelReports.get(info.harness),
       // The run's live gate stops a revoked run; Codex also verifies its
       // pinned interface at initialize.
+      ...(info.harness === "codex" && info.installed ? { activeTurnSteer: true as const } : {}),
       toolApproval: this.supportsToolApproval(info),
       coordinator: false,
     })) : await Promise.all(supported.map(info => this.localHarnessReport(info)))
@@ -706,12 +708,14 @@ export class Daemon {
           await this.pauseCommands(1_000, signal)
           continue
         }
-        if (this.unacked.size > 0) {
+        if (this.unacked.size > 0 || this.refusedSteers.size > 0) {
           // One notice may contain several mailbox IDs; keep ACK requests
           // within the protocol bound even when input and notices arrive together.
           const ids = [...this.unacked].slice(0, 500)
-          await link.ackCommands(deviceId, ids)
+          const refused = [...this.refusedSteers].slice(0, 500)
+          await link.ackCommands(deviceId, ids, refused)
           for (const id of ids) this.unacked.delete(id)
+          for (const id of refused) this.refusedSteers.delete(id)
         }
         // The push socket is the idle path. A missing gateway, or one that
         // refuses the connection, falls through to the long-poll below.
@@ -766,7 +770,7 @@ export class Daemon {
           await this.pauseCommands(500, signal)
           continue
         }
-        if (this.unacked.size > 0) continue // ack right away
+        if (this.unacked.size > 0 || this.refusedSteers.size > 0) continue // ack right away
         // The poll ended early for news this daemon now has; the next one waits for stops and messages at once.
         if (news) continue
         if (commands.length === 0 && !signal.aborted) {
@@ -813,10 +817,12 @@ export class Daemon {
     if (queued.length > 0) this.claimQueued(queued)
     // A held socket never returns to pollCommands' ACK step. Confirm delivery
     // here, retaining IDs on failure so the fallback retries without redelivery.
-    while (this.unacked.size > 0 && !signal.aborted) {
+    while ((this.unacked.size > 0 || this.refusedSteers.size > 0) && !signal.aborted) {
       const ids = [...this.unacked].slice(0, 500)
-      await this.options.link.ackCommands(deviceId, ids)
+      const refused = [...this.refusedSteers].slice(0, 500)
+      await this.options.link.ackCommands(deviceId, ids, refused)
       for (const id of ids) this.unacked.delete(id)
+      for (const id of refused) this.refusedSteers.delete(id)
     }
   }
 
@@ -1031,6 +1037,27 @@ export class Daemon {
       const entry = this.journal.get(command.runId)
       // Not a run of this daemon (yet), or one that already ended.
       if (!entry) continue
+      if (command.kind === "steer") {
+        const id = command.messageId
+        const prior = entry.steerReceipts?.[id]
+        if (prior === "accepted") { this.unacked.add(id); continue }
+        if (prior || isTerminalRunState(entry.state)) { this.refusedSteers.add(id); continue }
+        // Commit the attempt before the external call. The previous turn may
+        // have ended while the daemon was disconnected. Never send it again.
+        const record = (outcome: "starting" | "accepted" | "refused") => this.journal.update(command.runId,
+          { steerReceipts: { ...this.journal.get(command.runId)?.steerReceipts, [id]: outcome } })
+        record("starting")
+        try {
+          await this.supervisor.send(command.runId, command.text, "steer")
+          record("accepted")
+          this.unacked.add(id)
+        } catch {
+          record("refused")
+          this.refusedSteers.add(id)
+        }
+        acted = true
+        continue
+      }
       if (isTerminalRunState(entry.state)) {
         // The server cancelled a run this daemon had parked on a question:
         // nothing runs there, so its leftovers can go.
@@ -1110,6 +1137,7 @@ export class Daemon {
   /** Advertise only a checked local runner, replacing any old readiness or failure. */
   private async localHarnessReport(info: HarnessInfo): Promise<HarnessInfo> {
     const report: HarnessInfo = { ...info, ...this.modelReports.get(info.harness),
+      ...(info.harness === "codex" && info.installed ? { activeTurnSteer: true as const } : {}),
       toolApproval: this.supportsToolApproval(info), coordinator: false }
     delete report.subscriptionBroker
     delete report.subscriptionModelCatalogue
@@ -1351,7 +1379,7 @@ export class Daemon {
   /** Idle on the push socket: no runs, nothing waiting to upload. The database can sleep. */
   private gatewayIdle() {
     return this.gatewayLive && this.server === "online" && this.supervisor.heartbeatRuns().length === 0
-      && this.queuedClaims.size === 0 && this.unacked.size === 0 && this.outbox.pending() === 0 && !this.draining && !this.updating
+      && this.queuedClaims.size === 0 && this.unacked.size === 0 && this.refusedSteers.size === 0 && this.outbox.pending() === 0 && !this.draining && !this.updating
       && this.deviceReceiptsVersion === this.deviceReceiptsAcknowledged
   }
 

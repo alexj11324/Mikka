@@ -61,6 +61,7 @@ export const harnessInfoSchema = z.object({
   computerBroker: z.literal(true).optional(),
   /** Run-scoped CLI approvals and policy-version checks are supported. */
   toolApproval: z.literal(true).optional(),
+  activeTurnSteer: z.literal(true).optional(),
   /**
    * The CLI exists but `installed` stays false because the daemon cannot run it
    * in a sandbox. `missing` names the absent packages; empty means the machine

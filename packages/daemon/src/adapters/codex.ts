@@ -1007,7 +1007,7 @@ export class CodexAdapter implements AgentAdapter {
       sessionId,
       runtimeModel,
       events: () => queue.drain(),
-      async send(message) {
+      async send(message, mode) {
         sensitiveText.push(message)
         if (ending) throw new Error("The Codex session already ended")
         if (activeTurn) {
@@ -1028,6 +1028,7 @@ export class CodexAdapter implements AgentAdapter {
           }
         }
         if (ending) throw new Error("The Codex session already ended")
+        if (mode === "steer") throw new Error("The Codex turn is no longer active")
         await startTurn(message)
       },
       async cancel() {

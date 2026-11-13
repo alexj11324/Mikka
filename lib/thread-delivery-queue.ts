@@ -68,8 +68,9 @@ export async function queueThreadReply(pool: Pool, userId: string, chain: RunCha
 }
 
 export async function threadDeliveryView(pool: Pool, ownerId: string, rootRunId: string, latestRunId: string): Promise<import('./thread-delivery').ThreadDeliveryView> {
-  const { rows: [run] } = await pool.query<{ workspaceId: string; status: string; stopRequestedAt: Date | null; harness: string; interrupt: boolean; continuable: boolean }>(
+  const { rows: [run] } = await pool.query<{ workspaceId: string; status: string; stopRequestedAt: Date | null; harness: string; canSteer: boolean; interrupt: boolean; continuable: boolean }>(
     `SELECT r."workspaceId",r.status,r."stopRequestedAt",coalesce(r."agentDefinition"->>'harness',a.harness) AS harness,
+       EXISTS (SELECT 1 FROM devices d WHERE d.id=r."deviceId" AND d."ownerId"=r."userId" AND d.harnesses @> '[{"harness":"codex","installed":true,"activeTurnSteer":true}]'::jsonb) AS "canSteer",
        (r."issueId" IS NOT NULL AND r."deviceRepoId" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM factory_attempts f WHERE f."runId"=r.id AND f.stage IN ('review','verify','monitor'))) AS continuable,
        EXISTS (SELECT 1 FROM factory_tasks t JOIN factory_attempts f ON f.id=t."attemptId" WHERE f."runId"=r.id
          AND t."userId"=r."userId" AND t."workspaceId"=r."workspaceId" AND t."issueId"=r."issueId"
@@ -79,14 +80,23 @@ export async function threadDeliveryView(pool: Pool, ownerId: string, rootRunId:
   const modes: import('./thread-delivery').ThreadDeliveryMode[] = []
   if (['preparing','running','finishing','queued'].includes(run.status) && !run.stopRequestedAt) {
     if (run.continuable) modes.push('queue')
-    if (run.status === 'running' && run.harness === 'codex') modes.push('steer')
+    if (run.status === 'running' && run.harness === 'codex' && run.canSteer) modes.push('steer')
     if (run.interrupt) modes.push('interrupt')
   }
   const workspaceId = run.workspaceId
   const { rows } = await pool.query<Pick<QueueRow,'id'|'text'|'status'|'failureCode'|'requestId'>>(
-    `SELECT id,text,status,"failureCode","requestId" FROM thread_queued_messages
-     WHERE "userId"=$1 AND "workspaceId"=$2 AND "rootRunId"=$3 AND status IN ('queued','delivering','failed')
-     ORDER BY "createdAt",id`, [ownerId, workspaceId, rootRunId])
+    `SELECT id,text,status,"failureCode","requestId" FROM (
+       SELECT id,text,status,"failureCode","requestId","createdAt" FROM thread_queued_messages
+       WHERE "userId"=$1 AND "workspaceId"=$2 AND "rootRunId"=$3 AND status IN ('queued','delivering','failed')
+       UNION ALL
+       SELECT m.id,e.payload->>'text',CASE WHEN m.failure IS NOT NULL OR r.status NOT IN ('running','preparing','waiting_input','finishing') THEN 'failed' ELSE 'delivering' END,
+         CASE WHEN m.failure IS NOT NULL OR r.status NOT IN ('running','preparing','waiting_input','finishing') THEN 'threadDeliveryUnavailable' END,
+         (e.payload#>>'{threadSubmission,requestId}')::uuid,m."createdAt"
+       FROM coordinator_events e JOIN run_messages m ON m.id=e.id AND m."userId"=e."userId"
+       JOIN agent_runs r ON r.id=m."runId" AND r."userId"=m."userId" AND r."workspaceId"=$2
+       WHERE e."userId"=$1 AND e.payload#>>'{threadSubmission,rootRunId}'=$3::uuid::text
+         AND e.payload#>>'{threadSubmission,delivery}'='steer' AND m."deliveredAt" IS NULL
+     ) pending ORDER BY "createdAt",id`, [ownerId, workspaceId, rootRunId])
   return { modes, queued: rows }
 }
 
