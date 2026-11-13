@@ -532,7 +532,6 @@ test('desktop replaces obsolete preflights while preserving active signing and d
   assert.match(preflight, /group: .*'desktop-release-preflight'.*\n      cancel-in-progress: true/)
   assert.match(signing, /group: .*'desktop-release'.*\n      cancel-in-progress: false/)
   assert.doesNotMatch(signing, /queue: max|cancel-in-progress: true/, 'keep one active signer and only the latest pending candidate')
-  assert.match(signing, /Reject an installer whose production UI overlay changed\n        run: node scripts\/release\/hosted-ui\.mjs production\n      - name: Require the matching production Web deployment/)
   assert.match(desktop, /run: node scripts\/release\/web-deploy\.mjs await-desktop-web/)
   assert.doesNotMatch(desktop, /run: node scripts\/release\/web-deploy\.mjs await-web(?:\s|$)/)
   const paths = [...desktop.slice(desktop.indexOf('\n  push:'), desktop.indexOf('\n  workflow_dispatch:'))

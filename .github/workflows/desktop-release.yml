@@ -84,7 +84,7 @@ jobs:
       EXPECTED_UI_OVERLAY_SHA: ${{ inputs.overlay-sha }}
     outputs:
       version: ${{ steps.version.outputs.version }}
-      overlay-sha: ${{ steps.overlay.outputs.overlay-sha }}
+      overlay-sha: ${{ steps.promoted.outputs.overlay-sha || steps.overlay.outputs.overlay-sha }}
     steps:
       - name: Require main
         run: |
@@ -110,10 +110,9 @@ jobs:
         run: node scripts/release/web-deploy.mjs await-desktop-web
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      - name: Select the production Web overlay
+      - name: Select the legacy production Web overlay
         id: overlay
-        env:
-          EXPECTED_UI_OVERLAY_SHA: ${{ steps.promoted.outputs.overlay-sha || inputs.overlay-sha }}
+        if: github.event.inputs.cloudflare_receipt == ''
         run: node scripts/release/hosted-ui.mjs production
       - name: Version from workflow run
         id: version
@@ -354,7 +353,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/release/ci-gate.mjs
-      - name: Reject an installer whose production UI overlay changed
+      - name: Verify the signed candidate before creating the release
+        env:
+          RELEASE_MANIFEST_SHA256: ${{ steps.seal.outputs.manifest-sha256 }}
+        run: node scripts/release/evidence.mjs verify "$RUNNER_TEMP/mikka-desktop-release-candidate"
+      - name: Reject a changed legacy overlay before waiting for its Web build
+        if: github.event.inputs.cloudflare_receipt == ''
         run: node scripts/release/hosted-ui.mjs production
       - name: Require the matching production Web deployment
         if: github.event.inputs.cloudflare_receipt == ''
@@ -362,12 +366,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/release/web-deploy.mjs await-desktop-web
-      - name: Verify the signed candidate before creating the release
-        env:
-          RELEASE_MANIFEST_SHA256: ${{ steps.seal.outputs.manifest-sha256 }}
-        run: |
-          node scripts/release/hosted-ui.mjs production
-          node scripts/release/evidence.mjs verify "$RUNNER_TEMP/mikka-desktop-release-candidate"
       - name: Recheck the promoted Web before publishing the signed installers
         if: github.event.inputs.cloudflare_receipt != ''
         env:
