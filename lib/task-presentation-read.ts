@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { db, pool, withDatabaseClient } from '@/lib/db'
 import { issues } from '@/lib/db/schema'
+import { readTaskAttention } from '@/lib/inbox/store'
 import { readTaskDispatches } from '@/lib/task-dispatches'
 import { teamIssues } from '@/lib/db/team-schema'
 import { factorySourceAllowed, readFactoryFlowStates } from '@/lib/factory/public-flow'
@@ -104,6 +105,7 @@ async function readPresentationBatch(user: Reader, input: TaskPresentationsInput
             else dispatchByIssue.set(issueId, [dispatch])
           }
         }
+        const attention = parsed.includeInboxReason ? await readTaskAttention(client, reader.id, workspaceId, ids) : undefined
         const byId = new Map(visible.map(task => [task.id, task]))
         const status = new Map(rows.filter(readable).map(task => [task.id, task.status]))
         const identifiers = new Map(rows.filter(readable).map(task => [task.id, task.identifier]))
@@ -129,6 +131,7 @@ async function readPresentationBatch(user: Reader, input: TaskPresentationsInput
         }, runByIssue.get(task.id), flowByIssue.get(task.id) ?? null,
         id => !['done', 'canceled', 'duplicate'].includes(status.get(id) ?? 'todo'),
         { schedule: task.schedule, blockerIdentifier: id => identifiers.get(id) ?? null }),
+        ...(attention ? { inboxReason: attention.get(task.id) ?? null } : {}),
         ...(parsed.includeBotDispatches ? { botDispatches: dispatchByIssue.get(task.id) ?? [] } : {}),
         ...((parsed.includeFactoryIdentity || counts) && factoryByIssue.has(task.id) ? { factoryTaskId: factoryByIssue.get(task.id) } : {}),
         ...(counts?.has(factoryByIssue.get(task.id) ?? '') ? { factoryExtraCount: counts.get(factoryByIssue.get(task.id)!) } : {}) }]))

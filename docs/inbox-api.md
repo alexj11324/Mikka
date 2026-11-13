@@ -50,10 +50,15 @@ remain at that shared boundary.
 `historySince` is the actual time the migration ran, not the example above.
 History starts at that instant; earlier handling is not backfilled.
 
-`type` is `task` or `suggestion`. A task's `id` and `issueId` are its task UUID;
+`GET /api/inbox?workspaceId=<uuid>&count=1` returns `count` for actionable
+rows and `suggestionCount` for suggestions. Both exclude snoozed entries and
+respect the same workspace and source permissions as the pending list. The
+sidebar displays `count`. Each pending Factory question counts once.
+
+`type` is `task`, `conversation`, or `suggestion`. A standalone conversation uses its run UUID and has no `issueId`. A task's `id` and `issueId` are its task UUID;
 `runId` identifies its latest attempt. Suggestions use their existing suggestion
 UUID. Task `source` is `agent`; suggestion `source` is its connected app. Task
-`reason` is `needsReply`, `confirm`, or `review`; suggestion `reason` is null.
+`reason` identifies a question (`needsReply`), approval (`confirm`), review, offline device, quota, subscription, API key, access denial, blocked run, or failure. Suggestions have no reason.
 `pending` describes the underlying source; `status` describes this tab's item.
 Timestamps are UTC ISO 8601 strings. Nullable fields remain present as null.
 
@@ -151,7 +156,7 @@ undelivered handoff; undo makes that rejected matter eligible again. Undo restor
 ```
 
 `action` accepts `reject`, `undo_reject`, `snooze`, and `reopen`. Rejection and
-undo apply only to suggestions. Snooze additionally requires `until`, an ISO
+undo apply only to suggestions. `dismiss` hides a task or conversation request for the current user, run and reason. It appears in Done with a `reopen` action while the request remains current. A new run or reason can ask again. Snooze additionally requires `until`, an ISO
 8601 timestamp with a timezone, strictly in the future:
 
 ```json
