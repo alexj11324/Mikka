@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useTranslations } from 'next-intl'
+import { findThreadReferences } from '@/app/actions/task-runs'
 import { Button } from '@/components/ui/button'
 import { withBasePath } from '@/lib/base-path'
 import { mentionAt, personReferenceParts, referenceMarker, referenceQueryReady, type ThreadReference } from '@/lib/thread-references'
@@ -61,8 +62,7 @@ export function ThreadReferencePicker({ draft, workspaceId, input, onChange }: {
     const at = { from, end, query, kind }
     const timer = setTimeout(async () => {
       try {
-        const { findThreadReferences } = await import('@/app/actions/task-runs')
-        const items = await findThreadReferences(workspaceId, query, kind)
+        const items = kind ? await findThreadReferences(workspaceId, query, kind) : await findThreadReferences(workspaceId, query)
         if (active) setLookup({ mention: at, workspaceId, items })
       } catch { if (active) setLookup({ mention: at, workspaceId, failed: true }) }
     }, 180)

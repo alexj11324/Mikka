@@ -282,6 +282,7 @@ export const desktopActionSchemas = {
   'task-runs.pollTaskRuns': none,
   'task-runs.pollThreads': tuple(version.optional(), listPositions(200).optional()),
   'task-runs.syncThreadList': tuple(version.optional(), listPositions(200).optional()),
+  'task-runs.findThreadReferences': z.union([tuple(uuid, text(120)), tuple(uuid, text(120), z.enum(['task', 'thread', 'pr']))]),
   'task-runs.listConversations': tuple(directoryInput),
   'task-runs.readConversationOrganization': tuple(uuid),
   'task-runs.setConversationOrganization': tuple(uuid, object({ field: z.enum(['archived', 'pinned']), value: bool })),
