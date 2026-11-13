@@ -29,7 +29,7 @@ export function ConversationDirectory({ ownerId, workspaceId }: { ownerId: strin
   const query = useDeferredValue(search.trim())
   const getKey = (index: number, previous: Page | null) => !workspaceId || (index > 0 && !previous?.cursor)
     ? null : ['conversation-directory', ownerId, workspaceId, query, state, archived, previous?.cursor ?? null] as const
-  const { data, error, mutate, size, setSize, isValidating } = useSWRInfinite<Page>(getKey,
+  const { data, error, mutate, size, setSize, isValidating } = useSWRInfinite<Page, Error, typeof getKey>(getKey,
     ([, , , text, selected, showArchive, cursor]) => listConversations({ search: text, state: selected, archived: showArchive, cursor: cursor ?? undefined }),
     { revalidateOnFocus: false, shouldRetryOnError: false })
   useLiveKey('thread_list', workspaceId, workspaceId ? [unstable_serialize(getKey)] : [], workspaceId)
