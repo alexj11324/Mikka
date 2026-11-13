@@ -30,11 +30,63 @@ jobs:
           node-version: 24
       - name: Validate the reviewed operations source
         run: node -e "if (!/^[a-f0-9]{40}$/.test(process.env.MIKKA_CLOUD_SOURCE_SHA || '')) process.exit(1)"
+      - name: Verify the actual public release identity
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict'
+          const endpoint = new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL)
+          endpoint.searchParams.set('audience', 'mikka-infisical')
+          const response = await fetch(endpoint, {headers: {authorization: 'Bearer ' + process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}})
+          assert.equal(response.ok, true)
+          const {value} = await response.json()
+          const claims = JSON.parse(Buffer.from(value.split('.')[1], 'base64url'))
+          assert.equal(claims.repository_id, '1427517699')
+          assert.equal(claims.ref, 'refs/heads/main')
+          assert.equal(claims.workflow_ref, 'alexj11324/Mikka/.github/workflows/cloudflare-world-deploy.yml@refs/heads/main')
+          console.log(JSON.stringify({subject: claims.sub, repositoryId: claims.repository_id, ref: claims.ref, workflowRef: claims.workflow_ref}))
+          JS
+      - name: Read the existing source App id
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /github
+          secret-name: GITHUB_APP_ID
+          recursive: false
+          include-imports: false
+      - name: Read the existing source App private key
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /github
+          secret-name: GITHUB_APP_PRIVATE_KEY
+          recursive: false
+          include-imports: false
+      - name: Mint a short-lived read-only operations checkout token
+        id: source-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        with:
+          app-id: ${{ env.GITHUB_APP_ID }}
+          private-key: ${{ env.GITHUB_APP_PRIVATE_KEY }}
+          owner: alexj11324
+          repositories: mikka-cloud
+          permission-contents: read
+      - name: Remove App credentials before loading private operations code
+        run: |
+          echo 'GITHUB_APP_ID=' >> "$GITHUB_ENV"
+          echo 'GITHUB_APP_PRIVATE_KEY=' >> "$GITHUB_ENV"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: alexj11324/mikka-cloud
           ref: ${{ inputs.cloud_source_sha }}
-          token: ${{ secrets.MIKKA_CLOUD_READ_TOKEN }}
+          token: ${{ steps.source-token.outputs.token }}
           path: operations
           persist-credentials: false
       - name: Verify and retrieve the immutable public GitHub build
