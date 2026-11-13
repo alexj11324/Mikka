@@ -9,6 +9,7 @@ import { deploymentSwitch } from '@/lib/deployment-switches'
 import { createHash } from 'node:crypto'
 import { gunzipSync } from 'node:zlib'
 import { headers } from 'next/headers'
+import { threadModelChoice, type ThreadModelChoice } from '@/lib/thread-model-choice'
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import type { SelectResult } from 'drizzle-orm/query-builders/select.types'
 import { z } from 'zod'
@@ -589,7 +590,7 @@ function safeHttpUrl(value: string) {
 }
 
 /** Something a person says in a running thread; the daemon delivers it to the agent. */
-export async function sendIssueThreadMessage(input: { issueId: string | null; runId: string; text: string; requestId?: string; expectedOwnerId?: string; expectedWorkspaceId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<{ runId: string; continued: boolean }> {
+export async function sendIssueThreadMessage(input: { issueId: string | null; runId: string; text: string; requestId?: string; modelChoice?: ThreadModelChoice; expectedOwnerId?: string; expectedWorkspaceId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<{ runId: string; continued: boolean }> {
   const text = z.string().trim().min(1).max(10_000).safeParse(input.text)
   if (!text.success) throw new ActionFailureError('messageRequired')
   const { row, user } = await readableThread(input.issueId, input.runId, threadColumns)
@@ -602,6 +603,7 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
   if(row.userId!==user.id)throw new ActionFailureError('runNotFound')
   if(input.retryOriginalSession!==undefined && input.retryOriginalSession!==true)throw new ActionFailureError('runInvalid')
   if(input.requestId!==undefined && !z.uuid().safeParse(input.requestId).success)throw new ActionFailureError('validationGeneric')
+  if(input.modelChoice !== undefined && (input.retryOriginalSession || !input.requestId || !threadModelChoice.safeParse(input.modelChoice).success))throw new ActionFailureError('validationGeneric')
   if(input.requestId!==undefined && input.retryOriginalSession)throw new ActionFailureError('validationGeneric')
   if(input.questionWakeGeneration!==undefined && (!input.retryOriginalSession || !z.uuid().safeParse(input.questionWakeGeneration).success))throw new ActionFailureError('validationGeneric')
   if(input.questionWakeGeneration!==undefined) {
@@ -634,7 +636,7 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
     }
   }
   // A working thread gets it as a message; an ended one runs again in the same thread (R-81, lib/thread-continue.ts).
-  return sendThreadMessage(user.id,row.id,text.data,{source:'human',sessionId:session.session.id},input.requestId)
+  return sendThreadMessage(user.id,row.id,text.data,{source:'human',sessionId:session.session.id},input.requestId,input.modelChoice)
 }
 
 /**
@@ -643,8 +645,15 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
  * dispatch with no machine or model) returned as its code, so the thread says
  * why instead of 「发送失败」. Other failures still throw.
  */
-export async function sendIssueThreadReply(input: { issueId: string | null; runId: string; text: string; requestId?: string; expectedOwnerId?: string; expectedWorkspaceId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<ActionResult<{ sent: true; runId: string; continued: boolean }>> {
+export async function sendIssueThreadReply(input: { issueId: string | null; runId: string; text: string; requestId?: string; modelChoice?: ThreadModelChoice; expectedOwnerId?: string; expectedWorkspaceId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<ActionResult<{ sent: true; runId: string; continued: boolean }>> {
   return runAction(async () => { const result=await sendIssueThreadMessage(input); return { sent: true as const,...result } })
+}
+
+export async function getThreadContinuationModels(issueId: string, runId: string) {
+  const { row, user } = await readableThread(issueId, runId, threadIdentityColumns)
+  if (row.userId !== user.id) throw new ActionFailureError('runNotFound')
+  const { threadModelMenu } = await import('@/lib/thread-model-menu')
+  return threadModelMenu(user.id, issueId, row.id)
 }
 
 /**

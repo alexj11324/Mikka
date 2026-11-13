@@ -73,13 +73,38 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'MacBook','local','laptop',true,now(),$3)`, [deviceId, id, JSON.stringify(mac)])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [randomUUID(), id, deviceId, `codex-${deviceId.slice(0, 8)}`])
     const botId = await chatBotId(id, null, ws.id)
-    return { id, issueId, botId, ws }
+    return { id, issueId, botId, ws, connection, deviceId }
   }
   const end = (runId: string, status: string) => pool.query(`UPDATE agent_runs SET status=$2,"finishedAt"=now(),"updatedAt"=now() WHERE id=$1`, [runId, status])
 
   const a = await person()
   const first = await steps.dispatchRun(a.id, { issueId: a.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, a.botId) as unknown as { runId: string; thread: string }
   assert.equal(first.thread, 'new', JSON.stringify(first))
+
+  await t.test('a supported continuation freezes the selected model and subscription, including across a lost acknowledgement', async () => {
+    const b = await person()
+    const initial = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: 'picked:' + randomUUID() }, undefined, b.botId) as unknown as { runId: string }
+    const second = 'gpt-5.1', id = randomUUID()
+    const choice = { model: second, source: { kind: 'subscription' as const, connectionId: b.connection } }
+    const { threadModelMenu } = await import('../lib/thread-model-menu')
+    assert.equal(await threadModelMenu(b.id, b.issueId, initial.runId), null)
+    await assert.rejects(sendThreadMessage(b.id, initial.runId, 'Running stays frozen.', 'user', randomUUID(), choice), /threadCannotContinue/)
+    await end(initial.runId, 'succeeded')
+    await pool.query(`UPDATE byos_connections SET "modelCatalog"=$2 WHERE id=$1`, [b.connection, JSON.stringify({ revision: '1', models: ['gpt-5', second] })])
+    await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa',$5)`, [randomUUID(), b.id, b.ws.id, b.connection, second])
+    await pool.query(`UPDATE devices SET harnesses=$2 WHERE id=$1`, [b.deviceId, JSON.stringify(mac.map(h => ({ ...h, modelSlots: [...h.modelSlots, { slot: second, model: second, name: second }] })))])
+    const menu = await threadModelMenu(b.id, b.issueId, initial.runId)
+    assert.ok(menu?.groups.some(group => group.options.some(option => option.modelId === second)))
+    assert.equal(await threadModelMenu(a.id, b.issueId, initial.runId), null)
+    const receipt = await sendThreadMessage(b.id, initial.runId, 'Continue with this model.', 'user', id, choice)
+    assert.equal(receipt.continued, true)
+    const {rows: [frozen]} = await pool.query(`SELECT "agentDefinition" FROM agent_runs WHERE id=$1`, [receipt.runId])
+    assert.equal(frozen.agentDefinition.model, second)
+    assert.equal(frozen.agentDefinition.modelDispatch.entry.source.connectionId, b.connection)
+    assert.equal(frozen.agentDefinition.modelDispatch.mode, 'picked')
+    assert.deepEqual(await sendThreadMessage(b.id, initial.runId, 'Continue with this model.', 'user', id, choice), receipt)
+    await assert.rejects(sendThreadMessage(b.id, initial.runId, 'Continue with this model.', 'user', id, { ...choice, model: 'gpt-5' }), /submissionConflict/)
+  })
 
   await t.test('a dispatch records its entry and a person continuation is an app entry', async () => {
     const c = await person()

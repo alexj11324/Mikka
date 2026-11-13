@@ -14,7 +14,7 @@ export function useChatDelivery<T extends ChatSubmission>(scope: string, uncerta
   return useChatDeliveryState(rows, setRows, uncertain)
 }
 
-type BoundThreadReply = Pick<ChatSubmission, 'id' | 'text'> & { runId: string; expectedOwnerId?: string; expectedWorkspaceId?: string }
+type BoundThreadReply = Pick<ChatSubmission, 'id' | 'text'> & { runId: string; expectedOwnerId?: string; expectedWorkspaceId?: string; modelChoice?: import('@/lib/thread-model-choice').ThreadModelChoice }
 type OriginalSessionRetry = { retryOriginalSession: true; runId: string; text: string; questionWakeGeneration?: string }
 type ThreadReplyReceipt = { status: 'accepted' } | { status: 'failed' | 'uncertain'; error: string }
 
@@ -34,6 +34,7 @@ export function useThreadReplyCommand() {
       const request = 'retryOriginalSession' in command ? command : {
         requestId: command.id, runId: command.runId, text: command.text,
         expectedOwnerId: command.expectedOwnerId, expectedWorkspaceId: command.expectedWorkspaceId,
+        ...(command.modelChoice ? { modelChoice: command.modelChoice } : {}),
       }
       const { sendIssueThreadReply } = await import('@/app/actions/agents')
       const result = await sendIssueThreadReply({ issueId, ...request })

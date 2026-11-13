@@ -7,7 +7,7 @@ import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { MessageSquareDiff } from 'lucide-react'
-import { getIssueThread, getThreadChanges, getThreadInstructions, stopRun, type IssueThreadDetail } from '@/app/actions/agents'
+import { getIssueThread, getThreadChanges, getThreadInstructions, stopRun, getThreadContinuationModels, type IssueThreadDetail } from '@/app/actions/agents'
 import { useActionError } from '@/lib/use-action-error'
 import { sendReviewChange, type ReviewChangeTarget } from '@/lib/factory/review-change'
 import { RequestError } from '@/lib/factory/browser-request'
@@ -33,6 +33,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { AgentMarkdown } from './agent-markdown'
 import { ComputerCard } from '@/components/computer/computer-card'
 import { harnessLabel, type IssueThreadsRead } from './issue-threads'
+import { BotModelPicker } from '@/components/coordinator/bot-model-picker'
+import { choiceFromMenu, threadModelKey, type ThreadModelChoice } from '@/lib/thread-model-choice'
 import { ThreadScreen } from '@ui-slot/thread'
 import type { ThreadEntry, ThreadEntryPart } from '@/components/slots/thread-contract'
 import { HarnessMark, harnessName, ModelLabel } from '@/components/labels/entity-labels'
@@ -169,8 +171,9 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const feedback = useTranslations('Coordinator')
   const deliveryLabels = useTranslations('HostedThread')
   const writer = useThreadReplyCommand()
-  const delivery = useChatDelivery<ChatSubmission & { review?: ReviewChangeTarget; runId: string; expectedOwnerId?: string; expectedWorkspaceId?: string }>(`thread:${runId}`, feedback('sendUncertain'))
+  const delivery = useChatDelivery<ChatSubmission & { review?: ReviewChangeTarget; runId: string; expectedOwnerId?: string; expectedWorkspaceId?: string; modelChoice?: ThreadModelChoice }>(`thread:${runId}`, feedback('sendUncertain'))
   const sendLock = useRef(false)
+  const [pickedModel, setPickedModel] = useViewState<ThreadModelChoice | null>(`thread:${runId}:next-model`, null)
   const [submission, setSubmission] = useViewState<ThreadReplySubmission | null>(`thread:${runId}:submission`, null)
   // Words picked from the agent's reply with 引用: they head the next message as quote lines.
   const [replyQuote, setReplyQuote] = useViewState<string | null>(`thread:${runId}:quote`, null)
@@ -250,13 +253,13 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     if (retryOriginalSession ? !canRetry : !review && replyBlocked) return
     const words = previous?.text ?? (retry === undefined && !review ? withReplyQuote(text, replyQuote) : text)
     // Preserve an interrupted send from the previous client version when its unchanged draft is submitted.
-    const saved = prepareThreadReply(submission, liveRunId, words)
-    const command = previous ?? { id: saved.requestId, runId: saved.runId, text: words, at: Date.now(), ...(review ? { review: { label: review.label, binding: review.binding } } : {}),
+    const saved = prepareThreadReply(submission, liveRunId, words, undefined, !review && !retryOriginalSession && !active && !question && !replyBlocked && pickedModel ? pickedModel : undefined)
+    const command = previous ?? { id: saved.requestId, runId: saved.runId, text: words, at: Date.now(), ...(saved.modelChoice ? { modelChoice: saved.modelChoice } : {}), ...(review ? { review: { label: review.label, binding: review.binding } } : {}),
       expectedOwnerId: data?.live?.viewerId, expectedWorkspaceId: data?.live?.runs.find(run => run.id === liveRunId)?.workspaceId ?? undefined }
     if (!retryOriginalSession && !delivery.begin(command)) return
     sendLock.current = true
     setSending(true); setSendFailed(false)
-    if (!retryOriginalSession && !previous) { setDraft(''); setReplyQuote(null); setSubmission(null); if (review) changeRequest?.onCancel() }
+    if (!retryOriginalSession && !previous) { setDraft(''); setReplyQuote(null); setSubmission(null); if (saved.modelChoice) setPickedModel(null); if (review) changeRequest?.onCancel() }
     const fail = (reason: string) => retryOriginalSession ? setSendFailed(reason) : delivery.finish(command.id, { error: reason })
     try {
       if (command.review) {
@@ -437,7 +440,11 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   if (transcriptOnly) return <div data-attempt-section={runId} className="flex flex-col gap-3">{transcriptBody}</div>
   const recorded = data?.context?.composerModel
   const currentModel = recorded?.served || recorded?.selected
+  const pickerEnabled = issueId && data?.live?.viewerId && !active && !question && !replyBlocked && !changeRequest &&
+    (detail?.harness === 'codex' || detail?.harness === 'claude_code')
   const modelControl = data?.thread.ownedByCurrentUser ? <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+    {pickerEnabled && issueId && <BotModelPicker botId={null} thread={{ scope: JSON.stringify([data?.live?.viewerId, issueId, liveRunId]),
+      load: () => getThreadContinuationModels(issueId, liveRunId), selected: pickedModel ? threadModelKey(pickedModel) : null, choose: id => setPickedModel(choiceFromMenu(id)) }} />}
     {currentModel ? <ModelLabel model={currentModel} /> : t('composerModelUnknown')}
     {recorded?.served && recorded.selected && recorded.served !== recorded.selected &&
       <span>{t('composerModelRequested', { model: recorded.selected })}</span>}

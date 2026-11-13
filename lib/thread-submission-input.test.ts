@@ -14,3 +14,13 @@ test('edited text is a new explicit request; damaged saved state is not reused',
   assert.deepEqual(prepareThreadReply(first, latest, 'Edited.', () => nextId), { requestId: nextId, runId: latest, text: 'Edited.' })
   assert.equal(prepareThreadReply({ ...first, requestId: 'invalid' }, latest, 'Original.', () => nextId).requestId, nextId)
 })
+
+test('changing only the next model or its funded account creates a fresh submission and preserves the old retry', () => {
+  const modelChoice = { model: 'coding', source: { kind: 'subscription' as const, connectionId: crypto.randomUUID() } }
+  const first = prepareThreadReply(null, crypto.randomUUID(), 'Continue', undefined, modelChoice)
+  const retry = prepareThreadReply(first, crypto.randomUUID(), 'Continue', undefined, modelChoice)
+  assert.deepEqual(retry, first)
+  const switched = prepareThreadReply(first, first.runId, first.text, undefined, { ...modelChoice, source: { ...modelChoice.source, connectionId: crypto.randomUUID() } })
+  assert.notEqual(switched.requestId, first.requestId)
+  assert.notEqual(prepareThreadReply(first, first.runId, first.text).requestId, first.requestId)
+})

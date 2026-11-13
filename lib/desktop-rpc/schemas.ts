@@ -1,3 +1,4 @@
+import { threadModelChoice } from '@/lib/thread-model-choice'
 import { directoryInput } from '@/lib/conversation-directory-input'
 import { saveEnvironmentInput, projectDefaultEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
 import { createOnlyCommand, dispatchReceiptInput } from '@/lib/task-create-command'
@@ -138,7 +139,8 @@ export const desktopActionSchemas = {
   'agents.getThreadChanges': tuple(uuid.nullable(), uuid),
   'agents.getThreadMachine': tuple(uuid.nullable(), uuid),
   'agents.getThreadInstructions': tuple(uuid.nullable(), uuid),
-  'agents.sendIssueThreadReply': tuple(object({ expectedOwnerId: text(256).optional(), expectedWorkspaceId: uuid.optional(), issueId: uuid.nullable(), runId: uuid, text: text(10_000).min(1), requestId: uuid.optional(), retryOriginalSession: z.literal(true).optional(), questionWakeGeneration: uuid.optional() })),
+  'agents.sendIssueThreadReply': tuple(object({ modelChoice: threadModelChoice.optional(), expectedOwnerId: text(256).optional(), expectedWorkspaceId: uuid.optional(), issueId: uuid.nullable(), runId: uuid, text: text(10_000).min(1), requestId: uuid.optional(), retryOriginalSession: z.literal(true).optional(), questionWakeGeneration: uuid.optional() })),
+  'agents.getThreadContinuationModels': tuple(uuid, uuid),
   'agents.getThreadName': oneId,
   'agents.stopRun': oneId,
   'agents.resumeQuotaPausedRunOnApiKey': oneId,
