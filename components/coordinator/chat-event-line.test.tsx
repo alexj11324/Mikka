@@ -11,6 +11,8 @@ import type { AgentCitations } from '../workspace/agent-citations'
 // (decision 2026-11-10), then what happened.
 const browser = new Window({ url: 'https://mikka.example/' })
 let createRoot: typeof import('react-dom/client')['createRoot']
+import { TaskPresentationsContext } from '@/hooks/use-task-collection'
+import { taskPresentation } from '@/lib/task-presentation'
 let ChatEventLine: typeof import('./chat-event-line')['ChatEventLine']
 before(async () => {
   for (const [key, value] of Object.entries({ window: browser, document: browser.document, navigator: browser.navigator, location: browser.location, IS_REACT_ACT_ENVIRONMENT: true, Element: browser.Element, HTMLElement: browser.HTMLElement, Node: browser.Node, ShadowRoot: browser.ShadowRoot, getComputedStyle: browser.getComputedStyle.bind(browser), requestAnimationFrame: browser.requestAnimationFrame.bind(browser), cancelAnimationFrame: browser.cancelAnimationFrame.bind(browser) })) {
@@ -34,14 +36,17 @@ test('an event line reads as its thread title or its task code, then what happen
   document.body.append(container)
   const root = createRoot(container)
   const render = (line: Parameters<typeof ChatEventLine>[0]['line']) => act(async () => {
-    root.render(<NextIntlClientProvider locale="en" timeZone="UTC" messages={messages}><ChatEventLine line={line} citations={citations} /></NextIntlClientProvider>)
+    root.render(<NextIntlClientProvider locale="en" timeZone="UTC" messages={messages}><TaskPresentationsContext value={{ [TASK]: taskPresentation({ status: 'done', metadata: { pullRequests: [] } }, undefined, null, () => false) }}><ChatEventLine line={line} citations={citations} /></TaskPresentationsContext></NextIntlClientProvider>)
   })
   try {
     await render({ kind: 'runFinished', runId: RUN, issueId: null, status: 'succeeded', title: null })
-    assert.equal(container.textContent, 'Create the handoff finished')
+    // The thread is named by the conversation's own short title; the two parts are spaced by the row's gap, not a character.
+    assert.equal(container.querySelector('[data-thread-link]')?.textContent, 'Create the handoff in Mikka')
+    assert.equal(container.querySelector('[data-event-line] > span:last-child')?.textContent, 'finished')
     assert.equal(container.querySelector('[data-thread-link] svg'), null, 'the thread has no icon')
     await render({ kind: 'issueStatus', runId: null, issueId: TASK, status: 'done', title: null })
-    assert.equal(container.textContent, 'ALEX-45 moved to Done')
+    assert.equal(container.querySelector('[data-task-chip]')?.textContent, 'ALEX-45')
+    assert.equal(container.querySelector('[data-event-line] > span:last-child')?.textContent, 'moved to Done')
     assert.equal(container.querySelector('[data-task-status]')?.getAttribute('data-task-status'), 'done')
   } finally {
     await act(async () => { root.unmount() })

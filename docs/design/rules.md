@@ -83,15 +83,17 @@ source wins in a conflict is in [`README.md`](README.md).
   the user taps is their message but keeps its card shape, no blue bubble; the
   instruction under it is a blue bubble (R-55). This holds in every one-to-one
   chat, the board's Coordinator sidebar and the AI sidebar included.
-- **R-15** A task mentioned in chat is an inline chip: its status icon (R-52),
-  the Agent mark when there is one, and its code, such as 「◐ ALEX-45」, with
-  the title, status and priority in the hover card; a task with no code
-  shows its title. Internal object chips
+- **R-15** A task mentioned in chat is an inline chip: its status icon (R-52)
+  alone and its code, such as 「◐ ALEX-45」, with the title, status, priority
+  and what its Agent is doing (in words) in the hover card; a task with no
+  code shows its title. A chip never carries a second icon. Internal object chips
   use the faint accent fill (`--object-chip`), rounded corners and accent
   text at the surrounding text's size and line height. A thread mentioned in
   chat is the conversation's own bounded short title in the link colour
-  (`conversationTitle`, [2026-11-13-1405](decisions/2026-11-13-1405-one-task-status.md)), with no icon, fill, accent or state badge;
-  it never repeats the task's code or borrows the task's title. A task's
+  (`conversationTitle`, [2026-11-13-1405](decisions/2026-11-13-1405-one-task-status.md)), with no fill, accent or state badge, and
+  one small Agent mark after it only while the conversation is working,
+  waiting or failed; it never repeats the task's code or borrows the task's
+  title. A task's
   chip directly followed by its own thread reads as one reference (chip, one
   word gap, title); when that thread's card sits under the reply the inline
   title is left out. Every mention uses the same
@@ -324,12 +326,15 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   - Lists are a view of the board's tasks: rows sit under their status, in
     the board's order; closed statuses start collapsed. Nothing is grouped by
     what a run is doing.
-  - The **Agent mark** follows the status icon: a turning ring while the
-    task's Agent works, the hand when it waits for the person (a question,
+  - The **Agent mark** is the conversation's, never the task's: a turning
+    ring while it works, the hand when it waits for the person (a question,
     an approval, a PR to review, a login, quota), a triangle when the run
-    failed. Its words are a tooltip and an accessible name. It is never a
-    status, a group, a column or a status filter. What needs the person is
-    in 收件箱.
+    failed. It sits after a thread's title, is the dispatch card's one glyph
+    while the conversation is active (else the card shows the task's status
+    icon), and is the board card's line; on a task's chip, row or hover card
+    it is words only. Two status-like glyphs are never side by side. It is
+    never a status, a group, a column or a status filter. What needs the
+    person is in 收件箱.
   - 受阻 is a board column, not a status: a task the person flagged or one a
     dependency holds back. What a run says never moves a task there.
   - The status advances with the work, forward only and never over a status
@@ -347,9 +352,9 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
     result), never the hand. Running uses the ring, waiting for the person
     uses pause, finished a check, failed a triangle, blocked an octagon, and
     replaced no icon.
-- **R-53** A task row shows its status icon, the Agent mark when there is
-  one, number, title and date, with a grey line for the status, dispatching
-  bot and schedule when present. Raw error codes stay under 详情 inside the
+- **R-53** A task row shows its status icon alone, number, title and date,
+  with a grey line for the status, what its Agent is doing in words,
+  dispatching bot and schedule when present. Raw error codes stay under 详情 inside the
   relevant run. The former thread-list last-reply preview is superseded by
   [2045](decisions/2026-11-07-2045-tasks-only-threads-inside.md).
 - **R-54** The PR tab lists the PRs of the threads this bot dispatched, in groups 等待审查, 进行中, 已合并,

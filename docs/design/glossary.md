@@ -76,9 +76,11 @@ same icon and word
 the work (Agent starts → 进行中, submitted or PR delivered → 评审中, PR merged
 or accepted → 已完成) and the person can always set it.
 
-The **Agent mark** is the small icon after the status icon that says what the
-task's Agent is doing: working, waiting for the person, or error. It is not a
-status and has no group, column or status word. What needs the person is
+The **Agent mark** is one small glyph that says what a conversation's Agent is
+doing: working, waiting for the person, or error. It belongs to the
+conversation (after its title, on its dispatch card, on the board card's
+line), never beside a task's status icon: a task chip has exactly one icon.
+It is not a status and has no group, column or status word. What needs the person is
 listed in 收件箱.
 
 受阻 is a board column for a task the person flagged or one blocked by an open

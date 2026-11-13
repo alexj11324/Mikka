@@ -10,15 +10,21 @@
   - [2026-11-06-1600](2026-11-06-1600-blocked-board-column.md), in part: a question, quota, a blocked or a failed run no longer moves a task into 受阻. 受阻 holds a task the person flagged or one a dependency holds back.
   - The board's default filter 「负责人：我」 and its 全部 / 工作区 / 个人 segment (Figma 77:2), with the lock on a personal task's card.
   - The 任务 page (`?section=tasks`, [2026-11-09-2330](2026-11-09-2330-overview-as-work-area-tab.md)'s 「看板 is a view of 任务」): the board is the entry.
-  - [2026-11-10-0659](2026-11-10-0659-task-code-chips-and-work-area-tabs.md), 「A thread … is its title … The title is the task's title without its code」: a thread is named by the conversation's own short title.
+  - [2026-11-10-0659](2026-11-10-0659-task-code-chips-and-work-area-tabs.md), 「A thread … is its title … The title is the task's title without its code」 and 「It has no icon … and no state badge」: a thread is named by the conversation's own short title, with one small activity mark after it while it is working, waiting or failed.
 - Unchanged: [2026-11-10-1341](2026-11-10-1341-sidebar-short-title-limits.md). A task's title is whatever the person or the model wrote, with no limit, and the task detail keeps the full title.
 
 ## One status
 
 The model is Linear's: an issue has one state, and what an agent is doing is beside it, not a second state. Capy 0.7.2 does the same (issues carry one `status` / `stateId`; threads are separate objects with their own `statuses`).
 
-- A task's status is its status field: 待整理, 待办, 进行中, 评审中, 已完成, 已取消, 重复. Every surface shows that status with the same icon and the same word: the board's columns and cards, task rows, the chat's task chip and its hover card, the dispatch card, the bot sidebar, the task page and the work-area tab.
-- What the task's Agent is doing is the **Agent mark**, a small icon after the status icon: working (a turning ring), waiting for the person (the hand), error (a triangle). Its words (Agent 运行中, 等你处理, Agent 出错) are a tooltip and an accessible name. It is never a status, a group, a column or a filter on status. A task with no run under way, waiting or failed has no mark.
+- A task's status is its status field: 待整理, 待办, 进行中, 评审中, 已完成, 已取消, 重复. Every surface shows that status with the same icon and the same word: the board's columns and cards, task rows, the chat's task chip and its hover card, the bot sidebar, the task page and the work-area tab.
+- **A task chip has exactly one icon, its status icon** (Alex, 2026-11-13, rejecting a chip with two icons). The same holds wherever a task is named inline: the chat chip, the bot sidebar's rows, a task row.
+- What an Agent is doing belongs to the conversation, not the task. It is the **Agent mark**, one small glyph: working (a turning ring), waiting for the person (the hand), error (a triangle); nothing when the conversation is idle or finished. Its words (Agent 运行中, 等你处理, Agent 出错) are its tooltip and accessible name. It is never a status, a group, a column or a filter on status. It appears only on the conversation's own surfaces:
+  - after the thread's title where a thread is named in a sentence;
+  - on the dispatch card, as the card's one glyph while the conversation is working, waiting or failed; otherwise that glyph is the task's status icon, never both;
+  - as a line of words in the task chip's hover card and in a task row's grey line;
+  - on the board card's and list row's line, as before.
+- **Two status-like glyphs are never side by side.** That is why the mark follows the thread's title: beside its own task's chip it would sit next to the chip's status icon.
 - What needs the person stays in 收件箱, as before. No status word is added for it.
 - 受阻 remains a column and not a status: a task the person flagged, or one blocked by an open task. What a run says (a question, quota, a failed run) is the Agent mark on the card in the task's own column.
 - A run keeps its own result where a run is shown (活动 rows, a run with no task): glossary, Run result.
@@ -62,7 +68,7 @@ One rule for every move (`lib/task-status-advance.ts`): forward only along 待�
 - A conversation (a thread: a run and the runs that continue it; a session run, an agent run, a subagent run) is always named by one bounded short title, the same on every surface that names it: the thread link in a reply and its hover card, the dispatch card, thread rows, the thread header, a waiting row in 收件箱. The bound is [1341](2026-11-10-1341-sidebar-short-title-limits.md)'s: 12 CJK characters, or 6 words and 60 characters.
 - The title is the conversation's own: its stored title; until it has one, the bounded first line of what it was asked; and only when that is empty, its task's short title. A conversation never borrows its task's full title.
 - Task titles are not restricted or rewritten by this.
-- In a reply, a task's chip directly followed by its own thread (nothing but spaces between) is one reference: the chip (status icon and code), one word gap, then the thread's short title as a link. Each keeps its own click target, and they are never two pills. When that thread's dispatch card sits right under the reply, the inline thread title is left out and the chip stays.
+- In a reply, a task's chip directly followed by its own thread (nothing but spaces between) is one reference: the chip (status icon and code), one word gap, then the thread's short title as a link, with the conversation's activity mark after the title when it has one. Each keeps its own click target, and they are never two pills. When that thread's dispatch card sits right under the reply, the inline thread title is left out and the chip stays.
 
 ### The stored title
 

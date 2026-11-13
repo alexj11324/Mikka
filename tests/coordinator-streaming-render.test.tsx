@@ -374,8 +374,10 @@ test('a task and its thread in one reply: the task is its status icon and code, 
     assert.equal(text(), 'MIK-1 的线程 Fix sign-in redirect 在等你。', 'the code once, the conversation\'s own title once: never 「MIK-1 MIK-1 …」')
     assert.equal(view.container.querySelector('[data-citation-covered]'), null)
     assert.equal(chips()[0].querySelector('[data-task-status]')?.getAttribute('data-task-status'), 'doing', 'the task leads with its status icon')
-    assert.equal(chips()[0].querySelector('[data-run-indicator]')?.getAttribute('data-run-indicator'), 'working', 'its running Agent is a mark, not a status')
-    assert.equal(chips()[1].querySelector('svg'), null, 'the thread has no icon')
+    assert.equal(chips()[0].querySelectorAll('svg').length, 1, 'a chip has one icon, its status')
+    assert.equal(chips()[0].querySelector('[data-run-indicator]'), null, 'what the Agent is doing is not on the task\'s chip')
+    assert.equal(chips()[1].querySelector('[data-run-indicator]')?.getAttribute('data-run-indicator'), 'working', 'the running conversation carries its own mark, after its title')
+    assert.equal(chips()[1].querySelectorAll('svg').length, 1)
     // A task with no code is its title; the thread still names its task's title.
     const unnumbered = { [TASK]: { ...issue(TASK, 'Release checklist'), identifier: null }, [THREAD]: ownThread }
     await renderReply(<CoordinatorReply text={`[[issue:${TASK}]]的线程 [[run:${THREAD}]] 在等你。`} citations={{ ...base, sources: unnumbered }} />)
