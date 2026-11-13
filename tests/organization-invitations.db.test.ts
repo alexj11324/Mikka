@@ -38,11 +38,14 @@ test('Organization invitations grant only a verified Member without inheriting W
   let organizationId = ''
   let secondOrganizationId = ''
   const workspaceId = randomUUID()
+  const secondWorkspaceId = randomUUID()
   t.after(async () => {
     if (organizationId) await check.query('delete from mikka_organizations where id=$1', [organizationId])
     if (secondOrganizationId) await check.query('delete from mikka_organizations where id=$1', [secondOrganizationId])
-    await check.query('delete from mikka_workspace_members where "workspaceId"=$1', [workspaceId])
-    await check.query('delete from mikka_workspaces where id=$1', [workspaceId])
+    for (const id of [workspaceId, secondWorkspaceId]) {
+      await check.query('delete from mikka_workspace_members where "workspaceId"=$1', [id])
+      await check.query('delete from mikka_workspaces where id=$1', [id])
+    }
     for (const user of people) await check.query('delete from "user" where id=$1', [user.id])
   })
   t.after(async () => { await Promise.all([check.end(), workspacePool.end(), appPool.end()]) })
@@ -54,7 +57,14 @@ test('Organization invitations grant only a verified Member without inheriting W
     [workspaceId, owner.id, 'Private shared workspace', 'team'])
   await check.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role) values ($1,$2,$3,$4,$5)',
     [workspaceId, owner.id, owner.name, owner.email, 'admin'])
-  await workspaceDb.insert(organizationWorkspaces).values({ organizationId, workspaceId })
+  await check.query('insert into mikka_workspaces (id,"userId",name,kind) values ($1,$2,$3,$4)',
+    [secondWorkspaceId, outsider.id, 'Second org private workspace', 'team'])
+  await check.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role) values ($1,$2,$3,$4,$5)',
+    [secondWorkspaceId, outsider.id, outsider.name, outsider.email, 'admin'])
+  await workspaceDb.insert(organizationWorkspaces).values([
+    { organizationId, workspaceId },
+    { organizationId: secondOrganizationId, workspaceId: secondWorkspaceId },
+  ])
 
   await t.test('any member can issue only Member links; duplicate and pending do not rotate the bearer', async () => {
     await assert.rejects(invite.issueOrganizationInvitations(organizationId, outsider.id, { emails: [invitee.email] }),
@@ -97,6 +107,7 @@ test('Organization invitations grant only a verified Member without inheriting W
     await assert.rejects(invite.acceptOrganizationInvitation({ token: newToken }, outsider),
       (error: unknown) => (error as { detail?: string }).detail === 'invalid_request')
     const before = await workspaceDb.select().from(workspaceMembers).where(eq(workspaceMembers.workspaceId, workspaceId))
+    const beforeSecond = await workspaceDb.select().from(workspaceMembers).where(eq(workspaceMembers.workspaceId, secondWorkspaceId))
     const attempts = await Promise.allSettled([
       invite.acceptOrganizationInvitation({ token: newToken }, invitee),
       invite.acceptOrganizationInvitation({ token: newToken }, invitee),
@@ -109,9 +120,49 @@ test('Organization invitations grant only a verified Member without inheriting W
     assert.equal(member.status, 'active')
     assert.equal((await workspaceDb.select().from(workspaceMembers).where(eq(workspaceMembers.workspaceId, workspaceId))).length,
       before.length, 'joining an Organization must not create Workspace membership')
+    assert.equal((await workspaceDb.select().from(workspaceMembers).where(eq(workspaceMembers.workspaceId, secondWorkspaceId))).length,
+      beforeSecond.length, 'joining the first Organization must not grant access to the second private Workspace')
     assert.equal((await workspaceDb.select().from(organizationMembers).where(and(
       eq(organizationMembers.organizationId, secondOrganizationId), eq(organizationMembers.userId, invitee.id)))).length, 0)
     await assert.rejects(invite.acceptOrganizationInvitation({ token: newToken }, invitee))
+  })
+
+  await t.test('two Organizations keep member invitations separate from both private Workspace ACLs', async () => {
+    // "other" belongs to the first Organization, but neither private Workspace.
+    const invitation = await invite.issueOrganizationInvitations(secondOrganizationId, outsider.id, { emails: [other.email] })
+    const outcome = invitation.outcomes[0]
+    if (!outcome.created) throw new Error('second Organization fixture invitation not created')
+    const firstOrgBefore = await workspaceDb.select({ role: organizationMembers.role }).from(organizationMembers)
+      .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, other.id)))
+    assert.equal(firstOrgBefore.length, 1)
+    const result = await invite.acceptOrganizationInvitation({ token: outcome.path.split('/').at(-1)! }, other)
+    assert.equal(result.organizationId, secondOrganizationId)
+    assert.equal(result.role, 'member')
+    const firstOrgAfter = await workspaceDb.select({ role: organizationMembers.role }).from(organizationMembers)
+      .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, other.id)))
+    assert.deepEqual(firstOrgAfter, firstOrgBefore, 'second Organization membership must not replace the first')
+    for (const id of [workspaceId, secondWorkspaceId]) {
+      const unauthorized = await workspaceDb.select().from(workspaceMembers)
+        .where(and(eq(workspaceMembers.workspaceId, id), eq(workspaceMembers.userId, other.id)))
+      assert.equal(unauthorized.length, 0, 'accepting either Organization invitation must not confer a private Workspace role')
+    }
+    const isolated = await invite.listOrganizationInvitations(secondOrganizationId, other.id)
+    assert.deepEqual(isolated.invitations, [], 'a newly invited Member cannot enumerate the second Organization owner\'s invites')
+    await assert.rejects(invite.issueOrganizationInvitations(secondOrganizationId, sender.id, { emails: [invitee.email] }),
+      (error: unknown) => (error as { detail?: string }).detail === 'access_denied')
+    // An Organization owner must not revoke an invitation from another
+    // Organization even when given the exact UUID of its pending invitation.
+    const otherOrgPending = await invite.issueOrganizationInvitations(secondOrganizationId, outsider.id, {
+      emails: [unverified.email],
+    })
+    const pending = otherOrgPending.outcomes[0]
+    if (!pending.created) throw new Error('independent Organization fixture invitation not created')
+    await assert.rejects(invite.revokeOrganizationInvitation(organizationId, owner.id, { invitationId: pending.id }),
+      (error: unknown) => (error as { detail?: string }).detail === 'access_denied')
+    const [unmodified] = await workspaceDb.select({ status: organizationInvitations.status }).from(organizationInvitations)
+      .where(eq(organizationInvitations.id, pending.id))
+    assert.equal(unmodified.status, 'pending', 'cross-Organization revocation must not mutate the invitation')
+    await invite.revokeOrganizationInvitation(secondOrganizationId, outsider.id, { invitationId: pending.id })
   })
 
   await t.test('revoked and expired bearers never reactivate, and members can only revoke their own invites', async () => {
@@ -124,6 +175,13 @@ test('Organization invitations grant only a verified Member without inheriting W
     await assert.rejects(invite.acceptOrganizationInvitation({ token: issued.path.split('/').at(-1)! }, outsider))
     const expired = await invite.issueOrganizationInvitations(organizationId, other.id, { emails: [outsider.email] })
     if (!expired.outcomes[0].created) throw new Error('fixture retry not created')
+    // The same invitation row ID is reused. Reissuing it must still invalidate
+    // the previously revoked bearer while the new invitation remains pending.
+    await assert.rejects(invite.acceptOrganizationInvitation({ token: issued.path.split('/').at(-1)! }, outsider),
+      (error: unknown) => (error as { detail?: string }).detail === 'invalid_request')
+    const [reissued] = await workspaceDb.select({ status: organizationInvitations.status }).from(organizationInvitations)
+      .where(eq(organizationInvitations.id, expired.outcomes[0].id))
+    assert.equal(reissued.status, 'pending', 'a rejected old bearer must not consume its replacement')
     await workspaceDb.update(organizationInvitations).set({ expiresAt: new Date(0) })
       .where(eq(organizationInvitations.id, expired.outcomes[0].id))
     await assert.rejects(invite.acceptOrganizationInvitation({
