@@ -1494,5 +1494,40 @@
     "behavior": "Search authorized workspace conversations by their own titles, including task-free historical runs. Page by activity after resolving continuation chains in installation PostgreSQL.",
     "test": "tests/conversation-title.db.test.ts",
     "suite": "test:run-publication-db"
+  },
+  "app/actions/agents.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the current conversation model and authorize its owner before loading the next-turn model menu using the installation database.",
+    "test": "tests/thread-continue.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "lib/thread-model-choice.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validate the exact model and its funding source when the owner requests a new turn.",
+    "test": "tests/thread-continue.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "lib/thread-model-menu.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Build the next-turn menu from the authorized owner’s ordered candidates, device and existing coding harness.",
+    "test": "tests/thread-continue.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "lib/thread-reference-search.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Search only readable tasks, conversations and pull requests in the active installation workspace.",
+    "test": "tests/thread-references.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "lib/thread-references.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Recognize and encode supported conversation citations using installation routes.",
+    "test": "tests/thread-references.db.test.ts",
+    "suite": "test:bot-threads-db"
   }
 }

@@ -6,6 +6,7 @@ import { db, pool } from '@/lib/db'
 import { agentRuns, runMessages } from '@/lib/db/schema'
 import { threadModelChoice, threadModelKey, type ThreadModelChoice } from '@/lib/thread-model-choice'
 import type { TaskThreadRun } from '@/lib/thread-dispatch'
+import type { OrderEntry } from '@/lib/model-order-plan'
 import { ActionFailureError } from '@/lib/action-error'
 import { ACTION_ERROR_CODES, type ActionErrorCode } from '@/lib/action-result'
 import { addRunMessage } from '@/lib/agent-runs'
@@ -210,7 +211,7 @@ async function queueNextRun(userId: string, run: typeof agentRuns.$inferSelect, 
       (run.agentDefinition?.agentProfile && run.agentDefinition.agentProfile.definition.model.mode !== 'inherit') ||
       run.questionContinuation?.requireSessionResume) throw new ActionFailureError('threadCannotContinue')
     const scope = { ownerId: userId, workspaceId: run.workspaceId, botId: run.botId }
-    const entry = { ...modelChoice, harness, id: threadModelKey(modelChoice) }
+    const entry: OrderEntry = { ...modelChoice, harness, id: threadModelKey(modelChoice) }
     const selected = previous.cloud
       ? await chooseCloudRunModel(pool, scope, run.agentId, harness, modelChoice.model, 'task', entry)
       : run.deviceId ? await chooseLocalRunModel(pool, scope, { id: run.agentId, deviceId: run.deviceId, harness }, modelChoice.model, entry) : null
