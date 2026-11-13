@@ -81,9 +81,9 @@ export default function Conversations() {
           onPress={() => router.push(`/thread/${item.id}`)} />
         {!item.unread && <View style={styles.action}><GlassButton label={labels.markUnread} disabled={writing} onPress={() => void mark(item.id)} /></View>}
       </View>}
-      ListEmptyComponent={!list.error ? <Text style={styles.action}>{list.loading || !workspaceId ? labels.loading : labels.empty}</Text> : null}
+      ListEmptyComponent={!list.error ? <Text style={styles.action}>{list.loading || !workspaceId ? labels.loading : labels.empty}</Text> : undefined}
       ListFooterComponent={pages.hasMore ? <View style={styles.action}><GlassButton label={pages.failed ? labels.retry : labels.more}
-        busy={pages.loading} onPress={() => void pages.loadMore()} /></View> : null} />
+        busy={pages.loading} onPress={() => void pages.loadMore()} /></View> : undefined} />
   </View>
 }
 const styles = StyleSheet.create({
