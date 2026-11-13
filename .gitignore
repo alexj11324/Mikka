@@ -92,3 +92,5 @@ next-env.d.ts
 # Cloudflare build receipts and release artifacts.
 /.cloudflare-ci/
 /.mikka-cloud/
+/.mikka-web/
+/.cloudflare-marketing/
