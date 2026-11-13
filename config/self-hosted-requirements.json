@@ -650,6 +650,18 @@
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "lib/governance/organization-invitation-mail.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "MIKKA_ORG_INVITE_EMAIL_ENABLED",
+      "MIKKA_EMAIL_FROM",
+      "SMTP_URL",
+      "RESEND_API_KEY"
+    ],
+    "behavior": "Organization invitation email is an explicit opt-in side effect after the Member-only invitation is committed. The canonical application origin anchors bearer links, and provider failure preserves the manual invite without granting Workspace access.",
+    "test": "lib/governance/organization-invitation-mail.test.ts",
+    "suite": "test:governance"
+  },
   "lib/governance/organization-invitations.ts": {
     "mode": "built-in",
     "environment": [],
