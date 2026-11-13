@@ -16,5 +16,4 @@ export async function inboxChanged(userId: string, workspaceId: string) {
   await sendLiveInvalidations({ ownerId: userId, workspaceId }, [{ kind: 'issue_list', id: workspaceId }, { kind: 'pending_actions', id: workspaceId }])
 }
 export const inbox = () => new InboxStore(pool, inboxGuard, inboxChanged, () => armDueTimer('schedules'))
-export const inboxNextDue = () => inbox().nextDue()
 export const expireInboxSnoozes = () => inbox().expire()
