@@ -2,14 +2,14 @@ import {eveChannel} from 'eve/channels/eve'
 import type {RouteHandlerArgs} from 'eve/channels'
 import type {EveAuthResult} from 'eve/channels/eve'
 import {z} from 'zod'
-import {internalEveScope} from './auth'
+import {internalEveRequestScope} from './auth'
 import {assertEveScope,scopeAuth,scopeFromAuth} from './scope'
 import {bindEvaluationSession,loadEvaluationBinding} from './evaluation-store'
 import {evaluationBindingId} from './evaluation-context'
 
 const prefix='/mikka/evaluations'
 async function authenticate(request:Request):Promise<EveAuthResult|null> {
-  const scope=internalEveScope(request.headers.get('authorization'))
+  const scope=internalEveRequestScope(request)
   const id=z.uuid().safeParse(request.headers.get('x-mikka-evaluation-id'))
   if(!scope||!id.success)return null
   await assertEveScope(scope)

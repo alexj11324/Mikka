@@ -6,7 +6,7 @@ const scope = { ownerId: 'owner', botId: 'b11e5145-bf3e-4a30-b7de-745c386813c4',
 const body = { operation: 'execute', sessionId: 'wrun_session', turnId: 'turn_1', executionId: '653d6418-3a58-417e-8aeb-0a56b8d46ac2', name: 'read_issue', input: { id: 'issue_1' }, callId: 'call_1' }
 const request = (value: unknown) => new Request('https://app.example/mikka/api/internal/eve/tools', { method: 'POST', body: JSON.stringify(value) })
 
-test('unsigned requests are refused before body parsing, session lookup or tool work', async () => {
+test('unauthenticated requests are refused before body parsing, session lookup or tool work', async () => {
   let touched = false
   const services: EveProductGatewayServices = { authorize: async () => null, assertSession: async () => { touched = true }, run: async () => { touched = true } }
   const response = await handleEveProductRequest(request(body), services)
@@ -14,7 +14,7 @@ test('unsigned requests are refused before body parsing, session lookup or tool 
   assert.equal(touched, false)
 })
 
-test('a signed request still needs authorization to its persisted session before tool execution', async () => {
+test('an authenticated request still needs authorization to its persisted session before tool execution', async () => {
   let invoked = false
   const response = await handleEveProductRequest(request(body), {
     authorize: async () => scope,
@@ -54,8 +54,8 @@ test('approval review and native resumption use separate strict host operations'
   const responder = { authenticator: 'mikka', principalType: 'user', principalId: scope.ownerId,
     attributes: { botId: scope.botId, workspaceId: scope.workspaceId, surface: scope.surface } }
   const seen: unknown[] = []
-  const services: EveProductGatewayServices = { authorize: async () => scope, assertSession: async () => {}, run: async (_scope, input, _signal, authorization) => {
-    assert.equal(authorization, 'Bearer trusted-service-fixture')
+  const services: EveProductGatewayServices = { authorize: async () => scope, assertSession: async () => {}, run: async (_scope, input, _signal, request) => {
+    assert.equal(request.headers.get('authorization'), 'Bearer trusted-service-fixture')
     seen.push(input)
     return input.operation === 'approval' ? { status: 'user-approval' } : { output: 'sent' }
   } }

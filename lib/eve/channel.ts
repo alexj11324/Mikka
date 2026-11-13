@@ -2,7 +2,7 @@ import { eveChannel } from 'eve/channels/eve'
 import { POST, type RouteHandlerArgs, type HttpRouteDefinition } from 'eve/channels'
 import { z } from 'zod'
 import { ActionFailureError } from '../action-error'
-import { authenticateEveRequest, internalEveScope } from './auth'
+import { authenticateEveRequest, internalEveRequestScope } from './auth'
 import { assertSessionScope, conversationAddress, registerSession, scopeFromAuth, scopeAuth, type EveScope } from './scope'
 import { priorHistory } from './history'
 import { withSessionControlDelivery } from './session-control-delivery.mjs'
@@ -93,7 +93,7 @@ export function mikkaEveChannel() {
       },
     }),
     POST('/eve/v1/mikka/events', async (request,args) => {
-      const scope = internalEveScope(request.headers.get('authorization'))
+      const scope = internalEveRequestScope(request)
       if (!scope) return Response.json({ok:false,error:'authRequired'},{status:401})
       const input = z.object({eventId:z.uuid()}).strict().parse(await request.json())
       const { deliverEveEvent } = await import('./submission')
