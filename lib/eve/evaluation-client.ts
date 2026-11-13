@@ -41,13 +41,12 @@ export async function evaluationDeliveryTrace(delivery:Delivery,plan:EvaluationP
  * completes before the terminal commit; there is no timer/polling loop. */
 async function endEvaluationSession(session:ClientSession) {
   const signal=AbortSignal.timeout(30000)
-  const end=await session.end({reason:'Agent Kit evaluation complete',signal})
-  await end.result({signal}).catch(()=>{})
-  const snapshot=await session.snapshot({signal})
-  if(!snapshot.events.some(event=>event.type==='session.ended')) {
-    for await(const event of session.stream({startIndex:snapshot.session.streamIndex,signal}))if(event.type==='session.ended')break
+  await session.end({reason:'Agent Kit evaluation complete',signal})
+  for await (const event of session.stream({startIndex:0,signal})) {
+    if (event.type === 'session.ended') return
   }
-  if(!(await session.snapshot({signal})).events.some(event=>event.type==='session.ended'))throw new Error('agentEvaluationGenerationFailed')
+  signal.throwIfAborted()
+  throw new Error('agentEvaluationGenerationFailed')
 }
 
 /** Public Client owns sends, streaming, settlement, cancellation and teardown. */
