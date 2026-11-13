@@ -283,3 +283,12 @@ export async function listConversations(input: DirectoryInput) {
   const { pool } = await import('@/lib/db')
   return conversationDirectory(pool, ownerId, workspaceId, input)
 }
+
+/** A workspace switch between composing and searching invalidates the old picker. */
+export async function findThreadReferences(expectedWorkspaceId: string, query: string, kind?: 'task' | 'thread' | 'pr') {
+  const { ownerId, workspaceId } = await conversationActor()
+  if (expectedWorkspaceId !== workspaceId || typeof query !== 'string' || query.length > 120 ||
+    (kind !== undefined && !['task', 'thread', 'pr'].includes(kind))) throw new ActionFailureError('validationGeneric')
+  const { searchThreadReferences } = await import('@/lib/thread-reference-search')
+  return searchThreadReferences(ownerId, workspaceId, query.trim(), kind)
+}

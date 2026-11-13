@@ -45,6 +45,8 @@ export type ThreadEntry =
     /** When it was written, ms. */
     at: number
     text: string
+    /** The same words with explicit task, thread and PR references linked. */
+    body?: ReactNode
     /** What went with it: a quote from an artifact or a reply, browser notes, a 建议 card. */
     attachments?: { id: string; name: string; meta?: string }[]
     /** queued: written offline · sending · failed: shows 重试 (onRetry). */

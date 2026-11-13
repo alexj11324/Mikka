@@ -4393,6 +4393,15 @@
     "untitled": "未命名对话",
     "more": "加载更多"
   },
+  "ThreadReferences": {
+    "references": "引用",
+    "task": "任务",
+    "thread": "对话",
+    "pr": "拉取请求",
+    "searching": "正在搜索…",
+    "error": "引用加载失败",
+    "empty": "没有匹配的引用"
+  },
   "IssueThreads": {
     "composerModelUnknown": "模型未上报",
     "composerModelRequested": "所选模型：{model}",

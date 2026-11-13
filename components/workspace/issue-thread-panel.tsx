@@ -38,6 +38,7 @@ import type { ThreadEntry, ThreadEntryPart } from '@/components/slots/thread-con
 import { HarnessMark, harnessName, ModelLabel } from '@/components/labels/entity-labels'
 import { navigate } from './workspace-navigation'
 import { ThreadHeader, ThreadStatusLine } from './thread-header'
+import { PersonReferences, ThreadReferencePicker } from './thread-references'
 import { ThreadContextUsage } from './thread-context-usage'
 import { ThreadOutlineIndex } from './thread-outline-index'
 import { threadOutline } from '@/lib/thread-outline'
@@ -70,7 +71,7 @@ function PersonBubble({ text, mine }: { text: string; mine: boolean }) {
   const { quote, text: words } = splitReplyQuote(text)
   const attached = splitChatFiles(words)
   return <>
-    <div className={cn(BUBBLE, 'flex flex-col', mine ? 'self-end bg-background text-foreground ring-1 ring-border' : 'self-start')}><CollapsibleMessage>{quote && <QuoteLine slot="reply-quote" text={quote} />}<ChatFileCards files={attached.files} sent /><span>{attached.text}</span></CollapsibleMessage></div>
+    <div className={cn(BUBBLE, 'flex flex-col', mine ? 'self-end bg-background text-foreground ring-1 ring-border' : 'self-start')}><CollapsibleMessage>{quote && <QuoteLine slot="reply-quote" text={quote} />}<ChatFileCards files={attached.files} sent /><span><PersonReferences text={attached.text} /></span></CollapsibleMessage></div>
     <MessageActions className={cn(HOVER_ACTIONS, mine ? 'self-end' : 'self-start')}><CopyAction text={words} /></MessageActions>
   </>
 }
@@ -426,6 +427,9 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   if (!readRejected) for (const row of localMessages) entries.push({ id: row.id, role: 'person', at: row.at, text: row.text,
     status: row.phase === 'accepted' ? 'sent' : row.phase, deliveryMessage: row.error,
     ...(row.phase === 'failed' && (!replyBlocked || row.review) ? { onRetry: () => { void send(undefined, undefined, row) } } : {}) })
+  for (const entry of entries) {
+    if (entry.role === 'person' && /\[\[(?:issue|run):|https:\/\/github\.com\//i.test(entry.text)) entry.body = <PersonReferences text={entry.text} />
+  }
   // Re-publish the admitted read itself. Identical message lengths or tool
   // counts do not prove the content, grant or attempt result is unchanged.
   useEffect(() => { if (collect) collect(runId, entries) }, [collect, runId, data, active, canRetry, sending, view?.status, retryLabel, delivery.rows]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -438,6 +442,9 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     {recorded?.served && recorded.selected && recorded.served !== recorded.selected &&
       <span>{t('composerModelRequested', { model: recorded.selected })}</span>}
   </span> : undefined
+  const referenceWorkspace = liveRuns.find(run => run.id === liveRunId)?.workspaceId
+  const references = referenceWorkspace && data?.thread.ownedByCurrentUser ? <ThreadReferencePicker draft={draft}
+    workspaceId={referenceWorkspace} input={inputRef} onChange={setDraft} /> : null
   const conversation = !bare && detail ? <ThreadScreen botId={null} name={title} mark={author?.mark ?? null} entries={data ? [...beforeEntries ?? [], ...entries, ...afterEntries ?? []] : null}
     working={working} onStop={working && canStop ? () => { void stop() } : undefined}
     composer={{ ref: inputRef, model: modelControl, label: replyBlocked ? t('checkEnded') : t('composer', { agent: harnessLabel(threadComposerHarness(detail.harness, liveRunId, modelFallback)) }), value: draft, onChange: setDraft, onSubmit: () => { void send() },
@@ -445,6 +452,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       running: working || (question === 'resuming' && !data?.thread.questionWake), thread: true }}
     pending={[...changeRequest ? [{ id: 'change-request', name: changeRequest.label, onRemove: changeRequest.onCancel }] : [], ...replyQuote ? [{ id: 'reply-quote', name: replyQuote, onRemove: () => setReplyQuote(null) }] : []]}
     notices={<>
+      {references}
       {data?.thread.quota?.paused && <ThreadQuotaPausedCard paused={data.thread.quota.paused} onContinued={() => { void mutate(); void mutateCache(['issue-threads', issueId]) }} />}
       {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive-foreground">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
@@ -462,6 +470,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
         again in the same thread (R-81); only a thread the viewer cannot see in full (no `detail`) has none. */}
     {detail && <div data-slot="thread-composer" className="flex shrink-0 flex-col gap-1 p-3">
       {/* Keep the draft editable while stop waits for the daemon; do not queue new work after stop. */}
+      {references}
       <ChatComposer ref={inputRef} model={modelControl} label={replyBlocked ? t('checkEnded') : t('composer', { agent: harnessLabel(threadComposerHarness(detail.harness, liveRunId, modelFallback)) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }} attachmentScope={{ kind: 'thread', id: liveRunId }}
         quote={changeRequest ? <QuoteChip slot="change-request-chip" text={changeRequest.label} icon={<MessageSquareDiff aria-hidden="true" className="size-3.5 shrink-0" />} onRemove={changeRequest.onCancel} />
           : replyQuote ? <QuoteChip slot="reply-quote-chip" text={replyQuote} onRemove={() => { setReplyQuote(null); inputRef.current?.focus() }} /> : undefined}
