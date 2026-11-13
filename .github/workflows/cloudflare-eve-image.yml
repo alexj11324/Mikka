@@ -1,5 +1,19 @@
 name: Cloudflare Eve image
 on:
+  workflow_dispatch:
+    inputs:
+      api_build_uuid:
+        description: Accepted API build UUID
+        type: string
+        required: true
+      api_image_digest:
+        description: Accepted API image digest
+        type: string
+        required: true
+      overlay_sha:
+        description: Accepted UI Overlay commit SHA
+        type: string
+        required: true
   pull_request:
     paths:
       - 'apps/eve/**'
@@ -31,6 +45,7 @@ permissions:
   contents: read
 jobs:
   image:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -38,8 +53,8 @@ jobs:
       MIKKA_EVE_WORKFLOW_WORLD: cloudflare
       NODE_OPTIONS: --max-old-space-size=6144
       MIKKA_BUILD_REVISION: ${{ github.sha }}
-      # A public checkout builds its server authentication and status resources.
-      # Only the private release supplies both an official UI checkout and its SHA.
+      # Ordinary qualification builds the public server resources.
+      # Manual publication restores resources from the accepted official API image.
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -81,3 +96,82 @@ jobs:
           docker run --rm --network none \
             --mount "type=bind,src=$PWD/cloudflare/eve-runtime/test/compiled-host.mjs,dst=/acceptance.mjs,readonly" \
             mikka-eve-qualification node /acceptance.mjs
+  publish:
+    if: github.repository == 'alexj11324/Mikka' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: cloudflare-runtime-release
+    timeout-minutes: 60
+    env:
+      NITRO_PRESET: node-server
+      MIKKA_EVE_WORKFLOW_WORLD: cloudflare
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/pnpm-install
+        with:
+          skip-electron: 'true'
+      - name: Prepare the source-bound runtime release
+        env:
+          API_BUILD_UUID: ${{ inputs.api_build_uuid }}
+          API_IMAGE_DIGEST: ${{ inputs.api_image_digest }}
+          OVERLAY_SHA: ${{ inputs.overlay_sha }}
+          MIKKA_CF_API_RECEIPT: ${{ secrets.MIKKA_CF_API_RECEIPT }}
+          CF_RUNTIME_REGISTRY_USERNAME: ${{ secrets.CF_RUNTIME_REGISTRY_USERNAME }}
+          CF_RUNTIME_REGISTRY_PASSWORD: ${{ secrets.CF_RUNTIME_REGISTRY_PASSWORD }}
+        run: node scripts/cloudflare-runtime-release.mjs prepare eve
+      - name: Bundle the private World authority from the locked public source
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          set -euo pipefail
+          world="$RUNNER_TEMP/eve-world"
+          pnpm exec wrangler deploy --dry-run --config packages/eve-cloudflare-world/wrangler.jsonc --outdir "$world"
+          artifact="$RUNNER_TEMP/eve-world-artifact"
+          mkdir -p "$artifact/modules"
+          cp -a "$world/." "$artifact/modules/"
+          rm -f "$artifact/modules/README.md"
+          cd "$artifact"
+          find modules -type f -print -quit | grep -q .
+          git -C "$GITHUB_WORKSPACE" rev-parse HEAD > source.txt
+          find modules -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS
+          sha256sum source.txt >> SHA256SUMS
+          sha256sum --check --status SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: eve-world-authority-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/eve-world-artifact/
+          if-no-files-found: error
+          retention-days: 1
+      - name: Compile the official Eve runtime and shared product resources offline
+        run: bash scripts/build-cloudflare-eve-image.sh --prebuilt-api
+      - name: Build the portable Node 24 image
+        run: |
+          docker build -f cloudflare/eve-runtime/Dockerfile --label "org.opencontainers.image.revision=$MIKKA_BUILD_REVISION" --label "com.mikka.overlay=$MIKKA_UI_OVERLAY_SHA" --label "com.mikka.release=$MIKKA_DEPLOYMENT_ID" -t "mikka-eve:$MIKKA_DEPLOYMENT_ID" .
+          image_id=$(docker image inspect --format '{{.Id}}' "mikka-eve:$MIKKA_DEPLOYMENT_ID")
+          echo "RUNTIME_TESTED_IMAGE_ID=$image_id" >> "$GITHUB_ENV"
+      - name: Start the compiled host and require the native World
+        run: |
+          docker run --rm --network none \
+            --mount "type=bind,src=$PWD/cloudflare/eve-runtime/test/compiled-host.mjs,dst=/acceptance.mjs,readonly" \
+            "$RUNTIME_TESTED_IMAGE_ID" node /acceptance.mjs
+      - name: Publish the verified runtime image
+        env:
+          API_BUILD_UUID: ${{ inputs.api_build_uuid }}
+          API_IMAGE_DIGEST: ${{ inputs.api_image_digest }}
+          OVERLAY_SHA: ${{ inputs.overlay_sha }}
+          MIKKA_CF_API_RECEIPT: ${{ secrets.MIKKA_CF_API_RECEIPT }}
+          CF_RUNTIME_REGISTRY_USERNAME: ${{ secrets.CF_RUNTIME_REGISTRY_USERNAME }}
+          CF_RUNTIME_REGISTRY_PASSWORD: ${{ secrets.CF_RUNTIME_REGISTRY_PASSWORD }}
+        run: node scripts/cloudflare-runtime-release.mjs publish eve
+      - name: Upload the runtime OCI receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: runtime-eve-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/runtime-eve-receipt.json
+          if-no-files-found: error
+          retention-days: 1
+      - name: Remove the temporary Registry credentials
+        if: always()
+        run: node scripts/cloudflare-runtime-release.mjs cleanup
