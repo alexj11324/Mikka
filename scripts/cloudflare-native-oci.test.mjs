@@ -40,7 +40,8 @@ test('prepared image evidence and registry digest remain bound to this build', (
   assert.equal(validatePrepared(prepared, selected), prepared)
   assert.throws(() => validatePrepared({ ...prepared, privateSha: publicSha }, selected), /CF_OCI_PREPARED_MISMATCH/)
   const account = 'f'.repeat(32)
-  assert.equal(digestFromRepoDigests('registry.cloudflare.com/' + account + '/mikka-api@' + digest, account, selected.id).digest, digest)
+  const printed = 'registry.cloudflare.com/' + account + '/mikka-api@' + digest + '\n'
+  assert.equal(digestFromRepoDigests(printed + printed, account, selected.id).digest, digest)
   assert.throws(() => digestFromRepoDigests('', account, selected.id), /CF_OCI_REGISTRY_DIGEST_UNVERIFIED/)
   assert.ok(releaseDockerfile('FROM node:24').includes('RUN --network=none'))
 })
