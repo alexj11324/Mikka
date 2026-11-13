@@ -283,3 +283,10 @@ export async function listConversations(input: DirectoryInput) {
   const { pool } = await import('@/lib/db')
   return conversationDirectory(pool, ownerId, workspaceId, input)
 }
+
+export async function listConversationSidebar() {
+  const { ownerId, workspaceId } = await conversationActor()
+  const { conversationSidebar } = await import('@/lib/conversation-directory')
+  const { pool } = await import('@/lib/db')
+  return conversationSidebar(pool, ownerId, workspaceId)
+}

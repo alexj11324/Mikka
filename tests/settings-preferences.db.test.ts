@@ -84,6 +84,7 @@ dbTest('preferences read both optional owner rows in one statement without losin
     } finally { observed.mock.restore() }
   }
   const stored = {
+    archiveIdleAfterDays: 30,
     pushDecide: false, pushReview: false, pushFinished: false, pushBriefing: false,
     pushWhen: schema.PUSH_WHEN.find(value => value !== 'always')!,
     memoryEnabled: false, sendKey: 'modEnter' as const, personalInstructions: 'Synthetic owner preference',
@@ -142,6 +143,11 @@ dbTest('preferences: send key, personal instructions and daily suggestions save 
   assert.equal((await preferences.getPreferences()).personalInstructions, '回答用中文', 'a refused patch changes nothing')
 
   // 每日建议 needs 记忆.
+  for (const days of [3, 7, 14, 30, 90, 0]) {
+    assert.equal((await preferences.updatePreferences({ archiveIdleAfterDays: days })).archiveIdleAfterDays, days)
+  }
+  assert.equal((await preferences.updatePreferences({ archiveIdleAfterDays: 1 })).error, 'validationGeneric')
+  assert.equal((await preferences.getPreferences()).archiveIdleAfterDays, 0)
   const memoryOff = await preferences.updatePreferences({ memoryEnabled: false })
   assert.equal(!memoryOff.error && memoryOff.dailySuggestions, false, 'turning 记忆 off turns 每日建议 off')
   assert.equal((await preferences.updatePreferences({ dailySuggestions: true })).error, 'dailySuggestionsNeedMemory')

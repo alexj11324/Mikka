@@ -4378,6 +4378,10 @@
     "copyFailed": "Couldn't copy"
   },
   "ConversationDirectory": {
+    "archiveIdle": "Automatically archive idle conversations",
+    "archiveDays": "{days, plural, one {# day} other {# days}}",
+    "archiveOff": "Off",
+    "viewAll": "View all",
     "title": "Conversations",
     "search": "Search conversations",
     "all": "All",

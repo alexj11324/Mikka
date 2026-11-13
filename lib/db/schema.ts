@@ -436,6 +436,7 @@ export const agentRuns = pgTable('agent_runs', {
   title: varchar('title', { length: 60 }), titleSource: text('titleSource').$type<'generated' | 'manual'>(),
   /** On the canonical chain root, shared by all attempts. */
   conversationArchivedAt: timestamp('conversationArchivedAt', { withTimezone: true }),
+  conversationRestoredAt: timestamp('conversationRestoredAt', { withTimezone: true }),
   conversationPinnedAt: timestamp('conversationPinnedAt', { withTimezone: true }),
   /** On a thread's root run: the root of the thread that replaced it, when the person explicitly asked for a new one. */
   threadReplacedBy: uuid('threadReplacedBy').references((): AnyPgColumn => agentRuns.id, { onDelete: 'set null' }),
@@ -1282,6 +1283,7 @@ export const userPreferences = pgTable('user_preferences', {
   /** The chat composer's send key: Enter (Shift+Enter breaks the line) or ⌘/Ctrl+Enter (Enter breaks the line). */
   sendKey: text('sendKey').$type<SendKey>().notNull().default('enter'),
   /** The person's own instructions for the Coordinator and their Bots, at most 2000 characters. */
+  archiveIdleAfterDays: integer('archiveIdleAfterDays').notNull().default(30),
   personalInstructions: text('personalInstructions').notNull().default(''),
   /** 每日建议: the 08:00 briefing. Needs memoryEnabled. */
   dailySuggestions: boolean('dailySuggestions').notNull().default(true),
