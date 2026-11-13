@@ -20,10 +20,8 @@ const SHORT_TITLE_TIMEOUT_MS = 10_000
  * model, admission, prompt, parsing and limits. Null when the model gives nothing usable. Throws what the model or
  * admission throws; callers decide that a title is never worth failing for.
  */
-export async function generateShortTitle(ownerId: string, text: { title: string; body: string }): Promise<string | null> {
+export async function generateShortTitle(ownerId: string, text: { title: string; body: string }, workspaceId: string): Promise<string | null> {
   const { hostedModel, admitHostedModel } = await import('@/lib/abuse/model')
-  const { executionWorkspace } = await import('@/lib/execution-settings')
-  const workspaceId = await executionWorkspace(ownerId, null)
   await admitHostedModel({ workspaceId, ownerId }, SHORT_TITLE_MODEL, { auditAllowed: false })
   const model = await hostedModel(workspaceId, SHORT_TITLE_MODEL, undefined, ownerId)
   const { instructions, prompt } = shortTitlePrompt(text)
@@ -40,10 +38,10 @@ export async function generateShortTitle(ownerId: string, text: { title: string;
 export async function writeShortTitle(issueId: string, ownerId: string): Promise<void> {
   try {
     if (!await defaultModelAvailable(ownerId)) return
-    const [task] = await db.select({ title: issues.title, content: issues.content, shortTitle: issues.shortTitle }).from(issues)
+    const [task] = await db.select({ workspaceId: issues.workspaceId, title: issues.title, content: issues.content, shortTitle: issues.shortTitle }).from(issues)
       .where(and(eq(issues.id, issueId), eq(issues.userId, ownerId))).limit(1)
-    if (!task || task.shortTitle) return
-    const shortTitle = await generateShortTitle(ownerId, { title: task.title, body: tiptapToText(task.content) })
+    if (!task?.workspaceId || task.shortTitle) return
+    const shortTitle = await generateShortTitle(ownerId, { title: task.title, body: tiptapToText(task.content) }, task.workspaceId)
     if (!shortTitle) return
     await db.transaction(async tx => {
       const written = await tx.update(issues).set({ shortTitle, shortTitleFrom: task.title })

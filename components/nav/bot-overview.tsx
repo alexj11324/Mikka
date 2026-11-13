@@ -12,7 +12,7 @@ import { ComputerViewer } from '@/components/computer/computer-viewer'
 import { deleteLibraryFile, fetchBotLibrary } from '@/lib/bot-library'
 import { BOT_COLORS, BOT_NAME_MAX, BOT_SHAPES } from '@/lib/bot-shapes'
 import { isMockedComputer } from '@/lib/computer/client'
-import { PR_GROUPS, pullRequestsOf } from '@/lib/thread-groups'
+import { PR_GROUPS, botGlance, pullRequestsOf } from '@/lib/thread-groups'
 import { useActionError } from '@/lib/use-action-error'
 import { usePresence } from '@/lib/use-presence'
 import { DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotColor, type BotShape } from './bot-avatar'
@@ -147,8 +147,9 @@ export function BotOverviewBody({ conversation, tabs, tab, onTab, query, onQuery
       }) }
     }).filter(group => group.rows.length),
   }
+  const glance = botGlance(threads, issues)
   const draw = (role: BotOverviewProps['details']['role'], edit: BotOverviewProps['edit']) => <BotOverview conversation={conversation} tabs={tabs} tab={tab} onTab={onTab} query={query} onQuery={onQuery}
-    edit={edit} details={{ role, routines: [], library }} tasks={tasks} pullRequests={pullRequests} computer={computer} dialogs={dialogs} />
+    edit={edit} details={{ role, routines: [], library }} glance={glance} tasks={tasks} pullRequests={pullRequests} computer={computer} dialogs={dialogs} />
   if (!botId) return draw(null, null)
   return <RoleOf key={botId} botId={botId} workspaceId={workspaceId} visible={tab === 'details'}>{role =>
     <EditsOf botId={botId} color={conversation.color} shape={conversation.shape}>{edit => draw(role, edit)}</EditsOf>}</RoleOf>

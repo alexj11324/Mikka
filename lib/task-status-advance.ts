@@ -23,7 +23,7 @@ export function advancesTo(current: string, target: AdvanceTarget): boolean {
 
 /** A version written by a person after `since` whose status differs from the version before it. */
 const PERSON_CHANGED = (issue: string, since: string) => `EXISTS (
-  SELECT 1 FROM issue_versions v WHERE v."issueId"=${issue} AND v.actor_type='user' AND v."createdAt">${since}
+  SELECT 1 FROM issue_versions v WHERE v."issueId"=${issue} AND v.revision>1 AND v.actor_type='user' AND v."createdAt">${since}
     AND v.status IS DISTINCT FROM (SELECT p.status FROM issue_versions p WHERE p."issueId"=v."issueId" AND p.revision<v.revision ORDER BY p.revision DESC LIMIT 1))`
 
 /** $1 issue id, $2 target status, $3 when the work began (or null), $4 the source recorded on the version. */
@@ -53,7 +53,7 @@ export async function advanceIssueStatus(database: Query, input: { issueId: stri
 /** The same guard for a caller that already holds the task's row in a Drizzle transaction and writes it itself. */
 export function personChangedStatusSince(issueId: string, since: Date): SQL<boolean> {
   return sql<boolean>`EXISTS (
-    SELECT 1 FROM issue_versions v WHERE v."issueId"=${issueId} AND v.actor_type='user' AND v."createdAt">${since.toISOString()}::timestamptz
+    SELECT 1 FROM issue_versions v WHERE v."issueId"=${issueId} AND v.revision>1 AND v.actor_type='user' AND v."createdAt">${since.toISOString()}::timestamptz
       AND v.status IS DISTINCT FROM (SELECT p.status FROM issue_versions p WHERE p."issueId"=v."issueId" AND p.revision<v.revision ORDER BY p.revision DESC LIMIT 1))`
 }
 
