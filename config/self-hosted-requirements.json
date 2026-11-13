@@ -1233,6 +1233,13 @@
     "test": "lib/coding-workspace/review-authority.db.test.ts",
     "suite": "test:coding-workspace-db"
   },
+  "lib/computer/anonymous-startup-hint.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Build the selected harness's speculative hint from the frozen run configuration. Unsupported or ineligible self-hosted runs use their ordinary worker claim.",
+    "test": "lib/computer/anonymous-startup-hint.test.ts",
+    "suite": "test:cloud-limits"
+  },
   "lib/cloud-computer/thread-machines.ts": {
     "mode": "built-in",
     "environment": [],
