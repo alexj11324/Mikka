@@ -168,7 +168,7 @@ test('host settlement receipts preserve product publication across native RPC re
       const approval = tool.approval as import('eve/tools/approval').ApprovalConfiguration<unknown>
       const foreign = {...context,session:{...context.session,auth:{current:scopeAuth({...scope,ownerId:'another-owner'})}}}
       assert.equal(await approval.request(foreign as never), 'denied')
-      await assert.rejects(approval.request({...context,abortSignal:AbortSignal.abort()} as never) as Promise<unknown>, {name:'AbortError'})
+      await assert.rejects(async () => approval.request({...context,abortSignal:AbortSignal.abort()} as never), {name:'AbortError'})
       assert.equal(await approval.request(context as never), 'not-applicable')
       assert.deepEqual(await tool.execute!(input as never, context as never), [])
       assert.deepEqual(calls, ['catalogue','execute'])
@@ -181,9 +181,9 @@ test('host settlement receipts preserve product publication across native RPC re
       // still requires a matching durable review before any provider dispatch.
       const priorCatalogue = createProductTool(scope,binding,{...write,needsApprovalReview:false})
       const mail = {to:['fixture@example.invalid'],subject:'Fixture',body:'No delivery'}
-      await assert.rejects(priorCatalogue.execute!(mail as never, {...context,callId:'changed_policy'} as never), /agentToolUnavailable/)
+      await assert.rejects(async () => priorCatalogue.execute!(mail as never, {...context,callId:'changed_policy'} as never), /agentToolUnavailable/)
       await store.finishExecution(scope, execution.id, 'completed')
-      await assert.rejects(tool.execute!(input as never, context as never), /agentToolUnavailable/)
+      await assert.rejects(async () => tool.execute!(input as never, context as never), /agentToolUnavailable/)
     })
     await t.test('failed native turn marks only its owned source and never overwrites a newer session',async()=>{
       const {projectEveTurn,projectTurnState}=await import('./projection')
