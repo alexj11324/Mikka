@@ -245,7 +245,7 @@ async function publish() {
   // Wrangler authenticates with the Cloudflare Workers Builds deploy token, not GitHub Actions/OIDC.
   const publishEnv = { ...dockerEnv, CLOUDFLARE_API_TOKEN: process.env.CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID }
   command('corepack', ['pnpm', 'exec', 'wrangler', 'containers', 'push', record.tag], { cwd: root, env: publishEnv, stage: 'REGISTRY_PUSH' })
-  const refs = stdout('docker', ['image', 'inspect', registry + '/' + record.tag, '--format', '{{join .RepoDigests "\n"}}'], { env: dockerEnv, stage: 'REGISTRY_DIGEST' })
+  const refs = stdout('docker', ['image', 'inspect', registry + '/' + record.tag, '--format', '{{range .RepoDigests}}{{println .}}{{end}}'], { env: dockerEnv, stage: 'REGISTRY_DIGEST' })
   const verified = digestFromRepoDigests(refs, process.env.CLOUDFLARE_ACCOUNT_ID, selected.id)
   assertCurrentRefs(selected, await currentRefs())
   console.log('MIKKA_CF_OCI_RECEIPT=' + JSON.stringify({ version: 1, provider: selected.context.provider, ...verified,
