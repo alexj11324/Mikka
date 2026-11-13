@@ -2,8 +2,7 @@ import { freshSessionRoute } from '@/lib/fresh-session'
 import { organizationSession } from '@/lib/enterprise/http'
 import { governanceJson, governanceResponse } from '@/lib/governance/http'
 import { issueOrganizationInvitations, listOrganizationInvitations, revokeOrganizationInvitation } from '@/lib/governance/organization-invitations'
-import { sendOrganizationInvitationEmails } from '@/lib/governance/organization-invitation-mail'
-import { mailConfigured } from '@/lib/mail-delivery'
+import { organizationInvitationMailEnabled, sendOrganizationInvitationEmails } from '@/lib/governance/organization-invitation-mail'
 import { appOrigin } from '@/lib/mcp/resource'
 import { afterJob } from '@/lib/background'
 
@@ -21,7 +20,7 @@ export const POST = freshSessionRoute(async (request: Request, context: Context)
   const session = await organizationSession(request, organizationId)
   // Persist the invitation and audit record before any external mail side effect.
   const result = await issueOrganizationInvitations(organizationId, session.user.id, await governanceJson(request))
-  if (appOrigin && mailConfigured() && result.outcomes.some(outcome => outcome.created)) {
+  if (appOrigin && organizationInvitationMailEnabled() && result.outcomes.some(outcome => outcome.created)) {
     // A provider failure must not revoke a valid invite or lose the manual one-time link.
     // The configured origin, not a caller-controlled Host header, anchors every bearer URL.
     afterJob('after:organization-invitation-mail', async () => {
