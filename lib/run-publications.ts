@@ -15,6 +15,7 @@ import { readIssueMetadata, withIssueMetadata, pullRequestSchema } from '@/lib/i
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { workspaceDb } from '@/lib/workspace-db'
 import { systemActor } from '@/lib/activity-actor'
+import { advancesTo, personChangedStatusSince } from '@/lib/task-status-advance'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runFinishedEvent } from '@/lib/coordinator-events'
 import { publicationBranch, publicationGate } from '@/lib/run-publication-policy'
@@ -120,7 +121,10 @@ async function finishResult(tx: Transaction, run: Run, publication?: { pullReque
         const pullRequests = found ? metadata.pullRequests.map(existing => existing.url.replace(/\/$/, '') === pr.url ? pr : existing) : [...metadata.pullRequests, pr]
         content = withIssueMetadata(task.content, { ...metadata, pullRequests })
       }
-      const status = run.status === 'succeeded' && run.stopReason === 'submitted' && reachesReview('submitted', report ?? undefined) && !['done', 'cancelled', 'canceled'].includes(task.status) ? 'review' : task.status
+      // 评审中 only as a step forward (never from 已完成, 已取消 or 重复), and never over a status the person set after
+      // this run was asked for (lib/task-status-advance.ts).
+      const reaches = run.status === 'succeeded' && run.stopReason === 'submitted' && reachesReview('submitted', report ?? undefined) && advancesTo(task.status, 'review')
+      const status = reaches && !(await tx.execute<{ changed: boolean }>(sql`SELECT ${personChangedStatusSince(task.id, run.createdAt)} AS changed`)).rows[0]?.changed ? 'review' : task.status
       if (status !== task.status || JSON.stringify(content) !== JSON.stringify(task.content)) {
         const [saved] = await tx.update(issues).set({ content, status, revision: task.revision + 1, updatedAt: new Date() }).where(eq(issues.id, task.id)).returning()
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...systemActor('run-result') })

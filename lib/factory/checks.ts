@@ -3,6 +3,7 @@ import { runChanged } from '../live/panels';
 import { factoryRunBotMatches } from './run-scope'
 import { cloudTaskTarget, ownedCloudTaskTarget } from '../computer/cloud-task-target'
 import { runListChanged } from '../live/lists'
+import { advanceTaskAfterRunStart } from '../task-status-run-start'
 import type { Pool, PoolClient } from "pg";
 import { isDeepStrictEqual } from 'node:util';
 import { orchestratorSettings } from '@mikka/protocol/orchestrator';
@@ -816,6 +817,7 @@ export function createFactoryCheckClaim(pool:Pool,authorize:import('./store').Fa
    await onClaim?.(tx);
    const updated=await tx.query('UPDATE agent_runs SET status=\'preparing\',"startedAt"=now(),"leaseExpiresAt"=$2,"updatedAt"=now() WHERE id=$1 AND status=\'queued\' AND "stopRequestedAt" IS NULL RETURNING id',[runId,leaseExpiresAt]);
    if(updated.rowCount!==1)throw new FactoryError('factoryRunMismatch');
+    advanceTaskAfterRunStart(tx,runId);
     await runListChanged(tx,runId);
     await runChanged(tx,runId);
    const policy = runPolicySchema.parse(result.policy);
