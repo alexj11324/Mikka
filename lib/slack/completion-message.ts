@@ -2,6 +2,7 @@
 // caller supplies the visible task label, the fixed status and the deep link,
 // so prompt, report, error, stop reason and failure details can never reach
 // Slack. Only the display labels give way; the link is never truncated.
+import { isTerminalRunState, type TerminalRunState } from '@mikka/protocol/run-state'
 import { workspaceLink } from '@/components/workspace/workspace-navigation'
 import { withBasePath } from '@/lib/base-path'
 
@@ -12,8 +13,8 @@ import { withBasePath } from '@/lib/base-path'
  */
 export const SLACK_COMPLETION_MAX = 400
 
-export const SLACK_RUN_STATUSES = ['succeeded', 'failed', 'stopped', 'cancelled'] as const
-export type SlackRunStatus = (typeof SLACK_RUN_STATUSES)[number]
+export { isTerminalRunState as isSlackRunStatus, TERMINAL_RUN_STATES as SLACK_RUN_STATUSES } from '@mikka/protocol/run-state'
+export type SlackRunStatus = TerminalRunState
 export type SlackCompletionLocale = 'en' | 'zh-CN'
 
 const LABELS: Record<SlackCompletionLocale, Record<SlackRunStatus, string>> = {
@@ -29,10 +30,6 @@ const HTTP_URL = /^https?:\/\/\S+$/
 /** A person's Mikka locale, falling back to English as the completion copy does. */
 export function slackCompletionLocale(value: string | null | undefined): SlackCompletionLocale {
   return value === 'zh-CN' ? 'zh-CN' : 'en'
-}
-
-export function isSlackRunStatus(value: unknown): value is SlackRunStatus {
-  return typeof value === 'string' && (SLACK_RUN_STATUSES as readonly string[]).includes(value)
 }
 
 /** Count characters, not UTF-16 code units, so an emoji is one character. */
@@ -80,7 +77,7 @@ export interface SlackCompletionInput {
  * `<@U123>` render as text rather than mentions.
  */
 export function slackCompletionMessage(input: SlackCompletionInput): string {
-  if (!isSlackRunStatus(input.status)) throw new TypeError('unknown run status')
+  if (!isTerminalRunState(input.status)) throw new TypeError('unknown run status')
   const deepLink = input.deepLink.trim()
   if (!HTTP_URL.test(deepLink)) throw new TypeError('deep link must be an http(s) URL without whitespace')
   const locale = slackCompletionLocale(input.locale)
