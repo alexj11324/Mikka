@@ -18,7 +18,7 @@ test('one read per opened resource, with fresh data on run transitions, reopen a
   const { createRoot } = await import('react-dom/client')
   const { SWRConfig } = await import('swr')
   const { useRunArtifacts, useThreadMachine } = await import('./use-thread-run-reads')
-  const node = document.createElement('div')
+  const node = browser.document.createElement('div') as unknown as HTMLDivElement
   const root = createRoot(node)
   const cache = () => new Map()
   function Header({ run, status, issue }: { run: string; status: string; issue: string }) {
