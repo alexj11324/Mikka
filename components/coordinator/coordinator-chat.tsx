@@ -24,6 +24,7 @@ import { Message, MessageContent, MessageFooter } from '@/components/ui/message'
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport, useMessageScroller } from '@/components/ui/message-scroller'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { CircleAlert, CircleHelp } from 'lucide-react'
 import { toast } from 'sonner'
 import { AgentCitationsContext, CitationSources, useLinkPreviews, type AgentCitations } from '@/components/workspace/agent-citations'
@@ -110,7 +111,7 @@ const HEADER_FADE = 'md:[--scroll-fade-mask:linear-gradient(to_bottom,transparen
 export type CoordinatorPrefill = { text: string; nonce: number; suggestionId?: string }
 
 /** A chat read and when it was asked for, which anchors its live deadline (lib/live/list-read.ts). */
-type PersonalChatSend = ChatSubmission & { context: CoordinatorMessageContext }
+type PersonalChatSend = ChatSubmission & { context: CoordinatorMessageContext; turnPolicy?: 'queue' | 'steer' }
 
 type ChatRead = Chat & { requestedAt?: number }
 /** Pushes closer together than this share one read; the stream shows a turn's words meanwhile. */
@@ -176,6 +177,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
   /** A floating title pill sits over the chat on wide screens (ConversationPill): the layer's screen starts below it. */
   pill?: boolean }) {
   const t = useTranslations('Coordinator')
+  const threadCopy = useTranslations('IssueThreads')
   const cloudErrors = useTranslations('RunErrors')
   const tNav = useTranslations('Nav')
   const tCommon = useTranslations('Common')
@@ -269,14 +271,30 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
   if (mounted && data && initialScroll.current.following === null) initialScroll.current.following = following
   const startAtEnd = initialScroll.current.following ?? following
   const transcript = useViewScroll<HTMLDivElement>(`${stateKey}:messages`, !!data, !startAtEnd)
-  const [sending, setSending] = useState(false)
+  const [sends, setSends] = useState(0)
+  const sending = sends > 0
+  const [turnPolicy, setTurnPolicy] = useViewState<'queue' | 'steer'>('eve:turn-policy', 'queue')
+  const turnOptions = working && !resuming ? <NativeSelect size="sm" aria-label={threadCopy('deliveryMode')} value={turnPolicy}
+    onChange={event => setTurnPolicy(event.target.value === 'steer' ? 'steer' : 'queue')}>
+    <NativeSelectOption value="queue">{threadCopy('deliveryModes.queue')}</NativeSelectOption>
+    <NativeSelectOption value="steer">{threadCopy('deliveryModes.steer')}</NativeSelectOption>
+  </NativeSelect> : null
   // Words picked from a reply with 引用: they wait above the draft and head the next message as quote lines.
   const [replyQuote, setReplyQuote] = useViewState<string | null>(`${stateKey}:quote`, null)
   function quoteReply(text: string) {
     setReplyQuote(text)
     inputRef.current?.focus()
   }
-  const deliveryInFlight = useRef(false)
+  const draftInFlight = useRef(new Set<string>())
+  const admission = useRef(Promise.resolve())
+  const waitingAdmissions = useRef(new Map<string, { cancelled: boolean }>())
+  function cancelWaitingAdmission(id: string) {
+    const entry = waitingAdmissions.current.get(id)
+    if (!entry) { toast.error(threadCopy('deliveryTooLate')); return }
+    entry.cancelled = true
+    waitingAdmissions.current.delete(id)
+    delivery.setRows(rows => rows.filter(row => row.id !== id))
+  }
   const delivery = useChatDelivery<PersonalChatSend>(stateKey, t('sendUncertain'))
   const [retrying, setRetrying] = useState<ReadonlySet<number>>(() => new Set())
   const { submit, failureMessage } = useCoordinatorSubmit(stream)
@@ -310,6 +328,14 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
   const cardsOf = (item: Chat['items'][number], live: boolean) => item.threads.filter(id => (live ? !firstThreadCard.has(id) : firstThreadCard.get(id) === item.position) && sources?.[id]?.kind === 'run')
   const received = useMemo(() => new Set(items.flatMap(item => item.from === 'person' && item.submissionId ? [item.submissionId] : [])), [items])
   const localMessages = delivery.rows.filter(row => !received.has(row.id))
+  const waitingRows = delivery.rows.filter(row => waitingAdmissions.current.has(row.id))
+  const queuedNotice = working && waitingRows.length > 0 ? <div className="flex flex-col gap-1" aria-live="polite">
+    {waitingRows.map(row => <div key={row.id} className="flex min-w-0 items-center gap-2">
+      <span className="shrink-0 text-xs">{threadCopy('deliveryQueued')}</span>
+      <span className="min-w-0 flex-1 truncate text-sm">{row.text}</span>
+      <Button type="button" size="xs" variant="ghost" onClick={() => cancelWaitingAdmission(row.id)}>{threadCopy('deliveryCancel')}</Button>
+    </div>)}
+  </div> : null
   useEffect(() => {
     if (delivery.rows.some(row => received.has(row.id))) delivery.setRows(current => current.filter(row => !received.has(row.id)))
   }, [received, delivery.rows, delivery.setRows])
@@ -472,28 +498,48 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
 
   /** Sends `text` to the Coordinator or bot, with the browser's notes when `withNotes`: sent, failed (now a failed bubble), or skipped. */
   async function deliver(text: string, withNotes = false, retryOf?: number, previous?: PersonalChatSend, releaseDraft?: () => void): Promise<'sent' | 'failed' | 'skipped'> {
-    if (!text || sending || resuming || deliveryInFlight.current || unavailable) return 'skipped'
+    if (!text || resuming || unavailable) return 'skipped'
+    // A double-click can enter twice before React paints the emptied draft.
+    // A different draft has its own journal ID and may enter Eve immediately.
+    const draftKey = JSON.stringify([text, retryOf ?? null])
+    if (!previous && draftInFlight.current.has(draftKey)) return 'skipped'
     const notes = withNotes && browser?.notes.length ? [...browser.notes] : undefined
     const command = previous ?? { id: crypto.randomUUID(), at: Date.now(), text,
+      ...(working ? { turnPolicy } : {}),
       context: { quote: embedded?.quote, botId, notes, expectedWorkspaceId: selectedWorkspaceId ?? undefined, expectedOwnerId: userId ?? liveOwner ?? undefined,
         ...(retryOf !== undefined ? { retryOf } : {}) } }
     if (!delivery.begin(command)) return 'skipped'
     if (command.context.retryOf !== undefined) { const position = command.context.retryOf; setRetrying(current => new Set(current).add(position)) }
-    deliveryInFlight.current = true
-    setSending(true)
+    if (!previous) draftInFlight.current.add(draftKey)
+    const prior = admission.current
+    let advance!: () => void
+    admission.current = new Promise<void>(resolve => { advance = resolve })
+    const entry = { cancelled: false }
+    waitingAdmissions.current.set(command.id, entry)
+    setSends(count => count + 1)
     releaseDraft?.()
     const fail = (message: string) => { delivery.finish(command.id, { error: message }); return 'failed' as const }
     try {
+      await prior
+      if (entry.cancelled) return 'skipped'
       if (navigator.onLine === false) return fail(t('sendOffline'))
-      if (!await checkPageBuildBeforeAction()) return fail(t('sendUpdateRequired'))
-      const outcome = await submit(command.text, command.context, command.id)
+      const currentBuild = await checkPageBuildBeforeAction()
+      if (entry.cancelled) return 'skipped'
+      if (!currentBuild) return fail(t('sendUpdateRequired'))
+      waitingAdmissions.current.delete(command.id)
+      const outcome = await submit(command.text, command.context, command.id, command.turnPolicy)
       if (outcome.kind !== 'accepted') return fail(failureMessage(outcome) ?? t('sendUncertain'))
       delivery.finish(command.id, {})
       if (command.context.notes) browser?.removeMany(command.context.notes.map(note => note.n))
       void mutate().catch(() => undefined)
       setLocalSend(current => ({ key: stateKey, count: current.key === stateKey ? current.count + 1 : 1 }))
       return 'sent'
-    } catch { return fail(t('sendUncertain')) } finally { deliveryInFlight.current = false; setSending(false) }
+    } catch { return fail(t('sendUncertain')) } finally {
+      waitingAdmissions.current.delete(command.id)
+      advance()
+      if (!previous) draftInFlight.current.delete(draftKey)
+      setSends(count => count - 1)
+    }
   }
   /** Sends `text`; false if it did not go. */
   async function post(text: string, withNotes = false) {
@@ -611,13 +657,13 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
         <ThreadScreen botId={botId} name={name} mark={avatar('pill')} entries={data || localMessages.length ? entries : null} empty={empty} panels={compact ? undefined : panels} work={work.work}
           older={data?.historyBefore ? { loading: loadingHistory, onLoad: () => void loadHistory() } : undefined}
           working={working && !stopping} onStop={(working || sending || activeTurn(stream.view) !== undefined) && !resuming && !stopping ? () => { void stop() } : undefined}
-          composer={{ ref: inputRef, label: bot ? t('inputTo', { name: bot.name }) : t('input'), placeholder, value: draft, onChange: updateDraft, sending: sending || resuming, editableWhileSending: sending || resuming, onSubmit: () => { void send() },
+          composer={{ ref: inputRef, label: bot ? t('inputTo', { name: bot.name }) : t('input'), placeholder, value: draft, onChange: updateDraft, sending: resuming, editableWhileSending: resuming, onSubmit: () => { void send() },
             attachmentScope: data?.botId ? { kind: 'bot', id: data.botId } : undefined, running: working && !stopping }}
           pending={[
             ...(replyQuote ? [{ id: 'reply-quote', name: replyQuote, meta: tMessage('quote'), onRemove: () => setReplyQuote(null) }] : []),
             ...(browser?.notes ?? []).map(note => ({ id: `note-${note.n}`, name: noteChipText(note), meta: tNavAll('Editor.richText.annotate'), onRemove: () => browser?.remove(note.n) })),
           ]}
-          notices={<>{notices}{factory.error && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1">{actionError()}</AlertTitle><Button variant="ghost" size="sm" onClick={() => { void factory.reload() }}>{tCommon('retry')}</Button></Alert>}</>}
+          notices={<>{notices}{turnOptions}{queuedNotice}{factory.error && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1">{actionError()}</AlertTitle><Button variant="ghost" size="sm" onClick={() => { void factory.reload() }}>{tCommon('retry')}</Button></Alert>}</>}
           questions={factory.questions.map(question => {
             const reason = factoryQuestionUnavailable(question.status)
             return { id: question.questionId, revision: question.reference.questionRevision, question: question.question, task: question.task, recordedAnswer: question.recordedAnswer, unavailable: reason ? actionError(reason) : undefined, taskId: question.issueId ?? undefined,
@@ -762,7 +808,8 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
         {waitingQuestions[0].runId && <Button variant="link" size="xs" className="h-auto min-w-0 max-w-full px-0 font-normal" onClick={() => showThread({ runId: waitingQuestions[0].runId! })}><span className="min-w-0 truncate">{waitingQuestions[0].title}</span></Button>}
       </p>}
       <PendingActions />
-      <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending || resuming} editableWhileSending={sending || resuming} onSubmit={() => { void send() }} attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : undefined}
+      {turnOptions}{queuedNotice}
+      <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={resuming} editableWhileSending={resuming} onSubmit={() => { void send() }} attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : undefined}
         running={working && !stopping} onStop={(working || sending || activeTurn(stream.view) !== undefined) && !resuming && !stopping ? () => { void stop() } : undefined}
         model={<div className="flex min-w-0 items-center gap-1">
           <BotModelPicker botId={botId ?? null} running={working || sending} />

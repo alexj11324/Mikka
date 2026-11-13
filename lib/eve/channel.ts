@@ -17,6 +17,9 @@ async function sessionFor(args: RouteHandlerArgs, scope: EveScope) {
 }
 
 const accessRefusals = new WeakSet<Request>()
+// The native channel consumes the request body before its onMessage hook.
+// Bind the selected admission policy to the forwarded, authenticated request.
+const steeringRequests = new WeakSet<Request>()
 
 async function admit(request: Request, deliver: () => Response | Promise<Response>) {
   const refused = () => Response.json({ ok: false, code: 'accessChangeConfirmationRequired', error: 'accessChangeConfirmationRequired' }, { status: 409 })
@@ -35,7 +38,7 @@ export function mikkaEveChannel() {
     async onMessage(ctx, message) {
       const scope = scopeFromAuth(ctx.eve.caller)
       const { acceptEveMessage } = await import('./submission')
-      const accepted = await acceptEveMessage(scope, message, ctx.eve.clientContext, ctx.eve.request).catch(error => {
+      const accepted = await acceptEveMessage(scope, message, ctx.eve.clientContext, ctx.eve.request, steeringRequests.has(ctx.eve.request) ? 'steer' : undefined).catch(error => {
         if (error instanceof ActionFailureError && error.code === 'accessChangeConfirmationRequired' && error.confirmable) accessRefusals.add(ctx.eve.request)
         throw error
       })
@@ -60,6 +63,7 @@ export function mikkaEveChannel() {
           if (submission) payload.idempotencyKey = z.uuid().parse(submission)
           const url = new URL(request.url); url.pathname = `/eve/v1/session/${session.id}`
           const forwarded = forwardEveRequest(request,url,JSON.stringify(payload))
+          if (payload.turnPolicy === 'steer') steeringRequests.add(forwarded)
           const response = await admit(forwarded, () => follow.handler(forwarded, { ...args, params:{sessionId:session.id} }))
           if (response.ok) await (await import('./submission')).commitEveIngress(forwarded)
           return response
@@ -81,6 +85,7 @@ export function mikkaEveChannel() {
           const payload = await request.clone().json()
           payload.idempotencyKey = z.uuid().parse(request.headers.get('x-mikka-submission-id'))
           forwarded = forwardEveRequest(request,request.url,JSON.stringify(payload))
+          if (payload.turnPolicy === 'steer') steeringRequests.add(forwarded)
         }
         const response = await admit(forwarded, () => withSessionControlDelivery(route, sessionId, () => route.handler(forwarded,args)))
         if (response.ok) await (await import('./submission')).commitEveIngress(forwarded)
