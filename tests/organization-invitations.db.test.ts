@@ -150,6 +150,19 @@ test('Organization invitations grant only a verified Member without inheriting W
     assert.deepEqual(isolated.invitations, [], 'a newly invited Member cannot enumerate the second Organization owner\'s invites')
     await assert.rejects(invite.issueOrganizationInvitations(secondOrganizationId, sender.id, { emails: [invitee.email] }),
       (error: unknown) => (error as { detail?: string }).detail === 'access_denied')
+    // An Organization owner must not revoke an invitation from another
+    // Organization even when given the exact UUID of its pending invitation.
+    const otherOrgPending = await invite.issueOrganizationInvitations(secondOrganizationId, outsider.id, {
+      emails: [unverified.email],
+    })
+    const pending = otherOrgPending.outcomes[0]
+    if (!pending.created) throw new Error('independent Organization fixture invitation not created')
+    await assert.rejects(invite.revokeOrganizationInvitation(organizationId, owner.id, { invitationId: pending.id }),
+      (error: unknown) => (error as { detail?: string }).detail === 'access_denied')
+    const [unmodified] = await workspaceDb.select({ status: organizationInvitations.status }).from(organizationInvitations)
+      .where(eq(organizationInvitations.id, pending.id))
+    assert.equal(unmodified.status, 'pending', 'cross-Organization revocation must not mutate the invitation')
+    await invite.revokeOrganizationInvitation(secondOrganizationId, outsider.id, { invitationId: pending.id })
   })
 
   await t.test('revoked and expired bearers never reactivate, and members can only revoke their own invites', async () => {
@@ -162,6 +175,13 @@ test('Organization invitations grant only a verified Member without inheriting W
     await assert.rejects(invite.acceptOrganizationInvitation({ token: issued.path.split('/').at(-1)! }, outsider))
     const expired = await invite.issueOrganizationInvitations(organizationId, other.id, { emails: [outsider.email] })
     if (!expired.outcomes[0].created) throw new Error('fixture retry not created')
+    // The same invitation row ID is reused. Reissuing it must still invalidate
+    // the previously revoked bearer while the new invitation remains pending.
+    await assert.rejects(invite.acceptOrganizationInvitation({ token: issued.path.split('/').at(-1)! }, outsider),
+      (error: unknown) => (error as { detail?: string }).detail === 'invalid_request')
+    const [reissued] = await workspaceDb.select({ status: organizationInvitations.status }).from(organizationInvitations)
+      .where(eq(organizationInvitations.id, expired.outcomes[0].id))
+    assert.equal(reissued.status, 'pending', 'a rejected old bearer must not consume its replacement')
     await workspaceDb.update(organizationInvitations).set({ expiresAt: new Date(0) })
       .where(eq(organizationInvitations.id, expired.outcomes[0].id))
     await assert.rejects(invite.acceptOrganizationInvitation({
