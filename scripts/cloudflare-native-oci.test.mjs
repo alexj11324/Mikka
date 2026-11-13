@@ -23,6 +23,15 @@ const settings = { NEXT_PUBLIC_POSTHOG_KEY: 'public-analytics', NEXT_PUBLIC_STRI
   NEXT_PUBLIC_TURNSTILE_SITE_KEY: 'public-turnstile', NEXT_PUBLIC_COMPUTER_ENABLED: '1' }
 const snapshot = { publicSha, privateSha, publication: 'registry-only', ...settings }
 const snapshotHash = createHash('sha256').update(JSON.stringify(snapshot)).digest('hex')
+const workerBundles = {
+  apiIngress: { path: 'ingress.mjs', sha256: 'c'.repeat(64), bytes: 120 },
+  eveRuntime: { path: 'workers/eve-runtime.mjs', sha256: 'd'.repeat(64), bytes: 220 },
+  taskSandbox: { path: 'workers/task-sandbox.mjs', sha256: 'e'.repeat(64), bytes: 320 },
+  web: { path: 'workers/web.mjs', sha256: 'f'.repeat(64), bytes: 420 },
+  credentialIdentity: { path: 'workers/credential-identity.mjs', sha256: '1'.repeat(64), bytes: 520 },
+  credentialBroker: { path: 'workers/credential-broker.mjs', sha256: '2'.repeat(64), bytes: 620 },
+  appGateway: { path: 'workers/app-gateway.mjs', sha256: '3'.repeat(64), bytes: 720 },
+}
 
 test('publication requires the public main build and exact selected overlay', () => {
   assert.equal(selected.publicSha, publicSha)
@@ -46,12 +55,26 @@ test('production compilation receives public settings and no read key', () => {
 
 test('prepared image evidence and registry digest remain bound to this build', () => {
   const prepared = { version: 1, context, publicSha, privateSha, id: selected.id, localImageId: digest, webRenderer: 'd'.repeat(64),
-    workerDigest: digest, webArchiveSha256: 'e'.repeat(64), webArchiveBytes: 10, offlineVerification: 'buildkit-network-none', publicBuildSettings: snapshot, publicBuildSettingsSha256: snapshotHash, publication: 'none' }
+    workerDigest: digest, workerBundles, webArchiveSha256: 'e'.repeat(64), webArchiveBytes: 10,
+    brokerLocalImageId: digest, brokerOfflineVerification: 'docker-network-none',
+    offlineVerification: 'buildkit-network-none', publicBuildSettings: snapshot, publicBuildSettingsSha256: snapshotHash, publication: 'none' }
   assert.equal(validatePrepared(prepared, selected), prepared)
   assert.throws(() => validatePrepared({ ...prepared, privateSha: publicSha }, selected), /CF_OCI_PREPARED_MISMATCH/)
+  for (const broker of [{ brokerLocalImageId: 'tag-only' }, { brokerOfflineVerification: 'skipped' }]) {
+    assert.throws(() => validatePrepared({ ...prepared, ...broker }, selected), /CF_OCI_PREPARED_MISMATCH/)
+  }
+  for (const bundles of [undefined, { ...workerBundles, extra: workerBundles.web },
+    { ...workerBundles, web: undefined }, { ...workerBundles, web: { ...workerBundles.web, path: '../web.mjs' } },
+    { ...workerBundles, web: { ...workerBundles.web, bytes: 0 } },
+    { ...workerBundles, apiIngress: { ...workerBundles.apiIngress, sha256: '0'.repeat(64) } }]) {
+    assert.throws(() => validatePrepared({ ...prepared, workerBundles: bundles }, selected), /CF_OCI_WORKER_BUNDLES_INVALID/)
+  }
   const account = 'f'.repeat(32)
   const printed = 'registry.cloudflare.com/' + account + '/mikka-api@' + digest + '\n'
   assert.equal(digestFromRepoDigests(printed + printed, account, selected.id).digest, digest)
+  const brokerRef = 'registry.cloudflare.com/' + account + '/mikka-credential-broker@' + digest
+  assert.equal(digestFromRepoDigests(printed + brokerRef, account, selected.id, 'mikka-credential-broker').image, brokerRef)
+  assert.throws(() => digestFromRepoDigests(printed, account, selected.id, 'mikka-credential-broker'), /CF_OCI_REGISTRY_DIGEST_UNVERIFIED/)
   assert.throws(() => digestFromRepoDigests('', account, selected.id), /CF_OCI_REGISTRY_DIGEST_UNVERIFIED/)
   assert.ok(releaseDockerfile('FROM node:24').includes('RUN --network=none'))
 })

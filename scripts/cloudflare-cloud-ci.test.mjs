@@ -26,7 +26,7 @@ const stages = [
 function qualifiedArtifact(context) {
   return { privateSource: context.privateSource, modelSource: 'e'.repeat(40), publicSource: context.publicSource,
     runId: context.runId, runAttempt: context.runAttempt, localImageId: 'sha256:' + 'f'.repeat(64),
-    workerDigest: '1'.repeat(64), manifestSha256: '2'.repeat(64) }
+    workerDigest: '1'.repeat(64), githubWebhookDigest: '3'.repeat(64), manifestSha256: '2'.repeat(64) }
 }
 function receipt(context) {
   const { privateSource, ...shared } = context
@@ -114,7 +114,7 @@ test('pinned private helper receives original Actions context and only publish w
       export async function runCi({ env, verify, publicRoot, publicSource }) {
         if (!publicRoot || publicSource !== env.GITHUB_SHA || env.GITHUB_ACTIONS !== 'true' || env.WORKERS_CI) throw new Error('missing public owner')
         if (env.MIKKA_TEST_SOURCE_DRIFT) execFileSync('git', ['-c', 'user.name=CI Fixture', '-c', 'user.email=ci@example.test', 'commit', '--allow-empty', '-m', 'source drift'], { cwd: publicRoot, stdio: 'pipe' })
-        return { version: 1, qualifiedArtifact: { privateSource: env.MIKKA_CLOUD_SOURCE_SHA, modelSource: '${'e'.repeat(40)}', publicSource, runId: env.GITHUB_RUN_ID, runAttempt: env.GITHUB_RUN_ATTEMPT, localImageId: 'sha256:${'f'.repeat(64)}', workerDigest: '${'1'.repeat(64)}', manifestSha256: '${'2'.repeat(64)}' }, publication: 'none', publicMainCompatibilitySha: '${'c'.repeat(40)}',
+        return { version: 1, qualifiedArtifact: { privateSource: env.MIKKA_CLOUD_SOURCE_SHA, modelSource: '${'e'.repeat(40)}', publicSource, runId: env.GITHUB_RUN_ID, runAttempt: env.GITHUB_RUN_ATTEMPT, localImageId: 'sha256:${'f'.repeat(64)}', workerDigest: '${'1'.repeat(64)}', githubWebhookDigest: '${'3'.repeat(64)}', manifestSha256: '${'2'.repeat(64)}' }, publication: 'none', publicMainCompatibilitySha: '${'c'.repeat(40)}',
           artifactSha256: '${'d'.repeat(64)}', databaseIntegration: 'isolated-postgresql-17-core-models-and-eve',
           imageRuntimeExecutor: 'image-files-node24', stages: ${JSON.stringify(stages)}, context: {
             provider: 'github-actions', repository: env.GITHUB_REPOSITORY, publicSource,
@@ -201,6 +201,12 @@ test('published metadata contains exactly the qualified sources, hashes and immu
   const reference = 'registry.cloudflare.com/d8f6630c7869111a5139bc5ed4d24ace/mikka-cloud-services@sha256:' + '3'.repeat(64)
   const artifact = { ...inner.qualifiedArtifact, image: reference, reference, registryDigest: reference.split('@')[1] }
   assert.equal(verifyPublishedArtifact(artifact, inner, context), artifact)
+  const missing = structuredClone(inner)
+  delete missing.qualifiedArtifact.githubWebhookDigest
+  assert.throws(() => verifyPublicReceipt(missing, context), /ARTIFACT_INVALID/)
+  const invalid = structuredClone(inner)
+  invalid.qualifiedArtifact.githubWebhookDigest = 'sha256:' + '3'.repeat(64)
+  assert.throws(() => verifyPublicReceipt(invalid, context), /ARTIFACT_INVALID/)
   for (const key of Object.keys(artifact)) {
     assert.throws(() => verifyPublishedArtifact({ ...artifact, [key]: 'changed' }, inner, context))
   }

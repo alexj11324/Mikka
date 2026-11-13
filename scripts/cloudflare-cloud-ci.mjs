@@ -63,11 +63,11 @@ export function verifyPublicReceipt(receipt, context) {
 }
 
 export function verifyQualifiedArtifact(artifact, context) {
-  if (!exactKeys(artifact, ['privateSource', 'modelSource', 'publicSource', 'runId', 'runAttempt', 'workerDigest', 'localImageId', 'manifestSha256']) ||
+  if (!exactKeys(artifact, ['privateSource', 'modelSource', 'publicSource', 'runId', 'runAttempt', 'workerDigest', 'githubWebhookDigest', 'localImageId', 'manifestSha256']) ||
       artifact.privateSource !== context.privateSource || artifact.publicSource !== context.publicSource ||
       artifact.runId !== context.runId || artifact.runAttempt !== context.runAttempt || !fullSha.test(artifact.modelSource ?? '') ||
       !/^sha256:[a-f0-9]{64}$/.test(artifact.localImageId ?? '') ||
-      ![artifact.workerDigest, artifact.manifestSha256].every(value => /^[a-f0-9]{64}$/.test(value ?? ''))) fail('CLOUD_PUBLIC_CI_ARTIFACT_INVALID')
+      ![artifact.workerDigest, artifact.githubWebhookDigest, artifact.manifestSha256].every(value => /^[a-f0-9]{64}$/.test(value ?? ''))) fail('CLOUD_PUBLIC_CI_ARTIFACT_INVALID')
   return artifact
 }
 

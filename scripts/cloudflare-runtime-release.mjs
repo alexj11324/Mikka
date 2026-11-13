@@ -81,7 +81,7 @@ export function checkedResource(resource) {
 }
 
 export function verifyApiPayload(api, release, app) {
-  for (const field of ['publicSha', 'privateSha', 'buildId', 'release', 'webRenderer', 'workerDigest', 'webArchiveSha256', 'webArchiveBytes']) {
+  for (const field of ['publicSha', 'privateSha', 'buildId', 'release', 'webRenderer', 'workerDigest', 'webArchiveSha256', 'webArchiveBytes', 'workerBundles']) {
     assert.deepEqual(release[field], api[field], 'API supplemental identity differs')
   }
   assert.equal(app.version, 1)

@@ -3,6 +3,7 @@ import { AwsClient } from 'aws4fetch'
 import { getVercelOidcToken } from '@vercel/oidc'
 import { CredentialError, type EncryptionContext, type Envelope } from './contracts'
 import { isCloudEdition } from '@/lib/edition'
+import { cloudflareCredentialToken, credentialRuntimeEnvironment } from './runtime-identity'
 
 export type Kms = { generate(context: EncryptionContext): Promise<{ plaintext: Buffer; wrapped: string }>; decrypt(wrapped: string, context: EncryptionContext): Promise<Buffer> }
 const aad = (context: EncryptionContext, kind = 'password') => Buffer.from(JSON.stringify({ userId: context.userId, credentialId: context.credentialId, origin: context.origin, v: 1, kind }))
@@ -50,14 +51,15 @@ export function credentialKms(role: 'app' | 'broker'): Kms {
   return { generate: context => backend().generate(context), decrypt: (wrapped, context) => backend().decrypt(wrapped, context) }
 }
 
-/** No fallback to AWS access keys, instance profiles, or another project's role. */
+/** Each platform uses its own runtime issuer; no fallback to another identity. */
 export async function assumeVercelRole(role: 'app' | 'broker') {
   const arn = process.env[role === 'app' ? 'CREDENTIAL_APP_ROLE_ARN' : 'CREDENTIAL_BROKER_ROLE_ARN']
   if (!arn || !/^arn:aws:iam::\d{12}:role\//.test(arn)) throw new CredentialError()
   try {
+    const token = credentialRuntimeEnvironment() ? await cloudflareCredentialToken() : await getVercelOidcToken()
     const response = await fetch('https://sts.amazonaws.com/', {
       method: 'POST', body: new URLSearchParams({ Action: 'AssumeRoleWithWebIdentity', Version: '2011-06-15', RoleArn: arn,
-        RoleSessionName: `mikka-credential-${role}`, DurationSeconds: '900', WebIdentityToken: await getVercelOidcToken() }),
+        RoleSessionName: `mikka-credential-${role}`, DurationSeconds: '900', WebIdentityToken: token }),
       signal: AbortSignal.timeout(10_000), redirect: 'error', cache: 'no-store',
     })
     const xml = await response.text()
