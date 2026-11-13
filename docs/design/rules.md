@@ -224,14 +224,12 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   A group heading that names the
   workspace its settings apply to (设置's workspace group) is not a crumb and
   stays.
-- **R-62** A task's 活动 lists its creation, its events and one row per Agent
-  stretch, oldest first: consecutive runs by the same Agent are one row, and
-  every row is labelled with its Agent's mark and name, never a 「换」 verb, as
-  Warp labels runs ([2026-11-09-0045](decisions/2026-11-09-0045-no-attempt-word.md)).
-  There is no per-run thread list. A row shows its stretch's latest run in the
-  run-result words (glossary: Run result) and
-  opens the task's single conversation at the stretch's first run (R-81),
-  ending in the shared composer (R-10). The task properties
+- **R-62** A task’s 工作 section follows its description. It lists authorized
+  conversations and PRs with their available Agent, observed model, status
+  and result. Each run has one expandable progress row. 活动 contains task
+  changes, links and comments with the author or system actor visible.
+  The conversation opens directly at its authorized root. Its composer follows
+  the current run (R-10, R-81). The task properties
   show its dispatching bot, Agent/model and execution location. A reader who
   cannot access the work sees no private transcript. Workspace visibility
   follows [#1849](decisions/2026-11-10-0017-collaboration-governance.md)
@@ -277,10 +275,9 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   again in the same thread, resuming the agent's session where it can. The
   thread's root identity does not change across its continuation runs. Only the person's explicit request for a new
   session or thread, or another agent, starts a new one; the old thread is
-  stopped and marked replaced. The task still has one conversation joining
-  every run oldest first; a 活动 row opens it at that Agent stretch, and
-  replies go to the newest run
-  ([2300](decisions/2026-11-07-2300-one-conversation-per-task.md)).
+  stopped and marked replaced. The task keeps links to its distinct
+  conversation roots. Within a chain, the transcript orders runs by time and
+  sends replies to the latest eligible run.
   The server enforces this at every dispatch
   entry, not the prompt ([decision](decisions/2026-11-01-1330-one-thread-per-task.md)).
   The person may name where it runs (one of their computers, or the cloud);
@@ -296,9 +293,8 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   tasks that bot dispatched. 电脑 shows its cloud computer (`AgentComputer`).
   The window bar's 全部任务 entry opens all dispatched tasks in the right
   column while keeping the centre chat. Search, widen and close act on that
-  column. A thread opens from its task's 活动 into the task's one conversation
-  ([2045](decisions/2026-11-07-2045-tasks-only-threads-inside.md),
-  [2300](decisions/2026-11-07-2300-one-conversation-per-task.md)).
+  column. A conversation opens from the workspace directory, a Bot subitem or
+  its linked task’s 工作 section. All entries resolve the same identity.
 - **R-51** The right panel is read-only. No action buttons anywhere in it (no
   让它安排, 新建, 上传 or arrange). Besides navigation (the pills, the tabs, the
   header's search, widen and close, and a list group's collapse chevron), the only
@@ -415,7 +411,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
     ([Capy layout](decisions/2026-11-10-1317-capy-sidebar-and-task-layout.md)).
   - 全部任务 opens from the window bar on every page, with the hand and the
     count of 等你处理 tasks. A bot's 任务 tab lists its dispatched tasks.
-    Search hits in a task conversation resolve to the task. Legacy run IDs
+    Conversation search results open the conversation. Task results open the task. Legacy run IDs
     and `?threads=` remain routing identifiers, not list labels.
   - On the phone task detail and its conversation push over the task tab.
     Bot · 任务 · 建议 · 设置 and search are the native tabs; the tab bar hides
@@ -429,9 +425,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
     pages open in a new tab. Phone web uses a full-page right column and
     retains a bot-list/header entry. Invalid addresses normalize to the
     authorized visible location.
-  Sources are [navigation](decisions/2026-11-01-1320-navigation-model.md),
-  [task lists](decisions/2026-11-07-2045-tasks-only-threads-inside.md) and
-  [one conversation](decisions/2026-11-07-2300-one-conversation-per-task.md).
+  See [navigation](decisions/2026-11-01-1320-navigation-model.md), the [conversation decision](https://github.com/alexj11324/Mikka/issues/2262) and the [task Work section](https://github.com/alexj11324/Mikka/issues/2271).
   The UI is the official build ([one UI](decisions/2026-11-08-2133-one-ui.md));
   default slots in this repository can retain older thread presentation
   ([UI slots](../ui-overlay.md)).
