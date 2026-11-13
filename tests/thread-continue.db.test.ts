@@ -6,6 +6,7 @@
 // thread still gets a message; nobody but the thread's owner can send.
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import { observePoolCommits } from '../lib/db/commit-effects'
 import { mock, test } from 'node:test'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
@@ -23,6 +24,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
   const coordinator = await isolateCoordinatorWakes(t)
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
+  observePoolCommits(pool)
   const steps = await import('../workflows/coordinator/steps')
   const { readRunChain } = await import('../lib/run-chain')
   const { sendThreadMessage } = await import('../lib/thread-continue')
