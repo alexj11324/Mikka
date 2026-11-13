@@ -40,6 +40,27 @@ it('waits for the real Claude process exit before emitting terminal safety evide
   }
 })
 
+it("reports a refused Codex steer without queuing it or exposing native diagnostics", async () => {
+  const binary = resolve(import.meta.dirname, "fakes/fake-codex.mjs")
+  const runId = "refused-steer"
+  const adapter = new CodexAdapter({ stateDir: tempDir(), binary, sandbox: new NoSandbox() })
+  const session = await adapter.start({
+    runId, cwd: await makeRepo(), prompt: "WAIT for input",
+    toolApproval: new ToolApprovalGate(runId, { isLive: () => true }),
+    env: buildChildEnv(), log: createLogger({ level: "silent" }),
+  })
+  try {
+    await expect(session.send("REFUSE_STEER")).rejects.toThrow(
+      /^Codex could not steer the active turn \(rpc_refused, RPC -32000\)$/,
+    )
+    await session.send("Finish this turn")
+    const output: AgentEvent[] = []
+    for await (const event of session.events()) output.push(event)
+    expect(output.at(-1)).toMatchObject({ type: "exit", outcome: "succeeded" })
+    expect(output.filter(event => event.type === "chunk" && event.chunk.type === "data-usage")).toHaveLength(1)
+  } finally { await session.cancel() }
+})
+
 async function run(harness: "claude_code" | "codex", scenario: Record<string, unknown> | string) {
   const stateDir = tempDir(), runId = "provider-failure"
   const binary = resolve(import.meta.dirname, `fakes/fake-${harness === "claude_code" ? "claude" : "codex"}.mjs`)

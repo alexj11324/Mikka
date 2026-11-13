@@ -575,7 +575,6 @@ export class CodexAdapter implements AgentAdapter {
     )
     const queue = new EventQueue()
     const streamed = new Set<string>()
-    const pending: string[] = []
     let activeTurn: string | null = null
     let pendingTurnStart: Promise<void> | null = null
     let ending = false
@@ -626,11 +625,6 @@ export class CodexAdapter implements AgentAdapter {
       ending = true
       pendingMcp.clear()
       options.toolApproval?.revoke()
-      if (pending.length > 0)
-        log.warn(
-          { dropped: pending.length },
-          "session ended with unsent messages",
-        )
       rpc.dispose()
       await child.kill()
       if (event) {
@@ -834,19 +828,6 @@ export class CodexAdapter implements AgentAdapter {
           })
         }
       }
-      const next = pending.shift()
-      if (next) {
-        await startTurn(next).catch((error: unknown) =>
-          finish({
-            outcome: "failed",
-            error: managedAuth
-              ? turnStartFailure ?? subscriptionFailure('turn_start', codexFailureInfo(error))
-              : error instanceof ProviderFailureError ? error.message : `Codex: ${errorMessage(error)}`,
-            ...(error instanceof ProviderFailureError ? { providerFailure: error.providerFailure } : {}),
-          })
-        )
-        return
-      }
       if (turn.status === "failed" || lastError) {
         quota = mergeQuota(quota, codexQuotaSignal(turn.error, rateLimits))
         const failure = codexFailureInfo(turn.error)
@@ -1037,12 +1018,16 @@ export class CodexAdapter implements AgentAdapter {
               expectedTurnId: activeTurn,
             })
             return
-          } catch {
-            // The turn ended in between: the message starts the next one.
+          } catch (error) {
+            // The request was for this turn only. A refusal (or a lost reply)
+            // is never permission to execute the same input on a later turn.
+            const { category, rpcCode } = codexFailureInfo(error)
+            const code = rpcCode === undefined ? "" : `, RPC ${rpcCode}`
+            throw new Error(`Codex could not steer the active turn (${category}${code})`)
           }
         }
-        if (activeTurn) pending.push(message)
-        else await startTurn(message)
+        if (ending) throw new Error("The Codex session already ended")
+        await startTurn(message)
       },
       async cancel() {
         // Revoking the gate tears down the owned proxy/CLI immediately. Mark
