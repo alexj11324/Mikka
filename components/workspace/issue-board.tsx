@@ -4,7 +4,7 @@ import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
-import { changeIssuePriority, moveIssue, type listIssues } from '@/app/actions/issues'
+import { changeIssuePriority, getIssue, moveIssue, type listIssues } from '@/app/actions/issues'
 import { setIssueDeleted } from '@/app/actions/issue-operations'
 import { updateIssueMetadata } from '@/app/actions/issue-metadata'
 import { clearedBlock, FLAGGED_BLOCK, type BlockFlag, type TaskBlock } from '@/lib/task-blocked'
@@ -40,6 +40,7 @@ export function useIssueBoardSaves({ issues, blocks, newestRuns, onUpdated, onBu
   const t = useTranslations('Board')
   const tIssue = useTranslations('Issue')
   const tDetail = useTranslations('IssueDetail')
+  const tTransport = useTranslations('RunErrors')
   const translateError = useActionError()
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const [columns, setColumns] = useState<Columns>(() => groupIssues(issues, blocks))
@@ -71,28 +72,48 @@ export function useIssueBoardSaves({ issues, blocks, newestRuns, onUpdated, onBu
     onBusyChange(true)
     setMessage(t('savingProperties'))
     try {
-      const result = patch.status
-        ? await moveIssue({ id: issue.id, status: patch.status, revision: issue.revision, block: patch.block })
+      const write = patch.status
+        ? moveIssue({ id: issue.id, status: patch.status, revision: issue.revision, block: patch.block })
         : patch.priority
-          ? await changeIssuePriority({ id: issue.id, priority: patch.priority, revision: issue.revision })
-          : await updateIssueMetadata({ id: issue.id, revision: issue.revision, patch: { block: patch.block } })
-      if (!('issue' in result) || !result.issue) {
+          ? changeIssuePriority({ id: issue.id, priority: patch.priority, revision: issue.revision })
+          : updateIssueMetadata({ id: issue.id, revision: issue.revision, patch: { block: patch.block } })
+      // A lost response can follow a committed write. Read once under the current
+      // task permissions and never resend the mutation to discover its outcome.
+      let verifiedByRead = false
+      const result = await write.catch(async (error: unknown) => {
+        const failure = error && typeof error === 'object' ? error : null
+        const status = failure && 'status' in failure ? failure.status : undefined
+        if (failure && 'code' in failure && failure.code === 'desktop_session_changed') {
+          return { error: 'desktop_session_changed' }
+        }
+        if (status === 401) return { error: 'authRequired' }
+        if (status === 403) return { error: 'issueAccessLost' }
+        if (status === 409) return { error: 'issueOutdated' }
+        const readback = await getIssue(issue.id).catch(() => null)
+        if (readback?.error) return readback
+        const latest = readback && 'issue' in readback ? readback.issue : undefined
+        if (latest?.id !== issue.id || latest.revision <= issue.revision) return null
+        if (patch.status && latest.status !== patch.status) return null
+        if (patch.priority && latest.priority !== patch.priority) return null
+        if (patch.block && (latest.metadata.block?.blocked !== patch.block.blocked || latest.metadata.block.runId !== patch.block.runId)) return null
+        verifiedByRead = true
+        return readback
+      })
+      if (!result || !('issue' in result) || !result.issue) {
         setColumns(rollback)
-        const errorMessage = translateError(result.error)
+        const errorMessage = !result ? t('saveUnconfirmed') : result.error === 'desktop_session_changed'
+          ? tTransport('desktop_session_changed.default') : translateError(result.error)
         setMessage(errorMessage)
         toast.error(errorMessage, { id: errorToastId })
         return false
       }
       const savedIssue = result.issue
       setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.map(item => item.id === issue.id ? { ...item, status: savedIssue.status, priority: savedIssue.priority, metadata: savedIssue.metadata, revision: savedIssue.revision, updatedAt: savedIssue.updatedAt } : item)])))
-      setMessage(patch.block?.blocked ? t('moved', { status: statusLabel(BLOCKED_COLUMN) }) : patch.status ? t('moved', { status: statusLabel(patch.status) }) : t('prioritySaved'))
+      const status = patch.block?.blocked ? BLOCKED_COLUMN : patch.status
+      if (verifiedByRead) setMessage(t('changeVerified'))
+      else if (status) setMessage(t('moved', { status: statusLabel(status) }))
+      else setMessage(patch.priority ? t('prioritySaved') : t('propertiesSaved'))
       return true
-    } catch {
-      setColumns(rollback)
-      const errorMessage = t('moveRollback')
-      setMessage(errorMessage)
-      toast.error(errorMessage, { id: errorToastId })
-      return false
     } finally {
       saving.current = false
       setPending(false)

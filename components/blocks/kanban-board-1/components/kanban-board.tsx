@@ -2,7 +2,7 @@
 
 import { useViewScroll } from '@/lib/hooks/view-state'
 import { displayTaskTitle } from '@/lib/short-title'
-import { useState, type ComponentProps, type ReactNode, type Ref } from 'react'
+import { isValidElement, useState, type ComponentProps, type ReactNode, type Ref } from 'react'
 import { ScrollArea as ScrollAreaPrimitive } from '@base-ui/react/scroll-area'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { Box, CalendarDays, Circle, CircleStop, CircleUserRound, Ellipsis, EyeOff, Flag, Link2, ListChecks, Lock, MessageSquare, Tag, Trash2 } from 'lucide-react'
@@ -228,7 +228,9 @@ export function TaskContextMenu({ task, disabled, block, children, onStatusChang
   const ask = (target: MetadataRequest['target']) => setRequest(current => ({ target, sequence: (current?.sequence ?? 0) + 1 }))
   return <>
     <ContextMenu>
-      <ContextMenuTrigger render={<div className="contents" />}>{children}</ContextMenuTrigger>
+      {isValidElement(children) && typeof children.type === 'string'
+        ? <ContextMenuTrigger render={children} data-focus-id={task.id} />
+        : <ContextMenuTrigger render={<div className="contents" />}>{children}</ContextMenuTrigger>}
       <ContextMenuContent className="w-56"><TaskMenuItems task={task} disabled={disabled} block={block} ask={ask} onStatusChange={onStatusChange} onPriorityChange={onPriorityChange} onDelete={onDelete} onDiscuss={onDiscuss} onBlockChange={onBlockChange} /></ContextMenuContent>
     </ContextMenu>
     <div hidden><IssueMetadataControls task={task} section="all" compact disabled={disabled} request={request} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></div>

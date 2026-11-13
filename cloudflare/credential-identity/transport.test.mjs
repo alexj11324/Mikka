@@ -23,6 +23,47 @@ test('the identity intercept fixes its endpoint and removes all caller headers',
   assert.equal((await identityRequest(new Request('https://identity.internal/token', { method: 'POST' }))).status, 503)
 })
 
+test('the identity intercept accepts zero-byte POST streams and still forwards a bodyless fixed request', async () => {
+  for (const body of ['', new ReadableStream({ start(controller) {
+    controller.enqueue(new Uint8Array())
+    controller.close()
+  } })]) {
+    let calls = 0
+    const request = new Request('https://identity.internal/token', { method: 'POST', body, duplex: 'half',
+      headers: { authorization: 'untrusted', subject: 'broker' } })
+    assert.notEqual(request.body, null)
+    const response = await identityRequest(request, { async fetch(sent) {
+      calls++
+      assert.equal(sent.url, 'https://identity.internal/token')
+      assert.equal(sent.method, 'POST')
+      assert.equal(sent.body, null)
+      assert.deepEqual([...sent.headers], [])
+      return new Response(null, { status: 204 })
+    } })
+    assert.equal(response.status, 204)
+    assert.equal(calls, 1)
+    assert.equal(request.body.locked, false)
+  }
+})
+
+test('the identity intercept reads actual bytes and refuses nonempty or failed streams before signing', async () => {
+  let cancelled = false
+  const nonempty = new ReadableStream({ start(controller) {
+    controller.enqueue(new Uint8Array())
+    controller.enqueue(new Uint8Array([1]))
+  }, cancel() { cancelled = true } })
+  const failed = new ReadableStream({ start(controller) { controller.error(Error('private stream error')) } })
+  for (const body of ['{}', nonempty, failed]) {
+    const request = new Request('https://identity.internal/token', { method: 'POST', body, duplex: 'half',
+      headers: { 'content-length': '0' } })
+    const response = await identityRequest(request, { fetch() { assert.fail('Payload request reached signer') } })
+    assert.equal(response.status, 404)
+    assert.equal(await response.text(), '')
+    assert.equal(request.body.locked, false)
+  }
+  assert.equal(cancelled, true)
+})
+
 test('the private Broker transport forwards only the existing lease contract', async () => {
   let sent
   const response = await brokerRequest(new Request('https://broker.internal/api/fill', {

@@ -2,8 +2,19 @@ import { boundedJson } from '../bounded-json.mjs'
 
 const deny = status => new Response(null, { status, headers: { 'cache-control': 'no-store' } })
 
-export function identityRequest(request, binding) {
-  if (request.url !== 'https://identity.internal/token' || request.method !== 'POST' || request.body) return deny(404)
+export async function identityRequest(request, binding) {
+  if (request.url !== 'https://identity.internal/token' || request.method !== 'POST') return deny(404)
+  if (request.body) {
+    const reader = request.body.getReader()
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        if (value.byteLength) { await reader.cancel(); return deny(404) }
+      }
+    } catch { return deny(404) }
+    finally { reader.releaseLock() }
+  }
   if (!binding) return deny(503)
   return binding.fetch(new Request('https://identity.internal/token', { method: 'POST', redirect: 'manual' }))
 }

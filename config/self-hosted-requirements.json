@@ -794,6 +794,12 @@
     "test": "lib/run-app-mcp.test.ts",
     "suite": "test:integrations"
   },
+  "lib/server-pages.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Recognize local authentication documents and valid Workspace and Organization invitations so invitees can sign in even when Workspace bootstrap is unavailable.",
+    "test": "apps/frontend/scripts/auth-only-bootstrap.test.mjs"
+  },
   "lib/slack/api.ts": {
     "mode": "operator-configured",
     "environment": [

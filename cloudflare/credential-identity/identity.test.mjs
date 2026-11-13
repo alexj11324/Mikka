@@ -59,8 +59,8 @@ async function verify(token, subject, before, after) {
     Buffer.from(signature, 'base64url'), Buffer.from(`${header}.${payload}x`)), false)
 }
 
-test('both trusted environments issue independently verifiable fixed role identities for exactly 300 seconds', async () => {
-  for (const environment of ['preview', 'production']) {
+test('configured deployment labels issue independently verifiable fixed role identities for exactly 300 seconds', async () => {
+  for (const environment of ['preview', 'production', 'customer_stage']) {
     for (const role of ['app', 'broker']) {
       const { env, reads } = fixture({ CREDENTIAL_ENVIRONMENT: environment })
       const before = Math.floor(Date.now() / 1000)
@@ -105,7 +105,7 @@ test('public fetch rejects issuance, RPC-shaped paths, alternate methods and met
 })
 
 test('named entrypoints choose the role in class code and the environment in trusted bindings', async () => {
-  for (const environment of ['preview', 'production']) {
+  for (const environment of ['preview', 'production', 'customer_stage']) {
     for (const [Entrypoint, role] of [[AppIdentity, 'app'], [BrokerIdentity, 'broker']]) {
       const { env } = fixture({ CREDENTIAL_ENVIRONMENT: environment })
       const before = Math.floor(Date.now() / 1000)
@@ -149,7 +149,7 @@ test('private entrypoints reject every request override before private key acces
 
 test('unknown helper roles and malformed trusted configuration fail before reading a signing key', async () => {
   const invalid = [
-    { CREDENTIAL_ENVIRONMENT: 'staging' }, { CREDENTIAL_ENVIRONMENT: '' }, { CREDENTIAL_ENVIRONMENT: undefined },
+    { CREDENTIAL_ENVIRONMENT: 42 }, { CREDENTIAL_ENVIRONMENT: '' }, { CREDENTIAL_ENVIRONMENT: undefined },
     { ISSUER_URL: 'http://identity.example.test' }, { ISSUER_URL: 'https://identity.example.test/path' },
     { ISSUER_URL: 'https://identity.example.test?override=1' }, { ISSUER_URL: 'https://identity.example.test#fragment' },
     { ISSUER_URL: 'https://user:password@identity.example.test' }, { ISSUER_URL: ' https://identity.example.test' },

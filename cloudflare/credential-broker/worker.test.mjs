@@ -42,7 +42,7 @@ function context() {
 }
 
 test('each workload receives its own role and intercepts before every supported container start path', async () => {
-  for (const environment of ['preview', 'production']) {
+  for (const environment of ['preview', 'production', 'customer_stage']) {
     for (const Host of [BusinessApi, CredentialBrokerRuntime]) {
       const ctx = context()
       const host = new Host(ctx, { ...configuration, CREDENTIAL_ENVIRONMENT: environment })
@@ -67,7 +67,9 @@ test('incomplete runtime bindings fail before a container starts and an unbound 
   assert.throws(() => new BusinessApi(context(), { ...configuration, CREDENTIAL_BROKER: undefined }))
   assert.throws(() => new CredentialBrokerRuntime(context(), { ...configuration, CREDENTIAL_IDENTITY: undefined }))
   for (const Host of [BusinessApi, CredentialBrokerRuntime]) {
-    assert.throws(() => new Host(context(), { ...configuration, CREDENTIAL_ENVIRONMENT: 'development' }))
+    for (const environment of [undefined, '', 42]) {
+      assert.throws(() => new Host(context(), { ...configuration, CREDENTIAL_ENVIRONMENT: environment }))
+    }
     assert.throws(() => new Host(context(), { ...configuration, CREDENTIAL_KMS_KEY_ARN: undefined }))
   }
   const legacy = new BusinessApi(context(), { PUBLIC_ORIGIN: 'https://app.example' })
@@ -95,7 +97,7 @@ test('public Broker HTTP never dispatches fill while its named entrypoint reache
   assert.equal(calls, 1)
 })
 
-test('the ingress configuration binds the paired credential services to fixed workload entrypoints', () => {
+test('the ingress configuration maps supplied credential services to workload entrypoints', () => {
   const input = {
     release: 'a'.repeat(12) + '-1-1', origin: 'https://app.example',
     image: 'registry.cloudflare.com/' + 'b'.repeat(32) + '/mikka-api@sha256:' + 'c'.repeat(64),
@@ -105,6 +107,10 @@ test('the ingress configuration binds the paired credential services to fixed wo
     { binding: 'CREDENTIAL_IDENTITY', service: 'identity-preview', entrypoint: 'AppIdentity' },
     { binding: 'CREDENTIAL_BROKER', service: 'broker-preview', entrypoint: 'CredentialBroker' },
   ])
-  assert.throws(() => ingressConfig({ ...input, credentialIdentityService: undefined }))
-  assert.throws(() => ingressConfig({ ...input, credentialBrokerService: undefined }))
+  assert.deepEqual(ingressConfig({ ...input, credentialIdentityService: undefined }).services, [
+    { binding: 'CREDENTIAL_BROKER', service: input.credentialBrokerService, entrypoint: 'CredentialBroker' },
+  ])
+  assert.deepEqual(ingressConfig({ ...input, credentialBrokerService: undefined }).services, [
+    { binding: 'CREDENTIAL_IDENTITY', service: input.credentialIdentityService, entrypoint: 'AppIdentity' },
+  ])
 })

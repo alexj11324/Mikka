@@ -555,7 +555,8 @@
     "saving": "Saving task status…",
     "moved": "Moved to {status}",
     "moveFailed": "Could not move the task. Please try again.",
-    "moveRollback": "Could not save the status. The previous position has been restored.",
+    "changeVerified": "The task now shows the requested change.",
+    "saveUnconfirmed": "Could not confirm the change. Check the task before trying again.",
     "scrollLeft": "Scroll board left",
     "scrollRight": "Scroll board right",
     "keyboardHint": "Browse with a trackpad, the bottom scrollbar, or the arrow buttons. When this area is focused, use the left and right arrow keys to scroll, Home to return to the start, and End to jump to the end. When a draggable card is focused, press Space to start dragging, use the arrow keys to move across columns, and press Space again to drop; press Escape to cancel.",
@@ -3471,6 +3472,8 @@
     "signInToAccept": "Sign in and accept",
     "createAccount": "Create account",
     "backToWorkspace": "Back to workspace",
+    "joined": "You joined the workspace.",
+    "viewServerAndApps": "View server and available apps",
     "acceptFailed": "Could not accept the invitation.",
     "signOutFailed": "Sign out failed."
   },
