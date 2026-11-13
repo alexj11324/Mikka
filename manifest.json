@@ -1,0 +1,67 @@
+{
+  "publicSha": "c3e62b729c0700d3ca75cd6205749fad0cd17edd",
+  "privateSha": "83e69c6a92722126f7a54890629800c7878a47c6",
+  "officialWebRenderer": "293792729ade76eab41bd309bf703a51cdf47779487476139c98fdcd9f1328c4",
+  "states": [
+    {
+      "basename": "reads-desktop-light.png",
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "sha256": "c25ea28d2e8496b09bd7e6f00bba0c94a703a5781a2b18d37da23ae6e5d0a247",
+      "initialBot": 2,
+      "initialChildren": [
+        1,
+        1
+      ],
+      "remainingBot": 1,
+      "remainingUnreadChildren": 1,
+      "threadReadHttpStatus": 200
+    },
+    {
+      "basename": "reads-desktop-dark.png",
+      "width": 1440,
+      "height": 900,
+      "theme": "dark",
+      "sha256": "76e6899affa033cc9141e7c479e0b7b1b966000ece0fa5d13e43fe1753671220",
+      "initialBot": 2,
+      "initialChildren": [
+        1,
+        1
+      ],
+      "remainingBot": 1,
+      "remainingUnreadChildren": 1,
+      "threadReadHttpStatus": 200
+    },
+    {
+      "basename": "reads-mobile-light.png",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "sha256": "659b1bd28927258c12f88ccb148669ef61b6d27130a31cacbc9610a89a6f590a",
+      "initialBot": 2,
+      "initialChildren": [
+        1,
+        1
+      ],
+      "remainingBot": 1,
+      "remainingUnreadChildren": 1,
+      "threadReadHttpStatus": 200
+    },
+    {
+      "basename": "reads-mobile-dark.png",
+      "width": 390,
+      "height": 844,
+      "theme": "dark",
+      "sha256": "583c1baac05de251a2aebd0e43b5be9d00c768ff4d9735a782d053e260220e32",
+      "initialBot": 2,
+      "initialChildren": [
+        1,
+        1
+      ],
+      "remainingBot": 1,
+      "remainingUnreadChildren": 1,
+      "threadReadHttpStatus": 200
+    }
+  ]
+}

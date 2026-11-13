@@ -1,6 +1,0 @@
-**
-!package.json
-!server.mjs
-!dist/
-!dist/fill.js
-!dist/oidc.js
