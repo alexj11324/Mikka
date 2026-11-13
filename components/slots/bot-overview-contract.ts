@@ -47,7 +47,8 @@ export type BotOverviewProps = {
   }
   /**
    * What the bot is doing, at a glance on 详情: its tasks by their newest thread (进行中, 等待你) and its PRs that are
-   * not merged (等待审查, 进行中). Counted before the search. A row opens the tab that lists them.
+   * not merged (等待审查, 进行中). A task that waits only on its PR's review is the PR's, not among `waiting`
+   * (lib/thread-groups.ts botGlance). Counted before the search. A row opens the tab that lists them.
    */
   glance?: { running: number; waiting: number; pullRequests: { review: number; running: number } }
   /** 任务: the bot-tasks slot's list, rendered. */

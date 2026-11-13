@@ -12,7 +12,7 @@ import { ComputerViewer } from '@/components/computer/computer-viewer'
 import { deleteLibraryFile, fetchBotLibrary } from '@/lib/bot-library'
 import { BOT_COLORS, BOT_NAME_MAX, BOT_SHAPES } from '@/lib/bot-shapes'
 import { isMockedComputer } from '@/lib/computer/client'
-import { PR_GROUPS, groupThreads, pullRequestsOf } from '@/lib/thread-groups'
+import { PR_GROUPS, botGlance, pullRequestsOf } from '@/lib/thread-groups'
 import { useActionError } from '@/lib/use-action-error'
 import { usePresence } from '@/lib/use-presence'
 import { DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotColor, type BotShape } from './bot-avatar'
@@ -147,10 +147,7 @@ export function BotOverviewBody({ conversation, tabs, tab, onTab, query, onQuery
       }) }
     }).filter(group => group.rows.length),
   }
-  // The same folding as the lists: a task counts once, by its newest thread.
-  const grouped = groupThreads(threads, id => issues.find(item => item.id === id))
-  const glance = { running: grouped.running.length, waiting: grouped.waiting.length,
-    pullRequests: { review: all.filter(row => row.group === 'review').length, running: all.filter(row => row.group === 'running').length } }
+  const glance = botGlance(threads, issues)
   const draw = (role: BotOverviewProps['details']['role'], edit: BotOverviewProps['edit']) => <BotOverview conversation={conversation} tabs={tabs} tab={tab} onTab={onTab} query={query} onQuery={onQuery}
     edit={edit} details={{ role, routines: [], library }} glance={glance} tasks={tasks} pullRequests={pullRequests} computer={computer} dialogs={dialogs} />
   if (!botId) return draw(null, null)
