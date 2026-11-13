@@ -4394,6 +4394,8 @@
     "more": "Load more"
   },
   "IssueThreads": {
+    "composerModelUnknown": "Model not reported",
+    "composerModelRequested": "Requested {model}",
     "organization": {
       "archive": "Archive conversation",
       "unarchive": "Unarchive conversation",

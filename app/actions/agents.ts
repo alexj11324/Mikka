@@ -429,9 +429,9 @@ export async function getThreadMachine(issueId: string | null, runId: string): P
  * It covers the whole run chain and the whole stored brief whatever the cursor
  * returned, so a cursor read reports the same usage as a full one.
  */
-async function readContextUsage(runIds: string[], rootRunId: string): Promise<import('@/lib/context-usage').ContextUsage> {
+async function readContextUsage(runIds: string[], rootRunId: string, latestRunId: string): Promise<import('@/lib/context-usage').ContextUsage> {
   const { CONTEXT_CHARS_SQL, contextUsageFromCounts } = await import('@/lib/context-usage')
-  const { rows: [counted] } = await pool.query<Record<string, string | number | null>>(CONTEXT_CHARS_SQL, [runIds, rootRunId])
+  const { rows: [counted] } = await pool.query<Record<string, string | number | null>>(CONTEXT_CHARS_SQL, [runIds, rootRunId, latestRunId])
   const count = (value: unknown) => Number(value ?? 0) || 0
   const counts = (ascii: unknown, other: unknown) => ({ ascii: count(ascii), other: count(other) })
   return contextUsageFromCounts({
@@ -441,6 +441,10 @@ async function readContextUsage(runIds: string[], rootRunId: string): Promise<im
     task: counts(counted?.taskAscii, counted?.taskOther),
     messages: counts(counted?.messageAscii, counted?.messageOther),
     conversation: counts(counted?.conversationAscii, counted?.conversationOther),
+    ...(typeof counted?.selectedModel === 'string' || typeof counted?.servedModel === 'string' ? { composerModel: {
+      selected: typeof counted?.selectedModel === 'string' ? counted.selectedModel : null,
+      served: typeof counted?.servedModel === 'string' ? counted.servedModel : null,
+    } } : {}),
     model: typeof counted?.model === 'string' ? counted.model : null,
   })
 }
@@ -530,7 +534,7 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
     threadLiveReferences(pool, workspacePool, runIds, user.id),
     row.issueId ? documentLiveWorkspace(pool, workspacePool, row.issueId, user.id) : null,
     // Over the whole chain and the whole brief, so a cursor read reports what a full one does.
-    readContextUsage(chainRunIds, row.id),
+    readContextUsage(chainRunIds, row.id, chain?.latestRunId ?? row.id),
   ])
   return {
     live: { viewerId: user.id, runs, issueWorkspaceId, questionDeadline, ...(Object.keys(revisions).length ? { revisions } : {}) },

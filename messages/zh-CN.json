@@ -4394,6 +4394,8 @@
     "more": "加载更多"
   },
   "IssueThreads": {
+    "composerModelUnknown": "模型未上报",
+    "composerModelRequested": "所选模型：{model}",
     "organization": {
       "archive": "归档对话",
       "unarchive": "取消归档",
