@@ -72,6 +72,21 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
   const volume = (await created.json()).volume
   const duplicate = await call('', { method: 'POST', body: { name: volume.name } })
   assert.equal(duplicate.status, 409)
+  // Measure the point lookups used to open a single folder. Match only SELECTs
+  // of the volume row; membership, immutable versions and session reads remain independent.
+  const selectRows = pool.query.bind(pool)
+  let volumeLookups = 0
+  const lookup = t.mock.method(pool, 'query', (...args: Parameters<typeof pool.query>) => {
+    const [sql] = args
+    if (typeof sql === 'string' && /FROM\s+drive_volumes\b/i.test(sql)) volumeLookups++
+    return selectRows(...args)
+  })
+  try {
+    const open = await call(`/${volume.id}`)
+    assert.equal(open.status, 200)
+    assert.equal((await open.json()).volume.id, volume.id)
+    assert.equal(volumeLookups, 1, 'open one folder with one authorized volume row lookup')
+  } finally { lookup.mock.restore() }
   assert.deepEqual(await duplicate.json(), { error: 'drive_volume_exists' })
   assert.equal(created.headers.get('cache-control'), 'private, no-store')
   assert.equal((await call('', { token: null })).status, 401)
