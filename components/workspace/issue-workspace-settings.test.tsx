@@ -24,6 +24,10 @@ let workspaceError: Error | undefined
 let groupList: { id: string; title: string; workspaceId: string }[] = []
 let groupListError: Error | undefined
 let groupListRetries = 0
+const teamIssuesId = '8055a7ae-204f-4045-8780-66b9c93ce229'
+let scopedTeamFixture = false
+let workspaceTasksPending = false
+let scopedTasksPending = false
 const workspace = () => ({ currentUserId: user.id, workspace: { id: workspaceId, name: 'Fixture', kind: 'team' }, members: [], role: 'admin' })
 const emptyList = { data: { items: [] }, mutate: refreshed }
 const bot = { id: '3f0c9d2e-5b1a-4c7e-9f00-1a2b3c4d5e6f', name: 'Ada', coordinator: false }
@@ -34,7 +38,14 @@ mock.module('next-intl', { namedExports: { useLocale: () => 'en', useTranslation
 mock.module('next/navigation', { namedExports: { useSearchParams: () => new URLSearchParams(browser.location.search) } })
 mock.module('@/i18n/navigation', { namedExports: { getPathname: ({ href }: { href: string }) => href, usePathname: () => browser.location.pathname, useRouter: () => router } })
 mock.module('sonner', { namedExports: { toast: { error: nothing, dismiss: nothing } } })
-mock.module('swr', { defaultExport: (key: unknown) => ({ data: key === '/api/workspace/switcher' ? { ...workspace(), live: { ownerId: user.id } } : [], mutate: refreshed }), namedExports: { SWRConfig: swr.SWRConfig, unstable_serialize: swr.unstable_serialize, useSWRConfig: swr.useSWRConfig } })
+mock.module('swr', { defaultExport: (key: unknown) => ({
+  data: key === '/api/workspace/switcher' ? { ...workspace(), live: { ownerId: user.id } }
+    : key === 'teams' && scopedTeamFixture ? [{ id: teamIssuesId, name: 'Scoped Team' }]
+    : Array.isArray(key) && key[0] === 'team-issues-page' ? { items: [], next: null }
+    : [],
+  isLoading: Array.isArray(key) && key[0] === 'team-issues-page' ? scopedTasksPending : false,
+  mutate: refreshed,
+}), namedExports: { SWRConfig: swr.SWRConfig, unstable_serialize: swr.unstable_serialize, useSWRConfig: swr.useSWRConfig } })
 mock.module('@/lib/app-build', { namedExports: { APP_BUILD: '' } })
 mock.module('@/lib/auth-client', { namedExports: { endSession: async () => ({}), authClient: { getSession: async () => ({ data: { user } }), useSession: () => ({ data: null }) } } })
 mock.module('@/lib/settings-data', { namedExports: { fetchSettingsData: refreshed } })
@@ -44,7 +55,7 @@ mock.module('@/hooks/use-agent-history', { namedExports: { useAgentHistory: () =
 mock.module('@/hooks/use-focus-return', { namedExports: { focusChatComposer: nothing, useOpenerFocus: () => () => true } })
 mock.module('@/hooks/use-live-key', { namedExports: { LiveProvider: plain, useLiveKey: nothing, useLiveKeys: nothing, useLiveScope: () => null } })
 mock.module('@/hooks/use-live-lists', { namedExports: {
-  useLiveIssueList: () => emptyList, useLiveThreadList: () => emptyList,
+  useLiveIssueList: () => ({ ...emptyList, isLoading: workspaceTasksPending }), useLiveThreadList: () => emptyList,
   useLiveBotRoster: () => botList, useLiveBotChatList: () => ({ data: { items: {} } }), useLiveGroupList: () => ({
     data: groupList,
     error: groupListError,
@@ -75,7 +86,7 @@ for (const [file, names] of [
   ['./thread-column.tsx', ['ThreadColumn']], ['./task-column.tsx', ['TaskColumn']],
   ['../plugins/plugins-view.tsx', ['PluginsPage']], ['../suggestions/suggestion-feed.tsx', ['SuggestionFeed', 'SuggestionsRefresh', 'useSuggestionCount']],
   ['../artifacts/artifact-library.tsx', ['ArtifactLibrary']], ['./legacy-chat-archive.tsx', ['LegacyChatArchive']],
-] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, name === 'useSuggestionCount' ? () => 0 : empty])) })
+] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, name === 'useSuggestionCount' ? () => 0 : name === 'BoardPage' ? () => <section data-team-board-visible="" /> : empty])) })
 mock.module('./group-chat-view', { namedExports: {
   GroupChatView: ({ group }: { group: { id: string } }) => <section data-open-group={group.id} />,
 } })
@@ -177,6 +188,7 @@ beforeEach(() => {
   groupList = []
   groupListError = undefined
   groupListRetries = 0
+  scopedTeamFixture = false; workspaceTasksPending = false; scopedTasksPending = false
   browser.history.replaceState({}, '', '/?workspace=workspace-one')
   browser.localStorage.clear(); browser.sessionStorage.clear()
   notes = null; railMounts = 0; composerMounts = 0; composerUnmounts = 0
@@ -246,6 +258,20 @@ async function go(href: string) {
   browser.history.pushState({}, '', href)
   await render()
 }
+
+test('Team Issues first-page readiness is independent of the unrelated workspace-wide list', async () => {
+  scopedTeamFixture = true
+  workspaceTasksPending = true // The large global page is slow; the authorized Team page is ready.
+  browser.history.replaceState({}, '', `/?workspace=${workspaceId}&team=${teamIssuesId}&section=team-issues`)
+  await render({ initialSection: 'team-issues' })
+  assert.ok(container.querySelector('[data-team-board-visible]'), 'the ready Team list must be reachable without waiting for global pagination')
+  assert.equal(container.querySelector('[role="status"][aria-label="Workspace.loadingEditor"]'), null)
+
+  scopedTasksPending = true // The Team-scoped read itself remains a real loading gate.
+  await render({ initialSection: 'team-issues' })
+  assert.equal(container.querySelector('[data-team-board-visible]'), null)
+  assert.ok(container.querySelector('[role="status"][aria-label="Workspace.loadingEditor"]'))
+})
 
 test('a group absent from stale rows offers retry until a successful membership read', async () => {
   const id = '8055a7ae-204f-4045-8780-66b9c93ce228'
