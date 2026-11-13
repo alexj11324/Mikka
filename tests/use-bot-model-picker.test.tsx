@@ -15,6 +15,7 @@ const initial: BotModelMenu = {
 let chooseResult: Promise<BotModelMenu | { error: string }> = Promise.resolve(initial)
 let refreshes = 0
 let failures = 0
+let choices: string[] = []
 mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) => key } })
 mock.module('sonner', { namedExports: { toast: { error: () => { failures++ } } } })
 mock.module('swr', { defaultExport: function useFixtureSWR() {
@@ -35,7 +36,7 @@ mock.module('swr', { defaultExport: function useFixtureSWR() {
 } })
 mock.module(new URL('../app/actions/execution-settings.ts', import.meta.url).href, { namedExports: {
   getBotModelMenu: async () => initial,
-  chooseBotModel: async () => chooseResult,
+  chooseBotModel: async (_botId: string | null, id: string) => { choices.push(id); return chooseResult },
   refreshBotModelMenuAction: async () => { refreshes++; return initial },
 } })
 
@@ -49,6 +50,37 @@ before(async () => {
   })) Object.defineProperty(globalThis, key, { configurable: true, writable: true, value })
   ;({ createRoot } = await import('react-dom/client'))
   ;({ useBotModelPicker } = await import('../hooks/use-bot-model-picker'))
+})
+
+test('rapid choices are saved in order and sending waits for the last requested choice', async () => {
+  const releases: Array<(menu: BotModelMenu) => void> = []
+  const deferred = () => new Promise<BotModelMenu>(resolve => { releases.push(resolve) })
+  chooseResult = deferred()
+  choices = []
+  const root = createRoot(browser.document.createElement('div') as unknown as HTMLDivElement)
+  let picker!: ReturnType<typeof useBotModelPicker>
+  function Probe() { picker = useBotModelPicker(null); return null }
+  const haiku: BotModelMenu = { ...initial, current: { ...initial.current, id: 'haiku', modelId: 'claude-haiku-5-5', provider: 'claude' } }
+  try {
+    await act(async () => { root.render(<Probe />) })
+    let first!: Promise<boolean>, second!: Promise<boolean>, third!: Promise<boolean>
+    await act(async () => { first = picker.choose('haiku') })
+    let ready = false
+    const send = picker.waitForSave().then(() => { ready = true })
+    await act(async () => { second = picker.choose('old'); third = picker.choose('haiku') })
+    assert.deepEqual(choices, ['haiku'])
+    chooseResult = deferred()
+    await act(async () => { releases[0](haiku); await first })
+    assert.deepEqual(choices, ['haiku', 'old'])
+    assert.equal(ready, false, 'sending also waits for choices queued after the first send attempt')
+    chooseResult = deferred()
+    await act(async () => { releases[1](initial); await second })
+    assert.deepEqual(choices, ['haiku', 'old', 'haiku'], 'the final choice cannot be skipped against a stale optimistic menu')
+    await Promise.resolve()
+    assert.equal(ready, false)
+    await act(async () => { releases[2](haiku); await third; await send })
+    assert.equal(picker.menu?.current.id, 'haiku')
+  } finally { await act(async () => root.unmount()) }
 })
 
 test('opening a cached picker does not refresh subscriptions, and an unsaved choice rolls back', async () => {
