@@ -1,3 +1,4 @@
+import { filterRun } from './records.mjs'
 import {
   EntityConflictError, HookConflictError, HookNotFoundError,
   RunExpiredError, TooEarlyError, WorkflowRunNotFoundError, WorkflowWorldError,
@@ -11,12 +12,6 @@ function filterStep(step, options) {
   return options?.resolveData === 'none' ? { ...step, input: undefined, output: undefined } : step
 }
 
-function filterRun(run, options) {
-  if (options?.resolveData !== 'none') return run
-  const { dynamicWorkflowCode, ...rest } = run
-  return { ...rest, input: undefined, output: undefined }
-}
-
 function filterHook(hook, options) {
   if (options?.resolveData !== 'none') return hook
   const { metadata, ...rest } = hook
@@ -25,7 +20,8 @@ function filterHook(hook, options) {
 
 function requireRun(run, runId, options) {
   if (!run) throw new WorkflowRunNotFoundError(runId)
-  return filterRun(run, options)
+  // Node and Worker releases roll independently; an older Worker can still return a full run.
+  return filterRun(run, options?.resolveData)
 }
 
 function requireHook(hook, id, options) {
@@ -43,8 +39,8 @@ async function page(promise, fn) {
 export function createAdmissionStorage(authority) {
   return {
     runs: {
-      get: async (id, options) => requireRun(await authority.run(id), id, options),
-      list: (options = {}) => page(authority.runs(options), run => filterRun(run, options)),
+      get: async (id, options) => requireRun(await authority.run(id, options?.resolveData), id, options),
+      list: (options = {}) => page(authority.runs(options), run => filterRun(run, options.resolveData)),
       ...(authority.waitTerminal ? { waitForTerminalStatus: async (id, options) =>
         requireRun(await authority.waitTerminal(id, options), id, options) } : {}),
     },
@@ -76,7 +72,7 @@ export function createAdmissionStorage(authority) {
             if (replayEventObserver) for (const event of receipt.events) replayEventObserver(event)
           }
           if (receipt.event) receipt.event = stripEventDataRefs(receipt.event, options.resolveData ?? 'all')
-          if (receipt.run) receipt.run = filterRun(receipt.run, options)
+          if (receipt.run) receipt.run = filterRun(receipt.run, options.resolveData)
           if (receipt.step) receipt.step = filterStep(receipt.step, options)
           if (receipt.hook) receipt.hook = filterHook(receipt.hook, options)
           return receipt
