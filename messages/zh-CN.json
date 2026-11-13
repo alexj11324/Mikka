@@ -1414,6 +1414,17 @@
     "viewProjects": "查看项目"
   },
   "IssueDetail": {
+    "work": {
+      "heading": "工作",
+      "system": "系统",
+      "agent": "Agent",
+      "states": {
+        "open": "开放",
+        "closed": "已关闭",
+        "draft": "草稿",
+        "merged": "已合并"
+      }
+    },
     "frame": {
       "delegate": "交给",
       "open": "打开",

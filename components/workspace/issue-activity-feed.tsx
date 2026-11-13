@@ -44,7 +44,7 @@ export function useActivityEvents(versions: ActivityVersion[], children: Activit
   return (barriers: readonly { id: string; at: string }[]): ActivityEventItem[] => {
     const rows = activityTimeline(history, barriers.map(row => ({ id: row.id, createdAt: row.at })))
     return rows.flatMap(row => row.type === 'thread' ? [] : [{
-      id: row.id, at: row.at, actor: row.events[0].actor?.name ? row.events[0].actor : null,
+      id: row.id, at: row.at, actor: row.events[0].actor ?? null,
       text: row.events.map(labelOf).join(t('separator')),
       time: format.dateTime(new Date(row.at), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
     }])

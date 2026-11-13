@@ -25,7 +25,7 @@ import { useIssueConnections, type RelationKind } from './issue-relations'
 import { useIssueScope } from './issue-scope-control'
 import { AgentSphere } from './issue-assignee-menu'
 import type { useAgentActivity } from './issue-threads'
-import { useSelectedTaskPresentation } from '@/hooks/use-selected-task-presentation'
+import { TaskWorkSection } from './task-work-section'
 import { useActivityEvents } from './issue-activity-feed'
 import { useActivityDrafts, type DiscussionSave } from './issue-activity'
 import type { IssueDiscussions } from './issue-editor'
@@ -116,7 +116,7 @@ export function FramedTask(props: FramedTaskProps) {
   const [teamChoice, setTeamChoice] = useState<ExplicitTeamChoice | null>(null)
   const scope = useIssueScope({ task, disabled: locked, onSaved: adopt, teamChoice })
   const team = useIssueTeam({ issueId: task.id, viewerId: userId, disabled: locked, onChosen: (issueId, teamId) => setTeamChoice(teamId ? { issueId, teamId, selectionId: crypto.randomUUID() } : null) })
-  const presentation = useSelectedTaskPresentation(userId, task.workspaceId, preview ? undefined : task.id)
+  const presentation = { data: props.agentActivity.work?.presentation, error: props.agentActivity.failed, retry: props.agentActivity.retry }
   const connections = useIssueConnections({ liveWorkspaceId: props.liveWorkspaceId, viewerId: userId, task, getCurrent, onSaved: adopt, disabled: locked, enabled: !preview })
 
   const loading = (text = tCommon('loading')): TaskMenuItem[] => optionsError
@@ -244,10 +244,9 @@ export function FramedTask(props: FramedTaskProps) {
           message: { record: { id: fact.messageId, body: fact.body, author: fact.author, at: fact.at }, first: fact.kind === 'comment', last: fact.messageId === thread.messages.at(-1)?.id } }
       })
       : current.threads.map(thread => ({ kind: 'comment', id: thread.id, at: thread.createdAt, thread, time, excerpt: excerpt(thread.id) }))
-    const history = eventsFor([...props.agentActivity.items, ...comments, ...additional])
+    const history = eventsFor([...comments, ...additional])
     return chronologicalActivity<TaskActivityItem>([
-      ...history.map((item): TaskActivityItem => ({ kind: 'event', id: `history:${item.id}`, at: item.at, who: item.actor?.name ?? null, mark: item.actor?.name ? (item.actor.type === 'agent' ? { kind: 'node', node: <AgentSphere name={item.actor.name} compact /> } : { kind: 'person', name: item.actor.name }) : undefined, text: item.text, time: item.time })),
-      ...props.agentActivity.items.map((item): TaskActivityItem => ({ kind: 'agent', id: item.id, at: item.at, who: item.name, mark: { kind: 'node', node: item.mark }, text: item.result, time: item.time, open: item.open, onOpen: item.onOpen, openLabel: tFrame('openThread', { name: item.name }) })),
+      ...history.map((item): TaskActivityItem => ({ kind: 'event', id: `history:${item.id}`, at: item.at, who: item.actor?.name || (item.actor?.type === 'system' ? t('work.system') : item.actor?.type === 'agent' ? t('work.agent') : null), mark: item.actor?.name ? (item.actor.type === 'agent' ? { kind: 'node', node: <AgentSphere name={item.actor.name} compact /> } : { kind: 'person', name: item.actor.name }) : undefined, text: item.text, time: item.time })),
       ...comments, ...additional,
     ])
   }
@@ -258,6 +257,9 @@ export function FramedTask(props: FramedTaskProps) {
     attachments={preview ? undefined : trigger => <TaskAttachments key={task.id} taskId={task.id} trigger={trigger} />}
     workspaceId={preview ? undefined : task.workspaceId}
     factoryTaskId={presentation.data?.factoryTaskId}
+    factorySnapshot={props.agentActivity.work?.factory ?? null}
+    work={!preview && <TaskWorkSection threads={props.agentActivity.threads ?? []} pulls={meta.pullRequests}
+      factory={props.agentActivity.work?.factory} open={props.agentActivity.openThread} />}
     rootRef={props.rootRef} onKeyDown={props.onKeyDown} label={props.label} busy={preview}
     origin={props.origin} identifier={task.identifier} title={props.title} saveLabel={props.saveLabel} saved={props.saved} saveHint={t('autosaveHint')}
     navigation={props.navigation} onClose={props.onClose}

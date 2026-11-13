@@ -253,11 +253,15 @@ export async function listIssueThreads(issueId: string): Promise<IssueThread[]> 
 
 /** The same list, plus the channel its `issue_threads` key arrives on: the issue's
  * workspace, or the owner's home for a personal issue; null reads once a minute. */
-export async function pollIssueThreads(issueId: string): Promise<{ threads: IssueThread[]; live: { workspaceId: string | null } }> {
+export async function pollIssueThreads(issueId: string, includeTaskWork = false) {
   return withDatabaseOperation('/actions/threads/issue-list', async () => {
     const { threads, issue, user } = await readIssueThreads(issueId)
     const [{ documentLiveWorkspace }, { workspacePool }] = await Promise.all([import('@/lib/live/panels'), import('@/lib/workspace-db')])
-    return { threads, live: { workspaceId: await documentLiveWorkspace(pool, workspacePool, issue.id, user.id) } }
+    const workspaceId = await documentLiveWorkspace(pool, workspacePool, issue.id, user.id)
+    const work = includeTaskWork && issue.workspaceId
+      ? await (await import('@/lib/task-work-read')).readTaskWork(user, issue.workspaceId, issue.id)
+      : null
+    return { threads, live: { workspaceId }, work }
   })
 }
 
