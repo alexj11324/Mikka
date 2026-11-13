@@ -478,3 +478,27 @@ test('a reply draws its words in bubbles on its own, and plain in a frame that s
     assert.deepEqual(sent, ['See running tasks'])
   } finally { await view.unmount() }
 })
+
+test('a choice card that could not send says the chat\'s real reason; the general sentence is only the last fallback', async () => {
+  const card = 'root = BeQuestions("New bot", [{id:"next", title:"What first?", options:[{value:"task", label:"Create a task"}, {value:"list", label:"See running tasks"}]}])'
+  const view = await mount()
+  const pick = async () => {
+    const row = view.container.querySelector<HTMLButtonElement>('[data-choice-rows] button[data-choice="open"]')
+    assert.ok(row)
+    await act(async () => { row.click() })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
+  }
+  try {
+    for (const [interaction, shown, hidden] of [
+      [{ busy: false, continueFromAnswer: async () => false, answer: async () => ({ sent: false as const, reason: 'You are offline. Reconnect and send again.' }) }, /You are offline/, /Unable to continue/],
+      [{ busy: false, continueFromAnswer: async () => false, answer: async () => ({ sent: false as const, reason: 'This page is out of date. Refresh, then send again.' }) }, /Refresh, then send again/, /Unable to continue/],
+      [{ busy: false, continueFromAnswer: async () => false, answer: async () => ({ sent: false as const }) }, /Unable to continue/, /offline/],
+      [{ busy: false, continueFromAnswer: async () => false }, /Unable to continue/, /offline/],
+    ] as const) {
+      await view.render(<AgentInteractionContext key={String(shown)} value={interaction}><CoordinatorReply key={String(shown)} text={card} citations={base} /></AgentInteractionContext>)
+      await pick()
+      assert.match(view.container.textContent ?? '', shown)
+      assert.doesNotMatch(view.container.textContent ?? '', hidden)
+    }
+  } finally { await view.unmount() }
+})
