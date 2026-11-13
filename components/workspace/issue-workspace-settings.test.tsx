@@ -29,6 +29,7 @@ let scopedTeamFixture = false
 let workspaceTasksPending = false
 let scopedTasksPending = false
 let scopedTeamPageMutations = 0
+let acknowledgeNewTask: ((id: string) => void) | null = null
 const workspace = () => ({ currentUserId: user.id, workspace: { id: workspaceId, name: 'Fixture', kind: 'team' }, members: [], role: 'admin' })
 const emptyList = { data: { items: [] }, mutate: refreshed }
 const bot = { id: '3f0c9d2e-5b1a-4c7e-9f00-1a2b3c4d5e6f', name: 'Ada', coordinator: false }
@@ -107,7 +108,10 @@ mock.module('@/components/nav/all-threads', { namedExports: { AllThreadsColumn: 
 mock.module('@/components/browser/browser-toggle', { namedExports: { useBrowserFits: () => true, BrowserToggle: ({ onToggle }: { onToggle: () => void }) => <Button onClick={onToggle}>browser</Button> } })
 mock.module('@/components/ui/sheet', { namedExports: { Sheet: empty, SheetContent: plain, SheetHeader: plain, SheetTitle: plain, SheetDescription: plain } })
 mock.module('@/components/nav/global-search', { namedExports: { GlobalSearch: ({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) => open ? <div data-search-open=""><Button onClick={() => onOpenChange(false)}>dismiss search</Button></div> : null, SearchPill: ({ onSearch }: { onSearch: () => void }) => <Button onClick={onSearch}>search</Button> } })
-mock.module('@/components/coordinator/new-task-dialog', { namedExports: { NewTaskDialog: ({ open }: { open: boolean }) => open ? <div data-new-task-open="" /> : null } })
+mock.module('@/components/coordinator/new-task-dialog', { namedExports: { NewTaskDialog: ({ open, onCreated }: { open: boolean; onCreated: (id: string) => void }) => {
+  acknowledgeNewTask = onCreated
+  return open ? <div data-new-task-open="" /> : null
+} } })
 let railMounts = 0
 mock.module('@/components/nav/icon-rail', { namedExports: { IconRail: ({ onSettings, onNavigate, chats }: { onSettings: () => void; onNavigate: (destination: 'chats') => void; chats?: { onNewGroup: () => void } }) => {
   useEffect(() => { railMounts++ }, [])
@@ -194,7 +198,7 @@ beforeEach(() => {
   groupList = []
   groupListError = undefined
   groupListRetries = 0
-  scopedTeamFixture = false; workspaceTasksPending = false; scopedTasksPending = false; scopedTeamPageMutations = 0
+  scopedTeamFixture = false; workspaceTasksPending = false; scopedTasksPending = false; scopedTeamPageMutations = 0; acknowledgeNewTask = null
   browser.history.replaceState({}, '', '/?workspace=workspace-one')
   browser.localStorage.clear(); browser.sessionStorage.clear()
   notes = null; railMounts = 0; composerMounts = 0; composerUnmounts = 0
@@ -293,6 +297,17 @@ test('a Team detail ACK refreshes its own authorized list after save and deletio
   assert.ok(remove)
   await act(async () => { remove.click() })
   assert.equal(scopedTeamPageMutations, 2, 'an acknowledged deletion must retire the Team page too')
+})
+
+test('a new Team task ACK invalidates the scoped first page before opening its detail', async () => {
+  scopedTeamFixture = true
+  browser.history.replaceState({}, '', `/?workspace=${workspaceId}&team=${teamIssuesId}&section=team-issues`)
+  await render({ initialSection: 'team-issues' })
+  const acknowledged = acknowledgeNewTask
+  assert.ok(acknowledged, 'the authorized Team creation dialog must be wired')
+  assert.equal(scopedTeamPageMutations, 0)
+  await act(async () => { acknowledged('8055a7ae-204f-4045-8780-66b9c93ce231') })
+  assert.equal(scopedTeamPageMutations, 1, 'a confirmed Team Task creation must invalidate the authorized Team page')
 })
 
 test('a group absent from stale rows offers retry until a successful membership read', async () => {
