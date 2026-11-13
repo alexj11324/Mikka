@@ -1437,6 +1437,13 @@
     "test": "lib/bot-model-menu-view.test.ts",
     "suite": "test:issues"
   },
+  "lib/thread-groups.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Compute the bot overview from visible task, conversation and pull request rows, counting each handoff once.",
+    "test": "lib/thread-groups.test.ts",
+    "suite": "test:issues"
+  },
   "lib/conversation-title-schedule.ts": {
     "mode": "built-in",
     "environment": [],
