@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { directoryPullRequests } from '@/lib/pull-request-appearance'
 import assert from 'node:assert/strict'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { taskPresentation, type TaskPresentation } from '@/lib/task-presentation'
@@ -82,4 +83,16 @@ test('sidebar task names use the existing short title and bound pending/manual t
   assert.equal(rows[1].name, 'MIK-b 这是一个超过十二字限制的')
   assert.equal(rows[2].name, 'one two three four five six')
   assert.equal(generated.title, '完整的任务需求原文不应该出现在紧凑的导航里面')
+})
+
+test('each GitHub PR retains every authorized conversation across directory pages', () => {
+  const open = { url: 'https://github.com/First/Repo/pull/8', state: 'open' as const }
+  const merged = { url: 'https://github.com/second/repo/pull/8', state: 'merged' as const }
+  const rows = [
+    { id: 'one', pulls: [open, merged] },
+    { id: 'two', pulls: [{ ...open, url: open.url.toLowerCase() + '/' }] },
+  ]
+  assert.deepEqual(directoryPullRequests(rows, 'all').map(entry => [entry.pull.url, entry.conversations.map(row => row.id)]),
+    [[open.url, ['one', 'two']], [merged.url, ['one']]])
+  assert.deepEqual(directoryPullRequests(rows, 'merged').map(entry => entry.pull), [merged])
 })

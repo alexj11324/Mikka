@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { SearchInput } from '@/components/ui/search-input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { PullRequestsBadge, pullRequestRef } from './pull-requests-badge'
+import { directoryPullRequests } from '@/lib/pull-request-appearance'
 import { useLiveKey } from '@/hooks/use-live-key'
 import type { DirectoryState } from '@/lib/conversation-directory-input'
 import { openTask, openThread } from './workspace-navigation'
@@ -50,24 +51,26 @@ export function ConversationDirectory({ ownerId, workspaceId, pullsOnly = false 
     {!error && !data && <p role="status">{t('loading')}</p>}
     {data && !rows.length && !more && !error && <p role="status">{t('empty')}</p>}
     <ul className="flex flex-col gap-2">
-      {rows.map(row => <li key={row.id} className="flex flex-wrap items-center gap-2 py-2">
-        {pullsOnly && <ul className="basis-full">
-          {row.pulls.filter(pr => pullState === 'all' || pr.state === pullState).map(pr => {
-            const ref = pullRequestRef(pr.url)
-            return <li key={pr.url} className="flex flex-wrap items-center gap-2">
-              <a href={pr.url} target="_blank" rel="noopener noreferrer" className="break-words font-medium underline-offset-2 hover:underline">
-                {pr.title || ref.repo} · {ref.repo} #{ref.number}
-              </a>
-              <span>{prLabel(pr.state)}</span>
-              {pr.additions !== undefined && pr.deletions !== undefined && <bdi>+{pr.additions} −{pr.deletions}</bdi>}
-            </li>
-          })}
-        </ul>}
+      {pullsOnly ? directoryPullRequests(rows, pullState).map(({ pull, conversations }) => {
+        const ref = pullRequestRef(pull.url)
+        const tasks = new Map(conversations.flatMap(row => row.issueId ? [[row.issueId, row.identifier || row.taskTitle] as const] : []))
+        return <li key={pull.url} className="flex flex-wrap items-center gap-2 py-2">
+          <a href={pull.url} target="_blank" rel="noopener noreferrer" className="break-words font-medium underline-offset-2 hover:underline">
+            {pull.title && <>{pull.title} · </>}{ref.repo} #{ref.number}
+          </a>
+          <span>{prLabel(pull.state)}</span>
+          {pull.additions !== undefined && pull.deletions !== undefined && <bdi>+{pull.additions} −{pull.deletions}</bdi>}
+          <div className="flex basis-full flex-wrap items-center gap-2">
+            {conversations.map(row => <Button key={row.id} variant="ghost" onClick={() => openThread(row.id)}>{row.title || t('untitled')}</Button>)}
+            {[...tasks].map(([id, label]) => <Button key={id} size="sm" variant="link" onClick={() => openTask(id)}>{label}</Button>)}
+          </div>
+        </li>
+      }) : rows.map(row => <li key={row.id} className="flex flex-wrap items-center gap-2 py-2">
         <Button variant="ghost" onClick={() => openThread(row.id)} className="min-w-0 flex-1 justify-start whitespace-normal text-start">
           {row.title || t('untitled')}
         </Button>
         {row.issueId && <Button size="sm" variant="link" onClick={() => openTask(row.issueId!)}>{row.identifier || row.taskTitle}</Button>}
-        {!pullsOnly && <><PullRequestsBadge pullRequests={row.pulls} /><span>{t(row.state)}</span></>}
+        <PullRequestsBadge pullRequests={row.pulls} /><span>{t(row.state)}</span>
         <time dateTime={row.at}>{format.dateTime(new Date(row.at), { dateStyle: 'medium', timeStyle: 'short' })}</time>
       </li>)}
     </ul>
