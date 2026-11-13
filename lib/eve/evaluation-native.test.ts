@@ -41,8 +41,8 @@ test('Agent Kit evaluations run through compiled public Eve sessions with inert 
  for(const source of sources)await writeFile(join(fixture,source),await readFile(join(root,source)))
  // Only provider/account boundaries and storage are synthetic. Channel, auth,
  // dynamic capabilities, approvals, hooks and the native Client are unchanged.
- await writeFile(join(fixture,'lib/eve/evaluation-store.ts'),`import{readFile,writeFile}from'node:fs/promises';import{join}from'node:path';
- export async function loadEvaluationBinding(_pool,scope,id){try{const row=JSON.parse(await readFile(join(process.env.FIXTURE_BINDINGS,id+'.json'),'utf8'));return scope.ownerId==='${scope.ownerId}'&&scope.botId==='${scope.botId}'&&scope.workspaceId==='${scope.workspaceId}'?row:null}catch{return null}}
+ await writeFile(join(fixture,'lib/eve/evaluation-store.ts'),`import{appendFile,readFile,writeFile}from'node:fs/promises';import{join}from'node:path';
+ export async function loadEvaluationBinding(_pool,scope,id){try{await appendFile(join(process.env.FIXTURE_BINDINGS,id+'.reads'),'1');const row=JSON.parse(await readFile(join(process.env.FIXTURE_BINDINGS,id+'.json'),'utf8'));return scope.ownerId==='${scope.ownerId}'&&scope.botId==='${scope.botId}'&&scope.workspaceId==='${scope.workspaceId}'?row:null}catch{return null}}
  export async function bindEvaluationSession(_pool,id,sessionId){const path=join(process.env.FIXTURE_BINDINGS,id+'.json'),row=JSON.parse(await readFile(path,'utf8'));if(row.session_id&&row.session_id!==sessionId)throw Error('agentEvaluationMismatch');row.session_id=sessionId;await writeFile(path,JSON.stringify(row))}
  `)
  await writeFile(join(fixture,'lib/db.ts'),`export const pool={async query(_sql,values){return{rowCount:values?.[0]==='${scope.botId}'&&values?.[1]==='${scope.ownerId}'&&values?.[2]==='${scope.workspaceId}'?1:0,rows:[]}}}`)
@@ -97,6 +97,15 @@ test('Agent Kit evaluations run through compiled public Eve sessions with inert 
   assert.equal(foreign.status,404)
   const unauthenticated=await fetch(origin+'/mikka/evaluations/eve/v1/session',{method:'POST',headers:{'content-type':'application/json','x-mikka-evaluation-id':id},body:'{}'})
   assert.equal(unauthenticated.status,401)
+  const readCount = async () => (await readFile(join(fixture, 'bindings', id + '.reads'))).length
+  const before = await readCount()
+  assert.equal((await client.sessions.create()).session.id, binding.session_id)
+  assert.equal(await readCount() - before, 1, 'a repeated create reads its current owned binding once')
+  await rm(join(fixture, 'bindings', id + '.json'))
+  const removed = await fetch(origin+'/mikka/evaluations/eve/v1/session', {
+    method:'POST', headers:{authorization:internalEveAuthorization(scope),'x-mikka-evaluation-id':id},
+  })
+  assert.equal(removed.status, 401, 'the next request observes binding removal')
  })
  assert.equal(new Set(ids).size,6,'each case and revision gets an isolated native session')
 })
