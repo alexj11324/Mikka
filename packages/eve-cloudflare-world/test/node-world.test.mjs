@@ -10,6 +10,7 @@ import { afterAll, beforeAll, expect, test } from 'vitest'
 import { createBoundFetch } from '../src/bound-fetch.mjs'
 import { authenticateDelivery, bodyDigest, deliveryHeaders } from '../src/queue-auth.mjs'
 import { createNodeWorld } from '../src/node-world.mjs'
+import { decodeRecord, encodeRecord } from '../src/records.mjs'
 
 const require = createRequire(import.meta.url)
 const { Miniflare, convertV4MiniflareOptions } = createRequire(realpathSync(require.resolve('wrangler/package.json')))('miniflare')
@@ -85,6 +86,35 @@ test('the Node World crosses only its bound private service for catalogues, attr
   await expect(world.events.create(b,resume)).rejects.toMatchObject({ name:'HookNotFoundError' })
   expect((await world.events.listByCorrelationId({runId:a,correlationId:'hook_a'})).data.map(x=>x.eventType)).toEqual(['hook_created','hook_received'])
   expect((await world.events.get(a,receipts[0].event.eventId,{resolveData:'none'})).eventData?.payload).toBeUndefined()
+})
+
+test('metadata-only run reads omit workflow bytes on the private connection and support older Workers', async () => {
+  const input = new Uint8Array(64 * 1024).fill(7)
+  const runId = await start('metadata-only', input)
+  const replies = []
+  const measured = createNodeWorld({ deploymentId, signingKey, async fetchBound(url, options) {
+    const response = await outbound.fetch(url, options)
+    const bytes = await response.clone().arrayBuffer()
+    replies.push({ bytes: bytes.byteLength, record: decodeRecord(bytes) })
+    return response
+  } })
+  const full = await measured.runs.get(runId)
+  expect(full.input).toEqual(input)
+  expect((await measured.runs.get(runId, { resolveData: 'none' })).input).toBeUndefined()
+  expect((await measured.runs.list({ workflowName: 'metadata-only', resolveData: 'none' })).data[0].input).toBeUndefined()
+  expect((await measured.runs.waitForTerminalStatus(runId, {timeoutMs: 0, resolveData: 'none'})).input).toBeUndefined()
+  console.info('Run RPC response bytes (full, metadata, list, immediate wait):', replies.map(r => r.bytes).join(', '))
+  expect(replies[1].record.input).toBeUndefined()
+  expect(replies[2].record.data[0].input).toBeUndefined()
+  expect(replies[3].record.input).toBeUndefined()
+  await measured.runs.waitForTerminalStatus(runId, {timeoutMs: 20, resolveData: 'none'})
+  expect(replies.at(-1).record.input).toBeUndefined()
+  await world.events.create(runId, {...spec,eventType:'run_completed',eventData:{output:input}})
+  await measured.runs.waitForTerminalStatus(runId, {timeoutMs: 500, resolveData: 'none'})
+  expect(replies.at(-1).record.input).toBeUndefined()
+  expect(replies.at(-1).record.output).toBeUndefined()
+  const olderWorker = createNodeWorld({ deploymentId, signingKey, fetchBound: async () => new Response(encodeRecord(full)) })
+  expect((await olderWorker.runs.get(runId, { resolveData: 'none' })).input).toBeUndefined()
 })
 
 test('terminal snapshots wake through the Durable Object, and byte streams use isolated per-run storage', async () => {
