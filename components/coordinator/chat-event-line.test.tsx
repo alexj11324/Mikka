@@ -42,7 +42,7 @@ test('an event line reads as its thread title or its task code, then what happen
     assert.equal(container.querySelector('[data-thread-link] svg'), null, 'the thread has no icon')
     await render({ kind: 'issueStatus', runId: null, issueId: TASK, status: 'done', title: null })
     assert.equal(container.textContent, 'ALEX-45 moved to Done')
-    assert.equal(container.querySelector('[data-task-state]')?.getAttribute('data-task-state'), 'done')
+    assert.equal(container.querySelector('[data-task-status]')?.getAttribute('data-task-status'), 'done')
   } finally {
     await act(async () => { root.unmount() })
     container.remove()

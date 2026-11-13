@@ -70,12 +70,15 @@ test('a task chip uses the same authorized presentation as its detail, including
   })
   try {
     const chips = [...container.querySelectorAll('[data-slot="inline-citation-trigger"]')] as HTMLElement[]
-    assert.deepEqual(chips.map(chip => chip.querySelector('[data-task-state]')?.getAttribute('data-task-state')), ['running', 'failed', 'blocked', 'waiting', 'waiting', 'todo', 'done'])
+    // One status, the task's status field (2026-11-13-1405); what its Agent is doing is the small mark after it.
+    assert.deepEqual(chips.map(chip => chip.querySelector('[data-task-status]')?.getAttribute('data-task-status')), ['doing', 'doing', 'doing', 'doing', 'doing', 'backlog', 'done'])
+    assert.deepEqual(chips.map(chip => chip.querySelector('[data-run-indicator]')?.getAttribute('data-run-indicator') ?? null), ['working', 'error', 'waiting', 'waiting', 'waiting', null, null])
     await act(async () => { chips[3].click(); chips[5].click() })
     assert.deepEqual(opened, [ids[3], ids[5]])
     assert.deepEqual(chips.map(chip => chip.textContent), ['ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'Ship it'])
-    assert.ok(chips[0].querySelector('svg')?.getAttribute('class')?.includes('lucide-circle-dot'), 'running is the ring')
-    assert.ok(chips[3].querySelector('svg')?.getAttribute('class')?.includes('lucide-hand'), 'waiting is the hand')
+    assert.equal(chips[0].querySelector('svg')?.getAttribute('viewBox'), '0 0 12 12', '进行中 is the status ring, whatever the run does')
+    assert.ok(chips[0].querySelector('[data-run-indicator] svg')?.getAttribute('class')?.includes('lucide-loader-circle'), 'a working Agent is the small turning mark')
+    assert.ok(chips[3].querySelector('[data-run-indicator] svg')?.getAttribute('class')?.includes('lucide-hand'), 'waiting for the person is the hand')
     assert.equal(chips[6].getAttribute('aria-label'), 'Open task: Ship it')
   } finally {
     await act(async () => { root.unmount() })

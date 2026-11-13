@@ -25,6 +25,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils'
 import { BOARD_FILTERS_KEY, LEGACY_BOARD_FILTERS_KEY, boardProjectFilters, migrateBoardFilters, personFilters } from '@/lib/board-filters'
 import { BoardScreenView } from './board-screen'
+import { BOARD_SETTINGS_KEY as SETTINGS_KEY, BOARD_VIEW_EVENT as VIEW_EVENT } from './board-view'
 import type { BoardMenuItem } from '@/components/slots/board-contract'
 import { ISSUE_PRIORITIES } from './issue-properties'
 import { ResizablePane } from '@/components/ui/resizable-pane'
@@ -36,7 +37,6 @@ type Sort = 'priority' | 'updated' | 'created'
 type Completed = 'all' | 'week' | 'month'
 type Display = { sort: Sort; completed: Completed; showEmpty: boolean; properties: CardProperty[]; hidden: BoardColumn[] }
 
-const SETTINGS_KEY = 'mikka:board-v2'
 const SIDEBAR_KEY = 'mikka:board-coordinator-open'
 const WIDE = '(min-width: 80rem)'
 const ME = 'me'
@@ -48,17 +48,6 @@ const DEFAULT_SETTINGS = { view: 'board' as 'board' | 'list', display: DEFAULT_D
 const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 }
 const COMPLETED_DAYS: Record<Completed, number> = { all: Infinity, week: 7, month: 30 }
 const FILTER_FIELDS: FilterField[] = ['status', 'priority', 'assignee', 'creator', 'labels', 'project', 'agentState']
-
-const VIEW_EVENT = 'mikka:board-view'
-
-/** Opens the board in a view from outside it (an old 任务 link opens the list): saved as the person's choice, and applied to a board already on screen. */
-export function showBoardView(view: 'board' | 'list') {
-  try {
-    const stored = JSON.parse(window.localStorage.getItem(SETTINGS_KEY) ?? 'null')
-    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...stored, view }))
-  } catch { /* storage unavailable */ }
-  window.dispatchEvent(new CustomEvent(VIEW_EVENT, { detail: view }))
-}
 
 /** Browser preferences remain durable; named filters belong to the authenticated view scope. */
 function useBoardSettings() {
@@ -179,15 +168,17 @@ export function BoardPage({ issues, userId, workspaceId, teamId, presentationRea
     const result = new Map<string, AgentState>()
     for (const [id, task] of taskStates) {
       const state = cardStateKind(task.state)
-      if (state && state !== 'done') result.set(id, state)
+      if (state) result.set(id, state)
     }
     return result
   }, [taskStates])
   const blocks = useMemo(() => {
     const result = new Map<string, TaskBlock>()
     for (const [id, task] of taskStates) {
+      // 受阻 holds what the person flagged or a dependency holds back. What a task's Agent is doing (a question, quota,
+      // a failed run) is the mark on its card, never a column (2026-11-13-1405): the task stays in its status column.
       const reason = task.blockedReason
-      if (reason) result.set(id, { reason: reason === 'factory' ? 'run' : reason, blockerIdentifier: task.blockedBy })
+      if (reason === 'dependency' || reason === 'flagged') result.set(id, { reason, blockerIdentifier: task.blockedBy })
     }
     return result
   }, [taskStates])

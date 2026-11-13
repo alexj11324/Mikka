@@ -137,7 +137,12 @@
       "emptyTitle": "No tasks yet",
       "newTask": "New task"
     },
-    "createdAtDate": "Created {date}"
+    "createdAtDate": "Created {date}",
+    "agentMark": {
+      "working": "Agent working",
+      "waiting": "Needs you",
+      "error": "Agent error"
+    }
   },
   "Nav": {
     "switchLanguage": "Switch language",
@@ -4959,7 +4964,7 @@
         "creator": "Created by me",
         "labels": "Labels",
         "project": "Project",
-        "agentState": "Thread status"
+        "agentState": "Agent activity"
       },
       "removeFilter": "Remove {field} filter",
       "me": "Me",
@@ -4990,7 +4995,7 @@
         "labels": "Labels",
         "pullRequests": "PR",
         "subtasks": "Subtasks",
-        "agentState": "Thread status",
+        "agentState": "Agent activity",
         "project": "Project",
         "dueDate": "Due date",
         "createdAt": "Created"
@@ -5014,9 +5019,9 @@
         "discuss": "Discuss",
         "delete": "Delete",
         "agent": {
-          "running": "Running",
-          "waiting": "Waiting for you",
-          "blocked": "Blocked"
+          "running": "Agent working",
+          "waiting": "Needs you",
+          "blocked": "Agent error"
         },
         "block": {
           "question": "Needs your answer",

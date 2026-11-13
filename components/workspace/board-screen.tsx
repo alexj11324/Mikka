@@ -5,15 +5,14 @@ import { useFormatter, useTranslations } from 'next-intl'
 import { BoardScreen } from '@ui-slot/board'
 import type { BoardScreenCard, BoardScreenColumn, BoardScreenProps } from '@/components/slots/board-contract'
 import { TaskContextMenu, type CardContext } from '@/components/blocks/kanban-board-1/components/kanban-board'
-import { cardStateKind, type BoardColumn, type BoardTask } from '@/components/blocks/kanban-board-1/components/data'
-import { useTaskStateLabel } from '@/components/workspace/task-state-icon'
+import { runMarkKind, type BoardColumn, type BoardTask } from '@/components/blocks/kanban-board-1/components/data'
+import { useRunIndicatorLabel } from '@/components/workspace/task-state-icon'
+import { runIndicatorOf } from '@/lib/task-state'
 import { blockLabel } from '@/components/workspace/block-label'
 import { displayTaskTitle } from '@/lib/short-title'
 import { formatDateOnly } from '@/lib/date-only'
 import type { TaskBlock } from '@/lib/task-blocked'
 import { useIssueBoardSaves } from './issue-board'
-
-const DONE = ['done', 'canceled', 'duplicate']
 
 /**
  * 看板 through the `board` slot's BoardScreen: BoardPage's filtered tasks in its visible columns, the hidden statuses'
@@ -35,7 +34,7 @@ export function BoardScreenView({ issues, columns: visible, hidden, blocks, newe
   const tIssue = useTranslations('Issue')
   const tCard = useTranslations('Shell.board.card')
   const tHosted = useTranslations('HostedBoard')
-  const stateLabel = useTaskStateLabel()
+  const runLabel = useRunIndicatorLabel()
   const format = useFormatter()
   const saves = useIssueBoardSaves({ issues, blocks, newestRuns, onUpdated, onBusyChange })
   if (!BoardScreen) throw new Error('Required product UI export missing: board.BoardScreen')
@@ -53,8 +52,8 @@ export function BoardScreenView({ issues, columns: visible, hidden, blocks, newe
       byId.set(task.id, task)
       const block = blocks.get(task.id)
       const own = context.taskStates?.get(task.id)
-      const kind = own && cardStateKind(own.state)
-      // A dependency or the person's flag is the task's own 受阻 and names why; what a thread says is the task's state.
+      const indicator = own ? runIndicatorOf(own.state) : null
+      // A dependency or the person's flag is why the task sits in 受阻; what its Agent is doing is only a mark on the card.
       const ownBlock = block && (block.reason === 'dependency' || block.reason === 'flagged') ? block : null
       const subtasks = context.subtasks.get(task.id)
       const metadata = task.metadata
@@ -77,10 +76,10 @@ export function BoardScreenView({ issues, columns: visible, hidden, blocks, newe
         identifier: show('identifier') ? task.identifier ?? null : null,
         detail,
         priority: show('priority') ? task.priority : null,
-        // A task blocked by a dependency or by hand names why; otherwise the task's own state, shown while 智能体状态 is on,
-        // when a thread stops it (受阻), or once it is closed.
+        // A task blocked by a dependency or by hand names why. Otherwise the line is the Agent's mark (working, waiting
+        // for the person, error) while 智能体状态 is on; the card's column is its status, so a closed task has no line.
         state: ownBlock ? { kind: 'blocked', label: blockLabel(tCard, ownBlock) }
-          : own && kind && (show('agentState') || block || DONE.includes(task.status)) ? { kind, label: stateLabel(own.state, own.reason) } : null,
+          : indicator && show('agentState') ? { kind: runMarkKind(indicator), label: runLabel(indicator) } : null,
       })
     }
   }

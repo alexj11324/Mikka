@@ -137,7 +137,12 @@
       "emptyTitle": "这里还没有任务",
       "newTask": "新建任务"
     },
-    "createdAtDate": "创建于 {date}"
+    "createdAtDate": "创建于 {date}",
+    "agentMark": {
+      "working": "Agent 运行中",
+      "waiting": "等你处理",
+      "error": "Agent 出错"
+    }
   },
   "Nav": {
     "switchLanguage": "切换语言",
@@ -4959,7 +4964,7 @@
         "creator": "我创建的",
         "labels": "标签",
         "project": "项目",
-        "agentState": "线程状态"
+        "agentState": "Agent 活动"
       },
       "removeFilter": "移除{field}筛选",
       "me": "我",
@@ -4990,7 +4995,7 @@
         "labels": "标签",
         "pullRequests": "PR",
         "subtasks": "子任务",
-        "agentState": "线程状态",
+        "agentState": "Agent 活动",
         "project": "项目",
         "dueDate": "截止日期",
         "createdAt": "创建时间"
@@ -5014,9 +5019,9 @@
         "discuss": "讨论",
         "delete": "删除",
         "agent": {
-          "running": "进行中",
-          "waiting": "等待你",
-          "blocked": "受阻"
+          "running": "Agent 运行中",
+          "waiting": "等你处理",
+          "blocked": "Agent 出错"
         },
         "block": {
           "question": "等你回答",

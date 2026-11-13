@@ -373,7 +373,8 @@ test('a task and its thread in one reply: the task is its state icon and code, t
     assert.equal(chips().length, 2, 'the task and the thread each stay their own object')
     assert.equal(text(), 'MIK-1 的线程 Release checklist 在等你。', 'the code once, the title once: never 「MIK-1 MIK-1 …」')
     assert.equal(view.container.querySelector('[data-citation-covered]'), null)
-    assert.equal(chips()[0].querySelector('[data-task-state]')?.getAttribute('data-task-state'), 'running', 'the task leads with its projected state icon')
+    assert.equal(chips()[0].querySelector('[data-task-status]')?.getAttribute('data-task-status'), 'doing', 'the task leads with its status icon')
+    assert.equal(chips()[0].querySelector('[data-run-indicator]')?.getAttribute('data-run-indicator'), 'working', 'its running Agent is a mark, not a status')
     assert.equal(chips()[1].querySelector('svg'), null, 'the thread has no icon')
     // A task with no code is its title; the thread still names its task's title.
     const unnumbered = { [TASK]: { ...issue(TASK, 'Release checklist'), identifier: null }, [THREAD]: ownThread }

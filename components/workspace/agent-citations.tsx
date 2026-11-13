@@ -16,7 +16,8 @@ import { OpenAI } from '@/components/ui/svgs/openai'
 import { useTaskCards } from '@/hooks/use-task-cards'
 import { TaskPresentationsContext } from '@/hooks/use-task-collection'
 import { ISSUE_PRIORITIES } from '@/components/workspace/issue-properties'
-import { TaskStateIcon, useTaskStateLabel } from '@/components/workspace/task-state-icon'
+import { TaskRunMark, TaskStatusIcon, TaskStatusMark, useRunIndicatorLabel, useTaskStatusLabel } from '@/components/workspace/task-state-icon'
+import { runIndicatorOf } from '@/lib/task-state'
 import { ThreadStatus } from '@/components/workspace/thread-status-icon'
 import { openThread } from '@/components/workspace/workspace-navigation'
 
@@ -122,21 +123,24 @@ export function PendingCitation() {
 }
 
 /**
- * A task mentioned in a reply shows its code or title and its authorized state.
+ * A task mentioned in a reply shows its status icon and its code (its title when it has none).
  * Older citations outside the workspace list share the mounted cards' batch.
  */
 export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (id: string) => void }) {
   const t = useTranslations('Coordinator.citation')
   const tIssue = useTranslations('Issue')
-  const stateLabel = useTaskStateLabel()
+  const statusLabel = useTaskStatusLabel()
+  const runLabel = useRunIndicatorLabel()
   const resident = useContext(TaskPresentationsContext)[issue.id]
   const cards = useTaskCards(resident ? [] : [issue.id])
   const presentation = resident ?? cards[issue.id]
   const priority = ISSUE_PRIORITIES.find(item => item.value === issue.priority)
   const identifier = issue.identifier
-  const icon = presentation && <TaskStateIcon state={presentation.state} />
+  // One status, the task's status field; what its Agent is doing is the small mark after it (2026-11-13-1405).
+  const icon = presentation && <TaskStatusMark status={presentation.primaryStatus} state={presentation.state} />
+  const indicator = presentation ? runIndicatorOf(presentation.state) : null
   return <InlineCitation>
-    <InlineCitationTrigger variant="object" aria-label={t('openIssue', { title: issue.title })} data-focus-id={issue.id} data-task-chip={presentation?.state ?? ''} onClick={() => onOpen(issue.id)}>
+    <InlineCitationTrigger variant="object" aria-label={t('openIssue', { title: issue.title })} data-focus-id={issue.id} data-task-chip={presentation?.primaryStatus ?? ''} onClick={() => onOpen(issue.id)}>
       {identifier
         // A code never breaks: the icon and the code are one unit.
         ? <InlineCitationLabel><span data-slot="chip-head" className="whitespace-nowrap"><span data-slot="chip-icon" className="me-1 inline-flex align-[-0.125em]">{icon}</span>{identifier}</span></InlineCitationLabel>
@@ -147,7 +151,8 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
         <InlineCitationSource><Mikka />{identifier ? `Mikka · ${identifier}` : 'Mikka'}</InlineCitationSource>
         <InlineCitationTitle>{issue.title}</InlineCitationTitle>
         <InlineCitationMeta>
-          {presentation && <span data-task-state-label={presentation.state}>{icon}{stateLabel(presentation.state, presentation.reason)}</span>}
+          {presentation && <span data-task-status-label={presentation.primaryStatus}><TaskStatusIcon status={presentation.primaryStatus} />{statusLabel(presentation.primaryStatus)}</span>}
+          {indicator && <span data-run-indicator-label={indicator}><TaskRunMark indicator={indicator} />{runLabel(indicator)}</span>}
           {priority && <span><priority.icon {...priority.iconProps} />{tIssue(`priority.${priority.value}`)}</span>}
         </InlineCitationMeta>
       </InlineCitationBody>

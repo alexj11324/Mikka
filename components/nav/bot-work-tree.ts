@@ -7,14 +7,14 @@ import { compactTaskTitle } from '@/lib/short-title'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 export type BotWorkRun = { id: string; name: string; harness: string | null }
-export type BotWorkTask = { id: string; issueId: string | null; name: string; fullName: string; state: TaskState | null; reason: TaskReason | null; runs: BotWorkRun[] }
+export type BotWorkTask = { id: string; issueId: string | null; name: string; fullName: string; /** The task's status field; null for a run that has no task. */ status: string | null; state: TaskState | null; reason: TaskReason | null; runs: BotWorkRun[] }
 
 type Dispatch = NonNullable<TaskPresentation['botDispatches']>[number]
 const taskRow = (issue: Issue, presentation: TaskPresentation, dispatch: Dispatch): BotWorkTask => ({
   id: issue.id, issueId: issue.id,
   name: [issueIdentifier(issue), compactTaskTitle(issue)].filter(Boolean).join(' '),
   fullName: [issueIdentifier(issue), issue.title].filter(Boolean).join(' '),
-  state: presentation.state, reason: presentation.reason, runs: [{ id: dispatch.runId, name: dispatch.name, harness: dispatch.harness }],
+  status: issue.status, state: presentation.state, reason: presentation.reason, runs: [{ id: dispatch.runId, name: dispatch.name, harness: dispatch.harness }],
 })
 
 /** Reuse the shell's authorized Task membership and state. Standalone Runs
@@ -41,7 +41,7 @@ export function botWorkTree(workspaceId: string | null, botIds: readonly string[
     if (!run.issueId) {
       const title = run.prompt.split('\n').find(line => line.trim())?.trim() || run.agentName
       rowsFor(botId).set(run.id, { id: run.id, issueId: null, name: compactTaskTitle({ title }), fullName: title,
-        state: null, reason: null, runs: [child] })
+        status: null, state: null, reason: null, runs: [child] })
       continue
     }
     const issue = tasks.get(run.issueId), projected = presentations[run.issueId]

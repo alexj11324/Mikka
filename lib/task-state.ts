@@ -88,3 +88,18 @@ export function attemptStateOf(run: TaskStateRun): AttemptState {
   if (run.status === 'failed' || run.outcome === 'failed') return 'failed'
   return 'done'
 }
+
+/**
+ * What a task's Agent is doing, shown as a small mark beside the task's status and never as a status, a group or a
+ * column (decision 2026-11-13-1405): `working` while a run is queued or under way, `waiting` when it has stopped for
+ * the person (a question, an approval, a PR to review, a login, quota), `error` when the run failed. Null otherwise.
+ */
+export type RunIndicator = 'working' | 'waiting' | 'error'
+export function runIndicatorOf(state: TaskState | 'idle'): RunIndicator | null {
+  switch (state) {
+    case 'running': case 'queued': return 'working'
+    case 'waiting': case 'blocked': return 'waiting'
+    case 'failed': return 'error'
+    default: return null
+  }
+}

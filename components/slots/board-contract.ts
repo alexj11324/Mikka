@@ -78,8 +78,8 @@ export type BoardScreenCard = {
   detail: string
   /** urgent, high, normal or low; null when the 优先级 property is off. */
   priority: string | null
-  /** The newest thread's state or why it is 受阻 when 线程状态 is on, else done/canceled/duplicate; with its words. */
-  state: { kind: AgentState | 'done'; label: string } | null
+  /** What the task's Agent is doing (working, waiting for the person, error) when Agent 活动 is on, or why the task sits in 受阻; with its words. Never the task's status: its column is. */
+  state: { kind: AgentState; label: string } | null
 }
 
 /**
