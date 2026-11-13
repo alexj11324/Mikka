@@ -144,7 +144,9 @@ dbTest('preferences: send key, personal instructions and daily suggestions save 
 
   // 每日建议 needs 记忆.
   for (const days of [3, 7, 14, 30, 90, 0]) {
-    assert.equal((await preferences.updatePreferences({ archiveIdleAfterDays: days })).archiveIdleAfterDays, days)
+    const written = await preferences.updatePreferences({ archiveIdleAfterDays: days })
+    assert.equal(written.error, undefined)
+    if (!written.error) assert.equal(written.archiveIdleAfterDays, days)
   }
   assert.equal((await preferences.updatePreferences({ archiveIdleAfterDays: 1 })).error, 'validationGeneric')
   assert.equal((await preferences.getPreferences()).archiveIdleAfterDays, 0)
