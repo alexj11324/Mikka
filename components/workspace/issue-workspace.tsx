@@ -527,13 +527,21 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     return true
   }
   const openFromList = (id: string) => open(id, true)
+  // Team Issues reads a separate authorized page. An acknowledged detail write
+  // must invalidate both lists; refreshing the global page alone leaves the
+  // Team board stale until a later live-key event.
+  const refreshTaskPages = useCallback(() => {
+    void mutate()
+    if (section === 'team-issues' && teamPageKey) void teamFirst.mutate()
+  }, [mutate, section, teamPageKey, teamFirst.mutate])
   function deleted() {
     flushDetail.current = null
     dirtyRef.current = false
     applySelection(null)
     move({ issue: null }, 'replace')
+    refreshTaskPages()
   }
-  const saved = useCallback((id: string) => { setSelected(id); void mutate() }, [mutate])
+  const saved = useCallback((id: string) => { setSelected(id); refreshTaskPages() }, [refreshTaskPages])
   function signOut() {
     if (boardBusy || leaving.current) return
     void leave(async () => {
