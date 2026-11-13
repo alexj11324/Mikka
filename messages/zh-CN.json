@@ -6961,6 +6961,20 @@
     "noTasks": "没有任务"
   },
   "HostedInbox": {
+    "dismiss": "忽略",
+    "dismissed": "已忽略",
+    "reason": {
+      "needsReply": "打开对话回答问题。",
+      "confirm": "打开对话审核请求。",
+      "review": "打开任务审查更改。",
+      "offline": "重新连接设备后继续运行。",
+      "quota": "检查模型额度后继续运行。",
+      "api_key": "更新模型凭据后重试。",
+      "access_denied": "检查执行身份的权限后重试。",
+      "subscription": "重新连接模型订阅后重试。",
+      "blocked": "打开运行记录处理阻碍。",
+      "failed": "查看运行错误后重试。"
+    },
     "snoozed": "稍后处理",
     "until": "提醒时间",
     "done": "已完成",

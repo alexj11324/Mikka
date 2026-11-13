@@ -5,7 +5,7 @@ import test from 'node:test'
 import { Pool } from 'pg'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { taskStateOf } from '../task-state'
-import { InboxStore } from './store'
+import { InboxStore, readTaskAttention } from './store'
 import { createInboxGuard } from './workspace'
 import { handleInbox } from './http'
 import { tokenWorkspace } from '../tokens/principal'
@@ -23,7 +23,7 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
   t.after(async () => { await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end() })
   // Actual migrated source columns, defaults and constraints. LIKE deliberately
   // omits foreign keys to public so every fixture stays in our private schema.
-  for (const table of ['"user"', 'issues', 'agent_runs', 'bots', 'suggestions', 'run_messages', 'factory_tasks', 'factory_attempts', 'factory_questions', 'factory_approvals', 'factory_merges', 'attention_matters', 'coordinator_events', 'mikka_workspaces', 'mikka_workspace_members', 'mikka_teams', 'mikka_team_issues', 'resource_access_policies', 'resource_access_grants', 'run_publications', 'agent_tool_approvals', 'local_computer_reviews', 'factory_candidates', 'factory_deliverable_acceptances']) {
+  for (const table of ['"user"', 'issues', 'agent_runs', 'bots', 'suggestions', 'run_messages', 'factory_tasks', 'factory_attempts', 'factory_questions', 'factory_approvals', 'factory_merges', 'attention_matters', 'coordinator_events', 'mikka_workspaces', 'mikka_workspace_members', 'mikka_teams', 'mikka_team_issues', 'resource_access_policies', 'resource_access_grants', 'run_publications', 'agent_tool_approvals', 'local_computer_reviews', 'factory_candidates', 'factory_deliverable_acceptances', 'devices']) {
     await pool.query(`CREATE TABLE ${table} (LIKE public.${table} INCLUDING DEFAULTS INCLUDING CONSTRAINTS INCLUDING INDEXES)`)
   }
   // Exercise the function installed by the real ACL migrations against this
@@ -33,6 +33,7 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
   await pool.query(acl.rows[0].definition.replace('public.mikka_resource_acl_allowed', 'mikka_resource_acl_allowed'))
   await pool.query('ALTER TABLE suggestions DROP COLUMN "rejectedAt", DROP COLUMN "rejectedBy"')
   await pool.query(await readFile(new URL('../../drizzle/20261109130000_inbox.sql', import.meta.url), 'utf8'))
+  await pool.query(await readFile(new URL('../../drizzle/20261113165037_inbox_conversations.sql', import.meta.url), 'utf8'))
   const owner = 'inbox-owner', peer = 'inbox-peer', stranger = 'inbox-stranger'
   const personal = randomUUID(), workspace = randomUUID(), other = randomUUID(), team = randomUUID(), otherTeam = randomUUID(), bot = randomUUID(), teamBot = randomUUID()
   for (const user of [owner, peer, stranger]) await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [user, `${user}@example.invalid`])
@@ -124,16 +125,72 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
     const peerReview = (await list(peer)).items.find(item => item.id === issue)
     assert.equal(peerReview?.reason, 'review', 'an owner-only running attempt cannot hide the reviewer’s own manual review')
     assert.equal(peerReview?.runId, null)
-    assert.deepEqual(peerReview?.actions, ['open','snooze'])
+    assert.deepEqual(peerReview?.actions, ['open','dismiss','snooze'])
     await pool.query("UPDATE issues SET status='todo' WHERE id=$1", [issue])
     await pool.query(`UPDATE agent_runs SET "failureDetails"=$2 WHERE id=$1`, [run, {
       schemaVersion:1, runId:run, code:'run_failed', category:'subscription', occurredAt:'2026-11-08T00:00:00Z', appVersion:'fixture',
     }])
-    assert.equal(await ownerRow(), undefined)
+    assert.equal((await ownerRow())?.reason, 'subscription')
     await pool.query('UPDATE agent_runs SET "failureDetails"=NULL WHERE id=$1', [run])
     await pool.query('UPDATE agent_tool_approvals SET "expiresAt"=now() WHERE id=$1', [approval])
     assert.equal(await ownerRow(), undefined)
     await pool.query("UPDATE agent_runs SET status='waiting_input',outcome='needs_input' WHERE id=$1", [run])
+  })
+  await t.test('task and standalone run attention agree with card state and personal dismissal scope', async () => {
+    const standalone = randomUUID()
+    await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","workspaceId",status,prompt,"promptTaskStart","promptTaskLength")
+      VALUES($1,$2,$3,$4,'running','System: visible',8,7)`, [standalone, owner, randomUUID(), workspace])
+    const ids = [run, standalone]
+    try {
+      const cases = [
+        ['waiting_input', null, null, null, null, 'needsReply'], ['paused', null, 'human_control', null, null, 'confirm'],
+        ['paused', null, 'quota_exhausted', null, null, 'quota'], ['failed', 'failed', null, 'device_lost', null, 'offline'],
+        ['failed', 'failed', null, null, 'api_key', 'api_key'], ['failed', 'failed', null, null, 'access_denied', 'access_denied'],
+        ['failed', 'failed', null, null, 'subscription', 'subscription'], ['failed', 'failed', null, null, null, 'failed'],
+        ['succeeded', 'blocked', null, null, null, 'blocked'], ['running', null, null, null, null, null],
+      ] as const
+      for (const [status, outcome, pauseReason, stopReason, category, reason] of cases) {
+        const failure = category && { schemaVersion:1 as const, runId:run, code:'run_failed' as const, category, occurredAt:'2026-11-13T00:00:00Z', appVersion:'fixture' }
+        await pool.query('UPDATE agent_runs SET status=$2,outcome=$3,"pauseReason"=$4,"stopReason"=$5,"failureDetails"=$6 WHERE id=ANY($1::uuid[])', [ids,status,outcome,pauseReason,stopReason,failure])
+        const card = taskStateOf({ status:'todo', metadata:{pullRequests:[]} }, { runId:run, status, outcome, pauseReason, stopReason, failureDetails: failure })
+        const items = (await list()).items.filter(item => item.id === issue || item.id === standalone)
+        assert.equal((await readTaskAttention(pool, owner, workspace, [issue])).get(issue) ?? null, reason)
+        assert.equal(items.length, card.group === 'pending' ? 2 : 0)
+        for (const item of items) assert.equal(item.reason, reason)
+      }
+      await pool.query("UPDATE agent_runs SET status='waiting_input',outcome='needs_input' WHERE id=ANY($1::uuid[])", [ids])
+      const request = { workspaceId: workspace, type:'conversation', id:standalone } as const
+      const ask = (await list()).items.find(item => item.id === standalone)
+      assert.equal(ask?.title, 'visible')
+      assert.equal(ask?.issueId, null)
+      assert.equal(ask?.runId, standalone)
+      assert.equal((await readTaskAttention(pool, peer, workspace, [issue])).get(issue), 'needsReply')
+      await store.command(peer, { workspaceId:workspace, type:'task', id:issue, action:'dismiss' })
+      assert.equal((await readTaskAttention(pool, peer, workspace, [issue])).has(issue), false)
+      assert.equal((await readTaskAttention(pool, owner, workspace, [issue])).has(issue), true)
+      await store.command(peer, { workspaceId:workspace, type:'task', id:issue, action:'reopen' })
+      const initial = await store.pendingCounts(owner, workspace)
+      assert.deepEqual((await Promise.all([store.command(owner,{ ...request, action:'dismiss' }),store.command(owner,{ ...request, action:'dismiss' })])).map(r=>r.changed).sort(),[false,true])
+      assert.ok(!(await list()).items.some(item => item.id === standalone))
+      assert.equal((await store.pendingCounts(owner, workspace)).count, initial.count - 1)
+      assert.deepEqual((await list(owner,workspace,'done')).items.find(item => item.id === standalone)?.actions, ['reopen'])
+      assert.ok(!(await list(peer)).items.some(item => item.id === standalone))
+      assert.ok(!(await list(peer,workspace,'done')).items.some(item => item.id === standalone))
+      await assert.rejects(store.command(peer,{ ...request, action:'reopen' }), {code:'inboxNotFound'})
+      await assert.rejects(store.command(owner,{ ...request, workspaceId:other, action:'dismiss' }), {code:'inboxNotFound'})
+      assert.deepEqual(await store.command(owner,{ ...request, action:'reopen' }), {changed:true})
+      assert.equal((await store.pendingCounts(owner, workspace)).count, initial.count)
+      await store.command(owner,{ ...request, action:'snooze', until:new Date(Date.now()+60_000).toISOString() })
+      assert.ok((await list(owner,workspace,'snoozed')).items.some(item=>item.id===standalone))
+      await store.command(owner,{ ...request, action:'reopen' })
+      await store.command(owner,{ ...request, action:'dismiss' })
+      await pool.query("UPDATE agent_runs SET status='failed',outcome='failed' WHERE id=$1",[standalone])
+      assert.equal((await list()).items.find(item=>item.id===standalone)?.reason,'failed', 'a new reason requires a new decision')
+    } finally {
+      await pool.query('DELETE FROM inbox_dismissals WHERE "itemId"=$1',[standalone])
+      await pool.query('DELETE FROM agent_runs WHERE id=$1',[standalone])
+      await pool.query(`UPDATE agent_runs SET status='waiting_input',outcome='needs_input',"pauseReason"=NULL,"stopReason"=NULL,"failureDetails"=NULL WHERE id=$1`,[run])
+    }
   })
   await t.test('canonical ownership ignores missing and stale team links and denies unresolved tasks and corrupt personal members', async () => {
     await pool.query('DELETE FROM mikka_team_issues WHERE "issueId"=$1', [issue])
@@ -176,7 +233,7 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
       if (row) {
         assert.equal(row.reason, 'review')
         assert.equal(row.runId, null)
-        assert.deepEqual(row.actions, ['open','snooze'])
+        assert.deepEqual(row.actions, ['open','dismiss','snooze'])
       }
     }
     await pool.query("UPDATE issues SET status='review' WHERE id=$1", [review])
@@ -300,7 +357,7 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
     await pool.query("UPDATE factory_tasks SET stage='spec',status='passed' WHERE id=$1", [task])
     assert.equal((await list()).items.find(item => item.id === issue)?.reason, 'review')
     await pool.query("UPDATE factory_tasks SET status='blocked' WHERE id=$1", [task])
-    assert.ok(!(await list()).items.some(item => item.id === issue))
+    assert.equal((await list()).items.find(item => item.id === issue)?.reason, 'blocked')
     await pool.query("UPDATE factory_tasks SET stage='approval',status='pending' WHERE id=$1", [task])
     await pool.query("UPDATE coordinator_events SET kind='matter_handoff' WHERE id=$1", [sourceEvent])
     assert.ok(!(await list()).items.some(item => item.id === issue), 'an unverified Factory source cannot create an approval')
