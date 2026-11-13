@@ -1,5 +1,5 @@
 import 'server-only'
-import { createHash } from 'node:crypto'
+import { snapshotDigest } from '../operations/write-target'
 import type { TurnOutcome } from 'eve/events'
 import { pool } from '../db'
 import { withDirectSession } from '../db/direct-session'
@@ -10,12 +10,6 @@ import { completeScheduledRead, failScheduledRead, loadScheduledRead } from './s
 
 export interface EveTurnSettlement {sessionId:string;turnId:string;outcome:TurnOutcome;messages?:unknown[];executionId?:string|null}
 type Receipt = {request_digest:string;occurrence:ScheduledRead|null;completed_at:Date|null}
-function canonical(value:unknown):unknown {
-  if (Array.isArray(value)) return value.map(canonical)
-  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([,item])=>item !== undefined).sort(([a],[b])=>a.localeCompare(b)).map(([key,item])=>[key,canonical(item)]))
-  return value
-}
-
 /** Runs only on the Mikka app host, whose Workflow world owns product timers. */
 export async function finishEveTurn(scope:EveScope,input:EveTurnSettlement) {
   await assertSessionScope(scope,input.sessionId)
@@ -25,7 +19,7 @@ export async function finishEveTurn(scope:EveScope,input:EveTurnSettlement) {
     // A session advisory lock serializes retries without nesting their SQL
     // transactions or holding a lock on the original conversation's rows.
     await client.query('SELECT pg_advisory_lock(hashtextextended($1,0))',[lock])
-    const requestDigest = createHash('sha256').update(JSON.stringify(canonical({outcome:input.outcome,messages:input.messages ?? null}))).digest('hex')
+    const requestDigest = snapshotDigest({outcome:input.outcome,messages:input.messages ?? null})
     let receipt = (await client.query<Receipt>('SELECT * FROM eve_turn_settlements WHERE session_id=$1 AND turn_id=$2',[input.sessionId,input.turnId])).rows[0]
     if (receipt && receipt.request_digest !== requestDigest) throw new Error('operationBindingConflict')
     const execution = (await pool.query<{id:string}>('SELECT id FROM agent_kit_executions WHERE owner_id=$1 AND bot_key=$2 AND execution_key=$3',[scope.ownerId,scope.botId,`${input.sessionId}:${input.turnId}:0`])).rows[0]
