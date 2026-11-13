@@ -1548,5 +1548,19 @@
     "behavior": "Keep owner-created standalone chats in installation PostgreSQL and reopen them only through their active participant and workspace authorization.",
     "test": "tests/conversation-title.db.test.ts",
     "suite": "test:run-publication-db"
+  },
+  "lib/standalone-chat-controls.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Apply the same title, pin and archive menu to owned independent conversations, rechecking personal membership and the selected workspace on every change. Explicit regeneration uses the existing workspace title provider.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "drizzle/20261113193638_standalone_conversation_organization.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Add nullable organization timestamps to independent conversations. Existing rows remain available without backfilling.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
   }
 }

@@ -964,6 +964,9 @@ export const conversations = pgTable('conversations', {
   kind: text('kind').$type<'group' | 'agent_dm'>().notNull(), title: text('title').notNull(),
   createdBy: text('createdBy').notNull(), lastPosition: bigint('lastPosition', { mode: 'bigint' }).notNull().default(sql`0`),
   creationPurpose: text('creationPurpose').notNull().default('group'),
+  conversationArchivedAt: timestamp('conversationArchivedAt', { withTimezone: true }),
+  conversationPinnedAt: timestamp('conversationPinnedAt', { withTimezone: true }),
+  conversationRestoredAt: timestamp('conversationRestoredAt', { withTimezone: true }),
   // Optional owner-designated current group agent; never inferred or backfilled.
   leadAgentId: uuid('leadAgentId'),
   leadBotId: uuid('leadBotId'),
