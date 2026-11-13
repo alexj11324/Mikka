@@ -39,7 +39,7 @@ export function useInboxQueue(ownerId: string | undefined, workspaceId: string |
     // Refresh only mounted projections belonging to this command's original scope.
     void Promise.allSettled([mutate(unstable_serialize(getKey)), mutate(inboxCountKey(version, ownerId, workspaceId))])
   }
-  async function command(entry: InboxEntry, action: 'reject' | 'undo_reject' | 'reopen' | 'snooze', until?: string) {
+  async function command(entry: InboxEntry, action: 'reject' | 'undo_reject' | 'reopen' | 'snooze' | 'dismiss', until?: string) {
     if (!ownerId || !workspaceId || forbidden || !entry.actions.includes(action)) throw new Error('decisionUnavailable')
     const target = { workspaceId, type: entry.type, id: entry.id }
     let operation: InboxCommand

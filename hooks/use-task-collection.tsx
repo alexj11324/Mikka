@@ -19,7 +19,7 @@ export function useWorkspaceTaskPresentations(ownerId: string, workspaceId: stri
   const ids = useMemo(() => issues.filter(issue => issue.workspaceId === workspaceId).map(issue => issue.id).sort(), [issues, workspaceId])
   const key = workspaceId && ids.length ? ['task-presentations', ownerId, workspaceId, ids] : null
   const { data, error, isLoading, mutate } = useSWR(key, async () => Object.fromEntries(await readPresentationPages(workspaceId!, ids,
-    input => getTaskPresentations({ ...input, includeFactoryIdentity: true, includeBotDispatches: true }))), {
+    input => getTaskPresentations({ ...input, includeInboxReason: true, includeFactoryIdentity: true, includeBotDispatches: true }))), {
     revalidateOnFocus: false, shouldRetryOnError: false, isPaused: () => !enabled,
   })
   // A write may finish inside SWR's deduplication interval while live reads are paused.

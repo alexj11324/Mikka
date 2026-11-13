@@ -46,7 +46,11 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     }
     const stored = async (id: string) => (await pool.query<{ title: string | null; titleSource: string | null }>('SELECT title, "titleSource" FROM agent_runs WHERE id=$1', [id])).rows[0]
     const calls: { title: string; body: string }[] = []
-    const model = (answer: string | null) => async (_owner: string, text: { title: string; body: string }) => { calls.push(text); return answer }
+    const model = (answer: string | null) => async (_owner: string, text: { title: string; body: string }, scope: string) => {
+      assert.equal(scope, workspaceId, 'model admission belongs to the run workspace')
+      calls.push(text)
+      return answer
+    }
 
     // The schema holds the bound and ties a title to who wrote it.
     const first = await run()
@@ -128,6 +132,16 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     // Regenerate is the person asking for a generated title again.
     assert.equal(await nameConversation(pool, first, 'owner', 'regenerate', model('登录回调与前缀')), '登录回调与前缀')
     assert.deepEqual([await stored(first), await stored(second), await stored(third)], Array(3).fill({ title: '登录回调与前缀', titleSource: 'generated' }))
+    const revoked = await run({ prompt: 'A pending workspace title' })
+    const suspend = () => pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"='owner'`, [workspaceId])
+    assert.equal(await nameConversation(pool, revoked, 'owner', 'created', async () => {
+      await suspend()
+      return 'Late workspace reply'
+    }), null, 'membership revoked while the model was answering')
+    assert.equal(await nameConversation(pool, revoked, 'owner', 'created', async () => {
+      assert.fail('revoked workspace must not invoke the model')
+    }), null)
+    assert.deepEqual(await stored(revoked), { title: null, titleSource: null })
   } finally {
     await dropTestDatabase(adminPool, name, pool)
     await adminPool.end()
