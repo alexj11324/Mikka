@@ -117,6 +117,42 @@ test('metadata-only run reads omit workflow bytes on the private connection and 
   expect((await olderWorker.runs.get(runId, { resolveData: 'none' })).input).toBeUndefined()
 })
 
+test('metadata-only hook and history reads retain cursors without sending hook payloads', async () => {
+  const runId = await start('hook-and-history')
+  const payload = new Uint8Array(64 * 1024).fill(7)
+  const hookId = 'hook_metadata', token = 'private-metadata'
+  await world.events.create(runId, { ...spec, eventType: 'hook_created', correlationId: hookId, eventData: {token,metadata:payload} })
+  const receipt = await world.events.create(runId, { ...spec, eventType: 'hook_received', correlationId: hookId, eventData: {token,payload} })
+  const sizes = []
+  const measured = createNodeWorld({deploymentId,signingKey,async fetchBound(url,options) {
+    const response = await outbound.fetch(url,options)
+    sizes.push((await response.clone().arrayBuffer()).byteLength)
+    return response
+  }})
+  const none = {resolveData:'none'}
+  const hook = await measured.hooks.get(hookId)
+  const event = await measured.events.get(runId,receipt.event.eventId)
+  expect(hook.metadata).toEqual(payload)
+  expect(event.eventData.payload).toEqual(payload)
+  expect((await measured.hooks.get(hookId,none)).token).toBe(token)
+  expect((await measured.hooks.getByToken(token,none)).metadata).toBeUndefined()
+  expect((await measured.hooks.list({runId,...none})).data.map(h=>h.hookId)).toEqual([hookId])
+  expect((await measured.events.get(runId,event.eventId,none)).eventData?.payload).toBeUndefined()
+  const listed = await measured.events.list({runId,...none})
+  const correlated = await measured.events.listByCorrelationId({runId,correlationId:hookId,pagination:{limit:1},...none})
+  expect(listed.data.at(-1).eventId).toBe(event.eventId)
+  expect(correlated.hasMore).toBe(true)
+  expect((await measured.events.listByCorrelationId({runId,correlationId:hookId,pagination:{cursor:correlated.cursor},...none})).data.map(e=>e.eventId)).toEqual([event.eventId])
+  console.info('Hook/history private response bytes (two full then seven metadata reads):', sizes.join(', '))
+  expect(sizes.slice(2).every(size=>size < 4096)).toBe(true)
+  const priorWorld = createNodeWorld({deploymentId,signingKey,async fetchBound(url,options) {
+    const [method] = decodeRecord(options.body)
+    return new Response(encodeRecord(method === 'hook' ? hook : event))
+  }})
+  expect((await priorWorld.hooks.get(hookId,none)).metadata).toBeUndefined()
+  expect((await priorWorld.events.get(runId,event.eventId,none)).eventData?.payload).toBeUndefined()
+})
+
 test('terminal snapshots wake through the Durable Object, and byte streams use isolated per-run storage', async () => {
   const run = await start('terminal')
   expect((await world.runs.waitForTerminalStatus(run,{timeoutMs:30})).status).toBe('running')
