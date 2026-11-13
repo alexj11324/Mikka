@@ -19,6 +19,7 @@ export function sourceContext(env, publicSource) {
   assert.ok(sha.test(publicSource) && env.WORKERS_CI_COMMIT_SHA === publicSource, 'MARKETING_PUBLIC_CI_SOURCE_MISMATCH')
   assert.match(env.MIKKA_MARKETING_SOURCE_SHA ?? '', sha, 'MARKETING_PUBLIC_CI_PRIVATE_PIN_REQUIRED')
   assert.match(env.WORKERS_CI_BUILD_UUID ?? '', uuid, 'MARKETING_PUBLIC_CI_BUILD_UUID_REQUIRED')
+  // oxlint-disable-next-line no-control-regex -- Reject control bytes in provider branch metadata.
   assert.ok(env.WORKERS_CI_BRANCH && !/^[-\s]|[\s\x00-\x1f]/.test(env.WORKERS_CI_BRANCH), 'MARKETING_PUBLIC_CI_BRANCH_REQUIRED')
   return { provider: 'cloudflare-workers-builds', repository, publicSource, privateRepository,
     privateSource: env.MIKKA_MARKETING_SOURCE_SHA, branch: env.WORKERS_CI_BRANCH, buildId: env.WORKERS_CI_BUILD_UUID }
