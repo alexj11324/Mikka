@@ -5,12 +5,18 @@ import type { EveScope } from './scope'
 export async function priorHistory(scope: EveScope): Promise<SessionHistoryMessage[]> {
   if (scope.surface !== 'web') return []
   const { pool } = await import('../db')
-  const { rows } = await pool.query<{ id: string; message: { role: string; content: unknown } }>(
-    'SELECT id,message FROM coordinator_messages WHERE "userId"=$1 AND "botId"=$2 ORDER BY position', [scope.ownerId, scope.botId])
-  return rows.flatMap(row => {
-    if (row.message.role !== 'user' && row.message.role !== 'assistant') return []
-    const text = typeof row.message.content === 'string' ? row.message.content : Array.isArray(row.message.content)
-      ? row.message.content.flatMap(part => part?.type === 'text' && typeof part.text === 'string' ? [part.text] : []).join('\n') : ''
-    return text.trim() ? [{ id: row.id, role: row.message.role, text }] : []
-  })
+  const { rows } = await pool.query<SessionHistoryMessage>(`
+    SELECT id, message->>'role' AS role,
+      coalesce(CASE jsonb_typeof(message->'content')
+        WHEN 'string' THEN message->>'content'
+        WHEN 'array' THEN (
+          SELECT string_agg(part->>'text', E'\\n' ORDER BY ordinality)
+          FROM jsonb_array_elements(message->'content') WITH ORDINALITY AS parts(part, ordinality)
+          WHERE part->>'type' = 'text' AND jsonb_typeof(part->'text') = 'string'
+        )
+      END, '') AS text
+    FROM coordinator_messages
+    WHERE "userId"=$1 AND "botId"=$2 AND message->>'role' IN ('user','assistant')
+    ORDER BY position`, [scope.ownerId, scope.botId])
+  return rows.filter(row => row.text.trim())
 }

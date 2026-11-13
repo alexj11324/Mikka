@@ -82,12 +82,34 @@ test('eve sessions keep Bot, Workspace, owner and surface authorization after im
       for(const foreign of [{...scope,ownerId:other},{...scope,ownerId:other,botId:otherBot},{...scope,workspaceId:randomUUID()},{...scope,surface:'slack' as const}])await assert.rejects(assertSessionScope(foreign,sessionId))
       await assert.rejects(registerSession({...scope,ownerId:other,botId:otherBot},sessionId),/workspaceAccessDenied/)
     })
-    await t.test('historic user/assistant rows import once without deletion or forged tool turns',async()=>{
-      const historic=[{role:'user',content:'Original request'},{role:'assistant',content:[{type:'text',text:'Original response'}]},{role:'tool',content:[{type:'tool-result',toolCallId:'old',output:{type:'text',value:'old result'}}]}]
-      for(const [index,message]of historic.entries())await pool.query('INSERT INTO coordinator_messages(id,"userId","botId",position,message)VALUES($1,$2,$3,$4,$5)',[randomUUID(),ownerId,botId,index+1,message])
-      assert.deepEqual((await priorHistory(scope)).map(({role,text})=>({role,text})),[{role:'user',text:'Original request'},{role:'assistant',text:'Original response'}])
+    await t.test('legacy history imports ordered text and leaves rich rows intact', async t => {
+      const excluded = 'private tool result '.repeat(512)
+      const history = [
+        {role:'user', content:'  Original request  ', metadata:excluded},
+        {role:'assistant', content:[null, {type:'text',text:'First'}, {type:'image', data:excluded}, {type:'text',text:42}, {type:'text',text:''}, {type:'text',text:'Last'}]},
+        {role:'tool', content:[{type:'tool-result',output:excluded}]},
+        {role:'assistant', content:'  '},
+        {role:'user', content:{text:'not a text part'}},
+      ]
+      const ids = history.map(() => randomUUID())
+      for (const [index, message] of history.entries()) {
+        await pool.query('INSERT INTO coordinator_messages(id,"userId","botId",position,message)VALUES($1,$2,$3,$4,$5)',[ids[index],ownerId,botId,index+1,message])
+      }
+      const queries = t.mock.method(pool, 'query')
+      const imported = await priorHistory(scope)
+      assert.deepEqual(imported, [
+        {id:ids[0], role:'user', text:'  Original request  '},
+        {id:ids[1], role:'assistant', text:'First\n\nLast'},
+      ])
+      assert.equal(queries.mock.callCount(), 1)
+      const result = await (queries.mock.calls[0]!.result as unknown as Promise<{rows: unknown[]}>)
+      const transferred = JSON.stringify(result.rows)
+      t.diagnostic(`Legacy history query rows: ${result.rows.length}; JSON bytes: ${Buffer.byteLength(transferred)}`)
+      assert.ok(!transferred.includes(excluded), 'exclude rich content from the history query result')
       assert.deepEqual(await priorHistory({...scope,surface:'slack'}),[])
-      assert.equal((await pool.query('SELECT 1 FROM coordinator_messages WHERE "userId"=$1',[ownerId])).rowCount,3)
+      assert.equal(queries.mock.callCount(), 1, 'Slack performs no legacy web history read')
+      queries.mock.restore()
+      assert.deepEqual((await pool.query('SELECT message FROM coordinator_messages WHERE "userId"=$1 AND "botId"=$2 ORDER BY position',[ownerId,botId])).rows.map(row => row.message), history)
     })
     await t.test('a stale session settlement cannot clear the active user session; mirror commits once',async()=>{
       await registerSession(scope,'wrun_stale_'+sessionId)
