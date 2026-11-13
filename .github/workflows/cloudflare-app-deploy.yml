@@ -144,6 +144,9 @@ jobs:
       - name: Install pinned product client and verification dependencies
         working-directory: operations/product
         run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Prepare Ubuntu package mirrors
+        working-directory: operations/product
+        run: sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
       - name: Install immutable image inspection tools
         run: sudo apt-get update -qq && sudo apt-get install -y -qq skopeo
       - name: Read the existing Cloudflare deployment identity
