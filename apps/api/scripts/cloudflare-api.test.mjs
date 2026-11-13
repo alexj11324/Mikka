@@ -160,7 +160,21 @@ test('the private API receives its sign-in and product bindings without inheriti
   const { applicationEnvironment } = await import('../../../cloudflare/api/ingress/environment.mjs')
   const logs = ['log', 'info', 'warn', 'error', 'debug'].map(method => t.mock.method(console, method, () => {}))
   const origin = 'https://app.example'
+  const preserved = Object.fromEntries([
+    'MIKKA_CLOUD_WORKER_URL', 'GITHUB_APP_ID', 'GITHUB_APP_SLUG',
+    'NEXT_PUBLIC_POSTHOG_KEY', 'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY',
+    'LINEAR_CLIENT_ID', 'LINEAR_CLIENT_SECRET', 'LINEAR_TOKEN_ENCRYPTION_KEY', 'LINEAR_WEBHOOK_SECRET', 'CRON_SECRET',
+    'TELEGRAM_BOT_TOKEN', 'TELEGRAM_BOT_USERNAME', 'TELEGRAM_WEBHOOK_SECRET_TOKEN', 'EXPO_ACCESS_TOKEN', 'NEON_API_KEY',
+    'MIKKA_BYOS_INFISICAL_ORIGIN', 'MIKKA_BYOS_INFISICAL_PROJECT', 'MIKKA_BYOS_INFISICAL_ENVIRONMENT', 'MIKKA_BYOS_INFISICAL_PATH',
+    'MIKKA_BYOS_ACCESS_INFISICAL_PATH', 'MIKKA_BYOS_ACCESS_INFISICAL_PROJECT',
+    'MIKKA_BYOS_SHARED_CUSTODY_IDENTITY', 'MIKKA_BYOS_CUSTODY_CLIENT_ID', 'MIKKA_BYOS_CUSTODY_CLIENT_SECRET',
+    'MIKKA_BYOS_ACCESS_CLIENT_ID', 'MIKKA_BYOS_ACCESS_CLIENT_SECRET',
+    'MIKKA_BYOS_ENABLED', 'MIKKA_BYOS_CLAUDE_OAUTH', 'MIKKA_BYOS_CODEX_OAUTH', 'MIKKA_BYOS_ENROLLMENT_ENABLED',
+    'MIKKA_BYOS_ENROLLMENT_ATTEMPT_PATH', 'MIKKA_BYOS_ENROLLMENT_CLAIM_PATH', 'MIKKA_BYOS_ENROLLMENT_GRANT_PATH',
+  ].map(name => [name, `production-marker-${name}`]))
+  assert.equal(Object.keys(preserved).length, 33)
   const allowed = {
+    ...preserved,
     SLACK_APP_ID: 'AEXAMPLE', SLACK_CLIENT_ID: 'client-fixture', SLACK_CLIENT_SECRET: 'oauth-fixture',
     E2B_BYO_COMPUTER_TEMPLATE: 'desktop-release', E2B_CLAUDE_TEMPLATE: 'claude-release', E2B_CODEX_TEMPLATE: 'codex-release',
     MIKKA_CLOUD_TEMPLATE_MODELS: 'verified-catalogue', MIKKA_CLOUD_WORKER_SHA: 'a'.repeat(40),
