@@ -1,8 +1,10 @@
 'use client'
 
 // A task has one status, its status field, drawn with the same icon on every surface (decision 2026-11-13-1405):
-// TaskStatusIcon. What its Agent is doing is TaskRunMark, a small mark beside the status (working, waiting for the
-// person, error); it is never a status, a group or a column. TaskStatusMark draws the two together.
+// TaskStatusIcon, and a task's chip carries that one icon only. What an Agent is doing belongs to the conversation:
+// TaskRunMark is its small mark (working, waiting for the person, error), drawn on the conversation's own surfaces and
+// never beside a status icon. TaskStatusMark is a conversation card's one glyph: the mark while active, else the status.
+import { useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { Hand, LoaderCircle, TriangleAlert, type LucideIcon } from 'lucide-react'
 import { cn } from 'cn'
@@ -34,7 +36,7 @@ const RUN_MARKS: Record<RunIndicator, { icon: LucideIcon; tone: StatusTone }> = 
 /** The words of a run mark, for its tooltip and for assistive technology. They are not status names. */
 export function useRunIndicatorLabel() {
   const t = useTranslations('Issue.agentMark')
-  return (indicator: RunIndicator) => t(indicator)
+  return useCallback((indicator: RunIndicator) => t(indicator), [t])
 }
 
 /** What the task's Agent is doing, as a small mark; nothing when no run is under way, waiting or failed. */
@@ -47,9 +49,12 @@ export function TaskRunMark({ state, indicator = state ? runIndicatorOf(state) :
   </span>
 }
 
-/** A task's status icon with its Agent's mark after it. */
-export function TaskStatusMark({ status, state, size }: { status: string; state?: TaskState | 'idle' | null; size?: TaskIconSize }) {
-  return <span className="inline-flex shrink-0 items-center gap-0.5"><TaskStatusIcon status={status} size={size} /><TaskRunMark state={state} /></span>
+/**
+ * The one glyph of a conversation's card (a dispatch card): what the conversation is doing while it is working, waiting
+ * or failed, otherwise its task's status icon. Never both: two status-like glyphs are never side by side.
+ */
+export function TaskStatusMark({ status, indicator, size }: { status: string; indicator?: RunIndicator | null; size?: TaskIconSize }) {
+  return indicator ? <TaskRunMark indicator={indicator} /> : <TaskStatusIcon status={status} size={size} />
 }
 
 /** A status's name, as the board's column and the status menu write it. */

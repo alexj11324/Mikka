@@ -9,8 +9,6 @@ export type ThreadHeaderProps = {
   /** The task it works on; null for a thread with no task. */
   issueId: string | null
   runId: string
-  /** True only for a thread whose signed-in owner may manage its title and organization. */
-  canOrganize?: boolean
   /** The name the thread's row shows (its task, else what it was asked). */
   title: string
   /** The heading Esc and focus return to. */

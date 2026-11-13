@@ -72,13 +72,13 @@ test('a task chip uses the same authorized presentation as its detail, including
     const chips = [...container.querySelectorAll('[data-slot="inline-citation-trigger"]')] as HTMLElement[]
     // One status, the task's status field (2026-11-13-1405); what its Agent is doing is the small mark after it.
     assert.deepEqual(chips.map(chip => chip.querySelector('[data-task-status]')?.getAttribute('data-task-status')), ['doing', 'doing', 'doing', 'doing', 'doing', 'backlog', 'done'])
-    assert.deepEqual(chips.map(chip => chip.querySelector('[data-run-indicator]')?.getAttribute('data-run-indicator') ?? null), ['working', 'error', 'waiting', 'waiting', 'waiting', null, null])
+    // A chip has exactly one icon, the status: what an Agent is doing is never drawn on the task's chip.
+    assert.deepEqual(chips.map(chip => chip.querySelectorAll('svg').length), [1, 1, 1, 1, 1, 1, 1])
+    assert.ok(chips.every(chip => !chip.querySelector('[data-run-indicator]')))
     await act(async () => { chips[3].click(); chips[5].click() })
     assert.deepEqual(opened, [ids[3], ids[5]])
     assert.deepEqual(chips.map(chip => chip.textContent), ['ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'Ship it'])
     assert.equal(chips[0].querySelector('svg')?.getAttribute('viewBox'), '0 0 12 12', '进行中 is the status ring, whatever the run does')
-    assert.ok(chips[0].querySelector('[data-run-indicator] svg')?.getAttribute('class')?.includes('lucide-loader-circle'), 'a working Agent is the small turning mark')
-    assert.ok(chips[3].querySelector('[data-run-indicator] svg')?.getAttribute('class')?.includes('lucide-hand'), 'waiting for the person is the hand')
     assert.equal(chips[6].getAttribute('aria-label'), 'Open task: Ship it')
   } finally {
     await act(async () => { root.unmount() })
@@ -138,7 +138,8 @@ test('a thread is its title as a link, no icon or badge, and opens the thread be
     // The task's title, without the code the task chip already carries; nothing else on it (decision 2026-11-10).
     assert.deepEqual(threadChips.map(chip => chip.textContent), ['Thread running', 'Thread failed', 'Thread succeeded'], 'each conversation by its own short title, not its task\'s')
     for (const chip of threadChips) {
-      assert.equal(chip.querySelector('svg, [role="img"], [data-thread-attention]'), null, 'no icon, dot or badge')
+      assert.equal(chip.querySelector('[data-thread-attention]'), null, 'no dot or badge')
+      assert.ok(chip.querySelectorAll('svg').length <= 1, 'at most the one activity mark')
       assert.match(chip.className, /text-object-chip-foreground/, 'thread titles use the existing citation link colour')
       assert.doesNotMatch(chip.className, /(^| )text-primary( |$)/, 'hosted primary is body black, not the citation link colour')
       assert.match(chip.className, /bg-transparent/)
@@ -147,6 +148,9 @@ test('a thread is its title as a link, no icon or badge, and opens the thread be
       assert.equal(chip.getAttribute('role'), 'button')
       assert.equal(chip.getAttribute('tabindex'), '0')
     }
+    // The conversation's activity is one small mark after its title: working and failed show it, a finished run shows nothing.
+    assert.deepEqual(threadChips.map(chip => chip.querySelector('[data-run-indicator]')?.getAttribute('data-run-indicator') ?? null), ['working', 'error', null])
+    assert.equal(threadChips[0].querySelector('[data-slot="thread-activity"]')?.previousSibling?.textContent, 'Thread running', 'the mark comes after the title')
     assert.equal(threadChips[0].getAttribute('aria-label'), 'Open thread: Thread running')
     await act(async () => { threadChips[1].click() })
     // The thread's address, written through the navigation module; the workspace shows it in the right column (R-80).

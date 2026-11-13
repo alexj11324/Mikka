@@ -103,3 +103,18 @@ export function runIndicatorOf(state: TaskState | 'idle'): RunIndicator | null {
     default: return null
   }
 }
+
+/**
+ * What a conversation (a run) is doing, for the one small mark on the conversation's own surfaces: its title link, its
+ * dispatch card (decision 2026-11-13-1405). Working while it runs or waits for a machine, waiting when it has stopped
+ * for the person, error when it failed; null when it is idle, finished or replaced. The task's chip never carries it.
+ */
+export function conversationIndicatorOf(run: { status: string; outcome?: string | null; stopReason?: string | null; pauseReason?: string | null }): RunIndicator | null {
+  const outcome = run.outcome === 'done' || run.outcome === 'blocked' || run.outcome === 'needs_input' || run.outcome === 'failed' || run.outcome === 'idle' ? run.outcome : null
+  switch (attemptStateOf({ runId: '', status: run.status, outcome, stopReason: run.stopReason ?? null, pauseReason: run.pauseReason === 'human_control' || run.pauseReason === 'quota_exhausted' ? run.pauseReason : null })) {
+    case 'running': return 'working'
+    case 'paused': case 'blocked': return 'waiting'
+    case 'failed': return 'error'
+    default: return null
+  }
+}
