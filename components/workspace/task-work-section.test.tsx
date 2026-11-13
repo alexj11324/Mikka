@@ -16,12 +16,15 @@ test('work shows the admitted conversation, one PR and the current progress; oth
   const restricted = { ...base, id:'r2', rootRunId:'r2', latestRunId:'r2', ownedByCurrentUser:false, ownerName:'A colleague', detail:null }
   const url='https://github.com/example/repo/pull/5'
   const gate=(id:string,stage:string,revision:number)=>({id:'gate:f:'+id,kind:'factory_gate',sourceId:id,at:at.toISOString(),runId:'r1',attemptId:'a',candidateId:null,factoryTaskId:'f',stage,status:'running',revision})
-  const factory = { task:{ id:'f',pullRequest:{url,state:'open'} }, events:[gate('old','execute',1),gate('new','verify',2)],artifacts:[] } as unknown as FactoryActivityView
+  const factory = { task:{ id:'f',pullRequest:{url,state:'open'} }, events:[gate('old','execute',1),gate('new','verify',2)],artifacts:[{kind:'pull_request',url,runId:'r1',state:'merged'}] } as unknown as FactoryActivityView
   const html=renderToStaticMarkup(<IntlProvider locale="en" messages={messages} timeZone="UTC">
     <TaskWorkSection threads={[mine, restricted] as IssueThread[]} pulls={[{url,title:'Release review',state:'open'}]} factory={factory} open={()=>{}}/>
   </IntlProvider>)
   assert.match(html,/Analyze the release/)
-  assert.match(html,/gpt-example/)
+  const pull = html.match(/<a\b[^>]*>[\s\S]*?<\/a>/)?.[0] ?? ''
+  assert.match(pull,/Analyze the release/)
+  assert.match(pull,/My agent · gpt-example · Merged/)
+  assert.match(pull,/Reviewed the release./)
   assert.match(html,/Reviewed the release/)
   assert.match(html,/A colleague/)
   assert.equal((html.match(/<button\b/g) ?? []).length,1)

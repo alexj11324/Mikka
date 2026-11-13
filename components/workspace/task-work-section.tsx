@@ -63,14 +63,15 @@ export function TaskWorkSection({ threads, pulls, factory, open }: {
       </Button>
     })}
     {linked.map(pull => {
-      const thread = pull.runId ? byRun.get(pull.runId) : null
+      const detail = pull.runId ? byRun.get(pull.runId)?.detail : null
       const number = pull.url.split('/').filter(Boolean).at(-1)
       const state = pull.state?.toLowerCase()
       const status = state ? states[state] : null
       return <a key={pull.url} href={pull.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-md px-1 py-2 text-sm hover:bg-muted">
         <GitPullRequest aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" /><span className="min-w-0">
           <span className="block truncate">#{number}{pull.title && ' '+pull.title}</span>
-          <span className="text-xs text-muted-foreground">{[thread?.detail?.agentName,thread?.detail?.observedModel,status].filter(Boolean).join(' · ')}</span>
+          <span className="block text-xs text-muted-foreground">{[detail?.name, detail?.profile?.name || detail?.agentName, detail?.observedModel, status].filter(Boolean).join(' · ')}</span>
+          {detail?.summary && <span className="line-clamp-2 text-xs">{detail.summary}</span>}
         </span></a>
     })}
     {progress.map(group => <details key={group.id} className="text-sm">
