@@ -1494,5 +1494,19 @@
     "behavior": "Search authorized workspace conversations by their own titles, including task-free historical runs. Page by activity after resolving continuation chains in installation PostgreSQL.",
     "test": "tests/conversation-title.db.test.ts",
     "suite": "test:run-publication-db"
+  },
+  "lib/standalone-chat-directory.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Keep owner-created standalone chats in installation PostgreSQL and reopen them only through their active participant and workspace authorization.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "drizzle/20261113180454_standalone_bot_conversations.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Keep owner-created standalone chats in installation PostgreSQL and reopen them only through their active participant and workspace authorization.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
   }
 }

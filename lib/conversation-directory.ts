@@ -1,4 +1,5 @@
 import 'server-only'
+import { standaloneChatDirectory } from './standalone-chat-directory'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import { directoryInput, type DirectoryInput, type DirectoryState } from './conversation-directory-input'
@@ -68,11 +69,21 @@ export async function conversationDirectory(database: RunChainQueryable, userId:
     input.botId ?? null, input.cursor?.pinned ?? null, input.cursor?.at ?? null, input.cursor?.id ?? null, input.search])).rows as Row[]
   const batch = rows.slice(0, 100)
   const items = batch.map(row => ({
-    id: row.id, issueId: row.issueId, identifier: row.identifier, title: conversationTitle({ title: row.title,
+    kind: 'run' as const, id: row.id, issueId: row.issueId, identifier: row.identifier, title: conversationTitle({ title: row.title,
       name: threadName(row.asked, ''), issue: { title: row.taskTitle || row.agentName } }),
     state: directoryState(row), at: row.at, pinned: row.pinned,
   })).filter(item => (input.state === 'all' || item.state === input.state) &&
     (!input.search || item.title.toLowerCase().includes(input.search.toLowerCase())))
-  const last = batch.at(-1)
-  return { items, cursor: rows.length > batch.length && last ? { id: last.id, at: last.at, pinned: last.pinned } : null }
+  const chats = await standaloneChatDirectory(database, userId, workspaceId, input)
+  const order = (a: { pinned: boolean; at: string; id: string }, b: typeof a) =>
+    Number(b.pinned) - Number(a.pinned) || b.at.localeCompare(a.at) || b.id.localeCompare(a.id)
+  const merged = [...items, ...chats].sort(order)
+  // A state or title filter can reject the last run we examined. Preserve this
+  // scan boundary so older results do not skip still-unexamined runs.
+  const boundary = rows.length > batch.length ? batch.at(-1) : undefined
+  const eligible = boundary ? merged.filter(item => order(item, boundary) <= 0) : merged
+  const page = eligible.slice(0, 100)
+  const last = page.length === 100 ? page.at(-1) : boundary
+  const more = Boolean(boundary) || merged.length > page.length
+  return { items: page, cursor: more && last ? { id: last.id, at: last.at, pinned: last.pinned } : null }
 }

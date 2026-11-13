@@ -267,8 +267,8 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     listsWerePaused.current = listsPaused
   }, [listsPaused, mutate, refreshThreads])
   const [creatingBot, setCreatingBot] = useState(false)
-  // The frame's chat navigation opens the workspace's group creation dialog.
-  const [creatingGroup, setCreatingGroup] = useState(false)
+  const [creation, setCreation] = useState<'group' | 'conversation' | null>(null)
+  const closeComposer = () => setCreation(null)
   const [createdBot, setCreatedBot] = useState<BotView>()
   // The Coordinator's last line and time come from the bot chat summaries, never its whole chat.
   const { data: botChatSummaries } = useLiveBotChatList(user.id)
@@ -688,9 +688,9 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
       onCreated={id => { void mutate(); open(id) }} initialText={typedAhead}
       onOpenChange={open => { setCreating(open); if (!open) setTypedAhead('') }} />}
     {onboardingOpen && <Onboarding computer={onboarding?.computer} saveKey={saveOnboardingKey} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} onDone={bot => { setOnboardingOpen(false); if (bot) openChat({ kind: 'bot', botId: bot.id }, bot) }} />}
-    {(workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null) && <NewGroupDialog key={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null} workspaceId={(workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null)!} bots={bots} open={creatingGroup} onOpenChange={setCreatingGroup}
-      onCreated={group => { setCreatingGroup(false); void reloadGroups().catch(() => {}); openChat({ kind: 'group', ...group }) }}
-      onNewBot={() => { setCreatingGroup(false); setCreatingBot(true) }} onReviewGroups={() => { setCreatingGroup(false); void reloadGroups().catch(() => {}) }} />}
+    {(workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null) && <NewGroupDialog key={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null} workspaceId={(workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null)!} bots={bots} purpose={creation === 'conversation' ? creation : undefined} open={creation !== null} onOpenChange={open => { if (!open) closeComposer() }}
+      onCreated={group => { closeComposer(); void reloadGroups().catch(() => {}); openChat({ kind: 'group', ...group }) }}
+      onNewBot={() => { closeComposer(); setCreatingBot(true) }} onReviewGroups={() => { closeComposer(); if (creation === 'conversation') navigateSection('conversations'); void reloadGroups().catch(() => {}) }} />}
     <NewBotDialog open={creatingBot} onOpenChange={setCreatingBot} onCreated={bot => { setCreatingBot(false); openChat({ kind: 'bot', botId: bot.id }, bot) }} />
     {search.value && <GlobalSearch open={search.open} onOpenChange={setSearchOpen} onOpenChangeComplete={search.onOpenChangeComplete} bots={bots} sessions={conversationSessions} coordinatorLine={coordinatorSummary?.line ? chatPreview(coordinatorSummary.line) ?? i18nText('Nav.cardPreview') : undefined} issues={tasks} projects={projects} threads={threads} onThread={runId => openThread(runId)} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null}
       onChat={openChat} onNewBot={() => setCreatingBot(true)} onIssue={open} onCreateIssue={() => create()}
@@ -736,7 +736,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     ? <SettingsFrame user={user} onRail={leaveSettings} onBack={backFromSettings} onSearch={searchFromBar} onBrowser={browserFromSettings} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>{settingsContent}</SettingsFrame>
     : <AppFrame settings={settingsShown}
     bar={FRAME_OWNS_HEADER ? <WindowBar center={null} /> : <WindowBar center={<SearchPill onSearch={searchFromBar} />} trailing={<>{!settingsShown && (isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}{!settingsShown && <AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} pending={tasksPending} onToggle={() => toggleAllThreads(!threadsView)} />}<BrowserToggle open={!settingsShown && browserShown && !threadsView} onToggle={settingsShown ? browserFromSettings : () => { if (threadsView) { toggleAllThreads(false); showBrowser(true) } else showBrowser(!rightTaken) }} /></>} />}
-    rail={<IconRail active={settingsShown ? null : rail} onNavigate={settingsShown ? leaveSettings : openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={settingsShown ? undefined : beforeChange} chats={{ workspaceId: workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null, entries: chatNav, onOpen: openChat, onNewBot: () => setCreatingBot(true), onNewGroup: () => setCreatingGroup(true) }} onSearch={searchFromBar} inboxCount={inboxItems} />}>
+    rail={<IconRail active={settingsShown ? null : rail} onNavigate={settingsShown ? leaveSettings : openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={settingsShown ? undefined : beforeChange} chats={{ workspaceId: workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null, entries: chatNav, onOpen: openChat, onNewBot: () => setCreatingBot(true), onNewGroup: () => setCreation('group'), onNewConversation: () => setCreation('conversation') }} onSearch={searchFromBar} inboxCount={inboxItems} />}>
     {settingsShown ? settingsContent
       : <>
     {/* An open issue's header carries its own list toggle, so the floating one would sit on top of it; every other page keeps the phone header and its list button. */}

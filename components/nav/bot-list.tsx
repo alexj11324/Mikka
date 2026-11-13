@@ -28,7 +28,7 @@ function useChatRows({ bots, workspaceId, active, userId }: { bots: BotView[]; w
   // Group chats sit among the bots (R-01), ordered by their latest message.
   const { data: groups = [], mutate: reloadGroups } = useLiveGroupList(userId, workspaceId)
   // The Coordinator's bot row is the entry pinned on top; the rest are the person's other bots.
-  const rows = [...bots.filter(bot => !bot.coordinator).map(bot => ({ kind: 'bot' as const, bot, at: chats[bot.id]?.at ?? '' })), ...groups.map(group => ({ kind: 'group' as const, group, at: group.lastMessage?.createdAt ?? group.createdAt }))]
+  const rows = [...bots.filter(bot => !bot.coordinator).map(bot => ({ kind: 'bot' as const, bot, at: chats[bot.id]?.at ?? '' })), ...groups.filter(group => group.creationPurpose !== 'conversation').map(group => ({ kind: 'group' as const, group, at: group.lastMessage?.createdAt ?? group.createdAt }))]
     .sort((a, b) => b.at.localeCompare(a.at) || (a.kind === 'bot' ? a.bot.name : a.group.title).localeCompare(b.kind === 'bot' ? b.bot.name : b.group.title))
   const latest: Record<string, string> = {}
   // The Coordinator's row is read as 'coordinator', from its bot's summary below.
