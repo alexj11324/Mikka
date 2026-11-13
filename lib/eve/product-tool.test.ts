@@ -75,3 +75,20 @@ test('self-hosted product RPC uses the configured server and reserves the privat
   await assert.rejects(productRpc(scope, operation), { message: 'agentToolUnavailable' })
   assert.equal(calls.length, 1)
 })
+
+
+test('Cloudflare product RPC carries the native Eve scope without a second signed expiring credential', async t => {
+  t.mock.property(process, 'env', { ...process.env, MIKKA_EVE_HOST: 'cloudflare', MIKKA_EVE_PRODUCT_TOKEN: 'private-runtime-capability', BETTER_AUTH_SECRET: '' })
+  let calls = 0
+  t.mock.method(globalThis, 'fetch', async (url: URL, options: RequestInit) => {
+    calls++
+    const request = new Request(url, options)
+    assert.equal(request.url, 'https://product.internal/mikka/api/internal/eve/tools')
+    assert.equal(request.headers.get('authorization'), null)
+    assert.deepEqual(JSON.parse(request.headers.get('x-mikka-eve-scope')!), scope)
+    assert.equal(request.headers.get('x-mikka-product-capability'), 'private-runtime-capability')
+    return Response.json({ accepted: true })
+  })
+  assert.deepEqual(await productRpc(scope, { ...binding, operation: 'prepare' }), { accepted: true })
+  assert.equal(calls, 1)
+})

@@ -30,7 +30,7 @@ export function TaskCardDataProvider({ ownerId, workspaceId, children }: {
   const ids = useMemo(() => [...new Set([...subscriptions.values()].flat())].sort(), [subscriptions])
   const key = workspaceId && ids.length ? ['task-cards', ownerId, workspaceId, ids] : null
   const cards = useSWR(key, async () => Object.fromEntries(await readPresentationPages(workspaceId!, ids,
-    input => getTaskPresentations({ ...input, includeReview: true }))), { revalidateOnFocus: false, shouldRetryOnError: false })
+    input => getTaskPresentations({ ...input, includeInboxReason: true, includeReview: true }))), { revalidateOnFocus: false, shouldRetryOnError: false })
   useLiveKeys(key ? ids.flatMap(id => (['issue_threads', 'pull_request_status', 'factory_issue'] as const)
     .map(kind => ({ kind, id, workspaceId }))) : [], key ? [unstable_serialize(key)] : [], workspaceId ?? null, { minIntervalMs: 2000 })
   return <Registration value={register}><Cards value={cards.error ? EMPTY : cards.data ?? EMPTY}>{children}</Cards></Registration>
