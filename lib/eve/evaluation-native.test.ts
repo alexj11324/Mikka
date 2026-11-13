@@ -76,15 +76,26 @@ test('Agent Kit evaluations run through compiled public Eve sessions with inert 
  process.env.BETTER_AUTH_SECRET=secret;process.env.MIKKA_EVE_ORIGIN=origin
  const definition={...DEFAULT_AGENT_DEFINITION,tools:['web_search'] as typeof DEFAULT_AGENT_DEFINITION.tools}
  const ids:string[]=[]
- for(const kind of ['baseline','candidate','subscription','native-blocked','provider-failure','abort'])await t.test(kind,async()=>{
+ for(const kind of ['baseline','candidate','subscription','native-blocked','provider-failure','abort'])await t.test(kind,async t=>{
   const id=randomUUID(),snapshot=makeSnapshot(randomUUID(),kind==='candidate'?2:1,{...definition,instructions:kind==='candidate'?'Candidate guidance':''},'Frozen host',{harness:'ai_sdk',model:kind==='subscription'?'frozen-subscription-model':'frozen-shared-model',...kind==='subscription'?{modelSelection:{type:'subscription',bindingId:randomUUID(),ownerId:scope.ownerId,consumerId:scope.botId,workspaceId:scope.workspaceId,connectionId:randomUUID(),connectionRevision:7,modelId:'frozen-subscription-model',route:'codex_cpa'}}:{}})
   const plan:EvaluationPlan={scope,snapshot,testCase:{...CORE_EVAL_CASES[0],input:['native-blocked','provider-failure','abort'].includes(kind)?kind:'grounded-search'},instructions:snapshot.hostInstructions+'\n'+snapshot.definition.instructions,tools:[{name:'web_search',description:'Inert search fixture',inputSchema:{type:'object',properties:{query:{type:'string'}},required:['query'],additionalProperties:false}}]}
   await writeFile(join(fixture,'bindings',id+'.json'),JSON.stringify({id,session_id:null,plan}))
+  let endStreamPath: string | undefined
+  let teardownReads = 0
+  const nativeFetch = globalThis.fetch
+  const requests = t.mock.method(globalThis, 'fetch', (input, init) => {
+    const path = new URL(input instanceof Request ? input.url : input.toString()).pathname
+    if (init?.method === 'POST' && path.endsWith('/end')) endStreamPath = path.slice(0, -4) + '/stream'
+    if (path === endStreamPath) teardownReads++
+    return nativeFetch(input, init)
+  })
   if(kind==='abort') {
    const controller=new AbortController(),watcher=watch(join(fixture,'bindings'),(_event,file)=>{if(file==='abort-started')controller.abort()})
    try{await assert.rejects(runEveEvaluation(scope,id,plan,controller.signal),{name:'AbortError'})}finally{watcher.close()}
   } else if(kind==='provider-failure')await assert.rejects(runEveEvaluation(scope,id,plan,AbortSignal.timeout(20000)),/agentEvaluationGenerationFailed/)
   else{const trace=await runEveEvaluation(scope,id,plan,AbortSignal.timeout(20000));assert.equal(trace.tools.length,1);assert.equal(trace.tools[0].effectPerformed,false);assert.equal(trace.tools[0].name,kind==='native-blocked'?'agent':'web_search');assert.equal(trace.tools[0].outcome,kind==='native-blocked'?'error':'ok');assert.match(trace.text,kind==='candidate'?/^Candidate:/ : /^Baseline:/)}
+  requests.mock.restore()
+  assert.equal(teardownReads, 1, 'one native stream observes the durable session end')
   const binding=JSON.parse(await readFile(join(fixture,'bindings',id+'.json'),'utf8'));assert.ok(binding.session_id);ids.push(binding.session_id)
   const client=new Client({baseUrl:origin+'/mikka/evaluations',headers:()=>({authorization:internalEveAuthorization(scope),'x-mikka-evaluation-id':id})})
   const snapshotResult=await client.sessions.attach(binding.session_id).snapshot()
