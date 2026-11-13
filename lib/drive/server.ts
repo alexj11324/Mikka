@@ -11,8 +11,8 @@ import { workspaceListChanged } from '@/lib/live/lists'
 import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, isVolumeId, isVolumeVersionId } from './contract'
 import { driveBytes, driveSha256, readDriveBlobObject, recordDriveBlob, storeDriveBlob } from './blobs'
 import { applyDriveWrite, DriveError, readDriveHistory, readDriveVersion, restoreDriveVersion } from './store'
-import { createDriveVolume, DriveVolumeError, listDriveVolumes, readDriveVolume } from './volumes'
-import { driveErrorBody } from './http'
+import { createDriveVolume, listDriveVolumes, readDriveVolume } from './volumes'
+import { driveErrorResponse } from './http'
 
 const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }
 const digest = z.string().regex(/^[a-f0-9]{64}$/)
@@ -144,8 +144,6 @@ export async function driveResponse(request: Request, operation: Operation, para
   } catch (error) {
     if (error instanceof z.ZodError || error instanceof SyntaxError) return json({ error: 'drive_write_invalid' }, 400)
     if (error instanceof ActionFailureError && error.code === 'workspaceAccessDenied' || error instanceof WorkspaceError && error.code === 'workspaceAccessDenied') return json({ error: 'drive_not_found' }, 404)
-    if (error instanceof DriveError) return json(driveErrorBody(error), error.status)
-    if (error instanceof DriveVolumeError) return json({ error: error.code }, error.status)
-    throw error
+    return driveErrorResponse(error, headers)
   }
 }
