@@ -262,7 +262,9 @@ export async function verifyWorkDomain({ accounts, pool, rpc, switchTo, a, b, ta
 
   for (const [account, issue] of [[accounts.owner, taskA], [accounts.peer, peerTask]]) {
     const view = await rpc(account, 'task-domain.getTaskPresentation', issue.id)
-    assert.deepEqual(view, { version: 1, inboxReason: 'needsReply', primaryStatus: 'todo', factoryStage: 'triage', runStatus: null, needsAction: 'question', blockedReason: null, completion: null,
+    const cards = await rpc(account, 'task-domain.getTaskPresentations', { workspaceId, issueIds: [issue.id], includeInboxReason: true })
+    assert.deepEqual(cards.items[issue.id], { ...view, inboxReason: 'needsReply' })
+    assert.deepEqual(view, { version: 1, primaryStatus: 'todo', factoryStage: 'triage', runStatus: null, needsAction: 'question', blockedReason: null, completion: null,
       state: 'waiting', reason: 'needs_input', blockedBy: null, group: 'pending' })
   }
   const sharedView = await rpc(accounts.peer, 'task-domain.getTaskPresentation', taskA.id)
