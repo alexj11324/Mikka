@@ -1,7 +1,7 @@
 import { modelMessage } from '@/lib/coordinator/message-safety'
 import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
-import { and, desc, eq, gt, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, inArray, or, sql } from 'drizzle-orm'
 import { chatBotId } from '@/lib/coordinator/coordinator-bot'
 import type { ModelMessage } from 'ai'
 import { readRun, visibleRuns } from '@/lib/agent-runs'
@@ -153,10 +153,20 @@ export async function getIssue(userId: string, issueId: string) {
   const runs = await visibleRuns(userId, { issueId: issue.id, limit: 5 })
   const view = await issueView(issue)
   const metadata = view.metadata
-  // Children and the issues this one blocks point at it, so they are found by looking the other way.
-  const siblings = await db.select({ id: issues.id, title: issues.title, status: issues.status, content: issueAttrsContent }).from(issues)
-    .where(and(eq(issues.userId, issue.userId), (await issueVisibility(userId, false, issue.workspaceId!, db, { withTeamLinks: false })).predicate))
-  const linked = new Map(siblings.filter(row => !readIssueMetadata(row.content).deletedAt).map(row => [row.id, { id: row.id, title: row.title, status: row.status, parentId: readIssueMetadata(row.content).parentId, blockedByIds: readIssueMetadata(row.content).blockedByIds }]))
+  const direct = [metadata.parentId, metadata.duplicateOfId, ...metadata.blockedByIds, ...metadata.relatedIds]
+    .filter((id): id is string => id !== null)
+  const attrs = sql`coalesce(nullif(${issues.content}->'attrs'->'mikka', 'null'::jsonb), ${issues.content}->'attrs'->'orvilo')`
+  const visibility = await issueVisibility(userId, false, issue.workspaceId!, db, { withTeamLinks: false })
+  const candidates = await db.select({ id: issues.id, title: issues.title, status: issues.status, content: issueAttrsContent }).from(issues)
+    .where(and(eq(issues.userId, issue.userId), visibility.predicate, or(
+      inArray(issues.id, direct),
+      sql`${attrs}->>'parentId' = ${issue.id}`,
+      sql`${attrs}->'blockedByIds' @> ${JSON.stringify([issue.id])}::jsonb`,
+    )))
+  const linked = new Map(candidates.flatMap(row => {
+    const { deletedAt, parentId, blockedByIds } = readIssueMetadata(row.content)
+    return deletedAt ? [] : [[row.id, { id: row.id, title: row.title, status: row.status, parentId, blockedByIds }] as const]
+  }))
   const pick = (ids: (string | null)[]) => ids.flatMap(id => {
     const row = id ? linked.get(id) : undefined
     return row ? [{ id: row.id, title: row.title, status: row.status }] : []
