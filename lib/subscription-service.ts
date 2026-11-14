@@ -57,7 +57,7 @@ export class SubscriptionService {
     // Probe only after scope/state/revision and server-side capability checks.
     if ((use.execution !== 'native' || this.capabilities.nativeIsolation === 'verified_runtime') && readiness === 'ready' && row.state === 'connected' && revision === binding.connectionRevision && (subscriptionQuotaState(quota, binding.route, Date.now(), modelOverride === null ? undefined : modelOverride ?? boundModelId) === 'unknown' || Date.now() - Date.parse(quota.observedAt) > 45_000)) {
       const client = this.worker(this.repository.scope(row)).forUse(use)
-      await client.call('prepare', { revision }, signal)
+      await client.call(use.execution === 'model' && !use.runId ? 'prepareStream' : 'prepare', { revision }, signal)
       const result = await client.call<{status: number; body: unknown}>('quota', { revision }, signal)
       quota = quotaSnapshotSchema.parse(await this.quota(row.provider, result))
       await this.repository.saveQuota(row, quota)
