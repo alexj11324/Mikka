@@ -673,6 +673,13 @@
     "behavior": "Replay the current account deletion journal only against the isolated restored databases and object target, with external post-commit work quarantined.",
     "test": "scripts/ops/recovery-drill.test.mjs"
   },
+  "lib/account/export.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Recheck a signed-in user’s unexpired export grant in the installation database before streaming each file, and group the owner’s exported thread messages in memory.",
+    "test": "lib/account/export-files.db.test.ts",
+    "suite": "test:account-db"
+  },
   "lib/activity-actor-view.ts": {
     "mode": "built-in",
     "environment": [],
