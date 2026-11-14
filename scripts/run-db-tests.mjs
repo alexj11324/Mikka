@@ -126,6 +126,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/computer/event-page.ts', file: 'lib/computer/event-session.db.test.ts', script: 'test:live-db' },
   { marker: 'lib/credentials/broker.ts', file: 'lib/computer/event-broker.db.test.ts', script: 'test:live-db' },
   { marker: 'lib/captures/store.ts', file: 'lib/captures/store.db.test.ts', script: 'test:captures-db' },
+  { marker: 'lib/thread-reads.ts', file: 'lib/thread-reads.db.test.ts', script: 'test:conversation-reads' },
   { marker: 'lib/group-conversations-store.ts', file: 'lib/group-conversations.test.ts', script: 'test:groups' },
   { marker: 'lib/group-conversations-store.ts', file: 'lib/group-reads.db.test.ts', script: 'test:conversation-reads' },
   { marker: 'lib/active-agents.ts', file: 'lib/active-agents.test.ts', script: 'test:active-agents' },

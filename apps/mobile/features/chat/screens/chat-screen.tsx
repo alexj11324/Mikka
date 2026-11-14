@@ -1,11 +1,11 @@
 import { mobileMessages } from '@/lib/messages'
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Keyboard } from 'react-native'
+import { AppState, Keyboard } from 'react-native'
 import { StyleSheet, View } from 'react-native'
 import { ChatMessageList, type ChatListHandle } from '@/features/chat/components/chat-message-list'
 import { chatHistoryPath, chatUpdatePath, mergeChatHistory, mergeChatRead, personalReadback, olderThrough, type ChatHistoryPage, type ChatRead } from '@/features/chat/model/chat-pages'
 import { latestOwnIndex } from '@/features/chat/model/chat-layout'
-import { useRouter } from 'expo-router'
+import { useFocusEffect, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { uuid } from 'expo'
 import { Spinner } from '@/components/icons'
@@ -47,7 +47,7 @@ import { nextQueueCheck, queuedItems } from '@/features/chat/model/chat-queue'
 import { FailedReply } from '@/components/FailedReply'
 import { eventText, questionCard } from '@/lib/event-line'
 import { waitingLabel } from '@/lib/waiting'
-import { useLiveApi, useRefresh } from '@/lib/useApi'
+import { onAppForeground, useLiveApi, useRefresh } from '@/lib/useApi'
 import { listRef, UNRESOLVED_LIVE_ID } from '@/lib/live'
 import { pendingActionsDeadline } from '@/lib/live-client'
 import { useStop } from '@/lib/useStop'
@@ -160,6 +160,21 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
   }, [queueCheck])
   const queue = queuedItems(allItems, agent.status === 'busy', now, sentWhileWorking.current)
   const items = queue.length ? allItems.filter(item => !queue.includes(item)) : allItems
+  const lastMessage = items.findLast(item => item.from !== 'event' && !item.pending && item.position > 0)
+  const lastId = lastMessage?.id ?? (lastMessage ? String(lastMessage.position) : null)
+  const acknowledged = useRef<string | null>(null)
+  useFocusEffect(useCallback(() => {
+    const acknowledge = () => {
+      if (AppState.currentState !== 'active' || !atLatest || !lastId || !data || error || acknowledged.current === lastId) return
+      acknowledged.current = lastId
+      const id = data.botId ? 'bot:' + data.botId : 'coordinator'
+      void api('/api/conversations/' + encodeURIComponent(id) + '/read', { method: 'POST', body: { messageId: lastId } })
+        .catch(() => { if (acknowledged.current === lastId) acknowledged.current = null })
+    }
+    const frame = requestAnimationFrame(acknowledge)
+    const unwatch = onAppForeground(acknowledge)
+    return () => { cancelAnimationFrame(frame); unwatch() }
+  }, [atLatest, data, error, lastId]))
   // 选择文本: one message's words are selectable where they are; capsules above the composer act on the selection.
   const [selection, setSelection] = useState<{ key: number; text: string; selected: string } | null>(null)
   const selectionRect = useRef<Rect | null>(null)

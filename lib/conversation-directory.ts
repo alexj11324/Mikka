@@ -3,6 +3,8 @@ import { PgDialect } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import { directoryInput, type DirectoryInput, type DirectoryState } from './conversation-directory-input'
 import { runAwaitingApproval, runDeviceOffline } from './task-state-query'
+import { conversationReads, agentRuns } from './db/schema'
+import { joinThreadRead, threadUnread } from './thread-reads'
 import { runFailureBrief } from './run-failure-projection'
 import { runChainSql, RUN_CHAIN_MAX_DEPTH, type RunChainQueryable } from './run-chain'
 import { attemptStateOf, type TaskStateRun } from './task-state'
@@ -11,7 +13,7 @@ import { conversationTitle } from './short-title'
 
 type Row = TaskStateRun & {
   id: string; issueId: string | null; identifier: string | null; title: string | null; asked: string
-  taskTitle: string | null; agentName: string; pinned: boolean; at: string
+  taskTitle: string | null; agentName: string; pinned: boolean; unread: boolean; at: string
 }
 
 function directoryState(row: Row): DirectoryState {
@@ -29,6 +31,9 @@ export async function conversationDirectory(database: RunChainQueryable, userId:
   const input = directoryInput.parse(raw)
   const projection = sql`SELECT roots.id, roots.title, roots.asked, roots."agentName", roots.pinned, roots.at,
       roots."issueId", roots.identifier, roots."taskTitle",
+      EXISTS (SELECT 1 FROM assigned receipt JOIN ${agentRuns} ON ${agentRuns.id}=receipt.id
+        LEFT JOIN ${conversationReads} ON ${joinThreadRead(userId)}
+        WHERE receipt.root=roots.id AND NOT receipt."depthExceeded" AND (${threadUnread})) AS unread,
       agent_runs.id AS "runId", agent_runs.status, agent_runs.outcome, agent_runs."pauseReason", agent_runs."stopReason",
       agent_runs."threadReplacedBy", ${runFailureBrief} AS "failureDetails", (${runAwaitingApproval}) AS "awaitingApproval",
       (${runDeviceOffline}) AS "deviceOffline" FROM roots JOIN agent_runs ON agent_runs.id=roots.latest`
@@ -70,7 +75,7 @@ export async function conversationDirectory(database: RunChainQueryable, userId:
   const items = batch.map(row => ({
     id: row.id, issueId: row.issueId, identifier: row.identifier, title: conversationTitle({ title: row.title,
       name: threadName(row.asked, ''), issue: { title: row.taskTitle || row.agentName } }),
-    state: directoryState(row), at: row.at, pinned: row.pinned,
+    state: directoryState(row), at: row.at, pinned: row.pinned, unread: row.unread,
   })).filter(item => (input.state === 'all' || item.state === input.state) &&
     (!input.search || item.title.toLowerCase().includes(input.search.toLowerCase())))
   const last = batch.at(-1)

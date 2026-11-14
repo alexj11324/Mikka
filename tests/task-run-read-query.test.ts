@@ -42,7 +42,7 @@ const client = { query: async (config: { text: string; rowMode?: string }, param
   if (text.includes('string_agg(md5(to_jsonb(snapshot)::text)')) return { rows: [{ version: SIGNATURE, expiresAt: expiry }] }
   if (text.startsWith('select min(')) return { rows: [[expiry]] }
   if (text.includes('md5(to_jsonb(thread_list_expiry)::text)')) return { rows: threadRows ? [[RUN, ROW_SIGNATURE]] : [] }
-  if (text.includes('"thread_list_expiry"')) return { rows: [[RUN, null, 'Fixture agent', ISSUE, 'Fixture task', null, 'running',
+  if (text.includes('"thread_list_expiry"')) return { rows: [[true, RUN, null, 'Fixture agent', ISSUE, 'Fixture task', null, 'running',
     '2099-01-01T00:00:00.000Z', '2099-01-02T00:00:00.000Z', 'Fixture reply', null, null, null, null, null, false, 'codex', null, null]] }
   throw Error('Unexpected fixture query')
 } }
@@ -152,6 +152,7 @@ test('changed thread rows keep their manifest, owner hash and ordered data read 
   assert.equal(queries.length, 3, 'one aggregate, one manifest, one changed-row query')
   assert.equal(result.snapshot.items?.length, 1)
   assert.equal(result.snapshot.items?.[0].id, RUN)
+  assert.equal(result.snapshot.items?.[0].unread, true)
   assert.equal(result.snapshot.items?.[0].createdAt, '2099-01-01T00:00:00.000Z')
   assert.equal(result.snapshot.items?.[0].failureDetails, null)
   assert.equal(result.snapshot.items?.[0].harness, 'codex')

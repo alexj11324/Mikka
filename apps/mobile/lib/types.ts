@@ -12,7 +12,7 @@ export interface Workspace { id: string; name: string }
 /** The person's own state for a chat on the home list (lib/chat-preferences.ts on the server). Absent from a server older than it. */
 export interface ChatOwnState { hidden?: boolean; markedUnread?: boolean; pinOrder?: number | null; listOrder?: number | null }
 
-export interface HomeBot extends ChatOwnState { id: string; name: string; color: string; shape: string; /** Plain text; an empty string is a card with no words. */ line: string | null; at: string | null; working: boolean; pinned?: boolean; /** The person's Coordinator: the app draws it pinned on top, not as a row. */ coordinator?: boolean; /** Its threads waiting on the person. */ waiting?: number }
+export interface HomeBot extends ChatOwnState { unreadCount?: number; id: string; name: string; color: string; shape: string; /** Plain text; an empty string is a card with no words. */ line: string | null; at: string | null; working: boolean; pinned?: boolean; /** The person's Coordinator: the app draws it pinned on top, not as a row. */ coordinator?: boolean; /** Its threads waiting on the person. */ waiting?: number }
 
 export interface Home {
   user: Person
@@ -130,6 +130,7 @@ export interface GroupPage {
 }
 
 export interface Thread {
+  unread?: boolean
   id: string
   name: string
   status: ThreadStatus
@@ -174,7 +175,7 @@ export type ThreadItem =
 
 /** A thread paused because its subscription ran out (the web's ThreadQuotaPausedCard). */
 export interface ThreadPaused { runId: string; subscription: 'claude' | 'codex'; plan: string | null; resetsAt: string | null; keyReady: boolean }
-export interface ThreadDetail { issueId?: string | null; canReply?: boolean; confirmedSubmissionIds?: string[]; /** Each run's live channel (lib/live/panels.ts threadLiveReferences); absent from a server older than it. */ live?: { runs: { id: string; workspaceId: string | null }[] }; thread: Thread; active: boolean; /** Generating or running, not waiting for an answer: only then does the composer's button stop. */ working?: boolean; paused?: ThreadPaused | null; summary: string | null; error: string | null; items: ThreadItem[] }
+export interface ThreadDetail { readReceipts?: { id: string; through: string | null; revision: number; unread: boolean }[]; issueId?: string | null; canReply?: boolean; confirmedSubmissionIds?: string[]; /** Each run's live channel (lib/live/panels.ts threadLiveReferences); absent from a server older than it. */ live?: { runs: { id: string; workspaceId: string | null }[] }; thread: Thread; active: boolean; /** Generating or running, not waiting for an answer: only then does the composer's button stop. */ working?: boolean; paused?: ThreadPaused | null; summary: string | null; error: string | null; items: ThreadItem[] }
 
 export interface Suggestion { id: string; source: Source; action: string; title: string; url: string | null; actor: string | null; occurredAt: string }
 export interface Suggestions { groups: { source: Source; items: Suggestion[] }[] }
