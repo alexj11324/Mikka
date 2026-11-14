@@ -30,6 +30,9 @@ let projectsFailed = false
 let projectsPending = false
 let projectTeamsFailed = false
 let projectTeamsPending = false
+let teamDirectoryError = false
+let teamDirectoryPending = false
+let teamDirectoryRetries = 0
 let scopedTeamFixture = false
 let workspaceTasksPending = false
 let refreshGlobalTasks = refreshed
@@ -56,9 +59,9 @@ mock.module('swr', { defaultExport: (key: unknown, _read?: unknown, options?: { 
     : key === 'project-teams' ? [{ projectId: 'known-project', teamId: teamIssuesId }]
     : Array.isArray(key) && key[0] === 'team-issues-page' ? { items: [], next: null }
     : [],
-  error: ((key === 'project-teams' && projectTeamsFailed) || (Array.isArray(key) && key[0] === 'projects' && projectsFailed)) ? new Error('unavailable') : undefined,
-  isLoading: key === 'project-teams' ? projectTeamsPending : Array.isArray(key) && key[0] === 'projects' ? projectsPending : Array.isArray(key) && key[0] === 'team-issues-page' ? scopedTasksPending : false,
-  mutate: key === 'project-teams' ? async () => { projectReads.links++ }
+  error: ((key === 'teams' && teamDirectoryError) || (key === 'project-teams' && projectTeamsFailed) || (Array.isArray(key) && key[0] === 'projects' && projectsFailed)) ? new Error('unavailable') : undefined,
+  isLoading: key === 'teams' ? teamDirectoryPending : key === 'project-teams' ? projectTeamsPending : Array.isArray(key) && key[0] === 'projects' ? projectsPending : Array.isArray(key) && key[0] === 'team-issues-page' ? scopedTasksPending : false,
+  mutate: key === 'teams' ? async () => { teamDirectoryRetries++ } : key === 'project-teams' ? async () => { projectReads.links++ }
     : Array.isArray(key) && key[0] === 'projects' ? async () => { projectReads.projects++ }
     : Array.isArray(key) && key[0] === 'team-issues-page' ? async () => { if (!options?.isPaused?.()) scopedTeamPageMutations++ } : refreshed,
 }), namedExports: { SWRConfig: swr.SWRConfig, unstable_serialize: swr.unstable_serialize, useSWRConfig: swr.useSWRConfig } })
@@ -232,6 +235,7 @@ beforeEach(() => {
   groupListRetries = 0
   projectTeamsFailed = false; projectTeamsPending = false; projectsFailed = false; projectsPending = false
   projectReads.projects = 0; projectReads.links = 0
+  teamDirectoryError = false; teamDirectoryPending = false; teamDirectoryRetries = 0
   scopedTeamFixture = false; workspaceTasksPending = false; scopedTasksPending = false; scopedTeamPageMutations = 0; acknowledgeNewTask = null; probeEmbeddedAck = false
   browser.history.replaceState({}, '', '/?workspace=workspace-one')
   browser.localStorage.clear(); browser.sessionStorage.clear()
@@ -364,6 +368,36 @@ test('Team Home distinguishes either pending or failed project read from its las
   }
   assert.deepEqual(projectReads, { projects: 2, links: 2 })
 })
+
+for (const section of ['team-home', 'team-projects', 'team-issues'] as const) {
+  test(`${section} requires its own team directory and can retry a failed or missing team`, async () => {
+    browser.history.replaceState({}, '', `/?workspace=${workspaceId}&team=${teamIssuesId}&section=${section}`)
+    await act(async () => { releaseChunk(); await chunkReady })
+    const show = () => render({ initialSection: section })
+    const pageSelector = { 'team-home': '#team-resources-heading', 'team-projects': '[data-project-list-state]', 'team-issues': '[data-team-board-visible]' }[section]
+    teamDirectoryPending = true
+    await show()
+    assert.ok(container.querySelector('[role="status"][aria-label="Workspace.loading"]'))
+    assert.equal(container.querySelector(pageSelector), null)
+    teamDirectoryPending = false
+    teamDirectoryError = true
+    scopedTeamFixture = true // SWR can still hold the previous Team after failing to refresh it.
+    await show()
+    const alert = () => container.querySelector('[role="alert"]')
+    assert.match(alert()?.textContent ?? '', /FeatureCopy.c_f4ae1a97/)
+    assert.equal(container.querySelector(pageSelector), null)
+    await act(async () => { alert()!.querySelector('button')!.click() })
+    assert.equal(teamDirectoryRetries, 1)
+    teamDirectoryError = false; scopedTeamFixture = false
+    await show()
+    assert.match(alert()?.textContent ?? '', /FeatureCopy.c_19b23b31/)
+    assert.equal(container.querySelector(pageSelector), null)
+    scopedTeamFixture = true
+    await show()
+    assert.equal(alert(), null)
+    assert.ok(container.querySelector(pageSelector))
+  })
+}
 
 test('Team Issues first-page readiness is independent of the unrelated workspace-wide list', async () => {
   scopedTeamFixture = true
