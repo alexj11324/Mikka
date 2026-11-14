@@ -323,7 +323,10 @@ test('a restore writes the old tree FORWARD as a new version, never back', async
 })
 
 test('a restore with a stale expectedDigest is refused and changes nothing', async () => {
-  const { state, id, digest } = volume([entry('a.txt', { sha256: hex('a') })])
+  const { state, id, digest } = volume([entry('kept'), entry('changed-mode'), entry('changed-bytes'), entry('added')])
+  state.versions[0]!.manifest = [
+    entry('kept'), entry('changed-bytes', { sha256: hex('b') }), entry('removed'), entry('changed-mode', { mode: 0o755 }),
+  ]
   const before = snapshot(state)
   await assert.rejects(
     () => restoreDriveVersion(poolFor(state), { ownerId: 'owner', volumeId: id }, actor,
@@ -332,6 +335,7 @@ test('a restore with a stale expectedDigest is refused and changes nothing', asy
       assert.ok(error instanceof DriveError)
       assert.equal(error.code, 'drive_version_conflict')
       assert.equal(error.detail?.headDigest, digest)
+      assert.deepEqual(error.detail?.paths, ['added', 'changed-bytes', 'changed-mode', 'removed'])
       return true
     })
   assert.deepEqual(snapshot(state), before)

@@ -381,10 +381,14 @@ export async function restoreDriveVersion(
     const current = await readEntries(client, volume.id)
     if (input.expectedDigest !== volume.headDigest) {
       const wanted = new Map(source.manifest.map(entry => [entry.path, entry]))
-      const paths = [...new Set([...current.map(entry => entry.path), ...wanted.keys()])].filter(path => {
-        const held = current.find(entry => entry.path === path), target = wanted.get(path)
-        return target ? !held || held.sha256 !== target.sha256 || held.mode !== target.mode : Boolean(held)
-      }).sort()
+      const paths: string[] = []
+      for (const entry of current) {
+        const target = wanted.get(entry.path)
+        if (!target || entry.sha256 !== target.sha256 || entry.mode !== target.mode) paths.push(entry.path)
+        wanted.delete(entry.path)
+      }
+      for (const path of wanted.keys()) paths.push(path)
+      paths.sort()
       throw new DriveError('drive_version_conflict', 409, { headDigest: volume.headDigest, headVersionId: volume.headVersionId, paths })
     }
     // The restored version is written forward as a new one that names its source.
