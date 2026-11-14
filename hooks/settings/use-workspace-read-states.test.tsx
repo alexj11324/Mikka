@@ -45,6 +45,38 @@ async function render() {
   await act(async () => root.render(<SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}><Probe /></SWRConfig>))
   await settle()
 }
+test('workspace danger actions withdraw stale impact and transfer targets until a successful retry', async () => {
+  targets = [{ userId: 'former-member', name: 'Original', email: 'original@example.invalid' }]
+  await render()
+  const teamCount = () => deletion.counts?.teams
+  assert.ok(transfer.canTransferTo('former-member'))
+  assert.equal(teamCount(), 1)
+
+  targets = new TypeError('Disconnected')
+  impact = new TypeError('Disconnected')
+  await act(async () => { await Promise.all([transfer.reload(), deletion.reload()]) })
+  await settle()
+  assert.equal(transfer.canTransferTo('former-member'), false)
+  assert.equal(transfer.people?.length ?? 0, 0)
+  assert.equal(teamCount(), undefined)
+  assert.equal(transfer.readError, 'Read failed')
+  assert.equal(deletion.readError, 'Read failed')
+  await act(async () => {
+    assert.equal(await transfer.transfer('former-member'), null)
+    await deletion.remove('workspace')
+  })
+  assert.equal(transfer.error, null)
+  assert.equal(deletion.error, null)
+
+  targets = [{ userId: 'new-member', name: 'New', email: 'new@example.invalid' }]
+  impact = { bots: 2, tasks: 3, teams: 2, purchasedPoints: 0 }
+  await act(async () => { await Promise.all([transfer.reload(), deletion.reload()]) })
+  await settle()
+  assert.equal(transfer.canTransferTo('former-member'), false)
+  assert.ok(transfer.canTransferTo('new-member'))
+  assert.equal(teamCount(), 2)
+})
+
 for (const source of ['targets', 'impact', 'archived'] as const) {
   for (const failure of ['network', 'action'] as const) {
     test(`workspace ${source} ${failure} failure exposes a read error and retry`, async () => {

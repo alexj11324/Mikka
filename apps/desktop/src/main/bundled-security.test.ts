@@ -172,6 +172,19 @@ test('billing metadata and commands have exact scoped routes and methods', () =>
   }
 })
 
+test('installed Organization invitations expose only listing, issuing, revoking and accepting', () => {
+  const org = 'ab81a708-013c-4e44-9ab2-a500bd59f381'
+  const collection = `/api/organizations/${org}/invitations`
+  const accept = '/api/organization-invitations/accept'
+  for (const method of ['GET', 'HEAD', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS']) {
+    assert.equal(allowedApiPath(collection, method), ['GET', 'POST', 'DELETE'].includes(method))
+    assert.equal(allowedApiPath(accept, method), method === 'POST')
+    for (const path of [collection.replace(org, 'unknown'), `${collection}/accept`, `${collection}/${org}`, `${accept}/extra`]) {
+      assert.equal(allowedApiPath(path, method), false, `${method} ${path}`)
+    }
+  }
+})
+
 test('local entry/assets load without backend; missing assets and symlink escape fail closed', async t => {
   const root = await fixture(t)
   await mkdir(join(root, 'assets'))
