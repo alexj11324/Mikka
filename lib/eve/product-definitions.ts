@@ -52,10 +52,11 @@ export async function productCatalogue(scope: Scope, binding: Pick<ExecutionBind
   })
 }
 
-async function productExecution(scope: Scope, input: ExecutionBinding): Promise<AgentExecution | null> {
-  const { agentKitEnabled, agentKitStore, agentScope } = await import('../agent-kit/service')
-  if (!input.executionId) {
-    if (!agentKitEnabled()) return null
+/** Actual native actions allocate the existing business execution before calling the app. */
+export async function beginProductAction(scope: Scope, input: Pick<ExecutionBinding, 'sessionId' | 'turnId'>): Promise<string | undefined> {
+  return asProductPrincipal(scope, async () => {
+    const { agentKitEnabled } = await import('../agent-kit/service')
+    if (!agentKitEnabled()) return undefined
     const [{ pool }, { withDirectSession }] = await Promise.all([import('../db'), import('../db/direct-session')])
     return withDirectSession(pool, async client => {
       // Allocation and finish own the same turn, including a turn with no earlier action.
@@ -65,8 +66,16 @@ async function productExecution(scope: Scope, input: ExecutionBinding): Promise<
       const { beginAgentExecution } = await import('../../workflows/coordinator/agent-kit-steps')
       const execution = await beginAgentExecution(scope.ownerId, scope.botId, `${input.sessionId}:${input.turnId}`, 0, { harness: 'ai_sdk' })
       if (!execution) throw new Error('agentExecutionClosed')
-      return agentKitStore.readExecution(await agentScope(scope.ownerId, scope.botId), execution.id, `${input.sessionId}:${input.turnId}:0`)
+      return execution.id
     })
+  })
+}
+
+async function productExecution(scope: Scope, input: ExecutionBinding): Promise<AgentExecution | null> {
+  const { agentKitEnabled, agentKitStore, agentScope } = await import('../agent-kit/service')
+  if (!input.executionId) {
+    if (agentKitEnabled()) throw new Error('agentExecutionClosed')
+    return null
   }
   return agentKitStore.readExecution(await agentScope(scope.ownerId, scope.botId), input.executionId, `${input.sessionId}:${input.turnId}:0`)
 }

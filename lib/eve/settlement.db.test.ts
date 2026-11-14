@@ -49,8 +49,8 @@ test('host settlement receipts preserve product publication across native RPC re
         assert.equal(response.status, 200)
         assert.deepEqual(await response.json(), { status: 'accepted' })
         assert.deepEqual(imports, [])
-        const { productContext } = await import('./product-definitions')
-        await assert.rejects(productContext(scope, { sessionId, turnId: 'child_without_execution' }), /agentExecutionClosed/)
+        const { beginProductAction } = await import('./product-definitions')
+        await assert.rejects(beginProductAction(scope, { sessionId, turnId: 'child_without_execution' }), /agentExecutionClosed/)
         assert.equal((await pool.query('SELECT count(*)::int count FROM agent_kit_executions WHERE owner_id=$1 AND bot_key=$2 AND execution_key=$3',
           [ownerId, botId, `${sessionId}:child_without_execution:0`])).rows[0].count, 0)
       } finally { loader.deregister() }

@@ -219,9 +219,9 @@
   "apps/eve/agent/agent.ts": {
     "mode": "optional-cloud",
     "environment": [
-      "MIKKA_EVE_WORKFLOW_WORLD"
+      "WORKFLOW_TARGET_WORLD"
     ],
-    "behavior": "The official Eve host opts into its private Cloudflare World explicitly. Leaving the selector unset preserves the normal workflow selection.",
+    "behavior": "The self-hosted Eve server selects the official Postgres World through Workflow's standard environment setting.",
     "test": "cloudflare/eve-runtime/test/config.test.mjs"
   },
   "drizzle/20261112090913_account_subscription_custody.sql": {

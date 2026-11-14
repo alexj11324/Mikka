@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
-import test from 'node:test'
+import test, { mock } from 'node:test'
 import type { ApprovalConfiguration } from 'eve/tools/approval'
 import { createProductTool } from './product-tool'
 import { productRpc, type ProductCatalogueEntry, type ProductOperation } from './product-rpc'
@@ -91,4 +91,48 @@ test('Cloudflare product RPC carries the native Eve scope without a second signe
   })
   assert.deepEqual(await productRpc(scope, { ...binding, operation: 'finish', outcome: 'completed' }), { accepted: true })
   assert.equal(calls, 1)
+})
+
+
+test('actual native approval and execution bind the existing app contract only when invoked', async () => {
+  const pendingBinding = { sessionId: binding.sessionId, turnId: binding.turnId }
+  const allocations: unknown[] = []
+  const requests: ProductOperation[] = []
+  let closed = false
+  mock.module(new URL('./product-definitions.ts', import.meta.url).href, { namedExports: {
+    async beginProductAction(actual: EveScope, current: typeof pendingBinding) {
+      assert.deepEqual(actual, scope)
+      assert.deepEqual(current, pendingBinding)
+      allocations.push(current)
+      if (closed) throw new Error('agentExecutionClosed')
+      return binding.executionId
+    },
+  } })
+  const rpc: typeof productRpc = async <T>(_scope: EveScope, request: ProductOperation) => {
+    // The deployed app requires this ID and rechecks its running execution key.
+    assert.equal(request.executionId, binding.executionId)
+    requests.push(request)
+    return (request.operation === 'approval' ? { status: 'user-approval' } : { output: 'sent' }) as T
+  }
+  const tool = createProductTool(scope, pendingBinding, definition, rpc)
+  const readTool = createProductTool(scope, pendingBinding, { ...definition, needsApprovalReview: false }, rpc)
+  const context = { session: { id: binding.sessionId, turn: { id: binding.turnId }, auth: { current: scopeAuth(scope) } },
+    callId: 'call_lazy', toolInput: input, abortSignal: new AbortController().signal }
+  assert.equal(allocations.length, 0)
+  assert.equal(await (readTool.approval as ApprovalConfiguration<unknown>).request(context as never), 'not-applicable')
+  assert.equal(allocations.length, 0)
+  assert.equal(await readTool.execute!(input as never, context as never), 'sent')
+  assert.equal(await (tool.approval as ApprovalConfiguration<unknown>).request(context as never), 'user-approval')
+  // Eve may reconstruct the tool after its approval pause. Allocation uses the same business key.
+  const resumed = createProductTool(scope, pendingBinding, definition, rpc)
+  assert.equal(await resumed.execute!(input as never, { ...context, approval: { responder: scopeAuth(scope) } } as never), 'sent')
+  assert.equal(allocations.length, 3)
+  assert.deepEqual(requests.map(request => request.operation), ['execute', 'approval', 'execute'])
+  const aborted = new AbortController()
+  aborted.abort()
+  await assert.rejects(resumed.execute!(input as never, { ...context, abortSignal: aborted.signal } as never), { name: 'AbortError' })
+  assert.equal(allocations.length, 3)
+  closed = true
+  await assert.rejects(resumed.execute!(input as never, context as never), /agentExecutionClosed/)
+  assert.equal(requests.length, 3)
 })
