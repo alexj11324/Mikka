@@ -112,7 +112,7 @@ test('installed cache writes are main-only and a miss installs; hits do not inst
 })
 
 
-test('Eve Postgres deployment checks out the Eve publication source and other phases keep the application source', async () => {
+test('Eve migration and maintenance check out the Eve publication source and other phases keep the application source', async () => {
   const { mkdtemp, mkdir, writeFile, readFile, rm } = await import('node:fs/promises')
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
@@ -130,7 +130,7 @@ test('Eve Postgres deployment checks out the Eve publication source and other ph
       const child = spawnSync(process.execPath, ['--input-type=module'], { input: script, cwd: directory,
         env: { PATH: process.env.PATH, MIKKA_DEPLOYMENT_PHASE: phase, GITHUB_OUTPUT: output }, encoding: 'utf8' })
       assert.equal(child.status, 0, child.stderr)
-      assert.equal(await readFile(output, 'utf8'), 'source=' + (phase === 'production-eve-postgres' ? eve : application) + '\n')
+      assert.equal(await readFile(output, 'utf8'), 'source=' + (['production-eve-postgres', 'production-eve-maintenance'].includes(phase) ? eve : application) + '\n')
     }
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
