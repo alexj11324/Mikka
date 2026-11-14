@@ -1444,6 +1444,15 @@
       "sourceHash": "24bc15ef2265252770c47005cb51af35f2bee36bd481ae74d57acaf769e27106"
     },
     {
+      "path": "/mikka/api/me/joinable-organizations",
+      "template": "/api/me/joinable-organizations",
+      "source": "app/api/me/joinable-organizations/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "bfcda7d1450ff35013c1617c114ff5f92b6153f2ff419ee88f4f8166134144a0"
+    },
+    {
       "path": "/mikka/api/mobile/artifacts/[id]",
       "template": "/api/mobile/artifacts/[id]",
       "source": "app/api/mobile/artifacts/[id]/route.ts",
@@ -1708,6 +1717,25 @@
       "sourceHash": "b8fc718d704bb3843de16f2bf3824b720f1c25a215236ad993017bb87568724e"
     },
     {
+      "path": "/mikka/api/organizations/[organizationId]/allowed-domains",
+      "template": "/api/organizations/[organizationId]/allowed-domains",
+      "source": "app/api/organizations/[organizationId]/allowed-domains/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "sourceHash": "5e1799c50a5db7956cd39dddc37d24f51f5f843e26866f516789633359af6060"
+    },
+    {
+      "path": "/mikka/api/organizations/[organizationId]/allowed-domains/[domainId]",
+      "template": "/api/organizations/[organizationId]/allowed-domains/[domainId]",
+      "source": "app/api/organizations/[organizationId]/allowed-domains/[domainId]/route.ts",
+      "methods": [
+        "DELETE"
+      ],
+      "sourceHash": "f67e1622a442ce40975b266ab1d4b61953a7b3e559437b925c4523b732387f04"
+    },
+    {
       "path": "/mikka/api/organizations/[organizationId]/api-keys",
       "template": "/api/organizations/[organizationId]/api-keys",
       "source": "app/api/organizations/[organizationId]/api-keys/route.ts",
@@ -1775,6 +1803,15 @@
         "POST"
       ],
       "sourceHash": "295d403e4d2ee9839581a4cf0097db0fbde48fdfabaeeafbc97c7a266c4fe747"
+    },
+    {
+      "path": "/mikka/api/organizations/[organizationId]/join-by-domain",
+      "template": "/api/organizations/[organizationId]/join-by-domain",
+      "source": "app/api/organizations/[organizationId]/join-by-domain/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "bb106c0c4b667782813cebe47ec7f5e812e71d672bf9cf006c5dea201b072118"
     },
     {
       "path": "/mikka/api/organizations/[organizationId]/members",

@@ -6399,6 +6399,19 @@
     "renderHint": "请重试打开页面。"
   },
   "Organization": {
+    "domains": {
+      "discover": "可加入的组织",
+      "join": "加入",
+      "manage": "通过邮箱域名加入",
+      "hint": "允许已验证工作邮箱的域名后，使用同一域名的人可以加入组织，成为普通成员。",
+      "domain": "邮箱域名",
+      "add": "允许域名",
+      "remove": "移除 {domain}",
+      "empty": "暂未允许任何域名",
+      "joined": "已加入{name}",
+      "added": "已允许 {domain}",
+      "removed": "已移除 {domain}。现有成员保留组织成员身份。"
+    },
     "serviceKeys": {
       "title": "组织服务密钥",
       "empty": "你管理的工作区中暂无绑定此组织的服务密钥。",
@@ -7495,10 +7508,17 @@
     "history": "版本历史",
     "currentVersion": "当前版本",
     "version": "版本 {seq} · {count} 个文件 · {date}",
+    "fileHistoryAction": "文件版本历史",
+    "chooseFile": "选择文件",
+    "fileHistory": "{name} 的版本历史",
+    "fileVersion": "版本 {seq} · {date}",
+    "fileDeleted": "已删除",
+    "downloadVersion": "下载版本 {seq}",
+    "fileHistoryEmpty": "此文件暂无版本记录。",
     "moreVersions": "更多版本",
     "moreFolders": "更多文件夹",
     "restore": "恢复版本",
-    "restoreTitle": "恢复此版本？",
+    "restoreTitle": "将整个文件夹恢复到此版本？",
     "replace": "替换文件",
     "replaceTitle": "替换同名文件？",
     "conflict": "文件已更新，请查看最新版本后重试。",

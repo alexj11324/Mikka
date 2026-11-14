@@ -218,7 +218,7 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
     const listIds = async (path: string) => (await (await call(path)).json()).volumes.map((v: { id: string }) => v.id)
     assert.ok(!(await listIds('')).includes(volume.id))
     assert.deepEqual(await listIds('?archived=true'), [volume.id])
-    for (const suffix of ['', '/versions', `/versions/${first.headVersionId}`, '/files?path=notes%2Fresult.txt']) {
+    for (const suffix of ['', '/versions', '/versions?path=notes%2Fresult.txt', `/versions/${first.headVersionId}`, '/files?path=notes%2Fresult.txt']) {
       assert.equal((await call(`/${volume.id}${suffix}`)).status, 404)
     }
     assert.equal((await call(`/${volume.id}/entries`, { method: 'PATCH', body: writeA })).status, 404)
@@ -236,6 +236,32 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
     assert.equal(oldFile.status, 200)
     assert.equal(await oldFile.text(), 'first file bytes')
   })
+
+  const edits = await call(`/${volume.id}/entries`, { method: 'PATCH', body: {
+    expectedDigest: restoredBody.headDigest, mutationId: randomUUID(),
+    changes: [{ op: 'put', path: 'unrelated.txt', mode: 0o644, ...blobA }],
+  } })
+  assert.equal(edits.status, 200)
+  const unrelated = await edits.json()
+  const deletion = await call(`/${volume.id}/entries`, { method: 'PATCH', body: {
+    expectedDigest: unrelated.headDigest, mutationId: randomUUID(), changes: [{ op: 'delete', path: 'notes/result.txt' }],
+  } })
+  assert.equal(deletion.status, 200)
+  const fileHistory = `/${volume.id}/versions?path=notes%2Fresult.txt`
+  const firstChanges = await (await call(fileHistory + '&limit=2')).json()
+  assert.deepEqual(firstChanges.versions.map((v: { seq: number }) => v.seq), [6, 4],
+    'single-file history records a deletion and restore while excluding an unrelated edit')
+  assert.equal(firstChanges.versions[0].file, null)
+  assert.deepEqual(firstChanges.versions[1].file, current.head.entries[0])
+  const earlierChanges = await (await call(fileHistory + '&limit=2&before=' + firstChanges.nextCursor)).json()
+  assert.deepEqual(earlierChanges.versions.map((v: { seq: number }) => v.seq), [3, 2])
+  assert.equal(earlierChanges.versions[0].file.sha256, blobB.sha256)
+  assert.equal(earlierChanges.nextCursor, null)
+  assert.deepEqual(await (await call(`/${volume.id}/versions?path=missing.txt`)).json(), { versions: [], nextCursor: null })
+  assert.equal((await call(`/${volume.id}/versions?path=`)).status, 400)
+  assert.equal((await call(fileHistory, { token: null })).status, 401)
+  assert.equal((await call(fileHistory, { token: sharedToken, workspaceId: team.id })).status, 404)
+  assert.equal((await call(fileHistory, { token: peerToken, workspaceId: team.id })).status, 404)
   await fixture.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [team.id, owner])
   assert.equal((await call(`/${otherVolume.id}`, { token: sharedToken, workspaceId: team.id })).status, 401)
   await fixture.query(`UPDATE personal_access_tokens SET "revokedAt"=now() WHERE "userId"=$1`, [owner])
