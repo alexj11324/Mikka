@@ -206,6 +206,40 @@ test('mobile task endpoints with real task ACL, current workspace membership and
       await pool.query('DELETE FROM agent_runs WHERE id=$1', [idle])
     }
   })
+  await t.test('the native Bot detail ranks eight of fifty conversations, distinguishes overflow and enforces the workspace and owner', async () => {
+    const { GET: directory } = await import('../app/api/mobile/conversations/route')
+    const childBot = await seedBot(pool, teamWorkspace.id, owner)
+    const ids = Array.from({ length: 50 }, () => randomUUID())
+    await pool.query(`INSERT INTO agent_runs(id,"userId","workspaceId","agentId","botId",status,title,"titleSource","createdAt","updatedAt","conversationPinnedAt","conversationArchivedAt")
+      SELECT id,$2,$3,$4,$5,CASE n WHEN 7 THEN 'waiting_input' WHEN 3 THEN 'running' ELSE 'succeeded' END,
+        'Bot conversation '||n,'manual',now()-n*interval '1 hour',now()-n*interval '1 hour',
+        CASE WHEN n=48 THEN now() END,CASE WHEN n=1 THEN now() END
+      FROM unnest($1::uuid[]) WITH ORDINALITY input(id,n)`, [ids, owner, teamWorkspace.id, agent, childBot])
+    const read = (options?: ReadOptions, id = childBot) => run('/api/mobile/conversations?' + new URLSearchParams({
+      view: 'botChildren', workspaceId: teamWorkspace.id, botId: id,
+    }), directory, { workspaceId: teamWorkspace.id, ...options })
+    try {
+      const response = await read()
+      assert.equal(response.status, 200)
+      const group = await response.json()
+      assert.equal(group.workspaceId, teamWorkspace.id)
+      assert.equal(group.botId, childBot)
+      assert.equal(group.more, true)
+      assert.deepEqual(group.items.map((row: { id: string }) => row.id), [47, 6, 2, 1, 3, 4, 5, 7].map(index => ids[index]))
+      assert.deepEqual((await (await read({ bearer: peer.token })).json()).items, [])
+      assert.deepEqual((await (await read({}, secondBot)).json()).items, [])
+      assert.equal((await read({ workspaceId: secondWorkspace.id })).status, 403)
+      assert.equal((await read({ bearer: null })).status, 401)
+      assert.equal((await read({}, 'invalid')).status, 422)
+      await pool.query('UPDATE agent_runs SET "conversationArchivedAt"=now() WHERE id=ANY($1::uuid[])', [ids.slice(3)])
+      const remainder = await (await read()).json()
+      assert.equal(remainder.more, false)
+      assert.deepEqual(remainder.items.map((row: { id: string }) => row.id), [ids[2], ids[1]])
+    } finally {
+      await pool.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[])', [ids])
+      await pool.query('DELETE FROM bots WHERE id=$1', [childBot])
+    }
+  })
   await t.test('the native PR directory filters canonical publications with the requested workspace and authenticated reader', async () => {
     const { GET: directory } = await import('../app/api/mobile/conversations/route')
     const read = (space: string, filter: string, options?: ReadOptions) =>

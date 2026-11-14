@@ -155,12 +155,14 @@ async function directoryPage(database: RunChainQueryable, userId: string, worksp
 }
 
 /** A single bounded result per visible Bot, independent of thread-list paging. */
-export async function conversationSidebar(database: RunChainQueryable, reader: ConversationReader, workspaceId: string) {
+export async function conversationSidebar(database: RunChainQueryable, reader: ConversationReader, workspaceId: string, botId?: string) {
   const { userId } = taskReaderScope(reader)
-  return await withConversationWorkspace(reader, workspaceId, () => sidebarRows(database, userId, workspaceId)) ?? {}
+  return await withConversationWorkspace(reader, workspaceId, () => sidebarRows(database, userId, workspaceId, botId)) ?? {}
 }
 
-async function sidebarRows(database: RunChainQueryable, userId: string, workspaceId: string) {
+async function sidebarRows(database: RunChainQueryable, userId: string, workspaceId: string, botId?: string) {
+  const values = [...facts.params, userId, workspaceId, RUN_CHAIN_MAX_DEPTH]
+  const botFilter = botId ? `AND "botId"=$${values.push(botId)}::uuid` : ''
   const statement = conversationQuery() + `, bot_rows AS (
     SELECT kind,pulls,unread,id,title,"agentName",harness,"issueId",identifier,"taskTitle",status,"runStatus",pinned,touched,source,asked,state,at,archived,"botId" FROM visible
     UNION ALL
@@ -170,9 +172,9 @@ async function sidebarRows(database: RunChainQueryable, userId: string, workspac
     SELECT *,row_number() OVER (PARTITION BY "botId" ORDER BY pinned DESC,
       CASE WHEN state IN ('waiting','failed') THEN 0 WHEN state='working' THEN 1 WHEN status IN ('done','canceled','duplicate') OR "runStatus" IN ('succeeded','failed','stopped','cancelled','canceled') THEN 3 ELSE 2 END,
       touched DESC,id DESC)::integer AS position
-    FROM bot_rows WHERE NOT archived AND "botId" IS NOT NULL AND source IS DISTINCT FROM 'mcp'
+    FROM bot_rows WHERE NOT archived AND "botId" IS NOT NULL AND source IS DISTINCT FROM 'mcp' ${botFilter}
   ) SELECT * FROM ranked WHERE position<=9 ORDER BY "botId",position`
-  const rows = (await database.query(statement,[...facts.params,userId,workspaceId,RUN_CHAIN_MAX_DEPTH])).rows as Row[]
+  const rows = (await database.query(statement, values)).rows as Row[]
   const bots: Record<string,{ items: (ReturnType<typeof item> & {harness:string | null; status:string | null})[]; more:boolean }> = {}
   for (const row of rows) {
     const group = bots[row.botId!] ??= {items:[],more:false}

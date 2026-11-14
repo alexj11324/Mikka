@@ -13,6 +13,8 @@ const items: Item[] = [{ id: runId, kind: 'run', title: 'Run conversation' }, { 
 const navigation: string[] = []
 const requested: string[] = []
 let view: string | undefined
+let linked: { workspaceId?: string; botId?: string } = {}
+let botChildren: { botId: string; workspaceId: string; items: Item[]; more: boolean } | null = null
 const writes: unknown[] = []
 let archiveDays: number | undefined = 30
 let archivePending = false
@@ -20,7 +22,7 @@ let settingReads = 0
 const reloadSettings = () => { settingReads++ }
 const none = () => null
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL('../' + path, import.meta.url).href, { namedExports })
-mock.module('expo-router', { namedExports: { useRouter: () => ({ push: (path: string) => navigation.push(path) }), useLocalSearchParams: () => ({ view }), useFocusEffect: (read: () => void) => useEffect(read, [read]) } })
+mock.module('expo-router', { namedExports: { useRouter: () => ({ push: (path: string) => navigation.push(path) }), useLocalSearchParams: () => ({ view, ...linked }), useFocusEffect: (read: () => void) => useEffect(read, [read]) } })
 mock.module('react-native', { namedExports: {
   StyleSheet: { create: (styles: unknown) => styles }, View: 'div', RefreshControl: none, Linking: { openURL: (url: string) => navigation.push(url) },
   FlatList: ({ data, renderItem, ListHeaderComponent }: { data: { key: string; conversation?: Item; pull?: { title: string } }[]; renderItem: (props: { item: unknown }) => ReactNode; ListHeaderComponent: ReactNode }) =>
@@ -49,10 +51,50 @@ stub('lib/api-cache.ts', { apiCache: {} })
 stub('lib/home.tsx', { useHome: () => ({ data: { workspace: { id: 'workspace' } } }) })
 stub('lib/live.ts', { listRef: none })
 stub('lib/theme.ts', { colors: {}, LIST_INSET: 0 })
-stub('lib/useApi.ts', { useRefresh: () => ({}), useLiveApi: (path: string) => { requested.push(path); return { data: { items, workspaceId: 'workspace' }, reload: none } } })
+stub('lib/useApi.ts', { useRefresh: () => ({}), useLiveApi: (path: string) => { requested.push(path); return { data: path?.includes('view=botChildren') ? botChildren : { items, workspaceId: 'workspace' }, reload: none } } })
 stub('../../lib/hooks/use-task-continuation.ts', { useTaskContinuation: (items: Item[]) => ({ items, hasMore: false }) })
 const { default: ArchivePreferences } = await import('../app/(tabs)/settings/conversations.tsx')
 const { default: Conversations } = await import('../app/conversations.tsx')
+
+test('the mounted Bot detail opens its ranked eight conversations and carries the Bot and workspace into View all', async () => {
+  const { BotConversations } = await import('../features/chat/components/bot-conversations.tsx')
+  const browser = new Window()
+  Object.assign(globalThis, { window: browser, document: browser.document, IS_REACT_ACT_ENVIRONMENT: true })
+  const { createRoot } = await import('react-dom/client')
+  const host = document.createElement('div')
+  const root = createRoot(host)
+  const props = { botId: '30000000-0000-4000-8000-000000000003', workspaceId: 'workspace' }
+  const ranked = Array.from({ length: 8 }, (_, i) => ({ ...items[i % 2]!, id: `${i}`, title: `Rank ${i + 1}`, unread: i === 0 }))
+  const links = () => [...host.querySelectorAll('a')]
+  try {
+    botChildren = { ...props, items: ranked, more: true }
+    await act(async () => root.render(createElement(BotConversations, props)))
+    assert.equal(new URL(requested.at(-1)!, 'http://localhost').searchParams.get('view'), 'botChildren')
+    assert.equal(links().length, 9)
+    for (const [i, item] of ranked.entries()) assert.ok(links()[i]!.textContent?.includes(item.title))
+    assert.ok(links()[0]!.textContent?.includes(mobileMessages.ConversationDirectory.unread))
+    for (const index of [0, 1, 8]) await act(async () => links()[index]!.click())
+    assert.deepEqual(navigation.splice(0), ['/thread/0', '/groups/1', { pathname: '/conversations', params: props }])
+    linked = props
+    await act(async () => root.render(createElement(Conversations)))
+    const query = new URL(requested.at(-1)!, 'http://localhost').searchParams
+    assert.equal(query.get('botId'), props.botId)
+    assert.equal(query.get('workspaceId'), props.workspaceId)
+    linked = { ...props, workspaceId: 'another-workspace' }
+    await act(async () => root.render(createElement(Conversations)))
+    assert.equal(new URL(requested.at(-1)!, 'http://localhost').searchParams.get('workspaceId'), linked.workspaceId)
+    assert.equal(host.querySelectorAll('section').length, 0, 'never display another workspace’s cached rows on this link')
+    botChildren = { ...props, items: ranked.slice(0, 1), more: false }
+    await act(async () => root.render(createElement(BotConversations, props)))
+    assert.equal(links().length, 1)
+    await act(async () => root.render(createElement(BotConversations, { ...props, botId: 'other' })))
+    assert.equal(links().length, 0, 'a previous Bot’s cached rows disappear on a scope change')
+  } finally {
+    await act(async () => root.unmount())
+    linked = {}; botChildren = null; navigation.length = 0
+    await browser.happyDOM.close()
+  }
+})
 
 test('the native directory marks each conversation kind and all rows using their own write receipts', async () => {
   const labels = mobileMessages.ConversationDirectory
