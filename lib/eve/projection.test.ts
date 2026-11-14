@@ -26,6 +26,35 @@ test('completed native calls retain results and dispatched thread cards after hi
   assert.match(history[0].activity?.tools[0].output ?? '',new RegExp(runId))
 })
 
+test('turn projection lists its native tools once across a long session',async t=>{
+  const eve = await import('eve/events')
+  let listed = 0, observed = 0
+  t.mock.module('eve/events',{namedExports:{...eve,calls:(...args:Parameters<typeof eve.calls>)=>{
+    listed++
+    const result = eve.calls(...args)
+    observed += result.length
+    return result
+  }}})
+  const {projectEveTurn:project}:typeof import('./projection') = await import(new URL('./projection.ts?profile=turn-calls',import.meta.url).href)
+  const facts = []
+  for (const turnId of ['previous','current']) {
+    facts.push({type:'turn.started',data:{turnId,cause:{deliveryId:'delivery_'+turnId},follows:null}})
+    for(let i=0;i<64;i++) {
+      const callId = turnId+'_'+i
+      facts.push({type:'call.requested',scope:{turnId},data:{callId,owner:{turnId},capability:{kind:'tool',name:'list_issues'},input:{page:i}}})
+      if (i<63) facts.push({type:'call.settled',scope:{turnId},data:{callId,outcome:'completed',output:i}})
+    }
+  }
+  const view = foldEvents(emptySessionView(),facts.map((fact,line)=>({...fact,meta:{position:{line,index:0},at:'2026-11-11T00:00:00Z',endOfLine:true}})) as ReceivedEvent[])
+  const result = project(view,'wrun_fixture','current','completed')
+  const requested = Array.from({length:64},(_,i)=>({type:'tool-call',toolCallId:'current_'+i,toolName:'list_issues',input:{page:i}}))
+  const completed = Array.from({length:63},(_,i)=>({type:'tool-result',toolCallId:'current_'+i,toolName:'list_issues',output:{type:'json',value:i}}))
+  assert.deepEqual(result[0].content,requested)
+  assert.deepEqual(result[1].content,completed)
+  t.diagnostic(`Eve calls queries: ${listed}, matching call observations returned: ${observed}`)
+  assert.equal(listed,1)
+})
+
 test('native failed outcomes preserve a closed provider code without publishing raw errors',()=>{
   const view=foldEvents(emptySessionView(),[
     {type:'turn.started',data:{turnId:'turn_failed',cause:{deliveryId:'delivery_failed'},follows:null},meta:{position:{line:0,index:0},at:'2026-11-11T00:00:00Z',endOfLine:true}},
