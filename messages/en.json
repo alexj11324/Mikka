@@ -4378,6 +4378,14 @@
     "copyFailed": "Couldn't copy"
   },
   "IssueThreads": {
+    "organization": {
+      "archive": "Archive conversation",
+      "unarchive": "Unarchive conversation",
+      "pin": "Pin conversation",
+      "unpin": "Unpin conversation",
+      "unavailable": "This conversation is no longer available.",
+      "failed": "Could not save the conversation change."
+    },
     "title": "Threads",
     "modelSwitched": "Switched to",
     "agent": "Bot",

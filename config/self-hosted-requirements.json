@@ -1513,5 +1513,19 @@
     "behavior": "After a successful run claim commits, advance its task within the installation database.",
     "test": "tests/task-status-advance.db.test.ts",
     "suite": "test:run-publication-db"
+  },
+  "lib/conversation-organization.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read and write pin and archive state on the conversation root inside the selected workspace and existing owner boundary. No external services are required.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "drizzle/20261113165356_conversation_organization.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Add two nullable PostgreSQL timestamps for pinning and archiving. Earlier application revisions can leave both columns in place.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
   }
 }

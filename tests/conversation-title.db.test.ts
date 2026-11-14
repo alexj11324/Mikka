@@ -6,6 +6,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { orderMigrations } from '../scripts/migration-order.mjs'
 import { dropTestDatabase } from './support/drop-test-database'
+import { conversationOrganization } from '../lib/conversation-organization'
 import { nameConversation, renameConversationTitle } from '../lib/conversation-title-server'
 
 const base = process.env.E2E_DATABASE_URL
@@ -95,9 +96,9 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     assert.deepEqual([await stored(first), await stored(second)], [{ title: '登录前缀保留', titleSource: 'generated' }, { title: '登录前缀保留', titleSource: 'generated' }], 'every run of the chain carries it')
 
     // A manual rename is the title: bounded, on every run, and no trigger overwrites it.
-    assert.equal(await renameConversationTitle(pool, first, 'other', '越权改名'), null)
-    assert.equal(await renameConversationTitle(pool, first, 'owner', '   '), null)
-    assert.equal(await renameConversationTitle(pool, first, 'owner', '  我自己起的名字，特别特别特别长  '), '我自己起的名字，特别特别')
+    assert.equal(await renameConversationTitle(pool, first, 'other', '越权改名', workspaceId), null)
+    assert.equal(await renameConversationTitle(pool, first, 'owner', '   ', workspaceId), null)
+    assert.equal(await renameConversationTitle(pool, first, 'owner', '  我自己起的名字，特别特别特别长  ', workspaceId), '我自己起的名字，特别特别')
     assert.deepEqual([await stored(first), await stored(second)], Array(2).fill({ title: '我自己起的名字，特别特别', titleSource: 'manual' }))
     const quiet = calls.length
     for (const trigger of ['created', 'first_run_ended', 'pull_opened'] as const) assert.equal(await nameConversation(pool, second, 'owner', trigger, model('模型的名字')), null, trigger)
@@ -108,8 +109,25 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     assert.deepEqual(await stored(third), { title: '我自己起的名字，特别特别', titleSource: 'manual' })
     // A rename that lands while the model is answering is kept: the write checks again.
     const racing = await run({ prompt: '导出账单 CSV' })
-    assert.equal(await nameConversation(pool, racing, 'owner', 'created', async () => { await renameConversationTitle(pool, racing, 'owner', '账单导出'); return '模型晚到的名字' }), null)
+    assert.equal(await nameConversation(pool, racing, 'owner', 'created', async () => { await renameConversationTitle(pool, racing, 'owner', '账单导出', workspaceId); return '模型晚到的名字' }), null)
     assert.deepEqual(await stored(racing), { title: '账单导出', titleSource: 'manual' })
+
+    const foreignWorkspace = randomUUID()
+    assert.equal(await renameConversationTitle(pool, first, 'owner', 'different workspace', foreignWorkspace), null)
+    const organize = (id: string, field: 'archived' | 'pinned', value: boolean) =>
+      conversationOrganization(pool, 'owner', workspaceId, id, { field, value })
+    assert.deepEqual(await organize(second, 'pinned', true), { archived: false, pinned: true })
+    const originalPin = (await pool.query('SELECT "conversationPinnedAt" FROM agent_runs WHERE id=$1', [first])).rows[0]
+    await organize(first, 'pinned', true)
+    assert.deepEqual((await pool.query('SELECT "conversationPinnedAt" FROM agent_runs WHERE id=$1', [first])).rows[0], originalPin)
+    assert.deepEqual(await organize(first, 'archived', true), { archived: true, pinned: true })
+    assert.deepEqual(await conversationOrganization(pool, 'owner', workspaceId, third), { archived: true, pinned: true })
+    for (const [actor, space] of [['other', workspaceId], ['owner', foreignWorkspace]]) {
+      assert.equal(await conversationOrganization(pool, actor, space, first), null)
+      assert.equal(await conversationOrganization(pool, actor, space, first, { field: 'pinned', value: false }), null)
+    }
+    assert.deepEqual(await organize(third, 'archived', false), { archived: false, pinned: true })
+    assert.deepEqual(await organize(second, 'pinned', false), { archived: false, pinned: false })
 
     // Regenerate is the person asking for a generated title again.
     assert.equal(await nameConversation(pool, first, 'owner', 'regenerate', model('登录回调与前缀')), '登录回调与前缀')

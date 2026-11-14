@@ -42,6 +42,13 @@ after(() => {
     if (value === undefined) delete process.env[name]; else process.env[name] = value
 })
 
+test('a task without its persisted workspace does not call a title provider', async () => {
+  task = { ...task!, workspaceId: null }
+  await writeShortTitle('task', 'owner')
+  assert.deepEqual(models, [])
+  assert.deepEqual(writes, [])
+})
+
 test('a new task gets one short title, written with the title it came from, and the title change is pushed', async () => {
   await writeShortTitle('task', 'owner')
   assert.deepEqual(models, ['deepseek/deepseek-v4.1-flash'], 'the default model, which picks ZeroCat or its Gateway fallback')
