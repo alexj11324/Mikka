@@ -17,11 +17,13 @@ const event = (id, text, patch = {}) => ({
   event: { type: 'message', channel: 'C123', channel_type: 'channel', user: 'U456', text,
     ts: `1700000000.00000${id}`, ...patch },
 })
-function signed(payload) {
-  const body = JSON.stringify(payload), timestamp = String(Math.floor(Date.now() / 1000))
+function signed(payload, interaction = false) {
+  const json = JSON.stringify(payload)
+  const body = interaction ? new URLSearchParams({ payload: json }).toString() : json
+  const timestamp = String(Math.floor(Date.now() / 1000))
   const signature = 'v0=' + createHmac('sha256', env.SLACK_SIGNING_SECRET).update(`v0:${timestamp}:${body}`).digest('hex')
   return new Request('http://localhost/eve/v1/slack', { method: 'POST', body, headers: {
-    'content-type': 'application/json', 'x-slack-request-timestamp': timestamp, 'x-slack-signature': signature,
+    'content-type': interaction ? 'application/x-www-form-urlencoded' : 'application/json', 'x-slack-request-timestamp': timestamp, 'x-slack-signature': signature,
   } })
 }
 function harness({ respond = false, failure = false, channelEnv = env } = {}) {
@@ -54,8 +56,8 @@ function harness({ respond = false, failure = false, channelEnv = env } = {}) {
     resolveSession: async () => undefined,
     waitUntil: task => tasks.push(task), params: {}, requestIp: '127.0.0.1',
   }
-  return { sends, classifications, scopes, api, addresses, async post(payload) {
-    const response = await route.handler(signed(payload), args)
+  return { sends, classifications, scopes, api, addresses, async post(payload, interaction = false) {
+    const response = await route.handler(signed(payload, interaction), args)
     await Promise.all(tasks.splice(0))
     return response
   }, route, args }
@@ -151,11 +153,11 @@ test('signed interactions require the current installation and workspace member'
   const modal = { ...callback, type: 'view_submission', channel: undefined, view: { private_metadata: JSON.stringify({ channelId: 'C123' }) } }
   for (const payload of [callback, modal]) {
     const allowed = harness()
-    await allowed.post(payload)
+    await allowed.post(payload, true)
     assert.deepEqual(allowed.scopes, [['owner-a', workspaceId]])
     for (const patch of [{ user: { id: 'U999' } }, { team: { id: 'T999' } }]) {
       const denied = harness()
-      assert.equal((await denied.post({ ...payload, ...patch })).status, 204)
+      assert.equal((await denied.post({ ...payload, ...patch }, true)).status, 204)
       assert.deepEqual([denied.scopes, denied.sends, denied.api], [[], [], []])
     }
   }
