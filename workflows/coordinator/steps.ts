@@ -1,4 +1,3 @@
-import { composeEveInstructions } from '@/lib/coordinator/product-instructions'
 import { AgentProfileError, builtinAgentProfileSelection } from '@/lib/factory/agent-profile-definition'
 import { AgentProfileAdmissionError } from '@/lib/factory/profile-admission'
 import { queueTaskRun } from '@/lib/factory/queue-local'
@@ -103,6 +102,7 @@ export async function prepareEveInstructions(userId: string, botId: string, snap
     const { factoryRuntimeForBot } = await import('@/lib/factory/runtime')
     await factoryRuntimeForBot(botId).reconcile(userId)
   }
+  const { composeEveInstructions } = await import('@/lib/coordinator/product-instructions')
   return composeEveInstructions(userId, botId, snapshot, nativeTurn)
 }
 
