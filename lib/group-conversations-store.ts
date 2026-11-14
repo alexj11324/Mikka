@@ -1,6 +1,7 @@
 import { ChatFileError } from '@/lib/chat-attachments/extract'
 import { splitChatFiles } from '@mikka/protocol/chat-attachments'
 import { isDeepStrictEqual } from 'node:util'
+import { acknowledgeGroupReads } from './group-read-receipts'
 import { groupSubmissionMessageId } from './group-submission'
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
@@ -14,7 +15,7 @@ const member = z.object({ memberType: z.enum(['user', 'agent', 'bot']), memberId
 const create = z.object({ workspaceId: z.uuid(), title: z.string().trim().min(1).max(200), members: z.array(member).max(100).default([]), leadAgentId: z.uuid().nullable().optional(), leadBotId: z.uuid().nullable().optional() }).strict().refine(input => !input.leadAgentId || !input.leadBotId)
 const configure = z.union([z.object({ leadAgentId: z.uuid().nullable() }).strict(), z.object({ leadBotId: z.uuid().nullable() }).strict()])
 const message = z.object({ requestId: z.uuid().optional(), expectedOwnerId: z.string().min(1).max(256).optional(), expectedWorkspaceId: z.uuid().optional(), body: z.string().trim().min(1).max(32000), mentions: z.array(member).max(100).default([]), replyToId: z.uuid().nullable().optional() }).strict()
-const read = z.object({ messageId: z.string().min(1).max(64) }).strict()
+const read = z.object({ messageId: z.string().min(1).max(64).nullable(), readRevision: z.number().int().min(0).max(2147483647).optional() }).strict()
 export type Member = z.infer<typeof member>
 export type Directory = (workspaceId: string, userId: string, members: Member[]) => Promise<boolean>
 export type GroupRequest = { userId: string | null; method: 'GET' | 'POST' | 'DELETE' | 'PATCH'; resource: 'conversations' | 'messages' | 'members' | 'read' | 'links' | 'stop'; id?: string; origin: string | null; host: string; body?: string; before?: string | null; after?: string | null; limit?: string | null; workspaceId?: string | null }
@@ -114,19 +115,21 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
       } else if (req.resource === 'read' && ['GET', 'POST'].includes(req.method)) {
         if (req.method === 'POST') {
           const input = parse(read, req.body)
-          const byId = z.uuid().safeParse(input.messageId).success
-          const value = byId ? input.messageId : decimal(input.messageId, '')
-          const { rows: messages } = await q(`SELECT id,position FROM conversation_messages WHERE "conversationId"=$1 AND ${byId ? 'id=$2::uuid' : 'position=$2::bigint'}`, [req.id, value])
-          const selected = messages[0]
-          if (!selected || BigInt(selected.position) > BigInt(2147483647)) return fail(422)
-          const advanced = await q(`INSERT INTO conversation_reads AS r ("userId","conversationId","lastReadPosition","lastReadMessageId","updatedAt") VALUES ($1,$2,$3,$4,now())
-            ON CONFLICT ("userId","conversationId") DO UPDATE SET
-              "lastReadPosition"=GREATEST(r."lastReadPosition",EXCLUDED."lastReadPosition"),
-              "lastReadMessageId"=CASE WHEN EXCLUDED."lastReadPosition">r."lastReadPosition" THEN EXCLUDED."lastReadMessageId" ELSE r."lastReadMessageId" END,
-              "updatedAt"=CASE WHEN EXCLUDED."lastReadPosition">r."lastReadPosition" THEN EXCLUDED."updatedAt" ELSE r."updatedAt" END
-            WHERE EXCLUDED."lastReadPosition">r."lastReadPosition" RETURNING "conversationId"`, [userId, req.id, selected.position, selected.id])
-          const cleared = await q('UPDATE chat_preferences SET "markedUnread"=false, "updatedAt"=now() WHERE "userId"=$1 AND "chatKey"=$2 AND "markedUnread"', [userId, req.id])
-          if (advanced.rowCount || cleared.rowCount) await groupListReadChanged(client, group.id, userId)
+          let messageId: string | null = null
+          const named = group.creationPurpose === 'conversation'
+          if (input.messageId === null) {
+            if (!named || input.readRevision === undefined ||
+              (await q('SELECT 1 FROM conversation_messages WHERE "conversationId"=$1 LIMIT 1', [group.id])).rowCount) return fail(422)
+          } else {
+            const byId = z.uuid().safeParse(input.messageId).success
+            const value = byId ? input.messageId : decimal(input.messageId, '')
+            const { rows: [selected] } = await q(`SELECT id,position FROM conversation_messages WHERE "conversationId"=$1 AND ${byId ? 'id=$2::uuid' : 'position=$2::bigint'}`, [req.id, value])
+            if (!selected || BigInt(selected.position) > BigInt(2147483647)) return fail(422)
+            messageId = selected.id
+          }
+          if (await acknowledgeGroupReads(client, userId, [group.id], { messageId, revision: named ? input.readRevision ?? 0 : undefined })) {
+            await groupListReadChanged(client, group.id, userId)
+          }
         }
         const { rows: [state] } = await q(`SELECT "lastReadPosition","lastReadMessageId" FROM conversation_reads WHERE "userId"=$1 AND "conversationId"=$2`, [userId, req.id])
         const { rows: [unread] } = await q(`SELECT count(*)::text AS n FROM conversation_messages WHERE "conversationId"=$1 AND position>$2 AND NOT ("authorType"='user' AND "authorId"=$3)`, [req.id, state?.lastReadPosition ?? 0, userId])
@@ -157,6 +160,9 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         if (limit > 100) return fail(422)
         // The newest page carries the group key's revision, read before the page itself.
         // Best effort, in a savepoint: a missing revision only means the next push reads.
+        const readRevision = before == null && group.creationPurpose === 'conversation'
+          ? Number((await q('SELECT "unreadRevision" FROM conversation_reads WHERE "conversationId"=$1 AND "userId"=$2', [group.id,userId])).rows[0]?.unreadRevision ?? 0)
+          : undefined
         let revision = 0
         if (before == null) {
           await q('SAVEPOINT live_revision')
@@ -197,6 +203,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         const active = queueAgents ? await q(`SELECT "agentId","botId",status,"updatedAt" FROM group_turns WHERE "conversationId"=$1 AND status IN ('queued','running') ORDER BY "createdAt" LIMIT 1`, [req.id]) : { rows: [] }
         const failed = queueAgents ? await q(`SELECT error FROM group_turns WHERE "conversationId"=$1 ORDER BY "createdAt" DESC,"messageId" DESC LIMIT 1`, [req.id]) : { rows: [] }
         result = { messages, timeline, nextBefore: more ? messages.at(-1)?.position : null, agentStatus: active.rows[0] ?? null,
+          ...(readRevision !== undefined ? { readRevision } : {}),
           ...(idle ? { unchanged: true } : {}),
           ...(appended ? { appended: true } : {}),
           ...(revision > 0 ? { revision } : {}),

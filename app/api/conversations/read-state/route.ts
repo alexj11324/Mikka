@@ -3,8 +3,9 @@ import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@
 import { effectiveRequestWorkspace } from '@/lib/request-workspace'
 import { changeThreadRead } from '@/lib/thread-reads'
 
-const change = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('unread'), runId: z.uuid() }),
+const change = z.union([
+  z.strictObject({ action: z.literal('unread'), runId: z.uuid() }),
+  z.strictObject({ action: z.literal('unread'), chatId: z.uuid() }),
   z.object({ action: z.literal('read'), runId: z.uuid(), through: z.iso.datetime().nullable(), revision: z.number().int().nonnegative() }),
   z.object({ action: z.literal('readAll') }),
 ])

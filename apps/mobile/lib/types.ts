@@ -121,6 +121,7 @@ export interface GroupMember { id: string; name: string; memberType: 'user' | 'a
 
 /** GET /api/conversations/<id>/messages: newest first. */
 export interface GroupPage {
+  readRevision?: number
   messages: GroupMessage[]
   nextBefore: string | null
   agentStatus: { agentId: string | null; botId: string | null; status: string } | null

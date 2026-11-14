@@ -15,6 +15,7 @@ const threadReadRevision = sql<number>`coalesce(${conversationReads.unreadRevisi
 
 export type ThreadReadChange =
   | { action: 'unread'; runId: string }
+  | { action: 'unread'; chatId: string }
   | { action: 'read'; runId: string; through: string | null; revision: number }
   | { action: 'readAll' }
 
@@ -39,6 +40,42 @@ export async function changeThreadRead(reader: IssueReader, workspaceId: string,
 }
 
 async function writeThreadRead(reader: IssueReader, workspaceId: string, change: ThreadReadChange) {
+  if (change.action !== 'readAll' && !('chatId' in change)) return writeRunRead(reader, workspaceId, change)
+  const { pool, withDatabaseClient } = await import('@/lib/db')
+  const userId = typeof reader === 'string' ? reader : reader.id
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const applied = await withDatabaseClient(client, async () => {
+      // Match the group writer's lock before observing any message or changing
+      // a mark. Stable order serializes overlapping bulk operations.
+      const { rows } = await client.query<{ id: string }>(`SELECT c.id FROM conversations c
+        JOIN conversation_members m ON m."conversationId"=c.id AND m."memberType"='user'
+          AND m."memberId"=$1 AND m."leftAt" IS NULL
+        WHERE c."workspaceId"=$2 AND c."createdBy"=$1 AND c.kind='group' AND c."creationPurpose"='conversation'
+          AND ($3::uuid IS NULL OR c.id=$3) ORDER BY c.id FOR UPDATE OF c FOR SHARE OF m`,
+      [userId, workspaceId, 'chatId' in change ? change.chatId : null])
+      if ('chatId' in change) {
+        if (!rows.length) return false
+        const { setGroupPreference } = await import('@/lib/chat-preferences')
+        return await setGroupPreference(userId, change.chatId, { markedUnread: true }) === 'ok'
+      }
+      if (!await writeRunRead(reader, workspaceId, change)) return false
+      const { acknowledgeGroupReads } = await import('./group-read-receipts')
+      if (await acknowledgeGroupReads(client, userId, rows.map(row => row.id))) {
+        await (await import('./live/lists')).threadReadChanged(client, userId, workspaceId, 'group_list')
+      }
+      return true
+    })
+    await client.query(applied ? 'COMMIT' : 'ROLLBACK')
+    return applied
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally { client.release() }
+}
+
+async function writeRunRead(reader: IssueReader, workspaceId: string, change: Exclude<ThreadReadChange, { chatId: string }>) {
   const { db, pool } = await import('@/lib/db')
   const userId = typeof reader === 'string' ? reader : reader.id
   const { issueVisibility } = await import('@/lib/issue-visibility')
