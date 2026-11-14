@@ -55,14 +55,23 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
     const foreignWorkspace = await insert(1,owner,botId,'workspace',randomUUID(),sameTime)
     const fixtures = [...shared,...oldest,...own,...privateMember,...coordinatorOnly,...foreignWorkspace]
     t.after(async () => { await pool.query('DELETE FROM user_schedules WHERE id=ANY($1::uuid[])',[fixtures]) })
-    const list = async (who: Actor, input: {limit?: number; cursor?: string} = {}) => {
+    const list = async (who: Actor, input: {limit?: number; cursor?: string; scheduleId?: string} = {}) => {
       const tools = scheduleTools(command => store().command(who,command))
-      return await tools.schedule_list.execute!(scheduleListInput.parse(input),{toolCallId:randomUUID(),messages:[],context:{}}) as {schedules: {id:string}[]; nextCursor: string | null}
+      return await tools.schedule_list.execute!(scheduleListInput.parse(input),{toolCallId:randomUUID(),messages:[],context:{}}) as {schedules: {id:string; definition: Definition}[]; nextCursor: string | null}
     }
     const first = await list(actor)
     assert.equal(first.schedules.length,100)
     assert.ok(first.nextCursor,'the first 100 rows return a continuation for the remaining visible schedules')
     assert.deepEqual(first.schedules.map(row => row.id),shared)
+    const one = await list(actor, { scheduleId: own[0] })
+    assert.deepEqual(one.schedules.map(row => row.id), own)
+    assert.deepEqual(one.schedules[0]?.definition, definition)
+    assert.equal(one.nextCursor, null)
+    assert.deepEqual((await list(memberActor, { scheduleId: shared[0] })).schedules.map(row => row.id), [shared[0]])
+    for (const hiddenId of [privateMember[0], coordinatorOnly[0], foreignWorkspace[0], randomUUID()]) {
+      assert.deepEqual(await list(actor, { scheduleId: hiddenId }), { schedules: [], nextCursor: null })
+    }
+    await assert.rejects(list({ ...actor, ownerId: other }, { scheduleId: shared[0] }), /scheduleWorkspaceAccessDenied/)
     const later = await list(actor,{cursor:first.nextCursor})
     assert.deepEqual(later.schedules.map(row => row.id),[...oldest,...own].sort().reverse())
     assert.equal(later.nextCursor,null)
@@ -76,7 +85,7 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
     assert.deepEqual(coordinator.schedules.map(row => row.id),[...oldest,...coordinatorOnly].sort().reverse())
     assert.ok(!first.schedules.some(row => foreignWorkspace.includes(row.id)))
     await assert.rejects(list({...actor,ownerId:other},{cursor:first.nextCursor}),/scheduleWorkspaceAccessDenied/)
-    for (const input of [{limit:0},{limit:101},{cursor:'invalid'}]) {
+    for (const input of [{limit:0},{limit:101},{cursor:'invalid'},{scheduleId:'invalid'}]) {
       assert.equal(scheduleListInput.safeParse(input).success,false)
       await assert.rejects(store().command(actor,{action:'list',...input}),/invalidScheduleCommand/)
     }
