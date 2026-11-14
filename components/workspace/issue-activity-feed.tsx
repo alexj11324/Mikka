@@ -13,8 +13,8 @@ import { activityTimeline, deriveIssueActivity, type ActivityChild, type Activit
  * The task's own events in time order, with its Agent rows (R-62): one per Agent stretch, never 「派出线程」
  * (decision 2026-11-04-2200) and never one per run (2026-11-09-0045). A row opens the task's one conversation.
  */
-export function IssueActivityFeed({ versions, children, agents = [] }: { versions: ActivityVersion[]; children: ActivityChild[]; agents?: AgentActivityRow[] }) {
-  const eventsFor = useActivityEvents(versions, children)
+export function IssueActivityFeed({ versions, children, agents = [], issueCode }: { versions: ActivityVersion[]; children: ActivityChild[]; agents?: AgentActivityRow[]; issueCode?: string | null }) {
+  const eventsFor = useActivityEvents(versions, children, issueCode)
   const items = eventsFor(agents)
   if (!items.length && !agents.length) return null
   // R-63: one person's events in the same minute are one plain row, led by who did them.
@@ -30,16 +30,15 @@ export function IssueActivityFeed({ versions, children, agents = [] }: { version
 export type ActivityEventItem = { id: string; at: string; actor: ActivityActorView | null; text: string; time: string }
 
 /** The task's own events as words, oldest first, for IssueActivityFeed and a layer that draws the log. */
-export function useActivityEvents(versions: ActivityVersion[], children: ActivityChild[]) {
+export function useActivityEvents(versions: ActivityVersion[], children: ActivityChild[], issueCode?: string | null) {
   const t = useTranslations('Workspace.activity')
-  const tDetail = useTranslations('Workspace.detail')
   const tIssue = useTranslations('Issue')
   const format = useFormatter()
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
   const history = deriveIssueActivity(versions, children, Infinity)
   const labelOf = (event: IssueActivityEvent) => taskHistoryLabel(event, {
-    activity: t, created: tDetail('createdTask'), status: statusLabel, priority: priorityLabel,
+    activity: t, created: t('created'), status: statusLabel, priority: priorityLabel, issueCode,
   })
   return (barriers: readonly { id: string; at: string }[]): ActivityEventItem[] => {
     const rows = activityTimeline(history, barriers.map(row => ({ id: row.id, createdAt: row.at })))
