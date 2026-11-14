@@ -17,7 +17,7 @@ import { getDeletedIssue, setIssueDeleted } from '@/app/actions/issue-operations
 import { pollIssue, pollIssueVersionSummaries, saveIssue, listIssueVersions, type IssueView } from '@/app/actions/issues'
 import { CacheReadError } from '@/lib/cache-read-error'
 import { readAccessFailure, waitForCacheHydration } from '@/lib/swr/persistent-cache'
-import { issueKeys } from '@/lib/swr/keys'
+import { isTaskPresentationKey, issueKeys } from '@/lib/swr/keys'
 import { ListReadScopeError } from '@/lib/live/list-read'
 import { heldListPositions, mergeList, type ListSnapshot } from '@/lib/list-poll'
 import { IssueEditor, createDocumentSeed, type IssueDiscussions } from './issue-editor'
@@ -172,13 +172,16 @@ const noSubscribe = () => () => {}
 function TaskForm({ initial, preview = false, thread: openThread, origin, user, onSaved, onDirty, onClose, onDeleted, onRegisterFlush, navigation, onOpen }: DetailProps & { initial: Issue; preview?: boolean }) {
   const t = useTranslations('Workspace.detail')
   const { cache, mutate: mutateCache } = useSWRConfig()
-  const publishSaved = useCallback((issue: Issue) => {
+  const publishSaved = useCallback((issue: Issue, previousStatus: Issue['status']) => {
     // A confirmed write also updates the preview that another placement opens immediately.
     // Discard the old conditional token. A slower mutation must never move the cache backwards.
     void mutateCache<IssueRead>(issueKeys.detail(issue.id), previous =>
       previous && previous.revision > issue.revision ? previous : issue, { revalidate: false })
+    if (previousStatus !== issue.status) {
+      void mutateCache(key => isTaskPresentationKey(key, user.id, issue.workspaceId, issue.id))
+    }
     onSaved(issue.id)
-  }, [mutateCache, onSaved])
+  }, [mutateCache, onSaved, user.id])
   const tDetail = useTranslations('IssueDetail')
   const actionError = useActionError()
   const saveMessages = useRef({ t, actionError })
@@ -303,7 +306,8 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
       try {
         do {
           const snapshot = { ...draft.current }
-          const revision = savedRef.current.revision
+          const previous = savedRef.current
+          const revision = previous.revision
           if (!snapshot.title.trim()) { setError(saveMessages.current.t('titleRequired')); return false }
           const yjs = sync?.getSnapshot() ?? readOnlySnapshot()
           const bodyDirty = JSON.stringify(snapshot.content) !== JSON.stringify(savedRef.current.content)
@@ -322,7 +326,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
             acknowledged.current = snapshot.generation
             setDirty(draft.current.generation !== acknowledged.current)
             void refreshVersions().catch(() => {})
-            publishSaved(result.issue)
+            publishSaved(result.issue, previous.status)
           }
         } while (draft.current.generation !== acknowledged.current)
         return true
@@ -347,9 +351,10 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   }, [editSequence, syncState.ready, syncState.pending, syncState.error, save])
   function adopt(issue: Issue) {
     if (issue.revision < savedRef.current.revision) return
+    const previousStatus = savedRef.current.status
     savedRef.current = issue; setSaved(issue); setStatus(issue.status); setPriority(issue.priority)
     draft.current = { ...draft.current, status: issue.status, priority: issue.priority }
-    void refreshVersions().catch(() => {}); publishSaved(issue)
+    void refreshVersions().catch(() => {}); publishSaved(issue, previousStatus)
   }
   async function getCurrent() { return await save() ? savedRef.current : null }
   async function restore(version: NonNullable<typeof historyVersions>[number]) {

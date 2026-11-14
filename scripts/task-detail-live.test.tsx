@@ -8,6 +8,8 @@ import { Window } from 'happy-dom'
 import { LIVE_KINDS } from '../lib/live/events'
 import type { IssueView } from '../app/actions/issues'
 import type { ActivityVersion } from '../lib/issue-activity'
+import { ISSUE_STATUS_CODES } from '../lib/issue-meta'
+import { taskPresentation } from '../lib/task-presentation'
 import { PersistentReadCache } from '../lib/swr/persistent-cache'
 import { ReadResponseError } from '../lib/swr/retry'
 import type { ReadStorage, StoredRead } from '../lib/swr/indexed-db'
@@ -47,6 +49,17 @@ let knownVersions: (string | undefined)[]
 let documentHold: Promise<void> | null = null
 let documentWaits = 0
 let latestDocumentUpdate: string | undefined
+let projectionReads = 0
+mock.module(at('app/actions/task-domain.ts'), { namedExports: {
+  getTaskPresentations: async ({ workspaceId, issueIds }: { workspaceId: string; issueIds: string[] }) => {
+    projectionReads++
+    const status = ISSUE_STATUS_CODES.find(code => code === stored.status)
+    assert.ok(status)
+    const view = taskPresentation({ status, metadata: { pullRequests: [] } },
+      { runId: 'active-run', status: 'running', outcome: null }, null, () => false)
+    return { version: 1, workspaceId, items: Object.fromEntries(issueIds.map(id => [id, view])) }
+  },
+} })
 let writes: Parameters<typeof import('../app/actions/issues')['saveIssue']>[0][]
 mock.module(at('app/actions/issues.ts'), { namedExports: {
   pollIssue: async (id: string, known?: string) => {
@@ -104,6 +117,9 @@ mock.module(at('components/workspace/task-detail-frame.tsx'), { namedExports: {
         onChange={event => titleField.onChange(event.currentTarget.value)} onBlur={titleField.onBlur}
         onCompositionStart={titleField.onCompositionStart} onCompositionEnd={titleField.onCompositionEnd} onKeyDown={titleField.onKeyDown} />
       <button data-history="" disabled={locked} onClick={onHistory}>History</button>
+      <button data-complete="" onClick={() => props.onStatus('done')}>Done</button>
+      <button data-reopen="" onClick={() => props.onStatus('todo')}>Reopen</button>
+      <button data-priority="" onClick={() => props.onPriority('high')}>High</button>
       <output data-properties="" data-revision={task.revision}>{status}:{priority}</output>
       {props.editor(null, () => null)}
       <section data-activity="">{!preview && <IssueActivityFeed versions={props.versions} children={[]} agents={props.agentActivity.rows} />}</section>
@@ -198,14 +214,15 @@ function HydrateFixtureCache() {
   }, [cache, mutate])
   return null
 }
-async function renderDetail(visible: boolean, origin = 'Tasks') {
+async function renderDetail(visible: boolean, origin = 'Tasks', siblings?: ReactNode, live = true) {
   // Keep the provider mounted when a task closes: SWR retains both completed
   // and pending reads across a quick reopen, with its default dedupe interval.
+  const detail = <>{siblings}{visible && <TaskDetail id={issueId} thread={null} origin={origin}
+    user={{ id: owner, name: 'Owner', email: 'owner@example.invalid' }} navigation={{ index: -1, total: 0, onOpen: noop }}
+    onOpen={noop} onSaved={noop} onDirty={recordDirty} onClose={noop} onDeleted={noop} onRegisterFlush={registerFlush} />}</>
   await act(async () => root.render(<SWRConfig value={{ ...(cache instanceof PersistentReadCache ? swrDefaults : {}), provider: () => cache, shouldRetryOnError: false }}>
     {cache instanceof PersistentReadCache && <HydrateFixtureCache />}
-    <LiveProvider ownerId={owner} workspaceId={workspaceId}>{visible && <TaskDetail id={issueId} thread={null} origin={origin}
-      user={{ id: owner, name: 'Owner', email: 'owner@example.invalid' }} navigation={{ index: -1, total: 0, onOpen: noop }}
-      onOpen={noop} onSaved={noop} onDirty={recordDirty} onClose={noop} onDeleted={noop} onRegisterFlush={registerFlush} />}</LiveProvider>
+    {live ? <LiveProvider ownerId={owner} workspaceId={workspaceId}>{detail}</LiveProvider> : detail}
   </SWRConfig>))
 }
 async function mount(ready = true) {
@@ -438,6 +455,40 @@ test('a confirmed read-only grant shows activity without enabling title, body or
   await emit()
   await until(() => properties().textContent === 'done:normal', 'a read grant continues to observe the task')
   assert.equal(documentReads, 0)
+})
+
+test('a confirmed status write refreshes only this viewer’s Task projections without a live event', async () => {
+  const { useWorkspaceTaskPresentations } = await import('../hooks/use-task-collection')
+  const { useSelectedTaskPresentation } = await import('../hooks/use-selected-task-presentation')
+  const { TaskCardDataProvider, useTaskCards } = await import('../hooks/use-task-cards')
+  stored = { ...stored, workspaceId, status: 'todo' }
+  projectionReads = 0
+  function Card() {
+    const cards = useTaskCards([issueId])
+    return <output data-card="">{cards[issueId]?.state}</output>
+  }
+  function Projections() {
+    const collection = useWorkspaceTaskPresentations(owner, workspaceId, null, [{ id: issueId, workspaceId }], true)
+    const detail = useSelectedTaskPresentation(owner, workspaceId, issueId)
+    const otherViewer = useSelectedTaskPresentation('another-viewer', workspaceId, issueId)
+    const otherWorkspace = useSelectedTaskPresentation(owner, 'other-workspace', issueId)
+    const otherTask = useSelectedTaskPresentation(owner, workspaceId, 'other-task')
+    return <><output data-projections="">{[collection.items[issueId]?.state, detail.data?.state].join('/')}</output>
+      <output data-unrelated="">{[otherViewer, otherWorkspace, otherTask].map(read => read.data?.state).join('/')}</output>
+      <TaskCardDataProvider ownerId={owner} workspaceId={workspaceId}><Card /></TaskCardDataProvider></>
+  }
+  await renderDetail(true, 'Tasks', <Projections />, false)
+  const state = (attribute: string) => container.querySelector(`[data-${attribute}]`)?.textContent
+  await until(() => state('card') === 'running' && state('unrelated') === 'running/running/running' && !!description(), 'six scoped reads mounted')
+  const initialReads = projectionReads
+  for (const [control, status, projected] of [['complete', 'done', 'done'], ['reopen', 'todo', 'running']]) {
+    await act(async () => container.querySelector<HTMLButtonElement>(`[data-${control}]`)!.click())
+    await until(() => stored.status === status && state('card') === projected && state('projections') === [projected, projected].join('/'), 'the authorized state catches up without push')
+    assert.equal(state('unrelated'), 'running/running/running')
+  }
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-priority]')!.click())
+  await until(() => stored.priority === 'high', 'priority save committed')
+  assert.equal(projectionReads - initialReads, 6, 'only the three matching keys revalidated after each status change')
 })
 
 test('a committed acceptance event refreshes the mounted task status and activity without reload', { timeout: 10_000 }, async () => {
