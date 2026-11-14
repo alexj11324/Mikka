@@ -33,7 +33,9 @@ export function developmentOptions(args = [], env = process.env) {
   return { port: Number(port), host, allowStaleRoutes, origin: `http://${browserHost}:${Number(port)}` }
 }
 
-export function developmentTracing(nitro, tracing) {
+export function configureDevelopmentWorker(nitro, tracing) {
+  // Nitro keeps the old worker until its admitted HTTP exchanges finish.
+  nitro.options.devServer.drain = true
   const config = nitro.options.rolldownConfig ?? {}
   nitro.options.rolldownConfig = {
     ...config,
@@ -236,7 +238,7 @@ export async function startDevelopment({ args = [], root = repository, log = con
     // Config merging appends arrays; explicitly remove production public assets
     // so a clean development checkout needs no previous frontend build.
     nitro.options.publicAssets = []
-    developmentTracing(nitro, await compileTracing(root))
+    configureDevelopmentWorker(nitro, await compileTracing(root))
     const api = createDevServer(nitro)
     workerReady = developmentWorkerReady(api)
     const compiled = Promise.withResolvers()
