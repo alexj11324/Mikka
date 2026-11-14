@@ -354,7 +354,6 @@ async function continuePausedRun(userId: string, runId: string, mode: 'apiKey' |
       const key = mode === 'apiKey' ? await quotaKey(client, run, scope) ?? null : null
       if (mode === 'apiKey' && !key) throw new ActionFailureError('apiKeyNotFound')
       if (scope.cloud) { cloud = { run, plan: scope, key }; return }
-      await assertRunProjectResources(client, run)
       if (!await endPausedRun(tx, run.id, userId, workspaceId)) throw new ActionFailureError('runNotActive')
       const retryRunId = await queueDeviceContinuation(tx, client, run, key)
       if (key) await recordCoordinatorEvent(tx, runCredentialSwitchedEvent(run, scope.from, key, retryRunId, run.quotaResetsAt?.toISOString() ?? null))
