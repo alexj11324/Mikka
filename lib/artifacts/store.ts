@@ -1,6 +1,5 @@
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
-import { afterJob } from '@/lib/background'
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { db, pool } from '@/lib/db'
 import { executionIdentityForRun } from '@/lib/execution-identity'
@@ -8,7 +7,6 @@ import { agentRuns, agents, artifactShares, artifactVersions, artifacts, bots, i
 import { runAgentName, runBotName } from '@/lib/run-bot-name'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { artifactSubmittedEvent } from '@/lib/coordinator-events'
-import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { ARTIFACT_CONTENT_TYPES, ARTIFACT_EXTENSIONS, ARTIFACT_MAX_BYTES, cleanTitle, utf8Bytes } from '@/lib/artifacts/limits'
 import { stripDiffMarkers } from '@/lib/artifacts/diff'
 import type { ArtifactDetail, ArtifactListItem, ArtifactMedia, ArtifactSummary } from '@/lib/artifacts/types'
@@ -62,7 +60,7 @@ export async function submitArtifact(submitter: ArtifactSubmitter, input: { titl
   const hash = sha256(content)
 
   const workspaceId = await submissionWorkspace(submitter)
-  const result = await withTaskWorkspace({ id: submitter.userId, [enterprisePrincipal]: submitter[enterprisePrincipal] }, workspaceId, () => db.transaction(async tx => {
+  return withTaskWorkspace({ id: submitter.userId, [enterprisePrincipal]: submitter[enterprisePrincipal] }, workspaceId, () => db.transaction(async tx => {
     await tx.execute(sql`select mikka_account_assert_writable(${submitter.userId})`)
     let artifactId = input.artifactId
     let version = 1
@@ -92,9 +90,6 @@ export async function submitArtifact(submitter: ArtifactSubmitter, input: { titl
     if (submitter.runId) taskActivityChanged(tx, submitter.runId)
     return submitted
   }))
-  if ('error' in result) return result
-  afterJob('after:coordinator-wake', () => wakeCoordinator(submitter.userId))
-  return result
 }
 
 /** Titles and latest versions of the person's artifacts among `ids`, for cards in the chat. */
