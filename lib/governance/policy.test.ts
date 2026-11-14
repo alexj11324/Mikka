@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
 import { deploymentMode } from './edition'
-import { csvCell, resolveEntitlements, seatAdmissionAllowed } from './policy'
+import { ORGANIZATION_MODEL_PROVIDERS, csvCell, resolveEntitlements, seatAdmissionAllowed } from './policy'
 
 test('governance follows the canonical deployment edition, independent of hosting and billing', () => {
   assert.equal(deploymentMode({}), 'selfhost')
@@ -64,4 +65,14 @@ test('CSV contains literal data, not spreadsheet formulas', () => {
   for (const prefix of ['=', '+', '-', '@', ' \t=']) assert.equal(csvCell(`${prefix}SUM(A1:A2)`), `"'${prefix}SUM(A1:A2)"`)
   assert.equal(csvCell(123), '"123"')
   assert.equal(csvCell(null), '""')
+})
+
+test('organization policy offers each model source, including Workers AI, in both settings languages', () => {
+  assert.ok(ORGANIZATION_MODEL_PROVIDERS.includes('cloudflare-workers-ai'))
+  for (const locale of ['en', 'zh-CN']) {
+    const catalog = JSON.parse(readFileSync(new URL(`../../messages/${locale}.json`, import.meta.url), 'utf8'))
+    const names = catalog.Organization.policy.providers.names
+    assert.deepEqual(Object.keys(names).sort(), [...ORGANIZATION_MODEL_PROVIDERS].sort())
+    for (const provider of ORGANIZATION_MODEL_PROVIDERS) assert.ok(names[provider]?.trim(), `${locale}: ${provider}`)
+  }
 })
