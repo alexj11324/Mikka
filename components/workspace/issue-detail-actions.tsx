@@ -90,8 +90,11 @@ export function useIssueDetailActions({ task, userId, disabled, request, getCurr
       if (!result.issue) throw new Error(actionError(result.error ?? 'generic'))
       const updatesCurrent = mode === 'current' || mode === 'favorite' || mode === 'unfavorite'
       if (updatesCurrent) onSaved(result.issue)
-      // Adopting a task also refreshes its board through issue-workspace.
-      await Promise.all([mutate(issueKeys.connections(task.id)), updatesCurrent ? undefined : mutate(key => isIssueListKey(key, userId))])
+      // A deleted task can no longer serve its connections. Its surrounding list still needs the ACK.
+      await Promise.all([
+        mode === 'delete' ? undefined : mutate(issueKeys.connections(task.id)),
+        updatesCurrent ? undefined : mutate(key => isIssueListKey(key, userId)),
+      ])
       if (mode === 'duplicate') onOpen(result.issue.id)
       if (mode === 'delete') {
         onDeleted()
