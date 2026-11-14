@@ -4,22 +4,27 @@ import type { ThreadRecord } from './task-discussion'
 export type IssueActivityEvent = {
   id: string
   at: string
-  kind: 'created' | 'status' | 'priority' | 'title' | 'assigned' | 'unassigned' | 'subtask' | 'labelAdded' | 'labelRemoved'
+  /** Capy's issue events, as they apply to a task (labels are not an activity event in Capy). */
+  kind: 'created' | 'status' | 'priority' | 'title' | 'description' | 'assigned' | 'unassigned' | 'subtask' | 'parent' | 'relation' | 'pull' | 'unsupported'
   status?: string
   priority?: string
   title?: string
-  /** Subtask this clause names. Absent when the clause is about the page's own task. */
+  /** The other task a clause names (a sub-task, the parent, a related task). Absent when it is about the page's own task. */
   targetId?: string
-  /** That subtask's identifier, when the sentence shows a code instead of its title. */
+  /** That task's identifier, when the event itself knows it. */
   code?: string
   assigneeName?: string
-  /** Absent means the human assignee. Keep the existing event kinds for old
-   * consumers, but never describe clearing a Delegate as clearing the person. */
+  /** Kept for data: a delegate is said the same way as an assignee, as Capy's assignees include its threads. */
   assignmentTarget?: 'delegate'
-  /** `type:id` of whoever made the change; null for rows from before MIK-17 and for subtasks. */
+  /** `relation`: which relation, and whether it was removed. `parent`: removed when `targetId` is absent. */
+  relation?: 'blockedBy' | 'related'
+  removed?: boolean
+  /** `pull`: the pull request the clause names and what happened to it. */
+  pull?: { label: string; href: string; title?: string; action: 'linked' | 'unlinked' | 'merged' }
   source?: { kind: 'revision'; id: string; revision: number } | { kind: 'subtask'; id: string }
+  /** `type:id` of whoever made the change; null for rows from before MIK-17 and for subtasks. */
   actorKey?: string | null
-  /** Who made the change, as the server resolved it (R-63 names them in front of the row). */
+  /** Who made the change, as the server resolved it; the sentence starts with them, as Capy's does. */
   actor?: ActivityActorView | null
 }
 
@@ -64,36 +69,36 @@ export function taskActivityFacts(history: readonly IssueActivityEvent[], thread
 }
 
 type HistoryLabels = Pick<typeof import('../messages/en.json')['Workspace']['activity'],
-  'unknownAssignee' | 'created' | 'changedStatus' | 'changedStatusCode' | 'changedPriority' | 'changedTitle' | 'assigned' | 'delegated' |
-  'unassigned' | 'unassignedNamed' | 'undelegated' | 'undelegatedNamed' | 'addedLabel' | 'removedLabel' | 'addedSubtask' | 'addedSubtaskCode'>
+  'created' | 'createdTask' | 'moved' | 'movedTask' | 'setPriority' | 'renamed' | 'editedDescription' | 'assigned' | 'unassigned' | 'unassignedTask' |
+  'someone' | 'setParent' | 'removedParent' | 'aTask' | 'addedSubtask' | 'markedBlockedBy' | 'markedRelated' | 'removedRelation' | 'linked' | 'unlinked' |
+  'merged' | 'unsupported' | 'system' | 'untitledThread'>
 
-/** A clause is words plus the task, thread or pull a word opens. The row paints them; the name is one part at the front. */
+/** A sentence is words plus the task, conversation or pull request a word opens. */
 export type ActivityPiece =
   | { kind: 'text'; text: string; name?: boolean }
   | ({ kind: 'task'; text: string; taskId: string } & TaskPreview)
   | ({ kind: 'thread'; text: string; runId: string } & RunPreview)
   | { kind: 'pull'; text: string; href: string }
 
-/** The task the page is showing, so 「创建了 {编号}」 and 「把 {编号} 改成了」 can name it. */
 /** What a task code's hover card shows, as Capy's: status, priority, title, assignee. */
 export type TaskPreview = { title?: string; status?: string; priority?: string; assignee?: string }
-/** What an Agent name's hover card shows, as Capy's thread card: the Agent, the conversation's title (the task's, R-81), how its run ended and when. */
+/** What a conversation chip's hover card shows, as Capy's thread card: its Agent, its title, how its run ended and when. */
 export type RunPreview = { harness?: string; title?: string; result?: string; time?: string }
 
-export type ActivitySubject = { taskId: string; code: string | null } & TaskPreview
+/** The task the page is showing, and the other tasks this page can name by code (sub-tasks, parent, related). */
+export type ActivitySubject = { taskId: string; code: string | null; refs?: Readonly<Record<string, { code: string | null } & TaskPreview>> } & TaskPreview
 
-/** One Agent stretch on this task. `linked` is false when that run has no conversation to open. */
+/** One conversation on this task. `linked` is false when it has no transcript to open. `title` is the conversation's own. */
 export type ActivityStretch = { at: string; runId: string; linked: boolean } & RunPreview
 
 export type ActivityLabels = {
-  created: string
   activity: (key: keyof HistoryLabels, values?: Record<string, string>) => string
   status: (value: string) => string
   priority: (value: string) => string
 }
 
-/** A character that cannot appear in a status, title or name, so the translated sentence can be split around the code. */
-const CODE = '\u0001'
+/** A character that cannot appear in a status, title or name, so the translated sentence can be split around a chip. */
+const SLOT = '\u0001'
 
 /** The fields that have a value, so a part never carries `undefined` keys. */
 function defined<T extends Record<string, string | undefined>>(values: T): Partial<T> {
@@ -104,59 +109,65 @@ function words(text: string): ActivityPiece[] {
   return text ? [{ kind: 'text', text }] : []
 }
 
-/** `about` is what that task's hover card shows, when this page knows it. Absent fields are left out. */
-function withTask(rendered: string, text: string, taskId: string, about: TaskPreview = {}): ActivityPiece[] {
-  const chunks = rendered.split(CODE)
+/** Fills each slot of the rendered sentence with its chip, in order. */
+function withChips(rendered: string, chips: ActivityPiece[]): ActivityPiece[] {
+  const chunks = rendered.split(SLOT)
   const pieces: ActivityPiece[] = []
   chunks.forEach((chunk, index) => {
     if (chunk) pieces.push({ kind: 'text', text: chunk })
-    if (index < chunks.length - 1) pieces.push({ kind: 'task', text, taskId, ...defined(about) })
+    if (index < chunks.length - 1 && chips[index]) pieces.push(chips[index])
   })
   return pieces.length ? pieces : words(rendered)
 }
 
-/** The clause for one event. The caller's locale supplies the sentence; a code is a task part when this page can open it. */
+/** The clause for one event, after the actor, in Capy's words. A task code is a chip when this page can name it. */
 export function taskHistoryPieces(event: IssueActivityEvent, labels: ActivityLabels, subject?: ActivitySubject | null): ActivityPiece[] {
   const t = labels.activity
-  const own = subject?.code && subject.taskId ? { code: subject.code, taskId: subject.taskId, about: { title: subject.title, status: subject.status, priority: subject.priority, assignee: subject.assignee } } : null
+  const own: ActivityPiece | null = subject?.code ? { kind: 'task', text: subject.code, taskId: subject.taskId, ...defined({ title: subject.title, status: subject.status, priority: subject.priority, assignee: subject.assignee }) } : null
+  const other = (id: string | undefined, code?: string, title?: string): ActivityPiece => {
+    const ref = id ? subject?.refs?.[id] : undefined
+    const text = ref?.code ?? code
+    if (id && text) return { kind: 'task', text, taskId: id, ...defined({ title: ref?.title ?? title, status: ref?.status, priority: ref?.priority, assignee: ref?.assignee }) }
+    return { kind: 'text', text: t('aTask') }
+  }
   switch (event.kind) {
-    case 'created': return own ? withTask(t('created', { code: CODE }), own.code, own.taskId, own.about) : words(labels.created)
+    case 'created': return own ? withChips(t('created', { code: SLOT }), [own]) : words(t('createdTask'))
     case 'status': {
       const status = labels.status(event.status ?? '')
-      return own ? withTask(t('changedStatusCode', { code: CODE, status }), own.code, own.taskId, own.about) : words(t('changedStatus', { status }))
+      return own ? withChips(t('moved', { code: SLOT, status }), [own]) : words(t('movedTask', { status }))
     }
-    case 'priority': return words(t('changedPriority', { priority: labels.priority(event.priority ?? '') }))
-    case 'title': return words(t('changedTitle', { title: event.title ?? '' }))
-    case 'assigned': return words(t(event.assignmentTarget === 'delegate' ? 'delegated' : 'assigned', { name: event.assigneeName || t('unknownAssignee') }))
-    case 'unassigned': {
-      const name = event.assigneeName
-      if (event.assignmentTarget === 'delegate') return words(name ? t('undelegatedNamed', { name }) : t('undelegated'))
-      return words(name ? t('unassignedNamed', { name }) : t('unassigned'))
+    case 'priority': return words(t('setPriority', { priority: labels.priority(event.priority ?? '') }))
+    case 'title': return words(t('renamed', { title: event.title ?? '' }))
+    case 'description': return words(t('editedDescription'))
+    case 'assigned': return words(t('assigned', { name: event.assigneeName || t('someone') }))
+    case 'unassigned': return words(event.assigneeName ? t('unassigned', { name: event.assigneeName }) : t('unassignedTask'))
+    case 'parent': return event.removed || !event.targetId ? words(t('removedParent')) : withChips(t('setParent', { code: SLOT }), [other(event.targetId, event.code, event.title)])
+    case 'subtask': return withChips(t('addedSubtask', { code: SLOT }), [other(event.targetId, event.code, event.title)])
+    case 'relation': {
+      const target = other(event.targetId, event.code, event.title)
+      if (event.removed) return withChips(t('removedRelation', { other: SLOT }), [target])
+      const subjectChip = own ?? { kind: 'text', text: t('aTask') } as ActivityPiece
+      return withChips(t(event.relation === 'blockedBy' ? 'markedBlockedBy' : 'markedRelated', { code: SLOT, other: SLOT }), [subjectChip, target])
     }
-    case 'labelAdded': return words(t('addedLabel', { name: event.title ?? '' }))
-    case 'labelRemoved': return words(t('removedLabel', { name: event.title ?? '' }))
-    case 'subtask': {
-      if (event.targetId && event.code) return withTask(t('addedSubtaskCode', { code: CODE }), event.code, event.targetId, { title: event.title })
-      if (event.targetId && event.title) return withTask(t('addedSubtask', { title: CODE }), event.title, event.targetId)
-      return words(t('addedSubtask', { title: event.title ?? '' }))
+    case 'pull': {
+      if (!event.pull) return words(t('unsupported'))
+      const chip: ActivityPiece = { kind: 'pull', text: event.pull.label, href: event.pull.href }
+      if (event.pull.action === 'merged') return withChips(t('merged', { pull: SLOT, title: event.pull.title ?? '' }).trim(), [chip])
+      return withChips(t(event.pull.action === 'linked' ? 'linked' : 'unlinked', { pull: SLOT }), [chip])
     }
+    case 'unsupported': return words(t('unsupported'))
   }
 }
 
-/** Both renderers supply their locale; the source event determines the wording. */
+/** The sentence as plain words, for a reader with no chips (iOS, a notification). */
 export function taskHistoryLabel(event: IssueActivityEvent, labels: ActivityLabels, subject?: ActivitySubject | null) {
   return taskHistoryPieces(event, labels, subject).map(piece => piece.text).join('')
 }
 
 /**
- * The last linked Agent stretch that had already started when this event happened.
- * A person's name, an unmatched Agent and a run with no conversation stay text.
+ * The conversation that had already started when this Agent change happened: the last one, as Capy names the thread
+ * that made the change. A person's change, an unmatched Agent and a conversation with no transcript match nothing.
  */
-export function activityRunId(at: string, actor: { type?: string | null } | null | undefined, stretches: readonly ActivityStretch[]): string | null {
-  return activityStretch(at, actor, stretches)?.runId ?? null
-}
-
-/** The stretch itself, so the name's hover preview can say how that run ended. */
 export function activityStretch(at: string, actor: { type?: string | null } | null | undefined, stretches: readonly ActivityStretch[]): ActivityStretch | null {
   if (actor?.type !== 'agent') return null
   const time = Date.parse(at)
@@ -170,23 +181,31 @@ export function activityStretch(at: string, actor: { type?: string | null } | nu
   return match
 }
 
-/** One row: the name once, then each clause joined by the locale's separator. The name is a thread part only when a run matches. */
+export function activityRunId(at: string, actor: { type?: string | null } | null | undefined, stretches: readonly ActivityStretch[]): string | null {
+  return activityStretch(at, actor, stretches)?.runId ?? null
+}
+
+/**
+ * One event as Capy writes it: who, then what. A person is their name; an Agent is the conversation it worked in (a chip
+ * that opens it); no actor is Mikka. A merged pull request is a line of its own, with no actor, as Capy's PR rows are.
+ */
 export function activityLineParts(
-  events: readonly IssueActivityEvent[],
+  event: IssueActivityEvent,
   labels: ActivityLabels,
   subject: ActivitySubject | null | undefined,
-  separator: string,
-  actor: { type?: string | null; name?: string | null } | null | undefined,
   stretches: readonly ActivityStretch[] = [],
 ): ActivityPiece[] {
-  const clause = events.flatMap((event, index) => [
-    ...(index ? words(separator) : []),
-    ...taskHistoryPieces(event, labels, subject),
-  ])
-  const name = actor?.name || null
-  if (!name) return clause
-  const stretch = activityStretch(events[0]?.at ?? '', actor, stretches)
-  // A task has one conversation, named by the task (R-81), so the card's title is the task's.
-  const lead: ActivityPiece = stretch ? { kind: 'thread', text: name, runId: stretch.runId, ...defined({ harness: stretch.harness, title: stretch.title ?? subject?.title, result: stretch.result, time: stretch.time }) } : { kind: 'text', text: name, name: true }
+  const clause = taskHistoryPieces(event, labels, subject)
+  if (event.kind === 'pull' && event.pull?.action === 'merged') return clause
+  const actor = event.actor
+  const t = labels.activity
+  let lead: ActivityPiece
+  if (actor?.type === 'agent') {
+    const stretch = activityStretch(event.at, actor, stretches)
+    lead = stretch
+      ? { kind: 'thread', text: stretch.title || t('untitledThread'), runId: stretch.runId, ...defined({ harness: stretch.harness, title: stretch.title, result: stretch.result, time: stretch.time }) }
+      : { kind: 'text', text: t('untitledThread'), name: true }
+  } else if (actor?.type === 'user' && actor.name) lead = { kind: 'text', text: actor.name, name: true }
+  else lead = { kind: 'text', text: t('system'), name: true }
   return [lead, { kind: 'text', text: ' ' }, ...clause]
 }

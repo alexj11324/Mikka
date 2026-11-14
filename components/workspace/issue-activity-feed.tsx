@@ -39,9 +39,9 @@ export type ActivityEventItem = {
   id: string
   at: string
   actor: ActivityActorView | null
-  /** The clauses only, so a renderer that still paints `who` beside `text` does not repeat the name. */
+  /** The whole sentence as words, actor first. */
   text: string
-  /** The name once, then the clauses. A code is a task part; an Agent name is a thread part when a run matches. */
+  /** The actor, then the clause. A code is a task chip; an Agent is its conversation's chip. */
   parts: ActivityPiece[]
   /** How long ago, as every row says it (「2 小时前」); `exact` is the date and time for a tooltip. */
   time: string
@@ -50,35 +50,38 @@ export type ActivityEventItem = {
   kind: IssueActivityEvent['kind']
   status?: string
   priority?: string
+  relation?: 'blockedBy' | 'related'
+  pullAction?: 'linked' | 'unlinked' | 'merged'
 }
 
 /** The task's own events as words, oldest first, for IssueActivityFeed and a layer that draws the log. */
 export function useActivityEvents(versions: ActivityVersion[], children: ActivityChild[], context?: { task?: ActivitySubject | null; stretches?: readonly ActivityStretch[] }) {
   const t = useTranslations('Workspace.activity')
-  const tDetail = useTranslations('Workspace.detail')
   const tIssue = useTranslations('Issue')
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
   const history = deriveIssueActivity(versions, children, Infinity)
-  const labels = { activity: t, created: tDetail('createdTask'), status: statusLabel, priority: priorityLabel }
+  const labels = { activity: t, status: statusLabel, priority: priorityLabel }
   return (barriers: readonly { id: string; at: string }[]): ActivityEventItem[] => {
     const rows = activityTimeline(history, barriers.map(row => ({ id: row.id, createdAt: row.at })))
+    // One event per row, as Capy's log: who, then what, then how long ago.
     return rows.flatMap(row => {
       if (row.type === 'thread') return []
-      const actor = row.events[0].actor?.name ? row.events[0].actor : null
-      const parts = activityLineParts(row.events, labels, context?.task, t('separator'), actor, context?.stretches ?? [])
-      const clause = actor?.name ? parts.slice(2) : parts
-      const first = row.events[0]
+      const event = row.events[0]
+      const actor = event.actor?.name ? event.actor : null
+      const parts = activityLineParts(event, labels, context?.task, context?.stretches ?? [])
       return [{
         id: row.id, at: row.at, actor, parts,
-        text: clause.map(part => part.text).join(''),
+        text: parts.map(part => part.text).join(''),
         time: format.relativeTime(new Date(Math.min(Date.parse(row.at), now.getTime())), now),
         exact: format.dateTime(new Date(row.at), { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-        kind: first.kind,
-        ...first.kind === 'status' && first.status ? { status: first.status } : {},
-        ...first.kind === 'priority' && first.priority ? { priority: first.priority } : {},
+        kind: event.kind,
+        ...event.kind === 'status' && event.status ? { status: event.status } : {},
+        ...event.kind === 'priority' && event.priority ? { priority: event.priority } : {},
+        ...event.kind === 'relation' && event.relation ? { relation: event.relation } : {},
+        ...event.kind === 'pull' && event.pull ? { pullAction: event.pull.action } : {},
       }]
     })
   }

@@ -222,13 +222,17 @@ export function FramedTask(props: FramedTaskProps) {
   // 活动: the task's events, its Agent rows and its discussions in one log, oldest first.
   const subtaskRows = (connections.rows ?? []).filter(row => row.metadata.parentId === task.id).map(row => ({ id: row.id, title: row.title, identifier: row.identifier, createdAt: row.createdAt }))
   // An Agent's change is said by its conversation (Capy: the thread's code or title), matched to the conversation that had started by then.
-  const conversations = (props.agentActivity.threads ?? []).map(thread => ({
+  const runConversations = (props.agentActivity.threads ?? []).map(thread => ({
     at: new Date(thread.createdAt).toISOString(), runId: thread.id, linked: Boolean(thread.detail),
     title: thread.detail?.name || tDirectory('untitled'), ...thread.detail?.harness ? { harness: thread.detail.harness } : {},
   }))
   const eventsFor = useActivityEvents(props.historyFailed ? [] : props.versions, props.historyFailed ? [] : subtaskRows, {
-    task: { taskId: task.id, code: task.identifier, title: props.title, status: props.status, priority: props.priority, assignee: member?.name },
-    stretches: conversations,
+    task: {
+      taskId: task.id, code: task.identifier, title: props.title, status: props.status, priority: props.priority, assignee: member?.name,
+      // Parent, sub-tasks and related tasks this page already reads, so a sentence names them by code, as Capy's does.
+      refs: Object.fromEntries((connections.rows ?? []).map(row => [row.id, { code: row.identifier ?? null, title: row.title, status: row.status, ...row.priority ? { priority: row.priority } : {} }])),
+    },
+    stretches: runConversations,
   })
   const discussions = useRef<IssueDiscussions | null>(null)
   const drafts = useActivityDrafts(task.id,
@@ -251,7 +255,7 @@ export function FramedTask(props: FramedTaskProps) {
       : current.threads.map(thread => ({ kind: 'comment', id: thread.id, at: thread.createdAt, thread, time, exact, excerpt: excerpt(thread.id) }))
     const history = eventsFor([...comments, ...additional])
     return chronologicalActivity<TaskActivityItem>([
-      ...history.map((item): TaskActivityItem => ({ kind: 'event', id: `history:${item.id}`, at: item.at, who: item.actor?.name || (item.actor?.type === 'system' ? t('work.system') : item.actor?.type === 'agent' ? t('work.agent') : null), mark: item.actor?.name ? (item.actor.type === 'agent' ? { kind: 'node', node: <AgentSphere name={item.actor.name} compact /> } : { kind: 'person', name: item.actor.name }) : undefined, text: item.text, parts: item.parts, time: item.time, exact: item.exact, actor: item.actor ? (item.actor.type === 'agent' ? 'agent' : 'person') : null, glyph: glyphOf(item) })),
+      ...history.map((item): TaskActivityItem => ({ kind: 'event', id: `history:${item.id}`, at: item.at, who: item.actor?.name || (item.actor?.type === 'system' ? t('work.system') : item.actor?.type === 'agent' ? t('work.agent') : null), mark: item.actor?.name ? (item.actor.type === 'agent' ? { kind: 'node', node: <AgentSphere name={item.actor.name} compact /> } : { kind: 'person', name: item.actor.name }) : undefined, text: item.text, parts: item.parts, time: item.time, exact: item.exact, actor: item.pullAction === 'merged' || !item.actor ? null : item.actor.type === 'agent' ? 'agent' : 'person', glyph: glyphOf(item) })),
       ...comments, ...additional,
     ])
   }
@@ -299,13 +303,19 @@ export function FramedTask(props: FramedTaskProps) {
   />
 }
 
-/** The icon that leads an event row: Capy leads each line with its change's icon (the new status's own icon for a move). */
+/** The icon that leads an event row, as Capy's: the new status's own icon for a move, the priority's bars, else the kind of change. */
 function glyphOf(item: ActivityEventItem): TaskActivityGlyph {
-  if (item.kind === 'status' && item.status) return { kind: 'status', value: item.status }
-  if (item.kind === 'priority' && item.priority) return { kind: 'priority', value: item.priority }
-  if (item.kind === 'labelAdded' || item.kind === 'labelRemoved') return { kind: 'event', value: 'label' }
-  if (item.kind === 'status' || item.kind === 'priority') return { kind: 'event', value: 'title' }
-  return { kind: 'event', value: item.kind }
+  switch (item.kind) {
+    case 'status': return item.status ? { kind: 'status', value: item.status } : { kind: 'event', value: 'edit' }
+    case 'priority': return item.priority ? { kind: 'priority', value: item.priority } : { kind: 'event', value: 'edit' }
+    case 'created': return { kind: 'event', value: 'created' }
+    case 'title': case 'description': return { kind: 'event', value: 'edit' }
+    case 'assigned': case 'unassigned': return { kind: 'event', value: 'assignee' }
+    case 'parent': case 'subtask': return { kind: 'event', value: 'hierarchy' }
+    case 'relation': return { kind: 'event', value: item.relation === 'related' ? 'related' : 'blocked' }
+    case 'pull': return { kind: 'event', value: item.pullAction === 'merged' ? 'pullMerged' : 'pull' }
+    case 'unsupported': return { kind: 'event', value: 'unsupported' }
+  }
 }
 
 /** Which relation a 相关 row really is: a closed block shows as related but is removed as the block it is. */

@@ -95,7 +95,8 @@ export type TaskSubtask = {
 export type TaskActivityGlyph =
   | { kind: 'status'; value: string }
   | { kind: 'priority'; value: string }
-  | { kind: 'event'; value: 'created' | 'title' | 'assigned' | 'unassigned' | 'subtask' | 'label' }
+  /** Capy's event icons: created, an edit (title, description), assignee, hierarchy (parent, sub-task), a relation, a pull request, an update this build cannot read. */
+  | { kind: 'event'; value: 'created' | 'edit' | 'assignee' | 'hierarchy' | 'blocked' | 'related' | 'pull' | 'pullMerged' | 'unsupported' }
 
 /**
  * `time` is how long ago (「2 小时前」) on every row; `exact` is the date and time for its tooltip.
