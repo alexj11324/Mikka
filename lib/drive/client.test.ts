@@ -3,7 +3,7 @@ import test from 'node:test'
 const previousBase = process.env.MIKKA_BASE_PATH
 process.env.MIKKA_BASE_PATH = '/mikka'
 const {
-  driveFileURL, driveHeadKey, driveHistoryKey, driveVolumesKey, DriveRequestError,
+  deleteDriveFile, driveFileURL, driveHeadKey, driveHistoryKey, driveVolumesKey, DriveRequestError,
   readDriveFileHistory, readDriveVolumes, restoreDriveVersion, uploadDriveFiles,
 } = await import('./client')
 if (previousBase === undefined) delete process.env.MIKKA_BASE_PATH
@@ -81,4 +81,21 @@ test('the file history reader preserves literal path characters, cursor and work
     return Response.json({ versions: [], nextCursor: null })
   })
   assert.deepEqual(page, { versions: [], nextCursor: null })
+})
+
+test('deleting a file submits one literal path against the head the person selected', async () => {
+  const path = 'notes/a & + #%.md'
+  const send: typeof fetch = async (input, init) => {
+    const url = new URL(String(input), 'https://example.invalid')
+    assert.equal(url.pathname, '/mikka/api/drive/volumes/volume-a/entries')
+    assert.equal(url.searchParams.get('workspaceId'), 'workspace-a')
+    assert.equal(init?.method, 'PATCH')
+    assert.equal(init.credentials, 'same-origin')
+    assert.deepEqual(JSON.parse(String(init.body)), {
+      expectedDigest: 'displayed-head', mutationId: 'delete-request', changes: [{ op: 'delete', path }],
+    })
+    return Response.json({ error: 'drive_head_conflict' }, { status: 409 })
+  }
+  await assert.rejects(deleteDriveFile('workspace-a', 'volume-a', path, 'displayed-head', 'delete-request', send),
+    (error: unknown) => error instanceof DriveRequestError && error.status === 409)
 })
