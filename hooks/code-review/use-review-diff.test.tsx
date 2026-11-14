@@ -38,8 +38,15 @@ after(async () => { await act(async () => root.unmount()); await browser.happyDO
 test('a refused current Review withdraws its summary, diff and loaded file pages until a successful retry', async () => {
   await act(async () => root.render(<SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}><Probe /></SWRConfig>))
   assert.deepEqual(paths(), ['first'])
+  failure = true
+  await act(async () => { await state.loadMore() })
+  assert.equal(state.loadMoreError, true)
+  assert.deepEqual(paths(), ['first'])
+  assert.equal(state.nextCursor, 'additional')
+  failure = false
   await act(async () => { await state.loadMore() })
   assert.deepEqual(paths(), ['first', 'additional'])
+  assert.equal(state.loadMoreError, false)
 
   failure = true
   await act(async () => { await state.mutate() })
@@ -48,7 +55,7 @@ test('a refused current Review withdraws its summary, diff and loaded file pages
   assert.deepEqual(paths(), [])
   assert.equal(state.nextCursor, undefined)
   await act(async () => { await state.loadMore() })
-  assert.deepEqual(reads, ['root', 'additional', 'root'])
+  assert.deepEqual(reads, ['root', 'additional', 'additional', 'root'])
 
   failure = false
   revision = 'replacement'
