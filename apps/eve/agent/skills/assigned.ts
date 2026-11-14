@@ -1,12 +1,12 @@
 import {evaluationBindingId} from '../../../../lib/eve/evaluation-context'
 import { defineDynamic, defineSkill } from 'eve/skills'
-import { executionForSession } from '../../../../lib/eve/runtime'
+import { turnPolicy } from '../../../../lib/eve/runtime'
 
 export default defineDynamic(async ctx => {
   if(evaluationBindingId(ctx.session.auth.current))return null
-  const { execution } = await executionForSession(ctx)
-  const assigned = execution?.snapshot.definition.skills ?? []
-  const personal = execution?.snapshot.personalPlugins?.skills ?? []
+  const policy = turnPolicy.get()
+  const assigned = policy?.definition.skills ?? []
+  const personal = policy?.personalPlugins?.skills ?? []
   return Object.fromEntries([...assigned, ...personal].map(skill => [skill.id.replace(/[^a-zA-Z0-9_-]/g, '_'), defineSkill({
     description: skill.name, content: skill.body, deferred: true,
   })]))

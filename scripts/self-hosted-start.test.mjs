@@ -22,7 +22,7 @@ test('installation keys survive restart, remain private, and explicit overrides 
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
-test('standalone startup uses the operator database and durable local Workflow only', () => {
+test('standalone startup uses the operator database and configured Workflow world', () => {
   const env = selfHostedEnvironment({ DATABASE_URL: 'postgres://local:fixture@postgres/mikka', BETTER_AUTH_URL: 'https://self.example.test', MIKKA_DATA_DIR: '/data' }, '/app')
   assert.equal(env.MIKKA_DATABASE_URL, env.DATABASE_URL)
   assert.equal(env.WORKFLOW_TARGET_WORLD, 'local')
@@ -32,7 +32,7 @@ test('standalone startup uses the operator database and durable local Workflow o
   assert.equal(selfHostedEnvironment({ DATABASE_URL: env.DATABASE_URL, WORKFLOW_LOCAL_BASE_URL: override }, '/app').WORKFLOW_LOCAL_BASE_URL, override)
   assert.throws(() => selfHostedEnvironment({}, '/app'), /SELF_HOSTED_DATABASE_REQUIRED/)
   assert.throws(() => selfHostedEnvironment({ DATABASE_URL: 'postgres://fixture', VERCEL: '1' }, '/app'), /SELF_HOSTED_PLATFORM_ENV_REFUSED/)
-  assert.throws(() => selfHostedEnvironment({ DATABASE_URL: 'postgres://fixture', WORKFLOW_TARGET_WORLD: 'vercel' }, '/app'), /SELF_HOSTED_LOCAL_WORKFLOW_REQUIRED/)
+  assert.equal(selfHostedEnvironment({ DATABASE_URL: 'postgres://fixture', WORKFLOW_TARGET_WORLD: '@workflow/world-postgres' }, '/app').WORKFLOW_TARGET_WORLD, '@workflow/world-postgres')
 })
 
 test('bad self-hosted origins fail before migration or sign-in', () => {
