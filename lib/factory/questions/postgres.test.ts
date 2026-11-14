@@ -1,3 +1,5 @@
+import { builtinGateway } from '../../builtin-gateway/runtime';
+import { coordinatorWakeTransport } from '../../coordinator/wake-after-commit';
 import { measured, readMetrics } from '../../../tests/helpers/read-metrics';
 import type { ModelMessage } from 'ai';
 import { completeAttentionQuestions } from '../../coordinator/question-attention';
@@ -60,6 +62,9 @@ test(
   "PG17 execution questions: durable waiting, exact facts/human source, one continuation, rollback and stop fences",
   { skip: !dbURL, timeout: 120000 },
   async (t) => {
+    const previousWake = coordinatorWakeTransport.wake;
+    coordinatorWakeTransport.wake = async () => undefined;
+    t.after(() => { coordinatorWakeTransport.wake = previousWake; });
     const fixtureURL = await isolatedPostgresURL(dbURL!);
     const schema = `questions_${randomUUID().replaceAll("-", "")}`;
     const admin = new Pool({ connectionString: fixtureURL, max: 1 });
@@ -251,6 +256,22 @@ test(
             [issueId, originRuns.get(issueId)],
           )
         ).rows[0].n;
+
+      await t.test("recovering a stopped question settles its prior continuation once", async (st) => {
+        const f = await fixture("context", false);
+        const settle = st.mock.method(questions, "settle");
+        const record = st.mock.method(questions, "record");
+        const reconcile = createFactoryReconciler(pool, store, questions);
+        assert.deepEqual(await reconcile.run(userId, f.runId), { recovered: 1 });
+        const question = await questions.read(userId, f.questionId);
+        assert.equal(question.status, "open");
+        assert.equal(question.originRunId, f.runId);
+        assert.equal((await store.read(userId, f.task.id)).task.status, "waiting");
+
+        assert.deepEqual(await reconcile.run(userId, f.runId), { recovered: 0 });
+        assert.equal(settle.mock.callCount(), 1);
+        assert.equal(record.mock.callCount(), 1);
+      });
 
       await t.test("Coordinator attention completes a permission handoff once without another read or a fabricated answer", async (t) => {
         const normal = await fixture('permission');
@@ -1838,6 +1859,7 @@ test(
         },
       );
     } finally {
+      await builtinGateway()?.stop();
       await closeWorkspaceDatabase();
       await pool.end();
       await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
