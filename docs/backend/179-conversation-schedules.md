@@ -17,6 +17,12 @@ or resume; an ordinary member gets `scheduleAdminRequired`. Legacy rows keep
 schedule creator's original chat. If its Bot is deleted, `bot_id` becomes null
 and the result falls back to the creator's Coordinator chat.
 
+`schedule_list` returns up to 100 visible schedules by default. Pass an integer
+`limit` from 1 through 100 to request a smaller page. Pass a non-null
+`nextCursor` back unchanged as `cursor` to continue. Pages are ordered by
+creation time and schedule ID, newest first. Each read checks the current
+workspace membership and conversation visibility.
+
 Request deduplication uses a frozen internal `request_origin` rather than the
 mutable `bot_id`. Two Bots can use the same SDK tool-call ID; removing either
 Bot preserves its schedule without merging their request keys. The internal
