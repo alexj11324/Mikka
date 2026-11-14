@@ -274,15 +274,32 @@ export async function revokeShares(reader: ArtifactReader, artifactId: string): 
   })
 }
 
-/** The artifact a live share token opens, at its latest version. */
-export async function sharedArtifact(token: string): Promise<(ArtifactDetail & { content: string }) | null> {
+async function sharedArtifactAccess(token: string) {
   if (!token.startsWith(SHARE_PREFIX)) return null
   const [share] = await db.select({ artifactId: artifactShares.artifactId, createdBy: artifactShares.createdBy }).from(artifactShares)
     .where(and(eq(artifactShares.tokenHash, sha256(token)), isNull(artifactShares.revokedAt))).limit(1)
   if (!share) return null
   // A removed/suspended issuer cannot leave an anonymous back door into a tenant.
-  const found = await detail(and(eq(artifacts.id, share.artifactId), await artifactAccess(share.createdBy)))
+  return and(eq(artifacts.id, share.artifactId), await artifactAccess(share.createdBy))
+}
+
+/** Markdown is rendered inline. An HTML share's iframe reads its own body. */
+export async function sharedArtifact(token: string): Promise<(ArtifactDetail & { content: string | null }) | null> {
+  const access = await sharedArtifactAccess(token)
+  if (!access) return null
+  const found = await detail(access)
   if (!found) return null
+  if (found.kind === 'html') return found.versions.some(row => row.version === found.latestVersion) ? { ...found, content: null } : null
   const content = await versionContent(found.id, found.latestVersion)
   return content === null ? null : { ...found, content }
+}
+
+/** The sandboxed frame needs the latest HTML body without author/version history. */
+export async function sharedArtifactFrame(token: string): Promise<string | null> {
+  const access = await sharedArtifactAccess(token)
+  if (!access) return null
+  const [row] = await db.select({ storageKey: artifactVersions.storageKey, inlineContent: artifactVersions.inlineContent })
+    .from(artifacts).innerJoin(artifactVersions, and(eq(artifactVersions.artifactId, artifacts.id), eq(artifactVersions.version, artifacts.latestVersion)))
+    .where(and(access, eq(artifacts.kind, 'html'))).limit(1)
+  return row ? row.inlineContent ?? await getArtifactObject(row.storageKey) : null
 }
