@@ -12,6 +12,8 @@ import { Collaboration } from "@tiptap/extension-collaboration"
 import { ySyncPluginKey } from "@tiptap/y-tiptap"
 import * as Y from "yjs"
 import { Check, FileText, MessageSquare, X } from "lucide-react"
+import { flushSync } from "react-dom"
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -66,7 +68,7 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
     const body = issueContentToMarkdown(initialContent)
     return body.length >= 1000 && /\bsha-?256\b|file contract|文件契约|Before editing, compare this task with the actual Git origin/i.test(body)
   })
-  const instructionsDisclosure = useRef<HTMLDetailsElement>(null)
+  const [instructionsOpen, setInstructionsOpen] = useState(false)
   const unreadable = !sharedDoc && initialContent === null
   // Read-only shows no typing hint, including on the empty document that stands in for unreadable content.
   const placeholder = disabled || unreadable ? null : compact ? t('placeholderCompact') : t('placeholderFull')
@@ -198,7 +200,7 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
       let to = 0
       editor.state.doc.descendants((node, pos) => { if (node.isText && node.marks.some(mark => mark.type.name === 'comment' && mark.attrs.id === id)) { from ??= pos; to = pos + node.nodeSize } })
       if (from !== undefined) {
-        if (instructionsDisclosure.current) instructionsDisclosure.current.open = true
+        if (foldInstructions && !instructionsOpen) flushSync(() => setInstructionsOpen(true))
         editor.chain().focus().setTextSelection({ from, to }).scrollIntoView().run()
       }
     },
@@ -228,10 +230,10 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
       </div>}</>}
     </section>
     return <TooltipProvider delay={300}>
-      {foldInstructions ? <details ref={instructionsDisclosure}>
-        <summary className="cursor-pointer text-sm text-muted-foreground">{t('executionInstructions')}</summary>
-        {description}
-      </details> : description}
+      {foldInstructions ? <Collapsible open={instructionsOpen} onOpenChange={setInstructionsOpen}>
+        <CollapsibleTrigger className="cursor-pointer text-sm text-muted-foreground">{t('executionInstructions')}</CollapsibleTrigger>
+        <CollapsibleContent keepMounted>{description}</CollapsibleContent>
+      </Collapsible> : description}
       {layout === 'issue' && !compact && afterDescription}
       {layout === 'issue' && !compact && issueId && (renderActivity ? renderActivity({ issueId, ...discussions }) : <IssueActivity issueId={issueId} events={activity} {...discussions} />)}
       <DeleteTableDialog editor={editor} open={deleteTableOpen} onOpenChange={setDeleteTableOpen} />

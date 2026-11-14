@@ -60,14 +60,14 @@ test('legacy machine instructions can be opened without hiding related work or r
   const { container, done } = await render(<IssueEditor issueId="legacy-instructions" layout="issue" content={content}
     onChange={() => { throw new Error('opening instructions cannot edit the task') }} afterDescription={<a href="#linked-work">Related conversation</a>} />)
   try {
-    const disclosure = container.querySelector('details')
+    const disclosure = container.querySelector('[data-slot="collapsible"]')
     assert.ok(disclosure)
-    assert.equal(disclosure.open, false)
-    const summary = disclosure.querySelector('summary')
+    const summary = disclosure.querySelector<HTMLButtonElement>('button[data-slot="collapsible-trigger"]')
+    assert.equal(summary?.getAttribute('aria-expanded'), 'false')
     assert.ok(summary?.textContent)
     assert.ok(!disclosure.contains(container.querySelector('a[href="#linked-work"]')))
     await act(async () => { summary.click() })
-    assert.equal(disclosure.open, true)
+    assert.equal(summary.getAttribute('aria-expanded'), 'true')
     assert.equal(disclosure.querySelector('.ProseMirror')?.getAttribute('contenteditable'), 'true')
     assert.equal(disclosure.querySelector('.ProseMirror')?.textContent, raw)
   } finally { await done() }
@@ -80,7 +80,7 @@ test('a long human task brief stays visible', async () => {
     { type: 'paragraph', content: [{ type: 'text', text }] },
   ] }} onChange={() => {}} />)
   try {
-    assert.equal(container.querySelector('details'), null)
+    assert.equal(container.querySelector('[data-slot="collapsible"]'), null)
     assert.equal(container.querySelector('.ProseMirror')?.textContent, text)
   } finally { await done() }
 })
