@@ -77,6 +77,16 @@ test('a message to an ended thread runs it again in the same thread; only its ow
   }
   const end = (runId: string, status: string) => pool.query(`UPDATE agent_runs SET status=$2,"finishedAt"=now(),"updatedAt"=now() WHERE id=$1`, [runId, status])
 
+  // An admitted test subscription reports a fresh allowance. Keep the original
+  // plan, limits and status when a later subtest reuses a long-lived account.
+  async function observeFixtureAllowance(account: { id: string; connection: string }) {
+    const result = await pool.query(
+      `UPDATE byos_connections SET quota=jsonb_set(quota,'{observedAt}',to_jsonb($3::text))
+       WHERE id=$1 AND "ownerId"=$2 AND state='connected'`,
+      [account.connection, account.id, new Date().toISOString()],
+    )
+    assert.equal(result.rowCount, 1)
+  }
   const a = await person()
   const first = await steps.dispatchRun(a.id, { issueId: a.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, a.botId) as unknown as { runId: string; thread: string }
   assert.equal(first.thread, 'new', JSON.stringify(first))
@@ -294,6 +304,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       await assert.rejects(sendThreadMessage(b.id, initial.runId, 'Changed answer.', human, requestId), { code: 'submissionConflict' })
       await assert.rejects(sendThreadMessage(a.id, initial.runId, text, human, requestId), { code: 'runNotFound' })
       await pool.query('UPDATE thread_machines SET "workerLeaseUntil"=NULL WHERE "runId"=$1', [initial.runId])
+      await observeFixtureAllowance(b)
       const retried = await Promise.all(Array.from({ length: 3 }, () => sendThreadMessage(b.id, initial.runId, text, human, requestId)))
       const accepted = retried[0]
       for (const result of retried) assert.deepEqual(result, accepted)
@@ -493,6 +504,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
   })
 
   await t.test('repeated owner text is a fresh request after an intervening target', async () => {
+    await observeFixtureAllowance(a)
     const epochs: string[] = [];
     for (const text of ['Use exactly 74 bytes.', 'Use exactly 77 bytes.', 'Use exactly 74 bytes.']) {
       await sendThreadMessage(a.id, first.runId, text);
@@ -507,6 +519,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     // executor. End the current run, while keeping the original thread URL.
     let last = (await readRunChain(pool, a.id, first.runId))!.latestRunId
     for (const status of ['succeeded', 'failed', 'stopped', 'cancelled']) {
+      await observeFixtureAllowance(a)
       await end(last, status)
       const text = `Go on after ${status}.`
       // Sent from the thread as it was opened: the first run's id, never the newest.
