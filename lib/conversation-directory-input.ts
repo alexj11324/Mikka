@@ -14,7 +14,7 @@ export type DirectoryState = Exclude<z.output<typeof directoryInput>['state'], '
 
 export interface ConversationDirectoryPage {
   items: {
-    id: string; issueId: string | null; identifier: string | null; title: string
+    kind?: 'run' | 'chat'; id: string; issueId: string | null; identifier: string | null; title: string
     state: DirectoryState; at: string; pinned: boolean; unread: boolean
   }[]
   cursor: NonNullable<DirectoryInput['cursor']> | null

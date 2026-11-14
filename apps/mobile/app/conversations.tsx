@@ -35,7 +35,7 @@ export default function Conversations() {
   const params = new URLSearchParams({ workspaceId: workspaceId ?? '', search, state, archived: String(archived) })
   if (botId) params.set('botId', botId)
   const path = workspaceId ? '/api/mobile/conversations?' + params : null
-  const list = useLiveApi<Page>(path, () => ({ refs: [listRef('thread_list', workspaceId)], minIntervalMs: 2_000 }))
+  const list = useLiveApi<Page>(path, () => ({ refs: [listRef('thread_list', workspaceId), listRef('group_list', workspaceId)], minIntervalMs: 2_000 }))
   const page = list.data?.workspaceId === workspaceId ? list.data : null
   const pages = useTaskContinuation(page?.items ?? [], page, page?.cursor ?? null, async cursor => {
     const context = apiCache.context()
@@ -54,13 +54,13 @@ export default function Conversations() {
     return { items: result.items, next: result.cursor }
   })
   const refresh = useRefresh(list.reload)
-  async function mark(runId?: string) {
+  async function mark(body: { action: 'unread'; runId: string } | { action: 'unread'; chatId: string } | { action: 'readAll' }) {
     if (pending.current || !workspaceId) return
     pending.current = true
     setWriting(true)
     setWriteError(false)
     try {
-      await api('/api/conversations/read-state', { method: 'POST', body: runId ? { action: 'unread', runId } : { action: 'readAll' } })
+      await api('/api/conversations/read-state', { method: 'POST', body })
       await list.reload()
     } catch { setWriteError(true) }
     finally { pending.current = false; setWriting(false) }
@@ -71,15 +71,15 @@ export default function Conversations() {
       ListHeaderComponent={<View style={styles.controls}>
         <Segmented options={states.map(value => ({ value, label: labels[value] }))} value={state} onChange={setState} />
         <Row label={labels.archived} value={archived ? '✓' : undefined} onPress={() => setArchived(!archived)} />
-        <GlassButton label={labels.readAll} busy={writing} disabled={!page} onPress={() => void mark()} />
+        <GlassButton label={labels.readAll} busy={writing} disabled={!page} onPress={() => void mark({ action: 'readAll' })} />
         {writeError && <Text accessibilityRole="alert">{labels.writeError}</Text>}
         <ReadNotice error={list.error} label={labels.title} hasData={Boolean(page)} onRetry={list.reload} />
       </View>}
       renderItem={({ item }) => <View>
         <Row label={item.title || labels.untitled} value={item.unread ? labels.unread : undefined}
           detail={[labels[item.state], item.identifier, new Date(item.at).toLocaleString(mobileLocale)].filter(Boolean).join(' · ')}
-          onPress={() => router.push(`/thread/${item.id}`)} />
-        {!item.unread && <View style={styles.action}><GlassButton label={labels.markUnread} disabled={writing} onPress={() => void mark(item.id)} /></View>}
+          onPress={() => router.push(item.kind === 'chat' ? `/groups/${item.id}` : `/thread/${item.id}`)} />
+        {!item.unread && <View style={styles.action}><GlassButton label={labels.markUnread} disabled={writing} onPress={() => void mark(item.kind === 'chat' ? { action: 'unread', chatId: item.id } : { action: 'unread', runId: item.id })} /></View>}
       </View>}
       ListEmptyComponent={!list.error ? <Text style={styles.action}>{list.loading || !workspaceId ? labels.loading : labels.empty}</Text> : undefined}
       ListFooterComponent={pages.hasMore ? <View style={styles.action}><GlassButton label={pages.failed ? labels.retry : labels.more}
