@@ -47,8 +47,8 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     const issueId = randomUUID()
     await pool.query(`INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority) VALUES ($1,'owner',$2,'修复登录后的工作区前缀和查询参数丢失问题并补充回归测试','{"type":"doc"}','doing','normal')`, [issueId, workspaceId])
     const asked = '排查登录回调里丢失的 workspace 前缀\n补上回归测试'
-    const run = async (extra: { continues?: string; prompt?: string; finished?: boolean } = {}) => {
-      const id = randomUUID(), prompt = extra.prompt ?? asked
+    const run = async (extra: { id?: string; continues?: string; prompt?: string; finished?: boolean } = {}) => {
+      const id = extra.id ?? randomUUID(), prompt = extra.prompt ?? asked
       await pool.query(`INSERT INTO agent_runs (id,"userId","workspaceId","issueId","agentId",status,prompt,"promptTaskStart","promptTaskLength","continuesRunId",report,"finishedAt")
         VALUES ($1,'owner',$2,$3,$4,$5,$6,0,$7,$8,$9,$10)`, [id, workspaceId, issueId, agentId, extra.finished ? 'succeeded' : 'running', prompt, prompt.length, extra.continues ?? null,
         extra.finished ? JSON.stringify({ summary: 'Restored the workspace prefix in the callback' }) : null, extra.finished ? new Date() : null])
@@ -271,13 +271,13 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     await pool.query(`UPDATE chat_preferences SET "markedUnread"=false WHERE "userId"='owner' AND "chatKey"=$1`, [id])
 
     // Both storage kinds use one page boundary even when activity timestamps coincide.
-    const pageRun = await run({prompt:'Mixed page boundary'})
+    const pageRun = await run({id:'00000000-0000-4000-8000-000000000001',prompt:'Mixed page boundary'})
     const mixed = await pool.query(`WITH created AS (
       INSERT INTO conversations (id,"workspaceId",kind,title,"createdBy","creationPurpose","createdAt")
-      SELECT gen_random_uuid(), $1, 'group', 'Mixed page boundary ' || n, 'owner', 'conversation', '2026-01-01T00:00:00Z'
+      SELECT CASE WHEN n=100 THEN $2::uuid ELSE gen_random_uuid() END, $1, 'group', 'Mixed page boundary ' || n, 'owner', 'conversation', '2026-01-01T00:00:00Z'
       FROM generate_series(1,100) n RETURNING id
     ) INSERT INTO conversation_members ("conversationId","memberType","memberId",role)
-      SELECT id,'user','owner','owner' FROM created RETURNING "conversationId" AS id`, [workspaceId])
+      SELECT id,'user','owner','owner' FROM created RETURNING "conversationId" AS id`, [workspaceId,pageRun])
     await pool.query(`UPDATE agent_runs SET "createdAt"='2026-01-01T00:00:00Z',"updatedAt"='2026-01-01T00:00:00Z' WHERE id=$1`, [pageRun])
     const mixedInput = {search:'mixed page boundary',archived:'any' as const}
     const firstMixed = await conversationDirectory(pool,'owner',workspaceId,mixedInput)
@@ -287,6 +287,12 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     assert.equal(remaining.cursor, null)
     assert.equal(remaining.items.length, 1)
     assert.deepEqual(new Set([...firstMixed.items,...remaining.items].map(row => row.id)),new Set([pageRun,...mixed.rows.map(row=>row.id)]))
+    const sameId = [...firstMixed.items, ...remaining.items].filter(row => row.id === pageRun)
+    assert.deepEqual(sameId.map(row => row.kind).sort(), ['chat', 'run'], 'both independent objects span the page boundary')
+    const { kind: cursorKind, ...legacyCursor } = firstMixed.cursor
+    assert.equal(cursorKind, 'run')
+    assert.deepEqual((await conversationDirectory(pool, 'owner', workspaceId, { ...mixedInput, cursor: legacyCursor })).items, [],
+      'a cursor sent by a previous client preserves the old exclusive UUID boundary')
     // The sidebar, header and archive filter use the same idle clock for a named chat.
     await pool.query(`UPDATE user_preferences SET "archiveIdleAfterDays"=3 WHERE "userId"='owner'`)
     await pool.query(`UPDATE conversations SET "createdAt"=now()-interval '10 days',"conversationRestoredAt"=NULL WHERE id=$1`, [id])
