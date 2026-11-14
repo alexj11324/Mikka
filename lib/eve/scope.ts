@@ -29,10 +29,20 @@ export async function assertEveScope(scope: EveScope) {
 export async function registerSession(scope: EveScope, sessionId: string) {
   await assertEveScope(scope)
   const { pool } = await import('../db')
-  const row = await pool.query(`INSERT INTO eve_sessions(session_id,owner_id,bot_id,workspace_id,surface)
-    VALUES($1,$2,$3,$4,$5) ON CONFLICT(session_id) DO UPDATE SET session_id=excluded.session_id
-    WHERE eve_sessions.owner_id=excluded.owner_id AND eve_sessions.bot_id=excluded.bot_id
-      AND eve_sessions.workspace_id=excluded.workspace_id AND eve_sessions.surface=excluded.surface RETURNING session_id`,
+  // The primary key binds a session once. With a matching existing owner,
+  // return the verification result without updating its physical PostgreSQL row.
+  const row = await pool.query(`WITH existing AS (
+      SELECT owner_id=$2 AND bot_id=$3 AND workspace_id=$4 AND surface=$5 AS matches
+      FROM eve_sessions WHERE session_id=$1
+    ), inserted AS (
+      INSERT INTO eve_sessions(session_id,owner_id,bot_id,workspace_id,surface)
+      SELECT $1,$2,$3::uuid,$4::uuid,$5 WHERE NOT EXISTS (SELECT 1 FROM existing)
+      ON CONFLICT(session_id) DO UPDATE SET session_id=excluded.session_id
+      WHERE eve_sessions.owner_id=excluded.owner_id AND eve_sessions.bot_id=excluded.bot_id
+        AND eve_sessions.workspace_id=excluded.workspace_id AND eve_sessions.surface=excluded.surface
+      RETURNING true
+    )
+    SELECT 1 FROM existing WHERE matches UNION ALL SELECT 1 FROM inserted`,
   [sessionId, scope.ownerId, scope.botId, scope.workspaceId, scope.surface])
   if (!row.rowCount) throw new Error('workspaceAccessDenied')
 }
