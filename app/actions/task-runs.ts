@@ -1,5 +1,6 @@
 'use server'
 
+import type { DirectoryInput } from '@/lib/conversation-directory-input'
 import type { ConversationOrganizationChange } from '@/lib/conversation-organization'
 import { runAwaitingApproval, runHistoryWindow } from '@/lib/task-state-query'
 import { singleFlight } from '@/lib/single-flight'
@@ -218,7 +219,7 @@ async function conversationActor() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
   const context = await loadWorkspaceContext(undefined, session.user)
-  return { ownerId: session.user.id, workspaceId: context.workspace.id }
+  return { reader: session.user, ownerId: session.user.id, workspaceId: context.workspace.id }
 }
 
 /**
@@ -283,4 +284,11 @@ export async function setConversationOrganization(runId: string, change: Convers
   const state = await conversationOrganization(pool, ownerId, workspaceId, runId, change)
   if (state) await (await import('@/lib/live/lists')).runListChanged(pool, runId)
   return state
+}
+
+export async function listConversations(input: DirectoryInput) {
+  const { reader, workspaceId } = await conversationActor()
+  const { conversationDirectory } = await import('@/lib/conversation-directory')
+  const { pool } = await import('@/lib/db')
+  return conversationDirectory(pool, reader, workspaceId, input)
 }

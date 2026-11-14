@@ -4418,6 +4418,22 @@
     "copied": "ID 已复制",
     "copyFailed": "复制失败"
   },
+  "ConversationDirectory": {
+    "title": "对话",
+    "search": "搜索对话",
+    "all": "全部",
+    "working": "进行中",
+    "waiting": "待处理",
+    "idle": "空闲",
+    "failed": "失败",
+    "archived": "已归档",
+    "loadError": "未能加载对话。",
+    "retry": "重试",
+    "loading": "正在加载对话…",
+    "empty": "没有匹配的对话。",
+    "untitled": "未命名对话",
+    "more": "加载更多"
+  },
   "IssueThreads": {
     "organization": {
       "archive": "归档对话",

@@ -48,7 +48,7 @@ const bot = { id: '3f0c9d2e-5b1a-4c7e-9f00-1a2b3c4d5e6f', name: 'Ada', coordinat
 const botList = { data: { items: [bot] } }
 const router = { push: (href: string) => browser.history.pushState({}, '', href), replace: (href: string) => browser.history.replaceState({}, '', href), refresh: nothing }
 
-mock.module('next-intl', { namedExports: { useLocale: () => 'en', useTranslations: (namespace?: string) => Object.assign((key: string) => namespace ? `${namespace}.${key}` : key, { has: () => false }) } })
+mock.module('next-intl', { namedExports: { useLocale: () => 'en', useTranslations: (namespace?: string) => Object.assign((key: string) => namespace ? `${namespace}.${key}` : key, { has: () => false }), useMessages: () => ({ IssueDetail: { work: { states: {} } }, GroupTask: { stage: {}, status: {} } }), useFormatter: () => ({ dateTime: () => '' }) } })
 mock.module('next/navigation', { namedExports: { useSearchParams: () => new URLSearchParams(browser.location.search) } })
 mock.module('@/i18n/navigation', { namedExports: { getPathname: ({ href }: { href: string }) => href, usePathname: () => browser.location.pathname, useRouter: () => router } })
 mock.module('../settings/settings-link.tsx', { namedExports: { SettingsLink: ({ href, children }: { href: string; children?: ReactNode }) => <a href={href}>{children}</a> } })
@@ -322,6 +322,11 @@ async function go(href: string) {
   browser.history.pushState({}, '', href)
   await render()
 }
+async function popTo(href: string, renderFrame = render) {
+  browser.history.replaceState({}, '', href)
+  await act(async () => { browser.dispatchEvent(new browser.PopStateEvent('popstate')) })
+  await renderFrame()
+}
 
 test('Team Projects distinguishes unavailable associations from an empty list and keeps Workspace Projects independent', async () => {
   scopedTeamFixture = true
@@ -593,8 +598,8 @@ test('a cold Settings chunk keeps the same frame, bar and rail; returning keeps 
   await go('/settings/members?workspace=workspace-one&invite=1')
   assert.equal(container.querySelector('[data-invite]')?.getAttribute('data-invite'), 'true')
 
-  await act(async () => button('chats').click())
-  await render()
+  // The Chats rail button opens the conversation directory; browser Back returns to the prior chat.
+  await popTo('/?workspace=workspace-one')
   assert.ok(frame() === original.frame, 'the frame DOM node must survive Settings navigation')
   assert.ok(bar() === original.bar, 'the window bar DOM node must survive Settings navigation')
   assert.ok(rail() === original.rail, 'the rail DOM node must survive Settings navigation')
@@ -610,7 +615,7 @@ test('a cold Settings chunk keeps the same frame, bar and rail; returning keeps 
   assert.equal(railMounts, 1)
 })
 
-test('legacy Settings also loads inside the frame and keeps it when returning to chat', async () => {
+test('legacy Settings also loads inside the frame and the Chats rail opens the conversation directory', async () => {
   await render({ initialSettingsSection: 'account' })
   const original = { frame: frame(), bar: bar(), rail: rail() }
   assert.ok(original.frame && original.bar && original.rail, 'legacy Settings must retain the real shell while its chunk loads')
@@ -619,7 +624,8 @@ test('legacy Settings also loads inside the frame and keeps it when returning to
   assert.ok(container.querySelector('[data-settings-section="account"]'))
   await act(async () => button('chats').click())
   await render()
-  assert.ok(container.querySelector('textarea'))
+  assert.equal(new URLSearchParams(browser.location.search).get('section'), 'conversations')
+  assert.equal(container.querySelector('textarea'), null, 'the conversation directory is not an active composer')
   assert.ok(frame() === original.frame, 'the frame DOM node must survive Settings navigation')
   assert.ok(bar() === original.bar, 'the window bar DOM node must survive Settings navigation')
   assert.ok(rail() === original.rail, 'the rail DOM node must survive Settings navigation')
@@ -648,8 +654,8 @@ test('hosted Settings preserves pending browser notes and the computer registry 
   await act(async () => { releaseChunk(); await chunkReady })
   const duringSettings = { notes: notes?.notes.length ?? null, hasComposer: notes?.hasComposer ?? null, computerRun: computerThread?.runId ?? null }
 
-  await act(async () => button('hosted chats').click())
-  await renderHosted()
+  // The Chats rail opens the directory; return with browser Back to the prior chat.
+  await popTo('/?workspace=workspace-one', renderHosted)
   const after = { draft: container.querySelector('textarea')?.value, notes: notes?.notes.map(note => [note.n, note.note]), computerRun: computerThread?.runId ?? null }
   t.diagnostic(JSON.stringify({ duringSettings, after }))
   assert.deepEqual(after, { draft: 'hosted unsent draft', notes: [[1, 'keep hosted annotation']], computerRun: registeredComputerThread.runId })

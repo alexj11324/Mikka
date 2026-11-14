@@ -34,6 +34,7 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     workspacePool = (await import('../lib/workspace-db')).workspacePool
     const { nameConversation, renameConversationTitle } = await import('../lib/conversation-title-server')
     const { conversationOrganization } = await import('../lib/conversation-organization')
+    const { conversationDirectory } = await import('../lib/conversation-directory')
     const dir = new URL('../drizzle/', import.meta.url)
     for (const f of orderMigrations((await readdir(dir)).filter(f => f.endsWith('.sql')))) await pool.query(await readFile(new URL(f, dir), 'utf8'))
     await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','O','o@example.invalid',true,now(),now()),('other','X','x@example.invalid',true,now(),now())`)
@@ -135,6 +136,22 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     assert.deepEqual(await organize(third, 'archived', false), { archived: false, pinned: true })
     assert.deepEqual(await organize(second, 'pinned', false), { archived: false, pinned: false })
     assert.equal(await renameConversationTitle(pool, first, 'owner', 'wrong workspace', randomUUID()), null)
+
+    const unlinked = await run({ prompt: 'Needle question' })
+    await pool.query(`UPDATE agent_runs SET "issueId"=NULL, "createdAt"=now()-interval '60 days' WHERE id=$1`, [unlinked])
+    const search = { search: 'needle' }
+    const directory = await conversationDirectory(pool, 'owner', workspaceId, search)
+    assert.deepEqual(directory.items.map(row => [row.id, row.issueId, row.title, row.state]), [[unlinked, null, 'Needle question', 'working']])
+    assert.deepEqual((await conversationDirectory(pool, 'other', workspaceId, search)).items, [])
+    assert.deepEqual((await conversationDirectory(pool, 'owner', foreignWorkspace, search)).items, [])
+    assert.deepEqual((await conversationDirectory(pool, 'owner', workspaceId, { ...search, state: 'failed' })).items, [])
+    await pool.query("UPDATE agent_runs SET status='failed' WHERE id=$1", [unlinked])
+    assert.equal((await conversationDirectory(pool, 'owner', workspaceId, { ...search, state: 'failed' })).items[0].id, unlinked)
+    await organize(unlinked, 'pinned', true)
+    assert.equal((await conversationDirectory(pool, 'owner', workspaceId, {})).items[0].id, unlinked)
+    await organize(unlinked, 'archived', true)
+    assert.deepEqual((await conversationDirectory(pool, 'owner', workspaceId, search)).items, [])
+    assert.equal((await conversationDirectory(pool, 'owner', workspaceId, { ...search, archived: true })).items[0].id, unlinked)
 
     // Regenerate is the person asking for a generated title again.
     assert.equal(await nameConversation(pool, first, 'owner', 'regenerate', model('登录回调与前缀')), '登录回调与前缀')

@@ -1750,5 +1750,26 @@
     "behavior": "Add two nullable PostgreSQL timestamps for pinning and archiving. Earlier application revisions can leave both columns in place.",
     "test": "tests/conversation-title.db.test.ts",
     "suite": "test:run-publication-db"
+  },
+  "lib/conversation-directory.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Search authorized workspace conversations by their own titles, including task-free historical runs. Page by activity after resolving continuation chains in installation PostgreSQL.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "lib/conversation-directory-input.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Search authorized workspace conversations by their own titles, including task-free historical runs. Page by activity after resolving continuation chains in installation PostgreSQL.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "lib/run-chain.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Search authorized workspace conversations by their own titles, including task-free historical runs. Page by activity after resolving continuation chains in installation PostgreSQL.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
   }
 }
