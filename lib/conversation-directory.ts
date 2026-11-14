@@ -8,9 +8,11 @@ import { threadUnread } from './thread-reads'
 import { runBotId } from './run-bot-name'
 import { runChainSql, RUN_CHAIN_MAX_DEPTH, type RunChainQueryable } from './run-chain'
 import { threadName } from './issue-threads'
+import { pullRequestSchema, type IssuePullRequest } from './issue-metadata'
 import { conversationTitle } from './short-title'
 
 type Row = {
+  pulls: unknown[]
   id: string; issueId: string | null; identifier: string | null; title: string | null; asked: string
   taskTitle: string | null; agentName: string; pinned: boolean; at: string; state: DirectoryState
   botId: string | null; status: string | null; harness: string | null; position: number; unread: boolean
@@ -34,7 +36,7 @@ function conversationQuery() {
     FROM assigned a JOIN agent_runs r ON r.id=a.id WHERE NOT a."depthExceeded"
     ORDER BY a.root,r."createdAt" DESC,r.id DESC
   ), roots AS (
-    SELECT root.id,EXISTS (SELECT 1 FROM assigned receipt JOIN agent_runs ON agent_runs.id=receipt.id
+    SELECT delivered.pulls,root.id,EXISTS (SELECT 1 FROM assigned receipt JOIN agent_runs ON agent_runs.id=receipt.id
       LEFT JOIN conversation_reads ON conversation_reads."userId"=${owner} AND conversation_reads."conversationId"='run:' || agent_runs.id::text
       WHERE receipt.root=root.id AND NOT receipt."depthExceeded" AND (${unread.sql})) AS unread, coalesce(agent_runs.title,root.title) AS title, agents.name AS "agentName",agents.harness,
       root."issueId",i."issuedIdentifier" AS identifier,i.title AS "taskTitle",i.status,agent_runs.status AS "runStatus",
@@ -62,6 +64,19 @@ function conversationQuery() {
       CROSS JOIN LATERAL (${attribution.sql}) resolved JOIN bots matched ON matched.id=resolved.id
         AND matched."workspaceId"=${workspace} AND matched."ownerId"=${owner}
       WHERE agent_runs.id=root.id LIMIT 1) bot ON true
+      CROSS JOIN LATERAL (
+        SELECT coalesce(jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
+          'url',pr->'url','title',pr->'title','state',pr->'state','additions',pr->'additions','deletions',pr->'deletions'
+        )) ORDER BY pr->>'url'), '[]'::jsonb) AS pulls
+        FROM (
+          SELECT DISTINCT ON (p."pullRequest"->>'url') p."pullRequest" AS pr
+          FROM assigned a JOIN run_publications p ON p."runId"=a.id
+          WHERE a.root=root.id AND NOT a."depthExceeded" AND p."userId"=${owner}
+            AND p."issueId"=root."issueId" AND p.status='published'
+            AND p."pullRequest"->>'state' IN ('draft','open','merged','closed')
+          ORDER BY p."pullRequest"->>'url',p."updatedAt" DESC,p."runId" DESC
+        ) by_url
+      ) delivered
     WHERE root."issueId" IS NULL OR i.id IS NOT NULL
   ), visible AS (
     SELECT *,to_char(touched AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at,
@@ -77,24 +92,25 @@ export async function effectiveConversationArchive(database: RunChainQueryable, 
 }
 
 function item(row: Row) {
-  return { kind: 'run' as const, id: row.id, issueId: row.issueId, identifier: row.identifier, title: conversationTitle({ title: row.title,
+  return { pulls: row.pulls.flatMap((raw): IssuePullRequest[] => { const parsed = pullRequestSchema.safeParse(raw); return parsed.success ? [parsed.data] : [] }), taskTitle: row.taskTitle, kind: 'run' as const, id: row.id, issueId: row.issueId, identifier: row.identifier, title: conversationTitle({ title: row.title,
     name: threadName(row.asked, ''), issue: { title: row.taskTitle || row.agentName } }), state: row.state, unread:row.unread, at: row.at, pinned: row.pinned }
 }
 
 export async function conversationDirectory(database: RunChainQueryable, userId: string, workspaceId: string, raw: DirectoryInput) {
   const input = directoryInput.parse(raw)
   const param = (i: number) => '$' + (facts.params.length + i)
-  const [archived,bot,search,state,id,pinned,at] = Array.from({length:7}, (_,i) => param(4+i))
-  const statement = conversationQuery() + ` SELECT * FROM visible WHERE archived=${archived}
+  const [archived,bot,search,state,id,pinned,at,pullState] = Array.from({length:8}, (_,i) => param(4+i))
+  const statement = conversationQuery() + ` SELECT * FROM visible WHERE (${archived}::boolean IS NULL OR archived=${archived})
+    AND (${pullState}='all' OR (${pullState}='linked' AND jsonb_array_length(pulls)>0) OR pulls @> jsonb_build_array(jsonb_build_object('state',${pullState}::text)))
     AND (${bot}::uuid IS NULL OR "botId"=${bot}) AND (${state}='all' OR state=${state})
     AND (${search}='' OR strpos(lower(coalesce(title,nullif(trim(asked),''),"taskTitle","agentName")),lower(${search}))>0)
     AND (${id}::uuid IS NULL OR (pinned,touched,visible.id)<(${pinned}::boolean,${at}::timestamptz,${id}::uuid))
     ORDER BY pinned DESC,touched DESC,visible.id DESC LIMIT 101`
-  const rows = (await database.query(statement,[...facts.params,userId,workspaceId,RUN_CHAIN_MAX_DEPTH,input.archived,input.botId ?? null,
-    input.search,input.state,input.cursor?.id ?? null,input.cursor?.pinned ?? null,input.cursor?.at ?? null])).rows as Row[]
+  const rows = (await database.query(statement,[...facts.params,userId,workspaceId,RUN_CHAIN_MAX_DEPTH,input.archived === 'any' ? null : input.archived,input.botId ?? null,
+    input.search,input.state,input.cursor?.id ?? null,input.cursor?.pinned ?? null,input.cursor?.at ?? null,input.pullState])).rows as Row[]
   const batch = rows.slice(0,100)
   const items = batch.map(item).filter(row=>!input.search || row.title.toLowerCase().includes(input.search.toLowerCase()))
-  const chats = await standaloneChatDirectory(database, userId, workspaceId, input)
+  const chats = input.pullState === 'all' ? await standaloneChatDirectory(database, userId, workspaceId, input) : []
   const order = (a: { pinned: boolean; at: string; id: string }, b: typeof a) =>
     Number(b.pinned) - Number(a.pinned) || b.at.localeCompare(a.at) || b.id.localeCompare(a.id)
   const merged = [...items, ...chats].sort(order)

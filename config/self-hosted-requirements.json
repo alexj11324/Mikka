@@ -858,6 +858,13 @@
     "behavior": "Read the published web action manifest for the selected deployment. When the legacy manifest returns HTTP 404, use the release action contract with the same deployment pin and validate its compiler inventory.",
     "test": "apps/api/scripts/cloudflare-web.test.mjs"
   },
+  "lib/pull-request-appearance.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Groups already-authorized pull request states for conversation and sidebar badges using built-in icons.",
+    "test": "scripts/pull-requests-badge.test.tsx",
+    "suite": "test:issues"
+  },
   "lib/run-app-mcp.ts": {
     "mode": "built-in",
     "environment": [],

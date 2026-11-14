@@ -250,6 +250,20 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     assert.equal(await regenerateStandalone(pool, id, 'other', workspaceId, async () => { throw Error('unauthorized model call') }), null)
 
     assert.deepEqual((await pool.query(`SELECT "botId" FROM coordinator_bots WHERE "ownerId"='owner' AND "workspaceId"=$1`, [workspaceId])).rows, [{ botId: bot }])
+    // The publication on the second attempt resolves to the root. Counts and state come from the webhook store.
+    const delivered = () => conversationDirectory(pool, 'owner', workspaceId, { archived: 'any', pullState: 'linked' })
+    const published = (await delivered()).items.find(item => item.id === first)
+    assert.equal(published?.pulls[0].state, 'open')
+    await pool.query(`UPDATE run_publications SET "pullRequest"="pullRequest" || '{"state":"merged","additions":12,"deletions":4}'::jsonb WHERE "runId"=$1`, [second])
+    assert.deepEqual((await conversationDirectory(pool, 'owner', workspaceId, { pullState: 'open' })).items, [])
+    assert.deepEqual((await delivered()).items[0].pulls, [{
+      title: 'Keep the workspace prefix after sign-in', url: 'https://github.com/o/r/pull/7', state: 'merged', additions: 12, deletions: 4,
+    }])
+    await organize(first, 'archived', true)
+    assert.equal((await delivered()).items[0].id, first, 'the PR destination includes archived conversations')
+    for (const [reader, space] of [['other', workspaceId], ['owner', foreignWorkspace]]) {
+      assert.deepEqual((await conversationDirectory(pool, reader, space, { archived: 'any', pullState: 'merged' })).items, [])
+    }
 
     // Regenerate is the person asking for a generated title again.
     assert.equal(await nameConversation(pool, first, 'owner', 'regenerate', model('登录回调与前缀')), '登录回调与前缀')

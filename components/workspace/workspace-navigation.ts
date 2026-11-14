@@ -9,10 +9,11 @@ import { pushSettingsHistory } from '@/lib/settings-navigation'
  * Nothing outside this file and lib/settings-navigation.ts writes the
  * browser history; scripts/navigation-policy.mjs enforces that.
  */
-export type WorkspaceSection = 'conversations' | 'inbox' | 'my-issues' | 'agent' | 'coordinator' | 'group' | 'projects' | 'views' | 'team-home' | 'team-issues' | 'team-projects' | 'all-issues' | 'plugins' | 'suggestions' | 'artifacts' | 'memory'
+export type WorkspaceSection = 'pulls' | 'conversations' | 'inbox' | 'my-issues' | 'agent' | 'coordinator' | 'group' | 'projects' | 'views' | 'team-home' | 'team-issues' | 'team-projects' | 'all-issues' | 'plugins' | 'suggestions' | 'artifacts' | 'memory'
 
 export const SECTION_TITLE_KEYS: Record<WorkspaceSection, string> = {
   conversations: 'Nav.conversations',
+  pulls: 'ArtifactsPage.category.pullRequests',
   inbox: 'Nav.inbox',
   'my-issues': 'Nav.myTasks',
   agent: 'Nav.agent',
@@ -31,7 +32,7 @@ export const SECTION_TITLE_KEYS: Record<WorkspaceSection, string> = {
 }
 
 /** Sections a reload or a shared link reopens; the others start from their parent page. The Coordinator's chat is the default and needs none. */
-const URL_SECTIONS = ['conversations', 'agent', 'plugins', 'suggestions', 'artifacts', 'memory', 'all-issues', 'projects'] as const satisfies readonly WorkspaceSection[]
+const URL_SECTIONS = ['pulls', 'conversations', 'agent', 'plugins', 'suggestions', 'artifacts', 'memory', 'all-issues', 'projects'] as const satisfies readonly WorkspaceSection[]
 const READ_SECTIONS: readonly string[] = [...URL_SECTIONS, 'coordinator']
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 /** Query keys that belong to a page inside a section (the plugins page's app and category); a new place drops them. */
