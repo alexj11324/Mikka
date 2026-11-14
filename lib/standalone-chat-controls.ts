@@ -4,8 +4,6 @@ import type { RunChainQueryable } from './run-chain'
 
 const ownerScope = `c.id=$1 AND c."createdBy"=$2 AND c."workspaceId"=$3
   AND c.kind='group' AND c."creationPurpose"='conversation'
-  AND EXISTS (SELECT 1 FROM mikka_workspace_members w
-    WHERE w."workspaceId"=c."workspaceId" AND w."userId"=$2 AND w.status='active')
   AND EXISTS (SELECT 1 FROM conversation_members m WHERE m."conversationId"=c.id
     AND m."memberType"='user' AND m."memberId"=$2 AND m."leftAt" IS NULL)`
 
