@@ -4,6 +4,7 @@ import test, { mock } from 'node:test'
 import type { RunFailure } from '@mikka/protocol/run-failure'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { nextTaskListCursor } from '../lib/task-list-page'
+import { measured, readMetrics } from './helpers/read-metrics'
 
 // No business/local database fallback, including when REQUIRE_DB is unset.
 const url = process.env.E2E_DATABASE_URL
@@ -117,6 +118,31 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
     assert.equal((await readRun(owner,sharedRun))?.messages.length,1)
     assert.equal((await readRun(owner,sharedRun))?.run.report?.summary,'secret-report')
     assert.deepEqual((await readRun(owner,sharedRun))?.run.failureDetails, failureDetails)
+    await t.test('MCP run lists and nested issue run summaries do not transfer report bodies', async subtest => {
+      const read = () => scoped(owner, workspace, async () => ({
+        list: await tools.listRuns(owner, { issueId: shared }),
+        nested: (await tools.getIssue(owner, shared))?.runs,
+      }))
+      await read()
+      const before = await measured(read)
+      await pool.query(`UPDATE agent_runs SET report = report || jsonb_build_object('opaqueReport', repeat('r',32768))
+        WHERE id=$1`, [sharedRun])
+      try {
+        const after = await measured(read)
+        subtest.diagnostic(JSON.stringify({ normal: readMetrics(before), largeReport: readMetrics(after) }))
+        assert.deepEqual(after.value, before.value)
+        assert.equal(after.value.list[0]?.id, sharedRun)
+        assert.equal(after.value.nested?.[0]?.id, sharedRun)
+        assert.equal(after.value.list[0]?.stopReason, 'secret-stop')
+        const peer = await scoped(member, workspace, () => tools.listRuns(member, { issueId: shared, activeOnly: true }))
+        assert.equal(peer[0]?.id, sharedRun)
+        assert.equal(peer[0]?.agent, 'codex')
+        assert.equal(peer[0]?.stopReason, null)
+        assert.equal(after.resultBytes, before.resultBytes, 'status-only projections never read a full report')
+      } finally {
+        await pool.query(`UPDATE agent_runs SET report = report - 'opaqueReport' WHERE id=$1`, [sharedRun])
+      }
+    })
     const ownBrief = await visibleRuns(owner, { issueId: shared, brief: true })
     assert.equal(ownBrief[0].failureDetails?.code, 'run_api_key_invalid')
     assert.doesNotMatch(JSON.stringify(ownBrief[0].failureDetails), /secret-provider-message|APIError/)

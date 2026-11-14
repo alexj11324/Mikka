@@ -4,7 +4,7 @@ import 'server-only'
 import { and, desc, eq, gt, sql } from 'drizzle-orm'
 import { chatBotId } from '@/lib/coordinator/coordinator-bot'
 import type { ModelMessage } from 'ai'
-import { readRun, visibleRuns } from '@/lib/agent-runs'
+import { readRun } from '@/lib/agent-runs'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { peerCoordinatorMessageEvent } from '@/lib/coordinator-events'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
@@ -150,7 +150,8 @@ export async function getIssue(userId: string, issueId: string) {
   if (!taskReaderScope(userId).workspaceId) throw new ActionFailureError('workspaceAccessDenied')
   const issue = await issueForUser(userId, issueId)
   if (!issue) return null
-  const runs = await visibleRuns(userId, { issueId: issue.id, limit: 5 })
+  const { visibleRunStates } = await import('@/lib/agent-runs')
+  const runs = await visibleRunStates(userId, { issueId: issue.id, limit: 5 })
   const view = await issueView(issue)
   const metadata = view.metadata
   // Children and the issues this one blocks point at it, so they are found by looking the other way.
@@ -176,7 +177,8 @@ export async function getIssue(userId: string, issueId: string) {
 }
 
 export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }) {
-  const rows = await visibleRuns(userId, input)
+  const { visibleRunStates } = await import('@/lib/agent-runs')
+  const rows = await visibleRunStates(userId, input)
   return rows.map(run => ({ id: run.id, issueId: run.issueId, agent: run.agentName, status: run.status, stopReason: run.stopReason, createdAt: run.createdAt.toISOString() }))
 }
 
