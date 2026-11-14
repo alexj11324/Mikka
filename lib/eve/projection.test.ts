@@ -29,7 +29,7 @@ test('completed native calls retain results and dispatched thread cards after hi
 test('turn projection lists its native tools once across a long session',async t=>{
   const eve = await import('eve/events')
   let listed = 0, observed = 0
-  t.mock.module('eve/events',{exports:{...eve,calls:(...args:Parameters<typeof eve.calls>)=>{
+  t.mock.module('eve/events',{namedExports:{...eve,calls:(...args:Parameters<typeof eve.calls>)=>{
     listed++
     const result = eve.calls(...args)
     observed += result.length
