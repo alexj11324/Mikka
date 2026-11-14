@@ -1,0 +1,67 @@
+name: Original conversation baseline Eve artifact
+on:
+  push:
+    branches: [evidence/2254-sidebar-85dfc396]
+    paths: [.github/workflows/eve-baseline-evidence.yml]
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: github.repository == 'alexj11324/Mikka'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      MIKKA_BUILD_REVISION: 515afb30a7c87f19f1d3740893e3bcc2c78d319a
+      WORKFLOW_TARGET_WORLD: '@workflow/world-postgres'
+      NITRO_PRESET: node-server
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - name: Check out the fixed public product revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 515afb30a7c87f19f1d3740893e3bcc2c78d319a
+          persist-credentials: false
+      - name: Verify source commit and tree
+        run: |
+          test "$(git rev-parse HEAD)" = "$MIKKA_BUILD_REVISION"
+          test "$(git rev-parse 'HEAD^{tree}')" = f34c639917624be74914ac93e01e4a96eab84905
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.22.1
+      - name: Install the frozen public workspace dependencies
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+        run: pnpm install --frozen-lockfile
+      - name: Compile the official pinned Eve node-server application
+        run: node scripts/build-eve.mjs
+      - name: Verify and archive only the compiled public Eve output
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/eve-receipt"
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict'
+          import fs from 'node:fs'
+          import path from 'node:path'
+          const output='apps/eve/.output'
+          const marker=JSON.parse(fs.readFileSync(path.join(output,'mikka-eve-build.json')))
+          assert.deepEqual(marker,{version:1,eve:'1.0.0-rc.9',revision:process.env.MIKKA_BUILD_REVISION,preset:'node-server',world:'@workflow/world-postgres',worldVersion:'5.2.0'})
+          assert.ok(fs.statSync(path.join(output,'server/index.mjs')).size>0)
+          assert.ok(fs.statSync(path.join(output,'nitro.json')).size>0)
+          fs.writeFileSync(path.join(process.env.RUNNER_TEMP,'eve-receipt','source.json'),JSON.stringify({source:marker.revision,tree:'f34c639917624be74914ac93e01e4a96eab84905',qualificationRun:process.env.GITHUB_RUN_ID,build:marker},null,2)+'\n')
+          JS
+          tar -C apps/eve/.output -czf "$RUNNER_TEMP/eve-receipt/eve.tar.gz" .
+          cd "$RUNNER_TEMP/eve-receipt"
+          sha256sum eve.tar.gz source.json > SHA256SUMS
+          sha256sum --check SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: eve-2265-515afb30a7c87f19f1d3740893e3bcc2c78d319a
+          path: ${{ runner.temp }}/eve-receipt/
+          if-no-files-found: error
+          retention-days: 2
+          compression-level: 0
