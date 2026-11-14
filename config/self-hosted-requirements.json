@@ -1810,9 +1810,9 @@
   "app/api/mobile/conversations/route.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Serve the existing authorized conversation directory to an authenticated native client using the selected installation workspace.",
-    "test": "tests/conversation-title.db.test.ts",
-    "suite": "test:run-publication-db"
+    "behavior": "Read ranked Bot conversations and the complete directory through the authenticated native account’s selected workspace; reject other workspaces and withhold other owners’ rows.",
+    "test": "tests/mobile-tasks.db.test.ts",
+    "suite": "test:workspace-admin-db"
   },
   "app/api/conversations/read-state/route.ts": {
     "mode": "built-in",
@@ -1846,13 +1846,6 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Retain legacy group identity and admit owner-created named conversations to their durable read receipts.",
-    "test": "lib/thread-reads.db.test.ts",
-    "suite": "test:conversation-reads"
-  },
-  "lib/standalone-chat-directory.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Keep owner-created standalone chats in installation PostgreSQL and reopen them only through their active participant and workspace authorization.",
     "test": "lib/thread-reads.db.test.ts",
     "suite": "test:conversation-reads"
   },

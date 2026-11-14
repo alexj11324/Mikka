@@ -24,7 +24,7 @@ const states = ['all', 'working', 'waiting', 'idle', 'failed'] as const
 
 export default function Conversations() {
   const router = useRouter()
-  const { botId } = useLocalSearchParams<{ botId?: string }>()
+  const { botId, workspaceId: linkedWorkspace } = useLocalSearchParams<{ botId?: string; workspaceId?: string }>()
   const workspaceId = useHome().data?.workspace.id
   const [search, setSearch] = useState('')
   const [state, setState] = useState<NonNullable<DirectoryInput['state']>>('all')
@@ -32,11 +32,11 @@ export default function Conversations() {
   const [writing, setWriting] = useState(false)
   const [writeError, setWriteError] = useState(false)
   const pending = useRef(false)
-  const params = new URLSearchParams({ workspaceId: workspaceId ?? '', search, state, archived: String(archived) })
+  const params = new URLSearchParams({ workspaceId: linkedWorkspace ?? workspaceId ?? '', search, state, archived: String(archived) })
   if (botId) params.set('botId', botId)
   const path = workspaceId ? '/api/mobile/conversations?' + params : null
   const list = useLiveApi<Page>(path, () => ({ refs: [listRef('thread_list', workspaceId), listRef('group_list', workspaceId)], minIntervalMs: 2_000 }))
-  const page = list.data?.workspaceId === workspaceId ? list.data : null
+  const page = (!linkedWorkspace || linkedWorkspace === workspaceId) && list.data?.workspaceId === workspaceId ? list.data : null
   const pages = useTaskContinuation(page?.items ?? [], page, page?.cursor ?? null, async cursor => {
     const context = apiCache.context()
     const revision = path && apiCache.revision(path)
@@ -70,6 +70,7 @@ export default function Conversations() {
     <FlatList {...underBar} data={pages.items} keyExtractor={item => item.id} refreshControl={<RefreshControl {...refresh} />}
       ListHeaderComponent={<View style={styles.controls}>
         <Segmented options={states.map(value => ({ value, label: labels[value] }))} value={state} onChange={setState} />
+        <Row label={labels.archiveIdle} onPress={() => router.push('/settings/conversations')} />
         <Row label={labels.archived} value={archived ? '✓' : undefined} onPress={() => setArchived(!archived)} />
         <GlassButton label={labels.readAll} busy={writing} disabled={!page} onPress={() => void mark({ action: 'readAll' })} />
         {writeError && <Text accessibilityRole="alert">{labels.writeError}</Text>}

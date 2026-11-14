@@ -1,5 +1,5 @@
 import { directoryInput } from '@/lib/conversation-directory-input'
-import { conversationDirectory } from '@/lib/conversation-directory'
+import { conversationDirectory, conversationSidebar } from '@/lib/conversation-directory'
 import { pool } from '@/lib/db'
 import { json, mobileUser, unauthorized } from '@/lib/mobile-api'
 import { effectiveRequestWorkspace } from '@/lib/request-workspace'
@@ -10,6 +10,12 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams
   const workspaceId = await effectiveRequestWorkspace(user)
   if (!workspaceId || params.get('workspaceId') !== workspaceId) return json({ error: 'workspaceAccessDenied' }, 403)
+  if (params.get('view') === 'botChildren') {
+    const bot = directoryInput.shape.botId.unwrap().safeParse(params.get('botId'))
+    if (!bot.success) return json({ error: 'invalidInput' }, 422)
+    const groups = await conversationSidebar(pool, user, workspaceId, bot.data)
+    return json({ workspaceId, botId: bot.data, ...(groups[bot.data] ?? { items: [], more: false }) })
+  }
   const pinned = params.get('pinned')
   const archived = params.get('archived')
   if ((pinned !== null && pinned !== 'true' && pinned !== 'false') ||

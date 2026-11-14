@@ -252,6 +252,8 @@ export interface TaskDetail {
 }
 
 export interface Preferences {
+  /** Older servers do not offer a personal conversation archive interval. */
+  archiveIdleAfterDays?: number
   proactive: boolean
   pushDecide: boolean
   pushReview: boolean

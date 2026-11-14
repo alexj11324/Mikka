@@ -11,6 +11,7 @@ import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { useTasks } from '@/features/tasks/components/task-list'
 import { TaskStateIcon } from '@/features/tasks/components/task-icons'
+import { BotConversations } from '@/features/chat/components/bot-conversations'
 import { menuTasks } from '@/features/chat/model/chat-header-menu'
 import { rowState } from '@/features/tasks/model/task-groups'
 import { displayTitle } from '@/lib/display-title'
@@ -130,6 +131,7 @@ export default function BotInfo() {
         ) : null}
         {busy ? <Text accessibilityLiveRegion="polite" style={{ color: colors.secondary, marginBottom: 16 }}>正在保存</Text> : null}
         {unsaved ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.unsaved}>{unsaved}没保存，请稍后重试</Text> : null}
+        <BotConversations workspaceId={homeData?.workspace.id} botId={computerBot} />
         {tasks.length ? (
           <Group label="任务">
             {tasks.map(task => <Row key={task.id} icon={<TaskStateIcon state={rowState(task).state} status={task.status} />} label={displayTitle(task.title)} value={task.identifier ?? undefined} onPress={() => router.push(`/task/${task.id}`)} />)}

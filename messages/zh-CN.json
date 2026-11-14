@@ -4420,6 +4420,8 @@
   },
   "ConversationDirectory": {
     "archiveIdle": "闲置对话自动归档",
+    "archiveUnavailable": "此服务器不支持闲置对话自动归档。",
+    "archiveSaveError": "未能保存自动归档偏好。",
     "archiveDays": "{days} 天",
     "archiveOff": "关闭",
     "viewAll": "查看全部",

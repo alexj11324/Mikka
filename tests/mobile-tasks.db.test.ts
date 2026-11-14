@@ -629,6 +629,93 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.equal((await request(issueId, unselected)).status, 200)
   })
 
+  await t.test('native archive days persist across settings and Bot rows for the authenticated owner only', async () => {
+    const { GET: directory } = await import('../app/api/mobile/conversations/route')
+    const { GET: preference, PATCH: update } = await import('../app/api/mobile/preferences/route')
+    const { readPreferences } = await import('../lib/preferences')
+    const pref = '/api/mobile/preferences'
+    const selected = teamWorkspace.id
+    const readPreference = (options?: ReadOptions) => run(pref, preference, options)
+    const setDays = (days: number, options?: ReadOptions) => run(pref, request => update(new Request(request, {
+      method: 'PATCH', headers: { ...Object.fromEntries(request.headers), 'content-type': 'application/json' },
+      body: JSON.stringify({ archiveIdleAfterDays: days }),
+    })), options)
+    const rows = (archived: boolean, botId: string = bot, options?: ReadOptions) => run(
+      '/api/mobile/conversations?' + new URLSearchParams({ workspaceId: selected, archived: String(archived), botId }),
+      directory, { workspaceId: selected, ...options },
+    )
+    const ids = async (archived: boolean, botId: string = bot, options?: ReadOptions) => {
+      const response = await rows(archived, botId, options)
+      assert.equal(response.status, 200)
+      return (await response.json()).items.map((row: { id: string }) => row.id)
+    }
+    const idle = await seedRun(pool, { userId: owner, agentId: agent, workspaceId: selected, botId: bot, status: 'succeeded' })
+    await pool.query(`UPDATE agent_runs SET "createdAt"=now()-interval '9 days',"updatedAt"=now()-interval '9 days' WHERE id=$1`, [idle])
+    const ownDays = (await (await readPreference()).json()).archiveIdleAfterDays
+    const otherDays = (await (await readPreference({ bearer: peer.token })).json()).archiveIdleAfterDays
+    assert.equal(ownDays, 30)
+    assert.equal(otherDays, 30)
+    assert.equal((await readPreference({ bearer: null })).status, 401)
+    try {
+      assert.equal((await setDays(7)).status, 200)
+      assert.equal((await (await readPreference()).json()).archiveIdleAfterDays, 7)
+      assert.equal((await pool.query(`SELECT "archiveIdleAfterDays" FROM user_preferences WHERE "userId"=$1`, [owner])).rows[0].archiveIdleAfterDays, 7)
+      assert.equal((await readPreferences(owner)).archiveIdleAfterDays, 7)
+      assert.ok((await ids(true)).includes(idle))
+      assert.ok(!(await ids(false)).includes(idle))
+      assert.ok(!(await ids(true, secondBot)).includes(idle))
+      assert.ok(!(await ids(true, bot, { bearer: peer.token })).includes(idle))
+      assert.equal((await (await readPreference({ bearer: peer.token })).json()).archiveIdleAfterDays, otherDays)
+      assert.equal((await rows(true, bot, { workspaceId: secondWorkspace.id })).status, 403)
+      assert.equal((await setDays(7, { bearer: null })).status, 401)
+      assert.equal((await setDays(1)).status, 400)
+      assert.equal((await (await readPreference()).json()).archiveIdleAfterDays, 7)
+      assert.equal((await setDays(0)).status, 200)
+      assert.equal((await readPreferences(owner)).archiveIdleAfterDays, 0)
+      assert.equal((await (await readPreference()).json()).archiveIdleAfterDays, 0)
+      assert.ok((await ids(false)).includes(idle))
+      assert.ok(!(await ids(true)).includes(idle))
+    } finally {
+      assert.equal((await setDays(ownDays)).status, 200)
+      await pool.query('DELETE FROM agent_runs WHERE id=$1', [idle])
+    }
+  })
+
+  await t.test('the native Bot detail ranks eight of fifty conversations, distinguishes overflow and enforces the workspace and owner', async () => {
+    const { GET: directory } = await import('../app/api/mobile/conversations/route')
+    const childBot = await seedBot(pool, teamWorkspace.id, owner)
+    const ids = Array.from({ length: 50 }, () => randomUUID())
+    await pool.query(`INSERT INTO agent_runs(id,"userId","workspaceId","agentId","botId",status,title,"titleSource","createdAt","updatedAt","conversationPinnedAt","conversationArchivedAt")
+      SELECT id,$2,$3,$4,$5,CASE n WHEN 7 THEN 'waiting_input' WHEN 3 THEN 'running' ELSE 'succeeded' END,
+        'Bot conversation '||n,'manual',now()-n*interval '1 hour',now()-n*interval '1 hour',
+        CASE WHEN n=48 THEN now() END,CASE WHEN n=1 THEN now() END
+      FROM unnest($1::uuid[]) WITH ORDINALITY input(id,n)`, [ids, owner, teamWorkspace.id, agent, childBot])
+    const read = (options?: ReadOptions, id = childBot) => run('/api/mobile/conversations?' + new URLSearchParams({
+      view: 'botChildren', workspaceId: teamWorkspace.id, botId: id,
+    }), directory, { workspaceId: teamWorkspace.id, ...options })
+    try {
+      const response = await read()
+      assert.equal(response.status, 200)
+      const group = await response.json()
+      assert.equal(group.workspaceId, teamWorkspace.id)
+      assert.equal(group.botId, childBot)
+      assert.equal(group.more, true)
+      assert.deepEqual(group.items.map((row: { id: string }) => row.id), [47, 6, 2, 1, 3, 4, 5, 7].map(index => ids[index]))
+      assert.deepEqual((await (await read({ bearer: peer.token })).json()).items, [])
+      assert.deepEqual((await (await read({}, secondBot)).json()).items, [])
+      assert.equal((await read({ workspaceId: secondWorkspace.id })).status, 403)
+      assert.equal((await read({ bearer: null })).status, 401)
+      assert.equal((await read({}, 'invalid')).status, 422)
+      await pool.query('UPDATE agent_runs SET "conversationArchivedAt"=now() WHERE id=ANY($1::uuid[])', [ids.slice(3)])
+      const remainder = await (await read()).json()
+      assert.equal(remainder.more, false)
+      assert.deepEqual(remainder.items.map((row: { id: string }) => row.id), [ids[2], ids[1]])
+    } finally {
+      await pool.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[])', [ids])
+      await pool.query('DELETE FROM bots WHERE id=$1', [childBot])
+    }
+  })
+
   await t.test('invalid/missing IDs are 404; unauthenticated and expired native requests are 401', async () => {
     assert.equal((await request('invalid')).status, 404)
     assert.equal((await request(randomUUID())).status, 404)
