@@ -1048,7 +1048,7 @@
     "toggleSidebar": "Expand or collapse the sidebar",
     "breadcrumb": "Current location",
     "openSearch": "Open global search",
-    "listError": "Could not refresh the list. The previous results are kept.",
+    "listError": "Could not load the task list.",
     "taskStatesReadFailed": "Could not load task states. Try again.",
     "searchPlaceholder": "Search tasks…",
     "taskView": "Task view",
