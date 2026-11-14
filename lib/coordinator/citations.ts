@@ -5,7 +5,7 @@
 
 import { conversationTitle } from '../short-title'
 
-import { splitCitations, type CitationPart, type CitationKind } from './citation-parts'
+import { splitCitations, type CitationPart } from './citation-parts'
 export { splitCitations, type CitationPart, type CitationKind } from './citation-parts'
 
 export interface IssueSource {

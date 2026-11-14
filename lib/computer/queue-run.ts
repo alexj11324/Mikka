@@ -7,6 +7,7 @@ import type { ProfileFactoryContext } from '@/lib/factory/profile-watchdog'
 import { freezeExecutionIdentity, revalidateExecutionIdentity, ExecutionIdentityError } from '../execution-identity'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
+import { observePoolCommits } from '../db/commit-effects'
 import { z } from 'zod'
 import { runPromptParts } from '@/lib/run-prompt'
 import { freezeWorkerDefinition, type WorkerModelDispatch } from '@/lib/agent-kit/worker'
@@ -92,6 +93,9 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
       snapshot => queueCloudRun(pool, actor, input, existing, factoryContext, snapshot), Boolean(existing))
   }
   requireProjectResourceLease(actor.userId, actor.workspaceId)
+  // Standalone callers can supply their own pg pool. Observe it before the
+  // checkout, so run notifications follow its actual commit or rollback.
+  if (!existing) observePoolCommits(pool)
   const client = existing ?? await pool.connect()
   try {
     if (!existing) await client.query('BEGIN')
