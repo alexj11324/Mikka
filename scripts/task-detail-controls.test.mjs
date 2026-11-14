@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import { after, before, beforeEach, mock, test } from 'node:test'
 import { Window } from 'happy-dom'
+import { z } from 'zod'
 import { act, createElement, useState } from 'react'
+import { desktopActionSchemas } from '../lib/desktop-rpc/schemas.ts'
+import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '../lib/issue-meta.ts'
 import { metadataSchema } from '../lib/issue-metadata.ts'
 
 const browser = new Window({ url: 'https://mikka.example/mikka' })
@@ -74,14 +77,14 @@ beforeEach(() => {
 })
 after(() => browser.close())
 
-async function mount() {
+async function mount(props = {}) {
   const host = document.createElement('div')
   document.body.append(host)
   const root = createRoot(host)
   const Capture = props => { frame = props; return null }
   function Task() {
     const [task, setTask] = useState(issue)
-    return createElement(FramedTask, { Frame: Capture, task, userId: 'owner', title: task.title, status: task.status, priority: 'normal',
+    return createElement(FramedTask, { Frame: Capture, task, userId: 'owner', title: task.title, status: task.status, priority: 'normal', locked: false, ...props,
       agentActivity: { items: [] }, versions: [], getCurrent: async () => issue, adopt: saved => { issue = saved; setTask(saved) } })
   }
   await act(async () => root.render(createElement(Task)))
@@ -90,20 +93,62 @@ async function mount() {
 const row = id => frame.rows.find(item => item.id === id)
 const pickTeam = id => act(async () => row('team').menu.find(item => item.id === id).onSelect())
 
-test('team selection confirms the current team once after reopen and rejected changes retain the saved team', async () => {
+test('Task property menus expose every writable value, send precisely that value and lock for readers', async () => {
+  const selected = { status: [], priority: [] }
+  const save = desktopActionSchemas['issues.saveIssue']
+  // The title and document use the inline editors exercised by task-detail-live.
+  // Request coordinates are not editable properties.
+  const propertyCodes = { status: ISSUE_STATUS_CODES, priority: ISSUE_PRIORITY_CODES }
+  const saveInput = z.toJSONSchema(save, { io: 'input', unrepresentable: 'any' }).prefixItems[0]
+  assert.deepEqual(Object.keys(saveInput.properties).sort(),
+    ['id', 'revision', 'workspaceId', 'title', 'content', ...Object.keys(propertyCodes)].sort(),
+    'classify each new save field and cover its consumer')
+  const input = { title: 'Task', content: { type: 'doc', content: [] }, status: 'todo', priority: 'normal' }
+  const dispose = await mount({
+    onStatus: value => selected.status.push(value),
+    onPriority: value => selected.priority.push(value),
+  })
+  try {
+    for (const [field, codes] of Object.entries(propertyCodes)) {
+      const property = row(field)
+      assert.equal(property.disabled, false)
+      assert.deepEqual(property.menu.map(choice => choice.id), [...codes])
+      assert.deepEqual(property.menu.filter(choice => choice.checked).map(choice => choice.id), [input[field]])
+      for (const choice of property.menu) {
+        choice.onSelect()
+        assert.equal(selected[field].at(-1), choice.id)
+        assert.equal(save.safeParse([{ ...input, [field]: choice.id }]).success, true, choice.id)
+      }
+      assert.deepEqual(selected[field], [...codes])
+    }
+    for (const state of ['queued', 'running', 'waiting', 'blocked', 'failed']) {
+      assert.ok(!row('status').menu.some(choice => choice.id === state), state)
+      assert.equal(save.safeParse([{ ...input, status: state }]).success, false, state)
+    }
+  } finally { await dispose() }
+  const closeReadOnly = await mount({ locked: true })
+  try {
+    for (const field of ['status', 'priority']) assert.equal(row(field).disabled, true, field)
+  } finally { await closeReadOnly() }
+})
+
+test('reselecting the current team does not write and rejected changes retain the saved team', async () => {
   const dispose = await mount()
   try {
     await pickTeam('existing')
-    assert.deepEqual(teamWrites, [{ issueId: 'task', teamId: 'existing', expectedTeamId: 'existing' }])
     await pickTeam('existing')
-    assert.equal(teamWrites.length, 1)
+    assert.deepEqual(teamWrites, [])
     assert.deepEqual(reads, [])
+    const change = { issueId: 'task', teamId: 'another', expectedTeamId: 'existing' }
     response = { ok: false, error: 'denied' }
     await pickTeam('another')
+    assert.deepEqual(teamWrites, [change])
+    assert.deepEqual(reads, [])
     assert.equal(row('team').menu.find(item => item.checked).id, 'existing')
     assert.equal(frame.rowsError, 'denied')
     response = null
     await pickTeam('another')
+    assert.deepEqual(teamWrites, [change, change])
     assert.equal(row('team').menu.find(item => item.checked).id, 'another')
     assert.deepEqual(reads, ['viewer-list'])
   } finally { await dispose() }
