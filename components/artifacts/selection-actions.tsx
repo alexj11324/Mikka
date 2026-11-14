@@ -6,6 +6,8 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent } from '@/components/ui/popover'
 
+const copyFeedback = { id: 'selection-copy' }
+
 /** A popover anchor on a live range: it moves with the words when their column scrolls. */
 export function selectionAnchor(range: Range) {
   return { getBoundingClientRect: () => range.getBoundingClientRect() }
@@ -25,7 +27,13 @@ export function SelectionActions({ selection, onQuote, onClose }: { selection: {
   }
   async function copy() {
     if (!selection) return
-    try { await navigator.clipboard.writeText(selection.text); toast.success(t('copied')) } catch { /* the browser refused; nothing to undo */ }
+    try {
+      await navigator.clipboard.writeText(selection.text)
+    } catch {
+      toast.error(t('copyFailed'), copyFeedback)
+      return
+    }
+    toast.success(t('copied'), copyFeedback)
     onClose()
   }
   return <Popover open={selection != null} onOpenChange={open => { if (!open) onClose() }}>
