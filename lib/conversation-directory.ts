@@ -1,4 +1,6 @@
 import 'server-only'
+import { withConversationWorkspace, type ConversationReader } from './conversation-workspace'
+import { taskReaderScope } from './task-workspace'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import { directoryInput, type DirectoryInput, type DirectoryState, type ConversationDirectoryPage } from './conversation-directory-input'
@@ -27,7 +29,12 @@ function directoryState(row: Row): DirectoryState {
 
 /** The detail reader allows the run owner in their active workspace; attached tasks also require current content access.
  * Resolve chains before paging, so a continued conversation appears only once and older task-free work remains reachable. */
-export async function conversationDirectory(database: RunChainQueryable, userId: string, workspaceId: string, raw: DirectoryInput): Promise<ConversationDirectoryPage> {
+export async function conversationDirectory(database: RunChainQueryable, reader: ConversationReader, workspaceId: string, raw: DirectoryInput): Promise<ConversationDirectoryPage> {
+  const { userId } = taskReaderScope(reader)
+  return await withConversationWorkspace(reader, workspaceId, () => directoryPage(database, userId, workspaceId, raw)) ?? { items: [], cursor: null }
+}
+
+async function directoryPage(database: RunChainQueryable, userId: string, workspaceId: string, raw: DirectoryInput): Promise<ConversationDirectoryPage> {
   const input = directoryInput.parse(raw)
   const projection = sql`SELECT roots.id, roots.title, roots.asked, roots."agentName", roots.pinned, roots.at,
       roots."issueId", roots.identifier, roots."taskTitle",
@@ -40,8 +47,7 @@ export async function conversationDirectory(database: RunChainQueryable, userId:
   const query = new PgDialect().sqlToQuery(projection)
   const param = (i: number) => '$' + (query.params.length + i)
   const [owner, workspace, depth, archived, bot, pinCursor, atCursor, idCursor, search] = Array.from({ length: 9 }, (_, i) => param(i + 1))
-  const scope = `r."userId"=${owner} AND r."workspaceId"=${workspace} AND EXISTS (
-    SELECT 1 FROM mikka_workspace_members m WHERE m."workspaceId"=r."workspaceId" AND m."userId"=r."userId" AND m.status='active')`
+  const scope = `r."userId"=${owner} AND r."workspaceId"=${workspace}`
   const statement = `WITH RECURSIVE ${runChainSql(scope, depth)}, latest AS (
       SELECT DISTINCT ON (a.root) a.root,r.id,
         max(greatest(r."lastReplyAt",r."updatedAt",r."createdAt")) OVER (PARTITION BY a.root) AS touched
