@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
+import { QUARTER_HOUR } from '../../cloudflare/suggestions-cron/src/schedule.mjs'
 import { applicationWitness, readJson } from '../device-gateway/deploy.mjs'
 import { affectsWorker } from '../device-gateway/select-release.mjs'
 
@@ -25,21 +26,23 @@ export function validateConfig(text) {
   if (Object.keys(config).some(key => !allowed.includes(key)) || config.name !== WORKER || config.main !== 'src/index.mjs'
     || !/^\d{4}-\d{2}-\d{2}$/.test(config.compatibility_date ?? '')
     || config.workers_dev !== false || config.preview_urls !== false
-    || JSON.stringify(config.triggers) !== JSON.stringify({ crons: ['* * * * *'] })
+    || JSON.stringify(config.triggers) !== JSON.stringify({ crons: [QUARTER_HOUR] })
     || JSON.stringify(config.vars) !== JSON.stringify({})
     || JSON.stringify(config.observability) !== JSON.stringify({ enabled: true })) fail('cron_resource_change_refused')
   return config
 }
 
 /** Inspect binding metadata only. The native-synced CRON_SECRET value is never read or replaced. */
-export function existingWorker(settings, subdomain, schedules) {
+export function existingWorker(settings, subdomain, schedules, requireNewCadence = false) {
   if (!Array.isArray(settings?.bindings) || settings.bindings.length !== 2) fail('cron_bindings_mismatch')
   const secret = settings.bindings.find(binding => binding.name === 'CRON_SECRET')
   const origin = settings.bindings.find(binding => binding.name === 'MIKKA_URL')
   if (secret?.type !== 'secret_text' || origin?.type !== 'plain_text' || origin.text !== MIKKA_URL) fail('cron_bindings_mismatch')
   if (settings.observability?.enabled !== true) fail('cron_observability_mismatch')
   if (subdomain?.enabled !== false || subdomain?.previews_enabled !== false) fail('cron_public_url_enabled')
-  if (!Array.isArray(schedules?.schedules) || schedules.schedules.length !== 1 || schedules.schedules[0].cron !== '* * * * *') fail('cron_schedule_mismatch')
+  if (!Array.isArray(schedules?.schedules) || schedules.schedules.length !== 1) fail('cron_schedule_mismatch')
+  const cadence = schedules.schedules[0].cron
+  if (cadence !== QUARTER_HOUR && (requireNewCadence || cadence !== '* * * * *')) fail('cron_schedule_mismatch')
 }
 
 /** These two read-only origins need different credentials; neither receives the other's bearer. */
@@ -106,8 +109,11 @@ export async function deployCron({ sourceCommit, accountId, cloudflareToken, ver
     if (response.success !== true || !response.result) fail('cloudflare_response_invalid')
     return response.result
   }
-  const preflight = async () => existingWorker(...await Promise.all(['settings', 'subdomain', 'schedules'].map(cloudflare)))
-  await preflight()
+  const inspect = async (requireNewCadence = false) => {
+    const [settings, subdomain, schedules] = await Promise.all(['settings', 'subdomain', 'schedules'].map(cloudflare))
+    existingWorker(settings, subdomain, schedules, requireNewCadence)
+  }
+  await inspect()
   const readApplication = await applicationWitness({ sourceCommit, vercelToken, readPromotedWeb, fetchImpl })
 
   const releaseState = async () => {
@@ -133,7 +139,7 @@ export async function deployCron({ sourceCommit, accountId, cloudflareToken, ver
     const state = await releaseState()
     if (state.state === 'superseded') return { skipped: true, reason: 'newer_cron_source' }
     if (state.state === 'ready') {
-      await preflight()
+      await inspect()
       // Main, the deployment and the public build are checked again immediately before the one write.
       const final = await releaseState()
       if (final.state === 'superseded') return { skipped: true, reason: 'newer_cron_source' }
@@ -144,10 +150,10 @@ export async function deployCron({ sourceCommit, accountId, cloudflareToken, ver
         const { deployments } = await cloudflare('deployments')
         const versions = deployments?.[0]?.versions
         if (!Array.isArray(versions) || versions.length !== 1 || versions[0].version_id !== versionId || versions[0].percentage !== 100) fail('cron_deployment_not_active')
-        await preflight()
+        await inspect(true)
         return { skipped: false, sourceCommit, production: final.production,
           ...(final.webDeployRunId ? { webDeployRunId: final.webDeployRunId } : {}),
-          versionId, cron: '* * * * *', publicUrls: false, secretBinding: 'CRON_SECRET', observability: true }
+          versionId, cron: QUARTER_HOUR, publicUrls: false, secretBinding: 'CRON_SECRET', observability: true }
       }
     }
     if (poll + 1 < maxPolls) { log('Waiting for Web deploy and the matching production application'); await wait(30_000) }
@@ -176,7 +182,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const report = await deployCron({ sourceCommit: process.env.GITHUB_SHA, accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
       cloudflareToken: process.env.CLOUDFLARE_API_TOKEN, vercelToken: process.env.VERCEL_TEAM_TOKEN,
       githubToken: process.env.GITHUB_TOKEN })
-    const sourceHash = createHash('sha256').update(readFileSync(new URL('../../cloudflare/suggestions-cron/src/index.mjs', import.meta.url))).digest('hex')
+    const hash = createHash('sha256')
+    for (const file of ['index.mjs', 'schedule.mjs']) {
+      hash.update(file + '\0').update(readFileSync(new URL('../../cloudflare/suggestions-cron/src/' + file, import.meta.url)))
+    }
+    const sourceHash = hash.digest('hex')
     console.log(JSON.stringify({ ...report, sourceHash }))
   } catch (error) {
     console.error(error instanceof Error && /^[a-z0-9_]+$/.test(error.message) ? error.message : 'cron_release_failed')
