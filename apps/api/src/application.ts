@@ -1,8 +1,9 @@
-import { Hono } from 'hono'
+import { METHOD_NAME_ALL } from 'hono/router'
+import { TrieRouter } from 'hono/router/trie-router'
 import { H3, onDispose } from 'h3'
 import { NextRequest } from '../compat/server'
 import { NavigationResponse } from '../compat/navigation'
-import { allowedMethods, routeMatcher, routerPath, type ApiRoute } from './routes'
+import { allowedMethods, routeMatcher, routerPath, type ApiRoute, type RouteMatch } from './routes'
 import { createRequestScope, requireRequestScope, runRequestScope } from './context'
 import { trailingSlashRedirect } from '../runtime/http-policy.mjs'
 import type { PrepareWebTransport, WebTransport } from '../../../lib/web-connection/transport'
@@ -12,50 +13,44 @@ type TraceFactory = (request: Request, route: string) => Trace
 const noTrace: TraceFactory = () => ({ run: work => work(), finish() {} })
 const failure = (status: number) => Response.json({ error: status === 404 ? 'Not found' : 'Request failed' }, { status, headers: { 'cache-control': 'no-store' } })
 
-/** Hono owns route dispatch; H3 owns real Node/Web-stream disposal. Neither
- * resolving a handler nor Nitro's onResponse means the body has finished. */
-export function createApiHandler(routes: ApiRoute[], beginTrace: TraceFactory = noTrace, prepareWebTransport?: PrepareWebTransport) {
-  const matchers = routes.map(routeMatcher)
-  const router = new Hono({ strict: true })
-  for (const [index, route] of routes.entries()) {
-    const match = matchers[index]!
-    router.all(routerPath(route.path), async context => {
-      const original = context.req.raw
-      const matched = match(new URL(original.url).pathname)
-      if (!matched) return failure(404)
-      const method = original.method.toUpperCase()
-      if (method === 'OPTIONS' && !route.methods.includes('OPTIONS')) {
-        return new Response(null, { status: 204, headers: { allow: allowedMethods(route).join(', ') } })
-      }
-      const selected = method === 'HEAD' && !route.methods.includes('HEAD') && route.methods.includes('GET') ? 'GET' : method
-      if (!route.methods.includes(selected)) return new Response(null, { status: 405, headers: { allow: allowedMethods(route).join(', ') } })
-      const module = await route.load()
-      const handler = module[selected]
-      if (typeof handler !== 'function') throw new Error('API_ROUTE_EXPORT_MISSING')
-      const response: unknown = await handler(new NextRequest(original), { params: Promise.resolve(matched.params) })
-      if (!(response instanceof Response)) throw new TypeError('API_ROUTE_RESPONSE_REQUIRED')
-      if (method !== 'HEAD') return response
-      await response.body?.cancel()
-      return new Response(null, { status: response.status, statusText: response.statusText, headers: response.headers })
-    })
+async function dispatchRoute(original: Request, matched: RouteMatch | undefined): Promise<Response> {
+  if (!matched) return failure(404)
+  const { route, params } = matched
+  const method = original.method.toUpperCase()
+  if (method === 'OPTIONS' && !route.methods.includes('OPTIONS')) {
+    return new Response(null, { status: 204, headers: { allow: allowedMethods(route).join(', ') } })
   }
-  router.notFound(() => failure(404))
-  // Keep failures in the outer scope, where tracing and cookie commitment are
-  // shared by all dispatch outcomes. Never expose stack traces or raw errors.
-  router.onError(error => { throw error })
+  const selected = method === 'HEAD' && !route.methods.includes('HEAD') && route.methods.includes('GET') ? 'GET' : method
+  if (!route.methods.includes(selected)) return new Response(null, { status: 405, headers: { allow: allowedMethods(route).join(', ') } })
+  const module = await route.load()
+  const handler = module[selected]
+  if (typeof handler !== 'function') throw new Error('API_ROUTE_EXPORT_MISSING')
+  const response: unknown = await handler(new NextRequest(original), { params: Promise.resolve(params) })
+  if (!(response instanceof Response)) throw new TypeError('API_ROUTE_RESPONSE_REQUIRED')
+  if (method !== 'HEAD') return response
+  await response.body?.cancel()
+  return new Response(null, { status: response.status, statusText: response.statusText, headers: response.headers })
+}
+
+/** Select the declared route before authentication, then dispatch that same
+ * route inside the adapted request scope. H3 owns body disposal and after work. */
+export function createApiHandler(routes: ApiRoute[], beginTrace: TraceFactory = noTrace, prepareWebTransport?: PrepareWebTransport) {
+  const router = new TrieRouter<ReturnType<typeof routeMatcher>>()
+  for (const route of routes) router.add(METHOD_NAME_ALL, routerPath(route.path), routeMatcher(route))
   const app = new H3()
   app.all('/**', async event => {
     const original = event.req
     const canonical = trailingSlashRedirect(original)
     if (canonical) return canonical
-    let template = '/unmatched', result: Response | undefined, caught: unknown
+    let matched: RouteMatch | undefined, result: Response | undefined, caught: unknown
     try {
       const path = new URL(original.url).pathname
-      for (const match of matchers) {
-        const found = match(path)
-        if (found) { template = found.route.template; break }
+      for (const [match] of router.match(original.method, path)[0]) {
+        matched = match(path)
+        if (matched) break
       }
     } catch { return failure(400) }
+    const template = matched?.route.template ?? '/unmatched'
     const trace = beginTrace(original, template)
     // Authentication and transport refusals are part of the original request.
     // Register trace disposal before preparation can return or reject.
@@ -87,7 +82,7 @@ export function createApiHandler(routes: ApiRoute[], beginTrace: TraceFactory = 
       event.waitUntil(scope.after.lifetime)
       onDispose(event, () => scope.after.finish())
       const dispatch = () => runRequestScope(scope, async () => {
-        try { result = await router.fetch(request) }
+        try { result = await dispatchRoute(request, matched) }
         catch (error) {
           if (error instanceof NavigationResponse) {
             result = error.location ? new Response(null, { status: error.status, headers: { location: error.location } }) : failure(error.status)
