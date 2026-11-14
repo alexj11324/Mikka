@@ -157,33 +157,28 @@ old module owners (backend was Codex's).
    does not require an up-to-date branch, and each merge reruns the full CI.
    Merge `main` in when there is a conflict, or when a change that just landed
    touches the same code and the PR must be checked against it.
-5. **After the merge** the owner watches the Vercel production deployment
-   until it is READY and the production domain serves that commit. After a
-   batch lands, leave `main` unchanged until both conditions hold. Pending
-   migrations run through the existing flow (`pnpm build` runs
-   `scripts/migrate.mjs`). A change a local production build can show (UI,
-   interaction, navigation, page refresh, layout, copy) is accepted by CI
-   and the PR's screenshots; the owner notes on the issue that production
-   serves the merge commit and closes it. Only what cannot be tested
-   locally (real subscriptions, OAuth, model providers, the GitHub App,
-   payments, push and other external services) is accepted in production,
-   with the shared test account and a real task (no junk data; see
-   [`acceptance.md`](acceptance.md)). A simulated test is not production
-   acceptance. The owner writes the evidence on the issue (time, run id,
-   log summary; no secrets or personal data) and closes the issue. Every
-   production Web deploy also triggers the implemented API smoke. The required
-   message/task smoke remains a documented coverage gap in
-   [production smoke](production-smoke.md).
-   A PR that touches only `apps/mobile/**` and documentation is the
-   exception: it merges once CI is green and it is mergeable, without
-   waiting for Web deploy or E2B to be idle. Its push still queues a Web
-   build (`queue: max`, `cancel-in-progress: false`) that rebuilds unchanged
-   web output, so the owner watches only the Mobile OTA run and reports its
-   update group ID.
-   It still does not merge while an E2B runtime release is in progress or
-   awaiting Web: that release is bound to the exact `main` SHA, so moving
-   `main` fails it with `mainChanged` and forces a rebuild. It also respects
-   any merge window an owner has posted on a PR or issue.
+5. **After the merge** the PR owner verifies the merge SHA, records the
+   post-merge regression and links its CI. For an official hosted change,
+   link the merged public source and the pinned UI Overlay when applicable to
+   the [existing release owner and window](https://github.com/alexj11324/Mikka/issues/1954).
+   Public GitHub Actions builds the product, and the release owner stages and
+   promotes its verified immutable artifacts following the
+   [build and release contract](operations/build-source-of-truth.md).
+   Pending production migrations use the reviewed database window and the
+   `production-migrate-database` phase. Record code delivery while a change
+   awaits promotion. Record production acceptance after the serving release,
+   public/UI source pair and requested behavior have been verified. Continue
+   independent protected merges subject to active owner release windows.
+   UI changes use CI and local production-build screenshots for interaction,
+   navigation, layout, refresh and copy. Check real providers and external
+   services with the shared account and a real task as described in
+   [acceptance](acceptance.md). Record the acceptance time, original run,
+   versions and result with secrets and personal data omitted. Follow the
+   [production smoke coverage](production-smoke.md) for the released surface.
+   A mobile-only change records the actual OTA run and update group when
+   published. Desktop and E2B use their existing source and receipt checks.
+   Respect any active release window announced by the owner and report the
+   decision when a platform skips or defers a candidate.
 6. **If production breaks,** fix forward with a new PR, or revert through a
    revert PR. Never delete deployments, revoke shared tokens, change
    production Neon settings or create paid resources without Alex.
