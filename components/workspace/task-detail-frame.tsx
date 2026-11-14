@@ -246,6 +246,10 @@ export function FramedTask(props: FramedTaskProps) {
     ])
   }
 
+  const readerMenu = locked && !preview
+  const menuItems = readerMenu
+    ? menu.items.filter(item => item.id === 'history')
+    : menu.items.map(item => item.id === 'assignee' ? { ...item, onSelect: undefined, submenu: assigneeItems } : item.id === 'project' ? { ...item, onSelect: undefined, submenu: projectItems } : item.id === 'labels' ? { ...item, onSelect: undefined, submenu: labelItems } : item)
   const created = new Date(task.createdAt)
   return <Frame
     taskId={preview ? undefined : task.id}
@@ -266,7 +270,7 @@ export function FramedTask(props: FramedTaskProps) {
       anchorRemoved: tActivity('anchorRemoved'), copyLink: tMenu('copyLink'), commentBy: name => tActivity('comment', { author: name }),
     }}
     favorite={menu.favorite}
-    menu={{ items: menu.items.map(item => item.id === 'assignee' ? { ...item, onSelect: undefined, submenu: assigneeItems } : item.id === 'project' ? { ...item, onSelect: undefined, submenu: projectItems } : item.id === 'labels' ? { ...item, onSelect: undefined, submenu: labelItems } : item), disabled: menu.disabled, onOpen: loadOptions }}
+    menu={{ items: menuItems, disabled: !readerMenu && menu.disabled, onOpen: loadOptions }}
     titleField={props.titleField} saveError={props.saveError} syncNotice={props.syncNotice}
     description={({ afterDescription, activity }) => props.editor(afterDescription, current => { discussions.current = current; return activity(current) })}
     acceptance={props.acceptance}

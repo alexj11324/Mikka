@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { readRendererActions, rendererActionContract } from '../../../lib/renderer-actions.mjs'
 import gateway from '../../../cloudflare/web/gateway.mjs'
 import release from '../../../cloudflare/web/release.mjs'
-import { gatewayConfig, prepareRelease, releaseConfig } from '../../../cloudflare/web/prepare.mjs'
+import { gatewayConfig, prepareRelease } from '../../../cloudflare/web/prepare.mjs'
 
 const request = (path, init) => new Request(new URL(path, 'https://app.example'), init)
 const services = () => ({
@@ -237,22 +237,21 @@ test('release config requires the official compiled shell, matching pins and pri
   const inventory = { version: 1, rendererBuild: 'a'.repeat(64), usedActions: ['issues.pollIssue'],
     modules: { issues: ['pollIssue', 'unusedAction'], internal: ['privateExport'] }, target: 'web', serverModules: [], inputs: ['components/slots/navigation.tsx'] }
   const put = data => writeFile(join(assets, 'renderer-manifest.json'), JSON.stringify(data))
-  await put(inventory)
-  await writeFile(join(assets, 'index.html'), '<script src="/mikka/assets/main.js?dpl=abcdef0-1-1"></script>')
-  await assert.rejects(releaseConfig(input), /OFFICIAL_UI_REQUIRED/)
-  await put({ ...inventory, inputs: ['.hosted-ui/slots/navigation.tsx'] })
-  const config = await releaseConfig(input)
-  assert.equal(config.workers_dev, false)
-  assert.equal(config.preview_urls, false)
-  assert.equal(config.assets.run_worker_first, true)
-  assert.equal(config.assets.html_handling, 'none')
-  await assert.rejects(releaseConfig({ ...input, id: 'abcdef0-2-1' }), /PIN_MISMATCH/)
   const parent = await mkdtemp(join(tmpdir(), 'cf-web-publish-'))
   t.after(() => rm(parent, { recursive: true, force: true }))
+  await put(inventory)
+  await writeFile(join(assets, 'index.html'), '<script src="/mikka/assets/main.js?dpl=abcdef0-1-1"></script>')
+  await assert.rejects(prepareRelease(input, parent), /OFFICIAL_UI_REQUIRED/)
+  await put({ ...inventory, inputs: ['.hosted-ui/slots/navigation.tsx'] })
+  await assert.rejects(prepareRelease({ ...input, id: 'abcdef0-2-1' }, parent), /PIN_MISMATCH/)
   await mkdir(join(assets, '.vite'))
   await writeFile(join(assets, '.vite', 'manifest.json'), '{}')
   await writeFile(join(assets, '_redirects'), '/old /new')
   const ready = await prepareRelease(input, parent)
+  assert.equal(ready.workers_dev, false)
+  assert.equal(ready.preview_urls, false)
+  assert.equal(ready.assets.run_worker_first, true)
+  assert.equal(ready.assets.html_handling, 'none')
   assert.deepEqual((await readdir(ready.assets.directory)).sort(), ['index.html', 'renderer-actions.json'])
   const actions = JSON.parse(await readFile(join(ready.assets.directory, 'renderer-actions.json'), 'utf8'))
   assert.deepEqual(actions, { version: 1, target: 'web', rendererBuild: 'a'.repeat(64),
@@ -261,11 +260,11 @@ test('release config requires the official compiled shell, matching pins and pri
   assert.ok((await readFile(join(assets, 'renderer-manifest.json'), 'utf8')).includes('.hosted-ui'))
   await assert.rejects(prepareRelease(input, assets), /OUTPUT_INSIDE_BUILD/)
   await writeFile(join(assets, 'chunk.js.map'), '{}')
-  await assert.rejects(releaseConfig(input), /sourceInOutput/)
+  await assert.rejects(prepareRelease(input, parent), /sourceInOutput/)
   assert.throws(() => gatewayConfig({ current: 'new', retained: ['old'] }), /RETENTION_INVALID/)
   const routes = gatewayConfig({ current: input.id, retained: ['abcdef0-0-1', input.id] })
   assert.deepEqual(routes.version_metadata, { binding: 'CF_VERSION_METADATA' })
-  assert.equal(routes.services[1].service, config.name)
+  assert.equal(routes.services[1].service, ready.name)
 })
 
 test('version reads only public fields from the release backend, once per warm binding; HEAD is bodyless', async () => {
