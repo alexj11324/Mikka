@@ -142,6 +142,12 @@ export function useOrganizations(enabled = true) {
   return useSWR(enabled ? organizationsKey : null, () => request<{ organizations: OrganizationListItem[] }>('/api/organizations').then(value => value.organizations), swr)
 }
 
+export function useArchivedOrganizations() {
+  const { data, isPending } = authClient.useSession()
+  return useSWR(isPending || !data ? null : ['archived-organizations', data.user.id, data.session.id],
+    () => request<{ organizations: Pick<OrganizationListItem, 'id' | 'name'>[] }>('/api/organizations?archived=true').then(value => value.organizations))
+}
+
 export function useJoinableOrganizations() {
   const { data, isPending } = authClient.useSession()
   // Desktop projects the public identity without emailVerified. The API checks the current verified email.

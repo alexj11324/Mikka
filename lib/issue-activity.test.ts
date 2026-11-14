@@ -61,6 +61,7 @@ test('records clearing an assignee and ignores subtasks created before the paren
     { id: 'old', title: 'Older', createdAt: '2026-10-22T09:00:00.000Z' },
   ])
   assert.deepEqual(events.map(event => event.kind), ['created', 'unassigned'])
+  assert.equal(events.find(event => event.kind === 'unassigned')?.assigneeName, 'Ada')
 })
 
 function responsibilityVersions(contents: JSONContent[]) {
@@ -114,6 +115,18 @@ test('modern Delegate kind changes are real changes, while an explicit null over
   const explicitlyCleared: JSONContent = { type: 'doc', attrs: { mikka: { assignee: { ...reference, kind: 'agent' }, delegate: null } } }
   const events = deriveIssueActivity(responsibilityVersions([modern('agent'), modern('bot'), explicitlyCleared]), [])
   assert.deepEqual(events.slice(1).map(event => [event.kind, event.assignmentTarget]), [['assigned', 'delegate'], ['unassigned', 'delegate']])
+})
+
+test('a subtask keeps its identifier so the activity line can name and open it', () => {
+  const events = deriveIssueActivity([
+    { id: 'v1', revision: 1, title: 'A', status: 'todo', priority: 'normal', content: content(null), createdAt: '2026-10-22T10:00:00.000Z' },
+  ], [
+    { id: 'child', title: 'Sub', identifier: 'MIK-13', createdAt: '2026-10-22T10:03:00.000Z' },
+  ])
+  const subtask = events.find(event => event.kind === 'subtask')
+  assert.equal(subtask?.targetId, 'child')
+  assert.equal(subtask?.code, 'MIK-13')
+  assert.equal(subtask?.title, 'Sub')
 })
 
 test('joins events in the same minute into one row', () => {

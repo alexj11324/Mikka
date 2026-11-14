@@ -15,7 +15,7 @@ import { SearchInput } from '@/components/ui/search-input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { useLiveKey } from '@/hooks/use-live-key'
-import { archiveIdleDays, type DirectoryState } from '@/lib/conversation-directory-input'
+import { archiveIdleDays, directoryConversationKey, type DirectoryState } from '@/lib/conversation-directory-input'
 import { PullRequestsBadge, pullRequestRef } from './pull-requests-badge'
 import { directoryPullRequests, directoryPullStates as pullStates } from '@/lib/directory-pulls'
 import { openGroupConversation, openTask, openThread } from './workspace-navigation'
@@ -47,7 +47,7 @@ export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 
     { revalidateOnFocus: false, shouldRetryOnError: false })
   useLiveKey('thread_list', workspaceId, workspaceId ? [unstable_serialize(getKey)] : [], workspaceId)
   useLiveKey('group_list', workspaceId, workspaceId ? [unstable_serialize(getKey)] : [], workspaceId)
-  const rows = [...new Map(data?.flatMap(page => page.items).map(item => [item.id, item])).values()]
+  const rows = [...new Map(data?.flatMap(page => page.items).map(item => [directoryConversationKey(item), item])).values()]
   const more = Boolean(data?.at(-1)?.cursor)
   async function mark(change: ThreadReadChange) {
     if (writing) return
@@ -102,11 +102,11 @@ export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 
           <span>{prLabel(pull.state)}</span>
           {pull.additions !== undefined && pull.deletions !== undefined && <bdi>+{pull.additions} −{pull.deletions}</bdi>}
           <div className="flex basis-full flex-wrap items-center gap-2">
-            {conversations.map(row => <Button key={row.id} variant="ghost" onClick={() => row.kind === 'chat' ? openGroupConversation(row.id) : openThread(row.id)}>{row.title || t('untitled')}</Button>)}
+            {conversations.map(row => <Button key={directoryConversationKey(row)} variant="ghost" onClick={() => row.kind === 'chat' ? openGroupConversation(row.id) : openThread(row.id)}>{row.title || t('untitled')}</Button>)}
             {[...tasks].map(([id, label]) => <Button key={id} size="sm" variant="link" onClick={() => openTask(id)}>{label}</Button>)}
           </div>
         </li>
-      }) : rows.map(row => <li key={row.id} className="flex items-center gap-2"><Button variant="ghost" type="button" onClick={() => row.kind === 'chat' ? openGroupConversation(row.id) : openThread(row.id)}
+      }) : rows.map(row => <li key={directoryConversationKey(row)} className="flex items-center gap-2"><Button variant="ghost" type="button" onClick={() => row.kind === 'chat' ? openGroupConversation(row.id) : openThread(row.id)}
         className="h-auto min-w-0 flex-1 flex-wrap justify-start gap-x-3 gap-y-1 py-3 text-start">
         <span className="min-w-0 flex-1 break-words font-medium">{row.title || t('untitled')}</span>
         {row.unread && <span className="size-2 rounded-full bg-primary" role="img" aria-label={t('unread')} />}

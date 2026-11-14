@@ -1,6 +1,6 @@
 import 'server-only'
 import { randomUUID } from 'node:crypto'
-import { and, asc, desc, eq, isNull, inArray, or } from 'drizzle-orm'
+import { and, asc, desc, eq, isNotNull, isNull, inArray, or } from 'drizzle-orm'
 import { z } from 'zod'
 import { organizationAuditEvents, organizationBillingAccounts, organizationEntitlements, organizationInvitations, organizationMembers, organizations, organizationWorkspaces } from '@/lib/db/governance-schema'
 import { requireWorkspace, type WorkspaceTransaction } from '@/lib/workspace-access'
@@ -33,6 +33,15 @@ export async function listOrganizations(userId: string) {
   return workspaceDb.select({ id: organizations.id, name: organizations.name, role: organizationMembers.role }).from(organizations)
     .innerJoin(organizationMembers, eq(organizationMembers.organizationId, organizations.id))
     .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.status, 'active'), isNull(organizations.archivedAt))).orderBy(asc(organizations.createdAt))
+}
+
+/** Only a current owner may see the retained name after archiving. */
+export async function listArchivedOrganizations(userId: string) {
+  return workspaceDb.select({ id: organizations.id, name: organizations.name }).from(organizations)
+    .innerJoin(organizationMembers, eq(organizationMembers.organizationId, organizations.id))
+    .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.status, 'active'),
+      eq(organizationMembers.role, 'owner'), isNotNull(organizations.archivedAt)))
+    .orderBy(desc(organizations.archivedAt), asc(organizations.id))
 }
 
 export async function createOrganization(user: { id: string; name: string; email: string }, input: unknown) {

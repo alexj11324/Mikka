@@ -238,6 +238,12 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     let deliveries = 0
     await assert.rejects(submitThreadOnce(pool, input, async () => { deliveries++; throw new Error('synthetic interruption') }), /synthetic interruption/)
     await assert.rejects(submitThreadOnce(pool, input, async () => { deliveries++; return { runId: first.runId, continued: false } }), /threadSubmissionOutcomeUnconfirmed/)
+    const { runAction } = await import('../lib/action-error')
+    const retry = await runAction(() => submitThreadOnce(pool, input, async () => {
+      deliveries++
+      return { runId: first.runId, continued: false }
+    }))
+    assert.equal(retry.error, 'threadSubmissionOutcomeUnconfirmed', 'the user-facing action can explain the pending receipt')
     assert.equal(deliveries, 1)
   })
 
@@ -691,6 +697,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
   })
 
   await t.test('repeated owner text is a fresh request after an intervening target', async () => {
+    await observeFixtureAllowance(a)
     const epochs: string[] = [];
     for (const text of ['Use exactly 74 bytes.', 'Use exactly 77 bytes.', 'Use exactly 74 bytes.']) {
       await sendThreadMessage(a.id, first.runId, text);

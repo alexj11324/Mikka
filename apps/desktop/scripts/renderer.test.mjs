@@ -175,7 +175,7 @@ test('a pinned expired Web installation can reopen its own sign-in control while
   globalThis.fetch = async path => String(path).endsWith('/api/desktop/config')
     ? configuration() : Response.json({ error: 'unauthorized' }, { status: 401 })
   const signedOut = { user: null, session: null, googleEnabled: false, githubEnabled: false, emailEnabled: false }
-  assert.deepEqual(await readBootstrap(), { ...signedOut, cacheWorkspace: null })
+  assert.deepEqual(await readBootstrap(), { ...signedOut, cacheWorkspace: null, liveHomeWorkspaceId: null })
   assert.deepEqual(await readAuthentication(), signedOut)
   configuration = () => Response.json({ error: 'temporarily_unavailable' }, { status: 503 })
   await assert.rejects(readBootstrap(), { code: 'desktop_backend_unreachable', status: 503 })

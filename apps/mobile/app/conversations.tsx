@@ -17,7 +17,7 @@ import { colors, LIST_INSET } from '@/lib/theme'
 import { useLiveApi, useRefresh } from '@/lib/useApi'
 import { useTaskContinuation } from '../../../lib/hooks/use-task-continuation'
 import { directoryPullRequests, directoryPullStates, pullRequestsState } from '../../../lib/directory-pulls'
-import type { ConversationDirectoryPage, DirectoryInput } from '../../../lib/conversation-directory-input'
+import { directoryConversationKey, type ConversationDirectoryPage, type DirectoryInput } from '../../../lib/conversation-directory-input'
 
 type Page = ConversationDirectoryPage & { workspaceId: string }
 const labels = mobileMessages.ConversationDirectory
@@ -47,6 +47,7 @@ export default function Conversations() {
     const revision = path && apiCache.revision(path)
     const next = new URLSearchParams(params)
     next.set('after', cursor.id)
+    if (cursor.kind) next.set('afterKind', cursor.kind)
     next.set('at', cursor.at)
     next.set('pinned', String(cursor.pinned))
     const result = await api<Page>('/api/mobile/conversations?' + next).catch(error => {
@@ -57,7 +58,7 @@ export default function Conversations() {
     })
     if (result.workspaceId !== workspaceId) throw new Error('workspaceAccessDenied')
     return { items: result.items, next: result.cursor }
-  })
+  }, directoryConversationKey)
   const refresh = useRefresh(list.reload)
   async function mark(body: { action: 'unread'; runId: string } | { action: 'unread'; chatId: string } | { action: 'readAll' }) {
     if (pending.current || !workspaceId) return
@@ -74,7 +75,7 @@ export default function Conversations() {
   const open = (row: Conversation) => router.push(row.kind === 'chat' ? `/groups/${row.id}` : `/thread/${row.id}`)
   const rows = pullsOnly
     ? directoryPullRequests(pages.items, pullState).map(entry => ({ kind: 'pull' as const, key: entry.pull.url, ...entry }))
-    : pages.items.map(conversation => ({ kind: 'conversation' as const, key: conversation.id, conversation }))
+    : pages.items.map(conversation => ({ kind: 'conversation' as const, key: directoryConversationKey(conversation), conversation }))
   return <View style={styles.screen}>
     <NavBar title={title} back={() => router.back()} search={{ placeholder: labels.search, onChange: value => setSearch(value.slice(0, 120)) }} />
     <FlatList<(typeof rows)[number]> {...underBar} data={rows} keyExtractor={item => item.key} refreshControl={<RefreshControl {...refresh} />}
@@ -95,7 +96,7 @@ export default function Conversations() {
           return <View>
             <Row label={pull.title || pull.url} detail={[mobileMessages.Metadata.prState[pull.state], counts].filter(Boolean).join(' · ')}
               onPress={() => { void Linking.openURL(pull.url) }} />
-            {conversations.map(item => <Row key={item.id} label={item.title || labels.untitled} onPress={() => open(item)} />)}
+            {conversations.map(item => <Row key={directoryConversationKey(item)} label={item.title || labels.untitled} onPress={() => open(item)} />)}
             {[...tasks].map(([id, label]) => <Row key={id} label={label} onPress={() => router.push(`/task/${id}`)} />)}
           </View>
         }

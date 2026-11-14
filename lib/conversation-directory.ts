@@ -134,7 +134,7 @@ export async function conversationDirectory(database: RunChainQueryable, reader:
 async function directoryPage(database: RunChainQueryable, userId: string, workspaceId: string, raw: DirectoryInput): Promise<ConversationDirectoryPage> {
   const input = directoryInput.parse(raw)
   const param = (i: number) => '$' + (facts.params.length + i)
-  const [archived,bot,search,state,id,pinned,at,pullState] = Array.from({length:8}, (_,i) => param(4+i))
+  const [archived,bot,search,state,id,pinned,at,pullState,kind] = Array.from({length:9}, (_,i) => param(4+i))
   const statement = conversationQuery() + `, candidates AS (
     SELECT kind,pulls,unread,id,title,"agentName",harness,"issueId",identifier,"taskTitle",status,pinned,touched,asked,state,at,archived,"botId" FROM visible
     UNION ALL
@@ -145,13 +145,13 @@ async function directoryPage(database: RunChainQueryable, userId: string, worksp
     AND (${pullState}='all' OR (${pullState}='linked' AND jsonb_array_length(pulls)>0) OR pulls @> jsonb_build_array(jsonb_build_object('state',${pullState}::text)))
     AND (${bot}::uuid IS NULL OR "botId"=${bot}) AND (${state}='all' OR state=${state})
     AND (${search}='' OR strpos(lower(coalesce(title,nullif(trim(asked),''),"taskTitle","agentName")),lower(${search}))>0)
-    AND (${id}::uuid IS NULL OR (pinned,touched,candidates.id)<(${pinned}::boolean,${at}::timestamptz,${id}::uuid))
-    ORDER BY pinned DESC,touched DESC,candidates.id DESC LIMIT 101`
+    AND (${id}::uuid IS NULL OR (pinned,touched,candidates.id,kind)<(${pinned}::boolean,${at}::timestamptz,${id}::uuid,coalesce(${kind}::text,'')))
+    ORDER BY pinned DESC,touched DESC,candidates.id DESC,kind DESC LIMIT 101`
   const rows = (await database.query(statement,[...facts.params,userId,workspaceId,RUN_CHAIN_MAX_DEPTH,input.archived === 'any' ? null : input.archived,input.botId ?? null,
-    input.search,input.state,input.cursor?.id ?? null,input.cursor?.pinned ?? null,input.cursor?.at ?? null,input.pullState])).rows as Row[]
+    input.search,input.state,input.cursor?.id ?? null,input.cursor?.pinned ?? null,input.cursor?.at ?? null,input.pullState,input.cursor?.kind ?? null])).rows as Row[]
   const page = rows.slice(0,100), last = page.at(-1)
   return { items: page.map(item).filter(row=>!input.search || row.title.toLowerCase().includes(input.search.toLowerCase())),
-    cursor: rows.length>page.length && last ? {id:last.id,at:last.at,pinned:last.pinned} : null }
+    cursor: rows.length>page.length && last ? {id:last.id,at:last.at,pinned:last.pinned,kind:last.kind} : null }
 }
 
 /** A single bounded result per visible Bot, independent of thread-list paging. */
@@ -172,7 +172,7 @@ async function sidebarRows(database: RunChainQueryable, userId: string, workspac
     SELECT *,count(*) FILTER (WHERE unread) OVER (PARTITION BY "botId")::integer AS "unreadCount",
       row_number() OVER (PARTITION BY "botId" ORDER BY pinned DESC,
       CASE WHEN state IN ('waiting','failed') THEN 0 WHEN state='working' THEN 1 WHEN status IN ('done','canceled','duplicate') OR "runStatus" IN ('succeeded','failed','stopped','cancelled','canceled') THEN 3 ELSE 2 END,
-      touched DESC,id DESC)::integer AS position
+      touched DESC,id DESC,kind DESC)::integer AS position
     FROM bot_rows WHERE NOT archived AND "botId" IS NOT NULL AND source IS DISTINCT FROM 'mcp' ${botFilter}
   ) SELECT * FROM ranked WHERE position<=9 ORDER BY "botId",position`
   const rows = (await database.query(statement, values)).rows as (Row & { unreadCount: number })[]

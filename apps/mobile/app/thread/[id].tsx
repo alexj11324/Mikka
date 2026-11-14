@@ -50,7 +50,7 @@ export default function ThreadScreen() {
   const controls = useThreadDeliveryControls(liveRunId, data?.issueId ?? null, canSend ? data?.delivery : undefined, reload)
   const delivery = useConversationDelivery(canSend ? { kind: 'thread', id: liveRunId, issueId: data?.issueId ?? null, delivery: controls.mode } : null,
     [...(data?.confirmedSubmissionIds ?? []), ...(data?.delivery?.queued.map(row => row.requestId) ?? [])], reload)
-  const readEnd = useThreadReadEnd(error ? undefined : data?.readReceipts, bar.onScroll)
+  const readEnd = useThreadReadEnd(id, error ? undefined : data?.readReceipts, bar.onScroll)
   const thread = data?.thread
   // 停止 a working thread, as on the web; a thread that ended meanwhile (409) has nothing left to stop.
   const stopper = useStop(() => api(`/api/mobile/threads/${liveRunId}/stop`, { method: 'POST' }).catch(failure => {
@@ -78,7 +78,7 @@ export default function ThreadScreen() {
         // Stop for every live thread, also one waiting for your answer, whose composer sends (N1).
         right={data?.active && !stopper.sending ? { icon: 'stop.fill', label: IssueThreads.stop, web: <Square size={18} color={colors.ink} fill={colors.ink} />, onPress: () => void stopper.stop() } : undefined}
       />
-      <KeyboardChatScrollView {...readEnd} scrollEventThrottle={16} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
+      <KeyboardChatScrollView key={id} {...readEnd} scrollEventThrottle={16} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
         {!data && !error ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : null}
         <ReadNotice error={error} hasData={Boolean(data)} label={IssueThreads.hidden} onRetry={reload} />
         {data?.items.map((item, index) => {

@@ -87,6 +87,22 @@ test('rapid taps, a lost mobile write answer and an incomplete read-back retry o
   } finally { await ui.close() }
 })
 
+test('a pending delivery receipt is explained on native without resubmitting or clearing the original reply', async () => {
+  rows = [previous]
+  result = async () => ok({ error: 'threadSubmissionOutcomeUnconfirmed' })
+  const ui = await mount('edit')
+  try {
+    await ui.click(copy.versionEdit)
+    await ui.click(copy.versionRun)
+    const message = mobileMessages.Errors.threadSubmissionOutcomeUnconfirmed
+    assert.ok(message)
+    assert.equal(ui.host.querySelector('[role=alert]')?.textContent, message)
+    assert.ok(ui.host.textContent?.includes(previous.originalOutput))
+    assert.equal(reloads, 0)
+    assert.equal(writes.length, 1)
+  } finally { await ui.close() }
+})
+
 test('the native picker refuses malformed replies and revoked access without exposing cached versions or confirming a submission', async () => {
   rows = [{ id: oldId }]
   const ui = await mount('edit')
