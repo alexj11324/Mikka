@@ -1,4 +1,5 @@
 import { workerDefinitionDigest } from './agent-kit/worker-digest'
+import { scheduleConversationTitle } from '@/lib/conversation-title-schedule'
 import 'server-only'
 import { admitProfileSelection } from './factory/profile-admission'
 import { runListChanged } from './live/lists'
@@ -160,6 +161,8 @@ export async function acceptLocalRun(input: {
     const [active] = await tx.select({ id: agentRuns.id }).from(agentRuns).where(and(eq(agentRuns.userId, input.userId), eq(agentRuns.issueId, task.id), inArray(agentRuns.status, [...UNFINISHED_RUN_STATUSES]))).limit(1)
     if (active) throw new ActionFailureError('runAlreadyActive', { runId: active.id })
     if (readOnly) {
+      // The conversation is named once this commits (decision 2026-11-13-1405); a run that continues one takes its title.
+      scheduleConversationTitle(tx, input.id, input.userId, 'created')
       await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', source: input.source ?? null, origin: input.origin, originRef: input.originRef ?? null, baseBranch: effectiveBaseBranch, ...copyRunPrompt({ prompt: input.prompt, promptTaskStart: input.promptTaskStart ?? 0, promptTaskLength: input.promptTaskLength ?? null }), agentDefinition: definition, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })
       await runListChanged(tx, input.id)
       await runChanged(tx, input.id)
@@ -177,6 +180,8 @@ export async function acceptLocalRun(input: {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'repository-branch:' + repo.repoPath + ':' + branch}, 0))`)
     const [collision] = await tx.select({ runId: runPublications.runId }).from(runPublications).where(and(eq(runPublications.remoteKey, repo.repoPath), eq(runPublications.branch, branch), ne(runPublications.issueId, task.id))).limit(1)
     if (collision) throw invalid('branchInUse')
+    // The conversation is named once this commits (decision 2026-11-13-1405); a run that continues one takes its title.
+    scheduleConversationTitle(tx, input.id, input.userId, 'created')
     await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', source: input.source ?? null, origin: input.origin, originRef: input.originRef ?? null, baseBranch: effectiveBaseBranch, ...copyRunPrompt({ prompt: input.prompt, promptTaskStart: input.promptTaskStart ?? 0, promptTaskLength: input.promptTaskLength ?? null }), agentDefinition: { ...definition, repositoryAdmission: admission }, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })
     await tx.insert(runPublications).values({ runId: input.id, userId: input.userId, issueId: task.id, scopeVersion: task.scopeVersion, issueTitle: task.title, remoteUrl: repo.remoteUrl, remoteKey: repo.repoPath, identifier, branch, baseBranch: effectiveBaseBranch, pushApproved: true })
     await runListChanged(tx, input.id)

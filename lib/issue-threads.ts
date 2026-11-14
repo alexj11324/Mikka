@@ -3,6 +3,7 @@ import { runIsActive, runSummaryView } from './issue-run-conversation'
 import type { RunChain } from './run-chain'
 import { BUILTIN_AGENT_PROFILE_ID } from './factory/agent-profile-reference'
 import { resolveProfileMark, type ProfileMarkValue } from './factory/agent-profile-mark'
+import { conversationTitle } from './short-title'
 
 /**
  * A thread is one agent run on an issue, and its content is its owner's alone (R-62):
@@ -125,7 +126,7 @@ export function threadTime(thread: { createdAt: Date; finishedAt: Date | null },
 export const ISSUE_THREAD_LIMIT = 20
 
 export interface IssueThreadRow {
-  id: string; issueId: string | null; userId: string; status: string; prompt: string
+  id: string; issueId: string | null; userId: string; status: string; prompt: string; title?: string | null
   report: unknown; error: string | null; failureDetails?: unknown; createdAt: Date; finishedAt: Date | null
   agentName: string; harness: string; ownerName?: string | null
   stopRequestedAt?: Date | null
@@ -148,11 +149,13 @@ function plainLine(line: string) {
   return line.replace(/^(?:#{1,6}\s+|>\s*|[-*+]\s+|\d+[.)]\s+)+/, '').replace(/(\*\*|__|`|~~)/g, '').trim()
 }
 
-/** The thread's name: the first line of what it was asked to do, as plain text. */
+/**
+ * The thread's name until it has a stored title: the first line of what it was asked to do, as plain text, held to
+ * the short-title bound (lib/short-title.ts conversationTitle) so no surface shows a longer one.
+ */
 export function threadName(prompt: string, fallback: string) {
   const line = prompt.split('\n').map(part => plainLine(part.trim())).find(Boolean)
-  if (!line) return fallback
-  return Array.from(line).length > 60 ? `${Array.from(line).slice(0, 59).join('')}…` : line
+  return line ? conversationTitle({ name: line }) || fallback : fallback
 }
 
 /** Only a thread's owner, while still a collaborator, reads or joins it. */
@@ -182,7 +185,7 @@ export function projectIssueThreads(rows: readonly (IssueThreadRow | IssueThread
       stopping: runIsActive(row.status) && !!row.stopRequestedAt,
       ownerName: row.userId === viewerId ? null : row.ownerName ?? null,
       detail: canReadThread(row.userId, viewerId, memberIds)
-        ? { name: 'prompt' in row ? threadName(row.prompt, row.agentName) : row.name, agentName: row.agentName, harness: row.harness, ...('report' in row ? runSummaryView({ report: row.report, error: row.error }) : { summary: row.summary }), bot: row.botColor && row.botShape ? { color: row.botColor, shape: row.botShape } : null, ...(row.profile !== undefined ? { profile: threadProfile(row.profile) } : {}) }
+        ? { name: 'prompt' in row ? row.title || threadName(row.prompt, row.agentName) : conversationTitle({ name: row.name }) || row.agentName, agentName: row.agentName, harness: row.harness, ...('report' in row ? runSummaryView({ report: row.report, error: row.error }) : { summary: row.summary }), bot: row.botColor && row.botShape ? { color: row.botColor, shape: row.botShape } : null, ...(row.profile !== undefined ? { profile: threadProfile(row.profile) } : {}) }
         : null,
       rootRunId: row.id, latestRunId: row.id,
       attempts: [{ runId: row.id, attempt: 1, status: row.status, outcome: row.outcome ?? null, stopping: runIsActive(row.status) && !!row.stopRequestedAt, createdAt: row.createdAt, finishedAt: row.finishedAt }],

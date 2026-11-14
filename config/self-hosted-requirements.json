@@ -1429,5 +1429,89 @@
     "behavior": "Read only the requested account's Telegram link from the installation database. Report the bot configured only when all three operator inputs exist; normalize its public username and keep unlinked accounts disconnected.",
     "test": "tests/telegram-task-link.db.test.ts",
     "suite": "test:task-identity-db"
+  },
+  "app/actions/task-runs.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The signed-in user reads workspace runs and manages the titles of owned conversations using installation PostgreSQL.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "drizzle/20261113153514_conversation_titles.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Add nullable, bounded conversation titles and their source to existing runs in the installation database.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "lib/bot-model-menu-view.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Render the selected model while the installation saves the selection and reconcile the acknowledged choice.",
+    "test": "lib/bot-model-menu-view.test.ts",
+    "suite": "test:issues"
+  },
+  "lib/thread-groups.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Compute the bot overview from visible task, conversation and pull request rows, counting each handoff once.",
+    "test": "lib/thread-groups.test.ts",
+    "suite": "test:issues"
+  },
+  "lib/conversation-title-schedule.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Schedule a title update only after the run event commits to the installation database.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "lib/conversation-title-server.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the user's available default model to name a conversation. Keep its fallback when generation is unavailable and preserve manual titles on automatic triggers.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "lib/conversation-title.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Apply the same title limits, generation triggers and manual precedence on every installation.",
+    "test": "lib/conversation-title.test.ts",
+    "suite": "test:issues"
+  },
+  "lib/coordinator/citations.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Resolve and format titles of cited conversations from the installation's own run and task records.",
+    "test": "lib/coordinator/citations.test.ts",
+    "suite": "test:coordinator-events"
+  },
+  "lib/short-title-server.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Generate a short title with the installation's existing default-model service when available, retaining the display fallback otherwise.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "lib/short-title.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the stored conversation title when present and a bounded local fallback otherwise.",
+    "test": "lib/issue-threads.test.ts",
+    "suite": "test:issues"
+  },
+  "lib/task-status-advance.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Advance task status in PostgreSQL from eligible run and pull request lifecycle events.",
+    "test": "tests/task-status-advance.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "lib/task-status-run-start.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "After a successful run claim commits, advance its task within the installation database.",
+    "test": "tests/task-status-advance.db.test.ts",
+    "suite": "test:run-publication-db"
   }
 }

@@ -9,7 +9,7 @@ import { pushSettingsHistory } from '@/lib/settings-navigation'
  * Nothing outside this file and lib/settings-navigation.ts writes the
  * browser history; scripts/navigation-policy.mjs enforces that.
  */
-export type WorkspaceSection = 'inbox' | 'my-issues' | 'agent' | 'coordinator' | 'group' | 'projects' | 'views' | 'team-home' | 'team-issues' | 'team-projects' | 'all-issues' | 'plugins' | 'suggestions' | 'artifacts' | 'memory' | 'tasks'
+export type WorkspaceSection = 'inbox' | 'my-issues' | 'agent' | 'coordinator' | 'group' | 'projects' | 'views' | 'team-home' | 'team-issues' | 'team-projects' | 'all-issues' | 'plugins' | 'suggestions' | 'artifacts' | 'memory'
 
 export const SECTION_TITLE_KEYS: Record<WorkspaceSection, string> = {
   inbox: 'Nav.inbox',
@@ -27,17 +27,20 @@ export const SECTION_TITLE_KEYS: Record<WorkspaceSection, string> = {
   suggestions: 'Nav.suggestions',
   artifacts: 'Nav.artifacts',
   memory: 'HostedSettings.memory.title',
-  tasks: 'Nav.tasks',
 }
 
 /** Sections a reload or a shared link reopens; the others start from their parent page. The Coordinator's chat is the default and needs none. */
-const URL_SECTIONS = ['agent', 'plugins', 'suggestions', 'artifacts', 'memory', 'tasks', 'all-issues', 'projects'] as const satisfies readonly WorkspaceSection[]
+const URL_SECTIONS = ['agent', 'plugins', 'suggestions', 'artifacts', 'memory', 'all-issues', 'projects'] as const satisfies readonly WorkspaceSection[]
 const READ_SECTIONS: readonly string[] = [...URL_SECTIONS, 'coordinator']
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 /** Query keys that belong to a page inside a section (the plugins page's app and category); a new place drops them. */
 const PAGE_KEYS = ['app', 'category'] as const
 
+/** The retired 任务 page's address. Tasks have one entry, the board (2026-11-13-1405): an old link opens it in its list view. */
+export const LEGACY_TASKS_SECTION = 'tasks'
+
 export function sectionFromQuery(section: string | undefined): WorkspaceSection {
+  if (section === LEGACY_TASKS_SECTION) return 'all-issues'
   return READ_SECTIONS.includes(section ?? '') ? section as WorkspaceSection : 'coordinator'
 }
 

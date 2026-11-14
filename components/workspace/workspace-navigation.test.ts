@@ -316,3 +316,10 @@ test('a chat\'s work area takes tasks and threads opened beside it, and gives th
   assert.equal(opened.length, 4)
   assert.equal(readLocation(at(browser.path()).searchParams).thread, RUN)
 })
+
+test('an old 任务 link reads as the board: tasks have one entry', () => {
+  assert.equal(sectionFromQuery('tasks'), 'all-issues')
+  const location = readLocation(new URLSearchParams(`section=tasks&issue=${ISSUE}`))
+  assert.equal(location.section, 'all-issues')
+  assert.equal(location.issue, ISSUE)
+})

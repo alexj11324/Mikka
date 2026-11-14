@@ -1,13 +1,15 @@
-import { Circle, CircleDashed, CircleDot, CircleCheck, CircleX, CircleSlash2, CircleGauge, CircleAlert, SignalHigh, SignalMedium, SignalLow } from 'lucide-react'
+import { Circle, CircleDashed, CircleX, CircleSlash2, CircleAlert, SignalHigh, SignalMedium, SignalLow } from 'lucide-react'
 
 import { statusTone } from '@/lib/status-appearance'
+import { StatusDoneIcon, StatusProgressIcon, StatusReviewIcon } from './status-icons'
 
+/** A task's one status and its icon on every surface (2026-11-13-1405): 进行中, 评审中 and 已完成 are Orca's shapes (status-icons.tsx). */
 export const ISSUE_STATUSES = ([
   { value: 'backlog', label: 'Backlog', icon: CircleDashed, indicatorClassName: 'text-muted-foreground', surfaceClassName: 'bg-muted/25', borderClassName: 'border-border' },
   { value: 'todo', label: 'Todo', icon: Circle, indicatorClassName: 'text-muted-foreground', surfaceClassName: 'bg-muted/25', borderClassName: 'border-border' },
-  { value: 'doing', label: 'In Progress', icon: CircleDot, indicatorClassName: 'text-warning-foreground', surfaceClassName: 'bg-warning/5', borderClassName: 'border-warning/20' },
-  { value: 'review', label: 'In Review', icon: CircleGauge, indicatorClassName: 'text-info-foreground', surfaceClassName: 'bg-info/5', borderClassName: 'border-info/20' },
-  { value: 'done', label: 'Done', icon: CircleCheck, indicatorClassName: 'text-success-foreground', surfaceClassName: 'bg-success/5', borderClassName: 'border-success/20' },
+  { value: 'doing', label: 'In Progress', icon: StatusProgressIcon, indicatorClassName: 'text-warning-foreground', surfaceClassName: 'bg-warning/5', borderClassName: 'border-warning/20' },
+  { value: 'review', label: 'In Review', icon: StatusReviewIcon, indicatorClassName: 'text-info-foreground', surfaceClassName: 'bg-info/5', borderClassName: 'border-info/20' },
+  { value: 'done', label: 'Done', icon: StatusDoneIcon, indicatorClassName: 'text-success-foreground', surfaceClassName: 'bg-success/5', borderClassName: 'border-success/20' },
   { value: 'canceled', label: 'Canceled', icon: CircleX, indicatorClassName: 'text-muted-foreground', surfaceClassName: 'bg-muted/25', borderClassName: 'border-border' },
   { value: 'duplicate', label: 'Duplicate', icon: CircleSlash2, indicatorClassName: 'text-muted-foreground', surfaceClassName: 'bg-muted/25', borderClassName: 'border-border' },
 ] as const).map(item => ({ ...item, tone: statusTone(item.value) }))

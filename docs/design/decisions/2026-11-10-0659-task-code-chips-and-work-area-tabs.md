@@ -3,6 +3,7 @@
 - Date: 2026-11-10
 - Source: Alex, in the session reviewing #1864 against Capy, Warp Factory and affectUI's Live Session, with screenshots of ALEX-45 shown four ways: 「对于这个任务来说，直接显示图标加编号。我们的 run 还是显示标题。对于 issue，我们仍然选择全屏……如果是在对话里边打开，就显示侧栏。右侧标签页的话，比如我们看 sub agents，点一下就自动在右侧标签页里面开一个新的标签页」; on threads: 「在它前面不加任何强调色，但还是要加引用的连接色」; on Agent 配置: 「给每一个不同的 Agent 配上不同的图标」.
 - Rule: R-15, R-78, R-82
+- Superseded in part by: [2026-11-13-1405](2026-11-13-1405-one-task-status.md) (the state beside a task is its status field, not `localTaskState`; a thread is named by the conversation's own short title, not its task's title).
 - Replaces: R-15's title chip with the number in the hover card; R-78's Agent brand mark as the only mark of a thread's Agent stretch; R-82's chat-opened task detail in the right column.
 
 ## References in chat text
