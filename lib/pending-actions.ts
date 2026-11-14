@@ -8,7 +8,6 @@ import { accountWriteSetting, appToolWriteSetting } from '@/lib/operations/accou
 import { runComposioAction } from '@/lib/composio'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { actionDecidedEvent } from '@/lib/coordinator-events'
-import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { db, pool } from '@/lib/db'
 import { pendingActions } from '@/lib/db/schema'
 import { actionOutcome, PENDING_ACTION_TTL_MS } from '@/lib/pending-action-view'
@@ -63,7 +62,6 @@ export async function decidePendingAction(userId: string, id: string, approve: b
     }
   }
   await recordCoordinatorEvent(db, actionDecidedEvent({ id: row.id, userId, action: row.action, input: row.action === 'credential_operation' || row.action === 'browser_operation' ? { summary: (row.input as Record<string, unknown>).summary } : row.input }, { status, error, outcome }, { botId: row.botId }))
-  await wakeCoordinator(userId)
   return { status, error }
 }
 

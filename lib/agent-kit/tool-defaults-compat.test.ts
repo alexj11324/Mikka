@@ -17,7 +17,7 @@ const capture = (name: string) => async (...args: unknown[]) => { calls.push({na
 const forbidden = () => { throw Error('No DB, provider or device in catalogue tests') }
 stub('../db/index.ts', {db: {select: forbidden}, pool: {connect: forbidden}})
 stub('../workspace-db.ts', {workspaceDb: {select: forbidden}})
-stub('../../workflows/coordinator/steps.ts', {recordProjectDecisionStep: capture('project-decision'), composioAction: capture('read'), accountWrite: capture('write'), wakeComputerBot: capture('wake'), dispatchRun: capture('ordinary-dispatch'), dispatchFactoryRunStep: capture('factory-dispatch'), listFactoryRequestsScoped: capture('factory-read-scoped'), listFactoryRequests: capture('factory-read-legacy'), githubCallAllowedStep: async () => 'allow', githubMcp: capture('github'), findRepository: capture('find-repository'), getFactoryTask: capture('factory-read-legacy-id'), readFactoryTask: capture('factory-read-scoped-id')})
+stub('../../workflows/coordinator/steps.ts', {recordProjectDecisionStep: capture('project-decision'), composioAction: capture('read'), accountWrite: capture('write'), wakeComputerBot: capture('wake'), dispatchRun: capture('ordinary-dispatch'), dispatchFactoryRunStep: capture('factory-dispatch'), listFactoryRequestsScoped: capture('factory-read-scoped'), githubCallAllowedStep: async () => 'allow', githubMcp: capture('github'), findRepository: capture('find-repository'), readFactoryTask: capture('factory-read-scoped-id')})
 const readPersonalSkill = capture('read-personal-skill')
 stub('../../workflows/coordinator/agent-kit-steps.ts', { beforeAgentTool: async () => {}, afterAgentTool: async () => {}, loadAgentSkill: async () => ({ error: 'notAssigned' }), readPersonalSkill })
 let registry: typeof import('../../workflows/coordinator/tools')
@@ -172,6 +172,14 @@ test('existing custom and legacy execution snapshots never acquire new capabilit
   } finally {
     factoryGateKeys.forEach((key, i) => { if (saved[i] === undefined) delete process.env[key]; else process.env[key] = saved[i] })
   }
+})
+
+test('Coordinator-only Factory tools do not construct entries that the scoped registry replaces', () => {
+  const coordinatorOnly = factoryRegistry.factoryCoordinatorTools(owner, scope)
+  const scoped = registry.createCoordinatorRegistry(owner, bot, scope, {
+    switches: { issueTools: true, factoryRouting: true, factoryLifecycle: true }, execution: execution(),
+  })
+  assert.deepEqual(Object.keys(coordinatorOnly).filter(name => Object.hasOwn(scoped, name)), [])
 })
 
 test('Factory gates narrow frozen grants, preserve ordinary tools and keep named Bots on scoped entry points', async () => {
@@ -339,21 +347,17 @@ test('Factory task readers distinguish receipt IDs without changing validation, 
   const switches = { issueTools: true, factoryRouting: true, factoryLifecycle: true }
   const taskId = '10000000-0000-4000-8000-000000000011'
   const issueId = '10000000-0000-4000-8000-000000000012'
-  const originalDescriptions = {
-    legacy: "Read the task, current operation binding, reasons, candidates and retained execution evidence. V2 exposes one public stage with optional needsYou and bounded clarification context; use binding for controls. Older tasks keep their legacy contract.",
-    scoped: "Read this chat’s task, exact operation binding and retained execution evidence. V2 uses one public stage with optional needsYou; clarification records missing information/permissions and needsSpec. Use binding for subsequent controls. Older tasks keep their legacy contract.",
-  }
-  const cases: { name: string; tools: ToolSet; strict: boolean; description: string; expectedCall: (typeof calls)[number] }[] = [
-    { name: 'named Bot', tools: registry.coordinatorTools(owner, bot, scope, { switches, execution: execution() }), strict: true, description: originalDescriptions.scoped, expectedCall: { name: 'factory-read-scoped-id', args: [owner, taskId, scope, bot] } },
-    { name: 'Coordinator', tools: registry.coordinatorTools(owner, COORDINATOR_BOT, scope, { switches, coordinator: true, execution: execution() }), strict: true, description: originalDescriptions.scoped, expectedCall: { name: 'factory-read-scoped-id', args: [owner, taskId, scope, COORDINATOR_BOT] } },
-    { name: 'Factory export', tools: factoryRegistry.factoryCoordinatorTools(owner, scope), strict: false, description: originalDescriptions.legacy, expectedCall: { name: 'factory-read-legacy-id', args: [owner, { taskId }, scope] } },
+  const originalDescription = "Read this chat’s task, exact operation binding and retained execution evidence. V2 uses one public stage with optional needsYou; clarification records missing information/permissions and needsSpec. Use binding for subsequent controls. Older tasks keep their legacy contract."
+  const cases = [
+    { name: 'named Bot', tools: registry.coordinatorTools(owner, bot, scope, { switches, execution: execution() }), botId: bot },
+    { name: 'Coordinator', tools: registry.coordinatorTools(owner, COORDINATOR_BOT, scope, { switches, coordinator: true, execution: execution() }), botId: COORDINATOR_BOT },
   ]
   for (const item of cases) await t.test(item.name, async () => {
     const read = item.tools.get_factory_task
     assert.ok(read)
     const schema = asSchema(read.inputSchema)
     const inputSchema = await schema.jsonSchema
-    const originalInput = item.strict ? z.object({ taskId: z.uuid() }).strict() : z.object({ taskId: z.uuid() })
+    const originalInput = z.object({ taskId: z.uuid() }).strict()
     const originalSchema = await asSchema(originalInput).jsonSchema
     const withoutDescription = structuredClone(inputSchema)
     const parameter = withoutDescription.properties?.taskId
@@ -367,12 +371,11 @@ test('Factory task readers distinguish receipt IDs without changing validation, 
     assert.deepEqual(await schema.validate!({ taskId: issueId }), { success: true, value: { taskId: issueId } })
     for (const input of [{}, { taskId: 'not-a-uuid' }, { issueId }]) assert.equal((await schema.validate!(input)).success, false)
     const unknown = await schema.validate!({ taskId, issueId })
-    if (item.strict) assert.equal(unknown.success, false)
-    else assert.deepEqual(unknown, { success: true, value: { taskId } })
+    assert.equal(unknown.success, false)
 
     calls.length = 0
     await invoke(item.tools, 'get_factory_task', { taskId })
-    assert.deepEqual(calls, [item.expectedCall])
+    assert.deepEqual(calls, [{ name: 'factory-read-scoped-id', args: [owner, taskId, scope, item.botId] }])
 
     const description = read.description
     assert.ok(typeof description === 'string')
@@ -388,14 +391,12 @@ test('Factory task readers distinguish receipt IDs without changing validation, 
 
     const metadataBytes = (description: string | undefined, parameters: typeof inputSchema) =>
       Buffer.byteLength(JSON.stringify({ name: 'get_factory_task', description, inputSchema: parameters }), 'utf8')
-    const beforeBytes = metadataBytes(item.description, originalSchema)
+    const beforeBytes = metadataBytes(originalDescription, originalSchema)
     const afterBytes = metadataBytes(description, inputSchema)
     assert.ok(afterBytes <= beforeBytes, 'serialized tool description and complete input schema cannot grow')
     t.diagnostic(JSON.stringify({ surface: item.name, beforeBytes, afterBytes, deltaBytes: afterBytes - beforeBytes }))
 
-    if (item.strict) {
-      assert.deepEqual(await asSchema(item.tools.get_issue.inputSchema).validate!({ issueId }), { success: true, value: { issueId } })
-      assert.equal((await asSchema(item.tools.dispatch_run.inputSchema).validate!({ issueId, readOnly: true })).success, true)
-    }
+    assert.deepEqual(await asSchema(item.tools.get_issue.inputSchema).validate!({ issueId }), { success: true, value: { issueId } })
+    assert.equal((await asSchema(item.tools.dispatch_run.inputSchema).validate!({ issueId, readOnly: true })).success, true)
   })
 })

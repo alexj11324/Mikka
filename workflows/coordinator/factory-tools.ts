@@ -1,18 +1,14 @@
 import {tool,zodSchema,jsonSchema} from 'ai'
 import {z} from 'zod'
-import { bindingSchema,routeSchema } from '@/lib/factory/contract'
+import { routeSchema } from '@/lib/factory/contract'
 import {factoryDispatchSchema} from '@/lib/factory/dispatch-schema'
-import {contextQuestionAnswerSchema,questionEscalationSchema,questionReferenceSchema} from '@/lib/factory/questions/schema'
+import {questionReferenceSchema} from '@/lib/factory/questions/schema'
 import {commandSchema,skillEvaluationCommandSchema} from '@/lib/self-improvement/schema'
 import type {NativeToolScope} from './tool-scope'
 import * as steps from './steps'
 const coordinatorQuestionReferenceSchema = questionReferenceSchema.pick({ questionId: true, questionRevision: true })
 const skillEvaluationInput = zodSchema(skillEvaluationCommandSchema)
 export function factoryCoordinatorTools(userId:string,scope?:NativeToolScope){const id=z.uuid();return {
-list_factory_requests: tool({
-      description: 'Read recent authenticated requests to identify the source event for task routing.',
-      inputSchema: z.object({}), execute: () => steps.listFactoryRequests(userId, scope),
-    }),
 create_issue_from_request: tool({
       description: 'Create one personal issue from an actual authenticated user request when it needs a new task. Use the sourceEventId from list_factory_requests and a concise title; the server copies the original request into the description. Replaying the same source returns its existing accessible issue. Use the returned issueId for Factory routing.',
       inputSchema: z.object({ sourceEventId: id, title: z.string().trim().min(1).max(200) }).strict(),
@@ -22,33 +18,11 @@ route_factory_task: tool({
       description: 'Persist routing for the request and issue. Clear authorized work starts implementation. Record only material missing information/permissions; spec is optional. V2 returns an operation binding; get_factory_task reads current stage and needsYou.',
       inputSchema: routeSchema.omit({ eventId: true }), execute: ( input) => steps.routeFactoryTask(userId, input, scope),
     }),
-get_factory_task: tool({
-      description: 'Read Factory state/evidence and control binding (V2 stage/needsYou; legacy unchanged). Use Issue IDs with get_issue/dispatch_run.',
-      inputSchema: z.object({ taskId: id.describe('Factory receipt: readTask.input.taskId or binding.taskId; legacy task.id. Not an Issue ID.') }), execute: ( input) => steps.getFactoryTask(userId, input, scope),
-    }),
-list_factory_questions: tool({
-      description:
-        'Read durable execution questions and their original task/run/session after restart. Never infer waiting solely from model memory.',
-      inputSchema: z.object({ taskId: id.optional() }),
-      execute: (input) => steps.listFactoryQuestions(userId, input, scope),
-    }),
 get_factory_question: tool({
       description:
         'Read a durable question, current fence, reason and continuation state.',
       inputSchema: z.object({ questionId: id }),
       execute: (input) => steps.getFactoryQuestion(userId, input, scope),
-    }),
-answer_factory_context: tool({
-      description:
-        'Resolve only a context question using exact excerpts from accessible issue/request facts. This cannot answer a decision/permission or grant authorization.',
-      inputSchema: contextQuestionAnswerSchema.extend({ reference: coordinatorQuestionReferenceSchema }),
-      execute: (input) => steps.answerFactoryContext(userId, input, scope),
-    }),
-escalate_factory_question: tool({
-      description:
-        'Escalate the actual unresolved information, decision, permission or external condition after checking available facts. Does not cancel the task or authorize anything.',
-      inputSchema: questionEscalationSchema.extend({ reference: coordinatorQuestionReferenceSchema }),
-      execute: (input) => steps.escalateFactoryQuestion(userId, input, scope),
     }),
 answer_factory_question_from_user: tool({
       description:
@@ -61,15 +35,6 @@ answer_factory_question_from_user: tool({
         })
         .strict(),
       execute: (input) => steps.answerFactoryQuestionFromUser(userId, input, scope),
-    }),
-resolve_factory_task: tool({
-      description: 'Record only the missing items answered by a subsequent actual user request. Actual run permissions are checked again at dispatch.',
-      inputSchema: z.object({ binding: bindingSchema, sourceEventId: id, rationale: z.string().min(1).max(4000), missingInformation: z.array(z.string().min(1).max(4000)).max(20), missingPermissions: z.array(z.string().min(1).max(4000)).max(20), needsSpec: z.boolean(), }),
-      execute: ( input) => steps.resolveFactoryTask(userId, input, scope),
-    }),
-stop_factory_task: tool({
-      description: 'Cancel the task or record withdrawn permission; stop bound runs and block later events.',
-      inputSchema: z.object({ binding: bindingSchema, reason: z.string().min(1).max(4000), action: z.enum(['cancel','revoke']), }), execute: ( input) => steps.stopFactoryTask(userId, input, scope),
     }),
 dispatch_factory_run: tool({
       description: 'Queue and bind one Factory run on an existing registered device repository atomically. This does not provision a hosted thread. For work on a Bot computer or standalone delivery without a repository, use dispatch_bot_computer, which already routes through Factory. Use the exact current pending binding from route_factory_task/get_factory_task. Waiting, cancelled, revoked or stale tasks cannot dispatch. Reuse the same binding after a lost response.',
