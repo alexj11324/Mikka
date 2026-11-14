@@ -21,9 +21,9 @@ export async function standaloneChatDirectory(database: RunChainQueryable, owner
       AND (c."conversationArchivedAt" IS NOT NULL)=$8 AND strpos(lower(c.title),lower($3))>0
       AND ($4::uuid IS NULL OR EXISTS (SELECT 1 FROM conversation_members bot
         WHERE bot."conversationId"=c.id AND bot."memberType"='bot' AND bot."memberId"=($4::uuid)::text AND bot."leftAt" IS NULL))
-      AND ($5::uuid IS NULL OR ((c."conversationPinnedAt" IS NOT NULL),activity.at,c.id)<($6::boolean,$7::timestamptz,$5::uuid))
+      AND ($5::uuid IS NULL OR ((c."conversationPinnedAt" IS NOT NULL),activity.at,c.id,'chat'::text)<($6::boolean,$7::timestamptz,$5::uuid,coalesce($9::text,'')))
     ORDER BY pinned DESC,activity.at DESC,c.id DESC LIMIT 101`,[owner,workspace,input.search ?? '',input.botId ?? null,input.cursor?.id ?? null,
-      input.cursor?.pinned ?? false,input.cursor?.at ?? null,input.archived])
+      input.cursor?.pinned ?? false,input.cursor?.at ?? null,input.archived,input.cursor?.kind ?? null])
   return (result.rows as {id:string;title:string;at:string;pinned:boolean;unread:boolean}[]).map(row=>({
     ...row, kind:'chat' as const, issueId:null, identifier:null, state:'idle' as const,
   }))

@@ -47,7 +47,7 @@ async function directoryPage(database: RunChainQueryable, userId: string, worksp
       (${runDeviceOffline}) AS "deviceOffline" FROM roots JOIN agent_runs ON agent_runs.id=roots.latest`
   const query = new PgDialect().sqlToQuery(projection)
   const param = (i: number) => '$' + (query.params.length + i)
-  const [owner, workspace, depth, archived, bot, pinCursor, atCursor, idCursor, search] = Array.from({ length: 9 }, (_, i) => param(i + 1))
+  const [owner, workspace, depth, archived, bot, pinCursor, atCursor, idCursor, search, kindCursor] = Array.from({ length: 10 }, (_, i) => param(i + 1))
   const scope = `r."userId"=${owner} AND r."workspaceId"=${workspace}`
   const statement = `WITH RECURSIVE ${runChainSql(scope, depth)}, latest AS (
       SELECT DISTINCT ON (a.root) a.root,r.id,
@@ -72,12 +72,12 @@ async function directoryPage(database: RunChainQueryable, userId: string, worksp
         AND (${search}::text = '' OR strpos(lower(coalesce(current.title, root.title,
           CASE WHEN root."promptTaskStart">=0 AND root."promptTaskLength" BETWEEN 0 AND length(root.prompt)-root."promptTaskStart"::bigint
             THEN nullif(left(trim(substr(root.prompt,root."promptTaskStart"+1,root."promptTaskLength")),400),'') END, i.title,agent.name)),lower(${search}))>0)
-        AND (${idCursor}::uuid IS NULL OR (root."conversationPinnedAt" IS NOT NULL,latest.touched,root.id)
-          < (${pinCursor}::boolean,${atCursor}::timestamptz,${idCursor}::uuid))
+        AND (${idCursor}::uuid IS NULL OR (root."conversationPinnedAt" IS NOT NULL,latest.touched,root.id,'run'::text)
+          < (${pinCursor}::boolean,${atCursor}::timestamptz,${idCursor}::uuid,coalesce(${kindCursor}::text,'')))
       ORDER BY pinned DESC,latest.touched DESC,root.id DESC LIMIT 101
     ) ${query.sql} ORDER BY roots.pinned DESC,roots.at DESC,roots.id DESC`
   const rows = (await database.query(statement, [...query.params, userId, workspaceId, RUN_CHAIN_MAX_DEPTH, input.archived,
-    input.botId ?? null, input.cursor?.pinned ?? null, input.cursor?.at ?? null, input.cursor?.id ?? null, input.search])).rows as Row[]
+    input.botId ?? null, input.cursor?.pinned ?? null, input.cursor?.at ?? null, input.cursor?.id ?? null, input.search, input.cursor?.kind ?? null])).rows as Row[]
   const batch = rows.slice(0, 100)
   const items = batch.map(row => ({
     kind: 'run' as const, id: row.id, issueId: row.issueId, identifier: row.identifier, title: conversationTitle({ title: row.title,
@@ -86,15 +86,16 @@ async function directoryPage(database: RunChainQueryable, userId: string, worksp
   })).filter(item => (input.state === 'all' || item.state === input.state) &&
     (!input.search || item.title.toLowerCase().includes(input.search.toLowerCase())))
   const chats = await standaloneChatDirectory(database, userId, workspaceId, input)
-  const order = (a: { pinned: boolean; at: string; id: string }, b: typeof a) =>
-    Number(b.pinned) - Number(a.pinned) || b.at.localeCompare(a.at) || b.id.localeCompare(a.id)
+  const order = (a: { pinned: boolean; at: string; id: string; kind: 'run' | 'chat' }, b: typeof a) =>
+    Number(b.pinned) - Number(a.pinned) || b.at.localeCompare(a.at) || b.id.localeCompare(a.id) || b.kind.localeCompare(a.kind)
   const merged = [...items, ...chats].sort(order)
   // A state or title filter can reject the last run we examined. Preserve this
   // scan boundary so older results do not skip still-unexamined runs.
-  const boundary = rows.length > batch.length ? batch.at(-1) : undefined
+  const boundaryRun = rows.length > batch.length ? batch.at(-1) : undefined
+  const boundary = boundaryRun && { ...boundaryRun, kind: 'run' as const }
   const eligible = boundary ? merged.filter(item => order(item, boundary) <= 0) : merged
   const page = eligible.slice(0, 100)
   const last = page.length === 100 ? page.at(-1) : boundary
   const more = Boolean(boundary) || merged.length > page.length
-  return { items: page, cursor: more && last ? { id: last.id, at: last.at, pinned: last.pinned } : null }
+  return { items: page, cursor: more && last ? { id: last.id, at: last.at, pinned: last.pinned, kind: last.kind } : null }
 }
