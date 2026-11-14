@@ -17,8 +17,8 @@ export async function GET(request: Request) {
   const raw = {
     search: params.get('search') ?? '', state: params.get('state') ?? 'all', archived: archived === 'true',
     botId: params.get('botId') ?? undefined,
-    cursor: params.has('after') || params.has('at') || pinned !== null
-      ? { id: params.get('after'), at: params.get('at'), pinned: pinned === null ? null : pinned === 'true' } : undefined,
+    cursor: params.has('after') || params.has('at') || params.has('afterKind') || pinned !== null
+      ? { id: params.get('after'), kind: params.get('afterKind') ?? undefined, at: params.get('at'), pinned: pinned === null ? null : pinned === 'true' } : undefined,
   }
   const input = directoryInput.safeParse(raw)
   if (!input.success) return json({ error: 'invalidInput' }, 422)

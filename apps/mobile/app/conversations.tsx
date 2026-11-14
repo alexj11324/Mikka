@@ -16,7 +16,7 @@ import { mobileLocale, mobileMessages } from '@/lib/messages'
 import { colors, LIST_INSET } from '@/lib/theme'
 import { useLiveApi, useRefresh } from '@/lib/useApi'
 import { useTaskContinuation } from '../../../lib/hooks/use-task-continuation'
-import type { ConversationDirectoryPage, DirectoryInput } from '../../../lib/conversation-directory-input'
+import { directoryConversationKey, type ConversationDirectoryPage, type DirectoryInput } from '../../../lib/conversation-directory-input'
 
 type Page = ConversationDirectoryPage & { workspaceId: string }
 const labels = mobileMessages.ConversationDirectory
@@ -42,6 +42,7 @@ export default function Conversations() {
     const revision = path && apiCache.revision(path)
     const next = new URLSearchParams(params)
     next.set('after', cursor.id)
+    if (cursor.kind) next.set('afterKind', cursor.kind)
     next.set('at', cursor.at)
     next.set('pinned', String(cursor.pinned))
     const result = await api<Page>('/api/mobile/conversations?' + next).catch(error => {
@@ -52,7 +53,7 @@ export default function Conversations() {
     })
     if (result.workspaceId !== workspaceId) throw new Error('workspaceAccessDenied')
     return { items: result.items, next: result.cursor }
-  })
+  }, directoryConversationKey)
   const refresh = useRefresh(list.reload)
   async function mark(body: { action: 'unread'; runId: string } | { action: 'unread'; chatId: string } | { action: 'readAll' }) {
     if (pending.current || !workspaceId) return
@@ -67,7 +68,7 @@ export default function Conversations() {
   }
   return <View style={styles.screen}>
     <NavBar title={labels.title} back={() => router.back()} search={{ placeholder: labels.search, onChange: value => setSearch(value.slice(0, 120)) }} />
-    <FlatList {...underBar} data={pages.items} keyExtractor={item => item.id} refreshControl={<RefreshControl {...refresh} />}
+    <FlatList {...underBar} data={pages.items} keyExtractor={directoryConversationKey} refreshControl={<RefreshControl {...refresh} />}
       ListHeaderComponent={<View style={styles.controls}>
         <Segmented options={states.map(value => ({ value, label: labels[value] }))} value={state} onChange={setState} />
         <Row label={labels.archived} value={archived ? '✓' : undefined} onPress={() => setArchived(!archived)} />
