@@ -70,7 +70,14 @@ export function mikkaEveChannel() {
         }
         const sessionId = args.params.sessionId ?? args.params.parentSessionId
         if (!sessionId) return Response.json({ ok:false,error:'notFound' }, { status:404 })
-        try { await assertSessionScope(scope,sessionId) } catch { return Response.json({ok:false,error:'notFound'},{status:404}) }
+        try {
+          await assertSessionScope(scope, sessionId)
+        } catch (error) {
+          if (error instanceof Error && ['notFound', 'botNotFound', 'workspaceAccessDenied'].includes(error.message)) {
+            return Response.json({ ok: false, error: 'notFound' }, { status: 404 })
+          }
+          throw error
+        }
         let forwarded = request
         let streamAfter=0
         if (request.method === 'GET' && route.path.endsWith('/stream')) {
