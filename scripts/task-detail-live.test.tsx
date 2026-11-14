@@ -228,7 +228,7 @@ async function renderDetail(visible: boolean, origin = 'Tasks', siblings?: React
 async function mount(ready = true) {
   await renderDetail(true)
   if (!ready) return
-  await until(() => !!description() && sockets.some(socket => socket.readyState === 1) && activity().includes('createdTask'), 'task, activity and live channel mounted')
+  await until(() => !!description() && sockets.some(socket => socket.readyState === 1) && activity().includes('Workspace.activity.created'), 'task, activity and live channel mounted')
   await wait(100)
 }
 async function emit(id = issueId) { await act(async () => { for (const socket of sockets) socket.message({ kind: 'issue_document', id }) }) }
@@ -260,7 +260,7 @@ test('a recovered task appears before its conditional read, without creating a w
     assert.equal(versionReads, 0, 'activity is deferred until the task read succeeds')
     assert.equal(writes.length, 0)
     await act(async () => release())
-    await until(() => documentReads > 0 && activity().includes('createdTask'), 'verified document and activity mount')
+    await until(() => documentReads > 0 && activity().includes('Workspace.activity.created'), 'verified document and activity mount')
     assert.equal(title().readOnly, false)
     assert.equal(fullVersionReads, 0, 'the activity feed reads summaries, not fifty full historical documents')
     await act(async () => { (container.querySelector('[data-history]') as HTMLButtonElement).click() })
@@ -311,7 +311,7 @@ test('a quick reopen revalidates a completed SWR read before unlocking the cache
     assert.equal(writes.length, 0)
     await until(() => issueReads > before.issueReads, 'the reopened task checks current access despite SWR retaining the previous request')
     await act(async () => release())
-    await until(() => !!title() && !title().readOnly && documentReads > before.documentReads && activity().includes('createdTask'), 'the reopened form unlocks after its current authorized read')
+    await until(() => !!title() && !title().readOnly && documentReads > before.documentReads && activity().includes('Workspace.activity.created'), 'the reopened form unlocks after its current authorized read')
     assert.equal(description().readOnly, false)
     await act(async () => { assert.equal(await flush!(), true) })
     assert.equal(writes.length, 0)
@@ -350,7 +350,7 @@ test('closing and reopening during the first conditional read unlocks the new fo
     assert.equal(versionReads, 0)
     assert.equal(writes.length, 0)
     await act(async () => releaseCurrent())
-    await until(() => !!title() && !title().readOnly && documentReads > 0 && activity().includes('createdTask'), 'only the current authorization unlocks the reopened form')
+    await until(() => !!title() && !title().readOnly && documentReads > 0 && activity().includes('Workspace.activity.created'), 'only the current authorization unlocks the reopened form')
     assert.equal(description().readOnly, false)
     await act(async () => { assert.equal(await flush!(), true) })
     assert.equal(writes.length, 0)
@@ -396,7 +396,7 @@ test('a task reopened before persistent hydration starts its authorized read aft
     assert.equal(versionReads, 0)
     await act(async () => { assert.equal(await flush!(), true) })
     await act(async () => releaseRead())
-    await until(() => !!title() && !title().readOnly && documentReads > 0 && activity().includes('createdTask'), 'the post-hydration authorization unlocks the current form')
+    await until(() => !!title() && !title().readOnly && documentReads > 0 && activity().includes('Workspace.activity.created'), 'the post-hydration authorization unlocks the current form')
     assert.equal(description().readOnly, false)
     assert.equal(writes.length, 0)
     await act(async () => { assert.equal(await flush!(), true) })
