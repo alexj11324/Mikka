@@ -90,12 +90,25 @@ export class BusinessWorkflowDelivery extends WorkerEntrypoint {
 // Use the SDK setter so ContainerProxy registers the handler under this class.
 BusinessApi.outboundHandlers = { taskMachine }
 
-export default {
-  fetch(request, env) {
+export default class ApiIngress extends WorkerEntrypoint {
+  fetch(request) {
+    const env = this.env
     if (env.BUSINESS_WORLD && publicWorkflowDispatch(request.url)) return new Response(null, { status: 404 })
     const forwarded = apiRequest(request, env.PUBLIC_ORIGIN)
     if (!forwarded) return new Response(null, { status: 400, headers: { 'cache-control': 'no-store' } })
     // One active request or task never owns shutdown of the shared host.
     return getContainer(env.BUSINESS_API, 'shared-api').fetch(forwarded)
-  },
+  }
+
+  eveProduct(request, scope) {
+    const url = new URL(request.url)
+    if (request.method !== 'POST' || !['/mikka/api/internal/eve/tools', '/mikka/api/internal/eve/slack-credential'].includes(url.pathname)) return new Response(null, { status: 404 })
+    if (typeof scope !== 'string' || scope.length > 2048) return new Response(null, { status: 403 })
+    const forwarded = apiRequest(request, this.env.PUBLIC_ORIGIN)
+    if (!forwarded) return new Response(null, { status: 400 })
+    forwarded.headers.delete('authorization')
+    forwarded.headers.delete('cookie')
+    forwarded.headers.set('x-mikka-eve-binding-scope', scope)
+    return getContainer(this.env.BUSINESS_API, 'shared-api').fetch(forwarded)
+  }
 }

@@ -1,18 +1,20 @@
-# Glossary: bot, thread, chat
+# Product and execution glossary
 
 This file is the single definition of these words. Specs, designs, issues and
 code comments use them in this sense. Follow the source order in [the design entry point](README.md) when a
 newer accepted decision changes a definition here.
 
-Decided by Alex, 2026-10-24.
+The conversation and task definitions follow Alex’s [November 13 decision](https://github.com/alexj11324/Mikka/issues/2262) and [task detail decision](https://github.com/alexj11324/Mikka/issues/2271). The execution vocabulary dates to October 24.
 
-## The three things
+## Conversations, tasks and execution
 
 | Word | 中文 | What it is | Where it shows | Its name |
 | --- | --- | --- | --- | --- |
 | **Bot** | Bot | Chats with people. Does web tasks itself through sub-agents (分身, R-72), each with its own browser, and dispatches real tasks such as coding to threads. The user creates it (Grok Bot style) and can put several bots in a group chat. The Coordinator is a bot too. Stored in its own `bots` table (name, colour, shape) and runs on Mikka's own AI SDK on Vercel; it is not a row in `agents`. | **Bot list** (left column), one row per bot or group chat. | The bot's own name, e.g. "Mikka Frontend". |
-| **Chat** | 对话 | The conversation between a person and the selected bot or group chat. | **Center column**. Header pill = the bot's (or group's) name. | Same as the bot or group. It has no name of its own. |
-| **Thread** | 线程 | Does the work a bot dispatched: a run chain, identified by its root run (`rootRunId`), made of that run and every run that resumes, retries or continues it (`lib/run-chain.ts`; each is a row in `agent_runs`), usually tied to a task. A bot can dispatch many threads at once; it never runs, owns or does a thread. | Inside its task, in the task conversation and its attempts. Task lists occupy the right column. | Its own name, about the work, e.g. "#66 群聊前端骨架" or "MIK-11 群聊建表". Never the bot's name. |
+| **Conversation** | 对话 | A workspace object that a person can return to by its own identity, with a title, per-user read position, pin and archive state. It can exist without a task. | Conversation directory, Bot sidebar and the Work section of linked tasks. | Its stored title or the existing fallback. |
+| **Bot or group chat** | Bot 聊天 / 群聊 | The message history addressed to the selected Bot, Coordinator or group. A Bot can participate in other conversations. | The selected chat. | Its Bot or group name. |
+| **Task** | 任务 | A unit of work with its own ID, title, assignee and status. It can link to several conversations and PRs. | Board, task list and task detail. | Its task title and issued identifier. |
+| **Execution thread / run chain** | 执行线程 / 运行链 | The root Agent run and its authorized continuations and retries. Each run has a separate row in `agent_runs`. `lib/run-chain.ts` resolves the stable `rootRunId`. | An Agent conversation can open through its root run ID. Its transcript preserves the run order. | Use the conversation title for the product entry and the run identity when inspecting execution. |
 
 How they connect: a person chats with a bot (center). The bot dispatches
 real tasks such as coding to threads, which do the work (right). A web task
@@ -50,20 +52,14 @@ Collaboration and financial authority: [2026-11-10-0017](decisions/2026-11-10-00
   a task carries its own state, and the Agent's mark identifies its executor.
   This navigation does not change the distinction between dispatching Bot,
   task and executing Agent.
-- Task lists continue to show one row per task, with its threads inside
-  ([2026-11-07](decisions/2026-11-07-2045-tasks-only-threads-inside.md)).
-  A standalone Agent run already visible to its dispatching Bot can be a
-  child of that Bot in the hosted sidebar; it is not a global thread list.
+- Task lists show one row per task. The workspace conversation directory opens conversations directly, including those without a task. A task’s Work section opens the same conversation with the same access checks.
 - The right panel's 概览 header is the selected bot (the same avatar and
   name as its left row), followed by the tabs 详情 / 任务 / PR / 电脑. A
   task's title appears in its task row and detail, never as that
   bot header (Alex, 2026-10-28; `rules.md` R-02, R-50).
 - Choosing another bot on the left changes the center chat and the right
   column's dispatched tasks and computer together.
-- A task (issue, `MIK-xx`) is one conversation: its runs read oldest first,
-  and where the Agent changes, a label with the next Agent's mark and name,
-  never a 「换」 verb (as Warp labels runs). The composer addresses the
-  newest run ([decision](decisions/2026-11-09-0045-no-attempt-word.md)).
+- Inside one execution thread, read its runs oldest first and address the latest eligible run when replying. A task can link to several distinct roots. Activity shows human-level changes and comments. Its Work section presents the linked conversations, PRs and expandable run progress.
 - **Attempt** is an internal data term only (`factory_attempts`, a run chain's
   runs). User-facing copy never says 「尝试」 or "attempt".
 
@@ -127,16 +123,14 @@ Decided by Alex, 2026-10-28.
 | **Agent** | Agent | The coding agent that runs a thread: Claude Code, Codex, Cursor (`agents` table, a harness). It does the coding work; a bot never does. Shown by its own brand mark wherever a thread or run has an icon (R-78). Never called harness or 执行器 in the UI (R-43). |
 | **Agent Profile** | Agent 配置 | A reusable logical coding role owned by a person in a workspace: responsibilities, capabilities, Agent/model policy, effort, private instructions and controlled Skills. Several Profiles may use the same physical Agent/model. Managed in Settings › Models and subscriptions; frozen into each selected run. Has its own mark (a glyph and colour), the main mark of its Agent stretches (R-78). It never becomes a Bot or a left-column row. [Spec](factory-agent-profiles.md). |
 | **Library** | 资料库 | A bot's files, listed under 概览 › 详情; the person can delete their own (R-51). Files are added with the composer's 「+」. |
-| **Thread** | 线程 | As above. Since 2026-11-07 it is shown only inside its task (an Agent stretch in the task's 活动); no list or tab is named 线程. |
+| **Execution thread** | 执行线程 | The run chain described above. Existing run or thread deep links resolve through their original access checks. |
 | **Browser** | 浏览器 | The person's own local browser, one for the whole app, opened from the globe in the top bar (R-57). |
 | **Computer** | 电脑 | A bot's cloud computer: its own desktop (X display) on its owner's bot machine, which is one per person per workspace (`cloud_machines` keyed by `workspaceId`, `ownerId`; `bot_desktops` keyed by `botId`). Used by that bot only; a thread that needs a desktop gets its own machine ([0251](decisions/2026-11-02-0251-desktop-runs-get-their-own-machine.md)). Shown in the 电脑 tab of 概览 (R-50). Never called 浏览器. |
 
 ## Words to avoid
 
-- "会话" / "session" / "conversation list" for the left column. The left
-  column is the **bot list** and the right column is the **task list**.
-- "会话" for a run (e.g. "打开会话" on a task's run). Say **线程**.
-- 「线程」 as the name of a list or tab. Lists hold tasks (2026-11-07); the right panel's tab is **任务**.
+- Use **Bot list** for the Bot navigation and **Conversations / 对话** for the conversation directory.
+- Use **Run / 运行** for one execution, **execution thread / 执行线程** for its chain, and **Task / 任务** for the linked work item.
 - A Chinese word for Artifact. Keep **Artifact**.
 - "浏览器" for a bot's cloud computer, or "电脑" for the local browser.
 - "Agent" when you mean the thing on the left. Say **bot**. **Agent** is the

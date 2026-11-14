@@ -29,6 +29,16 @@ export const organizationMembers = pgTable('mikka_organization_members', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [primaryKey({ columns: [table.organizationId, table.userId] }), index('mikka_org_members_user_idx').on(table.userId)])
 
+/** Multiple organizations may independently allow the same email domain. */
+export const organizationJoinDomains = pgTable('mikka_organization_join_domains', {
+  id: uuid('id').primaryKey(),
+  organizationId: uuid('organizationId').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  domain: varchar('domain', { length: 253 }).notNull(),
+}, table => [
+  unique('mikka_org_join_domain_unique').on(table.organizationId, table.domain),
+  index('mikka_org_join_domain_idx').on(table.domain),
+])
+
 /** A pending invitation grants only Organization Member; no Workspace or Project ACL. */
 export const organizationInvitations = pgTable('mikka_organization_invitations', {
   id: uuid('id').primaryKey(),

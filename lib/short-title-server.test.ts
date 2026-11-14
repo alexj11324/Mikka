@@ -18,7 +18,11 @@ mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { db
 mock.module(new URL('./live/lists.ts', import.meta.url).href, { namedExports: { issueListChanged: async (...args: unknown[]) => { pushed.push(args.slice(1)) } } })
 mock.module(new URL('./cloud-services/runtime.ts', import.meta.url).href, { namedExports: { cloudClient: { capability: async () => null } } })
 mock.module(new URL('./abuse/model.ts', import.meta.url).href, { namedExports: {
-  admitHostedModel: async () => { if (!allowed) throw new Error('modelRouteDenied'); return null },
+  admitHostedModel: async (scope: { workspaceId: string; ownerId: string }) => {
+    assert.deepEqual(scope, { workspaceId: 'fixture-workspace', ownerId: 'owner' })
+    if (!allowed) throw new Error('modelRouteDenied')
+    return null
+  },
   hostedModel: async (workspace: string, modelId: string, provider: unknown, owner: string) => {
     assert.equal(workspace, 'fixture-workspace'); assert.equal(owner, 'owner'); assert.equal(provider, undefined); models.push(modelId); return { modelId } },
 } })
@@ -51,6 +55,14 @@ test('a new task gets one short title, written with the title it came from, and 
   assert.equal(generateText.mock.callCount(), 1)
   assert.deepEqual(writes, [{ shortTitle: '登录回调修复', shortTitleFrom: task!.title }])
   assert.deepEqual(pushed, [['task', true]])
+})
+
+test('a legacy task without a bound workspace cannot borrow another workspace for a model call', async () => {
+  task = { ...task!, workspaceId: null }
+  await writeShortTitle('task', 'owner')
+  assert.equal(generateText.mock.callCount(), 0)
+  assert.equal(writes.length, 0)
+  assert.equal(pushed.length, 0)
 })
 
 test('a task that already has a short title is not named again', async () => {

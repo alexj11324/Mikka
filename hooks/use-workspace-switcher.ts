@@ -6,6 +6,7 @@ import useSWR from 'swr'
 import { toast } from 'sonner'
 import { authClient } from '@/lib/auth-client'
 import { withBasePath } from '@/lib/base-path'
+import { rememberWorkspaceBeforeSwitch } from '@/lib/settings-navigation'
 import { getPathname } from '@/i18n/navigation'
 import { fetchSettingsData } from '@/lib/settings-data'
 import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
@@ -69,7 +70,10 @@ export function useWorkspaceSwitcher({ user, onSettings, signingOut, onBeforeCha
         const result = await switchWorkspace({ accountId, workspaceId })
         if (!result.ok) { toast.error(result.error); return }
         await clearPersistentReadCaches({ documentNavigation: true })
-        window.location.assign(withBasePath(getPathname({ locale, href: '/' })))
+        if (accountId === data?.accounts[0]?.id) rememberWorkspaceBeforeSwitch(data.workspace.id)
+        const selected = result.data.workspaceId
+        const href = selected ? { pathname: '/', query: { workspace: selected } } : '/'
+        window.location.assign(withBasePath(getPathname({ locale, href })))
       } catch { toast.error(i18nText("FeatureCopy.c_b8e346ef")) }
       finally { setPending(false) }
     })

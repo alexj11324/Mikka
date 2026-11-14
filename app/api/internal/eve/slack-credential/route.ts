@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { validSlackGrantProof } from '@/lib/slack/grant-proof'
-import { internalEveScope } from '@/lib/eve/auth'
+import { internalEveRequestScope } from '@/lib/eve/auth'
 import { assertEveScope } from '@/lib/eve/scope'
 import { withTaskWorkspace } from '@/lib/task-workspace'
 import { pool } from '@/lib/db'
@@ -19,7 +19,7 @@ const shape = z
   .strict()
 async function handle(request: Request) {
   const refuse = () => new Response(null, { status: 403, headers: { 'Cache-Control': 'no-store' } })
-  const scope = internalEveScope(request.headers.get('authorization')),
+  const scope = internalEveRequestScope(request),
     app = process.env.SLACK_APP_ID
   if (scope?.surface !== 'slack' || !app) return refuse()
   try {
@@ -27,7 +27,7 @@ async function handle(request: Request) {
     if (
       !input.success ||
       !validSlackGrantProof(
-        request.headers.get('authorization')!,
+        request.headers.get('authorization') ?? request.headers.get('x-mikka-eve-binding-scope')!,
         input.data,
         request.headers.get('x-mikka-slack-grant'),
       )

@@ -405,6 +405,30 @@ test('task source isolates the selected workspace and rechecks creator membershi
   expect((await snapshot()).rows).toEqual(before)
 })
 
+test('archived session preview reads a single deterministic latest turn while retaining owner-only access', async ({ request }) => {
+  const archiveId = randomUUID()
+  const [lowerId, higherId] = [randomUUID(), randomUUID()].sort()
+  const timestamp = '2026-01-01T00:00:00Z'
+  await pool.query('INSERT INTO agent_sessions(id,"userId",title,"updatedAt") VALUES($1,$2,$3,now())',
+    [archiveId, owner, `${prefix}-one-preview`])
+  for (const [id, prompt, completion] of [
+    [lowerId, 'Earlier saved prompt', 'Earlier saved reply'],
+    [higherId, 'Later saved prompt', 'Later saved reply'],
+  ]) {
+    await pool.query('INSERT INTO agent_turns(id,"sessionId","userId",prompt,completion,status,"attemptId","createdAt") VALUES($1,$2,$3,$4,$5,\'complete\',$6,$7)',
+      [id, archiveId, owner, prompt, completion, randomUUID(), timestamp])
+  }
+  const url = 'http://127.0.0.1:3210/mikka/api/agent/sessions?new=1'
+  const response = await request.get(url, { headers: { cookie } })
+  expect(response.status()).toBe(200)
+  const body = await response.json()
+  expect(body.sessions.find((session: { id: string }) => session.id === archiveId)?.preview).toBe('Later saved reply')
+  const outsiderResponse = await request.get(url, { headers: { cookie: foreignCookie } })
+  expect(outsiderResponse.status()).toBe(200)
+  const outsiderBody = await outsiderResponse.json()
+  expect(outsiderBody.sessions.some((session: { id: string }) => session.id === archiveId)).toBe(false)
+})
+
 test('continuations recheck group leave, workspace suspension and real auth revocation', async ({ request }) => {
   const params = { source: 'groups', workspaceId: workspace, q: `${prefix}-group-`, limit: '1' }
   const first = await get(request, params)

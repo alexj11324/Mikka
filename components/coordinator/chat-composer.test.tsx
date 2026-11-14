@@ -7,6 +7,7 @@ import { MESSAGE_MAX } from '@/lib/message-limits'
 import { splitChatFiles, type ChatFileScope } from '@mikka/protocol/chat-attachments'
 
 const errors: string[] = []
+let removalNotice: { action: { onClick: (event: { preventDefault(): void }) => void }; cancel: { onClick: () => void } } | undefined
 const uploaded = {
   id: '10000000-0000-4000-8000-000000000001',
   name: '长文件名_需求说明_最终版本_2026.md',
@@ -27,7 +28,10 @@ mock.module(new URL('../../lib/chat-attachments/client.ts', import.meta.url).hre
   },
 })
 mock.module('swr', { defaultExport: () => ({ data: uploaded }) })
-mock.module('sonner', { namedExports: { toast: { error: (message: string) => errors.push(message) } } })
+mock.module('sonner', { namedExports: { toast: {
+  error(message: string, options?: typeof removalNotice) { errors.push(message); removalNotice = options },
+  dismiss() { removalNotice = undefined },
+} } })
 mock.module('next-intl', {
   namedExports: { useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` },
 })
@@ -63,6 +67,7 @@ before(async () => {
 })
 beforeEach(() => {
   errors.length = 0
+  removalNotice = undefined
   submissions = []
   upload = async () => uploaded
   container = browser.document.createElement('div') as unknown as HTMLDivElement
@@ -223,7 +228,8 @@ for (const kind of ['bot', 'group', 'thread'] as const)
     })
   })
 
-test('a failed upload preserves the draft, blocks send, and can be retried or removed', async () => {
+test('a failed upload preserves the draft, blocks send, and can be retried or removed', async (t) => {
+  const deletion = t.mock.method(globalThis, 'fetch', async (_url: RequestInfo | URL, _init?: RequestInit) => Response.json({ removed: true }))
   upload = async () => {
     throw Error('fixture-read-error')
   }
@@ -242,5 +248,45 @@ test('a failed upload preserves the draft, blocks send, and can be retried or re
     container.querySelector<HTMLButtonElement>('button[aria-label="Shell.attachments.remove"]')!.click(),
   )
   assert.equal(inputRef.current!.value, 'keep my words')
+  assert.equal(deletion.mock.callCount(), 1)
   assert.equal(container.querySelector('[data-slot="chat-file-cards"]'), null)
+})
+
+test('a rejected file removal keeps the attachment, protects send, and retries only the delete', async (t) => {
+  let finish!: (response: Response) => void
+  const deletion = t.mock.method(globalThis, 'fetch', (_url: RequestInfo | URL, _init?: RequestInit) => new Promise<Response>(resolve => { finish = resolve }))
+  await render({ initial: 'keep my draft', attachmentScope: { kind: 'bot', id: uploaded.id } })
+  await dispatch('paste', transfer([new File(['attachment'], uploaded.name)]))
+  const remove = () => container.querySelector<HTMLButtonElement>('button[aria-label="Shell.attachments.remove"]')!
+  const send = () => container.querySelector<HTMLButtonElement>('button[type="submit"]')!
+  await act(async () => { remove().click(); remove().click() })
+  assert.equal(deletion.mock.callCount(), 1)
+  assert.equal(send().disabled, true)
+  assert.ok(remove())
+  await act(async () => { finish(Response.json({ error: 'unavailable' }, { status: 503 })) })
+  assert.ok(remove())
+  assert.equal(send().disabled, true)
+  assert.equal(errors.at(-1), 'Shell.attachments.removeFailed')
+  assert.ok(removalNotice)
+  await act(async () => removalNotice!.action.onClick({ preventDefault() {} }))
+  const last = deletion.mock.calls.at(-1)!
+  assert.match(String(last.arguments[0]), new RegExp('/api/chat/attachments/' + uploaded.id + '$'))
+  assert.equal(last.arguments[1]?.method, 'DELETE')
+  await act(async () => { finish(Response.json({ removed: true })) })
+  assert.equal(remove(), null)
+  assert.equal(inputRef.current!.value, 'keep my draft')
+  assert.equal(send().disabled, false)
+})
+
+test('keeping an attachment after a failed removal explicitly unlocks send', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => { throw new TypeError('offline') })
+  await render({ initial: 'keep', attachmentScope: { kind: 'bot', id: uploaded.id } })
+  await dispatch('paste', transfer([new File(['attachment'], uploaded.name)]))
+  await act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="Shell.attachments.remove"]')!.click())
+  assert.ok(removalNotice)
+  await act(async () => removalNotice!.cancel.onClick())
+  const send = container.querySelector<HTMLButtonElement>('button[type="submit"]')!
+  assert.equal(send.disabled, false)
+  await act(async () => send.click())
+  assert.deepEqual(splitChatFiles(submissions[0]), { text: 'keep', files: [{ id: uploaded.id, name: uploaded.name }] })
 })

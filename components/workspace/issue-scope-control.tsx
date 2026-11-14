@@ -2,73 +2,62 @@
 
 import { useLayoutEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Building2, User } from 'lucide-react'
+import useSWR from 'swr'
 import { toast } from 'sonner'
-import { setIssueScope, promoteIssueToTeam } from '@/app/actions/issues'
-import { getIssueTeam } from '@/app/actions/team-relations'
-import { submitTeamPromotion, type ExplicitTeamChoice, type TeamPromotionIntent } from '@/lib/issue-team-intent'
+import { setIssueScope, type IssueView } from '@/app/actions/issues'
+import type { TaskDetailRow } from '@/components/slots/task-detail-contract'
 import { useActionError } from '@/lib/use-action-error'
-import type { TaskScope } from '@/lib/task-identifier'
-import { IssuePropertyMenu } from './issue-property-menu'
-import type { MetadataSavedIssue } from './issue-metadata-controls'
+import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
 
-type ScopeProps = {
-  task: { id: string; revision: number; scope: TaskScope; scopeSetBy: 'agent' | 'user' }
-  disabled?: boolean
-  teamChoice?: ExplicitTeamChoice | null
-  onSaved: (issue: MetadataSavedIssue) => void
-}
+type OwnershipTask = Pick<IssueView, 'id' | 'userId' | 'revision' | 'workspaceId' | 'ownershipState' | 'linearSyncPolicy' | 'linearSyncBlocked' | 'linearTargetVerified'>
 
-/** Sharing requires the team's explicit save event; never infer a destination. */
-export function IssueScopeControl(props: ScopeProps) {
-  const { task, disabled } = props
-  const { options, change, pending, current, judgedByAgent } = useIssueScope(props)
-  return <div className="flex min-w-0 items-center gap-2">
-    <IssuePropertyMenu variant="row" label={judgedByAgent.label} value={task.scope} options={options} icon={task.scope === 'workspace' ? Building2 : User} disabled={disabled || pending} displayValue={current} onChange={value => { void change(value) }} />
-    {judgedByAgent.shown && <span className="truncate text-xs text-muted-foreground">{judgedByAgent.text}</span>}
-  </div>
-}
-
-/** 归属's choices and the save behind them, for IssueScopeControl and a layer that draws the row itself. */
-export function useIssueScope({ task, onSaved, teamChoice }: ScopeProps) {
+/** Workspace membership is fixed at creation. The switcher's existing authorized
+ * read can name that exact ID; the independent Linear command only disables sync. */
+export function useTaskOwnershipRows(task: OwnershipTask, viewerId: string, preview: boolean, locked: boolean, onSaved: (issue: IssueView) => void): TaskDetailRow[] {
   const t = useTranslations('Issue.scope')
-  const actionError = useActionError()
-  const [pending, setPending] = useState(false)
-  const promotion = useRef<TeamPromotionIntent | null>(null)
-  const generation = useRef(0)
+  const errorText = useActionError()
+  const { data: switcher } = useSWR<WorkspaceSwitcher>(preview ? null : '/api/workspace/switcher', null)
+  const account = switcher?.accounts[0]
+  const workspaceId = !preview && task.ownershipState === 'bound' ? task.workspaceId : null
+  const name = account?.id === viewerId ? account.choices.find(choice => choice.id === workspaceId)?.name : undefined
+  const rows: TaskDetailRow[] = [{
+    id: 'workspace', label: t('workspace'),
+    value: { text: name || workspaceId || t('workspaceUnavailable'), mark: { kind: 'icon', icon: 'workspace' } },
+  }]
+
+  const request = useRef<symbol | null>(null)
+  const [saving, setSaving] = useState(false)
   useLayoutEffect(() => {
-    generation.current++
-    return () => { generation.current++ }
-  }, [task.id, task.revision, teamChoice?.issueId, teamChoice?.teamId, teamChoice?.selectionId])
-  const options = [
-    { value: 'workspace', label: t('workspace'), icon: Building2 },
-    { value: 'personal', label: t('personal'), icon: User },
-  ]
-  async function change(value: string) {
-    if (value === task.scope || pending) return
-    const started = generation.current
-    const isCurrent = () => started === generation.current
-    setPending(true)
+    setSaving(false)
+    return () => { request.current = null }
+  }, [task.id, task.revision, viewerId, locked, preview])
+
+  const enabled = task.linearSyncPolicy === 'explicit' && task.linearSyncBlocked === false
+  if (!workspaceId || !enabled) return rows
+  const canDisable = !locked && task.userId === viewerId
+  async function disable() {
+    if (!canDisable || request.current) return
+    const token = Symbol()
+    request.current = token
+    setSaving(true)
     try {
-      let result
-      if (value === 'workspace') {
-        result = await submitTeamPromotion(task, teamChoice, promotion.current, {
-          isCurrent, readTeam: () => getIssueTeam(task.id), requestId: () => crypto.randomUUID(),
-          remember: intent => { promotion.current = intent }, promote: promoteIssueToTeam,
-        })
-      } else {
-        result = await setIssueScope({ id: task.id, revision: task.revision, scope: value })
-      }
-      if (!isCurrent()) return
-      if (!('issue' in result) || !result.issue) { toast.error(actionError(result.error)); return }
-      onSaved(result.issue)
-      // An idempotent replay returns the current task, which another request
-      // may since have made personal. Never describe the old requested state.
-      if (result.issue.scope !== value) { toast.error(actionError('teamIssueChanged')); return }
-      toast.success(value === 'workspace' ? t('movedToWorkspace') : t('movedToPersonal'))
-    } catch { if (isCurrent()) toast.error(actionError('generic')) }
-    finally { setPending(false) }
+      const result = await setIssueScope({ id: task.id, revision: task.revision, scope: 'personal' })
+      if (request.current !== token) return
+      if (!('issue' in result) || !result.issue) { toast.error(errorText(result.error)); return }
+      const saved = result.issue
+      if (saved.id !== task.id || saved.workspaceId !== workspaceId) { toast.error(errorText('issueStale')); return }
+      onSaved(saved)
+      if (saved.linearSyncPolicy === 'disabled' && saved.linearSyncBlocked) toast.success(t('linearDisabled'))
+      else toast.error(errorText('issueStale'))
+    } catch {
+      if (request.current === token) toast.error(errorText('generic'))
+    } finally {
+      if (request.current === token) { request.current = null; setSaving(false) }
+    }
   }
-  const current = options.find(option => option.value === task.scope)?.label ?? task.scope
-  return { options, change, pending, current, judgedByAgent: { label: t('label'), shown: task.scope === 'workspace' && task.scopeSetBy === 'agent', text: t('judgedByAgent') } }
+  rows.push({
+    id: 'linearSync', label: t('linearSync'), value: { text: t('linearEnabled') }, disabled: locked || saving,
+    menu: canDisable ? [{ id: 'disable', label: t(task.linearTargetVerified ? 'disableLinkedLinear' : 'disableLinear'), onSelect: () => { void disable() } }] : undefined,
+  })
+  return rows
 }

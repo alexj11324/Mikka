@@ -1,4 +1,4 @@
-// Same bounded cookie handling as the production read-cache driver; no application imports.
+/** A fresh, memory-only cookie jar per acceptance run. Preserve cookies set during page discovery for subsequent requests. */
 export function responseCookieJar(now) {
   const cookies = new Map()
   const domainMatches = (host, domain) => host === domain || host.endsWith(`.${domain}`)
