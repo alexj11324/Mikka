@@ -37,7 +37,7 @@ import { CoordinatorReply } from './coordinator-reply'
 import { ChatComposer } from './chat-composer'
 import { BotModelPicker, botModelMenuKey, openModelPicker } from './bot-model-picker'
 import { CoordinatorContextUsage } from './coordinator-context-usage'
-import { useChatDelivery, type ChatSubmission } from '@/lib/hooks/chat-delivery'
+import { isWebChatOffline, useChatDelivery, type ChatSubmission } from '@/lib/hooks/chat-delivery'
 import { useCoordinatorSubmit, type CoordinatorMessageContext } from './use-coordinator-submit'
 import { useCoordinatorAgent } from './use-coordinator-agent'
 import { activeTurn } from 'eve/events'
@@ -486,7 +486,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
     releaseDraft?.()
     const fail = (message: string) => { delivery.finish(command.id, { error: message }); return 'failed' as const }
     try {
-      if (navigator.onLine === false) return fail(t('sendOffline'))
+      if (isWebChatOffline()) return fail(t('sendOffline'))
       if (!await checkPageBuildBeforeAction()) return fail(t('sendUpdateRequired'))
       const outcome = await submit(command.text, command.context, command.id)
       if (outcome.kind !== 'accepted') return fail(failureMessage(outcome) ?? t('sendUncertain'))
