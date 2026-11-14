@@ -87,7 +87,8 @@ test('force claims preserve SDK wake receipts and redirect stale deliveries acro
     expect((await create(successor, 'hook_created', 'hook_declined', { token: 'pre-v8', force: true })).event)
       .toMatchObject({ eventType: 'hook_conflict', eventData: { token: 'pre-v8', conflictingRunId: oldOwner, forceRefusedReason: 'victim-spec-version' } })
     expect((await world.hooks.getByToken('pre-v8')).runId).toBe(oldOwner)
-    const free = await create(successor, 'hook_created', 'hook_free', { token: 'free', force: true, forceClaimedFrom: receipt })
+    const free = await create(successor, 'hook_created', 'hook_free', { token: 'free', force: true,
+      claimedFrom: receipt, forceClaimedFrom: receipt })
     expect(free.hook.claimedFrom).toBeUndefined()
     expect(free.event.eventData.forceClaimedFrom).toBeUndefined()
   } finally {
