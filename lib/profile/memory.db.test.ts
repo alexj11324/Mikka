@@ -127,13 +127,16 @@ pgTest('memory: manual idempotency, real provenance/usage, review, scoped reads/
 
     await t.test('native Eve prompt usage follows its owned source turn and survives retries without a legacy lease', async () => {
       const { registerSession, scopeAuth } = await import('../eve/scope')
+      const { ContextContainer, contextStorage } = await import(new URL('./context/container.js', import.meta.resolve('eve')).href)
       const { default: hook } = await import('../../apps/eve/agent/hooks/product')
       const sourceId = randomUUID(), sessionId = 'wrun_memory_' + randomUUID(), turnId = 'turn_1'
       const nativeScope = { ownerId: owner, botId, workspaceId: wsA, surface: 'web' as const }
       await db.insert(schema.coordinatorEvents).values({ id: sourceId, userId: owner, botId, kind: 'user_message', dedupeKey: sourceId, payload: { text: 'Synthetic native memory request' } })
       await registerSession(nativeScope, sessionId)
       const auth = scopeAuth(nativeScope)
-      await hook.events['turn.started']!({ data: { turnId } } as never, { session: { id: sessionId, auth: { current: { ...auth, attributes: { ...auth.attributes, sourceEventId: sourceId } } } } } as never)
+      await contextStorage.run(new ContextContainer(), async () => {
+        await hook.events['turn.started']!({ data: { turnId } } as never, { session: { id: sessionId, auth: { current: { ...auth, attributes: { ...auth.attributes, sourceEventId: sourceId } } } } } as never)
+      })
       await db.update(schema.coordinatorSessions).set({ leaseHolder: null }).where(eq(schema.coordinatorSessions.botId, botId))
       assert.equal((await db.select({ deliveredAt: schema.coordinatorEvents.deliveredAt }).from(schema.coordinatorEvents).where(eq(schema.coordinatorEvents.id, sourceId)))[0].deliveredAt, null, 'native instructions may precede HTTP admission acknowledgement')
       const nativeTurn = { sessionId, turnId }
@@ -141,7 +144,9 @@ pgTest('memory: manual idempotency, real provenance/usage, review, scoped reads/
       assert.equal((await memory.readMemoryView(owner, wsA)).facts.find(item => item.id === manual)?.usedCount, 4)
       await memory.memoryForBotPrompt(owner, botId, true, nativeTurn)
       assert.equal((await memory.readMemoryView(owner, wsA)).facts.find(item => item.id === manual)?.usedCount, 4, 'the same native prompt retry has one use')
-      await hook.events['turn.started']!({ data: { turnId: 'turn_2' } } as never, { session: { id: sessionId, auth: { current: { ...auth, attributes: { ...auth.attributes, sourceEventId: sourceId } } } } } as never)
+      await contextStorage.run(new ContextContainer(), async () => {
+        await hook.events['turn.started']!({ data: { turnId: 'turn_2' } } as never, { session: { id: sessionId, auth: { current: { ...auth, attributes: { ...auth.attributes, sourceEventId: sourceId } } } } } as never)
+      })
       await db.update(schema.coordinatorSessions).set({ leaseHolder: null }).where(eq(schema.coordinatorSessions.botId, botId))
       await memory.memoryForBotPrompt(owner, botId, true, { sessionId, turnId: 'turn_2' })
       assert.equal((await memory.readMemoryView(owner, wsA)).facts.find(item => item.id === manual)?.usedCount, 5, 'another turn in the same native session has its own use')
