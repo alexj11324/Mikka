@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { MCP_REPLY_CHANNEL, listenOn, notifyChannel, subscribeShared } from '../db/listen'
 import { coordinatorSessionScope } from '../live/coordinator-session'
 import { observeReplySignals } from './reply-signals'
@@ -57,7 +57,7 @@ test('PG reply triggers are transaction-bound and cover both databases and scope
   const workspaceSql = await readFile(new URL('../../drizzle/20261107120002_mcp_membership_notifications.sql', import.meta.url), 'utf8')
   try {
     for (const name of names) {
-      await admin.query(`CREATE DATABASE "${name}" TEMPLATE template0`)
+      await createTestDatabase(admin, name, 'template0')
       created.push(name)
       const url = new URL(target!); url.pathname = '/' + name
       const pool = new Pool({ connectionString: url.toString(), max: 3 })

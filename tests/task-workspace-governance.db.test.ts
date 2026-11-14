@@ -4,7 +4,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import test, { mock } from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 import { orderMigrations } from '../scripts/migration-order.mjs'
 import { applyMigration, planMigration } from '../scripts/migration-steps.mjs'
 import { scopeMigrationBeforeCommit } from '../scripts/scope-migration-history.mjs'
@@ -29,8 +29,8 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
   const admin = new Pool({ connectionString: url, max: 1 })
   const suffix = randomUUID().replaceAll('-', '')
   const appName = `governance_app_${suffix}_e2e`, workspaceName = `governance_ws_${suffix}_e2e`
-  await admin.query(`CREATE DATABASE "${appName}" TEMPLATE template0`)
-  await admin.query(`CREATE DATABASE "${workspaceName}" TEMPLATE template0`)
+  await createTestDatabase(admin, appName, 'template0')
+  await createTestDatabase(admin, workspaceName, 'template0')
   const appUrl = new URL(url!), workspaceUrl = new URL(url!)
   appUrl.pathname = `/${appName}`; workspaceUrl.pathname = `/${workspaceName}`
   const app = new Pool({ connectionString: appUrl.toString(), max: 5 })
@@ -104,6 +104,24 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
     const { factoryLiveTargets } = await import('../lib/live/factory')
     const { registeredTask } = await import('./helpers/registered-task')
 
+    await t.test('the conversation directory uses authoritative split-workspace membership and the original PAT binding', async () => {
+      const { conversationDirectory } = await import('../lib/conversation-directory')
+      const ownRun = randomUUID()
+      await app.query(`INSERT INTO agent_runs(id,"userId","workspaceId","agentId",title,"titleSource",status)
+        VALUES ($1,$2,$3,$4,'Directory governance fixture','manual','succeeded')`, [ownRun, member, alpha, agent])
+      const input = { search: 'Directory governance fixture' }
+      const ids = async (reader: Parameters<typeof conversationDirectory>[1], workspaceId: string) =>
+        (await conversationDirectory(app, reader, workspaceId, input)).items.map(row => row.id)
+      assert.deepEqual(await ids({ id: member, [tokenWorkspace]: alpha }, alpha), [ownRun])
+      assert.deepEqual(await ids({ id: member, [tokenWorkspace]: beta }, alpha), [])
+      assert.deepEqual(await ids(owner, alpha), [], 'active workspace membership does not confer run ownership')
+      await workspace.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [alpha, member])
+      try {
+        assert.deepEqual(await ids({ id: member, [tokenWorkspace]: alpha }, alpha), [])
+      } finally {
+        await workspace.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`, [alpha, member])
+      }
+    })
     await t.test('pending resources never inherit the creator personal workspace', async () => {
       for (const id of [conflict, unresolved, malformed, removed]) {
         assert.equal(await issueForUser(owner, id), null)

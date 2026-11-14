@@ -45,6 +45,8 @@ export type ThreadEntry =
     /** When it was written, ms. */
     at: number
     text: string
+    /** The same words with explicit task, thread and PR references linked. */
+    body?: ReactNode
     /** What went with it: a quote from an artifact or a reply, browser notes, a 建议 card. */
     attachments?: { id: string; name: string; meta?: string }[]
     /** queued: written offline · sending · failed: shows 重试 (onRetry). */
@@ -102,7 +104,7 @@ export type ThreadScreenProps = {
   lastSeen?: number
   onMarkRead?: () => void
   /** The composer, as the chat-composer slot gets it: `useChatComposer` (hooks/use-chat-composer.ts) does what it does. */
-  composer: Omit<ChatComposerProps, 'model' | 'quote'>
+  composer: Omit<ChatComposerProps, 'quote'>
   /** Chips that go out with the next message (a quote, a browser note), each with Remove. */
   pending: { id: string; name: string; meta?: string; onRemove: () => void }[]
   /** Notices that wait above the composer (quota, sign in again, actions to approve). */

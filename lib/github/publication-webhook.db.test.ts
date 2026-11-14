@@ -6,7 +6,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { refreshPublishedPullRequest } from './publication-webhook'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { readFactoryFlow } from '../factory/public-flow'
 import type { FactoryTask } from '../factory/store'
 import type { CoordinatorEventInput } from '../coordinator-events'
@@ -34,7 +34,7 @@ test('a PR webhook records its line counts on the delivery and on the tasks it b
   const admin = guarded(base!)
   const name = `prw_${randomUUID().replaceAll('-', '')}_e2e`
   const adminPool = new Pool({ connectionString: admin.toString(), max: 1 })
-  await adminPool.query(`CREATE DATABASE ${name} TEMPLATE template0`)
+  await createTestDatabase(adminPool, name, 'template0')
   const target = new URL(admin.toString()); target.pathname = `/${name}`; guarded(target.toString())
   const pool = new Pool({ connectionString: target.toString(), max: 2 })
   // The race clients are real transaction executors, just like the application

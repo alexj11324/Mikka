@@ -27,8 +27,8 @@ function OptionLabel({ t, option }: { t: ModelPickerT; option: ChipModel }) {
  * menu of what this person can use here. The choice is saved per bot; a run
  * already going keeps its model.
  */
-export function BotModelPicker({ botId, running = false }: BotModelPickerProps) {
-  const picker = useBotModelPicker(botId)
+export function BotModelPicker({ botId, running = false, thread }: BotModelPickerProps) {
+  const picker = useBotModelPicker(botId, thread)
   const { t, last } = picker
   // Someone else's bot gets no chip; while the menu loads, the chip keeps the model it showed last time (state completeness).
   // It is the chip's look only, not a control, until the menu it opens has arrived.

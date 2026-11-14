@@ -6,7 +6,7 @@ import { Pool } from 'pg'
 import { orderMigrations } from '../scripts/migration-order.mjs'
 import { applyMigration, planMigration } from '../scripts/migration-steps.mjs'
 import { scopeMigrationBeforeCommit } from '../scripts/scope-migration-history.mjs'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 import { count, dbUrl, seedAgent, seedIssue, seedPersonalWorkspace, seedProject, seedProjectTasks, seedRun, seedTeam, seedTeamIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
 test('account and workspace deletion preserve the canonical Project history boundary', { skip: !dbUrl, timeout: 180_000 }, async t => {
@@ -27,7 +27,7 @@ test('account and workspace deletion preserve the canonical Project history boun
       await admin.end()
     }
   })
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   Object.assign(process.env, { E2E_DATABASE_URL: isolated.toString(), MIKKA_DATABASE_URL: isolated.toString(), DATABASE_URL: isolated.toString() })
   await connection.query('CREATE TABLE schema_migrations(name text PRIMARY KEY,"appliedAt" timestamptz NOT NULL DEFAULT now())')
   const directory = new URL('../drizzle/', import.meta.url)

@@ -20,7 +20,7 @@ import { WORKSPACE_REVIEW_ERROR_CODES, diffFilePage, diffFilePatch, reviewAnchor
   type ReviewMutation, type TaskReviewRef, type TaskReviewSubmission } from '@mikka/protocol/coding-workspace-review'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { disposableDatabase, E2E_DB_RULE } from '../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 
 const databaseURL = process.env.E2E_DATABASE_URL
 if (databaseURL) assert.ok(disposableDatabase(process.env, databaseURL), E2E_DB_RULE)
@@ -48,7 +48,7 @@ export function registerHTTPDaemonAcceptance(kind: 'shared' | 'personal') {
   const version = Number((await admin.query('SHOW server_version_num')).rows[0].server_version_num)
   assert.ok(version >= 170000 && version < 180000, 'HTTP/daemon acceptance requires PostgreSQL 17')
   const database = `workspace_http_${kind}_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(databaseURL!); target.pathname = `/${database}`
   const pool = new Pool({ connectionString: target.toString(), max: 8, connectionTimeoutMillis: 5000 })
   const root = await mkdtemp(join(tmpdir(), 'mikka-files-http-'))

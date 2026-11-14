@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { ensureBotCloudRuntime } from './auto-runtime'
 import { ensureRecordedBotHarnessRuntime } from './bot-runtime-records'
 
@@ -20,7 +20,7 @@ if (url) {
 test('first task runtime is declared without a parent worker or VM and keeps ownership fences', { skip: !url, timeout: 120000 }, async () => {
   const admin = new Pool({ connectionString: url, max: 1 })
   const database = `task_runtime_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(url!); target.pathname = `/${database}`
   const pool = new Pool({ connectionString: target.toString(), max: 4 })
   try {

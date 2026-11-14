@@ -1,6 +1,7 @@
+import { taskWorkOwner } from './issue-metadata'
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { boardProjectFilters, personFilters } from './board-filters'
+import { boardProjectFilters, migrateBoardFilters, personFilters } from './board-filters'
 
 const me = 'user-me'
 const myAgent = 'agent-mine'
@@ -40,4 +41,26 @@ test('saved Board project names retain all visible matches and UUID filters surv
   assert.deepEqual(boardProjectFilters(['a'], projects), ['a'])
   assert.deepEqual(boardProjectFilters(['Missing'], new Map()), ['Missing'])
   assert.equal(boardProjectFilters(undefined, projects), undefined)
+})
+
+test('the retired default 负责人：我 is dropped from saved Board filters; a chosen selection is kept', () => {
+  assert.equal(migrateBoardFilters({ assignee: ['me'] }), null, 'the old default')
+  assert.equal(migrateBoardFilters({ assignee: ['me'], status: [], labels: [] }), null, 'the old default beside emptied fields')
+  assert.equal(migrateBoardFilters(null), null)
+  assert.equal(migrateBoardFilters({}), null)
+  const custom = { assignee: ['me'], status: ['todo'] }
+  assert.equal(migrateBoardFilters(custom), custom, 'a selection the person added to is theirs')
+  const other = { assignee: ['user-other'] }
+  assert.equal(migrateBoardFilters(other), other)
+  const project = { project: ['a'] }
+  assert.equal(migrateBoardFilters(project), project)
+})
+
+test('a Board card and actor filter name an admitted Agent without treating its owner as the assignee', () => {
+  const agent = { kind: 'agent' as const, id: myAgent, name: 'Builder', image: null }
+  const member = { kind: 'member' as const, id: me, name: 'Owner', image: null }
+  assert.equal(taskWorkOwner({ assignee: null, delegate: agent }), agent)
+  assert.equal(taskWorkOwner({ assignee: member, delegate: agent }), member)
+  assert.equal(taskWorkOwner({ assignee: null, delegate: null }), null)
+  assert.equal(personFilters(task('other', null), me, mine(true)).assignee, false)
 })

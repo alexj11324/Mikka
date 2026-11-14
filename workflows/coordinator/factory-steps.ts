@@ -144,7 +144,7 @@ export async function listFactoryRequests(userId: string, scope?: NativeToolScop
   }))
 }
 
-export async function createIssueFromRequestStep(userId: string, input: { sourceEventId: string; title: string }, scope?: NativeToolScope) {
+export async function createIssueFromRequestStep(userId: string, input: Parameters<typeof createIssueFromRequest>[1], scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,scope)
   return asToolResult(() => createIssueFromRequest(userId, input))

@@ -6,7 +6,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { Pool } from 'pg';
 import { orderMigrations } from '../../scripts/migration-order.mjs';
 import { sweepFactoryMonitor } from './monitor-sweep';
-import { dropTestDatabase } from '../../tests/support/drop-test-database';
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database';
 
 const base = process.env.E2E_DATABASE_URL;
 const required = process.env.REQUIRE_DB === '1' || (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true');
@@ -22,7 +22,7 @@ test('monitor sweep: finds unobserved monitor completions per (user, bot), is id
   const admin = guarded(base!);
   const name = `fac_sweep_${randomUUID().replaceAll('-', '')}_e2e`;
   const adminPool = new Pool({ connectionString: admin.toString(), max: 1 });
-  await adminPool.query(`CREATE DATABASE ${name} TEMPLATE template0`);
+  await createTestDatabase(adminPool, name, 'template0');
   const target = new URL(admin.toString()); target.pathname = `/${name}`; guarded(target.toString());
   const pool = new Pool({ connectionString: target.toString(), max: 4 });
   try {

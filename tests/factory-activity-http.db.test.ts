@@ -17,7 +17,7 @@ import { capturePosterBinary } from '../lib/captures/poster'
 import { decode, DESKTOP_RPC_VERSION, encode } from '../lib/desktop-rpc/wire'
 import type { FactoryActivityView } from '../lib/factory/activity'
 import { assertE2eTarget, disposableDatabase } from './helpers/e2e-target.mjs'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 import { seedAgent, seedBot, seedTeam, seedWorkspace } from './support/workspace-admin-db'
 import { WORKSPACE_SELECTION_HEADER } from '../lib/workspace-selection'
 
@@ -76,7 +76,7 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
   {skip:!enabled,timeout:300_000},async t=>{
   const adminUrl=assertE2eTarget(base!), name=`activity_http_${randomUUID().replaceAll('-','')}_e2e`
   const admin=new Pool({connectionString:adminUrl.toString(),max:1})
-  await admin.query(`CREATE DATABASE ${name} TEMPLATE template0`)
+  await createTestDatabase(admin, name, 'template0')
   const target=new URL(adminUrl);target.pathname=`/${name}`
   const pool=new Pool({connectionString:target.toString(),max:5})
   const directory=await mkdtemp(join(tmpdir(),'factory-activity-http-'))

@@ -45,10 +45,13 @@ let acknowledgeNewTask: ((id: string) => void) | null = null
 const workspace = () => ({ currentUserId: user.id, workspace: { id: workspaceId, name: 'Fixture', kind: 'team' }, members: [], role: 'admin' })
 const emptyList = { data: { items: [] }, mutate: refreshed }
 const bot = { id: '3f0c9d2e-5b1a-4c7e-9f00-1a2b3c4d5e6f', name: 'Ada', coordinator: false }
-const botList = { data: { items: [bot] } }
+const botList = { items: [bot] }
+let rosterPending = false
+let rosterError: Error | undefined
+let rosterRetries = 0
 const router = { push: (href: string) => browser.history.pushState({}, '', href), replace: (href: string) => browser.history.replaceState({}, '', href), refresh: nothing }
 
-mock.module('next-intl', { namedExports: { useLocale: () => 'en', useTranslations: (namespace?: string) => Object.assign((key: string) => namespace ? `${namespace}.${key}` : key, { has: () => false }) } })
+mock.module('next-intl', { namedExports: { useLocale: () => 'en', useTranslations: (namespace?: string) => Object.assign((key: string) => namespace ? `${namespace}.${key}` : key, { has: () => false }), useMessages: () => ({ IssueDetail: { work: { states: {} } }, GroupTask: { stage: {}, status: {} } }), useFormatter: () => ({ dateTime: () => '' }) } })
 mock.module('next/navigation', { namedExports: { useSearchParams: () => new URLSearchParams(browser.location.search) } })
 mock.module('@/i18n/navigation', { namedExports: { getPathname: ({ href }: { href: string }) => href, usePathname: () => browser.location.pathname, useRouter: () => router } })
 mock.module('../settings/settings-link.tsx', { namedExports: { SettingsLink: ({ href, children }: { href: string; children?: ReactNode }) => <a href={href}>{children}</a> } })
@@ -81,7 +84,11 @@ mock.module('@/hooks/use-focus-return', { namedExports: { focusChatComposer: not
 mock.module('@/hooks/use-live-key', { namedExports: { LiveProvider: plain, useLiveKey: nothing, useLiveKeys: nothing, useLiveScope: () => null } })
 mock.module('@/hooks/use-live-lists', { namedExports: {
   useLiveIssueList: () => ({ data: workspaceTasksCached ? emptyList.data : undefined, error: workspaceTasksFailed ? new Error('unavailable') : undefined, isLoading: workspaceTasksPending, mutate: refreshGlobalTasks }), useLiveThreadList: () => emptyList,
-  useLiveBotRoster: () => botList, useLiveBotChatList: () => ({ data: { items: {} } }), useLiveGroupList: () => ({
+  useLiveBotRoster: () => ({
+    data: rosterPending ? undefined : botList,
+    error: rosterError,
+    mutate: async () => { rosterRetries++; rosterPending = false; rosterError = undefined },
+  }), useLiveBotChatList: () => ({ data: { items: {} } }), useLiveGroupList: () => ({
     data: groupList,
     error: groupListError,
     mutate: async () => { groupListRetries++; groupListError = undefined },
@@ -230,6 +237,7 @@ beforeEach(() => {
   user = { id: 'owner-one', name: 'Fixture', email: 'fixture@example.com' }
   workspaceId = 'workspace-one'
   workspaceReady = true
+  rosterPending = false; rosterError = undefined; rosterRetries = 0
   workspaceError = undefined
   refreshGlobalTasks = refreshed
   workspaceTasksFailed = false
@@ -277,6 +285,28 @@ test('a narrow board opens an explicitly requested preview in the existing brows
   assert.ok(container.querySelector('[data-panel-sheet] [data-browser-pane]'))
 })
 
+test('an explicit Bot mounts only its own composer after its roster resolves', async () => {
+  rosterPending = true
+  browser.history.replaceState({}, '', `/?workspace=workspace-one&bot=${bot.id}`)
+  const render = () => act(async () => root.render(<OfficialIssueWorkspace user={user} />))
+  await render()
+  assert.equal(Boolean(container.querySelector('[data-chat]')), false)
+  assert.equal(composerMounts, 0)
+  assert.ok(container.querySelector('[role="status"]'))
+
+  rosterError = new Error('roster unavailable')
+  await render()
+  const retry = container.querySelector<HTMLButtonElement>('[role="alert"] button')
+  assert.ok(retry)
+  assert.equal(Boolean(container.querySelector('[data-chat]')), false)
+  await act(async () => retry.click())
+  await render()
+  assert.equal(rosterRetries, 1)
+  assert.equal(container.querySelector('[data-chat]')?.getAttribute('data-chat'), bot.name)
+  assert.equal(composerMounts, 1)
+  assert.equal(new URL(browser.location.href).searchParams.get('bot'), bot.id)
+})
+
 test('a valid browser request reveals the conversation browser tab without changing the selected Bot', async () => {
   browser.history.replaceState({}, '', `/?workspace=workspace-one&account=active&bot=${bot.id}`)
   await act(async () => root.render(<OfficialIssueWorkspace user={user} />))
@@ -321,6 +351,11 @@ const pin = async (text: string) => { await act(async () => notes!.add({ kind: '
 async function go(href: string) {
   browser.history.pushState({}, '', href)
   await render()
+}
+async function popTo(href: string, renderFrame = render) {
+  browser.history.replaceState({}, '', href)
+  await act(async () => { browser.dispatchEvent(new browser.PopStateEvent('popstate')) })
+  await renderFrame()
 }
 
 test('Team Projects distinguishes unavailable associations from an empty list and keeps Workspace Projects independent', async () => {
@@ -593,8 +628,8 @@ test('a cold Settings chunk keeps the same frame, bar and rail; returning keeps 
   await go('/settings/members?workspace=workspace-one&invite=1')
   assert.equal(container.querySelector('[data-invite]')?.getAttribute('data-invite'), 'true')
 
-  await act(async () => button('chats').click())
-  await render()
+  // The Chats rail button opens the conversation directory; browser Back returns to the prior chat.
+  await popTo('/?workspace=workspace-one')
   assert.ok(frame() === original.frame, 'the frame DOM node must survive Settings navigation')
   assert.ok(bar() === original.bar, 'the window bar DOM node must survive Settings navigation')
   assert.ok(rail() === original.rail, 'the rail DOM node must survive Settings navigation')
@@ -610,7 +645,7 @@ test('a cold Settings chunk keeps the same frame, bar and rail; returning keeps 
   assert.equal(railMounts, 1)
 })
 
-test('legacy Settings also loads inside the frame and keeps it when returning to chat', async () => {
+test('legacy Settings also loads inside the frame and the Chats rail opens the conversation directory', async () => {
   await render({ initialSettingsSection: 'account' })
   const original = { frame: frame(), bar: bar(), rail: rail() }
   assert.ok(original.frame && original.bar && original.rail, 'legacy Settings must retain the real shell while its chunk loads')
@@ -619,7 +654,8 @@ test('legacy Settings also loads inside the frame and keeps it when returning to
   assert.ok(container.querySelector('[data-settings-section="account"]'))
   await act(async () => button('chats').click())
   await render()
-  assert.ok(container.querySelector('textarea'))
+  assert.equal(new URLSearchParams(browser.location.search).get('section'), 'conversations')
+  assert.equal(container.querySelector('textarea'), null, 'the conversation directory is not an active composer')
   assert.ok(frame() === original.frame, 'the frame DOM node must survive Settings navigation')
   assert.ok(bar() === original.bar, 'the window bar DOM node must survive Settings navigation')
   assert.ok(rail() === original.rail, 'the rail DOM node must survive Settings navigation')
@@ -648,8 +684,8 @@ test('hosted Settings preserves pending browser notes and the computer registry 
   await act(async () => { releaseChunk(); await chunkReady })
   const duringSettings = { notes: notes?.notes.length ?? null, hasComposer: notes?.hasComposer ?? null, computerRun: computerThread?.runId ?? null }
 
-  await act(async () => button('hosted chats').click())
-  await renderHosted()
+  // The Chats rail opens the directory; return with browser Back to the prior chat.
+  await popTo('/?workspace=workspace-one', renderHosted)
   const after = { draft: container.querySelector('textarea')?.value, notes: notes?.notes.map(note => [note.n, note.note]), computerRun: computerThread?.runId ?? null }
   t.diagnostic(JSON.stringify({ duringSettings, after }))
   assert.deepEqual(after, { draft: 'hosted unsent draft', notes: [[1, 'keep hosted annotation']], computerRun: registeredComputerThread.runId })

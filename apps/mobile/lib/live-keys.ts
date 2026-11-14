@@ -13,6 +13,11 @@ const LIST_MERGE_MS = 2_000
 /** A list's key is its channel's own workspace id; with no channel known it reads once a minute and asks for no ticket. */
 export const listRef = (kind: LiveRef['kind'], scope: string | null | undefined): LiveRef => ({ kind, id: scope || UNRESOLVED_LIVE_ID, scope: scope || null })
 
+/** Both Inbox screens refresh from the same two owner/workspace keys as Web. */
+export const inboxLive = (workspace: string | undefined) => ({
+  minIntervalMs: LIST_MERGE_MS, refs: [listRef('pending_actions', workspace), listRef('issue_list', workspace)],
+})
+
 /** A read that refreshes only by the minute fallback, never by push. */
 export const minuteRef = (kind: LiveRef['kind']): LiveRef => ({ kind, id: UNRESOLVED_LIVE_ID, scope: null })
 
@@ -39,7 +44,7 @@ export function botPageLive(_data: BotPage | null, botId: string | null | undefi
   return {
     minIntervalMs: LIST_MERGE_MS,
     refs: [
-      listRef('thread_list', home),
+      listRef('thread_list', open),
       { kind: 'bot_chat', id: botId && home ? botId : UNRESOLVED_LIVE_ID, scope: home || null },
       listRef('bot_list', open),
     ],
@@ -57,9 +62,10 @@ export function tasksLive(home: string | null | undefined, open: string | null |
 }
 
 /** Only an open, authorized Task listens to its discussion and attempt keys. */
-export function taskDetailLive(id: string, workspaceId: string | null | undefined, home: string | null | undefined, open: string | null | undefined, factoryTaskId?: string, factoryActivityVersion?: number): Spec {
+export function taskDetailLive(id: string, workspaceId: string | null | undefined, home: string | null | undefined, open: string | null | undefined, factoryTaskId?: string, factoryActivityVersion?: number, hasConnections = false): Spec {
   const spec = tasksLive(home, open)
   if (workspaceId) for (const kind of ['issue_document', 'issue_threads'] as const) spec.refs.push({ kind, id, scope: workspaceId })
+  if (workspaceId && hasConnections) spec.refs.push({ kind: 'issue_relations', id, scope: workspaceId })
   if (workspaceId && factoryActivityVersion === 1) {
     spec.refs.push({ kind: 'factory_issue', id, scope: workspaceId })
     if (factoryTaskId) spec.refs.push({ kind: 'factory_task', id: factoryTaskId, scope: workspaceId })

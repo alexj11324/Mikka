@@ -12,7 +12,7 @@ import type { RequestBudget } from '../../request-budget'
 import type { ReviewActor } from './authority'
 import { orderMigrations } from '../../../scripts/migration-order.mjs'
 import { disposableDatabase, E2E_DB_RULE } from '../../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../../tests/support/drop-test-database'
 
 const url = process.env.E2E_DATABASE_URL
 if (url) assert.ok(disposableDatabase(process.env, url), E2E_DB_RULE)
@@ -46,7 +46,7 @@ test('native GitHub review delivery and reconciliation on PostgreSQL 17', { skip
   const database = `github_review_delivery_${randomUUID().replaceAll('-', '')}_e2e`
   const version = Number((await admin.query('SHOW server_version_num')).rows[0].server_version_num)
   assert.ok(version >= 170000 && version < 180000, 'native delivery acceptance requires PostgreSQL 17')
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(url!); target.pathname = `/${database}`
   const pool = new Pool({ connectionString: target.toString(), max: 16, connectionTimeoutMillis: 5000 })
   observePoolCommits(pool)

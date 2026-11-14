@@ -72,7 +72,12 @@ export class AgentKitStore {
     for (let depth = 0; chosen.source === 'improvement' && chosen.base_version && depth < 100; depth++) chosen = await this.version(client,scope,chosen.base_version)
     return { source: chosen.source, createdAt: chosen.created_at, tools: current.definition.tools }
   }
-  async active(scope: AgentScope, defaults: AgentDefinition) { return this.transaction(client => this.head(client,scope,defaults)) }
+  async active(scope: AgentScope, defaults: AgentDefinition) {
+    return this.transaction(async client => {
+      const current = await this.head(client, scope, defaults)
+      return { ...current, effectiveTools: platformEffectiveTools(await this.toolSource(client, scope, current), defaults.tools) }
+    })
+  }
   async history(scope: AgentScope) {
     return this.transaction(async client => {
       await this.authority(client,scope)

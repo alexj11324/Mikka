@@ -13,3 +13,5 @@ export const PULL_REQUEST_ICONS = {
   merged: GitMerge,
   closed: GitPullRequestClosed,
 } as const
+
+export { directoryPullRequests, pullRequestsState } from './directory-pulls'

@@ -78,7 +78,7 @@ export interface RunDetail {
   decisionWarnings?: ProjectDecisionWarning[]
   run: RunView
   chunks: Record<string, unknown>[]
-  messages: { id: string; text: string; createdAt: Date; submissionId?: string | null }[]
+  messages: { id: string; text: string; createdAt: Date; sourceRunId?: string | null; editable?: boolean; submissionId?: string | null }[]
 }
 
 export const runViewColumns = {
@@ -369,12 +369,14 @@ export async function runVisibilityPredicate(reader: IssueReader) {
  * `threadName` reads (`threadNameHead`), and a teammate's run named by its harness
  * as `workspaceRunView` does. No report, error or provenance.
  */
-export async function visibleRunNames(reader: IssueReader, runIds: string[], _teams?: readonly TeamScope[]): Promise<{ id: string; own: boolean; agentName: string; harness: string; promptHead: string | null }[]> {
+export async function visibleRunNames(reader: IssueReader, runIds: string[], _teams?: readonly TeamScope[]): Promise<{ id: string; own: boolean; hasIssue: boolean; agentName: string; harness: string; promptHead: string | null; title: string | null }[]> {
   const userId = typeof reader === 'string' ? reader : reader.id
   if (!runIds.length || runIds.some(id => !z.uuid().safeParse(id).success)) return []
   const visible = await runVisibilityPredicate(reader)
-  const rows = await db.select({ id: agentRuns.id, ownerId: agentRuns.userId, agentName: runBotName, harness: runViewColumns.harness,
-    promptHead: sql<string | null>`case when agent_runs."userId" = ${userId} then ${threadNameHead} end` }).from(agentRuns)
+  const rows = await db.select({ id: agentRuns.id, ownerId: agentRuns.userId, hasIssue: sql<boolean>`agent_runs."issueId" is not null`, agentName: runBotName, harness: runViewColumns.harness,
+    promptHead: sql<string | null>`case when agent_runs."userId" = ${userId} then ${threadNameHead} end`,
+    // The conversation's own stored title, for its owner only, as its prompt is.
+    title: sql<string | null>`case when agent_runs."userId" = ${userId} then agent_runs.title end` }).from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId))
     .where(and(visible, inArray(agentRuns.id, runIds))).limit(Math.max(1, Math.min(runIds.length, 100)))
   return rows.map(({ ownerId, ...row }) => ({ ...row, own: ownerId === userId }))
@@ -430,7 +432,8 @@ export async function visibleRuns(reader: IssueReader, input: RunListFilter & { 
 
 /** The caller has authorized these run IDs. Only the reader's own sends include a retry identity. */
 export function readRunMessages(userId: string, runIds: string[]) {
-  return db.select({ id: runMessages.id, text: runMessages.text, createdAt: runMessages.createdAt,
+  return db.select({ id: runMessages.id, text: runMessages.text, createdAt: runMessages.createdAt, sourceRunId:runMessages.runId,
+    editable:sql<boolean>`${runMessages.userId}=${userId} AND ${runMessages.origin}='owner' AND ${runMessages.deliveredAt} IS NOT NULL AND failure IS NULL`,
     submissionId: sql<string | null>`${coordinatorEvents.payload}#>>'{threadSubmission,requestId}'` })
     .from(runMessages).leftJoin(coordinatorEvents, and(eq(coordinatorEvents.id, runMessages.id),
       eq(coordinatorEvents.userId, userId), eq(coordinatorEvents.kind, 'user_message')))

@@ -84,6 +84,7 @@ dbTest('preferences read both optional owner rows in one statement without losin
     } finally { observed.mock.restore() }
   }
   const stored = {
+    archiveIdleAfterDays: 30,
     pushDecide: false, pushReview: false, pushFinished: false, pushBriefing: false,
     pushWhen: schema.PUSH_WHEN.find(value => value !== 'always')!,
     memoryEnabled: false, sendKey: 'modEnter' as const, personalInstructions: 'Synthetic owner preference',
@@ -211,6 +212,13 @@ dbTest('preferences: send key, personal instructions and daily suggestions save 
   assert.equal((await preferences.getPreferences()).personalInstructions, '回答用中文', 'a refused patch changes nothing')
 
   // 每日建议 needs 记忆.
+  for (const days of [3, 7, 14, 30, 90, 0]) {
+    const written = await preferences.updatePreferences({ archiveIdleAfterDays: days })
+    assert.equal(written.error, undefined)
+    if (!written.error) assert.equal(written.archiveIdleAfterDays, days)
+  }
+  assert.equal((await preferences.updatePreferences({ archiveIdleAfterDays: 1 })).error, 'validationGeneric')
+  assert.equal((await preferences.getPreferences()).archiveIdleAfterDays, 0)
   const memoryOff = await preferences.updatePreferences({ memoryEnabled: false })
   assert.equal(!memoryOff.error && memoryOff.dailySuggestions, false, 'turning 记忆 off turns 每日建议 off')
   assert.equal((await preferences.updatePreferences({ dailySuggestions: true })).error, 'dailySuggestionsNeedMemory')
@@ -235,22 +243,22 @@ dbTest('personal instructions reach the next prompt for the Coordinator and Bots
   assert.equal(await personal.withPersonalInstructions(people.alex, 'BASE RULES'), 'BASE RULES')
 })
 
-dbTest('the Coordinator\'s and a Bot\'s turn prompt (prepareEveInstructions) carry the saved instructions and drop them once cleared', async () => {
+dbTest('the Coordinator\'s and a Bot\'s turn prompt (composeEveInstructions) carry the saved instructions and drop them once cleared', async () => {
   as(people.alex)
   const { preferences } = m
-  const { prepareEveInstructions } = await import('@/workflows/coordinator/steps')
+  const { composeEveInstructions } = await import('@/lib/coordinator/product-instructions')
   const botId = randomUUID()
   // The Coordinator is an ordinary bot row; its prompt keeps the Coordinator's rules.
   const coordinator = (await seedCoordinator(people.alex)).botId
   await preferences.updatePreferences({ personalInstructions: 'Sign every reply with 🐧.' })
   for (const bot of [coordinator, botId]) {
-    const instructions = await prepareEveInstructions(people.alex, bot)
+    const instructions = await composeEveInstructions(people.alex, bot)
     assert.match(instructions, /You are the Coordinator in Mikka/, 'the rules come first')
     assert.match(instructions, /<personal_instructions>\nSign every reply with 🐧\.\n<\/personal_instructions>/)
     assert.ok(instructions.indexOf('<personal_instructions>') > instructions.indexOf('You are the Coordinator in Mikka'))
   }
   await preferences.updatePreferences({ personalInstructions: '' })
-  for (const bot of [coordinator, botId]) assert.doesNotMatch(await prepareEveInstructions(people.alex, bot), /personal_instructions|Sign every reply/)
+  for (const bot of [coordinator, botId]) assert.doesNotMatch(await composeEveInstructions(people.alex, bot), /personal_instructions|Sign every reply/)
 })
 
 dbTest('time zone: a picked zone survives browser and IP reports until 自动', async () => {

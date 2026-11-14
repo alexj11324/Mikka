@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import type { PoolClient } from 'pg'
 import type { ModelMessage } from 'ai'
+import { measured } from './helpers/read-metrics'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedAgent, seedBot, seedIssue, seedPersonalWorkspace, seedRun, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { ALLOWED_MODEL, seedAllowedModel } from './support/allowed-model'
@@ -13,6 +14,47 @@ import { connectGitHub, githubAppStub } from './support/github-app-stub'
 import { isolateCoordinatorWakes } from './support/coordinator-wake'
 
 const SECRET = 'isolated-ci-coordinator-backfill-fixture-key-0000'
+
+
+test('recording an attention decision reads the brief and still rechecks handed state after the model call', { skip: !dbUrl }, async t => {
+  const { pool, createRequestDatabaseScope } = await import('../lib/db')
+  const { recordDecision } = await import('../lib/attention/store')
+  const fixture = createRequestDatabaseScope(dbUrl!)
+  const owner = 'attention-decision-' + randomUUID(), id = randomUUID()
+  const run = () => fixture.run(async () => {
+    await pool.query('INSERT INTO attention_settings("userId",enabled) VALUES($1,false)', [owner])
+    await pool.query(`INSERT INTO attention_matters(id,"userId","matterKey",source,title,level,state,assessment,evidence)
+      VALUES($1,$2,$3,'gmail','Review','normal','handed','{}','{}')`, [id, owner, id])
+    let calls = 0
+    const notify = async () => measured(() => recordDecision(owner, { matterId: id, decision: 'notify' }, new Date(), async () => {
+      calls++
+      return new Map([['interruptNow', { type: 'predicate', name: 'interruptNow', probability: 1 }]])
+    }))
+    const small = await notify()
+    assert.deepEqual(small.value, { ok: true, state: 'notified' })
+    const payload = JSON.stringify({ detail: 'x'.repeat(32 * 1024) })
+    await pool.query(`UPDATE attention_matters SET state='handed',assessment=$2,evidence=$2 WHERE id=$1`, [id, payload])
+    const large = await notify()
+    assert.deepEqual(large.value, small.value)
+    assert.equal(calls, 2)
+    assert.equal((await pool.query(`SELECT count(*)::int n FROM attention_log WHERE "userId"=$1 AND action='notify'`, [owner])).rows[0].n, 2)
+    await pool.query("UPDATE attention_matters SET state='handed' WHERE id=$1", [id])
+    const raced = await recordDecision(owner, { matterId: id, decision: 'notify' }, new Date(), async () => {
+      await pool.query("UPDATE attention_matters SET state='quiet' WHERE id=$1", [id])
+      return null
+    })
+    assert.deepEqual(raced, { error: 'matterNotInHand' })
+    t.diagnostic(JSON.stringify({ smallResultBytes: small.resultBytes, largeResultBytes: large.resultBytes, largeSocketBytes: large.bytes }))
+    assert.ok(large.resultBytes < small.resultBytes + 1024, 'the decision must not transport stored evidence or assessment')
+  })
+  try { await run() } finally {
+    try { await fixture.run(async () => {
+      await pool.query('DELETE FROM attention_log WHERE "userId"=$1', [owner])
+      await pool.query('DELETE FROM attention_matters WHERE id=$1', [id])
+      await pool.query('DELETE FROM attention_settings WHERE "userId"=$1', [owner])
+    }) } finally { await fixture.close() }
+  }
+})
 
 test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
   const previousSecret = process.env.BETTER_AUTH_SECRET

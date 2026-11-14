@@ -26,6 +26,7 @@ MIKKA_PORT=3097
 BETTER_AUTH_URL=http://localhost:3097
 MIKKA_DATABASE_URL=$driver://mikka_external_query:$POSTGRES_PASSWORD@pooled:6432/external_fixture
 MIKKA_DATABASE_URL_UNPOOLED=$driver://mikka:$POSTGRES_PASSWORD@direct/external_fixture?application_name=mikka-direct
+WORKFLOW_POSTGRES_URL=$driver://mikka:$POSTGRES_PASSWORD@direct/external_fixture
 VARS
 trap cleanup EXIT
 
@@ -73,6 +74,11 @@ POOL
 
 "${compose[@]}" create app
 docker network connect --alias pooled --alias direct "$network" "$db_container"
+if [[ "${PUBLISH_IMAGE:-false}" != true ]]; then
+  "${compose[@]}" run --rm --no-deps --entrypoint node \
+    --volume "$PWD:/source:ro" app \
+    /source/apps/eve/node_modules/@workflow/world-postgres/bin/setup.js
+fi
 "${compose[@]}" up -d --wait --wait-timeout 240
 test "$("${compose[@]}" ps --services --status running)" = app
 node --input-type=module <<'JS'

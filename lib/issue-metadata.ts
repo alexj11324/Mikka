@@ -20,6 +20,8 @@ export const metadataSchema = z.object({
   number: z.number().int().positive().optional(),
   assignee: assigneeSchema.nullable().default(null),
   delegate: delegateSchema.nullable().default(null),
+  // Manual includes an explicit clear. An absent value predates dispatch assignment.
+  delegateSelection: z.enum(['dispatch','manual']).optional(),
   project: z.string().trim().max(100).nullable().default(null),
   labels: z.array(labelSchema).max(12).default([]),
   pullRequests: z.array(pullRequestSchema).max(10).default([]),
@@ -39,7 +41,13 @@ export type IssueLabel = z.infer<typeof labelSchema>
 export type IssuePullRequest = z.infer<typeof pullRequestSchema>
 export type IssueDelegate = z.infer<typeof delegateSchema>
 
+/** A named member owns the task when assigned; otherwise its admitted delegate provides the human-facing work owner. */
+export function taskWorkOwner(metadata: Pick<IssueMetadata, 'assignee' | 'delegate'>) {
+  return metadata.assignee ?? metadata.delegate
+}
+
 export const labelKey = (label: IssueLabel) => label.name.toLowerCase()
+export const githubPullRequestKey = (url: string) => url.toLowerCase().replace(/\/$/, '')
 export const pullRequestKey = (pr: IssuePullRequest) => pr.url.replace(/\/$/, '')
 
 /** Keep independent edits. A concurrent change to the same entry is shown as saved for review. */

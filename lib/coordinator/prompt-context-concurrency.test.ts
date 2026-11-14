@@ -62,10 +62,10 @@ stub('../telegram/client.ts', { postTelegramText: forbidden })
 stub('../attention/store.ts', { recordDecision: forbidden, settleTurn: forbidden })
 stub('../../workflows/coordinator/tool-scope.ts', { assertNativeToolScope: forbidden })
 
-let prepareEveInstructions: typeof import('../../workflows/coordinator/steps')['prepareEveInstructions']
+let composeEveInstructions: typeof import('./product-instructions')['composeEveInstructions']
 before(async () => {
   overrideDeploymentSwitch('factoryRouting', false)
-  ;({ prepareEveInstructions } = await import('../../workflows/coordinator/steps'))
+  ;({ composeEveInstructions } = await import('./product-instructions'))
 })
 after(() => overrideDeploymentSwitch('factoryRouting', undefined))
 beforeEach(() => {
@@ -81,7 +81,7 @@ function expectedPrompt() {
 
 test('all independent prompt reads start before any completes, keeping bytes, scope and one call each', async () => {
   gates = { execution: deferred(), personal: deferred(), github: deferred() }
-  const pending = prepareEveInstructions(owner, bot, snapshot)
+  const pending = composeEveInstructions(owner, bot, snapshot)
   await firstStarted.promise
   try {
     // The old serial code starts only execution here. No sleeps or timing threshold.
@@ -103,11 +103,11 @@ test('all independent prompt reads start before any completes, keeping bytes, sc
 })
 
 test('a later turn reads current context again without caching or changing the frozen host', async () => {
-  const first = await prepareEveInstructions(owner, bot, snapshot)
+  const first = await composeEveInstructions(owner, bot, snapshot)
   assert.deepEqual(first, expectedPrompt())
   personal = 'Updated synthetic instruction'; github = 'Updated authorized repositories'
   facts = { models: 'Updated allowed models', live: 'Updated availability' }
-  const second = await prepareEveInstructions(owner, bot, snapshot)
+  const second = await composeEveInstructions(owner, bot, snapshot)
   assert.deepEqual(second, expectedPrompt())
   assert.notEqual(second, first)
   for (const reader of ['execution', 'personal', 'github'] as const) assert.equal(calls.filter(call => call.reader === reader).length, 2)
@@ -118,13 +118,13 @@ test('a later turn reads current context again without caching or changing the f
 
 test('an instruction read refusal is propagated unchanged without retry or a partial prompt', async () => {
   denied = new Error('Synthetic instruction read refusal')
-  await assert.rejects(prepareEveInstructions(owner, bot, snapshot), error => error === denied)
+  await assert.rejects(composeEveInstructions(owner, bot, snapshot), error => error === denied)
   assert.equal(calls.filter(call => call.reader === 'personal').length, 1)
 })
 
 test('Eve instructions keep frozen discovery grants and leave history to eve', async () => {
   const selected = { ...snapshot, effectiveTools: [] }
-  const instructions = await prepareEveInstructions(owner, bot, selected)
+  const instructions = await composeEveInstructions(owner, bot, selected)
   assert.deepEqual(calls.find(call => call.reader === 'github')?.args, [owner, { hosted: true, readOnly: false, effectiveTools: [] }, undefined, undefined, bot])
   assert.equal(typeof instructions, 'string')
   assert.doesNotMatch(instructions, /Synthetic request/)

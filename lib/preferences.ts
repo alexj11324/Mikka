@@ -1,6 +1,7 @@
 import 'server-only'
 import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
+import { archiveIdleDays } from './conversation-directory-input'
 import { db } from '@/lib/db'
 import { attentionSettings, PUSH_WHEN, userPreferences, users } from '@/lib/db/schema'
 import { SEND_KEYS } from '@/lib/send-key'
@@ -15,6 +16,7 @@ import { setAttentionEnabled } from '@/lib/attention/store'
  * own reader (lib/suggestions/source-settings.ts).
  */
 export interface Preferences {
+  archiveIdleAfterDays: number
   proactive: boolean
   pushDecide: boolean
   pushReview: boolean
@@ -29,7 +31,7 @@ export interface Preferences {
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
-  proactive: true, pushDecide: true, pushReview: true, pushFinished: true, pushBriefing: true, pushWhen: 'always', memoryEnabled: true,
+  archiveIdleAfterDays: 30, proactive: true, pushDecide: true, pushReview: true, pushFinished: true, pushBriefing: true, pushWhen: 'always', memoryEnabled: true,
   sendKey: 'enter', personalInstructions: '', dailySuggestions: true,
 }
 
@@ -40,6 +42,7 @@ export const personalInstructionsSchema = z.string().transform(text => text.trim
   .refine(text => [...text].length <= PERSONAL_INSTRUCTIONS_MAX, { message: 'personalInstructionsTooLong' })
 
 export const preferencesPatch = z.object({
+  archiveIdleAfterDays: z.literal(archiveIdleDays),
   proactive: z.boolean(), pushDecide: z.boolean(), pushReview: z.boolean(), pushFinished: z.boolean(), pushBriefing: z.boolean(),
   pushWhen: z.enum(PUSH_WHEN), memoryEnabled: z.boolean(),
   sendKey: z.enum(SEND_KEYS), personalInstructions: personalInstructionsSchema, dailySuggestions: z.boolean(),
@@ -106,6 +109,9 @@ export async function savePreferences(userId: string, patch: PreferencesPatch): 
     const stored = { ...merged, dailySuggestions: merged.dailySuggestions && memoryEnabled }
     await tx.insert(userPreferences).values({ userId, ...stored, updatedAt: new Date() })
       .onConflictDoUpdate({ target: userPreferences.userId, set: { ...stored, updatedAt: new Date() } })
+    if (rest.archiveIdleAfterDays !== undefined && current.archiveIdleAfterDays !== rest.archiveIdleAfterDays) {
+      await (await import('./live/lists')).archivePreferenceChanged(tx, userId)
+    }
     return readPreferences(userId, tx)
   })
 }

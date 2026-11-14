@@ -2,7 +2,7 @@ import 'server-only'
 import { asSchema } from 'ai'
 import { z } from 'zod'
 import type { EveScope } from './scope'
-import { asProductPrincipal, beginProductExecution, describeProductTools, productContext, productTools } from './product-definitions'
+import { asProductPrincipal, productContext, productTools } from './product-definitions'
 
 const id = z.string().min(1).max(256)
 const common = { sessionId: id, turnId: id, executionId: z.uuid().nullable().optional() }
@@ -12,9 +12,6 @@ const approvalResponder = z.object({
   attributes: z.object({ botId: z.uuid(), workspaceId: z.uuid(), surface: z.enum(['web', 'slack']) }).strict(),
 }).strict()
 const requestSchema = z.discriminatedUnion('operation', [
-  z.object({ ...common, operation: z.literal('prepare') }).strict(),
-  z.object({ ...common, operation: z.literal('instructions') }).strict(),
-  z.object({ ...common, operation: z.literal('catalogue') }).strict(),
   z.object({ ...toolCall, operation: z.literal('approval') }).strict(),
   z.object({ ...toolCall, operation: z.literal('execute'), approvalResponder: approvalResponder.optional() }).strict(),
   z.object({ ...common, operation: z.literal('finish'), outcome: z.enum(['completed', 'failed', 'cancelled']), messages: z.array(z.unknown()).optional() }).strict(),
@@ -76,24 +73,12 @@ const defaultServices: EveProductGatewayServices = {
   },
   async run(scope, input, signal, request) {
     return asProductPrincipal(scope, async () => {
-      // Existing Eve releases can retain these callbacks during an API upgrade.
-      if (input.operation === 'prepare') return beginProductExecution(scope, input.sessionId, input.turnId)
       if (input.operation === 'finish') {
         const { finishEveTurn } = await import('./settlement')
         return finishEveTurn(scope, input)
       }
       const { execution, sourceEventId, scheduledRead, taskEventId, entryOrigin } = await productContext(scope, input)
-      if (input.operation === 'instructions') {
-        if (scheduledRead) return { instructions: `This is a scheduled read-only task. Use only its allowed read tools, perform no writes and request no approval.\n${scheduledRead.prompt}` }
-        if (scope.surface === 'slack') {
-          const { COORDINATOR_INSTRUCTIONS } = await import('../coordinator/instructions')
-          return { instructions: COORDINATOR_INSTRUCTIONS + '\nUse only this Slack conversation. Do not access private web conversation history, memories or profile. Reply in this thread, or call no_reply when no useful response is needed.' }
-        }
-        const { prepareEveInstructions } = await import('../../workflows/coordinator/steps')
-        return { instructions: await prepareEveInstructions(scope.ownerId, scope.botId, execution?.snapshot, { sessionId: input.sessionId, turnId: input.turnId }) }
-      }
       const tools = await productTools(scope, execution, sourceEventId, scheduledRead, taskEventId,entryOrigin)
-      if (input.operation === 'catalogue') return { tools: await describeProductTools(tools) }
       const tool = Object.hasOwn(tools, input.name) ? tools[input.name] : undefined
       if (!tool?.execute) throw new Error('notFound')
       const validator = asSchema(tool.inputSchema).validate
@@ -102,8 +87,8 @@ const defaultServices: EveProductGatewayServices = {
       if (!checked.success) throw new Error('validationGeneric')
       signal.throwIfAborted()
       const { withEveProductAuthority } = await import('../enterprise/execution-authority')
-      const output = await withEveProductAuthority(request, input, async () => {
-        const call = { ...scope, sessionId: input.sessionId, turnId: input.turnId, executionId: input.executionId, sourceEventId, name: input.name, input: checked.value, callId: input.callId }
+      const output = await withEveProductAuthority(request, { ...input, executionId: execution?.id }, async () => {
+        const call = { ...scope, sessionId: input.sessionId, turnId: input.turnId, executionId: execution?.id, sourceEventId, name: input.name, input: checked.value, callId: input.callId }
         const { reviewEveProductApproval, executeEveApprovedWrite } = await import('./product-approval')
         if (input.operation === 'approval') return reviewEveProductApproval(call, signal)
         const approved = await executeEveApprovedWrite(call, input.approvalResponder, signal)

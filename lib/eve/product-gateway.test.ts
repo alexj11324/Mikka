@@ -36,20 +36,6 @@ test('client fields cannot choose another owner, Workspace or schedule authority
   }
 })
 
-test('existing Eve releases retain the preparation and discovery protocol during an API upgrade', async () => {
-  const seen: unknown[] = []
-  const services: EveProductGatewayServices = {
-    authorize: async () => scope,
-    assertSession: async () => {},
-    run: async (_scope, input) => { seen.push(input); return { ok: true } },
-  }
-  for (const operation of ['prepare', 'catalogue']) {
-    const response = await handleEveProductRequest(request({ operation, sessionId: body.sessionId, turnId: body.turnId }), services)
-    assert.equal(response.status, 200)
-  }
-  assert.equal(seen.length, 2)
-})
-
 test('tool arguments and cancellation signal reach the authorized product service without another model loop', async () => {
   const req = request(body)
   const response = await handleEveProductRequest(req, {

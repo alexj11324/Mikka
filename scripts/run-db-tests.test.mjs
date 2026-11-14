@@ -5,7 +5,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { BOOTSTRAP, BROWSER_SUITES, REQUIRED_SUITES, SELF_MANAGED, TEMPLATE_BOUND, checkSummary, cloneDatabaseName, concurrency, inventory, runScript, scriptSteps, shardScripts, suiteEnv, main, parseSummary, readTree, validateTarget } from './run-db-tests.mjs'
+import { BOOTSTRAP, BROWSER_SUITES, REQUIRED_SUITES, SELF_MANAGED, TEMPLATE_BOUND, checkSummary, cloneDatabaseName, createClones, concurrency, inventory, runScript, scriptSteps, shardScripts, suiteEnv, main, parseSummary, readTree, validateTarget } from './run-db-tests.mjs'
 import { isE2eTarget } from '../tests/helpers/e2e-target.mjs'
 
 const target = 'postgresql://e2e:local@127.0.0.1:5432/mikka_e2e'
@@ -104,7 +104,12 @@ test('runner invokes only the selected scripts, each on its own clone, and retai
   const fullEnv = { ...env, FACTORY_MONITOR_TEST_URL: target, UNRELATED_URL: 'postgresql://e2e:local@127.0.0.1:5432/other_e2e', DB_TEST_EXPECTED: fixture.scripts.join(',') }
   assert.equal(await main({ root: fixture.root, env: { ...fullEnv, DB_TEST_SHARD: '1/2' }, run, clone }), 0)
   assert.deepEqual(calls.map(call => call.args), [['-s', 'test:a-db'], ['-s', 'test:c-db']])
-  assert.deepEqual(clones, [{ template: target, names: ['mikka_s00_a_e2e', 'mikka_s02_c_e2e'] }], 'clones are named by inventory position, so shards never collide')
+  assert.equal(clones.length, 1)
+  assert.equal(clones[0].template, target)
+  assert.equal(clones[0].names.length, 2)
+  assert.match(clones[0].names[0], /^mikka_[A-Za-z0-9_]+_r[a-f0-9]{12}_s00_e2e$/)
+  assert.match(clones[0].names[1], /^mikka_[A-Za-z0-9_]+_r[a-f0-9]{12}_s02_e2e$/)
+  assert.notEqual(clones[0].names[0], clones[0].names[1], 'each suite gets a unique per-run clone name')
   assert.ok(logs.some(line => line.startsWith('Required DB inventory: ') && line.includes('test:b-db')))
   assert.ok(logs.includes('Required DB selection: {"shard":"1/2","total":3,"scripts":["test:a-db","test:c-db"]}'))
   for (const [index, call] of calls.entries()) {
@@ -118,7 +123,7 @@ test('runner invokes only the selected scripts, each on its own clone, and retai
     assert.equal(call.options.env.UNRELATED_URL, fullEnv.UNRELATED_URL)
     assert.doesNotThrow(() => validateTarget(call.options.env))
   }
-  assert.ok(logs.some(line => /^::group::pnpm test:a-db \(mikka_s00_a_e2e, [\d.]+s\)$/.test(line)))
+  assert.ok(logs.some(line => /^::group::pnpm test:a-db \(mikka_.*_r[a-f0-9]{12}_s00_e2e, [\d.]+s\)$/.test(line)))
   assert.ok(logs.some(line => line.startsWith('Required DB timings: ')))
   calls.length = 0
   assert.equal(await main({ root: fixture.root, env: fullEnv, run, clone }), 0)
@@ -147,7 +152,8 @@ test('runner keeps suites bound to the bootstrapped database on it, one at a tim
     events.push('cloned')
   }
   assert.equal(await main({ root: fixture.root, env: { ...env, DB_TEST_CONCURRENCY: '3', DB_TEST_EXPECTED: fixture.scripts.join(',') }, run, clone }), 0)
-  assert.ok(events.indexOf('start test:a-db') > events.indexOf('clone mikka_s00_a_e2e'), 'a suite starts once its own clone exists')
+  const firstClone = events.find(event => /^clone mikka_.*_r[a-f0-9]{12}_s00_e2e$/.test(event))
+  assert.ok(firstClone && events.indexOf('start test:a-db') > events.indexOf(firstClone), 'a suite starts once its own clone exists')
   for (const script of TEMPLATE_BOUND.slice(0, 2).map(entry => entry.script)) assert.ok(events.indexOf(`start ${script}`) > events.indexOf('cloned'), 'nothing connects to the template until every clone is taken')
   assert.deepEqual(events.filter(event => event.startsWith('start ')).map(event => event.slice(6)).sort(), fixture.scripts)
   assert.equal(peak, 3)
@@ -197,18 +203,111 @@ test('a suite whose clone failed or is missing never runs, and the gate fails', 
   const partial = async (_template, names, ready) => { ready(names[0]) }
   assert.equal(await main({ root: fixture.root, env, run(command, args) { ran.push(args[1]); return { status: 0, stdout: '# tests 1\n# pass 1\n', stderr: '' } }, clone: partial }), 1)
   assert.deepEqual(ran, ['test:a-db'])
-  assert.ok(errors.some(error => /test:b-db: clone mikka_s01_b_e2e was not created/.test(error)))
+  assert.ok(errors.some(error => /test:b-db: clone mikka_.*_r[a-f0-9]{12}_s01_e2e was not created/.test(error)))
 })
 
 test('clone names stay loopback *_e2e databases within the identifier limit', () => {
   for (const script of ['test:a', 'test:personal-mailbox-default-off-db', `test:${'x'.repeat(120)}`, 'test:weird/$name']) {
     const name = cloneDatabaseName(target, 7, script)
     assert.ok(Buffer.byteLength(name) <= 63, name)
-    assert.match(name, /^mikka_s07_[A-Za-z0-9_]+_e2e$/)
+    assert.match(name, /^mikka_[A-Za-z0-9_]+_r[a-f0-9]{12}_s07_e2e$/)
     assert.ok(isE2eTarget(`postgresql://e2e:local@127.0.0.1:5432/${name}`))
   }
   assert.equal(suiteEnv(env, undefined).E2E_DATABASE_URL, target)
   assert.throws(() => suiteEnv(env, 'production'), /_e2e/)
+})
+
+
+class FakeCloneClient {
+  static databases = new Map()
+  static statements = []
+  constructor({ connectionString }) { this.database = new URL(connectionString).pathname.slice(1) }
+  async connect() {}
+  async end() {}
+  async query(sql, values = []) {
+    FakeCloneClient.statements.push({ database: this.database, sql })
+    if (sql.startsWith('CREATE DATABASE ')) {
+      const match = sql.match(/^CREATE DATABASE "([^"]+)" TEMPLATE "?([^"]+)"?$/)
+      assert.ok(match, sql)
+      if (FakeCloneClient.databases.has(match[1])) throw new Error(`database already exists: ${match[1]}`)
+      FakeCloneClient.databases.set(match[1], { template: match[2], ownership: null })
+      return { rows: [], rowCount: null }
+    }
+    if (sql.startsWith('COMMENT ON DATABASE ')) {
+      const match = sql.match(/^COMMENT ON DATABASE "([^"]+)" IS '([^']+)'$/)
+      assert.ok(match, sql)
+      const database = FakeCloneClient.databases.get(match[1])
+      assert.ok(database)
+      database.ownership = match[2]
+      return { rows: [], rowCount: null }
+    }
+    if (sql.includes('shobj_description')) {
+      const database = FakeCloneClient.databases.get(String(values[0]))
+      return { rows: [{ ownership: database?.ownership ?? null }], rowCount: database ? 1 : 0 }
+    }
+    if (sql.startsWith('DROP DATABASE ')) {
+      const name = sql.match(/^DROP DATABASE "([^"]+)" WITH \(FORCE\)$/)?.[1]
+      assert.ok(name, sql)
+      if (!FakeCloneClient.databases.has(name)) throw new Error(`missing database: ${name}`)
+      FakeCloneClient.databases.delete(name)
+      return { rows: [], rowCount: null }
+    }
+    throw new Error(`unexpected fake SQL: ${sql}`)
+  }
+}
+
+function resetFakeCloneClient() {
+  FakeCloneClient.databases = new Map([['mikka_e2e', { template: null, ownership: null }]])
+  FakeCloneClient.statements = []
+}
+
+test('clone runner uses unique per-run names, never pre-drops, and cleans only matching marked databases', async () => {
+  resetFakeCloneClient()
+  FakeCloneClient.databases.set('mikka_runner_e2e', { template: null, ownership: 'pre-existing' })
+  const runId = 'abcdef123456'
+  const names = ['test:a-db', 'test:b-db'].map((script, index) => cloneDatabaseName(target, index, script, runId))
+  const ready = []
+  const receipt = await createClones(target, names, name => ready.push(name), { ClientClass: FakeCloneClient, runId })
+  assert.deepEqual(ready, names)
+  assert.equal(FakeCloneClient.databases.has('mikka_runner_e2e'), true)
+  assert.equal(FakeCloneClient.statements.some(({ sql }) => sql.startsWith('DROP DATABASE ')), false)
+  const control = [...FakeCloneClient.databases.keys()].find(name => name.includes('_runner_abcdef123456'))
+  assert.ok(control)
+  assert.ok(FakeCloneClient.databases.get(control).ownership.startsWith('mikka-test-run:'))
+  const mismatch = names[1]
+  FakeCloneClient.databases.get(mismatch).ownership = 'other-run'
+  await assert.rejects(receipt.cleanup(), /per-run database clones could not be safely cleaned up/)
+  assert.equal(FakeCloneClient.databases.has(names[0]), false)
+  assert.equal(FakeCloneClient.databases.has(names[1]), true)
+  assert.equal(FakeCloneClient.databases.has(control), false, 'the independently marked control database is safely cleaned')
+})
+
+test('clone runner refuses every destructive cleanup when the control provenance marker mismatches', async () => {
+  resetFakeCloneClient()
+  const runId = 'a1b2c3d4e5f6'
+  const names = ['test:a-db'].map((script, index) => cloneDatabaseName(target, index, script, runId))
+  const receipt = await createClones(target, names, () => {}, { ClientClass: FakeCloneClient, runId })
+  const control = [...FakeCloneClient.databases.keys()].find(name => name.includes('_runner_a1b2c3d4e5f6'))
+  assert.ok(control)
+  FakeCloneClient.databases.get(control).ownership = 'other-run'
+  await assert.rejects(receipt.cleanup(), /per-run database clones could not be safely cleaned up/)
+  assert.equal(FakeCloneClient.databases.has(names[0]), true)
+  assert.equal(FakeCloneClient.databases.has(control), true)
+  assert.equal(FakeCloneClient.statements.some(({ sql }) => sql.startsWith('DROP DATABASE ')), false)
+})
+
+test('clone runner cleans every clone and its control database when run markers match', async () => {
+  resetFakeCloneClient()
+  const runId = 'fedcba654321'
+  const names = ['test:a-db', 'test:b-db'].map((script, index) => cloneDatabaseName(target, index, script, runId))
+  const receipt = await createClones(target, names, () => {}, { ClientClass: FakeCloneClient, runId })
+  const control = [...FakeCloneClient.databases.keys()].find(name => name.includes('_runner_fedcba654321'))
+  assert.ok(control)
+  await receipt.cleanup()
+  assert.equal(FakeCloneClient.databases.has('mikka_e2e'), true)
+  assert.equal(FakeCloneClient.databases.has(control), false)
+  for (const name of names) assert.equal(FakeCloneClient.databases.has(name), false)
+  assert.ok(FakeCloneClient.statements.every(({ sql }) => !sql.startsWith('DROP DATABASE IF EXISTS')))
 })
 
 test('the default runner buffers a suite\'s output and reports its exit status', async () => {

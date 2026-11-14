@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
 import type { EditorView } from "@tiptap/pm/view"
 import { useTranslations } from "next-intl"
+import { isLegacyTaskInstruction } from '@/lib/task-description'
+import { issueContentToMarkdown } from '@/lib/linear-sync/markdown'
 import { IssueActivity } from './issue-activity'
 import { useEditor, useEditorState, type JSONContent } from "@tiptap/react"
 import { createEditorExtensions, readableIssueContent } from "./issue-editor-schema"
@@ -11,6 +13,8 @@ import { Collaboration } from "@tiptap/extension-collaboration"
 import { ySyncPluginKey } from "@tiptap/y-tiptap"
 import * as Y from "yjs"
 import { Check, FileText, MessageSquare, X } from "lucide-react"
+import { flushSync } from "react-dom"
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -58,6 +62,13 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
   const label = labelProp ?? t('descriptionLabel')
   // Without a shared doc the editor renders `content` directly; content the schema rejects stays read-only and is never echoed back.
   const [initialContent] = useState(() => content === undefined ? EMPTY_DOCUMENT : readableIssueContent(content))
+  // Legacy task creators could store the complete execution contract as Markdown in a paragraph.
+  // Decide once from the stored document so typing into the open editor cannot collapse it.
+  const [foldInstructions] = useState(() => {
+    if (layout !== 'issue' || compact || !initialContent) return false
+    return isLegacyTaskInstruction(issueContentToMarkdown(initialContent))
+  })
+  const [instructionsOpen, setInstructionsOpen] = useState(false)
   const unreadable = !sharedDoc && initialContent === null
   // Read-only shows no typing hint, including on the empty document that stands in for unreadable content.
   const placeholder = disabled || unreadable ? null : compact ? t('placeholderCompact') : t('placeholderFull')
@@ -188,7 +199,10 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
       let from: number | undefined
       let to = 0
       editor.state.doc.descendants((node, pos) => { if (node.isText && node.marks.some(mark => mark.type.name === 'comment' && mark.attrs.id === id)) { from ??= pos; to = pos + node.nodeSize } })
-      if (from !== undefined) editor.chain().focus().setTextSelection({ from, to }).scrollIntoView().run()
+      if (from !== undefined) {
+        if (foldInstructions && !instructionsOpen) flushSync(() => setInstructionsOpen(true))
+        editor.chain().focus().setTextSelection({ from, to }).scrollIntoView().run()
+      }
     },
   }
 
@@ -196,8 +210,8 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
     <RichTextContent editor={editor} className={cn('min-h-28 px-4 py-2 sm:pl-16', RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE)} />
   </section>
 
-  if (compact || layout === 'description' || layout === 'issue') return <TooltipProvider delay={300}>
-    <section aria-label={t('editorAria', { label })} className="flex min-w-0 flex-col gap-2">
+  if (compact || layout === 'description' || layout === 'issue') {
+    const description = <section aria-label={t('editorAria', { label })} className="flex min-w-0 flex-col gap-2">
       <div className={cn('min-w-0 [--frame-panel-header-px:--spacing(2)] [--frame-panel-header-py:--spacing(2)]', layout === 'description' ? '[&>[role=toolbar]]:rounded-lg [&>[role=toolbar]]:border' : layout === 'issue' ? '' : 'rounded-lg border')}>
         {layout !== 'issue' && <FormattingToolbar editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} />}
         <div ref={pageRef} className="relative min-w-0">
@@ -215,10 +229,16 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
         {commentError && <FieldError className="text-xs">{commentError}</FieldError>}
       </div>}</>}
     </section>
-    {layout === 'issue' && !compact && afterDescription}
-    {layout === 'issue' && !compact && issueId && (renderActivity ? renderActivity({ issueId, ...discussions }) : <IssueActivity issueId={issueId} events={activity} {...discussions} />)}
-    <DeleteTableDialog editor={editor} open={deleteTableOpen} onOpenChange={setDeleteTableOpen} />
-  </TooltipProvider>
+    return <TooltipProvider delay={300}>
+      {foldInstructions ? <Collapsible open={instructionsOpen} onOpenChange={setInstructionsOpen}>
+        <CollapsibleTrigger className="cursor-pointer text-sm text-muted-foreground">{t('executionInstructions')}</CollapsibleTrigger>
+        <CollapsibleContent keepMounted>{description}</CollapsibleContent>
+      </Collapsible> : description}
+      {layout === 'issue' && !compact && afterDescription}
+      {layout === 'issue' && !compact && issueId && (renderActivity ? renderActivity({ issueId, ...discussions }) : <IssueActivity issueId={issueId} events={activity} {...discussions} />)}
+      <DeleteTableDialog editor={editor} open={deleteTableOpen} onOpenChange={setDeleteTableOpen} />
+    </TooltipProvider>
+  }
 
   return <TooltipProvider delay={300}><section aria-label={t('editorAria', { label: t('descriptionLabel') })} className="overflow-hidden rounded-lg border bg-background">
     <div className="flex flex-wrap items-center justify-between gap-2 bg-muted/20 px-3 py-2">

@@ -2,7 +2,7 @@ import { Client } from 'eve/client'
 import { api, type ApiConnection } from './api'
 import { eveClientOptions } from './eve-client'
 import { acceptTaskDelivery, backlogTaskDraft } from '../../../lib/task-create-form'
-import { DESKTOP_RPC_VERSION } from '../../../lib/desktop-rpc/wire'
+import { DESKTOP_RPC_VERSION } from '../../../lib/desktop-rpc/version'
 import type { CreateOnlyCommand, DispatchReceiptInput, DispatchedTaskReceipt } from '../../../lib/task-create-command'
 
 export type TaskCreationIntent = 'create_only' | 'create_and_dispatch'

@@ -23,13 +23,14 @@ export const sourceSuites = {
     'scripts/acceptance/team-workspace.mjs',
     'packages/daemon/harness/pins.json',
     'lib/smoke-account.ts',
+    'lib/account/avatar-file.ts',
+    'lib/desktop-rpc/version.ts',
     'lib/desktop-rpc/wire.ts',
   ],
 }
 
 export const jobs = {
   ...sourceSuites,
-  'eve-host-build': ['cloudflare/eve-runtime/test/compiled-host.mjs'],
   'postgres-policy': ['drizzle/20261029011701_cli_run_policy.sql'],
 }
 

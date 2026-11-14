@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { taskFactoryEvents } from './task-factory-events'
+import { taskFactoryEvents, taskFactoryProgress } from './task-factory-events'
 
 test('a gate transition keeps its actual revision and a hidden historical attempt cannot become an event', () => {
   const common = { createdAt: '2026-11-09T01:00:00Z', stage: 'review', status: 'passed', attemptId: 'visible', receiptCandidateId: 'candidate' }
@@ -46,4 +46,29 @@ test('revoked, foreign and malformed Factory receipts do not become Task activit
     factoryTaskId: 'active', runId: 'producer', candidateId: 'candidate', attemptId: 'attempt', artifactId: 'artifact', version: 2, title: 'Report', evidenceKind: 'document' }
   assert.deepEqual(presentedFactoryEvents([event, { ...event, version: -1 }, { ...event, runId: null }, { ...event, factoryTaskId: 'other' }], 'active'), [event])
   assert.deepEqual(presentedFactoryEvents([event], undefined), [])
+})
+
+test('progress folds visible gates per run, retains retries and keeps pre-dispatch work separate', () => {
+  const at = '2026-11-09T01:00:00Z'
+  const attempts = [{ id: 'a', runId: 'run', candidateId: null }, { id: 'b', runId: null, candidateId: null }]
+  const gates = [
+    { id: 'started', revision: 1, attemptId: 'a', stage: 'execute', status: 'running' },
+    { id: 'failed', revision: 2, attemptId: 'a', stage: 'verify', status: 'failed' },
+    { id: 'retried', revision: 3, attemptId: 'a', stage: 'execute', status: 'running' },
+    { id: 'unbound', revision: 4, attemptId: 'b', stage: 'review', status: 'pending' },
+    { id: 'unassigned', revision: 5, attemptId: null, stage: 'clarify', status: 'pending' },
+    { id: 'hidden', revision: 6, attemptId: 'foreign', stage: 'publish', status: 'passed' },
+  ].map(gate => ({ ...gate, createdAt: at }))
+  const receipts = taskFactoryEvents('factory', gates, attempts, [
+    { id: 'doc', kind: 'document', title: 'Report', createdAt: at, runId: 'run', attemptId: 'a' },
+  ])
+  const items = taskFactoryProgress(receipts.toReversed())
+  assert.equal(items.length, 3)
+  const run = items.find(item => item.runId === 'run')!
+  assert.deepEqual(run.steps.map(gate => gate.sourceId), ['started', 'failed', 'retried'])
+  assert.equal(run.current.sourceId, 'retried')
+  assert.deepEqual(items.filter(item => !item.runId).map(item => item.current.sourceId).sort(), ['unassigned', 'unbound'])
+  const otherTask = taskFactoryEvents('other', gates, attempts, [])
+  assert.equal(taskFactoryProgress([...receipts, ...otherTask]).length, 6)
+  assert.equal(JSON.stringify(items).includes('foreign'), false)
 })

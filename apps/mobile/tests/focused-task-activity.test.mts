@@ -3,7 +3,7 @@ import test, { mock } from 'node:test'
 
 const issue = '00000000-0000-4000-8000-000000000001', workspace = '00000000-0000-4000-8000-000000000002'
 const factoryId = '00000000-0000-4000-8000-000000000003'
-let context = 'origin', capability = true, entitled = true, revoked = false, swap = false
+let combined = false, context = 'origin', capability = true, entitled = true, revoked = false, swap = false
 let requests: { path: string; body?: Record<string, unknown> }[] = []
 const source = { version: 1, task: { id: factoryId, issueId: issue }, events: [{ kind: 'evidence', sourceId: 'immutable-version' }] }
 class ApiError extends Error { constructor(readonly status: number, readonly code: string) { super(code) } }
@@ -11,7 +11,7 @@ mock.module(new URL('../lib/api.ts', import.meta.url).href, { namedExports: {
   ApiError, apiConnection: () => ({ context }), api: async (path: string, config: { body?: Record<string, unknown> }, connection: { context: string }) => {
     assert.equal(connection.context, 'origin')
     requests.push({ path, body: config.body })
-    if (path === '/task') return { task: { id: issue }, live: { workspaceId: workspace, ...(capability ? { factoryActivityVersion: 1 } : {}) } }
+    if (path === '/task?work=1') return { ...(combined ? { work: {version: 1, linkedChats: [], pullRequests: []} } : {}), task: { id: issue }, live: { workspaceId: workspace, ...(capability ? { factoryActivityVersion: 1 } : {}) } }
     if (path === '/api/mobile/task-presentations') {
       if (swap) context = 'other'
       return { version: 1, workspaceId: workspace, items: { [issue]: { primaryStatus: 'todo', ...(capability && entitled ? { factoryTaskId: factoryId } : {}) } } }
@@ -45,4 +45,13 @@ test('only the selected Task with a confirmed Factory identity reads evidence, o
   requests = []; revoked = false; swap = true
   await assert.rejects(() => readPresentedTask('/task'), /workspaceAccessDenied/)
   assert.equal(requests.length, 2, 'no evidence request after an account change')
+})
+
+test('the versioned task work response needs only the authorized detail request', async () => {
+  context = 'origin'; swap = false; combined = true; requests = []
+  try {
+    const result = await readPresentedTask('/task')
+    assert.deepEqual(result.work, { version: 1, linkedChats: [], pullRequests: [] })
+    assert.deepEqual(requests.map(request => request.path), ['/task?work=1'])
+  } finally { combined = false }
 })

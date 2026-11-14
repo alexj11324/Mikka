@@ -48,7 +48,26 @@ test('PG17: independent clients serialize rotating refresh and protect callback 
     throw new Error('Unexpected fixed cloud endpoint')
   }
   const first = new CloudClientStore(pool, env, fetcher), second = new CloudClientStore(pool, env, fetcher)
+  const missing = await first.view('person', false)
+  assert.equal(missing.registered, false)
+  assert.equal(missing.pushContent, 'full')
   await first.register('Test installation')
+  await t.test('status reads the verified registration once and keeps its push policy for each viewer', async t => {
+    await first.setPushContent('reminder')
+    const reads = t.mock.method(pool, 'query')
+    const personal = await first.view('person', false)
+    const admin = await first.view('person', true)
+    const queries = reads.mock.calls.map(call => String(call.arguments[0]))
+    reads.mock.restore()
+    assert.equal(personal.serverId, null)
+    assert.equal(admin.serverId, serverId)
+    assert.equal(personal.pushContent, 'reminder')
+    assert.equal(admin.pushContent, 'reminder')
+    const wrongKey = new CloudClientStore(pool, { ...env, WORKSPACE_SECRETS_KEY: randomBytes(32).toString('base64') }, fetcher)
+    await assert.rejects(wrongKey.view('person', false), { code: 'cloud_unavailable' })
+    assert.equal(queries.filter(sql => sql.includes('FROM cloud_service_registration')).length, 2)
+    assert.equal(queries.filter(sql => sql.includes('FROM cloud_service_bindings')).length, 2)
+  })
   const authorize = new URL((await first.beginBinding('person', 'session-one', ['github'])).url)
   challenge = authorize.searchParams.get('code_challenge')!
   const state = authorize.searchParams.get('state')!

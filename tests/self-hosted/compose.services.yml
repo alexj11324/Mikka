@@ -10,6 +10,7 @@ x-application: &application
   CREDENTIAL_MASTER_KEY: ${SELF_HOSTED_FIXTURE_KEY:?Generate a disposable fixture key}
   CRON_SECRET: ${SELF_HOSTED_FIXTURE_KEY:?Generate a disposable fixture key}
   MIKKA_EXTERNAL_CRON: '1'
+  WORKFLOW_POSTGRES_URL: postgres://mikka:${POSTGRES_PASSWORD:?Generate a disposable database password}@postgres:5432/mikka
   MIKKA_EMAIL_FROM: Self-hosted acceptance <login@selfhost.example.test>
   SMTP_URL: smtp://mailpit:1025
   RESEND_API_KEY: ''
