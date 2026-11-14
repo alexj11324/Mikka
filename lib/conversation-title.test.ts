@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { conversationTitlePlan, manualConversationTitle } from './conversation-title'
+import { conversationTitlePlan, effectiveTitleSettings, manualConversationTitle, titleTriggerAllows } from './conversation-title'
 
 const none = { title: null, titleSource: null }
 const generated = { title: '登录回调修复', titleSource: 'generated' as const }
@@ -32,4 +32,25 @@ test('a title a person types is held to the short-title bound', () => {
   assert.equal([...manualConversationTitle('修复登录后的工作区前缀和查询参数丢失问题')!].length, 12)
   assert.equal(manualConversationTitle('Fix the workspace prefix that is lost after sign in'), 'Fix the workspace prefix that is')
   assert.equal(manualConversationTitle('   '), null)
+})
+
+test('Capy\'s thread-title settings: workspace instructions then the member\'s, the member\'s triggers else the workspace\'s', () => {
+  const rows = [
+    { userId: '', instructions: 'Prefix titles with the customer name when one is mentioned', triggers: 'pull_opened' as const },
+    { userId: 'u1', instructions: '  Use English  ', triggers: null },
+    { userId: 'u2', instructions: '', triggers: 'first_run_ended' as const },
+  ]
+  assert.deepEqual(effectiveTitleSettings(rows, 'u1'), { instructions: ['Prefix titles with the customer name when one is mentioned', 'Use English'], triggers: 'pull_opened' })
+  assert.deepEqual(effectiveTitleSettings(rows, 'u2'), { instructions: ['Prefix titles with the customer name when one is mentioned'], triggers: 'first_run_ended' })
+  assert.deepEqual(effectiveTitleSettings([], 'u3'), { instructions: [], triggers: 'either' })
+})
+
+test('creation and Regenerate always name; the other triggers follow the setting', () => {
+  for (const triggers of ['first_run_ended', 'pull_opened', 'either'] as const) {
+    assert.equal(titleTriggerAllows('created', triggers), true)
+    assert.equal(titleTriggerAllows('regenerate', triggers), true)
+  }
+  assert.equal(titleTriggerAllows('first_run_ended', 'pull_opened'), false)
+  assert.equal(titleTriggerAllows('pull_opened', 'first_run_ended'), false)
+  assert.equal(titleTriggerAllows('pull_opened', 'either'), true)
 })

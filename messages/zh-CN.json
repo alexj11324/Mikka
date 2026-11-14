@@ -3455,6 +3455,24 @@
       "restore": "恢复",
       "copyFiles": "复制到工作树的文件，每行一个",
       "approveSetup": "新工作树启动时运行这些准备步骤"
+    },
+    "conversationTitles": {
+      "title": "对话标题",
+      "instructions": "标题说明",
+      "instructionsMine": "Mikka 给你发起的对话起名时，在工作区说明之外再遵循这些",
+      "instructionsWorkspace": "Mikka 给这个工作区里每段对话起名时遵循这些",
+      "placeholder": "提到客户时，在标题前加上客户名",
+      "saved": "标题说明已保存",
+      "cleared": "标题说明已清除",
+      "saveError": "标题说明保存失败",
+      "triggers": "重新生成标题的时机",
+      "triggersHint": "手动设置的标题会保留",
+      "firstRunEnded": "Mikka 完成第一条消息时",
+      "pullOpened": "打开 PR 时",
+      "either": "任一发生时",
+      "workspaceDefault": "工作区默认",
+      "triggersError": "重新生成时机更新失败",
+      "loadError": "对话标题设置读取失败"
     }
   },
   "TelegramBot": {

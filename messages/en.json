@@ -3455,6 +3455,24 @@
       "restore": "Restore",
       "copyFiles": "Files to copy into the worktree, one per line",
       "approveSetup": "Run this setup when a new worktree starts"
+    },
+    "conversationTitles": {
+      "title": "Thread titles",
+      "instructions": "Title instructions",
+      "instructionsMine": "How Mikka names the conversations you start, on top of the workspace's instructions",
+      "instructionsWorkspace": "How Mikka names every conversation started in this workspace",
+      "placeholder": "Prefix titles with the customer name when one is mentioned",
+      "saved": "Title instructions saved",
+      "cleared": "Title instructions cleared",
+      "saveError": "Could not save title instructions",
+      "triggers": "Regenerate the title when",
+      "triggersHint": "Titles you set by hand are kept",
+      "firstRunEnded": "Mikka finishes the first message",
+      "pullOpened": "A pull request opens",
+      "either": "Either happens",
+      "workspaceDefault": "Workspace default",
+      "triggersError": "Could not update the title triggers",
+      "loadError": "Could not load thread title settings"
     }
   },
   "TelegramBot": {

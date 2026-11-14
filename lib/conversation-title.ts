@@ -11,6 +11,33 @@
 import { cleanShortTitle, isCjk } from './short-title'
 
 export type ConversationTitleTrigger = 'created' | 'first_run_ended' | 'pull_opened' | 'regenerate'
+/** Capy's "Regenerate the title when": the first message is finished, a pull request opens, or either. */
+export type ConversationTitleTriggers = 'first_run_ended' | 'pull_opened' | 'either'
+export const CONVERSATION_TITLE_TRIGGERS: readonly ConversationTitleTriggers[] = ['first_run_ended', 'pull_opened', 'either']
+export const DEFAULT_TITLE_TRIGGERS: ConversationTitleTriggers = 'either'
+export const TITLE_INSTRUCTIONS_MAX = 1000
+
+/** A workspace's row (`userId` '') and the member's own, as stored. */
+export type ConversationTitleSettingRow = { userId: string; instructions: string; triggers: ConversationTitleTriggers | null }
+
+/** The settings that apply to a member: the workspace's instructions, then theirs; their triggers, else the workspace's. */
+export function effectiveTitleSettings(rows: readonly ConversationTitleSettingRow[], userId: string) {
+  const workspace = rows.find(row => row.userId === '')
+  const own = rows.find(row => row.userId === userId && userId !== '')
+  return {
+    instructions: [workspace?.instructions ?? '', own?.instructions ?? ''].map(text => text.trim()).filter(Boolean),
+    triggers: own?.triggers ?? workspace?.triggers ?? DEFAULT_TITLE_TRIGGERS,
+  }
+}
+
+/** Whether a trigger names the conversation under these settings. Creation and a person's Regenerate always do. */
+export function titleTriggerAllows(trigger: ConversationTitleTrigger, triggers: ConversationTitleTriggers) {
+  if (trigger === 'created' || trigger === 'regenerate') return true
+  return triggers === 'either' || triggers === trigger
+}
+
+/** $1 workspace, $2 member. */
+export const READ_TITLE_SETTINGS = `SELECT "userId", instructions, triggers FROM conversation_title_settings WHERE "workspaceId"=$1 AND "userId" IN ('', $2)`
 export type ConversationTitleSource = 'generated' | 'manual'
 type Stored = { title: string | null; titleSource: ConversationTitleSource | null }
 

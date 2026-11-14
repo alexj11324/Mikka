@@ -14,7 +14,6 @@ import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { githubPullRequestKey, readIssueMetadata, taskWorkOwner } from '@/lib/issue-metadata'
 import { taskRelationKinds } from './issue-relations'
 import { taskPullConversations } from './task-work-pulls'
-import { displayTaskTitle } from '@/lib/short-title'
 import { issueContentToMarkdown } from '@/lib/linear-sync/markdown'
 import { runBotId } from '@/lib/run-bot-name'
 import { taskSchedule, taskScheduleLabels, taskScheduleView } from '@/lib/task-block-runs'
@@ -135,7 +134,7 @@ async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: s
     : newest?.location === 'cloud' ? { kind: 'cloud' as const, name: 'Cloud' } : null
   return {
     task: {
-      id, identifier: identifiers.get(id) ?? null, title: displayTaskTitle({ ...issue, shortTitle: issue.shortTitleFrom === issue.title ? issue.shortTitle : null }), description: issueContentToMarkdown(issue.content).trim() || null,
+      id, identifier: identifiers.get(id) ?? null, title: issue.title, description: issueContentToMarkdown(issue.content).trim() || null,
       workOwner: owner ? { kind: owner.kind, name: owner.name } : null,
       status: issue.status, priority: issue.priority, ...taskStateOf(task, newest, { block, schedule }), bot: newest?.bot ?? null,
       replyRunId: latestConversationRun(runs),

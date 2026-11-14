@@ -1656,7 +1656,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "a4e42915e622d356d02f19efe475505c07913229cdecdb469100df40be20d8c4"
+      "sourceHash": "1469260962c79b5f754b9f2b8b7bb0c452a01522440110c8215bd2da7db3bd95"
     },
     {
       "path": "/mikka/api/mobile/tasks/[id]",
@@ -2242,7 +2242,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "3dbb26c634a17d89496fb59171a2aa0da9cfbaa90c0e672ec9fe611a66765195"
+      "sourceHash": "5462d666bfcc1f318f20e5320d938079dec2896f028445a0541fb976150dbc89"
     },
     {
       "path": "/mikka/api/skills",

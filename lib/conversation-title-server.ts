@@ -5,10 +5,10 @@ import { pool } from '@/lib/db'
 import { defaultModelAvailable } from '@/lib/default-model'
 import { runListChanged } from '@/lib/live/lists'
 import { readRunChain } from '@/lib/run-chain'
-import { conversationTitlePlan, manualConversationTitle, READ_CHAIN_TITLE, WRITE_CONVERSATION_TITLE, type ConversationTitleSource, type ConversationTitleTrigger } from './conversation-title'
+import { conversationTitlePlan, effectiveTitleSettings, manualConversationTitle, READ_CHAIN_TITLE, READ_TITLE_SETTINGS, titleTriggerAllows, WRITE_CONVERSATION_TITLE, type ConversationTitleSettingRow, type ConversationTitleSource, type ConversationTitleTrigger } from './conversation-title'
 
 type Query = { query: (text: string, values?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> }
-type Generate = (ownerId: string, text: { title: string; body: string }, workspaceId: string) => Promise<string | null>
+type Generate = (ownerId: string, text: { title: string; body: string }, workspaceId: string, naming?: readonly string[]) => Promise<string | null>
 
 /**
  * What the model names a conversation from: only the recorded task range of its prompt (lib/run-bot-name.ts; never
@@ -43,6 +43,9 @@ export async function nameConversation(database: Query, runId: string, ownerId: 
   const input = await withConversationWorkspace(ownerId, tenant, async () => {
     const run = (await database.query(READ_RUN, [runId, ownerId, tenant])).rows[0] as { title: string | null; titleSource: ConversationTitleSource | null; asked: string; summary: string } | undefined
     if (!run) return null
+    // Capy's "Thread titles" settings: the workspace's and the member's instructions, and when a title is written again.
+    const settings = effectiveTitleSettings((await database.query(READ_TITLE_SETTINGS, [tenant, ownerId])).rows as ConversationTitleSettingRow[], ownerId)
+    if (!titleTriggerAllows(trigger, settings.triggers)) return null
     const runIds = await chainOf(database, ownerId, runId)
     const chain = ((await database.query(READ_CHAIN_TITLE, [runIds, ownerId])).rows[0] ?? { title: null, titleSource: null }) as { title: string | null; titleSource: ConversationTitleSource | null }
     const plan = conversationTitlePlan(trigger, run, chain, runIds.length)
@@ -55,11 +58,11 @@ export async function nameConversation(database: Query, runId: string, ownerId: 
     if (!first) return null
     const pullRequest = trigger === 'created' ? undefined : (await database.query(READ_PULL_REQUEST, [runIds])).rows[0] as { title: string } | undefined
     const body = [rest.join('\n'), trigger === 'created' ? '' : run.summary, pullRequest?.title ? `Pull request: ${pullRequest.title}` : ''].filter(Boolean).join('\n\n')
-    return { kind: 'generate' as const, first, body, chain, runIds }
+    return { kind: 'generate' as const, first, body, chain, runIds, naming: settings.instructions }
   })
   if (!input || input.kind === 'copied') return input?.title ?? null
   // The model runs outside the membership lock. Re-admit before persisting its result.
-  const title = await generate(ownerId, { title: input.first, body: input.body }, tenant)
+  const title = await generate(ownerId, { title: input.first, body: input.body }, tenant, input.naming)
   if (!title) return null
   const changed = await withConversationWorkspace(ownerId, tenant, () => write(database, ownerId, tenant, input.runIds, title, 'generated',
     trigger === 'regenerate', input.chain.titleSource === 'manual' ? input.chain.title : null))

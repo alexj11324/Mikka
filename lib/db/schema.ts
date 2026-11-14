@@ -99,6 +99,18 @@ export const issuePrefixes = pgTable('issue_prefixes', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
+/**
+ * How conversations are named (Capy's "Thread titles"): `userId` '' is the workspace default, a member's row adds their
+ * instructions and, unless `triggers` is null, their own choice of when a generated title is written again.
+ */
+export const conversationTitleSettings = pgTable('conversation_title_settings', {
+  workspaceId: uuid('workspaceId').notNull(),
+  userId: text('userId').notNull().default(''),
+  instructions: varchar('instructions', { length: 1000 }).notNull().default(''),
+  triggers: text('triggers').$type<'first_run_ended' | 'pull_opened' | 'either'>(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.workspaceId, table.userId] })])
+
 /** A successful issue mutation and its Workflow retry identity commit together. */
 export const issueToolCalls = pgTable('issue_tool_calls', {
   userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
