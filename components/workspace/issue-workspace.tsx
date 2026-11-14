@@ -300,13 +300,15 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   function openPanel() { showPanel(true); if (!window.matchMedia('(min-width: 80rem)').matches) setPanelSheet(true) }
   function showPanel(next: boolean) { setPanelOpen(next); try { window.localStorage.setItem('mikka:context-panel', next ? '1' : '0') } catch { /* storage unavailable */ } }
   // The app-wide browser (top bar 🌐): while open it takes the right panel's place.
-  const [browserOpen, setBrowserOpen] = useState(false)
-  // Not inside a frame: the app opened in its own browser must not open another one.
-  useEffect(() => { try { if (window.self === window.top && window.localStorage.getItem('mikka:browser') === '1') setBrowserOpen(true) } catch { /* storage unavailable */ } }, [])
-  // Below lg the toggle is hidden, so the browser counts as closed and the right panel stays.
+  const [browserMode, setBrowserMode] = useState<'closed' | 'column' | 'address'>('closed')
+  // A stored desktop layout should not open a sheet on a phone or a browser inside itself.
+  useEffect(() => { try { if (window.self === window.top && window.localStorage.getItem('mikka:browser') === '1') setBrowserMode('column') } catch { /* storage unavailable */ } }, [])
   const browserFits = useBrowserFits()
-  const browserShown = browserOpen && browserFits
-  function showBrowser(next: boolean) { setBrowserOpen(next); try { window.localStorage.setItem('mikka:browser', next ? '1' : '0') } catch { /* storage unavailable */ } }
+  const browserShown = browserMode !== 'closed' && browserFits
+  function showBrowser(mode: typeof browserMode) {
+    setBrowserMode(mode)
+    try { window.localStorage.setItem('mikka:browser', mode === 'closed' ? '0' : '1') } catch { /* storage unavailable */ }
+  }
   const [teamId, setTeamId] = useState<string | null>(() => readLocation(params).team)
   const activeTeam = teams.find(team => team.id === teamId)
   const [section, setSection] = useState<WorkspaceSection>(() => { const at = readLocation(params); return at.team || at.group ? at.section : initialSection })
@@ -674,20 +676,20 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   // conversation's own work area; nothing stands beside the chat. Both wait folded until asked for: the work area's
   // + (its Tools), ⌘⇧B for the browser, or the phone's chat pill for the Overview.
   const panelsInFrame = FRAME_OWNS_PANEL && isConversation
-  // One address opener serves chat tabs and the existing browser column on other pages.
+  // One address opener serves chat tabs and the responsive browser on other pages.
   useEffect(() => {
     if (!browserRequestVersion || handledBrowserRequest.current === browserRequestVersion) return
     handledBrowserRequest.current = browserRequestVersion
     if (panelsInFrame) setPanelReveal(value => ({ reveal: value.reveal + 1, revealId: 'browser' }))
     else {
       if (threadId || taskId || threadsView) navigateWorkspace({ thread: null, task: null, threads: null }, 'replace')
-      showBrowser(true)
+      showBrowser('address')
     }
   }, [browserRequestVersion, panelsInFrame, threadId, taskId, threadsView])
   const conversationPanels = panelsInFrame ? { ...panelReveal, onActiveTask: onActiveWorkTask, tabs: [
     { id: 'overview' as const, title: i18nText('Shell.panel.overview'), content: <ContextPanel key="context-panel" sheet frameTab workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} threadsLoading={threadsLoading} onOpenThread={thread => openThread(thread.runId)} onClose={() => {}}
       conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { id: coordinatorBot?.id, name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: botChatSummaries && coordinatorBot ? botChatSummaries.items[coordinatorBot.id]?.at ?? undefined : undefined }} /> },
-    { id: 'browser' as const, title: i18nText('Browser.label'), content: <BrowserPane inTab onClose={() => showBrowser(false)} /> },
+    { id: 'browser' as const, title: i18nText('Browser.label'), content: <BrowserPane inTab onClose={() => showBrowser('closed')} /> },
   ] } : undefined
   const savedSessions = new Map((agentHistory?.sessions ?? []).map(session => [session.id, session]))
   for (const session of liveSessions) savedSessions.set(session.id, { ...session, preview: session.preview ?? savedSessions.get(session.id)?.preview })
@@ -738,7 +740,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   }
   searchFromBarRef.current = searchFromBar
   const browserFromSettings = () => {
-    closeSettings(); showBrowser(true)
+    closeSettings(); showBrowser('column')
     if (pathname.startsWith('/settings') && !pushSettingsHistory('/')) router.push('/')
   }
   const settingsContent = pathname.startsWith('/settings')
@@ -750,7 +752,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   return <TaskPresentationsContext value={visiblePresentations}><TaskCardDataProvider key={JSON.stringify([user.id, listWorkspaceId])} ownerId={user.id} workspaceId={listWorkspaceId}><SignOutBoundary pending={signingOut}><EmbeddedTaskLifecycle value={embeddedLifecycle}><ComputerAgentsProvider><BrowserNotesProvider>{settingsShown && ownSettingsFrame
     ? <SettingsFrame user={user} onRail={leaveSettings} onBack={backFromSettings} onSearch={searchFromBar} onBrowser={browserFromSettings} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>{settingsContent}</SettingsFrame>
     : <AppFrame settings={settingsShown}
-    bar={FRAME_OWNS_HEADER ? <WindowBar center={null} /> : <WindowBar center={<SearchPill onSearch={searchFromBar} />} trailing={<>{!settingsShown && (isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}{!settingsShown && <AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} pending={tasksPending} onToggle={() => toggleAllThreads(!threadsView)} />}<BrowserToggle open={!settingsShown && browserShown && !threadsView} onToggle={settingsShown ? browserFromSettings : () => { if (threadsView) { toggleAllThreads(false); showBrowser(true) } else showBrowser(!rightTaken) }} /></>} />}
+    bar={FRAME_OWNS_HEADER ? <WindowBar center={null} /> : <WindowBar center={<SearchPill onSearch={searchFromBar} />} trailing={<>{!settingsShown && (isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}{!settingsShown && <AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} pending={tasksPending} onToggle={() => toggleAllThreads(!threadsView)} />}<BrowserToggle open={!settingsShown && browserShown && !threadsView} onToggle={settingsShown ? browserFromSettings : () => { if (threadsView) { toggleAllThreads(false); showBrowser('column') } else showBrowser(rightTaken ? 'closed' : 'column') }} /></>} />}
     rail={<IconRail active={settingsShown ? null : rail} onNavigate={settingsShown ? leaveSettings : openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={settingsShown ? undefined : beforeChange} chats={{ workspaceId: workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null, entries: chatNav, onOpen: openChat, onNewBot: () => setCreatingBot(true), onNewGroup: () => setCreatingGroup(true) }} onSearch={searchFromBar} inboxCount={inboxItems} />}>
     {settingsShown ? settingsContent
       : <>
@@ -771,7 +773,15 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
           </Button>
         </div>}
     </AppShellContent>
-    {browserShown && !threadShown && !threadsView && !panelsInFrame && <BrowserPane onClose={() => showBrowser(false)} />}
+    {browserShown && !threadShown && !threadsView && !panelsInFrame && <BrowserPane onClose={() => showBrowser('closed')} />}
+    {browserMode === 'address' && !browserFits && !panelsInFrame && <Sheet open onOpenChange={open => {
+      if (!open) showBrowser('closed')
+    }}>
+      <SheetContent side="right" instant showCloseButton={false} className="gap-0 p-0 data-[side=right]:w-full">
+        <SheetHeader className="sr-only"><SheetTitle>{i18nText('Browser.label')}</SheetTitle></SheetHeader>
+        <BrowserPane inTab onClose={() => showBrowser('closed')} />
+      </SheetContent>
+    </Sheet>}
     {threadShown && <ThreadColumn runId={threadShown} issueId={shownThread?.issueId} overList={!!threadsView} name={shownThread ? threadName(shownThread, tasks, '') : undefined} />}
     {taskShown && !threadShown && <TaskColumn issueId={taskShown} issue={tasks.find(task => task.id === taskShown)} threads={threads} overList={!!threadsView}>
       <EmbeddedTaskDetail key={taskShown} issueId={taskShown} origin={originLabel} onOpenTask={id => open(id)} onClose={closeTask} />
