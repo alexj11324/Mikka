@@ -500,13 +500,16 @@ test('a lost response followed by a competing Task edit preserves both the remot
   assert.equal(stored.title, 'Their newer title')
   assert.equal(title().value, 'My draft')
   assert.deepEqual(writes.map(write => write.revision), [1])
+  // The live transport can recover and notify SWR before the user chooses to retry.
+  await emit()
+  await until(() => properties().getAttribute('data-revision') === '3', 'the reconnect delivers the competing value')
   await act(async () => { assert.equal(await flush!(), false) })
   assert.equal(stored.title, 'Their newer title')
   assert.equal(title().value, 'My draft')
-  assert.deepEqual(writes.map(write => write.revision), [1, 1])
+  assert.deepEqual(writes.map(write => write.revision), [1])
   await act(async () => container.querySelector<HTMLButtonElement>('[data-retry-save]')!.click())
   await until(() => stored.title === 'My draft', 'the explicit retry uses the refreshed revision')
-  assert.deepEqual(writes.map(write => write.revision), [1, 1, 3])
+  assert.deepEqual(writes.map(write => write.revision), [1, 3])
 })
 
 test('a lost Task save response cannot be confirmed by the next signed-in account', async () => {

@@ -272,6 +272,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   const applyRead = useCallback((fresh: Issue) => {
     const previous = savedRef.current
     if (fresh.id !== previous.id || fresh.revision <= previous.revision) return
+    if (conflictingRead.current && fresh.revision > conflictingRead.current.revision) conflictingRead.current = fresh
     const current = draft.current
     const next = { ...current }
     // Only fields unchanged since the last server snapshot adopt its newer
@@ -308,7 +309,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   const save = useCallback((): Promise<boolean> => {
     if (locked) return Promise.resolve(false)
     if (flight.current) return flight.current
-    if (composing.current) return Promise.resolve(false)
+    if (composing.current || conflictingRead.current) return Promise.resolve(false)
     const operation = (async () => {
       const mustPersist = () => draft.current.generation !== acknowledged.current
       if (!mustPersist() && !sync?.getSnapshot().pending) return true
@@ -386,7 +387,10 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   }, [editSequence, syncState.ready, syncState.pending, syncState.error, save])
   function retryAutosave() {
     // Only a person's explicit retry may base their edited fields on a competing write.
-    if (conflictingRead.current) applyRead(conflictingRead.current)
+    if (conflictingRead.current) {
+      applyRead(conflictingRead.current)
+      conflictingRead.current = null
+    }
     void save()
   }
   function adopt(issue: Issue) {
