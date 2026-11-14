@@ -1,3 +1,5 @@
+import { builtinGateway } from '../../builtin-gateway/runtime';
+import { isolateCoordinatorWakes } from '../../../tests/support/coordinator-wake';
 import { measured, readMetrics } from '../../../tests/helpers/read-metrics';
 import type { ModelMessage } from 'ai';
 import { completeAttentionQuestions } from '../../coordinator/question-attention';
@@ -60,6 +62,7 @@ test(
   "PG17 execution questions: durable waiting, exact facts/human source, one continuation, rollback and stop fences",
   { skip: !dbURL, timeout: 120000 },
   async (t) => {
+    await isolateCoordinatorWakes(t);
     const fixtureURL = await isolatedPostgresURL(dbURL!);
     const schema = `questions_${randomUUID().replaceAll("-", "")}`;
     const admin = new Pool({ connectionString: fixtureURL, max: 1 });
@@ -1854,6 +1857,7 @@ test(
         },
       );
     } finally {
+      await builtinGateway()?.stop();
       await closeWorkspaceDatabase();
       await pool.end();
       await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
