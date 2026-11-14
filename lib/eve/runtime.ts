@@ -6,7 +6,7 @@ import { SubscriptionWorkflowModel } from '../subscription-workflow-model'
 import { assertEveScope, scopeFromAuth } from './scope'
 import { streamingModel } from './streaming-model'
 import { productRpc } from './product-rpc'
-import { prepareEveExecution } from './product-gateway'
+import { prepareEveExecution } from './product-definitions'
 
 // Eve memos belong to one definition. Session state shares the immutable
 // preparation across model, tools, connections, skills and instructions.

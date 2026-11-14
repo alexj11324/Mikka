@@ -79,8 +79,8 @@ function request(path = sessionId, headers: Record<string, string> = {}) {
   })
 }
 
-beforeEach(t => {
-  t.mock.property(process, 'env', { ...process.env, MIKKA_API_INGRESS: '', MIKKA_EVE_HOST: '', BETTER_AUTH_URL: 'https://app.test' })
+beforeEach(() => {
+  mock.property(process, 'env', { ...process.env, MIKKA_API_INGRESS: '', MIKKA_EVE_HOST: '', BETTER_AUTH_URL: 'https://app.test' })
   sessionReads = 0
   revoked = sendFails = false
   pauseAuthentication = undefined

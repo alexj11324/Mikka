@@ -21,7 +21,7 @@ mock.module(new URL('./scope.ts', import.meta.url).href, { namedExports: {
 mock.module(new URL('./product-rpc.ts', import.meta.url).href, { namedExports: {
   productRpc: async () => { throw new Error('unexpected product operation') },
 } })
-mock.module(new URL('./product-gateway.ts', import.meta.url).href, { namedExports: {
+mock.module(new URL('./product-definitions.ts', import.meta.url).href, { namedExports: {
   async prepareEveExecution() {
     prepareCalls++
     if (prepareFails) throw new Error('preparation unavailable')

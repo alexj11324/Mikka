@@ -89,7 +89,7 @@ mock.module(new URL('./product-tool.ts', import.meta.url).href, { namedExports: 
   },
 } })
 
-const { prepareEveExecution, productCatalogue } = await import('./product-gateway')
+const { prepareEveExecution, productCatalogue } = await import('./product-definitions')
 const { default: nativeProductTools } = await import('../../apps/eve/agent/tools/product')
 
 beforeEach(() => {

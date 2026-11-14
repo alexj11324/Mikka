@@ -1,7 +1,7 @@
 import {evaluationForSession,evaluationNativeTools} from '../../../../lib/eve/evaluation-runtime'
 import { defineDynamic } from 'eve/tools'
 import { executionForSession } from '../../../../lib/eve/runtime'
-import { productCatalogue } from '../../../../lib/eve/product-gateway'
+import { productCatalogue } from '../../../../lib/eve/product-definitions'
 import { createProductTool } from '../../../../lib/eve/product-tool'
 
 /** Product actions keep their existing ownership, billing and audit boundaries. */

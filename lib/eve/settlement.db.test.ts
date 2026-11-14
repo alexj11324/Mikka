@@ -222,7 +222,8 @@ test('host settlement receipts preserve product publication across native RPC re
     await t.test('the product catalogue skips only inapplicable Eve approval reviews', async t => {
       const { AgentKitStore } = await import('../agent-kit/store')
       const { DEFAULT_AGENT_DEFINITION } = await import('../agent-kit/builtin')
-      const { handleEveProductRequest, productCatalogue } = await import('./product-gateway')
+      const { handleEveProductRequest } = await import('./product-gateway')
+      const { productCatalogue } = await import('./product-definitions')
       const { createProductTool } = await import('./product-tool')
       const { scopeAuth } = await import('./scope')
       const store = new AgentKitStore(pool)
@@ -266,7 +267,7 @@ test('host settlement receipts preserve product publication across native RPC re
       const { AgentKitStore } = await import('../agent-kit/store')
       const { DEFAULT_AGENT_DEFINITION } = await import('../agent-kit/builtin')
       const { mailboxInputs } = await import('@mikka/protocol/mailbox')
-      const { productCatalogue } = await import('./product-gateway')
+      const { productCatalogue } = await import('./product-definitions')
       const { createRequestDatabaseScope } = await import('../db')
       const { Client } = await import('pg')
       const store = new AgentKitStore(pool)

@@ -3,14 +3,14 @@ import { randomBytes } from 'node:crypto'
 import test from 'node:test'
 import type { ApprovalConfiguration } from 'eve/tools/approval'
 import { createProductTool } from './product-tool'
-import { productRpc, type ProductOperation } from './product-rpc'
+import { productRpc, type ProductCatalogueEntry, type ProductOperation } from './product-rpc'
 import { internalEveScope } from './auth'
 import { scopeAuth, type EveScope } from './scope'
 
 const scope = {ownerId:'owner',botId:'10000000-0000-4000-8000-000000000001',workspaceId:'10000000-0000-4000-8000-000000000002',surface:'web' as const}
 const binding = {sessionId:'wrun_fixture',turnId:'turn_0',executionId:'10000000-0000-4000-8000-000000000003'}
 const input = {recipient:'fixture@example.invalid',body:'Proposed message'}
-const definition = {name:'send_email',description:'Send mail',inputSchema:{type:'object'}}
+const definition: ProductCatalogueEntry = {name:'send_email',description:'Send mail',inputSchema:{type:'object'}}
 
 test('native product tool pauses through Eve with exact durable call/input binding',async()=>{
   const requests:ProductOperation[]=[]
