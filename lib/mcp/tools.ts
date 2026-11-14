@@ -194,14 +194,14 @@ export async function listRuns(userId: string, input: { issueId?: string; active
 }
 
 export async function getRun(userId: string, runId: string) {
-  const detail = await runs.readRun(userId, runId)
+  const detail = await runs.readRun(userId, runId, 'latest-events')
   if (!detail) return null
   const { run } = detail
   return {
     id: run.id, issueId: run.issueId, agent: run.agentName, harness: run.harness, status: run.status,
     stopReason: run.stopReason, error: run.error, summary: (run.report as { summary?: string } | null)?.summary ?? null,
     startedAt: run.startedAt?.toISOString() ?? null, finishedAt: run.finishedAt?.toISOString() ?? null,
-    recentEvents: detail.chunks.slice(-5).map(chunk => JSON.stringify(chunk).slice(0, 1000)),
+    recentEvents: detail.chunks.map(chunk => JSON.stringify(chunk).slice(0, 1000)),
     ...(detail.decisionWarnings?.length ? { decisionWarnings: detail.decisionWarnings } : {}),
   }
 }

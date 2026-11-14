@@ -4,11 +4,9 @@ import { workflowWakes } from '../wake'
 import { recoverWakeDeadlineStep } from './steps'
 
 /**
- * Only the original pending batch lives here; there is no idle per-Bot pump.
- * Each pass waits for the batch's persisted deadline (lease, backoff, or a
- * lease it waits behind), or for a writer releasing that lease to wake it
- * early (#1212). A pass rechecks exact row versions, so an early or duplicate
- * wake cannot claim anything before it is due.
+ * Resume a deadline already scheduled by the pre-Eve Coordinator. Keep the
+ * persisted Workflow and step names while those runs drain. The recovery step
+ * now wakes the ordinary product outbox and completes the old Workflow.
  */
 export async function coordinatorWakeDeadline(ticket: WakeDeadlineTicket) {
   'use workflow'

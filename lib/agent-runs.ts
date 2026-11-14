@@ -440,14 +440,16 @@ export function readRunMessages(userId: string, runIds: string[]) {
     .where(inArray(runMessages.runId, runIds)).orderBy(asc(runMessages.createdAt))
 }
 
-export async function readRun(userId: string, runId: string): Promise<RunDetail | null> {
+export async function readRun(userId: string, runId: string, history: 'full' | 'latest-events' = 'full'): Promise<RunDetail | null> {
   const [run] = await visibleRuns(userId, { runIds: [runId], limit: 1 })
   if (!run) return null
   // Empty agentId is the deliberately restricted teammate projection.
   if (!run.agentId) return { run, chunks: [], messages: [] }
-  const chunks = await db.select({ chunk: runChunks.chunk }).from(runChunks)
-    .where(eq(runChunks.runId, run.id)).orderBy(asc(runChunks.seq))
-  const messages = await readRunMessages(userId, [run.id])
+  const chunksForRun = db.select({ chunk: runChunks.chunk }).from(runChunks).where(eq(runChunks.runId, run.id))
+  const chunks = history === 'full'
+    ? await chunksForRun.orderBy(asc(runChunks.seq))
+    : (await chunksForRun.orderBy(desc(runChunks.seq)).limit(5)).reverse()
+  const messages = history === 'full' ? await readRunMessages(userId, [run.id]) : []
   const decisionWarnings = await runDecisionWarnings(pool, userId, run.id)
   return { run, chunks: chunks.map(row => row.chunk), messages, decisionWarnings }
 }
