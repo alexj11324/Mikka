@@ -13,6 +13,12 @@ export const THREAD_MACHINE_DUE_AT_SQL = `CASE
     OR m.lifecycle->>'observedStop' IS DISTINCT FROM (r."stopRequestedAt" IS NOT NULL)::text
     OR m.lifecycle->>'observedClosed' IS DISTINCT FROM (${THREAD_MACHINE_CLOSED_SQL})::text
     THEN now()
+  -- A restore can lose its create response. Wake at the restore cadence rather
+  -- than the full provisioning lease so a stuck restore is re-observed
+  -- promptly; the persisted operation is reconciled once its lease is no
+  -- longer live.
+  WHEN m.state='restore'
+    THEN LEAST(COALESCE(m."lifecycleAt",now()), COALESCE(m."restoreStartedAt",now())+interval '2 minutes')
   ELSE m."lifecycleAt" END`
 
 /** Reuses run-recovery's durable owner and slow lost-wake reconciliation.

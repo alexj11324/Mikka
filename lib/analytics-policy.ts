@@ -27,18 +27,19 @@ export function analyticsPath(pathname: string) {
 }
 
 export function sanitizeAnalyticsEvent<T extends { event: string; properties: Record<string, unknown> }>(event: T | null): T | null {
-  if (!event) return null
+  if (!event || event.event !== '$snapshot' && !allowedEvents.has(event.event)) return null
+  const browserType = event.properties.$browser_type
+  const classification = browserType === 'bot' || browserType === 'browser' ? { $browser_type: browserType } : {}
   // rrweb masks the DOM before serialization (instrumentation-client.ts).
   // Its transport needs the opaque snapshot payload and session identifiers;
   // ordinary event properties still go through the narrow allowlist below.
   if (event.event === '$snapshot') {
     const keys = new Set(['token', 'distinct_id', '$session_id', '$window_id', '$lib', '$lib_version', '$snapshot_bytes', '$snapshot_data'])
-    const snapshot = { ...event, properties: Object.fromEntries(Object.entries(event.properties).filter(([key]) => keys.has(key))) }
+    const snapshot = { ...event, properties: { ...Object.fromEntries(Object.entries(event.properties).filter(([key]) => keys.has(key))), ...classification } }
     for (const key of ['$set', '$set_once', '$unset']) Reflect.deleteProperty(snapshot, key)
     return snapshot
   }
-  if (!allowedEvents.has(event.event)) return null
-  const properties: Record<string, unknown> = Object.fromEntries(Object.entries(event.properties).filter(([key]) => allowedProperties.has(key)))
+  const properties: Record<string, unknown> = { ...Object.fromEntries(Object.entries(event.properties).filter(([key]) => allowedProperties.has(key))), ...classification }
   if (typeof event.properties.$current_url === 'string') {
     try {
       const url = new URL(event.properties.$current_url)

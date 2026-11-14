@@ -27,16 +27,47 @@ const backfilled = new Map<string, number>()
 const backfillFresh = (ownerId: string) => Date.now() - (backfilled.get(ownerId) ?? -Infinity) < BACKFILL_MS
 
 /** The person's personal workspace, created when they have none yet (as the app does on their first page). */
-export async function personalWorkspaceId(ownerId: string): Promise<string> {
+async function activePersonalWorkspaceId(ownerId: string): Promise<string | undefined> {
   const { workspacePool } = await import('@/lib/workspace-db')
-  const found = (await workspacePool.query<{ id: string }>(`SELECT w.id FROM mikka_workspaces w
+  return (await workspacePool.query<{ id: string }>(`SELECT w.id FROM mikka_workspaces w
       JOIN mikka_workspace_members m ON m."workspaceId"=w.id AND m."userId"=$1 AND m.status='active'
     WHERE w."userId"=$1 AND w.kind='personal' LIMIT 1`, [ownerId])).rows[0]?.id
-  if (found) return found
+}
+
+async function createPersonalWorkspace(ownerId: string): Promise<string> {
   const { pool } = await import('@/lib/db')
   const [person] = (await pool.query<{ id: string; email: string; name: string }>('SELECT id,email,name FROM "user" WHERE id=$1', [ownerId])).rows
   if (!person) throw Object.assign(new Error('workspaceAccessDenied'), { code: 'workspaceAccessDenied' })
   return (await import('@/lib/personal-workspace')).ensurePersonalWorkspace(person, 'zh-CN')
+}
+
+export async function personalWorkspaceId(ownerId: string): Promise<string> {
+  return await activePersonalWorkspaceId(ownerId) ?? await createPersonalWorkspace(ownerId)
+}
+
+async function personalCoordinatorForBackfill(ownerId: string): Promise<CoordinatorBot | null> {
+  // Membership belongs to the Workspace database. Read the legacy rows and
+  // coordinator in the application database only after finding the authorized Personal workspace.
+  const workspaceId = await activePersonalWorkspaceId(ownerId)
+  if (!workspaceId) return ensureFor(ownerId, await createPersonalWorkspace(ownerId))
+  const { pool } = await import('@/lib/db')
+  const found = (await pool.query<{ botId: string; legacyWork: boolean }>(`SELECT c."botId",
+      (EXISTS (SELECT 1 FROM coordinator_messages WHERE "userId"=$1 AND "botId" IS NULL)
+        OR EXISTS (SELECT 1 FROM coordinator_sessions WHERE "userId"=$1 AND "botId" IS NULL)
+        OR EXISTS (SELECT 1 FROM agent_runs WHERE "userId"=$1 AND "botId" IS NULL)
+        OR EXISTS (SELECT 1 FROM coordinator_events WHERE "userId"=$1 AND "botId" IS NULL)
+        OR EXISTS (SELECT 1 FROM factory_tasks WHERE "userId"=$1 AND "botId" IS NULL)
+        OR EXISTS (SELECT 1 FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=c."workspaceId" AND "botKey"='coordinator')
+        OR EXISTS (SELECT 1 FROM chat_preferences WHERE "userId"=$1 AND "chatKey"='coordinator')
+        OR EXISTS (SELECT 1 FROM user_schedules WHERE owner_id=$1 AND bot_id IS NULL)
+        OR EXISTS (SELECT 1 FROM suggestions WHERE "userId"=$1 AND "botId" IS NULL)
+        OR EXISTS (SELECT 1 FROM pending_actions WHERE "userId"=$1 AND "botId" IS NULL)
+        OR EXISTS (SELECT 1 FROM agent_kit_heads old_head WHERE old_head.owner_id=$1 AND old_head.bot_key='coordinator'
+          AND NOT EXISTS (SELECT 1 FROM agent_kit_heads current_head
+            WHERE current_head.owner_id=$1 AND current_head.bot_key=c."botId"::text))) AS "legacyWork"
+    FROM coordinator_bots c WHERE c."ownerId"=$1 AND c."workspaceId"=$2`, [ownerId, workspaceId])).rows[0]
+  if (found?.botId && found.legacyWork === false) return null
+  return ensureFor(ownerId, workspaceId)
 }
 
 async function ensureFor(ownerId: string, workspaceId: string): Promise<CoordinatorBot> {
@@ -67,8 +98,8 @@ export async function coordinatorBot(ownerId: string, workspaceId: string | null
     // locks now (lock_timeout) is retried on the next read; the chat stays usable meanwhile.
     try {
       const { pool } = await import('@/lib/db')
-      const personal = workspaceId ? await ensureFor(ownerId, await personalWorkspaceId(ownerId)) : bot
-      await backfillCoordinatorChat(pool, ownerId, personal)
+      const personal = workspaceId ? await personalCoordinatorForBackfill(ownerId) : bot
+      if (personal) await backfillCoordinatorChat(pool, ownerId, personal)
       backfilled.set(ownerId, Date.now())
     } catch (error) { console.error('Coordinator chat move deferred', { code: (error as { code?: string }).code }) }
   }

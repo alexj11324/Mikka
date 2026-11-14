@@ -34,5 +34,18 @@ export function readBatchOwnerRevisionKinds(actions: readonly BatchReadAction[])
     ? [ownerRevisionKinds[action as keyof typeof ownerRevisionKinds]] : []))]
 }
 
+/** These readers also observe the workspace their own membership check selected.
+ * A Personal-home plan never supplies that authority for a selected Team. */
+const workspaceRevisionKinds = {
+  'issues.syncIssueList': 'issue_list',
+  'task-runs.pollTaskRuns': 'task_run_list',
+  'task-runs.syncThreadList': 'thread_list',
+} as const
+
+export function readBatchWorkspaceRevisionKinds(actions: readonly BatchReadAction[]) {
+  return [...new Set(actions.flatMap(action => Object.hasOwn(workspaceRevisionKinds, action)
+    ? [workspaceRevisionKinds[action as keyof typeof workspaceRevisionKinds]] : []))]
+}
+
 export type ReadBatchCall = { action: BatchReadAction; args: unknown[] }
 export type ReadBatchItem = { ok: true; result: unknown } | { ok: false; status: number; error: { code: string } }

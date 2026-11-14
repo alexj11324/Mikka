@@ -17,6 +17,7 @@ import { stepIdentity } from './model-call-timing'
 import { CLEANUP_DUE_SQL, expireSubscriptionAcquisitions } from './subscription-acquire-expiry'
 import { ownerSettingsChanged } from './live/lists'
 import { measureSubscriptionNative } from './subscription-native-timing'
+import { codexPrioritySupport, subscriptionModelRequestPolicySchema, type CodexPrioritySupport, type SubscriptionCatalogueModel, type SubscriptionModelRequestPolicy } from './subscription-service-tier'
 
 // Matches modelRequestMaxBytes in the Go worker. The conversation's 100k
 // compaction estimate excludes the system prompt and tool schemas.
@@ -32,6 +33,7 @@ export interface SubscriptionCapabilities {
 }
 
 export class SubscriptionService {
+  private readonly modelRequestPolicy?: SubscriptionModelRequestPolicy
   constructor(readonly repository: SubscriptionRepository,
     readonly worker: (scope: ReturnType<SubscriptionRepository['scope']>) => SubscriptionWorkerClient,
     readonly capabilities: SubscriptionCapabilities,
@@ -42,9 +44,12 @@ export class SubscriptionService {
       await assertSubscriptionModelTransport(...args)
     },
     /** Active membership in the workspace database; a teammate's shared subscription needs it for both people. */
-    readonly member: (userId: string, workspaceId: string, borrowerId?: string) => Promise<void> = async () => { throw new SubscriptionRefusal('account_unavailable') }) {}
+    readonly member: (userId: string, workspaceId: string, borrowerId?: string) => Promise<void> = async () => { throw new SubscriptionRefusal('account_unavailable') },
+    modelRequestPolicy?: SubscriptionModelRequestPolicy) {
+    this.modelRequestPolicy = modelRequestPolicy === undefined ? undefined : subscriptionModelRequestPolicySchema.parse(modelRequestPolicy)
+  }
 
-  async access(use: SubscriptionUse, signal?: AbortSignal, modelOverride?: string | null): Promise<SubscriptionAccess> {
+  async access(use: SubscriptionUse, signal?: AbortSignal, modelOverride?: string | null, includePrioritySupport = false): Promise<SubscriptionAccess & { codexPrioritySupport?: CodexPrioritySupport }> {
     const { modelId: boundModelId, ...binding } = await this.repository.binding(use.ownerId, use.bindingId)
     if (binding.workspaceId !== use.workspaceId || binding.consumerId !== use.consumerId) throw new SubscriptionRefusal('binding_mismatch')
     await this.workspace(use.ownerId, binding.workspaceId, binding.consumerId)
@@ -67,6 +72,7 @@ export class SubscriptionService {
     if (current.paused) throw new SubscriptionRefusal('account_unavailable')
     return {
       binding,
+      ...(includePrioritySupport ? { codexPrioritySupport: current.provider === 'codex' ? codexPrioritySupport(current.modelCatalog, Number(current.epoch), modelOverride ?? boundModelId) : 'unknown' as const } : {}),
       modelId: modelOverride === null ? undefined : modelOverride ?? boundModelId,
       credentialTransition: current.state === 'refreshing' ? 'refreshing' : current.state === 'publication_pending' ? 'publication_pending' : undefined,
       connection: { id: row.id, ownerId: row.ownerId, workspaceId: row.workspaceId, provider: row.provider === 'codex' ? 'openai' : 'anthropic', revision: Number(current.epoch), state: current.state === 'connected' ? 'connected' : current.state === 'disconnected' ? 'disconnected' : current.state === 'pending' ? 'pending' : 'reconnect_required', quota },
@@ -102,8 +108,19 @@ export class SubscriptionService {
             }
             const payload = JSON.parse(init.body)
             if (payload.model !== binding.modelId || payload.stream !== true) throw new SubscriptionRefusal('binding_mismatch')
-            await this.check(use, signal)
+            const priorityRequested = binding.route === 'codex_cpa' && this.modelRequestPolicy?.codexServiceTier === 'priority'
+            const authorized = await this.check(use, signal, undefined, priorityRequested)
             await admit(init.signal ?? signal ?? undefined)
+            // Provider options are not an opt-in to a paid service tier. Only
+            // the internal Coordinator policy and this fresh epoch's catalogue
+            // can request it. Unknown/unsupported uses the same single call.
+            if (binding.route === 'codex_cpa') {
+              delete payload.service_tier
+              if (priorityRequested && authorized.codexPrioritySupport === 'supported') payload.service_tier = 'priority'
+              if (priorityRequested) {
+                try { console.info(JSON.stringify({ level: 'info', msg: 'subscription_service_tier_policy', intent: 'priority', capability: authorized.codexPrioritySupport ?? 'unknown', requested: payload.service_tier === 'priority' ? 'priority' : 'omitted', ...await stepIdentity() })) } catch { /* diagnostics cannot change authorization or the request */ }
+              }
+            }
             return new Response(client.stream(binding.connectionRevision, modelId, payload, init.signal ?? signal ?? undefined), { headers: { 'content-type': 'text/event-stream' } })
           }
         })
@@ -153,7 +170,11 @@ export class SubscriptionService {
       }
     })
   }
-  async check(use: SubscriptionUse, signal?: AbortSignal, modelOverride?: string | null) { return authorizeSubscriptionUse(use, await this.access(use, signal, modelOverride)) }
+  async check(use: SubscriptionUse, signal?: AbortSignal, modelOverride?: string | null, includePrioritySupport = false) {
+    const access = await this.access(use, signal, modelOverride, includePrioritySupport)
+    const authorized = authorizeSubscriptionUse(use, access)
+    return { ...authorized, ...(includePrioritySupport ? { codexPrioritySupport: access.codexPrioritySupport } : {}) }
+  }
   async nativeRun(ownerId: string, deviceId: string, runId: string) {
     const { rows } = await this.repository.pool.query(`select b.id,b."ownerId",b."workspaceId",b."consumerId",b.route,b."modelId",r."agentDefinition",a.harness from byos_native_runs n join agent_runs r on r.id=n."runId" join agents a on a.id=r."agentId" join devices d on d.id=r."deviceId" and d."ownerId"=r."userId" and d.enabled=true join byos_bindings b on b.id=n."bindingId" where r.id=$1 and r."userId"=$2 and r."deviceId"=$3 and a."userId"=$2 and ${runMayUseCredentialSql('b."ownerId"', '$2', 'b."workspaceId"')} and b."consumerId"=a.id::text and d.harnesses @> jsonb_build_array(jsonb_build_object('harness',coalesce(r."agentDefinition"->>'harness',a.harness),'installed',true,'subscriptionBroker',true))
       and not exists (select 1 from jsonb_array_elements(d.harnesses) info where info->>'harness'=coalesce(r."agentDefinition"->>'harness',a.harness) and info ? 'subscriptionPreflight')
@@ -316,7 +337,7 @@ export class SubscriptionService {
     }
   }
   /** Account catalogue refresh; no inference, no static model names or binding required. */
-  async models(ownerId: string, id: string, signal?: AbortSignal): Promise<{ id: string; name: string }[]> {
+  async models(ownerId: string, id: string, signal?: AbortSignal): Promise<(SubscriptionCatalogueModel & { name: string })[]> {
     // The owner's own account-level read: no workspace membership needed (decision 2026-10-31-2130).
     const row = await this.repository.connection(ownerId, id)
     if (row.state !== 'connected') throw new SubscriptionRefusal('account_unavailable')
@@ -324,10 +345,11 @@ export class SubscriptionService {
     const current = await this.repository.connection(ownerId, id)
     if (current.state !== 'connected' || current.epoch !== row.epoch) throw new SubscriptionRefusal('stale_binding')
     if (!Array.isArray(result) || result.length > 500) throw new SubscriptionRefusal('backend_unavailable')
-    const options = new Map<string, { id: string; name: string }>()
+    const options = new Map<string, SubscriptionCatalogueModel & { name: string }>()
     for (const item of result) {
       if (!item || typeof item !== 'object' || typeof item.id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(item.id) || typeof item.name !== 'string' || !item.name.trim() || item.name.length > 200 || Array.from(item.name as string).some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)) throw new SubscriptionRefusal('backend_unavailable')
-      if (!options.has(item.id)) options.set(item.id, { id: item.id, name: item.name })
+      if (item.prioritySupported !== undefined && typeof item.prioritySupported !== 'boolean') throw new SubscriptionRefusal('backend_unavailable')
+      if (!options.has(item.id)) options.set(item.id, { id: item.id, name: item.name, ...(row.provider === 'codex' && typeof item.prioritySupported === 'boolean' ? { prioritySupported: item.prioritySupported } : {}) })
     }
     return [...options.values()]
   }

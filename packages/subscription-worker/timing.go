@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Only fixed numeric slots cross private IPC. A recorder never retains scope,
+// The legacy timing projection uses fixed numeric slots. A recorder never retains scope,
 // credentials, requests, response bodies or errors.
 type timingMetric int
 
@@ -54,12 +54,13 @@ type timingKey struct{}
 type startupTimingKey struct{}
 type startupTiming struct{ configToServe, dbInit float64 }
 type timingRecorder struct {
-	mu        sync.Mutex
-	started   time.Time
-	values    [timingMetricCount]float64
-	observed  [timingMetricCount]bool
-	backend   string
-	transport *httpTransportTiming
+	mu          sync.Mutex
+	started     time.Time
+	values      [timingMetricCount]float64
+	observed    [timingMetricCount]bool
+	backend     string
+	transport   *httpTransportTiming
+	serviceTier *serviceTierReceipt
 }
 
 // Called only by the private entry point after its original initialization.
@@ -181,6 +182,14 @@ func encodeTimingMessage(encoder *json.Encoder, message map[string]any, timing *
 			encoded, err := json.Marshal(message)
 			if err != nil || len(encoded) > timingTerminalMaxBytes {
 				delete(message, "transportTiming")
+			}
+		}
+		// This receipt has its own budget decision; never displace old timing.
+		if serviceTier := timing.serviceTierSnapshot(); serviceTier != nil {
+			message["serviceTier"] = serviceTier
+			encoded, err := json.Marshal(message)
+			if err != nil || len(encoded) > timingTerminalMaxBytes {
+				delete(message, "serviceTier")
 			}
 		}
 	}

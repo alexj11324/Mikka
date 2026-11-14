@@ -21,7 +21,9 @@ export async function modelForSession(ctx: DynamicModelContext) {
   const scope = scopeFromAuth(ctx.session.auth.current)
   const runtime = turnModel.get()
   if (!runtime || runtime.harness !== 'ai_sdk' || !runtime.model) throw new Error('subscription_model_unavailable')
-  return runtime.modelSelection ? streamingModel(new SubscriptionWorkflowModel(runtime.modelSelection)) : new HostedWorkflowModel(scope.ownerId, scope.botId, runtime.model)
+  if (!runtime.modelSelection) return new HostedWorkflowModel(scope.ownerId, scope.botId, runtime.model)
+  const requestPolicy = ctx.session.parent || turnRequest.get().scheduledRead ? undefined : { codexServiceTier: 'priority' as const }
+  return streamingModel(new SubscriptionWorkflowModel(runtime.modelSelection, requestPolicy))
 }
 
 export async function instructionsForSession(ctx: DynamicModelContext) {
