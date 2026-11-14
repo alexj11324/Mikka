@@ -140,6 +140,31 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
       await pool.query('DELETE FROM run_chunks WHERE "runId"=$1 AND seq>1', [sharedRun])
       await pool.query('DELETE FROM run_messages WHERE "runId"=$1 AND length(text)=8192', [sharedRun])
     })
+    await t.test('MCP run lists and nested issue run summaries do not transfer report bodies', async subtest => {
+      const read = () => scoped(owner, workspace, async () => ({
+        list: await tools.listRuns(owner, { issueId: shared }),
+        nested: (await tools.getIssue(owner, shared))?.runs,
+      }))
+      await read()
+      const before = await measured(read)
+      await pool.query(`UPDATE agent_runs SET report = report || jsonb_build_object('opaqueReport', repeat('r',32768))
+        WHERE id=$1`, [sharedRun])
+      try {
+        const after = await measured(read)
+        subtest.diagnostic(JSON.stringify({ normal: readMetrics(before), largeReport: readMetrics(after) }))
+        assert.deepEqual(after.value, before.value)
+        assert.equal(after.value.list[0]?.id, sharedRun)
+        assert.equal(after.value.nested?.[0]?.id, sharedRun)
+        assert.equal(after.value.list[0]?.stopReason, 'secret-stop')
+        const peer = await scoped(member, workspace, () => tools.listRuns(member, { issueId: shared, activeOnly: true }))
+        assert.equal(peer[0]?.id, sharedRun)
+        assert.equal(peer[0]?.agent, 'codex')
+        assert.equal(peer[0]?.stopReason, null)
+        assert.equal(after.resultBytes, before.resultBytes, 'status-only projections never read a full report')
+      } finally {
+        await pool.query(`UPDATE agent_runs SET report = report - 'opaqueReport' WHERE id=$1`, [sharedRun])
+      }
+    })
     const ownBrief = await visibleRuns(owner, { issueId: shared, brief: true })
     assert.equal(ownBrief[0].failureDetails?.code, 'run_api_key_invalid')
     assert.doesNotMatch(JSON.stringify(ownBrief[0].failureDetails), /secret-provider-message|APIError/)
@@ -158,6 +183,15 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
     assert.deepEqual((await scoped(member, workspace, () => tools.listRuns(member,{issueId:shared}))).map(run=>run.id),[sharedRun])
     assert.ok(await scoped(member, workspace, () => tools.getRun(member,sharedRun)))
     assert.equal(await scoped(member, workspace, () => actions.getRunEvents(member,{runId:sharedRun})),null)
+    await t.test('run event pages use the same current tenant as owner run detail', async () => {
+      const page = (workspaceId: string, after?: number) => scoped(owner, workspaceId,
+        () => actions.getRunEvents(owner, { runId: sharedRun, limit: 1, after }))
+      const first = await page(workspace)
+      assert.equal(first?.events[0]?.seq, 1)
+      assert.deepEqual((await page(workspace, 1))?.events, [])
+      assert.equal(await page(personalWorkspace), null)
+      await assert.rejects(actions.getRunEvents(owner, { runId: sharedRun }), /workspaceAccessDenied/)
+    })
     await assert.rejects(addRunMessage(member,{runId:sharedRun,text:'must not send'}))
     await assert.rejects(requestRunStop(member,sharedRun), /runNotFound/)
     assert.equal((await pool.query('select "stopRequestedAt" from agent_runs where id=$1',[sharedRun])).rows[0].stopRequestedAt,null)
