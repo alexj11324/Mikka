@@ -146,7 +146,12 @@ function assertPublicImageBuild(build) {
     assert.match(line, /^[A-Za-z_][A-Za-z0-9_]*=/, 'PUBLIC_IMAGE_EXPLICIT_BUILD_ARG_REQUIRED')
     assert.doesNotMatch(line, /(?:ffmpeg[_-])?github[_-]token/i, 'PUBLIC_IMAGE_CREDENTIAL_BUILD_ARG')
     for (const match of line.matchAll(/\$\{\{(.*?)\}\}/g))
-      assert.ok(['github.sha', 'steps.image-inputs.outputs.worker-sha'].includes(match[1].trim()), 'PUBLIC_IMAGE_NONPUBLIC_BUILD_ARG')
+      assert.ok(
+        ['github.sha', 'steps.image-inputs.outputs.worker-sha'].includes(match[1].trim()) ||
+          (line.startsWith('WORKFLOW_TARGET_WORLD=') &&
+            match[1].trim() === "env.PUBLISH_IMAGE != 'true' && '@workflow/world-postgres' || ''"),
+        'PUBLIC_IMAGE_NONPUBLIC_BUILD_ARG'
+      )
   }
 }
 function resolveInstallValue(value, inputs) {
@@ -237,6 +242,7 @@ test('the public image action refuses secret channels and credential-bearing bui
   assert.throws(() => assertPublicImageBuild(withInput({ 'build-args': 'IMPLICIT' })), /PUBLIC_IMAGE_EXPLICIT_BUILD_ARG_REQUIRED/)
   assert.throws(() => assertPublicImageBuild(withInput({ 'build-args': 'FFMPEG_GITHUB_TOKEN=fixture' })), /PUBLIC_IMAGE_CREDENTIAL_BUILD_ARG/)
   assert.throws(() => assertPublicImageBuild(withInput({ 'build-args': 'ALIAS=' + githubTokenExpression })), /PUBLIC_IMAGE_NONPUBLIC_BUILD_ARG/)
+  assert.throws(() => assertPublicImageBuild(withInput({ 'build-args': "OTHER=${{ env.PUBLISH_IMAGE != 'true' && '@workflow/world-postgres' || '' }}" })), /PUBLIC_IMAGE_NONPUBLIC_BUILD_ARG/)
   assert.throws(() => assertPublicImageBuild({ uses: 'docker/build-push-action@main' }), /PINNED_PUBLIC_IMAGE_ACTION_REQUIRED/)
   assert.throws(() => assertPublicImageBuild({ run: 'docker build --secret id=ffmpeg_github_token .' }))
 })
