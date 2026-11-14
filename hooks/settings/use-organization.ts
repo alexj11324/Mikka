@@ -4,6 +4,7 @@ import useSWR, { unstable_serialize } from 'swr'
 import { useTranslations } from 'next-intl'
 import type { SharedResourceKind } from '@/lib/db/governance-schema'
 import { withBasePath } from '@/lib/base-path'
+import { authClient } from '@/lib/auth-client'
 import { GovernanceRequestError, governanceKey, type GovernanceDetail } from '@/hooks/settings/use-workspace-governance'
 import { useLiveKey, useLiveKeys } from '@/hooks/use-live-key'
 
@@ -18,6 +19,8 @@ import { useLiveKey, useLiveKeys } from '@/hooks/use-live-key'
 
 export type OrganizationRole = 'owner' | 'admin' | 'member'
 export type OrganizationListItem = { id: string; name: string; role: OrganizationRole }
+export type JoinableOrganization = Pick<OrganizationListItem, 'id' | 'name'>
+export type OrganizationDomain = { id: string; domain: string }
 export type OrganizationMember = { organizationId: string; userId: string; role: OrganizationRole; status: 'active' | 'suspended'; name: string; email: string; createdAt: string; updatedAt: string }
 /** Organization membership only; invitations never confer Workspace/Project access. */
 export type OrganizationInvitation = {
@@ -137,6 +140,18 @@ export function useOrganizations(enabled = true) {
   return useSWR(enabled ? organizationsKey : null, () => request<{ organizations: OrganizationListItem[] }>('/api/organizations').then(value => value.organizations), swr)
 }
 
+export function useJoinableOrganizations() {
+  const { data, isPending } = authClient.useSession()
+  return useSWR(isPending || !data?.user.emailVerified ? null : ['joinable-organizations', data.user.id, data.user.email],
+    () => request<{ organizations: JoinableOrganization[] }>('/api/me/joinable-organizations').then(value => value.organizations))
+}
+
+export function useOrganizationDomains(organizationId: string) {
+  const { data, isPending } = authClient.useSession()
+  return useSWR(isPending || !data ? null : ['organization-domains', organizationId, data.user.id],
+    () => request<{ domains: OrganizationDomain[] }>(org(organizationId, '/allowed-domains')).then(value => value.domains))
+}
+
 /** Members, bound workspaces, seats and recent events. 403 for anyone who is not an Organization owner or admin. */
 export function useOrganizationSummary(organizationId: string | null | undefined) {
   return useSWR(organizationId ? organizationKey(organizationId) : null, ([, id]) => request<OrganizationSummary>(org(id)), swr)
@@ -169,6 +184,12 @@ export type OrganizationServiceKey = {
 }
 
 export const organizationApi = {
+  addDomain: (id: string, domain: string) =>
+    send<{ domain: OrganizationDomain }>(org(id, '/allowed-domains'), 'POST', { domain }),
+  removeDomain: (id: string, domainId: string) =>
+    send<{ removed: true }>(org(id, '/allowed-domains/' + encodeURIComponent(domainId)), 'DELETE'),
+  joinByDomain: (id: string) =>
+    send<{ organizationId: string; joined: true; role: OrganizationRole }>(org(id, '/join-by-domain'), 'POST'),
   serviceKeys: (id: string, after?: string) => request<{ keys: OrganizationServiceKey[]; nextCursor: string | null }>(
     org(id, '/api-keys') + (after ? '?' + new URLSearchParams({ after }) : '')),
   nameServiceKey: (id: string, keyId: string, name: string) =>
