@@ -821,22 +821,6 @@
     "behavior": "Recognize local authentication documents and valid Workspace and Organization invitations so invitees can sign in even when Workspace bootstrap is unavailable.",
     "test": "apps/frontend/scripts/auth-only-bootstrap.test.mjs"
   },
-  "lib/slack/api.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "SLACK_BOT_TOKEN"
-    ],
-    "behavior": "An enabled Slack integration supplies its bot token to post a completion to the bound channel and thread. The client classifies Slack errors and retry timing without exposing the token.",
-    "test": "lib/slack/api.test.ts",
-    "suite": "test:slack"
-  },
-  "lib/slack/completion-message.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Formats a localized completion from the visible task label and status, escapes Slack mentions, and builds a link using the caller's installation origin and base path.",
-    "test": "lib/slack/completion-message.test.ts",
-    "suite": "test:slack"
-  },
   "lib/task-activity-timeline.ts": {
     "mode": "built-in",
     "environment": [],
