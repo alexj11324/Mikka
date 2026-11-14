@@ -235,6 +235,7 @@ test('provider failure continues the same task through its authorized preferred 
       const sessionId = `candidate-implementation-${first.runId}`
       await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"startedAt"=now()-interval '1 second',"finishedAt"=now(),"sessionId"=$2,report=$3 WHERE id=$1`,
         [first.runId, sessionId, JSON.stringify({ ...emptyRunReport('Completed fixture candidate'), sourceCommit: sha, publish: { commit: sha }, verify: { status: 'passed' } })])
+      await addFactoryVisualEvidence(pool, first.runId)
       let state = await factory.apply(p.id, first.binding, randomUUID(), { action: 'candidate', runId: first.runId,
         candidate: { sha, repository: p.remote, environment: `device:${p.deviceId}`, scope: `issue:${issueId}` } })
       state = await factory.apply(p.id, factoryBinding(state.task), randomUUID(), { action: 'finish', status: 'passed', reason: 'The implementation yielded the fixed candidate',

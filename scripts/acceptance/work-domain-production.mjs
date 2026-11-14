@@ -360,14 +360,6 @@ function modelSource(state, scope, item) {
 }
 function modelReady(state, scope, item) { check(modelSource(state, scope, item).available === true, 'source_unavailable') }
 
-// The normal tool preview may end after 200 characters. Only a complete UUID
-// field from that exact tool call is a receipt; prose/Task-wide search is not.
-function previewId(text, key) {
-  if (typeof text !== 'string') return null
-  const match = new RegExp('"' + key + '"\\s*:\\s*"([0-9a-f-]{36})"', 'i').exec(text)
-  return uuid(match?.[1]) ? match[1] : null
-}
-
 async function dispatch(client, record, scope, item, timeoutMs) {
   const caseRef = '[1687:' + record.submissionId + ']'
   const input = { issueId: record.issueId, repo: scope.repositoryKey.slice('v2/github.com/'.length), target: 'cloud',

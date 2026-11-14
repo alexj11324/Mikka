@@ -43,7 +43,7 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
   const callId = randomUUID()
   // Like every hosted call (lib/abuse/model.ts): the workspace's own balance first, then shared credits.
   const { withSharedCredits } = await import('@/lib/credit-shares')
-  if (store && usage) {
+  if (store?.metered && usage) {
     const billingPrincipal = await withSharedCredits(scope.workspaceId, async payer => {
       await (billingAdapter?.admit ?? usage.canUseMikkaPaid)(payer)
       return { payer, organizationId: hostedBillingScope.getStore()?.billingOrganizationId ?? null }

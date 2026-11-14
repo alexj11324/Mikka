@@ -328,8 +328,14 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
         [{ botKey: 'coordinator' }], 'only the Personal model choice belongs to the legacy migration')
     }
     if (family === 'agent_kit_heads') {
-      assert.deepEqual((await pool.query('SELECT bot_key,cli_run_policy FROM agent_kit_heads WHERE owner_id=$1 ORDER BY bot_key', [p.id])).rows,
-        [personal.botId, 'coordinator'].sort().map(bot_key => ({ bot_key, cli_run_policy: { permissions: { git_push: 'deny' } } })), 'copy the policy and retain the old history')
+      const denied = { permissions: { git_push: 'deny' } }
+      const heads = (await pool.query('SELECT bot_key,cli_run_policy FROM agent_kit_heads WHERE owner_id=$1', [p.id])).rows
+      assert.deepEqual(Object.fromEntries(heads.map(row => [row.bot_key, row.cli_run_policy])), {
+        coordinator: denied, [personal.botId]: {},
+      }, 'retain the old history and keep the new Bot free of a permission layer')
+      const policies = await pool.query('SELECT "workspaceId",cli_run_policy FROM workspace_computer_policies WHERE "workspaceId"=ANY($1::uuid[])', [[p.workspaceId, team.id]])
+      assert.deepEqual(policies.rows.find(row => row.workspaceId === p.workspaceId)?.cli_run_policy, denied)
+      assert.equal(policies.rows.find(row => row.workspaceId === team.id)?.cli_run_policy?.permissions?.git_push, undefined)
     }
   })
 
@@ -435,7 +441,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     ]).then(results => results.map(result => result.rows))
     try {
       const observed = await observeCoordinatorCall(p.id, p.workspaceId, async row => {
-        assert.ok(row?.id)
+        assert.equal(row?.botId, personal.botId)
         const writer = await pool.connect()
         try {
           await writer.query('BEGIN')
