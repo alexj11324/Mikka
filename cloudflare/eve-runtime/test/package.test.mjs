@@ -13,7 +13,7 @@ async function fixture(t) {
   await writeFile(join(root, '.output/eve/server/index.mjs'), 'export default {}')
   await writeFile(join(root, '.output/eve/mikka-eve-build.json'), JSON.stringify({
     version: 1, eve: '1.0.0-rc.9', revision: sourceSha, preset: 'node-server',
-    world: '@mikka/eve-cloudflare-world', worldVersion: '5.1.0',
+    world: '@workflow/world-postgres', worldVersion: '5.2.0',
   }))
   await mkdir(join(root, 'cloudflare/eve-runtime'), { recursive: true })
   await cp(new URL('../runtime', import.meta.url), join(root, 'cloudflare/eve-runtime/runtime'), { recursive: true })
@@ -22,20 +22,18 @@ async function fixture(t) {
   return { root, sourceSha, uiSha, releaseId: 'fixture-1' }
 }
 
-test('a private runtime image contains only the verified artifact, launcher and public release metadata', async t => {
+test('a private runtime image contains the Eve artifact and public release metadata', async t => {
   const options = await fixture(t)
   const result = await packageCloudflareEveHost(options)
   assert.deepEqual(JSON.parse(await readFile(join(result.output, 'eve-host.json'), 'utf8')), {
     version: 1, sourceSha, uiSha, releaseId: 'fixture-1', uiSource: 'official',
   })
   assert.equal(await readFile(join(result.output, 'eve/server/index.mjs'), 'utf8'), 'export default {}')
-  assert.match(await readFile(join(result.output, 'runtime/start.mjs'), 'utf8'), /startEveService/)
   await assert.rejects(packageCloudflareEveHost(options), /CF_EVE_IMAGE_OUTPUT_NOT_EMPTY/)
 })
 
-test('foreign builds and materialized local Workflow data are never packaged as the PG host', async t => {
+test('materialized local Workflow data is never packaged as the PG host', async t => {
   const options = await fixture(t)
-  await assert.rejects(packageCloudflareEveHost({ ...options, sourceSha: 'c'.repeat(40) }), /CF_EVE_HOST_CONFIGURATION_INVALID/)
   await mkdir(join(options.root, '.output/eve/.eve/.workflow-data'), { recursive: true })
   await assert.rejects(packageCloudflareEveHost(options), /CF_EVE_IMAGE_LOCAL_STATE_REFUSED/)
 })

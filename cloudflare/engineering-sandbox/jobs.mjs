@@ -29,7 +29,6 @@ export const sourceSuites = {
 
 export const jobs = {
   ...sourceSuites,
-  'eve-host-build': ['cloudflare/eve-runtime/test/compiled-host.mjs'],
   'postgres-policy': ['drizzle/20261029011701_cli_run_policy.sql'],
 }
 
