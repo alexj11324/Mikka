@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import { registerHooks } from 'node:module'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
@@ -31,6 +32,25 @@ test('host settlement receipts preserve product publication across native RPC re
     await pool.query(`INSERT INTO mikka_workspaces(id,"userId",name)VALUES($1,$2,'Eve settlement fixture')`,[workspaceId,ownerId])
     await pool.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role)VALUES($1,$2,'Owner',$3,'admin')`,[workspaceId,ownerId,ownerId+'@example.invalid'])
     await pool.query(`INSERT INTO bots(id,"ownerId","workspaceId",name)VALUES($1,$2,$3,'Eve settlement fixture')`,[botId,ownerId,workspaceId])
+    await t.test('a native finish without an Agent Kit execution does not initialize its prepare workflow', async () => {
+      const { handleEveProductRequest } = await import('./product-gateway')
+      const { internalEveAuthorization } = await import('./auth')
+      const sessionId = await nativeSession()
+      const imports: string[] = []
+      const loader = registerHooks({ load(url, context, next) {
+        if (url.includes('/workflows/coordinator/agent-kit-steps.')) imports.push(url)
+        return next(url, context)
+      } })
+      try {
+        const response = await handleEveProductRequest(new Request('https://app.example/mikka/api/internal/eve/tools', {
+          method: 'POST', headers: { authorization: internalEveAuthorization(scope) },
+          body: JSON.stringify({ operation: 'finish', sessionId, turnId: 'child_without_execution', outcome: 'completed' }),
+        }))
+        assert.equal(response.status, 200)
+        assert.deepEqual(await response.json(), { status: 'accepted' })
+        assert.deepEqual(imports, [])
+      } finally { loader.deregister() }
+    })
     await t.test('native admission stays pending until its own root projection, including queued and quiet turns',async()=>{
       const {markEventAccepted}=await import('./submission')
       const {chatView,chatVersion,botChatSnapshot}=await import('../coordinator/store')

@@ -29,6 +29,11 @@ test('Owner-scoped history stays readable; generation write helpers are retired 
   assert.match(store, /export async function getAgentHistory/)
   assert.match(store, /eq\(agentSessions.userId, userId\)/)
   assert.match(store, /eq\(agentTurns.userId, userId\)/)
+  // The owner-only legacy archive's 100-row list must not run two identical
+  // correlated turn scans or pair fields from different turns on a time tie.
+  assert.equal((store.match(/from "agent_turns" t/g) ?? []).length, 1)
+  assert.match(store, /order by t\."createdAt" desc, t\."id" desc limit 1/)
+  assert.match(store, /sessionPreview\(latestTurn\?\.completion, latestTurn\?\.prompt\)/)
   assert.doesNotMatch(store, /beginAgentTurn|saveAgentTurn|\.insert\(|\.update\(|\.delete\(/)
   const schema = await source('lib/db/schema.ts')
   assert.match(schema, /pgTable\('agent_sessions'/)
