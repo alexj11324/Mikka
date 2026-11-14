@@ -9,7 +9,6 @@ export async function standaloneChatDirectory(database: RunChainQueryable, owner
       to_char(activity.at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at
     FROM conversations c JOIN conversation_members member ON member."conversationId"=c.id AND member."memberType"='user'
       AND member."memberId"=$1 AND member."leftAt" IS NULL
-    JOIN mikka_workspace_members w ON w."userId"=$1 AND w."workspaceId"=c."workspaceId" AND w.status='active'
     LEFT JOIN LATERAL (SELECT m."createdAt" FROM conversation_messages m
       WHERE m."conversationId"=c.id ORDER BY m.position DESC LIMIT 1) last ON true
     CROSS JOIN LATERAL (SELECT greatest(c."createdAt", last."createdAt") AS at) activity

@@ -82,16 +82,21 @@ test('Task presentation batches keep current tenant authority and one Factory pr
     }
     await t.test('standalone conversation controls use workspace membership from its authoritative database', async () => {
       const { standaloneOrganization, renameStandalone, regenerateStandalone } = await import('../lib/standalone-chat-controls')
+      const { conversationDirectory } = await import('../lib/conversation-directory')
       const id = randomUUID()
+      const chats = async (reader: string) => (await conversationDirectory(application, reader, shared, { search: 'Renamed' })).items.map(row => row.id)
       await application.query(`INSERT INTO conversations(id,"workspaceId",kind,title,"createdBy","creationPurpose")
         VALUES ($1,$2,'group','Original',$3,'conversation')`, [id, shared, owner])
       await application.query(`INSERT INTO conversation_members("conversationId","memberType","memberId",role) VALUES ($1,'user',$2,'owner')`, [id, owner])
       assert.equal(await renameStandalone(application, id, owner, shared, 'Renamed'), 'Renamed')
       assert.deepEqual(await standaloneOrganization(application, id, owner, shared, {field:'pinned',value:true}), {archived:false,pinned:true})
+      assert.deepEqual(await chats(owner), [id])
+      assert.deepEqual(await chats(peer), [])
       assert.equal(await renameStandalone(application, id, peer, shared, 'Other owner'), undefined)
       assert.equal(await standaloneOrganization(application, id, owner, other), null)
       await workspace.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [shared, owner])
       try {
+        assert.deepEqual(await chats(owner), [])
         assert.equal(await standaloneOrganization(application, id, owner, shared), null)
         assert.equal(await renameStandalone(application, id, owner, shared, 'Denied'), undefined)
         assert.equal(await regenerateStandalone(application, id, owner, shared, async () => { assert.fail('revoked writer reached provider') }), null)
