@@ -2,7 +2,7 @@
 
 **Current build ownership:** Official product code and build entry belong to public `Mikka`. A trusted build checks out the exact private UI Overlay under `.hosted-ui` using a limited read-only identity; untrusted public PRs receive neither UI secret nor customer config. See [build source of truth](build-source-of-truth.md).
 
-**Migration status (2026-11-12):** Cloudflare CI builds run, but an interim CF-native OCI publisher is currently launched from the private UI repository. It is not the permanent source-of-truth or evidence of a deployed new product. The current Vercel traffic route and rollback must remain until #1954 authorizes real Cloudflare production cutover.
+The [release owner](https://github.com/alexj11324/Mikka/issues/1954) selects and promotes a verified public build through the protected Cloudflare deployment workflow. Use the recorded serving receipt to identify the active public/UI pair and Cloudflare version. The [release ledger](https://github.com/alexj11324/Mikka/issues/1954#issuecomment-6868288411) distinguishes the promoted gateway and retained versions from later source merges. Preserve Cloudflare's version rollback and the recorded legacy workflow and callback obligations for their respective owners.
 
 Company-hosted deployment and credential operations are maintained in the
 [private operations repository](https://github.com/alexj11324/mikka-cloud/blob/main/docs/operations/web-deploy.md).
