@@ -1,3 +1,10 @@
+import type { Pool } from 'pg'
+import { z } from 'zod'
+import { runPolicySchema } from '@mikka/protocol/agent-policy'
+import { createFactoryClaim } from '../../lib/factory/claim'
+import { factoryCheckAssignment } from '../../lib/factory/checks'
+import { factoryMonitorDispatchAssignment } from '../../lib/factory/monitor-dispatch'
+import { FactoryError } from '../../lib/factory/contract'
 import { createFactoryStore } from '../../lib/factory/store'
 
 /** Fixtures for tasks persisted before the host-frozen flowVersion existed.
@@ -21,4 +28,36 @@ export function createLegacyFactoryStore(...args: Parameters<typeof createFactor
     return result
   }
   return store
+}
+
+/** Drive the real check guard for schema-local review and monitor fixtures. */
+export function claimFixtureFactoryCheck(pool: Pool, store: ReturnType<typeof createFactoryStore>) {
+  const guard = createFactoryClaim(store, {
+    claimContinuation: async () => { throw new Error('Expected a Factory check in the fixture') },
+  }, (tx, task, runId) => task.stage === 'monitor'
+    ? factoryMonitorDispatchAssignment(tx, task.userId, runId)
+    : factoryCheckAssignment(tx, task.userId, runId))
+
+  return async (userId: string, deviceId: string, runId: string, leaseExpiresAt: string) => {
+    const tx = await pool.connect()
+    try {
+      await tx.query('BEGIN')
+      const assignment = await guard(tx, userId, deviceId, runId, leaseExpiresAt)
+      const policy = runPolicySchema.parse(assignment.policy)
+      const baseBranch = z.string().parse(assignment.baseBranch)
+      const updated = await tx.query(
+        `UPDATE agent_runs SET status='preparing', "startedAt"=now(), "leaseExpiresAt"=$2, "updatedAt"=now()
+          WHERE id=$1 AND status='queued' AND "stopRequestedAt" IS NULL`,
+        [runId, leaseExpiresAt],
+      )
+      if (updated.rowCount !== 1) throw new FactoryError('factoryRunMismatch')
+      await tx.query('COMMIT')
+      return { ...assignment, policy, baseBranch }
+    } catch (error) {
+      await tx.query('ROLLBACK')
+      throw error
+    } finally {
+      tx.release()
+    }
+  }
 }
