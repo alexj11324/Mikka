@@ -81,6 +81,8 @@ test('private Drive forwarding has exact identifiers, paths and HTTP methods', (
     [`/api/drive/volumes/${volume}/blobs`, ['POST']],
     [`/api/drive/volumes/${volume}/entries`, ['PATCH']],
     [`/api/drive/volumes/${volume}/restore`, ['POST']],
+    [`/api/drive/volumes/${volume}/archive`, ['POST']],
+    [`/api/drive/volumes/${volume}/unarchive`, ['POST']],
   ]
   for (const [path, methods] of routes) {
     for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']) {
