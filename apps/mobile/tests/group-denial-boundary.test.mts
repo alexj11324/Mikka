@@ -65,7 +65,3 @@ test('an in-place group or account transition does not reuse the previous draft 
   assert.match(source, /const setQuote = \(value: string \| null\) => setComposerDraft\(current => \(\{/)
   assert.match(source, /identity, text: current\.identity === identity \? current\.text : '', quote: value/)
 })
-
-
-test('revoking a selected group message removes its text and actions without clearing another selection', () => {
- 
