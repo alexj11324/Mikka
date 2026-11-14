@@ -1545,6 +1545,13 @@
     "test": "lib/conversation-title.test.ts",
     "suite": "test:issues"
   },
+  "lib/conversation-workspace.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Hold the authorized workspace membership while reading or writing a conversation, including admission after title generation.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
   "lib/coordinator/citations.ts": {
     "mode": "built-in",
     "environment": [],

@@ -6,7 +6,6 @@ import { readFile, readdir } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { orderMigrations } from '../scripts/migration-order.mjs'
 import { dropTestDatabase } from './support/drop-test-database'
-import { nameConversation, renameConversationTitle } from '../lib/conversation-title-server'
 
 const base = process.env.E2E_DATABASE_URL
 const required = process.env.REQUIRE_DB === '1' || (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true')
@@ -26,7 +25,14 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
   await adminPool.query(`CREATE DATABASE ${name} TEMPLATE template0`)
   const target = new URL(admin.toString()); target.pathname = `/${name}`; guarded(target.toString())
   const pool = new Pool({ connectionString: target.toString(), max: 2 })
+  const before = { app: process.env.MIKKA_DATABASE_URL, workspace: process.env.DATABASE_URL }
+  process.env.MIKKA_DATABASE_URL = target.toString()
+  process.env.DATABASE_URL = target.toString()
+  let appPool: Pool | undefined, workspacePool: Pool | undefined
   try {
+    appPool = (await import('../lib/db')).pool
+    workspacePool = (await import('../lib/workspace-db')).workspacePool
+    const { nameConversation, renameConversationTitle } = await import('../lib/conversation-title-server')
     const dir = new URL('../drizzle/', import.meta.url)
     for (const f of orderMigrations((await readdir(dir)).filter(f => f.endsWith('.sql')))) await pool.query(await readFile(new URL(f, dir), 'utf8'))
     await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','O','o@example.invalid',true,now(),now()),('other','X','x@example.invalid',true,now(),now())`)
@@ -95,9 +101,9 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     assert.deepEqual([await stored(first), await stored(second)], [{ title: '登录前缀保留', titleSource: 'generated' }, { title: '登录前缀保留', titleSource: 'generated' }], 'every run of the chain carries it')
 
     // A manual rename is the title: bounded, on every run, and no trigger overwrites it.
-    assert.equal(await renameConversationTitle(pool, first, 'other', '越权改名'), null)
-    assert.equal(await renameConversationTitle(pool, first, 'owner', '   '), null)
-    assert.equal(await renameConversationTitle(pool, first, 'owner', '  我自己起的名字，特别特别特别长  '), '我自己起的名字，特别特别')
+    assert.equal(await renameConversationTitle(pool, first, 'other', '越权改名', workspaceId), null)
+    assert.equal(await renameConversationTitle(pool, first, 'owner', '   ', workspaceId), null)
+    assert.equal(await renameConversationTitle(pool, first, 'owner', '  我自己起的名字，特别特别特别长  ', workspaceId), '我自己起的名字，特别特别')
     assert.deepEqual([await stored(first), await stored(second)], Array(2).fill({ title: '我自己起的名字，特别特别', titleSource: 'manual' }))
     const quiet = calls.length
     for (const trigger of ['created', 'first_run_ended', 'pull_opened'] as const) assert.equal(await nameConversation(pool, second, 'owner', trigger, model('模型的名字')), null, trigger)
@@ -108,8 +114,10 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     assert.deepEqual(await stored(third), { title: '我自己起的名字，特别特别', titleSource: 'manual' })
     // A rename that lands while the model is answering is kept: the write checks again.
     const racing = await run({ prompt: '导出账单 CSV' })
-    assert.equal(await nameConversation(pool, racing, 'owner', 'created', async () => { await renameConversationTitle(pool, racing, 'owner', '账单导出'); return '模型晚到的名字' }), null)
+    assert.equal(await nameConversation(pool, racing, 'owner', 'created', async () => { await renameConversationTitle(pool, racing, 'owner', '账单导出', workspaceId); return '模型晚到的名字' }), null)
     assert.deepEqual(await stored(racing), { title: '账单导出', titleSource: 'manual' })
+
+    assert.equal(await renameConversationTitle(pool, first, 'owner', 'wrong workspace', randomUUID()), null)
 
     // Regenerate is the person asking for a generated title again.
     assert.equal(await nameConversation(pool, first, 'owner', 'regenerate', model('登录回调与前缀')), '登录回调与前缀')
@@ -123,8 +131,14 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     assert.equal(await nameConversation(pool, revoked, 'owner', 'created', async () => {
       assert.fail('revoked workspace must not invoke the model')
     }), null)
+    assert.equal(await renameConversationTitle(pool, revoked, 'owner', 'No access', workspaceId), null)
     assert.deepEqual(await stored(revoked), { title: null, titleSource: null })
   } finally {
+    for (const [key, value] of [['MIKKA_DATABASE_URL',before.app], ['DATABASE_URL',before.workspace]] as const) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+    await Promise.all([appPool?.end(), workspacePool?.end()])
     await dropTestDatabase(adminPool, name, pool)
     await adminPool.end()
   }

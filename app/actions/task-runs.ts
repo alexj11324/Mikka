@@ -213,10 +213,11 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
   })
 }
 
-async function conversationOwner() {
+async function conversationActor() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
-  return session.user.id
+  const context = await loadWorkspaceContext(undefined, session.user)
+  return { ownerId: session.user.id, workspaceId: context.workspace.id }
 }
 
 /**
@@ -225,12 +226,12 @@ async function conversationOwner() {
  * Only the conversation's owner renames it.
  */
 export async function renameConversation(runId: string, title: string): Promise<ActionResult<{ title: string }, 'issueTitleInvalid' | 'runNotFound'>> {
-  const ownerId = await conversationOwner()
+  const { ownerId, workspaceId } = await conversationActor()
   const { manualConversationTitle } = await import('@/lib/conversation-title')
   if (typeof title !== 'string' || title.length > 400 || !manualConversationTitle(title)) return { error: 'issueTitleInvalid' }
   const { renameConversationTitle } = await import('@/lib/conversation-title-server')
   const { pool } = await import('@/lib/db')
-  const saved = await renameConversationTitle(pool, String(runId), ownerId, title)
+  const saved = await renameConversationTitle(pool, String(runId), ownerId, title, workspaceId)
   if (!saved) return { error: 'runNotFound' }
   await (await import('@/lib/live/lists')).runListChanged(pool, String(runId))
   return { title: saved }
@@ -241,12 +242,17 @@ export async function renameConversation(runId: string, title: string): Promise<
  * false when the model was unavailable or gave nothing usable: the conversation keeps the title it had.
  */
 export async function regenerateConversationTitle(runId: string): Promise<ActionResult<{ title: string | null; regenerated: boolean }, 'runNotFound'>> {
-  const ownerId = await conversationOwner()
+  const { ownerId, workspaceId } = await conversationActor()
   const { pool } = await import('@/lib/db')
-  const owned = await pool.query('SELECT title FROM agent_runs WHERE id=$1 AND "userId"=$2', [String(runId), ownerId]).catch(() => ({ rows: [] }))
-  if (!owned.rows[0]) return { error: 'runNotFound' }
+  const { withConversationWorkspace } = await import('@/lib/conversation-workspace')
+  const read = () => withConversationWorkspace(ownerId, workspaceId, async () => {
+    const result = await pool.query('SELECT title FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "workspaceId"=$3', [String(runId), ownerId, workspaceId])
+    return result.rows[0] as { title: string | null } | undefined
+  })
+  const owned = await read()
+  if (!owned) return { error: 'runNotFound' }
   const { defaultModelAvailable } = await import('@/lib/default-model')
-  if (!await defaultModelAvailable(ownerId)) return { title: owned.rows[0].title ?? null, regenerated: false }
+  if (!await defaultModelAvailable(ownerId)) return { title: owned.title ?? null, regenerated: false }
   const { nameConversation } = await import('@/lib/conversation-title-server')
   const { generateShortTitle } = await import('@/lib/short-title-server')
   let title: string | null = null
@@ -254,5 +260,7 @@ export async function regenerateConversationTitle(runId: string): Promise<Action
     console.error('Conversation title regenerate failed', error instanceof Error ? error.name : 'unknown')
   }
   if (title) await (await import('@/lib/live/lists')).runListChanged(pool, String(runId))
-  return { title: title ?? owned.rows[0].title ?? null, regenerated: !!title }
+  const current = await read()
+  if (!current) return { error: 'runNotFound' }
+  return { title: current.title, regenerated: !!title }
 }
