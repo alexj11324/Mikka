@@ -4,13 +4,17 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 
 | Code path status | Count at this ledger revision |
 |---|---:|
-| complete | 27 |
-| partial | 7 |
+| complete | 41 |
+| partial | 14 |
 | prior-partial | 36 |
-| unreviewed | 6486 |
+| unreviewed | 6465 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
 ## Main differences
 
-main-delta.jsonl records 7 distinct changed paths between this fixed start and 4304949c65104f9f43d83f5b736789128ea5e159, tree 48ae85197f85b5faae6112d9176ab2b1150bac1a. It includes before/after Git IDs and explicit open follow-up for affected chains. An empty tip object is a deletion. Refresh using git ls-tree -rz --full-tree at each root, git diff --name-status -M with both exact commits, then examine all affected consumers. Keep merged-PR evidence and whole-file semantic evidence distinct. The current task and original nine are indexed in https://github.com/alexj11324/Mikka/issues/2506.
+main-delta.jsonl records 20 distinct changed paths between this fixed start and e0b64498c7396adbfd15e504ff9898f68d9c2186, tree b9b356279d96c33e8e43c0bad38fafd79836842f. It includes before/after Git IDs and explicit open follow-up for affected chains. An empty tip object is a deletion. Refresh using git ls-tree -rz --full-tree at each root, git diff --name-status -M with both exact commits, then examine all affected consumers. Keep merged-PR evidence and whole-file semantic evidence distinct. The current task and original nine are indexed in https://github.com/alexj11324/Mikka/issues/2506.
+
+changes.jsonl indexes source/merge IDs, original PR rationale, official links cited in that record, and the isolated receipt where available. Check the PR and its protections for current state before taking further action.
+
+api-entries.jsonl maps all 324 generated API route declarations (430 HTTP methods) to their exact source objects, template, router path, lazy loading, effective methods and duration. Source hashes and matcher coverage have been checked for every entry. Audit each handler and its full downstream chain using its separate path row.
