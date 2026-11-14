@@ -228,6 +228,12 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     let deliveries = 0
     await assert.rejects(submitThreadOnce(pool, input, async () => { deliveries++; throw new Error('synthetic interruption') }), /synthetic interruption/)
     await assert.rejects(submitThreadOnce(pool, input, async () => { deliveries++; return { runId: first.runId, continued: false } }), /threadSubmissionOutcomeUnconfirmed/)
+    const { runAction } = await import('../lib/action-error')
+    const retry = await runAction(() => submitThreadOnce(pool, input, async () => {
+      deliveries++
+      return { runId: first.runId, continued: false }
+    }))
+    assert.equal(retry.error, 'threadSubmissionOutcomeUnconfirmed', 'the user-facing action can explain the pending receipt')
     assert.equal(deliveries, 1)
   })
 

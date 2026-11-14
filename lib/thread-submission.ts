@@ -129,7 +129,7 @@ export async function submitThreadOnce(pool: Pool, input: Input,
     }
     const answer = recorded.mode === 'continuation' ? await recoverQuestion?.(id, previousRunId, false) : null
     if (answer) return saveResult(answer)
-    throw new Error('threadSubmissionOutcomeUnconfirmed')
+    throw new ActionFailureError('threadSubmissionOutcomeUnconfirmed')
   }
   try { return await saveResult(await deliver(id)) }
   catch (error) {
