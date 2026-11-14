@@ -10,7 +10,7 @@ import { withTaskWorkspace } from '@/lib/task-workspace'
 import { workspaceListChanged } from '@/lib/live/lists'
 import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, isVolumeId, isVolumeVersionId } from './contract'
 import { driveBytes, driveSha256, readDriveBlobObject, recordDriveBlob, storeDriveBlob } from './blobs'
-import { applyDriveWrite, DriveError, readDriveHistory, readDriveVersion, restoreDriveVersion } from './store'
+import { applyDriveWrite, DriveError, readDriveFileHistory, readDriveHistory, readDriveVersion, restoreDriveVersion } from './store'
 import { createDriveVolume, listDriveVolumes, readDriveVolume } from './volumes'
 import { driveErrorResponse } from './http'
 
@@ -85,7 +85,10 @@ export async function driveResponse(request: Request, operation: Operation, para
       if (operation === 'history') {
         const limit = z.coerce.number().int().min(1).max(100).parse(search.get('limit') ?? '50')
         const beforeId = search.has('before') ? versionId.parse(search.get('before')) : undefined
-        const versions = await readDriveHistory(pool, actor, volume.id, { limit: limit + 1, beforeId })
+        const options = { limit: limit + 1, beforeId }
+        const versions = search.has('path')
+          ? await readDriveFileHistory(pool, actor, volume.id, z.string().refine(isDrivePath).parse(search.get('path')), options)
+          : await readDriveHistory(pool, actor, volume.id, options)
         const page = versions.slice(0, limit)
         return json({ versions: page, nextCursor: versions.length > limit ? page.at(-1)!.id : null })
       }
