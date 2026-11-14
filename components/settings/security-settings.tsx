@@ -58,7 +58,7 @@ export function SecuritySettings() {
     </SettingsSection>
 
     <SettingsSection id="devices-heading" title={t('devices')}>
-      {security.devicesError !== null && <FieldError className="px-5 py-3">{security.devicesError || t('devicesError')}</FieldError>}
+      {security.devicesError !== null && <SettingsSaveError message={security.devicesError || t('devicesError')} retryLabel={commonT('retry')} onRetry={() => { void security.reloadDevices() }} />}
       {security.devicesLoading && <SettingsLoading label={t('devicesLoading')} rows={3} bare />}
       {devices.map(device => <SettingRow key={device.id} title={device.label ?? t('unknownDevice')} description={t('lastActive', { when: relativeTime(device.lastActiveAt, locale) })}>
         {device.current
