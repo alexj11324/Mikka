@@ -1,18 +1,14 @@
 'use client'
 
 import { useRef, useState, type ComponentType, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
-import useSWR, { useSWRConfig } from 'swr'
+import useSWR from 'swr'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
-import { toast } from 'sonner'
 import { getIssuePropertyOptions } from '@/app/actions/issue-metadata'
-import { createLinkedIssue } from '@/app/actions/issue-operations'
 import type { IssueView } from '@/app/actions/issues'
 import { TaskAttachments } from './task-attachments'
 import type { TaskActivityItem, TaskDetailFrameProps, TaskDetailRow, TaskMenuItem, TaskSubtask } from '@/components/slots/task-detail-contract'
 import { useIssueTeam } from '@/components/teams/issue-team-control'
 import { formatDateOnly } from '@/lib/date-only'
-import { isIssueListKey } from '@/lib/live/list-read'
-import { issueKeys } from '@/lib/swr/keys'
 import { withBasePath } from '@/lib/base-path'
 import { taskProjectOptions } from '@/lib/task-project-options'
 import { useActionError } from '@/lib/use-action-error'
@@ -139,7 +135,6 @@ export function FramedTask(props: FramedTaskProps) {
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
   const actionError = useActionError()
-  const { mutate } = useSWRConfig()
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
 
@@ -245,22 +240,6 @@ export function FramedTask(props: FramedTaskProps) {
       ],
     }
   })
-  const creating = useRef(false)
-  // The same create as 创建子任务… in the ⋯ menu (IssueDetailActions), with the title typed in the line.
-  async function createChild(title: string) {
-    if (creating.current || locked || !title.trim()) return false
-    creating.current = true
-    try {
-      const latest = await getCurrent()
-      if (!latest) throw new Error(t('saveCurrentFirst'))
-      const result: { issue?: Issue; error?: string } = await createLinkedIssue({ id: task.id, revision: latest.revision, kind: 'child', title: title.trim(), includeSubissues: false })
-      if (!result.issue) throw new Error(actionError(result.error ?? 'generic'))
-      await Promise.all([mutate(issueKeys.connections(task.id)), mutate(key => isIssueListKey(key, userId))])
-      toast.success(t('childCreated'))
-      return true
-    } catch (error) { toast.error(error instanceof Error ? error.message : t('operationFailed')); return false }
-    finally { creating.current = false }
-  }
 
   // 活动: the task's events, its Agent rows and its discussions in one log, oldest first.
   const subtaskRows = (connections.rows ?? []).filter(row => row.metadata.parentId === task.id).map(row => ({ id: row.id, title: row.title, createdAt: row.createdAt }))
@@ -317,7 +296,7 @@ export function FramedTask(props: FramedTaskProps) {
     description={({ afterDescription, activity }) => props.editor(afterDescription, current => { discussions.current = current; return activity(current) })}
     acceptance={props.acceptance}
     copyLink={menu.copyLink}
-    subtasks={preview ? null : { items: subtasks, done: subtasks.filter(item => item.done).length, total: subtasks.length, onCreate: createChild, disabled: locked || connections.pending, failed: connections.error ? { text: tRelations('readFailedRetry'), retry: () => { void connections.mutate() } } : null }}
+    subtasks={preview ? null : { items: subtasks, done: subtasks.filter(item => item.done).length, total: subtasks.length, onCreate: connections.error ? async () => false : menu.createChild, disabled: locked || connections.pending || Boolean(connections.error), failed: connections.error ? { text: tRelations('readFailedRetry'), retry: () => { void connections.mutate() } } : null }}
     activity={preview ? null : {
       items: activityItems, timeline: (current, additional) => activityItems(current, true, additional),
       failed: [...props.historyFailed ? [{ text: tDetail('activityFailed'), retry: props.historyFailed }] : [], ...props.agentActivity.failed ? [{ text: props.agentActivity.failed.label, retry: props.agentActivity.failed.retry }] : [], ...pullRequestTimeline.data?.failed ? [{ text: tActivity('timelinePullFailed'), retry: () => { void pullRequestTimeline.mutate() } }] : []],

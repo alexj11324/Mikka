@@ -4785,6 +4785,9 @@
       "open": "打开 {name}",
       "download": "下载 {name}",
       "remove": "移除 {name}",
+      "removeFailed": "未能移除 {name}",
+      "retryRemoval": "重试",
+      "keep": "保留附件",
       "retry": "重试上传 {name}",
       "errors": {
         "unsupported": "不支持此文件格式",
@@ -6710,7 +6713,8 @@
         "kinds": {
           "subscription": "模型订阅",
           "api_key": "API 密钥",
-          "mcp": "MCP 服务"
+          "mcp": "MCP 服务",
+          "skill": "技能"
         },
         "status": {
           "pending": "待审批",
@@ -7369,6 +7373,19 @@
     }
   },
   "MobileCore": {
+    "notifications": {
+      "on": "开",
+      "off": "关",
+      "pushTypes": "推送这些事",
+      "unavailable": "推送无法送达",
+      "openSettings": "打开设置",
+      "allow": "允许推送",
+      "savingOn": "正在开启",
+      "savingOff": "正在关闭",
+      "unconfirmedOn": "开启未确认",
+      "unconfirmedOff": "关闭未确认",
+      "retrySave": "重试保存"
+    },
     "pin": "置顶",
     "unpin": "取消置顶",
     "hide": "隐藏",
@@ -7383,6 +7400,8 @@
     "message": "发消息",
     "replySelection": "回复选中的文字",
     "messageTask": "给这个任务发消息",
+    "messageThread": "给这个线程发消息",
+    "lastThreadStatus": "上次状态：{status}",
     "noTasks": "没有任务",
     "notStarted": "还没开始",
     "allTasks": "全部任务",

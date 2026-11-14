@@ -71,7 +71,8 @@ export function useIssueConnections({ liveWorkspaceId = null, viewerId, task, ge
   const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
   const { mutate: refresh } = useSWRConfig()
   const connectionsKey = issueKeys.connections(task.id)
-  const { data: rows, error, mutate } = useSWR(enabled ? connectionsKey : null, () => listIssueConnections(task.id))
+  const { data, error, mutate } = useSWR(enabled ? connectionsKey : null, () => listIssueConnections(task.id))
+  const rows = error ? undefined : data
   // No timer (#1212): a change to this task or one connected to it pushes `issue_relations` on the
   // task's own channel, the one its document syncs on. Without one it is read once a minute.
   useLiveKey('issue_relations', liveWorkspaceId ? task.id : UNRESOLVED_LIST_SCOPE, [unstable_serialize(connectionsKey)], liveWorkspaceId, { minIntervalMs: 2_000 })
@@ -81,23 +82,35 @@ export function useIssueConnections({ liveWorkspaceId = null, viewerId, task, ge
   const current = rows?.find(row => row.id === task.id)?.metadata ?? task.metadata
   const children = rows?.filter(row => row.metadata.parentId === task.id) ?? []
   async function remove(kind: RelationKind, targetId: string) {
-    if (busy.current || disabled) return
+    if (busy.current || disabled || error) return
     busy.current = true; setPending(true)
     try {
       const latest = await getCurrent()
       if (!latest) return
       const result = await updateIssueRelation({ id: task.id, revision: latest.revision, kind, targetId, remove: true })
-      if (!('issue' in result) || !result.issue) throw new Error(actionError(result.error))
+      if (!('issue' in result) || !result.issue) {
+        if (result.error === 'issueOutdated') {
+          const [refreshed] = await Promise.all([refresh<Issue>(issueKeys.detail(task.id)), mutate()])
+          if (refreshed?.id === latest.id && refreshed.revision > latest.revision) throw new Error(actionError('issueStale'))
+        }
+        throw new Error(actionError(result.error))
+      }
       onSaved(result.issue); await Promise.all([mutate(), refresh(key => isIssueListKey(key, viewerId))]); toast.success(t('removed'))
     } catch (error) { toast.error(error instanceof Error ? error.message : t('removeFailed')) }
     finally { busy.current = false; setPending(false) }
   }
   async function status(id: string, revision: number, status: string) {
-    if (busy.current || disabled) return
+    if (busy.current || disabled || error) return
     busy.current = true; setPending(true)
     try {
       const result = await moveIssue({ id, revision, status })
-      if (!('issue' in result) || !result.issue) throw new Error(actionError(result.error))
+      if (!('issue' in result) || !result.issue) {
+        if (result.error === 'issueStale') {
+          const refreshed = await mutate()
+          if (!refreshed?.some(row => row.id === id && row.revision > revision)) throw new Error(actionError('issueOutdated'))
+        }
+        throw new Error(actionError(result.error))
+      }
       const saved = result.issue
       const previous = rows?.find(row => row.id === id)
       await Promise.all([mutate(), refresh(key => isIssueListKey(key, viewerId)),

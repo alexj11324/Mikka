@@ -63,7 +63,7 @@ export async function authenticateEveRequest(request: Request): Promise<EveAuthR
     } catch { return null }
     if (origin !== expected) return null
   }
-  const { auth, apiWorkspaceAllowed } = await import('../api-auth')
+  const { auth } = await import('../api-auth')
   const credentials = new Headers(request.headers)
   // An explicit bearer is its own credential. Never let an invalid header
   // fall back to a cookie after bypassing the browser Origin gate.
@@ -71,6 +71,6 @@ export async function authenticateEveRequest(request: Request): Promise<EveAuthR
   const session = await auth.api.getSession({ headers: credentials, query: { disableCookieCache: true } })
   if (!session) return null
   const bot=await (await import('./auth-bot')).resolveEveRequestBot(request,session)
-  if (!bot || !apiWorkspaceAllowed(session, bot.workspaceId)) return null
-  return scopeAuth(await assertEveScope({ ownerId: session.user.id, ...bot, surface: 'web' }))
+  if (!bot) return null
+  return scopeAuth({ ownerId: session.user.id, ...bot, surface: 'web' })
 }

@@ -73,14 +73,18 @@ export async function wakeCoordinator(userId: string): Promise<void> {
 /** Product outbox delivery only. eve owns turn queueing, retry and recovery. */
 async function wakeChat(scope: { userId: string; botId: string }) {
   await triageInbox(scope.userId,scope.botId)
-  const [{rows: events},{rows: bots}] = await Promise.all([
-    pool.query<{id:string}>(`SELECT id FROM coordinator_events WHERE "userId"=$1 AND "botId"=$2 AND "deliveredAt" IS NULL AND (kind='user_message' OR (tier IS NOT NULL AND tier<>'background')) ORDER BY "createdAt",id LIMIT 50`,[scope.userId,scope.botId]),
-    pool.query<{workspaceId:string}>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2',[scope.botId,scope.userId]),
-  ])
-  if (!bots[0]) return 'deferred' as const
-  const {sendEveEvent} = await import('../eve/server-client')
-  for (const event of events) await sendEveEvent({ownerId:scope.userId,botId:scope.botId,workspaceId:bots[0].workspaceId,surface:'web'},event.id)
-  return events.length ? 'started' as const : 'deferred' as const
+  const { rows: events } = await pool.query<{ id: string; workspaceId: string }>(`
+    SELECT e.id, b."workspaceId" FROM coordinator_events e
+    JOIN bots b ON b.id = e."botId" AND b."ownerId" = e."userId"
+    WHERE e."userId" = $1 AND e."botId" = $2 AND e."deliveredAt" IS NULL
+      AND (e.kind = 'user_message' OR (e.tier IS NOT NULL AND e.tier <> 'background'))
+    ORDER BY e."createdAt", e.id LIMIT 50`, [scope.userId, scope.botId])
+  if (!events.length) return 'deferred' as const
+  const { sendEveEvent } = await import('../eve/server-client')
+  for (const event of events) {
+    await sendEveEvent({ ownerId: scope.userId, botId: scope.botId, workspaceId: event.workspaceId, surface: 'web' }, event.id)
+  }
+  return 'started' as const
 }
 
 /** Compatibility entry for previously queued wake deadlines; no turn lease survives. */

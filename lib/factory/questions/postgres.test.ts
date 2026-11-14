@@ -31,7 +31,7 @@ import { threadQuestionStates } from "../../issue-thread-questions";
 import { readRunChain } from "../../run-chain";
 import { createFactoryReconciler } from "../reconcile";
 import { lostRunOutcome } from "../../run-retry";
-import { queueCloudQuestionContinuation } from "./queue-continuation";
+import { prepareCloudQuestionRecovery, queueCloudQuestionContinuation } from "./queue-continuation";
 import { questionExecutionContinuation } from "./execution-continuation";
 import { freezeWorkerDefinition } from "../../agent-kit/worker";
 import { blockQuestionRetry } from "./retry";
@@ -58,6 +58,22 @@ const rejects = (fn: () => Promise<unknown>, code: string) =>
     fn,
     (e: unknown) => e instanceof FactoryError && e.code === code,
   );
+test('cloud recovery preserves the cause when its machine lookup fails', async (t) => {
+  const cause = Object.assign(new Error('fixture lookup failed'), { code: '08006' });
+  const pool = new Pool();
+  t.mock.method(pool, 'query', async () => { throw cause; });
+  try {
+    await assert.rejects(prepareCloudQuestionRecovery(pool, 'owner', { runId: randomUUID(), workspaceId: randomUUID() }), error => {
+      assert.ok(error instanceof FactoryError);
+      assert.equal(error.code, 'factoryQuestionContinuationUnavailable');
+      assert.equal(error.cause, cause);
+      return true;
+    });
+  } finally {
+    await pool.end();
+  }
+});
+
 test(
   "PG17 execution questions: durable waiting, exact facts/human source, one continuation, rollback and stop fences",
   { skip: !dbURL, timeout: 120000 },

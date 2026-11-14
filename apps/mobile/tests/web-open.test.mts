@@ -17,6 +17,7 @@ mock.module(new URL('../lib/api.ts', import.meta.url).href, { namedExports: { ap
 mock.module(new URL('../lib/config.ts', import.meta.url).href, { namedExports: { API_URL: 'https://fixture.example/mikka', currentAccount: () => account } })
 mock.module(new URL('../lib/apple-auth.ts', import.meta.url).href, { namedExports: { finishAppleDeletionHandoff: (id: string) => finishApple(id) } })
 mock.module(new URL('../lib/messages.ts', import.meta.url).href, { namedExports: { mobileMessages: messages } })
+const { confirmDestructiveAction, showSystemAlert } = await import('../lib/system-alert.ts')
 const { openAccountDeletion, openCloudBilling, openOnWeb, openPrivacyPolicy } = await import('../lib/web.ts')
 beforeEach(() => { urls.length = 0; alerts.length = 0; calls.length = 0; confirmations.length = 0; finishApple = async () => false; platform.OS = 'ios'; account = { id: 'fixture-account-a', server: { url: 'https://fixture.example/mikka' } }; apiCache.clear(); read = async () => ({ token: 'fixture-one-time-token' }); openURL = async url => { urls.push(url) } })
 
@@ -182,4 +183,41 @@ test('an Apple management link failure preserves the manual revocation instructi
   confirmations[0].actions?.[1].onPress?.()
   await new Promise(resolve => setImmediate(resolve))
   assert.deepEqual(alerts, [messages.Auth.appleAuthorizationTitle, messages.Auth.webOpenUnconfirmed])
+})
+
+test('Expo Web uses a real system confirmation and invokes the destructive action only after consent', () => {
+  platform.OS = 'web'
+  const savedConfirm = Object.getOwnPropertyDescriptor(globalThis, 'confirm')
+  const savedAlert = Object.getOwnPropertyDescriptor(globalThis, 'alert')
+  let accepted = false
+  const shown: string[] = []
+  let deletes = 0
+  try {
+    Object.defineProperty(globalThis, 'confirm', { configurable: true, value: (title: string) => { shown.push(title); return accepted } })
+    Object.defineProperty(globalThis, 'alert', { configurable: true, value: (title: string) => { shown.push(title) } })
+    confirmDestructiveAction('Remove fixture?', 'Remove', () => { deletes++ })
+    assert.equal(deletes, 0)
+    accepted = true
+    confirmDestructiveAction('Remove fixture?', 'Remove', () => { deletes++ })
+    assert.equal(deletes, 1)
+    showSystemAlert('Read failed', 'Try again')
+    assert.deepEqual(shown, ['Remove fixture?', 'Remove fixture?', 'Read failed\nTry again'])
+    assert.deepEqual(confirmations, [])
+  } finally {
+    if (savedConfirm) Object.defineProperty(globalThis, 'confirm', savedConfirm)
+    else Reflect.deleteProperty(globalThis, 'confirm')
+    if (savedAlert) Object.defineProperty(globalThis, 'alert', savedAlert)
+    else Reflect.deleteProperty(globalThis, 'alert')
+  }
+})
+
+test('native system confirmation keeps cancellation and destructive actions distinct', () => {
+  let deletes = 0
+  confirmDestructiveAction('Remove fixture?', 'Remove', () => { deletes++ })
+  const buttons = confirmations[0].actions!
+  assert.deepEqual(buttons.map(button => button.text), [messages.Common.cancel, 'Remove'])
+  buttons[0].onPress?.()
+  assert.equal(deletes, 0)
+  buttons[1].onPress?.()
+  assert.equal(deletes, 1)
 })

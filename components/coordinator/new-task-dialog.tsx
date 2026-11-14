@@ -113,7 +113,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
   const handler = botChoices.find(bot => bot.id === botPick) ?? null
   // The task runs on Mikka Cloud on the computer of the bot it goes to.
   const cloudBotId = only ? undefined : handler?.id ?? (bots.find(bot => bot.coordinator) ?? bots[0])?.id
-  const attachments = useChatFiles(draft, setDraft, cloudBotId ? { kind: 'bot', id: cloudBotId } : undefined, sending)
+  const attachments = useChatFiles(draft, setDraft, cloudBotId ? { kind: 'bot', id: cloudBotId } : undefined, sending, tShell)
   // The menu's availability comes from the same dispatch planner as Settings. The default inherits
   // 运行位置 (会先用: the cloud, a server or a computer); only a destination the person explicitly picks becomes a fixed task destination.
   const e2bKey = useOwnE2BKey(dispatching)

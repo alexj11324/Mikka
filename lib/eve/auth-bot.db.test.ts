@@ -6,7 +6,7 @@ import {disposableDatabase} from '../../tests/helpers/e2e-target.mjs'
 
 const valid=disposableDatabase()&&process.env.E2E_DATABASE_URL===process.env.MIKKA_DATABASE_URL&&process.env.E2E_DATABASE_URL===process.env.DATABASE_URL
 if(process.env.REQUIRE_DB==='1'&&!valid)throw new Error('Eve default scope tests require matching isolated loopback _e2e databases')
-test('native default Bot uses the authenticated active Workspace and rejects supplied invalid selectors',{skip:!valid},async()=>{
+test('native default Bot uses the authenticated active Workspace and rejects supplied invalid selectors',{skip:!valid},async t=>{
   const aliases=[
     mock.module('next/headers',{namedExports:await import('../../apps/api/compat/headers')}),
     mock.module('next-intl/server',{namedExports:await import('../../apps/api/compat/intl')}),
@@ -45,8 +45,26 @@ test('native default Bot uses the authenticated active Workspace and rejects sup
     assert.deepEqual(await resolveEveRequestBot(request(),pat),selected)
     assert.equal(await resolveEveRequestBot(request({'x-mikka-workspace-id':personal}),pat),null)
     assert.deepEqual(await resolveEveRequestBot(request({cookie:'mikka-workspace='+personal}),pat),selected)
+    const { createLegacyPersonalAccessToken } = await import('../tokens/store')
+    const { authenticateEveRequest } = await import('./auth')
+    const { createRequestDatabaseScope } = await import('../db')
+    const { Client } = await import('pg')
+    const { token } = await createLegacyPersonalAccessToken(owner, team, { name: 'Eve ingress fixture' })
+    const nativeRequest = request({ authorization: 'Bearer ' + token }, '?botId=' + selected.botId)
+    const routed = createRequestDatabaseScope(process.env.E2E_DATABASE_URL!)
+    try {
+      const queries = t.mock.method(Client.prototype, 'query')
+      const principal = await routed.run(() => authenticateEveRequest(nativeRequest))
+      assert.equal(principal?.principalId, owner)
+      assert.equal(principal?.attributes?.workspaceId, team)
+      assert.equal(principal?.attributes?.botId, selected.botId)
+      const checks = queries.mock.calls.filter(call => /FROM bots WHERE id=\$1 AND "ownerId"=\$2 AND "workspaceId"=\$3/i.test(String(call.arguments[0])))
+      assert.equal(checks.length, 1, 'one exact Bot owner and workspace check in human Eve admission')
+      queries.mock.restore()
+    } finally { await routed.close() }
     await pool.query('UPDATE mikka_workspace_members SET status=\'inactive\' WHERE "workspaceId"=$1 AND "userId"=$2',[team,owner])
     assert.equal(await resolveEveRequestBot(request({'x-mikka-workspace-id':team}),session),null)
+    assert.equal(await authenticateEveRequest(nativeRequest),null)
   }finally{
     await pool.query('DELETE FROM bots WHERE "ownerId"=ANY($1::text[])',[[owner,other]])
     await pool.query('DELETE FROM mikka_workspaces WHERE id=ANY($1::uuid[])',[[personal,team,foreign]])

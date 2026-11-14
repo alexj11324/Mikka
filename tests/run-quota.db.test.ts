@@ -692,6 +692,17 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
           const cause = error instanceof Error && error.cause ? error.cause : error
           return !!cause && typeof cause==='object' && 'code' in cause && cause.code==='P0001'
         })
+      const { ActionFailureError, runAction } = await import('../lib/action-error')
+      const retry = () => actAs(reader, () => quota.retryQuotaPausedRun(p.id, original.id))
+      await assert.rejects(retry, (error: unknown) => {
+        assert.ok(error instanceof ActionFailureError)
+        assert.equal(error.code, 'runInvalid')
+        assert.equal(Object.hasOwn(JSON.parse(JSON.stringify(error)), 'cause'), false)
+        const underlying = error.cause instanceof Error && error.cause.cause ? error.cause.cause : error.cause
+        assert.equal((underlying as { code?: string } | undefined)?.code, 'P0001')
+        return true
+      })
+      assert.deepEqual(await runAction(retry), { error: 'runInvalid', params: undefined })
       assert.deepEqual(await quotaState(p.id),before,'run, binding, machine and notification writes must roll back together')
     } finally {
       await pool.query(`DROP TRIGGER IF EXISTS "${name}" ON agent_runs`)

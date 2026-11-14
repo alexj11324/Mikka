@@ -13,7 +13,12 @@ export const GITHUB_PLUGIN_PATH = withBasePath('/?section=plugins&app=github')
 function cookieValue(request: Request, name: string) {
   for (const part of (request.headers.get('cookie') ?? '').split(';')) {
     const [key, ...rest] = part.trim().split('=')
-    if (key === name) return decodeURIComponent(rest.join('='))
+    if (key === name) {
+      try { return decodeURIComponent(rest.join('=')) }
+      // Malformed browser cookies cannot block the shared Better Auth callback.
+      // Fail closed on the first matching cookie rather than picking a duplicate.
+      catch { return undefined }
+    }
   }
   return undefined
 }
