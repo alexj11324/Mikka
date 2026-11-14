@@ -78,7 +78,7 @@ dbTest('artifact evidence follows each real submission version, not the artifact
       assert.deepEqual(original, { runId: firstRun, latestVersion: 2 }, 'the creator is immutable, while global latest remains useful outside per-run evidence')
       const receipts = (await pool.query(`SELECT "runId",payload->>'version' AS version FROM coordinator_events WHERE "dedupeKey" LIKE $1 ORDER BY "dedupeKey"`, [`artifact_submitted:${first.artifactId}:%`])).rows
       assert.deepEqual(receipts, [{ runId: firstRun, version: '1' }, { runId: nextRun, version: '2' }])
-      assert.equal(scheduled, 4, 'each committed version schedules the receipt and submission wake hooks')
+      assert.equal(scheduled, 2, 'each committed version schedules one wake for its submission receipt')
     })
 
     await t.test('a foreign owner cannot read the run, replace the file, or download its version', async () => {

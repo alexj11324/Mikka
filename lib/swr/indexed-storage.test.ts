@@ -52,3 +52,43 @@ test('an activation invalidated while IndexedDB opens cannot replace the new acc
   assert.deepEqual(await delayed, [])
   assert.deepEqual((await newTab.activate('account-b')).map(row => row.data), [{ title: 'new account' }])
 })
+
+
+test('failed opens can recover without reloading the cache provider', async () => {
+  const originalFactory = indexedDB
+  const transient = new DOMException('Temporary storage error', 'UnknownError')
+  let opens = 0
+  Object.defineProperty(globalThis, 'indexedDB', { configurable: true, value: {
+    open(name: string, version?: number) {
+      if (++opens === 1) {
+        // A transient browser IndexedDB failure before any upgrade completes.
+        const request = { error: transient } as IDBOpenDBRequest
+        queueMicrotask(() => { request.onerror?.call(request, new Event('error')) })
+        return request
+      }
+      return originalFactory.open(name, version)
+    },
+  } })
+  const storage = new IndexedReadStorage()
+  await assert.rejects(storage.activate('account-a'), error => error === transient)
+  assert.deepEqual(await storage.activate('account-a'), [])
+  await storage.write('account-a', value('recovered'))
+  assert.deepEqual((await storage.activate('account-a')).map(row => row.data), [{ title: 'recovered' }])
+  assert.equal(opens, 2)
+})
+
+test('native versionchange closes the old database and allows another open', async () => {
+  const storage = new IndexedReadStorage()
+  await storage.activate('account-a')
+  // Simulate an IndexedDB versionchange notification without changing this
+  // test's schema. The actual browser upgrade is responsible for that step.
+  const getConnection = () => (storage as unknown as { open(): Promise<IDBDatabase> }).open()
+  const oldDatabase = await getConnection()
+  const onVersionChange = oldDatabase.onversionchange
+  assert.equal(typeof onVersionChange, 'function')
+  onVersionChange?.call(oldDatabase, new Event('versionchange') as IDBVersionChangeEvent)
+  const replacement = await getConnection()
+  assert.notEqual(replacement, oldDatabase)
+  await storage.write('account-a', value('reopened'))
+  assert.deepEqual((await storage.activate('account-a')).map(row => row.data), [{ title: 'reopened' }])
+})

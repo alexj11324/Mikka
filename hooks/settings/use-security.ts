@@ -22,10 +22,10 @@ export function useSecurity() {
   const [pendingSession, setPendingSession] = useState<string | null>(null)
   const [signOutError, setSignOutError] = useState<string | null>(null)
 
-  const passwordStatus = password.data && !('error' in password.data) ? password.data : null
+  const passwordStatus = !password.error && password.data && !('error' in password.data) ? password.data : null
   const passwordError = password.data && 'error' in password.data ? actionError(password.data.error) : password.error ? actionError() : null
   const hasPassword = passwordStatus?.hasPassword ?? null
-  const devices: SignedInDevice[] = sessions.data && !('error' in sessions.data) ? sessions.data.sessions : []
+  const devices: SignedInDevice[] = !sessions.error && sessions.data && !('error' in sessions.data) ? sessions.data.sessions : []
   const devicesLoading = !sessions.data && !sessions.error
   /** Why the device list could not be read, or a fixed message when the read itself failed */
   const devicesError = sessions.data && 'error' in sessions.data ? actionError(sessions.data.error) : sessions.error ? '' : null
@@ -77,6 +77,6 @@ export function useSecurity() {
 
   return {
     passwordLoading: password.isLoading, passwordError, hasPassword, savePassword, reloadPassword: () => password.mutate(),
-    devices, devicesLoading, devicesError, pendingSession, signOutError, signOut, signOutOthers,
+    devices, devicesLoading, devicesError, reloadDevices: () => sessions.mutate(), pendingSession, signOutError, signOut, signOutOthers,
   }
 }

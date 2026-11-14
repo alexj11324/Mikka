@@ -127,7 +127,7 @@ export async function pushReply(userId: string, botId: string, text: string | nu
                 if (!fresh.rowCount) return
                 try {
                   await deliverPhonePush(userId, { to: destinations.rows.map(row => row.token), title: bot.coordinator ? 'Coordinator' : bot.name, body,
-                    data: { botId: bot.coordinator ? null : botId, serverUrl: appOrigin + BASE_PATH, userId,
+                    data: { botId, serverUrl: appOrigin + BASE_PATH, userId,
                       ...(task ? { workspaceId: origin.workspaceId, issueId: task.issueId, ...(task.runId ? { runId: task.runId } : {}) } : {}) }, collapseId: botId }, locale)
                 } catch (error) {
                   if (!(error instanceof CloudServiceError)) throw error

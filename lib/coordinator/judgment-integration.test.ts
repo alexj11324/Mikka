@@ -32,11 +32,13 @@ stub('../attention/store.ts',{releaseAttention:async()=>{}})
 stub('../default-model.ts',{defaultModelAvailable:async()=>true,cloudDecisionTarget:async()=>null})
 stub('./coordinator-bot.ts',{coordinatorBot:async()=>({botId:'fixture-bot',workspaceId:'fixture-workspace'})})
 stub('../db/index.ts',{pool:{query:async(sql:string)=>{
- if(sql.includes('SELECT id FROM coordinator_events'))return {rows:events.filter(e=>e.tier!==null&&e.tier!=='background').map(e=>({id:e.id}))}
- if(sql.includes('SELECT "workspaceId" FROM bots'))return {rows:[{workspaceId:'fixture-workspace'}]}
+ if(sql.includes('SELECT e.id, b."workspaceId" FROM coordinator_events e'))return {rows:events.filter(e=>e.tier!==null&&e.tier!=='background').map(e=>({id:e.id,workspaceId:'fixture-workspace'}))}
  throw new Error('Unexpected SQL in decision boundary fixture')
 }}})
-stub('../eve/server-client.ts',{sendEveEvent:async()=>{starts++}})
+stub('../eve/server-client.ts',{sendEveEvent:async(scope:unknown,id:string)=>{
+ assert.deepEqual(scope,{ownerId:'synthetic',botId:null,workspaceId:'fixture-workspace',surface:'web'})
+ assert.ok(events.some(event=>event.id===id));starts++
+}})
 let wake:typeof import('./wake'),group:typeof import('./route-group'),transport:typeof import('./decide')
 before(async()=>{
  console.error=()=>{}
@@ -193,4 +195,16 @@ test('Decisions traces separate a connected Cloud receipt and custom transport f
   assert.deepEqual(decisionTraceTarget(gatewayEndpoint, false), { route: 'gateway' })
   assert.deepEqual(decisionTraceTarget(nativeEndpoint, false), { route: 'api_key', provider: 'openai' })
   assert.deepEqual(decisionTraceTarget('https://compatible.example/v1/decisions', false), { route: 'api_key' })
+})
+
+test('a previously queued Coordinator deadline delivers its pending event through Eve then completes', async () => {
+  starts = 0
+  events = [{ id: 'old-deadline-outbox', kind: 'run_finished', payload: {}, tier: 'result' }]
+  const ticket = { userId: 'synthetic', botId: 'fixture-bot', at: '2026-11-01T00:00:00Z',
+    events: [{ id: 'old-deadline-outbox', attempt: 1, nextWakeAt: '2026-11-01T00:00:00Z', leaseUntil: null }] }
+  assert.equal(await wake.recoverWakeDeadline(ticket), null)
+  assert.equal(starts, 1)
+  events = []
+  assert.equal(await wake.recoverWakeDeadline(ticket), null)
+  assert.equal(starts, 1, 'a retired deadline with no pending product event starts no Eve delivery')
 })

@@ -85,6 +85,7 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
   const homeData = useHome().data
   const home = homeData?.live?.workspaceId
   const homeBots = homeData?.bots
+  const coordinator = self === 'coordinator' || Boolean(homeBots?.some(bot => bot.id === self && bot.coordinator))
   // The web's chat key (components/coordinator/coordinator-chat.tsx) on the person's home channel; a turn's lease
   // running out has no write, so the server names it as a deadline.
   // A push reads only what is new since the last read, and merges it into what is shown (#1408).
@@ -336,7 +337,7 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
   return (
     <View style={styles.screen}>
       {/* Back is the system's (and its edge swipe); the title pill opens the bot's page, ⋯ its tasks and its page. */}
-      <ChatHeader scrolled={underBar.scrolled} name={name} color={color} shape={shape} botId={ownBotId} coordinator={self === 'coordinator'} tasks={tasks.data ? menuTasks(tasks.data.tasks, ownBotId) : null} onTask={id => router.push(`/task/${id}`)}
+      <ChatHeader scrolled={underBar.scrolled} name={coordinator ? 'Coordinator' : name} color={color} shape={shape} botId={ownBotId} coordinator={coordinator} tasks={tasks.data ? menuTasks(tasks.data.tasks, ownBotId) : null} onTask={id => router.push(`/task/${id}`)}
         onAllTasks={() => router.push(`/bots/${self}/tasks`)} onInfo={() => router.push(`/bots/${self}/info`)} />
       {/* The message list comes first, so the iOS bar finds it and blurs what scrolls under (scroll-edge effect). */}
       <View style={{ flex: 1, overflow: 'hidden' }}

@@ -3,14 +3,14 @@ import { randomBytes } from 'node:crypto'
 import test from 'node:test'
 import type { ApprovalConfiguration } from 'eve/tools/approval'
 import { createProductTool } from './product-tool'
-import { productRpc, type ProductOperation } from './product-rpc'
+import { productRpc, type ProductCatalogueEntry, type ProductOperation } from './product-rpc'
 import { internalEveScope } from './auth'
 import { scopeAuth, type EveScope } from './scope'
 
 const scope = {ownerId:'owner',botId:'10000000-0000-4000-8000-000000000001',workspaceId:'10000000-0000-4000-8000-000000000002',surface:'web' as const}
 const binding = {sessionId:'wrun_fixture',turnId:'turn_0',executionId:'10000000-0000-4000-8000-000000000003'}
 const input = {recipient:'fixture@example.invalid',body:'Proposed message'}
-const definition = {name:'send_email',description:'Send mail',inputSchema:{type:'object'}}
+const definition: ProductCatalogueEntry = {name:'send_email',description:'Send mail',inputSchema:{type:'object'}}
 
 test('native product tool pauses through Eve with exact durable call/input binding',async()=>{
   const requests:ProductOperation[]=[]
@@ -74,4 +74,21 @@ test('self-hosted product RPC uses the configured server and reserves the privat
   delete process.env.MIKKA_EVE_PRODUCT_TOKEN
   await assert.rejects(productRpc(scope, operation), { message: 'agentToolUnavailable' })
   assert.equal(calls.length, 1)
+})
+
+
+test('Cloudflare product RPC carries the native Eve scope without a second signed expiring credential', async t => {
+  t.mock.property(process, 'env', { ...process.env, MIKKA_EVE_HOST: 'cloudflare', MIKKA_EVE_PRODUCT_TOKEN: 'private-runtime-capability', BETTER_AUTH_SECRET: '' })
+  let calls = 0
+  t.mock.method(globalThis, 'fetch', async (url: URL, options: RequestInit) => {
+    calls++
+    const request = new Request(url, options)
+    assert.equal(request.url, 'https://product.internal/mikka/api/internal/eve/tools')
+    assert.equal(request.headers.get('authorization'), null)
+    assert.deepEqual(JSON.parse(request.headers.get('x-mikka-eve-scope')!), scope)
+    assert.equal(request.headers.get('x-mikka-product-capability'), 'private-runtime-capability')
+    return Response.json({ accepted: true })
+  })
+  assert.deepEqual(await productRpc(scope, { ...binding, operation: 'prepare' }), { accepted: true })
+  assert.equal(calls, 1)
 })

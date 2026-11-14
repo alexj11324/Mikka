@@ -27,8 +27,8 @@ export async function submitMobileTask(draft: TaskDraft, operation: { id: string
   }
   await acceptTaskDelivery(operation, async id => {
     const client = new Client(eveClientOptions(null, connection))
-    const { session } = await client.sessions.create()
-    await session.send(description, {
+    await client.sessions.create({
+      message: description,
       headers: { 'x-mikka-submission-id': id },
       clientContext: { expectedWorkspaceId: workspaceId, botId: null, ...(title ? { taskTitle: title } : {}),
         taskCommand: { version: 1, intent: 'create_and_dispatch', description } },

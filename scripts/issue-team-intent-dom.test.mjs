@@ -9,90 +9,103 @@ for (const key of ['window', 'document', 'navigator', 'HTMLElement', 'Element', 
   Object.defineProperty(globalThis, key, { value: key === 'window' ? window : window[key], configurable: true })
 }
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
-let readTeam, promote, saves, notices
+let write, cache, reads, notices
 mock.module(new URL('../app/actions/issues.ts', import.meta.url).href, { namedExports: {
-  promoteIssueToTeam: input => promote(input), setIssueScope: () => { throw Error('legacy action forbidden') },
+  setIssueScope: input => write(input),
 } })
-mock.module(new URL('../app/actions/team-relations.ts', import.meta.url).href, { namedExports: { getIssueTeam: () => readTeam() } })
+mock.module('swr', { defaultExport: (key, fetcher) => { reads.push({ key, fetcher }); return { data: cache } } })
 mock.module('next-intl', { namedExports: { useTranslations: () => key => key } })
-mock.module('sonner', { namedExports: { toast: { error: value => notices.push(value), success: value => notices.push(value) } } })
+mock.module('sonner', { namedExports: { toast: { error: message => notices.push(['error', message]), success: message => notices.push(['success', message]) } } })
 mock.module(new URL('../lib/use-action-error.ts', import.meta.url).href, { namedExports: { useActionError: () => code => code } })
-// Only the menu primitive and transport are substituted. Real component hooks,
-// layout effects, event handler, intent helper and lifecycle execute unchanged.
-mock.module(new URL('../components/workspace/issue-property-menu.tsx', import.meta.url).href, { namedExports: {
-  IssuePropertyMenu: props => createElement('button', { onClick: () => props.onChange('workspace') }, 'share'),
-} })
-const { IssueScopeControl } = await import('../components/workspace/issue-scope-control.tsx')
-const task = { id: 'task-a', revision: 3, scope: 'personal', scopeSetBy: 'user' }
-const teamChoice = { issueId: task.id, teamId: 'team-a', selectionId: 'save-a' }
+const { useTaskOwnershipRows } = await import('../components/workspace/issue-scope-control.tsx')
+const task = {
+  id: 'task-a', userId: 'owner', workspaceId: 'alpha', ownershipState: 'bound', scope: 'personal',
+  revision: 3, linearSyncPolicy: 'disabled', linearSyncBlocked: true, linearTargetVerified: false,
+}
+const synced = { ...task, linearSyncPolicy: 'explicit', linearSyncBlocked: false, linearTargetVerified: true }
 const settle = () => new Promise(resolve => setImmediate(resolve))
 
 async function mount(overrides = {}) {
-  const host = document.createElement('div'); document.body.append(host)
+  const host = document.createElement('div')
+  document.body.append(host)
   const root = createRoot(host)
-  let mounted = true
-  const props = { task, teamChoice, onSaved: issue => saves.push(issue), ...overrides }
-  const render = async next => { await act(async () => root.render(createElement(IssueScopeControl, { ...props, ...next }))) }
-  await render({})
-  return { host, render,
-    click: () => act(async () => { host.querySelector('button').click(); await settle() }),
-    unmount: async () => { if (mounted) { mounted = false; await act(async () => root.unmount()); host.remove() } },
+  const saves = []
+  let rows
+  let props = { task, viewerId: 'owner', preview: false, locked: false, ...overrides }
+  function Frame() {
+    rows = useTaskOwnershipRows(props.task, props.viewerId, props.preview, props.locked, issue => saves.push(issue))
+    return null
   }
+  async function render(next = {}) {
+    props = { ...props, ...next }
+    await act(async () => root.render(createElement(Frame)))
+  }
+  await render()
+  return { render, rows: () => rows, saves, unmount: async () => { await act(async () => root.unmount()); host.remove() } }
 }
-
-test('actual scope component cancels the waiting read on selection/task/revision changes and unmount', async () => {
-  for (const change of ['clear', 'selection', 'task', 'revision', 'unmount']) {
-    let release, calls = 0
-    const relation = new Promise(resolve => { release = resolve })
-    readTeam = () => relation; promote = async () => { calls++; return { issue: task } }; saves = []; notices = []
-    const view = await mount()
-    try {
-      await view.click()
-      if (change === 'unmount') await view.unmount()
-      else await view.render(change === 'clear' ? { teamChoice: null }
-        : change === 'selection' ? { teamChoice: { ...teamChoice, selectionId: 'save-b', teamId: 'team-b' } }
-          : { task: { ...task, ...(change === 'task' ? { id: 'task-b' } : { revision: 4 }) } })
-      await act(async () => { release('team-a'); await settle() })
-      assert.deepEqual({ calls, saves, notices }, { calls: 0, saves: [], notices: [] }, change)
-    } finally { await view.unmount() }
-  }
+test.beforeEach(() => {
+  cache = { accounts: [{ id: 'owner', choices: [{ id: 'alpha', name: 'Engineering' }] }] }
+  reads = []; notices = []
+  write = () => { throw Error('unexpected write') }
 })
 
-test('actual scope component refuses persisted team without this human choice and submits an explicit choice', async () => {
-  let reads = 0, calls = []
-  readTeam = async () => { reads++; return 'team-a' }; promote = async input => { calls.push(input); return { issue: { ...task, scope: 'workspace' } } }; saves = []; notices = []
-  const missing = await mount({ teamChoice: null })
-  try { await missing.click(); assert.equal(reads, 0); assert.equal(calls.length, 0); assert.equal(saves.length, 0) }
-  finally { await missing.unmount() }
-  notices = []
-  const chosen = await mount()
-  try {
-    await chosen.click()
-    assert.equal(calls.length, 1)
-    assert.deepEqual({ ...calls[0], requestId: 'checked' }, { requestId: 'checked', issueId: task.id, revision: 3, teamId: 'team-a', expectedTeamId: 'team-a' })
-    assert.match(calls[0].requestId, /^[0-9a-f-]{36}$/)
-    assert.equal(saves.length, 1)
-  } finally { await chosen.unmount() }
-})
-
-test('completed-request replay adopts the now-personal issue without claiming a workspace transition', async () => {
-  const personal = { ...task, revision: 5, scope: 'personal' }
-  let calls = 0
-  readTeam = async () => 'team-a'; promote = async () => { calls++; return { issue: personal } }; saves = []; notices = []
+test('the Task workspace is a fixed authorized binding, independent of the old scope and the selected workspace', async () => {
   const view = await mount()
   try {
-    await view.click()
-    assert.equal(calls, 1)
-    assert.deepEqual(saves, [personal])
-    assert.deepEqual(notices, ['teamIssueChanged'])
-    assert.equal(notices.includes('movedToWorkspace'), false)
-    assert.equal(notices.includes('movedToPersonal'), false)
+    const row = () => view.rows().find(item => item.id === 'workspace')
+    assert.equal(row().value.text, 'Engineering')
+    assert.equal(row().menu, undefined)
+    assert.equal(row().onClick, undefined)
+    assert.deepEqual(view.rows().map(item => item.id), ['workspace'])
+    cache = { accounts: [{ id: 'peer', choices: [{ id: 'alpha', name: 'Another session' }] }] }
+    await view.render({ task: { ...task, scope: 'workspace' } })
+    assert.equal(row().value.text, 'alpha')
+    await view.render({ preview: true })
+    assert.equal(row().value.text, 'workspaceUnavailable')
+    await view.render({ preview: false, task: { ...task, ownershipState: 'pending' } })
+    assert.equal(row().value.text, 'workspaceUnavailable')
+    assert.ok(reads.every(call => call.fetcher === null))
+    assert.deepEqual(notices, [])
   } finally { await view.unmount() }
 })
 
-test('default personal scope is not described as an agent classification',async()=>{
-  readTeam=async()=>null;promote=async()=>{throw Error('unexpected promotion')};saves=[];notices=[]
-  const view=await mount({task:{...task,scope:'personal',scopeSetBy:'agent'}})
-  try {assert.equal(view.host.textContent.includes('judgedByAgent'),false)}
-  finally {await view.unmount()}
+test('only the signed-in owner of an explicitly syncing Task can turn off Linear and save the returned policy', async () => {
+  const calls = []
+  let finish
+  write = input => { calls.push(input); return new Promise(resolve => { finish = resolve }) }
+  const view = await mount({ task: synced, viewerId: 'member' })
+  try {
+    const row = () => view.rows().find(item => item.id === 'linearSync')
+    assert.equal(row().menu, undefined)
+    await view.render({ viewerId: 'owner', locked: true })
+    assert.equal(row().menu, undefined)
+    await view.render({ locked: false })
+    const disable = row().menu[0]
+    assert.equal(disable.label, 'disableLinkedLinear')
+    await act(async () => { disable.onSelect(); disable.onSelect(); await settle() })
+    assert.deepEqual(calls, [{ id: task.id, revision: 3, scope: 'personal' }])
+    const result = { ...task, scope: 'workspace', revision: 4 }
+    await act(async () => { finish({ issue: result }); await settle() })
+    assert.deepEqual(view.saves, [result])
+    assert.deepEqual(notices, [['success', 'linearDisabled']])
+    await view.render({ task: result })
+    assert.equal(row(), undefined)
+  } finally { await view.unmount() }
+})
+
+test('failed and superseded Linear writes never report a changed workspace or false success', async () => {
+  let finish
+  write = () => new Promise(resolve => { finish = resolve })
+  const view = await mount({ task: { ...synced, linearTargetVerified: false } })
+  try {
+    const action = () => view.rows().find(row => row.id === 'linearSync').menu[0]
+    assert.equal(action().label, 'disableLinear')
+    await act(async () => { action().onSelect(); await settle(); finish({ error: 'issueStale' }); await settle() })
+    assert.deepEqual(notices, [['error', 'issueStale']])
+    await act(async () => { action().onSelect(); await settle() })
+    await view.render({ task: { ...task, id: 'task-b' } })
+    await act(async () => { finish({ issue: { ...task, revision: 4 } }); await settle() })
+    assert.deepEqual(view.saves, [])
+    assert.deepEqual(notices, [['error', 'issueStale']])
+  } finally { await view.unmount() }
 })

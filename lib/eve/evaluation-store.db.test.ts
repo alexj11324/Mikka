@@ -25,7 +25,7 @@ test('evaluation input bindings preserve owned proposal revisions and the frozen
  const scope={ownerId:owner,botId:bot,workspaceId:workspace,surface:'web' as const}
  const agent={...DEFAULT_AGENT_DEFINITION,tools:['web_search'] as typeof DEFAULT_AGENT_DEFINITION.tools}
  const snapshot=makeSnapshot(baseline,1,agent,'Frozen host',{harness:'ai_sdk',model:'fixture-model'})
- const plan:EvaluationPlan={scope,snapshot,testCase:CORE_EVAL_CASES[0],instructions:'Frozen instructions',tools:[]}
+ const plan:EvaluationPlan={scope,snapshot,testCase:CORE_EVAL_CASES[0],instructions:'Frozen instructions '.repeat(2048),tools:[]}
  await pool.query('INSERT INTO "user" VALUES($1)',[owner]);await pool.query('INSERT INTO bots VALUES($1,$2,$3)',[bot,owner,workspace])
  await pool.query('INSERT INTO agent_kit_heads(owner_id,bot_key,bot_id,workspace_id) VALUES($1,$2::text,$2::uuid,$3)',[owner,bot,workspace])
  for(const [id,version,definition] of [[baseline,1,agent],[candidate,2,{...agent,instructions:'Candidate guidance'}]] as const)await pool.query(`INSERT INTO agent_kit_versions(id,owner_id,bot_key,version,definition,digest,source,request_key) VALUES($1::uuid,$2,$3,$4,$5,$6,'builtin',$1::text)`,[id,owner,bot,version,definition,digest(definition)])
@@ -34,9 +34,18 @@ test('evaluation input bindings preserve owned proposal revisions and the frozen
  await pool.query(`INSERT INTO agent_kit_executions(id,owner_id,bot_key,execution_key,version_id,snapshot) VALUES($1,$2,$3,$4,$5,$6)`,[randomUUID(),owner,bot,'evaluation:'+request,baseline,snapshot])
  const id=await createEvaluationBinding(pool,scope,evaluation,baseline,plan)
  await bindEvaluationSession(pool,id,'native-evaluation-session')
- assert.equal((await loadEvaluationBinding(pool,scope,id))?.session_id,'native-evaluation-session')
+ const routing=await loadEvaluationBinding(pool,scope,id,'route')
+ assert.ok(routing)
+ const execution=await loadEvaluationBinding(pool,scope,id)
+ assert.ok(execution)
+ t.diagnostic(`Evaluation binding result bytes (route, runtime): ${Buffer.byteLength(JSON.stringify(routing))}, ${Buffer.byteLength(JSON.stringify(execution))}`)
+ assert.deepEqual(routing,{id,session_id:'native-evaluation-session'})
+ assert.deepEqual(execution.plan,plan)
  await assert.rejects(bindEvaluationSession(pool,id,'different-session'),/agentEvaluationMismatch/)
- for(const foreign of [{...scope,ownerId:'other'},{...scope,botId:randomUUID()},{...scope,workspaceId:randomUUID()}])assert.equal(await loadEvaluationBinding(pool,foreign,id),null)
+ for(const foreign of [{...scope,ownerId:'other'},{...scope,botId:randomUUID()},{...scope,workspaceId:randomUUID()}]) {
+   assert.equal(await loadEvaluationBinding(pool,foreign,id),null)
+   assert.equal(await loadEvaluationBinding(pool,foreign,id,'route'),null)
+ }
  const candidatePlan={...plan,snapshot:makeSnapshot(candidate,2,{...agent,instructions:'Candidate guidance'},snapshot.hostInstructions,snapshot.runtime)}
  assert.ok(await createEvaluationBinding(pool,scope,evaluation,candidate,candidatePlan))
  for(const changed of [{...plan,snapshot:{...snapshot,runtime:{harness:'ai_sdk' as const,model:'wrong-model'}}},{...plan,snapshot:{...snapshot,definition:{...agent,instructions:'changed'}}},{...plan,snapshot:{...snapshot,hostInstructionsDigest:'0'.repeat(64)}}])await assert.rejects(createEvaluationBinding(pool,scope,evaluation,baseline,changed),/agentEvaluationMismatch/)

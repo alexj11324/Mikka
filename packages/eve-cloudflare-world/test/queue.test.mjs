@@ -10,6 +10,7 @@ import { build } from 'esbuild'
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import { withSessionControlDelivery } from '../../../lib/eve/session-control-delivery.mjs'
 import { createNodeQueue } from '../src/node-queue.mjs'
+import { consumeWorldQueue } from '../src/queue-transport.mjs'
 import { WORKFLOW_FLOW_ROUTE } from '@workflow/world/queue.js'
 
 const require = createRequire(import.meta.url)
@@ -79,6 +80,62 @@ test('a delayed previous-revision message reaches only its signed Node executor 
   expect(seen.filter(x => x.message.id === id).map(x => [x.revision, x.meta.messageId, x.meta.attempt])).toEqual([
     [revisions[0], messageId, 1], [revisions[0], messageId, 2],
   ])
+})
+
+test('unkeyed publication returns the native ID even if the accepted response body is lost', async () => {
+  const id = randomUUID()
+  const handled = once(events, id)
+  const client = createNodeQueue({ deploymentId: revisions[1], signingKey, async fetchBound(url, init) {
+    const result = await outbound.fetch(url, init)
+    if (!result.ok) return result
+    await result.body?.cancel()
+    return new Response(new ReadableStream({ start(controller) {
+      controller.error(new Error('receipt body reset after native acceptance'))
+    } }), { status: result.status })
+  } })
+  const [receipt, [item]] = await Promise.all([client.queue(topic, { id }), handled])
+  expect(receipt).toEqual({ messageId: item.meta.messageId })
+})
+
+test.each(['reset', 'pending'])('response cleanup (%s) cannot change or delay the pinned executor acknowledgement', async cleanupMode => {
+  const revision = revisions[1]
+  for (const [status, returnedRevision, accepted] of [
+    [200, revision, true], [503, revision, false], [200, revisions[0], false],
+  ]) {
+    const outcome = []
+    const message = {
+      body: { revision, dueAt: 0, body: '{}' },
+      attempts: 2,
+      ack() { outcome.push('ack') },
+      retry(options) { outcome.push(options) },
+    }
+    const cancelStarted = Promise.withResolvers()
+    const release = Promise.withResolvers()
+    const env = { EVE_RELEASES: { [revision]: 'TARGET' }, EVE_QUEUE_SIGNING_KEY: signingKey,
+      TARGET: { fetch() {
+        const body = cleanupMode === 'reset'
+          ? new ReadableStream({ start(controller) { controller.error(new Error('response reset')) } })
+          : new ReadableStream({ cancel() { cancelStarted.resolve(); return release.promise } })
+        return new Response(body, { status, headers: { 'x-mikka-eve-release': returnedRevision } })
+      } },
+    }
+    const work = []
+    const batch = consumeWorldQueue({ messages: [message] }, env, { waitUntil(promise) { work.push(promise) } })
+    try {
+      if (cleanupMode === 'pending') {
+        await cancelStarted.promise
+        await new Promise(resolve => setImmediate(resolve))
+      } else {
+        await batch
+      }
+      expect(outcome).toEqual(accepted ? ['ack'] : [{ delaySeconds: 2 }])
+      expect(work).toHaveLength(1)
+    } finally {
+      release.resolve()
+      await batch
+      await Promise.all(work)
+    }
+  }
 })
 
 test('a payload larger than the native queue message limit is preserved through R2', async () => {

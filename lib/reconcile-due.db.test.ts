@@ -4,6 +4,7 @@ import test from 'node:test'
 import { Pool } from 'pg'
 import { isE2eTarget } from '../tests/helpers/e2e-target.mjs'
 import { reconcileDue } from './reconcile-due'
+import { nextScheduleDue } from './schedules/store'
 import { cleanupWorkspaceEphemera } from './coding-workspace/retention'
 
 // #1371: the one safety-net check. It is true for a job only when that job has
@@ -13,7 +14,7 @@ const target = process.env.E2E_DATABASE_URL
 const valid = isE2eTarget(target) && target === process.env.MIKKA_DATABASE_URL && target === process.env.DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !valid) throw new Error('Reconcile tests require matching isolated loopback _e2e URLs')
 
-const TABLES = ['coordinator_events', 'coordinator_sessions', 'user_schedules', 'schedule_occurrences', 'inbox_snoozes', 'agent_runs', 'devices', 'cloud_machines',
+const TABLES = ['coordinator_events', 'coordinator_sessions', 'user_schedules', 'schedule_occurrences', 'inbox_snoozes', 'inbox_conversation_snoozes', 'agent_runs', 'devices', 'cloud_machines',
   'thread_machines', 'coding_review_sessions', 'issues', 'sandbox_kill_retries', 'group_turns', 'group_task_bindings', 'factory_tasks', 'factory_attempts', 'factory_events',
   'factory_deliverable_acceptances', 'factory_candidates', 'factory_merges', 'account_deletion_jobs', 'account_deletion_guards', 'chat_attachments', 'chat_attachment_retirements',
   'workspace_audit_retention', 'workspace_audit_events', 'workspace_deletions', 'workspace_audit_outbox', 'mobile_push_receipts', 'coding_workspace_requests', 'coding_workspace_mentions']
@@ -63,6 +64,18 @@ test('the safety-net check names exactly the jobs with work already due', { skip
     await insert(`now()-interval '1 second'`)
     assert.deepEqual(await due(), { ...none, schedules: true })
     await clear()
+  })
+
+  await t.test('a conversation snooze alone sets the timer deadline and becomes due for recovery', async () => {
+    const id = randomUUID()
+    const inserted = await pool.query<{ until: Date }>(`INSERT INTO inbox_conversation_snoozes ("workspaceId","userId","itemType","itemId","snoozedUntil")
+      VALUES ($1,'owner','conversation',$2,date_trunc('milliseconds',now()) + interval '10 minutes') RETURNING "snoozedUntil" AS until`, [randomUUID(), id])
+    const future = await nextScheduleDue(pool)
+    const before = await due()
+    await pool.query(`UPDATE inbox_conversation_snoozes SET "snoozedUntil" = now() - interval '1 second' WHERE "itemId"=$1`, [id])
+    const expired = await due()
+    await clear()
+    assert.deepEqual([future, before.schedules, expired.schedules], [inserted.rows[0].until.getTime(), false, true])
   })
 
   await t.test('an Inbox snooze alone wakes schedules reconciliation only once it is due', async () => {

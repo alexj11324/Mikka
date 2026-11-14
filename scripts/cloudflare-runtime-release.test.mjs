@@ -1,15 +1,17 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { packageEve } from './package-eve.mjs'
-import { checkedResource, packagePrebuiltEve, registryGraph, releaseIdentity, verifyApiPayload, verifyResources } from './cloudflare-runtime-release.mjs'
+import { checkedResource, packagePrebuiltEve, registryGraph, releaseIdentity, runtimeImageIdentity, verifyApiPayload, verifyResources } from './cloudflare-runtime-release.mjs'
 
 const publicSha = 'a'.repeat(40), overlaySha = 'b'.repeat(40)
 const runId = '80001', runAttempt = '1', buildId = runId + '-' + runAttempt
 const release = 'aaaaaaaaaaaa-80001-1'
+const ownerRelease = '8a1234567890-70001-1'
 const imageDigest = 'sha256:' + 'c'.repeat(64)
 const api = { version: 1, provider: 'github-actions', repository: 'alexj11324/Mikka', repositoryId: '1427517699', ref: 'refs/heads/main',
   workflowRef: 'alexj11324/Mikka/.github/workflows/cloudflare-api-image.yml@refs/heads/main', workflowSha: publicSha,
@@ -49,6 +51,10 @@ test('manual publication binds the genuine public workflow run to the accepted A
   assert.equal(result.apiRunId, runId)
   assert.equal(result.apiRunAttempt, runAttempt)
   assert.equal(result.release, release)
+  assert.deepEqual(result, { version: 1, provider: 'github-actions', repository: 'alexj11324/Mikka', workload: 'eve',
+    driverSource: publicSha, publicSha, overlaySha, apiProvider: 'github-actions', apiRunId: runId, apiRunAttempt: runAttempt,
+    apiBuildId: buildId, apiImage: api.image, release, runId: '90001', runAttempt: '2' })
+  assert.deepEqual(releaseIdentity({ ...env, MAINTENANCE_OWNER_RELEASE: '' }, 'eve', api), result)
   for (const patch of [{ GITHUB_REPOSITORY: 'alexj11324/mikka-hosted-ui' }, { GITHUB_EVENT_NAME: 'pull_request' },
     { GITHUB_REF: 'refs/heads/feature' }, { GITHUB_WORKFLOW_SHA: overlaySha }, { GITHUB_SHA: overlaySha },
     { GITHUB_WORKFLOW_REF: 'alexj11324/Mikka/.github/workflows/another.yml@refs/heads/main' },
@@ -59,6 +65,30 @@ test('manual publication binds the genuine public workflow run to the accepted A
     { publicBuildSettings: { ...api.publicBuildSettings, NEXT_PUBLIC_COMPUTER_ENABLED: '0' } },
     { overlayCheckout: { ...api.overlayCheckout, actualSha: publicSha } }, { image: api.image.replace('/mikka-api@', '/another@') }]) {
     assert.throws(() => releaseIdentity(env, 'eve', { ...api, ...patch }))
+  }
+})
+
+test('explicit Eve maintenance preserves API provenance and gives the owner a distinct image identity', () => {
+  const ordinary = releaseIdentity(env, 'eve', api)
+  const maintenanceEnv = { ...env, MAINTENANCE_OWNER_RELEASE: ownerRelease }
+  const maintained = releaseIdentity(maintenanceEnv, 'eve', api)
+  assert.deepEqual(maintained, { ...ordinary, runtimeRelease: ownerRelease })
+  assert.deepEqual(runtimeImageIdentity(ordinary), { tag: release, labels: {
+    'org.opencontainers.image.revision': publicSha, 'com.mikka.overlay': overlaySha, 'com.mikka.release': release,
+  } })
+  assert.deepEqual(runtimeImageIdentity(maintained), { tag: 'aaaaaaaaaaaa-80001-1-maintenance-8a1234567890-70001-1', labels: {
+    'org.opencontainers.image.revision': publicSha, 'com.mikka.overlay': overlaySha, 'com.mikka.release': release,
+    'com.mikka.runtime-release': ownerRelease,
+  } })
+  assert.throws(() => releaseIdentity({ ...maintenanceEnv,
+    GITHUB_WORKFLOW_REF: 'alexj11324/Mikka/.github/workflows/cloudflare-task-sandbox.yml@refs/heads/main' }, 'task', api))
+  for (const value of [release, 'dpl_legacy', 'release', '8A1234567890-70001-1', 'aaaaaa-7-1', 'a'.repeat(13) + '-7-1',
+    'abcdef0-0-1', 'abcdef0-1-0', 'abcdef0-01-1', 'abcdef0-1-01', 'abcdef0-12345678901234567890123-1', ownerRelease + '\n']) {
+    assert.throws(() => releaseIdentity({ ...env, MAINTENANCE_OWNER_RELEASE: value }, 'eve', api))
+  }
+  for (const patch of [{ GITHUB_EVENT_NAME: 'pull_request' }, { GITHUB_ACTOR_ID: '1' }, { RUNTIME_SOURCE_SHA: overlaySha },
+    { API_IMAGE_DIGEST: 'sha256:' + '0'.repeat(64) }, { API_RUN_ID: '70001' }, { API_RUN_ATTEMPT: '2' }, { OVERLAY_SHA: publicSha }]) {
+    assert.throws(() => releaseIdentity({ ...maintenanceEnv, ...patch }, 'eve', api))
   }
 })
 
@@ -141,6 +171,20 @@ test('prebuilt packaging carries accepted API resource bytes into the official E
     assert.deepEqual(JSON.parse(await readFile(join(work, '.output/cf-eve/eve-host.json'), 'utf8')), { version: 1,
       sourceSha: publicSha, uiSha: overlaySha, releaseId: release, uiSource: 'official' })
     await assert.rejects(readFile(join(work, '.hosted-ui/package.json')), { code: 'ENOENT' })
+    await rm(join(work, '.output/cf-eve'), { recursive: true })
+    const maintenanceEnv = { MIKKA_BUILD_REVISION: publicSha, MIKKA_UI_OVERLAY_SHA: overlaySha,
+      MIKKA_DEPLOYMENT_ID: release, MIKKA_RUNTIME_RELEASE: ownerRelease }
+    for (const patch of [{ MIKKA_DEPLOYMENT_ID: ownerRelease }, { MIKKA_BUILD_REVISION: overlaySha },
+      { MIKKA_UI_OVERLAY_SHA: publicSha }, { MIKKA_RUNTIME_RELEASE: release }, { MIKKA_RUNTIME_RELEASE: 'dpl_legacy' }]) {
+      await assert.rejects(packagePrebuiltEve({ ...maintenanceEnv, ...patch }, work))
+    }
+    await packagePrebuiltEve(maintenanceEnv, work)
+    assert.deepEqual(JSON.parse(await readFile(join(work, '.output/cf-eve/eve-host.json'), 'utf8')), { version: 1,
+      sourceSha: publicSha, uiSha: overlaySha, releaseId: ownerRelease, uiSource: 'official' })
+    assert.deepEqual(await readFile(join(work, '.output/cf-eve/eve', resource.path)), bytes)
+    const apiBuild = JSON.parse(await readFile(join(work, '.output/mikka-build.json'), 'utf8'))
+    assert.equal(apiBuild.deploymentId, release)
+    assert.equal(apiBuild.revision, publicSha)
   } finally { await rm(work, { recursive: true, force: true }) }
 })
 
@@ -152,9 +196,110 @@ test('runtime workflow callers pass genuine API run identity and keep the Regist
     assert.ok(workflow.includes('api_run_attempt:'))
     assert.ok(workflow.includes('API_RUN_ID: ${{ inputs.api_run_id }}'))
     assert.ok(workflow.includes('API_RUN_ATTEMPT: ${{ inputs.api_run_attempt }}'))
-    assert.ok(workflow.includes('MIKKA_API_RECEIPT: ${{ secrets.MIKKA_API_RECEIPT }}'))
-    assert.ok(workflow.includes('CF_RUNTIME_REGISTRY_USERNAME: ${{ vars.CF_RUNTIME_REGISTRY_USERNAME }}'))
+    assert.ok(workflow.includes('node scripts/load-cloudflare-api-receipt.mjs'))
+    assert.ok(!workflow.includes('secrets.MIKKA_API_RECEIPT'))
+    assert.ok(workflow.includes('CF_RUNTIME_REGISTRY_USERNAME: ${{ steps.registry-read.outputs.username }}'))
+    assert.ok(workflow.includes('CF_RUNTIME_REGISTRY_USERNAME: ${{ steps.registry.outputs.username }}'))
+    assert.ok(!workflow.includes('secrets.CF_RUNTIME_REGISTRY_PASSWORD'))
+    assert.ok(workflow.includes("github.actor_id == '183887963' && github.triggering_actor == 'alexj11324'"))
     assert.ok(!workflow.includes('api_build_uuid'))
     assert.ok(!workflow.includes('secrets.CF_RUNTIME_REGISTRY_USERNAME'))
   }
+})
+
+
+test('the genuine main driver can compile the original accepted API source after main advances', () => {
+  const driverSource = 'd'.repeat(40)
+  const result = releaseIdentity({...env,GITHUB_SHA:driverSource,GITHUB_WORKFLOW_SHA:driverSource,RUNTIME_SOURCE_SHA:publicSha},'eve',api)
+  assert.equal(result.publicSha,publicSha)
+  assert.equal(result.driverSource,driverSource)
+  assert.equal(result.apiRunId,runId)
+  assert.throws(()=>releaseIdentity({...env,RUNTIME_SOURCE_SHA:overlaySha},'eve',api))
+  assert.throws(()=>releaseIdentity({...env,GITHUB_REF:'refs/tags/mikka-release-'+publicSha},'eve',api))
+})
+
+test('the Eve image build passes truthful API and optional owner labels with distinct tags to Docker', async () => {
+  const work = await mkdtemp(join(tmpdir(), 'mikka-eve-image-labels-'))
+  try {
+    const bin = join(work, 'bin')
+    await mkdir(bin)
+    await writeFile(join(bin, 'docker'), `#!/bin/bash
+set -euo pipefail
+printf '%s\\0' "$@" >> "$DOCKER_ARGS"
+if [[ "$1" == image ]]; then printf '%s' "$TEST_IMAGE_ID"; fi
+`, { mode: 0o700 })
+    const workflow = await readFile(new URL('../.github/workflows/cloudflare-eve-image.yml', import.meta.url), 'utf8')
+    const step = workflow.split('\n  publish:\n')[1].split('      - name: Build the portable Node 24 image\n')[1].split('\n      - ')[0]
+    const script = step.split('        run: |\n')[1].replace(/^ {10}/gm, '')
+    for (const runtimeRelease of [undefined, '', ownerRelease]) {
+      const argsFile = join(work, 'args')
+      await writeFile(argsFile, '')
+      const imageTag = runtimeRelease ? 'aaaaaaaaaaaa-80001-1-maintenance-8a1234567890-70001-1' : release
+      const child = spawnSync('bash', ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', script], {
+        env: { PATH: bin + ':' + process.env.PATH, DOCKER_ARGS: argsFile, TEST_IMAGE_ID: imageDigest,
+          GITHUB_ENV: join(work, 'env'), MIKKA_BUILD_REVISION: publicSha, MIKKA_UI_OVERLAY_SHA: overlaySha,
+          MIKKA_DEPLOYMENT_ID: release,
+          ...(runtimeRelease === undefined ? {} : { MIKKA_RUNTIME_RELEASE: runtimeRelease, RUNTIME_IMAGE_TAG: imageTag }) }, encoding: 'utf8',
+      })
+      assert.equal(child.status, 0, child.stderr)
+      const args = (await readFile(argsFile, 'utf8')).split('\0').slice(0, -1)
+      assert.deepEqual(args, ['build', '-f', 'cloudflare/eve-runtime/Dockerfile',
+        '--label', 'org.opencontainers.image.revision=' + publicSha,
+        '--label', 'com.mikka.overlay=' + overlaySha, '--label', 'com.mikka.release=' + release,
+        ...(runtimeRelease ? ['--label', 'com.mikka.runtime-release=' + ownerRelease] : []),
+        '-t', 'mikka-eve:' + imageTag, '.', 'image', 'inspect', '--format', '{{.Id}}', 'mikka-eve:' + imageTag])
+    }
+  } finally { await rm(work, { recursive: true, force: true }) }
+})
+
+test('explicit maintenance stops after historical prepare omits the owner routing identity', async () => {
+  const workflow = await readFile(new URL('../.github/workflows/cloudflare-eve-image.yml', import.meta.url), 'utf8')
+  const step = workflow.split('      - name: Verify the explicit maintenance owner selection\n')[1].split('\n      - ')[0]
+  const script = step.split('        run: |\n')[1].replace(/^ {10}/gm, '')
+  const env = { MAINTENANCE_OWNER_RELEASE: ownerRelease, MIKKA_DEPLOYMENT_ID: release }
+  for (const patch of [{}, { MIKKA_RUNTIME_RELEASE: release, RUNTIME_IMAGE_TAG: release },
+    { MIKKA_RUNTIME_RELEASE: ownerRelease, RUNTIME_IMAGE_TAG: release }]) {
+    const child = spawnSync('bash', ['--noprofile', '--norc', '-e', '-c', script], { env: { ...env, ...patch } })
+    assert.notEqual(child.status, 0)
+  }
+  const child = spawnSync('bash', ['--noprofile', '--norc', '-e', '-c', script], { env: { ...env,
+    MIKKA_RUNTIME_RELEASE: ownerRelease, RUNTIME_IMAGE_TAG: 'aaaaaaaaaaaa-80001-1-maintenance-8a1234567890-70001-1' } })
+  assert.equal(child.status, 0)
+})
+
+
+test('runtime publication replaces the pull-only Docker login before invoking the publisher', async () => {
+  const work = await mkdtemp(join(tmpdir(), 'mikka-registry-publication-'))
+  try {
+    const bin = join(work, 'bin')
+    await mkdir(bin)
+    await writeFile(join(bin, 'docker'), `#!/bin/bash
+set -euo pipefail
+[[ "$*" == 'login registry.cloudflare.com --username v1 --password-stdin' ]]
+credential="$(cat)"
+[[ "$credential" == "$CF_RUNTIME_REGISTRY_PASSWORD" ]]
+printf '%s' "$credential" > "$DOCKER_CONFIG/auth"
+`, { mode: 0o700 })
+    await writeFile(join(bin, 'node'), `#!/bin/bash
+set -euo pipefail
+[[ "$1" == 'scripts/cloudflare-runtime-release.mjs' && "$2" == 'publish' ]]
+[[ "$(cat "$DOCKER_CONFIG/auth")" == "$CF_RUNTIME_REGISTRY_PASSWORD" ]]
+`, { mode: 0o700 })
+    for (const name of ['cloudflare-eve-image.yml', 'cloudflare-task-sandbox.yml']) {
+      const workflow = await readFile(new URL('../.github/workflows/' + name, import.meta.url), 'utf8')
+      const step = workflow.split('      - name: Publish the verified runtime image\n')[1]?.split('\n      - ')[0]
+      assert.ok(step)
+      const run = /\n {8}run: (.*)(?:\n|$)/.exec(step)
+      assert.ok(run)
+      const script = run[1] === '|' ? step.slice(run.index + run[0].length).replace(/^ {10}/gm, '') : run[1]
+      await writeFile(join(work, 'auth'), 'expired-pull-only-fixture')
+      const child = spawnSync('bash', ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', script], {
+        env: { PATH: bin + ':' + process.env.PATH, DOCKER_CONFIG: work,
+          CF_RUNTIME_REGISTRY_USERNAME: 'v1', CF_RUNTIME_REGISTRY_PASSWORD: 'fresh-push-pull-fixture' },
+        encoding: 'utf8',
+      })
+      assert.equal(child.status, 0, name + ': publication retained its read-only login\n' + child.stderr)
+      assert.equal(child.stdout, '')
+    }
+  } finally { await rm(work, { recursive: true, force: true }) }
 })

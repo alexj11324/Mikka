@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
 import { db } from '@/lib/db'
@@ -7,7 +7,7 @@ import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@
 import { setChatPreference } from '@/lib/chat-preferences'
 import { mobileBot } from '@/lib/mobile-threads'
 import { coordinatorBot, openChatBotId } from '@/lib/coordinator/coordinator-bot'
-import { loadWorkspaceContext } from '@/lib/workspace-access'
+import { loadWorkspaceContext, WorkspaceError } from '@/lib/workspace-access'
 import { botOutsideToken } from '@/lib/tokens/scope'
 
 export const dynamic = 'force-dynamic'
@@ -18,6 +18,19 @@ async function handleGET(request: Request, context: { params: Promise<{ id: stri
   noteLogUser(user?.id)
   if (!user) return unauthorized()
   const { id } = await context.params
+  if (new URL(request.url).searchParams.get('view') === 'notification') {
+    if (!z.uuid().safeParse(id).success) return json({ error: 'botNotFound' }, 404)
+    const [bot] = await db.select({ workspaceId: bots.workspaceId }).from(bots)
+      .where(and(eq(bots.id, id), eq(bots.ownerId, user.id), isNull(bots.archivedAt))).limit(1)
+    if (!bot) return json({ error: 'botNotFound' }, 404)
+    try {
+      const { workspace } = await loadWorkspaceContext(bot.workspaceId, user)
+      if (workspace.id === bot.workspaceId) return json({ botId: id, workspaceId: workspace.id })
+    } catch (error) {
+      if (!(error instanceof WorkspaceError)) throw error
+    }
+    return json({ error: 'botNotFound' }, 404)
+  }
   const workspace = (await loadWorkspaceContext(undefined, user)).workspace
   // `coordinator` names the Coordinator of the workspace the app has open, an ordinary bot row of that workspace.
   if (id === 'coordinator') { const coordinator = await coordinatorBot(user.id, workspace.id); return json(await mobileBot(user.id, workspace.id, coordinator.botId)) }

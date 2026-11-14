@@ -58,9 +58,10 @@ export function useAuditLog(workspaceId: string) {
     { revalidateFirstPage: false },
   )
   const failure = pages.data?.find(page => page.error)
-  const events = (pages.data ?? []).flatMap(page => page.error ? [] : page.events)
+  const readFailed = Boolean(pages.error || failure)
+  const events = readFailed ? [] : (pages.data ?? []).flatMap(page => page.error ? [] : page.events)
   const last = pages.data?.at(-1)
-  const more = Boolean(last && !last.error && last.nextCursor)
+  const more = !readFailed && Boolean(last && !last.error && last.nextCursor)
   const time = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' })
   const days: Array<[string, AuditEventView[]]> = []
   for (const event of events) {
@@ -91,6 +92,9 @@ export function useAuditLog(workspaceId: string) {
   const refused = pages.error ? auditReadFailure(pages.error) : null
   const error = failure ? actionError(failure.error) : refused ? refused.kind === 'adminOnly' ? t('adminOnly') : actionError(refused.kind === 'signedOut' ? 'authRequired' : undefined) : null
   const errorCode = failure?.error ?? refused?.code ?? null
+  const retry = readFailed && !['authRequired', 'workspaceAccessDenied', 'workspaceMembershipSuspended'].includes(errorCode ?? '')
+    ? () => pages.mutate()
+    : undefined
   const loading = pages.isLoading
   const empty = !loading && !error && events.length === 0
   return {
@@ -98,7 +102,7 @@ export function useAuditLog(workspaceId: string) {
     events, days, time: (event: AuditEventView) => time.format(new Date(event.createdAt)), sentence,
     category: (event: AuditEventView) => t(`categories.${event.category}`),
     actorType: (event: AuditEventView) => event.actorType === 'bot' || event.actorType === 'token' ? t(`actorTypes.${event.actorType}`) : null,
-    loading, error, errorCode, empty,
+    loading, error, errorCode, empty, retry,
     more, loadingMore: pages.isValidating && !loading, loadMore: () => void pages.setSize(pages.size + 1),
     exportHref,
   }

@@ -57,6 +57,12 @@ export function serviceProjectAccess(workspaceId: string, actor: EnterpriseReade
       const removed = previous.filter(id => !target.includes(id))
       if (added.length && !identity.enabled) throw new GovernanceError('service_identity_disabled')
       if (added.length && !change.confirmExpansion) throw new GovernanceError('service_projects_confirmation')
+      if (added.length) {
+        const active = await workspace.execute(sql`SELECT id FROM workspace_projects
+          WHERE "workspaceId"=${workspaceId}::uuid AND id=ANY(${sql.param(added)}::uuid[])
+            AND "archivedAt" IS NULL ORDER BY id FOR SHARE`)
+        if (active.rows.length !== added.length) throw new GovernanceError('not_found')
+      }
       if (added.length || removed.length) {
         await tx.execute(sql`SELECT set_config('mikka.acl_actor',${actor.id},true),set_config('mikka.acl_source','service_project_assignment',true)`)
         if (removed.length) await tx.execute(sql`DELETE FROM resource_access_grants WHERE "resourceKind"='project'

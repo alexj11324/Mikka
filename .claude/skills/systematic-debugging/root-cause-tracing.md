@@ -98,13 +98,11 @@ npm test 2>&1 | grep 'DEBUG git init'
 
 If something appears during tests but you don't know which test:
 
-Use the bisection script `find-polluter.sh` in this directory:
-
-```bash
-bash ./find-polluter.sh '.git' 'src/**/*.test.ts'
-```
-
-Runs tests one-by-one, stops at first polluter. See script for usage.
+Start with the failing suite's existing command in `package.json`. Keep its
+Node flags, fixtures and file order. Run the failing test alone from a clean
+fixture, then include the preceding files in halves until one reliably
+introduces the unwanted state. Repeat the isolated and combined runs to
+confirm the dependency before changing setup or teardown.
 
 ## Real Example: Empty projectDir
 

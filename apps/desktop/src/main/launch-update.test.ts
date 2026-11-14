@@ -20,17 +20,17 @@ class FakeUpdater extends EventEmitter {
 function setup() {
   const updater = new FakeUpdater()
   const states: GateState[] = []
-  let proceeded = 0
+  const earlyRetries: boolean[] = []
   let fire: (() => void) | null = null
   let delay = 0
   let cleared = 0
   const gate = new UpdateGate(updater as unknown as GateUpdater, {
     onState: state => states.push(state),
-    onProceed: () => { proceeded += 1 },
+    onProceed: retryCheck => { earlyRetries.push(retryCheck) },
     setTimer: (run, ms) => { fire = run; delay = ms; return 'timer' },
     clearTimer: () => { cleared += 1 },
   })
-  return { updater, gate, states, proceeded: () => proceeded, timeout: () => fire?.(), delay: () => delay, cleared: () => cleared }
+  return { updater, gate, states, earlyRetries, proceeded: () => earlyRetries.length, timeout: () => fire?.(), delay: () => delay, cleared: () => cleared }
 }
 
 const flush = () => new Promise(resolve => setImmediate(resolve))
@@ -42,6 +42,7 @@ test('no update: the app opens and the gate stops listening', async () => {
   await flush()
   assert.equal(t.proceeded(), 1)
   assert.deepEqual(t.states, [{ kind: 'checking' }])
+  assert.deepEqual(t.earlyRetries, [false])
   assert.equal(t.delay(), CHECK_TIMEOUT_MS)
   assert.equal(t.updater.listenerCount('update-downloaded'), 0)
 })
@@ -53,17 +54,20 @@ test('offline or a failed check: the app opens; a failed check never locks anyon
   await flush()
   assert.equal(t.proceeded(), 1)
 
+  assert.deepEqual(t.earlyRetries, [true])
   const e = setup()
   e.updater.next = u => { u.emit('error', new Error('getaddrinfo ENOTFOUND')) }
   e.gate.start()
   await flush()
   assert.equal(e.proceeded(), 1)
+  assert.deepEqual(e.earlyRetries, [true])
 })
 
 test('no answer within five seconds: the app opens, and a late answer is ignored', async () => {
   const t = setup()
   t.gate.start()
   t.timeout()
+  assert.deepEqual(t.earlyRetries, [true])
   assert.equal(t.proceeded(), 1)
   t.updater.emit('update-available', { version: '2.0.0' })
   t.updater.emit('update-downloaded', { version: '2.0.0' })

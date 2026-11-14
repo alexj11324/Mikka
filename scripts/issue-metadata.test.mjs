@@ -64,3 +64,22 @@ test('Project choices retain same-name IDs and follow the linked ID across a ren
   assert.deepEqual(taskProjectOptions(records, second)[1], { id: second, label: 'Updated name', checked: true, description: undefined })
   assert.equal(taskProjectOptions(records, null).some(item => item.checked), false)
 })
+
+test('reconciling a label draft preserves independent changes and a concurrent edit to the same label', async () => {
+  const { reconcileMetadataDraft, labelKey } = await import('../lib/issue-metadata.ts')
+  const a = { name: 'A', color: 'red' }, b = { name: 'B', color: 'blue' }, c = { name: 'C', color: 'gray' }
+  const remoteB = { name: 'b', color: 'green' }, local = { name: 'Local', color: 'yellow' }, remote = { name: 'Remote', color: 'blue' }
+  const base = [a, b, c], draft = [b, c, local], latest = [a, remoteB, remote]
+  assert.deepEqual(reconcileMetadataDraft(base, draft, latest, labelKey, 'b'), { items: [remoteB, remote, local], inputChanged: true })
+  assert.equal(reconcileMetadataDraft(base, draft, latest, labelKey, 'another').inputChanged, false)
+})
+
+test('reconciling linked PRs keeps concurrent removals and the reported metadata of an overlapping PR', async () => {
+  const { reconcileMetadataDraft, pullRequestKey } = await import('../lib/issue-metadata.ts')
+  const pr = (id, state = 'open') => ({ url: 'https://github.com/example/repo/pull/' + id, state })
+  const base = [pr(1), pr(2), pr(3)], draft = [pr(1, 'closed'), pr(3, 'draft'), pr(4)]
+  const remote = { ...pr(1, 'merged'), title: 'Merged', additions: 23, deletions: 4 }
+  const latest = [remote, pr(2), pr(5)]
+  assert.deepEqual(reconcileMetadataDraft(base, draft, latest, pullRequestKey, remote.url), { items: [remote, pr(5), pr(4)], inputChanged: true })
+  assert.equal(pullRequestKey({ ...remote, url: remote.url + '/' }), remote.url)
+})

@@ -216,8 +216,7 @@ test('real Factory notifications retain their database across COMMIT and delayed
         const result = await submit()
         assert.ok(!('error' in result)); artifactId = result.artifactId
         assert.equal((await requestPool.query('SELECT id FROM artifacts WHERE id=$1', [artifactId])).rowCount, 0)
-        // Draining even while the transaction is open would expose an eager
-        // notification. Only the unrelated Coordinator scheduler can run now.
+        // Draining while the transaction is open would expose an eager notification.
         await drain(); await drain()
         assert.deepEqual(taskDeliveries(before), [])
       }))))

@@ -22,7 +22,7 @@ import type { z } from "zod";
 import {
   createVercelPublicationAdapter,
   MIKKA_VERCEL,
-} from "../../lib/factory/vercel-publication";
+} from "./factory-vercel-publication";
 import { vercelProtocolFixture } from "./factory-vercel";
 import { factory194Target } from "./factory194-target";
 

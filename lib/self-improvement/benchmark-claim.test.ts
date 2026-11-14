@@ -132,7 +132,6 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@/lib/run-leases':{failRunForDaemonUpgrade:async()=>false,failQueuedSubscriptionRuntime:async()=>{throw Error('A benchmark without subscriptions must not fail a subscription runtime')}},'@/lib/daemon-release':{daemonTooOld:()=>false},'@/lib/run-retry':{},
     '@/lib/thread-continuation':{continuationFollowUp:()=>null},
     '@/lib/run-completion-effects':{afterRunEnded:async()=>{calls.push('runEnded');return 0}},
-    '@/lib/factory/checks':{isFactoryCheckRun:async()=>false},
     '@/lib/factory/profile-admission':{AgentProfileAdmissionError:class extends Error {}},
     '@/lib/factory/profile-native-session':{profileNativeSessionMatches:(before:{agentProfile?:unknown}|null|undefined,after:{agentProfile?:unknown}|null|undefined)=>{
       assertNoProfile(before);assertNoProfile(after);return true

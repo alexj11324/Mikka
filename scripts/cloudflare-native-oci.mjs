@@ -94,10 +94,6 @@ export function digestFromRepoDigests(raw, account, id, repository = 'mikka-api'
   return { digest: digests[0], image: prefix + digests[0], release: id }
 }
 
-function assertCurrentRefs(receipt, current) {
-  if (current.publicSha !== receipt.publicSha || current.privateSha !== receipt.privateSha) fail('CF_OCI_MAIN_ADVANCED')
-}
-
 export function validatePrepared(record, selection) {
   if (!record || record.version !== 1 || record.publication !== 'none'
       || record.context?.provider !== selection.context.provider
@@ -212,19 +208,19 @@ export async function readSelection(env) {
   return { receipt, selected }
 }
 
-export async function currentRefs(env = process.env) {
-  const line = stdout('git', ['ls-remote', 'origin', 'refs/heads/main'], { stage: 'PUBLIC_MAIN_REF' })
-  const publicSha = /^([a-f0-9]{40})\s+refs\/heads\/main$/.exec(line)?.[1]
-  const privateLine = await withOverlayKey(env, keyEnv => stdout('git', ['ls-remote', 'git@github.com:alexj11324/mikka-hosted-ui.git', 'refs/heads/main'], { env: keyEnv, stage: 'PRIVATE_MAIN_REF' }))
-  const privateSha = /^([a-f0-9]{40})\s+refs\/heads\/main$/.exec(privateLine)?.[1]
-  if (!publicSha || !privateSha) fail('CF_OCI_MAIN_UNAVAILABLE')
-  return { publicSha, privateSha }
+export function verifyOverlayMain(work, privateSha, env = process.env) {
+  if (!SHA.test(privateSha ?? '')) fail('CF_OCI_OVERLAY_SOURCE_REQUIRED')
+  const shallow = stdout('git', ['rev-parse', '--is-shallow-repository'], {cwd:work,env,stage:'OVERLAY_HISTORY'})
+  command('git', ['fetch','--quiet','--no-tags','--filter=blob:none',...(shallow === 'true' ? ['--unshallow'] : []),
+    'git@github.com:alexj11324/mikka-hosted-ui.git','refs/heads/main'], {cwd:work,env,stage:'OVERLAY_MAIN_FETCH'})
+  command('git', ['merge-base','--is-ancestor',privateSha,'FETCH_HEAD'], {cwd:work,env,stage:'OVERLAY_MAIN_ANCESTRY'})
 }
 
 async function prepare() {
   const { selected } = await readSelection(process.env)
-  const current = await currentRefs()
-  assertCurrentRefs(selected, current)
+  // The genuine main dispatch authenticates the public source. Verify the
+  // pinned overlay belongs to main without selecting newer bytes for this run.
+  await withOverlayKey(process.env, env => verifyOverlayMain(join(root,'.hosted-ui'),selected.privateSha,env))
   const env = buildEnvironment(process.env, selected.publicSha, selected.privateSha, selected.id)
   const publicBuildSettings = { publicSha: selected.publicSha, privateSha: selected.privateSha, publication: 'registry-only',
     NEXT_PUBLIC_POSTHOG_KEY: env.NEXT_PUBLIC_POSTHOG_KEY, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
@@ -277,7 +273,6 @@ async function prepare() {
     '-t', tag, '-f', payload.dockerfile, join(work, 'cloudflare/api')], { cwd: work, env, stage: 'DOCKER_IMAGE' })
   const imageId = stdout('docker', ['image', 'inspect', tag, '--format', '{{.Id}}'], { env, stage: 'DOCKER_IMAGE_ID' })
   if (!DIGEST.test(imageId)) fail('CF_OCI_LOCAL_IMAGE_ID_INVALID')
-  assertCurrentRefs(selected, await currentRefs())
   await readSelection(process.env)
   const result = { version: 1, context: selected.context, publicSha: selected.publicSha, privateSha: selected.privateSha,
     id: selected.id, tag, localImageId: imageId, brokerLocalImageId, brokerOfflineVerification: 'docker-network-none',
@@ -300,7 +295,6 @@ async function publish() {
   const data = JSON.parse(await readFile(join(root, '.cloudflare-ci/oci-prepared.json'), 'utf8'))
   const record = validatePrepared(data, selected)
   if (!ACCOUNT.test(process.env.CLOUDFLARE_ACCOUNT_ID ?? '')) fail('CF_OCI_ACCOUNT_REQUIRED')
-  assertCurrentRefs(selected, await currentRefs())
   const registry = 'registry.cloudflare.com/' + process.env.CLOUDFLARE_ACCOUNT_ID
   if (!process.env.CF_RUNTIME_REGISTRY_USERNAME || !process.env.CF_RUNTIME_REGISTRY_PASSWORD
       || !process.env.RUNNER_TEMP) fail('CF_OCI_REGISTRY_CREDENTIALS_REQUIRED')
@@ -319,7 +313,7 @@ async function publish() {
     const brokerRefs = stdout('docker', ['image', 'inspect', brokerTag, '--format', '{{range .RepoDigests}}{{println .}}{{end}}'],
       { env: dockerEnv, stage: 'BROKER_REGISTRY_DIGEST' })
     const broker = digestFromRepoDigests(brokerRefs, process.env.CLOUDFLARE_ACCOUNT_ID, selected.id, 'mikka-credential-broker')
-    assertCurrentRefs(selected, await currentRefs())
+    await readSelection(process.env)
     const receipt = { version: 1, ...selected.context, ...verified,
       overlayCheckout: { repository: 'alexj11324/mikka-hosted-ui', requestedSha: selected.privateSha, actualSha: selected.privateSha },
       localImageId: record.localImageId, webRenderer: record.webRenderer,
