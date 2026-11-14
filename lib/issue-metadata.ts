@@ -39,6 +39,33 @@ export type IssueLabel = z.infer<typeof labelSchema>
 export type IssuePullRequest = z.infer<typeof pullRequestSchema>
 export type IssueDelegate = z.infer<typeof delegateSchema>
 
+export const labelKey = (label: IssueLabel) => label.name.toLowerCase()
+export const pullRequestKey = (pr: IssuePullRequest) => pr.url.replace(/\/$/, '')
+
+/** Keep independent edits. A concurrent change to the same entry is shown as saved for review. */
+export function reconcileMetadataDraft<T extends IssueLabel | IssuePullRequest>(
+  original: T[], draft: T[], latest: T[], key: (entry: T) => string, inputKey: string,
+) {
+  const entries = (items: T[]) => new Map(items.map(item => [key(item), item]))
+  const before = entries(original)
+  const edited = entries(draft)
+  const current = entries(latest)
+  function changedRemotely(id: string) {
+    const previous = before.get(id)
+    const saved = current.get(id)
+    if (!previous || !saved) return previous !== saved
+    return Object.keys({ ...previous, ...saved }).some(field => previous[field as keyof T] !== saved[field as keyof T])
+  }
+  const result = new Map(current)
+  for (const id of new Set([...before.keys(), ...edited.keys()])) {
+    if (changedRemotely(id)) continue
+    const item = edited.get(id)
+    if (item) result.set(id, item)
+    else result.delete(id)
+  }
+  return { items: [...result.values()], inputChanged: changedRemotely(inputKey) }
+}
+
 /** Preserve old assignments without continuing to present an Agent as a person.
  * A deliberate modern delegate (including null) takes precedence over history. */
 function canonicalMetadata(value: unknown): unknown {

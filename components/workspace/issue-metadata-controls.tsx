@@ -2,11 +2,12 @@
 
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
+import { getIssue } from '@/app/actions/issues'
 import { moveIssueToProject } from '@/app/actions/projects'
 import useSWR from 'swr'
 import { Box, Check, Circle, GitPullRequest, Link2, Tag, X } from 'lucide-react'
 import { getIssuePropertyOptions, updateIssueMetadata, type IssueMetadataPatch } from '@/app/actions/issue-metadata'
-import { LABEL_COLORS, type IssueLabel, type IssueMetadata, type IssuePullRequest } from '@/lib/issue-metadata'
+import { LABEL_COLORS, labelKey, pullRequestKey, reconcileMetadataDraft, type IssueLabel, type IssueMetadata, type IssuePullRequest } from '@/lib/issue-metadata'
 import { taskProjectOptions } from '@/lib/task-project-options'
 import { useActionError } from '@/lib/use-action-error'
 import { Button } from '@/components/ui/button'
@@ -25,6 +26,7 @@ import { IssuePullRequestLink } from './issue-pull-request-link'
 import { PULL_REQUEST_ICONS } from '@/lib/pull-request-appearance'
 
 export type MetadataSavedIssue = Extract<Awaited<ReturnType<typeof updateIssueMetadata>>, { issue: unknown }>['issue']
+export type OnMetadataChange = (issue: MetadataSavedIssue, source: 'save' | 'refresh') => void
 type Target = 'project' | 'labels' | 'pullRequests' | 'invite'
 export type MetadataRequest = { target: Target | 'assignee'; sequence: number }
 
@@ -41,7 +43,7 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
   section?: 'all' | 'assignee' | 'properties' | 'project' | 'labels' | 'pullRequests' | 'dialog'
   request?: MetadataRequest | null
   compact?: boolean; disabled?: boolean
-  onSaved: (issue: MetadataSavedIssue) => void
+  onSaved: OnMetadataChange
   onBusyChange?: (busy: boolean) => void
 }) {
   const tProperty = useTranslations('Metadata.property')
@@ -58,6 +60,7 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
   const [labels, setLabels] = useState<IssueLabel[]>([])
   const [prs, setPrs] = useState<IssuePullRequest[]>([])
   const [prState, setPrState] = useState<IssuePullRequest['state']>('open')
+  const editBase = useRef(task)
   const fieldId = useId()
   const { data: options } = useSWR(target === 'project' || target === 'labels' ? ['issue-property-options', task.id] : null, () => getIssuePropertyOptions(task.id))
   const query = name.trim().toLowerCase()
@@ -65,15 +68,27 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
   useEffect(() => {
     if (!request || request.target === 'assignee') return
     const matches = section === 'all' || section === 'dialog' || section === request.target || (section === 'assignee' && request.target === 'invite')
-    if (matches) {
-      setError(''); setTarget(request.target); setName('')
-      setLabels(task.metadata.labels); setPrs(task.metadata.pullRequests); setPrState('open')
-    }
+    if (matches) open(request.target)
   }, [request, section])
 
   function open(value: Target) {
+    editBase.current = task
     setError(''); setTarget(value); setName('')
     setLabels(task.metadata.labels); setPrs(task.metadata.pullRequests); setPrState('open')
+  }
+  function refreshDraft(issue: MetadataSavedIssue) {
+    const original = editBase.current.metadata
+    if (target === 'labels') {
+      const { items, inputChanged } = reconcileMetadataDraft(original.labels, labels, issue.metadata.labels, labelKey, name.trim().toLowerCase())
+      setLabels(items)
+      if (inputChanged) setName('')
+    }
+    if (target === 'pullRequests') {
+      const { items, inputChanged } = reconcileMetadataDraft(original.pullRequests, prs, issue.metadata.pullRequests, pullRequestKey, name.trim().replace(/\/$/, ''))
+      setPrs(items)
+      if (inputChanged) setName('')
+    }
+    editBase.current = issue
   }
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -83,8 +98,13 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
       const next = name.trim() ? [...labels.filter(label => label.name.toLowerCase() !== name.trim().toLowerCase()), { name: name.trim(), color }] : labels
       patch = { labels: next }
     }
-    if (target === 'pullRequests') patch = { pullRequests: name.trim() ? [...prs.filter(pr => pr.url !== name.trim()), { url: name.trim(), state: prState }] : prs }
-    if (await persist(patch, target === 'invite' ? name.trim().toLowerCase() : undefined)) setTarget(null)
+    if (target === 'pullRequests') {
+      const url = name.trim().replace(/\/$/, '')
+      const existing = prs.find(pr => pullRequestKey(pr) === url)
+      patch = { pullRequests: url ? [...prs.filter(pr => pullRequestKey(pr) !== url), { ...existing, url, state: prState }] : prs }
+    }
+    const edit = target === 'labels' || target === 'pullRequests' ? { revision: editBase.current.revision, refreshDraft } : undefined
+    if (await persist(patch, target === 'invite' ? name.trim().toLowerCase() : undefined, edit)) setTarget(null)
   }
   async function project(projectId: string | null) {
     if (projectId === task.projectId || await moveToProject(projectId)) setTarget(null)
@@ -177,19 +197,30 @@ export function AccessChangeDialog({ change, pending, onConfirm, onCancel }: { c
 }
 
 /** The metadata saves behind IssueMetadataControls, for it and for a layer that draws the values itself. */
-export function useIssueMetadataSave({ task, disabled = false, onSaved, onBusyChange }: { task: { id: string; revision: number; workspaceId?: string | null }; disabled?: boolean; onSaved: (issue: MetadataSavedIssue) => void; onBusyChange?: (busy: boolean) => void }) {
+export function useIssueMetadataSave({ task, disabled = false, onSaved, onBusyChange }: { task: { id: string; revision: number; workspaceId?: string | null }; disabled?: boolean; onSaved: OnMetadataChange; onBusyChange?: (busy: boolean) => void }) {
   const tProperty = useTranslations('Metadata.property')
   const actionError = useActionError()
   const [pending, setPending] = useState(false)
   const saving = useRef(false)
   const [error, setError] = useState('')
-  async function persist(patch: IssueMetadataPatch, inviteEmail?: string) {
+  async function persist(patch: IssueMetadataPatch, inviteEmail?: string, edit?: { revision: number; refreshDraft: (issue: MetadataSavedIssue) => void }) {
     if (saving.current || disabled) return false
     saving.current = true; setPending(true); setError(''); onBusyChange?.(true)
     try {
-      const result = await updateIssueMetadata({ id: task.id, revision: task.revision, patch, inviteEmail })
+      const revision = edit?.revision ?? task.revision
+      const result = await updateIssueMetadata({ id: task.id, revision, patch, inviteEmail })
+      if (result.error === 'issueOutdated') {
+        const latest = await getIssue(task.id)
+        if (latest.error) { setError(actionError(latest.error)); return false }
+        if (latest.issue?.id === task.id && latest.issue.revision > revision) {
+          edit?.refreshDraft(latest.issue)
+          onSaved(latest.issue, 'refresh')
+          setError(actionError('issueStale'))
+          return false
+        }
+      }
       if (!('issue' in result) || !result.issue) { setError(actionError(result.error ?? 'issueMetadataSaveFailed')); return false }
-      onSaved(result.issue)
+      onSaved(result.issue, 'save')
       return true
     } catch { setError(tProperty('saveFailedRetry')); return false }
     finally { saving.current = false; setPending(false); onBusyChange?.(false) }
@@ -208,7 +239,7 @@ export function useIssueMetadataSave({ task, disabled = false, onSaved, onBusyCh
         return false
       }
       if (!('issue' in result) || !result.issue) { setError(actionError(result.error ?? 'projectMoveFailed')); return false }
-      onSaved(result.issue); return true
+      onSaved(result.issue, 'save'); return true
     } catch { setError(tProperty('projectLinkFailedRetry')); return false }
     finally { saving.current = false; setPending(false); onBusyChange?.(false) }
   }
