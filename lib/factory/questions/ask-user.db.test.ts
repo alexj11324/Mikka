@@ -12,6 +12,7 @@ import { createFactoryDispatch, factoryBinding } from "../dispatch";
 import { factoryCheckIndependent } from "../check-independence";
 import { createFactoryQuestions } from "./store";
 import { handleFactoryQuestionList } from "./ask-user";
+import { observePoolCommits } from "../../db/commit-effects";
 import { dropTestDatabase } from "../../../tests/support/drop-test-database";
 
 const url = process.env.E2E_DATABASE_URL;
@@ -28,6 +29,7 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
   const target = new URL(url!);
   target.pathname = `/${database}`;
   const pool = new Pool({ connectionString: target.toString(), max: 6 });
+  observePoolCommits(pool);
   try {
     const dir = new URL("../../../drizzle/", import.meta.url);
     for (const f of orderMigrations((await readdir(dir)).filter((f) => f.endsWith(".sql"))))
@@ -68,7 +70,7 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
       await pool.query(`UPDATE agent_runs SET status='stopped',"stopReason"=$2,report=$3,"sessionId"='session:'||id,"startedAt"=now(),"finishedAt"=now() WHERE id=$1`, [runId, kind === "external" ? "blocked" : "asked_human",
         JSON.stringify({ summary: "Synthetic hand-in", openQuestions: [text], question: { questionId, kind, question: text, options } })]);
       await runtime.questions.record(user, runId);
-      return { taskId: r.task.id, runId, questionId, sourceEventId: src };
+      return { taskId: r.task.id, issueId, runId, questionId, sourceEventId: src };
     };
     const get = (userId: string | null, query = "") =>
       handleFactoryQuestionList(questions, { actor: userId ? { userId } : null, authorization: null, method: "GET", url: `https://mikka.test/api/factory/questions${query}` });
@@ -96,6 +98,8 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
     await t.test("by task: exact AskUserQuestion fields plus type and original text", async () => {
       const res = await get("owner", `?taskId=${a.taskId}`);
       assert.equal(res.status, 200);
+      const [item] = (res.body as { questions: { reference: { binding: { issueId: string } } }[] }).questions;
+      assert.equal(item.reference.binding.issueId, a.issueId);
       assert.deepEqual((res.body as { questions: unknown[] }).questions.map((q) => { const { reference: _r, ...rest } = q as Record<string, unknown>; return rest; }), [{
         questionId: a.questionId, taskId: a.taskId, runId: a.runId, status: "open", type: "decision",
         originalText: "Which API should we keep?", question: "Which API should we keep?", header: "Decision",
