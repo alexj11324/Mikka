@@ -51,6 +51,15 @@ export function readDriveVolumes(workspaceId: string, before?: string, send?: ty
   return request<DriveVolumePage>(url(workspaceId, '', { before }), {}, send)
 }
 
+export function readArchivedDriveVolumes(workspaceId: string, before?: string, send?: typeof fetch) {
+  return request<DriveVolumePage>(url(workspaceId, '', { archived: 'true', before }), {}, send)
+}
+
+export function setPersonalDriveArchive(workspaceId: string, volumeId: string, archived: boolean, send?: typeof fetch) {
+  const operation = archived ? 'archive' : 'unarchive'
+  return request<{ archived: boolean }>(url(workspaceId, `/${encodeURIComponent(volumeId)}/${operation}`), { method: 'POST' }, send)
+}
+
 export function readDriveHead(workspaceId: string, volumeId: string, send?: typeof fetch) {
   return request<DriveHead>(url(workspaceId, `/${encodeURIComponent(volumeId)}`), {}, send)
 }
@@ -91,6 +100,15 @@ export async function uploadDriveFiles(workspaceId: string, volumeId: string, ex
   }
   return request<{ headDigest: string; headVersionId: string }>(url(workspaceId, `/${encodeURIComponent(volumeId)}/entries`), {
     method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ expectedDigest, mutationId, changes }),
+  }, send)
+}
+
+/** Remove one path from the displayed head and retain all earlier immutable versions. */
+export function deleteDriveFile(workspaceId: string, volumeId: string, path: string, expectedDigest: string,
+  mutationId: string, send?: typeof fetch) {
+  return request<{ headDigest: string; headVersionId: string }>(url(workspaceId, `/${encodeURIComponent(volumeId)}/entries`), {
+    method: 'PATCH', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ expectedDigest, mutationId, changes: [{ op: 'delete', path }] }),
   }, send)
 }
 
