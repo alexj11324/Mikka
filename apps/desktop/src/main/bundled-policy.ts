@@ -23,7 +23,7 @@ const DRIVE_ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/versions/${DRIVE_VERSION_ID}$`), ['GET']],
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/blobs$`), ['POST']],
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/entries$`), ['PATCH']],
-  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/restore$`), ['POST']],
+  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/(?:restore|archive|unarchive)$`), ['POST']],
 ]
 const UUID = '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89aAbB][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}'
 const ORGANIZATION_OVERVIEW_OR_KEYS = new RegExp(`^/api/organizations/${UUID}(?:/api-keys)?$`)
@@ -96,7 +96,7 @@ export function allowedApiPath(path: string, method: string): boolean {
     return SERVICE_IDENTITY_ROUTES.some(([route, mutation]) => route.test(path) && (method === 'GET' || method === mutation))
   }
   if (WORKSPACE_GOVERNANCE.test(path) || path === '/api/organizations' || ORGANIZATION_OVERVIEW_OR_KEYS.test(path)) return method === 'GET'
-  if (path === '/api/me/joinable-organizations') return method === 'GET'
+  if (path === '/api/me/joinable-organizations' || path === '/api/me/invitations') return method === 'GET'
   if (ORGANIZATION_DOMAINS.test(path)) return method === 'GET' || method === 'POST'
   if (ORGANIZATION_DOMAIN.test(path)) return method === 'DELETE'
   if (ORGANIZATION_JOIN.test(path)) return method === 'POST'
