@@ -1070,6 +1070,8 @@
       "timelineBots": "Agent 与机器人",
       "timelineEarlier": "再显示更早的 {count} 条",
       "timelineFilter": "活动筛选",
+      "createdIssue": "创建了 {issue}",
+      "changedStatusWithIssue": "将 {issue} 移至{status}",
       "comment": "{author} 评论了",
       "created": "创建了这个 Issue",
       "label": "Issue 时间线",

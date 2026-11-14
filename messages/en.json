@@ -1070,6 +1070,8 @@
       "timelineBots": "Agents & bots",
       "timelineEarlier": "Show {count} earlier",
       "timelineFilter": "Activity filters",
+      "createdIssue": "created {issue}",
+      "changedStatusWithIssue": "moved {issue} to {status}",
       "comment": "{author} commented",
       "created": "created the issue",
       "label": "Issue activity",

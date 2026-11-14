@@ -60,7 +60,7 @@ export function taskActivityFacts(history: readonly IssueActivityEvent[], thread
 }
 
 type HistoryLabels = Pick<typeof import('../messages/en.json')['Workspace']['activity'],
-  'unknownAssignee' | 'changedStatus' | 'changedPriority' | 'changedTitle' | 'assigned' | 'delegated' |
+  'unknownAssignee' | 'changedStatus' | 'changedStatusWithIssue' | 'createdIssue' | 'changedPriority' | 'changedTitle' | 'assigned' | 'delegated' |
   'unassigned' | 'undelegated' | 'addedLabel' | 'removedLabel' | 'addedSubtask'>
 
 /** Both renderers supply their locale; the source event determines the wording. */
@@ -69,11 +69,14 @@ export function taskHistoryLabel(event: IssueActivityEvent, labels: {
   activity: (key: keyof HistoryLabels, values?: Record<string, string>) => string
   status: (value: string) => string
   priority: (value: string) => string
+  issueCode?: string | null
 }) {
   const t = labels.activity
   switch (event.kind) {
-    case 'created': return labels.created
-    case 'status': return t('changedStatus', { status: labels.status(event.status ?? '') })
+    case 'created': return labels.issueCode ? t('createdIssue', { issue: labels.issueCode }) : labels.created
+    case 'status': return labels.issueCode
+      ? t('changedStatusWithIssue', { issue: labels.issueCode, status: labels.status(event.status ?? '') })
+      : t('changedStatus', { status: labels.status(event.status ?? '') })
     case 'priority': return t('changedPriority', { priority: labels.priority(event.priority ?? '') })
     case 'title': return t('changedTitle', { title: event.title ?? '' })
     case 'assigned': return t(event.assignmentTarget === 'delegate' ? 'delegated' : 'assigned', { name: event.assigneeName || t('unknownAssignee') })

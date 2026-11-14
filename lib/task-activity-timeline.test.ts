@@ -13,6 +13,7 @@ function renderHistory(event: IssueActivityEvent, messages: typeof en.Workspace.
     ),
     status: value => value,
     priority: value => value,
+    issueCode: null,
   })
 }
 
@@ -36,7 +37,23 @@ test('issue history summaries are concise and natural in English and Chinese', (
   }
 })
 
-test('timeline controls use Capy’s activity filters without invented counts or empty-state copy', () => {
+test('created and status copy includes the issue code as Capy does', () => {
+  const labels = (messages: typeof en.Workspace.activity, issueCode: string | null) => ({
+    created: messages.created,
+    issueCode,
+    activity: (key: keyof typeof messages, values: Record<string, string> = {}) => Object.entries(values).reduce(
+      (text, [name, value]) => text.replaceAll(`{${name}}`, value), messages[key],
+    ),
+    status: (value: string) => value,
+    priority: (value: string) => value,
+  })
+  assert.equal(taskHistoryLabel({ id: 'c', at: '', kind: 'created' }, labels(en.Workspace.activity, 'MIK-284')), 'created MIK-284')
+  assert.equal(taskHistoryLabel({ id: 's', at: '', kind: 'status', status: 'In progress' }, labels(en.Workspace.activity, 'MIK-284')), 'moved MIK-284 to In progress')
+  assert.equal(taskHistoryLabel({ id: 'c', at: '', kind: 'created' }, labels(zhCN.Workspace.activity, 'MIK-284')), '创建了 MIK-284')
+  assert.equal(taskHistoryLabel({ id: 's', at: '', kind: 'status', status: '进行中' }, labels(zhCN.Workspace.activity, 'MIK-284')), '将 MIK-284 移至进行中')
+})
+
+test('timeline labels use Capy’s activity filters and earlier-history control', () => {
   assert.deepEqual(
     [en.Workspace.activity.title, en.Workspace.activity.created, en.Workspace.activity.timelineAll, en.Workspace.activity.timelineComments, en.Workspace.activity.timelineBots],
     ['Activity', 'created the issue', 'All', 'Comments', 'Agents & bots'],
