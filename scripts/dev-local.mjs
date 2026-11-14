@@ -211,7 +211,7 @@ await Promise.all([
   await fetch(`${server}${path}`, { method, signal: AbortSignal.timeout(120_000) }).then(response => response.arrayBuffer())
 }))
 await harnessPreparation
-// The production minute Worker's schedule (cloudflare/suggestions-cron) against this server.
+// The production scheduled Worker's schedule (cloudflare/suggestions-cron) against this server.
 const stopCron = startLocalCron({ appUrl: server, secret: cronSecret, log: line => console.log(`dev:local ${line}`) })
 closers.push(stopCron)
 mkdirSync(join(root, '.cache/dev-local'), { recursive: true })
