@@ -152,6 +152,21 @@ test('Task property menus expose every writable value, send precisely that value
   } finally { await closeReadOnly() }
 })
 
+test('the verified read-only Task menu exposes history alone and a cached preview keeps the menu locked', async () => {
+  const opened = []
+  const dispose = await mount({ locked: true, preview: false, userId: 'reader', onHistory: () => opened.push('history') })
+  try {
+    assert.equal(frame.menu.disabled, false, 'a verified reader can open the menu')
+    assert.deepEqual(frame.menu.items.map(item => item.id), ['history'])
+    frame.menu.items[0].onSelect()
+    assert.deepEqual(opened, ['history'])
+    assert.equal(frame.favorite.disabled, true)
+  } finally { await dispose() }
+
+  const disposePreview = await mount({ locked: true, preview: true, userId: 'reader' })
+  try { assert.equal(frame.menu.disabled, true) } finally { await disposePreview() }
+})
+
 test('reselecting the current team does not write and rejected changes retain the saved team', async () => {
   const dispose = await mount()
   try {
