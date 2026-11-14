@@ -27,6 +27,13 @@
     "test": "lib/thread-reads.db.test.ts",
     "suite": "test:conversation-reads"
   },
+  "app/api/drive/volumes/[volumeId]/archive/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Archive the active personal folder of the signed-in owner in the selected workspace while retaining its versions.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "app/api/drive/volumes/[volumeId]/blobs/route.ts": {
     "mode": "built-in",
     "environment": [],
@@ -59,6 +66,13 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Read the head of an authorized private volume in the requested workspace.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "app/api/drive/volumes/[volumeId]/unarchive/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Return an archived personal folder to its owner in the selected workspace with the original head and history.",
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
@@ -605,6 +619,15 @@
     "test": "tests/organization-join-domains.db.test.ts",
     "suite": "test:organization-join-domains-db"
   },
+  "drizzle/20261114152243_archive_personal_drive_volumes.sql": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "Store the reversible archive timestamp in the application database. Existing folders remain active and their manifests are preserved.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "lib/abuse/workers-ai.ts": {
     "mode": "optional-cloud",
     "environment": [
@@ -1131,6 +1154,13 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Read an authorized personal file's changes and deletions from the installed PostgreSQL volume snapshots. File history uses the existing versions and requires no external storage service.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "lib/drive/volumes.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Lock the owner's personal volume in its selected workspace and change its archival state independently of immutable content revisions.",
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },

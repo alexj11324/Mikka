@@ -29,7 +29,7 @@ import { mentionsIn } from '@/lib/group-mentions'
 import { authorRuns, chronological, fetchGroupMessages, mergeGroupPoll, mayLeaveGroup, newestGroupPosition, GroupMessagesRequestError, postGroupMessage, stopGroupReply, type GroupMessagePage } from '@/lib/group-messages'
 import { toast } from 'sonner'
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
-import { useChatDelivery, type ChatSubmission } from '@/lib/hooks/chat-delivery'
+import { isWebChatOffline, useChatDelivery, type ChatSubmission } from '@/lib/hooks/chat-delivery'
 import { checkPageBuildBeforeAction } from '@/lib/app-build'
 import { groupSubmissionMessageId } from '@/lib/group-submission'
 import { useActionError } from '@/lib/use-action-error'
@@ -125,7 +125,7 @@ export function GroupChatView({ group, userId, people, onLeft }: {
     if (departed.current || blockingCode || accessRejected || refused || !delivery.begin(item)) return
     release?.()
     try {
-      if (navigator.onLine === false) { delivery.finish(item.id, { error: feedback('sendOffline') }); return }
+      if (isWebChatOffline()) { delivery.finish(item.id, { error: feedback('sendOffline') }); return }
       if (!await checkPageBuildBeforeAction()) { delivery.finish(item.id, { error: feedback('sendUpdateRequired') }); return }
       if (departed.current) { delivery.finish(item.id, {}); return }
       void groupSubmissionMessageId(userId, group.id, item.id).then(storedId => {
