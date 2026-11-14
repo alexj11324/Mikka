@@ -257,14 +257,6 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
       presentation.error && presentation.mutate(),
     ]) : undefined,
   }
-  const listsWerePaused = useRef(listsPaused)
-  useEffect(() => {
-    if (listsWerePaused.current && !listsPaused) {
-      void mutate()
-      void refreshThreads()
-    }
-    listsWerePaused.current = listsPaused
-  }, [listsPaused, mutate, refreshThreads])
   const [creatingBot, setCreatingBot] = useState(false)
   // The frame's chat navigation opens the workspace's group creation dialog.
   const [creatingGroup, setCreatingGroup] = useState(false)
@@ -337,6 +329,14 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     mutate(),
     teamPageKey ? teamFirst.mutate() : undefined,
   ]), [mutate, teamPageKey, teamFirst.mutate])
+  const listsWerePaused = useRef(listsPaused)
+  useEffect(() => {
+    if (listsWerePaused.current && !listsPaused) {
+      void refreshTaskPages()
+      void refreshThreads()
+    }
+    listsWerePaused.current = listsPaused
+  }, [listsPaused, refreshTaskPages, refreshThreads])
   const visiblePresentations = useMemo(() => ({ ...presentation.items, ...teamPresentation.items }), [presentation.items, teamPresentation.items])
   const [pluginsVisit, setPluginsVisit] = useState(0)
   // True only while the detail was loaded directly and no section has been chosen since.

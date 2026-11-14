@@ -42,13 +42,13 @@ mock.module('next-intl', { namedExports: { useLocale: () => 'en', useTranslation
 mock.module('next/navigation', { namedExports: { useSearchParams: () => new URLSearchParams(browser.location.search) } })
 mock.module('@/i18n/navigation', { namedExports: { getPathname: ({ href }: { href: string }) => href, usePathname: () => browser.location.pathname, useRouter: () => router } })
 mock.module('sonner', { namedExports: { toast: { error: nothing, dismiss: nothing } } })
-mock.module('swr', { defaultExport: (key: unknown) => ({
+mock.module('swr', { defaultExport: (key: unknown, _read?: unknown, options?: { isPaused?: () => boolean }) => ({
   data: key === '/api/workspace/switcher' ? { ...workspace(), live: { ownerId: user.id } }
     : key === 'teams' && scopedTeamFixture ? [{ id: teamIssuesId, name: 'Scoped Team' }]
     : Array.isArray(key) && key[0] === 'team-issues-page' ? { items: [], next: null }
     : [],
   isLoading: Array.isArray(key) && key[0] === 'team-issues-page' ? scopedTasksPending : false,
-  mutate: Array.isArray(key) && key[0] === 'team-issues-page' ? async () => { scopedTeamPageMutations++ } : refreshed,
+  mutate: Array.isArray(key) && key[0] === 'team-issues-page' ? async () => { if (!options?.isPaused?.()) scopedTeamPageMutations++ } : refreshed,
 }), namedExports: { SWRConfig: swr.SWRConfig, unstable_serialize: swr.unstable_serialize, useSWRConfig: swr.useSWRConfig } })
 mock.module('@/lib/app-build', { namedExports: { APP_BUILD: '' } })
 mock.module('@/lib/auth-client', { namedExports: { endSession: async () => ({}), authClient: { getSession: async () => ({ data: { user } }), useSession: () => ({ data: null }) } } })
@@ -92,9 +92,10 @@ for (const [file, names] of [
   ['../artifacts/artifact-library.tsx', ['ArtifactLibrary']], ['./legacy-chat-archive.tsx', ['LegacyChatArchive']],
 ] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, name === 'useSuggestionCount' ? () => 0 : empty])) })
 mock.module(new URL('./board-page.tsx', import.meta.url).href, { namedExports: {
-  BoardPage: ({ onUpdated }: { onUpdated: () => Promise<unknown> }) => <section data-team-board-visible="">
+  BoardPage: ({ onUpdated, onBusyChange }: { onUpdated: () => Promise<unknown>; onBusyChange: (busy: boolean) => void }) => <section data-team-board-visible="">
     {probeEmbeddedAck && <EmbeddedSaveProbe />}
-    <Button data-board-write-ack="" onClick={() => { void onUpdated() }}>save board change</Button>
+    <Button data-board-write-start="" onClick={() => onBusyChange(true)}>start board change</Button>
+    <Button data-board-write-ack="" onClick={() => { onBusyChange(false); void onUpdated() }}>save board change</Button>
   </section>,
 } })
 // The Team detail fixture exercises acknowledged save/delete callbacks, not a fake list mutation.
@@ -303,8 +304,10 @@ test('a Team board write refreshes its visible page while the workspace refresh 
   refreshGlobalTasks = () => globalRefresh.promise
   browser.history.replaceState({}, '', `/?workspace=${workspaceId}&team=${teamIssuesId}&section=team-issues`)
   await render({ initialSection: 'team-issues' })
+  const start = container.querySelector<HTMLButtonElement>('[data-board-write-start]')
   const save = container.querySelector<HTMLButtonElement>('[data-board-write-ack]')
-  assert.ok(save)
+  assert.ok(start && save)
+  await act(async () => { start.click() })
   try {
     await act(async () => { save.click() })
     assert.equal(scopedTeamPageMutations, 1, 'the visible Team page must not wait for the global read')
