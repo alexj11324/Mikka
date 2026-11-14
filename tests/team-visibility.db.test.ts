@@ -4,6 +4,7 @@ import test, { mock } from 'node:test'
 import type { RunFailure } from '@mikka/protocol/run-failure'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { nextTaskListCursor } from '../lib/task-list-page'
+import { measured, readMetrics } from './helpers/read-metrics'
 
 // No business/local database fallback, including when REQUIRE_DB is unset.
 const url = process.env.E2E_DATABASE_URL
@@ -117,6 +118,28 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
     assert.equal((await readRun(owner,sharedRun))?.messages.length,1)
     assert.equal((await readRun(owner,sharedRun))?.run.report?.summary,'secret-report')
     assert.deepEqual((await readRun(owner,sharedRun))?.run.failureDetails, failureDetails)
+    await t.test('MCP reads its latest five events independently of transcript history', async subtest => {
+      const latest = Array.from({ length: 5 }, (_, i) => ({ index: i + 1, text: 'Latest event' }))
+      await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk)
+        SELECT gen_random_uuid(),$1,100+i,chunk FROM jsonb_array_elements($2::jsonb) WITH ORDINALITY AS e(chunk,i)`, [sharedRun, JSON.stringify(latest)])
+      const recent = () => scoped(owner, workspace, () => tools.getRun(owner, sharedRun))
+      await recent()
+      const small = await measured(recent)
+      assert.deepEqual(small.value?.recentEvents.map(line => JSON.parse(line)), latest)
+      await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk)
+        SELECT gen_random_uuid(),$1,i,jsonb_build_object('text',repeat('x',8192)) FROM generate_series(2,33) AS i`, [sharedRun])
+      await pool.query(`INSERT INTO run_messages(id,"runId","userId",text) VALUES(gen_random_uuid(),$1,$2,repeat('y',8192))`, [sharedRun, owner])
+      const large = await measured(recent)
+      subtest.diagnostic(JSON.stringify({ shortHistory: readMetrics(small), longHistory: readMetrics(large) }))
+      assert.deepEqual(large.value, small.value)
+      assert.equal(large.resultBytes, small.resultBytes, 'older events and unrequested human messages never leave Postgres')
+      assert.deepEqual((await scoped(member, workspace, () => tools.getRun(member, sharedRun)))?.recentEvents, [])
+      const full = await readRun(owner, sharedRun)
+      assert.equal(full?.chunks.length, 38)
+      assert.equal(full?.messages.length, 2)
+      await pool.query('DELETE FROM run_chunks WHERE "runId"=$1 AND seq>1', [sharedRun])
+      await pool.query('DELETE FROM run_messages WHERE "runId"=$1 AND length(text)=8192', [sharedRun])
+    })
     const ownBrief = await visibleRuns(owner, { issueId: shared, brief: true })
     assert.equal(ownBrief[0].failureDetails?.code, 'run_api_key_invalid')
     assert.doesNotMatch(JSON.stringify(ownBrief[0].failureDetails), /secret-provider-message|APIError/)
