@@ -40,8 +40,8 @@ export class TaskWorkspace {
   // under this prefix, so deleting only the old manifest would be insufficient.
   async prune() {
     const saved = await this.storage.get('checkpoint')
-    if (!saved) return
-    const keep = this.prefix + saved.id + '.tar.zst'
+    // A first upload can finish before the first manifest is committed.
+    const keep = saved && this.prefix + saved.id + '.tar.zst'
     let cursor
     do {
       const page = await this.bucket.list({ prefix: this.prefix, cursor, limit: 100 })
