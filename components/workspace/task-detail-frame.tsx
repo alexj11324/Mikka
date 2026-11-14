@@ -205,7 +205,7 @@ export function FramedTask(props: FramedTaskProps) {
   const creating = useRef(false)
   // The same create as 创建子任务… in the ⋯ menu (IssueDetailActions), with the title typed in the line.
   async function createChild(title: string) {
-    if (creating.current || locked || !title.trim()) return false
+    if (creating.current || locked || connections.error || !title.trim()) return false
     creating.current = true
     try {
       const latest = await getCurrent()
@@ -269,7 +269,7 @@ export function FramedTask(props: FramedTaskProps) {
     description={({ afterDescription, activity }) => props.editor(afterDescription, current => { discussions.current = current; return activity(current) })}
     acceptance={props.acceptance}
     copyLink={menu.copyLink}
-    subtasks={preview ? null : { items: subtasks, done: subtasks.filter(item => item.done).length, total: subtasks.length, onCreate: createChild, disabled: locked || connections.pending, failed: connections.error ? { text: tRelations('readFailedRetry'), retry: () => { void connections.mutate() } } : null }}
+    subtasks={preview ? null : { items: subtasks, done: subtasks.filter(item => item.done).length, total: subtasks.length, onCreate: createChild, disabled: locked || connections.pending || Boolean(connections.error), failed: connections.error ? { text: tRelations('readFailedRetry'), retry: () => { void connections.mutate() } } : null }}
     activity={preview ? null : {
       items: activityItems, timeline: (current, additional) => activityItems(current, true, additional),
       failed: [...props.historyFailed ? [{ text: tDetail('activityFailed'), retry: props.historyFailed }] : [], ...props.agentActivity.failed ? [{ text: props.agentActivity.failed.label, retry: props.agentActivity.failed.retry }] : []],

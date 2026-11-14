@@ -71,7 +71,8 @@ export function useIssueConnections({ liveWorkspaceId = null, viewerId, task, ge
   const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
   const { mutate: refresh } = useSWRConfig()
   const connectionsKey = issueKeys.connections(task.id)
-  const { data: rows, error, mutate } = useSWR(enabled ? connectionsKey : null, () => listIssueConnections(task.id))
+  const { data, error, mutate } = useSWR(enabled ? connectionsKey : null, () => listIssueConnections(task.id))
+  const rows = error ? undefined : data
   // No timer (#1212): a change to this task or one connected to it pushes `issue_relations` on the
   // task's own channel, the one its document syncs on. Without one it is read once a minute.
   useLiveKey('issue_relations', liveWorkspaceId ? task.id : UNRESOLVED_LIST_SCOPE, [unstable_serialize(connectionsKey)], liveWorkspaceId, { minIntervalMs: 2_000 })
@@ -81,7 +82,7 @@ export function useIssueConnections({ liveWorkspaceId = null, viewerId, task, ge
   const current = rows?.find(row => row.id === task.id)?.metadata ?? task.metadata
   const children = rows?.filter(row => row.metadata.parentId === task.id) ?? []
   async function remove(kind: RelationKind, targetId: string) {
-    if (busy.current || disabled) return
+    if (busy.current || disabled || error) return
     busy.current = true; setPending(true)
     try {
       const latest = await getCurrent()
@@ -93,7 +94,7 @@ export function useIssueConnections({ liveWorkspaceId = null, viewerId, task, ge
     finally { busy.current = false; setPending(false) }
   }
   async function status(id: string, revision: number, status: string) {
-    if (busy.current || disabled) return
+    if (busy.current || disabled || error) return
     busy.current = true; setPending(true)
     try {
       const result = await moveIssue({ id, revision, status })
