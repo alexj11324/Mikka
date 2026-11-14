@@ -399,6 +399,13 @@
     "test": "tests/organization-invitations.db.test.ts",
     "suite": "test:organization-invitations-db"
   },
+  "lib/audit/database.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Audit exports and retention use the installation's workspace and application PostgreSQL pools. A failed application checkout returns the workspace connection before propagating the error.",
+    "test": "lib/audit/retention.db.test.ts",
+    "suite": "test:audit-db"
+  },
   "lib/audit/events.ts": {
     "mode": "built-in",
     "environment": [
