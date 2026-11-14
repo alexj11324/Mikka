@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import worker, { runSchedule, SCHEDULES, MINUTE_ENDPOINTS, SWEEP_MINUTES, sweepsAt } from './index.mjs'
+import worker from './index.mjs'
+import { runSchedule, QUARTER_HOUR } from './schedule.mjs'
 
 const SCHEDULE = '0 * * * *'
+const RECONCILE = '/api/cron/reconcile'
+const SCHEDULES = { [QUARTER_HOUR]: RECONCILE, '*/15 * * * *': '/api/cron/briefings', [SCHEDULE]: '/api/cron/suggestions-reconcile', '30 * * * *': '/api/cron/user-facts' }
 const ONE_PAST_HOUR = Date.UTC(2026, 0, 1, 0, 1)
-// Every sweep interval divides 30, so all reconciliation sweeps run then, with the half-hour work.
+// The half-hour tick runs the quarter-hour sweeps and user facts.
 const HALF_PAST = Date.UTC(2026, 0, 1, 0, 30)
 const HALF_PAST_EXTRA = ['/api/cron/ops-monitor', '/api/cron/briefings', '/api/cron/user-facts']
 
@@ -29,9 +32,9 @@ test('each schedule calls its endpoints and logs only whitelisted numeric counts
   })
   for (const [schedule, endpoint] of Object.entries(SCHEDULES)) {
     const before = calls.length
-    const minuteTick = schedule === '* * * * *'
+    const minuteTick = schedule === QUARTER_HOUR
     assert.equal(await runSchedule(schedule, env, fetcher, minuteTick ? HALF_PAST : ONE_PAST_HOUR), 200)
-    const endpoints = minuteTick ? [...sweepsAt(30), ...HALF_PAST_EXTRA] : [endpoint]
+    const endpoints = minuteTick ? [RECONCILE, ...HALF_PAST_EXTRA] : [endpoint]
     assert.deepEqual(calls.slice(before).map(call => call.url), endpoints.map(path => `https://mikka.example.test/mikka${path}`))
     for (const call of calls.slice(before)) {
       assert.deepEqual(call.headers, { authorization: `Bearer ${env.CRON_SECRET}` })
@@ -39,7 +42,7 @@ test('each schedule calls its endpoints and logs only whitelisted numeric counts
       assert.ok(call.signal instanceof AbortSignal)
     }
   }
-  const endpoints = [...sweepsAt(30), ...HALF_PAST_EXTRA, ...Object.entries(SCHEDULES).filter(([cron]) => cron !== '* * * * *').map(([, path]) => path)]
+  const endpoints = [RECONCILE, ...HALF_PAST_EXTRA, ...Object.entries(SCHEDULES).filter(([cron]) => cron !== QUARTER_HOUR).map(([, path]) => path)]
   assert.equal(calls.length, endpoints.length)
   assert.deepEqual(logs, endpoints.map(path => `${path} 200 {"zones":2,"due":1,"written":1,"empty":0,"skipped":0,"failed":0,"deferred":3,"pushed":1,"people":4}`))
 })
@@ -60,8 +63,8 @@ test('wake recovery exposes started and exhausted counts in existing Worker logs
   const logs = []
   t.mock.method(console, 'log', line => logs.push(line))
   const { fetcher } = recorder(200, { due: 3, started: 1, failed: 1, deferred: 1, exhausted: 2, eventId: 'private-event-id' })
-  await runSchedule('* * * * *', env, fetcher, HALF_PAST)
-  assert.deepEqual(logs, [...MINUTE_ENDPOINTS, ...HALF_PAST_EXTRA].map(path => `${path} 200 {"due":3,"failed":1,"deferred":1,"started":1,"exhausted":2}`))
+  await runSchedule(QUARTER_HOUR, env, fetcher, HALF_PAST)
+  assert.deepEqual(logs, [RECONCILE, ...HALF_PAST_EXTRA].map(path => `${path} 200 {"due":3,"failed":1,"deferred":1,"started":1,"exhausted":2}`))
 })
 
 test('a failed safety-net sweep still waits for the other endpoints of that minute', async t => {
@@ -70,29 +73,30 @@ test('a failed safety-net sweep still waits for the other endpoints of that minu
   let finishSchedules
   const held = new Promise(resolve => { finishSchedules = resolve })
   let settled = false
-  const tick = runSchedule('* * * * *', env, async url => {
+  const tick = runSchedule(QUARTER_HOUR, env, async url => {
     const path = new URL(url).pathname.replace('/mikka', '')
     calls.push(path)
-    if (path === MINUTE_ENDPOINTS[0]) return new Response(null, { status: 503 })
+    if (path === RECONCILE) return new Response(null, { status: 503 })
     if (path === HALF_PAST_EXTRA[0]) await held
     return Response.json({ owners: 1, materialized: 2, executed: 2, reported: 1 })
   }, HALF_PAST).finally(() => { settled = true })
   const failure = assert.rejects(tick, /reconcile answered 503/)
   await new Promise(resolve => setImmediate(resolve))
-  assert.deepEqual(calls, [...MINUTE_ENDPOINTS, ...HALF_PAST_EXTRA])
+  assert.deepEqual(calls, [RECONCILE, ...HALF_PAST_EXTRA])
   assert.equal(settled, false)
   finishSchedules()
   await failure
 })
 
-test('wrangler uses one minute trigger for all existing production cadences', () => {
+test('wrangler uses one native quarter-hour trigger for all existing production cadences', () => {
   const source = readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8')
   const config = JSON.parse(source.replace(/^\s*\/\/.*$/gm, ''))
   assert.equal(config.main, 'src/index.mjs')
   assert.equal(config.workers_dev, false)
   assert.equal(config.preview_urls, false)
   assert.equal(config.routes, undefined)
-  assert.deepEqual(config.triggers.crons, ['* * * * *'])
+  assert.deepEqual(config.triggers.crons, ['0,15,30,45 * * * *'])
+  assert.equal(config.triggers.crons[0], QUARTER_HOUR)
   assert.deepEqual(config.vars, {}, 'deployment supplies MIKKA_URL; source has no production target')
 })
 
@@ -114,29 +118,26 @@ test('HTTP and network failures reject without exposing a body or underlying err
   }
 })
 
-test('scheduled execution passes its failure to waitUntil and serves no public HTTP route', async t => {
+test('scheduled execution reports its failure to Cloudflare and serves no public HTTP route', async t => {
   const { fetcher } = recorder(401)
   t.mock.method(globalThis, 'fetch', fetcher)
-  const pending = []
-  worker.scheduled({ cron: SCHEDULE, scheduledTime: ONE_PAST_HOUR }, env, { waitUntil: promise => pending.push(promise) })
-  assert.equal(pending.length, 1)
-  await assert.rejects(pending[0], /401/)
+  await assert.rejects(worker.scheduled({ cron: SCHEDULE, scheduledTime: ONE_PAST_HOUR }, env), /401/)
   assert.equal(worker.fetch().status, 404)
 })
 
-test('one minute trigger retains every UTC cadence without duplicate endpoints', async t => {
+test('a propagating legacy minute event retains cadences without duplicate endpoints', async t => {
   t.mock.method(console, 'log', () => {})
   for (const [minute, extra] of [
     [1, null],
     [15, ['/api/cron/ops-monitor', '/api/cron/briefings']],
     [30, ['/api/cron/ops-monitor', '/api/cron/briefings', '/api/cron/user-facts']],
     [45, ['/api/cron/ops-monitor', '/api/cron/briefings']],
-    [0, ['/api/cron/ops-monitor', '/api/cron/subscriptions', '/api/cron/briefings', '/api/cron/suggestions-reconcile']],
+    [0, ['/api/cron/ops-monitor', '/api/cron/briefings', '/api/cron/subscriptions', '/api/cron/suggestions-reconcile']],
   ]) {
     const { calls, fetcher } = recorder()
     await runSchedule('* * * * *', env, fetcher, Date.UTC(2026, 0, 1, 0, minute))
     const paths = calls.map(call => new URL(call.url).pathname.replace('/mikka', ''))
-    assert.deepEqual(paths, [...sweepsAt(minute), ...(extra ?? [])])
+    assert.deepEqual(paths, extra ? [RECONCILE, ...extra] : [])
     assert.equal(new Set(paths).size, paths.length)
   }
 })
@@ -146,18 +147,16 @@ test('scheduled dispatch uses the event timestamp even when wall time has advanc
   t.mock.method(Date, 'now', () => Date.UTC(2026, 0, 1, 0, 31))
   const { calls, fetcher } = recorder()
   t.mock.method(globalThis, 'fetch', fetcher)
-  const pending = []
-  worker.scheduled({ cron: '* * * * *', scheduledTime: Date.UTC(2026, 0, 1, 0, 0) }, env, { waitUntil: promise => pending.push(promise) })
-  await Promise.all(pending)
+  await worker.scheduled({ cron: QUARTER_HOUR, scheduledTime: Date.UTC(2026, 0, 1, 0, 0) }, env)
   assert.deepEqual(calls.map(call => new URL(call.url).pathname.replace('/mikka', '')),
-    [...MINUTE_ENDPOINTS, '/api/cron/ops-monitor', '/api/cron/subscriptions', '/api/cron/briefings', '/api/cron/suggestions-reconcile'])
+    [RECONCILE, '/api/cron/ops-monitor', '/api/cron/briefings', '/api/cron/subscriptions', '/api/cron/suggestions-reconcile'])
 })
 
 test('a complete UTC hour runs each reconciliation sweep and maintenance at its requested cadence', async t => {
   t.mock.method(console, 'log', () => {})
   const { calls, fetcher } = recorder()
-  for (let minute = 0; minute < 60; minute++) {
-    await runSchedule('* * * * *', env, fetcher, Date.UTC(2026, 0, 1, 8, minute))
+  for (const minute of [0, 15, 30, 45]) {
+    await runSchedule(QUARTER_HOUR, env, fetcher, Date.UTC(2026, 0, 1, 8, minute))
   }
   const counts = {}
   for (const call of calls) {
@@ -184,38 +183,32 @@ test('maintenance failures still wait for every selected endpoint without leakin
     let finishSchedules
     const held = new Promise(resolve => { finishSchedules = resolve })
     let settled = false
-    const tick = runSchedule('* * * * *', env, async url => {
+    const tick = runSchedule(QUARTER_HOUR, env, async url => {
       const path = new URL(url).pathname.replace('/mikka', '')
       paths.push(path)
-      if (path === sweepsAt(minute)[0]) await held
+      if (path === RECONCILE) await held
       if (path === failedPath) return new Response(env.CRON_SECRET, { status: 503 })
       return Response.json({})
     }, Date.UTC(2026, 0, 1, 8, minute)).finally(() => { settled = true })
     const failure = assert.rejects(tick, { message: `${failedPath} answered 503` })
     await new Promise(resolve => setImmediate(resolve))
-    const maintenance = []
     const reconcile = minute === 0 ? ['/api/cron/suggestions-reconcile'] : []
     const hourly = minute === 0 ? ['/api/cron/subscriptions'] : []
-    assert.deepEqual(paths, [...sweepsAt(minute), ...maintenance, '/api/cron/ops-monitor', ...hourly, '/api/cron/briefings', ...reconcile])
+    assert.deepEqual(paths, [RECONCILE, '/api/cron/ops-monitor', '/api/cron/briefings', ...hourly, ...reconcile])
     assert.equal(settled, false)
     finishSchedules()
     await failure
   }
 })
 
-test('reconciliation sweeps run only at their interval, each within 1-15 minutes', async t => {
+test('the transition from the minute trigger preserves the same per-endpoint deliveries for a full hour', async t => {
   t.mock.method(console, 'log', () => {})
-  for (const [path, every] of Object.entries(SWEEP_MINUTES)) {
-    assert.ok(Number.isSafeInteger(every) && every >= 1 && every <= 15, path)
-    assert.equal(30 % every, 0, `${path} must run at the half hour`)
-    for (let minute = 0; minute < 60; minute++) assert.equal(sweepsAt(minute).includes(path), minute % every === 0, `${path} at :${minute}`)
-  }
-  // A minute with nothing due makes no request at all.
-  const quiet = [...Array(60).keys()].find(minute => minute % 15 !== 0 && minute !== 30 && !sweepsAt(minute).length)
-  if (quiet !== undefined) {
-    const { calls, fetcher } = recorder()
-    assert.equal(await runSchedule('* * * * *', env, fetcher, Date.UTC(2026, 0, 1, 0, quiet)), null)
-    assert.equal(calls.length, 0)
+  const legacy = recorder(), current = recorder()
+  for (let minute = 0; minute < 60; minute++) {
+    const at = Date.UTC(2026, 0, 1, 8, minute)
+    await runSchedule('* * * * *', env, legacy.fetcher, at)
+    if (minute % 15 === 0) await runSchedule(QUARTER_HOUR, env, current.fetcher, at)
+    assert.deepEqual(legacy.calls.map(c => c.url), current.calls.map(c => c.url))
   }
 })
 

@@ -6,8 +6,8 @@
   // Scheduled calls only; no public Worker or version preview URL.
   "workers_dev": false,
   "preview_urls": false,
-  // One account-level trigger; the Worker fans out the existing UTC cadences.
-  "triggers": { "crons": ["* * * * *"] },
+  // One account-level quarter-hour trigger; every invocation has due work.
+  "triggers": { "crons": ["0,15,30,45 * * * *"] },
   // Set MIKKA_URL at deployment with --var MIKKA_URL:https://your-server/mikka.
   // The official release script supplies its production URL explicitly.
   "vars": {},
