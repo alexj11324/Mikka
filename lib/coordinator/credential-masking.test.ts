@@ -28,7 +28,11 @@ const tx = {
   },
 }
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
-stub('../db/index.ts', { db: { ...tx, transaction: async <T>(fn: (value: typeof tx) => Promise<T>) => fn(tx) }, pool: { query: async () => ({ rows: [{ present: false }] }) } })
+stub('../db/index.ts', {
+  db: { ...tx, transaction: async <T>(fn: (value: typeof tx) => Promise<T>) => fn(tx) },
+  withDatabaseTransaction: <T>(transaction: typeof tx, fn: () => T) => { assert.equal(transaction, tx); return fn() },
+  pool: { query: async () => ({ rows: [{ present: false }] }) },
+})
 stub('../credentials/chat-guard.ts', { assertCredentialSafeChat: async () => undefined })
 stub('../agent-runs.ts', { visibleRuns: () => {}, readRun: () => {} })
 stub('../issue-access.ts', { issueForUser: () => {} })
