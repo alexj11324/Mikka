@@ -383,6 +383,10 @@ test('registered service identity routes enforce a fresh Workspace admin through
     assert.equal(visible.status, 200)
     assert.ok(visible.noStore)
     assert.deepEqual(visible.data, { workspaceId: first.id, serviceIdentityId: serviceId, projects: [{ id: project, name: 'P' }], nextCursor: null })
+    const lowerCaseScheme = { authorization: 'bearer ' + firstKey }
+    assert.deepEqual(await serviceRead(lowerCaseScheme), visible)
+    assert.equal((await serviceRead({ authorization: firstKey })).status, 401)
+    assert.equal((await serviceRead(bearer(firstKey.replace('mksvc_', 'MKSVC_')))).status, 401)
     assert.deepEqual((await serviceRead(bearer(firstKey), project)).data.projects, [])
     await t.test('the dedicated bearer reads only current, explicitly granted Project details', async () => {
       const fixture = await pool.query('UPDATE workspace_projects SET description=$2 WHERE id=$1 RETURNING name,description,"createdAt","updatedAt"', [project, 'Release notes'])
@@ -391,6 +395,7 @@ test('registered service identity routes enforce a fresh Workspace admin through
           ($1,$2,'v2/file/localhost/unit-fixture','internal',false), ($1,$2,' V2/FILE/LOCALHOST/MIXED-CASE ','internal',false)`, [project, first.id])
       const normal = await projectDetails(bearer(firstKey), project)
       assert.equal(normal.status, 200)
+      assert.deepEqual(await projectDetails({ authorization: 'bEaReR  ' + firstKey }, project), normal)
       const stored = fixture.rows[0]
       assert.deepEqual(normal.body, {
         id: project, name: stored.name, description: stored.description, visibility: 'shared',
