@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import test, { mock } from 'node:test'
 import type { RunFailure } from '@mikka/protocol/run-failure'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
+import { nextTaskListCursor } from '../lib/task-list-page'
 
 // No business/local database fallback, including when REQUIRE_DB is unset.
 const url = process.env.E2E_DATABASE_URL
@@ -11,6 +12,13 @@ if (url && !authorized) throw new Error('Visibility DB tests require a loopback 
 if (process.env.REQUIRE_DB === '1' && !authorized) throw new Error('Visibility database tests cannot skip in required CI')
 
 test('real API/core visibility: immutable tenant, optional Team, provider scope and suspension', { skip: !authorized }, async t => {
+  // Server actions need a Next request boundary even when actAs pins a valid workspace.
+  // Supply only the browser transport; authentication and ACL still use the real fixture DB.
+  const request = mock.module('next/headers', { namedExports: {
+    headers: async () => new Headers(),
+    cookies: async () => ({ get: () => undefined }),
+  } })
+  t.after(() => request.restore())
   const intl = await import('next-intl/server')
   const locale = mock.module('next-intl/server', { namedExports: { ...intl, getLocale: async () => 'en',
     getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
@@ -138,6 +146,44 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
     assert.equal(JSON.stringify(citations).includes('private-agent'),false)
     assert.equal(citations[personal],undefined)
     assert.equal(citations[sharedRun]?.kind,'run')
+    // A Team whose rows fall outside the global top 100 must still load its
+    // own first page, traverse its own cursor, and reject foreign-Team anchors.
+    const overflowTeam = randomUUID()
+    const overflowIds: string[] = []
+    try {
+      await pool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Overflow\',\'OVER\')', [overflowTeam,workspace,owner])
+      const generated = await pool.query<{ id: string; title: string }>(`insert into issues(id,"userId","workspaceId","ownershipState",scope,title,content,status,priority,"updatedAt")
+        select gen_random_uuid(), $1, $2, 'bound', 'workspace', tag || n,
+          '{"type":"doc"}'::jsonb,'todo','normal',
+          case when tag='Overflow' then '2030-01-01'::timestamptz else '2020-01-01'::timestamptz end + n * interval '1 microsecond'
+        from (select 'Overflow' as tag, generate_series(1,105) n union all
+          select 'Target' as tag, generate_series(1,102) n) batch returning id,title`, [owner,workspace])
+      overflowIds.push(...generated.rows.map(row => row.id))
+      await pool.query(`insert into mikka_team_issues ("issueId","teamId","workspaceId","userId")
+        select task.id, case when task.title like 'Overflow%' then $2::uuid else $3::uuid end, $4::uuid, $5
+        from unnest($1::uuid[], $6::text[]) task(id,title)`,
+        [overflowIds, overflowTeam,team,workspace,owner,generated.rows.map(row => row.title)])
+      const { listWorkspaceIssues, listWorkspaceTaskPage } = await import('../app/actions/issues')
+      const list = await scoped(owner,workspace,() => listWorkspaceIssues(workspace))
+      assert.equal(list.length,100)
+      assert.equal(list.some(issue => issue.id === shared),false,'global page excludes the older target Team')
+      const first = await scoped(member,workspace,() => listWorkspaceTaskPage({ workspaceId: workspace, teamId: team, after: null }))
+      assert.equal(first.items.length,100)
+      assert.ok(first.items.some(issue => issue.id === shared),'the Team can read its own older Task')
+      assert.ok(first.items.every(issue => issue.teamId === team))
+      const last = await scoped(member,workspace,() => listWorkspaceTaskPage({ workspaceId: workspace, teamId: team, after: first.next! }))
+      assert.equal(last.items.length,3)
+      assert.equal(last.next,null)
+      assert.equal(new Set([...first.items,...last.items].map(issue => issue.id)).size,103)
+      const globalCursor = nextTaskListCursor(list)!
+      const stale = await scoped(member,workspace,() => listWorkspaceTaskPage({ workspaceId: workspace, teamId: team, after: globalCursor }))
+      assert.equal(stale.reset,true,'a cursor from another Team is never a valid Team page anchor')
+      await assert.rejects(scoped(member,workspace,() => listWorkspaceTaskPage({ workspaceId: workspace, teamId: otherTeam, after: null })), /teamNotFound/)
+    } finally {
+      await pool.query('delete from mikka_team_issues where "issueId"=any($1::uuid[])',[overflowIds])
+      await pool.query('delete from issues where id=any($1::uuid[])',[overflowIds])
+      await pool.query('delete from mikka_teams where id=$1',[overflowTeam])
+    }
     // Revoke after a successful read: no per-request/global positive cache.
     await pool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2',[workspace,member])
     assert.equal(await issueForUser(member,shared),null)
