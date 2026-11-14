@@ -164,7 +164,6 @@ export function FramedTask(props: FramedTaskProps) {
   const pullRequestTimeline = useSWR(
     !preview && pullRequestUrls.length ? ['issue-pull-request-timeline', userId, task.id, JSON.stringify(pullRequestUrls)] as const : null,
     pullRequestTimelineFetcher,
-    { revalidateOnFocus: true },
   )
 
   // 负责人 is a person; a Bot the task is handed to has its own line under it (R-60).
