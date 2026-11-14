@@ -212,6 +212,13 @@
     "test": "lib/account/deletion-lock.db.test.ts",
     "suite": "test:account-db"
   },
+  "drizzle/20261114061842_allow_exact_skill_sharing_approval.sql": {
+    "mode": "built-in",
+    "environment": ["DATABASE_URL"],
+    "behavior": "Store installed Skill sharing requests and their administrator decisions in the existing Workspace PostgreSQL approvals table.",
+    "test": "lib/enterprise/governance.db.test.ts",
+    "suite": "test:enterprise-db"
+  },
   "drizzle/20261113165037_inbox_conversations.sql": {
     "mode": "built-in",
     "environment": ["MIKKA_DATABASE_URL"],
