@@ -32,8 +32,8 @@ async function chatScope(chatBot: string | null) {
 export async function getBotModelMenu(chatBot: string | null) {
   const { botId, scope } = await chatScope(chatBot);
   const settings = new ExecutionSettings(pool);
-  // A subscription never asked for its models has none to list: ask it before reading the menu.
-  await settings.ensureCatalogues(scope);
+  // The chat menu also upgrades optional Codex Fast metadata; ordinary dispatch keeps valid legacy catalogues.
+  await settings.ensureCatalogues(scope, undefined, undefined, { codexPriority: true });
   return botModelMenu(pool, settings, scope, botId);
 }
 /** 刷新模型列表: re-reads what this person can use here, after asking each subscription for its models. */
