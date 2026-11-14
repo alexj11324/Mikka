@@ -100,6 +100,8 @@ export function FramedTask(props: FramedTaskProps) {
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
 
+  const menu = useIssueDetailMenu({ task, userId, disabled: locked, documentTools: props.documentTools, request: props.actionRequest, getCurrent, onSaved: adopt, onOpen, onDeleted: props.onDeleted, onHistory: props.onHistory, onMembers: props.onMembers, onDocumentTools: props.onDocumentTools, onProperty: props.requestProperty, onStatus: props.onStatus, onPriority: props.onPriority })
+
   // The property choices are read when a menu opens, as the community page reads them when its popover opens.
   const [wantOptions, setWantOptions] = useState(false)
   const { data: options, error: optionsError, mutate: reloadOptions } = useSWR(wantOptions && !locked ? ['issue-property-options', task.id] : null, () => getIssuePropertyOptions(task.id))
@@ -109,7 +111,6 @@ export function FramedTask(props: FramedTaskProps) {
   const team = useIssueTeam({ issueId: task.id, viewerId: userId, disabled: locked })
   const presentation = useSelectedTaskPresentation(userId, task.workspaceId, preview ? undefined : task.id)
   const connections = useIssueConnections({ liveWorkspaceId: props.liveWorkspaceId, viewerId: userId, task, getCurrent, onSaved: adopt, disabled: locked, enabled: !preview })
-  const menu = useIssueDetailMenu({ task, userId, disabled: locked, canCreateChild: !connections.error, documentTools: props.documentTools, request: props.actionRequest, getCurrent, onSaved: adopt, onOpen, onDeleted: props.onDeleted, onHistory: props.onHistory, onMembers: props.onMembers, onDocumentTools: props.onDocumentTools, onProperty: props.requestProperty, onStatus: props.onStatus, onPriority: props.onPriority })
 
   const loading = (text = tCommon('loading')): TaskMenuItem[] => optionsError
     ? [{ id: 'reload', label: tCommon('retry'), onSelect: () => { void reloadOptions() } }]
@@ -247,7 +248,7 @@ export function FramedTask(props: FramedTaskProps) {
     description={({ afterDescription, activity }) => props.editor(afterDescription, current => { discussions.current = current; return activity(current) })}
     acceptance={props.acceptance}
     copyLink={menu.copyLink}
-    subtasks={preview ? null : { items: subtasks, done: subtasks.filter(item => item.done).length, total: subtasks.length, onCreate: menu.createChild, disabled: locked || connections.pending || Boolean(connections.error), failed: connections.error ? { text: tRelations('readFailedRetry'), retry: () => { void connections.mutate() } } : null }}
+    subtasks={preview ? null : { items: subtasks, done: subtasks.filter(item => item.done).length, total: subtasks.length, onCreate: connections.error ? async () => false : menu.createChild, disabled: locked || connections.pending || Boolean(connections.error), failed: connections.error ? { text: tRelations('readFailedRetry'), retry: () => { void connections.mutate() } } : null }}
     activity={preview ? null : {
       items: activityItems, timeline: (current, additional) => activityItems(current, true, additional),
       failed: [...props.historyFailed ? [{ text: tDetail('activityFailed'), retry: props.historyFailed }] : [], ...props.agentActivity.failed ? [{ text: props.agentActivity.failed.label, retry: props.agentActivity.failed.retry }] : []],

@@ -299,15 +299,25 @@ test('inline and menu subtask creation refresh a stale parent and save once on e
   }
 })
 
-test('a failed relation read prevents inline and menu creation', async () => {
+test('a failed inline relation read does not block the independent menu form or its validation', async () => {
   connectionsError = new Error('relations unavailable')
-  createChild = mock.fn()
-  const dispose = await mount()
+  createChild = mock.fn(async input => input.title.trim() ? { issue: child } : { error: 'issueTitleInvalid' })
+  const dispose = await mount({ showDialogs: true })
   try {
     assert.equal(frame.subtasks.disabled, true)
     assert.ok(frame.subtasks.failed)
-    assert.equal(frame.menu.items.some(item => item.id === 'createChild'), false)
     await act(async () => { assert.equal(await frame.subtasks.onCreate('keep this title'), false) })
     assert.equal(createChild.mock.callCount(), 0)
+    await act(async () => frame.menu.items.find(item => item.id === 'createChild').onSelect())
+    const field = document.querySelector('#issue-action-value')
+    const submit = () => act(async () => field.form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true })))
+    field.value = '   '
+    await submit()
+    assert.equal(field.value, '   ')
+    assert.ok(field.form.textContent.includes('issueTitleInvalid'))
+    field.value = 'Valid title'
+    await submit()
+    assert.deepEqual(createChild.mock.calls.map(call => call.arguments[0].title), ['   ', 'Valid title'])
+    assert.deepEqual(reads, ['revalidate-connections', 'viewer-list'])
   } finally { await dispose() }
 })
