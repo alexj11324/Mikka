@@ -234,7 +234,10 @@ dbTest('devices: rename is owner-only and survives re-register; removal waits fo
   const bystander = await mintToken(A)
 
   sessionUser = A
+  const longestName = 'x'.repeat(60)
+  assert.deepEqual(await deviceActions.renameDevice(deviceId, longestName), { id: deviceId, name: longestName })
   assert.deepEqual(await deviceActions.renameDevice(deviceId, 'x'.repeat(61)), { error: 'deviceNameTooLong', params: undefined })
+  assert.equal((await pool.query('SELECT name FROM devices WHERE id=$1', [deviceId])).rows[0].name, longestName)
   assert.deepEqual(await deviceActions.renameDevice(deviceId, '   '), { error: 'validationNameRequired', params: undefined })
   assert.deepEqual(await deviceActions.renameDevice(deviceId, '  Studio Mac  '), { id: deviceId, name: 'Studio Mac' })
   assert.equal((await daemonCall('/v1/devices/register', token, registration(deviceId))).status, 200)

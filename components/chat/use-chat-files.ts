@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
+import type { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import {
   CHAT_FILE_MAX_BYTES,
   CHAT_FILE_MAX_COUNT,
@@ -25,11 +27,15 @@ export function useChatFiles(
   onChange: (value: string) => void,
   scope: ChatFileScope | undefined,
   blocked: boolean,
+  translate: ReturnType<typeof useTranslations<'Shell'>>,
 ) {
   const parsed = splitChatFiles(value)
   const [pending, setPending] = useState<PendingChatFile[]>([])
   const current = useRef({ value, onChange, scope, blocked })
   current.current = { value, onChange, scope, blocked }
+  // Keep each removal pending, including a failed attempt, until it is confirmed or explicitly canceled.
+  const removals = useRef(new Map<string, AbortController | null>())
+  const [, renderRemovals] = useReducer((revision: number) => revision + 1, 0)
   const uploads = useRef(new Map<string, AbortController>())
   const scopeKey = scope ? `${scope.kind}:${scope.id}` : ''
   const previousScope = useRef(scopeKey)
@@ -43,10 +49,16 @@ export function useChatFiles(
     }
     previousScope.current = scopeKey
     setPending([])
+    const removing = removals.current
     const running = uploads.current
     return () => {
       for (const controller of running.values()) controller.abort()
       running.clear()
+      for (const [id, controller] of removing) {
+        controller?.abort()
+        toast.dismiss(id)
+      }
+      removing.clear()
     }
   }, [scopeKey])
   const change = (next: string) => {
@@ -120,23 +132,55 @@ export function useChatFiles(
       else void start(item)
     }
   }
-  function remove(id: string) {
-    if (current.current.blocked) return
-    uploads.current.get(id)?.abort()
-    uploads.current.delete(id)
-    setPending((items) => items.filter((item) => item.key !== id))
-    const draft = splitChatFiles(current.current.value)
-    if (draft.files.some((file) => file.id === id)) {
-      change(
-        withChatFiles(
-          draft.text,
-          draft.files.filter((file) => file.id !== id),
-        ),
-      )
-      void fetch(withBasePath(`/api/chat/attachments/${id}`), {
+  function finishRemoval(id: string) {
+    removals.current.delete(id)
+    toast.dismiss(id)
+    renderRemovals()
+  }
+  async function remove(id: string) {
+    if (current.current.blocked || removals.current.get(id)) return
+    const file = splitChatFiles(current.current.value).files.find(entry => entry.id === id)
+    if (!file) {
+      uploads.current.get(id)?.abort()
+      uploads.current.delete(id)
+      setPending(items => items.filter(item => item.key !== id))
+      return
+    }
+
+    const controller = new AbortController()
+    removals.current.set(id, controller)
+    toast.dismiss(id)
+    renderRemovals()
+    try {
+      const response = await fetch(withBasePath(`/api/chat/attachments/${id}`), {
         method: 'DELETE',
         credentials: 'same-origin',
-      }).catch(() => {})
+        signal: controller.signal,
+      })
+      if (!response.ok) throw new ChatUploadError('unavailable')
+      if (controller.signal.aborted) return
+      const draft = splitChatFiles(current.current.value)
+      change(withChatFiles(draft.text, draft.files.filter(entry => entry.id !== id)))
+      finishRemoval(id)
+    } catch {
+      if (controller.signal.aborted) return
+      removals.current.set(id, null)
+      const keep = () => {
+        if (removals.current.get(id) === null) finishRemoval(id)
+      }
+      toast.error(translate('attachments.removeFailed', { name: file.name }), {
+        id,
+        duration: Infinity,
+        onDismiss: keep,
+        action: {
+          label: translate('attachments.retryRemoval'),
+          onClick: event => {
+            event.preventDefault()
+            void remove(id)
+          },
+        },
+        cancel: { label: translate('attachments.keep'), onClick: keep },
+      })
     }
   }
   return {
@@ -149,6 +193,6 @@ export function useChatFiles(
       void start(item)
     },
     edit,
-    locked: pending.length > 0,
+    locked: pending.length > 0 || removals.current.size > 0,
   }
 }

@@ -129,18 +129,22 @@ export async function listDriveVolumes(
   return rows.map(row => ({ ...row, totalBytes: Number(row.totalBytes) }))
 }
 
-/** One volume, or a typed 404. A volume of another owner is not found. */
+/** One owner-authorized volume, or 404. The personal Files API additionally
+ * requires the selected workspace and the owner's personal scope in this same read. */
 export async function readDriveVolume(
   database: Pick<PoolClient, 'query'>,
-  actor: { ownerId: string },
-  volumeId: string,
+  actor: { ownerId: string; workspaceId?: string },
+  volumeId: string | undefined,
 ): Promise<DriveVolumeSummary> {
   if (!isVolumeId(volumeId)) throw new DriveVolumeError('drive_not_found', 404)
+  const personal = 'workspaceId' in actor
   const { rows: [row] } = await database.query<{
     id: string; driveScope: DriveScope; scopeId: string; scopeUserId: string | null; name: string
     headVersionId: string; headDigest: string; entryCount: number; totalBytes: string; createdAt: Date; updatedAt: Date
   }>(`SELECT id,"driveScope","scopeId","scopeUserId",name,"headVersionId","headDigest","entryCount","totalBytes","createdAt","updatedAt"
-      FROM drive_volumes WHERE id=$1 AND "ownerId"=$2`, [volumeId, actor.ownerId])
+      FROM drive_volumes WHERE id=$1 AND "ownerId"=$2
+        AND (NOT $3::boolean OR ("workspaceId"=$4 AND "driveScope"='user' AND "scopeId"=$2))`,
+    [volumeId, actor.ownerId, personal, actor.workspaceId ?? null])
   if (!row) throw new DriveVolumeError('drive_not_found', 404)
   return { ...row, totalBytes: Number(row.totalBytes) }
 }

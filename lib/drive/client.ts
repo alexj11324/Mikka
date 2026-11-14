@@ -27,7 +27,7 @@ export const driveHistoryKey = (workspaceId: string, ownerId: string, volumeId: 
 
 function url(workspaceId: string, suffix = '', query: Record<string, string | undefined> = {}) {
   const params = new URLSearchParams({ workspaceId })
-  for (const [key, value] of Object.entries(query)) if (value) params.set(key, value)
+  for (const [key, value] of Object.entries(query)) if (value !== undefined) params.set(key, value)
   return withBasePath(`/api/drive/volumes${suffix}?${params}`)
 }
 
@@ -57,6 +57,11 @@ export function readDriveHead(workspaceId: string, volumeId: string, send?: type
 
 export function readDriveHistory(workspaceId: string, volumeId: string, before?: string, send?: typeof fetch) {
   return request<DriveHistoryPage>(url(workspaceId, `/${encodeURIComponent(volumeId)}/versions`, { before }), {}, send)
+}
+
+export function readDriveFileHistory(workspaceId: string, volumeId: string, path: string, before?: string, send?: typeof fetch) {
+  return request<{ versions: (DriveVersion & { file: DriveManifestEntry | null })[]; nextCursor: string | null }>(
+    url(workspaceId, `/${encodeURIComponent(volumeId)}/versions`, { path, before }), {}, send)
 }
 
 export function readDriveVersion(workspaceId: string, volumeId: string, versionId: string, send?: typeof fetch) {

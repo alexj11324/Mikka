@@ -1,9 +1,8 @@
 'use client'
 
-import { useEffect } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { listRunArtifacts } from '@/app/actions/artifacts'
+import { useRunArtifacts } from '@/hooks/use-thread-run-reads'
 import { ArtifactIcon } from '@/components/icons/artifact-icon'
 import { ArtifactCard, ArtifactKindIcon } from '@/components/artifacts/artifact-card'
 import { Button } from '@/components/ui/button'
@@ -67,9 +66,7 @@ export function ArtifactReviewDot({ kind }: { kind: ArtifactReviewKind }) {
  */
 export function ThreadArtifactButton({ runId, status, taskId }: { runId: string; status: string; /** The acceptance task this thread produced, when the panel knows it. */ taskId?: string | null }) {
   const text = useArtifactReviewText()
-  const { data, mutate } = useSWR(['run-artifacts', runId], () => listRunArtifacts(runId))
-  // A thread usually hands its artifact over as it finishes.
-  useEffect(() => { void mutate() }, [status, mutate])
+  const { data } = useRunArtifacts(runId, status)
   const mine = data ?? []
   const report = mine.find(item => item.acceptanceTaskId)
   const review = useArtifactReview(report?.acceptanceTaskId ?? taskId, { hasArtifact: mine.length > 0, runSucceeded: status === 'succeeded' })
@@ -105,7 +102,7 @@ function ReportCard({ artifact, taskId, onOpen }: { artifact: ArtifactSummary; t
 
 /** L3: under a finished thread's last message, the Artifacts it handed over, as cards. Shares the header button's read. */
 export function ThreadArtifactCards({ runId }: { runId: string }) {
-  const { data } = useSWR(['run-artifacts', runId], () => listRunArtifacts(runId))
+  const { data } = useRunArtifacts(runId)
   if (!data?.length) return null
   return <div data-slot="thread-artifacts" className="flex flex-col gap-2">{data.map(item => <ArtifactReviewCard key={item.id} artifact={item} onOpen={openArtifact} />)}</div>
 }

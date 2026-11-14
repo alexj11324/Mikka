@@ -1,8 +1,8 @@
-import { eveChannel } from 'eve/channels/eve'
+import { eveChannel, type EveAuthResult } from 'eve/channels/eve'
 import { POST, type RouteHandlerArgs, type HttpRouteDefinition } from 'eve/channels'
 import { z } from 'zod'
 import { ActionFailureError } from '../action-error'
-import { authenticateEveRequest, internalEveScope } from './auth'
+import { authenticateEveRequest, internalEveRequestScope } from './auth'
 import { assertSessionScope, conversationAddress, registerSession, scopeFromAuth, scopeAuth, type EveScope } from './scope'
 import { priorHistory } from './history'
 import { withSessionControlDelivery } from './session-control-delivery.mjs'
@@ -12,7 +12,6 @@ const body = z.object({ message: z.unknown().optional(), operationId: z.string()
 
 async function sessionFor(args: RouteHandlerArgs, scope: EveScope) {
   const result = await args.from(conversationAddress(scope)).create({ auth: scopeAuth(scope), history: await priorHistory(scope) })
-  await registerSession(scope, result.session.id)
   return result.session
 }
 
@@ -21,20 +20,24 @@ const accessRefusals = new WeakSet<Request>()
 // Bind the selected admission policy to the forwarded, authenticated request.
 const steeringRequests = new WeakSet<Request>()
 
-async function admit(request: Request, deliver: () => Response | Promise<Response>) {
-  const refused = () => Response.json({ ok: false, code: 'accessChangeConfirmationRequired', error: 'accessChangeConfirmationRequired' }, { status: 409 })
-  try {
-    const response = await deliver()
-    return accessRefusals.has(request) ? refused() : response
-  } catch (error) {
-    if (accessRefusals.has(request)) return refused()
-    throw error
-  }
-}
-
 /** Keep eve's protocol, changing only ownership, prior history and product ingress. */
 export function mikkaEveChannel() {
-  const base = eveChannel({ auth: authenticateEveRequest, turnPolicy: 'queue', audience: 'private',
+  const verifiedRequests = new WeakMap<Request, EveAuthResult>()
+  async function admit(request: Request, auth: EveAuthResult, deliver: () => Response | Promise<Response>) {
+    const refused = () => Response.json({ ok: false, code: 'accessChangeConfirmationRequired', error: 'accessChangeConfirmationRequired' }, { status: 409 })
+    // The native route receives the exact rewritten request verified by this wrapper.
+    verifiedRequests.set(request, auth)
+    try {
+      const response = await deliver()
+      return accessRefusals.has(request) ? refused() : response
+    } catch (error) {
+      if (accessRefusals.has(request)) return refused()
+      throw error
+    } finally {
+      verifiedRequests.delete(request)
+    }
+  }
+  const base = eveChannel({ auth: request => verifiedRequests.get(request) ?? authenticateEveRequest(request), turnPolicy: 'queue', audience: 'private',
     async onMessage(ctx, message) {
       const scope = scopeFromAuth(ctx.eve.caller)
       const { acceptEveMessage } = await import('./submission')
@@ -57,6 +60,7 @@ export function mikkaEveChannel() {
         if (route.method === 'POST' && route.path === '/eve/v1/session') {
           const input = body.parse(await request.clone().json().catch(() => ({})))
           const session = await sessionFor(args,scope)
+          await registerSession(scope,session.id)
           if (input.message === undefined) return Response.json({ ok:true, sessionId:session.id })
           const { operationId: _operation, ...payload } = input
           const submission = request.headers.get('x-mikka-submission-id')
@@ -64,7 +68,7 @@ export function mikkaEveChannel() {
           const url = new URL(request.url); url.pathname = `/eve/v1/session/${session.id}`
           const forwarded = forwardEveRequest(request,url,JSON.stringify(payload))
           if (payload.turnPolicy === 'steer') steeringRequests.add(forwarded)
-          const response = await admit(forwarded, () => follow.handler(forwarded, { ...args, params:{sessionId:session.id} }))
+          const response = await admit(forwarded, auth, () => follow.handler(forwarded, { ...args, params:{sessionId:session.id} }))
           if (response.ok) await (await import('./submission')).commitEveIngress(forwarded)
           return response
         }
@@ -87,7 +91,7 @@ export function mikkaEveChannel() {
           forwarded = forwardEveRequest(request,request.url,JSON.stringify(payload))
           if (payload.turnPolicy === 'steer') steeringRequests.add(forwarded)
         }
-        const response = await admit(forwarded, () => withSessionControlDelivery(route, sessionId, () => route.handler(forwarded,args)))
+        const response = await admit(forwarded, auth, () => withSessionControlDelivery(route, sessionId, () => route.handler(forwarded,args)))
         if (response.ok) await (await import('./submission')).commitEveIngress(forwarded)
         if (response.ok && response.body && request.method === 'GET' && route.path.endsWith('/stream')) {
           const [{credentialChatFingerprints},{maskEveStream}] = await Promise.all([import('../credentials/chat-guard'),import('./stream-mask')])
@@ -98,14 +102,17 @@ export function mikkaEveChannel() {
       },
     }),
     POST('/eve/v1/mikka/events', async (request,args) => {
-      const scope = internalEveScope(request.headers.get('authorization'))
+      const scope = internalEveRequestScope(request)
       if (!scope) return Response.json({ok:false,error:'authRequired'},{status:401})
       const input = z.object({eventId:z.uuid()}).strict().parse(await request.json())
       const { deliverEveEvent } = await import('./submission')
       const {pool} = await import('../db')
-      const event = (await pool.query('SELECT payload FROM coordinator_events WHERE id=$1 AND "userId"=$2 AND "botId"=$3',[input.eventId,scope.ownerId,scope.botId])).rows[0]
+      const event = (await pool.query<{ scheduled: boolean }>(
+        `SELECT coalesce(payload->>'source' = 'schedule_due', false) AS scheduled FROM coordinator_events WHERE id=$1 AND "userId"=$2 AND "botId"=$3`,
+        [input.eventId, scope.ownerId, scope.botId],
+      )).rows[0]
       if (!event) return Response.json({ok:false,error:'notFound'},{status:404})
-      const session = event.payload?.source === 'schedule_due'
+      const session = event.scheduled
         ? (await args.from(conversationAddress(scope)+':schedule:'+input.eventId).create({auth:scopeAuth(scope)})).session
         : await sessionFor(args,scope)
       await registerSession(scope,session.id)

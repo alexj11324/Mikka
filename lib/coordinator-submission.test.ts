@@ -750,9 +750,11 @@ test('the composer carries its captured Workspace expectation through the native
   const native = await import('./eve/client')
   const sent: { botId: string | null; text: string; options: import('eve/client').SendTurnOptions }[] = []
   const transport = mock.module(new URL('./eve/client.ts', import.meta.url).href, { namedExports: {
-    ...native, coordinatorAgentClient: (botId: string | null) => ({ sessions: { create: async () => ({ session: {
-      send: async (text: string, options: import('eve/client').SendTurnOptions) => { sent.push({ botId, text, options }) },
-    } }) } }),
+    ...native, coordinatorAgentClient: (botId: string | null) => ({ sessions: {
+      create: async ({ message, ...options }: import('eve/client').SendTurnOptions & {message: string}) => {
+        sent.push({ botId, text: message, options })
+      },
+    } }),
   } })
   const client = mock.module(new URL('./auth-client.ts', import.meta.url).href, { namedExports: {
     authClient: { getSession: async () => ({ data: { user: { id: 'owner' } }, error: null }) },

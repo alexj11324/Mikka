@@ -1,6 +1,7 @@
 import { and, eq, sql, type SQL } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
-import { issueMembers, issues } from '@/lib/db/schema'
+import { issues } from '@/lib/db/schema'
+import { resourceAccessPredicate } from '@/lib/resource-access/predicate'
 import { ActionFailureError } from '@/lib/action-error'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 
@@ -199,11 +200,6 @@ export async function fetchCandidates(db: Db, input: { userId: string; visibilit
   }))
 }
 
-export async function memberIssueIds(db: Db, ownerId: string, userId: string) {
-  const rows = await db.select({ id: issueMembers.issueId }).from(issueMembers).where(and(eq(issueMembers.userId, ownerId), eq(issueMembers.memberId, userId)))
-  return rows.map(row => row.id)
-}
-
 export type SearchResultItem = {
   id: string; identifier: string | null; title: string; status: string; priority: string
   ownerId: string; ownerName: string | null; parentId: string | null; revision: number; updatedAt: string
@@ -247,9 +243,18 @@ export async function searchIssues(db: Db, input: { userId: string; params: Sear
       truncated ||= closure.truncated
     }
   }
-  const members = current && current.ownerId !== userId ? await memberIssueIds(db, current.ownerId, userId) : []
   const rows = await fetchCandidates(db, { userId, visibility: candidatePredicate, excludedIds: [...excluded], query, cursor: params.cursor, limit: params.limit + 1, visibilityExcludesDeleted: true })
   const page = rows.slice(0, params.limit)
+  // A relation write checks canSteer on both Tasks. Resolve the same capability
+  // for only this page and its anchor; a plain search needs no relation grants.
+  const relatedIds = current ? page.filter(row => row.ownerId === current.ownerId && row.id !== current.id).map(row => row.id) : []
+  const steerable = new Set(current && relatedIds.length
+    ? (await db.select({ id: issues.id }).from(issues).where(and(
+      idIn(issues.id, [current.id, ...relatedIds]),
+      eq(issues.workspaceId, input.workspaceId),
+      resourceAccessPredicate(userId, issues.workspaceId, 'task', issues.id, 'canSteer'),
+    ))).map(row => row.id)
+    : [])
   const identifiers = await taskIdentifiers(page.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: row.metadata.number, issuedIdentifier: row.issuedIdentifier })))
   return {
     items: page.map((row): SearchResultItem => ({
@@ -259,14 +264,9 @@ export async function searchIssues(db: Db, input: { userId: string; params: Sear
       parentId: row.metadata.parentId ?? null, revision: row.revision, updatedAt: row.updatedAt.toISOString(),
       existingRelation: current ? existingRelation(current, row, params.relationKind) : null,
       canRelate: !!current && row.id !== current.id && row.ownerId === current.ownerId
-        && canEditIssueRelation({ actorId: userId, ownerId: current.ownerId, currentId: current.id, targetId: row.id, memberIssueIds: members }),
+        && steerable.has(current.id) && steerable.has(row.id),
     })),
     nextCursor: rows.length > params.limit ? encodeCursor(page[page.length - 1]) : null,
     truncated,
   }
-}
-
-/** Mirrors the existing writer's ownership/membership precondition, without widening writes. */
-export function canEditIssueRelation(input: { actorId: string; ownerId: string; currentId: string; targetId: string | null; memberIssueIds: string[] }) {
-  return input.actorId === input.ownerId || [input.currentId, ...(input.targetId ? [input.targetId] : [])].every(id => input.memberIssueIds.includes(id))
 }

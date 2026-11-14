@@ -11,6 +11,7 @@ import { MAX_IMAGES, pickImages, pickText, pickChatFile, uploadPickedFile, paste
 import { withChatFiles, CHAT_FILE_MAX_COUNT, type ChatFileScope } from '@mikka/protocol/chat-attachments'
 import { api } from '@/lib/api'
 import { tap } from '@/lib/haptics'
+import { mobileMessages } from '@/lib/messages'
 import { colors, font, plainColor } from '@/lib/theme'
 import { ChatAttachmentCard, ChatAttachmentPlus, useAttachmentCard } from './chat-attachment-card'
 import { cardAnchor } from '@/features/chat/model/chat-attachment-card'
@@ -104,7 +105,12 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
     try {
       if (attachmentScope && files.length >= CHAT_FILE_MAX_COUNT) { setProblem('最多添加 10 个文件'); return }
       if (source === 'file') {
-        if (attachmentScope) { const item = await pickChatFile(); if (item) void upload(item); return }
+        if (attachmentScope) {
+          const item = await pickChatFile()
+          if (typeof item === 'string') setProblem(mobileMessages.Shell.attachments.errors[item])
+          else if (item) void upload(item)
+          return
+        }
         const file = await pickText()
         if (file === 'notText') setProblem('只能发文本文件')
         else if (file === 'tooLong') setProblem('文件太长')
@@ -188,7 +194,9 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
 /** The composer's fade over the end of the list, in the page's colour for the scheme (a CSS gradient takes no system colour). */
 function fade(scheme: 'light' | 'dark') {
   const page = plainColor('page', scheme)
-  return { paddingTop: 28, backgroundImage: `linear-gradient(to bottom, ${page}00 0%, ${page}D9 45%, ${page}F7 100%)` }
+  // Finish the fade inside the empty top inset, including when the tray or input grows.
+  const paddingTop = 28
+  return { paddingTop, backgroundImage: `linear-gradient(to bottom, ${page}00 0px, ${page} ${paddingTop}px)` }
 }
 
 

@@ -9,7 +9,8 @@ import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { MessageSquareDiff } from 'lucide-react'
-import { getIssueThread, getThreadChanges, getThreadInstructions, stopRun, type IssueThreadDetail } from '@/app/actions/agents'
+import { getIssueThread, getThreadInstructions, stopRun, type IssueThreadDetail } from '@/app/actions/agents'
+import { useThreadChanges } from '@/hooks/use-thread-run-reads'
 import { useActionError } from '@/lib/use-action-error'
 import { sendReviewChange, type ReviewChangeTarget } from '@/lib/factory/review-change'
 import { RequestError } from '@/lib/factory/browser-request'
@@ -163,7 +164,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const [tab, setTab] = useViewState<ThreadTab>(`thread:${runId}:tab:${initialTab}`, initialTab)
   const accepting = !bare && Boolean(acceptance) && tab === 'acceptance'
   // 改动 (Figma 820:4843): the agent's work tree diff, read-only, once the run saved one.
-  const { data: changes, mutate: mutateChanges } = useSWR(bare ? null : ['thread-changes', issueId, runId], () => getThreadChanges(issueId, runId))
+  const view = data ? threadQuestionView(data.thread) : null
+  const { data: changes } = useThreadChanges(issueId, bare ? null : runId, view?.status)
   const hasChanges = !readRejected && !!changes && changes.state !== 'none'
   const viewingChanges = hasChanges && tab === 'changes'
   const transcript = useViewScroll<HTMLDivElement>(`thread:${runId}:chat`, !!data && !viewingChanges && !accepting)
@@ -197,7 +199,6 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   // 等你回复: the run ended on a question; the composer answers it (lib/agent-runs.ts addRunMessage).
   // Once answered it reads as the running thread it continues, with nothing to send or stop yet;
   // as soon as the resumed run starts, messages and stop go to that run.
-  const view = data ? threadQuestionView(data.thread) : null
   const displayOutcome = data ? acceptedProducerOutcome(data.thread, issueId, allTasks) : null
   const question = view?.question ?? null
   const liveRunId = view?.runId ?? runId
@@ -237,8 +238,6 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     const timer = setTimeout(() => setStopFailed(true), runStopTimeoutRemaining(requestedAt))
     return () => clearTimeout(timer)
   }, [active, requestedAt])
-  // The run saves its work as it goes; read it again when its state moves.
-  useEffect(() => { void mutateChanges() }, [view?.status, mutateChanges])
   useEffect(() => {
     // Acknowledgement updates the task's thread list as soon as this panel sees it.
     void mutateCache(['issue-threads', issueId])
@@ -339,7 +338,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
         : !data ? <div role="status" aria-label={t('loading')} data-thread-loading className="flex flex-col gap-3"><Skeleton className="h-5 w-40" /><Skeleton className="ml-auto h-12 w-3/4" /><Skeleton className="h-12 w-2/3" /></div>
         : <>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <ThreadStatusLine status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} startedAt={new Date(data.thread.createdAt).toISOString()} dispatchedBy={detail?.agentName || null}
+            <ThreadStatusLine pauseReason={view?.pauseReason} status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} startedAt={new Date(data.thread.createdAt).toISOString()} dispatchedBy={detail?.agentName || null}
               issueId={issueId} runId={runId} harness={detail?.harness ?? null}
               {...(attempt ? { attempt: { ...attempt, harness: detail?.harness ?? null, prompt: data.thread.prompt.trim() || null } } : {})} />
             {/* What the run holds (lib/context-usage.ts). Its own row keeps the shared status-line slot unchanged. */}
@@ -413,7 +412,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       entries.push(open)
     }
     // A later attempt's status line says nothing unless it is stopping (the thread-header slot): no empty row for it.
-    if (!attempt || attempt.first || stopRequested) bot('status', [{ kind: 'text', text: '', node: <ThreadStatusLine status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} startedAt={new Date(data.thread.createdAt).toISOString()} dispatchedBy={detail?.agentName || null}
+    if (!attempt || attempt.first || stopRequested) bot('status', [{ kind: 'text', text: '', node: <ThreadStatusLine pauseReason={view?.pauseReason} status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} startedAt={new Date(data.thread.createdAt).toISOString()} dispatchedBy={detail?.agentName || null}
       issueId={issueId} runId={runId} harness={detail?.harness ?? null} {...(attempt ? { attempt: { ...attempt, harness: detail?.harness ?? null, prompt: data.thread.prompt.trim() || null } } : {})} /> }])
     if (!attempt && data.thread.prompt.trim()) { open = null; entries.push({ id: `${runId}:prompt`, role: 'person', at: at(data.thread.createdAt), text: data.thread.prompt.trim() }) }
     if (!attempt && data.thread.hasInstructions) bot('instructions', [{ kind: 'text', text: '', node: <ThreadInstructions issueId={issueId} runId={runId} mine={data.thread.ownedByCurrentUser} /> }])

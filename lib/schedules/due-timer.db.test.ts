@@ -19,7 +19,7 @@ test('schedules due timer: exact due times, no minute sweep', { skip: !valid }, 
   const schema = `schedule_due_${randomUUID().replaceAll('-', '')}`
   const admin = new Pool({ connectionString: target, max: 1 })
   await admin.query(`CREATE SCHEMA ${schema}`)
-  for (const table of ['"user"', 'bots', 'coordinator_events', 'coordinator_messages', 'user_schedules', 'schedule_occurrences', 'inbox_snoozes']) {
+  for (const table of ['"user"', 'bots', 'coordinator_events', 'coordinator_messages', 'user_schedules', 'schedule_occurrences', 'inbox_snoozes', 'inbox_conversation_snoozes']) {
     await admin.query(`CREATE TABLE ${schema}.${table} (LIKE public.${table} INCLUDING DEFAULTS INCLUDING CONSTRAINTS INCLUDING INDEXES)`)
   }
   const pool = new Pool({ connectionString: target, options: `-c search_path=${schema}`, max: 4 })

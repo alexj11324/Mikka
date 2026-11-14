@@ -1,3 +1,6 @@
+import { observePoolCommits } from '../lib/db/commit-effects'
+import { builtinGateway } from '../lib/builtin-gateway/runtime'
+import { factoryResourceWorkspace } from './helpers/factory-resource-boundary'
 // Where a thread runs when a person has no cloud, no device, or a full cloud, against a real PostgreSQL.
 // 运行位置 decides (decision 2026-11-02-1400, which replaced 2026-10-31-2200's fallback): 本地 picks one of
 // the computers that take part (参与调度) and run the model, 云端 the person's own E2B; neither falls back to
@@ -21,6 +24,7 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
   const restoreModels = templateModelsFixture()
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
+  observePoolCommits(pool)
   const steps = await import('../workflows/coordinator/steps')
   const { reclaimLostRuns } = await import('../lib/run-leases')
   const { pool: appPool } = await import('../lib/db')
@@ -49,6 +53,7 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     await pool.query('DELETE FROM repository_settings WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM github_repository_installations WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM account WHERE "userId" = ANY($1)', [users])
+    await builtinGateway()?.stop()
     await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
   })
   const seeded = new Map<string, string>()
@@ -177,8 +182,14 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     assert.equal(child.agentDefinition.repositoryAdmission.targetBranch, original.agentDefinition.repositoryAdmission.targetBranch)
     assert.equal(current.runId, child.id)
     assert.equal(current.output.requestEpoch, sourceEventId)
-    const { claimExecutionRun } = await import('../lib/factory/server')
-    assert.equal((await claimExecutionRun(who.id, deviceB, child.id, new Date(now.getTime() + 90_000).toISOString())).length, 1)
+    const { claimLocalRun } = await import('../lib/computer/claim')
+    const { guardFactoryClaim } = await import('../lib/factory/runtime')
+    const lease = new Date(now.getTime() + 90_000)
+    const result = await factoryResourceWorkspace(pool)(who.id, current.id, () =>
+      claimLocalRun(pool, child.id, deviceB, lease, undefined, async tx => {
+        await guardFactoryClaim(tx, who.id, deviceB, child.id, lease.toISOString())
+      }))
+    assert.equal(result, 'claimed')
     await reclaim()
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "retryOf"=$1', [original.id])).rows[0].n, 1)
   })

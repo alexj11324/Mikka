@@ -3,7 +3,7 @@ import { apiRequest } from './request.mjs'
 
 const no = status => new Response(null, { status, headers: { 'cache-control': 'no-store' } })
 const eveProductHeaders = new Set([
-  'x-mikka-bot-id', 'x-mikka-submission-id', 'x-mikka-evaluation-id', 'x-mikka-workspace-id', 'x-mikka-locale',
+  'x-mikka-eve-scope', 'x-mikka-bot-id', 'x-mikka-submission-id', 'x-mikka-evaluation-id', 'x-mikka-workspace-id', 'x-mikka-locale',
 ])
 const flowPath = '/.well-known/workflow/v1/flow'
 const worldMethods = new Map([

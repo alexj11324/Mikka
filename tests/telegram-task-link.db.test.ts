@@ -31,10 +31,15 @@ test('Telegram /link resolves stable and historical task identity inside the cur
       assert.equal(requestedWorkspace, null)
       return { botId, workspaceId: workspace.id }
     } } })
+  const wake = await import('../lib/coordinator/wake')
+  const direct: string[] = []
+  mock.module('../lib/coordinator/wake', { namedExports: { ...wake, coordinatorEnabled: async () => true,
+    wakeCoordinator: async (owner: string) => { direct.push(owner) } } })
+  const { coordinatorWakeTransport } = await import('../lib/coordinator/wake-after-commit')
   const { handleTelegramDirectMessage } = await import('../lib/telegram/handler')
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
-  t.after(async () => { mock.restoreAll(); await Promise.all([connection.end(), appPool.end(), workspacePool.end()]) })
+  t.after(async () => { delete coordinatorWakeTransport.wake; mock.restoreAll(); await Promise.all([connection.end(), appPool.end(), workspacePool.end()]) })
   const identifier = async (issueId: string) => (await connection.query<{ issuedIdentifier: string }>('select "issuedIdentifier" from issues where id=$1', [issueId])).rows[0].issuedIdentifier
   const conversation = async () => (await connection.query('select * from telegram_conversations where "threadId"=$1', [threadId])).rows[0]
   const reset = () => connection.query('update telegram_conversations set "issueId"=$2 where "threadId"=$1', [threadId, anchor])
@@ -49,6 +54,32 @@ test('Telegram /link resolves stable and historical task identity inside the cur
     return JSON.parse(posts[0]) as { key: string; issue?: string; title?: string }
   }
   const canonical = await identifier(current)
+
+  await t.test('a linked message commits before the acknowledgement and a Telegram replay recovers once', async () => {
+    await connection.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES ($1,$2,$3,$4)', [botId, viewer, workspace.id, 'DM fixture'])
+    const committed: string[] = []
+    let delivered = Promise.withResolvers<void>()
+    coordinatorWakeTransport.wake = async owner => { committed.push(owner); delivered.resolve() }
+    const messages: string[] = []
+    const send = (author: string) => handleTelegramDirectMessage({ id: threadId, isDM: true,
+      post: async (text: string) => { messages.push(JSON.parse(text).key) } } as never,
+    { author: { isBot: false, isMe: false, userId: author, userName: 'Fixture' },
+      raw: { message_id: 80, chat: { type: 'private' } }, text: 'First message' } as never)
+    await send('unlinked-telegram-user')
+    assert.deepEqual(messages, ['connect'])
+    for (let attempt = 0; attempt < 2; attempt++) {
+      delivered = Promise.withResolvers<void>()
+      await send(telegramUserId)
+      const stored = await connection.query('SELECT "userId","botId","issueId",payload FROM coordinator_events WHERE "dedupeKey"=$1', [`telegram:${threadId}:80`])
+      assert.equal(stored.rowCount, 1)
+      assert.deepEqual([stored.rows[0].userId, stored.rows[0].botId, stored.rows[0].issueId], [viewer, botId, anchor])
+      assert.deepEqual(stored.rows[0].payload.telegram, { threadId, telegramUserId, messageId: 80 })
+      assert.deepEqual(direct, [])
+      await delivered.promise
+    }
+    assert.deepEqual(messages, ['connect', 'coordinatorQueued', 'coordinatorQueued'])
+    assert.deepEqual(committed, [viewer, viewer])
+  })
 
   await t.test('configured Telegram status reads only the requested account link', async () => {
     const { readTelegramIntegrationStatus } = await import('../lib/telegram/connection-status')

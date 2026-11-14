@@ -7,7 +7,7 @@ import test from 'node:test'
 import { build, createDevServer, createNitro, prepare } from 'nitro/builder'
 import { nodeRuntimePackages } from '../build-contract.mjs'
 import { compileTracing } from '../scripts/finalize-build.mjs'
-import { developmentTracing, developmentWorkerReady } from '../scripts/dev.mjs'
+import { configureDevelopmentWorker, developmentWorkerReady } from '../scripts/dev.mjs'
 import { decodeOtlp } from '../../../tests/mvp/trace-collector.mjs'
 
 const repository = fileURLToPath(new URL('../../../', import.meta.url))
@@ -16,9 +16,16 @@ const repository = fileURLToPath(new URL('../../../', import.meta.url))
 // A public pg query after client.end exercises its error path without opening
 // a database connection; the full trace chain independently tests real SQL.
 test('real development workers instrument pg before application imports, including hot replacements', { timeout: 60_000 }, async () => {
+  const held = Promise.withResolvers(), release = Promise.withResolvers()
   const spans = [], sentinel = 'private-dev-pg-parameter'
   let privateBytes = false
   const collector = createServer(async (request, response) => {
+    if (request.url === '/hold') {
+      held.resolve()
+      await release.promise
+      response.end()
+      return
+    }
     const chunks = []
     for await (const chunk of request) chunks.push(chunk)
     const body = Buffer.concat(chunks)
@@ -39,7 +46,11 @@ test('real development workers instrument pg before application imports, includi
 import { trace } from '@opentelemetry/api';
 import { defineHandler } from 'nitro';
 import { threadId } from 'node:worker_threads';
-export default defineHandler(async () => {
+export default defineHandler(async event => {
+  if (new URL(event.req.url).pathname === '/during-reload') {
+    await fetch(new URL('/hold', ${JSON.stringify(endpoint)}));
+  }
+
   const provider = globalThis[Symbol.for('mikka.tracing')];
   let parentId, queryFailed = false;
   await trace.getTracer('development-contract').startActiveSpan('test.request', async span => {
@@ -59,7 +70,7 @@ export default defineHandler(async () => {
     nitro = await createNitro({ rootDir: directory, workspaceDir: repository, dev: true, preset: 'nitro-dev', builder: 'rolldown', logLevel: 0,
       buildDir: join(directory, 'build'), output: { dir: join(directory, 'output') }, routes: { '/**': route },
       serveStatic: false, publicAssets: [], imports: false, rolldownConfig: { external: nodeRuntimePackages } }, { dotenv: false })
-    developmentTracing(nitro, await compileTracing(repository))
+    configureDevelopmentWorker(nitro, await compileTracing(repository))
     const api = createDevServer(nitro)
     worker = developmentWorkerReady(api)
     const compiled = Promise.withResolvers(); void compiled.promise.catch(() => {})
@@ -70,9 +81,15 @@ export default defineHandler(async () => {
     let previousWorker
     for (const version of [1, 2]) {
       if (version === 2) {
+        const inFlight = fetch(new URL('/during-reload', listener.url), { signal: AbortSignal.timeout(15_000) })
+        await Promise.race([held.promise, inFlight.then(() => { throw Error('request ended before reaching the first worker') })])
         worker = developmentWorkerReady(api, { phase: 'hot-replacement' })
         await writeFile(route, routeSource(version), { mode: 0o600 })
         await worker.wait(AbortSignal.timeout(30_000))
+        release.resolve()
+        const heldResponse = await inFlight
+        assert.equal(heldResponse.status, 200, 'a request admitted by the previous worker finishes through the dev proxy')
+        assert.equal((await heldResponse.json()).workerId, previousWorker)
       }
       const response = await fetch(listener.url, { signal: AbortSignal.timeout(10_000) })
       assert.equal(response.status, 200)
@@ -89,6 +106,7 @@ export default defineHandler(async () => {
       assert.equal(privateBytes, false)
     }
   } finally {
+    release.resolve()
     worker?.dispose()
     try { await nitro?.close() }
     finally {

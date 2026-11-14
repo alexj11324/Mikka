@@ -19,11 +19,6 @@
     "kind": "core",
     "env": {}
   },
-  "core-6": {
-    "command": "node --test scripts/ci-docs-only.test.mjs",
-    "kind": "core",
-    "env": {}
-  },
   "core-7": {
     "command": "pnpm test:ui-policy",
     "kind": "core",
@@ -205,7 +200,7 @@
     "env": {}
   },
   "core-43": {
-    "command": "pnpm test:coordinator-issue-tools",
+    "command": "pnpm test:coordinator-issue-mutations",
     "kind": "core",
     "env": {}
   },
@@ -225,7 +220,7 @@
     "env": {}
   },
   "core-47": {
-    "command": "pnpm test:artifacts",
+    "command": "pnpm test:artifacts && pnpm test:chat-actions",
     "kind": "core",
     "env": {}
   },
@@ -423,6 +418,11 @@
   },
   "core-triage": {
     "command": "node --test scripts/ci/*.test.mjs",
+    "kind": "core",
+    "env": {}
+  },
+  "core-view-state": {
+    "command": "pnpm test:view-state",
     "kind": "core",
     "env": {}
   },

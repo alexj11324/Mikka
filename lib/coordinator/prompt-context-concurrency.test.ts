@@ -32,6 +32,7 @@ const forbidden = () => { throw new Error('No database, provider or tool effects
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 
 stub('./store.ts', { loadProductPromptContext: async () => ({ ...conversation, personalInstructions: personal, memoryEnabled: true }), saveSummary: forbidden })
+stub('./prompt-context.ts', { loadProductPromptContext: async () => ({ ...conversation, personalInstructions: personal, memoryEnabled: true }) })
 stub('../profile/memory.ts', { memoryForBotPrompt: async () => '' })
 stub('./bot-instructions.ts', { botInstructions: forbidden })
 stub('./personal-instructions.ts', { withPersonalInstructionText: async (...args: unknown[]) => {

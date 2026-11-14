@@ -19,6 +19,12 @@ import { authorizeMcpSession } from '../../tests/support/mcp-closeout-session.mj
 const runnerRoot = fileURLToPath(new URL('../../', import.meta.url))
 const sourceRoot = resolve(process.env.MIKKA_WAKE_SOURCE_ROOT ?? runnerRoot)
 const source = path => import(pathToFileURL(join(sourceRoot, path)).href)
+// #176 accepted the Coordinator before Eve. Check the pinned implementation
+// before opening sessions or issuing fixture writes against the selected host.
+const legacyStore = await source('lib/coordinator/store.ts')
+if (typeof legacyStore.takeInbox !== 'function' || typeof legacyStore.releaseLease !== 'function' || typeof legacyStore.hasWakingEvents !== 'function') {
+  throw new Error('Historical #176 acceptance requires its pre-Eve source checkout and matching deployment. See the #176 acceptance receipt.')
+}
 const environment = await loadEnvironment()
 await assertDeploymentIdentity(environment)
 const applicationSha = environment.deploymentSha
@@ -27,7 +33,7 @@ assert.equal(execFileSync('git', ['status', '--porcelain', '--untracked-files=no
 const evidence = await mkdtemp('/tmp/mikka-wake176-consumer-')
 const database = new Pool({ connectionString: process.env.E2E_DATABASE_URL, max: 12 })
 const { createWakeRecovery, deliverWake, WAKE_BACKOFF_MS } = await source('lib/coordinator/wake-recovery.ts')
-const { hasWakingEvents, untriagedEvents } = await source('lib/coordinator/store.ts')
+const { hasWakingEvents, untriagedEvents } = legacyStore
 const sourcePool = (await source('lib/db/index.ts')).pool
 const workspacePool = (await source('lib/workspace-db.ts')).workspacePool
 let scope, passed = false

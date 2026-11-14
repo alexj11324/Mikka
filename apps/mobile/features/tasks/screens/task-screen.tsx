@@ -12,6 +12,7 @@ import { useScrolledUnderBar } from '@/components/BarBackdrop'
 import { ReadNotice } from '@/components/ReadNotice'
 import { Text } from '@/components/Text'
 import { GlassButton } from '@/components/GlassButton'
+import { Row } from '@/components/settings'
 import { HARNESS } from '@/lib/harness'
 import { useHome } from '@/lib/home'
 import { taskLinkAttempt } from '@/lib/push-route'
@@ -48,6 +49,7 @@ export function TaskScreen() {
   const { data, error, loading, reload } = useLiveApi<TaskDetail>(`/api/mobile/tasks/${id}`,
     detail => taskDetailLive(id, detail?.live?.workspaceId, home?.live?.workspaceId, home?.workspace.id, detail?.task.factoryTaskId, detail?.live?.factoryActivityVersion), readPresentedTask)
   const task = data?.task
+  const openTaskOnWeb = () => { if (task) void openOnWeb(`/?issue=${encodeURIComponent(task.id)}`) }
   // The task's own state: its current attempt's in 等待你 and 进行中, else its board status (2026-11-07-2230).
   const shown = task ? rowState(task) : null
   // 活动 runs oldest first, from the task's creation down (Alex 2026-11-07); the server sends it newest first.
@@ -86,6 +88,7 @@ export function TaskScreen() {
               {task.place ? <Chip icon={<MachineIcon machine={task.place.kind} size={15} />} label={task.place.name} /> : null}
               {task.schedule ? <Chip icon={<CalendarClock size={14} color={colors.secondary} strokeWidth={2} />} label={task.schedule.label} /> : null}
             </View>
+            <Row label={mobileMessages.MobileCore.taskPropertiesOnWeb} onPress={openTaskOnWeb} />
             {task.description ? <View style={styles.description}><Markdown text={task.description} /></View> : null}
             {activity.length ? <Text accessibilityRole="header" style={styles.section}>{mobileMessages.MobileCore.activity}</Text> : null}
             {activity.map((item, index) => <ActivityRow key={activityEntryId(item)} item={item} first={index === 0} last={index === activity.length - 1}
@@ -98,7 +101,7 @@ export function TaskScreen() {
       {task ? (
         <View pointerEvents="box-none" style={[styles.commentWrap, { bottom: insets.bottom + 12 }]}>
           {/* Comments are written on the web for now: the app has no comment route yet (#1671). */}
-          <GlassButton label={mobileMessages.MobileCore.comment} onPress={() => void openOnWeb(`/?issue=${task.id}`)} />
+          <GlassButton label={mobileMessages.MobileCore.comment} onPress={openTaskOnWeb} />
         </View>
       ) : null}
     </View>

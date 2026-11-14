@@ -33,7 +33,7 @@ const digest=(value:unknown)=>createHash('sha256').update(JSON.stringify(value))
 const textOf=(message:Record<string,unknown>)=>typeof message.content==='string' ? message.content : Array.isArray(message.content)
   ? message.content.flatMap(part=>part&&typeof part==='object'&&part.type==='text'&&typeof part.text==='string'?[part.text]:[]).join('\n') : ''
 const noReply=(message:Record<string,unknown>)=>Array.isArray(message.content)&&message.content.some(part=>part&&typeof part==='object'&&part.type==='tool-call'&&part.toolName==='no_reply')
-const carriesCode=(source:StoredOutcome)=>source.kind==='matter_handoff'&&Boolean(source.payload.assessment&&typeof source.payload.assessment==='object'&&(source.payload.assessment as Record<string,unknown>).verificationCode)
+const carriesCode=(source:StoredOutcome)=>source.kind==='matter_handoff'&&Boolean(source.payload.verificationCode)
 
 /** Product notifications consume a committed native root projection, never run
  * an Agent or claim a Coordinator lease. Provider calls have no portable
@@ -42,18 +42,20 @@ export function createEveOutcomeDelivery(app:Query,workspace:Query,overrides:Par
   const services={...defaults,...overrides}
   async function load(scope:EveScope,input:EveOutcomeDelivery):Promise<StoredOutcome|null> {
     if(scope.surface!=='web')return null
-    const {rows:[row]}=await app.query<StoredOutcome>(`SELECT e.id AS "sourceId",e.kind,e.tier,e."runId",e."issueId",e.payload,m.message,
+    const {rows:[row]}=await app.query<StoredOutcome>(`SELECT e.id AS "sourceId",e.kind,e.tier,e."runId",e."issueId",
+      jsonb_build_object('telegram', e.payload->'telegram', 'verificationCode', e.payload#>'{assessment,verificationCode}') AS payload,m.message,
       i."userId" AS "issueOwner",i."workspaceId" AS "issueWorkspace",i."ownershipState",i.content AS "issueContent",
       EXISTS(SELECT 1 FROM coordinator_bots cb WHERE cb."ownerId"=$2 AND cb."botId"=$3 AND cb."workspaceId"=$4) AS "personalCoordinator"
       FROM eve_sessions s JOIN bots b ON b.id=s.bot_id AND b."ownerId"=s.owner_id AND b."workspaceId"=s.workspace_id
       JOIN eve_turn_sources t ON t.session_id=s.session_id AND t.turn_id=$5
       JOIN coordinator_events e ON e.id=t.source_event_id AND e."userId"=s.owner_id AND e."botId"=s.bot_id AND e."deliveredAt" IS NOT NULL
+        AND e.payload->>'source' IS DISTINCT FROM 'schedule_due'
       JOIN eve_projection_receipts p ON p.session_id=s.session_id AND p.event_key=t.turn_id
       JOIN coordinator_messages m ON m."userId"=s.owner_id AND m."botId"=s.bot_id AND m.message->>'mikkaStreamId'=$6 AND m.message->>'role'='assistant'
       LEFT JOIN issues i ON i.id=e."issueId"
       WHERE s.session_id=$1 AND s.owner_id=$2 AND s.bot_id=$3 AND s.workspace_id=$4 AND s.surface='web'
       ORDER BY m.position DESC LIMIT 1`,[input.sessionId,scope.ownerId,scope.botId,scope.workspaceId,input.turnId,eveStreamId(input.sessionId,input.turnId)])
-    if(!row||row.payload.source==='schedule_due')return null
+    if(!row)return null
     const storedOutcome=row.message.mikkaStopped===true?'cancelled':typeof row.message.mikkaFailure==='string'?'failed':'completed'
     if(storedOutcome!==input.outcome)return null
     const {rows:[member]}=await workspace.query<{kind:string;userId:string}>(`SELECT w.kind,w."userId" FROM mikka_workspaces w
