@@ -39,6 +39,8 @@ let stored: IssueView
 let versions: ActivityVersion[]
 let issueReads = 0, versionReads = 0, fullVersionReads = 0, documentReads = 0
 let readOverride: (() => Promise<IssueView>) | null = null
+let deletedTask: { id: string; title: string; deletedAt: string; canRestore?: boolean } | null = null
+let restoreOverride: (() => Promise<{ error: string }>) | null = null
 let readFailure: string | null = null
 let readViewerId = owner
 let knownVersions: (string | undefined)[]
@@ -76,7 +78,13 @@ mock.module(at('app/actions/collaboration.ts'), { namedExports: {
   },
 } })
 mock.module(at('app/actions/issue-operations.ts'), { namedExports: {
-  getDeletedIssue: async () => null, listIssueConnections: async () => [], setIssueDeleted: async () => { throw new Error('no deletion in this fixture') },
+  getDeletedIssue: async () => deletedTask,
+  listIssueConnections: async () => [],
+  setIssueDeleted: async (input: { id: string; restore: boolean }) => {
+    if (!restoreOverride) throw new Error('no deletion in this fixture')
+    assert.deepEqual(input, { id: issueId, restore: true })
+    return restoreOverride()
+  },
 } })
 const none = () => null
 for (const [file, names] of [
@@ -159,6 +167,8 @@ beforeEach(() => {
   notices.clear(); dirty = false
   stored = { id: issueId, userId: owner, title: 'Accepted report', content: body('Original description'), status: 'review', priority: 'normal', revision: 1,
     identifier: 'ALEX-60', metadata: {}, createdAt: new Date('2026-11-05T08:00:00Z'), updatedAt: new Date('2026-11-05T08:00:00Z') } as IssueView
+  deletedTask = null
+  restoreOverride = null
   versions = [version(stored)]; writes = []; issueReads = 0; versionReads = 0; fullVersionReads = 0; documentReads = 0; knownVersions = []; readFailure = null; readViewerId = owner; readOverride = null; documentHold = null; documentWaits = 0; latestDocumentUpdate = undefined; flush = null; cache = new Map(); sockets.length = 0
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
@@ -634,4 +644,38 @@ test('discussion draft ACK clears only its submitted edit, keeps the original op
   assert.equal(commands[1].id, commands[2].id, 'a reopened draft reuses its Yjs operation identity')
   await act(async () => { acknowledgements.shift()!() })
   assert.equal(draft!.reply, '')
+})
+
+test('expired deleted Task explains its restore window without offering an impossible action', async () => {
+  readFailure = 'issueNotFound'
+  deletedTask = { id: issueId, title: 'Old task', deletedAt: '2020-01-01T00:00:00.000Z' }
+  await mount(false)
+  await until(() => container.textContent?.includes('deletedTitle') === true, 'owner sees the deleted Task')
+  assert.match(container.textContent ?? '', /Errors\.issueRestoreWindow/)
+  assert.doesNotMatch(container.textContent ?? '', /IssueDetail\.(restoreTask|deletedDescription)/)
+})
+
+test('a recoverable deleted Task withdraws Restore when its open page passes the deadline', async () => {
+  readFailure = 'issueNotFound'
+  const deadline = Date.now() + 1500
+  deletedTask = { id: issueId, title: 'Recent task', deletedAt: new Date(deadline - 30 * 86_400_000).toISOString(), canRestore: true }
+  await mount(false)
+  await until(() => container.textContent?.includes('restoreTask') === true, 'recoverable Task offers Restore')
+  await until(() => container.textContent?.includes('Errors.issueRestoreWindow') === true, 'an open page crosses the deadline')
+  assert.doesNotMatch(container.textContent ?? '', /IssueDetail\.(restoreTask|deletedDescription)/)
+})
+
+test('the server restore decision wins even when the client clock says a Task is still recoverable', async () => {
+  readFailure = 'issueNotFound'
+  deletedTask = { id: issueId, title: 'Clock-skewed task', deletedAt: new Date().toISOString(), canRestore: true }
+  let writes = 0
+  restoreOverride = async () => { writes++; return { error: 'issueRestoreWindow' } }
+  await mount(false)
+  const restoreButton = () => [...container.querySelectorAll('button')].find(button => button.textContent === 'IssueDetail.restoreTask')
+  await until(() => !!restoreButton(), 'the initial owner read allowed Restore')
+  await act(async () => restoreButton()!.click())
+  await until(() => container.textContent?.includes('Errors.issueRestoreWindow') === true, 'writer returned the authoritative expiry')
+  assert.equal(writes, 1)
+  assert.equal(restoreButton(), undefined)
+  assert.doesNotMatch(container.textContent ?? '', /IssueDetail\.deletedDescription/)
 })

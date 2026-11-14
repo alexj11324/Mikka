@@ -3,6 +3,8 @@
 import { Component, useCallback, type KeyboardEvent, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useLiveKey } from '@/hooks/use-live-key'
+import { useListExpiry } from '@/hooks/use-list-expiry'
+import { issueRestoreDeadline } from '@/lib/issue-metadata'
 import { useTranslations } from 'next-intl'
 import type { JSONContent } from '@tiptap/react'
 import { ArrowLeft } from 'lucide-react'
@@ -56,10 +58,46 @@ type DetailProps = { /** The thread open in the right column, from the address (
 function UnavailableIssue({ id, onRetry, onClose }: { id: string; onRetry: () => void; onClose: () => void }) {
   const t = useTranslations('IssueDetail')
   const actionError = useActionError()
-  const { data } = useSWR(issueKeys.deleted(id), () => getDeletedIssue(id))
+  const { data, mutate } = useSWR(issueKeys.deleted(id), () => getDeletedIssue(id))
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
-  return <div className="flex flex-col items-start gap-4 p-8"><h1 className="text-lg font-semibold">{data ? t('deletedTitle') : t('unavailableTitle')}</h1><p role="status" className="text-sm text-muted-foreground">{data ? t('deletedDescription', { title: data.title }) : t('unavailableDescription')}</p>{error && <FieldError>{error}</FieldError>}<div className="flex gap-2">{data && <Button disabled={pending} onClick={async () => { setPending(true); try { const result = await setIssueDeleted({ id, restore: true }); if (result.error) setError(actionError(result.error)); else { toast.success(t('taskRestored')); onRetry() } } catch { setError(t('restoreFailed')) } finally { setPending(false) } }}>{t('restoreTask')}</Button>}<Button size="sm" variant="outline" onClick={onRetry}>{t('reload')}</Button><Button size="sm" variant="ghost" onClick={onClose}>{t('backToWorkspace')}</Button></div></div>
+  const deadline = data ? issueRestoreDeadline(data.deletedAt) : null
+  useListExpiry(deadline === null ? [] : [deadline])
+  const canRestore = data && data.canRestore !== false && deadline !== null && Date.now() <= deadline
+
+  async function restore() {
+    if (!data || !canRestore) return
+    setPending(true)
+    setError('')
+    try {
+      const result = await setIssueDeleted({ id, restore: true })
+      if (result.error === 'issueRestoreWindow') {
+        await mutate({ ...data, canRestore: false }, { revalidate: false })
+      } else if (result.error) {
+        setError(actionError(result.error))
+      } else {
+        toast.success(t('taskRestored'))
+        onRetry()
+      }
+    } catch {
+      setError(t('restoreFailed'))
+    } finally {
+      setPending(false)
+    }
+  }
+
+  let description = t('unavailableDescription')
+  if (data) description = canRestore ? t('deletedDescription', { title: data.title }) : actionError('issueRestoreWindow')
+  return <div className="flex flex-col items-start gap-4 p-8">
+    <h1 className="text-lg font-semibold">{data ? t('deletedTitle') : t('unavailableTitle')}</h1>
+    <p role="status" className="text-sm text-muted-foreground">{description}</p>
+    {error && <FieldError>{error}</FieldError>}
+    <div className="flex gap-2">
+      {canRestore && <Button disabled={pending} onClick={restore}>{t('restoreTask')}</Button>}
+      <Button size="sm" variant="outline" onClick={onRetry}>{t('reload')}</Button>
+      <Button size="sm" variant="ghost" onClick={onClose}>{t('backToWorkspace')}</Button>
+    </div>
+  </div>
 }
 
 const WIDE = '(min-width: 1024px)'
