@@ -1,0 +1,73 @@
+{
+  "id": "03-cli-daemon-ffmpeg",
+  "title": "Real MCP CLI, daemon finalization and FFmpeg readback",
+  "codeCommit": "40376665ac416ce2228c08b60d7ea8cee97a3de6",
+  "startedAt": "2026-11-09T15:38:38.712Z",
+  "finishedAt": "2026-11-09T15:38:56.337Z",
+  "exitCode": 0,
+  "results": [
+    {
+      "command": [
+        "/usr/local/bin/node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "test/captures.test.ts",
+        "test/terminal-checkpoint.test.ts",
+        "test/publication-cancel.test.ts",
+        "test/server-link-http.test.ts",
+        "--reporter=verbose"
+      ],
+      "cwd": "/vercel/Mikka/packages/daemon",
+      "startedAt": "2026-11-09T15:38:39.927Z",
+      "finishedAt": "2026-11-09T15:38:46.175Z",
+      "atMs": 7463,
+      "durationMs": 6248,
+      "exitCode": 0,
+      "tests": {
+        "total": 91,
+        "passed": 91,
+        "failed": 0,
+        "skipped": 0
+      },
+      "accepted": true
+    },
+    {
+      "command": [
+        "/usr/local/bin/node",
+        "--test",
+        "--test-reporter=spec",
+        "packages/daemon/test/capture-video.node-test.mjs"
+      ],
+      "cwd": "/vercel/Mikka",
+      "startedAt": "2026-11-09T15:38:47.990Z",
+      "finishedAt": "2026-11-09T15:38:50.148Z",
+      "atMs": 11436,
+      "durationMs": 2158,
+      "exitCode": 0,
+      "tests": {
+        "total": 10,
+        "passed": 10,
+        "failed": 0,
+        "skipped": 0
+      },
+      "accepted": true
+    },
+    {
+      "command": [
+        "/usr/local/bin/node",
+        "/vercel/validation/issue-1783-harness/oversize-readback.mjs",
+        "/vercel/Mikka",
+        "/vercel/validation/issue-1783-2026-11-09-40376665ac41-final-03/ffmpeg-readback"
+      ],
+      "cwd": "/vercel/Mikka",
+      "startedAt": "2026-11-09T15:38:51.961Z",
+      "finishedAt": "2026-11-09T15:38:54.524Z",
+      "atMs": 15812,
+      "durationMs": 2563,
+      "exitCode": 0,
+      "tests": null,
+      "accepted": true
+    }
+  ],
+  "finalScreenAtMs": 19426
+}

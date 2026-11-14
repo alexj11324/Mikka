@@ -43,9 +43,12 @@ export async function completedRecoveryEvidence(tx: Query, task: Scope, candidat
       AND receipt.request#>>'{input,binding,taskId}'=t.id::text AND receipt.request#>>'{input,change,action}'='retry'
       AND receipt.result#>>'{task,id}'=t.id::text AND receipt.result#>>'{task,userId}'=t."userId" AND receipt.result#>>'{task,issueId}'=t."issueId"::text
       AND receipt.result#>>'{task,sourceEventId}'=t."sourceEventId"::text AND receipt.result#>>'{task,candidateId}'=c.id::text
-      AND (receipt.result#>>'{task,stage}'='review' OR (t.route->>'flowVersion'='2' AND receipt.result#>>'{task,route,flowVersion}'='2' AND receipt.result#>>'{task,stage}'='approval'))
+      AND (receipt.result#>>'{task,stage}'='review' OR (t.route->>'flowVersion'='2' AND receipt.result#>>'{task,route,flowVersion}'='2'
+        AND (receipt.result#>>'{task,stage}'='approval' OR (receipt.result#>>'{task,stage}'='execute'
+          AND receipt.result#>>'{task,status}'='blocked' AND receipt.result#>>'{refusal,code}'='factory_public_evidence_required'))))
       AND (receipt.result#>>'{task,status}' IN ('pending','running')
-        OR (receipt.result#>>'{task,stage}'='review' AND receipt.result#>>'{task,status}'='blocked'))
+        OR (receipt.result#>>'{task,stage}'='review' AND receipt.result#>>'{task,status}'='blocked')
+        OR (receipt.result#>>'{task,stage}'='execute' AND receipt.result#>>'{task,status}'='blocked' AND receipt.result#>>'{refusal,code}'='factory_public_evidence_required'))
       AND completion.request#>>'{binding,taskId}'=t.id::text AND completion.request#>>'{change,action}'='finish'
       AND completion.request#>>'{change,status}'='passed' AND completion.request#>>'{change,output,runId}'=r.id::text
       AND completion.result#>>'{task,id}'=t.id::text AND completion.result#>>'{task,userId}'=t."userId" AND completion.result#>>'{task,issueId}'=t."issueId"::text

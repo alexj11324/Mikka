@@ -1,0 +1,32 @@
+{
+  "id": "04-activity-registration",
+  "title": "Real capture upload, versioned reports and activity GET readback",
+  "codeCommit": "40376665ac416ce2228c08b60d7ea8cee97a3de6",
+  "startedAt": "2026-11-09T15:39:04.678Z",
+  "finishedAt": "2026-11-09T15:39:55.263Z",
+  "exitCode": 0,
+  "results": [
+    {
+      "command": [
+        "/usr/local/bin/node",
+        "--import",
+        "./scripts/server-test.mjs",
+        "--import",
+        "tsx",
+        "/vercel/validation/issue-1783-harness/register-readback.mjs",
+        "/vercel/Mikka",
+        "/vercel/validation/issue-1783-2026-11-09-40376665ac41-final-03",
+        "40376665ac416ce2228c08b60d7ea8cee97a3de6"
+      ],
+      "cwd": "/vercel/Mikka",
+      "startedAt": "2026-11-09T15:39:05.896Z",
+      "finishedAt": "2026-11-09T15:39:53.439Z",
+      "atMs": 48761,
+      "durationMs": 47543,
+      "exitCode": 0,
+      "tests": null,
+      "accepted": true
+    }
+  ],
+  "finalScreenAtMs": 52385
+}

@@ -1,0 +1,46 @@
+{
+  "id": "01-postgresql-gates",
+  "title": "PostgreSQL: evidence gates and completion ordering",
+  "codeCommit": "40376665ac416ce2228c08b60d7ea8cee97a3de6",
+  "startedAt": "2026-11-09T15:36:03.604Z",
+  "finishedAt": "2026-11-09T15:37:22.316Z",
+  "exitCode": 0,
+  "results": [
+    {
+      "command": [
+        "/usr/local/bin/node",
+        "--test-force-exit",
+        "--experimental-test-module-mocks",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "--test-concurrency=1",
+        "--test-reporter=spec",
+        "lib/captures/video-evidence.db.test.ts",
+        "lib/captures/publication.db.test.ts",
+        "lib/factory/checks.db.test.ts",
+        "lib/factory/approval.db.test.ts",
+        "lib/factory/merge.db.test.ts",
+        "tests/run-publications.db.test.ts",
+        "lib/factory/activity-artifacts.db.test.ts",
+        "lib/factory/task-media.db.test.ts"
+      ],
+      "cwd": "/vercel/Mikka",
+      "startedAt": "2026-11-09T15:36:04.818Z",
+      "finishedAt": "2026-11-09T15:37:20.501Z",
+      "atMs": 76897,
+      "durationMs": 75683,
+      "exitCode": 0,
+      "tests": {
+        "total": 202,
+        "passed": 202,
+        "failed": 0,
+        "skipped": 0
+      },
+      "accepted": true
+    }
+  ],
+  "finalScreenAtMs": 80512
+}

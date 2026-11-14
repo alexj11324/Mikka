@@ -3,7 +3,7 @@ import { posthogConfig } from '@/lib/posthog-config'
 import { redactReplayRequest, sanitizeAnalyticsEvent } from '@/lib/analytics-policy'
 import { watchRemovedActions } from '@/lib/app-build'
 import { setLiveTelemetrySink } from '@/lib/live/telemetry'
-import { installReplayReadiness } from '@/lib/replay-readiness'
+import { acceptanceReplayOptIn, installReplayReadiness } from '@/lib/replay-readiness'
 
 // Obsolete actions stop old traffic and offer a refresh without discarding the page.
 watchRemovedActions(window)
@@ -16,6 +16,7 @@ if (posthogConfig.token) {
   defaults: '2026-05-30',
   persistence: 'memory',
   reuseAnonymousId: true,
+  opt_out_useragent_filter: acceptanceReplayOptIn(window),
   person_profiles: 'identified_only',
   save_campaign_params: false,
   save_referrer: false,

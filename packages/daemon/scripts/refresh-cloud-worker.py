@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Owner-authorized idle Mikka runtime switch. Never edits the official image or user data."""
-import json,os,pathlib,pwd,re,signal,socket,stat,subprocess,sys,time,uuid
+import contextlib,fcntl,json,os,pathlib,pwd,re,signal,socket,stat,subprocess,sys,time,uuid
 RUNTIME=pathlib.Path('/opt/mikka')
 HOME=pathlib.Path('/home/user/.mikka')
+CONTROL=pathlib.Path('/run/mikka-review-control')
 ROOT_UID=0
 USER_UID=None
 
@@ -83,7 +84,30 @@ def atomically_write(path,text):
         os.chmod(temp,0o444);handle.write(text+'\n');handle.flush();os.fsync(handle.fileno())
     os.replace(temp,path)
 
+@contextlib.contextmanager
+def execution_fence(mode):
+    descriptor=None;directory=None
+    try:
+        if mode!='verify' and CONTROL.exists():
+            directory=os.open(CONTROL,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+            info=os.fstat(directory)
+            if info.st_uid!=ROOT_UID or info.st_mode&0o022:raise RuntimeError('runtime_install_untrusted')
+            descriptor=os.open('machine.lock',os.O_RDWR|os.O_NOFOLLOW,dir_fd=directory)
+            info=os.fstat(descriptor)
+            if not stat.S_ISREG(info.st_mode) or info.st_uid!=ROOT_UID or info.st_nlink!=1:raise RuntimeError('runtime_install_untrusted')
+            try:fcntl.flock(descriptor,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            except BlockingIOError:raise RuntimeError('runtime_native_busy') from None
+        yield
+    finally:
+        if descriptor is not None:os.close(descriptor)
+        if directory is not None:os.close(directory)
+
 def switch(mode,device,workspace,old_sha,source,sha,operation):
+    # A terminal owns the same execution inode as the native worker. Idle
+    # journal state alone is insufficient while a human owns that checkout.
+    with execution_fence(mode):return switch_locked(mode,device,workspace,old_sha,source,sha,operation)
+
+def switch_locked(mode,device,workspace,old_sha,source,sha,operation):
     phase('arguments')
     if mode not in ['switch','rollback','verify'] or not all(re.fullmatch('[a-f0-9]{40}',value) for value in [old_sha,source,sha]) or not re.fullmatch('[a-f0-9-]{36}',operation):raise RuntimeError('runtime_refresh_invalid')
     phase('installation')
@@ -135,6 +159,13 @@ def switch(mode,device,workspace,old_sha,source,sha,operation):
     temp=RUNTIME/('worker-next-'+operation)
     if temp.exists() or temp.is_symlink():raise RuntimeError('runtime_staging_conflict')
     temp.symlink_to(target);os.replace(temp,link)
+    # A new worker participates in the same fixed-inode execution fence as an
+    # owner terminal. Rollback to a legacy worker must withdraw its capability.
+    control_install=target/'packages/daemon/scripts/workspace-control-install.py'
+    if control_install.is_file():
+        subprocess.run([sys.executable,str(control_install)],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    else:
+        (CONTROL/'version').unlink(missing_ok=True)
     phase('switch_marker')
     atomically_write(marker,sha if mode=='switch' else old_sha)
     if mode=='switch':

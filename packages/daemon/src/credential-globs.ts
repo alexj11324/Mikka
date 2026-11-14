@@ -46,6 +46,14 @@ export const SNAPSHOT_CREDENTIAL_GLOBS: readonly string[] = [
   "/root/.git-credentials",
   // A Bot desktop's cached GitHub credential (lib/computer/desktop-github.ts).
   "/home/*/.mikka/github/token.json",
+  // One-use bootstrap handoffs carry the same device credential. The worker
+  // unlinks them after reading, but a pause may race an unconsumed handoff.
+  // The daemon's own `device.json`/`daemon.secret` stay: they are the local
+  // identity over a device token this machine revokes when it pauses, and
+  // removing them would break a same-VM resume before that revocation.
+  "/home/user/.mikka/bootstrap.json",
+  "/home/user/.mikka/anonymous-claude.json",
+  "/home/user/.mikka/anonymous-codex.json",
   ...runCredentialGlobs(CLOUD_WORKER_STATE_DIR),
 ]
 

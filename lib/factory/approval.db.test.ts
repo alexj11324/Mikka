@@ -40,6 +40,25 @@ test(
     const f = await factory194Fixture(db!);
     try {
       const { actor, pool, provider } = f;
+      await t.test('direct approval refuses missing visual evidence with HTTP 409 after committing blocked',async()=>{
+        const x=await f.prepare(actor,{visual:false}),service=f.service([f.adapter]);
+        const before=provider.posts();
+        const response=await handleFactoryApproval(service,{actor,authorization:null,method:'POST',taskId:x.task.id,origin:'https://mikka.example',
+          url:`https://mikka.example/api/factory/tasks/${x.task.id}/approval`,body:{operation:'approve',input:x.approval}});
+        assert.equal(response.status,409);
+        assert.deepEqual(response.body,{error:'factory_visual_evidence_required'});
+        assert.equal((await pool.query('SELECT status FROM factory_tasks WHERE id=$1',[x.task.id])).rows[0].status,'blocked');
+        assert.equal((await pool.query('SELECT id FROM factory_approvals WHERE "taskId"=$1',[x.task.id])).rowCount,0);
+        assert.equal(provider.posts(),before);
+      });
+      await t.test('direct approval cannot hand over a PR whose public evidence was revoked',async()=>{
+        const x=await f.prepare(actor),service=f.service([f.adapter]);
+        await pool.query(`UPDATE run_capture_shares SET "revokedAt"=now() WHERE "captureId" IN (
+          SELECT c.id FROM run_captures c JOIN factory_candidates candidate ON candidate."runId"=c."runId" WHERE candidate.id=$1)`,[x.task.candidateId]);
+        await rejects(()=>service.approve(actor,x.approval),'factory_public_evidence_required');
+        assert.equal((await pool.query('SELECT status FROM factory_tasks WHERE id=$1',[x.task.id])).rows[0].status,'blocked');
+        assert.equal((await pool.query('SELECT id FROM factory_approvals WHERE "taskId"=$1',[x.task.id])).rowCount,0);
+      });
       await t.test("run captures are display-only evidence behind the existing owner, issue and source fences", async () => {
         const x = await f.prepare(actor, { capture: true }), service = f.service([f.adapter]);
         const captureId = x.captureId!;

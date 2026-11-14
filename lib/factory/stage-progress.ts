@@ -40,6 +40,14 @@ export async function syncFactoryPresentation(tx: PoolClient, task: FactoryTask)
     body += ` [${copy.acceptance}](${withBasePath(workspaceLink({ artifact: artifactId }))})`;
   }
   if (flow.pullRequest?.url && /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+$/.test(flow.pullRequest.url)) body += ` [PR](${flow.pullRequest.url})`;
+  if (flow.stage === 'handoff' && flow.acceptance) {
+    // The same authenticated capture IDs/URLs appear in the report and task
+    // conversation. Clients use acceptance.media to render playable video.
+    for (const media of flow.acceptance.media.slice(0,40)) {
+      const title = redactFactoryCheckText(media.title).replace(/[\\`*_{}[\]<>#]/g, '\\$&').slice(0,200);
+      body += media.kind === 'image' ? `\n\n![${title}](${media.url})` : `\n\n[${copy.report.recording}: ${title}](${media.url})`;
+    }
+  }
   const hash = createHash('sha256').update(body).digest('hex');
   const { rows: [prior] } = await tx.query('SELECT "bodyHash","commentId","createdAt" FROM factory_stage_updates WHERE "taskId"=$1 AND stage=$2 LIMIT 1',[task.id,flow.stage]);
   if (prior?.bodyHash === hash) return;

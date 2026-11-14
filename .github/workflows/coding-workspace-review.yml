@@ -1,0 +1,86 @@
+name: Coding workspace review data plane
+on:
+  pull_request:
+    paths:
+      - 'lib/coding-workspace/**'
+      - 'app/api/tasks/**/review/**'
+      - 'scripts/e2b/preview-gateway*'
+      - 'scripts/e2b/preview-firewall*'
+      - 'scripts/e2b/preview-frameworks.test.py'
+      - 'scripts/e2b/preview-network-acceptance.mjs'
+      - 'scripts/e2b/preview-ingress-*'
+      - 'scripts/e2b/workspace-ingress-*'
+      - 'scripts/e2b/workspace-terminal-*'
+      - 'scripts/e2b/workspace-candidates*'
+      - 'scripts/e2b/fixtures/preview-frameworks/**'
+      - 'scripts/e2b/preview_firewall.py'
+      - 'scripts/e2b/terminal-gateway*'
+      - 'scripts/e2b/viewer-gateway.py'
+      - 'scripts/e2b/subagent-gateway.py'
+      - 'scripts/e2b/local-api-relay.py'
+      - 'scripts/e2b/start-prebuilt.sh'
+      - 'scripts/e2b/build-template*'
+      - 'packages/daemon/scripts/official-e2b-instance-bootstrap.sh'
+      - 'packages/daemon/scripts/workspace-ingress*'
+      - 'packages/protocol/src/coding-terminal*'
+      - '.github/workflows/coding-workspace-review.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  data-plane:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install the isolated preview dependency
+        run: |
+          python3 -m venv "$RUNNER_TEMP/coding-review-python"
+          "$RUNNER_TEMP/coding-review-python/bin/pip" install --disable-pip-version-check 'aiohttp==3.14.0'
+      - name: Real HTTP and WebSocket boundaries
+        run: |
+          sudo -n "$RUNNER_TEMP/coding-review-python/bin/python" scripts/e2b/preview-gateway.test.py
+          "$RUNNER_TEMP/coding-review-python/bin/python" scripts/e2b/preview-firewall.test.py
+          sudo -n "$RUNNER_TEMP/coding-review-python/bin/python" packages/daemon/scripts/workspace-ingress.test.py
+      - name: Real root supervisor and PTY boundaries
+        run: sudo -n env MIKKA_REQUIRE_REAL_PTY=1 "$RUNNER_TEMP/coding-review-python/bin/python" scripts/e2b/terminal-gateway.test.py
+      - uses: ./.github/actions/pnpm-install
+      - name: Check closed ingress probe evidence and failure paths
+        run: |
+          node --test scripts/e2b/preview-ingress-acceptance.test.mjs scripts/e2b/workspace-ingress-acceptance.test.mjs scripts/e2b/workspace-terminal-acceptance.test.mjs
+          python3 scripts/e2b/workspace-candidates.test.py
+      - name: Real Next and Vite pages, assets and hot reload
+        run: |
+          sudo -n env "PATH=$PATH" "$RUNNER_TEMP/coding-review-python/bin/python" scripts/e2b/preview-frameworks.test.py
+      - name: Check additive bootstrap syntax
+        run: bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh
+  ingress-kernel:
+    name: Real ingress kernel boundaries
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install namespace and netfilter tools
+        run: |
+          sudo -n apt-get update -qq
+          sudo -n apt-get install -y --no-install-recommends iproute2 nftables
+          nft --version
+      - name: Verify all IPv4 and IPv6 ingress cases on the real kernel
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n python3 packages/daemon/scripts/workspace-ingress.kernel.test.py \
+            --guard "$GITHUB_WORKSPACE/packages/daemon/scripts/workspace-ingress.py" \
+            --family both | tee "$RUNNER_TEMP/workspace-ingress-kernel.json"
+      - name: Preserve kernel regression evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: workspace-ingress-kernel-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/workspace-ingress-kernel.json
+          if-no-files-found: error
+          retention-days: 7

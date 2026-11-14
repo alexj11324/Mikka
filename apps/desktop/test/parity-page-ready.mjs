@@ -8,6 +8,7 @@ export async function selectWorkspaceMenuItem(page, item, timeout = 45_000) {
   // A switch assigns the locale home URL after its action finishes. The old URL
   // and ready DOM are not proof that the new document has loaded. An already
   // selected item is a product no-op and only closes its menu.
+  await page.waitForLoadState('domcontentloaded')
   const moved = await item.getAttribute('aria-checked') === 'true' ? undefined : page.waitForEvent('domcontentloaded', { timeout })
   void moved?.catch(() => {})
   await item.click()
