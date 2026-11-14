@@ -35,6 +35,7 @@ import { BundledServers } from './bundled-servers'
 import { AppLinks, appLinkFromArgv, appLinkScheme } from './app-link'
 import { pickRepo } from './repo-picker'
 import { openBundledWebPage } from './bundled-web'
+import { newWindowMenuItem } from './window-menu'
 import { markStartup } from '../startup'
 
 const APP_URL = __MIKKA_APP_URL__
@@ -492,6 +493,7 @@ function installMenu(): void {
   if (process.platform !== 'darwin') {
     // Windows and Linux show no menu bar; the menu stays only to keep its shortcuts.
     Menu.setApplicationMenu(Menu.buildFromTemplate([
+      { label: 'File', submenu: [newWindowMenuItem(() => openChild(PAGE_URL))] },
       { label: 'Edit', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
       { label: 'View', submenu: [{ label: 'Reload', accelerator: 'CommandOrControl+R', click: reloadApp }, ...ZOOM_ITEMS, ...(app.isPackaged ? [] : [{ role: 'forceReload' as const }, { role: 'toggleDevTools' as const }])] },
     ]))
@@ -512,6 +514,10 @@ function installMenu(): void {
         { type: 'separator' },
         { role: 'quit' },
       ],
+    },
+    {
+      label: 'File',
+      submenu: [newWindowMenuItem(() => openChild(PAGE_URL))],
     },
     {
       label: 'Edit',
