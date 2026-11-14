@@ -220,7 +220,7 @@
     "env": {}
   },
   "core-47": {
-    "command": "pnpm test:artifacts",
+    "command": "pnpm test:artifacts && pnpm test:chat-actions",
     "kind": "core",
     "env": {}
   },
