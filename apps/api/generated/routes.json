@@ -238,7 +238,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "a3734801629270494ed9e8aa930f263c664b923613fc22b9b9d997a85402aea6"
+      "sourceHash": "2c246d5e510373955a80eaf6dd4d49464632bc169e995802bb74806648b445f5"
     },
     {
       "path": "/mikka/api/bots/[botId]/computer/runtimes",
@@ -1647,7 +1647,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "6377496ce86ce98f591498b21c10e61149c223e9f13a7477f208a75a181cca42"
+      "sourceHash": "614deb1090de7a72efd323b64dcad464c6331533412a8600b4e747abb2f3603f"
     },
     {
       "path": "/mikka/api/mobile/threads",
