@@ -28,11 +28,12 @@ import { ActionFailureError } from '@/lib/action-error'
 // own tools (workflows/coordinator/steps.ts) read the same tables.
 
 /** MCP chat operations use the same verified tenant as its task tools. */
-const coordinatorChat = (userId: string) => {
+const mcpChatWorkspace = (userId: string) => {
   const workspaceId = taskReaderScope(userId).workspaceId
   if (!workspaceId) throw new ActionFailureError('workspaceAccessDenied')
-  return chatBotId(userId, null, workspaceId)
+  return workspaceId
 }
+const coordinatorChat = (userId: string) => chatBotId(userId, null, mcpChatWorkspace(userId))
 
 async function lastPosition(userId: string): Promise<number> {
   const [row] = await db.select({ last: sql<number>`coalesce(max(${coordinatorMessages.position}), 0)` })
@@ -112,21 +113,24 @@ export async function readCoordinatorMessages(userId: string, input: { after?: n
   const limit = input.limit ?? 20
   const started = new Date()
   const deadline = started.getTime() + (input.waitSeconds ?? 0) * 1000
-  const botId = await coordinatorChat(userId)
-  const scope = await coordinatorSessionScope(pool, workspacePool, userId, botId)
-  if (!scope) throw new Error('workspaceAccessDenied')
+  const workspaceId = mcpChatWorkspace(userId)
+  const botId = await chatBotId(userId, null, workspaceId)
   return waitForReply<CoordinatorReply>(async final => {
-    // A channel key never authorizes the data read. Recheck the persisted scope,
-    // including on a deadline or lost-notification reconciliation.
+    // Neither a channel key nor the authenticated request's tenant pin proves
+    // current access. Recheck the persisted Bot and Workspace on every read.
     const current = await coordinatorSessionScope(pool, workspacePool, userId, botId)
-    if (!current || current.workspaceId !== scope.workspaceId) throw new Error('workspaceAccessDenied')
+    if (!current || current.workspaceId !== workspaceId) throw new Error('workspaceAccessDenied')
     const turn = await turnState(userId, botId)
     const failed = Boolean(turn.errorAt && turn.errorAt >= started)
     if (!final && !failed && !await hasAssistantAfter(userId, botId, after)) return { done: false }
     const messages = await messagesAfter(userId, botId, after, limit)
     const replied = messages.some(message => message.role === 'assistant')
     return { done: true, value: { messages, replied, last: messages.at(-1)?.position ?? after, working: turn.working, lastError: turn.error, coordinatorRunning: await coordinatorEnabled(userId, botId) } }
-  }, { deadline, signal, subscribe: (changed, abort) => subscribeToCoordinatorReplies(scope, botId, changed, abort),
+  }, { deadline, signal, subscribe: async (changed, abort) => {
+    const scope = await coordinatorSessionScope(pool, workspacePool, userId, botId)
+    if (!scope || scope.workspaceId !== workspaceId) throw new Error('workspaceAccessDenied')
+    return subscribeToCoordinatorReplies(scope, botId, changed, abort)
+  },
     onComplete: completion => logReplyCompletion(botId, completion),
   })
 }

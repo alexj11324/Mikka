@@ -191,3 +191,31 @@ test('PG reply triggers are transaction-bound and cover both databases and scope
     await admin.end()
   }
 })
+
+test('immediate MCP history authorizes once at the actual read', { skip: !valid }, async t => {
+  const { measured, readMetrics } = await import('../../tests/helpers/read-metrics')
+  const { seedUser } = await import('../../tests/support/workspace-admin-db')
+  const { seedCoordinator } = await import('../../tests/support/coordinator-bot')
+  const { pool } = await import('../db')
+  const { workspacePool } = await import('../workspace-db')
+  t.after(async () => { await Promise.all([pool.end(), workspacePool.end()]) })
+  const { actAs } = await import('../acting-user')
+  const { tokenWorkspace } = await import('../tokens/principal')
+  const { readCoordinatorMessages } = await import('./tools')
+  const owner = await seedUser(pool, 'mcp-snapshot')
+  const { workspaceId } = await seedCoordinator(owner)
+  const history = () => actAs({ id: owner, [tokenWorkspace]: workspaceId }, () => readCoordinatorMessages(owner, {}))
+  try {
+    await history()
+    const result = await measured(history)
+    t.diagnostic('Immediate MCP history ' + JSON.stringify(readMetrics(result)))
+    assert.deepEqual(result.value.messages, [])
+    assert.equal(result.statements, 14, 'only the actual read checks current Bot and Workspace access')
+    await pool.query('UPDATE mikka_workspace_members SET status=$3 WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, owner, 'suspended'])
+    await assert.rejects(history(), /workspaceAccessDenied/)
+  } finally {
+    await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, owner])
+    await pool.query('DELETE FROM mikka_workspaces WHERE id=$1', [workspaceId])
+    await pool.query('DELETE FROM "user" WHERE id=$1', [owner])
+  }
+})
