@@ -591,6 +591,7 @@
     "openableDraggableTask": "可打开、可拖动任务"
   },
   "Editor": {
+    "executionInstructions": "执行指令",
     "draftAuthor": "草稿作者",
     "unsavedDraft": "未保存草稿",
     "editorLabel": "任务描述编辑器",

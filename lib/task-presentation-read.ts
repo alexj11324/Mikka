@@ -13,7 +13,7 @@ import { factoryScopeAllows } from '@/lib/factory/scope'
 import { FactoryError } from '@/lib/factory/contract'
 import type { FactoryTask } from '@/lib/factory/store'
 import { ISSUE_STATUS_CODES } from '@/lib/issue-meta'
-import { readIssueMetadata } from '@/lib/issue-metadata'
+import { pullRequestSchema, readIssueMetadata, type IssuePullRequest } from '@/lib/issue-metadata'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import { taskSchedule } from '@/lib/task-block-runs'
@@ -95,6 +95,19 @@ async function readPresentationBatch(user: Reader, input: TaskPresentationsInput
         const visible = tasks.filter(readable)
         if (!visible.length) return {}
         const ids = visible.map(task => task.id)
+        const pullsByIssue = new Map<string, IssuePullRequest[]>()
+        if (parsed.includePullRequests) {
+          const { rows: links } = await client.query<{ issueId: string; receipt: unknown }>(`
+            SELECT p."issueId", p.receipt FROM task_pull_links p
+            WHERE p."issueId"=ANY($1::uuid[]) ORDER BY p."issueId",p.ordinal`, [ids])
+          for (const link of links) {
+            const receipt = pullRequestSchema.safeParse(link.receipt)
+            if (!receipt.success) continue
+            const pulls = pullsByIssue.get(link.issueId) ?? []
+            pulls.push(receipt.data)
+            pullsByIssue.set(link.issueId, pulls)
+          }
+        }
         const dispatchByIssue = new Map<string, NonNullable<TaskPresentation['botDispatches']>>()
         if (parsed.includeBotDispatches) {
           const dispatches = await readTaskDispatches(reader.id, workspaceId, ids)
@@ -131,6 +144,7 @@ async function readPresentationBatch(user: Reader, input: TaskPresentationsInput
         }, runByIssue.get(task.id), flowByIssue.get(task.id) ?? null,
         id => !['done', 'canceled', 'duplicate'].includes(status.get(id) ?? 'todo'),
         { schedule: task.schedule, blockerIdentifier: id => identifiers.get(id) ?? null }),
+        ...(parsed.includePullRequests ? { pullRequests: pullsByIssue.get(task.id) ?? [] } : {}),
         ...(attention ? { inboxReason: attention.get(task.id) ?? null } : {}),
         ...(parsed.includeBotDispatches ? { botDispatches: dispatchByIssue.get(task.id) ?? [] } : {}),
         ...((parsed.includeFactoryIdentity || counts) && factoryByIssue.has(task.id) ? { factoryTaskId: factoryByIssue.get(task.id) } : {}),

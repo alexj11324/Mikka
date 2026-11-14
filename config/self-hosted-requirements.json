@@ -1,4 +1,25 @@
 {
+  "lib/coordinator/issue-input.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Accept an optional human-readable task brief. Preserve the original execution request in its linked Coordinator event.",
+    "test": "tests/coordinator-issue-create.db.test.ts",
+    "suite": "test:coordinator-issue-create-db"
+  },
+  "drizzle/20261114132713_task_pull_links.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Backfill and maintain ordered task pull-request links in the installation PostgreSQL database.",
+    "test": "tests/task-presentation.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "lib/task-presentation-read.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read linked pull requests only for the tasks admitted by the existing workspace and team authorization checks.",
+    "test": "tests/task-presentation.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
   "drizzle/20261113173501_thread_reply_versions.sql": {
     "mode": "built-in",
     "environment": [],

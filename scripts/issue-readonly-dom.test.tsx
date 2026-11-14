@@ -52,6 +52,39 @@ async function render(node: ReactNode, ready = '.ProseMirror') {
   return { container, update: (next: ReactNode) => act(async () => { root.render(next) }), done: () => act(async () => { root.unmount(); container.remove() }) }
 }
 
+test('legacy machine instructions can be opened without hiding related work or rewriting the task', async () => {
+  const { IssueEditor } = await import('../components/workspace/issue-editor')
+  const digest = 'ac'.repeat(32)
+  const raw = ['Implement the file contract.', ...Array.from({ length: 20 }, (_, i) => `src/module-${i}.ts sha256: ${digest}`)].join('\n')
+  const content = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: raw }] }] }
+  const { container, done } = await render(<IssueEditor issueId="legacy-instructions" layout="issue" content={content}
+    onChange={() => { throw new Error('opening instructions cannot edit the task') }} afterDescription={<a href="#linked-work">Related conversation</a>} />)
+  try {
+    const disclosure = container.querySelector('details')
+    assert.ok(disclosure)
+    assert.equal(disclosure.open, false)
+    const summary = disclosure.querySelector('summary')
+    assert.ok(summary?.textContent)
+    assert.ok(!disclosure.contains(container.querySelector('a[href="#linked-work"]')))
+    await act(async () => { summary.click() })
+    assert.equal(disclosure.open, true)
+    assert.equal(disclosure.querySelector('.ProseMirror')?.getAttribute('contenteditable'), 'true')
+    assert.equal(disclosure.querySelector('.ProseMirror')?.textContent, raw)
+  } finally { await done() }
+})
+
+test('a long human task brief stays visible', async () => {
+  const { IssueEditor } = await import('../components/workspace/issue-editor')
+  const text = 'Talk to the customer and record the outcome. '.repeat(35)
+  const { container, done } = await render(<IssueEditor layout="issue" content={{ type: 'doc', content: [
+    { type: 'paragraph', content: [{ type: 'text', text }] },
+  ] }} onChange={() => {}} />)
+  try {
+    assert.equal(container.querySelector('details'), null)
+    assert.equal(container.querySelector('.ProseMirror')?.textContent, text)
+  } finally { await done() }
+})
+
 test('IssueEditor: unreadable content is not editable and shows no typing hint or sync label', async () => {
   const { IssueEditor } = await import('../components/workspace/issue-editor')
   const { container, done } = await render(<IssueEditor issueId="issue-readonly" content={invalid} onChange={() => { throw new Error('no echo') }} layout="issue" syncLabel="" />)

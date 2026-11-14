@@ -591,6 +591,7 @@
     "openableDraggableTask": "Openable, draggable task"
   },
   "Editor": {
+    "executionInstructions": "Execution instructions",
     "draftAuthor": "Draft author",
     "unsavedDraft": "Unsaved draft",
     "editorLabel": "Task description editor",

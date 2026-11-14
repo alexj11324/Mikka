@@ -4,7 +4,6 @@
 // preload that sends GitHub's API to the fake, and the daemon from source with
 // tsx. A workspace's own model key stays real; without a real AI_GATEWAY_API_KEY
 // or RESEND_API_KEY, Mikka 默认, Decisions and mail use the local substitutes.
-import { once } from 'node:events'
 import { spawn, execFileSync } from 'node:child_process'
 import { generateKeyPairSync, randomUUID } from 'node:crypto'
 import { chmodSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -16,7 +15,7 @@ import { assertDevLocal } from './dev-local/guard.mjs'
 import { startLocalCron } from './dev-local/cron.mjs'
 import { localSecretsKey } from './dev-local/secrets-key.mjs'
 import { refreshQueue } from './dev-local/refresh-queue.mjs'
-import { stopOwnedServices } from './dev-local/shutdown.mjs'
+import { stopOwnedServices, waitForApiReady } from './dev-local/shutdown.mjs'
 import { prepareLocalHarnesses } from './dev-local/prepare-harnesses.mjs'
 import { grantLocalCredits, localServiceRoutes, LOCAL_CRON_SECRET, LOCAL_RESEND_KEY, LOCAL_ZEROCAT_KEY } from './dev-local/services.mjs'
 import { startMvpServices } from '../tests/mvp/services.mjs'
@@ -130,7 +129,7 @@ const apiProcess = watch(spawn(process.execPath, ['apps/api/scripts/dev.mjs', '-
 }), 'Vite + API')
 // Only the owned API child can announce its compiled worker and successful
 // public /api/version response. A Vite HTML shell can be available much earlier.
-const apiReady = once(apiProcess, 'message', { signal: AbortSignal.timeout(120_000) })
+const apiReady = waitForApiReady(apiProcess, new URL(server).origin, AbortSignal.timeout(120_000))
 mkdirSync(dataDir, { recursive: true, mode: 0o700 })
 if (daemonUser) execFileSync('chown', [daemonUser, dataDir])
 // Download only through the existing official pins and integrity validator.
@@ -157,10 +156,7 @@ const grantCredits = async () => {
   const count = await grantLocalCredits(db, workspaceDb)
   if (count) log(`granted local credit to ${count} workspace(s)`)
 }
-const [apiState] = await apiReady
-if (apiState?.type !== 'api-ready' || apiState.origin !== new URL(server).origin) {
-  throw new Error('dev:local received an invalid API readiness event')
-}
+await apiReady
 // Every local account gets the model key through lib/model-api-keys.ts (scripts/dev-local/seed-model-keys.ts).
 let seeder
 let seederReady

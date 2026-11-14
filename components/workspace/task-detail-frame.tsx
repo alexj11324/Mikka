@@ -233,7 +233,7 @@ export function FramedTask(props: FramedTaskProps) {
     workspaceId={preview ? undefined : task.workspaceId}
     factoryTaskId={presentation.data?.factoryTaskId}
     factorySnapshot={props.agentActivity.work?.factory ?? null}
-    work={!preview && <TaskWorkSection threads={props.agentActivity.threads ?? []} pulls={meta.pullRequests}
+    work={!preview && <TaskWorkSection threads={props.agentActivity.threads ?? []} pulls={props.agentActivity.work?.presentation?.pullRequests ?? meta.pullRequests}
       factory={props.agentActivity.work?.factory} open={props.agentActivity.openThread} />}
     rootRef={props.rootRef} onKeyDown={props.onKeyDown} label={props.label} busy={preview}
     origin={props.origin} identifier={task.identifier} title={props.title} saveLabel={props.saveLabel} saved={props.saved} saveHint={t('autosaveHint')}

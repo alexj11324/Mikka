@@ -131,6 +131,28 @@ test('Task presentation batches keep current tenant authority and one Factory pr
     const expected = (patch: Record<string, unknown> = {}) => ({ version: 1, primaryStatus: 'doing', factoryStage: null, runStatus: null, needsAction: null, blockedReason: null, completion: null,
       state: 'todo', reason: null, blockedBy: null, group: 'todo', ...patch })
 
+    await t.test('formal task PR links backfill, stay ordered on edits and respect the task reader', async () => {
+      const first = { url: 'https://github.com/example/project/pull/7', state: 'open' }
+      const second = { url: 'https://github.com/example/project/pull/9', state: 'draft' }
+      const legacy = await makeTask(shared, {}, 'doing', owner, { type: 'doc', attrs: { orvilo: { pullRequests: [second, first] } } })
+      const foreign = await makeTask(other, { pullRequests: [first] })
+      const read = () => as(owner, shared, () => getTaskPresentations({ workspaceId: shared, issueIds: [legacy, foreign], includePullRequests: true }))
+      const migration = await readFile(new URL('../drizzle/20261114132713_task_pull_links.sql', import.meta.url), 'utf8')
+      await application.query('DELETE FROM task_pull_links WHERE "issueId"=$1', [legacy])
+      await application.query(migration)
+      await application.query(migration)
+      const stored = await application.query(`SELECT p.receipt FROM task_pull_links p WHERE p."issueId"=$1 ORDER BY ordinal`, [legacy])
+      assert.deepEqual(stored.rows.map(row => row.receipt), [second, first])
+      const result = await read()
+      assert.deepEqual(result.items[legacy].pullRequests, [second, first])
+      assert.equal(result.items[foreign], undefined)
+      const merged = { ...first, state: 'merged' }
+      await application.query(`UPDATE issues SET content=jsonb_set(content,'{attrs}', $2::jsonb) WHERE id=$1`,
+        [legacy, JSON.stringify({ mikka: { pullRequests: [merged] } })])
+      assert.deepEqual((await read()).items[legacy].pullRequests, [merged])
+      assert.equal((await batch([legacy])).items[legacy].pullRequests, undefined)
+    })
+
     await t.test('the action returns current-tenant business status without another actor private Run or Factory', async () => {
       const issue = await makeTask(shared, {}, 'doing', peer)
       await makeRun(issue, { userId: peer, status: 'waiting_input' })

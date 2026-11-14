@@ -245,6 +245,9 @@ jobs:
                 'LEASE_ALREADY_COMPLETED', 'LEASE_ALREADY_ATTACHED', 'POOL_EXHAUSTED', 'LEASE_LOST',
               ])
               report.failure = { stage, ...(stage === 'account-lease' && leaseCodes.has(failure?.code) ? { code: failure.code } : {}),
+                ...(stage === 'account-lease' && failure?.code === 'DEPLOYMENT_ATTESTATION_REJECTED'
+                  && Number.isInteger(failure.httpStatus) && failure.httpStatus >= 100 && failure.httpStatus <= 599
+                  ? { httpStatus: failure.httpStatus } : {}),
                 kind: failure?.name === 'AssertionError' ? 'assertion' : 'runtime',
                 ...(failure?.name === 'AssertionError' ? {
                   assertion: String(failure.message).split('\n')[0].slice(0, 240),
