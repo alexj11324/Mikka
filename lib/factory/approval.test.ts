@@ -1,3 +1,5 @@
+import { observePoolCommits } from '../db/commit-effects';
+import { addFactoryVisualEvidence, addFactoryPublicationEvidence } from '../../tests/helpers/factory-visual-evidence';
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
@@ -12,7 +14,6 @@ import { once } from "node:events";
 import { betterAuth } from "better-auth";
 import { hashPassword } from "better-auth/crypto";
 import { Pool } from "pg";
-import { observePoolCommits } from "../db/commit-effects";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import {
   FactoryError,
@@ -228,6 +229,10 @@ test(
               }),
             ],
           );
+          if (stage === "execute") {
+            await addFactoryVisualEvidence(pool, runId);
+            await addFactoryPublicationEvidence(pool, s.task.id);
+          }
           const evidence: FactoryEvidence = {
             artifact: `run-report:${runId}`,
             kind: "report",

@@ -31,6 +31,8 @@ test('every answered refusal is final; only a missing answer keeps the click', (
   assert.equal(kind('factoryReplayMismatch', 409), 'stale')
   assert.equal(kind('factoryTransition', 409), 'transition')
   assert.equal(kind('factoryEvidenceRequired', 409), 'evidence')
+  assert.equal(kind('factory_visual_evidence_required', 409), 'evidence')
+  assert.equal(kind('factory_public_evidence_required', 409), 'evidence')
   assert.equal(kind('factoryHumanRequired', 401), 'signedOut')
   assert.equal(kind('originRejected', 403), 'signedOut')
   assert.equal(kind('factoryNotFound', 404), 'notFound')

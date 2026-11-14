@@ -203,6 +203,14 @@ else exec /usr/bin/stat "$@"; fi
         self.assertEqual(self.destination.stat().st_mode & 0o777,0o755)
         self.assertEqual((self.destination/'source').stat().st_mode & 0o777,0o755)
         self.assertEqual((self.destination/'worker-ready.sha').read_text().strip(),'c'*40)
+        manifest=json.loads((self.destination/'source/.mikka-original-cli.json').read_text())
+        self.assertEqual(manifest['original']['codex']['path'],str(self.bin/'codex'))
+        self.assertEqual(manifest['original']['claude_code']['path'],str(self.bin/'claude'))
+        self.assertEqual(manifest['added'],{})
+        for name in ['config','protocol','daemon']:
+            modules=self.destination/'source/packages'/name/'node_modules'
+            self.assertTrue(modules.is_symlink())
+            self.assertEqual(modules.resolve(strict=True),self.destination/'worker-install/packages'/name/'node_modules')
         self.assertEqual((self.runtime/'worker-source-sha').read_text(),'b'*40)
         self.assertEqual((self.runtime/'worker').readlink(),self.root/'original-source')
         pathlib.Path(self.env['STAGE_FAIL_FETCH']).touch();pathlib.Path(self.env['STAGE_FAIL_INSTALL']).touch()

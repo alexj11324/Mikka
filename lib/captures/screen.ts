@@ -4,7 +4,7 @@ import type { PoolClient } from 'pg'
 import { RECORDING_MAX_SECONDS, type CaptureView } from '@mikka/protocol/capture'
 import { pool } from '@/lib/db'
 import * as provider from '@/lib/computer/e2b-provider'
-import { currentRecording, failRecording, finishRecording, markRecordingStarted, openRecording, recordStep, runRecordings, saveCapture, type CaptureError, type CaptureOwner } from './store'
+import { currentRecording, failRecording, finishRecording, markRecordingStarted, openRecording, recordStep, recordingSteps, runRecordings, saveCapture, withRecordingFinalization, type CaptureError, type CaptureOwner } from './store'
 
 // The cloud computer's capture tools: a screenshot, and a recording started
 // and stopped, of the Bot desktop a thread is bound to. The daemon relays the
@@ -27,6 +27,7 @@ const unavailable: CaptureError = { error: 'unavailable', message: 'The cloud co
 const uncertain: CaptureError = { error: 'unavailable', message: 'Capture outcome is unknown; do not automatically retry.' }
 
 export class ScreenCaptures {
+  private readonly finalizations = new Map<string, Promise<CaptureView | CaptureError>>()
   constructor(private runtime: Runtime = provider, private now = () => Date.now(), private fenceMs = CAPTURE_FENCE_MS) {}
 
   /** The run's Bot desktop, if this device may capture it now. */
@@ -151,8 +152,8 @@ export class ScreenCaptures {
   }
 
   /** A step on this thread's recording in progress (an action's description or a marked moment); false when none is recording. */
-  async step(caller: ScreenCaller, runId: string, label: string, source: 'action' | 'mark') {
-    return recordStep({ userId: caller.userId, runId }, { label, source }, this.now())
+  async step(caller: ScreenCaller, runId: string, label: string, source: 'action' | 'mark', durationMs?: number) {
+    return recordStep({ userId: caller.userId, runId }, { label, source, ...(durationMs === undefined ? {} : { durationMs }) }, this.now())
   }
 
   async stopRecording(caller: ScreenCaller, runId: string): Promise<CaptureView | CaptureError> {
@@ -165,6 +166,20 @@ export class ScreenCaptures {
 
   /** Stops one recording and keeps the file; marks it failed when the machine or the file is gone. */
   private async finalize(row: NonNullable<Awaited<ReturnType<typeof currentRecording>>>, known?: { sandboxId: string; workspaceId: string }, signal?: AbortSignal): Promise<CaptureView | CaptureError> {
+    const current = this.finalizations.get(row.id)
+    if (current) return current
+    const next = this.finalizeOnce(row, known, signal).finally(() => { if (this.finalizations.get(row.id) === next) this.finalizations.delete(row.id) })
+    this.finalizations.set(row.id, next)
+    return next
+  }
+
+  private async finalizeOnce(row: NonNullable<Awaited<ReturnType<typeof currentRecording>>>, known?: { sandboxId: string; workspaceId: string }, signal?: AbortSignal): Promise<CaptureView | CaptureError> {
+    const deadline = AbortSignal.timeout(95_000)
+    const bounded = signal ? AbortSignal.any([signal, deadline]) : deadline
+    return withRecordingFinalization(row, current => this.finalizeLocked(current, known, bounded))
+  }
+
+  private async finalizeLocked(row: NonNullable<Awaited<ReturnType<typeof currentRecording>>>, known?: { sandboxId: string; workspaceId: string }, signal?: AbortSignal): Promise<CaptureView | CaptureError> {
     // A durable thread binding always selects its own sandbox, including
     // after end. Missing thread resources must never fall back to the Bot.
     const bound = known ?? (await pool.query(`SELECT CASE WHEN t."runId" IS NULL THEN m."sandboxId" ELSE t."sandboxId" END AS "sandboxId",b."workspaceId" FROM computer_run_bindings b
@@ -175,13 +190,14 @@ export class ScreenCaptures {
     signal?.throwIfAborted()
     const sandbox = machine && bound && row.display ? await this.connect(bound.workspaceId, machine, signal) : null
     signal?.throwIfAborted()
-    const file = sandbox ? await this.runtime.stopScreenRecording(sandbox, row.display!, row.id, signal).catch(() => null) : null
+    const steps = await recordingSteps(row.id)
+    const file = sandbox ? await this.runtime.stopScreenRecording(sandbox, row.display!, row.id, signal, steps).catch(() => null) : null
     signal?.throwIfAborted()
     if (!file) {
       await failRecording(row.id, sandbox ? 'Recording file missing' : 'Cloud computer gone')
       return unavailable
     }
-    return finishRecording(row, file)
+    return finishRecording(row, file, signal)
   }
 
   /**
@@ -189,7 +205,7 @@ export class ScreenCaptures {
    * keeps it, so no recording runs on with nobody to stop it.
    */
   async stopRunRecordings(runIds: readonly string[]) {
-    for (const row of await runRecordings(runIds)) await this.finalize(row).catch(() => failRecording(row.id, 'Recording not saved'))
+    for (const row of await runRecordings(runIds)) await this.finalize(row).catch(() => undefined)
   }
 }
 

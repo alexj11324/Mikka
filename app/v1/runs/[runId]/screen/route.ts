@@ -24,7 +24,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ runI
   const input = 'title' in parsed.data && typeof parsed.data.title === 'string' ? { ...parsed.data, title: await maskFor({ workspaceId: caller.workspaceId, ownerId: caller.userId }, parsed.data.title) }
     : parsed.data.action === 'step' ? { ...parsed.data, label: await maskFor({ workspaceId: caller.workspaceId, ownerId: caller.userId }, parsed.data.label) } : parsed.data
   if (input.action === 'step')
-    return captureJson({ action: input.action, recorded: await screenCaptures.step(caller, found.owner.runId, input.label, input.source) })
+    return captureJson({ action: input.action, recorded: await screenCaptures.step(caller, found.owner.runId, input.label, input.source, input.durationMs) })
   if (input.action === 'screenshot') {
     const result = await screenCaptures.screenshot(caller, found.owner.runId, input.title, request.signal)
     return 'error' in result ? captureFailure(result) : captureJson({ action: input.action, capture: result })

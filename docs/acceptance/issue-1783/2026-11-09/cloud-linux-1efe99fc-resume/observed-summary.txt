@@ -1,0 +1,17 @@
+Observed output from metadata command cmd_adbc13820ed0414d928779d2db3e.
+This is a transcription of the result excerpt, not a byte-identical raw log.
+
+Node v24.22.1; pnpm 10.34.3; FFmpeg 8.0.1-3ubuntu2.
+Source: 1efe99fcdf03f8b386682b92b0508cc164d2e179.
+Node: tests 57; pass 57; fail 0; cancelled 0; skipped 0; todo 0.
+Node duration_ms 71717.196977.
+Daemon: Test Files 6 passed (6); Tests 104 passed (104).
+Daemon Start at 21:25:36; Duration 10.10s.
+Runtime refresh: Ran 12 tests in 2.396s; OK.
+Worker install: Ran 5 tests in 0.006s; OK.
+Routes: {"routes":243,"methods":315}.
+Final git status --porcelain produced no output.
+
+The complete command cmd_7c2d3412fa724e28b5c61560b243 returned exit 0
+and durationMs 90691. It used set -euo pipefail and checked the exact HEAD
+and clean Git status before and after all five checks.

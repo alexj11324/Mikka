@@ -1,6 +1,6 @@
 # Telegram integration
 
-The Telegram bot accepts private messages only. Users connect it from **Settings → Connections** with a one-time link. Ordinary messages go to the user's persistent Coordinator chat and its replies return to Telegram. While a `/new` draft is active, ordinary messages add draft details.
+The Telegram bot accepts private messages only. Users connect it from **Settings → Connections** with a one-time link. Ordinary messages go to the Coordinator chat of the person's selected Mikka workspace and its replies return to Telegram. Today the link names a person and no workspace, so they reach the personal workspace's Coordinator; choosing the workspace from Telegram, and asking a person with none to choose, are target contract. While a `/new` draft is active, ordinary messages add draft details.
 
 ## Production configuration
 
