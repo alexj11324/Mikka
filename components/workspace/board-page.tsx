@@ -24,28 +24,28 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import { boardProjectFilters, personFilters } from '@/lib/board-filters'
+import { BOARD_FILTERS_KEY, LEGACY_BOARD_FILTERS_KEY, boardProjectFilters, migrateBoardFilters, personFilters } from '@/lib/board-filters'
 import { BoardScreenView } from './board-screen'
+import { BOARD_SETTINGS_KEY as SETTINGS_KEY, BOARD_VIEW_EVENT as VIEW_EVENT } from './board-view'
 import type { BoardMenuItem } from '@/components/slots/board-contract'
 import { ISSUE_PRIORITIES } from './issue-properties'
 import { ResizablePane } from '@/components/ui/resizable-pane'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
-type Scope = 'all' | 'workspace' | 'personal'
 type FilterField = 'status' | 'priority' | 'assignee' | 'creator' | 'labels' | 'project' | 'agentState'
 type Filters = Partial<Record<FilterField, string[]>>
 type Sort = 'priority' | 'updated' | 'created'
 type Completed = 'all' | 'week' | 'month'
 type Display = { sort: Sort; completed: Completed; showEmpty: boolean; properties: CardProperty[]; hidden: BoardColumn[] }
 
-const SETTINGS_KEY = 'mikka:board-v2'
 const SIDEBAR_KEY = 'mikka:board-coordinator-open'
 const WIDE = '(min-width: 80rem)'
 const ME = 'me'
 const NONE = 'none'
 const DEFAULT_DISPLAY: Display = { sort: 'priority', completed: 'week', showEmpty: true, properties: DEFAULT_CARD_PROPERTIES, hidden: DEFAULT_HIDDEN_COLUMNS }
-const DEFAULT_FILTERS: Filters = { assignee: [ME] }
-const DEFAULT_SETTINGS = { scope: 'all' as Scope, view: 'board' as 'board' | 'list', display: DEFAULT_DISPLAY }
+/** The Board shows every task of its workspace until the person filters it (2026-11-13-1405). */
+const NO_FILTERS: Filters = {}
+const DEFAULT_SETTINGS = { view: 'board' as 'board' | 'list', display: DEFAULT_DISPLAY }
 const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 }
 const COMPLETED_DAYS: Record<Completed, number> = { all: Infinity, week: 7, month: 30 }
 const FILTER_FIELDS: FilterField[] = ['status', 'priority', 'assignee', 'creator', 'labels', 'project', 'agentState']
@@ -57,12 +57,16 @@ function useBoardSettings() {
     try {
       const stored = JSON.parse(window.localStorage.getItem(SETTINGS_KEY) ?? 'null')
       if (stored) {
-        const { filters: legacyFilters, ...preferences } = stored
+        // `scope` is the retired 全部 / 工作区 / 个人 segment (2026-11-13-1405); it is read past and no longer written.
+        const { filters: legacyFilters, scope: _retiredScope, ...preferences } = stored
         setSettings(current => ({ ...current, ...preferences, display: { ...current.display, ...preferences.display } }))
         // The old entry has no owner/workspace proof, so its names cannot migrate.
         if (legacyFilters !== undefined) window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(preferences))
       }
     } catch { /* storage unavailable */ }
+    const show = (event: Event) => { const view = (event as CustomEvent<'board' | 'list'>).detail; setSettings(current => ({ ...current, view })) }
+    window.addEventListener(VIEW_EVENT, show)
+    return () => window.removeEventListener(VIEW_EVENT, show)
   }, [])
   function update(patch: Partial<typeof DEFAULT_SETTINGS>) {
     setSettings(current => {
@@ -87,14 +91,12 @@ function useStoredFlag(key: string, fallback: boolean) {
 }
 
 /**
- * The board page, v2 (Figma 77:2): scope segment, filters, Linear sync, board
+ * The board page, v2 (Figma 77:2): every task of the workspace, filters, Linear sync, board
  * or list, 显示 options and 新建任务 (described in a sentence, created by the
  * Coordinator) over the status columns and 受阻 (lib/task-blocked.ts), with the
  * Coordinator conversation in a sidebar that folds into a pill (MIK-45).
  */
-export function BoardPage({ issues, userId, workspaceId, teamId, personalWorkspace = false, presentationRead, onOpen, onUpdated, onBusyChange }: { stateKey?: string; workspaceId?: string; teamId?: string;
-  /** In a personal workspace every task is the person's: no 全部 / 工作区 / 个人 segment and no lock on cards (glossary, Known naming debt). */
-  personalWorkspace?: boolean
+export function BoardPage({ issues, userId, workspaceId, teamId, presentationRead, onOpen, onUpdated, onBusyChange }: { stateKey?: string; workspaceId?: string; teamId?: string;
   presentationRead: { isLoading: boolean; error?: unknown; mutate: () => Promise<unknown> }
   issues: Issue[]
   userId: string
@@ -112,8 +114,9 @@ export function BoardPage({ issues, userId, workspaceId, teamId, personalWorkspa
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
   const [settings, update] = useBoardSettings()
   const { view, display } = settings
-  const scope: Scope = personalWorkspace ? 'all' : settings.scope
-  const [savedFilters, setFilters] = useViewState<Filters>('board:filters', DEFAULT_FILTERS)
+  const [legacyFilters] = useViewState<Filters | null>(LEGACY_BOARD_FILTERS_KEY, null)
+  const [storedFilters, setFilters] = useViewState<Filters | null>(BOARD_FILTERS_KEY, null)
+  const savedFilters = useMemo(() => storedFilters ?? migrateBoardFilters(legacyFilters) ?? NO_FILTERS, [storedFilters, legacyFilters])
   const projects = useMemo(() => new Map(issues.flatMap(issue => issue.projectId && issue.metadata.project
     ? [[issue.projectId, issue.metadata.project] as const] : [])), [issues])
   const filters = useMemo(() => {
@@ -166,15 +169,17 @@ export function BoardPage({ issues, userId, workspaceId, teamId, personalWorkspa
     const result = new Map<string, AgentState>()
     for (const [id, task] of taskStates) {
       const state = cardStateKind(task.state)
-      if (state && state !== 'done') result.set(id, state)
+      if (state) result.set(id, state)
     }
     return result
   }, [taskStates])
   const blocks = useMemo(() => {
     const result = new Map<string, TaskBlock>()
     for (const [id, task] of taskStates) {
+      // 受阻 holds what the person flagged or a dependency holds back. What a task's Agent is doing (a question, quota,
+      // a failed run) is the mark on its card, never a column (2026-11-13-1405): the task stays in its status column.
       const reason = task.blockedReason
-      if (reason) result.set(id, { reason: reason === 'factory' ? 'run' : reason, blockerIdentifier: task.blockedBy })
+      if (reason === 'dependency' || reason === 'flagged') result.set(id, { reason, blockerIdentifier: task.blockedBy })
     }
     return result
   }, [taskStates])
@@ -203,7 +208,6 @@ export function BoardPage({ issues, userId, workspaceId, teamId, personalWorkspa
   }
   const now = Date.now()
   const shown = issues
-    .filter(issue => scope === 'all' || issue.scope === scope)
     .filter(issue => Object.entries(filters).every(([field, values]) => !values?.length || valuesOf(issue, field as FilterField).some(value => values.includes(value))))
     .filter(issue => issue.status !== 'done' || now - new Date(issue.updatedAt).getTime() <= COMPLETED_DAYS[display.completed] * 86400000)
     .toSorted((a, b) => display.sort === 'priority' ? (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9) || +new Date(b.updatedAt) - +new Date(a.updatedAt)
@@ -235,11 +239,8 @@ export function BoardPage({ issues, userId, workspaceId, teamId, personalWorkspa
   const refreshButton = <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={linearSynced ? t('synced') : t('refresh')} className={cn(linearSynced && 'text-success-foreground')} onClick={() => { void onUpdated() }} />}><RefreshCw /></TooltipTrigger><TooltipContent side="bottom">{linearSynced ? t('synced') : t('refresh')}</TooltipContent></Tooltip>
   const panelButton = <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', sidebar && 'xl:hidden')} aria-expanded={sheet} aria-label={t('expand')} aria-keyshortcuts="Control+j Meta+j" onClick={openPanel} />}><PanelRightOpen data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('expand')}<ShortcutKeys keys={['mod', 'J']} /></TooltipContent></Tooltip>
   // The template's own menus (the `board` slot's BoardScreen) carry the filters and the 显示 options.
-  const scoped = (value: Scope) => issues
-    .filter(issue => value === 'all' || issue.scope === value)
-    .filter(issue => Object.entries(filters).every(([field, values]) => !values?.length || valuesOf(issue, field as FilterField).some(item => values.includes(item))))
-    .filter(issue => issue.status !== 'done' || now - new Date(issue.updatedAt).getTime() <= COMPLETED_DAYS[display.completed] * 86400000).length
-  const scopes = (personalWorkspace ? ['all'] as const : ['all', 'workspace', 'personal'] as const).map(value => ({ id: value, label: t(`scope.${value}`), count: scoped(value) }))
+  // No tabs: the board holds every task of its workspace, and one tab that does nothing reads as a broken filter.
+  const scopes: { id: string; label: string; count: number }[] = []
   const filterItems: BoardMenuItem[] = [
     ...FILTER_FIELDS.map((field): BoardMenuItem => field === 'creator'
       ? { label: t(`filterField.${field}`), checked: filters.creator?.includes(ME) ?? false, onSelect: () => toggleFilter(field, ME) }
@@ -261,8 +262,8 @@ export function BoardPage({ issues, userId, workspaceId, teamId, personalWorkspa
   return <div className="flex min-h-0 flex-1">
     <section aria-labelledby={titleId} className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       <h1 id={titleId} className="sr-only">{t('title')}</h1>
-      {readNotice ?? <BoardScreenView issues={shown} columns={columns} hidden={display.hidden} blocks={blocks} newestRuns={newestRuns} context={{ properties: new Set(display.properties), agentStates, taskStates, subtasks, owners, blocks, personalWorkspace }}
-        view={view} onView={next => update({ view: next })} scopes={scopes} scope={scope} onScope={next => update({ scope: next as Scope })}
+      {readNotice ?? <BoardScreenView issues={shown} columns={columns} hidden={display.hidden} blocks={blocks} newestRuns={newestRuns} context={{ properties: new Set(display.properties), agentStates, taskStates, subtasks, owners, blocks }}
+        view={view} onView={next => update({ view: next })} scopes={scopes} scope="all" onScope={() => {}}
         filterItems={filterItems} filterCount={activeFilters.length} sortItems={sortItems} tools={<span className="flex items-center gap-1 max-md:hidden">{refreshButton}{panelButton}</span>}
         onNew={() => setNewTask(true)} onOpen={id => { onOpen(id) }} onDiscuss={discuss} onUpdated={onUpdated} onBusyChange={onBusyChange} />}
     </section>

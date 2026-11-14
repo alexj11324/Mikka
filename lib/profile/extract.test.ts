@@ -12,6 +12,14 @@ const store = { memoryEnabled: mock.fn(async () => true), claimExtractionCall: m
 const captured: unknown[] = []
 let policyAllowed=true
 const hostedCalls:string[]=[]
+// This installation has no linked Cloud model service. The configured provider still runs through admission.
+mock.module(new URL('../cloud-services/runtime.ts', import.meta.url).href, { namedExports: { cloudClient: {
+  capability: async (userId: string, capability: string) => {
+    assert.equal(userId, 'u1')
+    assert.equal(capability, 'models')
+    return null
+  },
+} } })
 mock.module(new URL('../abuse/model.ts',import.meta.url).href,{namedExports:{
   admitHostedModel:async()=>{if(!policyAllowed)throw new Error('modelRouteDenied');return null},
   hostedModel:async(ws:string,modelId:string,provider:unknown,ownerId:string)=>{assert.equal(ws,'fixture-workspace');assert.equal(ownerId,'u1');assert.equal(provider,undefined);hostedCalls.push(modelId);return {modelId}},

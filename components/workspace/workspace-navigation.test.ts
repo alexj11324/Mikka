@@ -317,6 +317,13 @@ test('a chat\'s work area takes tasks and threads opened beside it, and gives th
   assert.equal(readLocation(at(browser.path()).searchParams).thread, RUN)
 })
 
+test('an old 任务 link reads as the board: tasks have one entry', () => {
+  assert.equal(sectionFromQuery('tasks'), 'all-issues')
+  const location = readLocation(new URLSearchParams(`section=tasks&issue=${ISSUE}`))
+  assert.equal(location.section, 'all-issues')
+  assert.equal(location.issue, ISSUE)
+})
+
 test('an active chat work tab survives a document reload only on the same entry and account scope', () => {
   const browser = fakeBrowser('/?section=coordinator')
   const scope = 'owner/workspace/coordinator'
@@ -327,7 +334,7 @@ test('an active chat work tab survives a document reload only on the same entry 
   assert.equal(workTabForEntry('owner/workspace/another-bot'), null)
   assert.equal(browser.path(), '/?section=coordinator')
   assert.equal(window.history.state.__NA, true)
-  goTo({ section: 'tasks' })
+  goTo({ section: 'all-issues' })
   assert.equal(workTabForEntry(scope), null)
   window.history.back()
   assert.deepEqual(workTabForEntry(scope), { kind: 'thread', id: RUN })

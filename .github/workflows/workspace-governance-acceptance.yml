@@ -234,7 +234,18 @@ jobs:
             await writeFile(join(privateDirectory, 'runtime-private.log'), output, { mode: 0o600 })
             report.finishedAt = new Date().toISOString()
             if (failure) {
-              report.failure = { stage, kind: failure?.name === 'AssertionError' ? 'assertion' : 'runtime',
+              // Only fixed harness codes can enter the public artifact. Driver errors,
+              // response bodies, session values and arbitrary error messages stay private.
+              const leaseCodes = new Set([
+                'DEPLOYMENT_ATTESTATION_REJECTED', 'DEPLOYMENT_IDENTITY_MISMATCH', 'DEPLOYMENT_IDENTITY_UNAVAILABLE',
+                'DATABASE_ATTESTATION_UNAVAILABLE', 'DATABASE_IDENTITY_MISMATCH', 'DATABASE_IDENTITY_UNAVAILABLE',
+                'ACCOUNT_PROVISIONING_NOT_AUTHORIZED', 'ACCOUNT_LOGIN_FAILED', 'ACCOUNT_INITIALIZATION_FAILED',
+                'ACCOUNT_IDENTITY_UNVERIFIED', 'ACCOUNT_IDENTITY_MISMATCH', 'ACCOUNT_SESSION_INVALID',
+                'ACCOUNT_POOL_DATABASE_ERROR', 'TEST_ACCOUNT_SESSION_FAILED', 'PRIVATE_DIRECTORY_UNSAFE',
+                'LEASE_ALREADY_COMPLETED', 'LEASE_ALREADY_ATTACHED', 'POOL_EXHAUSTED', 'LEASE_LOST',
+              ])
+              report.failure = { stage, ...(stage === 'account-lease' && leaseCodes.has(failure?.code) ? { code: failure.code } : {}),
+                kind: failure?.name === 'AssertionError' ? 'assertion' : 'runtime',
                 ...(failure?.name === 'AssertionError' ? {
                   assertion: String(failure.message).split('\n')[0].slice(0, 240),
                   ...(typeof failure.actual === 'number' || typeof failure.actual === 'boolean' ? { actual: failure.actual } : {}),

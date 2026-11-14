@@ -68,7 +68,7 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       ALTER TABLE factory_tasks ADD COLUMN "createdAt" timestamptz NOT NULL DEFAULT now(), ADD COLUMN route jsonb;
       ALTER TABLE factory_attempts ADD COLUMN reason text;
       CREATE TABLE issue_versions (id uuid PRIMARY KEY,"issueId" uuid NOT NULL,"userId" text NOT NULL,
-        revision integer NOT NULL,title text,content jsonb,status text,priority text,actor_type text,actor_id text);
+        revision integer NOT NULL,title text,content jsonb,status text,priority text,actor_type text,actor_id text,"createdAt" timestamptz NOT NULL DEFAULT now());
     `);
 
     let nextPull = 418;
@@ -649,7 +649,7 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       // transport are fixtures. Signature admission has its own route tests.
       await pool.query(`
         ALTER TABLE agent_runs ADD COLUMN "pauseReason" text, ADD COLUMN "deviceTokenId" uuid,
-          ADD COLUMN "retryOf" uuid, ADD COLUMN "continuesRunId" uuid, ADD COLUMN "agentId" uuid;
+          ADD COLUMN "retryOf" uuid, ADD COLUMN "continuesRunId" uuid, ADD COLUMN "agentId" uuid, ADD COLUMN "createdAt" timestamptz NOT NULL DEFAULT now();
         ALTER TABLE run_publications ADD COLUMN "issueId" uuid, ADD COLUMN "updatedAt" timestamptz DEFAULT now();
         CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
         CREATE TABLE computer_run_bindings ("runId" uuid PRIMARY KEY,"botId" uuid,"ownerId" text);

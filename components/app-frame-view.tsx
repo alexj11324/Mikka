@@ -16,7 +16,7 @@ export const SETTINGS_COLORS = '[--background:var(--settings-background)] [--for
  */
 export function AppFrameView({ bar, rail, children, settings = false }: { bar: ReactNode; rail: ReactNode; children: ReactNode; settings?: boolean }) {
   const t = useTranslations('Shell')
-  return <TooltipProvider><SidebarProvider className={cn('h-svh min-h-0 flex-col overflow-hidden bg-shell-chrome in-data-desktop-translucent:bg-transparent', settings && SETTINGS_COLORS)}>
+  return <TooltipProvider><SidebarProvider className={cn('h-screen min-h-0 supports-[height:100dvh]:h-dvh flex-col overflow-hidden bg-shell-chrome in-data-desktop-translucent:bg-transparent', settings && SETTINGS_COLORS)}>
     {bar}
     <div className="flex min-h-0 flex-1 md:pr-2 md:pb-2">
       {rail}

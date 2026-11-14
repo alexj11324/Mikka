@@ -143,7 +143,12 @@
       "emptyTitle": "这里还没有任务",
       "newTask": "新建任务"
     },
-    "createdAtDate": "创建于 {date}"
+    "createdAtDate": "创建于 {date}",
+    "agentMark": {
+      "working": "Agent 运行中",
+      "waiting": "等你处理",
+      "error": "Agent 出错"
+    }
   },
   "Nav": {
     "switchLanguage": "切换语言",
@@ -4626,7 +4631,14 @@
     },
     "errorDetails": "详情",
     "fullInstructions": "查看完整指令",
-    "hideInstructions": "隐藏完整指令"
+    "hideInstructions": "隐藏完整指令",
+    "conversationTitle": {
+      "rename": "重命名",
+      "regenerate": "重新生成标题",
+      "label": "标题",
+      "renameFailed": "标题未保存",
+      "regenerateFailed": "未能生成新标题"
+    }
   },
   "Computer": {
     "status": {
@@ -4816,11 +4828,22 @@
         "label": "公开职责",
         "hint": "群聊按此公开职责选择 Bot；工具仍需授权。",
         "placeholder": "在群聊中负责的工作；留空可清除",
-        "count": "{count} / {max}",
         "tooLong": "公开职责最多 {max} 个字",
         "loadError": "公开职责加载失败",
         "saveError": "保存未确认，修改已保留。",
-        "saved": "已保存"
+        "saved": "已保存",
+        "add": "添加公开职责",
+        "edit": "编辑公开职责"
+      },
+      "glance": {
+        "running": "{count} 个进行中",
+        "waiting": "{count} 个等你处理",
+        "idle": "没有进行中的任务",
+        "prReview": "{count} 个等待审查",
+        "prRunning": "{count} 个进行中",
+        "prNone": "没有打开的 PR",
+        "computerScreen": "查看屏幕",
+        "computerMissing": "需要 E2B API Key"
       },
       "threads": "线程",
       "tasks": "任务",
@@ -5006,11 +5029,6 @@
     "board": {
       "toolbar": "看板工具栏",
       "scopeLabel": "任务范围",
-      "scope": {
-        "all": "全部",
-        "workspace": "工作区",
-        "personal": "个人"
-      },
       "filter": "筛选",
       "filterField": {
         "status": "状态",
@@ -5019,7 +5037,7 @@
         "creator": "我创建的",
         "labels": "标签",
         "project": "项目",
-        "agentState": "线程状态"
+        "agentState": "Agent 活动"
       },
       "removeFilter": "移除{field}筛选",
       "me": "我",
@@ -5050,7 +5068,7 @@
         "labels": "标签",
         "pullRequests": "PR",
         "subtasks": "子任务",
-        "agentState": "线程状态",
+        "agentState": "Agent 活动",
         "project": "项目",
         "dueDate": "截止日期",
         "createdAt": "创建时间"
@@ -5064,8 +5082,6 @@
       "inlineTitle": "任务标题",
       "discussPrefill": "我们聊聊 {id} {title}：",
       "card": {
-        "personal": "个人任务",
-        "personalHint": "个人任务 · 只有你能看到",
         "status": "状态",
         "priority": "优先级",
         "subtasks": "子任务",
@@ -5076,9 +5092,9 @@
         "discuss": "讨论",
         "delete": "删除",
         "agent": {
-          "running": "进行中",
-          "waiting": "等待你",
-          "blocked": "受阻"
+          "running": "Agent 运行中",
+          "waiting": "等你处理",
+          "blocked": "Agent 出错"
         },
         "block": {
           "question": "等你回答",
