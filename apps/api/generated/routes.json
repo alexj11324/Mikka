@@ -650,7 +650,7 @@
         "GET"
       ],
       "maxDuration": 60,
-      "sourceHash": "d67ce6ee4b39770322e64eb83775b62757ebb8d23b05460d13fc3ae49efa2b61"
+      "sourceHash": "82418e59012a94d1cde8decc4be04d207696998aba74615577e5bb2fc08c00b8"
     },
     {
       "path": "/mikka/api/cron/coordinator-wakes",
@@ -2278,7 +2278,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "a73ac42d81c8f719c0d9ca6191e134003408aad921aad3dd24740399b9612076"
+      "sourceHash": "8dd6775734d33f4610596bf64742753287ebe51278624b360f9e4020ffe4ac91"
     },
     {
       "path": "/mikka/api/suggestions/[id]",

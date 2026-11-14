@@ -22,7 +22,7 @@ import { automaticFactoryDispatch } from './automatic-dispatch';
 import { factoryCheckIndependent } from './check-independence';
 import { approvalGate, publishGate, createFactoryApprovals } from "./approval";
 import { createFactoryMerges, githubMergeApi } from "./merge";
-import { createFactoryCheckClaim, factoryCheckGates } from "./checks";
+import { factoryCheckGates } from "./checks";
 import { createFactoryMonitor, createFactoryMonitorRunConsumer, monitorGate } from "./monitor";
 import { reconcileFactoryCheck } from "./reconcile-check";
 import { appendMonitorEvidence } from "./monitor-evidence";
@@ -87,7 +87,6 @@ export const factoryApprovals = createFactoryApprovals(
 );
 export const factorySpecApproval = createFactorySpecApproval(pool, factoryHumanStore, automaticFactoryDispatch(pool));
 export const factoryMerges = createFactoryMerges(pool, authorize, factoryHumanStore, githubMergeApi());
-export const claimFactoryCheckRun = createFactoryCheckClaim(pool, authorize);
 export const factoryMonitorWorkspaceKey: Parameters<typeof createFactoryMonitor>[3] = async (userId, issueId, tx) => {
     const {
       rows: [issue],

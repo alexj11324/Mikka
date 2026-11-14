@@ -1,5 +1,9 @@
+import { observePoolCommits } from '../db/commit-effects';
+import { bindFixtureWorkspaceDatabase } from '../../tests/helpers/workspace-database';
+import { coordinatorWakeTransport } from '../coordinator/wake-after-commit';
+import { builtinGateway } from '../builtin-gateway/runtime';
 import { isDeviceOnline } from '@mikka/protocol/device';
-import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
+import { claimFixtureFactoryCheck, createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import { createFactoryDispatch } from "./dispatch";
@@ -21,7 +25,6 @@ import { execFileSync } from "node:child_process";
 import {
   factoryCheckGates,
   configureFactoryCheck,
-  createFactoryCheckClaim,
 } from "./checks";
 import { createFactoryTestAuthority } from "../../tests/helpers/factory-test-authority";
 import { createLocalPublicationAdapter } from "./local-publication";
@@ -168,8 +171,10 @@ test(
       await import("../linear-sync/document");
     const { createAppIssueFromLinear } = await import("../linear-sync/issue-sync");
     const { withDatabaseClient } = await import("../db");
-    const { workspacePool } = await import("../workspace-db");
     marker.deregister();
+    const previousWake = coordinatorWakeTransport.wake;
+    coordinatorWakeTransport.wake = async () => undefined;
+    t.after(() => { coordinatorWakeTransport.wake = previousWake; });
     const fixtureURL = await isolatedPostgresURL(target!);
     const schema = `monitor_195_${randomUUID().replaceAll("-", "")}`;
     const admin = new Pool({ connectionString: fixtureURL, max: 1 });
@@ -179,9 +184,9 @@ test(
       max: 16,
       options: `-c search_path=${schema}`,
     });
+    const closeWorkspace = await bindFixtureWorkspaceDatabase(pool);
     const scopes = new Map<string, string>();
     const workspaceFixtures = new Map<string, string>();
-    const authorityWorkspaces: string[] = [];
     const denied = new Set<string>();
     const authorize = async (
       userId: string,
@@ -664,7 +669,7 @@ test(
       });
       const id = dispatched.runId;
       state = dispatched;
-      const assignment = await createFactoryCheckClaim(pool, authorize)(
+      const assignment = await claimFixtureFactoryCheck(pool, store)(
         owner,
         f.deviceId,
         id,
@@ -716,9 +721,7 @@ test(
       );
       // The importer uses the real workspace authority while this suite's app
       // rows live in its isolated schema, as in a split-database deployment.
-      const workspaceId = await seedFixtureWorkspace(workspacePool, 'owner', 'team');
-      authorityWorkspaces.push(workspaceId);
-      await seedFixtureWorkspace(pool, 'owner', 'team', workspaceId);
+      const workspaceId = await seedFixtureWorkspace(pool, 'owner', 'team');
       workspaceFixtures.set(JSON.stringify(['owner', 'workspace:a']), workspaceId);
       const { rows: [linearTeam] } = await pool.query<Parameters<typeof createAppIssueFromLinear>[0]>(
         "INSERT INTO linear_team_syncs (id,\"ownerId\",\"linearTeamId\",\"linearTeamKey\",\"linearTeamName\",\"workspaceId\") VALUES ($1,'owner','fixture-team','FIX','Fixture team',$2) RETURNING *",
@@ -1011,6 +1014,7 @@ test(
             max: 16,
             options: `-c search_path=${schema}`,
           });
+          observePoolCommits(pool);
           store = createFactoryStore(pool, authorize, integrationGates);
           monitor = makeMonitor();
           assert.deepEqual(await monitor.consume("owner", sample.input), {
@@ -1536,7 +1540,7 @@ test(
               agentId: f.agentId,
               deviceRepoId: f.repoId,
             });
-            const assignment = await createFactoryCheckClaim(pool, authorize)(
+            const assignment = await claimFixtureFactoryCheck(pool, store)(
               "owner",
               f.deviceId,
               bound.runId,
@@ -1649,12 +1653,10 @@ test(
         }),
       );
     } finally {
-      for (const workspaceId of authorityWorkspaces) {
-        await workspacePool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1', [workspaceId]);
-        await workspacePool.query('DELETE FROM mikka_workspaces WHERE id=$1 AND "userId"=$2', [workspaceId, 'owner']);
-      }
       await cloud.close();
       await rm(targetRoot, { recursive: true, force: true });
+      await builtinGateway()?.stop();
+      await closeWorkspace();
       await pool.end();
       await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
       await admin.end();
