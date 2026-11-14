@@ -1,0 +1,79 @@
+{
+  "public": "85dfc39692d653c33ef9a4cb653263a55e667f96",
+  "private": "ddd75ba1f1c6dd467e17adecc82c3d1193a92e06",
+  "started": "2026-11-14T17:21:30.231Z",
+  "states": [
+    {
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "initialBot": 2,
+      "initialChildren": [
+        1,
+        1
+      ],
+      "postReloadBot": 1,
+      "remainingChildren": [
+        0,
+        1
+      ],
+      "openAcknowledged": 200,
+      "sha256": "8e182566a365fd3bb7aedc1ce12e9dcae02630a4e16d1e7bc575a0815c2e4b0d"
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "theme": "dark",
+      "initialBot": 2,
+      "initialChildren": [
+        1,
+        1
+      ],
+      "postReloadBot": 1,
+      "remainingChildren": [
+        0,
+        1
+      ],
+      "openAcknowledged": 200,
+      "sha256": "7fc4d9762c5dae50d91bf400fad8d673b33a5ce8c80a1aba77d21421c490d5ff"
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "initialBot": 2,
+      "initialChildren": [
+        1,
+        1
+      ],
+      "postReloadBot": 1,
+      "remainingChildren": [
+        0,
+        1
+      ],
+      "openAcknowledged": 200,
+      "sha256": "f1b5a0fd32b39b0cb0a126acc2e388162023f4d87e95da99105b7ff53806ecd0"
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "theme": "dark",
+      "initialBot": 2,
+      "initialChildren": [
+        1,
+        1
+      ],
+      "postReloadBot": 1,
+      "remainingChildren": [
+        0,
+        1
+      ],
+      "openAcknowledged": 200,
+      "sha256": "555a975c4bc159ab26615e3ffebb1ec996715685f278707133d5362441c88432"
+    }
+  ],
+  "renderer": "8b1522e3f75dc40f126116ae79e441d724866d6c820ed7fb4438cc8502ce7c06",
+  "chromium": "153.0.8010.0",
+  "memberDenied": true,
+  "finished": "2026-11-14T17:22:06.060Z"
+}
