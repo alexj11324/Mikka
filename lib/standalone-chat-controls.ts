@@ -1,4 +1,4 @@
-import type { ConversationOrganization, ConversationOrganizationChange } from './conversation-organization'
+import type { ConversationOrganizationChange } from './conversation-organization'
 import type { RunChainQueryable } from './run-chain'
 
 const ownerScope = `c.id=$1 AND c."createdBy"=$2 AND c."workspaceId"=$3
@@ -9,17 +9,16 @@ const ownerScope = `c.id=$1 AND c."createdBy"=$2 AND c."workspaceId"=$3
     AND m."memberType"='user' AND m."memberId"=$2 AND m."leftAt" IS NULL)`
 
 export async function standaloneOrganization(database: RunChainQueryable, id: string, owner: string, workspace: string, change?: ConversationOrganizationChange) {
-  const projection = 'c."conversationArchivedAt" IS NOT NULL AS archived,c."conversationPinnedAt" IS NOT NULL AS pinned'
   const keys = [id, owner, workspace]
-  if (!change) {
-    const { rows } = await database.query('SELECT ' + projection + ' FROM conversations c WHERE ' + ownerScope, keys)
-    return (rows[0] as ConversationOrganization | undefined) ?? null
+  if (change) {
+    const column = change.field === 'archived' ? '"conversationArchivedAt"' : '"conversationPinnedAt"'
+    const restore = change.field === 'archived' && !change.value ? ', "conversationRestoredAt"=now()' : ''
+    const update = await database.query('UPDATE conversations c SET ' + column + '=CASE WHEN $4 THEN coalesce(' + column + ',now()) END' + restore +
+      ' WHERE ' + ownerScope + ' RETURNING id', [...keys, change.value])
+    if (!update.rows.length) return null
   }
-  const column = change.field === 'archived' ? '"conversationArchivedAt"' : '"conversationPinnedAt"'
-  const restore = change.field === 'archived' && !change.value ? ', "conversationRestoredAt"=now()' : ''
-  const { rows } = await database.query('UPDATE conversations c SET ' + column + '=CASE WHEN $4 THEN coalesce(' + column + ',now()) END' + restore +
-    ' WHERE ' + ownerScope + ' RETURNING ' + projection, [...keys, change.value])
-  return (rows[0] as ConversationOrganization | undefined) ?? null
+  const { effectiveStandaloneOrganization } = await import('./conversation-directory')
+  return effectiveStandaloneOrganization(database, owner, workspace, id)
 }
 
 export async function renameStandalone(database: RunChainQueryable, id: string, owner: string, workspace: string, title: string) {

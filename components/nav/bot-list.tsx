@@ -49,11 +49,12 @@ export function useChatNav({ bots, workspaceId, active, userId, presentations }:
   const sidebarKey = workspaceId ? ['conversation-sidebar',userId,workspaceId] : null
   const {data: sidebar} = useSWR(sidebarKey, () => listConversationSidebar(), {revalidateOnFocus:false})
   useLiveKey('thread_list', workspaceId, sidebarKey ? [unstable_serialize(sidebarKey)] : [], workspaceId)
+  useLiveKey('group_list', workspaceId, sidebarKey ? [unstable_serialize(sidebarKey)] : [], workspaceId)
   const workFor = (botId: string | undefined) => {
     const group = botId ? sidebar?.[botId] : undefined
     return { moreBotId: group?.more ? botId : undefined, work: group?.items.map(row => {
       const task = row.issueId ? presentations[row.issueId] : undefined
-      return { id:row.id, issueId:row.issueId, name:row.title, fullName:row.title,
+      return { kind:row.kind, id:row.id, issueId:row.issueId, name:row.title, fullName:row.title,
         status:row.status, state:task?.state ?? null, reason:task?.reason ?? null,
         unread:row.unread,unreadCount:Number(row.unread), activity: row.state === 'waiting' ? 'waiting' as const : row.state === 'working' ? 'working' as const : row.state === 'failed' ? 'error' as const : null,
         runs:[{id:row.id,name:row.title,harness:row.harness}] }

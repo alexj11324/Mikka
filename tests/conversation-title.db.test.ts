@@ -226,6 +226,8 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     assert.deepEqual(new Set(namedPage.items.map(row => row.id)), new Set([id, multiId]))
     assert.ok(namedPage.items.every(row => row.kind === 'chat' && row.issueId === null))
     assert.deepEqual((await conversationDirectory(pool, 'owner', workspaceId, { ...named, botId: secondBot })).items.map(row => row.id), [multiId])
+    assert.deepEqual((await conversationSidebar(pool, 'owner', workspaceId))[secondBot].items.map(row => [row.kind, row.id]), [['chat', multiId]])
+    assert.equal((await conversationSidebar(pool, 'other', workspaceId))[bot], undefined)
     assert.deepEqual((await conversationDirectory(pool, 'other', workspaceId, named)).items, [])
     assert.deepEqual((await conversationDirectory(pool, 'owner', foreignWorkspace, named)).items, [])
     const { standaloneOrganization, renameStandalone, regenerateStandalone } = await import('@/lib/standalone-chat-controls')
@@ -252,6 +254,48 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     })
     assert.deepEqual(await regenerateStandalone(pool, id, 'owner', workspaceId, async () => null), { title: 'Manual chat', regenerated: false })
     assert.equal(await regenerateStandalone(pool, id, 'other', workspaceId, async () => { throw Error('unauthorized model call') }), null)
+
+    // A member's existing group receipt and explicit unread mark also appear in both conversation surfaces.
+    const chatUnread = async () => (await conversationDirectory(pool, 'owner', workspaceId, {search: 'Manual chat'})).items[0].unread
+    assert.equal(await chatUnread(), false, 'the owner authored the only message')
+    await pool.query(`INSERT INTO chat_preferences ("userId","chatKey","markedUnread") VALUES ('owner',$1,true)`, [id])
+    assert.equal(await chatUnread(), true)
+    assert.equal((await conversationSidebar(pool,'owner',workspaceId))[bot].items.find(row => row.id === id)?.unread, true)
+    await pool.query(`UPDATE chat_preferences SET "markedUnread"=false WHERE "userId"='owner' AND "chatKey"=$1`, [id])
+
+    // Both storage kinds use one page boundary even when activity timestamps coincide.
+    const pageRun = await run({prompt:'Mixed page boundary'})
+    const mixed = await pool.query(`WITH created AS (
+      INSERT INTO conversations (id,"workspaceId",kind,title,"createdBy","creationPurpose","createdAt")
+      SELECT gen_random_uuid(), $1, 'group', 'Mixed page boundary ' || n, 'owner', 'conversation', '2026-01-01T00:00:00Z'
+      FROM generate_series(1,100) n RETURNING id
+    ) INSERT INTO conversation_members ("conversationId","memberType","memberId",role)
+      SELECT id,'user','owner','owner' FROM created RETURNING "conversationId" AS id`, [workspaceId])
+    await pool.query(`UPDATE agent_runs SET "createdAt"='2026-01-01T00:00:00Z',"updatedAt"='2026-01-01T00:00:00Z' WHERE id=$1`, [pageRun])
+    const mixedInput = {search:'mixed page boundary',archived:'any' as const}
+    const firstMixed = await conversationDirectory(pool,'owner',workspaceId,mixedInput)
+    assert.equal(firstMixed.items.length, 100)
+    assert.ok(firstMixed.cursor)
+    const remaining = await conversationDirectory(pool,'owner',workspaceId,{...mixedInput,cursor:firstMixed.cursor})
+    assert.equal(remaining.cursor, null)
+    assert.equal(remaining.items.length, 1)
+    assert.deepEqual(new Set([...firstMixed.items,...remaining.items].map(row => row.id)),new Set([pageRun,...mixed.rows.map(row=>row.id)]))
+    // The sidebar, header and archive filter use the same idle clock for a named chat.
+    await pool.query(`UPDATE user_preferences SET "archiveIdleAfterDays"=3 WHERE "userId"='owner'`)
+    await pool.query(`UPDATE conversations SET "createdAt"=now()-interval '10 days',"conversationRestoredAt"=NULL WHERE id=$1`, [id])
+    await pool.query(`UPDATE conversation_messages SET "createdAt"=now()-interval '10 days' WHERE "conversationId"=$1`, [id])
+    await pool.query(`UPDATE group_turns SET status='complete' WHERE "conversationId"=$1`, [id])
+    const visibleInSidebar = async () => (await conversationSidebar(pool,'owner',workspaceId))[bot]?.items.some(row => row.id === id) ?? false
+    assert.deepEqual(await standaloneOrganization(pool,id,'owner',workspaceId), {archived:true,pinned:false})
+    assert.equal(await visibleInSidebar(), false)
+    assert.deepEqual(await change('pinned',true), {archived:false,pinned:true})
+    assert.equal(await visibleInSidebar(), true)
+    assert.deepEqual(await change('archived',true), {archived:true,pinned:true})
+    assert.equal(await visibleInSidebar(), false)
+    assert.deepEqual(await change('archived',false), {archived:false,pinned:true})
+    assert.deepEqual(await change('pinned',false), {archived:false,pinned:false})
+    assert.equal(await visibleInSidebar(), true)
+
 
     assert.deepEqual((await pool.query(`SELECT "botId" FROM coordinator_bots WHERE "ownerId"='owner' AND "workspaceId"=$1`, [workspaceId])).rows, [{ botId: bot }])
     // The publication on the second attempt resolves to the root. Counts and state come from the webhook store.

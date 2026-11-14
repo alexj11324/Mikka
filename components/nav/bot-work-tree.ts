@@ -8,7 +8,7 @@ import { compactTaskTitle, conversationTitle } from '@/lib/short-title'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 export type BotWorkRun = { id: string; name: string; harness: string | null }
-export type BotWorkTask = { pullState?: Thread['pullState']; unreadCount?: number; id: string; issueId: string | null; name: string; fullName: string; /** The task's status field; null for a run that has no task. */ status: string | null; /** What a conversation with no task is doing, for its one mark; null for a task row, whose one icon is its status. */ activity: RunIndicator | null; state: TaskState | null; reason: TaskReason | null; runs: BotWorkRun[] }
+export type BotWorkTask = { kind?: 'run' | 'chat'; pullState?: Thread['pullState']; unreadCount?: number; id: string; issueId: string | null; name: string; fullName: string; /** The task's status field; null for a run that has no task. */ status: string | null; /** What a conversation with no task is doing, for its one mark; null for a task row, whose one icon is its status. */ activity: RunIndicator | null; state: TaskState | null; reason: TaskReason | null; runs: BotWorkRun[] }
 
 type Dispatch = NonNullable<TaskPresentation['botDispatches']>[number]
 const taskRow = (issue: Issue, presentation: TaskPresentation, dispatch: Dispatch): BotWorkTask => ({

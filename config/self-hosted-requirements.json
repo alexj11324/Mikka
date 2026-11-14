@@ -284,7 +284,9 @@
   },
   "drizzle/20261114061842_allow_exact_skill_sharing_approval.sql": {
     "mode": "built-in",
-    "environment": ["DATABASE_URL"],
+    "environment": [
+      "DATABASE_URL"
+    ],
     "behavior": "Store installed Skill sharing requests and their administrator decisions in the existing Workspace PostgreSQL approvals table.",
     "test": "lib/enterprise/governance.db.test.ts",
     "suite": "test:enterprise-db"
@@ -1813,13 +1815,6 @@
     "behavior": "Recognize and encode supported conversation citations using installation routes.",
     "test": "tests/thread-references.db.test.ts",
     "suite": "test:bot-threads-db"
-  },
-  "lib/standalone-chat-directory.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Keep owner-created standalone chats in installation PostgreSQL and reopen them only through their active participant and workspace authorization.",
-    "test": "tests/conversation-title.db.test.ts",
-    "suite": "test:run-publication-db"
   },
   "drizzle/20261113180454_standalone_bot_conversations.sql": {
     "mode": "built-in",
