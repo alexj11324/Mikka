@@ -1485,6 +1485,15 @@
     "test": "tests/mobile-plugin-connections.test.ts",
     "suite": "test:mobile"
   },
+  "lib/schedules/contract.ts": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "Page the schedules visible in the current workspace and conversation using PostgreSQL creation time and schedule ID.",
+    "test": "lib/schedules/store.db.test.ts",
+    "suite": "test:schedules-db"
+  },
   "lib/telegram/connection-status.ts": {
     "mode": "operator-configured",
     "environment": [
