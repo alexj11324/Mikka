@@ -54,8 +54,9 @@ export function useChatNav({ bots, workspaceId, active, userId, presentations }:
   const { rows, unread, reloadGroups } = useChatRows({ bots, workspaceId, active, userId })
   const coordinatorId = bots.find(bot => bot.coordinator)?.id
   const sidebarKey = workspaceId ? ['conversation-sidebar',userId,workspaceId] : null
-  const {data: sidebar} = useSWR(sidebarKey, () => listConversationSidebar(), {revalidateOnFocus:true})
+  const {data: sidebar} = useSWR(sidebarKey, () => listConversationSidebar(), {revalidateOnFocus:false})
   useLiveKey('thread_list', workspaceId, sidebarKey ? [unstable_serialize(sidebarKey)] : [], workspaceId)
+  useLiveKey('group_list', workspaceId, sidebarKey ? [unstable_serialize(sidebarKey)] : [], workspaceId)
   const workFor = (botId: string | undefined) => {
     const group = botId ? sidebar?.[botId] : undefined
     return { moreBotId: group?.more ? botId : undefined, work: group?.items.map(row => {
