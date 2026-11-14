@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
+import { Window } from 'happy-dom'
 import { IntlProvider } from 'next-intl'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { FactoryActivityView } from '../../lib/factory/activity'
@@ -27,8 +28,15 @@ test('work shows the admitted conversation, one PR and the current progress; oth
   assert.match(pull,/Reviewed the release./)
   assert.match(html,/Reviewed the release/)
   assert.match(html,/A colleague/)
-  assert.equal((html.match(/<button\b/g) ?? []).length,1)
+  const { document } = new Window()
+  document.body.innerHTML = html
+  const navigation = [...document.querySelectorAll('button:not([data-slot="collapsible-trigger"])')]
+  assert.equal(navigation.length, 1)
+  assert.match(navigation[0].textContent ?? '', /Analyze the release/)
+  assert.ok(navigation.every(button => !button.textContent?.includes('A colleague')))
   assert.equal((html.match(/href="https:\/\/github.com\/example\/repo\/pull\/5"/g) ?? []).length,1)
-  assert.equal((html.match(/<details\b/g) ?? []).length,1)
-  assert.match(html,/<summary[^>]*>[^<]*Verification/)
+  const progress = document.querySelectorAll('button[data-slot="collapsible-trigger"]')
+  assert.equal(progress.length, 1)
+  assert.equal(progress[0].getAttribute('aria-expanded'), 'false')
+  assert.match(progress[0].textContent ?? '', /Verification/)
 })
