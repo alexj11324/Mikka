@@ -226,6 +226,12 @@ export type TaskActivity =
 
 /** GET /api/mobile/tasks/:id (lib/mobile-tasks.ts on the server): the task's detail and its 活动, newest first. */
 export interface TaskDetail {
+  /** The same authorized work projection as the official task page, available on new servers. */
+  work?: { version: 1
+    connections?: { id: string; identifier: string | null; title: string; kinds: ('child' | 'parent' | 'duplicate' | 'blockedBy' | 'blocks' | 'related')[] }[]
+    conversations?: { id: string; ownerName: string | null; detail: { name: string; agent: string; observedModel: string | null; summary: string | null } | null
+      state: 'running' | 'paused' | 'done' | 'failed' | 'blocked' | 'replaced'; stopping: boolean }[]
+    pullRequests: { url: string; title?: string; state: 'open' | 'draft' | 'merged' | 'closed'; additions?: number; deletions?: number; sourceConversationId?: string }[] }
   task: Pick<Task, 'id' | 'identifier' | 'title' | 'status' | 'priority' | 'group' | 'state' | 'reason' | 'blockedBy'> & {
     /** Authorized conversation head, null for read-only evidence. Absent on older servers. */
     replyRunId?: string | null

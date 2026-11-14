@@ -24,7 +24,7 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import { BOARD_FILTERS_KEY, LEGACY_BOARD_FILTERS_KEY, boardProjectFilters, migrateBoardFilters, personFilters } from '@/lib/board-filters'
+import { BOARD_FILTERS_KEY, LEGACY_BOARD_FILTERS_KEY, boardProjectFilters, boardTaskOwner, migrateBoardFilters, personFilters } from '@/lib/board-filters'
 import { BoardScreenView } from './board-screen'
 import { BOARD_SETTINGS_KEY as SETTINGS_KEY, BOARD_VIEW_EVENT as VIEW_EVENT } from './board-view'
 import type { BoardMenuItem } from '@/components/slots/board-contract'
@@ -199,7 +199,7 @@ export function BoardPage({ issues, userId, workspaceId, teamId, presentationRea
       case 'status': return [issue.status, ...(blocks.has(issue.id) ? [BLOCKED_COLUMN] : [])]
       case 'priority': return [issue.priority]
       // listTaskRuns names a run's bot only when it is the person's own.
-      case 'assignee': return [...(personFilters(issue, userId, { agents: myAgents, heldByMyBot: !!owners.get(issue.id)?.bot }).assignee ? [ME] : []), issue.metadata.assignee?.id ?? NONE]
+      case 'assignee': return [...(personFilters(issue, userId, { agents: myAgents, heldByMyBot: !!owners.get(issue.id)?.bot }).assignee ? [ME] : []), boardTaskOwner(issue.metadata)?.id ?? NONE]
       case 'creator': return personFilters(issue, userId, { agents: myAgents, heldByMyBot: false }).creator ? [ME] : []
       case 'labels': return issue.metadata.labels.map(label => label.name)
       case 'project': return [issue.projectId ?? NONE]
@@ -216,7 +216,10 @@ export function BoardPage({ issues, userId, workspaceId, teamId, presentationRea
   const columns = BOARD_COLUMNS.map(column => column.value).filter(column => !display.hidden.includes(column) && (display.showEmpty || count(column) > 0))
 
   // Every value a filter can take, from the tasks on the board.
-  const assignees = [...new Map(issues.flatMap(issue => issue.metadata.assignee ? [[issue.metadata.assignee.id, issue.metadata.assignee] as const] : [])).values()]
+  const assignees = [...new Map(issues.flatMap(issue => {
+    const actor = boardTaskOwner(issue.metadata)
+    return actor ? [[actor.id, actor] as const] : []
+  })).values()]
   const labels = [...new Set(issues.flatMap(issue => issue.metadata.labels.map(label => label.name)))]
   const options: Record<FilterField, { value: string; label: string }[]> = {
     status: BOARD_COLUMNS.map(column => ({ value: column.value, label: statusLabel(column.value) })),

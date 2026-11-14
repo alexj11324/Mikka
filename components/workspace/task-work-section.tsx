@@ -4,6 +4,7 @@ import { useFormatter, useMessages, useTranslations } from 'next-intl'
 import { ChevronRight, GitPullRequest, MessagesSquare } from 'lucide-react'
 import type { FactoryActivityView } from '@/lib/factory/activity'
 import { type IssueThread, threadQuestionView } from '@/lib/issue-threads'
+import { taskPullConversations } from '@/lib/task-work-pulls'
 import { githubPullRequestKey, type IssuePullRequest } from '@/lib/issue-metadata'
 import { runResult, useRunResultLabel } from '@/hooks/use-run-result'
 import { presentedFactoryEvents, taskFactoryProgress } from '@/lib/task-factory-events'
@@ -23,11 +24,10 @@ export function TaskWorkSection({ threads, pulls, factory, open }: {
   const states: Record<string, string> = messages.IssueDetail.work.states
   const resultLabel = useRunResultLabel()
   const conversations = threads
-  const runByPull = new Map((factory?.artifacts ?? []).filter(artifact => artifact.kind === 'pull_request')
-    .map(artifact => [githubPullRequestKey(artifact.url), artifact.runId]))
+  const byRun = new Map(conversations.flatMap(thread => [thread.id, ...thread.attempts.map(attempt => attempt.runId)].map(id => [id, thread] as const)))
+  const sourceByPull = taskPullConversations(threads, factory)
   const progress = taskFactoryProgress(presentedFactoryEvents(factory?.events, factory?.task.id))
   if (!conversations.length && !pulls.length && !progress.length) return null
-  const byRun = new Map(conversations.flatMap(thread => [thread.id, ...thread.attempts.map(attempt => attempt.runId)].map(id => [id, thread] as const)))
   const labelStage = (stage: string) => (messages.GroupTask.stage as Record<string, string>)[stage] ?? stage
   const labelStatus = (status: string) => (messages.GroupTask.status as Record<string, string>)[status] ?? status
   return <section aria-label={t('heading')} className="my-4 flex flex-col gap-1" data-slot="task-work">
@@ -50,8 +50,7 @@ export function TaskWorkSection({ threads, pulls, factory, open }: {
       </Button>
     })}
     {pulls.map(pull => {
-      const runId = runByPull.get(githubPullRequestKey(pull.url))
-      const detail = runId ? byRun.get(runId)?.detail : null
+      const detail = sourceByPull.get(githubPullRequestKey(pull.url))?.detail
       const number = pull.url.split('/').filter(Boolean).at(-1)
       const state = pull.state?.toLowerCase()
       const status = state ? states[state] : null

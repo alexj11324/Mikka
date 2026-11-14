@@ -1,5 +1,6 @@
 'use client'
 
+import { boardTaskOwner } from '@/lib/board-filters'
 import type { ReactNode } from 'react'
 import { useFormatter, useTranslations } from 'next-intl'
 import { BoardScreen } from '@ui-slot/board'
@@ -60,7 +61,7 @@ export function BoardScreenView({ issues, columns: visible, hidden, blocks, newe
       const labels = metadata.labels.map(label => label.name)
       const pullRequest = metadata.pullRequests.at(-1)
       const detail = [
-        show('assignee') && metadata.assignee?.name,
+        show('assignee') && boardTaskOwner(metadata)?.name,
         show('labels') && labels.length > 0 && [labels.slice(0, 2).join('、'), labels.length > 2 ? `+${labels.length - 2}` : ''].join(' ').trim(),
         show('project') && metadata.project,
         show('pullRequests') && pullRequest && `PR #${pullRequest.url.match(/\/pull\/(\d+)/)?.[1] ?? ''}`.replace(/ #$/, ''),

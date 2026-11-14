@@ -1,5 +1,6 @@
 "use client"
 
+import { isLegacyTaskInstruction } from '@/lib/task-description'
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
 import type { EditorView } from "@tiptap/pm/view"
 import { useTranslations } from "next-intl"
@@ -66,7 +67,7 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
   const [foldInstructions] = useState(() => {
     if (layout !== 'issue' || compact || !initialContent) return false
     const body = issueContentToMarkdown(initialContent)
-    return body.length >= 1000 && /\bsha-?256\b|file contract|文件契约|Before editing, compare this task with the actual Git origin/i.test(body)
+    return isLegacyTaskInstruction(body)
   })
   const [instructionsOpen, setInstructionsOpen] = useState(false)
   const unreadable = !sharedDoc && initialContent === null
