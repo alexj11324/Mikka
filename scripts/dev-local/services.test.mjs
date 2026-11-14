@@ -85,7 +85,7 @@ test('the real AI SDK gateway provider and a Resend call reach the substitutes',
   assert.equal((await fetch(`${origin}/github/user`)).status, 404, 'other paths fall through to the MVP fake')
 })
 
-test('the local cron runs the production minute schedule on the minute and survives failures', async () => {
+test('the local cron runs the production schedule on each quarter hour and survives failures', async () => {
   const runs = [], logs = [], timers = []
   let clock = Date.UTC(2026, 10, 1, 12, 14, 30)
   const stop = startLocalCron({
@@ -97,10 +97,10 @@ test('the local cron runs the production minute schedule on the minute and survi
   clock += 30_000
   timers[0].fn()
   await new Promise(resolve => setImmediate(resolve))
-  assert.deepEqual(runs[0], { cron: '* * * * *', env: { MIKKA_URL: 'http://localhost:3000/mikka', CRON_SECRET: LOCAL_CRON_SECRET }, at: Date.UTC(2026, 10, 1, 12, 15) })
+  assert.deepEqual(runs[0], { cron: '0,15,30,45 * * * *', env: { MIKKA_URL: 'http://localhost:3000/mikka', CRON_SECRET: LOCAL_CRON_SECRET }, at: Date.UTC(2026, 10, 1, 12, 15) })
   assert.ok(logs.includes('[local-cron] /api/cron/schedules answered 502'))
   assert.equal(timers.length, 2)
-  assert.equal(timers[1].ms, 60_000)
+  assert.equal(timers[1].ms, 15 * 60_000)
   stop()
 })
 
