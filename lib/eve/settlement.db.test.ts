@@ -141,6 +141,50 @@ test('host settlement receipts preserve product publication across native RPC re
       assert.equal((await instructions(turnId)).status, 404)
       assert.equal((await store.readExecution(slack, execution.id)).status, 'completed')
     })
+    await t.test('the product catalogue skips only inapplicable Eve approval reviews', async t => {
+      const { AgentKitStore } = await import('../agent-kit/store')
+      const { DEFAULT_AGENT_DEFINITION } = await import('../agent-kit/builtin')
+      const { handleEveProductRequest } = await import('./product-gateway')
+      const { productRpc } = await import('./product-rpc')
+      const { createProductTool } = await import('./product-tool')
+      const { scopeAuth } = await import('./scope')
+      const store = new AgentKitStore(pool)
+      const sessionId = await nativeSession()
+      const turnId = 'turn_tool'
+      const execution = await store.beginExecution(scope, `${sessionId}:${turnId}:0`, 'Fixture policy', {harness:'codex',model:null}, DEFAULT_AGENT_DEFINITION)
+      const binding = { sessionId, turnId, executionId: execution.id }
+      const calls: string[] = []
+      t.mock.method(globalThis, 'fetch', async (url: URL, init: RequestInit) => {
+        const request = new Request(url, init)
+        calls.push((await request.clone().json()).operation)
+        return handleEveProductRequest(request)
+      })
+      const { tools } = await productRpc<{tools:import('./product-rpc').ProductCatalogueEntry[]}>(scope, {...binding,operation:'catalogue'})
+      const read = tools.find(tool => tool.name === 'list_issues')!
+      const write = tools.find(tool => tool.name === 'send_email')!
+      const input = {}
+      const context = {session:{id:sessionId,turn:{id:turnId},auth:{current:scopeAuth(scope)}},callId:'read_1',toolInput:input,abortSignal:new AbortController().signal}
+      const tool = createProductTool(scope,binding,read)
+      const approval = tool.approval as import('eve/tools/approval').ApprovalConfiguration<unknown>
+      const foreign = {...context,session:{...context.session,auth:{current:scopeAuth({...scope,ownerId:'another-owner'})}}}
+      assert.equal(await approval.request(foreign as never), 'denied')
+      await assert.rejects(async () => approval.request({...context,abortSignal:AbortSignal.abort()} as never), {name:'AbortError'})
+      assert.equal(await approval.request(context as never), 'not-applicable')
+      assert.deepEqual(await tool.execute!(input as never, context as never), [])
+      assert.deepEqual(calls, ['catalogue','execute'])
+      assert.equal(read.needsApprovalReview, false)
+      assert.equal(write.needsApprovalReview, true)
+      const legacy = createProductTool(scope,binding,{...read,needsApprovalReview:undefined})
+      assert.equal(await (legacy.approval as typeof approval).request(context as never), 'not-applicable')
+      assert.deepEqual(calls, ['catalogue','execute','approval'])
+      // If the host adds this tool to approval review after discovery, execution
+      // still requires a matching durable review before any provider dispatch.
+      const priorCatalogue = createProductTool(scope,binding,{...write,needsApprovalReview:false})
+      const mail = {to:['fixture@example.invalid'],subject:'Fixture',body:'No delivery'}
+      await assert.rejects(async () => priorCatalogue.execute!(mail as never, {...context,callId:'changed_policy'} as never), /agentToolUnavailable/)
+      await store.finishExecution(scope, execution.id, 'completed')
+      await assert.rejects(async () => tool.execute!(input as never, context as never), /agentToolUnavailable/)
+    })
     await t.test('failed native turn marks only its owned source and never overwrites a newer session',async()=>{
       const {projectEveTurn,projectTurnState}=await import('./projection')
       const {emptySessionView,foldEvents}=await import('eve/events')

@@ -2,6 +2,7 @@ import 'server-only'
 import { asSchema, type ToolSet } from 'ai'
 import { z } from 'zod'
 import type { AgentExecution } from '../agent-kit/store'
+import { requiresEveProductApproval } from './approval-bridge'
 
 const id = z.string().min(1).max(256)
 const common = { sessionId: id, turnId: id, executionId: z.uuid().nullable().optional() }
@@ -108,7 +109,10 @@ const defaultServices: EveProductGatewayServices = {
       }
       const tools = await productTools(scope, execution, sourceEventId, scheduledRead, taskEventId,entryOrigin)
       if (input.operation === 'catalogue') {
-        return { tools: await Promise.all(Object.entries(tools).map(async ([name, definition]) => ({ name, description: definition.description ?? name, inputSchema: await asSchema(definition.inputSchema).jsonSchema }))) }
+        return { tools: await Promise.all(Object.entries(tools).map(async ([name, definition]) => ({
+          name, description: definition.description ?? name, inputSchema: await asSchema(definition.inputSchema).jsonSchema,
+          needsApprovalReview: requiresEveProductApproval(name),
+        }))) }
       }
       const tool = Object.hasOwn(tools, input.name) ? tools[input.name] : undefined
       if (!tool?.execute) throw new Error('notFound')
