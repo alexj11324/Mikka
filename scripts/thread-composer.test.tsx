@@ -30,6 +30,8 @@ const actualSWR = await import('swr')
 let liveRead = false
 let readFailure: unknown = null
 let readHold: Promise<void> | null = null
+let observeChanges = false
+let changesReads = 0
 let changesRead: { state: string; changes?: object } | null = null
 let issueReads = 0
 const notices = new Map<string, { action?: { onClick: (event: Event) => void } }>()
@@ -38,7 +40,7 @@ mock.module('sonner', { namedExports: { toast: {
   dismiss: (id: string) => { notices.delete(id) }, success: () => {},
 } } })
 mock.module('swr', {
-  defaultExport: (key: unknown, fetcher: never, options: never) => liveRead && Array.isArray(key) && key[0] === 'issue-thread'
+  defaultExport: (key: unknown, fetcher: never, options: never) => liveRead && Array.isArray(key) && (key[0] === 'issue-thread' || observeChanges && key[0] === 'thread-changes')
     ? actualSWR.default(key, fetcher, options)
     : Array.isArray(key) && key[0] === 'issue-thread'
     ? { data: thread && { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: [] }, mutate: () => {} }
@@ -59,7 +61,7 @@ mock.module(at('app/actions/agents.ts'), { namedExports: { retryQuotaPausedRun: 
   if (readHold) await readHold
   if (readFailure) throw readFailure
   return { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: [], chunksAppend: false }
-}, getThreadChanges: async () => ({ state: 'none' }), getThreadInstructions: async () => '', getThreadMachine: async () => null, sendIssueThreadMessage: async () => {}, sendIssueThreadReply: async (request: { requestId: string; text: string }) => { replyCalls++; return postReply(request) }, stopRun: async () => ({}) } })
+}, getThreadChanges: async () => { changesReads++; return { state: 'none' } }, getThreadInstructions: async () => '', getThreadMachine: async () => null, sendIssueThreadMessage: async () => {}, sendIssueThreadReply: async (request: { requestId: string; text: string }) => { replyCalls++; return postReply(request) }, stopRun: async () => ({}) } })
 mock.module(at('app/actions/artifacts.ts'), { namedExports: { listRunArtifacts: async () => [] } })
 mock.module(at('components/workspace/factory-acceptance.tsx'), { namedExports: {
   useThreadAcceptance: (issueId: string | null, runId: string) =>
@@ -93,7 +95,7 @@ before(async () => { ({ createRoot } = await import('react-dom/client')); ({ Iss
 const base = { id: 'run-1', issueId: 'issue-1', status: 'succeeded', outcome: null, question: null, continuation: null, stopping: false, ownedByCurrentUser: true,
   createdAt: new Date(0), finishedAt: new Date(0), latestRunId: 'run-1', prompt: 'Fix it', stopRequestedAt: null, replyAvailable: true, retryAvailable: true, quota: null, feedbackEligible: false,
   detail: { name: 'ZHIX-2 Fix it', agentName: 'Claude Code', harness: 'claude_code', summary: null } }
-beforeEach(() => { buildGate = undefined; postReply = async () => ({ sent: true }); thread = { ...base }; acceptance = null; composer = null; replyCalls = 0; draftText = ''; pageChecks = 0; liveRead = false; readFailure = null; readHold = null; changesRead = null; issueReads = 0; notices.clear(); browser.sessionStorage.clear() })
+beforeEach(() => { buildGate = undefined; postReply = async () => ({ sent: true }); thread = { ...base }; acceptance = null; composer = null; replyCalls = 0; draftText = ''; pageChecks = 0; liveRead = false; observeChanges = false; changesReads = 0; readFailure = null; readHold = null; changesRead = null; issueReads = 0; notices.clear(); browser.sessionStorage.clear() })
 afterEach(async () => { if (root) { await act(async () => root!.unmount()); root = null; container.remove() } })
 after(() => browser.close())
 const render = (props: Partial<Parameters<typeof IssueThreadPanel>[0]> = {}) => renderToStaticMarkup(<IntlProvider locale="en" timeZone="UTC" messages={messages}>
@@ -126,6 +128,22 @@ async function failRead(error: unknown) {
   readFailure = error
   await act(async () => { await refreshRead().catch(() => {}) })
 }
+
+test('an opened thread reads changes once alongside detail and refreshes when its status becomes known or changes', async () => {
+  observeChanges = true
+  let resolveDetail!: () => void
+  readHold = new Promise(resolve => { resolveDetail = resolve })
+  await renderLive('owner:workspace', { bare: false })
+  assert.equal(changesReads, 1, 'start one diff read in parallel with a slow detail read')
+  await act(async () => { resolveDetail(); await readHold })
+  readHold = null
+  assert.equal(changesReads, 2, 'the known status may include a checkpoint committed after the first read')
+  thread = { ...base, status: 'running' }
+  await act(async () => { await refreshRead() })
+  assert.equal(changesReads, 3)
+  await act(async () => { await refreshRead() })
+  assert.equal(changesReads, 3, 'an unchanged status is already current')
+})
 
 test('a background thread read failure preserves transcript, scroll, composer focus and unsent draft', async () => {
   await renderLive()

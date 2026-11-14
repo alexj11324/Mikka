@@ -270,14 +270,18 @@ export async function sendToRun(userId: string, input: { runId: string; text: st
 }
 
 export async function stopRun(userId: string, runId: string) {
-  const [run] = await db.select({ id: agentRuns.id }).from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId))).limit(1)
-  if (!run) return { error: 'runNotFound' }
   return attempt(async () => ({ stopRequested: true, ...(await requestRunStop(userId, runId)) }))
 }
 
 /** A page of the run's event stream, by sequence number. */
 export async function getRunEvents(userId: string, input: { runId: string; after?: number; limit?: number }) {
-  const [run] = await db.select({ id: agentRuns.id, status: agentRuns.status }).from(agentRuns).where(and(eq(agentRuns.id, input.runId), eq(agentRuns.userId, userId))).limit(1)
+  if (!taskReaderScope(userId).workspaceId) throw new ActionFailureError('workspaceAccessDenied')
+  const { runVisibilityPredicate } = await import('@/lib/agent-runs')
+  const visible = await runVisibilityPredicate(userId)
+  // Run metadata may be shared with a teammate. Raw events are owner-only.
+  const [run] = await db.select({ id: agentRuns.id, status: agentRuns.status }).from(agentRuns)
+    .leftJoin(issues, eq(issues.id, agentRuns.issueId))
+    .where(and(eq(agentRuns.id, input.runId), eq(agentRuns.userId, userId), visible)).limit(1)
   if (!run) return null
   const limit = input.limit ?? 50
   const rows = await db.select({ seq: runChunks.seq, chunk: runChunks.chunk, createdAt: runChunks.createdAt }).from(runChunks)

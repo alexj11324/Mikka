@@ -14,6 +14,19 @@ export const taskRunKeys = {
   list: (ownerId: string) => ['task-runs', ownerId] as const,
 }
 
+export const taskPresentationKeys = {
+  collection: (viewer: string, workspace: string, ids: readonly string[]) => ['task-presentations', viewer, workspace, ids] as const,
+  cards: (viewer: string, workspace: string, ids: readonly string[]) => ['task-cards', viewer, workspace, ids] as const,
+  selected: (viewer: string, workspace: string, id: string) => ['selected-task-presentation', viewer, workspace, id] as const,
+}
+
+/** Revalidate mounted authorized readers of the changed Task, including a deep link outside the list. */
+export function isTaskPresentationKey(key: unknown, viewer: string, workspace: string | null, id: string) {
+  if (!workspace || !Array.isArray(key) || key[1] !== viewer || key[2] !== workspace) return false
+  if (key[0] === 'selected-task-presentation') return key[3] === id
+  return (key[0] === 'task-presentations' || key[0] === 'task-cards') && Array.isArray(key[3]) && key[3].includes(id)
+}
+
 export const issueKeys = {
   list: (ownerId: string, workspaceId: string) => ['issues', ownerId, workspaceId] as const,
   detail: (id: string) => ['issue', id] as const,

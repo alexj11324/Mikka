@@ -80,5 +80,5 @@ export async function guardFactoryClaim(tx: PoolClient,userId:string,deviceId:st
   if (!factoryLifecycleEnabled()) return {};
   const identity=await factoryClaimTask(tx,runId);
   if (!identity) return {};
-  return factoryRuntimeForBot(identity.botId).claim(tx,userId,deviceId,runId,leaseExpiresAt);
+  return factoryRuntimeForBot(identity.botId).claim(tx,userId,deviceId,runId,leaseExpiresAt,identity.id);
 }

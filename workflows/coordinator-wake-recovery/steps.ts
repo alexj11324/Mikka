@@ -7,7 +7,6 @@ export async function recoverWakeDeadlineStep(ticket: WakeDeadlineTicket) {
     const { recoverWakeDeadline } = await import('@/lib/coordinator/wake')
     return await recoverWakeDeadline(ticket)
   } catch {
-    // A replay rechecks exact database versions. It never reuses a prior claim.
     // error-cause: the Workflow event log would persist raw database/transport text.
     throw new RetryableError('coordinator_wake_deadline_unavailable', { retryAfter: '1m' })
   }

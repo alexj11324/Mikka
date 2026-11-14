@@ -28,6 +28,7 @@
     "./run-transcript": "./src/run-transcript.ts",
     "./capture": "./src/capture.ts",
     "./run": "./src/run.ts",
+    "./run-state": "./src/run-state.ts",
     "./skill": "./src/skill.ts",
     "./skill-presets": "./src/skill-presets/index.ts",
     "./version": "./src/version.ts",

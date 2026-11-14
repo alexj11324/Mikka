@@ -289,6 +289,9 @@ importers:
       file-type:
         specifier: ^22.3.0
         version: 22.3.0
+      free-email-domains:
+        specifier: 1.16.2
+        version: 1.16.2
       h3:
         specifier: 2.0.8
         version: 2.0.8(crossws@0.4.17(srvx@1.0.8))(ocache@0.3.1)
@@ -8029,6 +8032,10 @@ packages:
         optional: true
       react-dom:
         optional: true
+
+  free-email-domains@1.16.2:
+    resolution: {integrity: sha512-yZppIYWyiXWvRmdEpO5ez5MdeUQD5Ixb4hbZPFTtITTPhef/fDqhKg42rzogI1kPMx/6zUpXtG1ozBezQaYQlg==}
+    engines: {node: '>= 18'}
 
   fresh@0.5.2:
     resolution: {integrity: sha512-zJ2mQYM18rEFOudeV4GShTGIQ7RbzA7ozbU9I/XBpm7kqgMywgmylMwXHxZJmkVoYkna9d2pVXVXPdYTP9ej8Q==}
@@ -20991,6 +20998,8 @@ snapshots:
     optionalDependencies:
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
+
+  free-email-domains@1.16.2: {}
 
   fresh@0.5.2: {}
 

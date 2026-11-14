@@ -75,8 +75,15 @@ export function dependencyTestCommand(spec, scripts) {
 }
 export function main(runTests = false, reportDatabase = false) {
   const event = process.env.GITHUB_EVENT_PATH ? JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')) : {}
-  const base = event.pull_request?.base?.sha || event.merge_group?.base_sha ||
+  let base = event.pull_request?.base?.sha || event.merge_group?.base_sha ||
     (typeof event.before === 'string' && !/^0+$/.test(event.before) && event.before) || 'HEAD^1'
+  // The event base can lag behind the authenticated merge tree being tested.
+  if (process.env.GITHUB_EVENT_NAME === 'pull_request' && process.env.GITHUB_REF === `refs/pull/${event.number}/merge`) {
+    const parents = git('rev-list', '--parents', '-n', '1', 'HEAD').trim().split(/\s+/)
+    if (parents.length === 3 && parents[0] === process.env.GITHUB_SHA && parents[2] === event.pull_request?.head?.sha) {
+      base = parents[1]
+    }
+  }
   git('rev-parse', '--verify', base + '^{commit}')
   const declarations = JSON.parse(readFileSync(requirements, 'utf8'))
   const isTest = file => /^(?:scripts|tests|apps|packages|lib|app|hooks|cloudflare|services|components)\/[\w./-]+$/.test(file) &&

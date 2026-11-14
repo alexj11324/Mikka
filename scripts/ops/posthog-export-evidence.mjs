@@ -18,6 +18,7 @@ import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { pathToFileURL } from 'node:url'
+import { EvidenceError as ExportEvidenceError, publicEvidenceError, readEvidenceBody } from './posthog-evidence-response.mjs'
 
 export const POSTHOG_ORIGIN = 'https://us.posthog.com'
 export const PROJECT_ID = 670821
@@ -36,15 +37,6 @@ Fixed target: PostHog US project 670821; image/png only.
 Output: production-run-observability-report/posthog-<type>-<id>.png and .receipt.json.
 Creates one native export; it never creates a dashboard/insight or retries POST.
 `
-
-class ExportEvidenceError extends Error {
-  constructor(code, { phase = 'input', httpStatus, cause } = {}) {
-    super(code, { cause })
-    this.code = code
-    this.phase = phase
-    this.httpStatus = httpStatus
-  }
-}
 
 function validId(value) {
   return Number.isSafeInteger(value) && value > 0
@@ -71,29 +63,6 @@ export function parseArguments(args) {
   if (values.has('--dashboard') === values.has('--insight')) throw new ExportEvidenceError('invalid_arguments')
   const type = values.has('--dashboard') ? 'dashboard' : 'insight'
   return validateOptions({ type, id: values.get(`--${type}`), timeoutMs: values.get('--timeout-ms') })
-}
-
-function publicError(error) {
-  // Never serialize a raw exception, cause, response, Location, or stack.
-  if (!(error instanceof ExportEvidenceError)) return { code: 'unexpected_error', phase: 'write' }
-  return { code: error.code, phase: error.phase, ...(error.httpStatus ? { http_status: error.httpStatus } : {}) }
-}
-
-async function readBounded(response, limit, phase) {
-  if (Number(response.headers.get('content-length')) > limit)
-    throw new ExportEvidenceError('response_too_large', { phase })
-  const reader = response.body?.getReader()
-  if (!reader) throw new ExportEvidenceError('empty_response', { phase })
-  const chunks = []
-  let length = 0
-  for (;;) {
-    const { value, done } = await reader.read()
-    if (done) break
-    length += value.byteLength
-    if (length > limit) throw new ExportEvidenceError('response_too_large', { phase })
-    chunks.push(value)
-  }
-  return Buffer.concat(chunks, length)
 }
 
 function validateAsset(asset, target, phase, expectedExportId) {
@@ -183,7 +152,7 @@ export async function exportEvidence(options, {
           if (!response.ok) throw new ExportEvidenceError('http_error', { phase, httpStatus: response.status })
           if (phase === 'download' && response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'image/png')
             throw new ExportEvidenceError('unexpected_content_type', { phase })
-          const bytes = await readBounded(response, phase === 'download' ? IMAGE_LIMIT : JSON_LIMIT, phase)
+          const bytes = await readEvidenceBody(response, phase === 'download' ? IMAGE_LIMIT : JSON_LIMIT, phase)
           if (phase === 'download') return bytes
           try { return JSON.parse(bytes.toString('utf8')) }
           catch (cause) { throw new ExportEvidenceError('invalid_json', { phase, cause }) }
@@ -234,7 +203,7 @@ export async function exportEvidence(options, {
     const error = cause instanceof ExportEvidenceError ? cause : new ExportEvidenceError('write_failed', { phase: 'write', cause })
     // Failure receipts deliberately exclude response/exception/filename/context.
     // A failed run never attests to an older PNG that may already exist.
-    try { await atomicWrite(receiptPath, `${JSON.stringify({ ...baseReceipt(), status: 'failed', error: publicError(error) }, null, 2)}\n`) }
+    try { await atomicWrite(receiptPath, `${JSON.stringify({ ...baseReceipt(), status: 'failed', error: publicEvidenceError(error) }, null, 2)}\n`) }
     catch (writeCause) { throw new ExportEvidenceError('receipt_write_failed', { phase: 'write', cause: writeCause }) }
     throw error
   }
@@ -248,7 +217,7 @@ export async function main(args = process.argv.slice(2), { env = process.env, st
     stdout.write(`${JSON.stringify(receipt)}\n`)
     return 0
   } catch (error) {
-    stderr.write(`${JSON.stringify({ status: 'failed', error: publicError(error) })}\n`)
+    stderr.write(`${JSON.stringify({ status: 'failed', error: publicEvidenceError(error) })}\n`)
     return 1
   }
 }

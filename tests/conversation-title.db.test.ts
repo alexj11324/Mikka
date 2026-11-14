@@ -6,9 +6,6 @@ import { readFile, readdir } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { orderMigrations } from '../scripts/migration-order.mjs'
 import { dropTestDatabase } from './support/drop-test-database'
-import { conversationDirectory } from '../lib/conversation-directory'
-import { conversationOrganization } from '../lib/conversation-organization'
-import { nameConversation, renameConversationTitle } from '../lib/conversation-title-server'
 
 const base = process.env.E2E_DATABASE_URL
 const required = process.env.REQUIRE_DB === '1' || (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true')
@@ -28,7 +25,16 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
   await adminPool.query(`CREATE DATABASE ${name} TEMPLATE template0`)
   const target = new URL(admin.toString()); target.pathname = `/${name}`; guarded(target.toString())
   const pool = new Pool({ connectionString: target.toString(), max: 2 })
+  const before = { app: process.env.MIKKA_DATABASE_URL, workspace: process.env.DATABASE_URL }
+  process.env.MIKKA_DATABASE_URL = target.toString()
+  process.env.DATABASE_URL = target.toString()
+  let appPool: Pool | undefined, workspacePool: Pool | undefined
   try {
+    appPool = (await import('../lib/db')).pool
+    workspacePool = (await import('../lib/workspace-db')).workspacePool
+    const { nameConversation, renameConversationTitle } = await import('../lib/conversation-title-server')
+    const { conversationOrganization } = await import('../lib/conversation-organization')
+    const { conversationDirectory } = await import('../lib/conversation-directory')
     const dir = new URL('../drizzle/', import.meta.url)
     for (const f of orderMigrations((await readdir(dir)).filter(f => f.endsWith('.sql')))) await pool.query(await readFile(new URL(f, dir), 'utf8'))
     await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','O','o@example.invalid',true,now(),now()),('other','X','x@example.invalid',true,now(),now())`)
@@ -129,6 +135,7 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     }
     assert.deepEqual(await organize(third, 'archived', false), { archived: false, pinned: true })
     assert.deepEqual(await organize(second, 'pinned', false), { archived: false, pinned: false })
+    assert.equal(await renameConversationTitle(pool, first, 'owner', 'wrong workspace', randomUUID()), null)
 
     const unlinked = await run({ prompt: 'Needle question' })
     await pool.query(`UPDATE agent_runs SET "issueId"=NULL, "createdAt"=now()-interval '60 days' WHERE id=$1`, [unlinked])
@@ -158,8 +165,17 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     assert.equal(await nameConversation(pool, revoked, 'owner', 'created', async () => {
       assert.fail('revoked workspace must not invoke the model')
     }), null)
+    assert.equal(await renameConversationTitle(pool, revoked, 'owner', 'No access', workspaceId), null)
     assert.deepEqual(await stored(revoked), { title: null, titleSource: null })
+    assert.equal(await conversationOrganization(pool, 'owner', workspaceId, first), null)
+    assert.equal(await organize(first, 'pinned', true), null, 'a suspended owner cannot organize a conversation')
+    assert.equal((await pool.query('SELECT "conversationPinnedAt" FROM agent_runs WHERE id=$1', [first])).rows[0].conversationPinnedAt, null)
   } finally {
+    for (const [key, value] of [['MIKKA_DATABASE_URL',before.app], ['DATABASE_URL',before.workspace]] as const) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+    await Promise.all([appPool?.end(), workspacePool?.end()])
     await dropTestDatabase(adminPool, name, pool)
     await adminPool.end()
   }

@@ -18,10 +18,13 @@ export async function factoryClaimTask(tx: PoolClient, runId: string) {
 }
 export function createFactoryClaim(store: ReturnType<typeof createFactoryStore>, questions: Pick<ReturnType<typeof createFactoryQuestions>,'claimContinuation'>,
   validateCheck?: (tx: PoolClient, task: FactoryTask, runId: string)=>Promise<Record<string,unknown>>) {
-  return async (tx: PoolClient,userId:string,deviceId:string,runId:string,leaseExpiresAt:string):Promise<Record<string,unknown>> => {
-    const identity=await factoryClaimTask(tx,runId);
-    if(!identity) return {};
-    const task=await store.lockTask(tx,userId,identity.id);
+  return async (
+    tx: PoolClient, userId: string, deviceId: string, runId: string, leaseExpiresAt: string,
+    routedTaskId?: string,
+  ): Promise<Record<string, unknown>> => {
+    const taskId = routedTaskId ?? (await factoryClaimTask(tx, runId))?.id;
+    if (!taskId) return {};
+    const task = await store.lockTask(tx, userId, taskId);
     const {rows:[attempt]}=await tx.query('SELECT * FROM factory_attempts WHERE id=$1 AND "taskId"=$2',[task.attemptId,task.id]);
     if(task.status!=='running'||!attempt||attempt.status!=='running'||attempt.runId!==runId||attempt.candidateId!==task.candidateId) throw new FactoryError('factoryClaimStale');
     const {rows:[run]}=await tx.query('SELECT * FROM agent_runs WHERE id=$1 FOR UPDATE',[runId]);

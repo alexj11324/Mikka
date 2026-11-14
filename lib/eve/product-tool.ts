@@ -13,6 +13,11 @@ export function createProductTool(scope:EveScope,binding:Binding,definition:Prod
   const approval:ApprovalConfiguration<unknown> = {
     async request(ctx) {
       if (ctx.session.id !== binding.sessionId || ctx.session.turn.id !== binding.turnId || !isEveApprovalResponder(scope,ctx.session.auth.current)) return 'denied'
+      // Older catalogues omit this hint. The gateway still enforces current policy at execution.
+      if (definition.needsApprovalReview === false) {
+        ctx.abortSignal?.throwIfAborted()
+        return 'not-applicable'
+      }
       const review = await rpc<ApprovalReview>(scope,{...binding,operation:'approval',name:definition.name,input:ctx.toolInput,callId:ctx.callId},ctx.abortSignal)
       return ['not-applicable','denied','user-approval'].includes(review.status) ? review.status : 'denied'
     },

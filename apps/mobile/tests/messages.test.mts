@@ -28,3 +28,27 @@ test('Chinese device variants preserve Chinese navigation and task copy', () => 
 test('other device languages use the available English core copy', () => {
   assert.equal(getMobileMessages('fr-FR').Nav.tasks, 'Tasks')
 })
+
+test('notification read errors identify settings in the same device language as the retry action', () => {
+  for (const [locale, title, failure, retry] of [
+    ['en-US', 'Notifications', 'Unable to load Settings.', 'Retry save'],
+    ['zh-CN', '通知', '设置加载失败。', '重试保存'],
+  ]) {
+    const messages = getMobileMessages(locale)
+    assert.equal(messages.Settings.sections.notifications.title, title)
+    assert.equal(messages.MobileCore.readFailed.replace('{label}', messages.Settings.title), failure)
+    assert.equal(messages.MobileCore.notifications.retrySave, retry)
+  }
+})
+
+test('legacy thread links, their read failures and the composer share the device language', () => {
+  for (const [locale, input, readError, lastStatus] of [
+    ['en-US', 'Message this thread', 'Unable to load Thread.', 'Last status: Done'],
+    ['zh-CN', '给这个线程发消息', '线程加载失败。', '上次状态：完成'],
+  ]) {
+    const copy = getMobileMessages(locale)
+    assert.equal(copy.MobileCore.messageThread, input)
+    assert.equal(copy.MobileCore.readFailed.replace('{label}', copy.IssueThreads.hidden), readError)
+    assert.equal(copy.MobileCore.lastThreadStatus.replace('{status}', copy.MobileCore.attempts.done), lastStatus)
+  }
+})

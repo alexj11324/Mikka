@@ -1,20 +1,20 @@
 import { modelMessage } from '@/lib/coordinator/message-safety'
 import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
-import { and, desc, eq, gt, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, inArray, or, sql } from 'drizzle-orm'
 import { chatBotId } from '@/lib/coordinator/coordinator-bot'
 import type { ModelMessage } from 'ai'
-import { readRun, visibleRuns } from '@/lib/agent-runs'
+import * as runs from '@/lib/agent-runs'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { peerCoordinatorMessageEvent } from '@/lib/coordinator-events'
-import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
+import { coordinatorEnabled } from '@/lib/coordinator/wake'
 import { db, pool } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
 import { coordinatorSessionScope } from '@/lib/live/coordinator-session'
 import { subscribeToCoordinatorReplies } from './reply-live'
 import { waitForReply } from './reply-wait'
 import { logReplyCompletion } from './reply-completion'
-import { coordinatorMessages, coordinatorSessions, issueMembers, issues } from '@/lib/db/schema'
+import { coordinatorMessages, coordinatorSessions, issues } from '@/lib/db/schema'
 import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { issueView, taskIdentifiers } from '@/lib/task-identifier-server'
@@ -28,15 +28,16 @@ import { ActionFailureError } from '@/lib/action-error'
 // own tools (workflows/coordinator/steps.ts) read the same tables.
 
 /** MCP chat operations use the same verified tenant as its task tools. */
-const coordinatorChat = (userId: string) => {
+const mcpChatWorkspace = (userId: string) => {
   const workspaceId = taskReaderScope(userId).workspaceId
   if (!workspaceId) throw new ActionFailureError('workspaceAccessDenied')
-  return chatBotId(userId, null, workspaceId)
+  return workspaceId
 }
+const coordinatorChat = (userId: string) => chatBotId(userId, null, mcpChatWorkspace(userId))
 
-async function lastPosition(userId: string): Promise<number> {
+async function lastPosition(userId: string, botId: string): Promise<number> {
   const [row] = await db.select({ last: sql<number>`coalesce(max(${coordinatorMessages.position}), 0)` })
-    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, await coordinatorChat(userId))))
+    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, botId)))
   return Number(row?.last ?? 0)
 }
 
@@ -47,9 +48,8 @@ async function lastPosition(userId: string): Promise<number> {
  */
 export async function sendToCoordinator(userId: string, text: string) {
   const botId = await coordinatorChat(userId)
-  const after = await lastPosition(userId)
+  const after = await lastPosition(userId, botId)
   await recordCoordinatorEvent(db, peerCoordinatorMessageEvent(userId, botId, text))
-  await wakeCoordinator(userId)
   return { queued: true, coordinatorRunning: await coordinatorEnabled(userId, botId), after }
 }
 
@@ -112,34 +112,39 @@ export async function readCoordinatorMessages(userId: string, input: { after?: n
   const limit = input.limit ?? 20
   const started = new Date()
   const deadline = started.getTime() + (input.waitSeconds ?? 0) * 1000
-  const botId = await coordinatorChat(userId)
-  const scope = await coordinatorSessionScope(pool, workspacePool, userId, botId)
-  if (!scope) throw new Error('workspaceAccessDenied')
+  const workspaceId = mcpChatWorkspace(userId)
+  const botId = await chatBotId(userId, null, workspaceId)
   return waitForReply<CoordinatorReply>(async final => {
-    // A channel key never authorizes the data read. Recheck the persisted scope,
-    // including on a deadline or lost-notification reconciliation.
+    // Neither a channel key nor the authenticated request's tenant pin proves
+    // current access. Recheck the persisted Bot and Workspace on every read.
     const current = await coordinatorSessionScope(pool, workspacePool, userId, botId)
-    if (!current || current.workspaceId !== scope.workspaceId) throw new Error('workspaceAccessDenied')
+    if (!current || current.workspaceId !== workspaceId) throw new Error('workspaceAccessDenied')
     const turn = await turnState(userId, botId)
     const failed = Boolean(turn.errorAt && turn.errorAt >= started)
     if (!final && !failed && !await hasAssistantAfter(userId, botId, after)) return { done: false }
     const messages = await messagesAfter(userId, botId, after, limit)
     const replied = messages.some(message => message.role === 'assistant')
     return { done: true, value: { messages, replied, last: messages.at(-1)?.position ?? after, working: turn.working, lastError: turn.error, coordinatorRunning: await coordinatorEnabled(userId, botId) } }
-  }, { deadline, signal, subscribe: (changed, abort) => subscribeToCoordinatorReplies(scope, botId, changed, abort),
+  }, { deadline, signal, subscribe: async (changed, abort) => {
+    const scope = await coordinatorSessionScope(pool, workspacePool, userId, botId)
+    if (!scope || scope.workspaceId !== workspaceId) throw new Error('workspaceAccessDenied')
+    return subscribeToCoordinatorReplies(scope, botId, changed, abort)
+  },
     onComplete: completion => logReplyCompletion(botId, completion),
   })
 }
 
 export async function listIssues(userId: string, input: { status?: string }) {
   if (!taskReaderScope(userId).workspaceId) throw new ActionFailureError('workspaceAccessDenied')
-  const rows = await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent, updatedAt: issues.updatedAt })
-    .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-    .where(and((await issueVisibility(userId)).predicate, input.status ? eq(issues.status, input.status) : undefined))
+  const visibility = await issueVisibility(userId, false, undefined, db, { withTeamLinks: false })
+  const rows = await db.select({ id: issues.id, ownerId: issues.userId, scope: issues.scope, issuedIdentifier: issues.issuedIdentifier,
+    title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent, updatedAt: issues.updatedAt })
+    .from(issues)
+    .where(and(visibility.predicate, input.status ? eq(issues.status, input.status) : undefined))
     .orderBy(desc(issues.updatedAt)).limit(100)
   const page = rows.filter(row => !readIssueMetadata(row.content).deletedAt).slice(0, 50)
   const identifiers = await taskIdentifiers(page)
-  return page.map(({ content, updatedAt, ownerId: _ownerId, scope: _scope, ...row }) => ({
+  return page.map(({ content, updatedAt, ownerId: _ownerId, scope: _scope, issuedIdentifier: _issued, ...row }) => ({
     ...row, identifier: identifiers.get(row.id) ?? null, number: readIssueMetadata(content).number ?? null, updatedAt: updatedAt.toISOString(),
   }))
 }
@@ -148,14 +153,23 @@ export async function getIssue(userId: string, issueId: string) {
   if (!taskReaderScope(userId).workspaceId) throw new ActionFailureError('workspaceAccessDenied')
   const issue = await issueForUser(userId, issueId)
   if (!issue) return null
-  const runs = await visibleRuns(userId, { issueId: issue.id, limit: 5 })
+  const recentRuns = await runs.visibleRunStates(userId, { issueId: issue.id, limit: 5 })
   const view = await issueView(issue)
   const metadata = view.metadata
-  // Children and the issues this one blocks point at it, so they are found by looking the other way.
-  const siblings = await db.select({ id: issues.id, title: issues.title, status: issues.status, content: issueAttrsContent }).from(issues)
-    .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-    .where(and(eq(issues.userId, issue.userId), (await issueVisibility(userId, false, issue.workspaceId!)).predicate))
-  const linked = new Map(siblings.filter(row => !readIssueMetadata(row.content).deletedAt).map(row => [row.id, { id: row.id, title: row.title, status: row.status, parentId: readIssueMetadata(row.content).parentId, blockedByIds: readIssueMetadata(row.content).blockedByIds }]))
+  const direct = [metadata.parentId, metadata.duplicateOfId, ...metadata.blockedByIds, ...metadata.relatedIds]
+    .filter((id): id is string => id !== null)
+  const attrs = sql`coalesce(nullif(${issues.content}->'attrs'->'mikka', 'null'::jsonb), ${issues.content}->'attrs'->'orvilo')`
+  const visibility = await issueVisibility(userId, false, issue.workspaceId!, db, { withTeamLinks: false })
+  const candidates = await db.select({ id: issues.id, title: issues.title, status: issues.status, content: issueAttrsContent }).from(issues)
+    .where(and(eq(issues.userId, issue.userId), visibility.predicate, or(
+      inArray(issues.id, direct),
+      sql`${attrs}->>'parentId' = ${issue.id}`,
+      sql`${attrs}->'blockedByIds' @> ${JSON.stringify([issue.id])}::jsonb`,
+    )))
+  const linked = new Map(candidates.flatMap(row => {
+    const { deletedAt, parentId, blockedByIds } = readIssueMetadata(row.content)
+    return deletedAt ? [] : [[row.id, { id: row.id, title: row.title, status: row.status, parentId, blockedByIds }] as const]
+  }))
   const pick = (ids: (string | null)[]) => ids.flatMap(id => {
     const row = id ? linked.get(id) : undefined
     return row ? [{ id: row.id, title: row.title, status: row.status }] : []
@@ -170,24 +184,24 @@ export async function getIssue(userId: string, issueId: string) {
       children: pick([...linked.values()].filter(row => row.parentId === issue.id).map(row => row.id)),
       blockedBy: pick(metadata.blockedByIds), blocks: pick([...linked.values()].filter(row => row.blockedByIds.includes(issue.id)).map(row => row.id)), related: pick(metadata.relatedIds), duplicateOf: pick([metadata.duplicateOfId])[0] ?? null,
     },
-    runs: runs.map(run => ({ id: run.id, agent: run.agentName, status: run.status, createdAt: run.createdAt.toISOString() })),
+    runs: recentRuns.map(run => ({ id: run.id, agent: run.agentName, status: run.status, createdAt: run.createdAt.toISOString() })),
   }
 }
 
 export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }) {
-  const rows = await visibleRuns(userId, input)
+  const rows = await runs.visibleRunStates(userId, input)
   return rows.map(run => ({ id: run.id, issueId: run.issueId, agent: run.agentName, status: run.status, stopReason: run.stopReason, createdAt: run.createdAt.toISOString() }))
 }
 
 export async function getRun(userId: string, runId: string) {
-  const detail = await readRun(userId, runId)
+  const detail = await runs.readRun(userId, runId, 'latest-events')
   if (!detail) return null
   const { run } = detail
   return {
     id: run.id, issueId: run.issueId, agent: run.agentName, harness: run.harness, status: run.status,
     stopReason: run.stopReason, error: run.error, summary: (run.report as { summary?: string } | null)?.summary ?? null,
     startedAt: run.startedAt?.toISOString() ?? null, finishedAt: run.finishedAt?.toISOString() ?? null,
-    recentEvents: detail.chunks.slice(-5).map(chunk => JSON.stringify(chunk).slice(0, 1000)),
+    recentEvents: detail.chunks.map(chunk => JSON.stringify(chunk).slice(0, 1000)),
     ...(detail.decisionWarnings?.length ? { decisionWarnings: detail.decisionWarnings } : {}),
   }
 }

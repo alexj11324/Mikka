@@ -34,6 +34,7 @@ function fixture(change = {}) {
     assert.equal(options.redirect, 'error')
     assert.equal(options.cache, 'no-store')
     if (u.origin === 'https://api.github.com') {
+      if (change.observation && u.pathname.includes('/actions/runs/99/attempts/1')) return Response.json(u.pathname.endsWith('/jobs') ? change.observation.jobs : change.observation.run)
       assert.equal(options.headers.authorization, 'Bearer test')
       if (u.pathname.includes('/compare/')) {
         const path = '/repos/' + repo + '/compare/' + env.GITHUB_SHA + '...' + product
@@ -163,5 +164,29 @@ test('read-only monitor witness rechecks an older actual promotion without autho
     {shell:'<script src="/unrelated.js"></script>'},{approval:{decision:'rejected'}},
     {approval:{until:iso(-10000)}},{post:{author_association:'MEMBER'}}]){
     await assert.rejects(fixture(changed).observe())
+  }
+})
+
+test('Desktop and E2B accept only an original successful protected serving observation and the currently served pins', async () => {
+  const repository = { id:1427517699, full_name:repo, fork:false }
+  const actor = { id:183887963 }
+  const run = { repository, head_repository:repository, path:'.github/workflows/cloudflare-app-deploy.yml', head_branch:'main',
+    head_sha:product, id:99, run_attempt:1, event:'workflow_dispatch', status:'completed', conclusion:'success', actor, triggering_actor:actor }
+  const gate = { status:'completed', conclusion:'success', head_sha:product, run_id:99, run_attempt:1, completed_at:iso(0) }
+  const jobs = { total_count:2, jobs:[{...gate,name:'deploy-application'}, {...gate,name:'Serving release '+[product,overlay,releasePin,'e'.repeat(64)].join(' ')}] }
+  const observation = {run,jobs}, env = {CLOUDFLARE_RECEIPT:'actions:99:1'}, consumer = {actor,triggering_actor:actor}
+  const f = fixture({observation,env,run:consumer})
+  assert.deepEqual(await f.verify(),{product,releasePin})
+  assert.equal((await f.observe()).verifiedAt,iso(0))
+  assert.ok(!f.calls.some(path=>path.includes('/issues/')||path==='/dns-query'))
+  assert.deepEqual(await fixture({observation,env,run:{...consumer,path:'.github/workflows/desktop-release.yml'}}).desktop(),{product,overlay,releasePin})
+  for (const change of [{observation:{...observation,run:{...run,conclusion:'failure'}}},
+    {observation:{...observation,run:{...run,triggering_actor:{id:1}}}},
+    {observation:{...observation,jobs:{total_count:2,jobs:[jobs.jobs[0],{...jobs.jobs[1],run_attempt:2}]}}},
+    {observation:{...observation,jobs:{total_count:2,jobs:[jobs.jobs[0],{...jobs.jobs[1],name:'Prepared release'}]}}},
+    {observation:{...observation,jobs:{total_count:1,jobs:[jobs.jobs[1]]}}},
+    {headers:{'x-mikka-gateway-version-sha256':'1'.repeat(64)}}, {version:{overlaySha:'1'.repeat(40)}},
+    {run:{...consumer,actor:{id:1}}}, {main:'a'.repeat(40)}]) {
+    await assert.rejects(fixture({observation,env,run:consumer,...change}).verify())
   }
 })

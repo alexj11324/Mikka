@@ -1,9 +1,5 @@
 import postcss from 'postcss'
-import tailwind from '@tailwindcss/postcss'
 import ts from 'typescript'
-import { loadBindings } from 'next/dist/build/swc/index.js'
-import webBrowserTargets from 'next/dist/shared/lib/modern-browserslist-target.js'
-import { getTargets } from 'next/dist/build/webpack/loaders/lightningcss-loader/src/utils.js'
 import { readFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -82,31 +78,6 @@ export function applicationBoundary(actions) {
           loader: 'js',
           resolveDir: repository,
         }
-      })
-    },
-  }
-}
-
-export async function compileSharedStyles(css, filename) {
-  const result = await postcss([tailwind({ base: repository, optimize: true })]).process(css, { from: filename })
-  // The web applies its Lightning CSS pass after Tailwind. Keeping explicit
-  // zero-hue oklch() neutrals changes color-mix() in Chromium (soft blue becomes
-  // pink), so use the same build-only engine and browser targets here as well.
-  const { css: { lightning } } = await loadBindings()
-  const transformed = lightning.transform({
-    filename, code: Buffer.from(result.css), minify: true,
-    targets: getTargets({ key: 'mikka-desktop-shared-css', targets: webBrowserTargets }),
-  })
-  return Buffer.from(transformed.code).toString()
-}
-
-export function sharedStyles() {
-  return {
-    name: 'mikka-shared-tailwind',
-    setup(builder) {
-      builder.onLoad({ filter: /[\\/]app[\\/]globals\.css$/ }, async args => {
-        const css = await readFile(args.path, 'utf8')
-        return { contents: await compileSharedStyles(css, args.path), loader: 'css', resolveDir: dirname(args.path) }
       })
     },
   }

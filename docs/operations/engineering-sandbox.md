@@ -1,8 +1,6 @@
 # Engineering acceptance on Cloudflare
 
-Mikka maintainers submit development and acceptance jobs through the private
-operations repository. Its protected workflow supplies the identity trusted by
-the company Worker. Open the [private operations entry](https://github.com/alexj11324/mikka-cloud/blob/main/AGENTS.md).
+Hosted engineering acceptance requires a runner enrolled for the workflow's repository and an active Worker endpoint. The old private dispatch was retired when public Mikka took ownership of product builds. For hosted enrollment and verified release receipts, see the [private engineering runbook](https://github.com/alexj11324/mikka-cloud/blob/main/docs/operations/engineering-sandbox.md) and [issue #1948](https://github.com/alexj11324/Mikka/issues/1948).
 
 For a self-hosted runner, dispatch `Cloudflare engineering sandbox` on the main
 branch of the repository configured as `CALLER_REPOSITORY`. Supply the owning
