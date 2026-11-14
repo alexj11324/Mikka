@@ -6,6 +6,7 @@ import { useLiveBotChatList, useLiveGroupList } from '@/hooks/use-live-lists'
 import type { BotView } from '@/app/actions/bots'
 import useSWR, { unstable_serialize } from 'swr'
 import { useLiveKey } from '@/hooks/use-live-key'
+import { pullRequestsState } from '@/lib/directory-pulls'
 import { listConversationSidebar } from '@/app/actions/task-runs'
 import type { Thread } from '@/app/actions/task-runs'
 import type { listIssues } from '@/app/actions/issues'
@@ -58,6 +59,7 @@ export function useChatNav({ bots, workspaceId, active, userId, presentations }:
         ...(row.kind === 'chat' && workspaceId ? {
           conversationTarget: { kind: 'group' as const, id: row.id, title: row.title, workspaceId },
         } : {}),
+        pullState: row.pulls?.length ? pullRequestsState(row.pulls) : undefined,
         status:row.status, state:task?.state ?? null, reason:task?.reason ?? null,
         unread:row.unread,unreadCount:Number(row.unread), activity: row.state === 'waiting' ? 'waiting' as const : row.state === 'working' ? 'working' as const : row.state === 'failed' ? 'error' as const : null,
         runs:row.kind === 'chat' ? [] : [{id:row.id,name:row.title,harness:row.harness}] }
