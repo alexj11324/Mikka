@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useClipboardCopy } from '@/hooks/use-clipboard-copy'
 import { Check, Copy, MoreHorizontal, RefreshCw, TriangleAlert } from 'lucide-react'
 import { useFormatter, useTranslations } from 'next-intl'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
@@ -169,7 +170,8 @@ function SubscriptionRowSkeleton({ provider, label }: { provider: Provider; labe
 /** The rest of a sign-in the browser can't finish for us, inside its provider's row. */
 function SignInPanel({ attempt, callback, pending, onCallback, onFinish, onCancel }: { attempt: Attempt; callback: string; pending: boolean; onCallback: (value: string) => void; onFinish: () => void; onCancel: () => void }) {
   const t = useTranslations('Settings.subscriptions')
-  const [copied, setCopied] = useState(false)
+  const { state: copyState, copy } = useClipboardCopy(attempt.userCode ?? '')
+  const copyText = useTranslations('AiElements.message')
   const name = t(attempt.provider === 'codex' ? 'codexProduct' : 'claudeProduct')
   const cancel = <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={onCancel}>{t('cancel')}</Button>
   const open = <Button variant="secondary" size="sm" nativeButton={false} render={<a href={attempt.authorizationUrl} target="_blank" rel="noopener noreferrer" />}>{t('open', { provider: name })}</Button>
@@ -177,7 +179,8 @@ function SignInPanel({ attempt, callback, pending, onCallback, onFinish, onCance
     <span className="text-xs font-medium">{t('deviceCode')}</span>
     <div className="flex flex-wrap items-center gap-2">
       <span className="font-mono text-xl font-semibold select-all">{attempt.userCode}</span>
-      <Button type="button" variant="ghost" size="icon-sm" aria-label={copied ? t('copied') : t('copy')} onClick={() => { void navigator.clipboard.writeText(attempt.userCode ?? '').then(() => setCopied(true), () => undefined) }}>{copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}</Button>
+      <Button type="button" variant="ghost" size="icon-sm" aria-label={copyState === 'copied' ? t('copied') : t('copy')} disabled={!attempt.userCode || copyState === 'pending'} onClick={copy}>{copyState === 'copied' ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}</Button>
+      {copyState === 'failed' && <span role="alert">{copyText('copyFailed')}</span>}
       <span className="ml-auto flex items-center gap-2">{cancel}{open}</span>
     </div>
   </div>
