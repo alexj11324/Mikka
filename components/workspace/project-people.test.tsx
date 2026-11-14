@@ -42,13 +42,18 @@ test('legacy me is resolved against the stored creator and names never cross wor
 })
 
 test('read-only Project text never mounts a writable heading or rich-text toolbar', () => {
-  function render(field: 'name' | 'description', readOnly: boolean) {
+  function render(field: 'name' | 'description', readOnly: boolean, value = 'Office inventory') {
     return renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
-      <ProjectTextEditor field={field} readOnly={readOnly} value="Office inventory" onSave={async () => false} onRegisterFlush={() => {}} />
+      <ProjectTextEditor field={field} readOnly={readOnly} value={value} onSave={async () => false} onRegisterFlush={() => {}} />
     </NextIntlClientProvider>)
   }
   assert.match(render('name', false), /contentEditable="plaintext-only"/i)
   assert.match(render('name', true), /<h1[^>]*>Office inventory<\/h1>/)
-  assert.doesNotMatch(render('name', true), /contentEditable|role="textbox"/i)
+  const longTitle = 'A'.repeat(170) + '项目归档后显示完整'
+  const heading = render('name', true, longTitle)
+  assert.ok(heading.includes('>' + longTitle + '</h1>'))
+  assert.match(heading, /class="[^"]*\bmax-w-full\b/)
+  assert.match(heading, /class="[^"]*\bwrap-anywhere\b/)
+  assert.doesNotMatch(heading, /contentEditable|role="textbox"/i)
   assert.doesNotMatch(render('description', true), /role="toolbar"|contentEditable="true"/i)
 })
