@@ -1,7 +1,7 @@
-import { splitCitations } from './coordinator/citations'
+import { splitCitations } from './coordinator/citation-parts'
 import { siteSearchQuery } from './site-search'
 
-export type ThreadReference = { kind: 'task' | 'thread' | 'pr'; id: string; title: string }
+export type ThreadReference = { kind: 'task' | 'thread' | 'pr'; id: string; title: string; conversationKind?: 'chat' }
 const pullRequest = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/[1-9]\d*\/?$/
 
 export function mentionAt(text: string, caret: number) {
@@ -11,7 +11,9 @@ export function mentionAt(text: string, caret: number) {
 }
 
 export function referenceMarker(item: ThreadReference) {
-  return item.kind === 'pr' ? item.id : `[[${item.kind === 'task' ? 'issue' : 'run'}:${item.id}]]`
+  if (item.kind === 'pr') return item.id
+  const kind = item.kind === 'task' ? 'issue' : item.conversationKind === 'chat' ? 'chat' : 'run'
+  return `[[${kind}:${item.id}]]`
 }
 
 export function referenceQueryReady(query: string) {
@@ -21,7 +23,8 @@ export function referenceQueryReady(query: string) {
 
 /** A person's other words, UUIDs, and Markdown stay literal. */
 export function personReferenceParts(text: string) {
-  return splitCitations(text).map(part => {
+  return splitCitations(text, true).map(part => {
+    if (part.type === 'chat') return { kind: 'chat' as const, id: part.id }
     if (part.type === 'citation' && part.kind) return { kind: part.kind === 'issue' ? 'task' as const : 'thread' as const, id: part.id }
     if (part.type === 'link' && pullRequest.test(part.url)) return { kind: 'pr' as const, id: part.url }
     return { kind: 'text' as const, text: part.type === 'text' ? part.text : part.raw }

@@ -24,6 +24,9 @@ type QueueRow = {
 
 const isActive = (status?: string) => UNFINISHED_RUN_STATUSES.some(value => value === status)
 
+const queueSupported = `(r."issueId" IS NOT NULL AND r."deviceRepoId" IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM factory_attempts f WHERE f."runId"=r.id AND f.stage IN ('review','verify','monitor')))`
+
 export async function readQueuedReplyReceipt(pool: Pool, userId: string, chain: RunChain, text: string, requestId: string, requestedRunId: string) {
   const id = factoryEventId('thread-queue', JSON.stringify([userId, requestId.toLowerCase()]))
   const { rows: [row] } = await pool.query<QueueRow>('SELECT * FROM thread_queued_messages WHERE id=$1 AND "userId"=$2', [id, userId])
@@ -42,8 +45,9 @@ export async function queueThreadReply(pool: Pool, userId: string, chain: RunCha
       await client.query('BEGIN')
       const dispatchId = factoryEventId('thread-submission', JSON.stringify([userId, requestId.toLowerCase()]))
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))', [dispatchId])
-      const { rows: [run] } = await client.query<{ status: string; workspaceId: string; stopRequestedAt: Date | null; issueId: string | null; deviceRepoId: string | null }>(
-        'SELECT status,"workspaceId","stopRequestedAt","issueId","deviceRepoId" FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [chain.latestRunId, userId])
+      const { rows: [run] } = await client.query<{ status: string; workspaceId: string; stopRequestedAt: Date | null; continuable: boolean }>(
+        `SELECT r.status,r."workspaceId",r."stopRequestedAt",${queueSupported} AS continuable
+          FROM agent_runs r WHERE r.id=$1 AND r."userId"=$2 FOR UPDATE`, [chain.latestRunId, userId])
       if (!run) throw new ActionFailureError('runNotFound')
       // A replay can arrive after the original anchor finished. Match its
       // immutable request first, so it does not start a second execution.
@@ -53,7 +57,7 @@ export async function queueThreadReply(pool: Pool, userId: string, chain: RunCha
         'SELECT * FROM thread_queued_messages WHERE id=$1 AND "userId"=$2', [id, userId])
       if (saved && (saved.rootRunId !== chain.rootRunId || saved.workspaceId !== run.workspaceId || saved.text !== text || saved.requestedRunId !== requestedRunId))
         throw new ActionFailureError('submissionConflict')
-      if (!saved && (!run.issueId || !run.deviceRepoId)) throw new ActionFailureError('threadDeliveryUnavailable')
+      if (!saved && (!run.continuable || requestedRunId !== chain.latestRunId)) throw new ActionFailureError('threadDeliveryUnavailable')
       if (!saved && (!isActive(run.status) || run.stopRequestedAt)) throw new ActionFailureError('threadStopping')
       if (!saved) await client.query(`INSERT INTO thread_queued_messages(id,"userId","workspaceId","rootRunId","runId",text,"requestId","requestedRunId")
         VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, [id, userId, run.workspaceId, chain.rootRunId, chain.latestRunId, text, requestId, requestedRunId])
@@ -71,10 +75,10 @@ export async function threadDeliveryView(pool: Pool, ownerId: string, rootRunId:
   const { rows: [run] } = await pool.query<{ workspaceId: string; status: string; stopRequestedAt: Date | null; harness: string; canSteer: boolean; interrupt: boolean; continuable: boolean }>(
     `SELECT r."workspaceId",r.status,r."stopRequestedAt",coalesce(r."agentDefinition"->>'harness',a.harness) AS harness,
        EXISTS (SELECT 1 FROM devices d WHERE d.id=r."deviceId" AND d."ownerId"=r."userId" AND d.harnesses @> '[{"harness":"codex","installed":true,"activeTurnSteer":true}]'::jsonb) AS "canSteer",
-       (r."issueId" IS NOT NULL AND r."deviceRepoId" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM factory_attempts f WHERE f."runId"=r.id AND f.stage IN ('review','verify','monitor'))) AS continuable,
+       ${queueSupported} AS continuable,
        EXISTS (SELECT 1 FROM factory_tasks t JOIN factory_attempts f ON f.id=t."attemptId" WHERE f."runId"=r.id
          AND t."userId"=r."userId" AND t."workspaceId"=r."workspaceId" AND t."issueId"=r."issueId"
-         AND t.status='running' AND NOT (t.stage='spec' AND coalesce(t.route->'flowVersion','1'::jsonb)='2'::jsonb)) AS interrupt
+         AND t.status='running' AND f.status='running' AND f."taskId"=t.id AND NOT (t.stage='spec' AND coalesce(t.route->'flowVersion','1'::jsonb)='2'::jsonb)) AS interrupt
        FROM agent_runs r JOIN agents a ON a.id=r."agentId" WHERE r.id=$1 AND r."userId"=$2`, [latestRunId, ownerId])
   if (!run?.workspaceId) return { modes: [], queued: [] }
   const modes: import('./thread-delivery').ThreadDeliveryMode[] = []

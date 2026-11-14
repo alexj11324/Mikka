@@ -14,6 +14,9 @@ test('an inline mention replaces only the active word at the caret and keeps unr
   assert.deepEqual(personReferenceParts(`ref ${marker} ${id}`), [
     { kind: 'text', text: 'ref ' }, { kind: 'thread', id }, { kind: 'text', text: ' ' }, { kind: 'text', text: id },
   ])
+  const chat = referenceMarker({ kind: 'thread', conversationKind: 'chat', id, title: 'Independent chat' })
+  assert.equal(chat, `[[chat:${id}]]`)
+  assert.deepEqual(personReferenceParts(`${chat} ${marker}`), [{ kind: 'chat', id }, { kind: 'text', text: ' ' }, { kind: 'thread', id }])
   assert.deepEqual(personReferenceParts('https://github.com/org/repo/pull/2'), [{ kind: 'pr', id: 'https://github.com/org/repo/pull/2' }])
   assert.equal(personReferenceParts('https://github.com.example/org/repo/pull/2')[0].kind, 'text')
 })
@@ -22,7 +25,7 @@ test('reference search scopes tasks, conversation roots, and PRs to the active v
   const { pool } = await import('../lib/db')
   const { searchThreadReferences } = await import('../lib/thread-reference-search')
   const owner = 'mention-' + randomUUID(), other = 'mention-' + randomUUID()
-  const issue = randomUUID(), agent = randomUUID(), run = randomUUID(), url = 'https://github.com/test/mikka/pull/2259'
+  const chat = randomUUID(), issue = randomUUID(), agent = randomUUID(), run = randomUUID(), url = 'https://github.com/test/mikka/pull/2259'
   try {
     for (const user of [owner, other]) await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$1,$2,true,now(),now())', [user, user + '@example.invalid'])
     const workspace = await seedFixtureWorkspace(pool, owner)
@@ -32,6 +35,9 @@ test('reference search scopes tasks, conversation roots, and PRs to the active v
     await pool.query(`INSERT INTO agents(id,"userId",name,harness) VALUES ($1,$2,'Coding','codex')`, [agent, owner])
     await pool.query(`INSERT INTO agent_runs(id,"userId","workspaceId","issueId","agentId",status,prompt,"promptTaskStart","promptTaskLength",title,"titleSource")
       VALUES ($1,$2,$3,$4,$5,'running','Checkout',0,8,'Checkout','manual')`, [run, owner, workspace, issue, agent])
+    await pool.query(`INSERT INTO conversations(id,"workspaceId",kind,title,"createdBy","creationPurpose") VALUES($1,$2,'group','Named citation',$3,'conversation')`, [chat,workspace,owner])
+    await pool.query(`INSERT INTO conversation_members("conversationId","memberId","memberType",role) VALUES($1,$2,'user','owner')`, [chat,owner])
+    assert.deepEqual(await searchThreadReferences(owner, workspace, 'Named citation', 'thread'), [{ kind: 'thread', conversationKind: 'chat', id: chat, title: 'Named citation' }])
     const items = await searchThreadReferences(owner, workspace, 'checkout')
     assert.deepEqual(items.map(item => [item.kind, item.id]), [['task', issue], ['thread', run], ['pr', url]])
     assert.deepEqual((await searchThreadReferences(owner, workspace, '#2259', 'pr')).map(item => item.id), [url])
@@ -40,6 +46,7 @@ test('reference search scopes tasks, conversation roots, and PRs to the active v
     await pool.query(`UPDATE issues SET content=jsonb_set(content,'{attrs,mikka,deletedAt}',to_jsonb(now())) WHERE id=$1`, [issue])
     assert.deepEqual(await searchThreadReferences(owner, workspace, 'checkout'), [])
   } finally {
+    await pool.query('DELETE FROM conversations WHERE id=$1', [chat])
     await pool.query('DELETE FROM agent_runs WHERE id=$1', [run])
     await pool.query('DELETE FROM issues WHERE id=$1', [issue])
     await pool.query('DELETE FROM agents WHERE id=$1', [agent])

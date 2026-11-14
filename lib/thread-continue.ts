@@ -61,6 +61,9 @@ export async function sendThreadMessage(userId: string, runId: string, text: str
       // Resolve an exact prior receipt first; only new work checks the current turn.
       if (active && parsed.data.modelChoice) throw new ActionFailureError('threadCannotContinue')
       if ((delivery === 'afterRun' || delivery === 'version') && (active || chain.latestRunId !== parsed.data.runId)) throw new ActionFailureError('threadReplaced')
+      // A queue intent that arrived after completion may continue its own
+      // successful anchor only. A stopped or replaced turn cannot restart it.
+      if (delivery === 'queue' && (chain.latestRunId !== parsed.data.runId || chain.attempts.at(-1)?.status !== 'succeeded')) throw new ActionFailureError('threadDeliveryUnavailable')
       if (delivery === 'afterRun' && chain.attempts.at(-1)?.status !== 'succeeded') throw new ActionFailureError('threadDeliveryUnavailable')
       if ((delivery === 'steer' || delivery === 'interrupt') && (!active || chain.latestRunId !== parsed.data.runId)) throw new ActionFailureError('runNotActive')
       return continueThread(userId, parsed.data.text, source, chain, sourceEventId, delivery, parsed.data.modelChoice)
@@ -171,7 +174,7 @@ async function continueThread(userId: string, text: string, source: Source,
       return { runId: latest.runId, continued: false }
     }
     if (source === 'user' || (typeof source === 'object' && source.source === 'human'))
-      if (await (await import('@/lib/factory/request-epoch')).continueActiveFactoryRequest(pool, userId, latest.runId, text, sourceEventId, sourceEventId ? { recordOwnerMessage: true } : undefined))
+      if (await (await import('@/lib/factory/request-epoch')).continueActiveFactoryRequest(pool, userId, latest.runId, text, sourceEventId, sourceEventId ? { recordOwnerMessage: true, interrupt: delivery === 'interrupt' } : undefined))
         return { runId: latest.runId, continued: false }
     if (delivery === 'interrupt') throw new ActionFailureError('threadDeliveryUnavailable')
     await addRunMessage(userId, { runId: latest.runId, text }, source, sourceEventId)

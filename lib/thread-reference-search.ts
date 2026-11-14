@@ -12,14 +12,12 @@ import type { ThreadReference } from './thread-references'
 /** Only PRs attached to readable tasks are candidates. Match the title, URL or number before limiting. */
 async function pullRequests(userId: string, workspaceId: string, query: string): Promise<ThreadReference[]> {
   const { predicate } = await issueVisibility(userId, false, workspaceId, db, { withTeamLinks: false })
-  const metadata = sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->'pullRequests'`
   const rows = await db.execute<{ url: string; title: string | null; state: string }>(sql`
-    SELECT DISTINCT ON (pr->>'url') pr->>'url' AS url, pr->>'title' AS title, pr->>'state' AS state
-    FROM ${issues} CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(${metadata})='array'
-      THEN ${metadata} ELSE '[]'::jsonb END) pr
-    WHERE ${predicate} AND (strpos(lower(coalesce(pr->>'title','')), lower(${query}))>0
-      OR strpos(lower(pr->>'url'), lower(${query}))>0 OR ('#'||substring(pr->>'url' from '/pull/([0-9]+)/?$'))=${query})
-    ORDER BY pr->>'url', ${issues.updatedAt} DESC, ${issues.id} LIMIT 8`)
+    SELECT DISTINCT ON (lower(link.url)) link.url, link.receipt->>'title' AS title, link.receipt->>'state' AS state
+    FROM ${issues} JOIN task_pull_links link ON link."issueId"=${issues.id}
+    WHERE ${predicate} AND (strpos(lower(coalesce(link.receipt->>'title','')), lower(${query}))>0
+      OR strpos(lower(link.url), lower(${query}))>0 OR ('#'||substring(link.url from '/pull/([0-9]+)$'))=${query})
+    ORDER BY lower(link.url), ${issues.updatedAt} DESC, ${issues.id}, link.ordinal LIMIT 8`)
   return rows.rows.flatMap(row => {
     const result = pullRequestSchema.safeParse({ url: row.url, title: row.title ?? undefined, state: row.state })
     return result.success ? [{ kind: 'pr' as const, id: result.data.url, title: result.data.title || result.data.url }] : []
@@ -35,7 +33,8 @@ export async function searchThreadReferences(userId: string, workspaceId: string
     ])
     return [
       ...tasks?.items.map(item => ({ kind: 'task' as const, id: item.id, title: [item.identifier, item.title].filter(Boolean).join(' ') })) ?? [],
-      ...threads?.items.slice(0, 8).map(item => ({ kind: 'thread' as const, id: item.id, title: item.title })) ?? [],
+      ...threads?.items.slice(0, 8).map(item => ({ kind: 'thread' as const, id: item.id, title: item.title,
+        ...(item.kind === 'chat' ? { conversationKind: 'chat' as const } : {}) })) ?? [],
       ...prs,
     ]
   })

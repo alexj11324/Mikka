@@ -32,7 +32,7 @@ export function MyBubble({ text, photos, selecting, threadReferences }: { thread
   const parsed = splitChatFiles(text)
   const pictures = useImageFiles(parsed.files)
   const { quoted, words } = splitQuoted(parsed.text)
-  const parts = threadReferences && /\[\[(?:issue|run):|https:\/\/github\.com\//i.test(words) ? personReferenceParts(words) : null
+  const parts = threadReferences && /\[\[(?:issue|run|chat):|https:\/\/github\.com\//i.test(words) ? personReferenceParts(words) : null
   return (
     <View style={styles.mine}>
       <ChatFiles files={parsed.files.filter(file => !isImageFile(file))} />
@@ -44,8 +44,9 @@ export function MyBubble({ text, photos, selecting, threadReferences }: { thread
             if (part.kind === 'text') return part.text
             return <Text key={index} accessibilityRole="link" style={{ color: colors.onAccent, textDecorationLine: 'underline' }} onPress={() => {
               if (part.kind === 'pr') void Linking.openURL(part.id)
+              else if (part.kind === 'chat') router.push(`/groups/${part.id}`)
               else router.push(part.kind === 'task' ? `/task/${part.id}` : `/thread/${part.id}`)
-            }}>{part.kind === 'pr' ? part.id : `${mobileMessages.ThreadReferences[part.kind]} ${part.id.slice(0, 8)}`}</Text>
+            }}>{part.kind === 'pr' ? part.id : `${mobileMessages.ThreadReferences[part.kind === 'chat' ? 'thread' : part.kind]} ${part.id.slice(0, 8)}`}</Text>
           })}</FoldedWords> : null)}
         </View>
       ) : null}

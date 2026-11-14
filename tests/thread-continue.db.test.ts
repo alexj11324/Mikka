@@ -91,6 +91,48 @@ test('a message to an ended thread runs it again in the same thread; only its ow
   const first = await steps.dispatchRun(a.id, { issueId: a.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, a.botId) as unknown as { runId: string; thread: string }
   assert.equal(first.thread, 'new', JSON.stringify(first))
 
+  await t.test('explicit interrupt fences exactly the selected live attempt and survives a lost owner acknowledgement', async () => {
+    const owner = await person()
+    const initial = await steps.dispatchRun(owner.id, { issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }
+    const run = initial.runId, requestId = randomUUID(), text = 'Stop this attempt and use the revised target.'
+    await pool.query("UPDATE agent_runs SET status='running' WHERE id=$1", [run])
+    const { threadDeliveryView } = await import('../lib/thread-delivery-queue')
+    const { deviceWork } = await import('../lib/device-link')
+    const taskState = async () => (await pool.query(`SELECT t.id,t."attemptId",t."sourceEventId",t.revision,t.status FROM factory_tasks t
+      JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1 AND t."userId"=$2`, [run, owner.id])).rows[0]
+    const previous = await taskState()
+    assert.ok((await threadDeliveryView(appPool, owner.id, run, run)).modes.includes('interrupt'))
+    await assert.rejects(sendThreadMessage(a.id, run, text, 'user', requestId, 'interrupt'), { code: 'runNotFound' })
+    assert.deepEqual(await taskState(), previous)
+    const accepted = await sendThreadMessage(owner.id, run, text, 'user', requestId, 'interrupt')
+    assert.deepEqual(accepted, { runId: run, continued: false })
+    const replacement = await taskState()
+    assert.notEqual(replacement.sourceEventId, previous.sourceEventId)
+    assert.notEqual(replacement.attemptId, previous.attemptId)
+    const { rows: [old] } = await pool.query(`SELECT a.status,a.output,r."stopRequestedAt" FROM factory_attempts a
+      JOIN agent_runs r ON r.id=a."runId" WHERE a.id=$1`, [previous.attemptId])
+    assert.equal(old.status, 'cancelled')
+    assert.equal(old.output.supersededBy, replacement.sourceEventId)
+    assert.ok(old.stopRequestedAt)
+    assert.ok((await deviceWork(owner.deviceId, [])).commands.some(command => command.kind === 'stop' && command.runId === run))
+    const { rows: [receipt] } = await pool.query(`SELECT request FROM factory_events WHERE "taskId"=$1 AND request->>'sourceEventId'=$2
+      AND request->>'kind'='request_epoch'`, [replacement.id, replacement.sourceEventId])
+    assert.deepEqual(receipt.request.supersededRunIds, [run])
+    assert.equal(receipt.request.previousRunId, run)
+    assert.equal(receipt.request.previousEpoch, previous.sourceEventId)
+    assert.ok(!(await threadDeliveryView(appPool, owner.id, run, run)).modes.includes('interrupt'))
+    await pool.query(`UPDATE coordinator_events SET payload=payload #- '{threadSubmission,result}' WHERE id=$1`, [replacement.sourceEventId])
+    assert.deepEqual(await sendThreadMessage(owner.id, run, text, 'user', requestId, 'interrupt'), accepted)
+    await assert.rejects(sendThreadMessage(owner.id, run, 'Late second window.', 'user', randomUUID(), 'interrupt'), { code: 'threadDeliveryUnavailable' })
+    assert.deepEqual(await taskState(), replacement)
+    const messages = (await pool.query('SELECT text,"deliveredAt" FROM run_messages WHERE "runId"=$1', [run])).rows
+    assert.deepEqual(messages.map(message => message.text), [text])
+    assert.ok(messages[0].deliveredAt)
+    await end(run, 'stopped')
+    await assert.rejects(sendThreadMessage(owner.id, run, 'Late queued request.', 'user', randomUUID(), 'queue'), { code: 'threadDeliveryUnavailable' })
+    assert.deepEqual(await taskState(), replacement)
+  })
+
   await t.test('a supported continuation freezes the selected model and subscription, including across a lost acknowledgement', async () => {
     const b = await person()
     const initial = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: 'picked:' + randomUUID() }, undefined, b.botId) as unknown as { runId: string }
@@ -565,13 +607,20 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     assert.equal(saved.text,'Revised instructions.')
     assert.equal(saved.originalOutput,'Original answer.')
     assert.equal(saved.originalPullRequest,pr)
-    const {rows:[fresh]}=await pool.query(`SELECT r.prompt,v."executionNote" FROM agent_runs r JOIN thread_reply_versions v ON v."resultRunId"=r.id WHERE r.id=$1`,[edited.runId])
+    const {rows:[fresh]}=await pool.query(`SELECT r.prompt,r."continuesRunId",r."agentDefinition",r."workspaceId",v."executionNote" FROM agent_runs r JOIN thread_reply_versions v ON v."resultRunId"=r.id WHERE r.id=$1`,[edited.runId])
+    assert.equal(fresh.continuesRunId,run)
+    assert.equal(fresh.workspaceId,owner.ws.id)
+    assert.equal(fresh.agentDefinition.modelDispatch.entry.source.connectionId,owner.connection)
+    assert.equal(fresh.agentDefinition.model,'gpt-5')
     assert.ok(fresh.prompt.includes('Revised instructions.'))
     assert.ok(!fresh.executionNote.includes('LATER_MARKER'))
     assert.equal((await pool.query('SELECT text FROM run_messages WHERE id=$1',[anchor])).rows[0].text,'Original instructions.')
     await end(edited.runId,'succeeded')
     const rerun=await createReplyVersion(appPool,owner.id,run,{operation:'rerun',anchorRunId:run,anchorKey:'answer1',requestId:randomUUID()})
     assert.notEqual(rerun.runId,edited.runId)
+    const { rows: [rerunRow] }=await pool.query('SELECT "continuesRunId","agentDefinition" FROM agent_runs WHERE id=$1',[rerun.runId])
+    assert.equal(rerunRow.continuesRunId,edited.runId)
+    assert.equal(rerunRow.agentDefinition.modelDispatch.entry.source.connectionId,owner.connection)
     const counts=async ()=>(await pool.query('SELECT count(*) FROM agent_runs WHERE "userId"=$1',[owner.id])).rows[0].count
     const n=await counts()
     const versionList=await readReplyVersions(appPool,owner.id,run)
