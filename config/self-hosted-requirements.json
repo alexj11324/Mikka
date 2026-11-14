@@ -1762,5 +1762,19 @@
     "behavior": "Recognize and encode supported conversation citations using installation routes.",
     "test": "tests/thread-references.db.test.ts",
     "suite": "test:bot-threads-db"
+  },
+  "lib/context-usage.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Estimate context usage from stored run text and segment counts inside the installation.",
+    "test": "lib/context-usage.test.ts",
+    "suite": "test:thread-changes"
+  },
+  "lib/coordinator/citation-parts.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Parse citation markers and web links in message text locally on web and native clients.",
+    "test": "lib/coordinator/citations.test.ts",
+    "suite": "test:coordinator-events"
   }
 }
