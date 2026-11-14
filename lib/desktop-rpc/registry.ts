@@ -74,6 +74,8 @@ const functions = {
   'agents.getThreadMachine': actions1.getThreadMachine,
   'agents.getThreadInstructions': actions1.getThreadInstructions,
   'agents.sendIssueThreadReply': actions1.sendIssueThreadReply,
+  'agents.createThreadReplyVersion': actions1.createThreadReplyVersion,
+  'agents.getThreadReplyVersions': actions1.getThreadReplyVersions,
   'agents.changeQueuedThreadReply': actions1.changeQueuedThreadReply,
   'agents.getThreadName': actions1.getThreadName,
   'agents.stopRun': actions1.stopRun,

@@ -202,6 +202,12 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     let deliveries = 0
     await assert.rejects(submitThreadOnce(pool, input, async () => { deliveries++; throw new Error('synthetic interruption') }), /synthetic interruption/)
     await assert.rejects(submitThreadOnce(pool, input, async () => { deliveries++; return { runId: first.runId, continued: false } }), /threadSubmissionOutcomeUnconfirmed/)
+    const { runAction } = await import('../lib/action-error')
+    const retry = await runAction(() => submitThreadOnce(pool, input, async () => {
+      deliveries++
+      return { runId: first.runId, continued: false }
+    }))
+    assert.equal(retry.error, 'threadSubmissionOutcomeUnconfirmed', 'the user-facing action can explain the pending receipt')
     assert.equal(deliveries, 1)
   })
 
@@ -553,6 +559,51 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     const second = (await view()).queued.find(message => message.text === 'Second native input.')!
     await ackCommands(row.deviceId, [second.id])
     assert.ok(!(await view()).queued.some(message => message.id === second.id))
+  })
+
+  await t.test('editing and rerunning preserve original output, bind the new run before claim and switch without dispatch', async () => {
+    const { createReplyVersion,readReplyVersions } = await import('../lib/thread-reply-versions')
+    const owner=await person()
+    const initial=await steps.dispatchRun(owner.id,{issueId:owner.issueId,repo:'octo/repo',requestKey:`dispatch:${randomUUID()}`},undefined,owner.botId) as unknown as {runId:string}
+    const run=initial.runId, anchor=randomUUID()
+    await pool.query(`INSERT INTO run_messages(id,"runId","userId",text,origin,"deliveredAt","createdAt") VALUES($1,$2,$3,'Original instructions.','owner',now(),now()-interval '2 minutes')`,[anchor,run,owner.id])
+    await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,1,'{"type":"text-delta","id":"answer1","delta":"Original answer."}',now()-interval '1 minute')`,[randomUUID(),run])
+    await pool.query(`INSERT INTO run_messages(id,"runId","userId",text,origin,"deliveredAt") VALUES($1,$2,$3,'LATER_MARKER','owner',now())`,[randomUUID(),run,owner.id])
+    await end(run,'succeeded')
+    await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,2,'{"type":"text-delta","id":"later","delta":"Later answer."}',now()+interval '1 second')`,[randomUUID(),run])
+    await pool.query(`UPDATE agent_runs SET "lastReply"='Later answer.' WHERE id=$1`,[run])
+    const pr='https://github.com/octo/repo/pull/18'
+    await pool.query(`INSERT INTO run_publications("runId","userId","issueId","remoteUrl","remoteKey",status,"pullRequest")
+      VALUES($1,$2,$3,'https://github.com/octo/repo','octo/repo','published',$4)
+      ON CONFLICT("runId") DO UPDATE SET status='published',"pullRequest"=excluded."pullRequest"`,[run,owner.id,owner.issueId,JSON.stringify({url:pr})])
+    const edit={operation:'edit' as const,anchorRunId:run,anchorKey:anchor,text:'Revised instructions.',requestId:randomUUID()}
+    await assert.rejects(createReplyVersion(appPool,a.id,run,edit))
+    const edited=await createReplyVersion(appPool,owner.id,run,edit)
+    assert.notEqual(edited.runId,run)
+    assert.deepEqual(await createReplyVersion(appPool,owner.id,run,edit),edited)
+    await assert.rejects(createReplyVersion(appPool,owner.id,run,{...edit,text:'A different request.'}),{code:'submissionConflict'})
+    const [saved]=await readReplyVersions(appPool,owner.id,run)
+    assert.equal(saved.resultRunId,edited.runId)
+    assert.equal(saved.originalText,'Original instructions.')
+    assert.equal(saved.text,'Revised instructions.')
+    assert.equal(saved.originalOutput,'Original answer.')
+    assert.equal(saved.originalPullRequest,pr)
+    const {rows:[fresh]}=await pool.query(`SELECT r.prompt,v."executionNote" FROM agent_runs r JOIN thread_reply_versions v ON v."resultRunId"=r.id WHERE r.id=$1`,[edited.runId])
+    assert.ok(fresh.prompt.includes('Revised instructions.'))
+    assert.ok(!fresh.executionNote.includes('LATER_MARKER'))
+    assert.equal((await pool.query('SELECT text FROM run_messages WHERE id=$1',[anchor])).rows[0].text,'Original instructions.')
+    await end(edited.runId,'succeeded')
+    const rerun=await createReplyVersion(appPool,owner.id,run,{operation:'rerun',anchorRunId:run,anchorKey:'answer1',requestId:randomUUID()})
+    assert.notEqual(rerun.runId,edited.runId)
+    const counts=async ()=>(await pool.query('SELECT count(*) FROM agent_runs WHERE "userId"=$1',[owner.id])).rows[0].count
+    const n=await counts()
+    const versionList=await readReplyVersions(appPool,owner.id,run)
+    assert.deepEqual(versionList.map(version=>version.resultRunId),[edited.runId,rerun.runId])
+    assert.equal(versionList[1].originalText,'Original answer.')
+    assert.equal(versionList[1].text,'Original instructions.')
+    assert.deepEqual(await readReplyVersions(appPool,owner.id,run),versionList)
+    assert.equal(await counts(),n)
+    await assert.rejects(readReplyVersions(appPool,a.id,run))
   })
 
   await t.test('concurrent immediate and queued requests with the same ID commit one intent', async () => {

@@ -78,7 +78,7 @@ export interface RunDetail {
   decisionWarnings?: ProjectDecisionWarning[]
   run: RunView
   chunks: Record<string, unknown>[]
-  messages: { id: string; text: string; createdAt: Date; submissionId?: string | null }[]
+  messages: { id: string; text: string; createdAt: Date; sourceRunId?: string | null; editable?: boolean; submissionId?: string | null }[]
 }
 
 export const runViewColumns = {
@@ -432,7 +432,8 @@ export async function visibleRuns(reader: IssueReader, input: RunListFilter & { 
 
 /** The caller has authorized these run IDs. Only the reader's own sends include a retry identity. */
 export function readRunMessages(userId: string, runIds: string[]) {
-  return db.select({ id: runMessages.id, text: runMessages.text, createdAt: runMessages.createdAt,
+  return db.select({ id: runMessages.id, text: runMessages.text, createdAt: runMessages.createdAt, sourceRunId:runMessages.runId,
+    editable:sql<boolean>`${runMessages.userId}=${userId} AND ${runMessages.origin}='owner' AND ${runMessages.deliveredAt} IS NOT NULL AND failure IS NULL`,
     submissionId: sql<string | null>`${coordinatorEvents.payload}#>>'{threadSubmission,requestId}'` })
     .from(runMessages).leftJoin(coordinatorEvents, and(eq(coordinatorEvents.id, runMessages.id),
       eq(coordinatorEvents.userId, userId), eq(coordinatorEvents.kind, 'user_message')))

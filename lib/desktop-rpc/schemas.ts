@@ -138,6 +138,10 @@ export const desktopActionSchemas = {
   'agents.getThreadMachine': tuple(uuid.nullable(), uuid),
   'agents.getThreadInstructions': tuple(uuid.nullable(), uuid),
   'agents.sendIssueThreadReply': tuple(object({ expectedOwnerId: text(256).optional(), expectedWorkspaceId: uuid.optional(), issueId: uuid.nullable(), runId: uuid, text: text(10_000).min(1), requestId: uuid.optional(), retryOriginalSession: z.literal(true).optional(), questionWakeGeneration: uuid.optional(), delivery: z.enum(['queue','steer','interrupt']).optional() })),
+  'agents.createThreadReplyVersion': tuple(object({issueId:uuid.nullable(),runId:uuid,change:z.discriminatedUnion('operation',[
+    object({operation:z.literal('edit'),anchorRunId:uuid,anchorKey:uuid,requestId:uuid,text:text(10_000).min(1)}),
+    object({operation:z.literal('rerun'),anchorRunId:uuid,anchorKey:text(320).min(1),requestId:uuid})])})),
+  'agents.getThreadReplyVersions': tuple(uuid.nullable(),uuid),
   'agents.changeQueuedThreadReply': tuple(object({issueId: uuid.nullable(), runId: uuid, messageId: uuid, action: z.enum(['cancel','sendNow'])})),
   'agents.getThreadName': oneId,
   'agents.stopRun': oneId,

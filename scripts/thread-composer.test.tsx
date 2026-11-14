@@ -56,7 +56,10 @@ mock.module(at('lib/hooks/view-state.tsx'), { namedExports: {
   useViewState: <T,>(key: string, initial: T) => actualViewState.useViewState(key, key.endsWith(':draft') ? draftText as T : initial),
 } })
 mock.module(at('lib/app-build.ts'), { namedExports: { ...actualAppBuild, checkPageBuildBeforeAction: async () => { pageChecks++; return buildGate ?? true } } })
-mock.module(at('app/actions/agents.ts'), { namedExports: { retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null, getThreadName: async () => null, listIssueThreads: async () => null, pollIssueThreads: async () => null, getIssueThread: async () => {
+mock.module(at('app/actions/agents.ts'), { namedExports: {
+  getThreadReplyVersions: async () => [],
+  createThreadReplyVersion: async () => { throw new Error('Composer interactions must not start a new version') },
+  retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null, getThreadName: async () => null, listIssueThreads: async () => null, pollIssueThreads: async () => null, getIssueThread: async () => {
   issueReads++
   if (readHold) await readHold
   if (readFailure) throw readFailure

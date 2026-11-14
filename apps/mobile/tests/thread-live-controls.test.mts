@@ -18,7 +18,7 @@ for (const [file, names] of Object.entries({
   'components/chat.tsx':['BotBubble','MyBubble'], 'components/icons.tsx':['Spinner','StatusIcon'],
   'components/ThreadPlace.tsx':['ThreadPlace'], 'components/Markdown.tsx':['Markdown'], 'components/OfflineBanner.tsx':['OfflineBanner'],
   'components/ReadNotice.tsx':['ReadNotice'],'components/Text.tsx':['Text'],'components/StopFailed.tsx':['StopFailed'],
-  'components/ThreadQuotaPaused.tsx':['ThreadQuotaPaused'],
+  'components/ThreadQuotaPaused.tsx':['ThreadQuotaPaused'],'features/chat/components/thread-reply-versions.tsx':['MobileReplyVersions'],
   'features/tasks/components/thread-steps.tsx':['ThreadSteps'],
 })) stub(file, Object.fromEntries(names.map(name=>[name,none])))
 stub('components/NavBar.tsx',{NavBar:none,underBar:{}})

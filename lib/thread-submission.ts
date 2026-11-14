@@ -9,7 +9,7 @@ export type ThreadSubmissionResult = { runId: string; continued: boolean }
 type Input = {
   userId: string; requestId: string; rootRunId: string; requestedRunId: string
   previousRunId: string; issueId: string | null; botId: string | null; text: string
-  delivery?: 'queue' | 'steer' | 'interrupt' | 'afterRun'
+  delivery?: 'queue' | 'steer' | 'interrupt' | 'afterRun' | 'version'
   mode: 'message' | 'continuation'
 }
 const resultSchema = z.object({ runId: z.uuid(), continued: z.boolean() }).strict()
@@ -127,7 +127,7 @@ export async function submitThreadOnce(pool: Pool, input: Input,
     }
     const answer = recorded.mode === 'continuation' ? await recoverQuestion?.(id, previousRunId, false) : null
     if (answer) return saveResult(answer)
-    throw new Error('threadSubmissionOutcomeUnconfirmed')
+    throw new ActionFailureError('threadSubmissionOutcomeUnconfirmed')
   }
   try { return await saveResult(await deliver(id)) }
   catch (error) {
