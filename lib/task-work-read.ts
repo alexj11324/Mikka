@@ -2,10 +2,26 @@ import 'server-only'
 import { actAs } from './acting-user'
 import { pool } from './db'
 import { readFactoryActivity } from './factory/activity'
+import { githubPullRequestKey, pullRequestSchema, type IssuePullRequest } from './issue-metadata'
 import { FactoryError } from './factory/contract'
 import { factoryHumanStore } from './factory/server'
 import { withFactoryWorkspace } from './factory/workspace-reader'
 import { readTaskPresentations } from './task-presentation-read'
+
+/** Combine only receipts already admitted by the task and Factory readers. */
+function taskWorkPulls(saved: IssuePullRequest[], activity: Awaited<ReturnType<typeof readFactoryActivity>>) {
+  const byUrl = new Map(saved.map(pull => [githubPullRequestKey(pull.url), pull]))
+  const receipts = [activity.task.pullRequest, ...activity.artifacts.filter(item => item.kind === 'pull_request')]
+  for (const receipt of receipts) {
+    if (!receipt) continue
+    const key = githubPullRequestKey(receipt.url)
+    const previous = byUrl.get(key)
+    const title = 'title' in receipt && receipt.title ? receipt.title : previous?.title
+    const parsed = pullRequestSchema.safeParse({ ...previous, url: previous?.url ?? receipt.url, state: receipt.state ?? previous?.state, ...(title ? { title } : {}) })
+    if (parsed.success) byUrl.set(key, parsed.data)
+  }
+  return [...byUrl.values()]
+}
 
 /** Reuse the detail reader's tenant and Factory checks, including revocation between the two reads. */
 export async function readTaskWork(user: Parameters<typeof readTaskPresentations>[0], workspaceId: string, issueId: string) {
@@ -16,7 +32,8 @@ export async function readTaskWork(user: Parameters<typeof readTaskPresentations
   try {
     const activity = await actAs(user, () => withFactoryWorkspace(user.id, () => readFactoryActivity(pool, factoryHumanStore, user.id, taskId)))
     const factory = activity.task.issueId === issueId && activity.task.id === taskId ? { ...activity, liveWorkspaceId: workspaceId } : null
-    return { presentation, factory }
+    if (!factory) return { presentation, factory: null }
+    return { presentation: { ...presentation, pullRequests: taskWorkPulls(presentation.pullRequests ?? [], factory) }, factory }
   } catch (error) {
     if (!(error instanceof FactoryError) || error.code !== 'factoryNotFound') throw error
     return { presentation: null, factory: null }

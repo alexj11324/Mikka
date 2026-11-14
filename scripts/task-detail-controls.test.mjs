@@ -110,6 +110,24 @@ test('properties and Work use the same authorized pull receipts, including an em
   }
 })
 
+test('properties link only admitted conversations and show the recorded Factory branch', async () => {
+  const opened = []
+  const done = await mount({ agentActivity: {
+    items: [], threads: [{ id: 'run', detail: { name: 'Worker review' } }, { id: 'hidden', detail: null }],
+    openThread: id => opened.push(id), work: {
+      presentation: { linkedChats: [{ id: 'chat', title: 'Planning' }] },
+      factory: { task: { review: { summary: { branch: 'feature/review' } } } },
+    },
+  } })
+  try {
+    assert.equal(row('branch').value.text, 'feature/review')
+    const { chips } = row('conversations')
+    assert.deepEqual(chips.map(chip => [chip.id, chip.text]), [['chat:chat', 'Planning'], ['run:run', 'Worker review']])
+    await act(async () => chips[1].menu[0].onSelect())
+    assert.deepEqual(opened, ['run'])
+  } finally { await done() }
+})
+
 const pickTeam = id => act(async () => row('team').menu.find(item => item.id === id).onSelect())
 
 test('confirmed deletion refreshes the viewer list without reading connections for the deleted task', async () => {

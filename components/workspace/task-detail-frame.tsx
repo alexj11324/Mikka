@@ -20,6 +20,7 @@ import { useIssueConnections, type RelationKind } from './issue-relations'
 import { useTaskOwnershipRows } from './issue-scope-control'
 import { AgentSphere } from './issue-assignee-menu'
 import type { useAgentActivity } from './issue-threads'
+import { openGroupConversation } from './workspace-navigation'
 import { TaskWorkSection } from './task-work-section'
 import { useActivityEvents } from './issue-activity-feed'
 import { useActivityDrafts, type DiscussionSave } from './issue-activity'
@@ -88,6 +89,8 @@ export function FramedTask(props: FramedTaskProps) {
   const tCommon = useTranslations('Common')
   const tFrame = useTranslations('IssueDetail.frame')
   const tDetail = useTranslations('Workspace.detail')
+  const tDirectory = useTranslations('ConversationDirectory')
+  const tArtifact = useTranslations('ArtifactReview')
   const tActivity = useTranslations('Workspace.activity')
   const tIssue = useTranslations('Issue')
   const tMenu = useTranslations('IssueDetail.menu')
@@ -128,6 +131,15 @@ export function FramedTask(props: FramedTaskProps) {
     ...options?.isOwner ? [{ id: 'invite', label: tAssignee('invite'), mark: { kind: 'icon', icon: 'mail' }, divider: true, onSelect: () => props.requestProperty('invite') } satisfies TaskMenuItem] : [],
   ]
   const delegate = meta.delegate?.name
+  const conversations = [
+    ...(presentation.data?.linkedChats ?? []).map(chat => ({
+      id: 'chat:' + chat.id, text: chat.title || tDirectory('untitled'), open: () => openGroupConversation(chat.id),
+    })),
+    ...(props.agentActivity.threads ?? []).flatMap(thread => thread.detail ? [{
+      id: 'run:' + thread.id, text: thread.detail.name || tDirectory('untitled'), open: () => props.agentActivity.openThread(thread.id),
+    }] : []),
+  ]
+  const reviewBranch = props.agentActivity.work?.factory?.task.review?.summary?.branch
 
   const allLabels = [...new Map([...(options?.labels ?? []), ...meta.labels].map(label => [label.name, label])).values()]
   const labelItems: TaskMenuItem[] = [
@@ -172,6 +184,10 @@ export function FramedTask(props: FramedTaskProps) {
     } })) },
     ...meta.dueDate ? [{ id: 'dueDate', label: tProperty('dueDate'), disabled: locked, onClick: () => props.requestAction('dueDate'), value: { text: formatDateOnly(format, meta.dueDate, { month: 'short', day: 'numeric' }), mark: { kind: 'icon', icon: 'calendar' }, danger: overdue(meta.dueDate, props.status, now) } } satisfies TaskDetailRow] : [],
     ...meta.estimate !== null ? [{ id: 'estimate', label: tProperty('estimate'), disabled: locked, onClick: () => props.requestAction('estimate'), value: { text: tProperty('estimatePoints', { count: meta.estimate }), mark: { kind: 'icon', icon: 'estimate' } } } satisfies TaskDetailRow] : [],
+    ...conversations.length ? [{ id: 'conversations', label: tDirectory('title'),
+      chips: conversations.map(({ id, text, open }) => ({ id, text, menu: [{ id: 'open', label: tFrame('open'), onSelect: open }] })),
+    } satisfies TaskDetailRow] : [],
+    ...reviewBranch ? [{ id: 'branch', label: tArtifact('branch'), value: { text: reviewBranch } } satisfies TaskDetailRow] : [],
     ...pullRequests.length ? [{ id: 'pullRequests', label: tProperty('pullRequests'), disabled: locked, chips: pullRequests.map(pr => ({ id: pr.url, text: `#${pr.url.split('/').filter(Boolean).at(-1)}`, href: pr.url, mark: { kind: 'icon', icon: 'pullRequest' }, live: draw => <PullRequestStatus issueId={task.id} pr={pr}>{view => draw({ text: view.text ? `#${view.number} ${view.text}` : `#${view.number}`, title: view.title, state: view.state, confirmed: view.confirmed })}</PullRequestStatus> })), add: { label: tProperty('managePullRequestsAria'), onClick: () => props.requestProperty('pullRequests') } } satisfies TaskDetailRow] : [],
     ...preview ? [] : connections.groups.filter(group => group.items.length).map((group): TaskDetailRow => ({
       id: `relation-${group.kind}`, label: group.label, disabled: locked || connections.pending,

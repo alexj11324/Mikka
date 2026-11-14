@@ -1,4 +1,4 @@
-import type { IssuePullRequest } from './issue-metadata'
+import { githubPullRequestKey, type IssuePullRequest } from './issue-metadata'
 import { GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft } from 'lucide-react'
 
 export const PULL_REQUEST_COLORS = {
@@ -26,7 +26,7 @@ export function directoryPullRequests<T extends { pulls: readonly IssuePullReque
   for (const row of rows) {
     for (const pull of row.pulls) {
       if (state !== 'all' && pull.state !== state) continue
-      const key = pull.url.toLowerCase().replace(/\/$/, '')
+      const key = githubPullRequestKey(pull.url)
       const existing = byUrl.get(key)
       if (!existing) byUrl.set(key, { pull, conversations: [row] })
       else if (existing.conversations.at(-1) !== row) existing.conversations.push(row)

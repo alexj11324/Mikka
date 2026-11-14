@@ -18,7 +18,7 @@ import { useLiveKey } from '@/hooks/use-live-key'
 import type { DirectoryState } from '@/lib/conversation-directory-input'
 import { PullRequestsBadge, pullRequestRef } from './pull-requests-badge'
 import { directoryPullRequests } from '@/lib/pull-request-appearance'
-import { navigate, openTask, openThread } from './workspace-navigation'
+import { openGroupConversation, openTask, openThread } from './workspace-navigation'
 
 type Page = Awaited<ReturnType<typeof listConversations>>
 const states = ['all', 'working', 'waiting', 'idle', 'failed'] as const
@@ -107,7 +107,7 @@ export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 
             {[...tasks].map(([id, label]) => <Button key={id} size="sm" variant="link" onClick={() => openTask(id)}>{label}</Button>)}
           </div>
         </li>
-      }) : rows.map(row => <li key={row.id} className="flex items-center gap-2"><Button variant="ghost" type="button" onClick={() => row.kind === 'chat' ? navigate({ section: 'group', group: row.id, issue: null, thread: null, task: null }) : openThread(row.id)}
+      }) : rows.map(row => <li key={row.id} className="flex items-center gap-2"><Button variant="ghost" type="button" onClick={() => row.kind === 'chat' ? openGroupConversation(row.id) : openThread(row.id)}
         className="h-auto min-w-0 flex-1 flex-wrap justify-start gap-x-3 gap-y-1 py-3 text-start">
         <span className="min-w-0 flex-1 break-words font-medium">{row.title || t('untitled')}</span>
         {row.unread && <span className="size-2 rounded-full bg-primary" role="img" aria-label={t('unread')} />}
