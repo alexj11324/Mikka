@@ -1639,5 +1639,40 @@
     "behavior": "Persist scoped run read positions and manual marks in the existing PostgreSQL database.",
     "test": "lib/thread-reads.db.test.ts",
     "suite": "test:conversation-reads"
+  },
+  "lib/preferences.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Rank only the current member’s authorized conversation roots by Bot, read their per-account idle policy, and preserve manual or automatic archive visibility in installation PostgreSQL.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "lib/db/schema.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Rank only the current member’s authorized conversation roots by Bot, read their per-account idle policy, and preserve manual or automatic archive visibility in installation PostgreSQL.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "lib/desktop-rpc/registry.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Rank only the current member’s authorized conversation roots by Bot, read their per-account idle policy, and preserve manual or automatic archive visibility in installation PostgreSQL.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "lib/desktop-rpc/schemas.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Rank only the current member’s authorized conversation roots by Bot, read their per-account idle policy, and preserve manual or automatic archive visibility in installation PostgreSQL.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "drizzle/20261113172948_conversation_idle_archive_preference.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Rank only the current member’s authorized conversation roots by Bot, read their per-account idle policy, and preserve manual or automatic archive visibility in installation PostgreSQL.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
   }
 }

@@ -15,6 +15,7 @@ import { setAttentionEnabled } from '@/lib/attention/store'
  * own reader (lib/suggestions/source-settings.ts).
  */
 export interface Preferences {
+  archiveIdleAfterDays: number
   proactive: boolean
   pushDecide: boolean
   pushReview: boolean
@@ -29,7 +30,7 @@ export interface Preferences {
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
-  proactive: true, pushDecide: true, pushReview: true, pushFinished: true, pushBriefing: true, pushWhen: 'always', memoryEnabled: true,
+  archiveIdleAfterDays: 30, proactive: true, pushDecide: true, pushReview: true, pushFinished: true, pushBriefing: true, pushWhen: 'always', memoryEnabled: true,
   sendKey: 'enter', personalInstructions: '', dailySuggestions: true,
 }
 
@@ -40,6 +41,7 @@ export const personalInstructionsSchema = z.string().transform(text => text.trim
   .refine(text => [...text].length <= PERSONAL_INSTRUCTIONS_MAX, { message: 'personalInstructionsTooLong' })
 
 export const preferencesPatch = z.object({
+  archiveIdleAfterDays: z.literal([0, 3, 7, 14, 30, 90]),
   proactive: z.boolean(), pushDecide: z.boolean(), pushReview: z.boolean(), pushFinished: z.boolean(), pushBriefing: z.boolean(),
   pushWhen: z.enum(PUSH_WHEN), memoryEnabled: z.boolean(),
   sendKey: z.enum(SEND_KEYS), personalInstructions: personalInstructionsSchema, dailySuggestions: z.boolean(),

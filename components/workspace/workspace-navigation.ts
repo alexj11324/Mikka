@@ -55,6 +55,8 @@ export type WorkspaceLocation = {
   section: WorkspaceSection
   /** The bot whose chat is in the centre; null for the Coordinator. */
   bot: string | null
+  /** Optional Bot filter for the conversation directory. */
+  directoryBot?: string | null
   /** The group chat in the centre (`group=<id>`; its section is implied). */
   group: string | null
   /** The saved chat in the centre (`section=agent&session=<id>`); null opens the latest. */
@@ -80,9 +82,9 @@ const TEAM_SECTIONS: readonly string[] = ['team-home', 'team-issues', 'team-proj
 /** Pages that can show one project. */
 const PROJECT_SECTIONS: readonly string[] = ['projects', 'team-projects'] satisfies readonly WorkspaceSection[]
 /** Keys this file owns besides `section`, in the order a new address writes them. */
-const PLACE_KEYS = ['bot', 'group', 'session', 'team', 'project', 'issue', 'task', 'thread', 'artifact', 'threads'] as const satisfies readonly (keyof WorkspaceLocation)[]
+const PLACE_KEYS = ['bot','directoryBot', 'group', 'session', 'team', 'project', 'issue', 'task', 'thread', 'artifact', 'threads'] as const satisfies readonly (keyof WorkspaceLocation)[]
 /** What is in the centre; the thread sits beside it and the Artifact window over it. */
-const CENTRE_KEYS = ['section', 'bot', 'group', 'session', 'team', 'project', 'issue'] as const satisfies readonly (keyof WorkspaceLocation)[]
+const CENTRE_KEYS = ['section', 'bot','directoryBot', 'group', 'session', 'team', 'project', 'issue'] as const satisfies readonly (keyof WorkspaceLocation)[]
 
 /** A team page without a team is the workspace-wide page it would scope. */
 export function sectionFor(section: WorkspaceSection, team: string | null): WorkspaceSection {
@@ -99,6 +101,7 @@ export function readLocation(params: URLSearchParams): WorkspaceLocation {
   else if (section === 'coordinator' && id('group')) section = 'group'
   return {
     section,
+    ...(section === 'conversations' && id('directoryBot') ? {directoryBot:id('directoryBot')} : {}),
     bot: section === 'coordinator' ? id('bot') : null,
     group: section === 'group' ? id('group') : null,
     session: section === 'agent' ? id('session') : null,
@@ -136,6 +139,7 @@ function buildHref(current: URL, change: Partial<WorkspaceLocation>, nameCoordin
   const named = params.get('section') === 'coordinator'
   const next = { ...before, ...change }
   next.section = sectionFor(next.section, next.team)
+  if (next.section !== 'conversations') delete next.directoryBot
   if (next.section !== 'coordinator') next.bot = null
   if (next.section !== 'group') next.group = null
   if (next.section !== 'agent') next.session = null
