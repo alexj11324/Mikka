@@ -1,3 +1,4 @@
+import { observePoolCommits } from '../lib/db/commit-effects'
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
@@ -23,6 +24,7 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
   const target = new URL(url!); target.pathname = `/${database}`
   const pool = new Pool({ connectionString: target.toString(), max: 8 })
   observePoolCommits(pool)
+  observePoolCommits(pool)
   let appPool: Pool | undefined, workspacePool: Pool | undefined
   let machines: Awaited<ReturnType<typeof fakeThreadMachines>> | undefined
   const scoped = { MIKKA_DATABASE_URL: target.toString(), DATABASE_URL: target.toString(),
@@ -38,7 +40,7 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
     let cloudWorkflows = 0
     mock.module('workflow/api', { namedExports: { ...workflow, start: async () => { cloudWorkflows++; return { runId: 'synthetic-workflow' } } } })
     const { queueFactoryCloudRun } = await import('../lib/factory/queue-cloud')
-    const { createExecutionClaim } = await import('../lib/factory/execution-claim')
+    const { createExecutionClaim } = await import('./helpers/factory-execution-claim')
     const { issueRunToken, verifyRunToken } = await import('../lib/mcp/worker')
     const { apiKeyForRun } = await import('../lib/model-api-keys')
     appPool = (await import('../lib/db')).pool; workspacePool = (await import('../lib/workspace-db')).workspacePool
@@ -264,6 +266,7 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
     machines?.restore(); mock.restoreAll()
     await (await import('../lib/builtin-gateway/runtime')).builtinGateway()?.stop()
     for (const [name, value] of Object.entries(previous)) { if (value === undefined) delete process.env[name]; else process.env[name] = value }
+    await (await import('../lib/builtin-gateway/runtime')).builtinGateway()?.stop()
     await dropTestDatabase(admin, database, pool, appPool, workspacePool)
     await admin.end()
   }
