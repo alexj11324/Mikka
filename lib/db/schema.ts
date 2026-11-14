@@ -434,6 +434,9 @@ export const agentRuns = pgTable('agent_runs', {
    * is written. `titleSource` says who wrote it: a 'manual' title is the person's and is never overwritten.
    */
   title: varchar('title', { length: 60 }), titleSource: text('titleSource').$type<'generated' | 'manual'>(),
+  /** On the canonical chain root, shared by all attempts. */
+  conversationArchivedAt: timestamp('conversationArchivedAt', { withTimezone: true }),
+  conversationPinnedAt: timestamp('conversationPinnedAt', { withTimezone: true }),
   /** On a thread's root run: the root of the thread that replaced it, when the person explicitly asked for a new one. */
   threadReplacedBy: uuid('threadReplacedBy').references((): AnyPgColumn => agentRuns.id, { onDelete: 'set null' }),
   stopRequestedAt: timestamp('stopRequestedAt', { withTimezone: true }),

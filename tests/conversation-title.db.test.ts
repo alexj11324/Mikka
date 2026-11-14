@@ -33,6 +33,7 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     appPool = (await import('../lib/db')).pool
     workspacePool = (await import('../lib/workspace-db')).workspacePool
     const { nameConversation, renameConversationTitle } = await import('../lib/conversation-title-server')
+    const { conversationOrganization } = await import('../lib/conversation-organization')
     const dir = new URL('../drizzle/', import.meta.url)
     for (const f of orderMigrations((await readdir(dir)).filter(f => f.endsWith('.sql')))) await pool.query(await readFile(new URL(f, dir), 'utf8'))
     await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','O','o@example.invalid',true,now(),now()),('other','X','x@example.invalid',true,now(),now())`)
@@ -117,6 +118,22 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     assert.equal(await nameConversation(pool, racing, 'owner', 'created', async () => { await renameConversationTitle(pool, racing, 'owner', '账单导出', workspaceId); return '模型晚到的名字' }), null)
     assert.deepEqual(await stored(racing), { title: '账单导出', titleSource: 'manual' })
 
+    const foreignWorkspace = randomUUID()
+    assert.equal(await renameConversationTitle(pool, first, 'owner', 'different workspace', foreignWorkspace), null)
+    const organize = (id: string, field: 'archived' | 'pinned', value: boolean) =>
+      conversationOrganization(pool, 'owner', workspaceId, id, { field, value })
+    assert.deepEqual(await organize(second, 'pinned', true), { archived: false, pinned: true })
+    const originalPin = (await pool.query('SELECT "conversationPinnedAt" FROM agent_runs WHERE id=$1', [first])).rows[0]
+    await organize(first, 'pinned', true)
+    assert.deepEqual((await pool.query('SELECT "conversationPinnedAt" FROM agent_runs WHERE id=$1', [first])).rows[0], originalPin)
+    assert.deepEqual(await organize(first, 'archived', true), { archived: true, pinned: true })
+    assert.deepEqual(await conversationOrganization(pool, 'owner', workspaceId, third), { archived: true, pinned: true })
+    for (const [actor, space] of [['other', workspaceId], ['owner', foreignWorkspace]]) {
+      assert.equal(await conversationOrganization(pool, actor, space, first), null)
+      assert.equal(await conversationOrganization(pool, actor, space, first, { field: 'pinned', value: false }), null)
+    }
+    assert.deepEqual(await organize(third, 'archived', false), { archived: false, pinned: true })
+    assert.deepEqual(await organize(second, 'pinned', false), { archived: false, pinned: false })
     assert.equal(await renameConversationTitle(pool, first, 'owner', 'wrong workspace', randomUUID()), null)
 
     // Regenerate is the person asking for a generated title again.
@@ -133,6 +150,9 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     }), null)
     assert.equal(await renameConversationTitle(pool, revoked, 'owner', 'No access', workspaceId), null)
     assert.deepEqual(await stored(revoked), { title: null, titleSource: null })
+    assert.equal(await conversationOrganization(pool, 'owner', workspaceId, first), null)
+    assert.equal(await organize(first, 'pinned', true), null, 'a suspended owner cannot organize a conversation')
+    assert.equal((await pool.query('SELECT "conversationPinnedAt" FROM agent_runs WHERE id=$1', [first])).rows[0].conversationPinnedAt, null)
   } finally {
     for (const [key, value] of [['MIKKA_DATABASE_URL',before.app], ['DATABASE_URL',before.workspace]] as const) {
       if (value === undefined) delete process.env[key]

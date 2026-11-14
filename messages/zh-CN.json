@@ -4419,6 +4419,14 @@
     "copyFailed": "复制失败"
   },
   "IssueThreads": {
+    "organization": {
+      "archive": "归档对话",
+      "unarchive": "取消归档",
+      "pin": "置顶对话",
+      "unpin": "取消置顶",
+      "unavailable": "此对话已不可用。",
+      "failed": "未能保存对话更改。"
+    },
     "title": "线程",
     "modelSwitched": "已改用",
     "agent": "Bot",

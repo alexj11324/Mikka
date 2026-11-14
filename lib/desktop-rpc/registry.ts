@@ -217,6 +217,8 @@ const functions = {
   'task-runs.pollTaskRuns': actions26.pollTaskRuns,
   'task-runs.pollThreads': actions26.pollThreads,
   'task-runs.syncThreadList': actions26.syncThreadList,
+  'task-runs.readConversationOrganization': actions26.readConversationOrganization,
+  'task-runs.setConversationOrganization': actions26.setConversationOrganization,
   'task-runs.renameConversation': actions26.renameConversation,
   'task-runs.regenerateConversationTitle': actions26.regenerateConversationTitle,
   'team-relations.getIssueTeam': actions27.getIssueTeam,
