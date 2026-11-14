@@ -1,9 +1,9 @@
 import { timingSafeEqual } from 'node:crypto'
+import { workersAiModelId } from '../../lib/workers-ai-config.ts'
 import { boundedJson } from '../bounded-json.mjs'
 import { nativeChatStream } from './stream.mjs'
 
 const host = 'workers-ai.internal'
-const model = '@cf/deepseek-ai/deepseek-v4.1-flash-1017'
 // The account binding accepts a single chat-completions operation. Provider-specific
 // URLs, billing/gateway options or extra completions cannot be supplied by a caller.
 const inputFields = new Set(['model', 'messages', 'max_tokens', 'temperature', 'top_p',
@@ -44,7 +44,7 @@ export async function workersAiRequest(request, ai, capability) {
   let body
   try { body = await boundedJson(request, 16 * 1024 * 1024) }
   catch (error) { return unavailable(error instanceof RangeError ? 413 : 400) }
-  if (body?.model !== model || !Object.keys(body).every(key => inputFields.has(key))
+  if (body?.model !== workersAiModelId || !Object.keys(body).every(key => inputFields.has(key))
       || (body.stream !== undefined && typeof body.stream !== 'boolean')
       || !Array.isArray(body.messages) || !body.messages.length
       || !Number.isSafeInteger(body.max_tokens) || body.max_tokens < 1 || body.max_tokens > 4096
