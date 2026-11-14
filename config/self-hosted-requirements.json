@@ -224,6 +224,12 @@
     "behavior": "The Vercel packaging step deduplicates byte-identical function trees only when deployment configuration and resolved dependencies agree. Compose uses the Node server target.",
     "test": "apps/api/scripts/dedupe-functions.test.mjs"
   },
+  "apps/api/scripts/dev.mjs": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The development server uses Nitro's native drain during worker replacement so admitted requests can finish with their original worker.",
+    "test": "apps/api/runtime/dev-tracing.test.mjs"
+  },
   "apps/api/scripts/finalize-build.mjs": {
     "mode": "built-in",
     "environment": [
