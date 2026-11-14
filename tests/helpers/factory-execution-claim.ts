@@ -1,14 +1,15 @@
-import { runChanged } from '../live/panels';
-import { executionIdentityForRun } from '../execution-identity';
+import { runChanged } from '../../lib/live/panels';
+import { executionIdentityForRun } from '../../lib/execution-identity';
 import type { Pool, PoolClient } from "pg";
-import { FactoryError } from "./contract";
-import type { FactoryAuthorize } from "./store";
-import { runListChanged } from "../live/lists";
-import { advanceTaskAfterRunStart } from "../task-status-run-start";
+import { FactoryError } from "../../lib/factory/contract";
+import type { FactoryAuthorize } from "../../lib/factory/store";
+import { runListChanged } from "../../lib/live/lists";
 
 /** Ordinary runs retain their contract. Factory runs must have a current,
  * adopted spec/execute binding. Lock order matches cancellation: task, issue,
  * run. A retry child is not an ordinary run while adoption is pending. */
+// Only historical schema fixtures use this lease transition. Production calls the
+// local/cloud device claim with its current scoped Factory guard.
 export function createExecutionClaim(pool: Pool, authorize: FactoryAuthorize) {
   const guard=createExecutionClaimGuard(authorize);
   return async (
@@ -26,7 +27,7 @@ export function createExecutionClaim(pool: Pool, authorize: FactoryAuthorize) {
          WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3 AND status='queued' AND "stopRequestedAt" IS NULL RETURNING id`,
         [runId, userId, deviceId, leaseExpiresAt],
       );
-      if (rows.length) { await runListChanged(tx, runId); await runChanged(tx, runId); advanceTaskAfterRunStart(tx, runId); }
+      if (rows.length) { await runListChanged(tx, runId); await runChanged(tx, runId); }
       await tx.query("COMMIT");
       return rows;
     } catch (error) {

@@ -187,11 +187,6 @@ export const reconcileFactoryRuns = createFactoryReconciler(
   backgroundWorkspace,
 );
 
-import { createExecutionClaim, createExecutionClaimGuard } from "./execution-claim";
-export const claimExecutionRun = createExecutionClaim(pool, authorize);
-
-export const guardExecutionRun=createExecutionClaimGuard(authorize);
-
 export function factoryRoutingEnabled() {
   return deploymentSwitch('factoryRouting');
 }
