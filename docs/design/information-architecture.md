@@ -227,18 +227,17 @@ Window bar
 ├── Back / forward
 ├── Search (⌘K)
 ├── Right column toggle
-├── 全部任务 (hand + count of 等你处理 tasks)
 └── Browser globe
 Icon rail
 ├── Home → bot list | chat | right column
-├── 建议
-├── 看板 → tasks, projects and teams
+├── 建议 / 收件箱 → what waits on the person, with its count
+├── 看板 → every task of the workspace (看板 / 列表 views), projects and teams; the one entry for tasks (2026-11-13-1405)
 ├── 插件
 ├── Artifact
 └── Account menu → accounts, workspaces and Settings
 Right column beside the chat
 ├── Bot overview → 详情 / 任务 / PR / 电脑
-├── 全部任务 → 等待你 / 进行中 / 待办 / 已完成
+├── A bot's tasks → the tasks it dispatched, under their status in the board's order (a filtered view of the board)
 ├── Task detail → properties, description and chronological 活动
 └── Task conversation → one conversation, oldest first, composer on the newest
 Centre pages

@@ -18,6 +18,7 @@ import { PullRequestsBadge } from '@/components/workspace/pull-requests-badge'
 import { useViewState } from '@/lib/hooks/view-state'
 import { ReviewSummaryLine } from '@ui-slot/review-summary'
 import { openReview } from '@/hooks/code-review/use-review-page'
+import { conversationTitle } from '@/lib/short-title'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 
@@ -31,8 +32,9 @@ export const TWO_LINE_ROW = 'flex h-auto w-full flex-col items-stretch justify-s
 
 export function threadName(thread: Thread, issues: Issue[], fallback: string) {
   const issue = thread.issueId ? issues.find(item => item.id === thread.issueId) : undefined
-  if (issue) return [issueIdentifier(issue), issue.title].filter(Boolean).join(' ')
-  return thread.prompt.split('\n').find(line => line.trim())?.trim().slice(0, 80) || fallback
+  // The conversation's one short title (decision 2026-11-13-1405), after its task's code when it has a task.
+  const title = conversationTitle({ title: thread.title, name: thread.prompt.split('\n').find(line => line.trim())?.trim(), issue })
+  return [issue && issueIdentifier(issue), title].filter(Boolean).join(' ') || fallback
 }
 
 /** A thread's mark: an orange disc with # (Figma 188:3192), 72px on its 详情. */

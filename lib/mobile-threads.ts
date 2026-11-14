@@ -81,7 +81,7 @@ function listed(rows: Awaited<ReturnType<typeof runRows>>): MobileThread[] {
 /** Threads with what their task links: its id, title and pull requests, as far as this person can see it. */
 async function runRows(userId: string, filter: SQL | undefined, limit: number) {
   const rows = await db.select({
-    unread: threadUnread, id: agentRuns.id, prompt: sql<string>`left(${runTaskPrompt}, 300)`, status: agentRuns.status,
+    unread: threadUnread, id: agentRuns.id, title: agentRuns.title, prompt: sql<string>`left(${runTaskPrompt}, 300)`, status: agentRuns.status,
     agentName: runBotName, harness: agents.harness,
     deviceId: devices.id, deviceName: devices.name, platform: devices.platform, deviceKind: devices.kind,
     createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt, outcome: agentRuns.outcome,
@@ -102,7 +102,7 @@ async function runRows(userId: string, filter: SQL | undefined, limit: number) {
     const source = found?.kind === 'run' ? found : undefined
     const thread: MobileThread = {
       id: row.id, unread: row.unread,
-      name: nameOf(source, row.prompt, row.agentName),
+      name: row.title || nameOf(source, row.prompt, row.agentName),
       status: mobileThreadStatus(row.status),
       by: row.agentName,
       harness: row.harness,
