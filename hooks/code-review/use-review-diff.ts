@@ -21,7 +21,7 @@ export function useReviewDiff(taskId: string | null | undefined, options: { comm
   useReviewLive(taskId ?? null, result.data?.summary.live?.workspaceId, key ? [unstable_serialize(key)] : [])
   const [pages, setPages] = useState<{ after: ReviewRead; files: ReviewFile[]; nextCursor?: string } | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
-  const first = result.data
+  const first = result.error ? undefined : result.data
   const extra = pages && pages.after === first ? pages : null
   const nextCursor = extra ? extra.nextCursor : first?.diff.nextCursor
   const loadMore = useCallback(async () => {
@@ -34,7 +34,7 @@ export function useReviewDiff(taskId: string | null | undefined, options: { comm
     } finally { setLoadingMore(false) }
   }, [taskId, first, nextCursor, loadingMore])
   const files = first ? [...first.diff.files, ...(extra?.files ?? [])] : []
-  return { ...result, files, nextCursor, loadMore, loadingMore }
+  return { ...result, data: first, files, nextCursor, loadMore, loadingMore }
 }
 
 /** One file's patch, for a file paged out or too large (R12 「按文件加载」); null path reads nothing. */
