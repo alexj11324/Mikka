@@ -83,11 +83,11 @@ test('a missing code or an unmatched Agent does not invent a link', () => {
   ])
 })
 
-test('a chip carries what its hover preview shows: the task title and status, the run result', () => {
+test('a chip carries what its hover card shows, as Capy: the task and the run, never empty fields', () => {
   const line = activityLineParts([
     event({ id: 's', at: '2026-11-14T14:02:00.000Z', kind: 'status', status: 'review' }),
-  ], labels(en), { ...subject, title: 'Retry does not refresh', status: 'review' }, en.Workspace.activity.separator, agent,
-  [{ at: '2026-11-14T14:00:00.000Z', runId: 'run-1', linked: true, result: 'Done' }])
-  assert.deepEqual(line[0], { kind: 'thread', text: 'Ada', runId: 'run-1', result: 'Done' })
-  assert.deepEqual(line.find(part => part.kind === 'task'), { kind: 'task', text: 'MIK-12', taskId: 'task-1', title: 'Retry does not refresh', status: 'review' })
+  ], labels(en), { ...subject, title: 'Retry does not refresh', status: 'review', priority: 'high', assignee: undefined }, en.Workspace.activity.separator, agent,
+  [{ at: '2026-11-14T14:00:00.000Z', runId: 'run-1', linked: true, harness: 'claude_code', result: 'Done', time: '34 minutes ago' }])
+  assert.deepEqual(line[0], { kind: 'thread', text: 'Ada', runId: 'run-1', harness: 'claude_code', title: 'Retry does not refresh', result: 'Done', time: '34 minutes ago' })
+  assert.deepEqual(line.find(part => part.kind === 'task'), { kind: 'task', text: 'MIK-12', taskId: 'task-1', title: 'Retry does not refresh', status: 'review', priority: 'high' })
 })

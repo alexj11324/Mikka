@@ -1444,7 +1444,7 @@
       "editDescription": "Edit description",
       "doneEditing": "Done",
       "noDescription": "No description",
-      "runBy": "Run by {name}"
+      "untitledThread": "Untitled thread"
     },
     "breadcrumbBoard": "Board",
     "breadcrumbMore": "More locations",

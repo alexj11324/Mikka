@@ -1444,7 +1444,7 @@
       "editDescription": "编辑描述",
       "doneEditing": "完成",
       "noDescription": "暂无描述",
-      "runBy": "{name} 的运行"
+      "untitledThread": "无标题对话"
     },
     "breadcrumbBoard": "看板",
     "breadcrumbMore": "更多位置",

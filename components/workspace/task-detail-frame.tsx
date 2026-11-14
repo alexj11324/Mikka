@@ -201,8 +201,8 @@ export function FramedTask(props: FramedTaskProps) {
   // 活动: the task's events, its Agent rows and its discussions in one log, oldest first.
   const subtaskRows = (connections.rows ?? []).filter(row => row.metadata.parentId === task.id).map(row => ({ id: row.id, title: row.title, identifier: row.identifier, createdAt: row.createdAt }))
   const eventsFor = useActivityEvents(props.historyFailed ? [] : props.versions, props.historyFailed ? [] : subtaskRows, {
-    task: { taskId: task.id, code: task.identifier, title: props.title, status: task.status },
-    stretches: (props.agentActivity.items ?? []).map(item => ({ at: item.at, runId: item.runId, linked: item.onOpen !== null, result: item.result })),
+    task: { taskId: task.id, code: task.identifier, title: props.title, status: props.status, priority: props.priority, assignee: member?.name },
+    stretches: (props.agentActivity.items ?? []).map(item => ({ at: item.at, runId: item.runId, linked: item.onOpen !== null, harness: item.harness, result: item.result, time: item.time })),
   })
   const discussions = useRef<IssueDiscussions | null>(null)
   const drafts = useActivityDrafts(task.id,

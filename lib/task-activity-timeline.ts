@@ -70,15 +70,20 @@ type HistoryLabels = Pick<typeof import('../messages/en.json')['Workspace']['act
 /** A clause is words plus the task, thread or pull a word opens. The row paints them; the name is one part at the front. */
 export type ActivityPiece =
   | { kind: 'text'; text: string; name?: boolean }
-  | { kind: 'task'; text: string; taskId: string; title?: string; status?: string }
-  | { kind: 'thread'; text: string; runId: string; result?: string }
+  | ({ kind: 'task'; text: string; taskId: string } & TaskPreview)
+  | ({ kind: 'thread'; text: string; runId: string } & RunPreview)
   | { kind: 'pull'; text: string; href: string }
 
 /** The task the page is showing, so 「创建了 {编号}」 and 「把 {编号} 改成了」 can name it. */
-export type ActivitySubject = { taskId: string; code: string | null; title?: string; status?: string }
+/** What a task code's hover card shows, as Capy's: status, priority, title, assignee. */
+export type TaskPreview = { title?: string; status?: string; priority?: string; assignee?: string }
+/** What an Agent name's hover card shows, as Capy's thread card: the Agent, the conversation's title (the task's, R-81), how its run ended and when. */
+export type RunPreview = { harness?: string; title?: string; result?: string; time?: string }
+
+export type ActivitySubject = { taskId: string; code: string | null } & TaskPreview
 
 /** One Agent stretch on this task. `linked` is false when that run has no conversation to open. */
-export type ActivityStretch = { at: string; runId: string; linked: boolean; result?: string }
+export type ActivityStretch = { at: string; runId: string; linked: boolean } & RunPreview
 
 export type ActivityLabels = {
   created: string
@@ -90,17 +95,22 @@ export type ActivityLabels = {
 /** A character that cannot appear in a status, title or name, so the translated sentence can be split around the code. */
 const CODE = '\u0001'
 
+/** The fields that have a value, so a part never carries `undefined` keys. */
+function defined<T extends Record<string, string | undefined>>(values: T): Partial<T> {
+  return Object.fromEntries(Object.entries(values).filter(([, value]) => value)) as Partial<T>
+}
+
 function words(text: string): ActivityPiece[] {
   return text ? [{ kind: 'text', text }] : []
 }
 
-/** `about` is what a hover preview shows for that task: its title and status, when this page knows them. */
-function withTask(rendered: string, text: string, taskId: string, about: { title?: string; status?: string } = {}): ActivityPiece[] {
+/** `about` is what that task's hover card shows, when this page knows it. Absent fields are left out. */
+function withTask(rendered: string, text: string, taskId: string, about: TaskPreview = {}): ActivityPiece[] {
   const chunks = rendered.split(CODE)
   const pieces: ActivityPiece[] = []
   chunks.forEach((chunk, index) => {
     if (chunk) pieces.push({ kind: 'text', text: chunk })
-    if (index < chunks.length - 1) pieces.push({ kind: 'task', text, taskId, ...about.title ? { title: about.title } : {}, ...about.status ? { status: about.status } : {} })
+    if (index < chunks.length - 1) pieces.push({ kind: 'task', text, taskId, ...defined(about) })
   })
   return pieces.length ? pieces : words(rendered)
 }
@@ -108,7 +118,7 @@ function withTask(rendered: string, text: string, taskId: string, about: { title
 /** The clause for one event. The caller's locale supplies the sentence; a code is a task part when this page can open it. */
 export function taskHistoryPieces(event: IssueActivityEvent, labels: ActivityLabels, subject?: ActivitySubject | null): ActivityPiece[] {
   const t = labels.activity
-  const own = subject?.code && subject.taskId ? { code: subject.code, taskId: subject.taskId, about: { title: subject.title, status: subject.status } } : null
+  const own = subject?.code && subject.taskId ? { code: subject.code, taskId: subject.taskId, about: { title: subject.title, status: subject.status, priority: subject.priority, assignee: subject.assignee } } : null
   switch (event.kind) {
     case 'created': return own ? withTask(t('created', { code: CODE }), own.code, own.taskId, own.about) : words(labels.created)
     case 'status': {
@@ -176,6 +186,7 @@ export function activityLineParts(
   const name = actor?.name || null
   if (!name) return clause
   const stretch = activityStretch(events[0]?.at ?? '', actor, stretches)
-  const lead: ActivityPiece = stretch ? { kind: 'thread', text: name, runId: stretch.runId, ...stretch.result ? { result: stretch.result } : {} } : { kind: 'text', text: name, name: true }
+  // A task has one conversation, named by the task (R-81), so the card's title is the task's.
+  const lead: ActivityPiece = stretch ? { kind: 'thread', text: name, runId: stretch.runId, ...defined({ harness: stretch.harness, title: stretch.title ?? subject?.title, result: stretch.result, time: stretch.time }) } : { kind: 'text', text: name, name: true }
   return [lead, { kind: 'text', text: ' ' }, ...clause]
 }
