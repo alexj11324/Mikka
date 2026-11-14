@@ -1488,5 +1488,33 @@
     "behavior": "Read only the requested account's Telegram link from the installation database. Report the bot configured only when all three operator inputs exist; normalize its public username and keep unlinked accounts disconnected.",
     "test": "tests/telegram-task-link.db.test.ts",
     "suite": "test:task-identity-db"
+  },
+  "lib/coordinator/product-instructions.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Native Eve and the application host compose the same current instruction context from the installation scoped stores, preserving memory settings and usage receipts.",
+    "test": "lib/coordinator/prompt-preferences.test.ts",
+    "suite": "test:agent-kit-model"
+  },
+  "lib/coordinator/prompt-context.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The instruction context reads the current owner and Bot memory alongside the existing current prompt preferences without loading chat history.",
+    "test": "lib/coordinator/prompt-preferences.test.ts",
+    "suite": "test:agent-kit-model"
+  },
+  "lib/factory/reconcile-pending.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Native instruction routing and Factory reconciliation use the same owner and Bot scoped eligibility query over the installation database.",
+    "test": "lib/factory/reconcile-pending.test.ts",
+    "suite": "test:factory"
+  },
+  "lib/factory/instructions.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The existing Factory question and check recovery instructions are shared as product policy text with no external service dependency.",
+    "test": "lib/coordinator/prompt-context-concurrency.test.ts",
+    "suite": "test:agent-kit-model"
   }
 }

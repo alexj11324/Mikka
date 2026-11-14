@@ -36,17 +36,18 @@ export const describeProductTools = (tools: ToolSet): Promise<ProductCatalogueEn
 )
 
 /** Refresh discovery before each native model call. Execution rechecks every action. */
-export async function productCatalogue(scope: Scope, binding: ExecutionBinding): Promise<ProductCatalogueEntry[]> {
+export async function productCatalogue(scope: Scope, binding: ExecutionBinding, prepared?: AgentExecution | null): Promise<ProductCatalogueEntry[]> {
   const { assertSessionScope } = await import('./scope')
   await assertSessionScope(scope, binding.sessionId)
   return asProductPrincipal(scope, async () => {
-    const { execution, sourceEventId, scheduledRead, taskEventId, entryOrigin } = await productContext(scope, binding)
+    const { execution, sourceEventId, scheduledRead, taskEventId, entryOrigin } = await productContext(scope, binding, prepared)
     const tools = await productTools(scope, execution, sourceEventId, scheduledRead, taskEventId, entryOrigin)
     return describeProductTools(tools)
   })
 }
 
-async function gatewayExecution(scope: Scope, input: ExecutionBinding): Promise<AgentExecution | null> {
+async function productExecution(scope: Scope, input: ExecutionBinding, prepared?: AgentExecution | null): Promise<AgentExecution | null> {
+  if (prepared !== undefined) return checkedPreparedEveExecution(scope, input, prepared)
   const { agentKitEnabled, agentKitStore, agentScope } = await import('../agent-kit/service')
   if (!input.executionId) {
     if (agentKitEnabled()) throw new Error('agentExecutionClosed')
@@ -55,8 +56,21 @@ async function gatewayExecution(scope: Scope, input: ExecutionBinding): Promise<
   return agentKitStore.readExecution(await agentScope(scope.ownerId, scope.botId), input.executionId, `${input.sessionId}:${input.turnId}:0`)
 }
 
-export async function productContext(scope: Scope, binding: ExecutionBinding) {
-  const execution = await gatewayExecution(scope, binding)
+/** Reuse the immutable native grant while checking its current execution state. */
+export async function checkedPreparedEveExecution(scope: Scope, input: ExecutionBinding, prepared: AgentExecution | null): Promise<AgentExecution | null> {
+  const { agentKitEnabled, agentKitStore } = await import('../agent-kit/service')
+  if (!input.executionId) {
+    if (agentKitEnabled()) throw new Error('agentExecutionClosed')
+    return null
+  }
+  if (prepared?.id !== input.executionId) throw new Error('agentExecutionClosed')
+  const status = await agentKitStore.executionStatus({ ownerId: scope.ownerId, botId: scope.botId, workspaceId: scope.workspaceId }, prepared.id)
+  if (status !== 'running') throw new Error('agentExecutionClosed')
+  return prepared
+}
+
+export async function productContext(scope: Scope, binding: ExecutionBinding, prepared?: AgentExecution | null) {
+  const execution = await productExecution(scope, binding, prepared)
   const { pool } = await import('../db')
   const source = (await pool.query<{ source_event_id: string; id: string | null; payload: Record<string, unknown> }>(`SELECT t.source_event_id,e.id,e.payload FROM eve_turn_sources t
     LEFT JOIN coordinator_events e ON e.id=t.source_event_id AND e."userId"=$3 AND e."botId"=$4

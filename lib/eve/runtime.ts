@@ -3,10 +3,11 @@ import { defineState } from 'eve/context'
 import {evaluationForSession,evaluationModel} from './evaluation-runtime'
 import { HostedWorkflowModel } from '../abuse/workflow-model'
 import { SubscriptionWorkflowModel } from '../subscription-workflow-model'
-import { assertEveScope, scopeFromAuth } from './scope'
+import { assertEveScope, assertSessionScope, scopeFromAuth } from './scope'
 import { streamingModel } from './streaming-model'
 import { productRpc } from './product-rpc'
 import { prepareEveExecution } from './product-definitions'
+import { deploymentSwitch } from '../deployment-switches'
 
 // Eve memos belong to one definition. Session state shares the immutable
 // preparation across model, tools, connections, skills and instructions.
@@ -34,8 +35,7 @@ export async function executionForSession(ctx: DynamicModelContext) {
   }
   // Keep each consumer's JSON independent, as ctx.memo does on every read.
   const { prepared, sourceEventId } = structuredClone(saved)
-  const scheduledRead = sourceEventId ? await (await import('./scheduled-read')).loadScheduledRead(scope,sourceEventId) : null
-  return { scope, ...prepared, sourceEventId, scheduledRead }
+  return { scope, ...prepared, sourceEventId }
 }
 
 export async function modelForSession(ctx: DynamicModelContext) {
@@ -50,12 +50,26 @@ export async function modelForSession(ctx: DynamicModelContext) {
 export async function instructionsForSession(ctx: DynamicModelContext) {
   const evaluation=await evaluationForSession(ctx)
   if(evaluation)return evaluation.instructions
-  const { scope, execution, scheduledRead } = await executionForSession(ctx)
+  const { scope, execution, sourceEventId } = await executionForSession(ctx)
+  const scheduledRead = sourceEventId ? await (await import('./scheduled-read')).loadScheduledRead(scope,sourceEventId) : null
   if (scheduledRead) return `This is an authorized scheduled read-only task. Use only the provided read tools. Do not request approval, create schedules or perform writes. Return the result for the original chat.\n${scheduledRead.prompt}`
   // Slack gets product policy but never private web history, memory or profile.
   if (scope.surface === 'slack') {
     const { COORDINATOR_INSTRUCTIONS } = await import('../coordinator/instructions')
     return COORDINATOR_INSTRUCTIONS + '\nUse only this Slack conversation. Do not access private web chat history or memories. Reply in the same thread; call no_reply when no useful response is needed.'
   }
-  return (await productRpc<{instructions:string}>(scope,{operation:'instructions',sessionId:ctx.session.id,turnId:ctx.turn!.id,executionId:execution?.id})).instructions
+  await assertSessionScope(scope, ctx.session.id)
+  const { asProductPrincipal } = await import('./product-definitions')
+  return asProductPrincipal(scope, async () => {
+    if (deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle')) {
+      const [{ pool }, { pendingFactoryReconciliation }] = await Promise.all([import('../db'), import('../factory/reconcile-pending')])
+      if ((await pendingFactoryReconciliation(pool, scope.ownerId, scope.botId)).length) {
+        return (await productRpc<{instructions:string}>(scope,{operation:'instructions',sessionId:ctx.session.id,turnId:ctx.turn!.id,executionId:execution?.id})).instructions
+      }
+    }
+    const { checkedPreparedEveExecution } = await import('./product-definitions')
+    const current = await checkedPreparedEveExecution(scope, { sessionId: ctx.session.id, turnId: ctx.turn!.id, executionId: execution?.id }, execution)
+    const { composeEveInstructions } = await import('../coordinator/product-instructions')
+    return composeEveInstructions(scope.ownerId, scope.botId, current?.snapshot, { sessionId: ctx.session.id, turnId: ctx.turn!.id })
+  })
 }
