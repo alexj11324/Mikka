@@ -105,12 +105,17 @@ test('a failed refresh withdraws cached rows and workspace permissions until a s
     })
     await settle()
   }
+  function assertPopulated() {
+    assert.equal(mine.secrets?.[0]?.id, 'mine')
+    assert.equal(shared.secrets?.[0]?.id, 'shared')
+    assert.equal(shared.role, 'admin')
+    assert.deepEqual(saved.logins, [login])
+    assert.deepEqual(used.uses, [use])
+  }
+
   restore()
   await render()
-  assert.equal(mine.secrets?.[0]?.id, 'mine')
-  assert.equal(shared.role, 'admin')
-  assert.equal(saved.logins[0]?.id, 'one')
-  assert.equal(used.uses[0]?.id, 'one')
+  assertPopulated()
 
   personal = workspace = list = usage = new Error('read unavailable')
   await reload()
@@ -126,9 +131,5 @@ test('a failed refresh withdraws cached rows and workspace permissions until a s
 
   restore()
   await reload()
-  assert.equal(mine.secrets?.[0]?.id, 'mine')
-  assert.equal(shared.secrets?.[0]?.id, 'shared')
-  assert.equal(shared.role, 'admin')
-  assert.deepEqual(saved.logins, [login])
-  assert.deepEqual(used.uses, [use])
+  assertPopulated()
 })
