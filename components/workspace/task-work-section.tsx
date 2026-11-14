@@ -8,6 +8,7 @@ import type { IssuePullRequest } from '@/lib/issue-metadata'
 import { runResult, useRunResultLabel } from '@/hooks/use-run-result'
 import { presentedFactoryEvents, taskFactoryProgress } from '@/lib/task-factory-events'
 import { Button } from '@/components/ui/button'
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 
 type Pull = { url: string; title?: string | null; state: string | null; runId?: string | null }
 
@@ -43,7 +44,7 @@ export function TaskWorkSection({ threads, pulls, factory, open }: {
   const byRun = new Map(conversations.flatMap(thread => [thread.id, ...thread.attempts.map(attempt => attempt.runId)].map(id => [id, thread] as const)))
   const labelStage = (stage: string) => (messages.GroupTask.stage as Record<string, string>)[stage] ?? stage
   const labelStatus = (status: string) => (messages.GroupTask.status as Record<string, string>)[status] ?? status
-  return <section aria-label={t('heading')} className="my-4 space-y-1" data-slot="task-work">
+  return <section aria-label={t('heading')} className="my-4 flex flex-col gap-1" data-slot="task-work">
     <h2 className="mb-2 text-sm font-semibold">{t('heading')}</h2>
     {conversations.map(thread => {
       const detail = thread.detail
@@ -55,11 +56,11 @@ export function TaskWorkSection({ threads, pulls, factory, open }: {
         <span className="min-w-0 flex-1 truncate">{name}</span><span className="text-xs text-muted-foreground">{resultLabel(result, reason)}</span>
       </div>
       return <Button key={thread.id} variant="ghost" onClick={() => open(thread.id)} className="h-auto w-full justify-start gap-2 px-1 py-2 text-left whitespace-normal">
-        <MessagesSquare aria-hidden="true" className="shrink-0 text-muted-foreground" />
+        <MessagesSquare data-icon="inline-start" aria-hidden="true" className="shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1"><span className="block truncate">{name}</span>
           <span className="block text-xs font-normal text-muted-foreground">{[detail.profile?.name || detail.agentName, detail.observedModel, view.stopping ? tThread('stopping') : resultLabel(result, reason)].filter(Boolean).join(' · ')}</span>
           {detail.summary && <span className="line-clamp-2 text-xs font-normal">{detail.summary}</span>}</span>
-        <ChevronRight aria-hidden="true" className="shrink-0 text-muted-foreground" />
+        <ChevronRight data-icon="inline-end" aria-hidden="true" className="shrink-0 text-muted-foreground" />
       </Button>
     })}
     {linked.map(pull => {
@@ -74,11 +75,13 @@ export function TaskWorkSection({ threads, pulls, factory, open }: {
           {detail?.summary && <span className="line-clamp-2 text-xs">{detail.summary}</span>}
         </span></a>
     })}
-    {progress.map(group => <details key={group.id} className="text-sm">
-      <summary className="cursor-pointer rounded-md py-2">{[group.runId ? byRun.get(group.runId)?.detail?.agentName : null, labelStage(group.current.stage), labelStatus(group.current.status)].filter(Boolean).join(' · ')}</summary>
-      <ol className="ms-5 space-y-1 border-s ps-3">{group.steps.map(step => <li key={step.id} className="text-xs">
+    {progress.map(group => <Collapsible key={group.id} className="text-sm">
+      <CollapsibleTrigger className="cursor-pointer rounded-md py-2 text-left">{[group.runId ? byRun.get(group.runId)?.detail?.agentName : null, labelStage(group.current.stage), labelStatus(group.current.status)].filter(Boolean).join(' · ')}</CollapsibleTrigger>
+      <CollapsibleContent>
+      <ol className="ms-5 flex flex-col gap-1 border-s ps-3">{group.steps.map(step => <li key={step.id} className="text-xs">
         {labelStage(step.stage)} · {labelStatus(step.status)} <time className="text-muted-foreground" dateTime={step.at}>{format.dateTime(new Date(step.at), { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</time>
       </li>)}</ol>
-    </details>)}
+    </CollapsibleContent>
+    </Collapsible>)}
   </section>
 }

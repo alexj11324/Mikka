@@ -79,6 +79,14 @@ test('a message to an ended thread runs it again in the same thread; only its ow
   }
   const end = (runId: string, status: string) => pool.query(`UPDATE agent_runs SET status=$2,"finishedAt"=now(),"updatedAt"=now() WHERE id=$1`, [runId, status])
 
+  // This suite covers continuation identity, not the separate quota-age gate.
+  // Earlier subtests can take over a minute on a loaded CI worker; renew the
+  // synthetic provider observation before each case, just as its live meter
+  // would. Preserve all allowance fields and production's strict 60 s gate.
+  t.beforeEach(async () => {
+    await pool.query(`UPDATE byos_connections SET quota=jsonb_set(quota, '{observedAt}', to_jsonb(now()::text)) WHERE "ownerId"=ANY($1)`, [users])
+  })
+
   const a = await person()
   const first = await steps.dispatchRun(a.id, { issueId: a.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, a.botId) as unknown as { runId: string; thread: string }
   assert.equal(first.thread, 'new', JSON.stringify(first))
