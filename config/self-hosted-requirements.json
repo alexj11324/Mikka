@@ -371,6 +371,13 @@
     "test": "lib/account-deletions-due.db.test.ts",
     "suite": "test:account-db"
   },
+  "lib/account/avatar-file.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The account settings upload validates the same image types and byte limit for Web and packaged desktop before storing an avatar.",
+    "test": "lib/account/account.test.ts",
+    "suite": "test:account"
+  },
   "lib/account/cloud-cleanup.ts": {
     "mode": "built-in",
     "environment": [],
