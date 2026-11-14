@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl'
 import { findThreadReferences } from '@/app/actions/task-runs'
 import { Button } from '@/components/ui/button'
 import { withBasePath } from '@/lib/base-path'
-import { mentionAt, personReferenceParts, referenceMarker, referenceQueryReady, type ThreadReference } from '@/lib/thread-references'
+import { mentionAt, personReferenceParts, referenceMarker, referenceQueryReady, sourceMentionAt, type ThreadReference } from '@/lib/thread-references'
 import { openGroupConversation, openTask, openThread, workspaceSearch } from './workspace-navigation'
 
 export function PersonReferences({ text }: { text: string }) {
@@ -83,6 +83,7 @@ export function ThreadReferencePicker({ draft, workspaceId, input, onChange }: {
     textarea.addEventListener('keydown', key, true)
     return () => textarea.removeEventListener('keydown', key, true)
   }, [visible, input, signature])
+  if (sourceMentionAt(draft, caret ?? draft.length)) return <p role="status" className="text-sm text-muted-foreground">{t('sourceUnavailable')}</p>
   if (!visible || !mention) return null
   const current = lookup?.workspaceId === workspaceId && lookup.mention.query === query && lookup.mention.kind === kind &&
     lookup.mention.from === from && lookup.mention.end === end ? lookup : null

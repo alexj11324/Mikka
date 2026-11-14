@@ -11,7 +11,7 @@ import type { ThreadDetail } from '@/lib/types'
 import { useApi } from '@/lib/useApi'
 import { DESKTOP_RPC_VERSION } from '../../../../../lib/desktop-rpc/version'
 import { choiceFromMenu, type ThreadModelChoice } from '../../../../../lib/thread-model-choice'
-import { mentionAt, referenceMarker, referenceQueryReady, type ThreadReference } from '../../../../../lib/thread-references'
+import { mentionAt, referenceMarker, referenceQueryReady, sourceMentionAt, type ThreadReference } from '../../../../../lib/thread-references'
 import { Composer } from './chat-composer'
 
 async function rpc<T>(action: string, args: unknown[]): Promise<T> {
@@ -45,8 +45,8 @@ function ThreadInput({ detail, runId, workspaceId, onSend, ...props }: Props & {
   const option = selectable && menu.data ? menu.data.groups.flatMap(group => group.options).find(row => row.id === choice) : undefined
   const group = option && menu.data?.groups.find(entry => entry.options.includes(option))
   const currentMenu = menu.data && option && group ? { ...menu.data, current: { ...menu.data.current, id: option.id, modelId: option.modelId, kind: group.kind, credentialLabel: group.credentialLabel } } : menu.data
-  const scopeFile = /(?:^|\s)@(file|folder)(?::[^\s]*)?$/i.test(text.slice(0, caret))
-  const mention = scopeFile ? null : mentionAt(text, caret)
+  const scopeFile = sourceMentionAt(text, caret)
+  const mention = mentionAt(text, caret)
   const kind = mention?.kind, query = mention?.query
   const signature = JSON.stringify([workspaceId, kind, query])
   const [lookup, setLookup] = useState<{ key: string; items?: ThreadReference[] } | null>(null)

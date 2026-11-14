@@ -4,7 +4,13 @@ import { siteSearchQuery } from './site-search'
 export type ThreadReference = { kind: 'task' | 'thread' | 'pr'; id: string; title: string; conversationKind?: 'chat' }
 const pullRequest = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/[1-9]\d*\/?$/
 
+/** Source mentions belong to the repository-scoped file picker. */
+export function sourceMentionAt(text: string, caret: number): boolean {
+  return /(?:^|\s)@(file|folder)(?::[^\s]*)?$/i.test(text.slice(0, caret))
+}
+
 export function mentionAt(text: string, caret: number) {
+  if (sourceMentionAt(text, caret)) return null
   const match = /(?:^|\s)@(?:(task|thread|pr):)?([^\s@:]{0,120})$/u.exec(text.slice(0, caret))
   if (!match) return null
   return { from: match.index + match[0].indexOf('@'), end: caret, kind: match[1] as ThreadReference['kind'] | undefined, query: match[2] }

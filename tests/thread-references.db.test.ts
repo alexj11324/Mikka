@@ -3,12 +3,18 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { seedFixtureWorkspace } from './helpers/task-workspace'
-import { mentionAt, personReferenceParts, referenceMarker } from '../lib/thread-references'
+import { mentionAt, personReferenceParts, referenceMarker, sourceMentionAt } from '../lib/thread-references'
 
 test('an inline mention replaces only the active word at the caret and keeps unrelated human text literal', () => {
   const text = 'Please see @thread:checkout and the log'
   assert.deepEqual(mentionAt(text, text.indexOf(' and')), { from: 11, end: 27, kind: 'thread', query: 'checkout' })
   assert.equal(mentionAt('mail@example', 12), null)
+  for (const query of ['@file', 'See @folder:', 'See @FILE:src/index.ts']) {
+    assert.equal(sourceMentionAt(query, query.length), true)
+    assert.equal(mentionAt(query, query.length), null)
+  }
+  assert.equal(sourceMentionAt('See @file:src/a.ts later', 24), false)
+  assert.equal(mentionAt('@filename', 9)?.query, 'filename')
   const id = randomUUID()
   const marker = referenceMarker({ kind: 'thread', id, title: 'Checkout' })
   assert.deepEqual(personReferenceParts(`ref ${marker} ${id}`), [
