@@ -13,7 +13,7 @@ A partial entry has evidence for specific behavior/symbols. Only complete entrie
 
 ## Main differences
 
-main-delta.jsonl records 20 distinct changed paths between this fixed start and e0b64498c7396adbfd15e504ff9898f68d9c2186, tree b9b356279d96c33e8e43c0bad38fafd79836842f. It includes before/after Git IDs and explicit open follow-up for affected chains. An empty tip object is a deletion. Refresh using git ls-tree -rz --full-tree at each root, git diff --name-status -M with both exact commits, then examine all affected consumers. Keep merged-PR evidence and whole-file semantic evidence distinct. The current task and original nine are indexed in https://github.com/alexj11324/Mikka/issues/2506.
+main-delta.jsonl records 27 distinct changed paths between this fixed start and 081556f62683312c4924434b04adec4a245375fe, tree df8f35903a32732605e485f295e8de1d2d6c03fd. It includes before/after Git IDs and explicit open follow-up for affected chains. An empty tip object is a deletion. Refresh using git ls-tree -rz --full-tree at each root, git diff --name-status -M with both exact commits, then examine all affected consumers. Keep merged-PR evidence and whole-file semantic evidence distinct. The current task and original nine are indexed in https://github.com/alexj11324/Mikka/issues/2506.
 
 changes.jsonl indexes source/merge IDs, original PR rationale, official links cited in that record, and the isolated receipt where available. Check the PR and its protections for current state before taking further action.
 
