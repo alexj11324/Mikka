@@ -6,6 +6,7 @@ import { listRef } from '@/lib/live'
 import { mobileMessages } from '@/lib/messages'
 import { useLiveApi } from '@/lib/useApi'
 import type { ConversationDirectoryPage } from '../../../../../lib/conversation-directory-input'
+import { pullRequestsState } from '../../../../../lib/directory-pulls'
 
 type Children = Pick<ConversationDirectoryPage, 'items'> & { workspaceId: string; botId: string; more: boolean }
 const labels = mobileMessages.ConversationDirectory
@@ -19,8 +20,11 @@ export function BotConversations({ workspaceId, botId }: { workspaceId?: string;
   return <>
     <ReadNotice error={read.error} hasData={Boolean(group)} label={labels.title} onRetry={read.reload} />
     {group?.items.length ? <Group label={labels.title}>
-      {group.items.map(item => <Row key={item.id} label={item.title || labels.untitled} detail={labels[item.state]}
-        value={item.unread ? labels.unread : undefined} onPress={() => router.push(item.kind === 'chat' ? `/groups/${item.id}` : `/thread/${item.id}`)} />)}
+      {group.items.map(item => {
+        const pullState = item.pulls?.length ? mobileMessages.Metadata.prState[pullRequestsState(item.pulls)] : null
+        return <Row key={item.id} label={item.title || labels.untitled} detail={[labels[item.state], pullState].filter(Boolean).join(' · ')}
+          value={item.unread ? labels.unread : undefined} onPress={() => router.push(item.kind === 'chat' ? `/groups/${item.id}` : `/thread/${item.id}`)} />
+      })}
       {group.more && <Row label={labels.viewAll} onPress={() => router.push({ pathname: '/conversations', params: { workspaceId: group.workspaceId, botId: group.botId } })} />}
     </Group> : null}
   </>

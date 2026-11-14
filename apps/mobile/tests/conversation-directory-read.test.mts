@@ -64,7 +64,8 @@ test('the mounted Bot detail opens its ranked eight conversations and carries th
   const host = document.createElement('div')
   const root = createRoot(host)
   const props = { botId: '30000000-0000-4000-8000-000000000003', workspaceId: 'workspace' }
-  const ranked = Array.from({ length: 8 }, (_, i) => ({ ...items[i % 2]!, id: `${i}`, title: `Rank ${i + 1}`, unread: i === 0 }))
+  const ranked: Item[] = Array.from({ length: 8 }, (_, i) => ({ ...items[i % 2]!, id: `${i}`, title: `Rank ${i + 1}`, unread: i === 0 }))
+  ranked[0]!.pulls = [{ url: 'https://github.com/mikka/app/pull/42', state: 'merged' }]
   const links = () => [...host.querySelectorAll('a')]
   try {
     botChildren = { ...props, items: ranked, more: true }
@@ -73,6 +74,8 @@ test('the mounted Bot detail opens its ranked eight conversations and carries th
     assert.equal(links().length, 9)
     for (const [i, item] of ranked.entries()) assert.ok(links()[i]!.textContent?.includes(item.title))
     assert.ok(links()[0]!.textContent?.includes(mobileMessages.ConversationDirectory.unread))
+    assert.ok(links()[0]!.textContent?.includes(mobileMessages.Metadata.prState.merged))
+    assert.ok(!links()[1]!.textContent?.includes(mobileMessages.Metadata.prState.merged))
     for (const index of [0, 1, 8]) await act(async () => links()[index]!.click())
     assert.deepEqual(navigation.splice(0), ['/thread/0', '/groups/1', { pathname: '/conversations', params: props }])
     linked = props
