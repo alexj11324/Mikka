@@ -92,6 +92,20 @@ const send = async () => { await act(async () => composer.onSubmit()) }
 const pending = () => container.querySelector('[data-pending]')
 const input = () => container.querySelector('textarea')!
 
+test('an offline bundled renderer still posts its group message once', async t => {
+  Object.defineProperty(browser.navigator, 'onLine', { configurable: true, value: false })
+  Object.defineProperty(browser, 'mikka', { configurable: true, value: { bundled: {} } })
+  t.after(() => {
+    Reflect.deleteProperty(browser.navigator, 'onLine')
+    Reflect.deleteProperty(browser, 'mikka')
+  })
+  post = async (_id, body) => message(body, 'stored', '2')
+  await render()
+  await draft('group delivery')
+  await send()
+  assert.deepEqual(sent, [{ group: 'group-one', body: 'group delivery' }])
+})
+
 test('a failed group send survives leaving for Settings and returning, with explicit retry only', async () => {
   await render(); await draft('keep the failed message'); await send()
   assert.equal(pending()?.getAttribute('data-pending'), 'failed')
