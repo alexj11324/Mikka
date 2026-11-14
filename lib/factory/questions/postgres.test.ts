@@ -1,3 +1,5 @@
+import { builtinGateway } from '../../builtin-gateway/runtime';
+import { coordinatorWakeTransport } from '../../coordinator/wake-after-commit';
 import { measured, readMetrics } from '../../../tests/helpers/read-metrics';
 import type { ModelMessage } from 'ai';
 import { completeAttentionQuestions } from '../../coordinator/question-attention';
@@ -29,7 +31,7 @@ import { threadQuestionStates } from "../../issue-thread-questions";
 import { readRunChain } from "../../run-chain";
 import { createFactoryReconciler } from "../reconcile";
 import { lostRunOutcome } from "../../run-retry";
-import { queueCloudQuestionContinuation } from "./queue-continuation";
+import { prepareCloudQuestionRecovery, queueCloudQuestionContinuation } from "./queue-continuation";
 import { questionExecutionContinuation } from "./execution-continuation";
 import { freezeWorkerDefinition } from "../../agent-kit/worker";
 import { blockQuestionRetry } from "./retry";
@@ -56,10 +58,29 @@ const rejects = (fn: () => Promise<unknown>, code: string) =>
     fn,
     (e: unknown) => e instanceof FactoryError && e.code === code,
   );
+test('cloud recovery preserves the cause when its machine lookup fails', async (t) => {
+  const cause = Object.assign(new Error('fixture lookup failed'), { code: '08006' });
+  const pool = new Pool();
+  t.mock.method(pool, 'query', async () => { throw cause; });
+  try {
+    await assert.rejects(prepareCloudQuestionRecovery(pool, 'owner', { runId: randomUUID(), workspaceId: randomUUID() }), error => {
+      assert.ok(error instanceof FactoryError);
+      assert.equal(error.code, 'factoryQuestionContinuationUnavailable');
+      assert.equal(error.cause, cause);
+      return true;
+    });
+  } finally {
+    await pool.end();
+  }
+});
+
 test(
   "PG17 execution questions: durable waiting, exact facts/human source, one continuation, rollback and stop fences",
   { skip: !dbURL, timeout: 120000 },
   async (t) => {
+    const previousWake = coordinatorWakeTransport.wake;
+    coordinatorWakeTransport.wake = async () => undefined;
+    t.after(() => { coordinatorWakeTransport.wake = previousWake; });
     const fixtureURL = await isolatedPostgresURL(dbURL!);
     const schema = `questions_${randomUUID().replaceAll("-", "")}`;
     const admin = new Pool({ connectionString: fixtureURL, max: 1 });
@@ -251,6 +272,22 @@ test(
             [issueId, originRuns.get(issueId)],
           )
         ).rows[0].n;
+
+      await t.test("recovering a stopped question settles its prior continuation once", async (st) => {
+        const f = await fixture("context", false);
+        const settle = st.mock.method(questions, "settle");
+        const record = st.mock.method(questions, "record");
+        const reconcile = createFactoryReconciler(pool, store, questions);
+        assert.deepEqual(await reconcile.run(userId, f.runId), { recovered: 1 });
+        const question = await questions.read(userId, f.questionId);
+        assert.equal(question.status, "open");
+        assert.equal(question.originRunId, f.runId);
+        assert.equal((await store.read(userId, f.task.id)).task.status, "waiting");
+
+        assert.deepEqual(await reconcile.run(userId, f.runId), { recovered: 0 });
+        assert.equal(settle.mock.callCount(), 1);
+        assert.equal(record.mock.callCount(), 1);
+      });
 
       await t.test("Coordinator attention completes a permission handoff once without another read or a fabricated answer", async (t) => {
         const normal = await fixture('permission');
@@ -915,6 +952,36 @@ test(
           assert.equal(await queued(changedTask.issueId), 0);
         },
       );
+      await t.test("a superseded continuation cannot claim or settle its replacement", async (st) => {
+        const f = await fixture();
+        const first = await questions.answer(orchestrator, facts(f));
+        const replacementRunId = randomUUID();
+        const lockTask = store.lockTask.bind(store);
+        st.mock.method(store, "lockTask", async (...args: Parameters<typeof lockTask>) => {
+          const task = await lockTask(...args);
+          await args[0].query(
+            'UPDATE factory_questions SET "continuationRunId"=$2 WHERE id=$1',
+            [f.questionId, replacementRunId],
+          );
+          return task;
+        });
+
+        await rejects(
+          () => questions.claimContinuation(userId, deviceId, first.continuationRunId, new Date(Date.now() + 60000).toISOString()),
+          "factoryQuestionContinuationUnavailable",
+        );
+        await pool.query(
+          `UPDATE agent_runs SET status='succeeded', "stopReason"='submitted', "sessionId"=$2 WHERE id=$1`,
+          [first.continuationRunId, f.q.originSessionId],
+        );
+        assert.equal(await questions.settle(userId, first.continuationRunId), null);
+        const { rows: [current] } = await pool.query(
+          'SELECT status, "continuationRunId" FROM factory_questions WHERE id=$1',
+          [f.questionId],
+        );
+        assert.deepEqual(current, { status: "resuming", continuationRunId: replacementRunId });
+      });
+
       await t.test(
         "known context facts answer ten times creates one strict original-session continuation",
         async () => {
@@ -1838,6 +1905,7 @@ test(
         },
       );
     } finally {
+      await builtinGateway()?.stop();
       await closeWorkspaceDatabase();
       await pool.end();
       await admin.query(`DROP SCHEMA "${schema}" CASCADE`);

@@ -15,6 +15,7 @@ export const QUESTION_STATUSES = [
   "expired",
   "superseded",
 ] as const;
+export const PENDING_QUESTION_STATUSES = ["open", "waiting_user", "resuming", "blocked"] as const satisfies readonly (typeof QUESTION_STATUSES)[number][];
 export type QuestionKind = (typeof QUESTION_KINDS)[number];
 export type QuestionStatus = (typeof QUESTION_STATUSES)[number];
 const text = z.string().trim().min(1).max(4000);

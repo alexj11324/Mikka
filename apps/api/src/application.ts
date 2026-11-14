@@ -17,8 +17,8 @@ const failure = (status: number) => Response.json({ error: status === 404 ? 'Not
 export function createApiHandler(routes: ApiRoute[], beginTrace: TraceFactory = noTrace, prepareWebTransport?: PrepareWebTransport) {
   const matchers = routes.map(routeMatcher)
   const router = new Hono({ strict: true })
-  for (const route of routes) {
-    const match = routeMatcher(route)
+  for (const [index, route] of routes.entries()) {
+    const match = matchers[index]!
     router.all(routerPath(route.path), async context => {
       const original = context.req.raw
       const matched = match(new URL(original.url).pathname)

@@ -1,6 +1,6 @@
 'use server'
 
-import { runAwaitingApproval } from '@/lib/task-state-query'
+import { runAwaitingApproval, runHistoryWindow } from '@/lib/task-state-query'
 import { singleFlight } from '@/lib/single-flight'
 import { readCompactRunFailure, runFailureBrief, type CompactRunFailure } from '@/lib/run-failure-projection'
 
@@ -62,7 +62,7 @@ async function readTaskRuns() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
   const context = await loadWorkspaceContext(undefined, session.user)
-  const visibility = await issueVisibility(session.user, false, context.workspace.id)
+  const visibility = await issueVisibility(session.user, false, context.workspace.id, db, { withTeamLinks: false })
   const observedAt = Date.now()
   const begun = await beginWorkspaceListRead(session.user.id, context.workspace.id, ['task_run_list'])
   // A run whose device went offline is retried (or lands in 等你) by the minute
@@ -74,10 +74,10 @@ async function readTaskRuns() {
     conversationTitle: agentRuns.title, asked: sql<string>`left(${runTaskPrompt}, 200)`.as('asked'), agentName: runAgentName.as('agentName'),
     status: agentRuns.status, outcome: agentRuns.outcome, failureDetails: runFailureBrief.as('failureDetails'),
     botId: runBotId.as('botId'),
-    expiresAt: sql<Date | null>`(select min(r."createdAt")+interval '30 days' from agent_runs r where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."workspaceId"=${agentRuns.workspaceId} and r."createdAt">now()-interval '30 days')`.as('expiresAt'),
-    harnesses: sql<string[]>`array(select a.harness from agent_runs r join agents a on a.id=r."agentId" where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."workspaceId"=${agentRuns.workspaceId} and r."createdAt" > now() - interval '30 days' group by a.harness order by max(r."createdAt") desc)`.as('harnesses'),
+    expiresAt: sql<Date | null>`(select min(r."createdAt")+${runHistoryWindow} from agent_runs r where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."workspaceId"=${agentRuns.workspaceId} and r."createdAt">now()-${runHistoryWindow})`.as('expiresAt'),
+    harnesses: sql<string[]>`array(select a.harness from agent_runs r join agents a on a.id=r."agentId" where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."workspaceId"=${agentRuns.workspaceId} and r."createdAt" > now() - ${runHistoryWindow} group by a.harness order by max(r."createdAt") desc)`.as('harnesses'),
   }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).innerJoin(issues, eq(issues.id, agentRuns.issueId))
-    .where(and(eq(agentRuns.userId, session.user.id), eq(agentRuns.workspaceId, context.workspace.id), visibility.predicate, isNotNull(agentRuns.issueId), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
+    .where(and(eq(agentRuns.userId, session.user.id), eq(agentRuns.workspaceId, context.workspace.id), visibility.predicate, isNotNull(agentRuns.issueId), sql`${agentRuns.createdAt} > now() - ${runHistoryWindow}`))
     .orderBy(agentRuns.issueId, desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200).as('latest_task_runs')
   // Select the same 200 issues first. Bot decoration is a one-to-one join in
   // this database; a missing or foreign bot cannot remove or duplicate a task.
@@ -157,7 +157,7 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
         .innerJoin(agentRuns, eq(agentRuns.deviceId, devices.id))
         .where(and(eq(agentRuns.userId, session.user.id), eq(agentRuns.workspaceId, context.workspace.id), eq(devices.ownerId, session.user.id),
           eq(devices.kind, 'local'), eq(devices.enabled, true), eq(agentRuns.status, 'queued'),
-          sql`${agentRuns.createdAt} > now() - interval '30 days'`))
+          sql`${agentRuns.createdAt} > now() - ${runHistoryWindow}`))
       : []
     const presence = await deviceOnlineStates(queuedDevices, observedAt)
     const presenceDevices = queuedDevices.map((device): PresenceDevice => [device.id, presence.get(device.id) ?? false,
@@ -181,9 +181,9 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
       outcome: agentRuns.outcome, failureDetails: runFailureBrief.as('failureDetails'),
       pauseReason: agentRuns.pauseReason, stopReason: agentRuns.stopReason, awaitingApproval: runAwaitingApproval.as('awaitingApproval'), threadReplacedBy: agentRuns.threadReplacedBy,
     }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(devices, eq(devices.id, agentRuns.deviceId))
-      .where(and(eq(agentRuns.userId, session.user.id), eq(agentRuns.workspaceId, context.workspace.id), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
+      .where(and(eq(agentRuns.userId, session.user.id), eq(agentRuns.workspaceId, context.workspace.id), sql`${agentRuns.createdAt} > now() - ${runHistoryWindow}`))
       .orderBy(desc(sql`greatest(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt})`), desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200)
-    const signature = await queryVersionWithExpiry(snapshot, sql`min(snapshot."createdAt")+interval '30 days'`)
+    const signature = await queryVersionWithExpiry(snapshot, sql`min(snapshot."createdAt")+${runHistoryWindow}`)
     const version = createHash('sha256').update(JSON.stringify([session.user.id, context.workspace.id, signature.version])).digest('hex').slice(0, 32)
     const visible = snapshot.as('thread_list_expiry')
     const live = withDevicePresence(await ownerListRead(session.user.id, [signature.expiresAt], observedAt, begun), presenceDevices, process.env, observedAt)
@@ -213,10 +213,11 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
   })
 }
 
-async function conversationOwner() {
+async function conversationActor() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
-  return session.user.id
+  const context = await loadWorkspaceContext(undefined, session.user)
+  return { ownerId: session.user.id, workspaceId: context.workspace.id }
 }
 
 /**
@@ -225,12 +226,12 @@ async function conversationOwner() {
  * Only the conversation's owner renames it.
  */
 export async function renameConversation(runId: string, title: string): Promise<ActionResult<{ title: string }, 'issueTitleInvalid' | 'runNotFound'>> {
-  const ownerId = await conversationOwner()
+  const { ownerId, workspaceId } = await conversationActor()
   const { manualConversationTitle } = await import('@/lib/conversation-title')
   if (typeof title !== 'string' || title.length > 400 || !manualConversationTitle(title)) return { error: 'issueTitleInvalid' }
   const { renameConversationTitle } = await import('@/lib/conversation-title-server')
   const { pool } = await import('@/lib/db')
-  const saved = await renameConversationTitle(pool, String(runId), ownerId, title)
+  const saved = await renameConversationTitle(pool, String(runId), ownerId, title, workspaceId)
   if (!saved) return { error: 'runNotFound' }
   await (await import('@/lib/live/lists')).runListChanged(pool, String(runId))
   return { title: saved }
@@ -241,12 +242,17 @@ export async function renameConversation(runId: string, title: string): Promise<
  * false when the model was unavailable or gave nothing usable: the conversation keeps the title it had.
  */
 export async function regenerateConversationTitle(runId: string): Promise<ActionResult<{ title: string | null; regenerated: boolean }, 'runNotFound'>> {
-  const ownerId = await conversationOwner()
+  const { ownerId, workspaceId } = await conversationActor()
   const { pool } = await import('@/lib/db')
-  const owned = await pool.query('SELECT title FROM agent_runs WHERE id=$1 AND "userId"=$2', [String(runId), ownerId]).catch(() => ({ rows: [] }))
-  if (!owned.rows[0]) return { error: 'runNotFound' }
+  const { withConversationWorkspace } = await import('@/lib/conversation-workspace')
+  const read = () => withConversationWorkspace(ownerId, workspaceId, async () => {
+    const result = await pool.query('SELECT title FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "workspaceId"=$3', [String(runId), ownerId, workspaceId])
+    return result.rows[0] as { title: string | null } | undefined
+  })
+  const owned = await read()
+  if (!owned) return { error: 'runNotFound' }
   const { defaultModelAvailable } = await import('@/lib/default-model')
-  if (!await defaultModelAvailable(ownerId)) return { title: owned.rows[0].title ?? null, regenerated: false }
+  if (!await defaultModelAvailable(ownerId)) return { title: owned.title ?? null, regenerated: false }
   const { nameConversation } = await import('@/lib/conversation-title-server')
   const { generateShortTitle } = await import('@/lib/short-title-server')
   let title: string | null = null
@@ -254,5 +260,7 @@ export async function regenerateConversationTitle(runId: string): Promise<Action
     console.error('Conversation title regenerate failed', error instanceof Error ? error.name : 'unknown')
   }
   if (title) await (await import('@/lib/live/lists')).runListChanged(pool, String(runId))
-  return { title: title ?? owned.rows[0].title ?? null, regenerated: !!title }
+  const current = await read()
+  if (!current) return { error: 'runNotFound' }
+  return { title: current.title, regenerated: !!title }
 }

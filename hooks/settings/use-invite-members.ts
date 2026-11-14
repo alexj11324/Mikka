@@ -19,9 +19,8 @@ export type InviteLink = { email: string; url: string }
 export type InviteSkip = { email: string; reason: 'alreadyMember' | 'duplicate' }
 
 /**
- * 邀请成员 as data, for a UI layer that draws its own invite (slot `settings-members`): the same
- * emails, CSV import, role, invite links and copy as InviteMembersDialog. Nothing is emailed; the
- * links are handed over by hand and last 7 days.
+ * The settings-members slot uses this hook to import recipients, choose their role, and create
+ * invitation links. The issuer shares the links directly, and they expire after seven days.
  */
 export function useInviteMembers(workspaceId: string | undefined, onCreated: () => Promise<unknown>) {
   const t = useTranslations('Invite')

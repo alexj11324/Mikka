@@ -13,7 +13,7 @@ import { requireIssueAccess, requireIssueAccessWithoutBody } from '@/lib/issue-a
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { issueVisibilityPredicate } from '@/lib/issue-visibility-policy'
 import { issueView, taskIdentifiers } from '@/lib/task-identifier-server'
-import { readIssueMetadata, withIssueMetadata, type IssueMetadata } from '@/lib/issue-metadata'
+import { issueRestoreDeadline, readIssueMetadata, withIssueMetadata, type IssueMetadata } from '@/lib/issue-metadata'
 import { allocateIssueNumbers } from '@/lib/issue-numbering'
 import { createsIssueCycle } from '@/lib/issue-relations'
 import { dispatchLinearIssueSync, dispatchLinearWork } from '@/lib/linear-sync/dispatch'
@@ -279,7 +279,8 @@ export async function getDeletedIssue(id: string) {
     const { issue, user } = await requireIssueAccess(id, true)
     await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
     const deletedAt = readIssueMetadata(issue.content).deletedAt
-    return issue.userId === user.id && deletedAt ? { id: issue.id, title: issue.title, deletedAt } : null
+    if (issue.userId !== user.id || !deletedAt) return null
+    return { id: issue.id, title: issue.title, deletedAt, canRestore: Date.now() <= issueRestoreDeadline(deletedAt) }
   } catch { return null }
 }
 
@@ -295,7 +296,7 @@ export async function setIssueDeleted(input: { id: string; revision?: number; re
         requireLockedIssueScope(latest, user.id, issue.scopeVersion, issue.workspaceId)
         if (!latest || (!input.restore && latest.revision !== input.revision)) return { error: 'issueOutdated' }
         const metadata = readIssueMetadata(latest.content)
-        if (input.restore && metadata.deletedAt && Date.now() - new Date(metadata.deletedAt).getTime() > 30 * 86400000) return { error: 'issueRestoreWindow' }
+        if (input.restore && metadata.deletedAt && Date.now() > issueRestoreDeadline(metadata.deletedAt)) return { error: 'issueRestoreWindow' }
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, { ...metadata, deletedAt: input.restore ? null : new Date().toISOString() }), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, user.id))).returning()
         reviewTaskChanged(tx, latest, saved)
         await issueListChanged(tx, saved.id, true)

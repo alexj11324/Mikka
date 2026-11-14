@@ -1,5 +1,5 @@
 import 'server-only'
-import { createHash } from 'node:crypto'
+import { snapshotDigest } from '../operations/write-target'
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import { db, withDatabaseTransaction } from '@/lib/db'
 import { coordinatorEvents, devices, issueToolCalls } from '@/lib/db/schema'
@@ -11,12 +11,6 @@ import { taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 
 export class IssueToolCallConflict extends Error {
   constructor() { super('issueToolCallConflict') }
-}
-
-function canonical(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonical)
-  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => [key, canonical(item)]))
-  return value
 }
 
 /**
@@ -37,9 +31,9 @@ export async function idempotentIssueMutation<T extends { id: string } & Record<
     // One requested title in one original person request has one frozen
     // creation receipt. A regenerated body/SDK call ID cannot create it twice.
     identity = { chatRequest, title: title.trim() }
-    toolCallId = `chat-create:${createHash('sha256').update(JSON.stringify(canonical(identity))).digest('hex')}`
   }
-  const inputHash = createHash('sha256').update(JSON.stringify(canonical(identity))).digest('hex')
+  const inputHash = snapshotDigest(identity)
+  if (chatRequest) toolCallId = `chat-create:${inputHash}`
   const workspaceId = taskReaderScope(userId).workspaceId
   if (!workspaceId) throw new IssueToolCallConflict()
   let key = and(eq(issueToolCalls.userId, userId), eq(issueToolCalls.toolCallId, toolCallId))

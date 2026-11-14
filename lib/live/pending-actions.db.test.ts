@@ -20,7 +20,8 @@ test('legacy pending producers invalidate only their committed owner-personal li
   const queued: (() => Promise<void>)[] = []
   const next = await import('next/server')
   const scheduler = mock.module('next/server', { namedExports: { ...next, after: (work: () => Promise<void>) => { queued.push(work) } } })
-  const wake = mock.module(new URL('../coordinator/wake.ts', import.meta.url).href, { namedExports: { wakeCoordinator: async () => {} } })
+  const ownerWakes: string[] = []
+  const wake = mock.module(new URL('../coordinator/wake.ts', import.meta.url).href, { namedExports: { wakeCoordinator: async (userId: string) => { ownerWakes.push(userId) } } })
   const sent: { path: string; events: unknown }[] = []
   const receiver = createServer(async (request, response) => {
     let body = ''; for await (const part of request) body += part
@@ -113,7 +114,37 @@ test('legacy pending producers invalidate only their committed owner-personal li
       await drain(); assert.equal(sent.length, committed)
     })
 
+    await t.test('a declined account card stays pending when its decision notice cannot commit', async () => {
+      const proposal = await proposeAction(owner, 'send_email', { to: ['fixture@example.invalid'], subject: 'Atomic decline', body: 'Never sent.' })
+      assert.ok('actionId' in proposal && typeof proposal.actionId === 'string')
+      const id = proposal.actionId
+      const row = () => database.query('SELECT status,"decidedAt" FROM pending_actions WHERE id=$1', [id]).then(r => r.rows[0])
+      const notice = () => database.query('SELECT payload FROM coordinator_events WHERE "dedupeKey"=$1', [`action_decided:${id}`])
+      await database.query(`CREATE FUNCTION reject_decline_notice() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN IF NEW."dedupeKey"='action_decided:${id}' THEN RAISE EXCEPTION 'fixture rejected decline notice'; END IF; RETURN NEW; END $$`)
+      try {
+        await database.query(`CREATE CONSTRAINT TRIGGER reject_decline_notice AFTER INSERT ON coordinator_events
+          DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION reject_decline_notice()`)
+        await assert.rejects(decidePendingAction(owner, id, false), (error: unknown) => String((error as { cause?: unknown }).cause ?? error).includes('fixture rejected decline notice'))
+        assert.deepEqual(await row(), { status: 'pending', decidedAt: null })
+        assert.equal((await notice()).rowCount, 0)
+      } finally {
+        await database.query('DROP TRIGGER IF EXISTS reject_decline_notice ON coordinator_events')
+        await database.query('DROP FUNCTION reject_decline_notice()')
+      }
+      await assert.rejects(decidePendingAction(other, id, false), /pendingActionUnavailable/)
+      const attempts = await Promise.allSettled([decidePendingAction(owner, id, false), decidePendingAction(owner, id, false)])
+      assert.equal(attempts.filter(attempt => attempt.status === 'fulfilled').length, 1)
+      assert.equal((await row()).status, 'declined')
+      const event = await notice()
+      assert.equal(event.rowCount, 1)
+      assert.equal(event.rows[0].payload.status, 'declined')
+      assert.equal(externalCalls, 0)
+      await drain()
+    })
+
     await t.test('actual account proposal and owner decline invalidate; repeated/foreign decisions execute nothing', async () => {
+      ownerWakes.length = 0
       const result = await proposeAction(owner, 'send_email', { to: ['fixture@example.invalid'], subject: 'Pending fixture', body: 'Never sent.' })
       assert.ok('actionId' in result && typeof result.actionId === 'string'); await drain(); const before = sent.length
       await assert.rejects(decidePendingAction(other, result.actionId, false), /pendingActionUnavailable/)
@@ -122,6 +153,8 @@ test('legacy pending producers invalidate only their committed owner-personal li
       // send a chat key. The committed owner-personal pending list still updates.
       await drain(); assert.deepEqual(sent.slice(before), [expected(owner)])
       await assert.rejects(decidePendingAction(owner, result.actionId, false), /pendingActionUnavailable/)
+      await drain()
+      assert.deepEqual(ownerWakes, [owner], 'the persisted decision wakes the owner once, including across a rejected replay')
       await drain(); assert.equal(sent.length, before + 1); assert.equal(externalCalls, 0)
       assert.equal((await listPendingActions(owner)).some(item => item.id === result.actionId), false)
     })

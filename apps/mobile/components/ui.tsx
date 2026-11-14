@@ -1,6 +1,7 @@
 import { Children, type ReactNode } from 'react'
 import { Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native'
 import { GlassView } from 'expo-glass-effect'
+import { mobileMessages as messages } from '@/lib/messages'
 import { useLiquidGlass } from '@/lib/glass'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ChevronLeft, X } from 'lucide-react-native'
@@ -36,7 +37,7 @@ export function RoundButton({ onPress, children, label, dot, disabled = false, b
 }
 
 export function BackButton({ onPress }: { onPress: () => void }) {
-  return <RoundButton label="返回" onPress={onPress}><ChevronLeft size={22} color={colors.ink} strokeWidth={2.2} /></RoundButton>
+  return <RoundButton label={messages.Shell.panel.back} onPress={onPress}><ChevronLeft size={22} color={colors.ink} strokeWidth={2.2} /></RoundButton>
 }
 
 export function CloseButton({ onPress }: { onPress: () => void }) {

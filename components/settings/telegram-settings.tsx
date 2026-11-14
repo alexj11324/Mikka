@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
@@ -17,33 +17,32 @@ export function useTelegramPlugin() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<'error' | 'notConfigured' | ''>('')
 
-  async function refresh() {
+  const latestRead = useRef(0)
+  const refresh = useCallback(async () => {
+    const read = ++latestRead.current
     setBusy(true)
     setError('')
     try {
-      setStatus(await getTelegramIntegrationStatus())
-      setConnectLink('')
+      const next = await getTelegramIntegrationStatus()
+      if (read !== latestRead.current) return
+      setStatus(next)
+      if (next.connected) setConnectLink('')
     } catch {
+      if (read !== latestRead.current) return
+      setStatus(null)
+      setConnectLink('')
       setError('error')
     } finally {
-      setBusy(false)
+      if (read === latestRead.current) setBusy(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    let active = true
-    setBusy(true)
-    void getTelegramIntegrationStatus().then(value => {
-      if (active) setStatus(value)
-    }).catch(() => {
-      if (active) setError('error')
-    }).finally(() => {
-      if (active) setBusy(false)
-    })
-    return () => { active = false }
-  }, [])
+    void refresh()
+    return () => { latestRead.current++ }
+  }, [refresh])
   // Opening Telegram to press Start: read once when the person comes back, never on plain focus.
-  const checkOnReturn = useCheckOnReturn(() => { void getTelegramIntegrationStatus().then(setStatus).catch(() => {}) })
+  const checkOnReturn = useCheckOnReturn(refresh)
 
   async function connect() {
     setBusy(true)
@@ -76,13 +75,18 @@ export function useTelegramPlugin() {
     }
   }
 
-  return { status, connectLink, busy, error, connect, disconnect, checkOnReturn }
+  return { status, connectLink, busy, error, refresh, connect, disconnect, checkOnReturn }
 }
 
 export function TelegramSettings() {
   const t = useTranslations('Settings.telegram')
-  const { status, connectLink, busy, error, connect, disconnect: disconnectNow, checkOnReturn } = useTelegramPlugin()
+  const common = useTranslations('Common')
+  const { status, connectLink, busy, error, refresh, connect, disconnect: disconnectNow, checkOnReturn } = useTelegramPlugin()
   const disconnect = async () => { if (window.confirm(t('disconnectConfirm'))) await disconnectNow() }
+  if (!status && error) return <SettingsSection id="telegram-heading" title={t('title')}
+    action={<Button variant="outline" size="sm" disabled={busy} onClick={() => void refresh()}>{common('retry')}</Button>}>
+    <FieldError className="px-5 py-3">{t(error)}</FieldError>
+  </SettingsSection>
   return <SettingsSection id="telegram-heading">
     <SettingRow title={t('title')}>
       {status === null

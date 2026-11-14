@@ -6,6 +6,13 @@
     "test": "tests/task-create-only.db.test.ts",
     "suite": "test:coordinator-issue-create-db"
   },
+  "app/actions/task-runs.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The signed-in user reads workspace runs and manages the titles of owned conversations using installation PostgreSQL.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
   "app/api/drive/volumes/[volumeId]/blobs/route.ts": {
     "mode": "built-in",
     "environment": [],
@@ -62,6 +69,63 @@
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
+  "app/api/integrations/slack/callback/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "SLACK_APP_ID",
+      "SLACK_CLIENT_ID",
+      "SLACK_CLIENT_SECRET",
+      "BETTER_AUTH_URL",
+      "MIKKA_DATABASE_URL",
+      "DATABASE_URL",
+      "WORKSPACE_SECRETS_KEY"
+    ],
+    "behavior": "Accept one browser-bound Slack OAuth code and encrypt the bot grant for the currently authorized workspace.",
+    "test": "tests/slack-installation.db.test.ts",
+    "suite": "test:slack-installation-db"
+  },
+  "app/api/integrations/slack/connect/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "SLACK_APP_ID",
+      "SLACK_CLIENT_ID",
+      "SLACK_CLIENT_SECRET",
+      "BETTER_AUTH_URL",
+      "MIKKA_DATABASE_URL",
+      "DATABASE_URL"
+    ],
+    "behavior": "Consume an authenticated member’s one-time handoff before opening the official Slack consent URL.",
+    "test": "tests/slack-installation.db.test.ts",
+    "suite": "test:slack-installation-db"
+  },
+  "app/api/integrations/slack/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "SLACK_APP_ID",
+      "SLACK_CLIENT_ID",
+      "SLACK_CLIENT_SECRET",
+      "BETTER_AUTH_URL",
+      "MIKKA_DATABASE_URL",
+      "DATABASE_URL",
+      "WORKSPACE_SECRETS_KEY"
+    ],
+    "behavior": "Show or update only an active member’s Slack installation and channel preferences. Missing platform configuration disables installation.",
+    "test": "tests/slack-installation.db.test.ts",
+    "suite": "test:slack-installation-db"
+  },
+  "app/api/internal/eve/slack-credential/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "MIKKA_DATABASE_URL",
+      "DATABASE_URL",
+      "WORKSPACE_SECRETS_KEY",
+      "SLACK_APP_ID",
+      "BETTER_AUTH_SECRET"
+    ],
+    "behavior": "Require the scoped Eve principal, recipient proof, current workspace membership, and current link generation to obtain the native bot credential.",
+    "test": "tests/slack-installation.db.test.ts",
+    "suite": "test:slack-installation-db"
+  },
   "app/api/internal/github/workflow-result/route.ts": {
     "mode": "optional-cloud",
     "environment": [
@@ -70,6 +134,13 @@
     "behavior": "Community installations return 404 before loading GitHub App configuration. The hosted receiver verifies its signed, bounded delivery before recording the result.",
     "test": "app/api/webhooks/github/route.test.ts",
     "suite": "test:suggestions"
+  },
+  "app/api/me/joinable-organizations/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Check the verified account and Organization policy for domain-based membership.",
+    "test": "tests/organization-join-domains.db.test.ts",
+    "suite": "test:organization-join-domains-db"
   },
   "app/api/mobile/open/route.ts": {
     "mode": "operator-configured",
@@ -88,12 +159,19 @@
     "test": "tests/organization-invitations.db.test.ts",
     "suite": "test:organization-invitations-db"
   },
-  "app/api/organizations/[organizationId]/invitations/route.ts": {
+  "app/api/organizations/[organizationId]/allowed-domains/[domainId]/route.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Let an active Organization member invite ordinary members, and revoke only their own pending invitations. Administrator access is explicitly scoped.",
-    "test": "tests/organization-invitations.db.test.ts",
-    "suite": "test:organization-invitations-db"
+    "behavior": "Check the verified account and Organization policy for domain-based membership.",
+    "test": "tests/organization-join-domains.db.test.ts",
+    "suite": "test:organization-join-domains-db"
+  },
+  "app/api/organizations/[organizationId]/allowed-domains/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Check the verified account and Organization policy for domain-based membership.",
+    "test": "tests/organization-join-domains.db.test.ts",
+    "suite": "test:organization-join-domains-db"
   },
   "app/api/organizations/[organizationId]/api-keys/[keyId]/route.ts": {
     "mode": "built-in",
@@ -108,6 +186,20 @@
     "behavior": "List a page of key metadata for attached team Workspaces the signed-in Organization administrator also administers.",
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
+  },
+  "app/api/organizations/[organizationId]/invitations/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Let an active Organization member invite ordinary members, and revoke only their own pending invitations. Administrator access is explicitly scoped.",
+    "test": "tests/organization-invitations.db.test.ts",
+    "suite": "test:organization-invitations-db"
+  },
+  "app/api/organizations/[organizationId]/join-by-domain/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Check the verified account and Organization policy for domain-based membership.",
+    "test": "tests/organization-join-domains.db.test.ts",
+    "suite": "test:organization-join-domains-db"
   },
   "app/api/service-identity/projects/[projectId]/route.ts": {
     "mode": "built-in",
@@ -129,6 +221,45 @@
     "behavior": "List, upload, download and delete task files under the task ACL using the installation database and configured attachment storage.",
     "test": "tests/team-issue-create.db.test.ts",
     "suite": "test:scope-detachment-db"
+  },
+  "app/api/tasks/[taskId]/review/preview/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "Issue a one-use link only after checking the installation origin and current checkout. A missing local dev server returns unavailable.",
+    "test": "lib/coding-workspace/preview/route.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "app/api/tasks/[taskId]/review/terminal/input/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_SECRET",
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
+    "test": "lib/coding-workspace/terminal/http.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "app/api/tasks/[taskId]/review/terminal/resize/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_SECRET",
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
+    "test": "lib/coding-workspace/terminal/http.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "app/api/tasks/[taskId]/review/terminal/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_SECRET",
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
+    "test": "lib/coding-workspace/terminal/http.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
   },
   "app/api/workspaces/[workspaceId]/service-identities/[identityId]/credential/route.ts": {
     "mode": "built-in",
@@ -175,6 +306,12 @@
     "behavior": "The Vercel packaging step deduplicates byte-identical function trees only when deployment configuration and resolved dependencies agree. Compose uses the Node server target.",
     "test": "apps/api/scripts/dedupe-functions.test.mjs"
   },
+  "apps/api/scripts/dev.mjs": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The development server uses Nitro's native drain during worker replacement so admitted requests can finish with their original worker.",
+    "test": "apps/api/runtime/dev-tracing.test.mjs"
+  },
   "apps/api/scripts/finalize-build.mjs": {
     "mode": "built-in",
     "environment": [
@@ -197,30 +334,33 @@
     "behavior": "The official Eve host opts into its private Cloudflare World explicitly. Leaving the selector unset preserves the normal workflow selection.",
     "test": "cloudflare/eve-runtime/test/config.test.mjs"
   },
-  "drizzle/20261112090913_account_subscription_custody.sql": {
+  "apps/eve/agent/hooks/slack-installation.ts": {
     "mode": "built-in",
-    "environment": [
-      "MIKKA_DATABASE_URL"
-    ],
-    "behavior": "Allow an existing owner-bound custody worker to revoke a frozen subscription only while its coordinator retains the exclusive deletion session. Preserve unsettled custody and ordinary write refusals.",
-    "test": "lib/account/deletion-lock.db.test.ts",
-    "suite": "test:account-db"
+    "environment": [],
+    "behavior": "Store non-secret, verified Slack link coordinates in the official Eve session for rendering a resumed turn.",
+    "test": "tests/slack-bot.test.mjs",
+    "suite": "test:slack"
   },
-  "drizzle/20261113165037_inbox_conversations.sql": {
+  "drizzle/20261109143100_coding_review_sessions.sql": {
     "mode": "built-in",
-    "environment": ["MIKKA_DATABASE_URL"],
-    "behavior": "Use the installation PostgreSQL database for per-user Inbox dismissals and standalone conversation snoozes. An authorized new run or changed cause can request attention again.",
-    "test": "lib/inbox/store.db.test.ts",
-    "suite": "test:inbox-db"
+    "environment": [],
+    "behavior": "Create the PostgreSQL human-review lease table, pending revocations and source-change triggers in the installation database.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
   },
-  "drizzle/20261112090914_workspace_subscription_custody.sql": {
+  "drizzle/20261109143101_coding_review_task_workspace.sql": {
     "mode": "built-in",
-    "environment": [
-      "DATABASE_URL"
-    ],
-    "behavior": "Retain Workspace insert and update fences after fresh consolidated migration ordering. Separate Workspace stores do not acquire BYOS objects.",
-    "test": "lib/account/deletion-lock.db.test.ts",
-    "suite": "test:account-db"
+    "environment": [],
+    "behavior": "Fence a review when its Task changes workspace or loses its original stored ownership.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
+  "drizzle/20261109143102_coding_review_task_thread.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Invalidate existing leases for an actual replacement Task run after the Factory binding transaction finishes.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
   },
   "drizzle/20261112030502_task_attachments.sql": {
     "mode": "built-in",
@@ -294,6 +434,23 @@
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "drizzle/20261112030511_coding_review_provider_receipts.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Existing PostgreSQL review leases retain their E2B placement. New sponsored leases record their immutable repository and independent human operation for cleanup.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
+  "drizzle/20261112030512_slack_workspace_installations.sql": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL",
+      "DATABASE_URL"
+    ],
+    "behavior": "Persist single-use browser state, encrypted Workspace installations, and member-specific channel preferences in the existing application PostgreSQL database.",
+    "test": "tests/slack-installation.db.test.ts",
+    "suite": "test:slack-installation-db"
+  },
   "drizzle/20261112032026_organization_service_key_names.sql": {
     "mode": "built-in",
     "environment": [
@@ -303,12 +460,73 @@
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "drizzle/20261112061146_organization_member_invitations.sql": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Persist hashed single-use Organization Member invitations in the Workspace PostgreSQL database; accepting one never writes Workspace or Project grants.",
+    "test": "tests/organization-invitations.db.test.ts",
+    "suite": "test:organization-invitations-db"
+  },
   "drizzle/20261112070028_handoff_owned_chat_retirements.sql": {
     "mode": "built-in",
     "environment": [],
     "behavior": "Leave an attachment retirement to the active account deletion job only when that transaction already owns its object key and outstanding grant deadline.",
     "test": "lib/chat-attachments/store.db.test.ts",
     "suite": "test:chat-attachments-db"
+  },
+  "drizzle/20261112090913_account_subscription_custody.sql": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "Allow an existing owner-bound custody worker to revoke a frozen subscription only while its coordinator retains the exclusive deletion session. Preserve unsettled custody and ordinary write refusals.",
+    "test": "lib/account/deletion-lock.db.test.ts",
+    "suite": "test:account-db"
+  },
+  "drizzle/20261112090914_workspace_subscription_custody.sql": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Retain Workspace insert and update fences after fresh consolidated migration ordering. Separate Workspace stores do not acquire BYOS objects.",
+    "test": "lib/account/deletion-lock.db.test.ts",
+    "suite": "test:account-db"
+  },
+  "drizzle/20261113153514_conversation_titles.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Add nullable, bounded conversation titles and their source to existing runs in the installation database.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "drizzle/20261113165037_inbox_conversations.sql": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "Use the installation PostgreSQL database for per-user Inbox dismissals and standalone conversation snoozes. An authorized new run or changed cause can request attention again.",
+    "test": "lib/inbox/store.db.test.ts",
+    "suite": "test:inbox-db"
+  },
+  "drizzle/20261114061842_allow_exact_skill_sharing_approval.sql": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Store installed Skill sharing requests and their administrator decisions in the existing Workspace PostgreSQL approvals table.",
+    "test": "lib/enterprise/governance.db.test.ts",
+    "suite": "test:enterprise-db"
+  },
+  "drizzle/20261114134255_organization_join_domains.sql": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Store allowed domains in the workspace database, independently for each Organization.",
+    "test": "tests/organization-join-domains.db.test.ts",
+    "suite": "test:organization-join-domains-db"
   },
   "lib/abuse/workers-ai.ts": {
     "mode": "optional-cloud",
@@ -348,6 +566,13 @@
     "test": "lib/activity-actor-view.test.ts",
     "suite": "test:issues"
   },
+  "lib/agent-runs.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read messages for already-authorized runs from PostgreSQL. Retry identities are projected only from the reader's own stored submission events.",
+    "test": "tests/team-visibility.db.test.ts",
+    "suite": "test:visibility-db"
+  },
   "lib/artifacts/storage.ts": {
     "mode": "operator-configured",
     "environment": [
@@ -370,14 +595,19 @@
     "test": "lib/artifacts/storage.test.ts",
     "suite": "test:self-hosted-byok"
   },
-  "drizzle/20261112061146_organization_member_invitations.sql": {
+  "lib/artifacts/store.ts": {
     "mode": "built-in",
-    "environment": [
-      "DATABASE_URL"
-    ],
-    "behavior": "Persist hashed single-use Organization Member invitations in the Workspace PostgreSQL database; accepting one never writes Workspace or Project grants.",
-    "test": "tests/organization-invitations.db.test.ts",
-    "suite": "test:organization-invitations-db"
+    "environment": [],
+    "behavior": "Authorize each request to a shared artifact against the installation's PostgreSQL share and workspace records. Markdown is delivered with metadata and HTML through its sandbox frame. Both use the configured artifact storage, including inline PostgreSQL on community installations.",
+    "test": "tests/desktop-links.db.test.ts",
+    "suite": "test:desktop-auth"
+  },
+  "lib/audit/database.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Audit exports and retention use the installation's workspace and application PostgreSQL pools. A failed application checkout returns the workspace connection before propagating the error.",
+    "test": "lib/audit/retention.db.test.ts",
+    "suite": "test:audit-db"
   },
   "lib/audit/events.ts": {
     "mode": "built-in",
@@ -395,6 +625,20 @@
     "behavior": "Resolve saved board project names to the installation's visible project IDs and retain UUID filters across renames.",
     "test": "lib/board-filters.test.ts",
     "suite": "test:issues"
+  },
+  "lib/bot-model-menu-view.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Render the selected model while the installation saves the selection and reconcile the acknowledged choice.",
+    "test": "lib/bot-model-menu-view.test.ts",
+    "suite": "test:issues"
+  },
+  "lib/bot-model-optimistic.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Preview only an existing authorized chat-model option while its write is pending; the server still owns validation, persistence, and rollback in both cloud and self-hosted editions.",
+    "test": "lib/bot-model-optimistic.test.ts",
+    "suite": "test:execution-rules"
   },
   "lib/cloud-computer/sponsored-lifecycle.ts": {
     "mode": "optional-cloud",
@@ -414,6 +658,13 @@
     "test": "lib/coding-workspace/review-authority.db.test.ts",
     "suite": "test:coding-workspace-db"
   },
+  "lib/cloud-computer/thread-machines.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Question recovery locks the current PostgreSQL task, owner, run and operation before reusing a retained machine. Self-hosted recovery uses its existing database and configured execution provider.",
+    "test": "lib/factory/checks.db.test.ts",
+    "suite": "test:factory-checks-db"
+  },
   "lib/code-review/read-contract.ts": {
     "mode": "built-in",
     "environment": [],
@@ -421,11 +672,145 @@
     "test": "lib/code-review/client.test.ts",
     "suite": "test:thread-changes"
   },
+  "lib/coding-workspace/cloudflare-review.ts": {
+    "mode": "optional-cloud",
+    "environment": [
+      "MIKKA_CLOUDFLARE_TASK_WORKSPACES",
+      "MIKKA_TASK_MACHINE_BRIDGE_TOKEN"
+    ],
+    "behavior": "A separately admitted sponsored checkout builds a bounded human lease. Local and owner-provided E2B review keep their existing transport.",
+    "test": "lib/coding-workspace/cloudflare-review.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/coding-workspace/preview/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "Issue a one-use link only after checking the installation origin and current checkout. A missing local dev server returns unavailable.",
+    "test": "lib/coding-workspace/preview/route.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/coding-workspace/preview/runtime.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "The configured application origin issues a one-use URL only after the existing owner-provided E2B guest acknowledges the scoped preview; an unavailable guest stays unavailable.",
+    "test": "lib/coding-workspace/preview/runtime.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/coding-workspace/review-authority.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the authenticated installation workspace, current Task, native run and checkout from PostgreSQL, and reject a changed owner or credential.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
+  "lib/coding-workspace/review-machine.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "HTTPS_PROXY"
+    ],
+    "behavior": "An active lease can reconnect to its existing E2B sandbox using that owner’s stored provider key and optional HTTPS proxy; no device credential is reissued.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
+  "lib/coding-workspace/review-sessions.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Persist and fence terminal and preview leases in PostgreSQL. Preserve pending remote closes for the existing recovery timer.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
+  "lib/coding-workspace/terminal/http.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_SECRET",
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
+    "test": "lib/coding-workspace/terminal/http.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/coding-workspace/terminal/runtime.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_SECRET",
+      "HTTPS_PROXY"
+    ],
+    "behavior": "Use the installation auth secret to derive an instance-specific terminal key. The owner’s E2B credential permits the same guest to open or close the signed gateway.",
+    "test": "lib/coding-workspace/terminal/runtime.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/coding-workspace/terminal/test-fixture.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Supplies disposable locally generated wire identities to the signed terminal contract tests.",
+    "test": "lib/coding-workspace/terminal/wire.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/coding-workspace/terminal/wire.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Bind a short-lived terminal action to its local installation key, current boot, lease and body digest.",
+    "test": "lib/coding-workspace/terminal/wire.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/composio-account-state.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Project stored account status and enabled switches locally; expired accounts require reconnection and an enabled usable account keeps its toolkit active.",
+    "test": "tests/mobile-plugin-connections.test.ts",
+    "suite": "test:mobile"
+  },
+  "lib/computer/anonymous-startup-hint.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Build the selected harness's speculative hint from the frozen run configuration. Unsupported or ineligible self-hosted runs use their ordinary worker claim.",
+    "test": "lib/computer/anonymous-startup-hint.test.ts",
+    "suite": "test:cloud-limits"
+  },
+  "lib/conversation-title-schedule.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Schedule a title update only after the run event commits to the installation database.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "lib/conversation-title-server.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the user's available default model to name a conversation. Keep its fallback when generation is unavailable and preserve manual titles on automatic triggers.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "lib/conversation-title.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Apply the same title limits, generation triggers and manual precedence on every installation.",
+    "test": "lib/conversation-title.test.ts",
+    "suite": "test:issues"
+  },
+  "lib/conversation-workspace.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Hold the authorized workspace membership while reading or writing a conversation, including admission after title generation.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
   "lib/coordinator/ci-suite-transport.ts": {
     "mode": "built-in",
     "environment": [],
     "behavior": "Only a committed CI suite notification bound to the finished run can bypass paid semantic triage. The transport grants no GitHub authority.",
     "test": "lib/coordinator/ci-suite-transport.test.mjs"
+  },
+  "lib/coordinator/citations.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Resolve and format titles of cited conversations from the installation's own run and task records.",
+    "test": "lib/coordinator/citations.test.ts",
+    "suite": "test:coordinator-events"
   },
   "lib/coordinator/decision-provider.ts": {
     "mode": "operator-configured",
@@ -449,21 +834,21 @@
     "test": "lib/coordinator/native-decision.test.ts",
     "suite": "test:coordinator-events"
   },
+  "lib/credentials/runtime-identity.ts": {
+    "mode": "optional-cloud",
+    "environment": [
+      "CREDENTIAL_RUNTIME",
+      "CREDENTIAL_ENVIRONMENT"
+    ],
+    "behavior": "Community installations leave Cloudflare runtime selection unset. Configured Cloudflare runtimes require an explicit environment and obtain a bounded identity token through the private service binding.",
+    "test": "lib/credentials/runtime-identity.test.mjs"
+  },
   "lib/db/commit-effects.ts": {
     "mode": "built-in",
     "environment": [],
     "behavior": "Keep ordinary transaction notifications after commit and fence only callbacks registered in a quarantined account recovery.",
     "test": "lib/account/deletion-restore.db.test.ts",
     "suite": "test:account-db"
-  },
-  "lib/db/governance-schema.ts": {
-    "mode": "built-in",
-    "environment": [
-      "DATABASE_URL"
-    ],
-    "behavior": "Use canonical Workspace database schema for Organization invitations and member-only admission, without a second ACL fact source.",
-    "test": "tests/organization-invitations.db.test.ts",
-    "suite": "test:organization-invitations-db"
   },
   "lib/db/direct-session.ts": {
     "mode": "built-in",
@@ -473,6 +858,15 @@
     ],
     "behavior": "Dedicated connections preserve session locks and use the external installation's direct URL or its bundled PostgreSQL connection.",
     "test": "scripts/postgres-connection.test.mjs"
+  },
+  "lib/db/governance-schema.ts": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Use canonical Workspace database schema for Organization invitations and member-only admission, without a second ACL fact source.",
+    "test": "tests/organization-invitations.db.test.ts",
+    "suite": "test:organization-invitations-db"
   },
   "lib/db/request-scope.ts": {
     "mode": "built-in",
@@ -523,6 +917,13 @@
     "behavior": "The application stage is optional on local Compose. Explicit production, preview or development stages take precedence over a provider's stage and invalid values fail validation.",
     "test": "lib/deployment-stage.test.mjs"
   },
+  "lib/device-name.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the persisted 60-character limit when renaming a device. Only a changed, nonempty trimmed name can be submitted from Settings.",
+    "test": "tests/settings-activity.db.test.ts",
+    "suite": "test:settings-activity-db"
+  },
   "lib/device-removal.ts": {
     "mode": "built-in",
     "environment": [],
@@ -544,14 +945,12 @@
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
-  "lib/credentials/runtime-identity.ts": {
-    "mode": "optional-cloud",
-    "environment": [
-      "CREDENTIAL_RUNTIME",
-      "CREDENTIAL_ENVIRONMENT"
-    ],
-    "behavior": "Community installations leave Cloudflare runtime selection unset. Configured Cloudflare runtimes require an explicit environment and obtain a bounded identity token through the private service binding.",
-    "test": "lib/credentials/runtime-identity.test.mjs"
+  "lib/drive/store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read an authorized personal file's changes and deletions from the installed PostgreSQL volume snapshots. File history uses the existing versions and requires no external storage service.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
   },
   "lib/enterprise/live-store.ts": {
     "mode": "built-in",
@@ -559,6 +958,19 @@
     "behavior": "Hold the shared organization policy lock while admitting a service credential.",
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
+  },
+  "lib/eve/auth.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_SECRET",
+      "BETTER_AUTH_URL",
+      "MIKKA_APP_ORIGIN",
+      "MIKKA_API_INGRESS",
+      "MIKKA_EVE_HOST"
+    ],
+    "behavior": "Self-hosted installations retain their existing signed internal scope and configured application origin. Cloudflare uses private service binding provenance and rejects legacy internal token fallback.",
+    "test": "lib/eve/product-tool.test.ts",
+    "suite": "test:eve-product-tool"
   },
   "lib/eve/cloudflare-task-bridge.ts": {
     "mode": "optional-cloud",
@@ -574,6 +986,13 @@
     "behavior": "The Cloudflare sandbox adapter requires an injected workspace binding and a scoped grant. Ordinary Compose installations do not supply the private binding.",
     "test": "apps/api/scripts/cloudflare-api.test.mjs"
   },
+  "lib/eve/product-definitions.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Native Eve definitions prepare the current session's execution and tool catalogue through the installation's existing scoped stores. Product actions retain their authenticated application-host boundary.",
+    "test": "lib/eve/product-definitions.test.ts",
+    "suite": "test:eve-product-tool"
+  },
   "lib/eve/product-rpc.ts": {
     "mode": "operator-configured",
     "environment": [
@@ -586,6 +1005,12 @@
     "behavior": "Self-hosted Eve calls the configured application origin or local server with its signed scope. The private product capability is sent only to the paired Cloudflare service and that deployment refuses to call without it.",
     "test": "lib/eve/product-tool.test.ts",
     "suite": "test:eve-product-tool"
+  },
+  "lib/eve/session-control-delivery.mjs": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Propagate only a verified native cancel or end request to its own session wake, across asynchronous calls from the official Eve channel.",
+    "test": "lib/eve/session-control-delivery.test.mjs"
   },
   "lib/factory/evidence-folder-index.ts": {
     "mode": "built-in",
@@ -600,6 +1025,13 @@
     "behavior": "Project current Factory attention and completion from authorized PostgreSQL source and candidate receipts on the selected server.",
     "test": "tests/task-presentation.db.test.ts",
     "suite": "test:task-presentation-db"
+  },
+  "lib/factory/questions/schema.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The selected server uses its existing PostgreSQL database and Factory question contract to return pending items before the newest-50 limit, while retaining complete task-history reads.",
+    "test": "lib/factory/questions/ask-user.db.test.ts",
+    "suite": "test:factory-routing-db"
   },
   "lib/factory/review-change.ts": {
     "mode": "built-in",
@@ -676,6 +1108,13 @@
     "test": "tests/organization-invitations.db.test.ts",
     "suite": "test:organization-invitations-db"
   },
+  "lib/governance/organization-join-domains.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Check the verified account and Organization policy for domain-based membership.",
+    "test": "tests/organization-join-domains.db.test.ts",
+    "suite": "test:organization-join-domains-db"
+  },
   "lib/governance/service-credentials.ts": {
     "mode": "built-in",
     "environment": [],
@@ -704,11 +1143,25 @@
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "lib/group-messages.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the installation's authenticated same-origin group API for reading, sending and voluntarily leaving. A departed member loses message and member caches; a later read remains unauthorized.",
+    "test": "lib/group-messages.test.ts",
+    "suite": "test:issue-search"
+  },
   "lib/group-submission.ts": {
     "mode": "built-in",
     "environment": [],
     "behavior": "Compute the same scoped message ID on the client and server. Existing PostgreSQL serialization and the current membership grant govern each retry.",
     "test": "lib/group-conversations.test.ts",
+    "suite": "test:groups"
+  },
+  "lib/hooks/chat-delivery-state.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Journal immutable browser commands before preflight, retain failed or interrupted sends, and retry the same command without a hosted service.",
+    "test": "scripts/thread-composer.test.tsx",
     "suite": "test:groups"
   },
   "lib/hooks/chat-delivery.ts": {
@@ -717,13 +1170,6 @@
     "behavior": "Store local send progress in the current account and workspace journal and reconcile the immutable command on acknowledgement.",
     "test": "scripts/thread-composer.test.tsx",
     "suite": "test:groups"
-  },
-  "lib/group-messages.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Use the installation's authenticated same-origin group API for reading, sending and voluntarily leaving. A departed member loses message and member caches; a later read remains unauthorized.",
-    "test": "lib/group-messages.test.ts",
-    "suite": "test:issue-search"
   },
   "lib/hooks/use-task-continuation.ts": {
     "mode": "built-in",
@@ -738,6 +1184,29 @@
     "behavior": "Keep per-window browsing state in sessionStorage and retire revoked conversation drafts when the authorized group changes; no hosted service is needed.",
     "test": "lib/hooks/view-state.test.tsx",
     "suite": "test:view-state"
+  },
+  "lib/inbox/client.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the selected workspace Inbox and submit authorized lifecycle commands through the connected installation, preserving the server receipt and opaque pagination cursor.",
+    "test": "lib/inbox/workspace.test.ts",
+    "suite": "test:factory"
+  },
+  "lib/inbox/store.ts": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "Read the same authorized pending requests for board cards, inbox rows and badge counts in the selected workspace.",
+    "test": "lib/inbox/store.db.test.ts",
+    "suite": "test:inbox-db"
+  },
+  "lib/issue-metadata.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Deleted Task metadata supplies the same 30-day recovery deadline to the owner-facing detail and the server restore command. No external service or configuration is required.",
+    "test": "scripts/task-detail-live.test.tsx",
+    "suite": "test:issue-readonly-dom"
   },
   "lib/issue-threads.ts": {
     "mode": "built-in",
@@ -760,18 +1229,18 @@
     "test": "lib/linear-sync/run-comment.test.ts",
     "suite": "test:linear-sync"
   },
+  "lib/mobile-plugin-connections.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "Read the current account from the installation-configured Composio, GitHub, Linear and Telegram integrations. Unconfigured providers contribute no connected toolkit; a paused Linear service stays paused and partial failures retain confirmed results.",
+    "test": "tests/mobile-plugin-connections.test.ts",
+    "suite": "test:mobile"
+  },
   "lib/mobile-task-handoff.ts": {
     "mode": "built-in",
     "environment": [],
     "behavior": "Accept only a validated Task or immutable receipt and an opaque rendezvous on the configured HTTPS server.",
     "test": "lib/mobile-web-target.test.ts",
-    "suite": "test:mobile"
-  },
-  "lib/openui-lang.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Parse generated reply documents locally and count their root assignments so a streamed answer retains its identity when the same turn is read from storage.",
-    "test": "lib/openui-lang.test.ts",
     "suite": "test:mobile"
   },
   "lib/mobile-web-target.ts": {
@@ -780,6 +1249,13 @@
     "behavior": "Preserve the allowlist for same-server mobile web handoff. The scoped Members destination requires the official page and current team administrator at exchange and confirmation.",
     "test": "tests/mobile-service-members.db.test.ts",
     "suite": "test:web-auth-db"
+  },
+  "lib/openui-lang.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Parse generated reply documents locally and count their root assignments so a streamed answer retains its identity when the same turn is read from storage.",
+    "test": "lib/openui-lang.test.ts",
+    "suite": "test:mobile"
   },
   "lib/platform/public-origin.ts": {
     "mode": "built-in",
@@ -801,27 +1277,127 @@
     "test": "lib/run-app-mcp.test.ts",
     "suite": "test:integrations"
   },
+  "lib/schedules/contract.ts": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "Page the schedules visible in the current workspace and conversation using PostgreSQL creation time and schedule ID.",
+    "test": "lib/schedules/store.db.test.ts",
+    "suite": "test:schedules-db"
+  },
   "lib/server-pages.ts": {
     "mode": "built-in",
     "environment": [],
     "behavior": "Recognize local authentication documents and valid Workspace and Organization invitations so invitees can sign in even when Workspace bootstrap is unavailable.",
     "test": "apps/frontend/scripts/auth-only-bootstrap.test.mjs"
   },
-  "lib/slack/api.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "SLACK_BOT_TOKEN"
-    ],
-    "behavior": "An enabled Slack integration supplies its bot token to post a completion to the bound channel and thread. The client classifies Slack errors and retry timing without exposing the token.",
-    "test": "lib/slack/api.test.ts",
-    "suite": "test:slack"
-  },
-  "lib/slack/completion-message.ts": {
+  "lib/settings-data.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Formats a localized completion from the visible task label and status, escapes Slack mentions, and builds a link using the caller's installation origin and base path.",
-    "test": "lib/slack/completion-message.test.ts",
+    "behavior": "Team home reads the complete authorized Task count from this server using the existing authenticated Team directory request and PostgreSQL.",
+    "test": "tests/team-visibility.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "lib/settings-navigation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Keep the departing workspace in browser history when an authenticated user changes workspaces. Preserve the existing task URL and history state.",
+    "test": "tests/settings-navigation.test.mjs"
+  },
+  "lib/short-title-server.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Generate a short title with the installation's existing default-model service when available, retaining the display fallback otherwise.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "lib/short-title.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the stored conversation title when present and a bounded local fallback otherwise.",
+    "test": "lib/issue-threads.test.ts",
+    "suite": "test:issues"
+  },
+  "lib/slack/channel-grant.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "MIKKA_EVE_HOST",
+      "MIKKA_APP_ORIGIN",
+      "BETTER_AUTH_URL",
+      "MIKKA_EVE_PRODUCT_TOKEN",
+      "BETTER_AUTH_SECRET"
+    ],
+    "behavior": "Get an uncached, member-bound native Slack credential from the configured product host for this Eve session.",
+    "test": "lib/slack/install-provider.test.ts",
     "suite": "test:slack"
+  },
+  "lib/slack/channel-scope.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Carry only verified coordinates within Eve’s signed request and durable session; absent Slack identity cannot resolve credentials.",
+    "test": "tests/slack-bot.test.mjs",
+    "suite": "test:slack"
+  },
+  "lib/slack/eve-channel.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "SLACK_SIGNING_SECRET",
+      "SLACK_APP_ID"
+    ],
+    "behavior": "The official Eve Slack channel accepts signed events only from a verified Slack member with active workspace access and a current OAuth link.",
+    "test": "tests/slack-bot.test.mjs",
+    "suite": "test:slack"
+  },
+  "lib/slack/grant-proof.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_SECRET"
+    ],
+    "behavior": "Bind the dedicated Slack grant proof to the timed Eve authorization, team, sender, installation and active member link.",
+    "test": "lib/slack/install-provider.test.ts",
+    "suite": "test:slack"
+  },
+  "lib/slack/install-provider.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "SLACK_APP_ID",
+      "SLACK_CLIENT_ID",
+      "SLACK_CLIENT_SECRET",
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "Use Slack OAuth, bot identity validation, member-visible conversation metadata and official revocation APIs for an operator-configured Slack app.",
+    "test": "lib/slack/install-provider.test.ts",
+    "suite": "test:slack"
+  },
+  "lib/slack/installation-store.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "SLACK_APP_ID",
+      "SLACK_CLIENT_ID",
+      "SLACK_CLIENT_SECRET",
+      "BETTER_AUTH_URL",
+      "MIKKA_DATABASE_URL",
+      "DATABASE_URL",
+      "WORKSPACE_SECRETS_KEY"
+    ],
+    "behavior": "Encrypt grants under the workspace secret key, lock refreshes, verify the active member link and disable local use before remote uninstall.",
+    "test": "tests/slack-installation.db.test.ts",
+    "suite": "test:slack-installation-db"
+  },
+  "lib/slack/installed-routing.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read coordinates only from the platform-signed Slack app/team envelope, bound sender and validated revocation events.",
+    "test": "lib/slack/install-provider.test.ts",
+    "suite": "test:slack"
+  },
+  "lib/swr/keys.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A confirmed Task status change revalidates the current viewer’s mounted Task presentation reads in its workspace.",
+    "test": "scripts/task-detail-live.test.tsx",
+    "suite": "test:issue-readonly-dom"
   },
   "lib/task-activity-timeline.ts": {
     "mode": "built-in",
@@ -942,6 +1518,13 @@
     "test": "apps/mobile/tests/server-api.test.mts",
     "suite": "test:mobile"
   },
+  "lib/task-presentation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Project the viewer's pending Inbox reason into the board's Agent activity mark while preserving the underlying task lifecycle.",
+    "test": "lib/task-presentation.test.ts",
+    "suite": "test:issues"
+  },
   "lib/task-project-options.ts": {
     "mode": "built-in",
     "environment": [],
@@ -955,6 +1538,13 @@
     "test": "tests/task-resource-registration.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "lib/task-state-query.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the same elapsed-time run history and deadline from the installation's PostgreSQL database in every server time zone, including across daylight-saving changes.",
+    "test": "tests/action-read-egress.db.test.ts",
+    "suite": "test:activity-actor-db"
+  },
   "lib/task-state.ts": {
     "mode": "built-in",
     "environment": [],
@@ -962,12 +1552,26 @@
     "test": "lib/inbox/store.db.test.ts",
     "suite": "test:inbox-db"
   },
-  "lib/task-work-read.ts": {
+  "lib/task-status-advance.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Task work exposes only the current member's authorized Factory receipts for the same task and workspace.",
-    "test": "lib/task-work-read.test.ts",
-    "suite": "test:factory-activity"
+    "behavior": "Advance task status in PostgreSQL from eligible run and pull request lifecycle events.",
+    "test": "tests/task-status-advance.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "lib/task-status-run-start.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "After a successful run claim commits, advance its task within the installation database.",
+    "test": "tests/task-status-advance.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "lib/task-thread-run.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Select the Task run using the installation’s PostgreSQL relations, excluding group chat and late-bound Factory checker runs.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
   },
   "lib/task-workspace.ts": {
     "mode": "built-in",
@@ -975,6 +1579,24 @@
     "behavior": "Workspace membership is checked against the current transaction boundary before granting task access.",
     "test": "tests/factory-workspace-admission.db.test.ts",
     "suite": "test:visibility-db"
+  },
+  "lib/telegram/connection-status.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "TELEGRAM_BOT_USERNAME",
+      "TELEGRAM_BOT_TOKEN",
+      "TELEGRAM_WEBHOOK_SECRET_TOKEN"
+    ],
+    "behavior": "Read only the requested account's Telegram link from the installation database. Report the bot configured only when all three operator inputs exist; normalize its public username and keep unlinked accounts disconnected.",
+    "test": "tests/telegram-task-link.db.test.ts",
+    "suite": "test:task-identity-db"
+  },
+  "lib/thread-groups.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Compute the bot overview from visible task, conversation and pull request rows, counting each handoff once.",
+    "test": "lib/thread-groups.test.ts",
+    "suite": "test:issues"
   },
   "lib/ui-overlay.mjs": {
     "mode": "built-in",
@@ -1016,6 +1638,12 @@
     "test": "lib/workspace-db.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "lib/workspace-defaults.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the same default workspace identity in project validation and presentation without loading browser components into server workflows.",
+    "test": "apps/api/scripts/workflow-source-boundary.test.mjs"
+  },
   "services/credential-broker/server.mjs": {
     "mode": "optional-cloud",
     "environment": [
@@ -1037,474 +1665,39 @@
     "test": "services/credential-broker/server.test.mjs",
     "suite": "test:self-hosted-broker"
   },
-  "app/api/integrations/slack/callback/route.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "SLACK_APP_ID",
-      "SLACK_CLIENT_ID",
-      "SLACK_CLIENT_SECRET",
-      "BETTER_AUTH_URL",
-      "MIKKA_DATABASE_URL",
-      "DATABASE_URL",
-      "WORKSPACE_SECRETS_KEY"
-    ],
-    "behavior": "Accept one browser-bound Slack OAuth code and encrypt the bot grant for the currently authorized workspace.",
-    "test": "tests/slack-installation.db.test.ts",
-    "suite": "test:slack-installation-db"
-  },
-  "app/api/integrations/slack/connect/route.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "SLACK_APP_ID",
-      "SLACK_CLIENT_ID",
-      "SLACK_CLIENT_SECRET",
-      "BETTER_AUTH_URL",
-      "MIKKA_DATABASE_URL",
-      "DATABASE_URL"
-    ],
-    "behavior": "Consume an authenticated member’s one-time handoff before opening the official Slack consent URL.",
-    "test": "tests/slack-installation.db.test.ts",
-    "suite": "test:slack-installation-db"
-  },
-  "app/api/integrations/slack/route.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "SLACK_APP_ID",
-      "SLACK_CLIENT_ID",
-      "SLACK_CLIENT_SECRET",
-      "BETTER_AUTH_URL",
-      "MIKKA_DATABASE_URL",
-      "DATABASE_URL",
-      "WORKSPACE_SECRETS_KEY"
-    ],
-    "behavior": "Show or update only an active member’s Slack installation and channel preferences. Missing platform configuration disables installation.",
-    "test": "tests/slack-installation.db.test.ts",
-    "suite": "test:slack-installation-db"
-  },
-  "app/api/internal/eve/slack-credential/route.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "MIKKA_DATABASE_URL",
-      "DATABASE_URL",
-      "WORKSPACE_SECRETS_KEY",
-      "SLACK_APP_ID",
-      "BETTER_AUTH_SECRET"
-    ],
-    "behavior": "Require the scoped Eve principal, recipient proof, current workspace membership, and current link generation to obtain the native bot credential.",
-    "test": "tests/slack-installation.db.test.ts",
-    "suite": "test:slack-installation-db"
-  },
-  "apps/eve/agent/hooks/slack-installation.ts": {
+  "lib/coordinator/product-instructions.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Store non-secret, verified Slack link coordinates in the official Eve session for rendering a resumed turn.",
-    "test": "tests/slack-bot.test.mjs",
-    "suite": "test:slack"
+    "behavior": "Native Eve and the application host compose the same current instruction context from the installation scoped stores, preserving memory settings and usage receipts.",
+    "test": "lib/coordinator/prompt-preferences.test.ts",
+    "suite": "test:agent-kit-model"
   },
-  "drizzle/20261112030512_slack_workspace_installations.sql": {
-    "mode": "built-in",
-    "environment": [
-      "MIKKA_DATABASE_URL",
-      "DATABASE_URL"
-    ],
-    "behavior": "Persist single-use browser state, encrypted Workspace installations, and member-specific channel preferences in the existing application PostgreSQL database.",
-    "test": "tests/slack-installation.db.test.ts",
-    "suite": "test:slack-installation-db"
-  },
-  "lib/slack/channel-grant.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "MIKKA_EVE_HOST",
-      "MIKKA_APP_ORIGIN",
-      "BETTER_AUTH_URL",
-      "MIKKA_EVE_PRODUCT_TOKEN",
-      "BETTER_AUTH_SECRET"
-    ],
-    "behavior": "Get an uncached, member-bound native Slack credential from the configured product host for this Eve session.",
-    "test": "lib/slack/install-provider.test.ts",
-    "suite": "test:slack"
-  },
-  "lib/slack/channel-scope.ts": {
+  "lib/coordinator/prompt-context.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Carry only verified coordinates within Eve’s signed request and durable session; absent Slack identity cannot resolve credentials.",
-    "test": "tests/slack-bot.test.mjs",
-    "suite": "test:slack"
+    "behavior": "The instruction context reads the current owner and Bot memory alongside the existing current prompt preferences without loading chat history.",
+    "test": "lib/coordinator/prompt-preferences.test.ts",
+    "suite": "test:agent-kit-model"
   },
-  "lib/slack/grant-proof.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "BETTER_AUTH_SECRET"
-    ],
-    "behavior": "Bind the dedicated Slack grant proof to the timed Eve authorization, team, sender, installation and active member link.",
-    "test": "lib/slack/install-provider.test.ts",
-    "suite": "test:slack"
-  },
-  "lib/slack/install-provider.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "SLACK_APP_ID",
-      "SLACK_CLIENT_ID",
-      "SLACK_CLIENT_SECRET",
-      "BETTER_AUTH_URL"
-    ],
-    "behavior": "Use Slack OAuth, bot identity validation, member-visible conversation metadata and official revocation APIs for an operator-configured Slack app.",
-    "test": "lib/slack/install-provider.test.ts",
-    "suite": "test:slack"
-  },
-  "lib/slack/installation-store.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "SLACK_APP_ID",
-      "SLACK_CLIENT_ID",
-      "SLACK_CLIENT_SECRET",
-      "BETTER_AUTH_URL",
-      "MIKKA_DATABASE_URL",
-      "DATABASE_URL",
-      "WORKSPACE_SECRETS_KEY"
-    ],
-    "behavior": "Encrypt grants under the workspace secret key, lock refreshes, verify the active member link and disable local use before remote uninstall.",
-    "test": "tests/slack-installation.db.test.ts",
-    "suite": "test:slack-installation-db"
-  },
-  "lib/slack/installed-routing.ts": {
+  "lib/factory/reconcile-pending.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Read coordinates only from the platform-signed Slack app/team envelope, bound sender and validated revocation events.",
-    "test": "lib/slack/install-provider.test.ts",
-    "suite": "test:slack"
-  },
-  "lib/slack/eve-channel.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "SLACK_SIGNING_SECRET",
-      "SLACK_APP_ID"
-    ],
-    "behavior": "The official Eve Slack channel accepts signed events only from a verified Slack member with active workspace access and a current OAuth link.",
-    "test": "tests/slack-bot.test.mjs",
-    "suite": "test:slack"
-  },
-  "lib/settings-data.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Team home reads the complete authorized Task count from this server using the existing authenticated Team directory request and PostgreSQL.",
-    "test": "tests/team-visibility.db.test.ts",
-    "suite": "test:visibility-db"
-  },
-  "lib/inbox/store.ts": {
-    "mode": "built-in",
-    "environment": ["MIKKA_DATABASE_URL"],
-    "behavior": "Read the same authorized pending requests for board cards, inbox rows and badge counts in the selected workspace.",
-    "test": "lib/inbox/store.db.test.ts",
-    "suite": "test:inbox-db"
-  },
-  "lib/task-presentation.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Project the viewer's pending Inbox reason into the board's Agent activity mark while preserving the underlying task lifecycle.",
-    "test": "lib/task-presentation.test.ts",
-    "suite": "test:issues"
-  },
-  "lib/inbox/client.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Read the selected workspace Inbox and submit authorized lifecycle commands through the connected installation, preserving the server receipt and opaque pagination cursor.",
-    "test": "lib/inbox/workspace.test.ts",
+    "behavior": "Native instruction routing and Factory reconciliation use the same owner and Bot scoped eligibility query over the installation database.",
+    "test": "lib/factory/reconcile-pending.test.ts",
     "suite": "test:factory"
   },
-  "drizzle/20261109143100_coding_review_sessions.sql": {
+  "lib/factory/instructions.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Create the PostgreSQL human-review lease table, pending revocations and source-change triggers in the installation database.",
-    "test": "lib/coding-workspace/review-authority.db.test.ts",
-    "suite": "test:coding-workspace-db"
+    "behavior": "The existing Factory question and check recovery instructions are shared as product policy text with no external service dependency.",
+    "test": "lib/coordinator/prompt-context-concurrency.test.ts",
+    "suite": "test:agent-kit-model"
   },
-  "drizzle/20261109143101_coding_review_task_workspace.sql": {
+  "lib/task-work-read.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Fence a review when its Task changes workspace or loses its original stored ownership.",
-    "test": "lib/coding-workspace/review-authority.db.test.ts",
-    "suite": "test:coding-workspace-db"
-  },
-  "drizzle/20261109143102_coding_review_task_thread.sql": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Invalidate existing leases for an actual replacement Task run after the Factory binding transaction finishes.",
-    "test": "lib/coding-workspace/review-authority.db.test.ts",
-    "suite": "test:coding-workspace-db"
-  },
-  "lib/cloud-computer/thread-machines.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Question recovery locks the current PostgreSQL task, owner, run and operation before reusing a retained machine. Self-hosted recovery uses its existing database and configured execution provider.",
-    "test": "lib/factory/checks.db.test.ts",
-    "suite": "test:factory-checks-db"
-  },
-  "lib/coding-workspace/preview/runtime.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "BETTER_AUTH_URL"
-    ],
-    "behavior": "The configured application origin issues a one-use URL only after the existing owner-provided E2B guest acknowledges the scoped preview; an unavailable guest stays unavailable.",
-    "test": "lib/coding-workspace/preview/runtime.test.ts",
-    "suite": "test:coding-workspace-review-runtime"
-  },
-  "lib/coding-workspace/review-authority.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Read the authenticated installation workspace, current Task, native run and checkout from PostgreSQL, and reject a changed owner or credential.",
-    "test": "lib/coding-workspace/review-authority.db.test.ts",
-    "suite": "test:coding-workspace-db"
-  },
-  "lib/coding-workspace/review-machine.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "HTTPS_PROXY"
-    ],
-    "behavior": "An active lease can reconnect to its existing E2B sandbox using that owner’s stored provider key and optional HTTPS proxy; no device credential is reissued.",
-    "test": "lib/coding-workspace/review-authority.db.test.ts",
-    "suite": "test:coding-workspace-db"
-  },
-  "lib/coding-workspace/review-sessions.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Persist and fence terminal and preview leases in PostgreSQL. Preserve pending remote closes for the existing recovery timer.",
-    "test": "lib/coding-workspace/review-authority.db.test.ts",
-    "suite": "test:coding-workspace-db"
-  },
-  "lib/coding-workspace/terminal/runtime.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "BETTER_AUTH_SECRET",
-      "HTTPS_PROXY"
-    ],
-    "behavior": "Use the installation auth secret to derive an instance-specific terminal key. The owner’s E2B credential permits the same guest to open or close the signed gateway.",
-    "test": "lib/coding-workspace/terminal/runtime.test.ts",
-    "suite": "test:coding-workspace-review-runtime"
-  },
-  "lib/coding-workspace/terminal/test-fixture.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Supplies disposable locally generated wire identities to the signed terminal contract tests.",
-    "test": "lib/coding-workspace/terminal/wire.test.ts",
-    "suite": "test:coding-workspace-review-runtime"
-  },
-  "lib/coding-workspace/terminal/wire.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Bind a short-lived terminal action to its local installation key, current boot, lease and body digest.",
-    "test": "lib/coding-workspace/terminal/wire.test.ts",
-    "suite": "test:coding-workspace-review-runtime"
-  },
-  "lib/eve/session-control-delivery.mjs": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Propagate only a verified native cancel or end request to its own session wake, across asynchronous calls from the official Eve channel.",
-    "test": "lib/eve/session-control-delivery.test.mjs"
-  },
-  "lib/task-thread-run.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Select the Task run using the installation’s PostgreSQL relations, excluding group chat and late-bound Factory checker runs.",
-    "test": "lib/coding-workspace/review-authority.db.test.ts",
-    "suite": "test:coding-workspace-db"
-  },
-  "app/api/tasks/[taskId]/review/preview/route.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "BETTER_AUTH_URL"
-    ],
-    "behavior": "Issue a one-use link only after checking the installation origin and current checkout. A missing local dev server returns unavailable.",
-    "test": "lib/coding-workspace/preview/route.test.ts",
-    "suite": "test:coding-workspace-review-runtime"
-  },
-  "app/api/tasks/[taskId]/review/terminal/input/route.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "BETTER_AUTH_SECRET",
-      "BETTER_AUTH_URL"
-    ],
-    "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
-    "test": "lib/coding-workspace/terminal/http.test.ts",
-    "suite": "test:coding-workspace-review-runtime"
-  },
-  "app/api/tasks/[taskId]/review/terminal/resize/route.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "BETTER_AUTH_SECRET",
-      "BETTER_AUTH_URL"
-    ],
-    "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
-    "test": "lib/coding-workspace/terminal/http.test.ts",
-    "suite": "test:coding-workspace-review-runtime"
-  },
-  "app/api/tasks/[taskId]/review/terminal/route.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "BETTER_AUTH_SECRET",
-      "BETTER_AUTH_URL"
-    ],
-    "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
-    "test": "lib/coding-workspace/terminal/http.test.ts",
-    "suite": "test:coding-workspace-review-runtime"
-  },
-  "drizzle/20261112030511_coding_review_provider_receipts.sql": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Existing PostgreSQL review leases retain their E2B placement. New sponsored leases record their immutable repository and independent human operation for cleanup.",
-    "test": "lib/coding-workspace/review-authority.db.test.ts",
-    "suite": "test:coding-workspace-db"
-  },
-  "lib/coding-workspace/cloudflare-review.ts": {
-    "mode": "optional-cloud",
-    "environment": [
-      "MIKKA_CLOUDFLARE_TASK_WORKSPACES",
-      "MIKKA_TASK_MACHINE_BRIDGE_TOKEN"
-    ],
-    "behavior": "A separately admitted sponsored checkout builds a bounded human lease. Local and owner-provided E2B review keep their existing transport.",
-    "test": "lib/coding-workspace/cloudflare-review.test.ts",
-    "suite": "test:coding-workspace-review-runtime"
-  },
-  "lib/coding-workspace/preview/route.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "BETTER_AUTH_URL"
-    ],
-    "behavior": "Issue a one-use link only after checking the installation origin and current checkout. A missing local dev server returns unavailable.",
-    "test": "lib/coding-workspace/preview/route.test.ts",
-    "suite": "test:coding-workspace-review-runtime"
-  },
-  "lib/coding-workspace/terminal/http.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "BETTER_AUTH_SECRET",
-      "BETTER_AUTH_URL"
-    ],
-    "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
-    "test": "lib/coding-workspace/terminal/http.test.ts",
-    "suite": "test:coding-workspace-review-runtime"
-  },
-  "lib/agent-runs.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Read messages for already-authorized runs from PostgreSQL. Retry identities are projected only from the reader's own stored submission events.",
-    "test": "tests/team-visibility.db.test.ts",
-    "suite": "test:visibility-db"
-  },
-  "lib/composio-account-state.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Project stored account status and enabled switches locally; expired accounts require reconnection and an enabled usable account keeps its toolkit active.",
-    "test": "tests/mobile-plugin-connections.test.ts",
-    "suite": "test:mobile"
-  },
-  "lib/hooks/chat-delivery-state.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Journal immutable browser commands before preflight, retain failed or interrupted sends, and retry the same command without a hosted service.",
-    "test": "scripts/thread-composer.test.tsx",
-    "suite": "test:groups"
-  },
-  "lib/mobile-plugin-connections.ts": {
-    "mode": "operator-configured",
-    "environment": [],
-    "behavior": "Read the current account from the installation-configured Composio, GitHub, Linear and Telegram integrations. Unconfigured providers contribute no connected toolkit; a paused Linear service stays paused and partial failures retain confirmed results.",
-    "test": "tests/mobile-plugin-connections.test.ts",
-    "suite": "test:mobile"
-  },
-  "lib/telegram/connection-status.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "TELEGRAM_BOT_USERNAME",
-      "TELEGRAM_BOT_TOKEN",
-      "TELEGRAM_WEBHOOK_SECRET_TOKEN"
-    ],
-    "behavior": "Read only the requested account's Telegram link from the installation database. Report the bot configured only when all three operator inputs exist; normalize its public username and keep unlinked accounts disconnected.",
-    "test": "tests/telegram-task-link.db.test.ts",
-    "suite": "test:task-identity-db"
-  },
-  "app/actions/task-runs.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "The signed-in user reads workspace runs and manages the titles of owned conversations using installation PostgreSQL.",
-    "test": "tests/conversation-title.db.test.ts",
-    "suite": "test:run-publication-db"
-  },
-  "drizzle/20261113153514_conversation_titles.sql": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Add nullable, bounded conversation titles and their source to existing runs in the installation database.",
-    "test": "tests/conversation-title.db.test.ts",
-    "suite": "test:run-publication-db"
-  },
-  "lib/bot-model-menu-view.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Render the selected model while the installation saves the selection and reconcile the acknowledged choice.",
-    "test": "lib/bot-model-menu-view.test.ts",
-    "suite": "test:issues"
-  },
-  "lib/thread-groups.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Compute the bot overview from visible task, conversation and pull request rows, counting each handoff once.",
-    "test": "lib/thread-groups.test.ts",
-    "suite": "test:issues"
-  },
-  "lib/conversation-title-schedule.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Schedule a title update only after the run event commits to the installation database.",
-    "test": "tests/conversation-title.db.test.ts",
-    "suite": "test:run-publication-db"
-  },
-  "lib/conversation-title-server.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Use the user's available default model to name a conversation. Keep its fallback when generation is unavailable and preserve manual titles on automatic triggers.",
-    "test": "tests/conversation-title.db.test.ts",
-    "suite": "test:run-publication-db"
-  },
-  "lib/conversation-title.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Apply the same title limits, generation triggers and manual precedence on every installation.",
-    "test": "lib/conversation-title.test.ts",
-    "suite": "test:issues"
-  },
-  "lib/coordinator/citations.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Resolve and format titles of cited conversations from the installation's own run and task records.",
-    "test": "lib/coordinator/citations.test.ts",
-    "suite": "test:coordinator-events"
-  },
-  "lib/short-title-server.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Generate a short title with the installation's existing default-model service when available, retaining the display fallback otherwise.",
-    "test": "tests/conversation-title.db.test.ts",
-    "suite": "test:run-publication-db"
-  },
-  "lib/short-title.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Use the stored conversation title when present and a bounded local fallback otherwise.",
-    "test": "lib/issue-threads.test.ts",
-    "suite": "test:issues"
-  },
-  "lib/task-status-advance.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Advance task status in PostgreSQL from eligible run and pull request lifecycle events.",
-    "test": "tests/task-status-advance.db.test.ts",
-    "suite": "test:run-publication-db"
-  },
-  "lib/task-status-run-start.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "After a successful run claim commits, advance its task within the installation database.",
-    "test": "tests/task-status-advance.db.test.ts",
-    "suite": "test:run-publication-db"
+    "behavior": "Task work exposes only the current member's authorized Factory receipts for the same task and workspace.",
+    "test": "lib/task-work-read.test.ts",
+    "suite": "test:factory-activity"
   }
 }

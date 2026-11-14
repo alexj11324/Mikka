@@ -65,6 +65,12 @@
   },
   "Issue": {
     "scope": {
+      "workspaceUnavailable": "无法获取所属工作区",
+      "linearSync": "Linear 同步",
+      "linearEnabled": "已启用",
+      "disableLinear": "关闭 Linear 同步",
+      "disableLinkedLinear": "关闭同步并归档关联的 Linear Issue",
+      "linearDisabled": "已关闭 Linear 同步。",
       "label": "归属",
       "workspace": "工作区",
       "personal": "个人",
@@ -880,7 +886,7 @@
     "title": "设备",
     "description": "查看已连接的电脑与运行环境。",
     "summary": "本页 {total} 台设备 · {online} 台在线",
-    "listError": "设备列表更新失败，已保留上次结果。",
+    "listError": "无法加载你的设备。",
     "emptyTitle": "还没有设备",
     "emptyDescription": "在电脑上安装并启动 Mikka，上线后它就会出现在这里。",
     "footer": "检查通过表示最近一次可用性检查成功，不代表工具正在运行。检查过期后需等待新的检查结果。",
@@ -1047,7 +1053,7 @@
     "toggleSidebar": "展开或收起侧栏",
     "breadcrumb": "当前位置",
     "openSearch": "打开全局搜索",
-    "listError": "列表更新失败，已保留上次结果。",
+    "listError": "无法加载任务列表。",
     "taskStatesReadFailed": "无法加载任务状态，请重试。",
     "searchPlaceholder": "搜索任务…",
     "taskView": "任务视图",
@@ -1714,6 +1720,41 @@
     "backToAccessible": "返回可访问的工作区"
   },
   "Projects": {
+    "lifecycle": {
+      "actions": "项目操作",
+      "impact": "项目影响范围",
+      "archived": "已归档",
+      "archive": "归档项目",
+      "restore": "恢复项目",
+      "delete": "删除项目",
+      "deleteNamed": "删除「{name}」？",
+      "permanent": "此操作会永久删除项目。",
+      "confirmName": "输入「{name}」以确认删除",
+      "archiveHint": "归档会保留任务和历史记录。恢复项目后可以继续开展工作。",
+      "restoreHint": "恢复后可以在此项目中开展新工作。",
+      "deleteBlocked": "只能删除无关联内容且没有历史记录的空项目。",
+      "noLinks": "无关联内容或历史记录。",
+      "loadFailed": "无法核实项目影响范围，请刷新后重试。",
+      "saveFailed": "无法确认更改结果，请刷新项目后重试。",
+      "loading": "正在核对项目影响范围…",
+      "counts": {
+        "teams": "团队",
+        "members": "成员",
+        "repositories": "仓库绑定",
+        "environments": "环境绑定",
+        "events": "项目动态",
+        "resourceEvents": "资源动态",
+        "incomingDependencies": "依赖本项目的项目",
+        "runs": "运行",
+        "activeRuns": "进行中的运行",
+        "factoryTasks": "Factory 任务",
+        "decisions": "决策",
+        "tasks": "任务",
+        "dependencies": "依赖项目",
+        "milestones": "里程碑",
+        "legacyTaskReferences": "历史任务关联"
+      }
+    },
     "title": "项目",
     "teamTitle": "{team} · 项目",
     "newProject": "新建项目",
@@ -4757,6 +4798,9 @@
       "open": "打开 {name}",
       "download": "下载 {name}",
       "remove": "移除 {name}",
+      "removeFailed": "未能移除 {name}",
+      "retryRemoval": "重试",
+      "keep": "保留附件",
       "retry": "重试上传 {name}",
       "errors": {
         "unsupported": "不支持此文件格式",
@@ -6382,6 +6426,19 @@
     "renderHint": "请重试打开页面。"
   },
   "Organization": {
+    "domains": {
+      "discover": "可加入的组织",
+      "join": "加入",
+      "manage": "通过邮箱域名加入",
+      "hint": "允许已验证工作邮箱的域名后，使用同一域名的人可以加入组织，成为普通成员。",
+      "domain": "邮箱域名",
+      "add": "允许域名",
+      "remove": "移除 {domain}",
+      "empty": "暂未允许任何域名",
+      "joined": "已加入{name}",
+      "added": "已允许 {domain}",
+      "removed": "已移除 {domain}。现有成员保留组织成员身份。"
+    },
     "serviceKeys": {
       "title": "组织服务密钥",
       "empty": "你管理的工作区中暂无绑定此组织的服务密钥。",
@@ -6686,7 +6743,8 @@
         "kinds": {
           "subscription": "模型订阅",
           "api_key": "API 密钥",
-          "mcp": "MCP 服务"
+          "mcp": "MCP 服务",
+          "skill": "技能"
         },
         "status": {
           "pending": "待审批",
@@ -7269,9 +7327,15 @@
     "deleteTeam": "删除团队",
     "deleteConfirm": "输入 {name} 以确认",
     "deleteTitle": "删除团队「{name}」？",
-    "deleteImpact": "将一并删除 {tasks} 个任务和 {projects} 个项目。与其他团队共享的项目只会取消关联。",
-    "deleteCounting": "正在统计将被删除的内容…",
+    "deleteImpact": "此团队关联了 {tasks} 个任务和 {projects} 个项目。永久删除仅适用于没有关联对象和执行历史的空团队。",
+    "deleteCounting": "正在检查团队关联和执行历史…",
     "deleting": "正在删除…",
+    "ungroup": "解除分组…",
+    "ungroupTitle": "解除「{name}」团队分组？",
+    "ungroupImpact": "{tasks} 个任务将成为此工作区的未分组任务，{projects} 个项目将移除此团队关联。任务、项目及其历史记录都会保留。",
+    "ungroupConfirm": "解除分组",
+    "ungroupPending": "正在解除分组…",
+    "teamUngrouped": "已解除「{name}」团队分组。",
     "teamDeleted": "已删除团队「{name}」。"
   },
   "HostedSettings": {
@@ -7339,6 +7403,19 @@
     }
   },
   "MobileCore": {
+    "notifications": {
+      "on": "开",
+      "off": "关",
+      "pushTypes": "推送这些事",
+      "unavailable": "推送无法送达",
+      "openSettings": "打开设置",
+      "allow": "允许推送",
+      "savingOn": "正在开启",
+      "savingOff": "正在关闭",
+      "unconfirmedOn": "开启未确认",
+      "unconfirmedOff": "关闭未确认",
+      "retrySave": "重试保存"
+    },
     "pin": "置顶",
     "unpin": "取消置顶",
     "hide": "隐藏",
@@ -7353,6 +7430,8 @@
     "message": "发消息",
     "replySelection": "回复选中的文字",
     "messageTask": "给这个任务发消息",
+    "messageThread": "给这个线程发消息",
+    "lastThreadStatus": "上次状态：{status}",
     "noTasks": "没有任务",
     "notStarted": "还没开始",
     "allTasks": "全部任务",
@@ -7401,6 +7480,7 @@
     "priority": "{priority}优先级",
     "noPriority": "无",
     "activity": "活动",
+    "taskPropertiesOnWeb": "状态和优先级（网页版）",
     "comment": "+ 评论",
     "conversation": {
       "fix": "修复",
@@ -7449,10 +7529,17 @@
     "history": "版本历史",
     "currentVersion": "当前版本",
     "version": "版本 {seq} · {count} 个文件 · {date}",
+    "fileHistoryAction": "文件版本历史",
+    "chooseFile": "选择文件",
+    "fileHistory": "{name} 的版本历史",
+    "fileVersion": "版本 {seq} · {date}",
+    "fileDeleted": "已删除",
+    "downloadVersion": "下载版本 {seq}",
+    "fileHistoryEmpty": "此文件暂无版本记录。",
     "moreVersions": "更多版本",
     "moreFolders": "更多文件夹",
     "restore": "恢复版本",
-    "restoreTitle": "恢复此版本？",
+    "restoreTitle": "将整个文件夹恢复到此版本？",
     "replace": "替换文件",
     "replaceTitle": "替换同名文件？",
     "conflict": "文件已更新，请查看最新版本后重试。",

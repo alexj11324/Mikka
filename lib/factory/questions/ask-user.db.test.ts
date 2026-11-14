@@ -12,6 +12,9 @@ import { createFactoryDispatch, factoryBinding } from "../dispatch";
 import { factoryCheckIndependent } from "../check-independence";
 import { createFactoryQuestions } from "./store";
 import { handleFactoryQuestionList } from "./ask-user";
+import { builtinGateway } from "../../builtin-gateway/runtime";
+import { isolateCoordinatorWakes } from "../../../tests/support/coordinator-wake";
+import { bindFixtureWorkspaceDatabase } from "../../../tests/helpers/workspace-database";
 import { dropTestDatabase } from "../../../tests/support/drop-test-database";
 
 const url = process.env.E2E_DATABASE_URL;
@@ -22,12 +25,14 @@ if (url) {
 } else if (process.env.REQUIRE_DB === "1") assert.fail("REQUIRE_DB=1 needs E2E_DATABASE_URL");
 
 test("pending Factory questions list by task and by run in AskUserQuestion shape", { skip: !url, timeout: 180000 }, async (t) => {
+  await isolateCoordinatorWakes(t);
   const admin = new Pool({ connectionString: url, max: 1 });
   const database = `fac_askq_${randomUUID().replaceAll("-", "")}_e2e`;
   await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`);
   const target = new URL(url!);
   target.pathname = `/${database}`;
   const pool = new Pool({ connectionString: target.toString(), max: 6 });
+  const closeWorkspace = await bindFixtureWorkspaceDatabase(pool);
   try {
     const dir = new URL("../../../drizzle/", import.meta.url);
     for (const f of orderMigrations((await readdir(dir)).filter((f) => f.endsWith(".sql"))))
@@ -68,7 +73,7 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
       await pool.query(`UPDATE agent_runs SET status='stopped',"stopReason"=$2,report=$3,"sessionId"='session:'||id,"startedAt"=now(),"finishedAt"=now() WHERE id=$1`, [runId, kind === "external" ? "blocked" : "asked_human",
         JSON.stringify({ summary: "Synthetic hand-in", openQuestions: [text], question: { questionId, kind, question: text, options } })]);
       await runtime.questions.record(user, runId);
-      return { taskId: r.task.id, runId, questionId, sourceEventId: src };
+      return { taskId: r.task.id, issueId, runId, questionId, sourceEventId: src };
     };
     const get = (userId: string | null, query = "") =>
       handleFactoryQuestionList(questions, { actor: userId ? { userId } : null, authorization: null, method: "GET", url: `https://mikka.test/api/factory/questions${query}` });
@@ -93,9 +98,33 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
     const a = await asked("decision", "Which API should we keep?", ["REST", "GraphQL"]);
     const b = await asked("context", "Where is the staging config?", []);
 
+    await t.test("a reassigned question is omitted from the earlier authorized task read", async (st) => {
+      const move = (tx: Pick<PoolClient, "query">, taskId: string) =>
+        tx.query(
+          `UPDATE factory_questions q
+              SET "taskId"=t.id, "attemptId"=t."attemptId", "candidateId"=t."candidateId"
+             FROM factory_tasks t WHERE q.id=$1 AND t.id=$2`,
+          [a.questionId, taskId],
+        );
+      const readTask = store.readTaskForUser.bind(store);
+      st.mock.method(store, "readTaskForUser", async (tx: PoolClient, userId: string, taskId: string) => {
+        const task = await readTask(tx, userId, taskId);
+        if (taskId === a.taskId) await move(tx, b.taskId);
+        return task;
+      });
+      try {
+        const visible = await questions.pending("owner", a.runId, "user");
+        assert.deepEqual(visible, []);
+      } finally {
+        await move(pool, a.taskId);
+      }
+    });
+
     await t.test("by task: exact AskUserQuestion fields plus type and original text", async () => {
       const res = await get("owner", `?taskId=${a.taskId}`);
       assert.equal(res.status, 200);
+      const [item] = (res.body as { questions: { reference: { binding: { issueId: string } } }[] }).questions;
+      assert.equal(item.reference.binding.issueId, a.issueId);
       assert.deepEqual((res.body as { questions: unknown[] }).questions.map((q) => { const { reference: _r, ...rest } = q as Record<string, unknown>; return rest; }), [{
         questionId: a.questionId, taskId: a.taskId, runId: a.runId, status: "open", type: "decision",
         originalText: "Which API should we keep?", question: "Which API should we keep?", header: "Decision",
@@ -155,6 +184,33 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
       // b's run is outside the newest 50: found only because runId is filtered before LIMIT.
       assert.ok(!all.includes(b.questionId));
       assert.deepEqual(((await get("owner", `?runId=${b.runId}`)).body as { questions: { questionId: string }[] }).questions.map((q) => q.questionId), [b.questionId]);
+    });
+
+    await t.test("the task's pending feed and its durable history each apply their own 50-row limit", async () => {
+      const item = await asked("decision", "Still waiting?", ["Yes"]);
+      const oldCandidate = randomUUID();
+      await pool.query(`INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,"runId")
+        VALUES ($1,$2,repeat('a',40),'fixture/repo','preview','fixture',$3)`, [oldCandidate, item.taskId, item.runId]);
+      await pool.query(
+        `INSERT INTO factory_questions
+           (id,"originRunId","userId","issueId","taskId","attemptId",stage,"originSessionId",
+            "originRevision","waitingBinding",kind,question,request,status,reason,"sourceEventId","expiresAt","createdAt","candidateId")
+         SELECT gen_random_uuid(),gen_random_uuid(),q."userId",q."issueId",q."taskId",q."attemptId",q.stage,
+                q."originSessionId",q."originRevision",q."waitingBinding",q.kind,q.question,q.request,
+                CASE WHEN n%3=0 THEN 'resolved' ELSE 'waiting_user' END,q.reason,q."sourceEventId",
+                CASE WHEN n%3=1 THEN q."createdAt"-interval '1 day' END,q."createdAt"+n*interval '1 second',
+                CASE WHEN n%3=2 THEN $2::uuid END
+           FROM factory_questions q CROSS JOIN generate_series(1,50) n WHERE q.id=$1`,
+        [item.questionId, oldCandidate],
+      );
+      const history = await questions.list("owner", item.taskId);
+      assert.equal(history.length, 50);
+      assert.ok(history.every(q => ["resolved", "expired", "superseded"].includes(q.status)));
+      const feed = await get("owner", `?taskId=${item.taskId}`);
+      assert.equal(feed.status, 200);
+      assert.deepEqual((feed.body as { questions: { questionId: string }[] }).questions.map(q => q.questionId), [item.questionId]);
+      const all = await get("owner");
+      assert.ok((all.body as { questions: { questionId: string }[] }).questions.some(q => q.questionId === item.questionId));
     });
 
     await t.test("BE-16: GETs compute expiry from expiresAt and write nothing", async () => {
@@ -300,7 +356,7 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
       // Move three more questions onto the same task, then give all four the same createdAt so only `id DESC` orders them.
       for (let i = 1; i < 4; i++) {
         const { questionId } = await asked("decision", `Tiebreak ${i}`, ["A"]);
-        await pool.query('UPDATE factory_questions f SET "taskId"=o."taskId","attemptId"=o."attemptId","candidateId"=o."candidateId" FROM factory_questions o WHERE f.id=$1 AND o.id=$2', [questionId, first.questionId]);
+        await pool.query('UPDATE factory_questions f SET "taskId"=o."taskId","issueId"=o."issueId","attemptId"=o."attemptId","candidateId"=o."candidateId","waitingBinding"=o."waitingBinding" FROM factory_questions o WHERE f.id=$1 AND o.id=$2', [questionId, first.questionId]);
         ids.push(questionId);
       }
       await pool.query(`UPDATE factory_questions SET "createdAt"='2020-06-01T00:00:00Z' WHERE "taskId"=$1`, [first.taskId]);
@@ -366,7 +422,10 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
       assert.equal((await get("owner", `?taskId=${first.taskId}`)).status, 200, "restored authorized source reads normally");
     });
   } finally {
-    await dropTestDatabase(admin, database, pool);
+    await builtinGateway()?.stop();
+    await closeWorkspace();
+    const { pool: appPool } = await import("../../db/request-scope");
+    await dropTestDatabase(admin, database, pool, appPool);
     await admin.end();
   }
 });
