@@ -590,6 +590,7 @@
     "openableDraggableTask": "可打开、可拖动任务"
   },
   "Editor": {
+    "executionInstructions": "执行指令",
     "draftAuthor": "草稿作者",
     "unsavedDraft": "未保存草稿",
     "editorLabel": "任务描述编辑器",
@@ -1420,6 +1421,17 @@
     "viewProjects": "查看项目"
   },
   "IssueDetail": {
+    "work": {
+      "heading": "工作",
+      "system": "系统",
+      "agent": "Agent",
+      "states": {
+        "open": "开放",
+        "closed": "已关闭",
+        "draft": "草稿",
+        "merged": "已合并"
+      }
+    },
     "frame": {
       "delegate": "交给",
       "open": "打开",

@@ -4,9 +4,9 @@ import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import { db } from '@/lib/db'
-import { issueListChanged } from '@/lib/live/lists'
-import { issueMembersChanged, issueRelationsChanged, relationIds } from '@/lib/live/issue-detail'
-import { agents, bots, issues, issueMembers, issueVersions, users } from '@/lib/db/schema'
+import { persistIssueMetadata } from '@/lib/issue-metadata-store'
+import { issueMembersChanged } from '@/lib/live/issue-detail'
+import { agents, bots, issues, issueMembers, users } from '@/lib/db/schema'
 import { factoryAgentProfiles } from '@/lib/db/agent-profile-schema'
 import { builtinAgentProfileDefinition, BUILTIN_AGENT_PROFILE_ID } from '@/lib/factory/agent-profile-definition'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
@@ -17,11 +17,10 @@ import { issuePropertyChoices } from '@/lib/issue-property-choices'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { listWorkspaceProjects } from '@/app/actions/projects'
 import { issueView } from '@/lib/task-identifier-server'
-import { assigneeSchema, delegateSchema, blockFlagSchema, labelSchema, pullRequestSchema, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
+import { assigneeSchema, delegateSchema, blockFlagSchema, labelSchema, pullRequestSchema, readIssueMetadata } from '@/lib/issue-metadata'
 import { scheduleIssueEffect } from '@/lib/issue-effects'
 import { activityActor } from '@/lib/activity-actor'
 import { requireCurrentIssueWorkspace, requireLockedIssueScope, withIssueWorkspace } from '@/lib/issue-scope-authorization'
-import { reviewTaskChanged } from '@/lib/coding-workspace/review-sessions'
 
 const patchSchema = z.object({
   // R-60 keeps the UI human-only; the verified legacy MCP contract remains supported.
@@ -127,21 +126,17 @@ export async function updateIssueMetadata(input: { id: string; revision: number;
             delegate = { id: profile.id, name: profile.definition.name, kind: 'profile', image: null }
           }
         }
-        const next = { ...metadata, ...patch, assignee, delegate }
+        const next = { ...metadata, ...patch, assignee, delegate, ...(requestedDelegate !== undefined ? { delegateSelection: 'manual' as const } : {}) }
         next.labels = [...new Map(next.labels.map(label => [label.name.toLowerCase(), label])).values()]
         next.pullRequests = [...new Map(next.pullRequests.map(pr => [pr.url.replace(/\/$/, ''), { ...pr, url: pr.url.replace(/\/$/, '') }])).values()]
-        const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, next), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId), eq(issues.revision, latest.revision))).returning()
+        const saved = await persistIssueMetadata(tx, latest, next, activityActor(user.id))
         if (!saved) return { error: 'issueOutdated' }
-        reviewTaskChanged(tx, latest, saved)
         // Invitation bookkeeping follows every validation and the revision
         // fence. An invalid delegate must not leave a partial invitation.
         if (parsed.data.inviteEmail && assignee?.kind === 'member' && assignee.id !== issue.userId) {
           const added = await tx.insert(issueMembers).values({ issueId: issue.id, userId: issue.userId, memberId: assignee.id }).onConflictDoNothing().returning({ memberId: issueMembers.memberId })
           if (added.length) await issueMembersChanged(tx, issue.id)
         }
-        await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(user.id) })
-        await issueListChanged(tx, saved.id)
-        await issueRelationsChanged(tx, [saved.id, ...relationIds(latest.content), ...relationIds(saved.content)])
         return { issue: await issueView(saved, tx) }
       })))
       if ('issue' in result && result.issue?.linearSyncPolicy === 'explicit' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })

@@ -1736,5 +1736,82 @@
     "behavior": "The existing Factory question and check recovery instructions are shared as product policy text with no external service dependency.",
     "test": "lib/coordinator/prompt-context-concurrency.test.ts",
     "suite": "test:agent-kit-model"
+  },
+  "lib/task-work-read.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Task work exposes only the current member's authorized Factory receipts for the same task and workspace.",
+    "test": "lib/task-work-read.test.ts",
+    "suite": "test:factory-activity"
+  },
+  "lib/coordinator/issue-input.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Accept an optional human-readable task brief. Preserve the original execution request in its linked Coordinator event.",
+    "test": "tests/coordinator-issue-create.db.test.ts",
+    "suite": "test:coordinator-issue-create-db"
+  },
+  "drizzle/20261114132713_task_pull_links.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Backfill and maintain ordered task pull-request links in the installation PostgreSQL database.",
+    "test": "tests/task-presentation.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "lib/task-presentation-read.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read linked pull requests only for the tasks admitted by the existing workspace and team authorization checks.",
+    "test": "tests/task-presentation.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "app/actions/agents.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read authorized conversations, task connections and paginated human history from installation PostgreSQL. Existing thread-only clients can omit Task Work.",
+    "test": "tests/action-read-egress.db.test.ts",
+    "suite": "test:activity-actor-db"
+  },
+  "lib/desktop-rpc/schemas.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validate the optional Task Work activity cursor with the same bounded version and positions accepted by the existing history read.",
+    "test": "lib/task-work-read.test.ts",
+    "suite": "test:factory-activity"
+  },
+  "lib/dispatch-delegate.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Initialize a delegate only on the authorized owner's first admitted dispatch, preserving human or cleared assignments.",
+    "test": "lib/dispatch-delegate.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "lib/issue-metadata-store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Persist task metadata, revision, version and live effects on one installation transaction.",
+    "test": "lib/dispatch-delegate.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "lib/task-work-pulls.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Projects authorized work outputs to GitHub pull requests without fetching remote repositories.",
+    "test": "components/workspace/task-work-section.test.tsx",
+    "suite": "test:issue-readonly-dom"
+  },
+  "lib/task-description.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Classifies existing task content locally for display on supported clients.",
+    "test": "apps/mobile/tests/task-description.test.mts",
+    "suite": "test:mobile"
+  },
+  "lib/issue-relations.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Uses stored task relations to display the current blocking and dependency state without an external service.",
+    "test": "components/workspace/issue-relations.test.tsx",
+    "suite": "test:view-state"
   }
 }

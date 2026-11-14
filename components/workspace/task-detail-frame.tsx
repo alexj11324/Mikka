@@ -1,5 +1,6 @@
 'use client'
 
+import { taskWorkOwner } from '@/lib/issue-metadata'
 import { useRef, useState, type ComponentType, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
@@ -19,8 +20,8 @@ import { ISSUE_PRIORITIES, ISSUE_STATUSES } from './issue-properties'
 import { useIssueConnections, type RelationKind } from './issue-relations'
 import { useTaskOwnershipRows } from './issue-scope-control'
 import { AgentSphere } from './issue-assignee-menu'
-import type { useAgentActivity } from './issue-threads'
-import { useSelectedTaskPresentation } from '@/hooks/use-selected-task-presentation'
+import type { useTaskWork } from './issue-threads'
+import { TaskWorkSection } from './task-work-section'
 import { useActivityEvents } from './issue-activity-feed'
 import { useActivityDrafts, type DiscussionSave } from './issue-activity'
 import type { IssueDiscussions } from './issue-editor'
@@ -60,7 +61,7 @@ export type FramedTaskProps = {
   acceptance: ReactNode
   versions: ActivityVersion[]
   historyFailed: (() => void) | null
-  agentActivity: ReturnType<typeof useAgentActivity>
+  agentActivity: ReturnType<typeof useTaskWork>
   documentTools: boolean
   actionRequest: IssueActionRequest | null
   propertyRequest: MetadataRequest | null
@@ -88,6 +89,8 @@ export function FramedTask(props: FramedTaskProps) {
   const tCommon = useTranslations('Common')
   const tFrame = useTranslations('IssueDetail.frame')
   const tDetail = useTranslations('Workspace.detail')
+  const tNav = useTranslations('Nav')
+  const tArtifact = useTranslations('ArtifactReview')
   const tActivity = useTranslations('Workspace.activity')
   const tIssue = useTranslations('Issue')
   const tMenu = useTranslations('IssueDetail.menu')
@@ -109,8 +112,9 @@ export function FramedTask(props: FramedTaskProps) {
   const metadata = useIssueMetadataSave({ task, disabled: locked, onSaved: adopt, onBusyChange: props.onMetadataBusy })
   const ownershipRows = useTaskOwnershipRows(task, userId, preview, locked, adopt)
   const team = useIssueTeam({ issueId: task.id, viewerId: userId, disabled: locked })
-  const presentation = useSelectedTaskPresentation(userId, task.workspaceId, preview ? undefined : task.id)
-  const connections = useIssueConnections({ liveWorkspaceId: props.liveWorkspaceId, viewerId: userId, task, getCurrent, onSaved: adopt, disabled: locked, enabled: !preview })
+  const presentation = { data: props.agentActivity.work?.presentation, error: props.agentActivity.failed, retry: props.agentActivity.retry }
+
+  const connections = useIssueConnections({ snapshot: props.agentActivity.connections, liveWorkspaceId: props.liveWorkspaceId, viewerId: userId, task, getCurrent, onSaved: adopt, disabled: locked, enabled: !preview })
 
   const loading = (text = tCommon('loading')): TaskMenuItem[] => optionsError
     ? [{ id: 'reload', label: tCommon('retry'), onSelect: () => { void reloadOptions() } }]
@@ -118,7 +122,8 @@ export function FramedTask(props: FramedTaskProps) {
   const busy = locked || metadata.pending
   const meta = task.metadata
 
-  // 负责人 is a person; a Bot the task is handed to has its own line under it (R-60).
+  // The human assignment picker and the execution delegate keep their independent write authority.
+  const workOwner = taskWorkOwner(meta)
   const member = meta.assignee?.kind === 'member' ? meta.assignee : null
   const assigneeItems: TaskMenuItem[] = [
     { id: 'none', label: tAssignee('unassigned'), mark: { kind: 'icon', icon: 'person' }, checked: !member, onSelect: () => { if (member) void metadata.persist({ assignee: null }) } },
@@ -126,6 +131,11 @@ export function FramedTask(props: FramedTaskProps) {
     ...options?.isOwner ? [{ id: 'invite', label: tAssignee('invite'), mark: { kind: 'icon', icon: 'mail' }, divider: true, onSelect: () => props.requestProperty('invite') } satisfies TaskMenuItem] : [],
   ]
   const delegate = meta.delegate?.name
+  const conversations = (props.agentActivity.threads ?? []).flatMap(thread => thread.detail ? [{
+    id: 'run:' + thread.id, text: thread.detail.name || tNav('untitledConversation'), open: () => props.agentActivity.openThread(thread.id),
+  }] : [])
+  const pullRequests = presentation.data?.pullRequests ?? meta.pullRequests
+  const reviewBranch = props.agentActivity.work?.factory?.task.review?.summary?.branch
 
   const allLabels = [...new Map([...(options?.labels ?? []), ...meta.labels].map(label => [label.name, label])).values()]
   const labelItems: TaskMenuItem[] = [
@@ -159,8 +169,8 @@ export function FramedTask(props: FramedTaskProps) {
     },
     { id: 'priority', label: tIssue('priorityLabel'), disabled: locked, value: { text: priorityLabel(props.priority), mark: { kind: 'priority', value: props.priority } }, menu: ISSUE_PRIORITIES.map(item => ({ id: item.value, label: priorityLabel(item.value), mark: { kind: 'priority', value: item.value }, checked: item.value === props.priority, onSelect: () => props.onPriority(item.value) })) },
     ...ownershipRows,
-    { id: 'assignee', label: tProperty('assignee'), disabled: busy, onOpen: loadOptions, value: member ? { text: member.name, mark: { kind: 'person', name: member.name }, aria: tAssignee('aria', { name: member.name }) } : { text: tAssignee('unassignedLabel'), mark: { kind: 'icon', icon: 'person' }, muted: true, aria: tAssignee('aria', { name: tAssignee('unassigned') }) }, menu: assigneeItems },
-    ...delegate ? [{ id: 'delegate', label: tFrame('delegate'), value: { text: delegate, aria: tAssignee('delegatedTo', { name: delegate }), mark: { kind: 'node', node: <AgentSphere name={delegate} compact /> } } } satisfies TaskDetailRow] : [],
+    { id: 'assignee', label: tProperty('assignee'), disabled: busy, onOpen: loadOptions, value: member ? { text: member.name, mark: { kind: 'person', name: member.name }, aria: tAssignee('aria', { name: member.name }) } : workOwner ? { text: workOwner.name, mark: { kind: 'node', node: <AgentSphere name={workOwner.name} compact /> }, aria: tAssignee('aria', { name: workOwner.name }) } : { text: tAssignee('unassignedLabel'), mark: { kind: 'icon', icon: 'person' }, muted: true, aria: tAssignee('aria', { name: tAssignee('unassigned') }) }, menu: assigneeItems },
+    ...member && delegate ? [{ id: 'delegate', label: tFrame('delegate'), value: { text: delegate, aria: tAssignee('delegatedTo', { name: delegate }), mark: { kind: 'node', node: <AgentSphere name={delegate} compact /> } } } satisfies TaskDetailRow] : [],
     { id: 'labels', label: tProperty('labels'), disabled: busy, onOpen: loadOptions, chips: meta.labels.map(label => ({ id: label.name, text: label.name, title: label.name })), add: { label: tProperty('editLabels'), menu: labelItems } },
     { id: 'project', label: tProperty('project'), disabled: busy, onOpen: loadOptions, value: { text: meta.project ?? tProperty('addToProject'), mark: { kind: 'icon', icon: 'project' }, muted: !meta.project, title: meta.project ?? undefined, aria: tProperty('projectAria', { name: meta.project ?? tProperty('unset') }) }, menu: projectItems },
     { id: 'team', label: team.label, disabled: locked || team.unavailable, value: { text: team.currentLabel, mark: { kind: 'icon', icon: 'team' }, muted: !team.selected, title: team.currentLabel }, menu: team.choices.map(choice => ({ id: choice.value, label: choice.label, mark: { kind: 'icon', icon: 'team' }, checked: choice.value === (team.selected || 'none'), onSelect: () => {
@@ -170,7 +180,11 @@ export function FramedTask(props: FramedTaskProps) {
     } })) },
     ...meta.dueDate ? [{ id: 'dueDate', label: tProperty('dueDate'), disabled: locked, onClick: () => props.requestAction('dueDate'), value: { text: formatDateOnly(format, meta.dueDate, { month: 'short', day: 'numeric' }), mark: { kind: 'icon', icon: 'calendar' }, danger: overdue(meta.dueDate, props.status, now) } } satisfies TaskDetailRow] : [],
     ...meta.estimate !== null ? [{ id: 'estimate', label: tProperty('estimate'), disabled: locked, onClick: () => props.requestAction('estimate'), value: { text: tProperty('estimatePoints', { count: meta.estimate }), mark: { kind: 'icon', icon: 'estimate' } } } satisfies TaskDetailRow] : [],
-    ...meta.pullRequests.length ? [{ id: 'pullRequests', label: tProperty('pullRequests'), disabled: locked, chips: meta.pullRequests.map(pr => ({ id: pr.url, text: `#${pr.url.split('/').filter(Boolean).at(-1)}`, href: pr.url, mark: { kind: 'icon', icon: 'pullRequest' }, live: draw => <PullRequestStatus issueId={task.id} pr={pr}>{view => draw({ text: view.text ? `#${view.number} ${view.text}` : `#${view.number}`, title: view.title, state: view.state, confirmed: view.confirmed })}</PullRequestStatus> })), add: { label: tProperty('managePullRequestsAria'), onClick: () => props.requestProperty('pullRequests') } } satisfies TaskDetailRow] : [],
+    ...conversations.length ? [{ id: 'conversations', label: tNav('conversations'),
+      chips: conversations.map(({ id, text, open }) => ({ id, text, menu: [{ id: 'open', label: tFrame('open'), onSelect: open }] })),
+    } satisfies TaskDetailRow] : [],
+    ...reviewBranch ? [{ id: 'branch', label: tArtifact('branch'), value: { text: reviewBranch } } satisfies TaskDetailRow] : [],
+    ...pullRequests.length ? [{ id: 'pullRequests', label: tProperty('pullRequests'), disabled: locked, chips: pullRequests.map(pr => ({ id: pr.url, text: `#${pr.url.split('/').filter(Boolean).at(-1)}`, href: pr.url, mark: { kind: 'icon', icon: 'pullRequest' }, live: draw => <PullRequestStatus issueId={task.id} pr={pr}>{view => draw({ text: view.text ? `#${view.number} ${view.text}` : `#${view.number}`, title: view.title, state: view.state, confirmed: view.confirmed })}</PullRequestStatus> })), add: { label: tProperty('managePullRequestsAria'), onClick: () => props.requestProperty('pullRequests') } } satisfies TaskDetailRow] : [],
     ...preview ? [] : connections.groups.filter(group => group.items.length).map((group): TaskDetailRow => ({
       id: `relation-${group.kind}`, label: group.label, disabled: locked || connections.pending,
       chips: group.items.map(row => ({
@@ -218,10 +232,9 @@ export function FramedTask(props: FramedTaskProps) {
           message: { record: { id: fact.messageId, body: fact.body, author: fact.author, at: fact.at }, first: fact.kind === 'comment', last: fact.messageId === thread.messages.at(-1)?.id } }
       })
       : current.threads.map(thread => ({ kind: 'comment', id: thread.id, at: thread.createdAt, thread, time, excerpt: excerpt(thread.id) }))
-    const history = eventsFor([...props.agentActivity.items, ...comments, ...additional])
+    const history = eventsFor([...comments, ...additional])
     return chronologicalActivity<TaskActivityItem>([
-      ...history.map((item): TaskActivityItem => ({ kind: 'event', id: `history:${item.id}`, at: item.at, who: item.actor?.name ?? null, mark: item.actor?.name ? (item.actor.type === 'agent' ? { kind: 'node', node: <AgentSphere name={item.actor.name} compact /> } : { kind: 'person', name: item.actor.name }) : undefined, text: item.text, time: item.time })),
-      ...props.agentActivity.items.map((item): TaskActivityItem => ({ kind: 'agent', id: item.id, at: item.at, who: item.name, mark: { kind: 'node', node: item.mark }, text: item.result, time: item.time, open: item.open, onOpen: item.onOpen, openLabel: tFrame('openThread', { name: item.name }) })),
+      ...history.map((item): TaskActivityItem => ({ kind: 'event', id: `history:${item.id}`, at: item.at, who: item.actor?.name || (item.actor?.type === 'system' ? t('work.system') : item.actor?.type === 'agent' ? t('work.agent') : null), mark: item.actor?.name ? (item.actor.type === 'agent' ? { kind: 'node', node: <AgentSphere name={item.actor.name} compact /> } : { kind: 'person', name: item.actor.name }) : undefined, text: item.text, time: item.time })),
       ...comments, ...additional,
     ])
   }
@@ -236,6 +249,9 @@ export function FramedTask(props: FramedTaskProps) {
     attachments={preview ? undefined : trigger => <TaskAttachments key={task.id} taskId={task.id} trigger={trigger} />}
     workspaceId={preview ? undefined : task.workspaceId}
     factoryTaskId={presentation.data?.factoryTaskId}
+    factorySnapshot={props.agentActivity.work?.factory ?? null}
+    work={!preview && <TaskWorkSection threads={props.agentActivity.threads ?? []} pulls={pullRequests}
+      factory={props.agentActivity.work?.factory} open={props.agentActivity.openThread} />}
     rootRef={props.rootRef} onKeyDown={props.onKeyDown} label={props.label} busy={preview}
     origin={props.origin} identifier={task.identifier} title={props.title} saveLabel={props.saveLabel} saved={props.saved} saveHint={t('autosaveHint')}
     navigation={props.navigation} onClose={props.onClose}

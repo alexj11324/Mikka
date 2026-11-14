@@ -128,6 +128,80 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     (select coalesce(jsonb_agg(jsonb_build_array(id,"workspaceId","issueId","runId") order by id),'[]') from artifacts where "userId"=$1) as artifacts,
     (select coalesce(jsonb_agg(jsonb_build_array(id,workspace_id,status,next_at) order by id),'[]') from user_schedules where owner_id=$1) as schedules`, [owner])).rows[0]
 
+  await t.test('an authorized task owner label follows its member or admitted Agent, with no private run access for the teammate', async () => {
+    const task = await workspaceTask()
+    const delegate = { kind: 'agent', id: randomUUID(), name: 'Builder', image: null }
+    const member = { kind: 'member', id: owner, name: 'Task owner', image: null }
+    async function setOwner(assignee: typeof member | null) {
+      const content = { type: 'doc', attrs: { mikka: { delegate, assignee } } }
+      await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [task, JSON.stringify(content)])
+    }
+    try {
+      await setOwner(null)
+      assert.deepEqual((await (await request(task)).json()).task.workOwner, { kind: 'agent', name: 'Builder' })
+      assert.deepEqual((await (await request(task, { bearer: peer.token, workspaceId: teamWorkspace.id })).json()).task.workOwner, { kind: 'agent', name: 'Builder' })
+      assert.equal((await request(task, { bearer: peer.token, workspaceId: secondWorkspace.id })).status, 404)
+      await setOwner(member)
+      assert.deepEqual((await (await request(task)).json()).task.workOwner, { kind: 'member', name: 'Task owner' })
+    } finally {
+      await pool.query('DELETE FROM issues WHERE id=$1', [task])
+    }
+  })
+  await t.test('the versioned work request returns task state, readable PRs and conversation metadata in one owner-authorized detail', async () => {
+    const load = (options?: ReadOptions) => run('/api/mobile/tasks/' + issueId + '?work=1', req => GET(req, { params: Promise.resolve({ id: issueId }) }), options)
+    const child = await workspaceTask()
+    const foreign = await workspaceTask(secondWorkspace.id, false)
+    const childContent = { type: 'doc', attrs: { mikka: { parentId: issueId } } }
+    await pool.query('update issues set content=$1 where id=any($2::uuid[])', [childContent, [child, foreign]])
+    const response = await load()
+    assert.equal(response.status, 200)
+    const detail = await response.json()
+    assert.equal(detail.work.version, 1)
+    assert.deepEqual(detail.work.pullRequests, [{ url: 'https://github.com/acme/app/pull/1', state: 'open' }])
+    assert.deepEqual(detail.work.connections.map((row: { id: string; kinds: string[] }) => [row.id, row.kinds]), [[child, ['child']]])
+    const ownedThread = detail.work.conversations.find((row: { id: string }) => row.id === latest)
+    assert.ok(ownedThread?.detail?.name)
+    assert.equal(ownedThread.detail.observedModel, null, 'a requested model must not stand in for the observed model')
+    const teammate = await load({ bearer: peer.token, workspaceId: teamWorkspace.id })
+    assert.equal(teammate.status, 200)
+    const peerWork = (await teammate.json()).work
+    assert.ok(peerWork.conversations.some((row: { id: string }) => row.id === latest))
+    assert.ok(peerWork.conversations.every((row: { detail: unknown }) => row.detail === null), 'teammates see only the shared status')
+    assert.equal(detail.task.id, issueId)
+    assert.ok(Array.isArray(detail.timeline))
+    assert.equal((await load({ bearer: null })).status, 401)
+    assert.equal((await load({ bearer: peer.token, workspaceId: secondWorkspace.id })).status, 404)
+    await pool.query('delete from issues where id=any($1::uuid[])', [[child, foreign]])
+  })
+  await t.test('a verified Factory PR identifies its conversation for the owner while a teammate sees only the shared work', async () => {
+    const factoryId = randomUUID(), attempt = randomUUID(), source = randomUUID()
+    const tx = await pool.connect()
+    try {
+      await tx.query('BEGIN')
+      await tx.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload)
+        VALUES($1::uuid,$2,$3,$4,'user_message',$1::text,'{"text":"Native pull request fixture"}')`, [source, owner, bot, issueId])
+      await tx.query(`INSERT INTO factory_tasks(id,"userId","botId","issueId","sourceEventId","scopeVersion",route,stage,status,"attemptId",reason)
+        SELECT $1,$2,$3,$4,$5,"scopeVersion",'{}','execute','passed',$6,'Native work fixture' FROM issues WHERE id=$4`, [factoryId, owner, bot, issueId, source, attempt])
+      await tx.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,"runId",reason)
+        VALUES($1,$2,'execute',1,1,'passed',$3,'Native work fixture')`, [attempt, factoryId, latest])
+      await tx.query('COMMIT')
+    } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+    try {
+      const load = (options?: ReadOptions) => run('/api/mobile/tasks/' + issueId + '?work=1', req => GET(req, { params: Promise.resolve({ id: issueId }) }), options)
+      const response = await load()
+      assert.equal(response.status, 200)
+      const ownerWork = (await response.json()).work
+      assert.equal(ownerWork.pullRequests.find((pull: { url: string }) => pull.url.endsWith('/42'))?.sourceConversationId, latest)
+      assert.ok(!('sourceConversationId' in ownerWork.pullRequests.find((pull: { url: string }) => pull.url.endsWith('/1'))))
+      const peerResponse = await load({ bearer: peer.token, workspaceId: teamWorkspace.id })
+      assert.equal(peerResponse.status, 200)
+      const peerWork = (await peerResponse.json()).work
+      assert.ok(peerWork.pullRequests.every((pull: { sourceConversationId?: string }) => !pull.sourceConversationId))
+    } finally {
+      await pool.query('DELETE FROM factory_tasks WHERE id=$1 AND "userId"=$2', [factoryId, owner])
+      await pool.query('DELETE FROM coordinator_events WHERE id=$1 AND "userId"=$2', [source, owner])
+    }
+  })
   await t.test('detail includes contract fields, every attempt, replacement time and creation; excludes raw errors', async () => {
     const response = await request(issueId)
     assert.equal(response.status, 200)

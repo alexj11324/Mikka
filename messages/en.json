@@ -590,6 +590,7 @@
     "openableDraggableTask": "Openable, draggable task"
   },
   "Editor": {
+    "executionInstructions": "Execution instructions",
     "draftAuthor": "Draft author",
     "unsavedDraft": "Unsaved draft",
     "editorLabel": "Task description editor",
@@ -1420,6 +1421,17 @@
     "viewProjects": "View projects"
   },
   "IssueDetail": {
+    "work": {
+      "heading": "Work",
+      "system": "System",
+      "agent": "Agent",
+      "states": {
+        "open": "Open",
+        "closed": "Closed",
+        "draft": "Draft",
+        "merged": "Merged"
+      }
+    },
     "frame": {
       "delegate": "Handed to",
       "open": "Open",

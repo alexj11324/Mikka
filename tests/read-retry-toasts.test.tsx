@@ -57,7 +57,7 @@ stub('components/workspace/thread-execution-identity.tsx', { ThreadExecutionIden
 stub('components/workspace/artifact-review.tsx', { ThreadArtifactButton: Empty, ThreadArtifactCards: Empty })
 stub('components/workspace/thread-quota.tsx', { ThreadModelFallbackNotice: Empty, ThreadQuotaPausedCard: Empty, ThreadQuotaSwitchLine: Empty })
 stub('components/computer/computer-card.tsx', { ComputerCard: Empty })
-stub('components/workspace/issue-threads.tsx', { harnessLabel: () => 'Agent', IssueThreads: Empty, ThreadEventRow: Empty, useIssueThreads: () => ({ data: [] }), useAgentActivity: () => ({ rows: [], error: null }) })
+stub('components/workspace/issue-threads.tsx', { harnessLabel: () => 'Agent', IssueThreads: Empty, ThreadEventRow: Empty, useIssueThreads: () => ({ data: [] }), useAgentActivity: () => ({ rows: [], error: null }), useTaskWork: () => ({ work: null, threads: [], failed: null }) })
 stub('components/nav/context-panel.tsx', { PANEL_WIDTH: { storageKey: 'fixture-panel-width', min: 320, max: 'half', initial: 360, edge: 'start' } })
 stub('components/coordinator/chat-composer.tsx', { ChatComposer: ({ value, onChange }: { value: string; onChange: (value: string) => void }) => <Textarea value={value} onChange={event => onChange(event.target.value)} /> })
 mock.module('next/dynamic', { defaultExport: () => Empty })
