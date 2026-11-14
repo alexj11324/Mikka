@@ -43,7 +43,10 @@ let acknowledgeNewTask: ((id: string) => void) | null = null
 const workspace = () => ({ currentUserId: user.id, workspace: { id: workspaceId, name: 'Fixture', kind: 'team' }, members: [], role: 'admin' })
 const emptyList = { data: { items: [] }, mutate: refreshed }
 const bot = { id: '3f0c9d2e-5b1a-4c7e-9f00-1a2b3c4d5e6f', name: 'Ada', coordinator: false }
-const botList = { data: { items: [bot] } }
+const botList = { items: [bot] }
+let rosterPending = false
+let rosterError: Error | undefined
+let rosterRetries = 0
 const router = { push: (href: string) => browser.history.pushState({}, '', href), replace: (href: string) => browser.history.replaceState({}, '', href), refresh: nothing }
 
 mock.module('next-intl', { namedExports: { useLocale: () => 'en', useTranslations: (namespace?: string) => Object.assign((key: string) => namespace ? `${namespace}.${key}` : key, { has: () => false }), useMessages: () => ({ IssueDetail: { work: { states: {} } }, GroupTask: { stage: {}, status: {} } }), useFormatter: () => ({ dateTime: () => '' }) } })
@@ -79,7 +82,11 @@ mock.module('@/hooks/use-focus-return', { namedExports: { focusChatComposer: not
 mock.module('@/hooks/use-live-key', { namedExports: { LiveProvider: plain, useLiveKey: nothing, useLiveKeys: nothing, useLiveScope: () => null } })
 mock.module('@/hooks/use-live-lists', { namedExports: {
   useLiveIssueList: () => ({ ...emptyList, isLoading: workspaceTasksPending, mutate: refreshGlobalTasks }), useLiveThreadList: () => emptyList,
-  useLiveBotRoster: () => botList, useLiveBotChatList: () => ({ data: { items: {} } }), useLiveGroupList: () => ({
+  useLiveBotRoster: () => ({
+    data: rosterPending ? undefined : botList,
+    error: rosterError,
+    mutate: async () => { rosterRetries++; rosterPending = false; rosterError = undefined },
+  }), useLiveBotChatList: () => ({ data: { items: {} } }), useLiveGroupList: () => ({
     data: groupList,
     error: groupListError,
     mutate: async () => { groupListRetries++; groupListError = undefined },
@@ -228,6 +235,7 @@ beforeEach(() => {
   user = { id: 'owner-one', name: 'Fixture', email: 'fixture@example.com' }
   workspaceId = 'workspace-one'
   workspaceReady = true
+  rosterPending = false; rosterError = undefined; rosterRetries = 0
   workspaceError = undefined
   refreshGlobalTasks = refreshed
   groupList = []
@@ -271,6 +279,28 @@ test('a narrow board opens an explicitly requested preview in the existing brows
   await act(async () => assert.equal(openBrowserAddress('/preview'), true))
   assert.equal(container.querySelectorAll('[data-browser-pane]').length, 1)
   assert.ok(container.querySelector('[data-panel-sheet] [data-browser-pane]'))
+})
+
+test('an explicit Bot mounts only its own composer after its roster resolves', async () => {
+  rosterPending = true
+  browser.history.replaceState({}, '', `/?workspace=workspace-one&bot=${bot.id}`)
+  const render = () => act(async () => root.render(<OfficialIssueWorkspace user={user} />))
+  await render()
+  assert.equal(Boolean(container.querySelector('[data-chat]')), false)
+  assert.equal(composerMounts, 0)
+  assert.ok(container.querySelector('[role="status"]'))
+
+  rosterError = new Error('roster unavailable')
+  await render()
+  const retry = container.querySelector<HTMLButtonElement>('[role="alert"] button')
+  assert.ok(retry)
+  assert.equal(Boolean(container.querySelector('[data-chat]')), false)
+  await act(async () => retry.click())
+  await render()
+  assert.equal(rosterRetries, 1)
+  assert.equal(container.querySelector('[data-chat]')?.getAttribute('data-chat'), bot.name)
+  assert.equal(composerMounts, 1)
+  assert.equal(new URL(browser.location.href).searchParams.get('bot'), bot.id)
 })
 
 test('a valid browser request reveals the conversation browser tab without changing the selected Bot', async () => {
