@@ -1,7 +1,7 @@
 import 'server-only'
 import { randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
-import { actionableAlerts, databaseSignals, notifyAlerts } from '../../scripts/ops/monitor.mjs'
+import { databaseSignals, notifyAlerts, operationalAlertAssessment } from '../../scripts/ops/monitor.mjs'
 
 type State = Record<string, { active?: boolean; lastSent?: number; lastFailed?: number; lastRecordedAt?: number; notifiedActive?: boolean }>
 
@@ -10,7 +10,7 @@ export async function collectOperationalSignals(pool: Pool, options: { sink?: st
   const now = options.now ?? new Date()
   let signals: Record<string, number>
   try { signals = await databaseSignals(pool, now) } catch { signals = { databaseAvailable: 0 } }
-  const alerts = actionableAlerts({ requests: {}, database: signals })
+  const { alerts, assessed } = operationalAlertAssessment({ requests: {}, database: signals })
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
@@ -19,7 +19,7 @@ export async function collectOperationalSignals(pool: Pool, options: { sink?: st
     const previous: State = (await client.query('SELECT state FROM ops_monitor_observations ORDER BY "observedAt" DESC,id DESC LIMIT 1')).rows[0]?.state ?? {}
     const state: State = structuredClone(previous), active = new Set(alerts.map((alert: { id: string }) => alert.id))
     const transitions = []
-    for (const id of new Set([...Object.keys(state).filter(id => id !== '__providerEgressCollector'), ...active])) {
+    for (const id of assessed) {
       const old = state[id] ?? {}, isActive = active.has(id)
       if (isActive !== Boolean(old.active) || isActive && now.getTime() - (old.lastRecordedAt ?? 0) >= 30 * 60_000) {
         transitions.push({ id, state: isActive ? 'firing' : 'resolved', observedAt: now.toISOString() })
@@ -31,7 +31,7 @@ export async function collectOperationalSignals(pool: Pool, options: { sink?: st
     if (options.sink) {
       // Delivery uses its own successful-send state, not the DB-recorded active state.
       const priorDelivery = Object.fromEntries(Object.entries(previous).filter(([id]) => id !== '__providerEgressCollector').map(([id, value]) => [id, { ...value, active: value.notifiedActive ?? false }]))
-      const result = await notifyAlerts(alerts, { sink: options.sink, now: now.getTime(), state: priorDelivery })
+      const result = await notifyAlerts(alerts, { sink: options.sink, now: now.getTime(), state: priorDelivery, assessed })
       notificationStatus = result.healthy ? 'delivered' : 'failed'
       deliveryState = structuredClone(state)
       for (const [id, value] of Object.entries(result.state as State)) deliveryState[id] = { ...state[id], lastSent: value.lastSent, lastFailed: value.lastFailed, notifiedActive: value.active }

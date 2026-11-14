@@ -36,11 +36,17 @@ test('minute collector persists real SQL signals without a sink and keeps delive
   assert.equal(result.notificationStatus, 'delivered')
   const before = delivered
   await collectOperationalSignals(pool, { sink }); assert.equal(delivered, before)
+  // The aggregate statement fails while its observation table and loopback sink remain available.
+  await pool.query('ALTER TABLE coordinator_events RENAME COLUMN "deliveredAt" TO hidden_delivered_at')
+  result = await collectOperationalSignals(pool, { sink })
+  assert.deepEqual(result.transitions.map(event => [event.id, event.state]), [['database-unavailable', 'firing']])
+  assert.equal(delivered, before + 1, 'no recovery notification for the unobserved stale wake')
+  await pool.query('ALTER TABLE coordinator_events RENAME COLUMN hidden_delivered_at TO "deliveredAt"')
   await pool.query('UPDATE coordinator_events SET "deliveredAt"=now()')
   result = await collectOperationalSignals(pool, { sink })
-  assert.deepEqual(result.transitions.map(event => event.state), ['resolved'])
+  assert.deepEqual(result.transitions.map(event => [event.id, event.state]).sort(), [['database-unavailable', 'resolved'], ['staleWake', 'resolved']])
   assert.equal(result.notificationStatus, 'delivered')
-  assert.equal((await pool.query('SELECT count(*)::int n FROM ops_monitor_observations')).rows[0].n, 6)
+  assert.equal((await pool.query('SELECT count(*)::int n FROM ops_monitor_observations')).rows[0].n, 7)
 })
 
 test('fault matrix preserves failed SLO history while live wake, lease, uncertainty and cleanup signals recover', { skip: !dbUrl }, async t => {
