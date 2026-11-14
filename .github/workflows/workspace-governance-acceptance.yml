@@ -246,9 +246,10 @@ jobs:
               ])
               // Startup errors stay on the private runner. Preserve only fixed classifications.
               const startup = /\[dev\] Startup failed\s*\{[^}]{0,260}code:\s*['"](API_DEV_(?:STARTUP_TIMEOUT|WORKER_INIT_FAILED|STARTUP_RESPONSE_INVALID|LOCAL_WORLD_REQUIRED|START_FAILED)|API_CONFIG_NOT_LOADED|EVE_SERVICE_(?:START_FAILED|START_TIMEOUT|EXITED|STORAGE_MISMATCH))['"]/.exec(output)
+              const staleRoutes = output.includes('[dev] Route manifest is out of date:')
               const init = /\[dev\] Worker initialization failed \{"phase":"(?:initial-start|hot-replacement|unavailable)","reason":"(module-missing|export-missing|module-syntax|listen-address-in-use|listen-access-denied|listen-address-unavailable|listen-path-too-long|listen-path-missing|entry-handler-missing|unavailable)"/.exec(output)
               report.failure = { stage,
-                ...(stage === 'runtime-ready' && startup ? { code: startup[1] } : {}),
+                ...(stage === 'runtime-ready' && (startup || staleRoutes) ? { code: startup?.[1] ?? 'API_DEV_ROUTES_STALE' } : {}),
                 ...(stage === 'runtime-ready' && init ? { workerReason: init[1] } : {}), ...(stage === 'account-lease' && leaseCodes.has(failure?.code) ? { code: failure.code } : {}),
                 ...(stage === 'account-lease' && failure?.code === 'DEPLOYMENT_ATTESTATION_REJECTED'
                   && Number.isInteger(failure.httpStatus) && failure.httpStatus >= 100 && failure.httpStatus <= 599

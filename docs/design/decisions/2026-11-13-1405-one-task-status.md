@@ -93,3 +93,8 @@ Not built:
 
 - Server-side `issues.scope` (`workspace | personal`) still decides who can see a task and whether it syncs to Linear, and the task page keeps its 归属 row because it is the only control over that. Whether every task in a team workspace should be a workspace task, so the row and the column can go, is a separate decision.
 - The iOS app keeps its own task states and icons until it follows.
+
+
+### 2026-11-14 · Task ownership and Linear sync
+
+The follow-up on the 归属 row landed in [f144a4c3](https://github.com/alexj11324/Mikka/commit/f144a4c32d74da6396920921a2e8e67e1c3efb31). The task's bound workspace, current membership and resource ACL govern visibility. The task page shows its workspace and gives the owner a separate control for Linear sync. Disabling sync updates `linearSyncPolicy` and keeps the bound workspace. The historical `scope` field grants no access.

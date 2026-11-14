@@ -1,9 +1,11 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import * as Clipboard from 'expo-clipboard'
+import { router } from 'expo-router'
+import { personReferenceParts } from '../../../lib/thread-references'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Reanimated, { useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
-import { Pressable, StyleSheet, View, type ImageURISource } from 'react-native'
+import { Linking, Pressable, StyleSheet, View, type ImageURISource } from 'react-native'
 import { Check, CircleAlert, Copy } from 'lucide-react-native'
 import { CardButton } from '@/components/cards'
 import { MessageMenu } from '@/components/MessageMenu'
@@ -26,10 +28,11 @@ export function BotBubble({ children }: { children: ReactNode }) {
 }
 
 /** The person's words sit in the blue bubble (R-14); photos they sent sit above it, as in Messages. */
-export function MyBubble({ text, photos, selecting }: { text: string; photos?: ImageURISource[]; selecting?: ReactNode }) {
+export function MyBubble({ text, photos, selecting, threadReferences }: { threadReferences?: boolean; text: string; photos?: ImageURISource[]; selecting?: ReactNode }) {
   const parsed = splitChatFiles(text)
   const pictures = useImageFiles(parsed.files)
   const { quoted, words } = splitQuoted(parsed.text)
+  const parts = threadReferences && /\[\[(?:issue|run):|https:\/\/github\.com\//i.test(words) ? personReferenceParts(words) : null
   return (
     <View style={styles.mine}>
       <ChatFiles files={parsed.files.filter(file => !isImageFile(file))} />
@@ -37,7 +40,13 @@ export function MyBubble({ text, photos, selecting }: { text: string; photos?: I
       {text ? (
         <View style={[styles.myBubble, { maxWidth: '100%' }]}>
           {quoted ? <Text numberOfLines={3} style={styles.quoted}>{quoted}</Text> : null}
-          {selecting ?? (words ? <FoldedWords text={words} color={colors.onAccent} /> : null)}
+          {selecting ?? (words ? <FoldedWords text={words} color={colors.onAccent}>{parts?.map((part, index) => {
+            if (part.kind === 'text') return part.text
+            return <Text key={index} accessibilityRole="link" style={{ color: colors.onAccent, textDecorationLine: 'underline' }} onPress={() => {
+              if (part.kind === 'pr') void Linking.openURL(part.id)
+              else router.push(part.kind === 'task' ? `/task/${part.id}` : `/thread/${part.id}`)
+            }}>{part.kind === 'pr' ? part.id : `${mobileMessages.ThreadReferences[part.kind]} ${part.id.slice(0, 8)}`}</Text>
+          })}</FoldedWords> : null)}
         </View>
       ) : null}
     </View>
@@ -53,14 +62,14 @@ const FOLD_AFTER = 13
  * ChatGPT fold a long one. The full height is measured once from layout (works on iOS and
  * Expo Web alike); folding is the native line limit.
  */
-export function FoldedWords({ text, color }: { text: string; color: string }) {
+export function FoldedWords({ text, color, children }: { text: string; color: string; children?: ReactNode }) {
   const [long, setLong] = useState(false)
   const [open, setOpen] = useState(false)
   useEffect(() => { setLong(false); setOpen(false) }, [text])
   return (
     <>
       <Text style={[styles.body, { color }]} numberOfLines={long && !open ? FOLD_LINES : undefined}
-        onLayout={event => { if (!long && event.nativeEvent.layout.height > FOLD_AFTER * styles.body.lineHeight) setLong(true) }}>{text}</Text>
+        onLayout={event => { if (!long && event.nativeEvent.layout.height > FOLD_AFTER * styles.body.lineHeight) setLong(true) }}>{children ?? text}</Text>
       {long ? (
         <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} hitSlop={8} onPress={() => { tap(); setOpen(value => !value) }} style={styles.foldToggle}>
           <Text style={[styles.foldLabel, { color }]}>{open ? '收起' : '显示更多'}</Text>

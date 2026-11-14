@@ -110,6 +110,10 @@ export const PROMPT_BUDGET_TOKENS = Math.ceil(PROMPT_MAX_CHARS / ASCII_CHARS_PER
  */
 export const CONVERSATION_CHUNK_KEYS = ['delta', 'output', 'errorText'] as const
 
+export const threadModelProjection = `left(latest."agentDefinition"->>'model',200) AS "selectedModel",
+    CASE WHEN jsonb_typeof(latest.report#>'{runtime,observedModel}')='string'
+        THEN left(latest.report#>>'{runtime,observedModel}',500) END AS "servedModel"`
+
 /**
  * The SQL that counts characters instead of returning them, so a cursor read
  * stays small: the whole point of `chunkCursor` is that a later read does not
@@ -158,9 +162,7 @@ export const CONTEXT_CHARS_SQL = `
     length(regexp_replace(task, '[^[:ascii:]]', '', 'g')) AS "taskAscii",
     length(task) - length(regexp_replace(task, '[^[:ascii:]]', '', 'g')) AS "taskOther",
     brief.model,
-    left(latest."agentDefinition"->>'model',200) AS "selectedModel",
-    CASE WHEN jsonb_typeof(latest.report#>'{runtime,observedModel}')='string'
-        THEN left(latest.report#>>'{runtime,observedModel}',500) END AS "servedModel"
+    ${threadModelProjection}
   FROM brief LEFT JOIN agent_runs latest ON latest.id=$3 AND latest.id=ANY($1::uuid[])`
 
 /** Everything about a run this host can read, as counted characters. */

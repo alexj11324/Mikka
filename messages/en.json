@@ -3896,6 +3896,7 @@
     "contextEstimated": "Estimated from stored text, not a provider token count",
     "contextNoWindow": "Mikka stores no model context window, so no share of one is shown",
     "modelPicker": {
+      "retryLoad": "Couldn’t load models. Retry",
       "label": "Model: {name}",
       "labelUnavailable": "Model: {name}, unavailable",
       "hosted": "Mikka Default",
@@ -4457,6 +4458,7 @@
     "more": "Load more"
   },
   "ThreadReferences": {
+    "sourceUnavailable": "Source file and folder references are unavailable for this conversation.",
     "references": "References",
     "task": "Task",
     "thread": "Conversation",

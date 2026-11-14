@@ -30,7 +30,7 @@ export async function createIssueForUserInTransaction(tx: Transaction, userId: s
   const workspace = await requireTaskWorkspace(userId, options.workspaceId)
   const id = options?.id ?? crypto.randomUUID()
   const number = await allocateIssueNumbers(tx, userId)
-  const metadata = { ...readIssueMetadata({ type: 'doc' }), number }
+  const metadata = { ...readIssueMetadata({ type: 'doc' }), number, delegateSelection: 'dispatch' as const }
   const [issue] = await tx.insert(issues).values({
     ...parsed.data,
     content: withIssueMetadata(parsed.data.content, metadata),

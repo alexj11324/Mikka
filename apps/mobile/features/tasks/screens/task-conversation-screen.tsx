@@ -21,7 +21,7 @@ import { ReadNotice } from '@/components/ReadNotice'
 import { StopFailed } from '@/components/StopFailed'
 import { Text } from '@/components/Text'
 import { ThreadQuotaPaused } from '@/components/ThreadQuotaPaused'
-import { Composer } from '@/features/chat/components/chat-composer'
+import { ThreadComposer } from '@/features/chat/components/thread-composer'
 import { api, ApiError } from '@/lib/api'
 import { useHome } from '@/lib/home'
 import { tasksLive, threadLive } from '@/lib/live-keys'
@@ -130,7 +130,7 @@ export function TaskConversationScreen() {
       <OfflineBanner top={insets.top + 66} />
       {/* R-10: the conversation ends in the composer; a message to an ended attempt runs it again (R-81). */}
       {controls.controls}
-      {live && newest ? <Composer placeholder={mobileMessages.MobileCore.messageTask} onSend={text => delivery.send(text)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'thread', id: newest }}
+      {live && newest ? <ThreadComposer detail={live} runId={newest} placeholder={mobileMessages.MobileCore.messageTask} onSend={(text, choice) => delivery.send(text, [], choice)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'thread', id: newest }}
         onStop={composerStops(live) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
     </View>
   )
@@ -142,7 +142,7 @@ function Item({ item, live }: { item: ThreadItem; live: boolean }) {
       return <ThreadSteps steps={item.steps} count={item.count} live={live} />
     case 'agent': return <View style={styles.message}><BotBubble><Markdown text={item.text} /></BotBubble></View>
     case 'error': return <AttemptError raw={item.text} />
-    case 'person': return <View style={styles.message}><MyBubble text={item.text} /></View>
+    case 'person': return <View style={styles.message}><MyBubble text={item.text} threadReferences /></View>
   }
 }
 

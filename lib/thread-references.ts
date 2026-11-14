@@ -1,5 +1,5 @@
-import { splitCitations } from '@/lib/coordinator/citations'
-import { siteSearchQuery } from '@/lib/site-search'
+import { splitCitations } from './coordinator/citations'
+import { siteSearchQuery } from './site-search'
 
 export type ThreadReference = { kind: 'task' | 'thread' | 'pr'; id: string; title: string }
 const pullRequest = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/[1-9]\d*\/?$/

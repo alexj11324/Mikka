@@ -3896,6 +3896,7 @@
     "contextEstimated": "按存储文本估算，非模型实际 token 计数",
     "contextNoWindow": "Mikka 不存储模型上下文窗口，因此不显示占窗口比例",
     "modelPicker": {
+      "retryLoad": "模型加载失败，重试",
       "label": "模型：{name}",
       "labelUnavailable": "模型：{name}，不可用",
       "hosted": "Mikka 默认",
@@ -4457,6 +4458,7 @@
     "more": "加载更多"
   },
   "ThreadReferences": {
+    "sourceUnavailable": "此对话暂时无法引用源码文件或目录。",
     "references": "引用",
     "task": "任务",
     "thread": "对话",

@@ -1753,6 +1753,20 @@
     "test": "lib/thread-reads.db.test.ts",
     "suite": "test:conversation-reads"
   },
+  "lib/issue-metadata-store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Persist task metadata, revision, version and live effects on one installation transaction.",
+    "test": "lib/dispatch-delegate.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "lib/dispatch-delegate.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Initialize a delegate only on the authorized owner's first admitted dispatch, preserving human or cleared assignments.",
+    "test": "lib/dispatch-delegate.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
   "lib/thread-reads.ts": {
     "mode": "built-in",
     "environment": [],

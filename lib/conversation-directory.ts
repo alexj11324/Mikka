@@ -1,4 +1,6 @@
 import 'server-only'
+import { withConversationWorkspace, type ConversationReader } from './conversation-workspace'
+import { requireTaskWorkspaceLease, taskReaderScope } from './task-workspace'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import { directoryInput, type DirectoryInput, type DirectoryState, type ConversationDirectoryPage } from './conversation-directory-input'
@@ -27,8 +29,7 @@ const attribution = dialect.sqlToQuery(sql`SELECT ${runBotId} AS id`)
 function conversationQuery() {
   const owner = '$' + (facts.params.length + 1), workspace = '$' + (facts.params.length + 2)
   const depth = '$' + (facts.params.length + 3)
-  const scope = `r."userId"=${owner} AND r."workspaceId"=${workspace} AND EXISTS (
-    SELECT 1 FROM mikka_workspace_members m WHERE m."workspaceId"=r."workspaceId" AND m."userId"=r."userId" AND m.status='active')`
+  const scope = `r."userId"=${owner} AND r."workspaceId"=${workspace}`
   return `WITH RECURSIVE ${runChainSql(scope,depth)}, latest AS (
     SELECT DISTINCT ON (a.root) a.root,r.id,
       max(greatest(r."lastReplyAt",r."updatedAt",r."createdAt")) OVER (PARTITION BY a.root) AS touched
@@ -95,7 +96,6 @@ function conversationQuery() {
         AND greatest(activity.touched,c."conversationRestoredAt")<now()-coalesce(pref."archiveIdleAfterDays",30)*interval '1 day')) AS archived
     FROM conversations c JOIN conversation_members cm ON cm."conversationId"=c.id AND cm."memberType"='user'
       AND cm."memberId"=${owner} AND cm."leftAt" IS NULL
-    JOIN mikka_workspace_members wm ON wm."userId"=${owner} AND wm."workspaceId"=c."workspaceId" AND wm.status='active'
     LEFT JOIN user_preferences pref ON pref."userId"=${owner}
     LEFT JOIN conversation_reads receipt ON receipt."userId"=${owner} AND receipt."conversationId"=c.id::text
     LEFT JOIN chat_preferences cp ON cp."userId"=${owner} AND cp."chatKey"=c.id::text
@@ -107,6 +107,7 @@ function conversationQuery() {
 }
 
 export async function effectiveStandaloneOrganization(database: RunChainQueryable, owner: string, workspace: string, id: string) {
+  requireTaskWorkspaceLease(owner, workspace)
   const result = await database.query(conversationQuery() + ' SELECT archived,pinned FROM named_chats WHERE id=$' + (facts.params.length+4),
     [...facts.params,owner,workspace,RUN_CHAIN_MAX_DEPTH,id])
   const row=result.rows[0]
@@ -114,6 +115,7 @@ export async function effectiveStandaloneOrganization(database: RunChainQueryabl
 }
 
 export async function effectiveConversationArchive(database: RunChainQueryable, userId: string, workspaceId: string, rootId: string) {
+  requireTaskWorkspaceLease(userId, workspaceId)
   const result = await database.query(conversationQuery() + ' SELECT archived FROM visible WHERE id=$' + (facts.params.length+4),
     [...facts.params,userId,workspaceId,RUN_CHAIN_MAX_DEPTH,rootId])
   return result.rows[0] ? Boolean(result.rows[0].archived) : null
@@ -124,7 +126,12 @@ function item(row: Row) {
     name: threadName(row.asked, ''), issue: { title: row.taskTitle || row.agentName } }), state: row.state, unread:row.unread, at: row.at, pinned: row.pinned }
 }
 
-export async function conversationDirectory(database: RunChainQueryable, userId: string, workspaceId: string, raw: DirectoryInput): Promise<ConversationDirectoryPage> {
+export async function conversationDirectory(database: RunChainQueryable, reader: ConversationReader, workspaceId: string, raw: DirectoryInput): Promise<ConversationDirectoryPage> {
+  const { userId } = taskReaderScope(reader)
+  return await withConversationWorkspace(reader, workspaceId, () => directoryPage(database, userId, workspaceId, raw)) ?? { items: [], cursor: null }
+}
+
+async function directoryPage(database: RunChainQueryable, userId: string, workspaceId: string, raw: DirectoryInput): Promise<ConversationDirectoryPage> {
   const input = directoryInput.parse(raw)
   const param = (i: number) => '$' + (facts.params.length + i)
   const [archived,bot,search,state,id,pinned,at,pullState] = Array.from({length:8}, (_,i) => param(4+i))
@@ -148,7 +155,12 @@ export async function conversationDirectory(database: RunChainQueryable, userId:
 }
 
 /** A single bounded result per visible Bot, independent of thread-list paging. */
-export async function conversationSidebar(database: RunChainQueryable, userId: string, workspaceId: string) {
+export async function conversationSidebar(database: RunChainQueryable, reader: ConversationReader, workspaceId: string) {
+  const { userId } = taskReaderScope(reader)
+  return await withConversationWorkspace(reader, workspaceId, () => sidebarRows(database, userId, workspaceId)) ?? {}
+}
+
+async function sidebarRows(database: RunChainQueryable, userId: string, workspaceId: string) {
   const statement = conversationQuery() + `, bot_rows AS (
     SELECT kind,pulls,unread,id,title,"agentName",harness,"issueId",identifier,"taskTitle",status,"runStatus",pinned,touched,source,asked,state,at,archived,"botId" FROM visible
     UNION ALL

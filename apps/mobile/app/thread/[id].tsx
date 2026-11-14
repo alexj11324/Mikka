@@ -17,7 +17,7 @@ import { NavBar, underBar } from '@/components/NavBar'
 import { mobileMessages } from '@/lib/messages'
 import { useScrolledUnderBar } from '@/components/BarBackdrop'
 import { ThreadSteps } from '@/features/tasks/components/thread-steps'
-import { Composer } from '@/features/chat/components/chat-composer'
+import { ThreadComposer } from '@/features/chat/components/thread-composer'
 import { api, ApiError } from '@/lib/api'
 import { ReadNotice } from '@/components/ReadNotice'
 import { StopFailed } from '@/components/StopFailed'
@@ -86,7 +86,7 @@ export default function ThreadScreen() {
               return <ThreadSteps key={item.id} steps={item.steps} count={item.count} live={data.active && index === data.items.length - 1} />
             case 'agent': return <View key={item.id} style={{ marginVertical: 4 }}><BotBubble><Markdown text={item.text} /></BotBubble><MobileReplyVersions detail={data} runId={id} itemId={item.id} text={item.text} reload={reload} working={data.active} /></View>
             case 'error': return <Text key={item.id} style={styles.error}>{item.text}</Text>
-            case 'person': return <View key={item.id} style={{ marginVertical: 4 }}><MyBubble text={item.text} /><MobileReplyVersions detail={data} runId={id} itemId={item.id} text={item.text} reload={reload} working={data.active} /></View>
+            case 'person': return <View key={item.id} style={{ marginVertical: 4 }}><MyBubble text={item.text} threadReferences /><MobileReplyVersions detail={data} runId={id} itemId={item.id} text={item.text} reload={reload} working={data.active} /></View>
           }
         })}
         {delivery.bubbles}
@@ -97,7 +97,7 @@ export default function ThreadScreen() {
       <OfflineBanner top={insets.top + 66} />
       {/* R-10: a thread ends in the composer, finished or not; a message to an ended thread runs it again (R-81). */}
       {controls.controls}
-      {data ? <Composer placeholder={MobileCore.messageThread} onSend={text => delivery.send(text)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'thread', id }} onStop={composerStops(data) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
+      {data ? <ThreadComposer detail={data} runId={id} placeholder={MobileCore.messageThread} onSend={(text, choice) => delivery.send(text, [], choice)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'thread', id }} onStop={composerStops(data) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
     </View>
   )
 }

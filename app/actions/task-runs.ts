@@ -231,7 +231,7 @@ async function conversationActor() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
   const context = await loadWorkspaceContext(undefined, session.user)
-  return { ownerId: session.user.id, workspaceId: context.workspace.id }
+  return { ownerId: session.user.id, reader: session.user, workspaceId: context.workspace.id }
 }
 
 /**
@@ -317,17 +317,17 @@ export async function setConversationOrganization(runId: string, change: Convers
 }
 
 export async function listConversations(input: DirectoryInput) {
-  const { ownerId, workspaceId } = await conversationActor()
+  const { reader, workspaceId } = await conversationActor()
   const { conversationDirectory } = await import('@/lib/conversation-directory')
   const { pool } = await import('@/lib/db')
-  return conversationDirectory(pool, ownerId, workspaceId, input)
+  return conversationDirectory(pool, reader, workspaceId, input)
 }
 
 export async function listConversationSidebar() {
-  const { ownerId, workspaceId } = await conversationActor()
+  const { reader, workspaceId } = await conversationActor()
   const { conversationSidebar } = await import('@/lib/conversation-directory')
   const { pool } = await import('@/lib/db')
-  return conversationSidebar(pool, ownerId, workspaceId)
+  return conversationSidebar(pool, reader, workspaceId)
 }
 
 /** A workspace switch between composing and searching invalidates the old picker. */

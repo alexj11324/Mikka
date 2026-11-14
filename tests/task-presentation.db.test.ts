@@ -131,6 +131,42 @@ test('Task presentation batches keep current tenant authority and one Factory pr
     const expected = (patch: Record<string, unknown> = {}) => ({ version: 1, primaryStatus: 'doing', factoryStage: null, runStatus: null, needsAction: null, blockedReason: null, completion: null,
       state: 'todo', reason: null, blockedBy: null, group: 'todo', ...patch })
 
+    await t.test('conversation lists and owner changes read workspace authority from the workspace database', async () => {
+      const { conversationDirectory, conversationSidebar } = await import('../lib/conversation-directory')
+      const { renameStandalone, standaloneOrganization, regenerateStandalone } = await import('../lib/standalone-chat-controls')
+      const { renameConversationTitle } = await import('../lib/conversation-title-server')
+      const { conversationOrganization } = await import('../lib/conversation-organization')
+      const chat = randomUUID(), issue = await makeTask(), run = await makeRun(issue)
+      await application.query(`INSERT INTO conversations(id,"workspaceId",kind,title,"createdBy","creationPurpose")
+        VALUES ($1,$2,'group','Split directory',$3,'conversation')`, [chat, shared, owner])
+      await application.query(`INSERT INTO conversation_members("conversationId","memberType","memberId",role)
+        VALUES ($1,'user',$2,'owner'),($1,'user',$3,'member')`, [chat, owner, peer])
+      const list = (reader: string, space: string) => conversationDirectory(application, reader, space, { archived: 'any' })
+      const own = await counted(() => list(owner, shared))
+      assert.deepEqual(own.result.items.map(row => row.id).filter(id => id === chat || id === run).sort(), [chat, run].sort())
+      assert.ok(own.statements.some(row => row.database === workspaceName && row.sql.includes('mikka_workspace_members')))
+      assert.ok(!own.statements.some(row => row.database === appName && row.sql.includes('mikka_workspace_members')))
+      await conversationSidebar(application, owner, shared)
+      assert.equal(await renameConversationTitle(application, run, owner, 'Split run', shared), 'Split run')
+      assert.deepEqual(await conversationOrganization(application, owner, shared, run, { field: 'pinned', value: true }), { pinned: true, archived: false })
+      assert.deepEqual(await standaloneOrganization(application, chat, owner, shared, { field: 'archived', value: true }), { pinned: false, archived: true })
+      assert.equal(await renameStandalone(application, chat, owner, shared, 'Split chat'), 'Split chat')
+      for (const [reader, space] of [[peer, shared], [owner, other]]) {
+        assert.equal((await list(reader, space)).items.some(row => row.id === chat || row.id === run), false)
+        assert.equal(await renameStandalone(application, chat, reader, space, 'Forbidden'), undefined)
+        assert.equal(await renameConversationTitle(application, run, reader, 'Forbidden', space), null)
+      }
+      const memberStatus = (status: string) => workspace.query('UPDATE mikka_workspace_members SET status=$3 WHERE "workspaceId"=$1 AND "userId"=$2', [shared, owner, status])
+      try {
+        assert.equal(await regenerateStandalone(application, chat, owner, shared, async () => {
+          await memberStatus('suspended')
+          return 'Late generated title'
+        }), null)
+        assert.deepEqual(await list(owner, shared), { items: [], cursor: null })
+        assert.equal((await application.query('SELECT title FROM conversations WHERE id=$1', [chat])).rows[0].title, 'Split chat')
+      } finally { await memberStatus('active') }
+    })
+
     await t.test('linked conversation access requires both a readable task and a current chat participant in its workspace', async () => {
       const task = await makeTask()
       const otherTask = await makeTask()

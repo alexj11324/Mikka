@@ -22,5 +22,5 @@ export async function GET(request: Request) {
   }
   const input = directoryInput.safeParse(raw)
   if (!input.success) return json({ error: 'invalidInput' }, 422)
-  return json({ workspaceId, ...await conversationDirectory(pool, user.id, workspaceId, input.data) })
+  return json({ workspaceId, ...await conversationDirectory(pool, user, workspaceId, input.data) })
 }

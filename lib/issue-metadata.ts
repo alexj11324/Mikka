@@ -20,6 +20,8 @@ export const metadataSchema = z.object({
   number: z.number().int().positive().optional(),
   assignee: assigneeSchema.nullable().default(null),
   delegate: delegateSchema.nullable().default(null),
+  // Manual includes an explicit clear. An absent value predates dispatch assignment.
+  delegateSelection: z.enum(['dispatch','manual']).optional(),
   project: z.string().trim().max(100).nullable().default(null),
   labels: z.array(labelSchema).max(12).default([]),
   pullRequests: z.array(pullRequestSchema).max(10).default([]),

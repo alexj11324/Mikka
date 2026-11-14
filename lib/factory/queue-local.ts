@@ -22,6 +22,7 @@ export async function queueTaskRun(userId: string, input: Parameters<typeof queu
   if (previous && !['cancelled','revoked'].includes(previous.status)) botId = previous.botId
   return queueFactoryTask(pool, userId, {
     issueId: input.issueId, botId, agentId: input.agentId, deviceRepoId: repo.id, note: input.note,
+    ownerRequested: Boolean(sourceEventId) && source !== 'mcp',
     key: input.requestKey, sourceEventId, previousRunId: input.threadRunId, needsSpec: input.needsSpec,
     selection: [input.model, input.apiKeyId, input.subscriptionBindingId, input.pinnedDeviceId, Boolean(input.readOnly), execution?.id, source, ...(input.modelDispatch ? [{ modelDispatch: input.modelDispatch }] : []), ...(input.agentProfile ? [{ agentProfile: input.agentProfile }] : []), ...(input.policyCeiling ? [{ policyCeiling: input.policyCeiling }] : [])],
     queue: async (tx, owner, request, scopeBot, context) => {

@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import test from 'node:test'
+import test, { mock } from 'node:test'
+import { tokenWorkspace } from './tokens/principal'
+import { MOBILE_APP_ORIGIN } from './auth-config'
 import { disposableDatabase } from '../tests/helpers/e2e-target.mjs'
 import { seedFixtureWorkspace } from '../tests/helpers/task-workspace'
 
@@ -104,6 +106,31 @@ test('unified directory marks named chats unread and bulk-reads only the ownerâ€
   }
   const originalRevision = await observed()
   assert.equal(originalRevision,0)
+  const signed = { actor: owner, workspace, active:true }
+  const auth = mock.module(new URL('./auth.ts',import.meta.url).href, {namedExports: {
+    MOBILE_APP_ORIGIN, auth:{api:{getSession:async () => signed.active
+      ? {user:{id:signed.actor,[tokenWorkspace]:signed.workspace},session:{id:'directory-http'},tokenWorkspaceId:signed.workspace}
+      : null}},
+  }})
+  t.after(() => auth.restore())
+  const { POST } = await import('../app/api/conversations/read-state/route')
+  const post = (body: Record<string,unknown>, origin = 'http://127.0.0.1') => POST(new Request('http://127.0.0.1/api/conversations/read-state', {
+    method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(body),
+  }))
+  signed.active=false
+  assert.equal((await post({action:'unread',chatId:empty})).status,401)
+  signed.active=true
+  assert.equal((await post({action:'unread',chatId:empty},'https://other.example.invalid')).status,403)
+  assert.equal((await post({action:'unread',chatId:empty,runId:empty})).status,422)
+  assert.equal((await post({action:'unread',chatId:empty})).status,200)
+  assert.equal(await state(empty),true)
+  signed.actor=peer
+  assert.equal((await post({action:'unread',chatId:empty})).status,404)
+  signed.actor=owner; signed.workspace=elsewhere
+  assert.equal((await post({action:'unread',chatId:empty})).status,404)
+  signed.workspace=workspace
+  assert.equal((await post({action:'readAll'})).status,200)
+  assert.equal(await state(empty),false)
   const third = await append(3)
   assert.equal(await state(chat),true,'activity after read-all remains unread')
   assert.equal((await historyRead(third)).status,200)
