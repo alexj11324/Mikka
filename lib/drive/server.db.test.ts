@@ -199,6 +199,31 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
   const nextPage = await (await call(`?limit=1&before=${firstPage.nextCursor}`)).json()
   assert.equal(nextPage.volumes[0].id, volume.id)
   assert.equal(nextPage.nextCursor, null)
+  const edits = await call(`/${volume.id}/entries`, { method: 'PATCH', body: {
+    expectedDigest: restoredBody.headDigest, mutationId: randomUUID(),
+    changes: [{ op: 'put', path: 'unrelated.txt', mode: 0o644, ...blobA }],
+  } })
+  assert.equal(edits.status, 200)
+  const unrelated = await edits.json()
+  const deletion = await call(`/${volume.id}/entries`, { method: 'PATCH', body: {
+    expectedDigest: unrelated.headDigest, mutationId: randomUUID(), changes: [{ op: 'delete', path: 'notes/result.txt' }],
+  } })
+  assert.equal(deletion.status, 200)
+  const fileHistory = `/${volume.id}/versions?path=notes%2Fresult.txt`
+  const firstChanges = await (await call(fileHistory + '&limit=2')).json()
+  assert.deepEqual(firstChanges.versions.map((v: { seq: number }) => v.seq), [6, 4],
+    'single-file history records a deletion and restore while excluding an unrelated edit')
+  assert.equal(firstChanges.versions[0].file, null)
+  assert.deepEqual(firstChanges.versions[1].file, current.head.entries[0])
+  const earlierChanges = await (await call(fileHistory + '&limit=2&before=' + firstChanges.nextCursor)).json()
+  assert.deepEqual(earlierChanges.versions.map((v: { seq: number }) => v.seq), [3, 2])
+  assert.equal(earlierChanges.versions[0].file.sha256, blobB.sha256)
+  assert.equal(earlierChanges.nextCursor, null)
+  assert.deepEqual(await (await call(`/${volume.id}/versions?path=missing.txt`)).json(), { versions: [], nextCursor: null })
+  assert.equal((await call(`/${volume.id}/versions?path=`)).status, 400)
+  assert.equal((await call(fileHistory, { token: null })).status, 401)
+  assert.equal((await call(fileHistory, { token: sharedToken, workspaceId: team.id })).status, 404)
+  assert.equal((await call(fileHistory, { token: peerToken, workspaceId: team.id })).status, 404)
   await fixture.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [team.id, owner])
   assert.equal((await call(`/${otherVolume.id}`, { token: sharedToken, workspaceId: team.id })).status, 401)
   await fixture.query(`UPDATE personal_access_tokens SET "revokedAt"=now() WHERE "userId"=$1`, [owner])

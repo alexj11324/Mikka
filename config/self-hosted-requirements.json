@@ -399,6 +399,13 @@
     "test": "tests/organization-invitations.db.test.ts",
     "suite": "test:organization-invitations-db"
   },
+  "lib/audit/database.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Audit exports and retention use the installation's workspace and application PostgreSQL pools. A failed application checkout returns the workspace connection before propagating the error.",
+    "test": "lib/audit/retention.db.test.ts",
+    "suite": "test:audit-db"
+  },
   "lib/audit/events.ts": {
     "mode": "built-in",
     "environment": [
@@ -575,6 +582,13 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Authorize workspace-scoped Drive requests and update versioned manifests in PostgreSQL. File bytes use the installation's existing artifact storage configuration, with inline database storage when no bucket is configured.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "lib/drive/store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read an authorized personal file's changes and deletions from the installed PostgreSQL volume snapshots. File history uses the existing versions and requires no external storage service.",
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
@@ -1516,5 +1530,49 @@
     "behavior": "The existing Factory question and check recovery instructions are shared as product policy text with no external service dependency.",
     "test": "lib/coordinator/prompt-context-concurrency.test.ts",
     "suite": "test:agent-kit-model"
+  },
+  "app/api/me/joinable-organizations/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Check the verified account and Organization policy for domain-based membership.",
+    "test": "tests/organization-join-domains.db.test.ts",
+    "suite": "test:organization-join-domains-db"
+  },
+  "app/api/organizations/[organizationId]/allowed-domains/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Check the verified account and Organization policy for domain-based membership.",
+    "test": "tests/organization-join-domains.db.test.ts",
+    "suite": "test:organization-join-domains-db"
+  },
+  "app/api/organizations/[organizationId]/allowed-domains/[domainId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Check the verified account and Organization policy for domain-based membership.",
+    "test": "tests/organization-join-domains.db.test.ts",
+    "suite": "test:organization-join-domains-db"
+  },
+  "app/api/organizations/[organizationId]/join-by-domain/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Check the verified account and Organization policy for domain-based membership.",
+    "test": "tests/organization-join-domains.db.test.ts",
+    "suite": "test:organization-join-domains-db"
+  },
+  "lib/governance/organization-join-domains.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Check the verified account and Organization policy for domain-based membership.",
+    "test": "tests/organization-join-domains.db.test.ts",
+    "suite": "test:organization-join-domains-db"
+  },
+  "drizzle/20261114134255_organization_join_domains.sql": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Store allowed domains in the workspace database, independently for each Organization.",
+    "test": "tests/organization-join-domains.db.test.ts",
+    "suite": "test:organization-join-domains-db"
   }
 }

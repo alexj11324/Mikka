@@ -184,6 +184,31 @@ test('registered service identity routes enforce a fresh Workspace admin through
     assert.deepEqual(events, [{ action: 'grant_insert', actorId: owner }, { action: 'grant_delete', actorId: owner }])
   })
 
+  await t.test('an archived Project cannot gain a service grant and its existing grant can be removed', async () => {
+    const { setProjectArchive } = await import('../lib/project-lifecycle')
+    const created = await request({ cookie, origin }, first.id, 'POST', '', { requestId: randomUUID(), name: 'Archive checks' })
+    assert.equal(created.status, 200)
+    const endpoint = `/${created.body.id}/projects`
+    const candidate = await seedProject(pool, owner, [{ teamId: firstTeam.id, workspaceId: first.id }])
+    const choices = await request({ cookie }, first.id, 'GET', endpoint + '?view=choices')
+    assert.equal(choices.status, 200)
+    assert.ok(choices.body.projects.some((entry: { id: string }) => entry.id === candidate))
+    assert.equal((await request({ cookie, origin }, first.id, 'PUT', endpoint, assign)).status, 200)
+    const archived = [candidate, project]
+    for (const id of archived) await setProjectArchive(owner, first.id, { id, archived: true, message: 'Archive fixture' })
+    try {
+      const replacement = await request({ cookie, origin }, first.id, 'PUT', endpoint, {
+        expectedProjectIds: [project], projectIds: [candidate], confirmExpansion: true,
+      })
+      assert.equal(replacement.status, 404)
+      assert.deepEqual((await request({ cookie }, first.id, 'GET', endpoint)).body, { projectIds: [project] })
+      const removal = await request({ cookie, origin }, first.id, 'PUT', endpoint, { expectedProjectIds: [project], projectIds: [] })
+      assert.deepEqual(removal, { status: 200, body: { projectIds: [] } })
+    } finally {
+      for (const id of archived) await setProjectArchive(owner, first.id, { id, archived: false, message: 'Restore fixture' })
+    }
+  })
+
   await t.test('an organization-scoped key requires both administrators and expires with the original attachment', async t => {
     const orgRequest = async (method: string, suffix: string, body: object) => {
       const response = await fetch(origin + '/mikka/api/organizations' + suffix, {
