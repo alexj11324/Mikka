@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
 import test from 'node:test'
-import { actionableAlerts, internalSink, notifyAlerts, requestAlertAssessment, requestOutcomes, requestSlis, WINDOW_MS } from './monitor.mjs'
+import { operationalAlertAssessment, internalSink, notifyAlerts, requestAlertAssessment, requestOutcomes, requestSlis, WINDOW_MS } from './monitor.mjs'
 import { withRequestLog } from '../../lib/request-log.ts'
 
 const now = Date.parse('2026-10-31T12:00:00Z')
@@ -39,9 +39,9 @@ test('started, failed, 429 and overdue unfinished requests share the denominator
     { ...end('orphan', 200), body: 'SECRET' }, 'malformed'], now)
   assert.deepEqual(result.login, { total: 4, successful: 1, timedOut: 1, rateLimited: 1, successRatio: .25, p95Ms: 500 })
   assert.ok(!JSON.stringify(result).includes('SECRET'))
-  const alerts = actionableAlerts({ requests: result, database: { databaseAvailable: 1, staleWake: 2, uncertainEffect: 1, dueTotal: 2, dueSuccessful: 1, dispatchTotal: 2, dispatchStarted: 0 } })
+  const { alerts } = operationalAlertAssessment({ requests: result, database: { databaseAvailable: 1, staleWake: 2, uncertainEffect: 1, dueTotal: 2, dueSuccessful: 1, dispatchTotal: 2, dispatchStarted: 0 } })
   assert.deepEqual(alerts.map(alert => alert.id), ['staleWake', 'uncertainEffect', 'due-on-time', 'dispatch-start', 'login-request-success'])
-  assert.equal(actionableAlerts({ requests: {}, database: { databaseAvailable: 0 } })[0].id, 'database-unavailable')
+  assert.equal(operationalAlertAssessment({ requests: {}, database: { databaseAvailable: 0 } }).alerts[0].id, 'database-unavailable')
 })
 
 test('real internal HTTP sink receives one firing and recovery; failed sink remains visible and retryable', async () => {
@@ -54,7 +54,7 @@ test('real internal HTTP sink receives one firing and recovery; failed sink rema
   server.listen(0, '127.0.0.1'); await once(server, 'listening')
   try {
     const sink = `http://127.0.0.1:${server.address().port}/internal-alerts`
-    const alerts = actionableAlerts({ requests: {}, database: { databaseAvailable: 0 } })
+    const { alerts } = operationalAlertAssessment({ requests: {}, database: { databaseAvailable: 0 } })
     let result = await notifyAlerts(alerts, { sink, now })
     assert.equal(result.healthy, true); assert.equal(received.length, 1)
     result = await notifyAlerts(alerts, { sink, now: now + 60_000, state: result.state })
@@ -112,7 +112,17 @@ test('real HTTP status and failure logs feed the request SLI without copying req
     const metric = requestSlis(lines, Date.now() + 180_000).chat
     assert.equal(metric.total, 3); assert.equal(metric.successful, 1); assert.equal(metric.rateLimited, 1); assert.equal(metric.timedOut, 0)
     assert.equal(metric.successRatio, 1 / 3)
-    assert.equal(actionableAlerts({ requests: { chat: metric }, database: { databaseAvailable: 1 } })[0].id, 'chat-request-success')
+    assert.equal(operationalAlertAssessment({ requests: { chat: metric }, database: { databaseAvailable: 1 } }).alerts[0].id, 'chat-request-success')
     assert.ok(!lines.join('\n').includes(marker))
   } finally { await new Promise(resolve => server.close(resolve)) }
+})
+
+test('database health and each SLO denominator determine which alert recoveries can be assessed', () => {
+  const unavailable = operationalAlertAssessment({ requests: {}, database: { databaseAvailable: 0 } })
+  assert.deepEqual(unavailable.assessed, ['database-unavailable'])
+  const empty = operationalAlertAssessment({ requests: {}, database: { databaseAvailable: 1, staleWake: 0, dispatchTotal: 0, dispatchStarted: 0 } })
+  assert.deepEqual(empty.assessed, ['database-unavailable', 'staleWake'])
+  const recovered = operationalAlertAssessment({ requests: {}, database: { databaseAvailable: 1, dispatchTotal: 1, dispatchStarted: 1 } })
+  assert.ok(recovered.assessed.includes('dispatch-start'))
+  assert.deepEqual(recovered.alerts, [])
 })

@@ -95,17 +95,25 @@ export function requestAlertAssessment(requests) {
   return { assessed, alerts }
 }
 
-export function actionableAlerts({ requests, database }) {
-  const alerts = []
+/** Only observed metrics may resolve a previous incident. */
+export function operationalAlertAssessment({ requests, database }) {
+  const assessed = ['database-unavailable'], alerts = []
   const add = (id, value, action) => alerts.push(alertRecord(id, value, action))
   if (database.databaseAvailable !== 1) add('database-unavailable', 1, 'Check database connectivity and pool saturation; keep uncertain actions quarantined.')
   else {
-    for (const key of ['staleWake', 'expiredRunLease', 'uncertainEffect', 'staleEffect', 'overdueSecretCleanup'])
+    for (const key of ['staleWake', 'expiredRunLease', 'uncertainEffect', 'staleEffect', 'overdueSecretCleanup']) {
+      if (!Number.isFinite(database[key])) continue
+      assessed.push(key)
       if (database[key] > 0) add(key, database[key], key.includes('Effect') ? 'Reconcile provider receipt and ledger before retrying any external effect.' : 'Inspect the existing worker and durable retry/cleanup queue; resume only the original authorized work.')
-    for (const [total, successful, name] of [['dueTotal', 'dueSuccessful', 'due-on-time'], ['dispatchTotal', 'dispatchStarted', 'dispatch-start']])
-      if (database[total] > 0 && database[successful] / database[total] < .99) add(name, database[successful] / database[total], 'Inspect worker heartbeat, lease and durable queue; failed and unfinished work remain in this denominator.')
+    }
+    for (const [total, successful, name] of [['dueTotal', 'dueSuccessful', 'due-on-time'], ['dispatchTotal', 'dispatchStarted', 'dispatch-start']]) {
+      if (!(database[total] > 0) || !Number.isFinite(database[successful])) continue
+      assessed.push(name)
+      if (database[successful] / database[total] < .99) add(name, database[successful] / database[total], 'Inspect worker heartbeat, lease and durable queue; failed and unfinished work remain in this denominator.')
+    }
   }
-  return [...alerts, ...requestAlertAssessment(requests).alerts]
+  const request = requestAlertAssessment(requests)
+  return { assessed: [...assessed, ...request.assessed], alerts: [...alerts, ...request.alerts] }
 }
 
 export function internalSink(raw) {
@@ -150,7 +158,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const requests = requestSlis(lines, observedAt), outcomes = requestOutcomes(lines, observedAt)
   let state = {}
   try { state = JSON.parse(await readFile(stateFile, 'utf8')) } catch (error) { if (error.code !== 'ENOENT') throw Error('opsAlertStateInvalid') }
-  const result = await notifyAlerts(actionableAlerts({ requests, database }), { state, sink: process.env.OPS_INTERNAL_ALERT_SINK })
+  const { alerts, assessed } = operationalAlertAssessment({ requests, database })
+  const result = await notifyAlerts(alerts, { state, assessed, sink: process.env.OPS_INTERNAL_ALERT_SINK })
   await writeFile(`${stateFile}.tmp`, JSON.stringify(result.state), { mode: 0o600 }); await rename(`${stateFile}.tmp`, stateFile)
   console.log(JSON.stringify({ observedAt: new Date(observedAt).toISOString(), requests, outcomes, database, deliveries: result.deliveries, healthy: result.healthy }))
   if (!result.healthy) process.exitCode = 1
