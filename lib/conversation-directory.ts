@@ -2,7 +2,7 @@ import 'server-only'
 import { standaloneChatDirectory } from './standalone-chat-directory'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
-import { directoryInput, type DirectoryInput, type DirectoryState } from './conversation-directory-input'
+import { directoryInput, type DirectoryInput, type DirectoryState, type ConversationDirectoryPage } from './conversation-directory-input'
 import { runAwaitingApproval, runDeviceOffline } from './task-state-query'
 import { threadUnread } from './thread-reads'
 import { runBotId } from './run-bot-name'
@@ -96,7 +96,7 @@ function item(row: Row) {
     name: threadName(row.asked, ''), issue: { title: row.taskTitle || row.agentName } }), state: row.state, unread:row.unread, at: row.at, pinned: row.pinned }
 }
 
-export async function conversationDirectory(database: RunChainQueryable, userId: string, workspaceId: string, raw: DirectoryInput) {
+export async function conversationDirectory(database: RunChainQueryable, userId: string, workspaceId: string, raw: DirectoryInput): Promise<ConversationDirectoryPage> {
   const input = directoryInput.parse(raw)
   const param = (i: number) => '$' + (facts.params.length + i)
   const [archived,bot,search,state,id,pinned,at,pullState] = Array.from({length:8}, (_,i) => param(4+i))

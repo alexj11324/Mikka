@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { IssuePullRequest } from './issue-metadata'
 
 export const directoryInput = z.strictObject({
   search: z.string().trim().max(120).default(''),
@@ -10,3 +11,11 @@ export const directoryInput = z.strictObject({
 })
 export type DirectoryInput = z.input<typeof directoryInput>
 export type DirectoryState = Exclude<z.output<typeof directoryInput>['state'], 'all'>
+
+export interface ConversationDirectoryPage {
+  items: {
+    pulls: IssuePullRequest[]; taskTitle: string | null; kind: 'run' | 'chat'; id: string; issueId: string | null; identifier: string | null; title: string
+    state: DirectoryState; at: string; pinned: boolean; unread?: boolean
+  }[]
+  cursor: NonNullable<DirectoryInput['cursor']> | null
+}
