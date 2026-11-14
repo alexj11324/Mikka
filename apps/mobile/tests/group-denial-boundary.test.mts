@@ -8,7 +8,8 @@ import { withholdsCachedRead } from '../lib/api-read-state.ts'
 const source = readFileSync(new URL('../app/groups/[id].tsx', import.meta.url), 'utf8')
 
 test('only a confirmed member denial hides the group; ordinary outages retain offline state', () => {
-  for (const code of [401, 403, 404]) assert.equal(withholdsCachedRead(code), true)
+  for (const code of [403, 404]) assert.equal(withholdsCachedRead(code), true)
+  assert.equal(withholdsCachedRead(401), false, 'account-wide 401 recovery is not a per-path cache eviction')
   for (const code of [0, 429, 500, 502, 503, 504]) assert.equal(withholdsCachedRead(code), false)
   assert.match(source, /const accessDenied = conversationAccessDenied\(page\.error\) \|\| conversationAccessDenied\(members\.error\)/)
   assert.match(source, /const messages = accessDenied \? \[\] : mergeGroupMessages/)
