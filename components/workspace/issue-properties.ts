@@ -30,8 +30,7 @@ export const ISSUE_PRIORITIES = ISSUE_PRIORITY_CODES.map(value => ({ value, ...p
 
 export type { IssueStatus }
 export type IssueView = 'all' | 'mine' | 'shared' | 'favorites' | 'following' | IssueStatus
-export const WORKSPACE_NAME = 'Mikka'
-export const WORKSPACE_SLUG = 'mikka'
+export { WORKSPACE_NAME, WORKSPACE_SLUG } from '@/lib/workspace-defaults'
 
 /**
  * Shows the id the server resolved with `taskIdentifier` (lib/task-identifier.ts): `MIK-12` or `ALEX-12`.

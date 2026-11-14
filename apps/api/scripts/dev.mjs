@@ -300,6 +300,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     development = await startDevelopment({ args: process.argv.slice(2) })
     if (stopping) await development.close()
+    else if (process.send) process.send({ type: 'api-ready', origin: development.origin })
   } catch (error) {
     // A stale route manifest is a condition the developer can fix, and the
     // refusal text is the whole value of stopping: print it as written rather
