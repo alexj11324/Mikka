@@ -628,6 +628,19 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     assert.equal(after.kind === 'device' && after.model, 'parallel-codex')
   })
 
+  await t.test('changing the preferred Agent only locks and writes the scoped setting', async t => {
+    const scope = await person('order-preferred-query')
+    const { Client } = await import('pg')
+    const traced = t.mock.method(Client.prototype, 'query')
+    await order.changeOrder(pool, scope, { kind: 'preferred', harness: 'codex' })
+    const statements = traced.mock.calls.map(call => call.arguments[0])
+    traced.mock.restore()
+    assert.deepEqual(statements.map(sql => sql.trim().split(/\s+/)[0]), ['BEGIN', 'SELECT', 'INSERT', 'COMMIT'])
+    assert.match(statements[1], /pg_advisory_xact_lock/)
+    assert.match(statements[2], /INSERT INTO model_order_settings/)
+    assert.equal((await order.readOrder(pool, scope)).preferredHarness, 'codex')
+  })
+
   await t.test('a model the account no longer reports stays listed, marked modelGone; never deleted', async () => {
     const scope = await person('order-model-gone')
     const connection = await subscribe(scope, 'claude', ['claude-opus-gone', 'claude-sonnet-kept'])
