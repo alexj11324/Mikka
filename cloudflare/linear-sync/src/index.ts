@@ -1,3 +1,4 @@
+import { causeFields } from '@mikka/protocol/coded-error'
 import { isLinearOAuthRevocation, parseLinearWebhookRequest, verifyBearer } from '@/lib/linear-sync/webhook'
 import { linearSyncDisabledResponse, linearSyncEnabled, linearSyncState } from '@/lib/linear-sync/flags'
 
@@ -147,16 +148,15 @@ export async function handleRequest(request: Request, env: Env, ctx: WorkerConte
 
 export default {
   fetch: handleRequest,
-  scheduled(_controller: WorkerSchedule, env: Env, ctx: WorkerContext) {
-    ctx.waitUntil(runScheduled(env).catch(() => {
-      console.error('Linear sync scheduled batch failed')
-    }))
+  async scheduled(_controller: WorkerSchedule, env: Env) {
+    if (!await linearSyncEnabled(env.NEXT_PUBLIC_POSTHOG_KEY ?? '')) return
+    // The native trigger has no HTTP bearer. Its returned promise is the Cron invocation.
+    const runtime = await loadSyncRuntime(env)
+    try {
+      await withRequestDatabase(runtime, env.HYPERDRIVE!.connectionString, () => runtime.processLinearSyncBatch())
+    } catch (error) {
+      // error-cause: Workers records unhandled rejections. Exclude raw query parameters and provider messages.
+      throw new Error('Linear sync scheduled batch failed', { cause: causeFields(error) })
+    }
   },
-}
-
-export async function runScheduled(env: Env) {
-  if (!await linearSyncEnabled(env.NEXT_PUBLIC_POSTHOG_KEY ?? '')) return
-  if (!env.CRON_SECRET || !syncConfigured(env)) return
-  const runtime = await loadSyncRuntime(env)
-  await withRequestDatabase(runtime, env.HYPERDRIVE!.connectionString, () => runtime.processLinearSyncBatch())
 }
