@@ -6700,7 +6700,8 @@
         "kinds": {
           "subscription": "Model subscription",
           "api_key": "API key",
-          "mcp": "MCP server"
+          "mcp": "MCP server",
+          "skill": "Skill"
         },
         "status": {
           "pending": "Pending",

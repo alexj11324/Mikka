@@ -6700,7 +6700,8 @@
         "kinds": {
           "subscription": "模型订阅",
           "api_key": "API 密钥",
-          "mcp": "MCP 服务"
+          "mcp": "MCP 服务",
+          "skill": "技能"
         },
         "status": {
           "pending": "待审批",
