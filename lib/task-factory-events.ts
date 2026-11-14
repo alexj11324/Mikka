@@ -15,6 +15,35 @@ type Attempt = { id: string; runId: string | null; candidateId: string | null }
 type Evidence = { id: string; createdAt: string | null; kind: Extract<TaskFactoryEvent, { kind: 'evidence' }>['evidenceKind']
   title: string | null; runId: string; attemptId: string | null; candidateId?: string | null; artifactId?: string; version?: number }
 
+export type TaskFactoryGate = Extract<TaskFactoryEvent, { kind: 'factory_gate' }>
+export type TaskFactoryProgress = {
+  id: string
+  factoryTaskId: string
+  runId: string | null
+  current: TaskFactoryGate
+  steps: TaskFactoryGate[]
+}
+
+/** One progress row per authorized run. Older and pre-dispatch receipts can
+ * lack a run; keep them with their own attempt or the unassigned task history. */
+export function taskFactoryProgress(events: readonly TaskFactoryEvent[]): TaskFactoryProgress[] {
+  const groups = new Map<string, TaskFactoryProgress>()
+  const gates = events.filter((event): event is TaskFactoryGate => event.kind === 'factory_gate')
+    .sort((a, b) => a.revision - b.revision || a.id.localeCompare(b.id))
+  for (const gate of gates) {
+    const owner = gate.runId ? `run:${gate.runId}` : gate.attemptId ? `attempt:${gate.attemptId}` : 'unassigned'
+    const id = `progress:${gate.factoryTaskId}:${owner}`
+    const group = groups.get(id)
+    if (group) {
+      group.steps.push(gate)
+      group.current = gate
+    } else {
+      groups.set(id, { id, factoryTaskId: gate.factoryTaskId, runId: gate.runId, current: gate, steps: [gate] })
+    }
+  }
+  return [...groups.values()].sort((a, b) => Date.parse(b.current.at) - Date.parse(a.current.at) || a.id.localeCompare(b.id))
+}
+
 /** Only admitted attempts and evidence enter this projection. Historical
  * receipts sometimes refer to an attempt whose content was revoked. Do not
  * expose that attempt or infer a change across the hidden boundary. */

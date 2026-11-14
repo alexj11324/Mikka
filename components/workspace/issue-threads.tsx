@@ -28,10 +28,12 @@ export type IssueThreadsRead = Awaited<ReturnType<typeof pollIssueThreads>>
  * `issue_threads` to every member who can see it. While the channel is down it is read once a minute. */
 export function useIssueThreads(issueId: string, enabled = true) {
   const key = issueThreadsKey(issueId)
-  const result = useSWR(enabled ? key : null, () => pollIssueThreads(issueId), { revalidateOnReconnect: true })
+  const result = useSWR(enabled ? key : null, () => pollIssueThreads(issueId, true), { revalidateOnReconnect: true })
   const scope = enabled ? result.data?.live.workspaceId ?? null : null
   useLiveKey('issue_threads', scope ? issueId : UNRESOLVED_LIST_SCOPE, [unstable_serialize(key)], scope, { minIntervalMs: 2_000 })
-  return { ...result, data: result.data?.threads }
+  useLiveKey('factory_issue', enabled && scope ? issueId : null, [unstable_serialize(key)], scope, { minIntervalMs: 2_000 })
+  useLiveKey('issue_list', enabled && scope ? scope : null, [unstable_serialize(key)], scope, { minIntervalMs: 2_000 })
+  return { ...result, data: result.data?.threads, work: result.error ? undefined : result.data?.work }
 }
 
 export function harnessLabel(harness: string) {
@@ -53,15 +55,16 @@ export type AgentActivityRow = { id: string; at: string; node: ReactNode }
 /** An Agent row as data, for a layer that draws the log: its mark (the Agent's, or the result's), name, run result and time. */
 export type AgentActivityItem = { id: string; at: string; name: string; mark: ReactNode; result: string; group: ThreadGroup; time: string; open: boolean; onOpen: (() => void) | null }
 
-export function useAgentActivity(issueId: string, openId: string | null, onOpen: (id: string) => void, enabled = true): { rows: AgentActivityRow[]; items: AgentActivityItem[]; error: ReactNode; failed: { label: string; retry: () => void } | null } {
+export function useAgentActivity(issueId: string, openId: string | null, onOpen: (id: string) => void, enabled = true) {
   const t = useTranslations('IssueThreads')
   const resultLabel = useRunResultLabel()
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
-  const { data, error, mutate } = useIssueThreads(issueId, enabled)
+  const { data, error, mutate, work } = useIssueThreads(issueId, enabled)
+  const snapshot = { work, threads: error ? [] : data ?? [], openThread: onOpen, retry: () => { void mutate() } }
   const { allTasks } = useAcceptanceTasks(enabled ? issueId : null)
-  if (!enabled) return { rows: [], items: [], error: null, failed: null }
-  if (error) return { rows: [], items: [], error: <InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />, failed: { label: t('loadFailed'), retry: () => { void mutate() } } }
+  if (!enabled) return { ...snapshot, rows: [], items: [], error: null, failed: null }
+  if (error) return { ...snapshot, rows: [], items: [], error: <InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />, failed: { label: t('loadFailed'), retry: () => { void mutate() } } }
   const stretches = agentStretches(data ?? [])
   const items: AgentActivityItem[] = []
   const rows = stretches.map(({ first, last, ids }, index): AgentActivityRow => {
@@ -89,7 +92,7 @@ export function useAgentActivity(issueId: string, openId: string | null, onOpen:
     items.push({ id: `agent:${first.id}`, at, name, mark: profile ? <ProfileMark icon={profile.icon} color={profile.color} /> : harness ? <HarnessMark harness={harness} /> : <ThreadStatusIcon group={group} />, result: view.stopping ? t('stopping') : resultLabel(result, reason), group, time: format.relativeTime(threadTime(last, now), now), open, onOpen: first.detail ? () => onOpen(first.id) : null })
     return { id: `agent:${first.id}`, at, node }
   })
-  return { rows, items, error: null, failed: null }
+  return { ...snapshot, rows, items, error: null, failed: null }
 }
 
 /** The dispatching Bot in its own look (R-36): the same bloub as its bot-list row; the Coordinator's own runs use its mark. */
