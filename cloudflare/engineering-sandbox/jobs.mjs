@@ -23,6 +23,8 @@ export const sourceSuites = {
     'scripts/acceptance/team-workspace.mjs',
     'packages/daemon/harness/pins.json',
     'lib/smoke-account.ts',
+    'lib/account/avatar-file.ts',
+    'lib/desktop-rpc/version.ts',
     'lib/desktop-rpc/wire.ts',
   ],
 }
