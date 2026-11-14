@@ -1,7 +1,0 @@
-{
-  "extends": "@mikka/config/tsconfig.base.json",
-  "compilerOptions": {
-    "types": ["node"]
-  },
-  "include": ["bin", "harness", "src", "test", "vitest.config.ts", "../../scripts/e2b/acceptance-daemon.mts", "../../scripts/e2b/acceptance-bootstrap.mts"]
-}

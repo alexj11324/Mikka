@@ -1,8 +1,0 @@
-@import "tailwindcss";
-@import "uniwind";
-@import "heroui-native/styles";
-@import "./styles/tokens.css";
-@import "./components/beui/styles/theme.css";
-
-/* Tailwind scans HeroUI Native's compiled components for the classes they use. */
-@source "./node_modules/heroui-native/lib";

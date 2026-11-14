@@ -1,0 +1,53 @@
+{
+  "public": "27dda384f9073a4662ec4fa0f0cf28a29d50d586",
+  "private": "6896edea131d398945aa06a4d858d09eeb3b10d7",
+  "renderer": "6a48bcb0650a30a71e0accaaa6617b06ee4b450627afe9064591b6e184559488",
+  "chromium": "153.0.8010.0",
+  "postgresql": "17.11",
+  "started": "2026-11-14T17:47:10.101Z",
+  "finished": "2026-11-14T17:48:23.194Z",
+  "verified": [
+    "rename through the owner dialog, return to the original linked thread, and verify the saved title from PostgreSQL",
+    "regenerate through the real RPC without configured model, get HTTP 200 and regenerated=false, and preserve the manual title",
+    "pin and unpin; archive, reload, and restore; independently read each persisted state",
+    "deny the other signed-in Member the same mutation"
+  ],
+  "states": [
+    {
+      "started": "2026-11-14T17:47:10.101Z",
+      "finished": "2026-11-14T17:47:33.212Z",
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "file": "1440-light.png",
+      "sha256": "b69ab1be094e51d0fcc7af259962adc47915b449be7a0057771f9a365710ed49"
+    },
+    {
+      "started": "2026-11-14T17:47:34.407Z",
+      "finished": "2026-11-14T17:47:50.698Z",
+      "width": 1440,
+      "height": 900,
+      "theme": "dark",
+      "file": "1440-dark.png",
+      "sha256": "8b30660608a466f0305e4d24444f6e73afb2bc3dcf94d8a64173671e5eea9769"
+    },
+    {
+      "started": "2026-11-14T17:47:51.567Z",
+      "finished": "2026-11-14T17:48:06.589Z",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "file": "390-light.png",
+      "sha256": "a5afc53439eb985bcc68e60ea4e9c6a56815768a2e6814b3edf5981a1b16255d"
+    },
+    {
+      "started": "2026-11-14T17:48:07.798Z",
+      "finished": "2026-11-14T17:48:23.194Z",
+      "width": 390,
+      "height": 844,
+      "theme": "dark",
+      "file": "390-dark.png",
+      "sha256": "40af4dbb13e057f8e1474c6cac01d6e01e0011364bb9a9a4c36817c12a7d27a1"
+    }
+  ]
+}
