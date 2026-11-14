@@ -12,7 +12,7 @@ import { SearchInput } from '@/components/ui/search-input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { useLiveKey } from '@/hooks/use-live-key'
-import type { DirectoryState } from '@/lib/conversation-directory-input'
+import { archiveIdleDays, type DirectoryState } from '@/lib/conversation-directory-input'
 import { openThread } from './workspace-navigation'
 
 type Page = Awaited<ReturnType<typeof listConversations>>
@@ -50,7 +50,7 @@ export function ConversationDirectory({ ownerId, workspaceId, botId }: { ownerId
     <Label className="flex items-center gap-2 text-sm">{t('archiveIdle')}
       <NativeSelect value={prefs.data?.archiveIdleAfterDays ?? 30} disabled={!prefs.data || saving}
         onChange={event=>void changeDays(Number(event.target.value))}>
-        {[0,3,7,14,30,90].map(days=><NativeSelectOption key={days} value={days}>{days ? t('archiveDays',{days}) : t('archiveOff')}</NativeSelectOption>)}
+        {archiveIdleDays.map(days=><NativeSelectOption key={days} value={days}>{days ? t('archiveDays',{days}) : t('archiveOff')}</NativeSelectOption>)}
       </NativeSelect>
     </Label>
     {(failed || prefs.error) && <p role="alert">{t('loadError')} <Button size="sm" variant="ghost" onClick={()=>void prefs.mutate()}>{t('retry')}</Button></p>}
