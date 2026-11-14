@@ -342,7 +342,10 @@ export async function runEvidence(userId: string, runId: string) {
   const routing = modelRoutingEvidenceSchema.safeParse(run.modelRouting)
   // Names for the identity's references, so the owner reads people and machines, not IDs.
   const labels = identity.success ? await (await import('@/lib/execution-identity-labels')).executionIdentityLabels(pool, (await import('@/lib/workspace-db')).workspacePool, userId, identity.data) : null
-  const captures = await db.select().from(runCaptures)
+  const captures = await db.select({
+    id: runCaptures.id, kind: runCaptures.kind, contentType: runCaptures.contentType, title: runCaptures.title,
+    size: runCaptures.size, durationMs: runCaptures.durationMs, source: runCaptures.source, createdAt: runCaptures.createdAt,
+  }).from(runCaptures)
     .where(and(eq(runCaptures.runId, runId), eq(runCaptures.userId, userId), eq(runCaptures.status, 'ready'))).orderBy(asc(runCaptures.createdAt))
   const documents = await runArtifactSubmissions(pool, userId, [runId])
   const recording = await db.select({ id: runCaptures.id }).from(runCaptures)

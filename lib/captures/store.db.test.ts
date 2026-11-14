@@ -5,6 +5,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
+import { measured } from '../../tests/helpers/read-metrics'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 
 // Run captures belong to one run and its owner: teammates, other devices and
@@ -24,6 +25,41 @@ const dbTest = databaseUrl ? test : test.skip
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...Buffer.from('IHDR-test-image')])
 const MP4 = new Uint8Array([0, 0, 0, 0x18, ...Buffer.from('ftypisom-test-video')])
 const sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
+
+dbTest('capture metadata reads do not transfer the inline file', async t => {
+  const [{ createRequestDatabaseScope, pool }, { runEvidence, readCapture }] = await Promise.all([import('../db'), import('./store')])
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const owner = 'capture-summary-' + randomUUID(), run = randomUUID(), agent = randomUUID(), id = randomUUID()
+  const at = new Date('2026-01-02T12:00:00.000Z')
+  try {
+    await scope.run(async () => {
+      await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [owner, owner + '@example.invalid'])
+      await pool.query(`INSERT INTO agents(id,"userId",name,harness) VALUES($1,$2,'Capture','codex')`, [agent, owner])
+      await pool.query(`INSERT INTO agent_runs(id,"userId","agentId",status) VALUES($1,$2,$3,'succeeded')`, [run, owner, agent])
+      await pool.query(`INSERT INTO run_captures(id,"userId","runId",kind,"contentType",source,status,title,size,"inlineContent","createdAt","storageKey",sha256)
+        VALUES($1,$2,$3,'image','image/png','local','ready','Preview',$4,$5,$6,$7,$8)`, [id, owner, run, PNG.length, PNG, at, 'fixture/' + id, sha(PNG)])
+      const small = await measured(() => runEvidence(owner, run))
+      const expected = { id, kind: 'image', contentType: 'image/png', source: 'local', title: 'Preview', size: PNG.length, durationMs: null, createdAt: at.toISOString() }
+      assert.deepEqual(small.value?.captures, [expected])
+      const payload = Buffer.concat([PNG, Buffer.alloc(256 * 1024)])
+      await pool.query('UPDATE run_captures SET "inlineContent"=$2,size=$3,sha256=$4 WHERE id=$1', [id, payload, payload.length, sha(payload)])
+      const large = await measured(() => runEvidence(owner, run))
+      assert.deepEqual(large.value?.captures, [{ ...expected, size: payload.length }])
+      assert.equal(await runEvidence('foreign-' + owner, run), null)
+      assert.deepEqual((await readCapture(owner, id))?.bytes, new Uint8Array(payload))
+      t.diagnostic(JSON.stringify({ inlineBytes: payload.length, smallResultBytes: small.resultBytes, largeResultBytes: large.resultBytes,
+        smallSocketBytes: small.bytes, largeSocketBytes: large.bytes }))
+      assert.ok(large.resultBytes < small.resultBytes + 256, 'metadata reads must not transfer the inline file')
+    })
+  } finally {
+    try { await scope.run(async () => {
+      await pool.query('DELETE FROM run_captures WHERE id=$1', [id])
+      await pool.query('DELETE FROM agent_runs WHERE id=$1', [run])
+      await pool.query('DELETE FROM agents WHERE id=$1', [agent])
+      await pool.query('DELETE FROM "user" WHERE id=$1', [owner])
+    }) } finally { await scope.close() }
+  }
+})
 
 dbTest('artifact evidence follows each real submission version, not the artifact creator or mutable latest version', async t => {
   const [{ createRequestDatabaseScope, pool }, { submitArtifact, readArtifactContent }, { runEvidence }, { artifactStorage }, { workAsyncStorage }, { workUnitAsyncStorage }] = await Promise.all([
