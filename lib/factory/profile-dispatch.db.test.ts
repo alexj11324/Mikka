@@ -1398,8 +1398,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
         assert.equal(result.preserveQuestionWorktree, true)
         const lineageReads = queries.mock.calls.filter(call => {
           const query = call.arguments[0]
-          const sql = typeof query === 'string' ? query : query?.text
-          return sql?.includes('WITH RECURSIVE lineage AS') && sql.includes('FROM lineage l')
+          return typeof query === 'string' && query.includes('WITH RECURSIVE lineage AS') && query.includes('FROM lineage l')
         })
         assert.equal(lineageReads.length, 1, 'the lease claim resolves its Factory task lineage once')
       } finally {
