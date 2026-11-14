@@ -6497,6 +6497,7 @@
       "openOrganization": "打开组织设置",
       "accept": "加入组织",
       "organizationSelect": "组织",
+      "receivedTitle": "收到的组织邀请",
       "noOrganizations": "暂未加入组织",
       "statusPending": "待接受",
       "statusAccepted": "已接受",

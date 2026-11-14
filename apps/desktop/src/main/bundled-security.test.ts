@@ -153,6 +153,7 @@ test('Organization domain discovery and admission forward only the declared rout
   const collection = `${base}/allowed-domains`
   for (const method of ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) {
     assert.equal(allowedApiPath('/api/me/joinable-organizations', method), method === 'GET')
+    assert.equal(allowedApiPath('/api/me/invitations', method), method === 'GET')
     assert.equal(allowedApiPath(collection, method), method === 'GET' || method === 'POST')
     assert.equal(allowedApiPath(`${collection}/${domain}`, method), method === 'DELETE')
     assert.equal(allowedApiPath(`${base}/join-by-domain`, method), method === 'POST')
