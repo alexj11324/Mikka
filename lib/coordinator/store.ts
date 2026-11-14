@@ -29,7 +29,7 @@ import { compactChatMessage, compactChatToolMetadata, summaryChatMessage } from 
 import { projectMessageDisplays } from './display-projection'
 import type { ChatToolMetadata, ChatToolMetadataRow } from './chat-tool-metadata'
 import { coordinatorLeaseActive } from './lease'
-import { readCoordinatorPromptPreferences, readPreferences } from '@/lib/preferences'
+import { readPreferences } from '@/lib/preferences'
 import { TRIAGE_RETRY_COOLDOWN_MS } from './triage-batch'
 import type { TriageJudgment } from './triage-batch'
 import type { DecisionExecution } from './decide'
@@ -178,20 +178,7 @@ export async function loadConversation(userId: string, botId: string): Promise<L
   return conversationWithMemory(conversation, (await readPreferences(userId)).memoryEnabled)
 }
 
-/** Product memory and settings only; eve owns conversation history and compaction. */
-export async function loadProductPromptContext(userId: string, botId: string): Promise<{ memory: string; personalInstructions: string; memoryEnabled: boolean }> {
-  const [session, preferences] = await Promise.allSettled([
-    db.select({ memory: coordinatorSessions.memory }).from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1),
-    readCoordinatorPromptPreferences(userId),
-  ])
-  if (session.status === 'rejected') throw session.reason
-  if (preferences.status === 'rejected') throw preferences.reason
-  return {
-    memory: preferences.value.memoryEnabled ? session.value[0]?.memory ?? '' : '',
-    personalInstructions: preferences.value.personalInstructions,
-    memoryEnabled: preferences.value.memoryEnabled,
-  }
-}
+export { loadProductPromptContext } from './prompt-context'
 
 /** Replaces every message at or before `through` with `summary`. The messages stay stored. */
 export async function saveSummary(userId: string, summary: string, through: number, botId: string): Promise<void> {

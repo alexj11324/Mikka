@@ -960,6 +960,20 @@
     "test": "tests/coordinator-issue-create.db.test.ts",
     "suite": "test:coordinator-issue-create-db"
   },
+  "lib/coordinator/product-instructions.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Native Eve and the application host compose the same current instruction context from the installation scoped stores, preserving memory settings and usage receipts.",
+    "test": "lib/coordinator/prompt-preferences.test.ts",
+    "suite": "test:agent-kit-model"
+  },
+  "lib/coordinator/prompt-context.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The instruction context reads the current owner and Bot memory alongside the existing current prompt preferences without loading chat history.",
+    "test": "lib/coordinator/prompt-preferences.test.ts",
+    "suite": "test:agent-kit-model"
+  },
   "lib/credentials/runtime-identity.ts": {
     "mode": "optional-cloud",
     "environment": [
@@ -1194,6 +1208,13 @@
     "test": "tests/task-presentation.db.test.ts",
     "suite": "test:task-presentation-db"
   },
+  "lib/factory/instructions.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The existing Factory question and check recovery instructions are shared as product policy text with no external service dependency.",
+    "test": "lib/coordinator/prompt-context-concurrency.test.ts",
+    "suite": "test:agent-kit-model"
+  },
   "lib/factory/public-flow.ts": {
     "mode": "built-in",
     "environment": [],
@@ -1207,6 +1228,13 @@
     "behavior": "The selected server uses its existing PostgreSQL database and Factory question contract to return pending items before the newest-50 limit, while retaining complete task-history reads.",
     "test": "lib/factory/questions/ask-user.db.test.ts",
     "suite": "test:factory-routing-db"
+  },
+  "lib/factory/reconcile-pending.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Native instruction routing and Factory reconciliation use the same owner and Bot scoped eligibility query over the installation database.",
+    "test": "lib/factory/reconcile-pending.test.ts",
+    "suite": "test:factory"
   },
   "lib/factory/review-change.ts": {
     "mode": "built-in",
