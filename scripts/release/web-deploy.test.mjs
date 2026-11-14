@@ -529,7 +529,9 @@ test('desktop replaces obsolete preflights while preserving active signing and d
   assert.doesNotMatch(desktop, /^concurrency:/m, 'a new workflow must not cancel a running signing job')
   const preflight = desktop.slice(desktop.indexOf('\n  preflight:'), desktop.indexOf('\n  macos:'))
   const signing = desktop.slice(desktop.indexOf('\n  macos:'))
-  assert.match(preflight, /group: .*'desktop-release-preflight'.*\n      cancel-in-progress: true/)
+  assert.ok(preflight.includes("group: desktop-release-preflight-${{ github.ref }}-${{ inputs.cloudflare_receipt && 'promoted' || 'legacy' }}"),
+    'a legacy push must not supersede the independently verified Cloudflare promotion')
+  assert.match(preflight, /cancel-in-progress: true/)
   assert.match(signing, /group: .*'desktop-release'.*\n      cancel-in-progress: false/)
   assert.doesNotMatch(signing, /queue: max|cancel-in-progress: true/, 'keep one active signer and only the latest pending candidate')
   assert.match(desktop, /run: node scripts\/release\/web-deploy\.mjs await-desktop-web/)

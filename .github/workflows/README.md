@@ -205,8 +205,8 @@ overlay SHA, while private documentation-only pushes refresh Web only. No schedu
 
 Web verifies `/mikka/api/version`'s `build` and `overlaySha`. Desktop uses the
 existing matching-Web source gate and checks out **that Web overlay SHA**, then
-verifies equality again before publishing. New desktop preflights replace older
-Web waits. The macOS job finishes its active signing/notarization work and keeps
+verifies equality again before publishing. A newer preflight supersedes older waits for the same ref and release path.
+An ordinary push and a dispatch carrying Cloudflare promotion evidence use separate preflight groups. The macOS job finishes its active signing/notarization work and keeps
 only the latest pending candidate; new main pushes do not cancel a signed build
 in progress. Before publication, an overlay that no longer matches production is
 rejected, and the existing proven-Web-descendant and sealed-candidate checks still
