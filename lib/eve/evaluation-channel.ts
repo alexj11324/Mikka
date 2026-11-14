@@ -12,7 +12,7 @@ async function resolveEvaluation(request: Request) {
   if(!scope||!id.success)return null
   await assertEveScope(scope)
   const {pool}=await import('../db')
-  const binding=await loadEvaluationBinding(pool,scope,id.data)
+  const binding=await loadEvaluationBinding(pool,scope,id.data,'route')
   if(!binding)return null
   return { scope, binding }
 }
