@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import { measured, readMetrics } from './helpers/read-metrics'
 // Framework/session plumbing only; all writers, membership, stores and ACLs below are real.
 import './fixtures/activity-runtime.mjs'
 import { dbUrl, seedAgent, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
@@ -80,7 +81,12 @@ test('Task responsibility: actual actions, MCP compatibility, tenant denial and 
       assert.equal(toolView?.identifier, result.issue.identifier)
       assert.equal(toolView?.assignee?.id, member)
       assert.equal(toolView?.delegate?.id, ownAgent)
-      assert.equal((await scoped(() => listToolIssues(owner, {}))).find(task => task.id === taskId)?.identifier, result.issue.identifier)
+      const resultPage = await measured(() => scoped(() => listToolIssues(owner, {})))
+      t.diagnostic('Authorized MCP task list '+JSON.stringify(readMetrics(resultPage)))
+      const item = resultPage.value.find(task => task.id === taskId)
+      assert.equal(item?.identifier, result.issue.identifier)
+      assert.equal(Object.hasOwn(item!, 'issuedIdentifier'), false)
+      assert.equal(resultPage.statements, 2, 'one current workspace lookup and one authorized list read for issued tasks')
     })
 
     await t.test('legacy MCP assignment and clearing affect delegation only', async () => {
