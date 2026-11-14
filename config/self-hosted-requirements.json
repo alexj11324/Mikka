@@ -1382,6 +1382,13 @@
     "test": "lib/coding-workspace/terminal/http.test.ts",
     "suite": "test:coding-workspace-review-runtime"
   },
+  "lib/task-state-query.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the same elapsed-time run history and deadline from the installation's PostgreSQL database in every server time zone, including across daylight-saving changes.",
+    "test": "tests/action-read-egress.db.test.ts",
+    "suite": "test:activity-actor-db"
+  },
   "lib/agent-runs.ts": {
     "mode": "built-in",
     "environment": [],
