@@ -27,10 +27,17 @@ export function useInboxQueue(ownerId: string | undefined, workspaceId: string |
   const showingDetail = Boolean(params.get('thread') || params.get('task') || params.get('issue') || params.get('artifact') || params.get('threads'))
   const wasShowingDetail = useRef(showingDetail)
   const reload = read.mutate
+  const confirmingReturn = useRef(true)
   useEffect(() => {
-    if (wasShowingDetail.current && !showingDetail) void reload(undefined, { revalidate: true })
+    if (wasShowingDetail.current && !showingDetail) {
+      confirmingReturn.current = true
+      void reload()
+    }
     wasShowingDetail.current = showingDetail
   }, [showingDetail, reload])
+  useEffect(() => {
+    if (!read.isValidating) confirmingReturn.current = false
+  }, [read.isValidating])
   useLiveKeys(ownerId && workspaceId ? [
     { kind: 'pending_actions', id: workspaceId }, { kind: 'issue_list', id: workspaceId },
   ] : [], [unstable_serialize(getKey)], workspaceId)
@@ -42,7 +49,8 @@ export function useInboxQueue(ownerId: string | undefined, workspaceId: string |
     else if (!read.error && read.data) setDeniedScope(null)
   }, [scope, denied, read.error, read.data])
   const forbidden = denied || deniedScope === scope
-  const unreadable = Boolean(read.error) || forbidden
+  const checkingReturn = confirmingReturn.current && read.isValidating
+  const unreadable = checkingReturn || Boolean(read.error) || forbidden
   const items = unreadable ? [] : read.data?.flatMap(page => page.items) ?? []
   const more = !unreadable && Boolean(read.data?.at(-1)?.nextCursor)
   function refreshAfterWrite() {
@@ -64,7 +72,7 @@ export function useInboxQueue(ownerId: string | undefined, workspaceId: string |
     return result
   }
   return {
-    items, refreshAfterWrite, error: read.error, loading: !read.data && !read.error, more, loadingMore: read.size > (read.data?.length ?? 0),
+    items, refreshAfterWrite, error: read.error, loading: !read.error && (!read.data || checkingReturn), more, loadingMore: read.size > (read.data?.length ?? 0),
     reload: read.mutate, loadMore: () => more && !read.isValidating ? read.setSize(size => size + 1) : undefined, command,
   }
 }
