@@ -6543,6 +6543,7 @@
     },
     "archive": {
       "title": "Danger zone",
+      "listTitle": "Archived organizations",
       "label": "Archive Organization",
       "body": "Unbind every workspace first, this one included, and turn off every sign-in method and SCIM connection. After archiving, its audit records are kept under the retention period and legal hold.",
       "action": "Archive Organization"
