@@ -17,7 +17,7 @@ const stub = (path, namedExports) => mock.module(new URL('../' + path, import.me
 const children = ({ children }) => children
 mock.module('next-intl', { namedExports: { useTranslations: () => translate } })
 mock.module('swr', { defaultExport: () => ({}) })
-stub('app/actions/issues.ts', { getIssue: async () => readResult ?? { issue: latest } })
+stub('app/actions/issues.ts', { pollIssue: async () => readResult ?? { issue: latest } })
 stub('app/actions/projects.ts', { moveIssueToProject: () => {} })
 stub('app/actions/issue-metadata.ts', { getIssuePropertyOptions: () => ({}), updateIssueMetadata: async input => {
   writes.push(input)

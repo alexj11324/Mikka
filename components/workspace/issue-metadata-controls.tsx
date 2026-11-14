@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
-import { getIssue } from '@/app/actions/issues'
+import { pollIssue } from '@/app/actions/issues'
 import { moveIssueToProject } from '@/app/actions/projects'
 import useSWR from 'swr'
 import { Box, Check, Circle, GitPullRequest, Link2, Tag, X } from 'lucide-react'
@@ -210,11 +210,12 @@ export function useIssueMetadataSave({ task, disabled = false, onSaved, onBusyCh
       const revision = edit?.revision ?? task.revision
       const result = await updateIssueMetadata({ id: task.id, revision, patch, inviteEmail })
       if (result.error === 'issueOutdated') {
-        const latest = await getIssue(task.id)
+        const latest = await pollIssue(task.id)
         if (latest.error) { setError(actionError(latest.error)); return false }
         if (latest.issue?.id === task.id && latest.issue.revision > revision) {
-          edit?.refreshDraft(latest.issue)
           onSaved(latest.issue, 'refresh')
+          if (latest.issue.canSteer === false) { setError(actionError('issueAccessChanged')); return false }
+          edit?.refreshDraft(latest.issue)
           setError(actionError('issueStale'))
           return false
         }
