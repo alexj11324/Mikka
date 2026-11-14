@@ -46,8 +46,9 @@ test('native offsets drain an equal-timestamp burst without subdividing the wind
   const at = start + 1000
   const rows = Array.from({ length: 1002 }, (_, index) => event('api_request_started', index, at))
   const offsets = []
-  const read = ({ timeframe, offset }) => {
+  const read = ({ timeframe, offset, offsetDirection }) => {
     assert.deepEqual(timeframe, { from: start, to: now })
+    assert.equal(offsetDirection, offset ? 'next' : undefined)
     offsets.push(offset)
     return offset ? page(rows.slice(999), rows.length) : page(rows.slice(0, 1000), rows.length)
   }

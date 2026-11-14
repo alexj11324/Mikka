@@ -32,7 +32,7 @@ export async function readContainerWindow({ application, environment, now, read,
     if (++pages > maxQueries) fail('container_log_query_budget_exceeded')
     const result = await read({
       queryId: 'mikka-container-runtime-window', view: 'events', limit, timeframe: { from: start, to: through },
-      ...(offset ? { offset } : {}),
+      ...(offset ? { offset, offsetDirection: 'next' } : {}),
       parameters: { datasets: ['containers'], filters: [{ key: '$metadata.service', type: 'string', operation: 'eq', value: app }] },
     })
     const section = result?.events, rows = section?.events
