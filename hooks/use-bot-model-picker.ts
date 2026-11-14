@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import useSWR from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
 import { toast } from 'sonner'
 import { useTranslations } from 'next-intl'
 import { chooseBotModel, getBotModelMenu, refreshBotModelMenuAction } from '@/app/actions/execution-settings'
@@ -49,14 +49,19 @@ export function modelGroupTag(t: ModelPickerT, group: BotModelMenuGroup) {
 
 export type ChipModel = Pick<BotModelMenuOption, 'id' | 'modelId' | 'provider'>
 
-/** Where this browser keeps the model a chat's chip showed last; someone else's bot or a failed menu clears it. */
-const lastChipKey = (botId: string | null) => `mikka:model-chip:${botId ?? 'coordinator'}`
+/** A scope is available only on the active authenticated cache. The ordinary memory cache has none. */
+function chipNamespace(cache: object): string | null {
+  return 'namespace' in cache && typeof cache.namespace === 'string' && 'isEnabled' in cache && cache.isEnabled
+    ? cache.namespace : null
+}
 
-function readChip(value: string | null): ChipModel | null {
+function readChip(value: string | null, namespace: string): ChipModel | null {
   try {
     const chip: unknown = value ? JSON.parse(value) : null
     if (!chip || typeof chip !== 'object') return null
-    const { id, modelId, provider } = chip as Record<string, unknown>
+    const stored = chip as Record<string, unknown>
+    if (stored.namespace !== namespace) return null
+    const { id, modelId, provider } = stored
     return typeof id === 'string' && typeof modelId === 'string' && typeof provider === 'string' ? { id, modelId, provider } : null
   } catch { return null }
 }
@@ -74,7 +79,10 @@ export function useBotModelPicker(botId: string | null) {
   const [refreshing, setRefreshing] = useState(false)
   const [refreshFailed, setRefreshFailed] = useState(false)
   const [open, setOpenState] = useState(false)
-  const [last, setLast] = useState<ChipModel | null>(null)
+  const { cache } = useSWRConfig()
+  const namespace = chipNamespace(cache)
+  const chipKey = `mikka:model-chip:${botId ?? 'coordinator'}`
+  const [last, setLast] = useState<{ key: string; namespace: string; chip: ChipModel } | null>(null)
   const [saving, setSaving] = useState(false)
   const pendingSave = useRef<Promise<boolean> | null>(null)
   const latestMenu = useRef(menu.data)
@@ -100,13 +108,16 @@ export function useBotModelPicker(botId: string | null) {
 
   const shown = menu.data?.current
   useEffect(() => {
-    const key = lastChipKey(botId)
+    if (!namespace) return
     try {
-      if (shown && !(saving && shown.availability === 'checking')) window.localStorage.setItem(key, JSON.stringify({ id: shown.id, modelId: shown.modelId, provider: shown.provider }))
-      else if (menu.error) window.localStorage.removeItem(key)
-      else setLast(readChip(window.localStorage.getItem(key)))
+      if (shown && !(saving && shown.availability === 'checking')) window.localStorage.setItem(chipKey, JSON.stringify({ namespace, id: shown.id, modelId: shown.modelId, provider: shown.provider }))
+      else if (menu.error) window.localStorage.removeItem(chipKey)
+      else {
+        const chip = readChip(window.localStorage.getItem(chipKey), namespace)
+        setLast(chip ? { key: chipKey, namespace, chip } : null)
+      }
     } catch { /* storage unavailable: the chip waits for the menu */ }
-  }, [botId, shown, menu.error, saving])
+  }, [chipKey, namespace, shown, menu.error, saving])
 
   function choose(id: string): Promise<boolean> {
     // A previous save must settle before another write; otherwise late server
@@ -172,7 +183,7 @@ export function useBotModelPicker(botId: string | null) {
     menu: menu.data,
     /** Someone else's bot, or the menu failed: no chip at all. */
     error: !!menu.error,
-    last: menu.data || menu.error ? null : last,
+    last: !menu.data && !menu.error && last?.key === chipKey && last.namespace === namespace ? last.chip : null,
     open,
     /** Opening uses the cached menu; catalogue refresh is explicit. */
     // Model catalogue refresh is explicit; opening a cached menu must not
