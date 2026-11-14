@@ -26,6 +26,22 @@ export type TaskStateContext = {
   factory?: Pick<FactoryFlowView, 'stage' | 'needsYou' | 'completion'> | null
 }
 
+const RUN_ACTIVITY = new Set<TaskState>(['running', 'waiting', 'failed', 'blocked', 'queued'])
+
+/** The activity word a task row shows, when the task's state is something an Agent is doing. */
+export function runIndicatorOf(state: string | null | undefined): TaskState | null {
+  return state && RUN_ACTIVITY.has(state as TaskState) ? state as TaskState : null
+}
+
+/** What a conversation is doing, from its run. Quiet finished runs stay empty so the task status shows. */
+export function conversationIndicatorOf(run: { status?: string | null; outcome?: string | null } | null | undefined): TaskState | null {
+  if (!run) return null
+  if (run.status === 'running' || run.status === 'queued' || run.status === 'waiting') return run.status
+  if (run.outcome === 'failed' || run.status === 'failed') return 'failed'
+  if (run.status === 'blocked' || run.outcome === 'blocked') return 'blocked'
+  return null
+}
+
 export function taskGroupOf(state: TaskState): TaskGroup {
   switch (state) {
     case 'waiting': case 'blocked': case 'failed': return 'pending'
