@@ -25,6 +25,8 @@ const priorityOptions = {
 } as const satisfies Record<IssuePriority, PriorityOption>
 
 export const ISSUE_STATUSES = ISSUE_STATUS_CODES.map(value => ({ value, ...statusOptions[value], tone: statusTone(value) }))
+/** Colour for each status glyph. */
+export const STATUS_INDICATOR_CLASS: Record<string, string> = Object.fromEntries(ISSUE_STATUS_CODES.map(value => [value, statusOptions[value].indicatorClassName]))
 export const ISSUE_PRIORITIES = ISSUE_PRIORITY_CODES.map(value => ({ value, ...priorityOptions[value], tone: statusTone(value) }))
 
 export type { IssueStatus }

@@ -7,7 +7,7 @@
 import type { ComponentType } from 'react'
 import { useTranslations } from 'next-intl'
 import { Ban, Circle, CircleCheck, CircleDashed, CircleDot, CircleX, Clock, Hand, OctagonAlert, TriangleAlert, type LucideIcon, type LucideProps } from 'lucide-react'
-import { ISSUE_STATUSES } from '@/components/workspace/issue-properties'
+import { ISSUE_STATUSES, STATUS_INDICATOR_CLASS } from '@/components/workspace/issue-properties'
 import { cn } from 'cn'
 import type { TaskReason, TaskState } from '@/hooks/use-bot-tasks'
 import { statusIconTints, type StatusTone } from '@/lib/status-appearance'
@@ -49,13 +49,13 @@ export function newestThreadRun(threads: readonly ThreadRun[] | undefined): { st
   return { status: live.status, outcome: live.outcome ?? null }
 }
 
-const STATUS_SIZE = { sm: 'size-3.5', md: 'size-4', lg: 'size-5' } as const
+type StatusIconSize = 'sm' | 'md' | 'lg'
 
 /** The board status glyph the official layer still draws (one status, one icon). */
-export function TaskStatusIcon({ status, size = 'md', plain = false }: { status: string; size?: keyof typeof STATUS_SIZE; plain?: boolean }) {
+export function TaskStatusIcon({ status, size = 'md', plain = false }: { status: string; size?: StatusIconSize; plain?: boolean }) {
   const option = ISSUE_STATUSES.find(item => item.value === status)
   const Icon: LucideIcon = option?.icon ?? Circle
-  return <Icon aria-hidden="true" data-task-status={status} className={cn(STATUS_SIZE[size], 'shrink-0', plain ? undefined : option?.indicatorClassName)} />
+  return <Icon aria-hidden="true" data-task-status={status} className={cn(size === 'sm' && 'size-3.5', size === 'md' && 'size-4', size === 'lg' && 'size-5', 'shrink-0', !plain && STATUS_INDICATOR_CLASS[status])} />
 }
 
 /** A run's activity mark. The official rows use it when a task has no board status of its own. */
@@ -66,7 +66,7 @@ export function TaskRunMark({ indicator, plain = false }: { indicator: string; p
 }
 
 /** Status when the task has one, otherwise what the run is doing. */
-export function TaskStatusMark({ status, indicator, size = 'md' }: { status: string; indicator?: string | null; size?: keyof typeof STATUS_SIZE }) {
+export function TaskStatusMark({ status, indicator, size = 'md' }: { status: string; indicator?: string | null; size?: StatusIconSize }) {
   if (indicator) return <TaskRunMark indicator={indicator} />
   return <TaskStatusIcon status={status} size={size} />
 }

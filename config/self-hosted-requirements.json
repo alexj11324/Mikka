@@ -6,6 +6,13 @@
     "test": "tests/task-create-only.db.test.ts",
     "suite": "test:coordinator-issue-create-db"
   },
+  "app/actions/task-runs.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The signed-in owner reads each visible task's newest run from PostgreSQL. Conversation organization is not stored.",
+    "test": "tests/task-run-organization.test.ts",
+    "suite": "test:task-run-organization"
+  },
   "app/api/drive/volumes/[volumeId]/archive/route.ts": {
     "mode": "built-in",
     "environment": [],
