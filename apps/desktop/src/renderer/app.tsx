@@ -21,7 +21,7 @@ import { withBasePath } from '@/lib/base-path'
 import { clearPersistentReadCaches } from '@/lib/swr/persistent-cache'
 import { readAuthentication, readBootstrap, type AuthenticationBootstrap, type BootstrapScope, type DesktopBootstrap } from './bootstrap'
 import { Link } from './i18n-navigation'
-import { localeOf, navigate, REFRESH_EVENT, useLocation, withoutLocale } from './location'
+import { localeOf, navigate, refresh, REFRESH_EVENT, useLocation, withoutLocale } from './location'
 import { getTransportState, setTransportState, subscribeTransport } from './transport-state'
 import { resetReadBatchScope } from './read-batch'
 import { Offline } from './offline'
@@ -66,7 +66,8 @@ function SessionApplication() {
   const [pending, setPending] = useState(true)
   const location = useLocation()
   const requestedScope = bootstrapScope(location)
-  const requestedWorkspace = requestedScope === 'workspace' ? location.searchParams.get('workspace') : null
+  const workspacePage = ['/', '/dashboard', '/settings', '/settings/teams', '/settings/members'].includes(withoutLocale(location.pathname))
+  const requestedWorkspace = requestedScope === 'workspace' && workspacePage && !serverDocumentKind() ? location.searchParams.get('workspace') : null
   const requested = useRef({ scope: requestedScope, workspace: requestedWorkspace })
   requested.current = { scope: requestedScope, workspace: requestedWorkspace }
   const lastRequested = useRef(requested.current)
@@ -114,15 +115,18 @@ function SessionApplication() {
     void preloadWorkspace().catch(() => {})
     const changed = () => { void reload() }
     const sessionChanged = () => { void reload(true) }
+    const restored = (event: PageTransitionEvent) => { if (event.persisted) void reload(true) }
     const offline = () => setTransportState('offline')
     const stop = onSessionChanged(sessionChanged)
     window.addEventListener(REFRESH_EVENT, changed)
+    window.addEventListener('pageshow', restored)
     window.addEventListener('online', changed)
     window.addEventListener('offline', offline)
     return () => {
       generation.current++
       stop()
       window.removeEventListener(REFRESH_EVENT, changed)
+      window.removeEventListener('pageshow', restored)
       window.removeEventListener('online', changed)
       window.removeEventListener('offline', offline)
     }
@@ -200,8 +204,17 @@ function Routes({ bootstrap }: { bootstrap: ApplicationBootstrap }) {
   if (serverDocument && serverPageKind(location) === 'github') return <Suspense fallback={<WorkspaceLoading />}><GitHubHandoff /></Suspense>
   if (serverDocument) return <WorkspaceLoading />
   if (path !== '/' && path !== '/dashboard' && !['/settings', '/settings/teams', '/settings/members'].includes(path)) return <NotFound />
+  if (bootstrap.value.workspaceError) return <WorkspaceSelectionError message={bootstrap.value.workspaceError} />
   if (platform === 'desktop') return <InstalledWorkspace user={user} bootstrap={bootstrap.value} />
   return <Suspense fallback={<WorkspaceLoading />}><Workspace user={user} bootstrap={bootstrap.value} /></Suspense>
+}
+
+function WorkspaceSelectionError({ message }: { message: string | true }) {
+  const t = useTranslations()
+  return <Auth><AuthCard title={t('Issue.scope.workspaceUnavailable')} description={message === true ? t('Members.noAccessDescription') : message}>
+    <Button onClick={refresh}>{t('Common.retry')}</Button>
+    <Link href="/" className={buttonVariants({ variant: 'outline' })}>{t('Members.backToAccessible')}</Link>
+  </AuthCard></Auth>
 }
 
 function NewWorkspace({ email }: { email: string }) {
