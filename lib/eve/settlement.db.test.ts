@@ -98,6 +98,27 @@ test('host settlement receipts preserve product publication across native RPC re
         assert.equal((await pool.query('SELECT lease_token FROM schedule_occurrences WHERE id=$1',[occurrenceId])).rows[0].lease_token,newLease)
       } finally {wakeTransport.resume=priorResume;dueTimerTransport.start=priorStart}
     })
+    await t.test('native settlement replay without an execution selector reads its completed receipt once', async t => {
+      const { Client } = await import('pg')
+      const { handleEveProductRequest } = await import('./product-gateway')
+      const { internalEveAuthorization } = await import('./auth')
+      const sessionId = await nativeSession()
+      const finish = (extra = {}) => handleEveProductRequest(new Request('https://app.example/mikka/api/internal/eve/tools', {
+        method: 'POST', headers: { authorization: internalEveAuthorization(scope) },
+        body: JSON.stringify({ operation: 'finish', sessionId, turnId: 'native_replay', outcome: 'completed', ...extra }),
+      }))
+      assert.equal((await finish()).status, 200)
+      const { createRequestDatabaseScope } = await import('../db')
+      const replay = createRequestDatabaseScope(process.env.E2E_DATABASE_URL!)
+      try {
+        const queries = t.mock.method(Client.prototype, 'query')
+        assert.equal((await replay.run(() => finish())).status, 200)
+        const reads = queries.mock.calls.map(call => String(call.arguments[0]))
+        assert.equal(reads.filter(sql => /FROM eve_turn_settlements/i.test(sql)).length, 1)
+        assert.equal(reads.filter(sql => /FROM agent_kit_executions/i.test(sql)).length, 0)
+        assert.equal((await replay.run(() => finish({ executionId: randomUUID() }))).status, 404)
+      } finally { await replay.close() }
+    })
     await t.test('compatibility reply and ended product execution finish once with exact session binding',async()=>{
       const {AgentKitStore}=await import('../agent-kit/store')
       const {DEFAULT_AGENT_DEFINITION}=await import('../agent-kit/builtin')
