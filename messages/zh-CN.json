@@ -6550,6 +6550,7 @@
       "openOrganization": "打开组织设置",
       "accept": "加入组织",
       "organizationSelect": "组织",
+      "receivedTitle": "收到的组织邀请",
       "noOrganizations": "暂未加入组织",
       "statusPending": "待接受",
       "statusAccepted": "已接受",
@@ -7540,6 +7541,12 @@
     "refreshFailed": "{label}更新失败，仍显示上次内容。"
   },
   "PersonalFiles": {
+    "archiveFolderTitle": "归档“{name}”？",
+    "unarchiveFolderTitle": "将“{name}”恢复到使用中的文件夹？",
+    "activeFolders": "在用文件夹",
+    "archivedFolders": "已归档的个人文件夹",
+    "archiveFolder": "归档文件夹",
+    "unarchiveFolder": "恢复文件夹",
     "overviewSub": "个人保存的文件和任务交付的成果。",
     "folders": "文件夹",
     "overviewEmpty": "还没有文件。",

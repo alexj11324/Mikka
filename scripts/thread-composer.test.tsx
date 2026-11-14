@@ -427,6 +427,22 @@ for (const scenario of retainedPanelStates) {
   })
 }
 
+test('an offline bundled renderer still submits its thread reply once', async t => {
+  Object.defineProperty(browser.navigator, 'onLine', { configurable: true, value: false })
+  Object.defineProperty(browser, 'mikka', { configurable: true, value: { bundled: {} } })
+  t.after(() => {
+    Reflect.deleteProperty(browser.navigator, 'onLine')
+    Reflect.deleteProperty(browser, 'mikka')
+  })
+  const runId = crypto.randomUUID()
+  thread = { ...base, id: runId, latestRunId: runId }
+  await renderLive('owner:workspace', { runId })
+  await act(async () => composer!.onChange('thread delivery'))
+  await act(async () => composer!.onSubmit())
+  assert.equal(replyCalls, 1)
+  assert.equal(container.querySelectorAll('[data-delivery-phase="accepted"]').length, 1)
+})
+
 test('Thread releases the draft before version preflight and retries an unknown ACK using the same immutable command', async () => {
   const runId = crypto.randomUUID()
   thread = { ...base, id: runId, latestRunId: runId }

@@ -9,6 +9,11 @@ import { useViewState } from './view-state'
 import { useChatDeliveryState, type ChatDelivery, type ChatSubmission } from './chat-delivery-state'
 export type { ChatDelivery, ChatSubmission } from './chat-delivery-state'
 
+// The packaged renderer sends through the main process, which can reach the backend while the page is offline.
+export function isWebChatOffline() {
+  return navigator.onLine === false && !window.mikka?.bundled
+}
+
 export function useChatDelivery<T extends ChatSubmission>(scope: string, uncertain: string) {
   const [rows, setRows] = useViewState<ChatDelivery<T>[]>(`chat-send:${scope}`, [])
   return useChatDeliveryState(rows, setRows, uncertain)
@@ -23,7 +28,7 @@ export function useThreadReplyCommand() {
   const feedback = useTranslations('Coordinator')
   const actionError = useActionError()
   async function preflight() {
-    if (navigator.onLine === false) return feedback('sendOffline')
+    if (isWebChatOffline()) return feedback('sendOffline')
     if (!await checkPageBuildBeforeAction()) return feedback('sendUpdateRequired')
     return null
   }
