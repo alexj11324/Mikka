@@ -37,6 +37,8 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()) })
 after(() => browser.happyDOM.close())
 
+const displayedIds = () => state.events.map(event => event.id)
+
 function Probe() {
   state = useAuditLog('workspace')
   return null
@@ -47,17 +49,17 @@ async function render() {
 
 test('retry restores a failed audit page without exposing cached events or advancing another cursor', async () => {
   await render()
-  assert.deepEqual(state.events.map(event => event.id), ['first'])
+  assert.deepEqual(displayedIds(), ['first'])
   status = 500
   failOnlyNextPage = true
   await act(async () => { state.loadMore() })
   assert.equal(state.errorCode, 'audit_read_failed (http_500)')
-  assert.deepEqual(state.events, [])
+  assert.deepEqual(displayedIds(), [])
   assert.equal(state.more, false)
   status = 200
   assert.ok(state.retry)
   await act(async () => { await state.retry?.() })
-  assert.deepEqual(state.events.map(event => event.id), ['first', 'second'])
+  assert.deepEqual(displayedIds(), ['first', 'second'])
   assert.equal(state.error, null)
   assert.equal(state.more, false)
   assert.equal(requests.filter(cursor => cursor === 'next').length, 2)
@@ -70,6 +72,6 @@ test('an initial audit read can be retried and a permission refusal does not off
   status = 403
   await act(async () => { await state.retry?.() })
   assert.equal(state.errorCode, 'workspaceAccessDenied')
-  assert.deepEqual(state.events, [])
+  assert.deepEqual(displayedIds(), [])
   assert.equal(state.retry, undefined)
 })
