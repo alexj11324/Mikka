@@ -75,9 +75,14 @@ test('rapid taps, a lost mobile write answer and an incomplete read-back retry o
     assert.ok(ui.host.querySelector('[role=alert]')); assert.equal(reloads, 0)
     result = async () => ok({ versionId: newId, runId: resultRunId })
     await ui.click(copy.versionRun); assert.ok(ui.host.querySelector('[role=alert]')); assert.equal(reloads, 0)
+    for (const unconfirmedRunId of [null, id(57)]) {
+      rows = [previous, { ...previous, id: newId, text: 'New input', resultRunId: unconfirmedRunId }]
+      await ui.click(copy.versionRun)
+      assert.ok(ui.host.querySelector('[role=alert]')); assert.equal(reloads, 0)
+    }
     rows = [previous, { ...previous, id: newId, text: 'New input', output: 'Saved new output' }]
     await ui.click(copy.versionRun)
-    assert.equal(issued, 1); assert.equal(writes.length, 3); assert.ok(writes.every(write => write.requestId === writes[0]!.requestId))
+    assert.equal(issued, 1); assert.equal(writes.length, 5); assert.ok(writes.every(write => write.requestId === writes[0]!.requestId))
     assert.ok(ui.host.textContent?.includes('Saved new output')); assert.equal(ui.host.querySelector('[role=alert]'), null); assert.equal(reloads, 1)
   } finally { await ui.close() }
 })

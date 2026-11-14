@@ -55,5 +55,10 @@ test('Web and Desktop can request work while existing thread-only reads retain t
   const schema = desktopActionSchemas['agents.pollIssueThreads']
   assert.ok(schema.safeParse([id]).success)
   assert.ok(schema.safeParse([id, true]).success)
+  const cursor = { version: 'a'.repeat(32), positions: [{ id, version: 'b'.repeat(32) }] }
+  assert.ok(schema.safeParse([id, true, cursor]).success)
+  assert.ok(schema.safeParse([id, true, {}]).success)
+  assert.equal(schema.safeParse([id, true, { positions: Array.from({ length: 52 }, () => cursor.positions[0]) }]).success, false)
+  assert.equal(schema.safeParse([id, true, { version: 'invalid' }]).success, false)
   assert.equal(schema.safeParse([id, 'true']).success, false)
 })

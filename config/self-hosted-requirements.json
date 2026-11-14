@@ -187,6 +187,13 @@
     "test": "tests/mobile-handoff.test.ts",
     "suite": "test:desktop-auth"
   },
+  "app/api/me/invitations/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Show the authenticated recipient's actionable Organization invitations using the verified account email and active issuer membership.",
+    "test": "tests/organization-invitations.db.test.ts",
+    "suite": "test:organization-invitations-db"
+  },
   "app/api/organization-invitations/accept/route.ts": {
     "mode": "built-in",
     "environment": [],
