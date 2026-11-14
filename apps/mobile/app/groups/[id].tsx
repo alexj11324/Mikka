@@ -63,23 +63,26 @@ export default function GroupChat() {
   const readPage = useCallback(async (at: string) => mergeGroupRead(apiCache.get<GroupRead>(at), await api<GroupRead>(groupPagePath(id, apiCache.get<GroupRead>(at)))), [id])
   const page = useLiveApi<GroupRead>(pagePath, () => live, readPage)
   const members = useLiveApi<{ members: GroupMember[] }>(`/api/conversations/${id}/members`, () => live)
+  // A server-confirmed loss of membership must hide this group's cached history and actions immediately.
+  // A network failure or 5xx is not a membership decision and keeps the recoverable offline view.
+  const accessDenied = conversationAccessDenied(page.error) || conversationAccessDenied(members.error)
   const identity = `${id}:${apiContext}`
   // Oldest first, as the chat reads.
-  const messages = mergeGroupMessages([], page.data?.messages ?? [])
+  const messages = accessDenied ? [] : mergeGroupMessages([], page.data?.messages ?? [])
   // Only a message sent on this visit is anchored under the bar with room for the reply (v0); opening the chat,
   // older pages and pushes keep the latest message against the composer.
   const opened = useRef<{ identity: string; newest: bigint } | null>(null)
   if (page.data && opened.current?.identity !== identity) opened.current = { identity, newest: messages.reduce((max, message) => BigInt(message.position) > max ? BigInt(message.position) : max, -1n) }
   const [sentHere, setSentHere] = useState(false)
   const anchorIndex = sentHere ? latestOwnIndex(messages, message => message.authorType === 'user' && message.authorId === me && BigInt(message.position) > (opened.current?.newest ?? -1n)) : undefined
-  const before = page.data?.nextBefore ?? null
+  const before = accessDenied ? null : page.data?.nextBefore ?? null
   const [historyError, setHistoryError] = useState<unknown>(null)
   const [loadingHistory, setLoadingHistory] = useState(false)
   const historyRequest = useRef<object | null>(null)
   useEffect(() => { historyRequest.current = null; setLoadingHistory(false); setHistoryError(null) }, [identity])
   // Scrolling to the top loads the page before, a page at a time.
   const loadEarlier = async () => {
-    if (!before || historyRequest.current) return
+    if (accessDenied || !before || historyRequest.current) return
     const request = {}; historyRequest.current = request
     setLoadingHistory(true); setHistoryError(null)
     try {
@@ -103,14 +106,31 @@ export default function GroupChat() {
   const reactionPending = useRef(new Map<string, object>())
   const [reactionFailure, setReactionFailure] = useState<{ id: string; emoji: string | null } | null>(null)
   useEffect(() => { reactionPending.current.clear(); setReactionFailure(null) }, [identity])
-  const working = Boolean(page.data?.agentStatus)
+  // The existing cache reader revokes denied responses; clear screen-local state as well.
+  // This does not erase other groups or treat temporary offline errors as revoked membership.
+  useEffect(() => {
+    if (!accessDenied) return
+    setText('')
+    setQuote(null)
+    setSentHere(false)
+    setReactionSnapshot(null)
+    setReactionFailure(null)
+    setHistoryError(null)
+    setLoadingHistory(false)
+    setStopFailed(false)
+    setStopping(false)
+    opened.current = null
+    historyRequest.current = null
+    reactionPending.current.clear()
+  }, [accessDenied, identity])
+  const working = Boolean(!accessDenied && page.data?.agentStatus)
   // 停止: the group's reply ends on the server; stop stays away until the group stops answering.
   const [stopping, setStopping] = useState(false)
   const [stopFailed, setStopFailed] = useState(false)
   const stopPending = useRef(false)
   useEffect(() => { if (!working) setStopping(false) }, [working])
   const stop = async () => {
-    if (stopPending.current) return
+    if (accessDenied || stopPending.current) return
     stopPending.current = true; setStopping(true); setStopFailed(false)
     try { await api(`/api/conversations/${id}/stop`, { method: 'POST' }); await page.reload() }
     catch { setStopping(false); setStopFailed(true) }
@@ -118,13 +138,13 @@ export default function GroupChat() {
   }
 
   // What the person has seen: the newest message, once it is on screen.
-  const newest = page.data?.messages[0]?.id
+  const newest = accessDenied ? undefined : page.data?.messages[0]?.id
   useEffect(() => { if (newest && atLatest) void api(`/api/conversations/${id}/read`, { method: 'POST', body: { messageId: newest } }).catch(() => undefined) }, [id, newest, atLatest])
 
   const member = (type: string, memberId: string) => members.data?.members.find(item => item.memberType === type && item.id === memberId)
-  const bots = (members.data?.members ?? []).filter(item => item.memberType !== 'user')
+  const bots = accessDenied ? [] : (members.data?.members ?? []).filter(item => item.memberType !== 'user')
 
-  const canSend = Boolean(page.data && members.data && !conversationAccessDenied(page.error) && !conversationAccessDenied(members.error))
+  const canSend = Boolean(page.data && members.data && !accessDenied)
   const delivery = useConversationDelivery(canSend ? { kind: 'group', id } : null, messages.map(message => message.id), page.reload)
   const send = (body: string) => {
     const queued = delivery.send(body, mentionsIn(body, bots))
@@ -136,7 +156,7 @@ export default function GroupChat() {
   }
 
   const react = async (messageId: string, emoji: string | null) => {
-    if (reactionPending.current.has(messageId)) return
+    if (accessDenied || reactionPending.current.has(messageId)) return
     const request = {}; reactionPending.current.set(messageId, request)
     const accept = (apply: () => void) => apiCache.commit(apiContext, () => { if (reactionPending.current.get(messageId) === request) apply() })
     const previous = reactions[messageId] ?? []
@@ -196,7 +216,7 @@ export default function GroupChat() {
 
   return (
     <View style={styles.screen}>
-      <NavBar title={title} scrolled={underBar.scrolled} />
+      <NavBar title={accessDenied ? '' : title} scrolled={underBar.scrolled} />
       <View style={{ flex: 1, overflow: 'hidden' }}>
         <ChatMessageList ref={list} testID="group-chat-scroll" data={messages} scrollEnabled onScrollUnderBar={underBar.onScroll} bottomInset={composerHeight} onAtLatestChange={setAtLatest}
           keyOf={message => message.id} renderItem={renderMessage} anchorIndex={anchorIndex}
@@ -211,19 +231,19 @@ export default function GroupChat() {
           </>}
           footer={<>
         {working ? <View style={styles.working}><Spinner size={16} /></View> : null}
-        {page.data && !messages.length && !delivery.bubbles.length ? <Text style={styles.empty}>@ 一个 Bot，或直接说</Text> : null}
-        {page.data?.routingError && !working ? <Text style={styles.error}>没有 Bot 接这条，@ 它的名字</Text> : null}
-        {page.data?.stopped && !working ? <Text style={styles.stopped}>已停止</Text> : null}
+        {!accessDenied && page.data && !messages.length && !delivery.bubbles.length ? <Text style={styles.empty}>@ 一个 Bot，或直接说</Text> : null}
+        {!accessDenied && page.data?.routingError && !working ? <Text style={styles.error}>没有 Bot 接这条，@ 它的名字</Text> : null}
+        {!accessDenied && page.data?.stopped && !working ? <Text style={styles.stopped}>已停止</Text> : null}
         {delivery.bubbles}
         {stopFailed ? <StopFailed busy={stopping} onRetry={() => void stop()} /> : null}
           </>} />
         <ListTopFade color={colors.page} />
       </View>
-      <ChatScrollToLatest visible={!atLatest} bottom={composerHeight + 12} onPress={() => list.current?.toLatest()} />
+      <ChatScrollToLatest visible={!accessDenied && !atLatest} bottom={composerHeight + 12} onPress={() => list.current?.toLatest()} />
       <OfflineBanner top={insets.top + 66} />
-      <Composer value={text} onChangeText={setText} placeholder={`发到 ${title || '群聊'}`} onSend={words => send(words)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'group', id }} overlay onHeight={setComposerHeight}
+      {!accessDenied ? <Composer value={text} onChangeText={setText} placeholder={`发到 ${title || '群聊'}`} onSend={words => send(words)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'group', id }} overlay onHeight={setComposerHeight}
         notice={reactionFailure ? <View accessibilityRole="alert" style={styles.reactionNotice}><Text style={styles.error}>回应没保存。</Text><GlassButton label="重试" onPress={() => void react(reactionFailure.id, reactionFailure.emoji)} /></View> : undefined}
-        quote={quote} onClearQuote={() => setQuote(null)} onStop={working && !stopping ? () => void stop() : undefined} />
+        quote={quote} onClearQuote={() => setQuote(null)} onStop={working && !stopping ? () => void stop() : undefined} /> : null}
     </View>
   )
 }
