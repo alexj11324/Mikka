@@ -122,6 +122,29 @@ test('an acknowledged subscription release succeeds even when the peer ends the 
   await request('/close', run, 'events', { method: 'POST' })
 })
 
+test('explicit World stream DELETE closes the reader cleanly while keeping durable chunks', async () => {
+  const run = 'explicit-release'
+  await write(run, new Uint8Array([17]))
+  const url = new URL('/world/stream', await runtime.ready)
+  url.search = new URLSearchParams({
+    runId: run, name: 'events', start: '0', subscriber: crypto.randomUUID(),
+  }).toString()
+  const response = await fetch(url, { headers: { 'accept-encoding': 'identity' } })
+  expect(response.status).toBe(200)
+  const reader = response.body.getReader()
+  expect(Array.from((await reader.read()).value)).toEqual([17])
+  const pending = reader.read()
+  await expect.poll(async () => (await info('/stats', run)).waiting).toBe(1)
+  expect((await fetch(url, { method: 'DELETE' })).status).toBe(204)
+  await expect(pending).resolves.toMatchObject({ done: true })
+  await expect.poll(async () => (await info('/stats', run)).waiting).toBe(0)
+  // Releasing one subscription is not closing the durable stream. Another
+  // subscriber must still be able to replay the old chunk and receive a new one.
+  await write(run, new Uint8Array([18]))
+  await request('/close', run, 'events', { method: 'POST' })
+  expect(Array.from(new Uint8Array(await (await request('/read', run, 'events')).arrayBuffer()))).toEqual([17, 18])
+})
+
 test('zero-byte chunks keep their durable cursor without breaking the byte stream', async () => {
   const run = 'zero'
   await write(run, new Uint8Array())

@@ -1,11 +1,9 @@
 'use client'
 
-import { useEffect } from 'react'
-import useSWR from 'swr'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { Cloud, Copy, Laptop, Server } from 'lucide-react'
 import { toast } from 'sonner'
-import { getThreadMachine } from '@/app/actions/agents'
+import { useThreadMachine } from '@/hooks/use-thread-run-reads'
 import { Button } from '@/components/ui/button'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -91,9 +89,7 @@ export function MachineDetails({ machine }: { machine: ThreadMachine }) {
 export function ThreadRunPlace({ issueId, runId, status, harness, botName }: { issueId: string | null; runId: string; status: string; harness?: string; botName?: string }) {
   const t = useTranslations('ThreadRunPlace')
   const threads = useTranslations('IssueThreads')
-  const { data: machine, mutate } = useSWR(['thread-machine', issueId, runId], () => getThreadMachine(issueId, runId), { revalidateOnFocus: false })
-  // A cloud machine pauses or ends with its run; read again when the run's state moves.
-  useEffect(() => { void mutate() }, [status, mutate])
+  const { data: machine } = useThreadMachine(issueId, runId, status)
   const name = useMachineName()
   const agent = harness ? harnessName(harness) : null
   return <span className="flex shrink-0 items-center gap-0.5" data-slot="thread-run-place">

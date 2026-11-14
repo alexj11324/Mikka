@@ -206,6 +206,13 @@
     "test": "lib/account/deletion-lock.db.test.ts",
     "suite": "test:account-db"
   },
+  "drizzle/20261113165037_inbox_conversations.sql": {
+    "mode": "built-in",
+    "environment": ["MIKKA_DATABASE_URL"],
+    "behavior": "Use the installation PostgreSQL database for per-user Inbox dismissals and standalone conversation snoozes. An authorized new run or changed cause can request attention again.",
+    "test": "lib/inbox/store.db.test.ts",
+    "suite": "test:inbox-db"
+  },
   "drizzle/20261112090914_workspace_subscription_custody.sql": {
     "mode": "built-in",
     "environment": [
@@ -544,12 +551,28 @@
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
+  "lib/credentials/runtime-identity.ts": {
+    "mode": "optional-cloud",
+    "environment": [
+      "CREDENTIAL_RUNTIME",
+      "CREDENTIAL_ENVIRONMENT"
+    ],
+    "behavior": "Community installations leave Cloudflare runtime selection unset. Configured Cloudflare runtimes require an explicit environment and obtain a bounded identity token through the private service binding.",
+    "test": "lib/credentials/runtime-identity.test.mjs"
+  },
   "lib/enterprise/live-store.ts": {
     "mode": "built-in",
     "environment": [],
     "behavior": "Hold the shared organization policy lock while admitting a service credential.",
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
+  },
+  "lib/eve/auth.ts": {
+    "mode": "operator-configured",
+    "environment": ["BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "MIKKA_APP_ORIGIN", "MIKKA_API_INGRESS", "MIKKA_EVE_HOST"],
+    "behavior": "Self-hosted installations retain their existing signed internal scope and configured application origin. Cloudflare uses private service binding provenance and rejects legacy internal token fallback.",
+    "test": "lib/eve/product-tool.test.ts",
+    "suite": "test:eve-product-tool"
   },
   "lib/eve/cloudflare-task-bridge.ts": {
     "mode": "optional-cloud",
@@ -647,6 +670,18 @@
     "behavior": "Read only current, explicitly bound service keys visible under both admin roles and rename by the ID of a single issuance.",
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
+  },
+  "lib/governance/organization-invitation-mail.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "MIKKA_ORG_INVITE_EMAIL_ENABLED",
+      "MIKKA_EMAIL_FROM",
+      "SMTP_URL",
+      "RESEND_API_KEY"
+    ],
+    "behavior": "Organization invitation email is an explicit opt-in side effect after the Member-only invitation is committed. The canonical application origin anchors bearer links, and provider failure preserves the manual invite without granting Workspace access.",
+    "test": "lib/governance/organization-invitation-mail.test.ts",
+    "suite": "test:governance"
   },
   "lib/governance/organization-invitations.ts": {
     "mode": "built-in",
@@ -779,6 +814,12 @@
     "behavior": "A run can use an installed toolkit only through the authorized account, tool list and scoped run token.",
     "test": "lib/run-app-mcp.test.ts",
     "suite": "test:integrations"
+  },
+  "lib/server-pages.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Recognize local authentication documents and valid Workspace and Organization invitations so invitees can sign in even when Workspace bootstrap is unavailable.",
+    "test": "apps/frontend/scripts/auth-only-bootstrap.test.mjs"
   },
   "lib/slack/api.ts": {
     "mode": "operator-configured",
@@ -985,9 +1026,21 @@
   "services/credential-broker/server.mjs": {
     "mode": "optional-cloud",
     "environment": [
-      "PORT"
+      "PORT",
+      "CREDENTIAL_RUNTIME"
     ],
-    "behavior": "The standalone broker is outside the standard Compose stack. When deployed separately its listen port is configurable and credential handlers enforce caller identity.",
+    "behavior": "The standalone broker is outside the standard Compose stack. Its configured runtime selects the private Cloudflare fill transport or the authenticated Vercel handlers, and its listen port is configurable.",
+    "test": "services/credential-broker/server.test.mjs",
+    "suite": "test:self-hosted-broker"
+  },
+  "services/credential-broker/src/fill.ts": {
+    "mode": "optional-cloud",
+    "environment": [
+      "MIKKA_DATABASE_URL",
+      "CREDENTIAL_RUNTIME",
+      "CREDENTIAL_ENVIRONMENT"
+    ],
+    "behavior": "The separately deployed broker uses its configured PostgreSQL database for credential leases. The Vercel handler verifies caller identity, and the private Cloudflare transport requires an explicit runtime environment before validating the bounded lease request.",
     "test": "services/credential-broker/server.test.mjs",
     "suite": "test:self-hosted-broker"
   },
@@ -1145,6 +1198,20 @@
     "test": "tests/team-visibility.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "lib/inbox/store.ts": {
+    "mode": "built-in",
+    "environment": ["MIKKA_DATABASE_URL"],
+    "behavior": "Read the same authorized pending requests for board cards, inbox rows and badge counts in the selected workspace.",
+    "test": "lib/inbox/store.db.test.ts",
+    "suite": "test:inbox-db"
+  },
+  "lib/task-presentation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Project the viewer's pending Inbox reason into the board's Agent activity mark while preserving the underlying task lifecycle.",
+    "test": "lib/task-presentation.test.ts",
+    "suite": "test:issues"
+  },
   "lib/inbox/client.ts": {
     "mode": "built-in",
     "environment": [],
@@ -1172,6 +1239,13 @@
     "behavior": "Invalidate existing leases for an actual replacement Task run after the Factory binding transaction finishes.",
     "test": "lib/coding-workspace/review-authority.db.test.ts",
     "suite": "test:coding-workspace-db"
+  },
+  "lib/computer/anonymous-startup-hint.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Build the selected harness's speculative hint from the frozen run configuration. Unsupported or ineligible self-hosted runs use their ordinary worker claim.",
+    "test": "lib/computer/anonymous-startup-hint.test.ts",
+    "suite": "test:cloud-limits"
   },
   "lib/cloud-computer/thread-machines.ts": {
     "mode": "built-in",

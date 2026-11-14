@@ -2,6 +2,8 @@ import 'server-only'
 import { asSchema, type ToolSet } from 'ai'
 import { z } from 'zod'
 import type { AgentExecution } from '../agent-kit/store'
+import { requiresEveProductApproval } from './approval-bridge'
+import { snapshotMailboxTools } from '../personal-mailbox-capability'
 
 const id = z.string().min(1).max(256)
 const common = { sessionId: id, turnId: id, executionId: z.uuid().nullable().optional() }
@@ -25,7 +27,7 @@ type Scope = { ownerId: string; botId: string; workspaceId: string; surface: 'we
 export interface EveProductGatewayServices {
   authorize(request: Request): Promise<Scope | null>
   assertSession(scope: Scope, sessionId: string): Promise<void>
-  run(scope: Scope, input: Input, signal: AbortSignal, authorization: string | null): Promise<unknown>
+  run(scope: Scope, input: Input, signal: AbortSignal, request: Request): Promise<unknown>
 }
 
 async function boundedBody(request: Request) {
@@ -54,7 +56,7 @@ export async function handleEveProductRequest(request: Request, services: EvePro
     const parsed = requestSchema.safeParse(await boundedBody(request))
     if (!parsed.success) return Response.json({ error: 'validationGeneric' }, { status: 400 })
     await services.assertSession(scope, parsed.data.sessionId)
-    const result = await services.run(scope, parsed.data, request.signal, request.headers.get('authorization'))
+    const result = await services.run(scope, parsed.data, request.signal, request)
     return Response.json(result, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (error) {
     // Raw tool/provider/SQL errors can contain credentials or user content.
@@ -66,14 +68,14 @@ export async function handleEveProductRequest(request: Request, services: EvePro
 
 const defaultServices: EveProductGatewayServices = {
   async authorize(request) {
-    const { internalEveScope } = await import('./auth')
-    return internalEveScope(request.headers.get('authorization'))
+    const { internalEveRequestScope } = await import('./auth')
+    return internalEveRequestScope(request)
   },
   async assertSession(scope, sessionId) {
     const { assertSessionScope } = await import('./scope')
     await assertSessionScope(scope, sessionId)
   },
-  async run(scope, input, signal, authorization) {
+  async run(scope, input, signal, request) {
     const { actAs } = await import('../acting-user')
     const { tokenWorkspace } = await import('../tokens/principal')
     return actAs({ id: scope.ownerId, [tokenWorkspace]: scope.workspaceId }, async () => {
@@ -108,7 +110,10 @@ const defaultServices: EveProductGatewayServices = {
       }
       const tools = await productTools(scope, execution, sourceEventId, scheduledRead, taskEventId,entryOrigin)
       if (input.operation === 'catalogue') {
-        return { tools: await Promise.all(Object.entries(tools).map(async ([name, definition]) => ({ name, description: definition.description ?? name, inputSchema: await asSchema(definition.inputSchema).jsonSchema }))) }
+        return { tools: await Promise.all(Object.entries(tools).map(async ([name, definition]) => ({
+          name, description: definition.description ?? name, inputSchema: await asSchema(definition.inputSchema).jsonSchema,
+          needsApprovalReview: requiresEveProductApproval(name),
+        }))) }
       }
       const tool = Object.hasOwn(tools, input.name) ? tools[input.name] : undefined
       if (!tool?.execute) throw new Error('notFound')
@@ -118,7 +123,7 @@ const defaultServices: EveProductGatewayServices = {
       if (!checked.success) throw new Error('validationGeneric')
       signal.throwIfAborted()
       const { withEveProductAuthority } = await import('../enterprise/execution-authority')
-      const output = await withEveProductAuthority(authorization, input, async () => {
+      const output = await withEveProductAuthority(request, input, async () => {
         const call = { ...scope, sessionId: input.sessionId, turnId: input.turnId, executionId: input.executionId, sourceEventId, name: input.name, input: checked.value, callId: input.callId }
         const { reviewEveProductApproval, executeEveApprovedWrite } = await import('./product-approval')
         if (input.operation === 'approval') return reviewEveProductApproval(call, signal)
@@ -141,17 +146,13 @@ async function gatewayExecution(scope: Scope, input: Input): Promise<AgentExecut
     if (agentKitEnabled()) throw new Error('agentExecutionClosed')
     return null
   }
-  const { pool } = await import('../db')
-  const found = await pool.query(`SELECT 1 FROM agent_kit_executions WHERE id=$1 AND owner_id=$2 AND bot_key=$3 AND execution_key=$4 AND status='running'`,
-    [input.executionId, scope.ownerId, scope.botId, `${input.sessionId}:${input.turnId}:0`])
-  if (!found.rowCount) throw new Error('agentExecutionClosed')
-  return agentKitStore.readExecution(await agentScope(scope.ownerId, scope.botId), input.executionId)
+  return agentKitStore.readExecution(await agentScope(scope.ownerId, scope.botId), input.executionId, `${input.sessionId}:${input.turnId}:0`)
 }
 
 async function productTools(scope: Scope, execution: AgentExecution | null, sourceEventId: string | undefined, scheduledRead: import('../schedules/contract').ScheduledRead | null, taskEventId: string | undefined,entryOrigin:import('../run-origin').ResolvedRunOrigin): Promise<ToolSet> {
   const steps = await import('../../workflows/coordinator/steps')
   const { coordinatorTools, readCoordinatorSwitches } = await import('../../workflows/coordinator/tools')
-  const mailboxEnabled = !scheduledRead && await steps.mailboxToolsEnabled()
+  const mailboxEnabled = !scheduledRead && snapshotMailboxTools(execution?.snapshot).length > 0 && await steps.mailboxToolsEnabled()
   const tools = coordinatorTools(scope.ownerId, scope.botId, scheduledRead ? { scheduledRead: { botId: scope.botId, occurrence: scheduledRead } } : undefined, {
     execution, sourceEventId, ...(taskEventId ? { taskEventId } : {}),...entryOrigin,
     switches: readCoordinatorSwitches(), coordinator: await steps.isCoordinatorChat(scope.ownerId, scope.botId),

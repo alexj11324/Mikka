@@ -14,9 +14,9 @@ export async function resolveEveRequestBot(request:Request,session:ApiSession) {
   return runRequestScope(context,async()=>{
     const {loadWorkspaceContext,WorkspaceError}=await import('../workspace-access')
     try {
-      const {openChatBotId}=await import('../coordinator/coordinator-bot')
-      const botId=parsed?.success?parsed.data.toLowerCase():await openChatBotId(session.user,null)
-      const workspace=(await loadWorkspaceContext(undefined,session.user)).workspace.id
+      const { chatBotId } = await import('../coordinator/coordinator-bot')
+      const workspace = (await loadWorkspaceContext(undefined, session.user)).workspace.id
+      const botId = await chatBotId(session.user.id, parsed?.data?.toLowerCase(), workspace)
       const {pool}=await import('../db')
       const bot=(await pool.query<{workspaceId:string}>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3',[botId,session.user.id,workspace])).rows[0]
       return bot?{botId,workspaceId:bot.workspaceId}:null

@@ -112,6 +112,114 @@ test('host settlement receipts preserve product publication across native RPC re
       await assert.rejects(finishEveTurn(scope,{...input,executionId:randomUUID()}),/agentExecutionClosed/)
       await assert.rejects(finishEveTurn({...scope,ownerId:'other-owner'},input))
     })
+    await t.test('the tool gateway reads one running snapshot bound to the native turn', async t => {
+      const { AgentKitStore } = await import('../agent-kit/store')
+      const { DEFAULT_AGENT_DEFINITION } = await import('../agent-kit/builtin')
+      const { handleEveProductRequest } = await import('./product-gateway')
+      const { internalEveAuthorization } = await import('./auth')
+      const { Client } = await import('pg')
+      const store = new AgentKitStore(pool)
+      const slack = { ...scope, surface: 'slack' as const }
+      const sessionId = 'wrun_' + randomUUID()
+      await registerSession(slack, sessionId)
+      const turnId = 'turn_gateway'
+      const execution = await store.beginExecution(slack, `${sessionId}:${turnId}:0`, 'Fixture policy', {harness:'codex',model:null}, DEFAULT_AGENT_DEFINITION)
+      const instructions = (turn: string) => handleEveProductRequest(new Request('https://app.example/mikka/api/internal/eve/tools', {
+        method: 'POST', headers: {authorization: internalEveAuthorization(slack)},
+        body: JSON.stringify({operation:'instructions',sessionId,turnId:turn,executionId:execution.id}),
+      }))
+      const queries = t.mock.method(Client.prototype, 'query')
+      const { createRequestDatabaseScope } = await import('../db')
+      const routed = createRequestDatabaseScope(process.env.E2E_DATABASE_URL!)
+      const response = await routed.run(() => instructions(turnId)).finally(() => routed.close())
+      assert.equal(response.status, 200)
+      assert.match((await response.json()).instructions, /Slack conversation/)
+      const reads = queries.mock.calls.filter(call => /from agent_kit_executions/i.test(String(call.arguments[0])))
+      assert.equal(reads.length, 1, 'retrieve and check the same execution row in one SQL statement')
+      assert.equal((await instructions('another_turn')).status, 404)
+      await store.finishExecution(slack, execution.id, 'completed')
+      assert.equal((await instructions(turnId)).status, 404)
+      assert.equal((await store.readExecution(slack, execution.id)).status, 'completed')
+    })
+    await t.test('the product catalogue skips only inapplicable Eve approval reviews', async t => {
+      const { AgentKitStore } = await import('../agent-kit/store')
+      const { DEFAULT_AGENT_DEFINITION } = await import('../agent-kit/builtin')
+      const { handleEveProductRequest } = await import('./product-gateway')
+      const { productRpc } = await import('./product-rpc')
+      const { createProductTool } = await import('./product-tool')
+      const { scopeAuth } = await import('./scope')
+      const store = new AgentKitStore(pool)
+      const sessionId = await nativeSession()
+      const turnId = 'turn_tool'
+      const execution = await store.beginExecution(scope, `${sessionId}:${turnId}:0`, 'Fixture policy', {harness:'codex',model:null}, DEFAULT_AGENT_DEFINITION)
+      const binding = { sessionId, turnId, executionId: execution.id }
+      const calls: string[] = []
+      t.mock.method(globalThis, 'fetch', async (url: URL, init: RequestInit) => {
+        const request = new Request(url, init)
+        calls.push((await request.clone().json()).operation)
+        return handleEveProductRequest(request)
+      })
+      const { tools } = await productRpc<{tools:import('./product-rpc').ProductCatalogueEntry[]}>(scope, {...binding,operation:'catalogue'})
+      const read = tools.find(tool => tool.name === 'list_issues')!
+      const write = tools.find(tool => tool.name === 'send_email')!
+      const input = {}
+      const context = {session:{id:sessionId,turn:{id:turnId},auth:{current:scopeAuth(scope)}},callId:'read_1',toolInput:input,abortSignal:new AbortController().signal}
+      const tool = createProductTool(scope,binding,read)
+      const approval = tool.approval as import('eve/tools/approval').ApprovalConfiguration<unknown>
+      const foreign = {...context,session:{...context.session,auth:{current:scopeAuth({...scope,ownerId:'another-owner'})}}}
+      assert.equal(await approval.request(foreign as never), 'denied')
+      await assert.rejects(async () => approval.request({...context,abortSignal:AbortSignal.abort()} as never), {name:'AbortError'})
+      assert.equal(await approval.request(context as never), 'not-applicable')
+      assert.deepEqual(await tool.execute!(input as never, context as never), [])
+      assert.deepEqual(calls, ['catalogue','execute'])
+      assert.equal(read.needsApprovalReview, false)
+      assert.equal(write.needsApprovalReview, true)
+      const legacy = createProductTool(scope,binding,{...read,needsApprovalReview:undefined})
+      assert.equal(await (legacy.approval as typeof approval).request(context as never), 'not-applicable')
+      assert.deepEqual(calls, ['catalogue','execute','approval'])
+      // If the host adds this tool to approval review after discovery, execution
+      // still requires a matching durable review before any provider dispatch.
+      const priorCatalogue = createProductTool(scope,binding,{...write,needsApprovalReview:false})
+      const mail = {to:['fixture@example.invalid'],subject:'Fixture',body:'No delivery'}
+      await assert.rejects(async () => priorCatalogue.execute!(mail as never, {...context,callId:'changed_policy'} as never), /agentToolUnavailable/)
+      await store.finishExecution(scope, execution.id, 'completed')
+      await assert.rejects(async () => tool.execute!(input as never, context as never), /agentToolUnavailable/)
+    })
+    await t.test('Eve checks live mailbox revocation only when the frozen execution grants mailbox tools', async t => {
+      const { AgentKitStore } = await import('../agent-kit/store')
+      const { DEFAULT_AGENT_DEFINITION } = await import('../agent-kit/builtin')
+      const { mailboxInputs } = await import('@mikka/protocol/mailbox')
+      const { handleEveProductRequest } = await import('./product-gateway')
+      const { internalEveAuthorization } = await import('./auth')
+      const { createRequestDatabaseScope } = await import('../db')
+      const { Client } = await import('pg')
+      const store = new AgentKitStore(pool)
+      const sessionId = await nativeSession()
+      const start = (turnId: string) => store.beginExecution(scope, `${sessionId}:${turnId}:0`, 'Mailbox fixture', {harness:'codex',model:null}, DEFAULT_AGENT_DEFINITION)
+      const original = await start('with_mailbox')
+      const queries = t.mock.method(Client.prototype,'query')
+      async function catalogue(turnId: string, executionId: string) {
+        const before = queries.mock.callCount()
+        const conn = createRequestDatabaseScope(process.env.E2E_DATABASE_URL!)
+        const response = await conn.run(() => handleEveProductRequest(new Request('http://localhost/mikka/api/internal/eve/tools', {
+          method:'POST', headers:{authorization:internalEveAuthorization(scope)}, body:JSON.stringify({operation:'catalogue',sessionId,turnId,executionId})
+        }))).finally(() => conn.close())
+        assert.equal(response.status,200)
+        const {tools} = await response.json() as {tools:{name:string}[]}
+        const grants = queries.mock.calls.slice(before).filter(call => /select active_version,workspace_id from agent_kit_heads|select snapshot,status,version_id from agent_kit_executions|select definition,digest from agent_kit_versions/i.test(String(call.arguments[0])))
+        return {mail:tools.some(tool=>Object.hasOwn(mailboxInputs,tool.name)),liveChecks:grants.length}
+      }
+      assert.deepEqual(await catalogue('with_mailbox',original.id), {mail:true,liveChecks:3})
+      const narrowed = {...DEFAULT_AGENT_DEFINITION,tools:DEFAULT_AGENT_DEFINITION.tools.filter(name=>!Object.hasOwn(mailboxInputs,name))}
+      const saved = await store.save(scope,narrowed,original.snapshot.revision,randomUUID(),DEFAULT_AGENT_DEFINITION)
+      try {
+        assert.deepEqual(await catalogue('with_mailbox',original.id), {mail:false,liveChecks:3})
+        const restricted = await start('without_mailbox')
+        assert.deepEqual(await catalogue('without_mailbox',restricted.id), {mail:false,liveChecks:0})
+      } finally {
+        await store.save(scope,DEFAULT_AGENT_DEFINITION,saved.version,randomUUID(),DEFAULT_AGENT_DEFINITION)
+      }
+    })
     await t.test('failed native turn marks only its owned source and never overwrites a newer session',async()=>{
       const {projectEveTurn,projectTurnState}=await import('./projection')
       const {emptySessionView,foldEvents}=await import('eve/events')

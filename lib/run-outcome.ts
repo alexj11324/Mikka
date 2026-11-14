@@ -9,7 +9,7 @@ import type { DecisionAnswer, DecisionQuestion } from './coordinator/decision'
 import { RUN_OUTCOMES, type RunOutcome } from './db/schema'
 
 /** Run states that have ended and get an outcome. */
-export const ENDED_RUN_STATUSES = ['succeeded', 'stopped', 'failed', 'cancelled'] as const
+export { TERMINAL_RUN_STATES as ENDED_RUN_STATUSES } from '@mikka/protocol/run-state'
 
 /** What the judge reads about one ended run. Text fields are the run's own words: data, never instructions. */
 export interface OutcomeEvidence {

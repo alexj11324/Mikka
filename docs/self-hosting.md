@@ -2,7 +2,7 @@
 
 Deploy the community server, then connect the official app to that server. It runs on your own database and does not need a Mikka account, Stripe, Vercel, Cloudflare, or a Mikka-owned API key. Your subscriptions and API keys belong to you. Hosted Mikka billing is disabled in the community edition.
 
-The image is a backend by default: API, realtime, the daemon gateway, scheduling, migrations and BYOK remain enabled. Mikka has one UI: the official apps, which connect to this server ([decision](design/decisions/2026-11-08-2133-one-ui.md)). An older built-in workspace UI is opt-in (below). Screenshots of the official apps are not copied into this public image.
+The image provides the server: API, realtime, daemon gateway, scheduling, migrations and BYOK. **Mikka has one official UI**, whose Web, Desktop and iOS clients connect to this server ([active One UI decision](design/decisions/2026-11-08-2133-one-ui.md)). The old built-in community workspace was retired; `MIKKA_COMMUNITY_UI=1` no longer re-enables it. The public image still serves server status, sign-in and account handoff pages, not a second workbench. Official UI screenshots are not copied into the public server image.
 
 ## Start the server
 
@@ -149,6 +149,8 @@ Email sign-in needs an email sender for verification and password reset. Configu
 MIKKA_EMAIL_FROM=Mikka <mikka@example.com>
 SMTP_URL=smtps://username:password@smtp.example.com:465
 ```
+
+Organization invitation links remain available for manual sharing by default. Only enable best-effort invitation email with `MIKKA_ORG_INVITE_EMAIL_ENABLED=true` after configuring the sender and the canonical application origin, and after approving mail usage. This does not send invitations to an attached Workspace or Project, does not guarantee mailbox delivery, and does not replace the one-time copyable link.
 
 Use your own Google or GitHub OAuth clients. Register callbacks on your exact origin:
 
@@ -378,7 +380,7 @@ The image acceptance check executes both packaged binaries and verifies their bu
 
 `MIKKA_EDITION` is read at runtime through `lib/edition.ts`. Its default is `community`; the only other accepted value is `cloud`. Invalid values fail configuration rather than silently choosing a billing mode. The same image can be used with a new origin without rebuilding its browser assets.
 
-Official Mikka production must explicitly set the non-secret `MIKKA_EDITION=cloud` selector in both the release build environment and Vercel Production before this default reaches production. The release job declares its build value and verifies the matching Vercel value; credentials still come from Infisical. Its Stripe checks, trial limits, reservation/settlement, and existing providers remain enabled. The previous domain redirect is separately configured with `MIKKA_LEGACY_APP_HOST`; it grants no authenticated access through the old host.
+Official Mikka Cloud production must explicitly set the non-secret `MIKKA_EDITION=cloud` selector in the trusted release build and deployed runtime. The legacy Vercel deployment retains the corresponding Vercel Production value while it still serves; the target Cloudflare release uses its own verified container and secret bindings instead. The release job declares its build value and verifies the matching Vercel value; credentials still come from Infisical. Its Stripe checks, trial limits, reservation/settlement, and existing providers remain enabled. The previous domain redirect is separately configured with `MIKKA_LEGACY_APP_HOST`; it grants no authenticated access through the old host.
 
 Optional Mikka cloud services are a separate connection. The community edition remains usable without connecting them. The hosted-compute resale option is not included; its pricing decision is tracked separately in #1569.
 

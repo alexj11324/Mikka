@@ -81,3 +81,32 @@ test('a restarted workerd preserves the winner and the other candidate’s refus
   await expect(storage.events.create(contender, request)).rejects.toMatchObject({ conflictingRunId: winner })
   await expect(storage.runs.get(contender)).rejects.toMatchObject({ name: 'WorkflowRunNotFoundError' })
 })
+
+test('hook mutation reads the parent status and preserves durable receipt replay', async () => {
+  namespace = randomUUID()
+  const storage = client(), runId = 'wrun_' + ulid(), correlationId = 'hook_status'
+  const input = new Uint8Array(64 * 1024).fill(9)
+  await storage.events.create(runId, {specVersion:8,eventType:'run_created',eventData:{deploymentId:'fixture',workflowName:'fixture',input}})
+  await storage.events.create(runId, {specVersion:8,eventType:'run_started'})
+  const measure = async (eventType,eventData,options,hookId = correlationId) => {
+    const reply = await fetch((await runtime.ready).origin, {method:'POST',body:encode([namespace,'measureHook',Date.now(),
+      [runId,{eventType,specVersion:8,correlationId:hookId,eventData},options]])})
+    expect(reply.status).toBe(200)
+    return decode(new Uint8Array(await reply.arrayBuffer()))
+  }
+  const created = await measure('hook_created',{token:'status-only'})
+  const conflict = await measure('hook_created',{token:'status-only'},undefined,'hook_contender')
+  expect(conflict.result.event.eventType).toBe('hook_conflict')
+  expect(conflict.parentRows).toBe(1)
+  const received = await measure('hook_received',{token:'status-only',payload:Uint8Array.of(3)},{resumeId:'req-1'})
+  const disposed = await measure('hook_disposed',{})
+  expect([created,received,disposed].map(v=>[v.result.ok,v.parentRows])).toEqual([[true,1],[true,1],[true,1]])
+  await storage.events.create(runId, {specVersion:8,eventType:'run_completed',eventData:{output:Uint8Array.of(4)}})
+  const replay = await measure('hook_received',{token:'status-only',payload:Uint8Array.of(3)},{resumeId:'req-1'})
+  expect(replay.result.event.eventId).toBe(received.result.event.eventId)
+  expect((await measure('hook_created',{token:'other'})).result.code).toBe('RUN_EXPIRED')
+  expect((await storage.runs.get(runId)).input).toEqual(input)
+  const bytes = [created,received,disposed,replay].map(v=>v.parentBytes)
+  console.info('SQLite parent bytes (hook create, receive, dispose and durable replay):',bytes.join(', '))
+  expect(bytes.every(size=>size<128)).toBe(true)
+})

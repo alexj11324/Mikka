@@ -10,7 +10,7 @@ import { PostHogAnalytics } from '@/components/posthog-analytics'
 import { posthogConfig } from '@/lib/posthog-config'
 import { authClient, cloudAuthClient } from '@/lib/auth-client'
 import { withBasePath } from '@/lib/base-path'
-import { serverDocumentKind } from '@/lib/server-pages'
+import { isInvitationPath, serverDocumentKind } from '@/lib/server-pages'
 import { bridgeFromWindow } from '@/lib/platform/detect'
 import { navigate, useLocation, withoutLocale } from '../../../desktop/src/renderer/location'
 import type { DesktopSession } from '../../../desktop/src/renderer/host'
@@ -22,12 +22,20 @@ import { currentWebServers, subscribeWebServers } from '@/lib/web-connection/bro
 export { authenticatedReturn } from './auth-routing'
 export const platform = 'web' as const
 
-/** Organization invitation acceptance needs only the current account session.
- * Never load Workspace bootstrap or its member-scoped data on a public invitation page. */
+function isInvitationHandoff(location: URL): boolean {
+  const path = withoutLocale(location.pathname)
+  if (path !== '/sign-in' && path !== '/sign-up') return isInvitationPath(path)
+  // The two links on the invitation card supply exactly one validated return destination.
+  const next = webAuthentication(location).next
+  return !location.hash && location.searchParams.size === 1
+    && next === location.searchParams.get('next') && isInvitationPath(next)
+}
+
+/** Invitation acceptance and the sign-in or sign-up return require only the current session. */
 export function bootstrapScope(location: URL): BootstrapScope {
-  const organizationInvite = serverDocumentKind() === 'authentication'
-    && /^\/organization-invite\/[a-f0-9]{64}$/.test(withoutLocale(location.pathname))
-  return typeof window !== 'undefined' && !bridgeFromWindow(window) && (isDesktopHandoffPage(location) || organizationInvite)
+  const documentKind = serverDocumentKind()
+  const invitation = (documentKind === null || documentKind === 'authentication') && isInvitationHandoff(location)
+  return typeof window !== 'undefined' && !bridgeFromWindow(window) && (isDesktopHandoffPage(location) || invitation)
     ? 'authentication' : 'workspace'
 }
 

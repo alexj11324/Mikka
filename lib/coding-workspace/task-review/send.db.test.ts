@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import test, { mock, type TestContext } from 'node:test'
 import { promisify } from 'node:util'
 import { Pool } from 'pg'
+import { observePoolCommits } from '../../db/commit-effects'
 import { z } from 'zod'
 import { runAssignmentSchema } from '@mikka/protocol'
 import { remoteKey } from '@mikka/protocol/repository'
@@ -58,6 +59,7 @@ test('Task review send composes real transactional deliveries on PostgreSQL 17',
   await admin.query('CREATE DATABASE "' + database + '" TEMPLATE template0')
   const target = new URL(url!); target.pathname = '/' + database
   const pool = new Pool({ connectionString: target.toString(), max: 16, connectionTimeoutMillis: 5000 })
+  observePoolCommits(pool)
   const directory = await mkdtemp(join(tmpdir(), 'mikka-task-send-db-'))
   const environment = { MIKKA_DATABASE_URL: target.toString(), DATABASE_URL: target.toString(), ORVILO_DATABASE_URL: target.toString(),
     E2E_DATABASE_URL: target.toString(), BETTER_AUTH_SECRET: randomBytes(32).toString('hex'),

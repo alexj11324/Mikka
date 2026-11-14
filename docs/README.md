@@ -27,9 +27,9 @@ for the part of Mikka you are changing. Development and acceptance rules live in
 - [Glossary](design/glossary.md) defines bots, chats, threads and Agents.
 - [Rules](design/rules.md), [components](design/components.md) and
   [copy](design/copy.md) guide product and UI changes.
-- [Decision records](design/decisions/README.md) explain how to record or
-  supersede a decision. [Earlier decisions](design/decisions.md) remain frozen
-  history with the authority described by that guide.
+- [Effective design and product rules](design/README.md) are read first. Dated
+  [decision records](design/decisions/README.md) explain provenance; superseded
+  entries and the [legacy decision log](design/decisions.md) are not active instructions.
 - [Feature specification template](design/spec-template.md) supplies the
   structure for a feature specification.
 - [Execution rules](execution-rules.md) describe model and machine selection.
@@ -54,6 +54,7 @@ for the part of Mikka you are changing. Development and acceptance rules live in
 - [Isolated test accounts](test-accounts.md) describes the loopback account pool
   and its application, database and lease boundaries.
 - [UI review checklist](review-checklist.md) applies before presenting UI.
+- [Current build source of truth](operations/build-source-of-truth.md) separates public-root official builds, private UI Overlay, Cloudflare CI and the transitional OCI publisher.
 - [Shared web and desktop runtime](operations/web-runtime.md) documents build
   outputs, startup and rollback.
 - [Hosted operations](operations/README.md) directs authorized operators to the private deployment and credential runbooks.
@@ -65,8 +66,7 @@ for the part of Mikka you are changing. Development and acceptance rules live in
 
 ## Update documentation
 
-[2026-11-08 全仓审校记录](audits/2026-11-08-documentation-refresh.md)列出本次覆盖的
-每一份文档、修改范围和验证边界。
+Dated audits and screenshot snapshots are not a second source of operating instructions. Consult live code, accepted current rules and the active release owner first; use Git history only when investigating old evidence.
 
 Use [`update-docs`](../.claude/skills/update-docs/SKILL.md) to discover affected
 pages and [`technical-documentation`](../.claude/skills/technical-documentation/SKILL.md)

@@ -1,15 +1,11 @@
 # Decision log
 
-**Frozen since 2026-10-31 17:30 UTC.** New decisions go in
-[`decisions/`](decisions/README.md), one file each, so parallel pull requests
-no longer conflict here. Everything below stays authoritative. To supersede a
-row, strike it and link the new file.
-
-One row per product or design decision Alex made. Add the row the day you
-hear it, quoting where it was said. If a decision replaces an older one,
-mark the older row ~~struck~~ and point to the new one; never delete rows.
-When a decision becomes a standing rule, add it to `rules.md` and link the
-rule id here.
+**HISTORICAL SNAPSHOT — NOT CURRENT OPERATING POLICY.** Frozen on 2026-10-31.
+Many decisions below were changed by subsequent One UI, build/release and product decisions.
+Do not extract current engineering behavior from this log. Start with `AGENTS.md`,
+[`design/README.md`](README.md), current `rules.md`, and verified active source.
+Keep this file only while older source links are migrated to current policy; no new rows or patches.
+Historical decisions remain recoverable from Git history after link cleanup.
 
 Newest first.
 

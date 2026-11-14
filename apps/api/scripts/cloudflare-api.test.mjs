@@ -41,20 +41,20 @@ test('private ingress keeps authority, body, cookies and upgrades while replacin
   const origin = 'https://app.example'
   const request = new Request(origin + '/mikka/api/rpc', { method: 'POST', body: 'payload',
     headers: { authorization: 'Bearer fixture', cookie: 'fixture', 'cf-connecting-ip': '192.0.2.31',
-      forwarded: 'for=bad', 'x-forwarded-host': 'other.example', 'x-mikka-edge-ip': '192.0.2.99',
+      'x-mikka-eve-scope': 'forged', 'x-mikka-eve-binding-scope': 'forged', forwarded: 'for=bad', 'x-forwarded-host': 'other.example', 'x-mikka-edge-ip': '192.0.2.99',
       'cf-container-target-port': '9000', 'x-vercel-ip-city': 'bad', 'x-forwarded-for': '192.0.2.10' } })
   assert.equal(apiRequest(request, 'https://other.example'), null)
   const forwarded = apiRequest(request, origin)
   assert.equal(await forwarded.text(), 'payload')
   for (const [key, value] of Object.entries({ host: 'app.example', authorization: 'Bearer fixture', cookie: 'fixture',
     'x-forwarded-host': 'app.example', 'x-forwarded-proto': 'https', 'x-mikka-edge-ip': '192.0.2.31' })) assert.equal(forwarded.headers.get(key), value)
-  for (const key of ['forwarded', 'x-vercel-ip-city', 'x-forwarded-for', 'cf-container-target-port', 'cf-connecting-ip']) assert.equal(forwarded.headers.has(key), false)
+  for (const key of ['x-mikka-eve-scope', 'x-mikka-eve-binding-scope', 'forwarded', 'x-vercel-ip-city', 'x-forwarded-for', 'cf-container-target-port', 'cf-connecting-ip']) assert.equal(forwarded.headers.has(key), false)
   const upgrade = apiRequest(new Request(origin + '/mikka/api/stream', { headers: { upgrade: 'websocket' } }), origin)
   assert.equal(upgrade.headers.get('upgrade'), 'websocket')
   assert.equal(upgrade.headers.get('x-mikka-edge-ip'), null)
 })
 
-test('ingress binds only the immutable account image with a private route and a bounded staging pool', () => {
+test('ingress maps the selected image with a private route and a bounded staging pool', () => {
   const input = { release: id, origin: 'https://app.example', image: 'registry.cloudflare.com/' + 'e'.repeat(32) + '/mikka-api@sha256:' + '3'.repeat(64) }
   const config = ingressConfig(input)
   assert.equal(config.workers_dev, false)
@@ -66,10 +66,26 @@ test('ingress binds only the immutable account image with a private route and a 
   const withAI = ingressConfig({ ...input, workersAi: true })
   assert.deepEqual(withAI.ai, { binding: 'WORKERS_AI' })
   assert.equal(withAI.vars.CLOUDFLARE_WORKERS_AI_ACCOUNT_ID, input.image.split('/')[1])
-  assert.throws(() => ingressConfig({ ...input, workersAi: 'untrusted' }))
-  for (const changed of [{ release: 'main' }, { image: input.image.split('@')[0] + ':latest' }, { origin: 'https://user@app.example' }]) {
-    assert.throws(() => ingressConfig({ ...input, ...changed }))
-  }
+})
+
+test('ingress maps custom deployment metadata and underscore service names', () => {
+  const input = { release: 'custom_release_v2', image: 'registry.example.test/team/api:release_2',
+    origin: 'http://localhost:4310', taskMachine: 'task_service', eveService: 'eve_service',
+    businessWorld: 'business_world', credentialIdentityService: 'identity_service',
+    credentialBrokerService: 'broker_service', workersAi: 'enabled' }
+  const config = ingressConfig(input)
+  assert.equal(config.name, 'mikka-api-' + input.release)
+  assert.equal(config.containers[0].image, input.image)
+  assert.deepEqual(config.vars, { PUBLIC_ORIGIN: input.origin, MIKKA_DEPLOYMENT_ID: input.release,
+    CLOUDFLARE_WORKERS_AI_ACCOUNT_ID: 'team' })
+  assert.deepEqual(config.ai, { binding: 'WORKERS_AI' })
+  assert.deepEqual(config.services, [
+    { binding: 'TASK_MACHINE', service: input.taskMachine },
+    { binding: 'EVE_SERVICE', service: input.eveService, entrypoint: 'EveService' },
+    { binding: 'BUSINESS_WORLD', service: input.businessWorld, entrypoint: 'BusinessWorldService' },
+    { binding: 'CREDENTIAL_IDENTITY', service: input.credentialIdentityService, entrypoint: 'AppIdentity' },
+    { binding: 'CREDENTIAL_BROKER', service: input.credentialBrokerService, entrypoint: 'CredentialBroker' },
+  ])
 })
 
 import { configureTaskBridge, taskMachine } from '../../../cloudflare/api/ingress/task-machine.mjs'
@@ -140,10 +156,25 @@ test('the task process handshake requires the private host capability, binding a
   assert.equal((await send(url, { headers }, {})).status, 503)
 })
 
-test('the private API receives its sign-in and product bindings without inheriting deployment or broker authority', async () => {
+test('the private API receives its sign-in and product bindings without inheriting deployment or broker authority', async (t) => {
   const { applicationEnvironment } = await import('../../../cloudflare/api/ingress/environment.mjs')
+  const logs = ['log', 'info', 'warn', 'error', 'debug'].map(method => t.mock.method(console, method, () => {}))
   const origin = 'https://app.example'
+  const preserved = Object.fromEntries([
+    'MIKKA_CLOUD_WORKER_URL', 'GITHUB_APP_ID', 'GITHUB_APP_SLUG',
+    'NEXT_PUBLIC_POSTHOG_KEY', 'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY',
+    'LINEAR_CLIENT_ID', 'LINEAR_CLIENT_SECRET', 'LINEAR_TOKEN_ENCRYPTION_KEY', 'LINEAR_WEBHOOK_SECRET', 'CRON_SECRET',
+    'TELEGRAM_BOT_TOKEN', 'TELEGRAM_BOT_USERNAME', 'TELEGRAM_WEBHOOK_SECRET_TOKEN', 'EXPO_ACCESS_TOKEN', 'NEON_API_KEY',
+    'MIKKA_BYOS_INFISICAL_ORIGIN', 'MIKKA_BYOS_INFISICAL_PROJECT', 'MIKKA_BYOS_INFISICAL_ENVIRONMENT', 'MIKKA_BYOS_INFISICAL_PATH',
+    'MIKKA_BYOS_ACCESS_INFISICAL_PATH', 'MIKKA_BYOS_ACCESS_INFISICAL_PROJECT',
+    'MIKKA_BYOS_SHARED_CUSTODY_IDENTITY', 'MIKKA_BYOS_CUSTODY_CLIENT_ID', 'MIKKA_BYOS_CUSTODY_CLIENT_SECRET',
+    'MIKKA_BYOS_ACCESS_CLIENT_ID', 'MIKKA_BYOS_ACCESS_CLIENT_SECRET',
+    'MIKKA_BYOS_ENABLED', 'MIKKA_BYOS_CLAUDE_OAUTH', 'MIKKA_BYOS_CODEX_OAUTH', 'MIKKA_BYOS_ENROLLMENT_ENABLED',
+    'MIKKA_BYOS_ENROLLMENT_ATTEMPT_PATH', 'MIKKA_BYOS_ENROLLMENT_CLAIM_PATH', 'MIKKA_BYOS_ENROLLMENT_GRANT_PATH',
+  ].map(name => [name, `production-marker-${name}`]))
+  assert.equal(Object.keys(preserved).length, 33)
   const allowed = {
+    ...preserved,
     SLACK_APP_ID: 'AEXAMPLE', SLACK_CLIENT_ID: 'client-fixture', SLACK_CLIENT_SECRET: 'oauth-fixture',
     E2B_BYO_COMPUTER_TEMPLATE: 'desktop-release', E2B_CLAUDE_TEMPLATE: 'claude-release', E2B_CODEX_TEMPLATE: 'codex-release',
     MIKKA_CLOUD_TEMPLATE_MODELS: 'verified-catalogue', MIKKA_CLOUD_WORKER_SHA: 'a'.repeat(40),
@@ -152,7 +183,7 @@ test('the private API receives its sign-in and product bindings without inheriti
     GITHUB_CLIENT_ID: 'github', GITHUB_CLIENT_SECRET: 'github-credential', GITHUB_WEBHOOK_SECRET: 'existing-hook',
     BETTER_AUTH_SECRET: 'auth', TURNSTILE_SECRET_KEY: 'signup-verification', MIKKA_CLOUDFLARE_TASK_WORKSPACES: 'sponsor',
     MIKKA_DEPLOYMENT_ID: id, MIKKA_WORKFLOW_QUEUE_PUBLIC_KEY: 'public-verification-key',
-    OPENAI_DECISIONS_API_KEY: 'decisions', CLOUDFLARE_WORKERS_AI_TOKEN: 'models',
+    DECISIONS_API_KEY: 'decision-gateway-fixture', OPENAI_DECISIONS_API_KEY: 'decisions', CLOUDFLARE_WORKERS_AI_TOKEN: 'models',
     DEVICE_GATEWAY_URL: 'https://gateway.example', DEVICE_GATEWAY_PUSH_SECRET: 'device-signing',
     WORKSPACE_SECRETS_KEY: 'workspace-sealing',
     COMPOSIO_API_KEY: 'integrations', COMPOSIO_WEBHOOK_SECRET: 'hook-verification',
@@ -170,6 +201,7 @@ test('the private API receives its sign-in and product bindings without inheriti
   assert.deepEqual(applicationEnvironment({ PUBLIC_ORIGIN: origin, ...allowed, ...unexpected }), {
     BETTER_AUTH_URL: origin, MIKKA_API_INGRESS: 'cloudflare', ...allowed,
   })
+  for (const log of logs) assert.equal(log.mock.callCount(), 0)
 })
 
 test('private World calls require the instance capability and forward only WDK payload and media headers', async () => {

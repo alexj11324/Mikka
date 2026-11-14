@@ -38,7 +38,7 @@ test('failed version reads stay unknown and do not turn into a known stale build
   assert.equal(calls, 1)
 })
 
-test('a known stale action asks for refresh before any action runs', async () => {
+test('concurrent stale actions share one refresh notification and a later action stays blocked', async () => {
   const priorBuild = process.env.NEXT_PUBLIC_MIKKA_BUILD
   const priorWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
   const priorFetch = globalThis.fetch
@@ -49,11 +49,36 @@ test('a known stale action asks for refresh before any action runs', async () =>
     Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: (event: Event) => { events.push(event.type); return true } } })
     globalThis.fetch = async () => { reads++; return Response.json({ build: 'fixture-new' }) }
     const { checkPageBuildBeforeAction } = await import(new URL('./app-build.ts?stale-action-fixture', import.meta.url).href)
-    if (await checkPageBuildBeforeAction()) actions++
-    if (await checkPageBuildBeforeAction()) actions++
+    const attempt = async () => { if (await checkPageBuildBeforeAction()) actions++ }
+    await Promise.all([attempt(), attempt()])
+    await attempt()
     assert.equal(actions, 0)
     assert.equal(reads, 1)
-    assert.deepEqual(events, [STALE_BUILD_EVENT, STALE_BUILD_EVENT])
+    assert.deepEqual(events, [STALE_BUILD_EVENT])
+  } finally {
+    if (priorBuild === undefined) delete process.env.NEXT_PUBLIC_MIKKA_BUILD
+    else process.env.NEXT_PUBLIC_MIKKA_BUILD = priorBuild
+    if (priorWindow) Object.defineProperty(globalThis, 'window', priorWindow)
+    else Reflect.deleteProperty(globalThis, 'window')
+    globalThis.fetch = priorFetch
+  }
+})
+
+test('a pending version check cannot reopen a page retired by another response', async () => {
+  const priorBuild = process.env.NEXT_PUBLIC_MIKKA_BUILD
+  const priorWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
+  const priorFetch = globalThis.fetch
+  const target = new EventTarget()
+  const pending = Promise.withResolvers<Response>()
+  try {
+    process.env.NEXT_PUBLIC_MIKKA_BUILD = 'fixture-old'
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: target })
+    globalThis.fetch = () => pending.promise
+    const app = await import(new URL('./app-build.ts?version-retired-while-pending', import.meta.url).href)
+    const allowed = app.checkPageBuildBeforeAction()
+    app.markPageNeedsRefresh()
+    pending.resolve(Response.json({ build: 'fixture-old' }))
+    assert.equal(await allowed, false)
   } finally {
     if (priorBuild === undefined) delete process.env.NEXT_PUBLIC_MIKKA_BUILD
     else process.env.NEXT_PUBLIC_MIKKA_BUILD = priorBuild
@@ -86,6 +111,16 @@ function refreshTarget(response: () => Response) {
 }
 
 const missingAction = () => new Response('', { status: 404, headers: { 'x-nextjs-action-not-found': '1' } })
+
+test('concurrent missing action responses retire the page once', async () => {
+  const app = await import(new URL('./app-build.ts?concurrent-missing', import.meta.url).href)
+  const fixture = refreshTarget(missingAction)
+  app.watchRemovedActions(fixture.target as unknown as Window)
+  await Promise.all([fixture.target.fetch('/actions/first'), fixture.target.fetch('/actions/second')])
+  assert.equal(fixture.reads(), 2)
+  assert.deepEqual(fixture.events, [STALE_BUILD_EVENT])
+  assert.equal(app.pageRefreshSignal().aborted, true)
+})
 
 test('a missing action asks for refresh without reloading, and retires obsolete traffic', async () => {
   const app = await import(new URL('./app-build.ts?missing-action-explicit-refresh', import.meta.url).href)

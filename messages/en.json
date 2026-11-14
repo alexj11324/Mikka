@@ -561,7 +561,8 @@
     "saving": "Saving task status…",
     "moved": "Moved to {status}",
     "moveFailed": "Could not move the task. Please try again.",
-    "moveRollback": "Could not save the status. The previous position has been restored.",
+    "changeVerified": "The task now shows the requested change.",
+    "saveUnconfirmed": "Could not confirm the change. Check the task before trying again.",
     "scrollLeft": "Scroll board left",
     "scrollRight": "Scroll board right",
     "keyboardHint": "Browse with a trackpad, the bottom scrollbar, or the arrow buttons. When this area is focused, use the left and right arrow keys to scroll, Home to return to the start, and End to jump to the end. When a draggable card is focused, press Space to start dragging, use the arrow keys to move across columns, and press Space again to drop; press Escape to cancel.",
@@ -3512,6 +3513,8 @@
     "signInToAccept": "Sign in and accept",
     "createAccount": "Create account",
     "backToWorkspace": "Back to workspace",
+    "joined": "You joined the workspace.",
+    "viewServerAndApps": "View server and available apps",
     "acceptFailed": "Could not accept the invitation.",
     "signOutFailed": "Sign out failed."
   },
@@ -6498,7 +6501,7 @@
       "revoked": "Invitation revoked",
       "expired": "Expired",
       "expires": "Expires {date}",
-      "sent": "New invitation links are shown once. Deliver them privately; they are not sent by email yet.",
+      "sent": "Invitation links are shown only once. Copy and share them securely. Configured email delivery is attempted separately and is not confirmed by this response.",
       "copy": "Copy link",
       "copyFailed": "Could not copy the invitation link.",
       "failed": "Invitation request failed."
@@ -6999,6 +7002,20 @@
     "noTasks": "No tasks"
   },
   "HostedInbox": {
+    "dismiss": "Dismiss",
+    "dismissed": "Dismissed",
+    "reason": {
+      "needsReply": "Open the conversation to answer.",
+      "confirm": "Open the conversation to review the request.",
+      "review": "Open the task to review the changes.",
+      "offline": "Reconnect the device, then resume the run.",
+      "quota": "Check the model quota, then resume the run.",
+      "api_key": "Update the model credential, then retry.",
+      "access_denied": "Check the execution identity’s permissions, then retry.",
+      "subscription": "Reconnect the model subscription, then retry.",
+      "blocked": "Open the run to resolve the blocker.",
+      "failed": "Review the run error, then retry."
+    },
     "snoozed": "Snoozed",
     "until": "Remind me at",
     "done": "Done",

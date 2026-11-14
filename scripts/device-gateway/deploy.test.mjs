@@ -218,7 +218,8 @@ test('legacy credentials remain unavailable to ambiguous and Cloudflare origin o
     return new URL(url).hostname === ALIAS ? Response.json({build:SOURCE}, {headers}) : Response.json(dns)
   }
   assert.equal((await readWebAuthority(read({Status:0, Question:question, Answer:answer}, cfHeaders))).provider, 'cloudflare')
-  for (const observer of [read({Status:2, Question:question},{'x-vercel-id':'iad'}), read({Status:3, Question:question},cfHeaders),
+  assert.equal((await readWebAuthority(read({Status:3, Question:question}, cfHeaders))).provider, 'cloudflare')
+  for (const observer of [read({Status:2, Question:question},{'x-vercel-id':'iad'}), read({Status:3, Question:question},{'cf-ray':'fixture'}),
     read({Status:0, Question:question, Answer:answer},{'x-vercel-id':'iad'}), read({Status:0, TC:true, Question:question},{'x-vercel-id':'iad'})]) {
     await assert.rejects(readWebAuthority(observer))
   }
