@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { orderMigrations } from '../scripts/migration-order.mjs'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 import { groupDirectory } from '../lib/group-conversations-directory'
 import { handleGroup, type GroupRequest } from '../lib/group-conversations-store'
 import { conversationDirectory, conversationSidebar } from '../lib/conversation-directory'
@@ -27,7 +27,7 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
   const admin = guarded(base!)
   const name = `cvt_${randomUUID().replaceAll('-', '')}_e2e`
   const adminPool = new Pool({ connectionString: admin.toString(), max: 1 })
-  await adminPool.query(`CREATE DATABASE ${name} TEMPLATE template0`)
+  await createTestDatabase(adminPool, name, 'template0')
   const target = new URL(admin.toString()); target.pathname = `/${name}`; guarded(target.toString())
   const pool = new Pool({ connectionString: target.toString(), max: 2 })
   try {

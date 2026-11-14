@@ -6,7 +6,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import test from 'node:test'
 import { Client, Pool } from 'pg'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 import { orderMigrations } from '../scripts/migration-order.mjs'
 import { applyMigration, planMigration } from '../scripts/migration-steps.mjs'
 import { scopeMigrationBeforeCommit } from '../scripts/scope-migration-history.mjs'
@@ -20,8 +20,8 @@ test('Task presentation batches keep current tenant authority and one Factory pr
   const suffix = randomUUID().replaceAll('-', '')
   const appName = `presentation_app_${suffix}_e2e`, workspaceName = `presentation_ws_${suffix}_e2e`
   const admin = new Pool({ connectionString: url, max: 1 })
-  await admin.query(`CREATE DATABASE "${appName}" TEMPLATE template0`)
-  await admin.query(`CREATE DATABASE "${workspaceName}" TEMPLATE template0`)
+  await createTestDatabase(admin, appName, 'template0')
+  await createTestDatabase(admin, workspaceName, 'template0')
   const appUrl = new URL(url!), workspaceUrl = new URL(url!)
   appUrl.pathname = `/${appName}`; workspaceUrl.pathname = `/${workspaceName}`
   const application = new Pool({ connectionString: appUrl.toString(), max: 4 })

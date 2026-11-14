@@ -31,7 +31,7 @@ export async function createTestDatabase(admin: Admin, database: string, templat
   const ownershipToken = `${ownershipCommentPrefix}${randomUUID()}`
   const statement = `CREATE DATABASE ${quoteIdentifier(database)}${template === undefined ? '' : ` TEMPLATE ${quoteIdentifier(template)}`}`
   const result = await query(admin, statement)
-  if (result.command !== 'CREATE DATABASE') throw new Error('database creation did not return a CREATE DATABASE result')
+  if (result.command !== 'CREATE') throw new Error('database creation did not return a CREATE command tag')
   // Record the CREATE immediately, but cleanup still requires the persisted
   // marker. If tagging fails, it will therefore fail closed instead of dropping
   // a database whose current ownership cannot be proved.

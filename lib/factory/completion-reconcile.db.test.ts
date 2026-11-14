@@ -36,7 +36,7 @@ import { beginFactoryTransaction, commitFactoryTransaction, rollbackFactoryTrans
 import { factoryCheckIndependent } from "./check-independence";
 import { reconcileFactoryAfterCompletion } from "../run-completion-effects";
 import { orchestratorSettings } from "@mikka/protocol/orchestrator";
-import { dropTestDatabase } from "../../tests/support/drop-test-database";
+import { createTestDatabase, dropTestDatabase } from "../../tests/support/drop-test-database";
 
 const url = process.env.E2E_DATABASE_URL;
 if (url) {
@@ -48,7 +48,7 @@ if (url) {
 test("run completion enters review without the Coordinator; replays do not advance twice", { skip: !url, timeout: 180000 }, async (t) => {
   const admin = new Pool({ connectionString: url, max: 1 });
   const database = `fac_complete_${randomUUID().replaceAll("-", "")}_e2e`;
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`);
+  await createTestDatabase(admin, database, 'template0');
   const target = new URL(url!);
   target.pathname = `/${database}`;
   const pool = new Pool({ connectionString: target.toString(), max: 8 });

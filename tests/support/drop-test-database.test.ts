@@ -12,7 +12,7 @@ function fakePool() {
       if (sql.startsWith('CREATE DATABASE ')) {
         const name = sql.match(/^CREATE DATABASE "([^"]+)"/)?.[1]
         assert.ok(name)
-        return { command: 'CREATE DATABASE', rows: [], rowCount: null }
+        return { command: 'CREATE', rows: [], rowCount: null }
       }
       if (sql.startsWith('COMMENT ON DATABASE ')) {
         const name = sql.match(/^COMMENT ON DATABASE "([^"]+)" IS '([^']+)'$/)?.[1]
@@ -30,7 +30,7 @@ function fakePool() {
         const name = sql.match(/^DROP DATABASE "([^"]+)" WITH \(FORCE\)$/)?.[1]
         assert.ok(name)
         comments.delete(name)
-        return { command: 'DROP DATABASE', rows: [], rowCount: null }
+        return { command: 'DROP', rows: [], rowCount: null }
       }
       throw new Error(`unexpected fake SQL: ${sql}`)
     },

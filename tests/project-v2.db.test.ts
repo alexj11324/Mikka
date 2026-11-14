@@ -7,7 +7,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import test, { mock } from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 import { orderMigrations } from '../scripts/migration-order.mjs'
 import { applyMigration, planMigration } from '../scripts/migration-steps.mjs'
 import { scopeMigrationBeforeCommit } from '../scripts/scope-migration-history.mjs'
@@ -31,8 +31,8 @@ test('Project v2: split database migration, canonical relationships and live ten
   const suffix = randomUUID().replaceAll('-', '')
   const appName = `project_app_${suffix}_e2e`, tenantName = `project_ws_${suffix}_e2e`
   const admin = new Pool({ connectionString: url, max: 1 })
-  await admin.query(`CREATE DATABASE "${appName}" TEMPLATE template0`)
-  await admin.query(`CREATE DATABASE "${tenantName}" TEMPLATE template0`)
+  await createTestDatabase(admin, appName, 'template0')
+  await createTestDatabase(admin, tenantName, 'template0')
   const appUrl = new URL(url!), tenantUrl = new URL(url!)
   appUrl.pathname = `/${appName}`; tenantUrl.pathname = `/${tenantName}`
   const application = new Pool({ connectionString: appUrl.toString(), max: 5 })

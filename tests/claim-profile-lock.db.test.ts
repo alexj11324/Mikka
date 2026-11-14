@@ -4,7 +4,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool, type PoolClient, type QueryResult } from 'pg'
 import { dbUrl, seedUser, seedWorkspace, seedBot, seedIssue } from './support/workspace-admin-db'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 import { templateModelsFixture } from './support/template-models'
 import { orderMigrations } from '../scripts/migration-order.mjs'
 import { observePoolCommits } from '../lib/db/commit-effects'
@@ -18,7 +18,7 @@ test('cloud locked run Profile: fresh authority and normal Task database budget'
   assert.ok(dbUrl)
   const admin = new Pool({ connectionString: dbUrl, max: 1 })
   const database = 'claim_locked_run_' + randomUUID().replaceAll('-', '') + '_e2e'
-  await admin.query('CREATE DATABASE "' + database + '" TEMPLATE template0')
+  await createTestDatabase(admin, database, 'template0')
   console.info(JSON.stringify({ event: 'claim_locked_run_owned_database', database }))
   const target = new URL(dbUrl); target.pathname = '/' + database
   const saved = Object.fromEntries(['E2E_DATABASE_URL', 'DATABASE_URL', 'MIKKA_DATABASE_URL', 'MIKKA_BYOS_ENABLED', 'MIKKA_BYOS_VALIDATED_MODEL_ROUTES'].map(k => [k, process.env[k]]))

@@ -415,7 +415,7 @@ export async function createClones(template, names, ready = () => {}, { ClientCl
       try {
         controlClient = await connect(control)
         if (!await hasMarker(controlClient, controlName)) throw new Error(`refusing cleanup: ${controlName} per-run marker is absent or mismatched`)
-        for (const name of [...created]) {
+        for (const name of created) {
           try {
             if (!await hasMarker(controlClient, name)) throw new Error(`refusing to drop ${name}: per-run marker is absent or mismatched`)
             await controlClient.query(`DROP DATABASE ${quote(name)} WITH (FORCE)`)

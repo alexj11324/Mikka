@@ -5,7 +5,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import test, { mock } from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { seedTeam } from '../../tests/support/workspace-admin-db'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { observePoolCommits, databaseCommitScope, captureDatabaseQuery } from '../db/commit-effects'
@@ -55,7 +55,7 @@ test('panel notifications follow actual committed writes and persisted owner/wor
   })
   const admin = new Pool({ connectionString: url, max: 1 })
   const database = `panel_live_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(url!); target.pathname = `/${database}`
   const databasePool = new Pool({ connectionString: target.toString(), max: 6 })
   observePoolCommits(databasePool)
