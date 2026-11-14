@@ -38,7 +38,7 @@ import { CoordinatorReply } from './coordinator-reply'
 import { ChatComposer } from './chat-composer'
 import { BotModelPicker, botModelMenuKey, openModelPicker } from './bot-model-picker'
 import { CoordinatorContextUsage } from './coordinator-context-usage'
-import { useChatDelivery, type ChatSubmission } from '@/lib/hooks/chat-delivery'
+import { isWebChatOffline, useChatDelivery, type ChatSubmission } from '@/lib/hooks/chat-delivery'
 import { useCoordinatorSubmit, type CoordinatorMessageContext } from './use-coordinator-submit'
 import { useCoordinatorAgent } from './use-coordinator-agent'
 import { activeTurn } from 'eve/events'
@@ -524,7 +524,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
     try {
       await prior
       if (entry.cancelled) return 'skipped'
-      if (navigator.onLine === false) return fail(t('sendOffline'))
+      if (isWebChatOffline()) return fail(t('sendOffline'))
       const currentBuild = await checkPageBuildBeforeAction()
       if (entry.cancelled) return 'skipped'
       if (!currentBuild) return fail(t('sendUpdateRequired'))
