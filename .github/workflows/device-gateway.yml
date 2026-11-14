@@ -46,7 +46,7 @@ jobs:
       - run: node --test scripts/device-gateway/deploy.test.mjs
       - run: node --test cloudflare/device-gateway/test/presence.test.mjs
       - run: node --test cloudflare/device-gateway/test/runtime.test.mjs
-      - run: node --import tsx --test lib/device-presence-grant.test.ts lib/live/presence-read.test.ts lib/live/scope.test.ts lib/live/home-scope-proof.test.ts lib/live/channel.test.ts lib/db/commit-effects.test.ts cloudflare/device-gateway/src/live-route.test.ts
+      - run: node --import tsx --test lib/device-presence-grant.test.ts lib/live/presence-read.test.ts lib/live/scope.test.ts lib/live/home-scope-proof.test.ts lib/live/channel.test.ts lib/db/commit-effects.test.ts cloudflare/device-gateway/src/live-route.test.ts cloudflare/device-gateway/src/route.test.ts
       - run: node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/live/ticket.test.ts lib/mobile-threads-presence.test.ts
       - name: Select changed Worker and confirm the legacy production origin
         id: select
