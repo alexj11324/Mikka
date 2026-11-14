@@ -4,10 +4,10 @@ import 'server-only'
 import { and, desc, eq, gt, sql } from 'drizzle-orm'
 import { chatBotId } from '@/lib/coordinator/coordinator-bot'
 import type { ModelMessage } from 'ai'
-import { readRun, visibleRuns } from '@/lib/agent-runs'
+import * as runs from '@/lib/agent-runs'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { peerCoordinatorMessageEvent } from '@/lib/coordinator-events'
-import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
+import { coordinatorEnabled } from '@/lib/coordinator/wake'
 import { db, pool } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
 import { coordinatorSessionScope } from '@/lib/live/coordinator-session'
@@ -34,9 +34,9 @@ const coordinatorChat = (userId: string) => {
   return chatBotId(userId, null, workspaceId)
 }
 
-async function lastPosition(userId: string): Promise<number> {
+async function lastPosition(userId: string, botId: string): Promise<number> {
   const [row] = await db.select({ last: sql<number>`coalesce(max(${coordinatorMessages.position}), 0)` })
-    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, await coordinatorChat(userId))))
+    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, botId)))
   return Number(row?.last ?? 0)
 }
 
@@ -47,9 +47,8 @@ async function lastPosition(userId: string): Promise<number> {
  */
 export async function sendToCoordinator(userId: string, text: string) {
   const botId = await coordinatorChat(userId)
-  const after = await lastPosition(userId)
+  const after = await lastPosition(userId, botId)
   await recordCoordinatorEvent(db, peerCoordinatorMessageEvent(userId, botId, text))
-  await wakeCoordinator(userId)
   return { queued: true, coordinatorRunning: await coordinatorEnabled(userId, botId), after }
 }
 
@@ -150,7 +149,7 @@ export async function getIssue(userId: string, issueId: string) {
   if (!taskReaderScope(userId).workspaceId) throw new ActionFailureError('workspaceAccessDenied')
   const issue = await issueForUser(userId, issueId)
   if (!issue) return null
-  const runs = await visibleRuns(userId, { issueId: issue.id, limit: 5 })
+  const recentRuns = await runs.visibleRunStates(userId, { issueId: issue.id, limit: 5 })
   const view = await issueView(issue)
   const metadata = view.metadata
   // Children and the issues this one blocks point at it, so they are found by looking the other way.
@@ -171,17 +170,17 @@ export async function getIssue(userId: string, issueId: string) {
       children: pick([...linked.values()].filter(row => row.parentId === issue.id).map(row => row.id)),
       blockedBy: pick(metadata.blockedByIds), blocks: pick([...linked.values()].filter(row => row.blockedByIds.includes(issue.id)).map(row => row.id)), related: pick(metadata.relatedIds), duplicateOf: pick([metadata.duplicateOfId])[0] ?? null,
     },
-    runs: runs.map(run => ({ id: run.id, agent: run.agentName, status: run.status, createdAt: run.createdAt.toISOString() })),
+    runs: recentRuns.map(run => ({ id: run.id, agent: run.agentName, status: run.status, createdAt: run.createdAt.toISOString() })),
   }
 }
 
 export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }) {
-  const rows = await visibleRuns(userId, input)
+  const rows = await runs.visibleRunStates(userId, input)
   return rows.map(run => ({ id: run.id, issueId: run.issueId, agent: run.agentName, status: run.status, stopReason: run.stopReason, createdAt: run.createdAt.toISOString() }))
 }
 
 export async function getRun(userId: string, runId: string) {
-  const detail = await readRun(userId, runId)
+  const detail = await runs.readRun(userId, runId)
   if (!detail) return null
   const { run } = detail
   return {
