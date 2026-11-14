@@ -7129,6 +7129,7 @@
     "noTasks": "没有任务"
   },
   "HostedInbox": {
+    "writeError": "未能确认收件箱更改。请刷新后重试。",
     "dismiss": "忽略",
     "dismissed": "已忽略",
     "reason": {

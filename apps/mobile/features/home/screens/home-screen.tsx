@@ -10,7 +10,9 @@ import { ReadNotice } from '@/components/ReadNotice'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { restartToUpdate, useUpdateReady } from '@/lib/updates'
-import { prefetch, useRefresh } from '@/lib/useApi'
+import { useHome } from '@/lib/home'
+import { inboxLive } from '@/lib/live-keys'
+import { prefetch, useLiveApi, useRefresh } from '@/lib/useApi'
 import { colors, LIST_INSET } from '@/lib/theme'
 import { HomeChatRow } from '../components/home-chat-row'
 import { PinnedGrid } from '../components/pinned-grid'
@@ -26,6 +28,8 @@ import { useHomeChats, type HomeChat } from '../model/use-home-chats'
  */
 export function HomeScreen() {
   const router = useRouter()
+  const workspace = useHome().data?.workspace.id
+  const counts = useLiveApi<{ count: number }>(workspace ? '/api/inbox?' + new URLSearchParams({ workspaceId: workspace, count: '1' }) : null, () => inboxLive(workspace))
   const actions = useHomeChats('')
   const { chats, loading, error, reload } = actions
   const [collapsed, setCollapsed] = useState<ReadonlySet<SectionId>>(new Set())
@@ -72,6 +76,7 @@ export function HomeScreen() {
                 <Text style={styles.updateText}>{mobileMessages.MobileCore.restartToUpdate}</Text>
               </Pressable>
             ) : null}
+            <Row label={mobileMessages.Nav.inbox} value={counts.data?.count ? String(counts.data.count) : undefined} onPress={() => router.push('/inbox')} />
             <Row label={mobileMessages.ConversationDirectory.title} onPress={() => router.push('/conversations')} />
             <Row label={mobileMessages.ArtifactsPage.category.pullRequests} onPress={() => router.push({ pathname: '/conversations', params: { view: 'pulls' } })} />
             <PinnedGrid pinned={pinned} actions={actions} />

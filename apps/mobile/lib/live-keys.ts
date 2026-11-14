@@ -13,6 +13,11 @@ const LIST_MERGE_MS = 2_000
 /** A list's key is its channel's own workspace id; with no channel known it reads once a minute and asks for no ticket. */
 export const listRef = (kind: LiveRef['kind'], scope: string | null | undefined): LiveRef => ({ kind, id: scope || UNRESOLVED_LIVE_ID, scope: scope || null })
 
+/** Both Inbox screens refresh from the same two owner/workspace keys as Web. */
+export const inboxLive = (workspace: string | undefined) => ({
+  minIntervalMs: LIST_MERGE_MS, refs: [listRef('pending_actions', workspace), listRef('issue_list', workspace)],
+})
+
 /** A read that refreshes only by the minute fallback, never by push. */
 export const minuteRef = (kind: LiveRef['kind']): LiveRef => ({ kind, id: UNRESOLVED_LIVE_ID, scope: null })
 

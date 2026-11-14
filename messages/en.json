@@ -7129,6 +7129,7 @@
     "noTasks": "No tasks"
   },
   "HostedInbox": {
+    "writeError": "Could not confirm the inbox change. Refresh and try again.",
     "dismiss": "Dismiss",
     "dismissed": "Dismissed",
     "reason": {
