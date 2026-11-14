@@ -7359,6 +7359,19 @@
     }
   },
   "MobileCore": {
+    "notifications": {
+      "on": "On",
+      "off": "Off",
+      "pushTypes": "Send notifications for",
+      "unavailable": "Push notifications are unavailable",
+      "openSettings": "Open settings",
+      "allow": "Allow notifications",
+      "savingOn": "Turning on",
+      "savingOff": "Turning off",
+      "unconfirmedOn": "Not confirmed on",
+      "unconfirmedOff": "Not confirmed off",
+      "retrySave": "Retry save"
+    },
     "pin": "Pin",
     "unpin": "Unpin",
     "hide": "Hide",
