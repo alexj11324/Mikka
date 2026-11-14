@@ -25,6 +25,9 @@ let groupList: { id: string; title: string; workspaceId: string }[] = []
 let groupListError: Error | undefined
 let groupListRetries = 0
 const teamIssuesId = '8055a7ae-204f-4045-8780-66b9c93ce229'
+const projectReads = { projects: 0, links: 0 }
+let projectsFailed = false
+let projectsPending = false
 let projectTeamsFailed = false
 let projectTeamsPending = false
 let scopedTeamFixture = false
@@ -43,15 +46,21 @@ const router = { push: (href: string) => browser.history.pushState({}, '', href)
 mock.module('next-intl', { namedExports: { useLocale: () => 'en', useTranslations: (namespace?: string) => Object.assign((key: string) => namespace ? `${namespace}.${key}` : key, { has: () => false }) } })
 mock.module('next/navigation', { namedExports: { useSearchParams: () => new URLSearchParams(browser.location.search) } })
 mock.module('@/i18n/navigation', { namedExports: { getPathname: ({ href }: { href: string }) => href, usePathname: () => browser.location.pathname, useRouter: () => router } })
+mock.module('../settings/settings-link.tsx', { namedExports: { SettingsLink: ({ href, children }: { href: string; children?: ReactNode }) => <a href={href}>{children}</a> } })
 mock.module('sonner', { namedExports: { toast: { error: nothing, dismiss: nothing } } })
 mock.module('swr', { defaultExport: (key: unknown, _read?: unknown, options?: { isPaused?: () => boolean }) => ({
   data: key === '/api/workspace/switcher' ? { ...workspace(), live: { ownerId: user.id } }
     : key === 'teams' && scopedTeamFixture ? [{ id: teamIssuesId, name: 'Scoped Team' }]
+    : Array.isArray(key) && key[0] === 'team-home' ? { members: [], taskCount: 0 }
+    : Array.isArray(key) && key[0] === 'projects' ? [{ id: 'known-project', name: 'Known project', summary: '' }]
+    : key === 'project-teams' ? [{ projectId: 'known-project', teamId: teamIssuesId }]
     : Array.isArray(key) && key[0] === 'team-issues-page' ? { items: [], next: null }
     : [],
-  error: key === 'project-teams' && projectTeamsFailed ? new Error('unavailable') : undefined,
-  isLoading: key === 'project-teams' ? projectTeamsPending : Array.isArray(key) && key[0] === 'team-issues-page' ? scopedTasksPending : false,
-  mutate: Array.isArray(key) && key[0] === 'team-issues-page' ? async () => { if (!options?.isPaused?.()) scopedTeamPageMutations++ } : refreshed,
+  error: ((key === 'project-teams' && projectTeamsFailed) || (Array.isArray(key) && key[0] === 'projects' && projectsFailed)) ? new Error('unavailable') : undefined,
+  isLoading: key === 'project-teams' ? projectTeamsPending : Array.isArray(key) && key[0] === 'projects' ? projectsPending : Array.isArray(key) && key[0] === 'team-issues-page' ? scopedTasksPending : false,
+  mutate: key === 'project-teams' ? async () => { projectReads.links++ }
+    : Array.isArray(key) && key[0] === 'projects' ? async () => { projectReads.projects++ }
+    : Array.isArray(key) && key[0] === 'team-issues-page' ? async () => { if (!options?.isPaused?.()) scopedTeamPageMutations++ } : refreshed,
 }), namedExports: { SWRConfig: swr.SWRConfig, unstable_serialize: swr.unstable_serialize, useSWRConfig: swr.useSWRConfig } })
 mock.module('@/lib/app-build', { namedExports: { APP_BUILD: '' } })
 mock.module('./project-workspace.tsx', { namedExports: {
@@ -59,7 +68,7 @@ mock.module('./project-workspace.tsx', { namedExports: {
     <section data-project-list-state={error ? 'failed' : loading ? 'pending' : 'ready'} />,
 } })
 mock.module('@/lib/auth-client', { namedExports: { endSession: async () => ({}), authClient: { getSession: async () => ({ data: { user } }), useSession: () => ({ data: null }) } } })
-mock.module('@/lib/settings-data', { namedExports: { fetchSettingsData: refreshed } })
+mock.module('@/lib/settings-data', { namedExports: { fetchSettingsData: refreshed, fetchTeamHome: refreshed, teamHomeKey: (actor: string, team: string) => ['team-home', actor, team], settingsReadOptions: {} } })
 mock.module('@/lib/use-presence', { namedExports: { usePresence: (open: boolean) => ({ value: open, open, onOpenChangeComplete: nothing }) } })
 mock.module('@/hooks/use-workspace', { namedExports: { useWorkspace: () => ({ data: workspaceReady ? workspace() : undefined, error: workspaceError, mutate: async () => { workspaceError = undefined; workspaceReady = true } }) } })
 mock.module('@/hooks/use-agent-history', { namedExports: { useAgentHistory: () => ({ data: { sessions: [] } }) } })
@@ -89,7 +98,7 @@ for (const [file, names] of [
   // The real app-frame slot also exports an unused rail; its account menu is outside this shell-state fixture.
   ['../workspace-menu.tsx', ['WorkspaceMenu']],
   ['../nav/new-bot-dialog.tsx', ['NewBotDialog']],
-  ['../onboarding/onboarding.tsx', ['Onboarding']], ['../teams/team-home.tsx', ['TeamHome']],
+  ['../onboarding/onboarding.tsx', ['Onboarding']],
   ['./issue-list.tsx', ['IssueList']],
   ['../nav/context-panel.tsx', ['ContextPanel']],
   ['../nav/group-panel.tsx', ['GroupPanel']], ['../nav/conversation-pill.tsx', ['ConversationPillButton']],
@@ -221,7 +230,8 @@ beforeEach(() => {
   groupList = []
   groupListError = undefined
   groupListRetries = 0
-  projectTeamsFailed = false; projectTeamsPending = false
+  projectTeamsFailed = false; projectTeamsPending = false; projectsFailed = false; projectsPending = false
+  projectReads.projects = 0; projectReads.links = 0
   scopedTeamFixture = false; workspaceTasksPending = false; scopedTasksPending = false; scopedTeamPageMutations = 0; acknowledgeNewTask = null; probeEmbeddedAck = false
   browser.history.replaceState({}, '', '/?workspace=workspace-one')
   browser.localStorage.clear(); browser.sessionStorage.clear()
@@ -321,6 +331,38 @@ test('Team Projects distinguishes unavailable associations from an empty list an
   browser.history.replaceState({}, '', `/?workspace=${workspaceId}&section=projects`)
   await render({ initialSection: 'projects' })
   assert.ok(container.querySelector('[data-project-list-state="ready"]'))
+})
+
+test('Team Home distinguishes either pending or failed project read from its last known count and retries both', async () => {
+  scopedTeamFixture = true
+  browser.history.replaceState({}, '', `/?workspace=${workspaceId}&team=${teamIssuesId}&section=team-home`)
+  await act(async () => { releaseChunk(); await chunkReady })
+  const show = () => render({ initialSection: 'team-home' })
+  const projects = () => container.querySelector('section[aria-labelledby="team-resources-heading"]')!
+  const shortcut = () => [...container.querySelectorAll('aside button')].find(button => button.textContent?.includes('Projects.title'))!
+  await show()
+  assert.match(projects().textContent!, /Known project/)
+  assert.match(shortcut().textContent!, /1$/)
+  for (const source of ['projects', 'links']) {
+    projectsPending = source === 'projects'; projectTeamsPending = source === 'links'
+    await show()
+    assert.ok(projects().querySelector('[data-slot="skeleton"]'))
+    assert.doesNotMatch(projects().textContent!, /Known project|FeatureCopy.c_174759ae/)
+    assert.match(shortcut().textContent!, /—$/)
+    projectsPending = false; projectTeamsPending = false
+    projectsFailed = source === 'projects'; projectTeamsFailed = source === 'links'
+    await show()
+    assert.doesNotMatch(projects().textContent!, /Known project|FeatureCopy.c_174759ae/)
+    assert.match(shortcut().textContent!, /—$/)
+    const retry = projects().querySelector<HTMLButtonElement>('[role="alert"] button')
+    assert.ok(retry)
+    await act(async () => { retry.click() })
+    projectsFailed = false; projectTeamsFailed = false
+    await show()
+    assert.match(projects().textContent!, /Known project/)
+    assert.match(shortcut().textContent!, /1$/)
+  }
+  assert.deepEqual(projectReads, { projects: 2, links: 2 })
 })
 
 test('Team Issues first-page readiness is independent of the unrelated workspace-wide list', async () => {
