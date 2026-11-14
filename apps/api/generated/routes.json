@@ -49,7 +49,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "0579169d8d4d0e0364805608b86ea20beb5928b0e94292ea125b5d2ed54185d5"
+      "sourceHash": "1b2beae54ad203803ab48b43a43a75064d0f861bb59b9f6102d0b62d7c35f438"
     },
     {
       "path": "/mikka/api/agent",
