@@ -7387,6 +7387,8 @@
     "message": "发消息",
     "replySelection": "回复选中的文字",
     "messageTask": "给这个任务发消息",
+    "messageThread": "给这个线程发消息",
+    "lastThreadStatus": "上次状态：{status}",
     "noTasks": "没有任务",
     "notStarted": "还没开始",
     "allTasks": "全部任务",
