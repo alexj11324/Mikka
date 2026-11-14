@@ -194,3 +194,15 @@ test('Decisions traces separate a connected Cloud receipt and custom transport f
   assert.deepEqual(decisionTraceTarget(nativeEndpoint, false), { route: 'api_key', provider: 'openai' })
   assert.deepEqual(decisionTraceTarget('https://compatible.example/v1/decisions', false), { route: 'api_key' })
 })
+
+test('a previously queued Coordinator deadline delivers its pending event through Eve then completes', async () => {
+  starts = 0
+  events = [{ id: 'old-deadline-outbox', kind: 'run_finished', payload: {}, tier: 'result' }]
+  const ticket = { userId: 'synthetic', botId: 'fixture-bot', at: '2026-11-01T00:00:00Z',
+    events: [{ id: 'old-deadline-outbox', attempt: 1, nextWakeAt: '2026-11-01T00:00:00Z', leaseUntil: null }] }
+  assert.equal(await wake.recoverWakeDeadline(ticket), null)
+  assert.equal(starts, 1)
+  events = []
+  assert.equal(await wake.recoverWakeDeadline(ticket), null)
+  assert.equal(starts, 1, 'a retired deadline with no pending product event starts no Eve delivery')
+})
