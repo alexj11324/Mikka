@@ -134,8 +134,8 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
 
     const unlinked = await run({ prompt: 'Needle question' })
     await pool.query(`UPDATE agent_runs SET "issueId"=NULL, "createdAt"=now()-interval '60 days' WHERE id=$1`, [unlinked])
-    const botId=randomUUID(), otherBot=randomUUID()
-    for (const id of [botId,otherBot]) await pool.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1::uuid,'owner',$2,$3)`,[id,workspaceId,'QA '+id])
+    const botId=randomUUID(), directoryOtherBot=randomUUID()
+    for (const id of [botId,directoryOtherBot]) await pool.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1::uuid,'owner',$2,$3)`,[id,workspaceId,'QA '+id])
     const historical=Array.from({length:50},()=>randomUUID())
     await pool.query(`INSERT INTO agent_runs(id,"userId","workspaceId","agentId","botId",status,prompt,"createdAt","updatedAt")
       SELECT id,'owner',$2,$3,$4,CASE n WHEN 3 THEN 'waiting_input' WHEN 4 THEN 'running' ELSE 'succeeded' END,
@@ -157,22 +157,26 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     await pool.query(`INSERT INTO user_preferences ("userId","archiveIdleAfterDays") VALUES ('owner',0)
       ON CONFLICT ("userId") DO UPDATE SET "archiveIdleAfterDays"=0`)
     assert.equal((await filtered()).length,49,'off keeps all 49 manually unarchived rows')
-    assert.equal((await conversationDirectory(pool,'owner',workspaceId,{botId:otherBot})).items.length,0)
+    assert.equal((await conversationDirectory(pool,'owner',workspaceId,{botId:directoryOtherBot})).items.length,0)
     assert.deepEqual(await conversationSidebar(pool,'other',workspaceId),{})
     await pool.query(`UPDATE user_preferences SET "archiveIdleAfterDays"=3 WHERE "userId"='owner'`)
     assert.equal((await sidebar()).more,false,'three days hides old idle work but preserves pinned/live/restored rows')
     await pool.query(`UPDATE user_preferences SET "archiveIdleAfterDays"=30 WHERE "userId"='owner'`)
     const search = { search: 'needle' }
+    const runUnread = async () => {
+      const item = (await conversationDirectory(pool, 'owner', workspaceId, search)).items.find(row => row.id === unlinked)
+      return item?.kind === 'run' ? item.unread : undefined
+    }
     const directory = await conversationDirectory(pool, 'owner', workspaceId, search)
     assert.deepEqual(directory.items.map(row => [row.id, row.issueId, row.title, row.state]), [[unlinked, null, 'Needle question', 'working']])
     assert.equal((directory.items[0].kind === 'run' ? directory.items[0].unread : undefined), false)
     await pool.query("UPDATE agent_runs SET \"finishedAt\"=now() WHERE id=$1", [unlinked])
-    assert.equal((await conversationDirectory(pool, 'owner', workspaceId, search)).items.find(row => row.kind === 'run')?.unread, true)
+    assert.equal(await runUnread(), true)
     await pool.query(`INSERT INTO conversation_reads ("userId","conversationId","runReadAt")
       SELECT 'owner','run:'||id::text,"finishedAt" FROM agent_runs WHERE id=$1`, [unlinked])
-    assert.equal((await conversationDirectory(pool, 'owner', workspaceId, search)).items.find(row => row.kind === 'run')?.unread, false)
+    assert.equal(await runUnread(), false)
     await pool.query(`UPDATE conversation_reads SET "manuallyUnread"=true WHERE "userId"='owner' AND "conversationId"='run:'||$1`, [unlinked])
-    assert.equal((await conversationDirectory(pool, 'owner', workspaceId, search)).items.find(row => row.kind === 'run')?.unread, true)
+    assert.equal(await runUnread(), true)
     assert.deepEqual((await conversationDirectory(pool, 'other', workspaceId, search)).items, [])
     assert.deepEqual((await conversationDirectory(pool, 'owner', foreignWorkspace, search)).items, [])
     assert.deepEqual((await conversationDirectory(pool, 'owner', workspaceId, { ...search, state: 'failed' })).items, [])
