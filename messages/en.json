@@ -7387,6 +7387,8 @@
     "message": "Message",
     "replySelection": "Reply to selected text",
     "messageTask": "Message this task",
+    "messageThread": "Message this thread",
+    "lastThreadStatus": "Last status: {status}",
     "noTasks": "No tasks",
     "notStarted": "Not started",
     "allTasks": "All tasks",
