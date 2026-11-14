@@ -574,6 +574,13 @@
     "behavior": "The application stage is optional on local Compose. Explicit production, preview or development stages take precedence over a provider's stage and invalid values fail validation.",
     "test": "lib/deployment-stage.test.mjs"
   },
+  "lib/device-name.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the persisted 60-character limit when renaming a device. Only a changed, nonempty trimmed name can be submitted from Settings.",
+    "test": "tests/settings-activity.db.test.ts",
+    "suite": "test:settings-activity-db"
+  },
   "lib/device-removal.ts": {
     "mode": "built-in",
     "environment": [],

@@ -200,6 +200,40 @@ test('CLI reports fixed errors without raw failure values', () => {
 })
 
 
+test('CLI preserves public qualification stages from a pinned private runner and suppresses unknown diagnostics', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'mikka-cloud-stage-error-'))
+  try {
+    const publicRoot = join(directory, 'public')
+    const script = 'scripts/cloudflare-cloud-ci.mjs'
+    const publicSource = await repository(publicRoot, 'alexj11324/Mikka', {
+      '.gitignore': '/.mikka-cloud/\n',
+      [script]: await readFile(new URL('./cloudflare-cloud-ci.mjs', import.meta.url), 'utf8'),
+      'scripts/cloudflare-source.mjs': await readFile(new URL('./cloudflare-source.mjs', import.meta.url), 'utf8'),
+    })
+    const privateSource = await repository(join(publicRoot, '.mikka-cloud'), 'alexj11324/mikka-cloud', {
+      'scripts/cloudflare-ci.mjs': 'export function runCi({env}) { throw new Error(env.TEST_DIAGNOSTIC) }',
+    })
+    for (const [diagnostic, expected] of [
+      ['CLOUD_CI_STAGE_FAILED_OPS_CONTRACTS', 'CLOUD_CI_STAGE_FAILED_OPS_CONTRACTS'],
+      ['CLOUD_CI_STAGE_FAILED_POSTGRES17_CORE_MODELS_AND_EVE', 'CLOUD_CI_STAGE_FAILED_POSTGRES17_CORE_MODELS_AND_EVE'],
+      ['CLOUD_CI_STAGE_FAILED_PRIVATE_SENTINEL', 'CLOUD_PUBLIC_CI_FAILED'],
+      ['CLOUD_CI_STAGE_FAILED_TYPECHECK_CORE\nprivate-sentinel', 'CLOUD_PUBLIC_CI_FAILED'],
+      ['provider failure: private-sentinel', 'CLOUD_PUBLIC_CI_FAILED'],
+    ]) {
+      const result = spawnSync(process.execPath, [join(publicRoot, script), 'verify'], {
+        cwd: publicRoot, encoding: 'utf8',
+        env: { PATH: process.env.PATH, ...env, GITHUB_SHA: publicSource, GITHUB_WORKFLOW_SHA: publicSource,
+          MIKKA_CLOUD_SOURCE_SHA: privateSource, TEST_DIAGNOSTIC: diagnostic },
+      })
+      assert.equal(result.status, 1)
+      assert.equal(result.stdout, '')
+      assert.equal(result.stderr.trim(), expected)
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
 test('published metadata contains exactly the qualified sources, hashes and immutable Registry reference', () => {
   const context = sourceContext(env, env.GITHUB_SHA)
   const inner = receipt(context)

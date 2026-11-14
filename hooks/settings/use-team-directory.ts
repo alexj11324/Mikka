@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import useSWR, { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
 import posthog from 'posthog-js'
-import { changeTeamMember, deleteTeam, getTeamDeletionImpact, loadTeamDirectory, saveTeam } from '@/app/actions/teams'
+import { changeTeamMember, deleteTeam, getTeamDeletionImpact, loadTeamDirectory, removeTeamGrouping, saveTeam } from '@/app/actions/teams'
 import { fetchTeamDirectory, fetchTeamMembers, isSettingsAccessError, settingsReadOptions, teamDirectoryKey, teamMembersKey } from '@/lib/settings-data'
 import { pushSettingsHistory } from '@/lib/settings-navigation'
 import { memberCsv } from '@/lib/invitation-csv'
@@ -17,6 +17,7 @@ import type { TeamDeletionImpact } from '@/lib/workspace-admin/teams'
 export type TeamDirectoryData = Awaited<ReturnType<typeof loadTeamDirectory>>
 export type DirectoryTeam = TeamDirectoryData['teams'][number]
 export type TeamPage = 'general' | 'members'
+type TeamRemovalIntent = 'delete' | 'ungroup'
 
 /**
  * 设置 › 团队 as data, for a UI layer that draws the page itself (slot `settings-members`): the
@@ -34,7 +35,9 @@ export function useTeamDirectory(workspaceId?: string) {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [deletion, setDeletion] = useState<{ team: DirectoryTeam; impact: TeamDeletionImpact | null } | null>(null)
+  const [deletion, setDeletion] = useState<{ intent: TeamRemovalIntent; team: DirectoryTeam; impact: TeamDeletionImpact | null } | null>(null)
+  const impactRead = useRef(0)
+  const isRemoving = useRef(false)
   const teamId = params.get('team') ?? undefined
   const view = params.get('view')
   const directoryHref = `/settings/teams?workspace=${encodeURIComponent(data?.workspace.id ?? workspaceId ?? '')}`
@@ -66,30 +69,44 @@ export function useTeamDirectory(workspaceId?: string) {
     finally { setPending(false) }
   }
 
-  /** Opens 删除团队's confirm and reads what goes with the team. */
-  async function askDelete(team: DirectoryTeam) {
+  async function inspectRemoval(team: DirectoryTeam, intent: TeamRemovalIntent) {
+    if (isRemoving.current) return
+    const read = ++impactRead.current
     setError(''); setNotice('')
-    setDeletion({ team, impact: null })
+    setDeletion({ team, intent, impact: null })
     try {
       const result = await getTeamDeletionImpact(team.id)
+      if (impactRead.current !== read) return
       if (result.error) { setDeletion(null); setError(translateError(result.error)); return }
-      const impact: TeamDeletionImpact = result
-      setDeletion(current => current?.team.id === team.id ? { team, impact } : current)
-    } catch { setDeletion(null); setError(t('IssueDetail.operationFailed')) }
+      setDeletion({ team, intent, impact: result })
+    } catch {
+      if (impactRead.current !== read) return
+      setDeletion(null); setError(t('IssueDetail.operationFailed'))
+    }
   }
 
-  async function confirmDelete(confirmName: string) {
-    if (!deletion || pending) return
+  function cancelDelete() {
+    if (isRemoving.current) return
+    impactRead.current++
+    setDeletion(null); setError('')
+  }
+
+  async function submitRemoval(intent: TeamRemovalIntent, confirmName: string) {
+    if (!deletion?.impact || deletion.intent !== intent || isRemoving.current
+      || deletion.team.workspaceId !== data?.workspace.id || confirmName.trim() !== deletion.team.name
+      || (intent === 'delete' && !deletion.impact.canDelete)) return
+    isRemoving.current = true
     setPending(true); setError('')
     try {
-      const result = await deleteTeam(deletion.team.id, confirmName)
+      const command = intent === 'delete' ? deleteTeam : removeTeamGrouping
+      const result = await command(deletion.team.id, confirmName)
       if (result.error) { setError(translateError(result.error)); return }
-      setNotice(t('HostedMembers.teamDeleted', { name: deletion.team.name }))
+      setNotice(t(intent === 'delete' ? 'HostedMembers.teamDeleted' : 'HostedMembers.teamUngrouped', { name: deletion.team.name }))
       setDeletion(null)
       updated()
       if (teamId === deletion.team.id) navigate(directoryHref)
     } catch { setError(t('IssueDetail.operationFailed')) }
-    finally { setPending(false) }
+    finally { isRemoving.current = false; setPending(false) }
   }
 
   /** The given teams as teams.csv, the columns TeamDirectory exports. */
@@ -119,7 +136,11 @@ export function useTeamDirectory(workspaceId?: string) {
     /** The team's own page in the workspace (团队概览). */
     openOverview: (id: string) => navigate(workspaceLink({ section: 'team-home', team: id })),
     saved, updated, membership,
-    deletion, askDelete, cancelDelete: () => { if (!pending) { setDeletion(null); setError('') } }, confirmDelete,
+    deletion, cancelDelete,
+    askDelete: (team: DirectoryTeam) => inspectRemoval(team, 'delete'),
+    askRemoveGrouping: (team: DirectoryTeam) => inspectRemoval(team, 'ungroup'),
+    confirmDelete: (name: string) => submitRemoval('delete', name),
+    confirmRemoveGrouping: (name: string) => submitRemoval('ungroup', name),
     exportCsv,
   }
 }
