@@ -782,11 +782,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
         </div>
         <IssueList issues={filtered} searching={!!query || view !== 'all'} onOpen={openFromList} onCreate={() => create()} />
       </>}
-<<<<<<< HEAD
-      {!selected && paging.hasMore && (section === 'all-issues' || section === 'my-issues' || section === 'team-issues' || threadsView) &&
-=======
       {!selected && visiblePaging.hasMore && (section === 'tasks' || section === 'all-issues' || section === 'my-issues' || section === 'team-issues' || threadsView) &&
->>>>>>> origin/main
         <div className="flex shrink-0 justify-center p-2">
           <Button variant="ghost" size="sm" disabled={visiblePaging.loading} onClick={() => void visiblePaging.loadMore()}>
             {visiblePaging.failed ? i18nText('Common.retry') : i18nText('HostedTasks.loadMore')}
