@@ -14,7 +14,7 @@ import { coordinatorSessionScope } from '@/lib/live/coordinator-session'
 import { subscribeToCoordinatorReplies } from './reply-live'
 import { waitForReply } from './reply-wait'
 import { logReplyCompletion } from './reply-completion'
-import { coordinatorMessages, coordinatorSessions, issueMembers, issues } from '@/lib/db/schema'
+import { coordinatorMessages, coordinatorSessions, issues } from '@/lib/db/schema'
 import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { issueView, taskIdentifiers } from '@/lib/task-identifier-server'
@@ -133,13 +133,15 @@ export async function readCoordinatorMessages(userId: string, input: { after?: n
 
 export async function listIssues(userId: string, input: { status?: string }) {
   if (!taskReaderScope(userId).workspaceId) throw new ActionFailureError('workspaceAccessDenied')
-  const rows = await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent, updatedAt: issues.updatedAt })
-    .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-    .where(and((await issueVisibility(userId)).predicate, input.status ? eq(issues.status, input.status) : undefined))
+  const visibility = await issueVisibility(userId, false, undefined, db, { withTeamLinks: false })
+  const rows = await db.select({ id: issues.id, ownerId: issues.userId, scope: issues.scope, issuedIdentifier: issues.issuedIdentifier,
+    title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent, updatedAt: issues.updatedAt })
+    .from(issues)
+    .where(and(visibility.predicate, input.status ? eq(issues.status, input.status) : undefined))
     .orderBy(desc(issues.updatedAt)).limit(100)
   const page = rows.filter(row => !readIssueMetadata(row.content).deletedAt).slice(0, 50)
   const identifiers = await taskIdentifiers(page)
-  return page.map(({ content, updatedAt, ownerId: _ownerId, scope: _scope, ...row }) => ({
+  return page.map(({ content, updatedAt, ownerId: _ownerId, scope: _scope, issuedIdentifier: _issued, ...row }) => ({
     ...row, identifier: identifiers.get(row.id) ?? null, number: readIssueMetadata(content).number ?? null, updatedAt: updatedAt.toISOString(),
   }))
 }
@@ -153,8 +155,7 @@ export async function getIssue(userId: string, issueId: string) {
   const metadata = view.metadata
   // Children and the issues this one blocks point at it, so they are found by looking the other way.
   const siblings = await db.select({ id: issues.id, title: issues.title, status: issues.status, content: issueAttrsContent }).from(issues)
-    .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-    .where(and(eq(issues.userId, issue.userId), (await issueVisibility(userId, false, issue.workspaceId!)).predicate))
+    .where(and(eq(issues.userId, issue.userId), (await issueVisibility(userId, false, issue.workspaceId!, db, { withTeamLinks: false })).predicate))
   const linked = new Map(siblings.filter(row => !readIssueMetadata(row.content).deletedAt).map(row => [row.id, { id: row.id, title: row.title, status: row.status, parentId: readIssueMetadata(row.content).parentId, blockedByIds: readIssueMetadata(row.content).blockedByIds }]))
   const pick = (ids: (string | null)[]) => ids.flatMap(id => {
     const row = id ? linked.get(id) : undefined
