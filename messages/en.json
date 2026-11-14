@@ -590,6 +590,7 @@
     "openableDraggableTask": "Openable, draggable task"
   },
   "Editor": {
+    "executionInstructions": "Execution instructions",
     "draftAuthor": "Draft author",
     "unsavedDraft": "Unsaved draft",
     "editorLabel": "Task description editor",
@@ -6524,6 +6525,7 @@
       "openOrganization": "Open Organization settings",
       "accept": "Join Organization",
       "organizationSelect": "Organization",
+      "receivedTitle": "Invitations for you",
       "noOrganizations": "No Organizations",
       "statusPending": "Pending",
       "statusAccepted": "Accepted",
@@ -7514,6 +7516,12 @@
     "refreshFailed": "Unable to refresh {label}. Previous content is shown."
   },
   "PersonalFiles": {
+    "archiveFolderTitle": "Archive {name}?",
+    "unarchiveFolderTitle": "Restore {name} to active folders?",
+    "activeFolders": "Active folders",
+    "archivedFolders": "Archived personal folders",
+    "archiveFolder": "Archive folder",
+    "unarchiveFolder": "Restore folder",
     "overviewSub": "Files you keep and results from your tasks.",
     "folders": "Folders",
     "overviewEmpty": "No files yet.",

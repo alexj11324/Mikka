@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { taskBriefGuidance } from "../coordinator/issue-input";
 import { routeSchema, bindingSchema, changeSchema } from "./contract";
 
 export const intakeSchema = routeSchema
@@ -6,7 +7,7 @@ export const intakeSchema = routeSchema
   .extend({
     sourceEventId: z.uuid().transform((value) => value.toLowerCase()),
     title: z.string().trim().min(1).max(200),
-    body: z.string().max(50_000).default(""),
+    body: z.string().max(50_000).default("").describe(taskBriefGuidance),
   })
   .strict();
 export const resolveInput = z

@@ -9,7 +9,7 @@ import { readTaskPresentations } from './task-presentation-read'
 
 /** Reuse the detail reader's tenant and Factory checks, including revocation between the two reads. */
 export async function readTaskWork(user: Parameters<typeof readTaskPresentations>[0], workspaceId: string, issueId: string) {
-  const batch = await readTaskPresentations(user, { workspaceId, issueIds: [issueId], includeFactoryIdentity: true })
+  const batch = await readTaskPresentations(user, { workspaceId, issueIds: [issueId], includeFactoryIdentity: true, includePullRequests: true })
   const presentation = batch.items[issueId] ?? null
   if (!presentation?.factoryTaskId) return { presentation, factory: null }
   const taskId = presentation.factoryTaskId

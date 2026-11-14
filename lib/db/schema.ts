@@ -1439,6 +1439,7 @@ export const driveVolumes = pgTable('drive_volumes', {
   ownerId: text('ownerId').notNull(),
   workspaceId: uuid('workspaceId'),
   name: text('name').notNull(),
+  archivedAt: timestamp('archivedAt', { withTimezone: true }),
   /** The two head pointers, moved together so a digest always names its version. */
   headVersionId: text('headVersionId').notNull(),
   headDigest: text('headDigest').notNull(),

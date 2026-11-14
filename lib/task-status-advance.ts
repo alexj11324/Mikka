@@ -7,10 +7,11 @@
  *   repeated or late event changes nothing;
  * - 已取消 and 重复 are the person's last word and never move;
  * - a status the person set by hand after the work began (`since`) is kept: the move is skipped;
- * - every move is a versioned system change (`issue_versions`, actor `system` / `source`), so the next check can tell
+ * - every move is versioned with its initiating actor (`issue_versions`), so the next check can tell
  *   a person's change from an automatic one.
  */
 import { sql, type SQL } from 'drizzle-orm'
+import type { ActivityActor } from './activity-actor'
 
 export type AdvanceTarget = 'doing' | 'review' | 'done'
 export const STATUS_ADVANCE_ORDER = ['backlog', 'todo', 'doing', 'review', 'done'] as const
@@ -26,7 +27,7 @@ const PERSON_CHANGED = (issue: string, since: string) => `EXISTS (
   SELECT 1 FROM issue_versions v WHERE v."issueId"=${issue} AND v.revision>1 AND v.actor_type='user' AND v."createdAt">${since}
     AND v.status IS DISTINCT FROM (SELECT p.status FROM issue_versions p WHERE p."issueId"=v."issueId" AND p.revision<v.revision ORDER BY p.revision DESC LIMIT 1))`
 
-/** $1 issue id, $2 target status, $3 when the work began (or null), $4 the source recorded on the version. */
+/** $1 issue id, $2 target status, $3 when the work began (or null), $4 the actor ID and $5 the actor type recorded on the version. */
 export const ADVANCE_ISSUE_STATUS = `WITH target AS (
   SELECT i.id FROM issues i WHERE i.id=$1
     AND array_position(ARRAY['backlog','todo','doing','review','done'], i.status) < array_position(ARRAY['backlog','todo','doing','review','done'], $2::text)
@@ -37,16 +38,16 @@ export const ADVANCE_ISSUE_STATUS = `WITH target AS (
   RETURNING i.id, i."userId", i.revision, i.title, i.content, i.status, i.priority
 ), versioned AS (
   INSERT INTO issue_versions (id,"issueId","userId",revision,title,content,status,priority,actor_type,actor_id)
-  SELECT gen_random_uuid(), id, "userId", revision, title, content, status, priority, 'system', $4::text FROM saved
+  SELECT gen_random_uuid(), id, "userId", revision, title, content, status, priority, $5::text, $4::text FROM saved
 )
 SELECT id FROM saved`
 
 type Query = { query: (text: string, values: unknown[]) => Promise<{ rows: unknown[] }> }
 
 /** Moves the task forward in one statement; true when it moved. Safe to repeat. */
-export async function advanceIssueStatus(database: Query, input: { issueId: string; to: AdvanceTarget; since: Date | string | null; source: string }): Promise<boolean> {
+export async function advanceIssueStatus(database: Query, input: { issueId: string; to: AdvanceTarget; since: Date | string | null; source: string; actor?: ActivityActor }): Promise<boolean> {
   const since = input.since instanceof Date ? input.since.toISOString() : input.since
-  const { rows } = await database.query(ADVANCE_ISSUE_STATUS, [input.issueId, input.to, since, input.source])
+  const { rows } = await database.query(ADVANCE_ISSUE_STATUS, [input.issueId, input.to, since, input.actor ? input.actor.actorId : input.source, input.actor?.actorType ?? 'system'])
   return rows.length > 0
 }
 
