@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import test from 'node:test'
-import { Pool } from 'pg'
+import { Client, Pool, type QueryResult } from 'pg'
 import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import {
   acceptInstall,
@@ -59,7 +59,17 @@ test(
       stateHash(expired),
     ])
     assert.equal(await consumeInstall(sql, a, expired, 'oauth'), null)
+    const queries = t.mock.method(Client.prototype, 'query')
     const id = await acceptInstall(sql, a, ws.id, grant, env)
+    grant.credential.token = randomBytes(32).toString('hex')
+    assert.equal(await acceptInstall(sql, a, ws.id, grant, env), id)
+    const writes = queries.mock.calls.filter(call => /^(INSERT INTO|SELECT .* FROM) mikka_slack_installations/i.test(String(call.arguments[0])))
+    queries.mock.restore()
+    const returned = await Promise.all(writes.map(async call => (await (call.result as unknown as Promise<QueryResult>)).rows))
+    t.diagnostic('Bytes returned to the OAuth writer (insert, conflicted insert, existing row): ' +
+      returned.map(rows => Buffer.byteLength(JSON.stringify(rows))).join(', '))
+    assert.deepEqual(returned.map(rows => rows.map(row => Object.keys(row))), [[['id']], [], [['id']]])
+    await assert.rejects(acceptInstall(sql, a, ws.id, { ...grant, botUserId: 'UOTHER' }, env), /slackInstallationConflict/)
     await assert.rejects(acceptInstall(sql, c, ws2.id, grant, env), /slackInstallationConflict/)
     await assert.rejects(acceptInstall(sql, b, ws.id, grant, env), /slackInstallationConflict/)
     const secret = (await sql.query('SELECT bot_secret FROM mikka_slack_installations WHERE id=$1', [id])).rows[0]
@@ -131,6 +141,7 @@ test(
     )
     assert.equal(await uninstallForWorkspace(sql, app, a, ws.id, async () => false, env), false)
     assert.equal((await installationStatus(sql, app, a, ws.id))?.revoking, true)
+    await assert.rejects(acceptInstall(sql, a, ws.id, grant, env), /slackInstallationConflict/)
     await assert.rejects(installationCredential(sql, asA, { env }), /slackInstallNotAuthorized/)
     assert.equal(
       await uninstallForWorkspace(sql, app, a, ws.id, async (token) => token === grant.credential.token, env),

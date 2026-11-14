@@ -421,6 +421,11 @@
     "kind": "core",
     "env": {}
   },
+  "core-view-state": {
+    "command": "pnpm test:view-state",
+    "kind": "core",
+    "env": {}
+  },
   "core-governance": {
     "command": "pnpm test:governance",
     "kind": "core",

@@ -11,7 +11,6 @@ import { TaskAttachments } from './task-attachments'
 import type { TaskActivityItem, TaskDetailFrameProps, TaskDetailRow, TaskMenuItem, TaskSubtask } from '@/components/slots/task-detail-contract'
 import { useIssueTeam } from '@/components/teams/issue-team-control'
 import { formatDateOnly } from '@/lib/date-only'
-import type { ExplicitTeamChoice } from '@/lib/issue-team-intent'
 import { isIssueListKey } from '@/lib/live/list-read'
 import { issueKeys } from '@/lib/swr/keys'
 import { taskProjectOptions } from '@/lib/task-project-options'
@@ -22,7 +21,7 @@ import { overdue } from './issue-detail-properties'
 import { AccessChangeDialog, IssueMetadataControls, useIssueMetadataSave, type MetadataRequest } from './issue-metadata-controls'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES } from './issue-properties'
 import { useIssueConnections, type RelationKind } from './issue-relations'
-import { useIssueScope } from './issue-scope-control'
+import { useTaskOwnershipRows } from './issue-scope-control'
 import { AgentSphere } from './issue-assignee-menu'
 import type { useAgentActivity } from './issue-threads'
 import { useSelectedTaskPresentation } from '@/hooks/use-selected-task-presentation'
@@ -113,9 +112,8 @@ export function FramedTask(props: FramedTaskProps) {
   const { data: options, error: optionsError, mutate: reloadOptions } = useSWR(wantOptions && !locked ? ['issue-property-options', task.id] : null, () => getIssuePropertyOptions(task.id))
   const loadOptions = () => setWantOptions(true)
   const metadata = useIssueMetadataSave({ task, disabled: locked, onSaved: adopt, onBusyChange: props.onMetadataBusy })
-  const [teamChoice, setTeamChoice] = useState<ExplicitTeamChoice | null>(null)
-  const scope = useIssueScope({ task, disabled: locked, onSaved: adopt, teamChoice })
-  const team = useIssueTeam({ issueId: task.id, viewerId: userId, disabled: locked, onChosen: (issueId, teamId) => setTeamChoice(teamId ? { issueId, teamId, selectionId: crypto.randomUUID() } : null) })
+  const ownershipRows = useTaskOwnershipRows(task, userId, preview, locked, adopt)
+  const team = useIssueTeam({ issueId: task.id, viewerId: userId, disabled: locked })
   const presentation = useSelectedTaskPresentation(userId, task.workspaceId, preview ? undefined : task.id)
   const connections = useIssueConnections({ liveWorkspaceId: props.liveWorkspaceId, viewerId: userId, task, getCurrent, onSaved: adopt, disabled: locked, enabled: !preview })
 
@@ -165,17 +163,14 @@ export function FramedTask(props: FramedTaskProps) {
       ],
     },
     { id: 'priority', label: tIssue('priorityLabel'), disabled: locked, value: { text: priorityLabel(props.priority), mark: { kind: 'priority', value: props.priority } }, menu: ISSUE_PRIORITIES.map(item => ({ id: item.value, label: priorityLabel(item.value), mark: { kind: 'priority', value: item.value }, checked: item.value === props.priority, onSelect: () => props.onPriority(item.value) })) },
-    { id: 'scope', label: scope.judgedByAgent.label, disabled: locked || scope.pending, value: { text: scope.current, mark: { kind: 'icon', icon: task.scope === 'workspace' ? 'workspace' : 'personal' } }, note: scope.judgedByAgent.shown ? scope.judgedByAgent.text : undefined, menu: scope.options.map(option => ({ id: option.value, label: option.label, mark: { kind: 'icon', icon: option.value === 'workspace' ? 'workspace' : 'personal' }, checked: option.value === task.scope, onSelect: () => { void scope.change(option.value) } })) },
+    ...ownershipRows,
     { id: 'assignee', label: tProperty('assignee'), disabled: busy, onOpen: loadOptions, value: member ? { text: member.name, mark: { kind: 'person', name: member.name }, aria: tAssignee('aria', { name: member.name }) } : { text: tAssignee('unassignedLabel'), mark: { kind: 'icon', icon: 'person' }, muted: true, aria: tAssignee('aria', { name: tAssignee('unassigned') }) }, menu: assigneeItems },
     ...delegate ? [{ id: 'delegate', label: tFrame('delegate'), value: { text: delegate, aria: tAssignee('delegatedTo', { name: delegate }), mark: { kind: 'node', node: <AgentSphere name={delegate} compact /> } } } satisfies TaskDetailRow] : [],
     { id: 'labels', label: tProperty('labels'), disabled: busy, onOpen: loadOptions, chips: meta.labels.map(label => ({ id: label.name, text: label.name, title: label.name })), add: { label: tProperty('editLabels'), menu: labelItems } },
     { id: 'project', label: tProperty('project'), disabled: busy, onOpen: loadOptions, value: { text: meta.project ?? tProperty('addToProject'), mark: { kind: 'icon', icon: 'project' }, muted: !meta.project, title: meta.project ?? undefined, aria: tProperty('projectAria', { name: meta.project ?? tProperty('unset') }) }, menu: projectItems },
     { id: 'team', label: team.label, disabled: locked || team.unavailable, value: { text: team.currentLabel, mark: { kind: 'icon', icon: 'team' }, muted: !team.selected, title: team.currentLabel }, menu: team.choices.map(choice => ({ id: choice.value, label: choice.label, mark: { kind: 'icon', icon: 'team' }, checked: choice.value === (team.selected || 'none'), onSelect: () => {
       const value = choice.value === 'none' ? '' : choice.value
-      // On reopening a personal task, the stored team still needs an explicit
-      // successful selection before it can be used as the sharing destination.
-      if (value === (team.data ?? '') && (!value || task.scope !== 'personal' || teamChoice?.teamId === value)) return
-      setTeamChoice(null)
+      if (value === (team.data ?? '')) return
       void team.save(value)
     } })) },
     ...meta.dueDate ? [{ id: 'dueDate', label: tProperty('dueDate'), disabled: locked, onClick: () => props.requestAction('dueDate'), value: { text: formatDateOnly(format, meta.dueDate, { month: 'short', day: 'numeric' }), mark: { kind: 'icon', icon: 'calendar' }, danger: overdue(meta.dueDate, props.status, now) } } satisfies TaskDetailRow] : [],

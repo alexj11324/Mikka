@@ -59,6 +59,40 @@ test('failed token acquisition stays in the native screen instead of using a bro
   assert.deepEqual(alerts, ['网页打开未确认'])
 })
 
+test('Expo Task properties use the account-bound handoff even with a different active browser workspace', async () => {
+  platform.OS = 'web'
+  const target = '/?issue=11111111-1111-4111-8111-111111111111'
+  let finish!: (value: unknown) => void
+  read = () => new Promise(resolve => { finish = resolve })
+  const tab = { opener: {}, closed: false, close() { this.closed = true }, location: { replace: (url: string) => urls.push(url) } }
+  const web = { open: mock.fn(() => tab), location: { assign: (url: string) => urls.push(url) } }
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'window')
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: web })
+  try {
+    const opened = openOnWeb(target)
+    assert.deepEqual(web.open.mock.calls[0].arguments, ['about:blank', '_blank'])
+    assert.equal(tab.opener, null)
+    assert.deepEqual(urls, [])
+    finish({ token: 'fixture-one-time-token' })
+    await opened
+    const handoff = new URL(urls[0])
+    assert.equal(handoff.origin + handoff.pathname, account.server.url + '/api/mobile/open')
+    assert.equal(handoff.searchParams.get('to'), target)
+    assert.equal(handoff.searchParams.get('token'), 'fixture-one-time-token')
+
+    urls.length = 0
+    const switched = openOnWeb(target)
+    account = { ...account, id: 'different-test-account' }
+    finish({ token: 'fixture-former-account' })
+    await switched
+    assert.equal(tab.closed, true)
+    assert.deepEqual(urls, [])
+  } finally {
+    if (previous) Object.defineProperty(globalThis, 'window', previous)
+    else Reflect.deleteProperty(globalThis, 'window')
+  }
+})
+
 const billing = 'https://operator-cloud.example/mikka/settings?section=billing&workspace=11111111-1111-4111-8111-111111111111'
 
 test('cloud billing is fetched on demand for the selected account and opens without forwarding its token', async () => {
