@@ -51,8 +51,6 @@ export default function GroupChat() {
   const reduceMotion = useReducedMotionPreference()
   const apiContext = apiCache.context()
   const [composerHeight, setComposerHeight] = useState(90)
-  const [text, setText] = useState('')
-  const [quote, setQuote] = useState<string | null>(null)
   const groups = useApi<{ conversations: GroupSummary[] }>(home.data ? `/api/conversations?workspaceId=${home.data.workspace.id}` : null)
   const summary = groups.data?.conversations.find(group => group.id === id)
   const title = summary?.title ?? ''
@@ -67,6 +65,20 @@ export default function GroupChat() {
   // A network failure or 5xx is not a membership decision and keeps the recoverable offline view.
   const accessDenied = conversationAccessDenied(page.error) || conversationAccessDenied(members.error)
   const identity = `${id}:${apiContext}`
+  // A screen can be reused for a different group or signed-in workspace without remounting.
+  // Keep drafts attached to their original identity so an old group's text/quote is never shown in the new group.
+  const [composerDraft, setComposerDraft] = useState<{ identity: string; text: string; quote: string | null }>(
+    () => ({ identity, text: '', quote: null }),
+  )
+  const draftMatches = !accessDenied && composerDraft.identity === identity
+  const text = draftMatches ? composerDraft.text : ''
+  const quote = draftMatches ? composerDraft.quote : null
+  const setText = (value: string) => setComposerDraft(current => ({
+    identity, text: value, quote: current.identity === identity ? current.quote : null,
+  }))
+  const setQuote = (value: string | null) => setComposerDraft(current => ({
+    identity, text: current.identity === identity ? current.text : '', quote: value,
+  }))
   // Oldest first, as the chat reads.
   const messages = accessDenied ? [] : mergeGroupMessages([], page.data?.messages ?? [])
   // Only a message sent on this visit is anchored under the bar with room for the reply (v0); opening the chat,
