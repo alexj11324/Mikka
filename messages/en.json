@@ -4775,6 +4775,9 @@
       "open": "Open {name}",
       "download": "Download {name}",
       "remove": "Remove {name}",
+      "removeFailed": "Could not remove {name}",
+      "retryRemoval": "Retry",
+      "keep": "Keep attachment",
       "retry": "Retry uploading {name}",
       "errors": {
         "unsupported": "Unsupported file format",
