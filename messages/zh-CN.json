@@ -6742,6 +6742,7 @@
         "names": {
           "vercel-gateway": "Mikka 托管模型（Gateway）",
           "zerocat": "Mikka 托管模型（ZeroCat）",
+          "cloudflare-workers-ai": "Mikka 托管模型（Cloudflare Workers AI）",
           "openai-subscription": "OpenAI 订阅",
           "anthropic-subscription": "Anthropic 订阅",
           "api-key": "自带 API 密钥"

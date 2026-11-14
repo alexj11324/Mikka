@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import type { SharedResourceKind } from '@/lib/db/governance-schema'
 import { withBasePath } from '@/lib/base-path'
 import { authClient } from '@/lib/auth-client'
+import { ORGANIZATION_MODEL_PROVIDERS } from '@/lib/governance/policy'
 import { GovernanceRequestError, governanceKey, type GovernanceDetail } from '@/hooks/settings/use-workspace-governance'
 import { useLiveKey, useLiveKeys } from '@/hooks/use-live-key'
 
@@ -67,7 +68,7 @@ export type ProviderConfigured = { providerId: string; dns: { type: 'TXT'; name:
 export type ScimCredential = { id: string; token: string; baseURL: string }
 
 export type SharingRule = 'allow' | 'approval_required' | 'deny'
-export const MODEL_PROVIDERS = ['vercel-gateway', 'zerocat', 'openai-subscription', 'anthropic-subscription', 'api-key'] as const
+export const MODEL_PROVIDERS = ORGANIZATION_MODEL_PROVIDERS
 export type ModelProvider = typeof MODEL_PROVIDERS[number]
 export type ResourcePolicy = {
   modelCredentialSharing: SharingRule; mcpSharing: SharingRule

@@ -61,14 +61,13 @@ export async function retainEveArtifact(
   const reader = await container.exec(["/bin/cat", "/tmp/eve-host.tar.gz"], {
     stdout: "pipe",
   });
-  await Promise.all([
-    reader.stdout.pipeTo(pipe.writable),
+  const [saved] = await Promise.all([
     bucket.put(key, pipe.readable, {
       sha256: artifact.sha256,
       httpMetadata: { contentType: "application/gzip" },
     }),
+    reader.stdout.pipeTo(pipe.writable),
   ]);
-  const saved = await bucket.head(key);
   if (!saved || saved.size !== artifact.size)
     throw new Error("Compiled Eve archive was not retained");
   return {
