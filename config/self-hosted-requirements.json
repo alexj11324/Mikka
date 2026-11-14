@@ -348,6 +348,13 @@
     "test": "lib/activity-actor-view.test.ts",
     "suite": "test:issues"
   },
+  "lib/artifacts/store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Authorize each request to a shared artifact against the installation's PostgreSQL share and workspace records. Markdown is delivered with metadata and HTML through its sandbox frame. Both use the configured artifact storage, including inline PostgreSQL on community installations.",
+    "test": "tests/desktop-links.db.test.ts",
+    "suite": "test:desktop-auth"
+  },
   "lib/artifacts/storage.ts": {
     "mode": "operator-configured",
     "environment": [
