@@ -109,8 +109,19 @@ test('fault matrix preserves failed SLO history while live wake, lease, uncertai
   assert.equal((await pool.query("SELECT count(*)::int n FROM schedule_occurrences WHERE status='failed'")).rows[0].n, 1)
   // Read a later window explicitly; do not rewrite old failed rows to fabricate
   // recovery. This is deterministic window testing, not a wall-clock SLA claim.
-  const afterWindow = await collectOperationalSignals(pool, { sink, now: new Date(at.getTime() + 20 * 60_000) })
+  const emptyWindow = new Date(at.getTime() + 20 * 60_000)
+  const afterWindow = await collectOperationalSignals(pool, { sink, now: emptyWindow })
   assert.deepEqual(afterWindow.alerts, [])
-  assert.deepEqual(afterWindow.transitions.map(event => event.id), ['due-on-time', 'dispatch-start'])
-  assert.ok(!JSON.stringify([fired, repaired, afterWindow, received]).includes(privateMarker))
+  assert.deepEqual(afterWindow.transitions, [], 'an empty denominator cannot resolve either incident')
+  assert.equal(received.length, 12, 'only the five observed recoveries have been delivered')
+
+  // Only new on-time work makes the two ratios observable and healthy again.
+  await pool.query(`INSERT INTO schedule_occurrences(id,schedule_id,version,due_at,definition,status,execution_decision,operation_id,next_retry_at,finished_at)
+    VALUES(gen_random_uuid(),gen_random_uuid(),1,$1,'{}','succeeded','execute',gen_random_uuid(),$1,$1)`, [emptyWindow])
+  await pool.query(`INSERT INTO agent_runs(id,"userId","agentId",status,"createdAt","startedAt","finishedAt")
+    VALUES(gen_random_uuid(),$1,gen_random_uuid(),'succeeded',$2,$2,$2)`, [privateMarker, emptyWindow])
+  const observed = await collectOperationalSignals(pool, { sink, now: new Date(emptyWindow.getTime() + 3 * 60_000) })
+  assert.deepEqual(observed.transitions.map(event => [event.id, event.state]), [['due-on-time', 'resolved'], ['dispatch-start', 'resolved']])
+  assert.equal(received.length, 14)
+  assert.ok(!JSON.stringify([fired, repaired, afterWindow, observed, received]).includes(privateMarker))
 })

@@ -25,6 +25,7 @@ const run = { id: 123, run_attempt: 2, workflow_id: workflow.id, name: RELEASE_N
 const expected = { sourceCommit: SHA, runId: run.id, runAttempt: run.run_attempt, workflowId: workflow.id, event: run.event }
 const env = () => ({ GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'workflow_run', GITHUB_REPOSITORY: REPOSITORY,
   GITHUB_REF: 'refs/heads/main', GITHUB_SHA: SHA, GITHUB_RUN_ID: '990', GITHUB_RUN_ATTEMPT: '1', GITHUB_TOKEN: TOKEN,
+  TASK_SECRETS_JOB_ID: '991', TASK_SECRETS_JOB_STARTED_AT: started, TASK_SECRETS_JOB_START_SOURCE: 'github_actions_job.started_at',
   APPLICATION_SHA: SHA, EXPECTED_SOURCE_SHA: SHA, EXPECTED_UPSTREAM_RUN_ID: '123', EXPECTED_UPSTREAM_RUN_ATTEMPT: '2',
   EXPECTED_WORKER_SHA: WORKER, EXPECTED_WORKER_SOURCE_SHA: SHA, EXPECTED_CLAUDE_TEMPLATE: 'candidate-claude', EXPECTED_CODEX_TEMPLATE: 'candidate-codex' })
 const event = () => ({ workflow_run: structuredClone(run) })
@@ -252,8 +253,8 @@ test('every OIDC read is directly preceded by source/attempt/public-build attest
   }
   const database = credentials.find(({ step }) => step.includes('secret-name: MIKKA_DATABASE_URL'))
   assert.ok(database)
-  assert.match(database.step, /if: env.PRODUCTION_CANARY == 'true'/)
-  assert.match(steps[database.index - 1], /if: env.PRODUCTION_CANARY == 'true'/)
+  assert.match(database.step, /^\s*if: env\.ACCEPTANCE_MODE == 'execute' && env\.PRODUCTION_CANARY == 'true'\s*$/m)
+  assert.match(steps[database.index - 1], /^\s*if: env\.ACCEPTANCE_MODE == 'execute' && env\.PRODUCTION_CANARY == 'true'\s*$/m)
   assert.match(workflowText, /PRODUCTION_CANARY: \$\{\{ github.event_name == 'workflow_dispatch' && inputs.production_canary && 'true' \|\| 'false' \}\}/)
   assert.match(workflowText, /group: production-smoke-owner-acceptance/)
   assert.ok(!JSON.stringify(safeCIFailure(Error('PRIVATE_SECRET_URL'))).includes('PRIVATE'))

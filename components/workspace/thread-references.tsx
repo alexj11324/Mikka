@@ -41,13 +41,15 @@ export function ThreadReferencePicker({ draft, workspaceId, input, onChange }: {
     if (!textarea) return
     const select = () => { if (textarea.ownerDocument.activeElement === textarea) update() }
     const update = () => setCaret(textarea.selectionStart)
+    // Let React commit the controlled draft before a caret render can restore its old value.
+    const edited = (event: Event) => { if (event.target === textarea) update() }
     update()
-    textarea.addEventListener('input', update)
+    textarea.ownerDocument.addEventListener('input', edited)
     textarea.ownerDocument.addEventListener('selectionchange', select)
     textarea.addEventListener('click', update)
     textarea.addEventListener('keyup', update)
     return () => {
-      textarea.removeEventListener('input', update)
+      textarea.ownerDocument.removeEventListener('input', edited)
       textarea.ownerDocument.removeEventListener('selectionchange', select)
       textarea.removeEventListener('click', update)
       textarea.removeEventListener('keyup', update)
@@ -99,7 +101,7 @@ export function ThreadReferencePicker({ draft, workspaceId, input, onChange }: {
   }}>
     {!current ? <span role="status">{t('searching')}</span> : current.failed ? <span role="alert">{t('error')}</span> :
       !current.items?.length ? <span role="status">{t('empty')}</span> : current.items.map(item =>
-        <Button key={`${item.kind}:${item.id}`} type="button" variant="ghost" size="sm" className="w-full justify-start"
+        <Button key={referenceMarker(item)} type="button" variant="ghost" size="sm" className="w-full justify-start"
           onClick={() => {
             const insert = referenceMarker(item) + ' '
             const next = draft.slice(0, mention.from) + insert + draft.slice(mention.end)

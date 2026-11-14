@@ -680,7 +680,7 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
         ALTER TABLE agent_runs ADD COLUMN "pauseReason" text, ADD COLUMN "deviceTokenId" uuid,
           ADD COLUMN "retryOf" uuid, ADD COLUMN "continuesRunId" uuid, ADD COLUMN "agentId" uuid,
           ADD COLUMN "createdAt" timestamptz NOT NULL DEFAULT now();
-        ALTER TABLE run_publications ADD COLUMN "issueId" uuid, ADD COLUMN "updatedAt" timestamptz DEFAULT now();
+        ALTER TABLE run_publications ADD COLUMN "updatedAt" timestamptz DEFAULT now();
         CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
         CREATE TABLE computer_run_bindings ("runId" uuid PRIMARY KEY,"botId" uuid,"ownerId" text);
         CREATE TABLE bot_cloud_runtimes ("agentId" uuid,"botId" uuid,"ownerId" text);
@@ -692,7 +692,7 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
           "runningSince" timestamptz,"computeSeconds" bigint NOT NULL DEFAULT 0,
           "snapshotState" text NOT NULL DEFAULT 'none',"snapshotOperationId" uuid,"filesystemSnapshotId" text,"restoreStartedAt" timestamptz,
           "lifecycleAt" timestamptz DEFAULT now(),lifecycle jsonb NOT NULL DEFAULT '{}');
-        CREATE TABLE coding_review_sessions ("runId" uuid,"taskId" uuid,"ownerId" text,"workspaceId" uuid,
+        CREATE TABLE coding_review_sessions ("runId" uuid,"taskId" uuid,"ownerId" text,"workspaceId" uuid,"deviceId" uuid,
           "sandboxId" text,"machineEpoch" bigint,"machineOperationId" uuid,"revokedAt" timestamptz,"expiresAt" timestamptz);
         CREATE TABLE IF NOT EXISTS mikka_workspaces (id uuid PRIMARY KEY,"userId" text,kind text);
         CREATE TABLE IF NOT EXISTS mikka_workspace_members ("workspaceId" uuid,"userId" text,status text);

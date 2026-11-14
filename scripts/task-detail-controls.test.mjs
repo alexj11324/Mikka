@@ -113,7 +113,10 @@ test('properties and Work use the same authorized pull receipts, including an em
 test('properties link only admitted conversations and show the recorded Factory branch', async () => {
   const opened = []
   const done = await mount({ agentActivity: {
-    items: [], threads: [{ id: 'run', detail: { name: 'Worker review' } }, { id: 'hidden', detail: null }],
+    threads: [
+      { id: 'run', createdAt: '2026-11-14T10:00:00Z', detail: { name: 'Worker review', harness: 'codex' } },
+      { id: 'hidden', createdAt: '2026-11-14T10:05:00Z', detail: null },
+    ],
     openThread: id => opened.push(id), work: {
       presentation: { linkedChats: [{ id: 'chat', title: 'Planning' }] },
       factory: { task: { review: { summary: { branch: 'feature/review' } } } },

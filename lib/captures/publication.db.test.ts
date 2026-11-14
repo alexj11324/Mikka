@@ -7,7 +7,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool, type PoolClient } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { factoryEventId } from '../factory/event-id'
 import { syncFactoryPresentation } from '../factory/stage-progress'
 import { readFactoryFlow } from '../factory/public-flow'
@@ -36,7 +36,7 @@ type Fixture = { taskId: string; candidateId: string; attemptId: string; issueId
 test('Factory public capture receipts bind the current producer and the acknowledged PR body', { skip: !connection, timeout: 120_000 }, async t => {
   const admin = new Pool({ connectionString: connection, max: 1 })
   const database = `capture_publish_${randomUUID().replaceAll('-','')}_e2e`
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(connection!)
   target.pathname = `/${database}`
   const pool = new Pool({ connectionString: target.href, max: 8 })

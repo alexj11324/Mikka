@@ -3,6 +3,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import test, { mock, type TestContext } from 'node:test'
 import { Pool } from 'pg'
+import { factoryEventId } from '../../factory/event-id'
 import { observePoolCommits } from '../../db/commit-effects'
 import { z } from 'zod'
 import { CodingWorkspaceError } from '@mikka/protocol/coding-workspace'
@@ -160,9 +161,13 @@ test('Task review merge uses the real Factory receipt and exact source on Postgr
         await tx.query('UPDATE factory_tasks SET "candidateId"=$2 WHERE id=$1', [taskId, candidateId])
         await tx.query('COMMIT')
       } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+      await pool.query(`INSERT INTO run_publications("runId","userId","issueId","remoteUrl","remoteKey",branch,status,"pullRequest")
+        VALUES($1,$2,$3,$4,$5,'mikka/original-task','published',$6)`, [producer.id, owner.id, issueId, remote, repositoryKey, { url: pullUrl }])
       // Same handoff gate as production: the producer declares the reviewed
       // capture as public evidence before the owner can accept the merge.
-      await addFactoryPublicationEvidence(pool, taskId)
+      const publication = await addFactoryPublicationEvidence(pool, taskId, { url: pullUrl })
+      assert.ok(publication)
+      const publicationEventId = factoryEventId('pr-visual-evidence', producer.id)
       const proof = await pool.connect()
       try {
         await proof.query('BEGIN')
@@ -175,8 +180,6 @@ test('Task review merge uses the real Factory receipt and exact source on Postgr
       tokens.set(owner.id, token)
       await saveGitHubConnection(owner.id, { githubAccountId: token.githubAccountId, githubLogin: 'merge-fixture' },
         { access_token: token.token, expires_in: 3600 })
-      await pool.query(`INSERT INTO run_publications("runId","userId","issueId","remoteUrl","remoteKey",branch,status,"pullRequest")
-        VALUES($1,$2,$3,$4,$5,'mikka/original-task','published',$6)`, [producer.id, owner.id, issueId, remote, repositoryKey, { url: pullUrl }])
       const deps = { database: pool, membership: pool }, scope = await ensureReviewScope(deps, who, producer.id, repoId)
       const before = Buffer.from('before\nstable\n'), after = Buffer.from('after\nstable\n'), nativePatch = '@@ -1,2 +1,2 @@\n-before\n+after\n stable\n'
       const tree = (bytes: Buffer) => new Map([['alpha.txt', { sha: gitBlobHash(bytes, headSha), mode: '100644', size: bytes.length }]])
@@ -247,13 +250,19 @@ test('Task review merge uses the real Factory receipt and exact source on Postgr
           (client, fresh) => result.render(client, fresh))
         return { status: rendered.status ?? result.status ?? 200, body: rendered.body as Projection }
       }
+      async function eventsSincePublication() {
+        const { rows } = await pool.query('SELECT * FROM factory_events WHERE "taskId"=$1 ORDER BY "eventId"', [taskId])
+        assert.deepEqual(rows.find(row => row.eventId === publicationEventId)?.result, publication,
+          'claim and replay must preserve the original publication evidence')
+        return rows.filter(row => row.eventId !== publicationEventId)
+      }
       const rows = async () => ({
         merges: (await pool.query<MergeRow>('SELECT * FROM factory_merges WHERE "taskId"=$1 ORDER BY "createdAt",id', [taskId])).rows,
         receipts: (await pool.query<{ requestId: string; response: { eventId: string } }>(
           'SELECT "requestId",response FROM coding_workspace_review_receipts WHERE "boardId"=$1 AND action=\'task_merge\' ORDER BY "requestId"', [scope.boardId])).rows,
         task: (await pool.query<FactoryTask>('SELECT * FROM factory_tasks WHERE id=$1', [taskId])).rows[0]!,
         attempts: (await pool.query('SELECT * FROM factory_attempts WHERE "taskId"=$1 ORDER BY position', [taskId])).rows,
-        events: (await pool.query('SELECT * FROM factory_events WHERE "taskId"=$1 ORDER BY "eventId"', [taskId])).rows,
+        events: await eventsSincePublication(),
       })
       const puts = () => calls.filter(call => call.method === 'PUT')
       async function replaceCandidate() {

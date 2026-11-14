@@ -10,7 +10,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { Pool } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
-import { dropTestDatabase } from "../../tests/support/drop-test-database";
+import { createTestDatabase, dropTestDatabase } from "../../tests/support/drop-test-database";
 
 type UploadedFile = { path: string; data: string };
 function uploadedFiles(path: string | UploadedFile[], body?: unknown): UploadedFile[] {
@@ -31,7 +31,7 @@ if (url) {
 test("thread filesystem snapshots park once and restore only the same task machine", { skip: !url, timeout: 180000 }, async (t) => {
   const admin = new Pool({ connectionString: url, max: 1 });
   const database = `thr_snap_${randomUUID().replaceAll("-", "")}_e2e`;
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`);
+  await createTestDatabase(admin, database, 'template0');
   const target = new URL(url!);
   target.pathname = `/${database}`;
   const savedEnv: [string, string | undefined][] = [

@@ -32,6 +32,7 @@ jobs:
       - name: Ensure FFmpeg for daemon recording regressions
         run: |
           if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
             sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
             sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y ffmpeg
           fi

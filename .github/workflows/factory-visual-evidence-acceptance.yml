@@ -104,6 +104,7 @@ jobs:
           node-version: 24
       - name: Install real media readers
         run: |
+          sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
           sudo apt-get update -qq
           sudo apt-get install --no-install-recommends -y ffmpeg
           ffmpeg -version

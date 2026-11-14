@@ -11,6 +11,10 @@ const option = { id: threadModelKey(choice), modelId: choice.model }
 const taskId = '10000000-0000-4000-8000-000000000001'
 const runId = '20000000-0000-4000-8000-000000000002'
 const requests: unknown[] = []
+const runAndChat = [
+  { kind: 'thread', id: runId, title: 'Execution run' },
+  { kind: 'thread', conversationKind: 'chat', id: runId, title: 'Standalone conversation' },
+]
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL('../' + path, import.meta.url).href, { namedExports })
 mock.module('react-native', { namedExports: { View: 'div', Pressable: ({ onPress, children }: any) => createElement('button', { onClick: onPress }, children) } })
 stub('components/Text.tsx', { Text: 'span' })
@@ -20,7 +24,7 @@ stub('lib/home.tsx', { useHome: () => ({ data: { workspace: { id: 'workspace' } 
 stub('lib/useApi.ts', { useApi: (key: string | null) => ({ data: key ? { current: {}, groups: [{ kind: 'subscription', options: [option] }] } : null }) })
 stub('lib/api.ts', { api: async (_path: string, init: { body: unknown }) => {
   requests.push(init.body)
-  return { ok: true, version: 1, result: [{ kind: 'task', id: taskId, title: 'Saved task' }] }
+  return { ok: true, version: 1, result: (init.body as {args?: unknown[]}).args?.[2] === 'thread' ? runAndChat : [{ kind: 'task', id: taskId, title: 'Saved task' }] }
 } })
 stub('features/chat/components/chat-composer.tsx', { Composer: (props: any) => createElement('div', null, props.notice, props.accessory,
   createElement('input', { value: props.value, onInput: (e: any) => { props.onChangeText(e.target.value); props.onCaretChange(e.target.selectionEnd) }, readOnly: true }),
@@ -76,4 +80,31 @@ test('native journal replay sends the initial model and funding source with the 
   assert.equal(sameConversationCommand(command, { ...target, modelChoice: undefined }, 'go', []), false)
   assert.equal(sameConversationCommand(command, { ...target, modelChoice: { ...choice, source: {kind:'api_key',keyId:taskId} } }, 'go', []), false)
   await submitConversation(command, async (path, input) => { assert.equal(path,'/api/rpc'); assert.deepEqual(input.body, { version:1,action:'agents.sendIssueThreadReply',args:[{ issueId:taskId,runId,modelChoice:choice,text:'go',requestId:'repeat',expectedOwnerId:'owner',expectedWorkspaceId:'workspace'}] }); return { ok:true, version:1, result:{sent:true,runId} } }, 'stored')
+})
+
+test('a native reference menu with an authorized standalone Chat and Run sharing a UUID selects either independently', async t => {
+  const browser = new Window()
+  Object.assign(globalThis, { window: browser, document: browser.document, IS_REACT_ACT_ENVIRONMENT: true })
+  const { createRoot } = await import('react-dom/client')
+  const root = createRoot(document.body)
+  const errors = t.mock.method(console, 'error', () => {})
+  try {
+    const detail = { liveRunId: runId, issueId: taskId, active: true, thread: { harness: 'codex' } }
+    await act(async () => root.render(createElement(ThreadComposer, { detail: detail as never, runId, placeholder: '', onSend: () => true })))
+    const input = document.querySelector('input')!
+    for (const [title, kind] of [['Standalone conversation', 'chat'], ['Execution run', 'run']]) {
+      await act(async () => {
+        input.value = '@thread:shared'
+        input.setSelectionRange(input.value.length, input.value.length)
+        input.dispatchEvent(new browser.Event('input', { bubbles: true }) as never)
+      })
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 230)) })
+      const buttons = Array.from(document.querySelectorAll('button'))
+      assert.ok(buttons.some(node => node.textContent?.includes('Standalone conversation')))
+      assert.ok(buttons.some(node => node.textContent?.includes('Execution run')))
+      await act(async () => buttons.find(node => node.textContent?.includes(title))!.click())
+      assert.equal(input.value, `[[${kind}:${runId}]] `)
+    }
+    assert.equal(errors.mock.calls.filter(call => String(call.arguments[0]).includes('same key')).length, 0)
+  } finally { await act(async () => root.unmount()); await browser.happyDOM.close() }
 })
