@@ -3,6 +3,7 @@ import * as WebBrowser from 'expo-web-browser'
 import { api, apiConnection } from '@/lib/api'
 import { API_URL, currentAccount } from '@/lib/config'
 import { finishAppleDeletionHandoff } from './apple-auth'
+import { showSystemAlert } from './system-alert'
 import { mobileMessages as messages } from './messages'
 import { apiCache } from './api-cache'
 import { mobileTaskTarget } from '../../../lib/mobile-task-handoff'
@@ -11,7 +12,7 @@ export { webChatPath } from './web-chat'
 
 export async function openPrivacyPolicy(): Promise<void> {
   try { await Linking.openURL('https://aspectlylabs.com/privacy') }
-  catch { Alert.alert(messages.Auth.webOpenUnconfirmed) }
+  catch { showSystemAlert(messages.Auth.webOpenUnconfirmed) }
 }
 
 /**
@@ -49,7 +50,7 @@ export async function openOnWeb(path: string): Promise<void> {
   } catch {
     tab?.close()
     if (web) window.alert(messages.Auth.webOpenUnconfirmed)
-    else Alert.alert(messages.Auth.webOpenUnconfirmed)
+    else showSystemAlert(messages.Auth.webOpenUnconfirmed)
   }
 }
 
@@ -60,9 +61,9 @@ export async function openAccountDeletion(): Promise<void> {
   try {
     if (await finishAppleDeletionHandoff(accountId)) Alert.alert(messages.Auth.appleAuthorizationTitle, messages.Auth.appleRevocationBody, [
       { text: messages.Common.close, style: 'cancel' },
-      { text: messages.Auth.manageAppleAuthorization, onPress: () => { void Linking.openURL('https://account.apple.com/').catch(() => Alert.alert(messages.Auth.webOpenUnconfirmed)) } },
+      { text: messages.Auth.manageAppleAuthorization, onPress: () => { void Linking.openURL('https://account.apple.com/').catch(() => showSystemAlert(messages.Auth.webOpenUnconfirmed)) } },
     ])
-  } catch { Alert.alert(messages.Auth.accountDeletionUnconfirmed) }
+  } catch { showSystemAlert(messages.Auth.accountDeletionUnconfirmed) }
 }
 
 /** The selected server checks the issuer and billing workspace. Never pass its
@@ -86,5 +87,5 @@ export async function openCloudBilling(): Promise<void> {
       || url.searchParams.getAll('section').length !== 1 || url.searchParams.getAll('workspace').length !== 1
       || [...url.searchParams.keys()].some(key => key !== 'section' && key !== 'workspace')) throw new Error('cloud_billing_unconfirmed')
     await WebBrowser.openBrowserAsync(url.href)
-  } catch { if (current()) Alert.alert(messages.Auth.webOpenUnconfirmed) }
+  } catch { if (current()) showSystemAlert(messages.Auth.webOpenUnconfirmed) }
 }
