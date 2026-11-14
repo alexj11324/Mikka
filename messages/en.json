@@ -4377,6 +4377,22 @@
     "copied": "ID copied",
     "copyFailed": "Couldn't copy"
   },
+  "ConversationDirectory": {
+    "title": "Conversations",
+    "search": "Search conversations",
+    "all": "All",
+    "working": "Working",
+    "waiting": "Waiting",
+    "idle": "Idle",
+    "failed": "Failed",
+    "archived": "Archived",
+    "loadError": "Could not load conversations.",
+    "retry": "Retry",
+    "loading": "Loading conversations…",
+    "empty": "No matching conversations.",
+    "untitled": "Untitled conversation",
+    "more": "Load more"
+  },
   "IssueThreads": {
     "organization": {
       "archive": "Archive conversation",

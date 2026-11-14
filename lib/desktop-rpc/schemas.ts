@@ -1,3 +1,4 @@
+import { directoryInput } from '@/lib/conversation-directory-input'
 import { saveEnvironmentInput, projectDefaultEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
 import { createOnlyCommand, dispatchReceiptInput } from '@/lib/task-create-command'
 import { taskListPageInput } from '@/lib/task-list-page'
@@ -281,6 +282,7 @@ export const desktopActionSchemas = {
   'task-runs.pollTaskRuns': none,
   'task-runs.pollThreads': tuple(version.optional(), listPositions(200).optional()),
   'task-runs.syncThreadList': tuple(version.optional(), listPositions(200).optional()),
+  'task-runs.listConversations': tuple(directoryInput),
   'task-runs.readConversationOrganization': tuple(uuid),
   'task-runs.setConversationOrganization': tuple(uuid, object({ field: z.enum(['archived', 'pinned']), value: bool })),
   'task-runs.renameConversation': tuple(uuid, text(400)),
