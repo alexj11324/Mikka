@@ -105,6 +105,15 @@ test('a finished spec shows its stages, 方案待审 and the approve action; no 
   assert.deepEqual(opened.splice(0), ['spec-run'])
 })
 
+test('a cancelled flow stops on its last reached stage and a completed flow marks every step done', async () => {
+  for (const stage of ['cancelled', 'completed'] as const) {
+    flow = specFlow({ stage, stages: ['implement', 'review', 'handoff', stage], needsYou: null })
+    await render()
+    const states = [...document.querySelectorAll('[data-slot="stepper-item"]')].map(item => item.getAttribute('data-state'))
+    assert.deepEqual(states, ['completed', 'completed', 'completed', stage === 'cancelled' ? 'active' : 'completed'])
+  }
+})
+
 test('approve POSTs approve_spec with the revision once, even when clicked twice', async () => {
   flow = specFlow()
   await render()
