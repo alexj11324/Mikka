@@ -27,6 +27,7 @@ let groupListRetries = 0
 const teamIssuesId = '8055a7ae-204f-4045-8780-66b9c93ce229'
 let scopedTeamFixture = false
 let workspaceTasksPending = false
+let refreshGlobalTasks = refreshed
 let scopedTasksPending = false
 let scopedTeamPageMutations = 0
 let probeEmbeddedAck = false
@@ -41,13 +42,13 @@ mock.module('next-intl', { namedExports: { useLocale: () => 'en', useTranslation
 mock.module('next/navigation', { namedExports: { useSearchParams: () => new URLSearchParams(browser.location.search) } })
 mock.module('@/i18n/navigation', { namedExports: { getPathname: ({ href }: { href: string }) => href, usePathname: () => browser.location.pathname, useRouter: () => router } })
 mock.module('sonner', { namedExports: { toast: { error: nothing, dismiss: nothing } } })
-mock.module('swr', { defaultExport: (key: unknown) => ({
+mock.module('swr', { defaultExport: (key: unknown, _read?: unknown, options?: { isPaused?: () => boolean }) => ({
   data: key === '/api/workspace/switcher' ? { ...workspace(), live: { ownerId: user.id } }
     : key === 'teams' && scopedTeamFixture ? [{ id: teamIssuesId, name: 'Scoped Team' }]
     : Array.isArray(key) && key[0] === 'team-issues-page' ? { items: [], next: null }
     : [],
   isLoading: Array.isArray(key) && key[0] === 'team-issues-page' ? scopedTasksPending : false,
-  mutate: Array.isArray(key) && key[0] === 'team-issues-page' ? async () => { scopedTeamPageMutations++ } : refreshed,
+  mutate: Array.isArray(key) && key[0] === 'team-issues-page' ? async () => { if (!options?.isPaused?.()) scopedTeamPageMutations++ } : refreshed,
 }), namedExports: { SWRConfig: swr.SWRConfig, unstable_serialize: swr.unstable_serialize, useSWRConfig: swr.useSWRConfig } })
 mock.module('@/lib/app-build', { namedExports: { APP_BUILD: '' } })
 mock.module('@/lib/auth-client', { namedExports: { endSession: async () => ({}), authClient: { getSession: async () => ({ data: { user } }), useSession: () => ({ data: null }) } } })
@@ -58,7 +59,7 @@ mock.module('@/hooks/use-agent-history', { namedExports: { useAgentHistory: () =
 mock.module('@/hooks/use-focus-return', { namedExports: { focusChatComposer: nothing, useOpenerFocus: () => () => true } })
 mock.module('@/hooks/use-live-key', { namedExports: { LiveProvider: plain, useLiveKey: nothing, useLiveKeys: nothing, useLiveScope: () => null } })
 mock.module('@/hooks/use-live-lists', { namedExports: {
-  useLiveIssueList: () => ({ ...emptyList, isLoading: workspaceTasksPending }), useLiveThreadList: () => emptyList,
+  useLiveIssueList: () => ({ ...emptyList, isLoading: workspaceTasksPending, mutate: refreshGlobalTasks }), useLiveThreadList: () => emptyList,
   useLiveBotRoster: () => botList, useLiveBotChatList: () => ({ data: { items: {} } }), useLiveGroupList: () => ({
     data: groupList,
     error: groupListError,
@@ -82,14 +83,21 @@ for (const [file, names] of [
   ['../workspace-menu.tsx', ['WorkspaceMenu']],
   ['../nav/new-bot-dialog.tsx', ['NewBotDialog']],
   ['../onboarding/onboarding.tsx', ['Onboarding']], ['../teams/team-home.tsx', ['TeamHome']],
-  ['./issue-list.tsx', ['IssueList']], ['./board-page.tsx', ['BoardPage']],
+  ['./issue-list.tsx', ['IssueList']],
   ['../nav/context-panel.tsx', ['ContextPanel']],
   ['../nav/group-panel.tsx', ['GroupPanel']], ['../nav/conversation-pill.tsx', ['ConversationPillButton']],
   ['../nav/group-avatar.tsx', ['GroupPillAvatar']],
   ['./thread-column.tsx', ['ThreadColumn']], ['./task-column.tsx', ['TaskColumn']],
   ['../plugins/plugins-view.tsx', ['PluginsPage']], ['../suggestions/suggestion-feed.tsx', ['SuggestionFeed', 'SuggestionsRefresh', 'useSuggestionCount']],
   ['../artifacts/artifact-library.tsx', ['ArtifactLibrary']], ['./legacy-chat-archive.tsx', ['LegacyChatArchive']],
-] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, name === 'useSuggestionCount' ? () => 0 : name === 'BoardPage' ? () => <section data-team-board-visible="">{probeEmbeddedAck && <EmbeddedSaveProbe />}</section> : empty])) })
+] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, name === 'useSuggestionCount' ? () => 0 : empty])) })
+mock.module(new URL('./board-page.tsx', import.meta.url).href, { namedExports: {
+  BoardPage: ({ onUpdated, onBusyChange }: { onUpdated: () => Promise<unknown>; onBusyChange: (busy: boolean) => void }) => <section data-team-board-visible="">
+    {probeEmbeddedAck && <EmbeddedSaveProbe />}
+    <Button data-board-write-start="" onClick={() => onBusyChange(true)}>start board change</Button>
+    <Button data-board-write-ack="" onClick={() => { onBusyChange(false); void onUpdated() }}>save board change</Button>
+  </section>,
+} })
 // The Team detail fixture exercises acknowledged save/delete callbacks, not a fake list mutation.
 mock.module(new URL('./task-detail.tsx', import.meta.url).href, { namedExports: {
   TaskDetail: ({ id, onSaved, onDeleted }: { id: string; onSaved: (id: string) => void; onDeleted: () => void }) =>
@@ -201,6 +209,7 @@ beforeEach(() => {
   workspaceId = 'workspace-one'
   workspaceReady = true
   workspaceError = undefined
+  refreshGlobalTasks = refreshed
   groupList = []
   groupListError = undefined
   groupListRetries = 0
@@ -287,6 +296,24 @@ test('Team Issues first-page readiness is independent of the unrelated workspace
   await render({ initialSection: 'team-issues' })
   assert.equal(container.querySelector('[data-team-board-visible]'), null)
   assert.ok(container.querySelector('[role="status"][aria-label="Workspace.loadingEditor"]'))
+})
+
+test('a Team board write refreshes its visible page while the workspace refresh is pending', async () => {
+  scopedTeamFixture = true
+  const globalRefresh = Promise.withResolvers<void>()
+  refreshGlobalTasks = () => globalRefresh.promise
+  browser.history.replaceState({}, '', `/?workspace=${workspaceId}&team=${teamIssuesId}&section=team-issues`)
+  await render({ initialSection: 'team-issues' })
+  const start = container.querySelector<HTMLButtonElement>('[data-board-write-start]')
+  const save = container.querySelector<HTMLButtonElement>('[data-board-write-ack]')
+  assert.ok(start && save)
+  await act(async () => { start.click() })
+  try {
+    await act(async () => { save.click() })
+    assert.equal(scopedTeamPageMutations, 1, 'the visible Team page must not wait for the global read')
+  } finally {
+    globalRefresh.resolve()
+  }
 })
 
 test('a Team detail ACK refreshes its own authorized list after save and deletion', async () => {
