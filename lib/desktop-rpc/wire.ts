@@ -108,4 +108,6 @@ export type DesktopBootstrap = DesktopSession & DesktopConfig & {
   /** Whether subsequent reads already use the explicit workspace in this bootstrap request. */
   requestedWorkspaceSelected?: boolean
   cacheWorkspace: { workspaceId: string; role: 'admin' | 'member' } | null
+  /** Routing only; the Live ticket endpoint rechecks current authority. */
+  liveHomeWorkspaceId: string | null
 }

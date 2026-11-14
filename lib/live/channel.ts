@@ -50,6 +50,7 @@ const heldRevisions = (value: LiveSubscriptionOptions['revisions']) => new Map(O
 /** One connection per mounted owner/workspace; repeated badges share each SWR read. */
 export class LiveChannel {
   private subscriptions = new Set<Subscription>()
+  private retainers = new Set<symbol>()
   private socket: LiveSocket | null = null
   private controller: AbortController | null = null
   private unwatch: (() => void) | null = null
@@ -89,6 +90,23 @@ export class LiveChannel {
     return this.connected && subscriptions.every(subscription => this.supported(subscription))
   }
 
+  /** A routing hint may prepare this exact connection before any key exists.
+   * It gets one attempt. Only real subscriptions own retries and fallback. */
+  retain(): () => void {
+    const token = Symbol()
+    this.retainers.add(token)
+    if (this.retainers.size === 1 && !this.subscriptions.size) this.start()
+    return () => {
+      if (!this.retainers.delete(token)) return
+      if (!this.retainers.size && !this.subscriptions.size) this.dispose()
+    }
+  }
+
+  private start() {
+    this.unwatch ??= this.runtime.watchVisibility(() => this.visibilityChanged())
+    if (this.runtime.visible()) { this.fallback(); void this.connect() }
+  }
+
   subscribe(kind: LiveKind, id: string, keys: readonly string[], refresh: Subscription['refresh'], options: LiveSubscriptionOptions = {}): LiveSubscription {
     if (!LIVE_ID.test(id)) return Object.assign(() => {}, { update() {} })
     const subscription: Subscription = { kind, id, keys, refresh, minIntervalMs: Math.max(0, options.minIntervalMs ?? 0),
@@ -97,10 +115,7 @@ export class LiveChannel {
       deadlineObservation: Number.isFinite(options.deadline?.observation) ? options.deadline!.observation! : null,
       timer: `deadline:${++this.nextDeadline}`, revisions: heldRevisions(options.revisions), presence: options.presence }
     this.subscriptions.add(subscription)
-    if (this.subscriptions.size === 1) {
-      this.unwatch = this.runtime.watchVisibility(() => this.visibilityChanged())
-      if (this.runtime.visible()) { this.fallback(); void this.connect() }
-    }
+    if (this.subscriptions.size === 1) this.start()
     if (this.connected && this.runtime.visible()) this.invalidate(kind, id, true, false, undefined,
       this.supported(subscription) && this.coverageAfter !== null
         ? Math.max(this.coverageAfter, this.invalidationAfter.get(kind) ?? 0) : undefined)
@@ -112,7 +127,8 @@ export class LiveChannel {
       this.clear(subscription.timer)
       this.syncPresence()
       if (this.allSupported()) this.clear('fallback')
-      if (!this.subscriptions.size) this.dispose()
+      if (!this.subscriptions.size) { this.clear('retry'); this.clear('fallback') }
+      if (!this.subscriptions.size && !this.retainers.size) this.dispose()
       else for (const key of keys) {
         if ([...this.subscriptions].some(value => value.keys.includes(key))) continue
         this.pending.delete(key); this.lastRead.delete(key); this.inFlight.delete(key)
@@ -153,6 +169,7 @@ export class LiveChannel {
     this.unwatch?.()
     this.unwatch = null
     this.subscriptions.clear()
+    this.retainers.clear()
   }
 
   private clear(name: string) {
@@ -392,7 +409,7 @@ export class LiveChannel {
   }
 
   private async connect() {
-    if (!this.runtime.visible() || !this.subscriptions.size || this.connected || this.controller) return
+    if (!this.runtime.visible() || !this.subscriptions.size && !this.retainers.size || this.connected || this.controller) return
     this.clear('retry')
     const generation = ++this.generation
     const controller = this.controller = new AbortController()

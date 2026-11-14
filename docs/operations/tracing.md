@@ -287,11 +287,15 @@ compaction, title/profile and daemon agent calls use the same convention.
 - Tier, effort, their score/confidence and the ZeroCat/Gateway/fallback route
   are attributes. Prompt content, output content and tool arguments are never
   included.
-- Real Gateway/ZeroCat/provider cost receipts set `$ai_total_cost_usd` and
-  `$ai_cost_passthrough=true`. A subscription without an actual per-call cost
-  omits that receipt. PostHog may display a model-catalog estimate from usage;
-  label that as an estimate, not the subscription bill or cash charged by a
-  provider. Unknown cost is not zero.
+- The application sets `$ai_total_cost_usd` and `$ai_cost_passthrough=true`
+  when it supplies a per-call amount. Gateway amounts come from provider
+  metadata. ZeroCat amounts are estimates from token counts and the configured
+  prices in `lib/abuse/zerocat.ts`, rounded up to integer microdollars before
+  conversion to USD. Passthrough alone does not establish an actual charge.
+  A subscription without a per-call amount omits these fields. PostHog may
+  display its own model-catalog estimate from usage; label estimates as such,
+  not as the subscription bill or cash charged by a provider. Unknown cost is
+  not zero.
 
 See PostHog's [APM/AI linkage](https://posthog.com/docs/distributed-tracing/link-ai-observability)
 and [AI traces](https://posthog.com/docs/ai-observability/traces).
@@ -399,6 +403,16 @@ type/code fields. Bodies are the fixed strings `mikka.stage.completed` or
 `mikka.stage.failed`; free-form messages and cause messages are excluded.
 Ordinary successful SQL spans are APM-only.
 
+Coordinator tools that convert a coded exception into an ordinary result keep
+an owned `coordinator.tool` child span around the operation. That child retains
+the safe exception type/code and `ERROR` status when the Workflow SDK records
+the returned result and completes its parent step as `OK`. The closed
+repository-resolution refusal branches likewise mark their owned
+`dispatch.resolveRepository` and enclosing `dispatch_run` spans with
+`error.type=DispatchRefusal` and the existing refusal code. Their
+`dispatch_timing.failed` is true. These explicit boundaries preserve the
+business return values; telemetry does not inspect arbitrary result contents.
+
 Batching, bounded queues, exporter timeouts and an outage circuit breaker keep
 telemetry off the business response path. No log export adds a database query
 or an application polling loop. See the official [Node.js Logs guide](https://posthog.com/docs/logs/installation/nodejs).
@@ -460,6 +474,23 @@ fragments and identifier segments. Live-channel `status` / `message` handling
 records only event kind, allowed key names and receive/skip state, never payload
 content. See [Replay privacy](https://posthog.com/docs/session-replay/privacy).
 
+Ordinary browser sessions keep the SDK's bot filter. The production acceptance
+runner explicitly opts in only its fresh automated browser context: before page
+scripts run, it installs a non-enumerable, in-memory deadline marker in the
+official Mikka main document. A valid marker enables the SDK's public
+`opt_out_useragent_filter` option for that instance. It does not alter the user
+agent, WebDriver signals, consent, project settings or recording privacy. The
+official `$browser_type` value survives the privacy filter only when it is exactly
+`bot` or `browser`, for both ordinary events and snapshots. The marker deadline
+limits eligibility at initialization; it is not an automatic timer that resets
+an already initialized SDK. The runner closes its owned context during cleanup.
+
+This opt-in never fabricates a snapshot or bypasses readiness: the same session
+must still produce a natural `$snapshot` before the single UI submission. Browser
+readiness alone does not prove ingestion or playback. See the
+[SDK configuration contract](https://posthog.com/docs/references/posthog-js/types/PostHogConfig)
+and the [acceptance driver contract](../../scripts/acceptance/run-observability.md).
+
 Project-level capture configuration and its deployment history belong to the
 [private operations entry](README.md). The SDK applies the local privacy policy
 before capture.
@@ -494,7 +525,10 @@ Company deployment queries, configuration and evidence are maintained through th
   entry loads. Set `1` locally to see every request.
 - Batch span processor (5 s, 512 spans per export, queue of 2048, then
   dropped). On Vercel a flush is handed to `waitUntil` when a request's root
-  span ends, after the response.
+  span ends, after the response. Its lifetime covers both the queued batches
+  and the exporter transport already started by the batch timer; native Logs
+  flush concurrently. Exporter rejection or a synchronous failure stays inside
+  the existing telemetry failure boundary.
 - Exporting never blocks or fails a request. A failed export drops its spans
   and pauses exporting for a minute; there are no retries beyond the
   exporter's own bounded 5 s attempt.
@@ -589,3 +623,17 @@ in `lib/tracing/tracing.test.ts` with the real `pg` driver and instrumentation.
 
 Adding an attribute means adding its key to the allowlist in `sanitize.ts`
 and a case to the privacy test.
+
+### Native reads and telemetry evidence
+
+The chat model readers share the workspace subscription-policy observation within an active batch and database executor. Keys, share and authority checks remain independent. Deferred work reads its own policy.
+
+Device run/repository polls read credential liveness, current device ownership
+and the requested list in one existing authority-bearing SQL snapshot. A
+revocation, expiry, removal or ownership change committed before that read is
+refused. Nonempty repository results keep their original settings reads. Grant
+consumption and credential issuance share one atomic SQL statement. A pending
+command read without completion/failure receipts reads the device state and
+queue together; acknowledgement and revocation transactions retain their
+existing behavior. These reductions do not alter the full Native measurement
+window or remove background traffic from its budget.
