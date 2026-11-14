@@ -2,47 +2,56 @@
   "public": "27dda384f9073a4662ec4fa0f0cf28a29d50d586",
   "private": "6896edea131d398945aa06a4d858d09eeb3b10d7",
   "renderer": "6a48bcb0650a30a71e0accaaa6617b06ee4b450627afe9064591b6e184559488",
+  "nitro": {
+    "manifestSha256": "8280a2ac41c6af0addf97d7f80b9958da574fd4faa6d41a9fe7c43111bcb0437",
+    "node": "v24.22.1",
+    "preset": "node-server",
+    "resourceCount": 61,
+    "readyMs": 6821
+  },
+  "peer": {
+    "revision": "47018c30259c2f7b9e024277d923ae8e89ef128e",
+    "health": {
+      "status": "ready",
+      "ok": true
+    },
+    "modelReplyVerified": false
+  },
+  "started": "2026-11-14T18:03:43.643Z",
+  "finished": "2026-11-14T18:05:02.495Z",
   "chromium": "153.0.8010.0",
   "postgresql": "17.11",
-  "started": "2026-11-14T17:47:10.101Z",
-  "finished": "2026-11-14T17:48:23.194Z",
-  "verified": [
-    "rename through the owner dialog, return to the original linked thread, and verify the saved title from PostgreSQL",
-    "regenerate through the real RPC without configured model, get HTTP 200 and regenerated=false, and preserve the manual title",
-    "pin and unpin; archive, reload, and restore; independently read each persisted state",
-    "deny the other signed-in Member the same mutation"
-  ],
   "states": [
     {
-      "started": "2026-11-14T17:47:10.101Z",
-      "finished": "2026-11-14T17:47:33.212Z",
+      "started": "2026-11-14T18:03:43.643Z",
+      "finished": "2026-11-14T18:04:00.671Z",
       "width": 1440,
       "height": 900,
       "theme": "light",
       "file": "1440-light.png",
-      "sha256": "b69ab1be094e51d0fcc7af259962adc47915b449be7a0057771f9a365710ed49"
+      "sha256": "5a38092188895419f27b35bd58e35942bf880db2c641873fa11c43f0065ee253"
     },
     {
-      "started": "2026-11-14T17:47:34.407Z",
-      "finished": "2026-11-14T17:47:50.698Z",
+      "started": "2026-11-14T18:04:01.724Z",
+      "finished": "2026-11-14T18:04:31.333Z",
       "width": 1440,
       "height": 900,
       "theme": "dark",
       "file": "1440-dark.png",
-      "sha256": "8b30660608a466f0305e4d24444f6e73afb2bc3dcf94d8a64173671e5eea9769"
+      "sha256": "9515f9063b74236413e7189485b2eb02f45a272e0377624e7a1d94fc9c49bcaa"
     },
     {
-      "started": "2026-11-14T17:47:51.567Z",
-      "finished": "2026-11-14T17:48:06.589Z",
+      "started": "2026-11-14T18:04:33.644Z",
+      "finished": "2026-11-14T18:04:48.978Z",
       "width": 390,
       "height": 844,
       "theme": "light",
       "file": "390-light.png",
-      "sha256": "a5afc53439eb985bcc68e60ea4e9c6a56815768a2e6814b3edf5981a1b16255d"
+      "sha256": "335a6ed88a039316f866c57789ae0251d4f229029df2b6b3e2f3863a1e604e27"
     },
     {
-      "started": "2026-11-14T17:48:07.798Z",
-      "finished": "2026-11-14T17:48:23.194Z",
+      "started": "2026-11-14T18:04:49.952Z",
+      "finished": "2026-11-14T18:05:02.495Z",
       "width": 390,
       "height": 844,
       "theme": "dark",
