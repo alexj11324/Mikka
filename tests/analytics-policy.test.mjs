@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { gzipSync } from 'node:zlib'
 import { applicationPlugin } from '../apps/frontend/scripts/application-plugin.mjs'
 import { analyticsPath, sanitizeAnalyticsEvent } from '../lib/analytics-policy.ts'
+import { FIRST_TOUCH_COOKIE, firstTouchFromPage, firstTouchCookieHeader, parseFirstTouch, rememberFirstTouch } from '../lib/first-touch.mjs'
 import { computerAcceptancePreview, computerProductionEnabled, featureAvailability, gatedFeatureEnabled, gatedFeatures, killSwitches, proactiveFeatures, upcomingFeatures } from '../lib/feature-flags.ts'
 import { analyticsEnvironment, analyticsKey, analyticsPaths, inspectAnalyticsBuild, localAnalyticsRequest, requiredRuntimeResources, syntheticPostHogRequest, verifyRuntimeResources } from '../scripts/check-analytics-ssr.mjs'
 import { analyticsBrowserProfile } from '../scripts/analytics-browser-sandbox.mjs'
@@ -378,4 +379,53 @@ test('patched FFmpeg provenance accepts only the exact frozen patch hash and ori
   await rm(join(root, packageDirectory, 'ffmpeg'))
   await symlink(join(root, packageDirectory, 'alternate'), join(root, packageDirectory, 'ffmpeg'))
   await assert.rejects(verifyRuntimeResources(root, built), /symlinks/)
+})
+
+
+test('pageview accepts only validated referring hostname and UTM tags', () => {
+  const event = sanitizeAnalyticsEvent({ event: '$pageview', properties: {
+    $current_url: 'https://app.aspectlylabs.com/mikka/sign-up?email=private@example.com',
+    $referring_domain: 'github.com',
+    $referrer: 'https://github.com/search?token=private',
+    utm_source: 'GitHub', utm_medium: 'SOCIAL', utm_campaign: 'mikka_launch',
+    utm_content: 'private@example.com', utm_term: '../../secret',
+    '$set_once': { email: 'private@example.com' },
+  } })
+  assert.equal(event.properties.$referring_domain, 'github.com')
+  assert.equal(event.properties.utm_source, 'github')
+  assert.equal(event.properties.utm_medium, 'social')
+  assert.equal(event.properties.utm_campaign, 'mikka_launch')
+  assert.equal(event.properties.utm_content, undefined)
+  assert.equal(event.properties.utm_term, undefined)
+  assert.equal(JSON.stringify(event).includes('private'), false)
+  assert.equal(JSON.stringify(event).includes('token='), false)
+})
+
+test('first-touch referral survives marketing to App to signup without persisting secret URL values', () => {
+  const now = 1760000000000
+  const touch = firstTouchFromPage('https://aspectlylabs.com/mikka?utm_source=reddit&utm_medium=social&utm_campaign=launch_2026',
+    'https://www.google.com/search?q=private@example.com', now)
+  const cookie = firstTouchCookieHeader(touch, 'aspectlylabs.com', 'https:')
+  assert.match(cookie, /Domain=aspectlylabs.com/)
+  const incoming = cookie.split(';')[0]
+  const parsed = parseFirstTouch(incoming, now + 5000)
+  assert.equal(parsed.source, 'reddit')
+  assert.equal(parsed.referrer_domain, 'www.google.com')
+  assert.equal(parsed.utm_campaign, 'launch_2026')
+  assert.equal(JSON.stringify(parsed).includes('private'), false)
+  let writes = 0
+  const fromApp = rememberFirstTouch('https://app.aspectlylabs.com/mikka/sign-up',
+    'https://aspectlylabs.com/mikka', incoming, () => { writes++ }, now + 5000)
+  assert.equal(fromApp.source, 'reddit')
+  assert.equal(writes, 0)
+  assert.equal(parseFirstTouch(`${FIRST_TOUCH_COOKIE}=${encodeURIComponent(JSON.stringify({ v: 1, acquired_at: now, source: 'mail@example.com' }))}`, now), null)
+})
+
+test('signup conversion event is attached to user creation, not sign-in handlers', () => {
+  const auth = readFileSync(new URL('../lib/auth.ts', import.meta.url), 'utf8')
+  const source = readFileSync(new URL('../lib/registration-analytics.ts', import.meta.url), 'utf8')
+  assert.match(auth, /user: \{ create: \{[\s\S]*?after: async user => \{[\s\S]*?trackNewRegistration/)
+  assert.match(source, /event: 'registration_completed'/)
+  assert.match(source, /afterJob\('after:registration-analytics'/)
+  assert.match(source, /parseFirstTouch/)
 })

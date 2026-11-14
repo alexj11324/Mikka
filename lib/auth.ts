@@ -19,6 +19,7 @@ import { newUserAvatar } from '@/lib/default-avatar'
 import { daemonAuthorizationOptions, exchangeDaemonSession } from '@/lib/daemon-authorization'
 import { issueDeviceToken } from '@/lib/device-link'
 import { auditAuthentication } from '@/lib/audit/authentication'
+import { trackNewRegistration } from '@/lib/registration-analytics'
 import { readFreshSessionsInScope, SESSION_OPTIONS } from '@/lib/fresh-session'
 import { desktopSessionCacheAfter, withDesktopSessionCache } from '@/lib/desktop-rpc/session-cache'
 import { completeEnterpriseSignIn, enterpriseIdentityModels, enterpriseSessionFields, enterpriseSso, ssoSessionData, withEnterpriseAuthRequest } from '@/lib/enterprise/sso-plugin'
@@ -71,6 +72,7 @@ export const auth = betterAuth({
           const { ensurePersonalWorkspace } = await import('@/lib/personal-workspace')
           await ensurePersonalWorkspace({ id: user.id, email: user.email, name: user.name }, 'zh-CN')
         } catch (error) { console.error('Personal workspace at sign-up failed', error instanceof Error ? error.name : 'UnknownError') }
+        await trackNewRegistration({ id: user.id, email: user.email })
       },
     } },
     account: {

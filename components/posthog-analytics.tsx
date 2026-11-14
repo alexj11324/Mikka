@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import posthog from 'posthog-js'
 import { authClient } from '@/lib/auth-client'
 import { analyticsPath } from '@/lib/analytics-policy'
+import { rememberFirstTouch } from '@/lib/first-touch.mjs'
 import { isSmokeAccountEmail } from '@/lib/smoke-account'
 
 export function PostHogAnalytics() {
@@ -13,6 +14,14 @@ export function PostHogAnalytics() {
   const userId = session?.user.id
   const previousIdentity = useRef<string | undefined>(undefined)
   const previousPage = useRef('')
+
+  useEffect(() => {
+    // First-touch attribution uses only bounded channel tags and a referring
+    // hostname. It is independent of login and survives a site-to-App hop.
+    if (window.mikka?.app?.runtime === 'electron') return
+    rememberFirstTouch(window.location.href, document.referrer, document.cookie,
+      (cookie: string) => { document.cookie = cookie })
+  }, [])
 
   useEffect(() => {
     if (isPending) return
