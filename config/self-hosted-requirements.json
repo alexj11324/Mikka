@@ -1757,5 +1757,19 @@
     "behavior": "Read linked pull requests only for the tasks admitted by the existing workspace and team authorization checks.",
     "test": "tests/task-presentation.db.test.ts",
     "suite": "test:task-presentation-db"
+  },
+  "app/actions/agents.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read authorized conversations, task connections and paginated human history from installation PostgreSQL. Existing thread-only clients can omit Task Work.",
+    "test": "tests/action-read-egress.db.test.ts",
+    "suite": "test:activity-actor-db"
+  },
+  "lib/desktop-rpc/schemas.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validate the optional Task Work activity cursor with the same bounded version and positions accepted by the existing history read.",
+    "test": "lib/task-work-read.test.ts",
+    "suite": "test:factory-activity"
   }
 }

@@ -253,7 +253,7 @@ export async function listIssueThreads(issueId: string): Promise<IssueThread[]> 
 
 /** The same list, plus the channel its `issue_threads` key arrives on: the issue's
  * workspace, or the owner's home for a personal issue; null reads once a minute. */
-export async function pollIssueThreads(issueId: string, includeTaskWork = false) {
+export async function pollIssueThreads(issueId: string, includeTaskWork = false, activityCursor?: { version?: string; positions?: import('@/lib/list-poll').ListPosition[] }) {
   return withDatabaseOperation('/actions/threads/issue-list', async () => {
     const { threads, issue, user } = await readIssueThreads(issueId)
     const [{ documentLiveWorkspace }, { workspacePool }] = await Promise.all([import('@/lib/live/panels'), import('@/lib/workspace-db')])
@@ -261,7 +261,15 @@ export async function pollIssueThreads(issueId: string, includeTaskWork = false)
     const work = includeTaskWork && issue.workspaceId
       ? await (await import('@/lib/task-work-read')).readTaskWork(user, issue.workspaceId, issue.id)
       : null
-    return { threads, live: { workspaceId }, work }
+    const snapshot = { threads, live: { workspaceId }, work }
+    if (!includeTaskWork) return snapshot
+    const { listIssueConnections } = await import('@/app/actions/issue-operations')
+    const connections = await listIssueConnections(issue.id)
+    const { pollIssueVersionSummaries } = await import('@/app/actions/issues')
+    const activity = await pollIssueVersionSummaries(issue.id, activityCursor?.version, activityCursor?.positions)
+    if (activity.error) throw new ActionFailureError(activity.error)
+    if (activity.viewerId !== user.id) throw new ActionFailureError('issueNotFound')
+    return { ...snapshot, connections, activity: activity.snapshot, viewerId: user.id }
   })
 }
 

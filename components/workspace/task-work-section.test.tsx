@@ -19,7 +19,7 @@ test('work shows the admitted conversation, one PR and the current progress; oth
   const gate=(id:string,stage:string,revision:number)=>({id:'gate:f:'+id,kind:'factory_gate',sourceId:id,at:at.toISOString(),runId:'r1',attemptId:'a',candidateId:null,factoryTaskId:'f',stage,status:'running',revision})
   const factory = { task:{ id:'f',pullRequest:{url,state:'open'} }, events:[gate('old','execute',1),gate('new','verify',2)],artifacts:[{kind:'pull_request',url,runId:'r1',state:'merged'}] } as unknown as FactoryActivityView
   const html=renderToStaticMarkup(<IntlProvider locale="en" messages={messages} timeZone="UTC">
-    <TaskWorkSection threads={[mine, restricted] as IssueThread[]} pulls={[{url,title:'Release review',state:'open'}]} factory={factory} open={()=>{}}/>
+    <TaskWorkSection threads={[mine, restricted] as IssueThread[]} pulls={[{url,title:'Release review',state:'merged'}]} factory={factory} open={()=>{}}/>
   </IntlProvider>)
   assert.match(html,/Analyze the release/)
   const pull = html.match(/<a\b[^>]*>[\s\S]*?<\/a>/)?.[0] ?? ''

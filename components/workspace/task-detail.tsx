@@ -24,7 +24,7 @@ import { IssueEditor, createDocumentSeed, type IssueDiscussions } from './issue-
 import { DocumentSync } from '@/lib/document-sync'
 import { useActionError } from '@/lib/use-action-error'
 import { IssueMembers } from './issue-members'
-import { useAgentActivity } from './issue-threads'
+import { useTaskWork } from './issue-threads'
 import { FramedTask } from './task-detail-frame'
 import { TaskThreadPane } from './task-thread-pane'
 import { navigate } from './workspace-navigation'
@@ -200,7 +200,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   const { mutate: retrySync } = useSWR(syncKey, () => sync?.exchange(saved.id), { refreshInterval: 0, revalidateOnFocus: false, revalidateOnReconnect: false, shouldRetryOnError: false })
   // A committed acceptance changes the issue and its history without editing
   // the Yjs body. All three reads follow the same authorized document event.
-  useLiveKey('issue_document', sync || reader ? saved.id : null, [...(syncKey ? [unstable_serialize(syncKey)] : []), unstable_serialize(issueKeys.detail(saved.id)), unstable_serialize(issueKeys.versions(saved.id)), unstable_serialize(issueKeys.activityVersions(saved.id))], liveWorkspaceId, { minIntervalMs: 1500 })
+  useLiveKey('issue_document', sync || reader ? saved.id : null, [...(syncKey ? [unstable_serialize(syncKey)] : []), unstable_serialize(issueKeys.detail(saved.id)), unstable_serialize(issueKeys.versions(saved.id)), unstable_serialize(issueKeys.activityVersions(saved.id)), unstable_serialize(['issue-threads', saved.id])], liveWorkspaceId, { minIntervalMs: 1500 })
   useEffect(() => {
     // Delay disposal so React Strict Mode's immediate effect replay retains this document.
     if (!sync) return
@@ -226,7 +226,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   const [openAcceptance, setOpenAcceptance] = useState<FactoryTask | null>(null)
   // The open thread is the address's (?thread=), so back closes it and a link reopens it beside this task (R-82).
   const showThread = useCallback((runId: string | null) => { setOpenAcceptance(null); setThreadTab('chat'); navigate({ thread: runId }) }, [])
-  const agentActivity = useAgentActivity(saved.id, openThread ?? null, showThread, !preview)
+  const agentActivity = useTaskWork(saved.id, showThread, !preview, user.id)
   const showAcceptance = useCallback((task: FactoryTask) => {
     if (task.candidateRunId) { setOpenAcceptance(null); setThreadTab('acceptance'); navigate({ thread: task.candidateRunId }) }
     else { navigate({ thread: null }); setOpenAcceptance(task) }
@@ -246,7 +246,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   const restoration = useRef<{ resolve: (success: boolean) => void } | null>(null)
   const [replacement, setReplacement] = useState<{ content: JSONContent; version: number }>()
   const activityKey = issueKeys.activityVersions(saved.id)
-  const { data: activityRead, error: historyError, mutate: refreshVersions } = useSWR<ActivityRead>(preview ? null : activityKey, async () => {
+  const localActivity = useSWR<ActivityRead>(preview || agentActivity.history ? null : activityKey, async () => {
     await waitForCacheHydration(cache)
     const previous = cache.get(unstable_serialize(activityKey))?.data as ActivityRead | undefined
     const held = heldListPositions(previous)
@@ -257,7 +257,9 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     const next = result.snapshot
     return { version: next.version, items: mergeList(previous?.items ?? [], next), positions: 'positions' in next ? next.positions : previous?.positions }
   })
-  const versions = activityRead?.items
+  const versions = agentActivity.history ? agentActivity.history.rows : localActivity.data?.items
+  const historyError = agentActivity.history ? agentActivity.history.error : localActivity.error
+  const refreshVersions = agentActivity.history?.refresh ?? localActivity.mutate
   const { data: historyVersions, error: historyBodyError, mutate: refreshHistoryVersions } = useSWR(history && !preview ? issueKeys.versions(saved.id) : null, () => listIssueVersions(saved.id))
   useEffect(() => {
     const previous = savedRef.current

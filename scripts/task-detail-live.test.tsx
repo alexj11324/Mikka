@@ -106,7 +106,7 @@ for (const [file, names] of [
   ['factory-acceptance', ['FactoryAcceptance', 'FactoryAcceptancePanel']],
 ] as const) mock.module(at(`components/workspace/${file}.tsx`), { namedExports: Object.fromEntries(names.map(name => [name, none])) })
 const emptyThreads = { data: [] }
-mock.module(at('components/workspace/issue-threads.tsx'), { namedExports: { IssueThreads: none, ThreadEventRow: none, useIssueThreads: () => emptyThreads, useAgentActivity: () => ({ rows: [], error: null }) } })
+mock.module(at('components/workspace/issue-threads.tsx'), { namedExports: { IssueThreads: none, ThreadEventRow: none, useIssueThreads: () => emptyThreads, useTaskWork: () => ({ threads: [], failed: null }) } })
 // The controller is mounted with a minimal renderer for the official frame contract.
 const { IssueActivityFeed } = await import('../components/workspace/issue-activity-feed')
 mock.module(at('components/workspace/task-detail-frame.tsx'), { namedExports: {
@@ -122,7 +122,7 @@ mock.module(at('components/workspace/task-detail-frame.tsx'), { namedExports: {
       <button data-priority="" onClick={() => props.onPriority('high')}>High</button>
       <output data-properties="" data-revision={task.revision}>{status}:{priority}</output>
       {props.editor(null, () => null)}
-      <section data-activity="">{!preview && <IssueActivityFeed versions={props.versions} children={[]} agents={props.agentActivity.rows} />}</section>
+      <section data-activity="">{!preview && <IssueActivityFeed versions={props.versions} children={[]} />}</section>
       {props.panel}{props.dialogs}
     </div>
   },

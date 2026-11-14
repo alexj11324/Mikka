@@ -183,6 +183,35 @@ test('Task presentation batches keep current tenant authority and one Factory pr
       t.diagnostic(JSON.stringify({ tasks: [1, 16], statements: [one.statements.length, many.statements.length], dispatchReads: membershipReads.length }))
     })
 
+    await t.test('Task Work reads authorized relations and human history across separate stores and retains the legacy read', async () => {
+      const { pollIssueThreads } = await import('../app/actions/agents')
+      const related = await makeTask(shared)
+      const foreign = await makeTask(other)
+      const task = await makeTask(shared, { relatedIds: [related, foreign] })
+      const humanVersion = randomUUID()
+      await application.query(`INSERT INTO issue_versions(id,"issueId","userId",revision,title,content,status,priority,actor_type,actor_id)
+        VALUES($1,$2,$3,1,'Human note','{"type":"doc"}','doing','normal','user',$3)`, [humanVersion, task, owner])
+      const legacy = await as(owner, shared, () => pollIssueThreads(task))
+      assert.equal('activity' in legacy, false)
+      for (const reader of [owner, peer]) {
+        const result = await as(reader, shared, () => pollIssueThreads(task, true))
+        assert.ok('activity' in result && result.activity && 'items' in result.activity)
+        assert.ok(Array.isArray(result.activity.items))
+        assert.equal(result.viewerId, reader)
+        assert.deepEqual(new Set(result.connections.map(row => row.id)), new Set([task, related]))
+        assert.deepEqual(result.activity.items.map(item => item.id), [humanVersion])
+        const cursor = { version: result.activity.version, positions: result.activity.positions }
+        const unchanged = await as(reader, shared, () => pollIssueThreads(task, true, cursor))
+        assert.ok('activity' in unchanged && unchanged.activity && 'unchanged' in unchanged.activity && unchanged.activity.unchanged)
+      }
+      await workspace.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [shared, peer])
+      try {
+        await assert.rejects(as(peer, shared, () => pollIssueThreads(task, true)), { code: 'issueNotFound' })
+      } finally {
+        await workspace.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`, [shared, peer])
+      }
+    })
+
     await t.test('a read-only member sees the same threadless and Factory states in citation cards and detail', async () => {
       const threadless = await makeTask(shared, {}, 'backlog')
       const reviewed = await makeTask()
