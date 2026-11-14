@@ -1772,6 +1772,13 @@
     "test": "tests/conversation-title.db.test.ts",
     "suite": "test:run-publication-db"
   },
+  "app/api/mobile/conversations/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Serve the existing authorized conversation directory to an authenticated native client using the selected installation workspace.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
   "app/api/conversations/read-state/route.ts": {
     "mode": "built-in",
     "environment": [],
