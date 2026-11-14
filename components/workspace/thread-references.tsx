@@ -41,13 +41,15 @@ export function ThreadReferencePicker({ draft, workspaceId, input, onChange }: {
     if (!textarea) return
     const select = () => { if (textarea.ownerDocument.activeElement === textarea) update() }
     const update = () => setCaret(textarea.selectionStart)
+    // Let React commit the controlled draft before a caret render can restore its old value.
+    const edited = (event: Event) => { if (event.target === textarea) update() }
     update()
-    textarea.addEventListener('input', update)
+    textarea.ownerDocument.addEventListener('input', edited)
     textarea.ownerDocument.addEventListener('selectionchange', select)
     textarea.addEventListener('click', update)
     textarea.addEventListener('keyup', update)
     return () => {
-      textarea.removeEventListener('input', update)
+      textarea.ownerDocument.removeEventListener('input', edited)
       textarea.ownerDocument.removeEventListener('selectionchange', select)
       textarea.removeEventListener('click', update)
       textarea.removeEventListener('keyup', update)
