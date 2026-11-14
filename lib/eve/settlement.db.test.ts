@@ -223,7 +223,7 @@ test('host settlement receipts preserve product publication across native RPC re
       const { AgentKitStore } = await import('../agent-kit/store')
       const { DEFAULT_AGENT_DEFINITION } = await import('../agent-kit/builtin')
       const { handleEveProductRequest } = await import('./product-gateway')
-      const { productRpc } = await import('./product-rpc')
+      const { productCatalogue } = await import('./product-definitions')
       const { createProductTool } = await import('./product-tool')
       const { scopeAuth } = await import('./scope')
       const store = new AgentKitStore(pool)
@@ -237,7 +237,7 @@ test('host settlement receipts preserve product publication across native RPC re
         calls.push((await request.clone().json()).operation)
         return handleEveProductRequest(request)
       })
-      const { tools } = await productRpc<{tools:import('./product-rpc').ProductCatalogueEntry[]}>(scope, {...binding,operation:'catalogue'})
+      const tools = await productCatalogue(scope, binding)
       const read = tools.find(tool => tool.name === 'list_issues')!
       const write = tools.find(tool => tool.name === 'send_email')!
       const input = {}
@@ -249,12 +249,12 @@ test('host settlement receipts preserve product publication across native RPC re
       await assert.rejects(async () => approval.request({...context,abortSignal:AbortSignal.abort()} as never), {name:'AbortError'})
       assert.equal(await approval.request(context as never), 'not-applicable')
       assert.deepEqual(await tool.execute!(input as never, context as never), [])
-      assert.deepEqual(calls, ['catalogue','execute'])
+      assert.deepEqual(calls, ['execute'])
       assert.equal(read.needsApprovalReview, false)
       assert.equal(write.needsApprovalReview, true)
       const legacy = createProductTool(scope,binding,{...read,needsApprovalReview:undefined})
       assert.equal(await (legacy.approval as typeof approval).request(context as never), 'not-applicable')
-      assert.deepEqual(calls, ['catalogue','execute','approval'])
+      assert.deepEqual(calls, ['execute','approval'])
       // If the host adds this tool to approval review after discovery, execution
       // still requires a matching durable review before any provider dispatch.
       const priorCatalogue = createProductTool(scope,binding,{...write,needsApprovalReview:false})
@@ -267,8 +267,7 @@ test('host settlement receipts preserve product publication across native RPC re
       const { AgentKitStore } = await import('../agent-kit/store')
       const { DEFAULT_AGENT_DEFINITION } = await import('../agent-kit/builtin')
       const { mailboxInputs } = await import('@mikka/protocol/mailbox')
-      const { handleEveProductRequest } = await import('./product-gateway')
-      const { internalEveAuthorization } = await import('./auth')
+      const { productCatalogue } = await import('./product-definitions')
       const { createRequestDatabaseScope } = await import('../db')
       const { Client } = await import('pg')
       const store = new AgentKitStore(pool)
@@ -279,11 +278,7 @@ test('host settlement receipts preserve product publication across native RPC re
       async function catalogue(turnId: string, executionId: string) {
         const before = queries.mock.callCount()
         const conn = createRequestDatabaseScope(process.env.E2E_DATABASE_URL!)
-        const response = await conn.run(() => handleEveProductRequest(new Request('http://localhost/mikka/api/internal/eve/tools', {
-          method:'POST', headers:{authorization:internalEveAuthorization(scope)}, body:JSON.stringify({operation:'catalogue',sessionId,turnId,executionId})
-        }))).finally(() => conn.close())
-        assert.equal(response.status,200)
-        const {tools} = await response.json() as {tools:{name:string}[]}
+        const tools = await conn.run(() => productCatalogue(scope, { sessionId, turnId, executionId })).finally(() => conn.close())
         const grants = queries.mock.calls.slice(before).filter(call => /select active_version,workspace_id from agent_kit_heads|select snapshot,status,version_id from agent_kit_executions|select definition,digest from agent_kit_versions/i.test(String(call.arguments[0])))
         return {mail:tools.some(tool=>Object.hasOwn(mailboxInputs,tool.name)),liveChecks:grants.length}
       }

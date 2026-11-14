@@ -349,7 +349,7 @@ test('Project v2: split database migration, canonical relationships and live ten
       const assigned = await actAs(member, () => actions.setProjectIssues({ id: source.id, revision: source.revision, issueIds: [task], workspaceId: alpha }))
       assert.ok('project' in assigned, JSON.stringify(assigned))
       const staleMove = await actAs(member, () => actions.moveIssueToProject({ issueId: task, revision: 1, projectId: null, workspaceId: alpha }))
-      assert.match(staleMove.error ?? '', /issueOutdated/, 'a Task detail opened before a Project edit cannot overwrite the new link')
+      assert.equal(staleMove.error, 'issueOutdated', 'a Task detail opened before a Project edit cannot overwrite the new link')
       assert.equal((await workspace.query('SELECT "projectId" FROM workspace_project_tasks WHERE "issueId"=$1', [task])).rows[0].projectId, source.id)
       const { changeResourceAccess } = await import('../lib/resource-access/store')
       const policy = (await application.query(`SELECT revision FROM resource_access_policies WHERE kind='project' AND id=$1`, [destination.id])).rows[0]

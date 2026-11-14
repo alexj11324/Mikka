@@ -693,6 +693,13 @@
     "behavior": "The Cloudflare sandbox adapter requires an injected workspace binding and a scoped grant. Ordinary Compose installations do not supply the private binding.",
     "test": "apps/api/scripts/cloudflare-api.test.mjs"
   },
+  "lib/eve/product-definitions.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Native Eve definitions prepare the current session's execution and tool catalogue through the installation's existing scoped stores. Product actions retain their authenticated application-host boundary.",
+    "test": "lib/eve/product-definitions.test.ts",
+    "suite": "test:eve-product-tool"
+  },
   "lib/eve/product-rpc.ts": {
     "mode": "operator-configured",
     "environment": [
