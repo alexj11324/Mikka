@@ -21,7 +21,7 @@ export function useChatComposer({ ref, value, onChange, onSubmit, sending = fals
   const fileRef = useRef<HTMLInputElement>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const fileId = useId()
-  const files = useChatFiles(value, onChange, attachmentScope, sending || disabled)
+  const files = useChatFiles(value, onChange, attachmentScope, sending || disabled, tShell)
   const stoppable = !!onStop && (sending || (running && !value.trim()))
   const canSend = !sending && !submitDisabled && !disabled && !files.locked && !!value.trim()
 

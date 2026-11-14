@@ -15,7 +15,7 @@ const url=process.env.E2E_DATABASE_URL
 if(url)assert.ok(isE2eTarget(url),E2E_DB_RULE)
 else if(process.env.REQUIRE_DB==='1')throw new Error('Native approval tests require E2E_DATABASE_URL')
 
-test('native Ask uses one durable product receipt and existing personal operation ledger',{skip:!url,timeout:30000},async()=>{
+test('native Ask uses one durable product receipt and existing personal operation ledger',{skip:!url,timeout:30000},async t=>{
   const schema=`eve_approval_${randomUUID().replaceAll('-','')}`,owner='fixture-owner',bot=randomUUID(),workspace=randomUUID()
   const admin=new Pool({connectionString:url}),pool=new Pool({connectionString:url,options:`-c search_path=${schema},pg_catalog`})
   await admin.query(`CREATE SCHEMA ${schema}`)
@@ -26,6 +26,22 @@ test('native Ask uses one durable product receipt and existing personal operatio
       CREATE TABLE agent_kit_executions(owner_id text,bot_key text,id uuid,status text,snapshot jsonb,version_id uuid)`)
     await pool.query('INSERT INTO "user" VALUES($1);',[owner]);await pool.query('INSERT INTO bots VALUES($1)',[bot])
     for(const name of ['20261025043000_pending_actions.sql','20261028143920_operation_ledger.sql','20261028143921_approved_write_binding.sql','20261027164515_workspace_computer_policy.sql','20261029010447_workspace_computer_policy_allow.sql','20261029043646_agent_external_write_policy.sql','20261029043647_workspace_external_write_policy.sql','20261030204751_workspace_computer_policy_default_allow.sql','20261112030300_eve_tool_approvals.sql'])await pool.query(await readFile(new URL('../../drizzle/'+name,import.meta.url),'utf8'))
+    await t.test('first preparation returns its stored receipt while a concurrent replay reads the winner', async subtest => {
+      const store = eveApprovalStore(pool, owner, bot)
+      const queries = subtest.mock.method(pool, 'query')
+      const key = randomUUID()
+      const record = { callDigest: 'call', planDigest: 'plan', decision: 'ask' as const, status: 'prepared' as const }
+      const inserted = await store.prepare(key, record)
+      assert.deepEqual(inserted, { ...record, output: null, expired: false })
+      assert.equal(queries.mock.calls.length, 1, 'the new receipt is available in the insert result')
+      queries.mock.restore()
+      const raceKey = randomUUID()
+      const competing = { ...record, planDigest: 'competing-plan' }
+      const winner = await Promise.all([store.prepare(raceKey, record), store.prepare(raceKey, competing)])
+      assert.deepEqual(winner[0], winner[1])
+      assert.deepEqual(winner[0], await store.read(raceKey))
+      await assert.rejects(eveApprovalStore(pool, 'another-owner', bot).prepare(raceKey, record), /operationBindingConflict/)
+    })
     const store=eveApprovalStore(pool,owner,bot)
     const call:ApprovalCall={ownerId:owner,botId:bot,workspaceId:workspace,surface:'web',sessionId:'fixture-session',turnId:'fixture-turn',callId:'legacy-call',name:'call_app_tool',input:{toolkit:'slack',tool:'SLACK_SEND_MESSAGE',arguments:{text:'Final text'}},sourceEventId:randomUUID()}
     const responder={authenticator:'mikka',principalType:'user',principalId:owner,attributes:{botId:bot,workspaceId:workspace,surface:'web'}}

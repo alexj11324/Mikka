@@ -9,7 +9,6 @@ import { Pool, type PoolClient } from 'pg'
 import { orderMigrations } from '../../../scripts/migration-order.mjs'
 import { dropTestDatabase } from '../../../tests/support/drop-test-database'
 import { createFactoryStore } from '../store'
-import { observePoolCommits } from '../../db/commit-effects'
 import { createFactoryDispatch, factoryBinding } from '../dispatch'
 import { factoryEventId } from '../event-id'
 import { questionFingerprint } from './contract'
@@ -33,7 +32,6 @@ test('real PG: question receipts preserve one execution without opening a repair
   await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
   const target = new URL(url!); target.pathname = '/' + database
   const pool = new Pool({ connectionString: target.toString(), max: 8 })
-  observePoolCommits(pool)
   let closeWorkspaceDatabase: (() => Promise<void>) | undefined
   const previousByos = process.env.MIKKA_BYOS_ENABLED, previousRoutes = process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES
   process.env.MIKKA_BYOS_ENABLED = '1'; process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'

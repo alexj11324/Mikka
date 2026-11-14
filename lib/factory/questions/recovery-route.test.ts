@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { mock,test } from 'node:test';
+import { FactoryError } from '../contract';
 let enabled=true,owner:string|null='owner',sessionId:string|null='session',queries=0,calls=0;
 const verifiedUsers = new WeakSet<object>();
 mock.module('@/lib/api-auth',{namedExports:{auth:{api:{getSession:async()=>{if(!owner)return null;const user={id:owner};verifiedUsers.add(user);return {user,session:sessionId?{id:sessionId}:null};}}}}});
@@ -13,7 +14,8 @@ mock.module("@/lib/factory/workspace-http", { namedExports: {
 } });
 
 mock.module('@/lib/db',{namedExports:{pool:{query:async()=>{queries++;return {rows:[{botId:null}]};}}}});
-mock.module('@/lib/factory/runtime',{namedExports:{factoryLifecycleEnabled:()=>enabled,factoryRuntimeForBot:()=>({questions:{recover:async(actor:unknown,body:unknown)=>{calls++;return {actor,body};}}})}});
+let recoveryError: FactoryError | undefined;
+mock.module('@/lib/factory/runtime',{namedExports:{factoryLifecycleEnabled:()=>enabled,factoryRuntimeForBot:()=>({questions:{recover:async(actor:unknown,body:unknown)=>{calls++;if(recoveryError)throw recoveryError;return {actor,body};}}})}});
 const id='00000000-0000-4000-8000-000000000001';
 const body={requestId:id,expectedFailedRunId:id,reference:{questionId:id,questionRevision:3,binding:{taskId:id,issueId:id,attemptId:id,candidateId:null,revision:12},originRunId:id,originSessionId:'sid'}};
 test('owner recovery has a bounded Node runtime budget for retained-machine preparation',async()=>{
@@ -37,4 +39,14 @@ test('recovery rejects caller answer, model, credential and history source; acce
  for(const extra of [{text:'answer'},{model:'model'},{subscriptionBindingId:id},{historyRunId:id}]) assert.equal((await call({},{...body,...extra})).status,422);
  assert.equal(calls,0);
  const result=await call();assert.equal(result.status,200);assert.deepEqual(result.body.actor,{source:'human',userId:'owner',sessionId:'session'});assert.deepEqual(result.body.body,body);assert.equal(calls,1);
+});
+
+test('cloud recovery sends only its public failure code', async () => {
+ const cause = new Error('private fixture diagnostic');
+ recoveryError = new FactoryError('factoryQuestionContinuationUnavailable', { cause });
+ try {
+   assert.deepEqual(await call(), { status: 409, body: { error: 'factoryQuestionContinuationUnavailable' } });
+ } finally {
+   recoveryError = undefined;
+ }
 });

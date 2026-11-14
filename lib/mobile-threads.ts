@@ -4,6 +4,7 @@ import { joinThreadRead, threadUnread } from '@/lib/thread-reads'
 import { db, pool } from '@/lib/db'
 import { agentRuns, agents, conversationReads, devices, issues } from '@/lib/db/schema'
 import { citationSources } from '@/lib/coordinator/store'
+import { runHistoryWindow } from '@/lib/task-state-query'
 import { deviceOnlineStates } from '@/lib/device-presence'
 import { threadName } from '@/lib/issue-threads'
 import type { RunSource } from '@/lib/coordinator/citations'
@@ -118,7 +119,7 @@ async function runRows(userId: string, filter: SQL | undefined, limit: number) {
 /** The person's threads from the last 30 days, newest first, and their machines with whether each is online (R-24). */
 export async function mobileThreads(userId: string, limit = 60, homeScopeToken?: string, workspaceId?: string | null): Promise<{ threads: MobileThread[]; devices: { id: string; name: string; kind: MachineKind; online: boolean }[]; live: ListLiveRead }> {
   const [threads, machines] = await Promise.all([
-    runRows(userId, and(sql`${agentRuns.createdAt} > now() - interval '30 days'`,
+    runRows(userId, and(sql`${agentRuns.createdAt} > now() - ${runHistoryWindow}`,
       workspaceId === undefined ? undefined : workspaceId ? eq(agentRuns.workspaceId, workspaceId) : sql`false`), limit).then(listed),
     // A task's own cloud sandbox is not one of the person's machines (Alex, 2026-11-01).
     db.select({ id: devices.id, name: devices.name, platform: devices.platform, kind: devices.kind, lastSeenAt: devices.lastSeenAt }).from(devices)

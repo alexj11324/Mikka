@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
-import { OperationError } from './ledger'
+import { OperationError } from './write-error'
 
 const slackChannel = z.object({
   id:z.string().min(1), name:z.string().optional(), user:z.string().optional(),
@@ -25,6 +25,15 @@ export function calendarSnapshot(raw: unknown, expected: unknown, notifications:
 }
 
 export function snapshotDigest(value: unknown): string {
-  const canonical = (v: unknown): unknown => Array.isArray(v) ? v.map(canonical) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).filter(([,x]) => x !== undefined).sort(([a],[b]) => a.localeCompare(b)).map(([k,x]) => [k,canonical(x)])) : v
+  function canonical(input: unknown): unknown {
+    if (Array.isArray(input)) return input.map(canonical)
+    if (input && typeof input === 'object') {
+      return Object.fromEntries(Object.entries(input)
+        .filter(([, item]) => item !== undefined)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, item]) => [key, canonical(item)]))
+    }
+    return input
+  }
   return createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex')
 }

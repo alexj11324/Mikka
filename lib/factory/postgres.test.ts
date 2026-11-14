@@ -1,3 +1,5 @@
+import { bindFixtureWorkspaceDatabase } from '../../tests/helpers/workspace-database';
+import { builtinGateway } from '../builtin-gateway/runtime';
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { factoryTestLifecycle } from "../../tests/helpers/factory-test-authority";
@@ -18,7 +20,7 @@ import { handleFactory } from "./http";
 import { type FactoryTask } from "./store";
 import { createFactoryDispatch } from "./dispatch";
 import { factoryDispatchDatabase } from "./transaction";
-import { createExecutionClaim } from "./execution-claim";
+import { createExecutionClaim } from "../../tests/helpers/factory-execution-claim";
 import { createFactoryReconciler } from "./reconcile";
 import { insertRunOnce } from "../run-dispatch";
 import { runPrompt } from "../run-prompt";
@@ -62,6 +64,7 @@ test(
       max: 12,
       options: `-c search_path=${schema}`,
     });
+    const closeWorkspace = await bindFixtureWorkspaceDatabase(pool);
     const authorize = async (
       userId: string,
       issueId: string,
@@ -997,6 +1000,8 @@ test(
         }),
       );
     } finally {
+      await builtinGateway()?.stop();
+      await closeWorkspace();
       await pool.end();
       await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
       await admin.end();

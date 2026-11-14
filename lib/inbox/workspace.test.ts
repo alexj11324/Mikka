@@ -7,7 +7,7 @@ import { ActionFailureError } from '../action-error'
 import { createInboxGuard } from './workspace'
 import { InboxStore } from './store'
 import { handleInbox } from './http'
-import { InboxRequestError, readableInboxCount, readInboxPage, submitInboxCommand } from './client'
+import { InboxRequestError, readableInboxCount, readInboxCount, readInboxPage, submitInboxCommand } from './client'
 
 test('inbox reads and commands preserve the original session and machine provenance through canonical admission', async () => {
   const workspaceId = randomUUID(), url = 'https://app.invalid/api/inbox'
@@ -85,12 +85,32 @@ test('official writes accept only the server receipt including an idempotent rep
   assert.equal(fetch.mock.callCount(), sent)
 })
 
-test('a failed badge refresh keeps its current scoped count until access is denied or a newer count arrives', () => {
+test('one scoped count read supplies the actionable badge and the full pending total independently of page or tab', async t => {
+  const workspaceId = randomUUID()
+  let response: Record<string, unknown> = { count: 1, suggestionCount: 55 }
+  const fetch = t.mock.method(globalThis, 'fetch', async (url: string) => {
+    const target = new URL(url, 'https://app.invalid')
+    assert.deepEqual(Object.fromEntries(target.searchParams), { workspaceId, count: '1' })
+    return Response.json(response)
+  })
+  assert.deepEqual(readableInboxCount(await readInboxCount(workspaceId, 0), undefined), { count: 1, pendingCount: 56 })
+  assert.equal(fetch.mock.callCount(), 1)
+  response = { count: 0, suggestionCount: 0 }
+  assert.deepEqual(readableInboxCount(await readInboxCount(workspaceId, 0), undefined), { count: 0, pendingCount: 0 })
+  response = { count: 1 }
+  assert.deepEqual(readableInboxCount(await readInboxCount(workspaceId, 0), undefined), { count: 1, pendingCount: undefined })
+  for (const value of [-1, '2', null, Number.MAX_SAFE_INTEGER]) {
+    response = { count: 1, suggestionCount: value }
+    await assert.rejects(readInboxCount(workspaceId, 0), InboxRequestError)
+  }
+})
+
+test('a failed badge refresh keeps its scoped rail count while the page total is unknown, and denial retires both', () => {
+  const data = { count: 2, suggestionCount: 4 }
   for (const failure of [new TypeError('offline'), ...[409, 429, 503].map(status => new InboxRequestError('unavailable', status))]) {
-    assert.equal(readableInboxCount(2, failure), 2)
+    assert.deepEqual(readableInboxCount(data, failure), { count: 2, pendingCount: undefined })
     assert.equal(readableInboxCount(undefined, failure), undefined)
   }
-  for (const status of [401, 403, 404]) assert.equal(readableInboxCount(2, new InboxRequestError('denied', status)), undefined)
-  assert.equal(readableInboxCount(0, undefined), 0)
-  assert.equal(readableInboxCount(1, undefined), 1)
+  for (const status of [401, 403, 404]) assert.equal(readableInboxCount(data, new InboxRequestError('denied', status)), undefined)
+  assert.deepEqual(readableInboxCount(1, undefined), { count: 1, pendingCount: undefined })
 })

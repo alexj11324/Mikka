@@ -25,7 +25,14 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
   delete process.env.MIKKA_FACTORY_ROUTING_ENABLED
   const next = await import('next/server')
   mock.module('next/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse, after: () => {} } })
-  const { Pool } = await import('pg')
+  const { Client, Pool } = await import('pg')
+  const query = Client.prototype.query
+  let resourceReads = 0
+  t.mock.method(Client.prototype, 'query', function (this: InstanceType<typeof Client>, ...args: unknown[]) {
+    const text = typeof args[0] === 'string' ? args[0] : (args[0] as { text?: string })?.text
+    if (text?.includes('FOR SHARE OF repo,device,agent')) resourceReads++
+    return Reflect.apply(query, this, args)
+  })
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
@@ -340,8 +347,11 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
     assert.equal(event.payload.resetsAt, null)
     assert.deepEqual(event.payload.actions, [{ action: 'addApiKey' }, { action: 'retryAfterReset', at: null }])
 
+    const readsBeforeRetry = resourceReads
     const { runId: retryRunId } = await quota.retryQuotaPausedRun(p.id, runId)
+    assert.equal(resourceReads - readsBeforeRetry, 1, 'the device continuation validates its locked project placement once')
     assert.deepEqual(await quota.retryQuotaPausedRun(p.id, runId), { runId: retryRunId }, 'idempotent')
+    assert.equal(resourceReads - readsBeforeRetry, 1, 'replaying the recorded child performs no new placement admission')
     assert.equal((await row(runId)).status, 'failed')
     const [continuation] = await continuations(runId)
     assert.equal(continuation.id, retryRunId)
@@ -682,6 +692,17 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
           const cause = error instanceof Error && error.cause ? error.cause : error
           return !!cause && typeof cause==='object' && 'code' in cause && cause.code==='P0001'
         })
+      const { ActionFailureError, runAction } = await import('../lib/action-error')
+      const retry = () => actAs(reader, () => quota.retryQuotaPausedRun(p.id, original.id))
+      await assert.rejects(retry, (error: unknown) => {
+        assert.ok(error instanceof ActionFailureError)
+        assert.equal(error.code, 'runInvalid')
+        assert.equal(Object.hasOwn(JSON.parse(JSON.stringify(error)), 'cause'), false)
+        const underlying = error.cause instanceof Error && error.cause.cause ? error.cause.cause : error.cause
+        assert.equal((underlying as { code?: string } | undefined)?.code, 'P0001')
+        return true
+      })
+      assert.deepEqual(await runAction(retry), { error: 'runInvalid', params: undefined })
       assert.deepEqual(await quotaState(p.id),before,'run, binding, machine and notification writes must roll back together')
     } finally {
       await pool.query(`DROP TRIGGER IF EXISTS "${name}" ON agent_runs`)

@@ -1,6 +1,6 @@
 import { readCompactRunFailure, type CompactRunFailure } from './run-failure-view'
 import { runIsActive, runSummaryView } from './issue-run-conversation'
-import type { RunChain } from './run-chain'
+import type { RunAttempt, RunChain } from './run-chain'
 import { BUILTIN_AGENT_PROFILE_ID } from './factory/agent-profile-reference'
 import { resolveProfileMark, type ProfileMarkValue } from './factory/agent-profile-mark'
 
@@ -10,6 +10,7 @@ import { resolveProfileMark, type ProfileMarkValue } from './factory/agent-profi
  * agent, output or messages, and cannot open or join it.
  */
 export interface IssueThread {
+  pauseReason?: RunAttempt['pauseReason']
   failureDetails?: CompactRunFailure | null
   id: string
   status: string
@@ -47,10 +48,11 @@ export interface IssueThread {
    * dispatch), or a rerun. It is derived from the run chain, never folded separately, and
    * it is the run `latestRunId` names: what send and stop address.
    */
-  continuation: { id: string; status: string; outcome?: string | null; stopping: boolean } | null
+  continuation: { id: string; status: string; pauseReason?: RunAttempt['pauseReason']; outcome?: string | null; stopping: boolean } | null
 }
 
 export interface IssueThreadAttempt {
+  pauseReason?: RunAttempt['pauseReason']
   failureDetails?: CompactRunFailure | null
   runId: string
   /** 1-based; the root run is attempt 1. */
@@ -67,12 +69,12 @@ export type ThreadQuestion = 'waiting' | 'resuming' | null
 /** Attach the run's resolved chain; without one the thread is a one-attempt chain. */
 export function withRunChain(thread: IssueThread, chain: RunChain | null | undefined): IssueThread {
   if (!chain) return thread
-  const attempts = chain.attempts.map(attempt => ({ ...(attempt.failureDetails ? { failureDetails: readCompactRunFailure(attempt.failureDetails) } : {}), runId: attempt.runId, attempt: attempt.attempt, status: attempt.status, outcome: attempt.outcome ?? null,
+  const attempts = chain.attempts.map(attempt => ({ ...(attempt.pauseReason ? { pauseReason: attempt.pauseReason } : {}), ...(attempt.failureDetails ? { failureDetails: readCompactRunFailure(attempt.failureDetails) } : {}), runId: attempt.runId, attempt: attempt.attempt, status: attempt.status, outcome: attempt.outcome ?? null,
     stopping: runIsActive(attempt.status) && !!attempt.stopRequestedAt, createdAt: attempt.createdAt, finishedAt: attempt.finishedAt }))
   const latest = attempts.find(attempt => attempt.runId === chain.latestRunId)
   return {
     ...thread, rootRunId: chain.rootRunId, latestRunId: chain.latestRunId, attempts, failureDetails: readCompactRunFailure(latest?.failureDetails),
-    continuation: latest && latest.runId !== thread.id ? { id: latest.runId, status: latest.status, outcome: latest.outcome ?? null, stopping: latest.stopping } : null,
+    continuation: latest && latest.runId !== thread.id ? { ...(latest.pauseReason ? { pauseReason: latest.pauseReason } : {}), id: latest.runId, status: latest.status, outcome: latest.outcome ?? null, stopping: latest.stopping } : null,
   }
 }
 
@@ -94,16 +96,16 @@ export function threadQuestionRunId(thread: Pick<IssueThread, 'attempts'>) {
  * status, send and stop follow it. An answered question whose continuation has not started
  * shows as the run it is about to continue: the same running state, nothing new.
  */
-export function threadQuestionView(thread: { id: string; status: string; outcome?: string | null; stopping?: boolean; question: ThreadQuestion; questionWake?: IssueThread['questionWake']; continuation?: IssueThread['continuation'] }) {
+export function threadQuestionView(thread: { id: string; status: string; pauseReason?: RunAttempt['pauseReason']; outcome?: string | null; stopping?: boolean; question: ThreadQuestion; questionWake?: IssueThread['questionWake']; continuation?: IssueThread['continuation'] }) {
   const next = thread.continuation ?? null
   // A failed wake offers Retry on this child. The committed answer stays in
   // resuming, so ordinary Send cannot replay it or create another run.
   if (next?.status === 'queued' && thread.question === 'resuming') return { question: 'resuming' as const, waiting: false, status: thread.questionWake ? 'failed' : 'running', outcome: null, runId: next.id, stopping: false }
-  const live = next ?? { id: thread.id, status: thread.status, outcome: thread.outcome ?? null, stopping: !!thread.stopping }
+  const live = next ?? { pauseReason: thread.pauseReason, id: thread.id, status: thread.status, outcome: thread.outcome ?? null, stopping: !!thread.stopping }
   if (live.status === 'queued' && thread.question === 'resuming' && thread.questionWake)
     return { question: 'resuming' as const, waiting: false, status: 'failed', outcome: null, runId: live.id, stopping: false }
   const question = runIsActive(live.status) ? null : thread.question
-  return { question, waiting: question === 'waiting', status: question === 'resuming' ? 'running' : live.status, outcome: live.outcome ?? null, runId: live.id, stopping: runIsActive(live.status) && live.stopping }
+  return { ...(live.pauseReason ? { pauseReason: live.pauseReason } : {}), question, waiting: question === 'waiting', status: question === 'resuming' ? 'running' : live.status, outcome: live.outcome ?? null, runId: live.id, stopping: runIsActive(live.status) && live.stopping }
 }
 
 /** Human acceptance resolves only its current candidate's still-waiting producer.
@@ -125,7 +127,7 @@ export function threadTime(thread: { createdAt: Date; finishedAt: Date | null },
 export const ISSUE_THREAD_LIMIT = 20
 
 export interface IssueThreadRow {
-  id: string; issueId: string | null; userId: string; status: string; prompt: string
+  id: string; issueId: string | null; userId: string; status: string; pauseReason?: RunAttempt['pauseReason']; prompt: string
   report: unknown; error: string | null; failureDetails?: unknown; createdAt: Date; finishedAt: Date | null
   agentName: string; harness: string; ownerName?: string | null
   stopRequestedAt?: Date | null
@@ -178,14 +180,14 @@ export function projectIssueThreads(rows: readonly (IssueThreadRow | IssueThread
     .slice(0, ISSUE_THREAD_LIMIT)
     .map(row => ({
       failureDetails: readCompactRunFailure(row.failureDetails),
-      id: row.id, status: row.status, outcome: row.outcome ?? null, ...(row.kind ? { kind: row.kind } : {}), createdAt: row.createdAt, finishedAt: row.finishedAt, ownedByCurrentUser: row.userId === viewerId,
+      ...(row.pauseReason ? { pauseReason: row.pauseReason } : {}), id: row.id, status: row.status, outcome: row.outcome ?? null, ...(row.kind ? { kind: row.kind } : {}), createdAt: row.createdAt, finishedAt: row.finishedAt, ownedByCurrentUser: row.userId === viewerId,
       stopping: runIsActive(row.status) && !!row.stopRequestedAt,
       ownerName: row.userId === viewerId ? null : row.ownerName ?? null,
       detail: canReadThread(row.userId, viewerId, memberIds)
         ? { name: 'prompt' in row ? threadName(row.prompt, row.agentName) : row.name, agentName: row.agentName, harness: row.harness, ...('report' in row ? runSummaryView({ report: row.report, error: row.error }) : { summary: row.summary }), bot: row.botColor && row.botShape ? { color: row.botColor, shape: row.botShape } : null, ...(row.profile !== undefined ? { profile: threadProfile(row.profile) } : {}) }
         : null,
       rootRunId: row.id, latestRunId: row.id,
-      attempts: [{ runId: row.id, attempt: 1, status: row.status, outcome: row.outcome ?? null, stopping: runIsActive(row.status) && !!row.stopRequestedAt, createdAt: row.createdAt, finishedAt: row.finishedAt }],
+      attempts: [{ ...(row.pauseReason ? { pauseReason: row.pauseReason } : {}), runId: row.id, attempt: 1, status: row.status, outcome: row.outcome ?? null, stopping: runIsActive(row.status) && !!row.stopRequestedAt, createdAt: row.createdAt, finishedAt: row.finishedAt }],
       question: null, continuation: null,
     }))
 }

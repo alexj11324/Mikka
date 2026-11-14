@@ -1,7 +1,8 @@
 import { ReadNotice } from '@/components/ReadNotice'
 import { useRef, useState } from 'react'
-import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { Trash2 } from 'lucide-react-native'
 import * as WebBrowser from 'expo-web-browser'
 import { BotAvatar, Spinner } from '@/components/icons'
 import { NavBar, underBar } from '@/components/NavBar'
@@ -13,7 +14,8 @@ import { TaskStateIcon } from '@/features/tasks/components/task-icons'
 import { menuTasks } from '@/features/chat/model/chat-header-menu'
 import { rowState } from '@/features/tasks/model/task-groups'
 import { displayTitle } from '@/lib/display-title'
-import { Group } from '@/components/ui'
+import { Group, RoundButton } from '@/components/ui'
+import { confirmDestructiveAction, showSystemAlert } from '@/lib/system-alert'
 import { api } from '@/lib/api'
 import { saveOptimistic } from '@/lib/optimistic'
 import { nextWhen, shortWhen } from '@/lib/clock'
@@ -85,16 +87,26 @@ export default function BotInfo() {
     }
     saving.current = false; setBusy(false)
   }
-  // A long press deletes one of the person's own files, after the system's confirmation (R-51, decision 2026-11-01-2255).
-  const deleteFile = (item: BotPage['library'][number]) => Alert.alert(`删除「${item.title}」？`, undefined, [
-    { text: '取消', style: 'cancel' },
-    { text: '删除', style: 'destructive', onPress: () => void (async () => {
+  const deleting = useRef(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const requestDelete = (item: BotPage['library'][number]) => {
+    if (deleting.current) return
+    confirmDestructiveAction(`删除「${item.title}」？`, '删除', async () => {
+      if (deleting.current) return
+      deleting.current = true
+      setDeletingId(item.id)
       try {
         await api(`/api/mobile/artifacts/${item.id}`, { method: 'DELETE' })
         page.setData(current => current && { ...current, library: current.library.filter(file => file.id !== item.id) })
-      } catch { Alert.alert(`「${item.title}」未删除`) } finally { void page.reload() }
-    })() },
-  ])
+      } catch {
+        showSystemAlert(`「${item.title}」未删除`)
+      } finally {
+        deleting.current = false
+        setDeletingId(null)
+        void page.reload()
+      }
+    })
+  }
   const openArtifact = (item: BotPage['library'][number]) => item.kind === 'html'
     ? void openOnWeb(`/api/artifacts/${item.id}/versions/${item.version}/frame`)
     : router.push({ pathname: '/artifact/[id]', params: { id: item.id, v: String(item.version), title: item.title } })
@@ -140,7 +152,14 @@ export default function BotInfo() {
         {library.length ? (
           <Group label="资料库">
             {library.map(item => (
-              <Row key={item.id} icon={<Symbol name={item.kind === 'html' ? 'globe' : 'doc.text'} size={19} />} label={item.title} value={shortWhen(item.updatedAt)} onPress={() => openArtifact(item)} onLongPress={() => deleteFile(item)} />
+              <View key={item.id} style={styles.libraryRow}>
+                <View style={styles.libraryFile}>
+                  <Row icon={<Symbol name={item.kind === 'html' ? 'globe' : 'doc.text'} size={19} />} label={item.title} value={shortWhen(item.updatedAt)} onPress={() => openArtifact(item)} onLongPress={() => requestDelete(item)} />
+                </View>
+                <RoundButton label={`删除「${item.title}」`} disabled={deletingId !== null} busy={deletingId === item.id} onPress={() => requestDelete(item)}>
+                  <Trash2 size={17} color={colors.danger} />
+                </RoundButton>
+              </View>
             ))}
           </Group>
         ) : null}
@@ -159,6 +178,8 @@ export default function BotInfo() {
 
 const styles = StyleSheet.create({
   body: { padding: 16 },
+  libraryRow: { flexDirection: 'row', alignItems: 'center', paddingRight: 8 },
+  libraryFile: { flex: 1, minWidth: 0 },
   hero: { alignItems: 'center', gap: 12, marginTop: 8, marginBottom: 28 },
   name: { fontSize: 26, fontWeight: '700' },
   center: { paddingVertical: 24, alignItems: 'center' },

@@ -571,12 +571,15 @@ export async function botChatSnapshot(reader: IssueReader) {
     ...waiting.flatMap(event => event.tier !== 'background' && event.kind !== 'matter_handoff' && event.wakeAttempts === 1 && event.wakeLeaseUntil && event.wakeLeaseUntil > now ? [event.wakeLeaseUntil] : []),
   ]
   const result: Record<string, BotChatSummary> = {}
-  for (const event of waiting) {
-    if (event.botId && !result[event.botId]) result[event.botId] = { line: null, at: null, working: coordinatorChatState(undefined, waiting.filter(row => row.botId === event.botId), now).working }
-  }
+  const waitingByBot = Map.groupBy(waiting, event => event.botId)
   for (const session of sessions) {
     if (!session.botId) continue
-    result[session.botId] = { line: null, at: null, working: coordinatorChatState(session, waiting.filter(event => event.botId === session.botId), now).working }
+    const events = waitingByBot.get(session.botId) ?? []
+    result[session.botId] = { line: null, at: null, working: coordinatorChatState(session, events, now).working }
+    waitingByBot.delete(session.botId)
+  }
+  for (const [botId, events] of waitingByBot) {
+    if (botId) result[botId] = { line: null, at: null, working: coordinatorChatState(undefined, events, now).working }
   }
   for(const row of latest)if(row.botId&&row.nativePending)result[row.botId]={line:null,at:null,working:true}
   const projected = await projectMessageDisplays(db, userId, latest)

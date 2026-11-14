@@ -9,7 +9,6 @@ import { dropTestDatabase } from '../../tests/support/drop-test-database';
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { bindFixtureWorkspaceDatabase } from '../../tests/helpers/workspace-database';
 import { freezeWorkerDefinition } from '../agent-kit/worker';
-import { observePoolCommits } from '../db/commit-effects';
 import { executionIdentityForRun, freezeExecutionIdentity } from '../execution-identity';
 import { GovernanceError } from '../governance/errors';
 import { createFactoryStore, type FactoryTask } from './store';
@@ -30,7 +29,6 @@ test('spec Artifact: real PG completion, immutable replay, concurrent writes and
   await admin.query(`CREATE DATABASE ${name} TEMPLATE template0`);
   const target = new URL(adminUrl); target.pathname = `/${name}`; assertE2eTarget(target.toString());
   const pool = new Pool({ connectionString: target.toString(), max: 5 });
-  observePoolCommits(pool);
   const closeWorkspace = await bindFixtureWorkspaceDatabase(pool);
   try {
     assert.equal((await pool.query('SHOW server_version_num')).rows[0].server_version_num.slice(0, 2), '17');

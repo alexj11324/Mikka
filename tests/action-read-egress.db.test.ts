@@ -50,12 +50,18 @@ test('task run rows keep the newest owner run and the 200-row limit without unus
   const owner = 'action-runs-' + randomUUID(), peer = 'action-peer-' + randomUUID()
   const agent = randomUUID(), issueIds = Array.from({ length: 201 }, () => randomUUID()).sort()
   const runtimeAgent = randomUUID(), runtimeDevice = randomUUID(), runtimeRepo = randomUUID(), workspace = randomUUID()
+  const team = randomUUID(), otherWorkspace = randomUUID()
+  const teamIssues = Array.from({ length: 129 }, () => randomUUID())
   const [boundBot, directBot, runtimeBot, peerBot] = Array.from({ length: 4 }, () => randomUUID())
   const botLooks = [boundBot, directBot, runtimeBot].map((id, index) => ({ id, name: 'Read bot ' + index, color: 'encre', shape: 'cercle' }))
   const newest = randomUUID(), peerRun = randomUUID(), oldRun = randomUUID(), peerIssue = randomUUID()
   try {
     for (const user of [owner, peer]) await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [user, user + '@example.invalid'])
     await seedFixtureWorkspace(pool, owner, 'personal', workspace)
+    await seedFixtureWorkspace(pool, owner, 'team', otherWorkspace)
+    await pool.query('INSERT INTO mikka_teams (id,"workspaceId","userId",name,identifier) VALUES ($1,$2,$3,\'Other team\',\'OTHER\')', [team, otherWorkspace, owner])
+    await pool.query('INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState") SELECT id,$2,\'Team task\',\'{}\',\'todo\',\'normal\',$3,\'bound\' FROM unnest($1::uuid[]) id', [teamIssues, owner, otherWorkspace])
+    await pool.query('INSERT INTO mikka_team_issues ("issueId","teamId","workspaceId","userId") SELECT id,$2,$3,$4 FROM unnest($1::uuid[]) id', [teamIssues, team, otherWorkspace, owner])
     for (const [index, id] of [agent, runtimeAgent].entries()) await pool.query('INSERT INTO agents(id,"userId",name,harness) VALUES($1,$2,$3,$4)', [id, owner, 'Read fixture ' + index, 'codex'])
     for (const bot of botLooks) await pool.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,$4)', [bot.id, owner, workspace, bot.name])
     await pool.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,\'Peer bot\')', [peerBot, peer, workspace])
@@ -80,6 +86,8 @@ test('task run rows keep the newest owner run and the 200-row limit without unus
       .where(and(eq(agentRuns.userId, owner), isNotNull(agentRuns.issueId), sql`${agentRuns.createdAt}>now()-interval '30 days'`))
       .orderBy(agentRuns.issueId, desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200))
     const result = await measured(() => poll(owner))
+    const teamReads = result.reads.filter(read => /from "mikka_(teams|team_issues)"/i.test(read.text))
+    assert.deepEqual(teamReads.map(read => read.rows), [], 'task run visibility does not enumerate team assignments')
     const selected = result.reads.find(read => read.text.includes('from (select distinct on'))
     assert.ok(selected)
     assert.equal(result.reads.filter(read => read.text.includes('from (select distinct on')).length, 1)
@@ -98,14 +106,32 @@ test('task run rows keep the newest owner run and the 200-row limit without unus
     assert.equal(selected.route, '/actions/task-runs/read')
     assert.deepEqual((await poll(peer)).items.map(row => row.runId), [peerRun])
   } finally {
+    await pool.query('DELETE FROM mikka_team_issues WHERE "teamId"=$1', [team])
+    await pool.query('DELETE FROM mikka_teams WHERE id=$1', [team])
     await pool.query('DELETE FROM agent_runs WHERE "agentId"=ANY($1::uuid[])', [[agent, runtimeAgent]])
     await pool.query('DELETE FROM agents WHERE id=ANY($1::uuid[])', [[agent, runtimeAgent]])
     await pool.query('DELETE FROM device_repos WHERE id=$1', [runtimeRepo])
     await pool.query('DELETE FROM devices WHERE id=$1', [runtimeDevice])
     await pool.query('DELETE FROM bots WHERE id=ANY($1::uuid[])', [[boundBot, directBot, runtimeBot, peerBot]])
-    await pool.query('DELETE FROM issues WHERE id=ANY($1::uuid[])', [[...issueIds, peerIssue]])
+    await pool.query('DELETE FROM issues WHERE id=ANY($1::uuid[])', [[...issueIds, peerIssue, ...teamIssues]])
     await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[owner, peer]])
   }
+})
+
+test('the run list deadline and lookback each span exactly 720 hours across daylight-saving changes', { skip: !enabled }, async () => {
+  const { sql } = await import('drizzle-orm')
+  const { db } = await import('../lib/db')
+  const { runHistoryWindow } = await import('../lib/task-state-query')
+  await db.transaction(async tx => {
+    await tx.execute(sql`set local time zone 'America/New_York'`)
+    const { rows } = await tx.execute<{ forward: number; backward: number }>(sql`
+      select extract(epoch from (started + ${runHistoryWindow} - started))::int as forward,
+             extract(epoch from (ended - (ended - ${runHistoryWindow})))::int as backward
+      from (values ('2026-02-20T12:00:00Z'::timestamptz, '2026-03-22T12:00:00Z'::timestamptz),
+                   ('2026-10-20T12:00:00Z'::timestamptz, '2026-11-19T12:00:00Z'::timestamptz)) as windows(started, ended)
+    `)
+    for (const row of rows) assert.deepEqual(row, { forward: 30 * 86400, backward: 30 * 86400 })
+  })
 })
 
 test('one bounded snapshot aggregate preserves the old fingerprint and exact expiry, including empty rows', { skip: !enabled }, async () => {

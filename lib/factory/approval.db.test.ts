@@ -13,7 +13,7 @@ import {
 import {
   createVercelPublicationAdapter,
   MIKKA_VERCEL,
-} from "./vercel-publication";
+} from "../../tests/helpers/factory-vercel-publication";
 import {
   readFactoryPublicationReceiptV2,
   readFactoryPublicationReceipt,

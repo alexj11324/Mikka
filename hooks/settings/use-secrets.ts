@@ -64,7 +64,7 @@ export function useMySecrets(workspaceId: string) {
   const actionError = useActionError()
   const list = useSWR(['account:my-secrets', workspaceId], () => listMySecrets(workspaceId))
   return {
-    secrets: list.data && !list.data.error ? list.data.secrets : null,
+    secrets: !list.error && list.data && !list.data.error ? list.data.secrets : null,
     loading: !list.data && !list.error,
     error: list.error || list.data?.error ? actionError(list.data?.error) : null,
     reload: () => { void list.mutate() },
@@ -159,7 +159,7 @@ export function useMySecretImport(workspaceId: string) {
 export function useWorkspaceSecrets(workspaceId: string) {
   const actionError = useActionError()
   const list = useSWR(settingsKeys.secrets(workspaceId), () => settingsRead<Awaited<ReturnType<typeof listSecrets>>>('secrets', { workspace: workspaceId }))
-  const ok = list.data && !list.data.error ? list.data : null
+  const ok = !list.error && list.data && !list.data.error ? list.data : null
   return {
     secrets: ok ? ok.secrets : null,
     /** Offer only what this reader may do (lib/secrets/permissions.ts); the server checks again. */
@@ -255,7 +255,7 @@ export function useSavedLogins() {
   }
 
   return {
-    logins: data && !('error' in data) ? data.logins : [],
+    logins: !error && data && !('error' in data) ? data.logins : [],
     loading: isLoading,
     failed: Boolean(error || (data && 'error' in data)),
     deleteError, clearDeleteError: () => setDeleteError(null), remove,
@@ -291,7 +291,7 @@ export function useSavedLoginEditor(login: SavedLogin | null) {
 /** Which bots used a saved login, and how it went. */
 export function useSavedLoginUsage(id: string) {
   const { data, error, isLoading, mutate } = useSWR(['account:saved-login-usage', id], () => listSavedLoginUsage(id))
-  const uses: SavedLoginUse[] = data && !('error' in data) ? data.uses : []
+  const uses: SavedLoginUse[] = !error && data && !('error' in data) ? data.uses : []
   return { uses, loading: isLoading, failed: Boolean(error || (data && 'error' in data)), reload: () => mutate() }
 }
 

@@ -96,6 +96,22 @@ test('mobile Settings and confirmed browser handoff require a current team admin
     assert.equal(response.status, 200)
     return (await response.json()).workspace
   }
+  await t.test('the profile and Coordinator memory come from the same selected workspace', async () => {
+    const { coordinatorBot } = await import('../lib/coordinator/coordinator-bot')
+    for (const workspaceId of [first.id, personal]) {
+      const { botId } = await coordinatorBot(owner, workspaceId)
+      await pool.query('INSERT INTO coordinator_sessions ("userId","botId",memory) VALUES ($1,$2,$3) ON CONFLICT ("userId","botId") DO UPDATE SET memory=excluded.memory',
+        [owner, botId, 'memory of ' + workspaceId])
+    }
+    for (const workspaceId of [personal, first.id]) {
+      const request = new Request(api + 'mobile/settings?view=profile', { headers: { cookie, 'x-mikka-workspace-id': workspaceId } })
+      const response = await app.fetch(request)
+      assert.equal(response.status, 200)
+      const profile = await response.json()
+      assert.equal(profile.workspace.id, workspaceId)
+      assert.equal(profile.memory, 'memory of ' + workspaceId)
+    }
+  })
   const members = (id: string) => '/settings/members?workspace=' + id
   const open = async (credentials: string, workspaceId: string) => {
     const generated = await fetch(api + 'auth/one-time-token/generate', { headers: { cookie: credentials } })

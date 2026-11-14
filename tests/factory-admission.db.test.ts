@@ -1,3 +1,5 @@
+import { builtinGateway } from '../lib/builtin-gateway/runtime'
+import { factoryResourceWorkspace } from './helpers/factory-resource-boundary'
 import { wireKeys } from '../lib/live/wire-keys.test-support'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
@@ -227,8 +229,14 @@ test('real Factory admission preserves host scope, policy and transaction owners
       assert.equal(current.runId, child.id, 'the real completion consumer must adopt the re-admitted Agent')
       const { rows: handoffs } = await pool.query(`SELECT result FROM factory_events WHERE "taskId"=$1 AND request->>'kind'='task_handoff' AND result->'checkpoint'->>'runId'=$2`, [f.task.id, admitted.runId])
       assert.ok(handoffs.some(h => h.result.requestEpoch === f.eventId && h.result.checkpoint.files === 1))
-      const { claimExecutionRun } = await import('../lib/factory/server')
-      assert.equal((await claimExecutionRun(f.userId, deviceB, child.id, new Date(now.getTime() + 90_000).toISOString())).length, 1)
+      const { claimLocalRun } = await import('../lib/computer/claim')
+      const { guardFactoryClaim } = await import('../lib/factory/runtime')
+      const lease = new Date(now.getTime() + 90_000)
+      const result = await factoryResourceWorkspace(pool)(f.userId, f.task.id, () =>
+        claimLocalRun(pool, child.id, deviceB, lease, undefined, async tx => {
+          await guardFactoryClaim(tx, f.userId, deviceB, child.id, lease.toISOString())
+        }))
+      assert.equal(result, 'claimed')
       await reclaim(f.userId, now)
       assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rows[0].n, 2)
     })
@@ -611,6 +619,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
     await coordinator.flush()
     // Keep immutable audit fixtures, but leave no queued execution authority.
     if (fixtures.length) await pool.query('UPDATE agent_runs SET "stopRequestedAt"=coalesce("stopRequestedAt",now()) WHERE "userId"=any($1::text[])', [fixtures.map(f => f.userId)])
+    await builtinGateway()?.stop()
     await pool.end()
     await workspacePool.end()
   }

@@ -129,8 +129,8 @@ export async function prepareCloudQuestionRecovery(pool: Pool, userId: string, s
       return;
     }
     await (await import('../../cloud-computer/thread-machines')).threadMachineAction(pool,{userId,workspaceId:scope.workspaceId},scope.runId,'refresh_runtime');
-  } catch {
-    throw new FactoryError('factoryQuestionContinuationUnavailable');
+  } catch (cause) {
+    throw new FactoryError('factoryQuestionContinuationUnavailable', { cause });
   }
 }
 

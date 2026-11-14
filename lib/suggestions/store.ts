@@ -123,8 +123,7 @@ const pending = (row: Briefing | undefined, dueAt: Date) => !row || (row.kind ==
 /**
  * Hands a briefing with something in it to the Coordinator, which writes it to
  * the person in its chat (R-21). The event's dedupe key keeps it to one push
- * per briefing kind and local date. True when there was something to push;
- * the caller then wakes the Coordinator.
+ * per briefing kind and local date. Its writer wakes the Coordinator on commit.
  */
 async function pushBriefing(row: Briefing): Promise<boolean> {
   if (!row.total) return false
@@ -166,11 +165,9 @@ export async function dailySuggestionsOn(userId: string): Promise<boolean> {
  * The person's current briefing. The briefings cron writes the daily one at
  * 08:00 their time; this is the fallback when it has not run yet. Before
  * 08:00 it is the latest briefing from the last day (yesterday's, or one
- * written on connecting an app), so nothing is written early. `onPushed`
- * runs when this read wrote the day's briefing and queued it for the
- * Coordinator, so the caller can wake it.
+ * written on connecting an app), so nothing is written early.
  */
-export async function todaysBriefing(userId: string, timeZoneName: string | null, { onPushed }: { onPushed?: () => void } = {}) {
+export async function todaysBriefing(userId: string, timeZoneName: string | null) {
   const timeZone = safeTimeZone(timeZoneName)
   const now = new Date()
   const { date: today, hour } = localClock(timeZone, now)
@@ -182,8 +179,7 @@ export async function todaysBriefing(userId: string, timeZoneName: string | null
   const existing = await todays()
   const dueAt = localInstant(timeZone, today, BRIEFING_HOUR)
   if (!pending(existing, dueAt) || !await dailySuggestionsOn(userId)) return shown(existing)
-  const { saved, pushed } = await writeDailyBriefing(userId, timeZone, dueAt, now)
-  if (pushed) onPushed?.()
+  const { saved } = await writeDailyBriefing(userId, timeZone, dueAt, now)
   return shown(saved ?? await todays())
 }
 
@@ -217,8 +213,8 @@ const BRIEFING_CONCURRENCY = 8
  * who has none for today yet. Running every 15 minutes, a person's briefing
  * lands within 15 minutes of 08:00; a missed or cut-short run is caught up by
  * the next one the same local day. Safe to run concurrently: the
- * (userId, localDate) key keeps it to one per day. `pushed` lists the people
- * whose briefing was queued for the Coordinator; the caller wakes them.
+ * (userId, localDate) key keeps it to one per day. `pushed` counts briefings
+ * queued for delivery by the Coordinator event writer.
  */
 export async function writeDueBriefings({ now = new Date(), limit = 500, deadline = Infinity }: { now?: Date; limit?: number; deadline?: number } = {}) {
   const zones = (await db.selectDistinct({ timeZone: userTimeZones.timeZone }).from(userTimeZones)).map(row => row.timeZone)
@@ -232,15 +228,14 @@ export async function writeDueBriefings({ now = new Date(), limit = 500, deadlin
       .limit(limit + 1 - people.length)
     people.push(...rows.map(row => ({ userId: row.userId, timeZone: zone.timeZone, dueAt: zone.dueAt })))
   }
-  const result = { zones: zones.length, due: Math.min(people.length, limit), written: 0, empty: 0, skipped: 0, failed: 0, deferred: Math.max(0, people.length - limit) }
-  const pushed: string[] = []
+  const result = { zones: zones.length, due: Math.min(people.length, limit), written: 0, empty: 0, skipped: 0, failed: 0, deferred: Math.max(0, people.length - limit), pushed: 0 }
   const batch = people.slice(0, limit)
   for (let index = 0; index < batch.length; index += BRIEFING_CONCURRENCY) {
     if (Date.now() > deadline) { result.deferred += batch.length - index; break }
     await Promise.all(batch.slice(index, index + BRIEFING_CONCURRENCY).map(async person => {
       try {
         const { saved, pushed: queued } = await writeDailyBriefing(person.userId, person.timeZone, person.dueAt, now)
-        if (queued) pushed.push(person.userId)
+        if (queued) result.pushed++
         if (!saved) result.skipped++
         else if (saved.total) result.written++
         else result.empty++
@@ -250,7 +245,7 @@ export async function writeDueBriefings({ now = new Date(), limit = 500, deadlin
       }
     }))
   }
-  return { result, pushed }
+  return result
 }
 
 /**
