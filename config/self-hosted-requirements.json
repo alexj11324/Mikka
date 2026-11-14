@@ -1800,6 +1800,34 @@
     "test": "lib/thread-reads.db.test.ts",
     "suite": "test:conversation-reads"
   },
+  "drizzle/20261113180454_standalone_bot_conversations.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Retain legacy group identity and admit owner-created named conversations to their durable read receipts.",
+    "test": "lib/thread-reads.db.test.ts",
+    "suite": "test:conversation-reads"
+  },
+  "lib/standalone-chat-directory.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Keep owner-created standalone chats in installation PostgreSQL and reopen them only through their active participant and workspace authorization.",
+    "test": "lib/thread-reads.db.test.ts",
+    "suite": "test:conversation-reads"
+  },
+  "drizzle/20261113193638_standalone_conversation_organization.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Add nullable organization timestamps to independent conversations. Existing rows remain available without backfilling.",
+    "test": "lib/thread-reads.db.test.ts",
+    "suite": "test:conversation-reads"
+  },
+  "lib/group-read-receipts.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Advance a participant's durable group message position and clear their manual mark inside the authorized conversation transaction.",
+    "test": "lib/thread-reads.db.test.ts",
+    "suite": "test:conversation-reads"
+  },
   "lib/thread-reads.ts": {
     "mode": "built-in",
     "environment": [],

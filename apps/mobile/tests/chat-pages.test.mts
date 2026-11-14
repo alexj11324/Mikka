@@ -59,6 +59,16 @@ const message = (position: number): GroupMessage => ({ id: `g${position}`, conve
 const page = (positions: number[], extra: Partial<GroupRead> = {}): GroupRead => ({ messages: positions.map(message), nextBefore: null, agentStatus: null, routingError: null, ...extra })
 const desc = (from: number, to: number) => range(from, to).reverse()
 
+test('a manual read revision survives an empty named chat and advances without another message', () => {
+  const empty = mergeGroupRead(null, page([], { readRevision: 0 }))
+  assert.equal(empty.readRevision, 0)
+  const first = mergeGroupRead(empty, page([1], { appended: true, readRevision: 1 }))
+  const revised = mergeGroupRead(first, page([], { unchanged: true, readRevision: 2 }))
+  assert.equal(revised.messages[0]?.id, 'g1')
+  assert.equal(revised.readRevision, 2)
+  assert.equal(mergeGroupRead(null, page([])).readRevision, undefined)
+})
+
 test('a group push reads only after its newest message; history reads before', () => {
   assert.equal(groupPagePath('c', null), '/api/conversations/c/messages?limit=50')
   assert.equal(groupPagePath('c', page(desc(1, 50))), '/api/conversations/c/messages?limit=50&after=50')
