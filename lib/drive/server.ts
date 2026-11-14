@@ -11,7 +11,7 @@ import { workspaceListChanged } from '@/lib/live/lists'
 import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, isVolumeId, isVolumeVersionId } from './contract'
 import { driveBytes, driveSha256, readDriveBlobObject, recordDriveBlob, storeDriveBlob } from './blobs'
 import { applyDriveWrite, DriveError, readDriveFileHistory, readDriveHistory, readDriveVersion, restoreDriveVersion } from './store'
-import { createDriveVolume, listDriveVolumes, readDriveVolume } from './volumes'
+import { createDriveVolume, listDriveVolumes, readDriveVolume, setPersonalDriveArchive } from './volumes'
 import { driveErrorResponse } from './http'
 
 const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }
@@ -23,7 +23,7 @@ const write = z.object({ expectedDigest: digest, mutationId, changes: z.array(z.
   z.object({ op: z.literal('delete'), path: z.string().refine(isDrivePath) }).strict(),
 ])).min(1).max(DRIVE_MAX_CHANGES) }).strict()
 const restore = z.object({ versionId, expectedDigest: digest, mutationId }).strict()
-type Operation = 'volumes' | 'volume' | 'write' | 'upload' | 'file' | 'history' | 'version' | 'restore'
+type Operation = 'volumes' | 'volume' | 'write' | 'upload' | 'file' | 'history' | 'version' | 'restore' | 'archive' | 'unarchive'
 type Params = { volumeId?: string; versionId?: string }
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers })
 
@@ -71,9 +71,15 @@ export async function driveResponse(request: Request, operation: Operation, para
         }
         const limit = z.coerce.number().int().min(1).max(100).parse(search.get('limit') ?? '50')
         const before = search.has('before') ? z.string().refine(isVolumeId).parse(search.get('before')) : null
-        const result = await listDriveVolumes(pool, actor, { driveScope: 'user', scopeId: actor.ownerId, workspaceId }, { limit: limit + 1, beforeId: before ?? undefined })
+        const archived = z.enum(['true', 'false']).parse(search.get('archived') ?? 'false') === 'true'
+        const result = await listDriveVolumes(pool, actor, { driveScope: 'user', scopeId: actor.ownerId, workspaceId }, { limit: limit + 1, beforeId: before ?? undefined, archived })
         const volumes = result.slice(0, limit)
         return json({ volumes, nextCursor: result.length > limit ? volumes.at(-1)!.id : null })
+      }
+      if (operation === 'archive' || operation === 'unarchive') {
+        const archived = operation === 'archive'
+        changed = await setPersonalDriveArchive(pool, { ownerId: actor.ownerId, workspaceId }, params.volumeId, archived)
+        return json({ archived })
       }
       const volume = await readDriveVolume(pool, { ownerId: actor.ownerId, workspaceId }, params.volumeId)
       if (operation === 'volume') {
@@ -125,7 +131,7 @@ export async function driveResponse(request: Request, operation: Operation, para
          FROM drive_volume_versions v JOIN drive_volumes d ON d.id = v."volumeId"
          CROSS JOIN LATERAL jsonb_array_elements(v.manifest) AS entry
          JOIN drive_blobs b ON b.sha256 = entry->>'sha256' AND d."ownerId" = b."ownerId"
-         WHERE v.id = $1 AND v."volumeId" = $2 AND d."ownerId" = $3
+         WHERE v.id = $1 AND v."volumeId" = $2 AND d."ownerId" = $3 AND d."archivedAt" IS NULL
            AND entry->>'path' = $4 AND entry->'sizeBytes' = to_jsonb(b."sizeBytes")
          LIMIT 1`, [selectedVersion, volume.id, actor.ownerId, path])
       if (!blob) throw new DriveError('drive_not_found', 404)

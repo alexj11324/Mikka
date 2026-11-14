@@ -286,6 +286,25 @@ for (const valid of [true, false]) test(`parallel sends during a pending version
   assert.equal(submissions, valid ? 2 : 1)
 })
 
+for (const bundled of [false, true]) test(`an offline renderer ${bundled ? 'submits through the bundled main process' : 'keeps the web message for explicit retry'}`, async t => {
+  Object.defineProperty(browser.navigator, 'onLine', { configurable: true, value: false })
+  if (bundled) Object.defineProperty(browser, 'mikka', { configurable: true, value: { bundled: {} } })
+  t.after(() => {
+    Reflect.deleteProperty(browser.navigator, 'onLine')
+    Reflect.deleteProperty(browser, 'mikka')
+  })
+  await act(async () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />))
+  await act(async () => composer.onChange('deliver once'))
+  await act(async () => composer.onSubmit())
+  assert.equal(submissions, bundled ? 1 : 0)
+  if (bundled) assert.equal(submitted[0].text, 'deliver once')
+  else {
+    const failed = container.querySelector('[data-testid="failed-message"]')
+    assert.match(failed?.textContent ?? '', /deliver once/)
+    assert.ok(failed?.querySelector('button'))
+  }
+})
+
 test('a stale send moves its original text and attachments to the retry bubble and preserves browser notes', async () => {
   currentBuild = false
   await act(async () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />))
