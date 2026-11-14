@@ -101,7 +101,7 @@ export function ThreadReferencePicker({ draft, workspaceId, input, onChange }: {
   }}>
     {!current ? <span role="status">{t('searching')}</span> : current.failed ? <span role="alert">{t('error')}</span> :
       !current.items?.length ? <span role="status">{t('empty')}</span> : current.items.map(item =>
-        <Button key={`${item.kind}:${item.id}`} type="button" variant="ghost" size="sm" className="w-full justify-start"
+        <Button key={referenceMarker(item)} type="button" variant="ghost" size="sm" className="w-full justify-start"
           onClick={() => {
             const insert = referenceMarker(item) + ' '
             const next = draft.slice(0, mention.from) + insert + draft.slice(mention.end)
