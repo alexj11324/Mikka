@@ -32,7 +32,7 @@ before(async () => {
   for (const [key, value] of Object.entries({ window: win, document: win.document, HTMLElement: win.HTMLElement, IS_REACT_ACT_ENVIRONMENT: true }))
     Object.defineProperty(globalThis, key, { value, configurable: true })
   const { createRoot } = await import('react-dom/client')
-  root = createRoot(document.createElement('div'))
+  root = createRoot(document.body)
   ;({ useIssueConnections } = await import('./issue-relations'))
 })
 after(async () => { if (root) await act(async () => root.unmount()); await win.happyDOM.abort() })
