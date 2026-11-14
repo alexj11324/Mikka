@@ -255,7 +255,7 @@ function openChild(url: string): void {
       devTools: !app.isPackaged,
       ...(trusted ? {
         preload: join(__dirname, 'preload.cjs'),
-        additionalArguments: [`--mikka-app-origin=${PAGE_ORIGIN}`],
+        additionalArguments: [`--mikka-app-origin=${PAGE_ORIGIN}`, '--mikka-window-kind=child'],
       } : {}),
     },
   })
@@ -324,7 +324,7 @@ function createMainWindow(): void {
       experimentalFeatures: false,
       devTools: !app.isPackaged,
       partition: PARTITION,
-      additionalArguments: [`--mikka-app-origin=${PAGE_ORIGIN}`, ...(appearance.translucent ? [TRANSLUCENT_ARGUMENT] : [])],
+      additionalArguments: [`--mikka-app-origin=${PAGE_ORIGIN}`, '--mikka-window-kind=main', ...(appearance.translucent ? [TRANSLUCENT_ARGUMENT] : [])],
     },
   })
   markStartup('main.window.created')

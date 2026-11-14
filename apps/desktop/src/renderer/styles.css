@@ -34,3 +34,6 @@
 html:has(.desktop-offline) {
   scrollbar-gutter: auto;
 }
+
+/* Keep the native saved-tab strip clear of the shared application surface. */
+html[data-desktop-window="main"] #root { padding-top: 2.5rem; }

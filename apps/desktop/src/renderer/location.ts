@@ -18,6 +18,9 @@ export function installNavigation() {
     const original = window.history[method].bind(window.history)
     window.history[method] = (data: unknown, unused: string, url?: string | URL | null) => {
       original(data, unused, url)
+      // Desktop tabs keep this in-app navigation in their own back/forward history.
+      const next = new URL(url ?? window.location.href, window.location.href)
+      window.dispatchEvent(new CustomEvent('mikka:desktop-history', { detail: { method, href: `${next.pathname}${next.search}${next.hash}` } }))
       // Let the workspace finish recording its own query before React observes it.
       queueMicrotask(() => window.dispatchEvent(new Event(LOCATION_EVENT)))
     }
