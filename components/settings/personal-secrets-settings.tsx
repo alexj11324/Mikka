@@ -15,7 +15,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
-import { SettingsLoading, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
+import { SettingsLoading, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { SECRET_NOTE_MAX } from '@/lib/secrets/format'
 import type { UserSecretView } from '@/lib/secrets/user-store'
 import { relativeTime } from '@/lib/relative-time'
@@ -34,6 +34,7 @@ type Saved = { notice: string | null } | null
  */
 export function PersonalSecretsSettings({ workspaceId, workspaceName }: { workspaceId: string; workspaceName?: string }) {
   const t = useTranslations('Settings.secrets')
+  const common = useTranslations('Common')
   const locale = useLocale()
   const list = useMySecrets(workspaceId)
   const [editing, setEditing] = useState<Editing | null>(null)
@@ -49,7 +50,7 @@ export function PersonalSecretsSettings({ workspaceId, workspaceName }: { worksp
       <Button {...settingsSectionAction} onClick={() => open({ kind: 'new' })}>{t('add')}</Button>
     </> : undefined}>
       {list.loading && <SettingsLoading label={t('loading')} rows={2} bare />}
-      {list.error && <FieldError className="px-5 py-4">{list.error}</FieldError>}
+      {list.error && <SettingsSaveError message={list.error} retryLabel={common('retry')} onRetry={list.reload} />}
       {secrets?.length === 0 && <div className="flex flex-col items-start gap-3 px-5 py-6">
         <p className="text-sm text-muted-foreground">{t('empty')}</p>
         <div className="flex gap-2">

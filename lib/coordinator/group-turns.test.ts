@@ -374,9 +374,19 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     const root = await send(id,'first')
     let unblock!: () => void, entered!: () => void
     const waiting = new Promise<void>(r => { entered=r }), release = new Promise<void>(r => { unblock=r })
-    const blocked: GroupRuntime = {...runtime,async generate(agent,input) { entered(); await release; return runtime.generate(agent,input) }}
+    const claims: string[] = []
+    let initialClaims: string[] | undefined
+    const blocked: GroupRuntime = { ...runtime,
+      async authorized(w,u) { claims.push(u); return runtime.authorized(w,u) },
+      async agents(owner,ids,client) {
+        initialClaims ??= [...claims]
+        return runtime.agents(owner,ids,client)
+      },
+      async generate(agent,input) { entered(); await release; return runtime.generate(agent,input) },
+    }
     releasePending = unblock
     const running = processGroupTurn(scoped,id,blocked); await waiting
+    assert.deepEqual(initialClaims,['owner'], 'the sender who created this group is authorized once for the initial roster')
     // Match #79 9760e912's existing owner + working + live lease predicate.
     const activeRuns = async (owner = 'owner', now = new Date()) => (await scoped.query(`SELECT id,"agentId","userId","workspaceId",kind FROM agent_runs WHERE "userId"=$1 AND status IN ('preparing','running','waiting_input','finishing') AND "leaseExpiresAt">$2`, [owner,now])).rows
     const active = await activeRuns()
@@ -527,6 +537,14 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     const revoked = await send(id,'revoked workspace',[a])
     await assert.rejects(processGroupTurn(scoped,id,{...runtime,async authorized() {return false},async generate() {assert.fail('revoked actor must not generate')}}),/no_longer_authorized/)
     assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1',[revoked])).rows[0].status,'failed')
+    const peerTurn = await handleGroup(scoped,directory,{...base,userId:'member',resource:'messages',id,body:JSON.stringify({body:'group creator lost access'})},true)
+    assert.equal(peerTurn.status,201)
+    const principals: string[] = []
+    await assert.rejects(processGroupTurn(scoped,id,{ ...runtime,
+      async authorized(w,u) { assert.equal(w,workspaceId); principals.push(u); return u === 'member' },
+      async agents() { assert.fail('an unauthorized creator cannot supply group actors') },
+    }),/group_actor_no_longer_authorized/)
+    assert.deepEqual(principals,['member','owner'])
     // 停止: a member stops while a reply generates; the reply in flight is aborted and nothing is posted, the turn reads stopped.
     const stoppedRoot = await send(id,'stopped mid reply',[a])
     let aborted = false

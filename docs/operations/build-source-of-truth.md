@@ -1,6 +1,6 @@
 # Official build ownership and Cloudflare release
 
-**Current architectural decision (2026-11-12): public Mikka owns the product build.** The repository containing a source file is not necessarily the CI trigger repository, and the CI provider is not the source of truth. This page supersedes conflicting *instructions* in historical notes, but does not rewrite release evidence.
+**Current architectural decision (Alex, 2026-11-13): GitHub Actions builds from public Mikka; Cloudflare deploys the verified artifacts.** The repository containing a source file is not necessarily the CI trigger repository, and the CI provider is not the source of truth. This page supersedes conflicting *instructions* in historical notes, but does not rewrite release evidence.
 
 ## One supported product architecture
 
@@ -8,7 +8,8 @@
 | --- | --- | --- |
 | Product source, Node API, Eve, Task runtime, official Web/Desktop build root | [public Mikka](https://github.com/alexj11324/Mikka) | Official build starts from a pinned public commit |
 | Paid UI source and official slot implementations | private `mikka-hosted-ui` | Checked out **read-only**, by exact approved SHA, into ignored `.hosted-ui/` in the public workspace |
-| CI execution, container build and image Registry | Cloudflare Workers Builds / Containers | No paid GitHub Actions runner required; trust must match the actual connected repo and trigger |
+| CI execution and product compilation | Public Mikka GitHub Actions | Pin source and original successful run, artifact ID and digest; use the existing public runners |
+| Production hosting and image Registry | Cloudflare Workers / Containers | Deploy the verified artifacts through the existing publisher |
 | Company deployment, secrets, staging, cutover and rollback | private `mikka-cloud`, issues #1953 and #1954 | Only the release owner promotes a verified immutable artifact; no private code committed to the public repository |
 
 Public/Fork PRs build the public server and compatibility contracts only. Never supply paid UI checkout credentials, production database URLs, or deployment privileges to arbitrary PR code. The official client is assembled from one public source SHA and one private UI SHA; there is **no second community UI**.
@@ -17,9 +18,15 @@ Public/Fork PRs build the public server and compatibility contracts only. Never 
 
 The original official release workflow `.github/workflows/web-deploy.yml` used a **public-root** checkout, then obtained `HOSTED_UI_READ_KEY` through a trusted identity and installed the private UI under `.hosted-ui/`. That source boundary was correct.
 
-During Cloudflare migration, `mikka-hosted-ui/scripts/cloudflare-ci.mjs` currently triggers Cloudflare Builds from the private UI repo, fetching public Mikka as a nested checkout. The recent OCI issuer was added there as a workaround for unavailable paid GitHub Actions. **This is a temporary implementation, not a decision to transfer ownership of the product build to the private UI repo.** Existing CF source CI `publication=none` is not Registry OCI publication. Do not call it production.
+The temporary private-UI Cloudflare-native builder is retired. Its old `publication=none` receipts and historical OCI issuer instructions do not authorize a release.
 
-**Target:** trusted public-Mikka Cloudflare main/release trigger → pinned private UI read-only Overlay checkout → official Web/API artifacts and separately scoped Eve/Task images → reviewed Cloudflare OCI/Registry digest → private #1953 staging and single #1954 production promotion. Keep the original two-SHA pin, customer secret isolation, authenticated Registry digest, database/Workflow recovery and rollback checks. Do not add another live publisher or change the production route while #1954 owns a release window.
+The supported flow is public Mikka GitHub Actions → pinned, read-only private UI checkout when required → immutable Web/API/Eve/Task/World artifacts → the existing private operations publisher → Cloudflare staging and production. Keep the original source pins, customer secret isolation, authenticated Registry digest, database/Workflow recovery and rollback checks. Respect active release windows.
+
+Protected API, Eve, Task and Cloud Services publishers use the existing Cloudflare workload identity to request a 15-minute Registry credential from Cloudflare's Containers API immediately before reading or publishing images. Read phases request only pull access; publication requests push and pull. Eve and Task publication replace the earlier pull-only Docker login with this fresh publication credential before pushing the verified image. Credentials stay in the consuming step, outside compiler environments. The compiler does not depend on a copied Registry password stored in GitHub Secrets. The existing Cloudflare identity needs Containers Edit for this API and container deployment.
+
+A build keeps its original reviewed source pair when later main merges arrive. The actual main workflow authenticates the public revision; the selected UI revision must belong to its main history. Compilation and publication recheck the original checkouts and receipt, without replacing their bytes or requiring a moving branch to remain unchanged.
+
+For a shared World authority hotfix, `.github/workflows/cloudflare-world-deploy.yml` retrieves the successful original public build artifact on the GitHub runner, verifies its digest and source, and invokes the pinned private operations publisher. It uses prebuilt modules without compiling the product again. The deployment does not depend on a Codex workspace downloading a build artifact. The private operations release plan pins both previous World versions and preserves their signing identity and physical storage.
 
 Backend-only work (Eve / Task) should not import paid UI source unless a reviewed, independently testable build dependency truly requires it. Docker must send only required build context, not the entire dependency or Git-history tree.
 

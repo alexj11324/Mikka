@@ -95,9 +95,10 @@ async function serviceOrganizationAllowed(tx: PoolClient, organizationId: string
 type ProjectRead = { after: string | null } | { projectId: string }
 
 export async function readServiceCredentialProjects(header: string | null, read: ProjectRead) {
-  const bearer = /^Bearer (mksvc_(org_)?[A-Za-z0-9_-]{43})$/.exec(header ?? '')
+  const credentials = /^Bearer +(\S+)$/i.exec(header ?? '')?.[1]
+  const bearer = /^mksvc_(org_)?[A-Za-z0-9_-]{43}$/.exec(credentials ?? '')
   if (!bearer) return null
-  const [, token, organizationBound] = bearer
+  const [token, organizationBound] = bearer
   const cursor = 'after' in read ? z.uuid().nullable().parse(read.after) : null
   const projectId = 'projectId' in read ? z.uuid().parse(read.projectId) : null
   const hash = digest(token)

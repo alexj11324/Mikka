@@ -12,6 +12,7 @@ export type DesktopBootstrap = AuthConfiguration & {
   session: DesktopSession['session'] | null
   onboarding?: { computer: OnboardingComputer }
   cacheWorkspace: WireBootstrap['cacheWorkspace']
+  workspaceError?: string | true
 }
 export type BootstrapScope = 'authentication' | 'workspace'
 export type AuthenticationBootstrap = Pick<DesktopBootstrap, 'user' | 'session' | 'googleEnabled' | 'githubEnabled' | 'emailEnabled'>
@@ -52,8 +53,25 @@ export async function readBootstrap(workspaceId?: string | null, isCurrent?: () 
 async function fetchBootstrap(workspaceId?: string | null, isCurrent?: () => boolean): Promise<DesktopBootstrap> {
   const requested = workspaceId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workspaceId) ? workspaceId : undefined
   try {
-    const value = await callAction<WireBootstrap>('desktop.bootstrap', requested ? [requested] : [], isCurrent)
-    return { user: value.user, session: value.session, cacheWorkspace: workspaceId && !requested ? null : value.cacheWorkspace, googleEnabled: value.googleEnabled, githubEnabled: value.githubEnabled, emailEnabled: value.emailEnabled, features: value.features, daemonPackageName: value.daemonPackageName, ...(value.onboarding ? { onboarding: { computer: value.computer } } : {}) }
+    let value = await callAction<WireBootstrap>('desktop.bootstrap', requested ? [requested] : [], isCurrent)
+    let workspaceError: string | true | undefined
+    if (requested && value.requestedWorkspaceSelected === false) {
+      // Back/Forward and pasted links use the same authenticated selection as the menu.
+      // Never expose the previous workspace while the switch or its new bootstrap is pending.
+      const result = await callAction<{ ok: true } | { ok: false; error: string }>('workspace.switchWorkspace', [requested], isCurrent)
+      if (result.ok) value = await callAction<WireBootstrap>('desktop.bootstrap', [requested], isCurrent)
+      else workspaceError = result.error
+    }
+    if (requested && value.requestedWorkspaceSelected !== undefined &&
+      (!value.requestedWorkspaceSelected || value.cacheWorkspace?.workspaceId !== requested)) workspaceError ||= true
+    return {
+      user: value.user, session: value.session,
+      ...(workspaceError ? { workspaceError } : {}),
+      cacheWorkspace: workspaceError || (workspaceId && !requested) ? null : value.cacheWorkspace,
+      googleEnabled: value.googleEnabled, githubEnabled: value.githubEnabled, emailEnabled: value.emailEnabled,
+      features: value.features, daemonPackageName: value.daemonPackageName,
+      ...(value.onboarding ? { onboarding: { computer: value.computer } } : {}),
+    }
   }
   catch (error) {
     if (!(error instanceof DesktopTransportError) || error.code !== 'desktop_session_expired') throw error

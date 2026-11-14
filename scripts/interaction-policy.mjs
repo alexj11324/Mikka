@@ -9,8 +9,18 @@ const notificationOnlyCalls = /^(?:(?:window\.)?alert|toast(?:\.(?:info|success|
 const placeholderText = /(?:coming\s+soon|not\s+implemented|待实现|尚未实现|敬请期待|功能开发中)/i
 
 export function auditInteractions(file, text) {
+  return audit(file, text, false)
+}
+
+// Platform adapters and paid blocks retain their own controls and presentation.
+export function auditActionBindings(file, text) {
+  return audit(file, text, true)
+}
+
+function audit(file, text, bindingsOnly) {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, /\.jsx?$/.test(file) ? ts.ScriptKind.JSX : ts.ScriptKind.TSX)
   const diagnostics = [], imports = new Map(), iconImports = new Set(), declarations = new Map(), forms = new Map()
+  const nativePressables = new Set(), nativeAlerts = new Set(), expoLinks = new Set()
   const opening = node => node && (ts.isJsxElement(node) ? node.openingElement : ts.isJsxSelfClosingElement(node) ? node : null)
   const attr = (node, name) => node.attributes.properties.find(p => ts.isJsxAttribute(p) && p.name.getText(source) === name)
   const expression = attribute => attribute?.initializer && (ts.isJsxExpression(attribute.initializer) ? attribute.initializer.expression : attribute.initializer)
@@ -23,7 +33,11 @@ export function auditInteractions(file, text) {
   function index(node) {
     if (ts.isImportDeclaration(node) && node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings)) {
       for (const spec of node.importClause.namedBindings.elements) {
-        imports.set(spec.name.text, spec.propertyName?.text ?? spec.name.text)
+        const original = spec.propertyName?.text ?? spec.name.text
+        imports.set(spec.name.text, original)
+        if (node.moduleSpecifier.text === 'react-native' && /^(?:Button|Pressable|TouchableOpacity|TouchableHighlight)$/.test(original)) nativePressables.add(spec.name.text)
+        if (node.moduleSpecifier.text === 'react-native' && original === 'Alert') nativeAlerts.add(spec.name.text)
+        if (node.moduleSpecifier.text === 'expo-router' && original === 'Link') expoLinks.add(spec.name.text)
         if (ts.isStringLiteral(node.moduleSpecifier) && node.moduleSpecifier.text === 'lucide-react') iconImports.add(spec.name.text)
       }
     }
@@ -75,7 +89,9 @@ export function auditInteractions(file, text) {
     if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) return hasEffects(node.body, seen)
     if (ts.isCallExpression(node)) {
       const call = node.expression.getText(source)
-      if (notificationOnlyCalls.test(call)) {
+      const nativeNotice = ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'alert'
+        && nativeAlerts.has(node.expression.expression.getText(source)) && node.arguments.length < 3
+      if (notificationOnlyCalls.test(call) || nativeNotice) {
         // A localized label is feedback. An awaited command can supply the text after completing its action.
         return node.arguments.some(argument => {
           const value = unwrap(argument)
@@ -151,9 +167,32 @@ export function auditInteractions(file, text) {
     const host = opening(unwrap(expression(attr(node, 'render'))))
     return !!host && (realHref(host) || hasAction(host))
   }
+  function checkAdapterBindings(tag) {
+    const name = nameOf(tag)
+    // A non-action DOM container may absorb clicks, for example inside a portal.
+    if (/^[a-z]/.test(name) && !['button', 'a', 'input', 'select'].includes(name)
+      && !['button', 'link', 'menuitem'].includes(literal(expression(attr(tag, 'role'))))) return
+    const parents = surrounding(tag)
+    const native = nativePressables.has(tag.tagName.getText(source))
+    const isLinkChild = parents.some(parent => expoLinks.has(parent.tagName.getText(source)) && attr(parent, 'asChild') && realHref(parent))
+    const inTrigger = parents.some(parent => behaviorControls.test(nameOf(parent)))
+    const handlers = ['onClick', 'onSelect', 'onPress', 'onLongPress'].map(key => attr(tag, key)).filter(Boolean)
+    for (const handler of handlers) {
+      if (!meaningful(expression(handler)) && !isLinkChild && !inTrigger) {
+        add(handler, 'interaction/no-placeholder-action', '操作回调仅反馈或没有可执行动作。')
+      }
+    }
+    // An Expo Link or forwarded PressableProps can own the native action.
+    const button = name === 'Button' || literal(expression(attr(tag, 'accessibilityRole'))) === 'button'
+    if (native && button && !attr(tag, 'onPress') && !attr(tag, 'onLongPress') && !isLinkChild && !tag.attributes.properties.some(ts.isJsxSpreadAttribute)
+      && !['onPressIn', 'onPressOut'].some(key => meaningful(expression(attr(tag, key))))) {
+      add(tag, 'interaction/no-dead-control', '原生按钮没有按压、手势或导航操作。')
+    }
+  }
   function visit(node) {
     const tag = opening(node)
-    if (tag) {
+    if (tag && bindingsOnly) checkAdapterBindings(tag)
+    else if (tag) {
       const name = nameOf(tag), parents = surrounding(tag)
       const role = literal(expression(attr(tag, 'role')))
       const intrinsic = /^[a-z]/.test(name)

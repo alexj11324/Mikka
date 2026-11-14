@@ -11,6 +11,45 @@ const authorized = disposableDatabase()
 if (url && !authorized) throw new Error('Search DB tests require a loopback *_e2e database')
 if (process.env.REQUIRE_DB === '1' && !authorized) throw new Error('Search DB tests cannot skip in required CI')
 
+test('relation search requires current steering on both same-author Tasks', { skip: !authorized }, async () => {
+  const { Pool } = await import('pg')
+  const { db } = await import('../lib/db')
+  const { parseSearchParams, searchIssues } = await import('../lib/issue-search')
+  const { seedIssue, seedUser } = await import('./support/workspace-admin-db')
+  const { seedFixtureWorkspace } = await import('./helpers/task-workspace')
+  const pool = new Pool({ connectionString: url })
+  try {
+    const author = await seedUser(pool, 'dependency-author')
+    const editor = await seedUser(pool, 'dependency-editor')
+    const workspaceId = await seedFixtureWorkspace(pool, author, 'team')
+    await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status)
+      SELECT $1,id,name,email,'member','active' FROM "user" WHERE id=$2`, [workspaceId, editor])
+    const current = await seedIssue(pool, author, workspaceId, { registered: true })
+    const target = await seedIssue(pool, author, workspaceId, { registered: true })
+    const differentAuthor = await seedIssue(pool, editor, workspaceId, { registered: true })
+    const both = [current, target]
+    await pool.query(`UPDATE resource_access_policies SET visibility='private' WHERE kind='task' AND id=ANY($1::uuid[])`, [both])
+    await pool.query(`INSERT INTO resource_access_grants ("resourceKind","resourceId","subjectKind","subjectId",capabilities)
+      SELECT 'task',id,'account',$2,ARRAY['canReadContent','canSteer'] FROM issues WHERE id=ANY($1::uuid[])`, [both, editor])
+    const search = async () => {
+      const params = parseSearchParams(new URLSearchParams({ issueId: current, relationKind: 'blockedBy' }))
+      const { items } = await searchIssues(db, { userId: editor, workspaceId, params })
+      return new Map(items.map(row => [row.id, row.canRelate]))
+    }
+    assert.equal((await search()).get(target), true)
+    assert.equal((await search()).get(differentAuthor), false)
+    for (const id of both) {
+      await pool.query(`UPDATE resource_access_grants SET capabilities=ARRAY['canReadContent']
+        WHERE "resourceKind"='task' AND "resourceId"=$1 AND "subjectId"=$2`, [id, editor])
+      assert.equal((await search()).get(target), false)
+      await pool.query(`UPDATE resource_access_grants SET capabilities=ARRAY['canReadContent','canSteer']
+        WHERE "resourceKind"='task' AND "resourceId"=$1 AND "subjectId"=$2`, [id, editor])
+    }
+  } finally {
+    await pool.end()
+  }
+})
+
 test('indexed workspace-isolated relation search beyond 101 tasks, paging and graph visibility', {skip: !authorized}, async () => {
   const {Pool} = await import('pg')
   const pool = new Pool({connectionString: url,max:2})

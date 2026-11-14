@@ -7,7 +7,11 @@
   "workers_dev": false,
   "preview_urls": false,
   "ai": { "binding": "WORKERS_AI" },
-  "observability": { "enabled": true },
+  "observability": {
+    "enabled": true,
+    "logs": { "invocation_logs": false },
+    "traces": { "enabled": true }
+  },
   "durable_objects": {
     "bindings": [{ "name": "EVE_RUNTIME", "class_name": "EveRuntime" }]
   },

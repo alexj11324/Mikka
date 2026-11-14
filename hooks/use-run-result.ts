@@ -19,7 +19,7 @@ const OPEN_TASK = { status: 'doing', metadata: { pullRequests: [] } }
  * one that was left waiting on the person has ended, since the conversation went on past it. Every other earlier run
  * keeps its own result (完成, 失败, 受阻).
  */
-export function runResult(run: { status: string; outcome?: string | null }, latest: boolean): { result: RunResult; reason: TaskReason | null } {
+export function runResult(run: NonNullable<Parameters<typeof localTaskState>[1]>, latest: boolean): { result: RunResult; reason: TaskReason | null } {
   const { state, reason } = localTaskState(OPEN_TASK, run)
   const result: RunResult = state === 'canceled' || state === 'duplicate' ? 'done' : state === 'todo' ? 'idle' : state
   if (!latest && result === 'waiting') return { result: 'ended', reason: null }

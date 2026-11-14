@@ -5,6 +5,7 @@ import useSWR from 'swr'
 import { deleteWorkspace, listArchivedBots, takeOverArchivedBot, transferWorkspace, updateWorkspace, type getWorkspaceDeletionImpact, type getWorkspaceGeneral, type getWorkspaceTransferTargets } from '@/app/actions/workspace-settings'
 import { settingsRead } from '@/lib/settings-read'
 import { settingsKeys } from '@/lib/swr/keys'
+import { ReadResponseError } from '@/lib/swr/retry'
 import { withBasePath } from '@/lib/base-path'
 import { publicServiceLink } from '@/lib/platform/public-origin'
 import { useActionError } from '@/lib/use-action-error'
@@ -32,7 +33,9 @@ function readDataUrl(file: File) {
 export function useWorkspaceGeneral(workspaceId: string | undefined) {
   const actionError = useActionError()
   const general = useSWR(settingsKeys.workspaceGeneral(workspaceId ?? ''), () => settingsRead<Awaited<ReturnType<typeof getWorkspaceGeneral>>>('workspace-general', { workspace: workspaceId }))
-  const data = general.data && !general.data.error ? general.data : null
+  const data = !general.error && general.data && !general.data.error ? general.data : null
+  const status = general.error instanceof ReadResponseError ? general.error.status : undefined
+  const readError = status === 401 ? 'authRequired' : status === 403 ? 'workspaceAccessDenied' : general.data?.error
   const [name, setName] = useState<string | null>(null)
   const [slug, setSlug] = useState<string | null>(null)
   const [saving, setSaving] = useState<Field | null>(null)
@@ -92,7 +95,7 @@ export function useWorkspaceGeneral(workspaceId: string | undefined) {
   return {
     loading: !general.data && !general.error,
     data,
-    loadError: data ? null : actionError(general.data?.error),
+    loadError: data ? null : actionError(readError),
     reload: () => { void general.mutate() },
     host, name, setName, slug, setSlug, saving, failed, save, commit, pickIcon,
     removeIcon: () => { void save('icon', null) },
@@ -106,12 +109,17 @@ export function useWorkspaceGeneral(workspaceId: string | undefined) {
 export function useTransferWorkspace(workspaceId: string) {
   const actionError = useActionError()
   const targets = useSWR(settingsKeys.transferTargets(workspaceId), () => settingsRead<Awaited<ReturnType<typeof getWorkspaceTransferTargets>>>('transfer-targets', { workspace: workspaceId }))
-  const people = targets.data && !targets.data.error ? targets.data : null
+  const people = !targets.error && targets.data && !targets.data.error ? targets.data : null
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   /** The new owner's name or email once transferred, or null */
+  function canTransferTo(to: string | null): to is string {
+    return !!people?.some(person => person.userId === to)
+  }
+
   async function transfer(to: string): Promise<string | null> {
+    if (pending || !canTransferTo(to)) return null
     setPending(true)
     setError(null)
     try {
@@ -125,7 +133,7 @@ export function useTransferWorkspace(workspaceId: string) {
     }
   }
 
-  return { people, readError: targets.error || targets.data?.error ? actionError(targets.data?.error) : null,
+  return { people, canTransferTo, readError: targets.error || targets.data?.error ? actionError(targets.data?.error) : null,
     reload: () => targets.mutate(), pending, error, transfer }
 }
 
@@ -133,11 +141,12 @@ export function useTransferWorkspace(workspaceId: string) {
 export function useDeleteWorkspace(workspaceId: string) {
   const actionError = useActionError()
   const impact = useSWR(settingsKeys.deletionImpact(workspaceId), () => settingsRead<Awaited<ReturnType<typeof getWorkspaceDeletionImpact>>>('deletion-impact', { workspace: workspaceId }))
-  const counts = impact.data && !impact.data.error ? impact.data : null
+  const counts = !impact.error && impact.data && !impact.data.error ? impact.data : null
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function remove(typed: string) {
+    if (pending || !counts) return
     setPending(true)
     setError(null)
     try {

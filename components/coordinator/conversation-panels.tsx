@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { InlineLoadError } from '@/components/load-error'
 import { TaskDetailPlacementContext } from '@/components/slots/task-detail-contract'
 import type { ThreadPanelTab, ThreadScreenProps } from '@/components/slots/thread-contract'
-import { NAVIGATE_EVENT, navigate, openThread, readLocation, setWorkAreaOpener } from '@/components/workspace/workspace-navigation'
+import { NAVIGATE_EVENT, navigate, openThread, readLocation, rememberWorkTab, setWorkAreaOpener, workTabForEntry } from '@/components/workspace/workspace-navigation'
 
 /**
  * The right-hand tabs a page hands its chat when the frame owns the panel (FRAME_OWNS_PANEL): the Overview
@@ -113,9 +113,15 @@ export type WorkTabNames = { task: (issueId: string) => string; thread: (runId: 
  * the page comes here (workspace-navigation's setWorkAreaOpener), and an old address that names one (`?task=`,
  * `?thread=`) opens its tab instead of a column beside the chat.
  */
-export function useWorkTabs(on: boolean, names: WorkTabNames, origin: string) {
+export function useWorkTabs(on: boolean, names: WorkTabNames, origin: string, scope: string | null) {
   const onActiveTask = useConversationPanels()?.onActiveTask
   const [activeTab, onActiveTab] = useState<string | null>(null)
+  const previousActive = useRef<string | null>(null)
+  useEffect(() => {
+    if (!on || !scope || previousActive.current === activeTab) return
+    previousActive.current = activeTab
+    rememberWorkTab(scope, activeTab)
+  }, [on, scope, activeTab])
   const [threadTasks, setThreadTasks] = useState<Record<string, string | null>>({})
   const learnTask = useCallback((runId: string, taskId: string | null) => setThreadTasks(current => current[runId] === taskId ? current : { ...current, [runId]: taskId }), [])
   const flushes = useRef(new Map<string, () => Promise<boolean>>())
@@ -144,18 +150,24 @@ export function useWorkTabs(on: boolean, names: WorkTabNames, origin: string) {
   useEffect(() => {
     if (!on) return
     const release = setWorkAreaOpener({ task: openTask, thread: openRun })
-    const take = () => {
+    const takeAddress = () => {
       const { task, thread } = readLocation(new URL(window.location.href).searchParams)
-      if (!task && !thread) return
+      if (!task && !thread) return false
       if (thread) openRun(thread)
       else if (task) openTask(task)
       navigate({ task: null, thread: null }, 'replace')
+      return true
     }
-    take()
-    window.addEventListener('popstate', take)
-    window.addEventListener(NAVIGATE_EVENT, take)
-    return () => { release(); window.removeEventListener('popstate', take); window.removeEventListener(NAVIGATE_EVENT, take) }
-  }, [on, openTask, openRun])
+    const restoreEntry = () => {
+      if (takeAddress() || !scope) return
+      const saved = workTabForEntry(scope)
+      if (saved) open(saved.kind, saved.id)
+    }
+    restoreEntry()
+    window.addEventListener('popstate', restoreEntry)
+    window.addEventListener(NAVIGATE_EVENT, takeAddress)
+    return () => { release(); window.removeEventListener('popstate', restoreEntry); window.removeEventListener(NAVIGATE_EVENT, takeAddress) }
+  }, [on, scope, open, openTask, openRun])
   const tabs = opened.map((item): ThreadPanelTab => {
     if (item.kind === 'task') return { id: `task:${item.id}`, title: names.task(item.id), content: <EmbeddedTaskDetail key={item.id} issueId={item.id} origin={origin} onOpenTask={openTask} onFlush={registerFlush} onDeleted={() => setOpened(list => list.filter(tab => tab.kind !== 'task' || tab.id !== item.id))} /> }
     const thread = names.thread(item.id)

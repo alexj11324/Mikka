@@ -24,6 +24,7 @@ export interface RunChainQueryable {
 export const RUN_CHAIN_MAX_DEPTH = 64
 
 export interface RunAttempt {
+  pauseReason?: import('./task-state').TaskStateRun['pauseReason']
   failureDetails?: RunFailure | CompactRunFailure | null
   runId: string
   /** 1-based, in chain order: the root is attempt 1. */
@@ -85,7 +86,7 @@ const COMPACT_FAILURE = `CASE WHEN jsonb_typeof(x."failureDetails")='object' AND
     'occurredAt',x."failureDetails"->'occurredAt','appVersion',x."failureDetails"->'appVersion') ||
   jsonb_strip_nulls(jsonb_build_object('detail',x."failureDetails"->'detail','provider',x."failureDetails"->'provider',
     'status',x."failureDetails"->'status','recovery',x."failureDetails"->'recovery')) END`
-const selectAttempts = (ownerDetail = false) => `a."depthExceeded", a.root::text AS "rootRunId", x.id::text AS "runId", x.status, x.outcome,
+const selectAttempts = (ownerDetail = false) => `a."depthExceeded", a.root::text AS "rootRunId", x.id::text AS "runId", x.status, x.outcome, x."pauseReason",
   x."stopRequestedAt", x."createdAt", x."finishedAt", ${ownerDetail ? 'x."failureDetails"' : COMPACT_FAILURE} AS "failureDetails"`
 
 /**
@@ -140,7 +141,8 @@ function foldChains(rows: Record<string, unknown>[]): RunChain[] {
     const root = String(row.rootRunId)
     const entry = byRoot.get(root) ?? { rootCreatedAt: row.rootCreatedAt as Date, runs: [] }
     const failureDetails = readRunFailure(row.failureDetails) ?? readCompactRunFailure(row.failureDetails)
-    entry.runs.push({ ...(failureDetails ? { failureDetails } : {}), runId: String(row.runId), status: String(row.status), outcome: (row.outcome as string | null) ?? null, stopRequestedAt: (row.stopRequestedAt as Date | null) ?? null, createdAt: row.createdAt as Date, finishedAt: (row.finishedAt as Date | null) ?? null })
+    const pauseReason = row.pauseReason === 'human_control' || row.pauseReason === 'quota_exhausted' ? row.pauseReason : null
+    entry.runs.push({ ...(pauseReason ? { pauseReason } : {}), ...(failureDetails ? { failureDetails } : {}), runId: String(row.runId), status: String(row.status), outcome: (row.outcome as string | null) ?? null, stopRequestedAt: (row.stopRequestedAt as Date | null) ?? null, createdAt: row.createdAt as Date, finishedAt: (row.finishedAt as Date | null) ?? null })
     byRoot.set(root, entry)
   }
   const order = (a: { createdAt: Date; runId: string }, b: { createdAt: Date; runId: string }) => a.createdAt.getTime() - b.createdAt.getTime() || (a.runId < b.runId ? -1 : a.runId > b.runId ? 1 : 0)

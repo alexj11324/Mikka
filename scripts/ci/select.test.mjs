@@ -20,6 +20,13 @@ test('mobile does not select server DB, daemon, Docker or macOS', async () => {
   assert.deepEqual(result.db_matrix.shard, [])
   assert(result.mobile)
 })
+test('non-documentation plans keep the suite that actually exercises the docs classifier', async () => {
+  const planForMobile = await pick('apps/mobile/lib/theme.ts')
+  const owners = planForMobile.units.filter(unit =>
+    plan.graph.dependencies[unit]?.some(edge => edge.target === sourceId('scripts/ci-docs-only.test.mjs')))
+  assert.deepEqual(owners, ['ci-core-7'])
+})
+
 test('web component edits select their consumers without server DB or Docker', async () => {
   const result = await pick('components/settings/settings-view.tsx')
   assert.equal(result.full, false)

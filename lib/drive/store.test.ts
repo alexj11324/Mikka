@@ -56,7 +56,7 @@ function volume(entries: DriveManifestEntry[], over: Partial<FakeVolume> = {}): 
 function poolFor(state: FakeState) {
   const client = {
     async query(text: string, values: unknown[] = []) {
-      state.statements.push(text.replace(/\s+/g, ' ').trim().slice(0, 60))
+      state.statements.push(text.replace(/\s+/g, ' ').trim())
       if (text === 'BEGIN' || text === 'COMMIT' || text === 'ROLLBACK') return { rows: [], rowCount: 0 }
       if (text.includes('FROM drive_volumes WHERE id=$1 FOR UPDATE')) {
         const found = state.volumes.filter(v => v.id === values[0])
@@ -201,6 +201,8 @@ test('a matching expectedDigest lands once, and the same mutationId replays with
   assert.equal(first.seq, 2)
   assert.equal(first.entryCount, 2)
   assert.equal(first.totalBytes, 8)
+  assert.equal(state.statements.filter(sql => sql.includes('FROM drive_volume_entries')).length, 1,
+    'one locked tree read supplies both CAS validation and the committed entry diff')
   const afterFirst = snapshot(state)
 
   // Ten replays of the same write: one version, one receipt, one tree.
@@ -321,7 +323,10 @@ test('a restore writes the old tree FORWARD as a new version, never back', async
 })
 
 test('a restore with a stale expectedDigest is refused and changes nothing', async () => {
-  const { state, id, digest } = volume([entry('a.txt', { sha256: hex('a') })])
+  const { state, id, digest } = volume([entry('kept'), entry('changed-mode'), entry('changed-bytes'), entry('added')])
+  state.versions[0]!.manifest = [
+    entry('kept'), entry('changed-bytes', { sha256: hex('b') }), entry('removed'), entry('changed-mode', { mode: 0o755 }),
+  ]
   const before = snapshot(state)
   await assert.rejects(
     () => restoreDriveVersion(poolFor(state), { ownerId: 'owner', volumeId: id }, actor,
@@ -330,6 +335,7 @@ test('a restore with a stale expectedDigest is refused and changes nothing', asy
       assert.ok(error instanceof DriveError)
       assert.equal(error.code, 'drive_version_conflict')
       assert.equal(error.detail?.headDigest, digest)
+      assert.deepEqual(error.detail?.paths, ['added', 'changed-bytes', 'changed-mode', 'removed'])
       return true
     })
   assert.deepEqual(snapshot(state), before)

@@ -225,6 +225,7 @@ export async function moveIssueToProject(input: { issueId: string; revision: num
     })
     return { issue: await issueView(result) }
   } catch (error) {
+    if (error instanceof ActionFailureError && error.code === 'issueOutdated') return { error: error.code }
     if (error instanceof ActionFailureError && error.confirmable) return { error: error.code, params: error.params, confirmable: error.confirmable }
     return { error: error instanceof ActionFailureError ? i18nText(`Errors.${error.code}`) : i18nText('Errors.projectMoveFailed') }
   }

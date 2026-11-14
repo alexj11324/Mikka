@@ -16,6 +16,7 @@ const original = {
 } satisfies MemoryData
 let persisted: MemoryData
 let allowed: boolean
+let refuseSwitch = false
 let mergeInto: string | null
 let reads = 0
 let readFailure: Error | null
@@ -23,7 +24,11 @@ const writes: string[] = []
 
 mock.module('@/app/actions/memory', { namedExports: {
   getMemory: async () => { reads++; if (readFailure) throw readFailure; return structuredClone(persisted) },
-  setMemory: async (enabled: boolean) => { persisted.enabled = enabled },
+  setMemory: async (enabled: boolean) => {
+    writes.push('switch')
+    if (refuseSwitch) throw new Error('Preference storage unavailable')
+    persisted.enabled = enabled
+  },
   updateFact: async (id: string, subject: string) => {
     writes.push('correct')
     if (!allowed) return false
@@ -55,7 +60,7 @@ before(async () => {
   ;({ useMemorySettings } = await import('./use-memory-settings'))
 })
 beforeEach(() => {
-  persisted = structuredClone(original); allowed = false; mergeInto = null; reads = 0; readFailure = null; writes.length = 0
+  persisted = structuredClone(original); allowed = false; refuseSwitch = false; mergeInto = null; reads = 0; readFailure = null; writes.length = 0
   container = browser.document.createElement('div') as unknown as HTMLDivElement
   document.body.append(container); root = createRoot(container)
 })
@@ -95,6 +100,20 @@ for (const action of ['correct', 'remove'] as const) {
     assert.equal(container.textContent, 'Original memory')
   })
 
+  test(`Retry resubmits the original memory ${action} after rollback`, async () => {
+    await render()
+    await act(async () => {
+      if (action === 'correct') await memory.correct(factId, 'Keep this correction')
+      else await memory.remove(factId)
+    })
+    assert.equal(memory.failed, true)
+    allowed = true
+    await act(async () => { await memory.reload() })
+    assert.deepEqual(writes, [action, action])
+    assert.equal(memory.failed, false)
+    assert.equal(container.textContent, action === 'correct' ? 'Keep this correction' : '')
+  })
+
   test(`an accepted memory ${action} remains saved after a refresh`, async () => {
     await render(); allowed = true
     await act(async () => {
@@ -119,6 +138,18 @@ test('the memory switch still accepts its void action result', async () => {
   assert.equal(memory.data?.enabled, false)
 })
 
+test('Retry saves the refused memory switch value', async () => {
+  await render(); refuseSwitch = true
+  await act(async () => { await memory.setEnabled(false) })
+  assert.equal(memory.data?.enabled, true)
+  assert.equal(memory.failed, true)
+  refuseSwitch = false
+  await act(async () => { await memory.reload() })
+  assert.deepEqual(writes, ['switch', 'switch'])
+  assert.equal(persisted.enabled, false)
+  assert.equal(memory.failed, false)
+})
+
 test('a correction merged into another saved fact renders the authoritative surviving row', async () => {
   const survivor = 'c12c497e-3511-40a9-a357-aa0e410794aa'
   persisted.facts.push({ ...persisted.facts[0], id: survivor, subject: 'Existing memory' })
@@ -141,6 +172,7 @@ test('a saved memory whose confirmation read fails exposes a read error without 
   assert.equal(persisted.facts[0].subject, 'Saved correction')
   readFailure = null
   await act(async () => { await memory.reload() })
+  assert.deepEqual(writes, ['correct'], 'retrying a confirmation read must not replay a saved write')
   assert.equal(memory.error, undefined)
   assert.equal(container.textContent, 'Saved correction')
 })

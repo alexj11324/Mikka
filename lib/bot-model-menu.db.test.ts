@@ -107,6 +107,8 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     const calls: unknown[][] = [];
     const countedPool = { query: new Proxy(pool.query, { apply(target, _receiver, args) { calls.push(args); return Reflect.apply(target, pool, args) } }) };
     await botModelMenu(countedPool, settings, alice, botA);
+    assert.equal(calls.filter(([sql]) => typeof sql === "string" && /FROM bot_model_choices\b/.test(sql)).length, 1,
+      "one menu reads the scoped preference row once");
     const ordinaryQueryCount = calls.length; calls.length = 0;
     const inspected = await botModelMenu(countedPool, settings, alice, botA, Date.now(), true);
     assert.equal(inspected.preferenceState, "absent");

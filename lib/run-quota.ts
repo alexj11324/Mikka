@@ -354,7 +354,6 @@ async function continuePausedRun(userId: string, runId: string, mode: 'apiKey' |
       const key = mode === 'apiKey' ? await quotaKey(client, run, scope) ?? null : null
       if (mode === 'apiKey' && !key) throw new ActionFailureError('apiKeyNotFound')
       if (scope.cloud) { cloud = { run, plan: scope, key }; return }
-      await assertRunProjectResources(client, run)
       if (!await endPausedRun(tx, run.id, userId, workspaceId)) throw new ActionFailureError('runNotActive')
       const retryRunId = await queueDeviceContinuation(tx, client, run, key)
       if (key) await recordCoordinatorEvent(tx, runCredentialSwitchedEvent(run, scope.from, key, retryRunId, run.quotaResetsAt?.toISOString() ?? null))
@@ -368,7 +367,10 @@ async function continuePausedRun(userId: string, runId: string, mode: 'apiKey' |
   if (!pending) throw new ActionFailureError('runNotActive')
   let retryRunId: string
   try { retryRunId = await queueCloudQuotaContinuation(pending.run, pending.plan.cloud!, pending.key) }
-  catch (error) { if (error instanceof ActionFailureError) throw error; throw new ActionFailureError('runInvalid') }
+  catch (cause) {
+    if (cause instanceof ActionFailureError) throw cause
+    throw new ActionFailureError('runInvalid', undefined, undefined, { cause })
+  }
   await db.transaction(async tx => {
     const ended = await endPausedRun(tx, pending.run.id, userId, workspaceId)
     if (ended && pending.key)

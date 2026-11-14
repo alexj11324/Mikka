@@ -6,7 +6,6 @@ import type { SuggestionSource } from '@/lib/db/schema'
 import { ACTION_LOCALES, type ActionLocale } from '@/lib/suggestions/action-title'
 import { rememberLocale } from '@/lib/suggestions/action-title-server'
 import { ensureComposioTriggers } from '@/lib/suggestions/sources'
-import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { listSuggestions, recordTimeZone, todaysBriefing } from '@/lib/suggestions/store'
 import { manualTimeZone } from '@/lib/suggestions/time-zone'
 
@@ -24,7 +23,7 @@ async function startedSuggestions(userId: string, ids: string[]) {
  * The suggestions list: the shown suggestions grouped by source app. The
  * daily briefing is not part of it; the Coordinator delivers it in its chat
  * (R-21). Reading the list still writes the day's briefing if the briefings
- * cron has not, and wakes the Coordinator to deliver it. `tz` is the person's
+ * cron has not. The committed event wakes the Coordinator. `tz` is the person's
  * IANA time zone, remembered so the cron writes at 08:00 their time; without
  * it the visitor's location decides. A zone the person picked in Settings
  * ('manual') is used instead and is not replaced.
@@ -63,7 +62,7 @@ export async function GET(request: Request) {
   }
   // A zone picked in Settings wins over what this browser or IP reports.
   const timeZone = await manualTimeZone(user.id) ?? browserTimeZone ?? request.headers.get('x-vercel-ip-timezone')
-  const [, items] = await Promise.all([todaysBriefing(user.id, timeZone, { onPushed: () => afterJob('after:coordinator-wake', () => wakeCoordinator(user.id)) }), listSuggestions(user.id)])
+  const [, items] = await Promise.all([todaysBriefing(user.id, timeZone), listSuggestions(user.id)])
   const execution = await startedSuggestions(user.id, items.map(item => item.id))
   const groups = new Map<SuggestionSource, typeof items>()
   for (const item of items) if (!execution.has(item.id)) groups.set(item.source, [...groups.get(item.source) ?? [], item])

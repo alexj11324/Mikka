@@ -64,15 +64,15 @@ export default function SettingsScreen() {
   }
   return (
     <View style={{ flex: 1, backgroundColor: colors.grouped }}>
-      <NavBar title="设置" topTitle background={colors.grouped} />
+      <NavBar title={messages.Settings.title} topTitle background={colors.grouped} />
       {!data && error ? (
         <View style={{ paddingTop: 40, alignItems: 'center', gap: 10 }}>
-          <Text style={{ color: colors.danger, fontSize: 13 }}>设置加载失败。</Text>
-          <CardButton label="重试" onPress={() => void reload()} />
+          <Text style={{ color: colors.danger, fontSize: 13 }}>{messages.MobileCore.readFailed.replace('{label}', messages.Settings.title)}</Text>
+          <CardButton label={messages.Common.retry} onPress={() => void reload()} />
         </View>
       ) : !data ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : (
         <ScrollView {...underBar} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}>
-          <ReadNotice error={error} hasData label="设置" onRetry={reload} />
+          <ReadNotice error={error} hasData label={messages.Settings.title} onRetry={reload} />
           <ReadNotice error={connections.error} hasData={connections.hasRetainedData} label={connections.noticeLabel} onRetry={connections.reload} />
           <PushRow proactive={data.preferences.proactive} />
           <PreferenceSaveNotice />
@@ -85,7 +85,7 @@ export default function SettingsScreen() {
             {data.billingScope && <Row label={messages.Billing.management.billingEntry} onPress={() => router.push('/settings/billing')} />}
           </Group>
           <Group>
-            <Row icon={icon('bell.fill', Bell, '#FF3B30')} label="通知" value={data.preferences.proactive ? '开' : '关'} onPress={() => router.push('/settings/notifications')} />
+            <Row icon={icon('bell.fill', Bell, '#FF3B30')} label={messages.Settings.sections.notifications.title} value={data.preferences.proactive ? messages.MobileCore.notifications.on : messages.MobileCore.notifications.off} onPress={() => router.push('/settings/notifications')} />
             <Row icon={icon('book.fill', BookOpen, '#AF52DE')} label="记忆" onPress={() => router.push('/settings/memory')} />
             <Row icon={icon('puzzlepiece.extension.fill', Blocks, '#34C759')} label="已连接的 App" value={connections.error ? '连接状态未知' : connections.snapshot ? String(connections.snapshot.toolkits.length) : undefined} onPress={() => router.push('/settings/plugins')} />
           </Group>
