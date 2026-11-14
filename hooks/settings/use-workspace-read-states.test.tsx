@@ -76,6 +76,7 @@ test('an archived-bot read denied to members retains the intentional absence', a
 
 test('General withdraws the last workspace profile and preserves the draft until a successful retry', async () => {
   let general!: ReturnType<typeof hooks.useWorkspaceGeneral>
+  const currentProfile = () => general.data
   function Profile() {
     general = hooks.useWorkspaceGeneral('workspace')
     return null
@@ -83,24 +84,24 @@ test('General withdraws the last workspace profile and preserves the draft until
   profile = { id: 'workspace', name: 'Original', slug: 'original', canEdit: true, canTransfer: true, personal: false, icon: null }
   await act(async () => root.render(<SWRConfig value={{ provider: () => new Map(), shouldRetryOnError: false }}><Profile /></SWRConfig>))
   await settle()
-  assert.equal(general.data?.name, 'Original')
+  assert.equal(currentProfile()?.name, 'Original')
   await act(async () => general.setName('Unsaved name'))
   profile = new TypeError('Disconnected')
   await act(async () => general.reload())
   await settle()
-  assert.deepEqual(general.data, null)
+  assert.equal(currentProfile(), null)
   assert.equal(general.loadError, 'Read failed')
   assert.equal(general.name, 'Unsaved name')
   const { ReadResponseError } = await import('@/lib/swr/retry')
   profile = new ReadResponseError(403)
   await act(async () => general.reload())
   await settle()
-  assert.deepEqual(general.data, null)
+  assert.equal(currentProfile(), null)
   assert.equal(general.loadError, 'workspaceAccessDenied')
   profile = { id: 'workspace', name: 'Updated', slug: 'updated', canEdit: false, canTransfer: false, personal: false, icon: null }
   await act(async () => general.reload())
   await settle()
-  assert.equal(general.data?.name, 'Updated')
-  assert.equal(general.data?.canEdit, false)
+  assert.equal(currentProfile()?.name, 'Updated')
+  assert.equal(currentProfile()?.canEdit, false)
   assert.equal(general.loadError, null)
 })
