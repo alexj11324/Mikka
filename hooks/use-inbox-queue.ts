@@ -53,11 +53,13 @@ export function useInboxQueue(ownerId: string | undefined, workspaceId: string |
   const unreadable = checkingReturn || Boolean(read.error) || forbidden
   const items = unreadable ? [] : read.data?.flatMap(page => page.items) ?? []
   const more = !unreadable && Boolean(read.data?.at(-1)?.nextCursor)
-  function refreshAfterWrite() {
+  function refreshProjections(reloadList: () => Promise<unknown>) {
     if (!ownerId || !workspaceId || version !== webSelectionVersion()) return
-    // The local reader must also converge on installations without a live gateway.
-    // Refresh only mounted projections belonging to this command's original scope.
-    void Promise.allSettled([mutate(unstable_serialize(getKey)), mutate(inboxCountKey(version, ownerId, workspaceId))])
+    return Promise.allSettled([reloadList(), mutate(inboxCountKey(version, ownerId, workspaceId))])
+  }
+  function refreshAfterWrite() {
+    // An ACK can arrive after navigation. Refresh the list the command was issued from.
+    void refreshProjections(() => mutate(unstable_serialize(getKey)))
   }
   async function command(entry: InboxEntry, action: 'reject' | 'undo_reject' | 'reopen' | 'snooze' | 'dismiss', until?: string) {
     if (!ownerId || !workspaceId || unreadable || !entry.actions.includes(action)) throw new Error('decisionUnavailable')
@@ -73,6 +75,6 @@ export function useInboxQueue(ownerId: string | undefined, workspaceId: string |
   }
   return {
     items, refreshAfterWrite, error: read.error, loading: !read.error && (!read.data || checkingReturn), more, loadingMore: read.size > (read.data?.length ?? 0),
-    reload: read.mutate, loadMore: () => more && !read.isValidating ? read.setSize(size => size + 1) : undefined, command,
+    reload: () => refreshProjections(read.mutate), loadMore: () => more && !read.isValidating ? read.setSize(size => size + 1) : undefined, command,
   }
 }

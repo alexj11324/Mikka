@@ -78,3 +78,54 @@ test('returning from a detail revalidates the visible Inbox and retires unusable
     await browser.happyDOM.close()
   }
 })
+
+test('Inbox Retry restores the failed list and total together for the active workspace only', async () => {
+  const browser = new Window()
+  Object.assign(globalThis, { window: browser, document: browser.document, IS_REACT_ACT_ENVIRONMENT: true })
+  const { createRoot } = await import('react-dom/client')
+  const { SWRConfig } = await import('swr')
+  const { useInboxCount } = await import('./use-inbox-count')
+  const { useInboxQueue } = await import('./use-inbox-queue')
+  const root = createRoot(browser.document.createElement('div') as unknown as HTMLDivElement)
+  const cache = new Map()
+  const requests = { list: 0, count: 0, other: 0 }
+  const originalFetch = globalThis.fetch
+  let available = false
+  globalThis.fetch = async input => {
+    const url = new URL(String(input), 'http://localhost')
+    assert.ok(url.pathname.endsWith('/api/inbox'))
+    if (url.searchParams.get('workspaceId') === 'other') {
+      requests.other++
+      return Response.json({ count: 3, suggestionCount: 0 })
+    }
+    assert.equal(url.searchParams.get('workspaceId'), 'workspace')
+    const count = url.searchParams.has('count')
+    requests[count ? 'count' : 'list']++
+    if (!available) return Response.json({ error: 'actionFailed' }, { status: 500 })
+    return count ? Response.json({ count: 1, suggestionCount: 55 })
+      : Response.json({ historySince: '2026-11-14T00:00:00.000Z', items: [], nextCursor: null })
+  }
+  let queue!: ReturnType<typeof useInboxQueue>
+  let counts: ReturnType<typeof useInboxCount>
+  function Inbox() {
+    queue = useInboxQueue('reader', 'workspace', 'pending')
+    counts = useInboxCount('reader', 'workspace', true)
+    useInboxCount('reader', 'other', true)
+    return null
+  }
+  try {
+    await act(async () => root.render(<SWRConfig value={{ provider: () => cache }}><Inbox /></SWRConfig>))
+    assert.ok(queue.error)
+    assert.equal(counts, undefined)
+    assert.deepEqual(requests, { list: 1, count: 1, other: 1 })
+    available = true
+    await act(async () => { await queue.reload() })
+    assert.equal(queue.error, undefined)
+    assert.deepEqual(counts, { count: 1, pendingCount: 56 })
+    assert.deepEqual(requests, { list: 2, count: 2, other: 1 })
+  } finally {
+    await act(async () => root.unmount())
+    globalThis.fetch = originalFetch
+    await browser.happyDOM.close()
+  }
+})
