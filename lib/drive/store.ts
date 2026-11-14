@@ -318,6 +318,31 @@ export async function readDriveHistory(
   return rows.map(row => ({ ...row, totalBytes: Number(row.totalBytes) }))
 }
 
+/** Compare the selected entry with the immediately preceding immutable snapshot.
+ * A deletion is a change with a null file. Writes to other paths leave no row.
+ */
+export async function readDriveFileHistory(
+  database: Pick<Pool, 'query'>,
+  actor: { ownerId: string },
+  volumeId: string,
+  path: string,
+  options: { limit: number; beforeId?: string },
+): Promise<(DriveVersionSummary & { file: DriveManifestEntry | null })[]> {
+  const { rows } = await database.query<DriveVersionSummary & { file: DriveManifestEntry | null }>(`
+    SELECT v.id, v.seq, v.kind, v."fileCount", v."totalBytes", v.digest, v."threadId", v."threadTitle",
+           v."authorName", v."restoredFromVersionId", v."createdAt", entries.file
+      FROM drive_volume_versions v
+      LEFT JOIN drive_volume_versions prev ON prev."volumeId" = v."volumeId" AND prev.seq = v.seq - 1
+      CROSS JOIN LATERAL (
+        SELECT jsonb_path_query_first(v.manifest, '$[*] ? (@.path == $path)', jsonb_build_object('path', $3::text)) AS file,
+               jsonb_path_query_first(prev.manifest, '$[*] ? (@.path == $path)', jsonb_build_object('path', $3::text)) AS prior
+      ) entries
+     WHERE v."volumeId" = $1 AND v."ownerId" = $2 AND entries.file IS DISTINCT FROM entries.prior
+       AND ($4::text IS NULL OR v.seq < (SELECT seq FROM drive_volume_versions WHERE id = $4 AND "volumeId" = $1))
+     ORDER BY v.seq DESC LIMIT $5`, [volumeId, actor.ownerId, path, options.beforeId ?? null, options.limit])
+  return rows.map(row => ({ ...row, totalBytes: Number(row.totalBytes) }))
+}
+
 /** One version and the tree it held, for a file diff or a preview of a restore. */
 export async function readDriveVersion(
   database: Pick<Pool, 'query'>,

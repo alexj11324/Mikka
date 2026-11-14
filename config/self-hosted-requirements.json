@@ -585,6 +585,13 @@
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
+  "lib/drive/store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read an authorized personal file's changes and deletions from the installed PostgreSQL volume snapshots. File history uses the existing versions and requires no external storage service.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "lib/credentials/runtime-identity.ts": {
     "mode": "optional-cloud",
     "environment": [
