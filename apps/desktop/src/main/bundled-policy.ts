@@ -96,7 +96,7 @@ export function allowedApiPath(path: string, method: string): boolean {
     return SERVICE_IDENTITY_ROUTES.some(([route, mutation]) => route.test(path) && (method === 'GET' || method === mutation))
   }
   if (WORKSPACE_GOVERNANCE.test(path) || path === '/api/organizations' || ORGANIZATION_OVERVIEW_OR_KEYS.test(path)) return method === 'GET'
-  if (path === '/api/me/joinable-organizations') return method === 'GET'
+  if (path === '/api/me/joinable-organizations' || path === '/api/me/invitations') return method === 'GET'
   if (ORGANIZATION_DOMAINS.test(path)) return method === 'GET' || method === 'POST'
   if (ORGANIZATION_DOMAIN.test(path)) return method === 'DELETE'
   if (ORGANIZATION_JOIN.test(path)) return method === 'POST'
