@@ -17,6 +17,13 @@ if (process.env.REQUIRE_DB === '1') assert.ok(url, 'REQUIRE_DB=1 needs PostgreSQ
 if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 
 test('an artifact key reaches only its owner home, after the real artifact writers commit', { skip: !url, timeout: 180_000 }, async t => {
+  const wakes: string[] = []
+  const receive = async (userId: string) => { wakes.push(userId) }
+  const { coordinatorWakeTransport } = await import('../coordinator/wake-after-commit')
+  const previousWake = coordinatorWakeTransport.wake
+  coordinatorWakeTransport.wake = receive
+  t.after(() => { coordinatorWakeTransport.wake = previousWake })
+  t.mock.module(new URL('../coordinator/wake.ts', import.meta.url).href, { namedExports: { wakeCoordinator: receive } })
   const pending: (() => Promise<void>)[] = []
   const sent: { scope: LiveScope; events: LiveInvalidation[] }[] = []
   const next = await import('next/server')
@@ -79,17 +86,24 @@ test('an artifact key reaches only its owner home, after the real artifact write
       assert.deepEqual(await artifactTargets(database, database, 'owner', artifactId), ownerHome(artifactId), 'the team and a peer sharing the home get nothing')
       assert.deepEqual(await artifactTargets(database, database, 'peer', artifactId), [])
       assert.deepEqual(await deliveries(), ownerHome(artifactId), 'creating it was one push')
+      assert.deepEqual(wakes.splice(0), ['owner'], 'one committed version wakes its owner once')
     })
 
     await t.test('a new version publishes after COMMIT, and nothing inside a rolled-back transaction', async () => {
       await assert.rejects(scope.run(() => db.transaction(outer => withDatabaseTransaction(outer, async () => {
         assert.ok(!('error' in await submit(artifactId)))
+        await drain()
+        assert.deepEqual(wakes, [], 'submitting a nested version cannot wake before its outer transaction commits')
         throw new Error('version rollback')
       }))), /version rollback/)
       assert.deepEqual(await deliveries(), [])
+      assert.deepEqual(wakes, [], 'a rolled-back version cannot wake the consumer')
       assert.equal((await database.query('SELECT "latestVersion" FROM artifacts WHERE id=$1', [artifactId])).rows[0].latestVersion, 1)
       assert.ok(!('error' in await scope.run(() => submit(artifactId))))
       assert.deepEqual(await deliveries(), ownerHome(artifactId))
+      assert.deepEqual(wakes.splice(0), ['owner'])
+      const events = await database.query(`SELECT "dedupeKey" FROM coordinator_events WHERE "userId"='owner' AND kind='artifact_submitted' ORDER BY "dedupeKey"`)
+      assert.deepEqual(events.rows.map(row => row.dedupeKey), [1, 2].map(version => `artifact_submitted:${artifactId}:${version}`))
     })
 
     await t.test('share links and deletion publish once; a no-op revoke and a foreign owner publish nothing', async () => {

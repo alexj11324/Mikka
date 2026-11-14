@@ -134,7 +134,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "0158c37f4e2c841b7302edec6c8632f4867b20bc5384c876a262db017ea4941f"
+      "sourceHash": "55fc3555acca7e5fd7e043e83febb8264eb1da947118ff21457844e57d21ceb2"
     },
     {
       "path": "/mikka/api/artifacts/[artifactId]/versions/[version]/download",

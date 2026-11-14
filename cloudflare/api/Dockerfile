@@ -1,6 +1,8 @@
 # syntax=docker/dockerfile:1
 # "release" is the node-server output built for this exact public+private release.
 FROM node:24-bookworm-slim
+RUN apt-get update && apt-get install --yes --no-install-recommends ca-certificates \
+    && test -s /etc/ssl/certs/ca-certificates.crt && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 ARG MIKKA_BUILD_REVISION
 ARG MIKKA_UI_OVERLAY_SHA

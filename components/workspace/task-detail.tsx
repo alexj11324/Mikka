@@ -3,6 +3,8 @@
 import { Component, useCallback, type KeyboardEvent, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useLiveKey } from '@/hooks/use-live-key'
+import { useListExpiry } from '@/hooks/use-list-expiry'
+import { issueRestoreDeadline } from '@/lib/issue-metadata'
 import { useTranslations } from 'next-intl'
 import type { JSONContent } from '@tiptap/react'
 import { ArrowLeft } from 'lucide-react'
@@ -15,7 +17,7 @@ import { getDeletedIssue, setIssueDeleted } from '@/app/actions/issue-operations
 import { pollIssue, pollIssueVersionSummaries, saveIssue, listIssueVersions, type IssueView } from '@/app/actions/issues'
 import { CacheReadError } from '@/lib/cache-read-error'
 import { readAccessFailure, waitForCacheHydration } from '@/lib/swr/persistent-cache'
-import { issueKeys } from '@/lib/swr/keys'
+import { isTaskPresentationKey, issueKeys } from '@/lib/swr/keys'
 import { ListReadScopeError } from '@/lib/live/list-read'
 import { heldListPositions, mergeList, type ListSnapshot } from '@/lib/list-poll'
 import { IssueEditor, createDocumentSeed, type IssueDiscussions } from './issue-editor'
@@ -56,10 +58,46 @@ type DetailProps = { /** The thread open in the right column, from the address (
 function UnavailableIssue({ id, onRetry, onClose }: { id: string; onRetry: () => void; onClose: () => void }) {
   const t = useTranslations('IssueDetail')
   const actionError = useActionError()
-  const { data } = useSWR(issueKeys.deleted(id), () => getDeletedIssue(id))
+  const { data, mutate } = useSWR(issueKeys.deleted(id), () => getDeletedIssue(id))
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
-  return <div className="flex flex-col items-start gap-4 p-8"><h1 className="text-lg font-semibold">{data ? t('deletedTitle') : t('unavailableTitle')}</h1><p role="status" className="text-sm text-muted-foreground">{data ? t('deletedDescription', { title: data.title }) : t('unavailableDescription')}</p>{error && <FieldError>{error}</FieldError>}<div className="flex gap-2">{data && <Button disabled={pending} onClick={async () => { setPending(true); try { const result = await setIssueDeleted({ id, restore: true }); if (result.error) setError(actionError(result.error)); else { toast.success(t('taskRestored')); onRetry() } } catch { setError(t('restoreFailed')) } finally { setPending(false) } }}>{t('restoreTask')}</Button>}<Button size="sm" variant="outline" onClick={onRetry}>{t('reload')}</Button><Button size="sm" variant="ghost" onClick={onClose}>{t('backToWorkspace')}</Button></div></div>
+  const deadline = data ? issueRestoreDeadline(data.deletedAt) : null
+  useListExpiry(deadline === null ? [] : [deadline])
+  const canRestore = data && data.canRestore !== false && deadline !== null && Date.now() <= deadline
+
+  async function restore() {
+    if (!data || !canRestore) return
+    setPending(true)
+    setError('')
+    try {
+      const result = await setIssueDeleted({ id, restore: true })
+      if (result.error === 'issueRestoreWindow') {
+        await mutate({ ...data, canRestore: false }, { revalidate: false })
+      } else if (result.error) {
+        setError(actionError(result.error))
+      } else {
+        toast.success(t('taskRestored'))
+        onRetry()
+      }
+    } catch {
+      setError(t('restoreFailed'))
+    } finally {
+      setPending(false)
+    }
+  }
+
+  let description = t('unavailableDescription')
+  if (data) description = canRestore ? t('deletedDescription', { title: data.title }) : actionError('issueRestoreWindow')
+  return <div className="flex flex-col items-start gap-4 p-8">
+    <h1 className="text-lg font-semibold">{data ? t('deletedTitle') : t('unavailableTitle')}</h1>
+    <p role="status" className="text-sm text-muted-foreground">{description}</p>
+    {error && <FieldError>{error}</FieldError>}
+    <div className="flex gap-2">
+      {canRestore && <Button disabled={pending} onClick={restore}>{t('restoreTask')}</Button>}
+      <Button size="sm" variant="outline" onClick={onRetry}>{t('reload')}</Button>
+      <Button size="sm" variant="ghost" onClick={onClose}>{t('backToWorkspace')}</Button>
+    </div>
+  </div>
 }
 
 const WIDE = '(min-width: 1024px)'
@@ -134,13 +172,16 @@ const noSubscribe = () => () => {}
 function TaskForm({ initial, preview = false, thread: openThread, origin, user, onSaved, onDirty, onClose, onDeleted, onRegisterFlush, navigation, onOpen }: DetailProps & { initial: Issue; preview?: boolean }) {
   const t = useTranslations('Workspace.detail')
   const { cache, mutate: mutateCache } = useSWRConfig()
-  const publishSaved = useCallback((issue: Issue) => {
+  const publishSaved = useCallback((issue: Issue, previousStatus: Issue['status']) => {
     // A confirmed write also updates the preview that another placement opens immediately.
     // Discard the old conditional token. A slower mutation must never move the cache backwards.
     void mutateCache<IssueRead>(issueKeys.detail(issue.id), previous =>
       previous && previous.revision > issue.revision ? previous : issue, { revalidate: false })
+    if (previousStatus !== issue.status) {
+      void mutateCache(key => isTaskPresentationKey(key, user.id, issue.workspaceId, issue.id))
+    }
     onSaved(issue.id)
-  }, [mutateCache, onSaved])
+  }, [mutateCache, onSaved, user.id])
   const tDetail = useTranslations('IssueDetail')
   const actionError = useActionError()
   const saveMessages = useRef({ t, actionError })
@@ -265,7 +306,8 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
       try {
         do {
           const snapshot = { ...draft.current }
-          const revision = savedRef.current.revision
+          const previous = savedRef.current
+          const revision = previous.revision
           if (!snapshot.title.trim()) { setError(saveMessages.current.t('titleRequired')); return false }
           const yjs = sync?.getSnapshot() ?? readOnlySnapshot()
           const bodyDirty = JSON.stringify(snapshot.content) !== JSON.stringify(savedRef.current.content)
@@ -284,7 +326,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
             acknowledged.current = snapshot.generation
             setDirty(draft.current.generation !== acknowledged.current)
             void refreshVersions().catch(() => {})
-            publishSaved(result.issue)
+            publishSaved(result.issue, previous.status)
           }
         } while (draft.current.generation !== acknowledged.current)
         return true
@@ -309,9 +351,10 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   }, [editSequence, syncState.ready, syncState.pending, syncState.error, save])
   function adopt(issue: Issue) {
     if (issue.revision < savedRef.current.revision) return
+    const previousStatus = savedRef.current.status
     savedRef.current = issue; setSaved(issue); setStatus(issue.status); setPriority(issue.priority)
     draft.current = { ...draft.current, status: issue.status, priority: issue.priority }
-    void refreshVersions().catch(() => {}); publishSaved(issue)
+    void refreshVersions().catch(() => {}); publishSaved(issue, previousStatus)
   }
   async function getCurrent() { return await save() ? savedRef.current : null }
   async function restore(version: NonNullable<typeof historyVersions>[number]) {

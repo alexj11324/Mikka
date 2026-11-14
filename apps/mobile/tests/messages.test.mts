@@ -28,3 +28,15 @@ test('Chinese device variants preserve Chinese navigation and task copy', () => 
 test('other device languages use the available English core copy', () => {
   assert.equal(getMobileMessages('fr-FR').Nav.tasks, 'Tasks')
 })
+
+test('notification read errors identify settings in the same device language as the retry action', () => {
+  for (const [locale, title, failure, retry] of [
+    ['en-US', 'Notifications', 'Unable to load Settings.', 'Retry save'],
+    ['zh-CN', '通知', '设置加载失败。', '重试保存'],
+  ]) {
+    const messages = getMobileMessages(locale)
+    assert.equal(messages.Settings.sections.notifications.title, title)
+    assert.equal(messages.MobileCore.readFailed.replace('{label}', messages.Settings.title), failure)
+    assert.equal(messages.MobileCore.notifications.retrySave, retry)
+  }
+})

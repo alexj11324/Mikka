@@ -2,6 +2,7 @@
 
 import useSWR, { unstable_serialize } from 'swr'
 import { useTranslations } from 'next-intl'
+import type { SharedResourceKind } from '@/lib/db/governance-schema'
 import { withBasePath } from '@/lib/base-path'
 import { GovernanceRequestError, governanceKey, type GovernanceDetail } from '@/hooks/settings/use-workspace-governance'
 import { useLiveKey, useLiveKeys } from '@/hooks/use-live-key'
@@ -74,7 +75,7 @@ export type ResourcePolicy = {
   revision: number
 }
 export type ResourceApproval = {
-  id: string; organizationId: string; workspaceId: string; kind: 'subscription' | 'api_key' | 'mcp'; resourceId: string
+  id: string; organizationId: string; workspaceId: string; kind: SharedResourceKind; resourceId: string
   ownerId: string; status: 'pending' | 'approved' | 'denied'; decidedBy: string | null; createdAt: string; updatedAt: string
 }
 export type ResourcePolicyState = { policy: ResourcePolicy; approvals: ResourceApproval[] }

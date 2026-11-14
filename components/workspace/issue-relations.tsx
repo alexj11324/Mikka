@@ -1,6 +1,6 @@
 'use client'
 
-import { issueKeys } from '@/lib/swr/keys'
+import { isTaskPresentationKey, issueKeys } from '@/lib/swr/keys'
 import { useRef, useState } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
@@ -98,7 +98,10 @@ export function useIssueConnections({ liveWorkspaceId = null, viewerId, task, ge
     try {
       const result = await moveIssue({ id, revision, status })
       if (!('issue' in result) || !result.issue) throw new Error(actionError(result.error))
-      await Promise.all([mutate(), refresh(key => isIssueListKey(key, viewerId))])
+      const saved = result.issue
+      const previous = rows?.find(row => row.id === id)
+      await Promise.all([mutate(), refresh(key => isIssueListKey(key, viewerId)),
+        previous?.status !== saved.status ? refresh(key => isTaskPresentationKey(key, viewerId, saved.workspaceId, id)) : undefined])
       toast.success(t('childStatusUpdated'))
     }
     catch (error) { toast.error(error instanceof Error ? error.message : t('statusSaveFailed')) }
