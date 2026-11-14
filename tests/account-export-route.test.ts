@@ -12,6 +12,7 @@ stub('../lib/auth.ts', { auth: { api: { getSession: async (options: { headers: H
 stub('../lib/api-auth.ts', { auth: { api: { getSession: async () => { throw Error('Workspace API token identity cannot authorize a complete account export') } } } })
 stub('../lib/account/export.ts', {
   claimExport: async (owner: string) => { calls.push({ kind: 'claim', owner }); return valid },
+  isExportCurrent: async (owner: string) => { calls.push({ kind: 'check', owner }); return valid },
   buildAccountExport: async (owner: string) => { calls.push({ kind: 'data', owner }); return { format: 'mikka-account-export', version: 1 } },
 })
 stub('../lib/account/export-files.ts', {
@@ -46,13 +47,15 @@ test('the streamed response retains JSON/download privacy and rechecks live brow
   assert.match(response.headers.get('content-disposition')!, /mikka-export-\d{4}-\d{2}-\d{2}\.json/)
   assert.ok(authority)
   await authority()
+  await authority()
+  assert.deepEqual(calls.map(call => call.kind), ['browser', 'claim', 'data', 'files', 'body', 'browser', 'check', 'browser', 'check'])
   const browserCalls = calls.filter(call => call.kind === 'browser')
   for (const call of browserCalls) assert.deepEqual((call.options as { query: unknown }).query, { disableCookieCache: true, disableRefresh: true })
-  assert.ok(calls.filter(call => ['data', 'files', 'body', 'claim'].includes(call.kind)).every(call => call.owner === 'owner'))
+  assert.ok(calls.filter(call => ['data', 'files', 'body', 'claim', 'check'].includes(call.kind)).every(call => call.owner === 'owner'))
   valid = false
   await assert.rejects(authority(), /authorization expired/)
   valid = true; user = null
-  const before = calls.filter(call => call.kind === 'claim').length
+  const before = calls.filter(call => call.kind === 'check').length
   await assert.rejects(authority(), /authorization expired/)
-  assert.equal(calls.filter(call => call.kind === 'claim').length, before, 'revoked session cannot reach grant renewal')
+  assert.equal(calls.filter(call => call.kind === 'check').length, before, 'revoked session cannot reach the grant check')
 })

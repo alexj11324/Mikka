@@ -35,7 +35,7 @@ test('portable account files preserve owned bytes/versions and abort missing, al
     return response.body
   } } })
   const { accountExportFiles, accountExportBody } = await import('./export-files')
-  const { buildAccountExport } = await import('./export')
+  const { buildAccountExport, claimExport, isExportCurrent, releaseExport, reserveExport } = await import('./export')
   const { pool } = await import('../db')
   const { workspacePool } = await import('../workspace-db')
   const artifactIds: string[] = []
@@ -46,6 +46,22 @@ test('portable account files preserve owned bytes/versions and abort missing, al
     await database.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[owner, peer]])
     await Promise.all([database.end(), pool.end(), workspacePool.end()])
     server.closeAllConnections(); server.close()
+  })
+  await t.test('stream rechecks preserve the download timestamp and row version until the grant expires or is removed', async () => {
+    const start = new Date('2026-01-11T12:00:00Z')
+    const grant = await reserveExport(owner, start)
+    assert.ok(grant.ok)
+    assert.ok(await claimExport(owner, grant.token, start))
+    const readReceipt = async () => (await database.query('SELECT "downloadedAt", xmin::text AS revision FROM account_data_exports WHERE id=$1', [grant.id])).rows[0]
+    const receipt = await readReceipt()
+    const later = new Date(start.getTime() + 1_000)
+    assert.ok(await isExportCurrent(owner, grant.token, later))
+    assert.ok(await isExportCurrent(owner, grant.token, later))
+    assert.equal(await isExportCurrent(peer, grant.token, later), false)
+    assert.equal(await isExportCurrent(owner, grant.token, grant.expiresAt), false)
+    assert.deepEqual(await readReceipt(), receipt)
+    await releaseExport(owner, grant.id)
+    assert.equal(await isExportCurrent(owner, grant.token, later), false)
   })
   async function artifact(userId: string, versions: Buffer[], remote = false) {
     const id = randomUUID(); artifactIds.push(id)
