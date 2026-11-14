@@ -24,8 +24,9 @@ export async function waitForTerminal(stub, request) {
   const url = new URL(request.url)
   const runId = url.searchParams.get('runId')
   const timeout = Number(url.searchParams.get('timeoutMs'))
+  const resolveData = url.searchParams.get('resolveData')
   if (!runId || !Number.isFinite(timeout) || timeout < 0) return new Response(null, { status: 400 })
-  if (timeout === 0) return cbor(await stub.run(runId))
+  if (timeout === 0) return cbor(await stub.run(runId, resolveData))
   const reply = await stub.fetch(new Request(url, { headers: { upgrade: 'websocket' } }))
   const peer = reply.webSocket
   if (!peer) return reply
@@ -40,7 +41,7 @@ export async function waitForTerminal(stub, request) {
     peer.accept()
     timer = setTimeout(resolve, Math.min(timeout, 60_000))
     if (!request.signal.aborted) await wake
-    return cbor(await stub.run(runId))
+    return cbor(await stub.run(runId, resolveData))
   } finally {
     clearTimeout(timer)
     request.signal.removeEventListener('abort', resolve)

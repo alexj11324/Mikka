@@ -10,9 +10,9 @@ import { withTaskWorkspace } from '@/lib/task-workspace'
 import { workspaceListChanged } from '@/lib/live/lists'
 import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, isVolumeId, isVolumeVersionId } from './contract'
 import { driveBytes, driveSha256, readDriveBlobObject, recordDriveBlob, storeDriveBlob } from './blobs'
-import { applyDriveWrite, DriveError, readDriveHistory, readDriveVersion, restoreDriveVersion } from './store'
-import { createDriveVolume, DriveVolumeError, listDriveVolumes, readDriveVolume } from './volumes'
-import { driveErrorBody } from './http'
+import { applyDriveWrite, DriveError, readDriveFileHistory, readDriveHistory, readDriveVersion, restoreDriveVersion } from './store'
+import { createDriveVolume, listDriveVolumes, readDriveVolume } from './volumes'
+import { driveErrorResponse } from './http'
 
 const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }
 const digest = z.string().regex(/^[a-f0-9]{64}$/)
@@ -51,16 +51,6 @@ async function body(request: Request) {
   return JSON.parse(new TextDecoder().decode(await bytes(request, 16 * 1024 * 1024))) as unknown
 }
 
-/** User volumes remain private to their owner within the selected tenant.
- * Project sharing is a separate capability and is never inferred from a name. */
-async function ownedVolume(ownerId: string, workspaceId: string, id: string | undefined) {
-  if (!isVolumeId(id)) throw new DriveError('drive_not_found', 404)
-  const found = await pool.query(`SELECT id FROM drive_volumes WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3
-    AND "driveScope"='user' AND "scopeId"=$2`, [id, ownerId, workspaceId])
-  if (!found.rowCount) throw new DriveError('drive_not_found', 404)
-  return readDriveVolume(pool, { ownerId }, id)
-}
-
 /** First HTTP surface over the existing volume, CAS and object-store implementation. */
 export async function driveResponse(request: Request, operation: Operation, params: Params = {}): Promise<Response> {
   const session = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true } })
@@ -85,7 +75,7 @@ export async function driveResponse(request: Request, operation: Operation, para
         const volumes = result.slice(0, limit)
         return json({ volumes, nextCursor: result.length > limit ? volumes.at(-1)!.id : null })
       }
-      const volume = await ownedVolume(actor.ownerId, workspaceId, params.volumeId)
+      const volume = await readDriveVolume(pool, { ownerId: actor.ownerId, workspaceId }, params.volumeId)
       if (operation === 'volume') {
         // Read an immutable manifest named by the head receipt, so a concurrent
         // write cannot mix an old digest with a newer mutable entry tree.
@@ -95,7 +85,10 @@ export async function driveResponse(request: Request, operation: Operation, para
       if (operation === 'history') {
         const limit = z.coerce.number().int().min(1).max(100).parse(search.get('limit') ?? '50')
         const beforeId = search.has('before') ? versionId.parse(search.get('before')) : undefined
-        const versions = await readDriveHistory(pool, actor, volume.id, { limit: limit + 1, beforeId })
+        const options = { limit: limit + 1, beforeId }
+        const versions = search.has('path')
+          ? await readDriveFileHistory(pool, actor, volume.id, z.string().refine(isDrivePath).parse(search.get('path')), options)
+          : await readDriveHistory(pool, actor, volume.id, options)
         const page = versions.slice(0, limit)
         return json({ versions: page, nextCursor: versions.length > limit ? page.at(-1)!.id : null })
       }
@@ -126,15 +119,19 @@ export async function driveResponse(request: Request, operation: Operation, para
         return json({ sha256: blob.sha256, sizeBytes: blob.sizeBytes }, 201)
       }
       const path = z.string().refine(isDrivePath).parse(search.get('path'))
-      const selected = await readDriveVersion(pool, actor, volume.id, search.has('versionId') ? versionId.parse(search.get('versionId')) : volume.headVersionId)
-      const entry = selected.manifest.find(item => item.path === path)
-      if (!entry) throw new DriveError('drive_not_found', 404)
-      const { rows: [blob] } = await pool.query<{ inlineContent: Buffer | null; sizeBytes: number }>(
-        `SELECT "inlineContent","sizeBytes" FROM drive_blobs WHERE "ownerId"=$1 AND sha256=$2`, [actor.ownerId, entry.sha256])
-      if (!blob || blob.sizeBytes !== entry.sizeBytes) throw new DriveError('drive_not_found', 404)
-      if (blob.inlineContent && driveSha256(driveBytes(blob.inlineContent)) !== entry.sha256) throw new DriveError('drive_blob_size_mismatch', 422)
-      const content = blob.inlineContent ? driveBytes(blob.inlineContent) : await readDriveBlobObject(actor.ownerId, entry.sha256, request.signal)
-      return new Response(content, { headers: { ...headers, 'Content-Type': 'application/octet-stream', 'Content-Length': String(entry.sizeBytes),
+      const selectedVersion = search.has('versionId') ? versionId.parse(search.get('versionId')) : volume.headVersionId
+      const { rows: [blob] } = await pool.query<{ sha256: string; inlineContent: Buffer | null; sizeBytes: number }>(
+        `SELECT b.sha256, b."inlineContent", b."sizeBytes"
+         FROM drive_volume_versions v JOIN drive_volumes d ON d.id = v."volumeId"
+         CROSS JOIN LATERAL jsonb_array_elements(v.manifest) AS entry
+         JOIN drive_blobs b ON b.sha256 = entry->>'sha256' AND d."ownerId" = b."ownerId"
+         WHERE v.id = $1 AND v."volumeId" = $2 AND d."ownerId" = $3
+           AND entry->>'path' = $4 AND entry->'sizeBytes' = to_jsonb(b."sizeBytes")
+         LIMIT 1`, [selectedVersion, volume.id, actor.ownerId, path])
+      if (!blob) throw new DriveError('drive_not_found', 404)
+      if (blob.inlineContent && driveSha256(driveBytes(blob.inlineContent)) !== blob.sha256) throw new DriveError('drive_blob_size_mismatch', 422)
+      const content = blob.inlineContent ? driveBytes(blob.inlineContent) : await readDriveBlobObject(actor.ownerId, blob.sha256, request.signal)
+      return new Response(content, { headers: { ...headers, 'Content-Type': 'application/octet-stream', 'Content-Length': String(blob.sizeBytes),
         'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(path.split('/').at(-1)!)}` } })
     })
     // Both the file mutation and its membership lease have finished. The
@@ -144,8 +141,6 @@ export async function driveResponse(request: Request, operation: Operation, para
   } catch (error) {
     if (error instanceof z.ZodError || error instanceof SyntaxError) return json({ error: 'drive_write_invalid' }, 400)
     if (error instanceof ActionFailureError && error.code === 'workspaceAccessDenied' || error instanceof WorkspaceError && error.code === 'workspaceAccessDenied') return json({ error: 'drive_not_found' }, 404)
-    if (error instanceof DriveError) return json(driveErrorBody(error), error.status)
-    if (error instanceof DriveVolumeError) return json({ error: error.code }, error.status)
-    throw error
+    return driveErrorResponse(error, headers)
   }
 }

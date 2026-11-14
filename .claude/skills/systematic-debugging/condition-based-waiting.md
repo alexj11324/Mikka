@@ -79,7 +79,7 @@ async function waitFor<T>(
 }
 ```
 
-See `condition-based-waiting-example.ts` in this directory for complete implementation with domain-specific helpers (`waitForEvent`, `waitForEventCount`, `waitForEventMatch`) from actual debugging session.
+Use a bounded assertion in the test harness. Register the response or event listener before the triggering action so a fast acknowledgement is captured. Mikka product code follows the existing live subscription and idle-request budget.
 
 ## Common Mistakes
 

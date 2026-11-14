@@ -87,6 +87,13 @@ export function observePoolCommits(pool: Pool) {
   pool.on('release', (_error, client) => { const state = (client as ObservedClient)[STATE]; if (state) reset(state) })
 }
 
+/** Keep an injected writer's checkout attached to its actual commit. Request
+ * proxies retain the physical pool or client already selected by their owner. */
+export function connectForCommitEffects(pool: Pick<Pool, 'connect'>): Promise<PoolClient> {
+  if (pool instanceof Pool) observePoolCommits(pool)
+  return pool.connect()
+}
+
 export function hasCommitEffect(client: PoolClient, key: string) {
   return (client as ObservedClient)[STATE]?.effects.has(key) ?? false
 }

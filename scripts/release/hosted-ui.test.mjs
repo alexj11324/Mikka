@@ -78,7 +78,20 @@ test('official jobs keep private code out of public artifacts and pin desktop to
     assert.equal(step.if, "github.event.inputs.cloudflare_receipt != ''")
     assert.equal(step.env.CLOUDFLARE_RECEIPT, '${{ github.event.inputs.cloudflare_receipt }}')
   }
-  const signing = desktop.jobs.macos.steps
+  const { preflight, macos } = desktop.jobs
+  const selectOverlay = preflight.steps.find(step => step.id === 'overlay')
+  assert.equal(selectOverlay.if, "github.event.inputs.cloudflare_receipt == ''")
+  assert.equal(preflight.outputs['overlay-sha'], '${{ steps.promoted.outputs.overlay-sha || steps.overlay.outputs.overlay-sha }}')
+  assert.equal(preflight.env.EXPECTED_UI_OVERLAY_SHA, '${{ inputs.overlay-sha }}')
+  assert.equal(macos.env.MIKKA_UI_OVERLAY_SHA, '${{ needs.preflight.outputs.overlay-sha }}')
+  const standaloneReads = macos.steps.filter(step => step.run?.includes('node scripts/release/hosted-ui.mjs production'))
+  assert.equal(standaloneReads.length, 1)
+  assert.equal(standaloneReads[0].if, "github.event.inputs.cloudflare_receipt == ''")
+  const signing = macos.steps
+  const legacyWait = signing.findIndex(step => step.run === 'node scripts/release/web-deploy.mjs await-desktop-web')
+  assert.equal(signing[legacyWait - 1], standaloneReads[0])
+  assert.equal(signing[legacyWait + 1], approved(macos)[1])
+  assert.ok(signing.findIndex(step => step.run?.includes('evidence.mjs verify')) < legacyWait)
   assert.ok(signing.indexOf(approved(desktop.jobs.macos)[0]) < signing.findIndex(step => step.uses?.startsWith('Infisical/')))
   assert.equal(signing.indexOf(approved(desktop.jobs.macos)[1]) + 1, signing.findIndex(step => step.uses?.startsWith('softprops/')))
   assert.ok(signing.some(step => step.run?.includes('evidence.mjs verify')))

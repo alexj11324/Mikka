@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import { measured, readMetrics } from './helpers/read-metrics'
 // Framework/session plumbing only; all writers, membership, stores and ACLs below are real.
 import './fixtures/activity-runtime.mjs'
 import { dbUrl, seedAgent, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
@@ -46,6 +47,37 @@ test('Task responsibility: actual actions, MCP compatibility, tenant denial and 
     assert.deepEqual(await snapshot(), before, 'refusal changes no task, history, invitation or approval')
   }
   try {
+    await t.test('MCP detail returns only the visible relationship graph when unrelated tasks grow', async t => {
+      const create = async (attrs: Record<string, unknown> = {}, user = owner, workspaceId = alpha.id) => {
+        const id = await seedIssue(pool, user, workspaceId, { registered: true })
+        taskIds.push(id)
+        await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [id, { type: 'doc', attrs }])
+        return id
+      }
+      const parent = await create(), blocker = await create(), related = await create(), duplicate = await create()
+      const hidden = await create({}, owner, beta.id)
+      const subject = await create({ mikka: { parentId: parent, blockedByIds: [blocker], relatedIds: [related, hidden], duplicateOfId: duplicate } })
+      const child = await create({ mikka: { parentId: subject } })
+      const blocked = await create({ mikka: { blockedByIds: [subject] } })
+      await create({ mikka: { parentId: subject, labels: 'invalid' } })
+      const read = () => measured(() => scoped(() => readToolIssue(owner, subject)))
+      await read()
+      const before = await read()
+      for (let i = 0; i < 16; i++) await create({ mikka: { fixture: 'irrelevant'.repeat(1024) } })
+      const after = await read()
+      assert.ok(before.value && after.value)
+      assert.deepEqual(after.value, before.value)
+      const relations = after.value.relations
+      assert.equal(relations.parent?.id, parent)
+      assert.equal(relations.duplicateOf?.id, duplicate)
+      assert.deepEqual(relations.children.map(row => row.id), [child])
+      assert.deepEqual(relations.blockedBy.map(row => row.id), [blocker])
+      assert.deepEqual(relations.blocks.map(row => row.id), [blocked])
+      assert.deepEqual(relations.related.map(row => row.id), [related])
+      t.diagnostic('MCP detail PostgreSQL result bytes before/after unrelated tasks: ' + before.resultBytes + '/' + after.resultBytes)
+      assert.equal(after.resultBytes, before.resultBytes, 'unrelated task metadata must stay in PostgreSQL')
+    })
+
     await t.test('Board unblocks and moves a Task in the same revision read by Task detail', async () => {
       const flag = await save({ block: { blocked: true, runId: null } })
       assert.ok('issue' in flag && flag.issue, JSON.stringify(flag))
@@ -80,7 +112,12 @@ test('Task responsibility: actual actions, MCP compatibility, tenant denial and 
       assert.equal(toolView?.identifier, result.issue.identifier)
       assert.equal(toolView?.assignee?.id, member)
       assert.equal(toolView?.delegate?.id, ownAgent)
-      assert.equal((await scoped(() => listToolIssues(owner, {}))).find(task => task.id === taskId)?.identifier, result.issue.identifier)
+      const resultPage = await measured(() => scoped(() => listToolIssues(owner, {})))
+      t.diagnostic('Authorized MCP task list '+JSON.stringify(readMetrics(resultPage)))
+      const item = resultPage.value.find(task => task.id === taskId)
+      assert.equal(item?.identifier, result.issue.identifier)
+      assert.equal(Object.hasOwn(item!, 'issuedIdentifier'), false)
+      assert.equal(resultPage.statements, 2, 'one current workspace lookup and one authorized list read for issued tasks')
     })
 
     await t.test('legacy MCP assignment and clearing affect delegation only', async () => {

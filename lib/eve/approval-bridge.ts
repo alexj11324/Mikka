@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { snapshotDigest as digest } from '../operations/write-target'
 import type { NativeWriteDecision, NativeWriteReview } from '../operations/native-write-review'
 import { isEveApprovalResponder, type ApprovalPrincipal } from './approval-principal'
 export { isEveApprovalResponder, type ApprovalPrincipal } from './approval-principal'
@@ -19,12 +19,6 @@ export interface ApprovalStore {
   finish(key:string,output:unknown):Promise<void>
 }
 const writes = new Set(['call_app_tool','send_email','create_calendar_event','update_calendar_event','append_notion_paragraph','send_slack_message','cancel_calendar_event'])
-function canonical(value:unknown):unknown {
-  if(Array.isArray(value))return value.map(canonical)
-  if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([,v])=>v!==undefined).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>[k,canonical(v)]))
-  return value
-}
-const digest=(value:unknown)=>createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex')
 const keyOf=(call:ApprovalCall)=>digest([call.ownerId,call.sessionId,call.turnId,call.callId])
 
 /** The gateway authenticates the service and session/source before entering this

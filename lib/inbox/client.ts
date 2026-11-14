@@ -17,16 +17,25 @@ async function inboxRequest(version: number, path: string, init: RequestInit) {
   return data
 }
 
-/** A delayed or unavailable refresh can still display this scope's last authorized value. */
-export function readableInboxCount(count: number | undefined, error: unknown): number | undefined {
-  return readAccessFailure(error) ? undefined : count
+type InboxCounts = { count: number; suggestionCount?: number }
+
+/** Older cached reads contain only the rail count. The page total requires a successful read of both counts. */
+export function readableInboxCount(data: InboxCounts | number | undefined, error: unknown) {
+  if (data === undefined || readAccessFailure(error)) return undefined
+  if (typeof data === 'number') return { count: data, pendingCount: undefined }
+  const pendingCount = !error && data.suggestionCount !== undefined ? data.count + data.suggestionCount : undefined
+  return { count: data.count, pendingCount }
 }
 
-export async function readInboxCount(workspaceId: string, version: number): Promise<number> {
+export async function readInboxCount(workspaceId: string, version: number): Promise<InboxCounts> {
   const query = new URLSearchParams({ workspaceId, count: '1' })
   const result = await inboxRequest(version, '/api/inbox?' + query, {})
   if (!Number.isSafeInteger(result?.count) || result.count < 0) throw new InboxRequestError('actionFailed', 0)
-  return result.count
+  const { count, suggestionCount } = result
+  if (suggestionCount !== undefined && (!Number.isSafeInteger(suggestionCount) || suggestionCount < 0 || !Number.isSafeInteger(count + suggestionCount))) {
+    throw new InboxRequestError('actionFailed', 0)
+  }
+  return { count, suggestionCount }
 }
 
 export async function readInboxPage(workspaceId: string, tab: InboxTab, cursor: string | null, version: number): Promise<InboxPage> {

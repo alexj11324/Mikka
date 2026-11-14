@@ -25,19 +25,19 @@ export function createPortableScratchProvider(getStore:()=>Promise<ScratchStore>
   return {
     async prepare(ctx:SandboxPrepareContext):Promise<Artifact> {
       let snapshot=emptyScratchSnapshot()
-      const connection=scratchConnection(async work=>{const result=await work(snapshot);snapshot=result.snapshot;return result.value})
+      const connection=scratchConnection(async work=>{const result=await work(snapshot);snapshot=result.snapshot ?? snapshot;return result.value})
       try {await ctx.populate(connection)}finally {await connection.close?.()}
       return {version:1,templateKey:ctx.templateKey({version:1,engine:'just-bash-3.6.0'}),snapshot}
     },
     async start(ctx:SandboxSessionContext,_options:undefined,artifact:Readonly<Artifact>) {
       if(artifact.version!==1||artifact.snapshot.version!==1)throw new Error('operationBindingConflict')
       const id=identity(ctx),store=await getStore()
-      await store.mutate(id,artifact.snapshot,async snapshot=>({snapshot,value:undefined}))
+      await store.mutate(id,artifact.snapshot,async()=>({value:undefined}))
       return {connection:connect(id),state:{version:1 as const,...id}}
     },
     async resume(ctx:SandboxSessionContext,_artifact:Readonly<Artifact>,state:Readonly<State>) {
       const id=identity(ctx,state)
-      await (await getStore()).mutate(id,undefined,async snapshot=>({snapshot,value:undefined}))
+      await (await getStore()).mutate(id,undefined,async()=>({value:undefined}))
       return connect(id)
     },
     async onSessionEnd(ctx:SandboxSessionContext,state:Readonly<State>|null,_options:SandboxSessionEndOptions) {

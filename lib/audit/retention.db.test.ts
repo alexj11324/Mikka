@@ -1,10 +1,34 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
-import { Pool } from 'pg'
+import { Pool, type PoolClient } from 'pg'
 import { dbUrl, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import { applyAuditRetention, configureAuditRetention, readAuditRetention, sweepAuditRetention } from './retention'
 import { createAuditExport } from './export'
+
+test('failed main checkout returns the workspace connection for each audit operation', { skip: !dbUrl }, async t => {
+  const main = new Pool({ connectionString: dbUrl }), workspace = new Pool({ connectionString: dbUrl, max: 1 })
+  const database = { main, workspace }
+  // The ended pool reports a real pg checkout error before any transaction begins.
+  await main.end()
+  const checkedOut = new Set<PoolClient>()
+  workspace.on('acquire', client => checkedOut.add(client))
+  workspace.on('release', (_error, client) => checkedOut.delete(client))
+  t.after(async () => {
+    for (const client of checkedOut) client.release()
+    await workspace.end()
+  })
+  const now = new Date()
+  const operations = [
+    () => createAuditExport('admin', 'workspace', 'all', now, 10, database),
+    () => configureAuditRetention('admin', 'workspace', { retentionDays: 30, legalHold: true }, database),
+    () => applyAuditRetention('workspace', now, database),
+  ]
+  for (const operation of operations) {
+    await assert.rejects(operation, /Cannot use a pool after calling end/)
+    assert.equal(workspace.idleCount, 1)
+  }
+})
 
 test('audit retention requires an explicit admin policy, honors hold/export leases and audits destructive work atomically', { skip: !dbUrl }, async t => {
   const main = new Pool({ connectionString: dbUrl, max: 5 }), workspace = new Pool({ connectionString: dbUrl, max: 5 }), database = { main, workspace }

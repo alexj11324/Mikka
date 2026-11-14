@@ -6,12 +6,16 @@ import { SWRConfig } from 'swr'
 import { Window } from 'happy-dom'
 
 let password: { hasPassword: boolean } | { error: string } | Error
+let sessions: { sessions: { id: string; label: string; current: boolean; lastActiveAt: string }[] } | { error: string } | Error
 const actions: string[] = []
 let reads = 0
 mock.module('next-intl', { namedExports: { useLocale: () => 'en', useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
 mock.module('@/lib/use-action-error', { namedExports: { useActionError: () => () => 'Read failed' } })
 mock.module('@/lib/settings-read', { namedExports: { settingsRead: async (read: string) => {
-  if (read === 'sessions') return { sessions: [] }
+  if (read === 'sessions') {
+    if (sessions instanceof Error) throw sessions
+    return sessions
+  }
   reads++
   if (password instanceof Error) throw password
   return password
@@ -36,7 +40,7 @@ before(async () => {
   ;({ SecuritySettings } = await import('@/components/settings/security-settings'))
 })
 beforeEach(() => {
-  password = new Error('offline'); reads = 0; actions.length = 0
+  password = new Error('offline'); sessions = { sessions: [] }; reads = 0; actions.length = 0
   container = browser.document.createElement('div') as unknown as HTMLDivElement
   document.body.append(container); root = createRoot(container)
 })
@@ -82,3 +86,50 @@ test('only a confirmed password-free account can choose set password', async () 
   await act(async () => { assert.equal(await security.savePassword({ current: '', next: 'new-password', revokeOthers: false }), null) })
   assert.deepEqual(actions, ['set'])
 })
+
+
+test('a failed password recheck withdraws the cached password action until retry', async () => {
+  password = { hasPassword: true }
+  await render()
+  assert.equal(security.hasPassword, true)
+  password = new Error('offline')
+  await act(async () => { await security.reloadPassword() })
+  assert.equal(security.hasPassword, null)
+  assert.ok(!container.textContent?.includes('Settings.security.changePassword'))
+  assert.equal(await security.savePassword({ current: 'previous', next: 'new-password', revokeOthers: false }), 'Read failed')
+  assert.deepEqual(actions, [])
+  password = { hasPassword: true }
+  const retry = [...container.querySelectorAll('button')].find(button => button.textContent === 'Common.retry')
+  assert.ok(retry)
+  await act(async () => retry.click())
+  await settle()
+  assert.equal(security.hasPassword, true)
+})
+
+for (const failure of ['network', 'action'] as const) {
+  test(`a failed ${failure} device recheck withdraws cached sign-out controls and retries only the session list`, async () => {
+    const device = { id: 'other', label: 'Other browser', current: false, lastActiveAt: new Date().toISOString() }
+    sessions = { sessions: [{ ...device, id: 'current', current: true }, device] }
+    password = { hasPassword: true }
+    await render()
+    const section = container.querySelector('[aria-labelledby="devices-heading"]')!
+    assert.ok(section.textContent?.includes(device.label))
+    assert.ok(section.textContent?.includes('Settings.security.signOutOthers'))
+    sessions = failure === 'network' ? new Error('offline') : { error: 'readFailed' }
+    await act(async () => { await security.reloadDevices() })
+    assert.deepEqual(security.devices, [])
+    assert.ok(!section.textContent?.includes(device.label))
+    assert.ok(!section.textContent?.includes('Settings.security.signOut'))
+    const retry = [...section.querySelectorAll('button')].find(button => button.textContent === 'Common.retry')
+    assert.ok(retry)
+    sessions = { sessions: [{ ...device, id: 'current', current: true }] }
+    const passwordReads = reads
+    await act(async () => retry.click())
+    await settle()
+    assert.equal(security.devices.length, 1)
+    assert.equal(reads, passwordReads)
+    assert.equal(security.devicesError, null)
+    assert.ok(section.textContent?.includes('Settings.security.currentDevice'))
+    assert.ok(!section.textContent?.includes('Settings.security.signOut'))
+  })
+}

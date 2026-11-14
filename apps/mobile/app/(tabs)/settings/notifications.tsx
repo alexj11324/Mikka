@@ -3,6 +3,7 @@ import { SettingsPage, ToggleRow } from '@/components/settings'
 import { Group } from '@/components/ui'
 import { PushRow } from '@/components/PushRow'
 import { PreferenceSaveNotice } from '@/components/PreferenceSaveNotice'
+import { mobileMessages as messages } from '@/lib/messages'
 import { askForPush } from '@/lib/push-state'
 import { useSettings } from '@/lib/settings'
 import type { Preferences } from '@/lib/types'
@@ -14,22 +15,24 @@ import type { Preferences } from '@/lib/types'
  */
 export default function NotificationsScreen() {
   const { data, savePreferences, preferenceSave } = useSettings()
+  const title = messages.Settings.sections.notifications.title
+  const copy = messages.Settings.notifications
   const p = data?.preferences
-  if (!p) return <SettingsPage title="通知"><View /></SettingsPage>
+  if (!p) return <SettingsPage title={title}><View /></SettingsPage>
   // Turning a push on is the moment to ask iOS, if it has not been asked yet.
   const save = (patch: Partial<Preferences>) => {
     if (Object.values(patch).includes(true)) void askForPush()
     void savePreferences(patch)
   }
   return (
-    <SettingsPage title="通知">
+    <SettingsPage title={title}>
       <PushRow proactive={p.proactive} ask />
-      <Group><ToggleRow label="主动消息" value={p.proactive} disabled={preferenceSave.status !== 'idle'} onChange={proactive => save({ proactive })} /></Group>
+      <Group><ToggleRow label={copy.proactive} value={p.proactive} disabled={preferenceSave.status !== 'idle'} onChange={proactive => save({ proactive })} /></Group>
       {p.proactive ? (
-        <Group label="推送这些事">
-          <ToggleRow label="需要你决策" value={p.pushDecide} disabled={preferenceSave.status !== 'idle'} onChange={pushDecide => save({ pushDecide })} />
-          <ToggleRow label="线程完成" value={p.pushFinished} disabled={preferenceSave.status !== 'idle'} onChange={pushFinished => save({ pushFinished })} />
-          <ToggleRow label="每日简报" value={p.pushBriefing} disabled={preferenceSave.status !== 'idle'} onChange={pushBriefing => save({ pushBriefing })} />
+        <Group label={messages.MobileCore.notifications.pushTypes}>
+          <ToggleRow label={copy.pushDecide} value={p.pushDecide} disabled={preferenceSave.status !== 'idle'} onChange={pushDecide => save({ pushDecide })} />
+          <ToggleRow label={copy.pushFinished} value={p.pushFinished} disabled={preferenceSave.status !== 'idle'} onChange={pushFinished => save({ pushFinished })} />
+          <ToggleRow label={copy.pushBriefing} value={p.pushBriefing} disabled={preferenceSave.status !== 'idle'} onChange={pushBriefing => save({ pushBriefing })} />
         </Group>
       ) : null}
       <PreferenceSaveNotice />

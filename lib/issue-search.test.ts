@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { issues } from '@/lib/db/schema'
-import { canEditIssueRelation, encodeCursor, escapeLike, existingRelation, idIn, parseSearchParams, parseSearchQuery, relationClosureQuery, RELATION_DEPTH_LIMIT, SearchInputError } from '@/lib/issue-search'
+import { encodeCursor, escapeLike, existingRelation, idIn, parseSearchParams, parseSearchQuery, relationClosureQuery, RELATION_DEPTH_LIMIT, SearchInputError } from '@/lib/issue-search'
 
 const A = '00000000-0000-4000-8000-00000000000a', B = '00000000-0000-4000-8000-00000000000b'
 const rejects = (fn: () => unknown, code: string) => assert.throws(fn, (error: unknown) => error instanceof SearchInputError && error.code === code)
@@ -60,13 +60,6 @@ test('existingRelation reports every kind and prefers relationKind', () => {
   assert.equal(existingRelation(plain, { id: B, metadata: { relatedIds: [A] } }), 'related')
   assert.equal(existingRelation({ ...plain, metadata: { duplicateOfId: B } }, { id: B, metadata: {} }), 'duplicate')
   assert.equal(existingRelation(plain, { id: B, metadata: {} }), null)
-})
-
-test('canEditIssueRelation: owner always, others need both memberships', () => {
-  assert.equal(canEditIssueRelation({ actorId: 'o', ownerId: 'o', currentId: A, targetId: B, memberIssueIds: [] }), true)
-  assert.equal(canEditIssueRelation({ actorId: 'm', ownerId: 'o', currentId: A, targetId: B, memberIssueIds: [A, B] }), true)
-  assert.equal(canEditIssueRelation({ actorId: 'm', ownerId: 'o', currentId: A, targetId: B, memberIssueIds: [A] }), false)
-  assert.equal(canEditIssueRelation({ actorId: 'm', ownerId: 'o', currentId: A, targetId: null, memberIssueIds: [A] }), true)
 })
 
 test('id lists bind as one = ANY array parameter, whatever the size', () => {

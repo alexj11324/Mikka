@@ -67,7 +67,8 @@ Bot and schedule. A search hit or chat dispatch card also opens the task.
 A task's detail has its number, title, property chips directly on the page,
 description and **活动**, oldest first. The creation uses a muted dot and
 each attempt its result icon on the continuous timeline. + 评论 opens the
-web task for writing a comment; there is no native comment write route.
+web task for writing a comment. The status and priority row opens the same
+authorized web detail, where the task’s existing permissions govern edits.
 
 A task has **one conversation** joining every attempt oldest first. Opening
 an attempt scrolls to its section, while opening the conversation normally

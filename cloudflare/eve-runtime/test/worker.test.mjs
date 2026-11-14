@@ -1,5 +1,13 @@
 import assert from 'node:assert/strict'
 import { beforeEach, mock, test } from 'node:test'
+import { readFile } from 'node:fs/promises'
+
+test('native traces keep private capability request headers out of invocation logs', async () => {
+  const config = JSON.parse(await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8'))
+  assert.equal(config.observability.enabled, true)
+  assert.equal(config.observability.traces.enabled, true)
+  assert.equal(config.observability.logs.invocation_logs, false)
+})
 
 const stateKey = 'mikka:eve-host:lifecycle:v1'
 const env = {

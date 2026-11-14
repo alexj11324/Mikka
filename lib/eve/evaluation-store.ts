@@ -13,7 +13,8 @@ export interface EvaluationPlan {
   instructions:string
   tools:ProductCatalogueEntry[]
 }
-export interface EvaluationBinding {id:string;session_id:string|null;plan:EvaluationPlan}
+interface EvaluationRoute {id:string;session_id:string|null}
+export interface EvaluationBinding extends EvaluationRoute {plan:EvaluationPlan}
 
 /** Host-only preparation. The frozen execution and selected proposal revision
  * must belong to the same evaluation; request JSON never supplies this plan. */
@@ -33,8 +34,11 @@ export async function createEvaluationBinding(pool:Pool,scope:EveScope,evaluatio
   return id
 }
 
-export async function loadEvaluationBinding(pool:Pool,scope:EveScope,id:string):Promise<EvaluationBinding|null> {
-  return (await pool.query<EvaluationBinding>(`SELECT b.id,b.session_id,b.plan FROM eve_evaluations b
+export function loadEvaluationBinding(pool:Pool,scope:EveScope,id:string,view:'route'):Promise<EvaluationRoute|null>
+export function loadEvaluationBinding(pool:Pool,scope:EveScope,id:string,view?:'plan'):Promise<EvaluationBinding|null>
+export async function loadEvaluationBinding(pool:Pool,scope:EveScope,id:string,view:'route'|'plan'='plan'):Promise<EvaluationRoute|null> {
+  const columns = view === 'route' ? 'b.id,b.session_id' : 'b.id,b.session_id,b.plan'
+  return (await pool.query<EvaluationRoute>(`SELECT ${columns} FROM eve_evaluations b
     JOIN agent_kit_evaluations e ON e.id=b.evaluation_id AND e.owner_id=b.owner_id
     WHERE b.id=$1 AND b.owner_id=$2 AND b.bot_id=$3 AND b.workspace_id=$4`,[id,scope.ownerId,scope.botId,scope.workspaceId])).rows[0]??null
 }

@@ -5,10 +5,9 @@ import { vercelProtocolFixture } from "../../tests/helpers/factory-vercel";
 import {
   createVercelPublicationAdapter,
   createVercelClient,
-  configuredVercelPublicationAdapters,
   MIKKA_VERCEL,
   vercelTarget,
-} from "./vercel-publication";
+} from "../../tests/helpers/factory-vercel-publication";
 import {
   PublicationDeferred,
   publicationBindingHash,
@@ -264,16 +263,8 @@ test("no match stays uncertain, grant mismatch and missing token make no provide
     f.state.project.link.repoId = 1;
     await assert.rejects(() => a.execute(i), /factoryVercelIdentityMismatch/);
     assert.equal(f.posts(), 0);
-    assert.deepEqual(configuredVercelPublicationAdapters({}), []);
-    assert.throws(
-      () =>
-        configuredVercelPublicationAdapters({
-          FACTORY_VERCEL_PUBLICATION: "1",
-        }),
-      /factoryVercelCredentialUnavailable/,
-    );
     await assert.rejects(
-      () => createVercelClient(() => undefined).request("/v9/projects/x"),
+      () => createVercelClient(() => undefined, { testOrigin: f.origin }).request("/v9/projects/x"),
       /factoryVercelCredentialUnavailable/,
     );
   } finally {
@@ -311,6 +302,7 @@ test("transport rejects invalid JSON and HTTP failure; receipt cannot relabel pr
     new Response("not json", { status: 200 }),
   ]) {
     const c = createVercelClient(() => "fixture", {
+      testOrigin: "http://127.0.0.1",
       fetch: async () => response,
     });
     await assert.rejects(

@@ -2,6 +2,9 @@
 
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { useEffect, useId, useRef, useState } from 'react'
+import { useSWRConfig } from 'swr'
+import { useLiveScope } from '@/hooks/use-live-key'
+import { isTaskPresentationKey } from '@/lib/swr/keys'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { changeIssuePriority, getIssue, moveIssue, type listIssues } from '@/app/actions/issues'
@@ -37,6 +40,8 @@ export function useIssueBoardSaves({ issues, blocks, newestRuns, onUpdated, onBu
   onUpdated: () => Promise<unknown>
   onBusyChange: (busy: boolean) => void
 }) {
+  const { mutate } = useSWRConfig()
+  const viewer = useLiveScope()?.ownerId
   const t = useTranslations('Board')
   const tIssue = useTranslations('Issue')
   const tDetail = useTranslations('IssueDetail')
@@ -108,6 +113,9 @@ export function useIssueBoardSaves({ issues, blocks, newestRuns, onUpdated, onBu
         return false
       }
       const savedIssue = result.issue
+      if (viewer && issue.status !== savedIssue.status) {
+        void mutate(key => isTaskPresentationKey(key, viewer, savedIssue.workspaceId, issue.id))
+      }
       setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.map(item => item.id === issue.id ? { ...item, status: savedIssue.status, priority: savedIssue.priority, metadata: savedIssue.metadata, revision: savedIssue.revision, updatedAt: savedIssue.updatedAt } : item)])))
       const status = patch.block?.blocked ? BLOCKED_COLUMN : patch.status
       if (verifiedByRead) setMessage(t('changeVerified'))
@@ -216,9 +224,9 @@ export function useIssueBoardSaves({ issues, blocks, newestRuns, onUpdated, onBu
     return save(issue, from, to, columns)
   }
   function metadataBusy(busy: boolean) { saving.current = busy; setPending(busy); onBusyChange(busy) }
-  function metadataSaved(savedIssue: MetadataSavedIssue) {
-    setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.map(item => item.id === savedIssue.id ? { ...item, metadata: savedIssue.metadata, revision: savedIssue.revision, updatedAt: savedIssue.updatedAt } : item)])))
-    setMessage(t('propertiesSaved'))
+  function metadataSaved(savedIssue: MetadataSavedIssue, source: 'save' | 'refresh') {
+    setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.map(item => item.id === savedIssue.id && item.revision <= savedIssue.revision ? { ...item, metadata: savedIssue.metadata, revision: savedIssue.revision, updatedAt: savedIssue.updatedAt } : item)])))
+    setMessage(source === 'save' ? t('propertiesSaved') : '')
     void onUpdated().catch(() => {})
   }
   return { columns, setColumns, pending, dragging, setDragging, message, cardMotion, saving, changeStatus, changeBlock, changePriority, remove, commit, moveTo, metadataBusy, metadataSaved }

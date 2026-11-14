@@ -2,14 +2,14 @@ import 'server-only'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { pool } from '@/lib/db'
+import { DEVICE_NAME_MAX } from './device-name'
 import { deviceIsOnline } from '@/lib/device-presence'
 import { notifyDeviceWork } from '@/lib/device-gateway-notify'
 import { DEVICE_WORK_CHANNEL, notifyChannel } from '@/lib/db/listen'
 import { DEVICE_UNINSTALL_GRACE_MS, enqueueDeviceCommand } from '@/lib/device-management'
 import { ownerListChanged } from '@/lib/live/lists'
 
-/** Same limit as a device token's name (createDeviceToken). */
-export const DEVICE_NAME_MAX = 60
+export { DEVICE_NAME_MAX } from './device-name'
 
 /** Run states where the daemon may still be working on the device. */
 const LIVE_RUN_STATUSES = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing'] as const

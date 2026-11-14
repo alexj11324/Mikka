@@ -21,9 +21,16 @@ export const definitionSchema = z.object({
   misfire: z.enum(['skip', 'catch_up_once']), maxLatenessMinutes: z.number().int().min(1).max(10080),
   maxConcurrent: z.number().int().min(1).max(5).optional(),
 }).strict()
+export const SCHEDULE_PAGE_MAX = 100
+const scheduleCursor = z.templateLiteral([z.iso.datetime({ precision: 6 }), '/', z.uuid()])
+export const scheduleListInput = z.object({
+  limit: z.number().int().min(1).max(SCHEDULE_PAGE_MAX).optional(),
+  cursor: scheduleCursor.optional(),
+}).strict()
+
 export const commandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('create'), requestId: z.string().min(1).max(200), definition: definitionSchema }).strict(),
-  z.object({ action: z.literal('list') }).strict(),
+  scheduleListInput.extend({ action: z.literal('list') }),
   z.object({ action: z.literal('history'), scheduleId: z.uuid() }).strict(),
   z.object({ action: z.literal('update'), scheduleId: z.uuid(), version: z.number().int().positive(), definition: definitionSchema }).strict(),
   z.object({ action: z.enum(['pause', 'resume', 'cancel']), scheduleId: z.uuid(), version: z.number().int().positive() }).strict(),

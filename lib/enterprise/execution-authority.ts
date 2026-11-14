@@ -9,7 +9,7 @@ type Query = Pick<PoolClient, 'query'>
 type Runtime = { workflowRunId: string; workflowName: string; stepId: string }
 type Authority =
   | { source: 'cron'; secret: string }
-  | { source: 'eve'; authorization: string; sessionId: string; turnId: string; executionId?: string | null }
+  | { source: 'eve'; request: Request; sessionId: string; turnId: string; executionId?: string | null }
   | { source: 'recovery'; runtime: Runtime }
   | { source: 'thread'; runtime: Runtime; userId: string; workspaceId: string; runId: string }
 type HeldAuthority = Authority & { active: boolean; expiresAt: number }
@@ -52,16 +52,16 @@ async function runWithAuthority<T>(value: Authority, work: () => Promise<T>): Pr
   finally { held.active = false }
 }
 
-/** Only the internal product gateway supplies this signed service credential.
+/** Only the internal product gateway supplies the binding-authenticated request.
  * Session/turn labels alone never construct Enterprise execution authority. */
 export async function withEveProductAuthority<T>(
-  authorization: string | null,
+  request: Request | null,
   input: { sessionId: string; turnId: string; executionId?: string | null },
   work: () => Promise<T>,
 ): Promise<T> {
-  const { internalEveScope } = await import('@/lib/eve/auth')
-  if (!authorization || !internalEveScope(authorization)) throw new WorkspaceError('workspaceAccessDenied')
-  return runWithAuthority({ source: 'eve', authorization, ...input }, work)
+  const { internalEveRequestScope } = await import('@/lib/eve/auth')
+  if (!request || !internalEveRequestScope(request)) throw new WorkspaceError('workspaceAccessDenied')
+  return runWithAuthority({ source: 'eve', request, ...input }, work)
 }
 
 /** Only the two authenticated recovery routes call this. Recheck the actual
@@ -121,8 +121,8 @@ export async function currentExecutionAuthority(userId: string, workspaceId: str
     if (!held.active || held.expiresAt <= Date.now()) return false
     if (held.source === 'cron') return held.secret === process.env.CRON_SECRET
     if (held.source === 'eve') {
-      const [{ internalEveScope }, { agentKitEnabled }] = await Promise.all([import('@/lib/eve/auth'), import('@/lib/agent-kit/config')])
-      const scope = internalEveScope(held.authorization)
+      const [{ internalEveRequestScope }, { agentKitEnabled }] = await Promise.all([import('@/lib/eve/auth'), import('@/lib/agent-kit/config')])
+      const scope = internalEveRequestScope(held.request)
       if (!scope || scope.ownerId !== userId || scope.workspaceId !== workspaceId) return false
       if (!held.executionId && agentKitEnabled()) return false
       const { rows } = await query.query(`SELECT 1 FROM eve_sessions s

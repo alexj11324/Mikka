@@ -65,6 +65,12 @@
   },
   "Issue": {
     "scope": {
+      "workspaceUnavailable": "Workspace unavailable",
+      "linearSync": "Linear sync",
+      "linearEnabled": "Enabled",
+      "disableLinear": "Turn off Linear sync",
+      "disableLinkedLinear": "Turn off sync and archive the linked Linear issue",
+      "linearDisabled": "Linear sync turned off.",
       "label": "Scope",
       "workspace": "Workspace",
       "personal": "Personal",
@@ -881,7 +887,7 @@
     "title": "Devices",
     "description": "Connected computers and their available tools.",
     "summary": "{total} devices on this page · {online} online",
-    "listError": "Could not refresh the device list. The previous results are kept.",
+    "listError": "Could not load your devices.",
     "emptyTitle": "No devices yet",
     "emptyDescription": "Install and start Mikka on a computer. It will appear here when it connects.",
     "footer": "A passing check means the latest availability check succeeded; it does not mean the tool is running. Wait for a new result after a check expires.",
@@ -1048,7 +1054,7 @@
     "toggleSidebar": "Expand or collapse the sidebar",
     "breadcrumb": "Current location",
     "openSearch": "Open global search",
-    "listError": "Could not refresh the list. The previous results are kept.",
+    "listError": "Could not load the task list.",
     "taskStatesReadFailed": "Could not load task states. Try again.",
     "searchPlaceholder": "Search tasks…",
     "taskView": "Task view",
@@ -1704,6 +1710,41 @@
     "backToAccessible": "Back to an accessible workspace"
   },
   "Projects": {
+    "lifecycle": {
+      "actions": "Project actions",
+      "impact": "Project impact",
+      "archived": "Archived",
+      "archive": "Archive project",
+      "restore": "Restore project",
+      "delete": "Delete project",
+      "deleteNamed": "Delete {name}?",
+      "permanent": "This permanently removes the project.",
+      "confirmName": "Type {name} to confirm deletion",
+      "archiveHint": "Archiving keeps tasks and history. Restore the project to resume work.",
+      "restoreHint": "Restoring allows new work in this project.",
+      "deleteBlocked": "Only an empty project without history can be deleted.",
+      "noLinks": "No linked items or history.",
+      "loadFailed": "The project impact could not be verified. Refresh and try again.",
+      "saveFailed": "The change could not be confirmed. Refresh the project and try again.",
+      "loading": "Checking project impact…",
+      "counts": {
+        "teams": "Teams",
+        "members": "Members",
+        "repositories": "Repository bindings",
+        "environments": "Environment bindings",
+        "events": "Project activity",
+        "resourceEvents": "Resource activity",
+        "incomingDependencies": "Projects depending on this project",
+        "runs": "Runs",
+        "activeRuns": "Active runs",
+        "factoryTasks": "Factory tasks",
+        "decisions": "Decisions",
+        "tasks": "Tasks",
+        "dependencies": "Dependencies",
+        "milestones": "Milestones",
+        "legacyTaskReferences": "Legacy task links"
+      }
+    },
     "title": "Projects",
     "teamTitle": "{team} · Projects",
     "newProject": "New project",
@@ -4782,6 +4823,9 @@
       "open": "Open {name}",
       "download": "Download {name}",
       "remove": "Remove {name}",
+      "removeFailed": "Could not remove {name}",
+      "retryRemoval": "Retry",
+      "keep": "Keep attachment",
       "retry": "Retry uploading {name}",
       "errors": {
         "unsupported": "Unsupported file format",
@@ -6407,6 +6451,19 @@
     "renderHint": "Retry to reopen the view."
   },
   "Organization": {
+    "domains": {
+      "discover": "Organizations you can join",
+      "join": "Join",
+      "manage": "Join by email domain",
+      "hint": "Allow the domain of your verified work email so people with that domain can join as members.",
+      "domain": "Email domain",
+      "add": "Allow domain",
+      "remove": "Remove {domain}",
+      "empty": "No domains allowed",
+      "joined": "Joined {name}",
+      "added": "Allowed {domain}",
+      "removed": "Removed {domain}. Existing members keep their membership."
+    },
     "serviceKeys": {
       "title": "Organization service keys",
       "empty": "No organization-bound service keys in the workspaces you administer.",
@@ -6711,7 +6768,8 @@
         "kinds": {
           "subscription": "Model subscription",
           "api_key": "API key",
-          "mcp": "MCP server"
+          "mcp": "MCP server",
+          "skill": "Skill"
         },
         "status": {
           "pending": "Pending",
@@ -7294,9 +7352,15 @@
     "deleteTeam": "Delete team",
     "deleteConfirm": "Type {name} to confirm",
     "deleteTitle": "Delete {name}?",
-    "deleteImpact": "{tasks, plural, one {# task} other {# tasks}} and {projects, plural, one {# project} other {# projects}} go with it. A project shared with another team only loses the link.",
-    "deleteCounting": "Counting what goes with it…",
+    "deleteImpact": "{tasks, plural, one {# task} other {# tasks}} and {projects, plural, one {# project} other {# projects}} are linked to this team. Permanent deletion requires an empty team with no execution history.",
+    "deleteCounting": "Checking team links and execution history…",
     "deleting": "Deleting…",
+    "ungroup": "Remove grouping…",
+    "ungroupTitle": "Remove {name} as a team grouping?",
+    "ungroupImpact": "{tasks, plural, one {# task becomes} other {# tasks become}} ungrouped in this workspace. {projects, plural, one {# project loses} other {# projects lose}} this team link. The tasks, projects and their history are kept.",
+    "ungroupConfirm": "Remove grouping",
+    "ungroupPending": "Removing grouping…",
+    "teamUngrouped": "{name} grouping removed.",
     "teamDeleted": "{name} deleted."
   },
   "HostedSettings": {
@@ -7364,6 +7428,19 @@
     }
   },
   "MobileCore": {
+    "notifications": {
+      "on": "On",
+      "off": "Off",
+      "pushTypes": "Send notifications for",
+      "unavailable": "Push notifications are unavailable",
+      "openSettings": "Open settings",
+      "allow": "Allow notifications",
+      "savingOn": "Turning on",
+      "savingOff": "Turning off",
+      "unconfirmedOn": "Not confirmed on",
+      "unconfirmedOff": "Not confirmed off",
+      "retrySave": "Retry save"
+    },
     "pin": "Pin",
     "unpin": "Unpin",
     "hide": "Hide",
@@ -7378,6 +7455,8 @@
     "message": "Message",
     "replySelection": "Reply to selected text",
     "messageTask": "Message this task",
+    "messageThread": "Message this thread",
+    "lastThreadStatus": "Last status: {status}",
     "noTasks": "No tasks",
     "notStarted": "Not started",
     "allTasks": "All tasks",
@@ -7426,6 +7505,7 @@
     "priority": "{priority} priority",
     "noPriority": "No",
     "activity": "Activity",
+    "taskPropertiesOnWeb": "Status and priority (web)",
     "comment": "+ Comment",
     "conversation": {
       "fix": "Fix",
@@ -7474,10 +7554,17 @@
     "history": "Version history",
     "currentVersion": "Current version",
     "version": "Version {seq} · {count} files · {date}",
+    "fileHistoryAction": "File version history",
+    "chooseFile": "Choose a file",
+    "fileHistory": "Version history for {name}",
+    "fileVersion": "Version {seq} · {date}",
+    "fileDeleted": "Deleted",
+    "downloadVersion": "Download version {seq}",
+    "fileHistoryEmpty": "No versions for this file.",
     "moreVersions": "More versions",
     "moreFolders": "More folders",
     "restore": "Restore version",
-    "restoreTitle": "Restore this version?",
+    "restoreTitle": "Restore the entire folder to this version?",
     "replace": "Replace files",
     "replaceTitle": "Replace files with the same names?",
     "conflict": "These files changed. Review the latest version before trying again.",

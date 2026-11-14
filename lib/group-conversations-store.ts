@@ -1,3 +1,4 @@
+import { connectForCommitEffects } from './db/commit-effects'
 import { ChatFileError } from '@/lib/chat-attachments/extract'
 import { splitChatFiles } from '@mikka/protocol/chat-attachments'
 import { isDeepStrictEqual } from 'node:util'
@@ -47,7 +48,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
       if (!['https:', 'http:'].includes(origin.protocol) || origin.host !== req.host) return fail(403)
     }
     if (req.id && !z.uuid().safeParse(req.id).success) return fail(404)
-    client = await pool.connect()
+    client = await connectForCommitEffects(pool)
     await client.query('BEGIN')
     const q = client.query.bind(client)
     let result: unknown
