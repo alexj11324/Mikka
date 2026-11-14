@@ -17,7 +17,7 @@ import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { SettingRow, SettingsLoading, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
+import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { SECRET_NOTE_MAX } from '@/lib/secrets/format'
 import { secretActionAllowed, type WorkspaceRole } from '@/lib/secrets/permissions'
 import type { WorkspaceSecretView } from '@/lib/secrets/store'
@@ -38,6 +38,7 @@ type Saved = { notice: string | null } | null
  */
 export function SecretsSettings({ workspaceId, workspaceName }: { workspaceId: string; workspaceName?: string }) {
   const t = useTranslations('Settings.secrets')
+  const common = useTranslations('Common')
   const locale = useLocale()
   const list = useWorkspaceSecrets(workspaceId)
   const [filter, setFilter] = useState<Filter>('all')
@@ -54,7 +55,7 @@ export function SecretsSettings({ workspaceId, workspaceName }: { workspaceId: s
       <Button {...settingsSectionAction} onClick={() => open({ kind: 'new' })}>{t('add')}</Button>
     </> : undefined}>
       {list.loading && <SettingsLoading label={t('loading')} rows={2} bare />}
-      {list.error && <FieldError className="px-5 py-4">{list.error}</FieldError>}
+      {list.error && <SettingsSaveError message={list.error} retryLabel={common('retry')} onRetry={list.reload} />}
       {/* Empty: the state as a title and Add as the one primary move; Bulk add stays beside it (UI audit settings2-05). */}
       {secrets?.length === 0 && role && <div className="flex flex-col items-start gap-3 px-5 py-6">
         <p className="text-sm font-medium">{t('empty')}</p>
