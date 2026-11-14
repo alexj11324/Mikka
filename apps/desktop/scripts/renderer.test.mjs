@@ -333,6 +333,17 @@ test('viewer HTTP seam retains shared response errors and routes ordinary reques
   const { computerRequest } = await moduleFrom({ entry: 'computer-request.ts', plugins: [applicationBoundary(new Map())] })
   await assert.rejects(computerRequest('/api/bots/bot-id/computer/viewer', { method: 'POST', json: { mode: 'view' } }), error => error.status === 403 && error.body.error === 'computer_not_available')
   assert.deepEqual(calls[0], { botId: 'bot-id', mode: 'view' })
+  // Invalid percent escapes are untrusted route values: preserve the shared
+  // typed 400 response without calling the privileged local viewer bridge.
+  for (const malformed of ['%', '%FF', '%E0%A4%A']) {
+    for (const endpoint of ['viewer', 'takeover']) {
+      await assert.rejects(
+        computerRequest(`/api/bots/${malformed}/computer/${endpoint}`, { method: 'POST', json: { mode: 'view' } }),
+        error => error.status === 400 && error.body?.error === 'invalid_request' && error.cause instanceof URIError,
+      )
+    }
+  }
+  assert.equal(calls.length, 1, 'malformed bot IDs cannot reach the viewer IPC')
   assert.deepEqual(await computerRequest('/api/bots/bot-id/computer'), { machine: 'sleeping' })
   assert.equal(calls[1].path, '/mikka/api/bots/bot-id/computer')
 }))
