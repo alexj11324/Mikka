@@ -41,7 +41,7 @@ test('portable account files preserve owned bytes/versions and abort missing, al
   const artifactIds: string[] = []
   t.after(async () => {
     await database.query('DELETE FROM artifacts WHERE id=ANY($1::uuid[])', [artifactIds])
-    await database.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[])', [[ownerRun, peerRun]])
+    await database.query('DELETE FROM agent_runs WHERE "userId"=ANY($1::text[])', [[owner, peer]])
     await database.query('DELETE FROM agents WHERE id=ANY($1::uuid[])', [[ownerAgent, peerAgent]])
     await database.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[owner, peer]])
     await Promise.all([database.end(), pool.end(), workspacePool.end()])
@@ -93,7 +93,15 @@ test('portable account files preserve owned bytes/versions and abort missing, al
   await database.query(`INSERT INTO run_captures(id,"userId","runId",kind,"contentType",source,status,title,"storageKey",sha256,size) VALUES($1,$2,$3,'image','image/png','local','ready','Owned capture',$4,$5,$6)`, [captureId, owner, ownerRun, captureKey, hash(capture), capture.length])
   await database.query('INSERT INTO run_checkpoints("runId","userId","baseCommit",patch,files,"takenAt","updatedAt") VALUES($1,$2,$3,$4,1,$5,$6)', [ownerRun, owner, baseCommit, patch, takenAt, updatedAt])
   await database.query('INSERT INTO run_checkpoints("runId","userId","baseCommit",patch,files,"takenAt") VALUES($1,$2,$3,$4,1,now())', [peerRun, peer, 'b'.repeat(40), gzipSync('peer private checkpoint')])
+  const emptyRun = await seedRun(database, { userId: owner, agentId: ownerAgent })
+  await database.query(`INSERT INTO run_messages (id,"runId","userId",text,"createdAt") VALUES
+    (gen_random_uuid(),$1,$3,'second','2026-01-01T00:01Z'), (gen_random_uuid(),$1,$3,'first','2026-01-01T00:00Z'),
+    (gen_random_uuid(),$2,$4,'peer','2026-01-01T00:00Z')`, [ownerRun, peerRun, owner, peer])
   const data = await buildAccountExport(owner)
+  const thread = (id: string) => data.threads.find(row => 'id' in row && row.id === id)
+  assert.deepEqual(thread(ownerRun)?.messages.map(row => row.text), ['first', 'second'])
+  assert.deepEqual(thread(emptyRun)?.messages, [])
+  assert.equal(thread(peerRun), undefined)
   const options = { database, signal: new AbortController().signal, assertCurrent: async () => {} }
   await t.test('all owned versions, binary capture and masked checkpoint round-trip; peer object IDs never reach storage', async () => {
     const files = await accountExportFiles(owner, database)

@@ -106,13 +106,20 @@ export async function buildAccountExport(userId: string, now = new Date()) {
     .from(workspaceMembers).innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))
     .where(eq(workspaceMembers.userId, userId))
   const messagesByRun = new Map<unknown, Row[]>()
-  for (const message of threadMessages) messagesByRun.set(message.runId, [...messagesByRun.get(message.runId) ?? [], { text: message.text, createdAt: message.createdAt }])
+  const exportedThreads = threads.map(thread => {
+    const messages: Row[] = []
+    messagesByRun.set(thread.id, messages)
+    return { ...thread, messages }
+  })
+  for (const message of threadMessages) {
+    messagesByRun.get(message.runId)?.push({ text: message.text, createdAt: message.createdAt })
+  }
   return {
     format: 'mikka-account-export', version: 1, exportedAt: now.toISOString(),
     profile: profile ?? null,
     signInMethods, preferences: preferences[0] ?? null, timeZone: timeZone[0] ?? null,
     workspaces: memberships, bots, agents,
-    threads: threads.map(thread => ({ ...thread, messages: messagesByRun.get(thread.id) ?? [] })),
+    threads: exportedThreads,
     botMessages, tasks, memory, artifacts, savedLogins,
     connections: { integrations, linear, telegram, repositories, devices, subscriptions },
   }
