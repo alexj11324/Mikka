@@ -32,11 +32,13 @@ stub('../attention/store.ts',{releaseAttention:async()=>{}})
 stub('../default-model.ts',{defaultModelAvailable:async()=>true,cloudDecisionTarget:async()=>null})
 stub('./coordinator-bot.ts',{coordinatorBot:async()=>({botId:'fixture-bot',workspaceId:'fixture-workspace'})})
 stub('../db/index.ts',{pool:{query:async(sql:string)=>{
- if(sql.includes('SELECT id FROM coordinator_events'))return {rows:events.filter(e=>e.tier!==null&&e.tier!=='background').map(e=>({id:e.id}))}
- if(sql.includes('SELECT "workspaceId" FROM bots'))return {rows:[{workspaceId:'fixture-workspace'}]}
+ if(sql.includes('SELECT e.id, b."workspaceId" FROM coordinator_events e'))return {rows:events.filter(e=>e.tier!==null&&e.tier!=='background').map(e=>({id:e.id,workspaceId:'fixture-workspace'}))}
  throw new Error('Unexpected SQL in decision boundary fixture')
 }}})
-stub('../eve/server-client.ts',{sendEveEvent:async()=>{starts++}})
+stub('../eve/server-client.ts',{sendEveEvent:async(scope:unknown,id:string)=>{
+ assert.deepEqual(scope,{ownerId:'synthetic',botId:null,workspaceId:'fixture-workspace',surface:'web'})
+ assert.ok(events.some(event=>event.id===id));starts++
+}})
 let wake:typeof import('./wake'),group:typeof import('./route-group'),transport:typeof import('./decide')
 before(async()=>{
  console.error=()=>{}
