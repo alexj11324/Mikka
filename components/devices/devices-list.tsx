@@ -240,13 +240,16 @@ function DeviceGroup({ title, devices, onChanged, onReconnect }: { title: string
 /** 设置 › 设备's page as the open-source UI draws it; the slot settings-devices' default. */
 export function DevicesPageView({ devices, listError, onAdd, onChanged, onReconnect, localSetup }: SettingsDevicesProps) {
   const t = useTranslations('Devices')
+  const common = useTranslations('Common')
   return <div className="flex flex-col gap-6">
     <div className="flex items-center justify-between gap-3">
       <h1 className="text-xl font-semibold">{t('title')}</h1>
       <Button size="sm" variant="secondary" aria-keyshortcuts="Meta+N Control+N" onClick={onAdd}><Plus data-icon="inline-start" />{t('add.trigger')}</Button>
     </div>
     {localSetup}
-    {listError && <FieldError className="text-xs">{t('listError')}</FieldError>}
+    {listError && <FieldError className="flex items-center gap-2 text-xs">{t('listError')}
+      <Button size="sm" variant="secondary" onClick={onChanged}>{common('retry')}</Button>
+    </FieldError>}
     {/* Not read yet: rows' shapes, never 还没有设备 (review C6, R-39). A failed first read says only that. */}
     {!devices ? !listError && <div className="overflow-hidden rounded-xl border bg-card"><SettingsLoading bare label={t('loading')} /></div>
       : devices.length === 0 ? <Empty className="rounded-xl border"><EmptyHeader><EmptyTitle>{t('emptyTitle')}</EmptyTitle></EmptyHeader></Empty> : <>

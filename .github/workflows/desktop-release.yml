@@ -72,9 +72,10 @@ jobs:
   preflight:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    # Replace obsolete Web waits without interrupting an already signing app.
+    # Replace stale waits for the same release path. A receiptless push cannot
+    # cancel the protected Cloudflare preflight while it verifies promotion.
     concurrency:
-      group: ${{ github.ref == 'refs/heads/main' && 'desktop-release-preflight' || format('desktop-release-preflight-{0}', github.ref) }}
+      group: desktop-release-preflight-${{ github.ref }}-${{ inputs.cloudflare_receipt && 'promoted' || 'legacy' }}
       cancel-in-progress: true
     permissions:
       contents: read

@@ -24,7 +24,7 @@ import { LocalSetupStatus } from './local-setup-status'
 export function DevicesSettings(_props: { workspaceId?: string }) {
   const key = 'devices-settings'
   const { data, error, mutate } = useSWR(key, () => observeListRead(pollDevices))
-  const devices = data?.devices ?? []
+  const devices = error ? undefined : data?.devices
   // The same home socket watches gateway presence; only an acknowledged watch
   // replaces fallback. Old Workers, unavailable proofs and disconnects keep it.
   const owner = data?.live.ownerId
@@ -56,10 +56,10 @@ export function DevicesSettings(_props: { workspaceId?: string }) {
     setAdding(true)
   }
   return <>
-    <DevicesPage devices={data?.devices} listError={Boolean(error)} onAdd={() => setAdding(true)} onChanged={changed} onReconnect={reconnect}
+    <DevicesPage devices={devices} listError={Boolean(error)} onAdd={() => setAdding(true)} onChanged={changed} onReconnect={reconnect}
       localSetup={desktopSsh ? <LocalSetupStatus onOnline={changed} /> : null} />
     {desktopSsh
-      ? <SshAddDialog open={adding} onOpenChange={setAdding} devices={devices} onAdded={changed} />
+      ? <SshAddDialog open={adding} onOpenChange={setAdding} devices={devices ?? []} onAdded={changed} />
       : <ConnectDeviceDialog open={adding} onOpenChange={setAdding} hideTrigger />}
     {!desktopSsh && <ConnectDeviceDialog open={reconnecting} onOpenChange={setReconnecting} hideTrigger reconnect />}
   </>
