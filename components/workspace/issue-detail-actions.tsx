@@ -87,7 +87,15 @@ export function useIssueDetailActions({ task, userId, disabled, request, getCurr
       const latest = await getCurrent()
       if (!latest) throw new Error(t('saveCurrentFirst'))
       const result = await operation(latest)
-      if (!result.issue) throw new Error(actionError(result.error ?? 'generic'))
+      if (!result.issue) {
+        if (result.error === 'issueOutdated') {
+          const refreshed = await mutate<Issue>(issueKeys.detail(task.id))
+          if (refreshed?.id === latest.id && refreshed.revision > latest.revision) {
+            throw new Error(actionError('issueStale'))
+          }
+        }
+        throw new Error(actionError(result.error ?? 'generic'))
+      }
       const updatesCurrent = mode === 'current' || mode === 'favorite' || mode === 'unfavorite'
       if (updatesCurrent) onSaved(result.issue)
       // A deleted task can no longer serve its connections. Its surrounding list still needs the ACK.
