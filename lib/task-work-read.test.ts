@@ -11,7 +11,7 @@ const reader = { id: 'owner' }
 const activity = { task: { id: 'factory', issueId: 'task' }, artifacts: [{ id: 'allowed' }] }
 const at = (path: string) => new URL(path, import.meta.url).href
 mock.module(at('./task-presentation-read.ts'), { namedExports: { readTaskPresentations: async (_reader: unknown, query: { workspaceId: string; issueIds: string[]; includeFactoryIdentity: boolean }) => {
-  assert.deepEqual(query, { workspaceId: 'workspace', issueIds: ['task'], includeFactoryIdentity: true, includePullRequests: true })
+  assert.deepEqual(query, { workspaceId: 'workspace', issueIds: ['task'], includeFactoryIdentity: true, includePullRequests: true, includeLinkedChats: true })
   return { items: visible ? { task: { factoryTaskId: 'factory' } } : {} }
 } } })
 mock.module(at('./acting-user.ts'), { namedExports: { actAs: async (principal: unknown, work: () => Promise<unknown>) => { assert.equal(principal, reader); return work() } } })

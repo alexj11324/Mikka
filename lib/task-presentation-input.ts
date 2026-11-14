@@ -9,6 +9,7 @@ export const taskPresentationsInput = z.strictObject({
   includeReview: z.literal(true).optional(),
   includeInboxReason: z.literal(true).optional(),
   includeBotDispatches: z.literal(true).optional(),
+  includeLinkedChats: z.literal(true).optional(),
   includePullRequests: z.literal(true).optional(),
   includeFactoryIdentity: z.literal(true).optional(),
   /** Only the Artifacts overview asks for evidence counts beyond its local catalog. */

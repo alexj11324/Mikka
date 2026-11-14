@@ -49,8 +49,9 @@ export function HomeScreen() {
       <NavBar
         title="Bot"
         topTitle
-        right={{ icon: 'plus', label: mobileMessages.Nav.create, web: <Plus size={22} color={colors.ink} strokeWidth={2} />, onOpen: () => router.push('/new-bot'),
+        right={{ icon: 'plus', label: mobileMessages.Nav.create, web: <Plus size={22} color={colors.ink} strokeWidth={2} />, onOpen: () => router.push({ pathname: '/new-group', params: { purpose: 'conversation' } }),
           items: [
+            { label: mobileMessages.Nav.newConversation, icon: 'bubble.left', onPress: () => router.push({ pathname: '/new-group', params: { purpose: 'conversation' } }) },
             { label: mobileMessages.Nav.newBot, icon: 'person.crop.circle.badge.plus', onPress: () => router.push('/new-bot') },
             { label: mobileMessages.Nav.newGroup, icon: 'person.2', onPress: () => router.push('/new-group') },
           ] }}

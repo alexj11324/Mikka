@@ -7,6 +7,7 @@ import type { FactoryFlowView } from './factory/public-flow'
 import { taskStateOf, type TaskStateContext, type TaskStateRun, type TaskStateView } from './task-state'
 
 export type TaskPresentation = TaskStateView & {
+  linkedChats?: { id: string; title: string }[]
   pullRequests?: IssuePullRequest[]
   version: 1
   /** Missing on cached snapshots from before the Inbox attention projection. */

@@ -131,6 +131,39 @@ test('Task presentation batches keep current tenant authority and one Factory pr
     const expected = (patch: Record<string, unknown> = {}) => ({ version: 1, primaryStatus: 'doing', factoryStage: null, runStatus: null, needsAction: null, blockedReason: null, completion: null,
       state: 'todo', reason: null, blockedBy: null, group: 'todo', ...patch })
 
+    await t.test('linked conversation access requires both a readable task and a current chat participant in its workspace', async () => {
+      const task = await makeTask()
+      const otherTask = await makeTask()
+      const bot = await makeBot()
+      const chat = async (title: string, creator = owner, workspaceId = shared) => {
+        const id = randomUUID(), message = randomUUID()
+        await application.query(`INSERT INTO conversations(id,"workspaceId",kind,title,"createdBy","creationPurpose")
+          VALUES($1,$2,'group',$3,$4,'conversation')`, [id, workspaceId, title, creator])
+        await application.query(`INSERT INTO conversation_members("conversationId","memberType","memberId",role)
+          VALUES($1,'user',$2,'owner')`, [id, owner])
+        await application.query(`INSERT INTO conversation_messages(id,"conversationId",position,"authorType","authorId",body)
+          VALUES($1,$2,1,'user',$3,'fixture')`, [message,id,owner])
+        for (const issue of [task, otherTask]) {
+          await application.query(`INSERT INTO group_task_bindings("conversationId","issueId","userId","reporterId",
+            "reporterOwnerId","reporterType","executionBotId","sourceMessageId","sourceEventId")
+            VALUES($1,$2,$3,$4,$3,'bot',$4,$5,$6)`, [id,issue,owner,bot,message,randomUUID()])
+        }
+        return { id, title }
+      }
+      const first = await chat('First conversation'), next = await chat('Second conversation')
+      await chat('Wrong workspace', owner, other)
+      await chat('Created by another owner', peer)
+      const forUser = (userId: string) => as(userId, shared, () => getTaskPresentations({
+        workspaceId: shared, issueIds: [task, otherTask], includeLinkedChats: true,
+      }))
+      const linked = await forUser(owner)
+      for (const id of [task, otherTask]) assert.deepEqual(linked.items[id].linkedChats, [next, first])
+      assert.deepEqual((await forUser(peer)).items[task].linkedChats, [])
+      assert.equal((await batch([task])).items[task].linkedChats, undefined)
+      await application.query('UPDATE conversation_members SET "leftAt"=now() WHERE "conversationId"=$1', [next.id])
+      assert.deepEqual((await forUser(owner)).items[task].linkedChats, [first])
+    })
+
     await t.test('formal task PR links backfill, stay ordered on edits and respect the task reader', async () => {
       const first = { url: 'https://github.com/example/project/pull/7', state: 'open' }
       const second = { url: 'https://github.com/example/project/pull/9', state: 'draft' }
