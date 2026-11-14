@@ -351,7 +351,7 @@ async function localRunCredential<S extends { id: string; ownerId: string; conne
 }
 
 /** Which runs `userId` may see: their own (on no task or a visible task) and teammates' runs on shared visible tasks. */
-async function runVisibilityPredicate(reader: IssueReader) {
+export async function runVisibilityPredicate(reader: IssueReader) {
   const userId = typeof reader === 'string' ? reader : reader.id
   // Current tenant membership and the joined Task authorize the Run. Team
   // naming rows and a preliminary Run-to-Task lookup do not enter this gate.
