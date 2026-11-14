@@ -263,10 +263,6 @@ export class InboxStore {
     return result
   }
 
-  async nextDue() {
-    const { rows } = await this.pool.query<{ at: Date | null }>(`SELECT min("snoozedUntil") AS at FROM (${snoozes}) all_snoozes`)
-    return rows[0].at?.getTime() ?? null
-  }
   async expire() {
     // Delete atomically, then publish committed invalidations. Concurrent due
     // timers cannot return the same persisted snooze twice.
@@ -281,6 +277,5 @@ export class InboxStore {
     } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
     const scopes = new Map(rows.map(row => [JSON.stringify([row.userId, row.workspaceId]), row]))
     await Promise.all([...scopes.values()].map(row => this.changed(row.userId, row.workspaceId)))
-    return this.nextDue()
   }
 }
