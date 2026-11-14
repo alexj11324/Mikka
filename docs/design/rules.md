@@ -83,13 +83,20 @@ source wins in a conflict is in [`README.md`](README.md).
   the user taps is their message but keeps its card shape, no blue bubble; the
   instruction under it is a blue bubble (R-55). This holds in every one-to-one
   chat, the board's Coordinator sidebar and the AI sidebar included.
-- **R-15** A task mentioned in chat is an inline chip: its state icon (R-52)
-  and its code, such as 「◐ ALEX-45」, with the title, state and priority in
-  the hover card; a task with no code shows its title. Internal object chips
+- **R-15** A task mentioned in chat is an inline chip: its status icon (R-52)
+  alone and its code, such as 「◐ ALEX-45」, with the title, status, priority
+  and what its Agent is doing (in words) in the hover card; a task with no
+  code shows its title. A chip never carries a second icon. Internal object chips
   use the faint accent fill (`--object-chip`), rounded corners and accent
   text at the surrounding text's size and line height. A thread mentioned in
-  chat is its title in the link colour, with no icon, fill, accent or state
-  badge; the title never repeats the task's code. Every mention uses the same
+  chat is the conversation's own bounded short title in the link colour
+  (`conversationTitle`, [2026-11-13-1405](decisions/2026-11-13-1405-one-task-status.md)), with no fill, accent or state badge, and
+  one small Agent mark after it only while the conversation is working,
+  waiting or failed; it never repeats the task's code or borrows the task's
+  title. A task's
+  chip directly followed by its own thread reads as one reference (chip, one
+  word gap, title); when that thread's card sits under the reply the inline
+  title is left out. Every mention uses the same
   chip, with cards deduplicated under R-66. A dispatch's card represents its
   task and opens that task. Web sources keep the unboxed source chip.
   An Artifact waiting for acceptance is a bordered card under the reply
@@ -138,8 +145,8 @@ source wins in a conflict is in [`README.md`](README.md).
 - **R-21** 建议 is its own rail page (R-55), not part of the right panel (R-50). 建议 is the normal-level
   items in one list, newest first, each row with its app's icon (no per-app
   cards). The daily briefing is not in 建议; it is the Coordinator's 08:00 message, also
-  sent right after the person connects an app. A thread started by the
-  orchestrator or a bot belongs inside its task, which is listed under R-52. 建议 items are standalone cards, each one
+  sent right after the person connects an app. A conversation started by the
+  Coordinator or a Bot has its own directory entry. A linked task shows the same conversation under 工作 (R-62). 建议 items are standalone cards, each one
   sentence: a verb chip, the app's icon inline, the concrete thing and its
   reason, deadline or amount
   (「取消你的 Verizon 套餐，赶在 11 月 1 日自动扣款 $52.13 之前」); no
@@ -217,14 +224,12 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   A group heading that names the
   workspace its settings apply to (设置's workspace group) is not a crumb and
   stays.
-- **R-62** A task's 活动 lists its creation, its events and one row per Agent
-  stretch, oldest first: consecutive runs by the same Agent are one row, and
-  every row is labelled with its Agent's mark and name, never a 「换」 verb, as
-  Warp labels runs ([2026-11-09-0045](decisions/2026-11-09-0045-no-attempt-word.md)).
-  There is no per-run thread list. A row shows its stretch's latest run in the
-  run-result words (glossary: Run result) and
-  opens the task's single conversation at the stretch's first run (R-81),
-  ending in the shared composer (R-10). The task properties
+- **R-62** A task’s 工作 section follows its description. It lists authorized
+  conversations and PRs with their available Agent, observed model, status
+  and result. Each run has one expandable progress row. 活动 contains task
+  changes, links and comments with the author or system actor visible.
+  The conversation opens directly at its authorized root. Its composer follows
+  the current run (R-10, R-81). The task properties
   show its dispatching bot, Agent/model and execution location. A reader who
   cannot access the work sees no private transcript. Workspace visibility
   follows [#1849](decisions/2026-11-10-0017-collaboration-governance.md)
@@ -270,10 +275,9 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   again in the same thread, resuming the agent's session where it can. The
   thread's root identity does not change across its continuation runs. Only the person's explicit request for a new
   session or thread, or another agent, starts a new one; the old thread is
-  stopped and marked replaced. The task still has one conversation joining
-  every run oldest first; a 活动 row opens it at that Agent stretch, and
-  replies go to the newest run
-  ([2300](decisions/2026-11-07-2300-one-conversation-per-task.md)).
+  stopped and marked replaced. The task keeps links to its distinct
+  conversation roots. Within a chain, the transcript orders runs by time and
+  sends replies to the latest eligible run.
   Replies typed during an active run default to the queue where a continuation is supported.
   The owner may select a supported native steer or interrupt instead. See [#2257](https://github.com/alexj11324/Mikka/issues/2257).
   The server enforces this at every dispatch
@@ -291,9 +295,8 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   tasks that bot dispatched. 电脑 shows its cloud computer (`AgentComputer`).
   The window bar's 全部任务 entry opens all dispatched tasks in the right
   column while keeping the centre chat. Search, widen and close act on that
-  column. A thread opens from its task's 活动 into the task's one conversation
-  ([2045](decisions/2026-11-07-2045-tasks-only-threads-inside.md),
-  [2300](decisions/2026-11-07-2300-one-conversation-per-task.md)).
+  column. A conversation opens from the workspace directory, a Bot subitem or
+  its linked task’s 工作 section. All entries resolve the same identity.
 - **R-51** The right panel is read-only. No action buttons anywhere in it (no
   让它安排, 新建, 上传 or arrange). Besides navigation (the pills, the tabs, the
   header's search, widen and close, and a list group's collapse chevron), the only
@@ -315,36 +318,42 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   task, the task panel's ⋯ menu also lists the code tools 改动 · 文件 · 终端 ·
   预览, and its PR summary line opens the review page; these only open the
   review page, and the rest of the panel stays read-only.
-- **R-52** Every list holds tasks, grouped **等待你 · 进行中 · 待办 · 已完成**.
-  已完成 starts collapsed. Each row carries its own state's icon, independent
-  of the group header's icon
-  ([states](decisions/2026-11-07-2230-one-icon-per-task-state.md),
-  [attempts](decisions/2026-11-07-2300-one-conversation-per-task.md)).
-  - 等你处理 uses a hand, for a question, approval or PR review. 受阻 uses an
-    octagon for login, key, permission, quota or an offline device. 失败 uses
-    a triangle. These states appear in 等待你. The window-bar hand counts
-    only 等你处理 tasks.
-  - 运行中 uses a ring and 排队中 a clock, under 进行中. Open tasks without an
-    active attempt appear in 待办 with their board icon. Closed tasks use
-    their board icon under 已完成.
-  - A dependency or manual blocked flag supplies its reason in the grey line
-    and keeps the task's own state and icon. It does not acquire the hand.
-  - `agent_runs.outcome` supplies the ended attempt's judgement, based on
-    its reply, status, task and PRs (`lib/run-outcome-judge.ts`). A finished
-    process alone does not prove success. A missing judgement cannot mark
-    an unresolved task complete.
-  - Task icons use semantic colours. 等你处理 is blue, 受阻 / 运行中 /
-    排队中 / 进行中 orange, 评审中 blue, 失败 red, 完成 green, and
-    待办 / 暂不处理 / 已取消 / 重复 grey. The reason line stays secondary text. There are no status
-    dots, corner marks or badges
-    ([colours](decisions/2026-11-08-0130-task-state-icon-colours.md)).
-  - An attempt shows its own result icon, never the hand. Running uses the
-    ring, waiting for the person uses pause, finished a check, failed a
-    triangle, blocked an octagon, and replaced no icon.
-- **R-53** A task row shows its state icon, number, title and date, with a
-  grey line for the reason, dispatching bot and schedule when present. Raw
-  error codes stay under 详情 inside the relevant attempt. The former
-  thread-list last-reply preview is superseded by
+- **R-52** A task has one status, its status field (待整理, 待办, 进行中,
+  评审中, 已完成, 已取消, 重复), shown with the same icon and word on every
+  surface ([2026-11-13-1405](decisions/2026-11-13-1405-one-task-status.md)).
+  - Lists are a view of the board's tasks: rows sit under their status, in
+    the board's order; closed statuses start collapsed. Nothing is grouped by
+    what a run is doing.
+  - The **Agent mark** is the conversation's, never the task's: a turning
+    ring while it works, the hand when it waits for the person (a question,
+    an approval, a PR to review, a login, quota), a triangle when the run
+    failed. It sits after a thread's title, is the dispatch card's one glyph
+    while the conversation is active (else the card shows the task's status
+    icon), and is the board card's line; on a task's chip, row or hover card
+    it is words only. Two status-like glyphs are never side by side. It is
+    never a status, a group, a column or a status filter. What needs the
+    person is in 收件箱.
+  - 受阻 is a board column, not a status: a task the person flagged or one a
+    dependency holds back. What a run says never moves a task there.
+  - The status advances with the work, forward only and never over a status
+    the person set since the work was asked for: Agent starts → 进行中;
+    submitted for review or PR delivered → 评审中; last delivered PR merged,
+    or accepted by the Factory → 已完成 (`lib/task-status-advance.ts`).
+  - Status icons take R-34's colours: 进行中 warning, 评审中 info, 已完成
+    success, the rest grey. The Agent mark is warning while working, info
+    when waiting, destructive on error. No status dots, corner marks or
+    badges.
+  - `agent_runs.outcome` supplies the ended run's judgement, based on its
+    reply, status, task and PRs (`lib/run-outcome-judge.ts`). A finished
+    process alone does not prove success.
+  - A run shows its own result icon where a run is listed (glossary: Run
+    result), never the hand. Running uses the ring, waiting for the person
+    uses pause, finished a check, failed a triangle, blocked an octagon, and
+    replaced no icon.
+- **R-53** A task row shows its status icon alone, number, title and date,
+  with a grey line for the status, what its Agent is doing in words,
+  dispatching bot and schedule when present. Raw error codes stay under 详情 inside the
+  relevant run. The former thread-list last-reply preview is superseded by
   [2045](decisions/2026-11-07-2045-tasks-only-threads-inside.md).
 - **R-54** The PR tab lists the PRs of the threads this bot dispatched, in groups 等待审查, 进行中, 已合并,
   with R-52's header style. Each row is the PR title and its number.
@@ -392,11 +401,10 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
     as a tab in the chat's right work area, preserving the chat; its expand
     button opens the same task as a page. A thread, Agent stretch or subagent
     opened from a chat opens its own work-area tab, reused when already open
-    ([0659](decisions/2026-11-10-0659-task-code-chips-and-work-area-tabs.md)). A row in 活动 (one per Agent
-    stretch, R-62) opens that task's one conversation, with ← back to the
-    task. The conversation joins runs oldest first, opens a selected stretch
-    at its first run and otherwise starts at the newest message. Its header
-    is the task title and current Agent; its composer addresses the newest run.
+    ([0659](decisions/2026-11-10-0659-task-code-chips-and-work-area-tabs.md)). A linked conversation in 工作 (R-62)
+    opens its own transcript, with ← back to the task. The transcript orders
+    the root’s runs chronologically. Its header shows the conversation title
+    and current Agent. Its composer addresses the selected conversation’s latest eligible run.
     The hosted work-area task view starts with one large editable title,
     its code and time, then compact properties, description, subtasks and
     activity. The tab names the task; no second inner title bar repeats it.
@@ -404,7 +412,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
     ([Capy layout](decisions/2026-11-10-1317-capy-sidebar-and-task-layout.md)).
   - 全部任务 opens from the window bar on every page, with the hand and the
     count of 等你处理 tasks. A bot's 任务 tab lists its dispatched tasks.
-    Search hits in a task conversation resolve to the task. Legacy run IDs
+    Conversation search results open the conversation. Task results open the task. Legacy run IDs
     and `?threads=` remain routing identifiers, not list labels.
   - On the phone task detail and its conversation push over the task tab.
     Bot · 任务 · 建议 · 设置 and search are the native tabs; the tab bar hides
@@ -418,9 +426,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
     pages open in a new tab. Phone web uses a full-page right column and
     retains a bot-list/header entry. Invalid addresses normalize to the
     authorized visible location.
-  Sources are [navigation](decisions/2026-11-01-1320-navigation-model.md),
-  [task lists](decisions/2026-11-07-2045-tasks-only-threads-inside.md) and
-  [one conversation](decisions/2026-11-07-2300-one-conversation-per-task.md).
+  See [navigation](decisions/2026-11-01-1320-navigation-model.md), the [conversation decision](https://github.com/alexj11324/Mikka/issues/2262) and the [task Work section](https://github.com/alexj11324/Mikka/issues/2271).
   The UI is the official build ([one UI](decisions/2026-11-08-2133-one-ui.md));
   default slots in this repository can retain older thread presentation
   ([UI slots](../ui-overlay.md)).

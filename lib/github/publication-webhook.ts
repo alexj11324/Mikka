@@ -4,6 +4,8 @@ import { z } from 'zod'
 import { pool } from '@/lib/db'
 import { factoryCommitted } from '@/lib/live/factory'
 import { pullRequestStatusChanged } from '@/lib/live/pull-requests'
+import { issueListChanged } from '@/lib/live/lists'
+import { ADVANCE_MERGED_TASKS } from '@/lib/task-status-advance'
 import { reviewCheckEvent } from './review-checks'
 
 const pullRequestEvent = z.object({
@@ -143,6 +145,12 @@ export async function refreshPublishedPullRequest(event: string, payload: unknow
   const tasks = [...new Set(rows.flatMap(row => row.id && row.changed ? [row.id] : []))].map(id => ({ id }))
   // The PR badge on each task it was delivered on asks GitHub again (#1212); the state itself never crosses.
   await pullRequestStatusChanged(database, rows.flatMap(row => row.issueId ? [row.issueId] : []))
+  // 已完成 once the last PR Mikka delivered on a task is merged: forward only, and a status the person set since the
+  // work began is kept (lib/task-status-advance.ts). A redelivery finds the task already there and changes nothing.
+  if (state === 'merged') {
+    const moved = await database.query<{ id: string }>(ADVANCE_MERGED_TASKS, [url, 'pull-request-merged'])
+    for (const task of moved.rows) await issueListChanged(database, task.id)
+  }
   try {
     if (lines) await database.query(RECORD_LINE_COUNTS, [url, JSON.stringify(lines), patch])
   } finally {
