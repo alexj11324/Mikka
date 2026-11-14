@@ -51,7 +51,7 @@ export type AgentActivityRow = { id: string; at: string; node: ReactNode }
  * run result and opens the task's one conversation at the stretch's first thread.
  */
 /** An Agent row as data, for a layer that draws the log: its mark (the Agent's, or the result's), name, run result and time. */
-export type AgentActivityItem = { id: string; at: string; runId: string; name: string; mark: ReactNode; result: string; group: ThreadGroup; time: string; open: boolean; onOpen: (() => void) | null }
+export type AgentActivityItem = { id: string; at: string; /** When its latest run last changed: the moment `time` describes. */ lastAt: string; runId: string; name: string; mark: ReactNode; result: string; group: ThreadGroup; time: string; open: boolean; onOpen: (() => void) | null }
 
 export function useAgentActivity(issueId: string, openId: string | null, onOpen: (id: string) => void, enabled = true): { rows: AgentActivityRow[]; items: AgentActivityItem[]; error: ReactNode; failed: { label: string; retry: () => void } | null } {
   const t = useTranslations('IssueThreads')
@@ -86,7 +86,7 @@ export function useAgentActivity(issueId: string, openId: string | null, onOpen:
       ? <Button variant="ghost" data-agent-stretch={index + 1} aria-pressed={open} aria-label={t('open', { name })} className={cn('-mx-3 h-auto w-[calc(100%+1.5rem)] justify-start gap-3 rounded-lg px-3 py-2', open && 'bg-muted hover:bg-muted')} onClick={() => onOpen(first.id)}>{body}<ChevronRight data-icon="inline-end" className="text-muted-foreground rtl:rotate-180" /></Button>
       : <div className="flex min-w-0 items-center gap-3 py-2">{body}<span className="size-4" /></div>
     const at = new Date(first.createdAt).toISOString()
-    items.push({ id: `agent:${first.id}`, at, runId: first.id, name, mark: profile ? <ProfileMark icon={profile.icon} color={profile.color} /> : harness ? <HarnessMark harness={harness} /> : <ThreadStatusIcon group={group} />, result: view.stopping ? t('stopping') : resultLabel(result, reason), group, time: format.relativeTime(threadTime(last, now), now), open, onOpen: first.detail ? () => onOpen(first.id) : null })
+    items.push({ id: `agent:${first.id}`, at, runId: first.id, name, mark: profile ? <ProfileMark icon={profile.icon} color={profile.color} /> : harness ? <HarnessMark harness={harness} /> : <ThreadStatusIcon group={group} />, result: view.stopping ? t('stopping') : resultLabel(result, reason), group, lastAt: threadTime(last, now).toISOString(), time: format.relativeTime(threadTime(last, now), now), open, onOpen: first.detail ? () => onOpen(first.id) : null })
     return { id: `agent:${first.id}`, at, node }
   })
   return { rows, items, error: null, failed: null }

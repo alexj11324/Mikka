@@ -91,11 +91,21 @@ export type TaskSubtask = {
   menu: TaskMenuItem[]
 }
 
+/** What leads an event row: the status it moved to, the priority it set, or the kind of change. */
+export type TaskActivityGlyph =
+  | { kind: 'status'; value: string }
+  | { kind: 'priority'; value: string }
+  | { kind: 'event'; value: 'created' | 'title' | 'assigned' | 'unassigned' | 'subtask' | 'label' }
+
+/**
+ * `time` is how long ago (「2 小时前」) on every row; `exact` is the date and time for its tooltip.
+ * `actor` says who made an event, so a layer can filter Agent rows; absent on rows from before MIK-17.
+ */
 export type TaskActivityItem =
-  | { kind: 'event'; id: string; at: string; who: string | null; mark?: TaskMark; text: string; parts?: ActivityPiece[]; time: string; onOpen?: () => void }
+  | { kind: 'event'; id: string; at: string; who: string | null; mark?: TaskMark; text: string; parts?: ActivityPiece[]; time: string; exact?: string; actor?: 'person' | 'agent' | null; glyph?: TaskActivityGlyph; onOpen?: () => void }
   /** An Agent's stretch of runs (R-62): opens the task's conversation at its first thread. */
-  | { kind: 'agent'; id: string; at: string; who: string; mark: TaskMark; text: string; time: string; open: boolean; onOpen: (() => void) | null; openLabel: string }
-  | { kind: 'comment'; id: string; at: string; thread: IssueDiscussions['threads'][number]; message?: { record: IssueDiscussions['threads'][number]['messages'][number]; first: boolean; last: boolean }; excerpt: string | null; time: (at: string) => string }
+  | { kind: 'agent'; id: string; at: string; who: string; mark: TaskMark; text: string; time: string; exact?: string; open: boolean; onOpen: (() => void) | null; openLabel: string }
+  | { kind: 'comment'; id: string; at: string; thread: IssueDiscussions['threads'][number]; message?: { record: IssueDiscussions['threads'][number]['messages'][number]; first: boolean; last: boolean }; excerpt: string | null; time: (at: string) => string; exact?: (at: string) => string }
 
 export type TaskDetailFrameProps = {
   /** The loaded task's identity, for task-specific navigation such as Review. Absent in older callers. */

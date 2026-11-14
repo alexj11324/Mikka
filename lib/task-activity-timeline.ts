@@ -70,15 +70,15 @@ type HistoryLabels = Pick<typeof import('../messages/en.json')['Workspace']['act
 /** A clause is words plus the task, thread or pull a word opens. The row paints them; the name is one part at the front. */
 export type ActivityPiece =
   | { kind: 'text'; text: string; name?: boolean }
-  | { kind: 'task'; text: string; taskId: string }
-  | { kind: 'thread'; text: string; runId: string }
+  | { kind: 'task'; text: string; taskId: string; title?: string; status?: string }
+  | { kind: 'thread'; text: string; runId: string; result?: string }
   | { kind: 'pull'; text: string; href: string }
 
 /** The task the page is showing, so 「创建了 {编号}」 and 「把 {编号} 改成了」 can name it. */
-export type ActivitySubject = { taskId: string; code: string | null }
+export type ActivitySubject = { taskId: string; code: string | null; title?: string; status?: string }
 
 /** One Agent stretch on this task. `linked` is false when that run has no conversation to open. */
-export type ActivityStretch = { at: string; runId: string; linked: boolean }
+export type ActivityStretch = { at: string; runId: string; linked: boolean; result?: string }
 
 export type ActivityLabels = {
   created: string
@@ -94,12 +94,13 @@ function words(text: string): ActivityPiece[] {
   return text ? [{ kind: 'text', text }] : []
 }
 
-function withTask(rendered: string, text: string, taskId: string): ActivityPiece[] {
+/** `about` is what a hover preview shows for that task: its title and status, when this page knows them. */
+function withTask(rendered: string, text: string, taskId: string, about: { title?: string; status?: string } = {}): ActivityPiece[] {
   const chunks = rendered.split(CODE)
   const pieces: ActivityPiece[] = []
   chunks.forEach((chunk, index) => {
     if (chunk) pieces.push({ kind: 'text', text: chunk })
-    if (index < chunks.length - 1) pieces.push({ kind: 'task', text, taskId })
+    if (index < chunks.length - 1) pieces.push({ kind: 'task', text, taskId, ...about.title ? { title: about.title } : {}, ...about.status ? { status: about.status } : {} })
   })
   return pieces.length ? pieces : words(rendered)
 }
@@ -107,12 +108,12 @@ function withTask(rendered: string, text: string, taskId: string): ActivityPiece
 /** The clause for one event. The caller's locale supplies the sentence; a code is a task part when this page can open it. */
 export function taskHistoryPieces(event: IssueActivityEvent, labels: ActivityLabels, subject?: ActivitySubject | null): ActivityPiece[] {
   const t = labels.activity
-  const own = subject?.code && subject.taskId ? { code: subject.code, taskId: subject.taskId } : null
+  const own = subject?.code && subject.taskId ? { code: subject.code, taskId: subject.taskId, about: { title: subject.title, status: subject.status } } : null
   switch (event.kind) {
-    case 'created': return own ? withTask(t('created', { code: CODE }), own.code, own.taskId) : words(labels.created)
+    case 'created': return own ? withTask(t('created', { code: CODE }), own.code, own.taskId, own.about) : words(labels.created)
     case 'status': {
       const status = labels.status(event.status ?? '')
-      return own ? withTask(t('changedStatusCode', { code: CODE, status }), own.code, own.taskId) : words(t('changedStatus', { status }))
+      return own ? withTask(t('changedStatusCode', { code: CODE, status }), own.code, own.taskId, own.about) : words(t('changedStatus', { status }))
     }
     case 'priority': return words(t('changedPriority', { priority: labels.priority(event.priority ?? '') }))
     case 'title': return words(t('changedTitle', { title: event.title ?? '' }))
@@ -125,7 +126,7 @@ export function taskHistoryPieces(event: IssueActivityEvent, labels: ActivityLab
     case 'labelAdded': return words(t('addedLabel', { name: event.title ?? '' }))
     case 'labelRemoved': return words(t('removedLabel', { name: event.title ?? '' }))
     case 'subtask': {
-      if (event.targetId && event.code) return withTask(t('addedSubtaskCode', { code: CODE }), event.code, event.targetId)
+      if (event.targetId && event.code) return withTask(t('addedSubtaskCode', { code: CODE }), event.code, event.targetId, { title: event.title })
       if (event.targetId && event.title) return withTask(t('addedSubtask', { title: CODE }), event.title, event.targetId)
       return words(t('addedSubtask', { title: event.title ?? '' }))
     }
@@ -142,16 +143,21 @@ export function taskHistoryLabel(event: IssueActivityEvent, labels: ActivityLabe
  * A person's name, an unmatched Agent and a run with no conversation stay text.
  */
 export function activityRunId(at: string, actor: { type?: string | null } | null | undefined, stretches: readonly ActivityStretch[]): string | null {
+  return activityStretch(at, actor, stretches)?.runId ?? null
+}
+
+/** The stretch itself, so the name's hover preview can say how that run ended. */
+export function activityStretch(at: string, actor: { type?: string | null } | null | undefined, stretches: readonly ActivityStretch[]): ActivityStretch | null {
   if (actor?.type !== 'agent') return null
   const time = Date.parse(at)
   if (Number.isNaN(time)) return null
-  let runId: string | null = null
+  let match: ActivityStretch | null = null
   const ordered = [...stretches].sort((a, b) => Date.parse(a.at) - Date.parse(b.at) || a.runId.localeCompare(b.runId))
   for (const stretch of ordered) {
     const started = Date.parse(stretch.at)
-    if (stretch.linked && !Number.isNaN(started) && started <= time) runId = stretch.runId
+    if (stretch.linked && !Number.isNaN(started) && started <= time) match = stretch
   }
-  return runId
+  return match
 }
 
 /** One row: the name once, then each clause joined by the locale's separator. The name is a thread part only when a run matches. */
@@ -169,7 +175,7 @@ export function activityLineParts(
   ])
   const name = actor?.name || null
   if (!name) return clause
-  const runId = activityRunId(events[0]?.at ?? '', actor, stretches)
-  const lead: ActivityPiece = runId ? { kind: 'thread', text: name, runId } : { kind: 'text', text: name, name: true }
+  const stretch = activityStretch(events[0]?.at ?? '', actor, stretches)
+  const lead: ActivityPiece = stretch ? { kind: 'thread', text: name, runId: stretch.runId, ...stretch.result ? { result: stretch.result } : {} } : { kind: 'text', text: name, name: true }
   return [lead, { kind: 'text', text: ' ' }, ...clause]
 }

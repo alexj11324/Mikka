@@ -63,7 +63,7 @@ test('chinese clauses name the code, the previous person, and the subtask', () =
   const subtask = taskHistoryPieces(event({ id: 's', at: 't', kind: 'subtask', title: 'Child', targetId: 'child', code: 'MIK-13' }), zhLabels, subject)
   assert.deepEqual(subtask, [
     { kind: 'text', text: '加了子任务 ' },
-    { kind: 'task', text: 'MIK-13', taskId: 'child' },
+    { kind: 'task', text: 'MIK-13', taskId: 'child', title: 'Child' },
   ])
 })
 
@@ -81,4 +81,13 @@ test('a missing code or an unmatched Agent does not invent a link', () => {
     { kind: 'text', text: 'added subtask ' },
     { kind: 'task', text: 'Child', taskId: 'child' },
   ])
+})
+
+test('a chip carries what its hover preview shows: the task title and status, the run result', () => {
+  const line = activityLineParts([
+    event({ id: 's', at: '2026-11-14T14:02:00.000Z', kind: 'status', status: 'review' }),
+  ], labels(en), { ...subject, title: 'Retry does not refresh', status: 'review' }, en.Workspace.activity.separator, agent,
+  [{ at: '2026-11-14T14:00:00.000Z', runId: 'run-1', linked: true, result: 'Done' }])
+  assert.deepEqual(line[0], { kind: 'thread', text: 'Ada', runId: 'run-1', result: 'Done' })
+  assert.deepEqual(line.find(part => part.kind === 'task'), { kind: 'task', text: 'MIK-12', taskId: 'task-1', title: 'Retry does not refresh', status: 'review' })
 })

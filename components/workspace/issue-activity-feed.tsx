@@ -1,11 +1,11 @@
 'use client'
 
 import { Fragment } from 'react'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { PersonAvatar } from '@/components/person-avatar'
 import { AgentSphere } from './issue-assignee-menu'
 import type { AgentActivityRow } from './issue-threads'
-import { activityLineParts, chronologicalActivity, type ActivityPiece, type ActivityStretch, type ActivitySubject } from '@/lib/task-activity-timeline'
+import { activityLineParts, chronologicalActivity, type ActivityPiece, type ActivityStretch, type ActivitySubject, type IssueActivityEvent } from '@/lib/task-activity-timeline'
 import type { ActivityActorView } from '@/lib/activity-actor-view'
 import { activityTimeline, deriveIssueActivity, type ActivityChild, type ActivityVersion } from '@/lib/issue-activity'
 import { openTask, openThread } from '@/components/workspace/workspace-navigation'
@@ -29,7 +29,7 @@ export function IssueActivityFeed({ versions, children, agents = [], task, stret
   const events = items.map(item => ({ id: item.id, at: item.at, node: <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
     <ActorMark actor={item.actor} />
     <ActivitySentence parts={item.parts} />
-    <time className="text-xs text-muted-foreground" dateTime={item.at}>{item.time}</time>
+    <time className="text-xs text-muted-foreground" dateTime={item.at} title={item.exact}>{item.time}</time>
   </div> }))
   return <>{chronologicalActivity([...events, ...agents]).map(row => <Fragment key={row.id}>{row.node}</Fragment>)}</>
 }
@@ -43,7 +43,13 @@ export type ActivityEventItem = {
   text: string
   /** The name once, then the clauses. A code is a task part; an Agent name is a thread part when a run matches. */
   parts: ActivityPiece[]
+  /** How long ago, as every row says it (「2 小时前」); `exact` is the date and time for a tooltip. */
   time: string
+  exact: string
+  /** The row's first event, so a layer can lead the row with that event's icon (its status's icon for a status change). */
+  kind: IssueActivityEvent['kind']
+  status?: string
+  priority?: string
 }
 
 /** The task's own events as words, oldest first, for IssueActivityFeed and a layer that draws the log. */
@@ -52,6 +58,7 @@ export function useActivityEvents(versions: ActivityVersion[], children: Activit
   const tDetail = useTranslations('Workspace.detail')
   const tIssue = useTranslations('Issue')
   const format = useFormatter()
+  const now = useNow({ updateInterval: 60_000 })
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
   const history = deriveIssueActivity(versions, children, Infinity)
@@ -63,10 +70,15 @@ export function useActivityEvents(versions: ActivityVersion[], children: Activit
       const actor = row.events[0].actor?.name ? row.events[0].actor : null
       const parts = activityLineParts(row.events, labels, context?.task, t('separator'), actor, context?.stretches ?? [])
       const clause = actor?.name ? parts.slice(2) : parts
+      const first = row.events[0]
       return [{
         id: row.id, at: row.at, actor, parts,
         text: clause.map(part => part.text).join(''),
-        time: format.dateTime(new Date(row.at), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        time: format.relativeTime(new Date(Math.min(Date.parse(row.at), now.getTime())), now),
+        exact: format.dateTime(new Date(row.at), { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        kind: first.kind,
+        ...first.kind === 'status' && first.status ? { status: first.status } : {},
+        ...first.kind === 'priority' && first.priority ? { priority: first.priority } : {},
       }]
     })
   }

@@ -6,7 +6,7 @@ import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { getIssuePropertyOptions } from '@/app/actions/issue-metadata'
 import type { IssueView } from '@/app/actions/issues'
 import { TaskAttachments } from './task-attachments'
-import type { TaskActivityItem, TaskDetailFrameProps, TaskDetailRow, TaskMenuItem, TaskSubtask } from '@/components/slots/task-detail-contract'
+import type { TaskActivityGlyph, TaskActivityItem, TaskDetailFrameProps, TaskDetailRow, TaskMenuItem, TaskSubtask } from '@/components/slots/task-detail-contract'
 import { useIssueTeam } from '@/components/teams/issue-team-control'
 import { formatDateOnly } from '@/lib/date-only'
 import { taskProjectOptions } from '@/lib/task-project-options'
@@ -21,7 +21,7 @@ import { useTaskOwnershipRows } from './issue-scope-control'
 import { AgentSphere } from './issue-assignee-menu'
 import type { useAgentActivity } from './issue-threads'
 import { useSelectedTaskPresentation } from '@/hooks/use-selected-task-presentation'
-import { useActivityEvents } from './issue-activity-feed'
+import { useActivityEvents, type ActivityEventItem } from './issue-activity-feed'
 import { useActivityDrafts, type DiscussionSave } from './issue-activity'
 import type { IssueDiscussions } from './issue-editor'
 import { chronologicalActivity, taskDiscussionEvents } from '@/lib/task-activity-timeline'
@@ -201,15 +201,18 @@ export function FramedTask(props: FramedTaskProps) {
   // 活动: the task's events, its Agent rows and its discussions in one log, oldest first.
   const subtaskRows = (connections.rows ?? []).filter(row => row.metadata.parentId === task.id).map(row => ({ id: row.id, title: row.title, identifier: row.identifier, createdAt: row.createdAt }))
   const eventsFor = useActivityEvents(props.historyFailed ? [] : props.versions, props.historyFailed ? [] : subtaskRows, {
-    task: { taskId: task.id, code: task.identifier },
-    stretches: (props.agentActivity.items ?? []).map(item => ({ at: item.at, runId: item.runId, linked: item.onOpen !== null })),
+    task: { taskId: task.id, code: task.identifier, title: props.title, status: task.status },
+    stretches: (props.agentActivity.items ?? []).map(item => ({ at: item.at, runId: item.runId, linked: item.onOpen !== null, result: item.result })),
   })
   const discussions = useRef<IssueDiscussions | null>(null)
   const drafts = useActivityDrafts(task.id,
     (body, operationId) => discussions.current ? discussions.current.onComment(body, operationId) : false,
     (id, body, operationId) => discussions.current ? discussions.current.onReply(id, body, operationId) : false,
     props.discussionSave)
-  const time = (at: string) => format.dateTime(new Date(at), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  // Every row says how long ago, as Capy's log does; the date and time is the tooltip.
+  // `now` ticks once a minute: a comment sent since then reads 「现在」, never 「6 秒钟后」.
+  const time = (at: string) => format.relativeTime(new Date(Math.min(Date.parse(at), now.getTime())), now)
+  const exact = (at: string) => format.dateTime(new Date(at), { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   const activityItems = (current: IssueDiscussions, expandReplies = false, additional: readonly TaskActivityItem[] = []): TaskActivityItem[] => {
     const anchors = new Map(current.anchors.map(anchor => [anchor.id, anchor.excerpt]))
     const byId = new Map(current.threads.map(thread => [thread.id, thread]))
@@ -217,14 +220,15 @@ export function FramedTask(props: FramedTaskProps) {
     const comments: TaskActivityItem[] = expandReplies
       ? taskDiscussionEvents(current.threads).map(fact => {
         const thread = byId.get(fact.threadId)!
-        return { kind: 'comment', id: fact.id, at: fact.at, thread, time, excerpt: excerpt(thread.id),
+        return { kind: 'comment', id: fact.id, at: fact.at, thread, time, exact, excerpt: excerpt(thread.id),
           message: { record: { id: fact.messageId, body: fact.body, author: fact.author, at: fact.at }, first: fact.kind === 'comment', last: fact.messageId === thread.messages.at(-1)?.id } }
       })
-      : current.threads.map(thread => ({ kind: 'comment', id: thread.id, at: thread.createdAt, thread, time, excerpt: excerpt(thread.id) }))
+      : current.threads.map(thread => ({ kind: 'comment', id: thread.id, at: thread.createdAt, thread, time, exact, excerpt: excerpt(thread.id) }))
     const history = eventsFor([...props.agentActivity.items, ...comments, ...additional])
     return chronologicalActivity<TaskActivityItem>([
-      ...history.map((item): TaskActivityItem => ({ kind: 'event', id: `history:${item.id}`, at: item.at, who: item.actor?.name ?? null, mark: item.actor?.name ? (item.actor.type === 'agent' ? { kind: 'node', node: <AgentSphere name={item.actor.name} compact /> } : { kind: 'person', name: item.actor.name }) : undefined, text: item.text, parts: item.parts, time: item.time })),
-      ...props.agentActivity.items.map((item): TaskActivityItem => ({ kind: 'agent', id: item.id, at: item.at, who: item.name, mark: { kind: 'node', node: item.mark }, text: item.result, time: item.time, open: item.open, onOpen: item.onOpen, openLabel: tFrame('openThread', { name: item.name }) })),
+      ...history.map((item): TaskActivityItem => ({ kind: 'event', id: `history:${item.id}`, at: item.at, who: item.actor?.name ?? null, mark: item.actor?.name ? (item.actor.type === 'agent' ? { kind: 'node', node: <AgentSphere name={item.actor.name} compact /> } : { kind: 'person', name: item.actor.name }) : undefined, text: item.text, parts: item.parts, time: item.time, exact: item.exact, actor: item.actor ? (item.actor.type === 'agent' ? 'agent' : 'person') : null, glyph: glyphOf(item) })),
+      // The row says how its latest run ended and when, so it sits at that time; matching a name to its run still uses the stretch's start.
+      ...props.agentActivity.items.map((item): TaskActivityItem => ({ kind: 'agent', id: item.id, at: item.lastAt, who: item.name, mark: { kind: 'node', node: item.mark }, text: item.result, time: item.time, exact: exact(item.lastAt), open: item.open, onOpen: item.onOpen, openLabel: tFrame('openThread', { name: item.name }) })),
       ...comments, ...additional,
     ])
   }
@@ -263,6 +267,15 @@ export function FramedTask(props: FramedTaskProps) {
     panel={props.panel} wide={props.wide} resize={props.resize}
     dialogs={<>{props.dialogs}{menu.dialogs}<AccessChangeDialog change={metadata.accessChange} pending={metadata.pending} onConfirm={metadata.confirmAccess} onCancel={metadata.cancelAccessChange} /><IssueMetadataControls task={task} section="dialog" disabled={locked} onSaved={adopt} onBusyChange={props.onMetadataBusy} request={props.propertyRequest} /></>}
   />
+}
+
+/** The icon that leads an event row: Capy leads each line with its change's icon (the new status's own icon for a move). */
+function glyphOf(item: ActivityEventItem): TaskActivityGlyph {
+  if (item.kind === 'status' && item.status) return { kind: 'status', value: item.status }
+  if (item.kind === 'priority' && item.priority) return { kind: 'priority', value: item.priority }
+  if (item.kind === 'labelAdded' || item.kind === 'labelRemoved') return { kind: 'event', value: 'label' }
+  if (item.kind === 'status' || item.kind === 'priority') return { kind: 'event', value: 'title' }
+  return { kind: 'event', value: item.kind }
 }
 
 /** Which relation a 相关 row really is: a closed block shows as related but is removed as the block it is. */
