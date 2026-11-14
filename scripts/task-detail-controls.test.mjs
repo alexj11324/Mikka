@@ -19,6 +19,7 @@ mock.module('swr', { defaultExport: key => {
   if (key?.[0] === 'issue-connections') return { data: [issue, child], mutate: async () => reads.push('connections') }
   return {}
 }, namedExports: { unstable_serialize: JSON.stringify, useSWRConfig: () => ({ mutate: async key => {
+  if (Array.isArray(key) && key[0] === 'issue-connections') reads.push('revalidate-connections')
   if (typeof key === 'function') {
     assert.equal(key(['issues', 'another-owner', 'workspace']), false)
     if (key(['issues', 'owner', 'workspace'])) reads.push('viewer-list')
@@ -36,7 +37,7 @@ stub('app/actions/issues.ts', {
 })
 stub('app/actions/issue-metadata.ts', { getIssuePropertyOptions: noop, updateIssueMetadata: noop })
 stub('app/actions/issue-operations.ts', {
-  createLinkedIssue: noop, setIssueDeleted: noop, updateIssueRelation: noop, listIssueConnections: noop,
+  createLinkedIssue: noop, setIssueDeleted: async () => ({ issue }), updateIssueRelation: noop, listIssueConnections: noop,
   toggleIssuePreference: async () => {
     if (favoriteDenied) return { error: 'issueUnavailable' }
     const favorites = issue.metadata.favoriteUserIds.length ? [] : ['owner']
@@ -61,6 +62,8 @@ before(async () => {
   for (const name of ['window', 'document', 'navigator', 'Node', 'Element', 'HTMLElement']) {
     Object.defineProperty(globalThis, name, { value: name === 'window' ? browser : browser[name], configurable: true })
   }
+  globalThis.requestAnimationFrame = browser.requestAnimationFrame.bind(browser)
+  globalThis.cancelAnimationFrame = browser.cancelAnimationFrame.bind(browser)
   globalThis.IS_REACT_ACT_ENVIRONMENT = true
   ;({ createRoot } = await import('react-dom/client'))
   ;({ FramedTask } = await import('../components/workspace/task-detail-frame.tsx'))
@@ -74,14 +77,14 @@ beforeEach(() => {
 })
 after(() => browser.close())
 
-async function mount() {
+async function mount({ showDialogs = false, onDeleted = noop } = {}) {
   const host = document.createElement('div')
   document.body.append(host)
   const root = createRoot(host)
-  const Capture = props => { frame = props; return null }
+  const Capture = props => { frame = props; return showDialogs ? props.dialogs : null }
   function Task() {
     const [task, setTask] = useState(issue)
-    return createElement(FramedTask, { Frame: Capture, task, userId: 'owner', title: task.title, status: task.status, priority: 'normal',
+    return createElement(FramedTask, { Frame: Capture, task, onDeleted, userId: 'owner', title: task.title, status: task.status, priority: 'normal',
       agentActivity: { items: [] }, versions: [], getCurrent: async () => issue, adopt: saved => { issue = saved; setTask(saved) } })
   }
   await act(async () => root.render(createElement(Task)))
@@ -89,6 +92,19 @@ async function mount() {
 }
 const row = id => frame.rows.find(item => item.id === id)
 const pickTeam = id => act(async () => row('team').menu.find(item => item.id === id).onSelect())
+
+test('confirmed deletion refreshes the viewer list without reading connections for the deleted task', async () => {
+  let deleted = false
+  const dispose = await mount({ showDialogs: true, onDeleted: () => { deleted = true } })
+  try {
+    await act(async () => frame.menu.items.find(item => item.id === 'delete').onSelect())
+    const confirm = [...document.querySelectorAll('button')].find(button => button.textContent === 'deleteAction')
+    assert.ok(confirm, 'delete confirmation must be available')
+    await act(async () => confirm.click())
+    assert.equal(deleted, true)
+    assert.deepEqual(reads, ['viewer-list'])
+  } finally { await dispose() }
+})
 
 test('team selection confirms the current team once after reopen and rejected changes retain the saved team', async () => {
   const dispose = await mount()
