@@ -1,6 +1,7 @@
 /** Pure product entitlements. Authorization must be checked independently. */
 export type DeploymentMode = 'cloud' | 'selfhost'
 export type Plan = 'free' | 'pro' | 'enterprise'
+export const ORGANIZATION_MODEL_PROVIDERS = ['vercel-gateway', 'zerocat', 'cloudflare-workers-ai', 'openai-subscription', 'anthropic-subscription', 'api-key'] as const
 export type PlanGrant = { plan: Plan; source: 'cloud' | 'license'; seatLimit: number | null; expiresAt: Date | null;
   billingPlan?: Plan; billingExpiresAt?: Date | null }
 export type GovernanceFeature = 'usageExport' | 'approvalTemplates'
