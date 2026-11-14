@@ -29,6 +29,7 @@ import { armDueTimerAfterCommit, armDueTimerSoon } from '@/lib/due-timer'
 import { afterDatabaseCommit } from '@/lib/db/commit-effects'
 import { THREAD_MACHINE_BUDGET_MS } from './thread-lifecycle'
 import { logThreadLifecycle } from './thread-lifecycle-log'
+import { THREAD_MACHINE_BUDGET_MS } from './thread-lifecycle'
 import { secretMaskerFor } from '@/lib/secrets/runtime'
 import { readWorkerTail, saveWorkerTail, workerCommand, logRuntimeRefreshFailure, type RuntimeRefreshPhase } from './thread-worker-logs'
 import { registrationCommand, quoteShell, REGISTRATION_WAITING, REGISTRATION_COMPLETE, REGISTRATION_LEGACY } from '@/lib/computer/registration-command'
@@ -258,6 +259,12 @@ const unconfirmedNativeExitSql = `((m.lifecycle->>'requiresNativeExit' IS NOT DI
  * and the new run's lock.
  */
 async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string, run: { issueId: string; runtimeBotId: string; repoPath: string; remoteUrl: string | null }, template: string | null) {
+  // New-run admission revokes the previous run's review capability. Its VM
+  // cannot change hands until the root gateways close PTY/HTTP/WS and ACK.
+  const pendingReview = await client.query(`SELECT 1 FROM coding_review_sessions s
+    WHERE s."taskId"=$1 AND s."ownerId"=$2 AND s."workspaceId"=$3 AND s."runId"<>$4 LIMIT 1`,
+  [run.issueId, actor.userId, actor.workspaceId, runId])
+  if (pendingReview.rowCount) throw new RetainedTaskMachineUnavailable()
   // The run's bot runtime is recorded on the new row; the old row's bot does not have to match.
   // A repository task's machine holds only its harness's CLI. Keep the same
   // harness's VM across additive releases; its private worker upgrades below.
@@ -418,6 +425,7 @@ export async function parkThreadMachine(pool: Pool, actor: Actor, runId: string,
     if (!existing) await client.query('BEGIN')
     let machine = await locked()
     if (!machine) { if (!existing) await client.query('COMMIT'); return }
+    if (machine.reviewHeldUntil) { if (!existing) await client.query('COMMIT'); return { reviewHeldUntil: machine.reviewHeldUntil } }
     intent = { sandboxId: machine.sandboxId, epoch: machine.epoch, failures: Number(machine.lifecycle?.failures) || 0 }
     if (machine.state !== 'paused') {
       await client.query(`UPDATE thread_machines SET lifecycle=lifecycle||jsonb_build_object('phase','pause_requested','owner','run-recovery')
@@ -434,6 +442,7 @@ export async function parkThreadMachine(pool: Pool, actor: Actor, runId: string,
         if (!machine || machine.sandboxId !== intent.sandboxId || machine.epoch !== intent.epoch) {
           await client.query('COMMIT'); return
         }
+        if (machine.reviewHeldUntil) { await client.query('COMMIT'); return { reviewHeldUntil: machine.reviewHeldUntil } }
       }
       if (machine.state !== 'paused') {
         const tail = machine.snapshotId === hostedSnapshot ? null : await readTail(machine.sandboxId)
