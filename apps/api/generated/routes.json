@@ -1522,7 +1522,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "3c1b9a1b08a92849c3b414416a99c9251dfece83a5e8df1d549e55ebedb59599"
+      "sourceHash": "4b8c5332c6e023d0daadbdbef717c87a404e13e5480dd025269ce64379fa08bd"
     },
     {
       "path": "/mikka/api/mobile/groups/[id]",
