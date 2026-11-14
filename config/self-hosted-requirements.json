@@ -16,7 +16,7 @@
   "app/actions/agents.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Authenticate the conversation owner to read, enqueue, cancel or version input through the installation PostgreSQL database.",
+    "behavior": "Authenticate the conversation owner to read, enqueue, cancel or version input through the installation PostgreSQL database. Also read the conversation continuation model menu only for its authorized owner.",
     "test": "tests/thread-continue.db.test.ts",
     "suite": "test:bot-threads-db"
   },
@@ -1674,5 +1674,33 @@
     "behavior": "Rank only the current member’s authorized conversation roots by Bot, read their per-account idle policy, and preserve manual or automatic archive visibility in installation PostgreSQL.",
     "test": "tests/conversation-title.db.test.ts",
     "suite": "test:run-publication-db"
+  },
+  "lib/thread-model-choice.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validate the exact model and its funding source when the owner requests a new turn.",
+    "test": "tests/thread-continue.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "lib/thread-model-menu.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Build the next-turn menu from the authorized owner’s ordered candidates, device and existing coding harness.",
+    "test": "tests/thread-continue.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "lib/thread-reference-search.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Search only readable tasks, conversations and pull requests in the active installation workspace.",
+    "test": "tests/thread-references.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "lib/thread-references.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Recognize and encode supported conversation citations using installation routes.",
+    "test": "tests/thread-references.db.test.ts",
+    "suite": "test:bot-threads-db"
   }
 }

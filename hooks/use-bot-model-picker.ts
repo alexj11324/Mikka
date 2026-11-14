@@ -65,9 +65,11 @@ function readChip(value: string | null): ChipModel | null {
  * can use here, the saved choice per bot, refresh on open, and the chip it
  * showed last while the menu loads. A run already going keeps its model.
  */
-export function useBotModelPicker(botId: string | null) {
+export function useBotModelPicker(botId: string | null, thread?: import('@/components/slots/model-picker-contract').BotModelPickerProps['thread']) {
   const t = useTranslations('Coordinator.modelPicker')
-  const menu = useSWR<BotModelMenu>(botModelMenuKey(botId), () => getBotModelMenu(botId))
+  const scope = thread?.scope ?? botId
+  const menu = useSWR<BotModelMenu | null>(thread ? ['thread-continuation-models', thread.scope] : botModelMenuKey(botId),
+    () => thread ? thread.load() : getBotModelMenu(botId), { shouldRetryOnError: false })
   const [failed, setFailed] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshFailed, setRefreshFailed] = useState(false)
@@ -80,11 +82,12 @@ export function useBotModelPicker(botId: string | null) {
     setRefreshing(true)
     setRefreshFailed(false)
     try {
-      await menu.mutate(() => refreshBotModelMenuAction(botId), { populateCache: true, revalidate: false })
+      await menu.mutate(() => thread ? thread.load() : refreshBotModelMenuAction(botId), { populateCache: true, revalidate: false })
     } catch { setRefreshFailed(true) } finally { setRefreshing(false) }
   }
 
   useEffect(() => {
+    if (thread) return
     const listener = (event: Event) => { if ((event as CustomEvent<string>).detail === (botId ?? 'coordinator')) { setOpenState(true); void refresh() } }
     window.addEventListener(OPEN_EVENT, listener)
     return () => window.removeEventListener(OPEN_EVENT, listener)
@@ -93,10 +96,12 @@ export function useBotModelPicker(botId: string | null) {
   // The menu this bot showed last stays on screen while a read is under way, so the chip never drops out and comes
   // back. Another bot's menu is never held over: its chip waits for its own.
   const held = useRef<{ botId: string | null; menu: BotModelMenu } | null>(null)
-  if (menu.data) held.current = { botId, menu: menu.data }
-  const data = menu.data ?? (!menu.error && held.current?.botId === botId ? held.current.menu : undefined)
+  if (menu.data) held.current = { botId: scope, menu: menu.data }
+  const loaded = thread ? menu.data : menu.data ?? (!menu.error && held.current?.botId === scope ? held.current.menu : undefined)
+  const data = loaded && thread?.selected ? withChosenModel(loaded, thread.selected) ?? loaded : loaded
   const shown = data?.current
   useEffect(() => {
+    if (thread) return
     const key = lastChipKey(botId)
     try {
       if (shown) window.localStorage.setItem(key, JSON.stringify({ id: shown.id, modelId: shown.modelId, provider: shown.provider }))
@@ -108,6 +113,7 @@ export function useBotModelPicker(botId: string | null) {
   async function choose(id: string) {
     const current = data?.current
     if (!current || (id === current.id && current.chosen)) return
+    if (thread) { if (data && withChosenModel(data, id)) thread.choose(id); return }
     setFailed(false)
     try {
       // The chip and the check mark move at once; the server's answer then replaces the guess. A pick that is not
@@ -134,7 +140,7 @@ export function useBotModelPicker(botId: string | null) {
     menu: data,
     /** Someone else's bot, or the menu failed: no chip at all. */
     error: !!menu.error,
-    last: data || menu.error ? null : last,
+    last: thread || data || menu.error ? null : last,
     open,
     /** Opening the menu refreshes it. */
     setOpen(next: boolean) { setOpenState(next); if (next) void refresh() },

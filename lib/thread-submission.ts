@@ -1,4 +1,5 @@
 import 'server-only'
+import { threadModelKey, type ThreadModelChoice } from './thread-model-choice'
 import type { Pool } from 'pg'
 import { z } from 'zod'
 import { ActionFailureError } from './action-error'
@@ -8,7 +9,7 @@ import { runChanged } from './live/panels'
 export type ThreadSubmissionResult = { runId: string; continued: boolean }
 type Input = {
   userId: string; requestId: string; rootRunId: string; requestedRunId: string
-  previousRunId: string; issueId: string | null; botId: string | null; text: string
+  previousRunId: string; issueId: string | null; botId: string | null; text: string; modelChoice?: ThreadModelChoice
   delivery?: 'queue' | 'steer' | 'interrupt' | 'afterRun' | 'version'
   mode: 'message' | 'continuation'
 }
@@ -24,7 +25,7 @@ export async function submitThreadOnce(pool: Pool, input: Input,
 ): Promise<ThreadSubmissionResult> {
   const requestId = z.uuid().parse(input.requestId).toLowerCase()
   const id = factoryEventId('thread-submission', JSON.stringify([input.userId, requestId]))
-  const binding = { requestId, rootRunId: input.rootRunId, requestedRunId: input.requestedRunId, mode: input.mode, ...(input.delivery ? { delivery: input.delivery } : {}) }
+  const binding = { requestId, rootRunId: input.rootRunId, requestedRunId: input.requestedRunId, mode: input.mode, ...(input.modelChoice ? { modelKey: threadModelKey(input.modelChoice) } : {}), ...(input.delivery ? { delivery: input.delivery } : {}) }
   // Queue and immediate delivery share one client request namespace. Acquire
   // the lock before the receipt read so concurrent intents see the winner.
   const client = await pool.connect()
@@ -53,6 +54,7 @@ export async function submitThreadOnce(pool: Pool, input: Input,
     || event.kind !== 'user_message' || event.payload?.source !== 'thread_continuation'
     || event.payload?.text !== input.text || recorded?.requestId !== binding.requestId
     || recorded?.delivery !== binding.delivery
+    || recorded?.modelKey !== binding.modelKey
     || recorded?.rootRunId !== binding.rootRunId || recorded?.requestedRunId !== binding.requestedRunId
     || !['message','continuation'].includes(recorded?.mode)
     || !z.uuid().safeParse(event.payload?.previousRunId).success) throw new ActionFailureError('submissionConflict')

@@ -40,7 +40,7 @@ stub('app/actions/agents.ts', {
   findThreadIssue: () => read('lookup', { issueId: 'issue' }),
   getIssueThread: () => read('thread', { thread, chunks: [{ chunk: { type: 'text-delta', id: 'reply', delta: 'Retained reply.' }, at: new Date(0) }], messages: [], chunksAppend: false }),
   getThreadChanges: async () => ({ state: 'none' }), getThreadInstructions: async () => '',
-  getThreadMachine: async () => null, getThreadName: async () => null,
+  getThreadMachine: async () => null, getThreadName: async () => null, getThreadContinuationModels: async () => null,
   listIssueThreads: async () => [], pollIssueThreads: async () => [],
   retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null,
   sendIssueThreadReply: async () => { throw new Error('This read test must not send') }, stopRun: async () => ({}),

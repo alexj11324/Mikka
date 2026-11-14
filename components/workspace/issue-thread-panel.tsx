@@ -11,7 +11,7 @@ import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { MessageSquareDiff } from 'lucide-react'
-import { getIssueThread, getThreadInstructions, stopRun, type IssueThreadDetail } from '@/app/actions/agents'
+import { getIssueThread, getThreadInstructions, stopRun, getThreadContinuationModels, type IssueThreadDetail } from '@/app/actions/agents'
 import { useThreadChanges } from '@/hooks/use-thread-run-reads'
 import { useActionError } from '@/lib/use-action-error'
 import { sendReviewChange, type ReviewChangeTarget } from '@/lib/factory/review-change'
@@ -39,11 +39,14 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { AgentMarkdown } from './agent-markdown'
 import { ComputerCard } from '@/components/computer/computer-card'
 import { harnessLabel, type IssueThreadsRead } from './issue-threads'
+import { BotModelPicker } from '@/components/coordinator/bot-model-picker'
+import { choiceFromMenu, threadModelKey, type ThreadModelChoice } from '@/lib/thread-model-choice'
 import { ThreadScreen } from '@ui-slot/thread'
 import type { ThreadEntry, ThreadEntryPart } from '@/components/slots/thread-contract'
-import { HarnessMark, harnessName } from '@/components/labels/entity-labels'
+import { HarnessMark, harnessName, ModelLabel } from '@/components/labels/entity-labels'
 import { navigate } from './workspace-navigation'
 import { ThreadHeader, ThreadStatusLine } from './thread-header'
+import { PersonReferences, ThreadReferencePicker } from './thread-references'
 import { ThreadContextUsage } from './thread-context-usage'
 import { ThreadOutlineIndex } from './thread-outline-index'
 import { threadOutline } from '@/lib/thread-outline'
@@ -76,7 +79,7 @@ function PersonBubble({ text, mine }: { text: string; mine: boolean }) {
   const { quote, text: words } = splitReplyQuote(text)
   const attached = splitChatFiles(words)
   return <>
-    <div className={cn(BUBBLE, 'flex flex-col', mine ? 'self-end bg-background text-foreground ring-1 ring-border' : 'self-start')}><CollapsibleMessage>{quote && <QuoteLine slot="reply-quote" text={quote} />}<ChatFileCards files={attached.files} sent /><span>{attached.text}</span></CollapsibleMessage></div>
+    <div className={cn(BUBBLE, 'flex flex-col', mine ? 'self-end bg-background text-foreground ring-1 ring-border' : 'self-start')}><CollapsibleMessage>{quote && <QuoteLine slot="reply-quote" text={quote} />}<ChatFileCards files={attached.files} sent /><span><PersonReferences text={attached.text} /></span></CollapsibleMessage></div>
     <MessageActions className={cn(HOVER_ACTIONS, mine ? 'self-end' : 'self-start')}><CopyAction text={words} /></MessageActions>
   </>
 }
@@ -178,8 +181,9 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const [deliveryMode, setDeliveryMode] = useViewState<ThreadDeliveryMode>('thread:delivery-mode', 'queue')
   const modes = data?.delivery?.modes ?? []
   const selectedMode = modes.includes(deliveryMode) ? deliveryMode : modes[0]
-  const delivery = useChatDelivery<ChatSubmission & { delivery?: ThreadDeliveryMode; review?: ReviewChangeTarget; runId: string; expectedOwnerId?: string; expectedWorkspaceId?: string }>(`thread:${runId}`, feedback('sendUncertain'))
+  const delivery = useChatDelivery<ChatSubmission & { delivery?: ThreadDeliveryMode; review?: ReviewChangeTarget; runId: string; expectedOwnerId?: string; expectedWorkspaceId?: string; modelChoice?: ThreadModelChoice }>(`thread:${runId}`, feedback('sendUncertain'))
   const sendLock = useRef(false)
+  const [pickedModel, setPickedModel] = useViewState<ThreadModelChoice | null>(`thread:${runId}:next-model`, null)
   const [submission, setSubmission] = useViewState<ThreadReplySubmission | null>(`thread:${runId}:submission`, null)
   // Words picked from the agent's reply with 引用: they head the next message as quote lines.
   const [replyQuote, setReplyQuote] = useViewState<string | null>(`thread:${runId}:quote`, null)
@@ -256,13 +260,13 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     if (retryOriginalSession ? !canRetry : !review && replyBlocked) return
     const words = previous?.text ?? (retry === undefined && !review ? withReplyQuote(text, replyQuote) : text)
     // Preserve an interrupted send from the previous client version when its unchanged draft is submitted.
-    const saved = prepareThreadReply(submission, liveRunId, words)
-    const command = previous ?? { ...(selectedMode && !retry && !review ? { delivery: selectedMode } : {}), id: saved.requestId, runId: saved.runId, text: words, at: Date.now(), ...(review ? { review: { label: review.label, binding: review.binding } } : {}),
+    const saved = prepareThreadReply(submission, liveRunId, words, undefined, !review && !retryOriginalSession && !active && !question && !replyBlocked && pickedModel ? pickedModel : undefined)
+    const command = previous ?? { ...(selectedMode && !retry && !review ? { delivery: selectedMode } : {}), id: saved.requestId, runId: saved.runId, text: words, at: Date.now(), ...(saved.modelChoice ? { modelChoice: saved.modelChoice } : {}), ...(review ? { review: { label: review.label, binding: review.binding } } : {}),
       expectedOwnerId: data?.live?.viewerId, expectedWorkspaceId: data?.live?.runs.find(run => run.id === liveRunId)?.workspaceId ?? undefined }
     if (!retryOriginalSession && !delivery.begin(command)) return
     sendLock.current = true
     setSending(true); setSendFailed(false)
-    if (!retryOriginalSession && !previous) { setDraft(''); setReplyQuote(null); setSubmission(null); if (review) changeRequest?.onCancel() }
+    if (!retryOriginalSession && !previous) { setDraft(''); setReplyQuote(null); setSubmission(null); if (saved.modelChoice) setPickedModel(null); if (review) changeRequest?.onCancel() }
     const fail = (reason: string) => retryOriginalSession ? setSendFailed(reason) : delivery.finish(command.id, { error: reason })
     try {
       if (command.review) {
@@ -449,6 +453,9 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   if (!readRejected) for (const row of localMessages) entries.push({ id: row.id, role: 'person', at: row.at, text: row.text,
     status: row.phase === 'accepted' ? 'sent' : row.phase, deliveryMessage: row.error,
     ...(row.phase === 'failed' && (!replyBlocked || row.review) ? { onRetry: () => { void send(undefined, undefined, row) } } : {}) })
+  for (const entry of entries) {
+    if (entry.role === 'person' && /\[\[(?:issue|run):|https:\/\/github\.com\//i.test(entry.text)) entry.body = <PersonReferences text={entry.text} />
+  }
   // Re-publish the admitted read itself. Identical message lengths or tool
   // counts do not prove the content, grant or attempt result is unchanged.
   useEffect(() => { if (collect) collect(runId, entries) }, [collect, runId, data, active, canRetry, sending, view?.status, retryLabel, delivery.rows]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -477,14 +484,29 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       </>}
     </div>)}
   </div>
+  const recorded = data?.context?.composerModel
+  const currentModel = recorded?.served || recorded?.selected
+  const pickerEnabled = issueId && data?.live?.viewerId && !active && !question && !replyBlocked && !changeRequest &&
+    (detail?.harness === 'codex' || detail?.harness === 'claude_code')
+  const modelControl = data?.thread.ownedByCurrentUser ? <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+    {pickerEnabled && issueId && <BotModelPicker botId={null} thread={{ scope: JSON.stringify([data?.live?.viewerId, issueId, liveRunId]),
+      load: () => getThreadContinuationModels(issueId, liveRunId), selected: pickedModel ? threadModelKey(pickedModel) : null, choose: id => setPickedModel(choiceFromMenu(id)) }} />}
+    {currentModel ? <ModelLabel model={currentModel} /> : t('composerModelUnknown')}
+    {recorded?.served && recorded.selected && recorded.served !== recorded.selected &&
+      <span>{t('composerModelRequested', { model: recorded.selected })}</span>}
+  </span> : undefined
+  const referenceWorkspace = liveRuns.find(run => run.id === liveRunId)?.workspaceId
+  const references = referenceWorkspace && data?.thread.ownedByCurrentUser ? <ThreadReferencePicker draft={draft}
+    workspaceId={referenceWorkspace} input={inputRef} onChange={setDraft} /> : null
   const conversation = !bare && detail ? <ThreadScreen botId={null} name={title} mark={author?.mark ?? null} entries={data ? [...beforeEntries ?? [], ...entries, ...afterEntries ?? []] : null}
     working={working} onStop={working && canStop ? () => { void stop() } : undefined}
-    composer={{ ref: inputRef, label: replyBlocked ? t('checkEnded') : t('composer', { agent: harnessLabel(threadComposerHarness(detail.harness, liveRunId, modelFallback)) }), value: draft, onChange: setDraft, onSubmit: () => { void send() },
+    composer={{ ref: inputRef, model: modelControl, label: replyBlocked ? t('checkEnded') : t('composer', { agent: harnessLabel(threadComposerHarness(detail.harness, liveRunId, modelFallback)) }), value: draft, onChange: setDraft, onSubmit: () => { void send() },
       attachmentScope: { kind: 'thread', id: liveRunId }, sending: sending || stopPending, editableWhileSending: true, submitDisabled: changeRequest ? false : replyBlocked || stopRequested || question === 'resuming',
       running: working || (question === 'resuming' && !data?.thread.questionWake), thread: true }}
     pending={[...changeRequest ? [{ id: 'change-request', name: changeRequest.label, onRemove: changeRequest.onCancel }] : [], ...replyQuote ? [{ id: 'reply-quote', name: replyQuote, onRemove: () => setReplyQuote(null) }] : []]}
     notices={<>
       {queueControls}
+      {references}
       {data?.thread.quota?.paused && <ThreadQuotaPausedCard paused={data.thread.quota.paused} onContinued={() => { void mutate(); void mutateCache(['issue-threads', issueId]) }} />}
       {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive-foreground">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
@@ -503,7 +525,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     {detail && <div data-slot="thread-composer" className="flex shrink-0 flex-col gap-1 p-3">
       {queueControls}
       {/* Keep the draft editable while stop waits for the daemon; do not queue new work after stop. */}
-      <ChatComposer ref={inputRef} label={replyBlocked ? t('checkEnded') : t('composer', { agent: harnessLabel(threadComposerHarness(detail.harness, liveRunId, modelFallback)) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }} attachmentScope={{ kind: 'thread', id: liveRunId }}
+      {references}
+      <ChatComposer ref={inputRef} model={modelControl} label={replyBlocked ? t('checkEnded') : t('composer', { agent: harnessLabel(threadComposerHarness(detail.harness, liveRunId, modelFallback)) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }} attachmentScope={{ kind: 'thread', id: liveRunId }}
         quote={changeRequest ? <QuoteChip slot="change-request-chip" text={changeRequest.label} icon={<MessageSquareDiff aria-hidden="true" className="size-3.5 shrink-0" />} onRemove={changeRequest.onCancel} />
           : replyQuote ? <QuoteChip slot="reply-quote-chip" text={replyQuote} onRemove={() => { setReplyQuote(null); inputRef.current?.focus() }} /> : undefined}
         sending={sending || stopPending} editableWhileSending submitDisabled={changeRequest ? false : replyBlocked || stopRequested || question === 'resuming'} running={working || (question === 'resuming' && !data?.thread.questionWake)} thread onStop={working && canStop ? () => { void stop() } : undefined} />

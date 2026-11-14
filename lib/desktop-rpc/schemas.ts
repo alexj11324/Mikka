@@ -1,3 +1,4 @@
+import { threadModelChoice } from '@/lib/thread-model-choice'
 import { directoryInput } from '@/lib/conversation-directory-input'
 import { saveEnvironmentInput, projectDefaultEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
 import { createOnlyCommand, dispatchReceiptInput } from '@/lib/task-create-command'
@@ -139,12 +140,13 @@ export const desktopActionSchemas = {
   'agents.getThreadChanges': tuple(uuid.nullable(), uuid),
   'agents.getThreadMachine': tuple(uuid.nullable(), uuid),
   'agents.getThreadInstructions': tuple(uuid.nullable(), uuid),
-  'agents.sendIssueThreadReply': tuple(object({ expectedOwnerId: text(256).optional(), expectedWorkspaceId: uuid.optional(), issueId: uuid.nullable(), runId: uuid, text: text(10_000).min(1), requestId: uuid.optional(), retryOriginalSession: z.literal(true).optional(), questionWakeGeneration: uuid.optional(), delivery: z.enum(['queue','steer','interrupt']).optional() })),
+  'agents.sendIssueThreadReply': tuple(object({ expectedOwnerId: text(256).optional(), expectedWorkspaceId: uuid.optional(), issueId: uuid.nullable(), runId: uuid, text: text(10_000).min(1), requestId: uuid.optional(), retryOriginalSession: z.literal(true).optional(), questionWakeGeneration: uuid.optional(), modelChoice: threadModelChoice.optional(), delivery: z.enum(['queue','steer','interrupt']).optional() })),
   'agents.createThreadReplyVersion': tuple(object({issueId:uuid.nullable(),runId:uuid,change:z.discriminatedUnion('operation',[
     object({operation:z.literal('edit'),anchorRunId:uuid,anchorKey:uuid,requestId:uuid,text:text(10_000).min(1)}),
     object({operation:z.literal('rerun'),anchorRunId:uuid,anchorKey:text(320).min(1),requestId:uuid})])})),
   'agents.getThreadReplyVersions': tuple(uuid.nullable(),uuid),
   'agents.changeQueuedThreadReply': tuple(object({issueId: uuid.nullable(), runId: uuid, messageId: uuid, action: z.enum(['cancel','sendNow'])})),
+  'agents.getThreadContinuationModels': tuple(uuid, uuid),
   'agents.getThreadName': oneId,
   'agents.stopRun': oneId,
   'agents.resumeQuotaPausedRunOnApiKey': oneId,
@@ -288,6 +290,7 @@ export const desktopActionSchemas = {
   'task-runs.pollTaskRuns': none,
   'task-runs.pollThreads': tuple(version.optional(), listPositions(200).optional()),
   'task-runs.syncThreadList': tuple(version.optional(), listPositions(200).optional()),
+  'task-runs.findThreadReferences': z.union([tuple(uuid, text(120)), tuple(uuid, text(120), z.enum(['task', 'thread', 'pr']))]),
   'task-runs.listConversations': tuple(directoryInput),
   'task-runs.listConversationSidebar': none,
   'task-runs.readConversationOrganization': tuple(uuid),
