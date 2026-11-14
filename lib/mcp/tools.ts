@@ -4,7 +4,7 @@ import 'server-only'
 import { and, desc, eq, gt, sql } from 'drizzle-orm'
 import { chatBotId } from '@/lib/coordinator/coordinator-bot'
 import type { ModelMessage } from 'ai'
-import { readRun, visibleRuns } from '@/lib/agent-runs'
+import * as runs from '@/lib/agent-runs'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { peerCoordinatorMessageEvent } from '@/lib/coordinator-events'
 import { coordinatorEnabled } from '@/lib/coordinator/wake'
@@ -149,7 +149,7 @@ export async function getIssue(userId: string, issueId: string) {
   if (!taskReaderScope(userId).workspaceId) throw new ActionFailureError('workspaceAccessDenied')
   const issue = await issueForUser(userId, issueId)
   if (!issue) return null
-  const runs = await visibleRuns(userId, { issueId: issue.id, limit: 5 })
+  const recentRuns = await runs.visibleRunStates(userId, { issueId: issue.id, limit: 5 })
   const view = await issueView(issue)
   const metadata = view.metadata
   // Children and the issues this one blocks point at it, so they are found by looking the other way.
@@ -170,17 +170,17 @@ export async function getIssue(userId: string, issueId: string) {
       children: pick([...linked.values()].filter(row => row.parentId === issue.id).map(row => row.id)),
       blockedBy: pick(metadata.blockedByIds), blocks: pick([...linked.values()].filter(row => row.blockedByIds.includes(issue.id)).map(row => row.id)), related: pick(metadata.relatedIds), duplicateOf: pick([metadata.duplicateOfId])[0] ?? null,
     },
-    runs: runs.map(run => ({ id: run.id, agent: run.agentName, status: run.status, createdAt: run.createdAt.toISOString() })),
+    runs: recentRuns.map(run => ({ id: run.id, agent: run.agentName, status: run.status, createdAt: run.createdAt.toISOString() })),
   }
 }
 
 export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }) {
-  const rows = await visibleRuns(userId, input)
+  const rows = await runs.visibleRunStates(userId, input)
   return rows.map(run => ({ id: run.id, issueId: run.issueId, agent: run.agentName, status: run.status, stopReason: run.stopReason, createdAt: run.createdAt.toISOString() }))
 }
 
 export async function getRun(userId: string, runId: string) {
-  const detail = await readRun(userId, runId)
+  const detail = await runs.readRun(userId, runId)
   if (!detail) return null
   const { run } = detail
   return {
