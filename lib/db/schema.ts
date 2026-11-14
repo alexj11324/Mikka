@@ -963,6 +963,10 @@ export const conversations = pgTable('conversations', {
   id: uuid('id').primaryKey(), workspaceId: uuid('workspaceId').notNull(),
   kind: text('kind').$type<'group' | 'agent_dm'>().notNull(), title: text('title').notNull(),
   createdBy: text('createdBy').notNull(), lastPosition: bigint('lastPosition', { mode: 'bigint' }).notNull().default(sql`0`),
+  creationPurpose: text('creationPurpose').notNull().default('group'),
+  conversationArchivedAt: timestamp('conversationArchivedAt', { withTimezone: true }),
+  conversationPinnedAt: timestamp('conversationPinnedAt', { withTimezone: true }),
+  conversationRestoredAt: timestamp('conversationRestoredAt', { withTimezone: true }),
   // Optional owner-designated current group agent; never inferred or backfilled.
   leadAgentId: uuid('leadAgentId'),
   leadBotId: uuid('leadBotId'),
@@ -1000,6 +1004,8 @@ export const messageReactions = pgTable('message_reactions', {
 export const conversationReads = pgTable('conversation_reads', {
   userId: text('userId').notNull(), conversationId: text('conversationId').notNull(),
   lastReadPosition: integer('lastReadPosition').notNull().default(0), lastReadMessageId: text('lastReadMessageId'),
+  runReadAt: timestamp('runReadAt', { withTimezone: true }), manuallyUnread: boolean('manuallyUnread').notNull().default(false),
+  unreadRevision: integer('unreadRevision').notNull().default(0),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, t => [primaryKey({ columns: [t.userId, t.conversationId] })])
 export const conversationLinks = pgTable('conversation_links', {

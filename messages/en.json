@@ -4419,6 +4419,10 @@
     "copyFailed": "Couldn't copy"
   },
   "ConversationDirectory": {
+    "unread": "Unread",
+    "readAll": "Mark all as read",
+    "markUnread": "Mark as unread",
+    "writeError": "Couldn’t save the read status. Try again.",
     "title": "Conversations",
     "search": "Search conversations",
     "all": "All",

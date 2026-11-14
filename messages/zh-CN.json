@@ -4419,6 +4419,10 @@
     "copyFailed": "复制失败"
   },
   "ConversationDirectory": {
+    "unread": "未读",
+    "readAll": "全部标为已读",
+    "markUnread": "标为未读",
+    "writeError": "未能保存已读状态，请重试。",
     "title": "对话",
     "search": "搜索对话",
     "all": "全部",

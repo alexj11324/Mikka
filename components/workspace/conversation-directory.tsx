@@ -1,6 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import { useSWRConfig } from 'swr'
+import type { ThreadReadChange } from '@/lib/thread-reads'
+import { setThreadRead } from '@/lib/thread-read-client'
+import { threadKeys } from '@/lib/swr/keys'
 import useSWRInfinite from 'swr/infinite'
 import { unstable_serialize } from 'swr/infinite'
 import { useFormatter, useTranslations } from 'next-intl'
@@ -9,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { SearchInput } from '@/components/ui/search-input'
 import { useLiveKey } from '@/hooks/use-live-key'
 import type { DirectoryState } from '@/lib/conversation-directory-input'
-import { openThread } from './workspace-navigation'
+import { navigate, openThread } from './workspace-navigation'
 
 type Page = Awaited<ReturnType<typeof listConversations>>
 const states = ['all', 'working', 'waiting', 'idle', 'failed'] as const
@@ -17,6 +21,9 @@ const states = ['all', 'working', 'waiting', 'idle', 'failed'] as const
 export function ConversationDirectory({ ownerId, workspaceId }: { ownerId: string; workspaceId: string | null }) {
   const t = useTranslations('ConversationDirectory')
   const format = useFormatter()
+  const { mutate: refresh } = useSWRConfig()
+  const [writing, setWriting] = useState(false)
+  const [writeError, setWriteError] = useState(false)
   const [search, setSearch] = useState('')
   const [state, setState] = useState<DirectoryState | 'all'>('all')
   const [archived, setArchived] = useState(false)
@@ -27,8 +34,19 @@ export function ConversationDirectory({ ownerId, workspaceId }: { ownerId: strin
     ([, , , text, selected, showArchive, cursor]) => listConversations({ search: text, state: selected, archived: showArchive, cursor: cursor ?? undefined }),
     { revalidateOnFocus: false, shouldRetryOnError: false })
   useLiveKey('thread_list', workspaceId, workspaceId ? [unstable_serialize(getKey)] : [], workspaceId)
+  useLiveKey('group_list', workspaceId, workspaceId ? [unstable_serialize(getKey)] : [], workspaceId)
   const rows = [...new Map(data?.flatMap(page => page.items).map(item => [item.id, item])).values()]
   const more = Boolean(data?.at(-1)?.cursor)
+  async function mark(change: ThreadReadChange) {
+    if (writing) return
+    setWriting(true)
+    setWriteError(false)
+    try {
+      await setThreadRead(change)
+      await Promise.all([mutate(), refresh(threadKeys.list(ownerId))])
+    } catch { setWriteError(true) }
+    finally { setWriting(false) }
+  }
   return <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4" aria-label={t('title')}>
     <SearchInput type="search" value={search} maxLength={120} aria-label={t('search')} placeholder={t('search')}
       onChange={event => setSearch(event.target.value)} />
@@ -36,17 +54,22 @@ export function ConversationDirectory({ ownerId, workspaceId }: { ownerId: strin
       {states.map(value => <Button key={value} size="sm" variant={value === state ? 'secondary' : 'ghost'}
         aria-pressed={value === state} onClick={() => setState(value)}>{t(value)}</Button>)}
       <Button size="sm" variant="outline" aria-pressed={archived} onClick={() => setArchived(!archived)}>{t('archived')}</Button>
+      <Button size="sm" variant="ghost" disabled={writing || !workspaceId} onClick={() => void mark({ action: 'readAll' })}>{t('readAll')}</Button>
     </div>
+    {writeError && <p role="alert">{t('writeError')}</p>}
     {error && <div role="alert">{t('loadError')} <Button size="sm" variant="ghost" onClick={() => void mutate()}>{t('retry')}</Button></div>}
     {!error && !data && <p role="status">{t('loading')}</p>}
     {data && !rows.length && !more && !error && <p role="status">{t('empty')}</p>}
     <ul className="flex flex-col gap-1">
-      {rows.map(row => <li key={row.id} className="flex items-center gap-2"><Button type="button" variant="ghost" onClick={() => openThread(row.id)}
+      {rows.map(row => <li key={row.id} className="flex items-center gap-2"><Button type="button" variant="ghost" onClick={() => row.kind === 'chat' ? navigate({ section: 'group', group: row.id, issue: null, thread: null, task: null }) : openThread(row.id)}
         className="h-auto min-w-0 flex-1 flex-wrap justify-start gap-x-3 gap-y-1 py-3 text-start">
         <span className="min-w-0 flex-1 break-words font-medium">{row.title || t('untitled')}</span>
+        {row.unread && <span className="size-2 rounded-full bg-primary" role="img" aria-label={t('unread')} />}
         {row.identifier && <bdi>{row.identifier}</bdi>}
         <span>{t(row.state)}</span><time dateTime={row.at}>{format.dateTime(new Date(row.at), { dateStyle: 'medium', timeStyle: 'short' })}</time>
-      </Button></li>)}
+      </Button>
+        {!row.unread && <Button size="sm" variant="ghost" disabled={writing} onClick={() => void mark(row.kind === 'chat' ? { action: 'unread', chatId: row.id } : { action: 'unread', runId: row.id })}>{t('markUnread')}</Button>}
+      </li>)}
     </ul>
     {more && <Button variant="outline" disabled={isValidating} onClick={() => void setSize(size + 1)}>{t('more')}</Button>}
   </section>

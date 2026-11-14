@@ -86,6 +86,7 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
         ['conversation_links','conversation_members','conversation_messages','conversation_reads','conversations'])
       assert.deepEqual(reverseCatalog, forwardCatalog, 'both migration orders must produce equivalent columns, constraints and indexes')
     } finally { await reverse.end() }
+    await scoped.query('CREATE TABLE chat_preferences (LIKE public.chat_preferences INCLUDING ALL)')
     const run = (changes: Partial<GroupRequest>) => handleGroup(scoped, directory, { ...base, ...changes })
     for (const input of [undefined, '{', JSON.stringify({ workspaceId, title: '', members: [] }), JSON.stringify({ workspaceId: randomUUID(), title: 'foreign' }), JSON.stringify({ workspaceId, title: 'private', members: [{ memberType: 'agent', memberId: privateAgent }] })]) {
       assert.ok([404, 422].includes((await run({ method: 'POST', body: input })).status))

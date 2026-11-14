@@ -1,10 +1,13 @@
 import 'server-only'
+import { standaloneChatDirectory } from './standalone-chat-directory'
 import { withConversationWorkspace, type ConversationReader } from './conversation-workspace'
 import { taskReaderScope } from './task-workspace'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import { directoryInput, type DirectoryInput, type DirectoryState } from './conversation-directory-input'
 import { runAwaitingApproval, runDeviceOffline } from './task-state-query'
+import { conversationReads, agentRuns } from './db/schema'
+import { joinThreadRead, threadUnread } from './thread-reads'
 import { runFailureBrief } from './run-failure-projection'
 import { runChainSql, RUN_CHAIN_MAX_DEPTH, type RunChainQueryable } from './run-chain'
 import { attemptStateOf, type TaskStateRun } from './task-state'
@@ -13,7 +16,7 @@ import { conversationTitle } from './short-title'
 
 type Row = TaskStateRun & {
   id: string; issueId: string | null; identifier: string | null; title: string | null; asked: string
-  taskTitle: string | null; agentName: string; pinned: boolean; at: string
+  taskTitle: string | null; agentName: string; pinned: boolean; unread: boolean; at: string
 }
 
 function directoryState(row: Row): DirectoryState {
@@ -36,6 +39,9 @@ async function directoryPage(database: RunChainQueryable, userId: string, worksp
   const input = directoryInput.parse(raw)
   const projection = sql`SELECT roots.id, roots.title, roots.asked, roots."agentName", roots.pinned, roots.at,
       roots."issueId", roots.identifier, roots."taskTitle",
+      EXISTS (SELECT 1 FROM assigned receipt JOIN ${agentRuns} ON ${agentRuns.id}=receipt.id
+        LEFT JOIN ${conversationReads} ON ${joinThreadRead(userId)}
+        WHERE receipt.root=roots.id AND NOT receipt."depthExceeded" AND (${threadUnread})) AS unread,
       agent_runs.id AS "runId", agent_runs.status, agent_runs.outcome, agent_runs."pauseReason", agent_runs."stopReason",
       agent_runs."threadReplacedBy", ${runFailureBrief} AS "failureDetails", (${runAwaitingApproval}) AS "awaitingApproval",
       (${runDeviceOffline}) AS "deviceOffline" FROM roots JOIN agent_runs ON agent_runs.id=roots.latest`
@@ -74,11 +80,21 @@ async function directoryPage(database: RunChainQueryable, userId: string, worksp
     input.botId ?? null, input.cursor?.pinned ?? null, input.cursor?.at ?? null, input.cursor?.id ?? null, input.search])).rows as Row[]
   const batch = rows.slice(0, 100)
   const items = batch.map(row => ({
-    id: row.id, issueId: row.issueId, identifier: row.identifier, title: conversationTitle({ title: row.title,
+    kind: 'run' as const, id: row.id, issueId: row.issueId, identifier: row.identifier, title: conversationTitle({ title: row.title,
       name: threadName(row.asked, ''), issue: { title: row.taskTitle || row.agentName } }),
-    state: directoryState(row), at: row.at, pinned: row.pinned,
+    state: directoryState(row), at: row.at, pinned: row.pinned, unread: row.unread,
   })).filter(item => (input.state === 'all' || item.state === input.state) &&
     (!input.search || item.title.toLowerCase().includes(input.search.toLowerCase())))
-  const last = batch.at(-1)
-  return { items, cursor: rows.length > batch.length && last ? { id: last.id, at: last.at, pinned: last.pinned } : null }
+  const chats = await standaloneChatDirectory(database, userId, workspaceId, input)
+  const order = (a: { pinned: boolean; at: string; id: string }, b: typeof a) =>
+    Number(b.pinned) - Number(a.pinned) || b.at.localeCompare(a.at) || b.id.localeCompare(a.id)
+  const merged = [...items, ...chats].sort(order)
+  // A state or title filter can reject the last run we examined. Preserve this
+  // scan boundary so older results do not skip still-unexamined runs.
+  const boundary = rows.length > batch.length ? batch.at(-1) : undefined
+  const eligible = boundary ? merged.filter(item => order(item, boundary) <= 0) : merged
+  const page = eligible.slice(0, 100)
+  const last = page.length === 100 ? page.at(-1) : boundary
+  const more = Boolean(boundary) || merged.length > page.length
+  return { items: page, cursor: more && last ? { id: last.id, at: last.at, pinned: last.pinned } : null }
 }

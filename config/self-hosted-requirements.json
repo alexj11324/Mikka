@@ -1771,5 +1771,75 @@
     "behavior": "Search authorized workspace conversations by their own titles, including task-free historical runs. Page by activity after resolving continuation chains in installation PostgreSQL.",
     "test": "tests/conversation-title.db.test.ts",
     "suite": "test:run-publication-db"
+  },
+  "app/api/conversations/read-state/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Record the personal read position or manual unread flag for visible runs in the selected workspace using the installation database.",
+    "test": "lib/thread-reads.db.test.ts",
+    "suite": "test:conversation-reads"
+  },
+  "drizzle/20261113164616_thread_read_watermarks.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Extend the installation’s existing per-user conversation read rows with a run activity timestamp and a revision for manual unread marks.",
+    "test": "lib/thread-reads.db.test.ts",
+    "suite": "test:conversation-reads"
+  },
+  "lib/conversation-reads-store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Compute Bot unread totals and retain per-workspace Coordinator positions using the installation database.",
+    "test": "lib/conversation-reads-store.test.ts",
+    "suite": "test:conversation-reads"
+  },
+  "lib/live/lists.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Notify only the reader in the current workspace of thread list changes using the existing live transport.",
+    "test": "lib/live/lists.db.test.ts",
+    "suite": "test:live-db"
+  },
+  "lib/thread-read-client.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Post same-origin reader acknowledgements to the installation’s own conversation read endpoint.",
+    "test": "lib/thread-reads.db.test.ts",
+    "suite": "test:conversation-reads"
+  },
+  "drizzle/20261113180454_standalone_bot_conversations.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Retain legacy group identity and admit owner-created named conversations to their durable read receipts.",
+    "test": "lib/thread-reads.db.test.ts",
+    "suite": "test:conversation-reads"
+  },
+  "lib/standalone-chat-directory.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Keep owner-created standalone chats in installation PostgreSQL and reopen them only through their active participant and workspace authorization.",
+    "test": "lib/thread-reads.db.test.ts",
+    "suite": "test:conversation-reads"
+  },
+  "drizzle/20261113193638_standalone_conversation_organization.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Add nullable organization timestamps to independent conversations. Existing rows remain available without backfilling.",
+    "test": "lib/thread-reads.db.test.ts",
+    "suite": "test:conversation-reads"
+  },
+  "lib/group-read-receipts.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Advance a participant's durable group message position and clear their manual mark inside the authorized conversation transaction.",
+    "test": "lib/thread-reads.db.test.ts",
+    "suite": "test:conversation-reads"
+  },
+  "lib/thread-reads.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Persist scoped run read positions and manual marks in the existing PostgreSQL database.",
+    "test": "lib/thread-reads.db.test.ts",
+    "suite": "test:conversation-reads"
   }
 }

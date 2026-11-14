@@ -576,7 +576,8 @@ test('mobile task endpoints with real task ACL, current workspace membership and
       const waitBlockedBy = async () => {
         for (let attempt = 0; attempt < 300; attempt++) {
           const { rows } = await pool.query<{ query: string }>(`select query from pg_stat_activity
-            where datname=current_database() and $1::int=any(pg_blocking_pids(pid))`, [pid])
+            where datname=current_database() and state='active' and wait_event_type='Lock'
+              and query ilike '%mikka_workspace_members%for share%' and $1::int=any(pg_blocking_pids(pid))`, [pid])
           if (rows.length) return rows[0]
           await new Promise(resolve => setTimeout(resolve, 10))
         }
