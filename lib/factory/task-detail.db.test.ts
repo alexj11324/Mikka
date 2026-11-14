@@ -1,3 +1,4 @@
+import { measured } from '../../tests/helpers/read-metrics';
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -65,7 +66,23 @@ test('task detail GET exposes criteria and delivery without unused fields or wri
     const tables = ['factory_tasks', 'factory_attempts', 'factory_candidates', 'factory_events', 'factory_publications', 'agent_runs', 'run_publications', 'coordinator_events'];
     const snapshot = async () => Promise.all(tables.map(async t => (await pool.query(`SELECT * FROM ${t} ORDER BY 1`)).rows));
     const before = await snapshot();
-    const detail = await store.read('owner', taskId);
+    const readDetail = () => measured(() => store.read('owner', taskId));
+    const ordinary = await readDetail();
+    const detail = ordinary.value;
+    await t.test('review history leaves unused execution and verifier output in PostgreSQL', async subtest => {
+      const diagnostics = 'x'.repeat(96 * 1024);
+      const large = { ...report, filesChanged: [diagnostics], verify: { ...report.verify, output: diagnostics } };
+      await pool.query('UPDATE agent_runs SET report=$2 WHERE id=$1', [reviewRun, JSON.stringify(large)]);
+      try {
+        const expanded = await readDetail();
+        subtest.diagnostic(JSON.stringify({ ordinaryBytes: ordinary.resultBytes, expandedBytes: expanded.resultBytes }));
+        assert.deepEqual(expanded.value.checks, detail.checks);
+        assert.equal(expanded.statements, ordinary.statements);
+        assert.ok(expanded.resultBytes < ordinary.resultBytes + 1024, 'unused report fields do not cross the database connection');
+      } finally {
+        await pool.query('UPDATE agent_runs SET report=$2 WHERE id=$1', [reviewRun, JSON.stringify(report)]);
+      }
+    });
     assert.deepEqual(await snapshot(), before, 'GET wrote nothing');
     assert.deepEqual(calls, [], 'detail reads do not recheck execution ancestry');
     assert.deepEqual(detail.checks?.map(x => [x.attemptId, x.stage]), [[reviewAttempt, 'review'], [verifyAttempt, 'verify']]);

@@ -648,9 +648,13 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       // Real PG, lifecycle/park and merge writers; only provider I/O and live
       // transport are fixtures. Signature admission has its own route tests.
       await pool.query(`
-        ALTER TABLE agent_runs ADD COLUMN "pauseReason" text, ADD COLUMN "deviceTokenId" uuid, ADD COLUMN "createdAt" timestamptz NOT NULL DEFAULT now();
+        ALTER TABLE agent_runs ADD COLUMN "pauseReason" text, ADD COLUMN "deviceTokenId" uuid,
+          ADD COLUMN "retryOf" uuid, ADD COLUMN "continuesRunId" uuid, ADD COLUMN "agentId" uuid,
+          ADD COLUMN "createdAt" timestamptz NOT NULL DEFAULT now();
         ALTER TABLE run_publications ADD COLUMN "issueId" uuid, ADD COLUMN "updatedAt" timestamptz DEFAULT now();
         CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
+        CREATE TABLE computer_run_bindings ("runId" uuid PRIMARY KEY,"botId" uuid,"ownerId" text);
+        CREATE TABLE bot_cloud_runtimes ("agentId" uuid,"botId" uuid,"ownerId" text);
         CREATE TABLE device_tokens (id uuid PRIMARY KEY,"boundDeviceId" uuid,"revokedAt" timestamptz);
         CREATE TABLE suggestion_executions ("runId" uuid,status text,"endedAt" timestamptz);
         CREATE TABLE thread_machines ("runId" uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"issueId" uuid,

@@ -12,6 +12,7 @@ import { once } from "node:events";
 import { betterAuth } from "better-auth";
 import { hashPassword } from "better-auth/crypto";
 import { Pool } from "pg";
+import { observePoolCommits } from "../db/commit-effects";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import {
   FactoryError,
@@ -32,7 +33,7 @@ import {
   createVercelPublicationAdapter,
   MIKKA_VERCEL,
   vercelTarget,
-} from "./vercel-publication";
+} from "../../tests/helpers/factory-vercel-publication";
 import { PublicationDeferred } from "./publication-operation";
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 
@@ -92,6 +93,7 @@ test(
       max: 14,
       options: `-c search_path=${schema}`,
     });
+    observePoolCommits(pool);
     const directory = await mkdtemp(join(tmpdir(), "mikka-194-"));
     const targetDirectory = join(directory, "target");
     const authorize = async (
@@ -1038,6 +1040,7 @@ test(
             max: 1,
             options: `-c search_path=${schema}`,
           });
+          observePoolCommits(reconnected);
           try {
             const recovered = createFactoryApprovals(
               reconnected,

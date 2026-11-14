@@ -83,6 +83,43 @@ test('host settlement receipts preserve product publication across native RPC re
       chat=await chatView(ownerId,200,botId)
       assert.equal(chat.working,false);assert.equal(chatFailure(chat),null,'a successful quiet native outcome is not inferred to have crashed')
     })
+    await t.test('admission claims its scoped event once and rolls back with the transcript', async t => {
+      const { Client } = await import('pg')
+      const { db, withDatabaseTransaction } = await import('../db')
+      const { markEventAccepted } = await import('./submission')
+      const eventId = randomUUID()
+      await pool.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload)
+        VALUES($1,$2,$3,'user_message',($1::uuid)::text,$4)`, [eventId, ownerId, botId, {text:'Claimed once'}])
+      const delivered = async () => (await pool.query('SELECT "deliveredAt" FROM coordinator_events WHERE id=$1', [eventId])).rows[0].deliveredAt
+      const projectionCount = async () => Number((await pool.query(`SELECT count(*) FROM coordinator_messages
+        WHERE "userId"=$1 AND "botId"=$2 AND message#>>'{mikkaUserEvent,id}'=$3`, [ownerId, botId, eventId])).rows[0].count)
+      await markEventAccepted({...scope, ownerId:ownerId+'-other'}, eventId)
+      await markEventAccepted({...scope, botId:randomUUID()}, eventId)
+      assert.equal(await delivered(), null)
+      await assert.rejects(db.transaction(tx => withDatabaseTransaction(tx, async () => {
+        await markEventAccepted(scope, eventId)
+        throw new Error('rollback admission')
+      })), /rollback admission/)
+      assert.equal(await delivered(), null)
+      assert.equal(await projectionCount(), 0)
+
+      const queries = t.mock.method(Client.prototype, 'query')
+      const { createRequestDatabaseScope } = await import('../db')
+      const routed = createRequestDatabaseScope(process.env.E2E_DATABASE_URL!)
+      try {
+        await routed.run(() => Promise.all([markEventAccepted(scope, eventId), markEventAccepted(scope, eventId)]))
+      } finally {
+        await routed.close()
+      }
+      const sourceStatements = queries.mock.calls.filter(call => {
+        const query = call.arguments[0] as unknown
+        const text = typeof query === 'string' ? query : (query as {text?:string})?.text
+        return /(?:from|update)\s+coordinator_events\b/i.test(text ?? '')
+      })
+      assert.equal(sourceStatements.length, 2, 'one scoped event claim for each of two competing admissions')
+      assert.ok(await delivered())
+      assert.equal(await projectionCount(), 1)
+    })
     await t.test('completed root survives concurrent finish and effect committed before receipt acknowledgement',async()=>{
       const {sessionId,occurrenceId}=await scheduled()
       const input={sessionId,turnId:'turn_0',outcome:'completed' as const,messages:[{role:'assistant',content:[{type:'text',text:'Combined root result'}]}]}

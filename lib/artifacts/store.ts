@@ -236,11 +236,12 @@ async function versionContent(artifactId: string, version: number): Promise<stri
 
 /** The person's artifact file at `version`. */
 export async function readArtifactContent(reader: ArtifactReader, artifactId: string, version: number): Promise<{ kind: ArtifactKind; title: string; content: string } | null> {
-  const [row] = await db.select({ kind: artifacts.kind, title: artifacts.title }).from(artifacts)
+  const [row] = await db.select({ kind: artifacts.kind, title: artifacts.title,
+    storageKey: artifactVersions.storageKey, inlineContent: artifactVersions.inlineContent }).from(artifacts)
+    .innerJoin(artifactVersions, and(eq(artifactVersions.artifactId, artifacts.id), eq(artifactVersions.version, version)))
     .where(and(eq(artifacts.id, artifactId), await artifactAccess(reader))).limit(1)
   if (!row) return null
-  const content = await versionContent(artifactId, version)
-  return content === null ? null : { ...row, content }
+  return { kind: row.kind, title: row.title, content: row.inlineContent ?? await getArtifactObject(row.storageKey) }
 }
 
 // --- Share links ----------------------------------------------------------

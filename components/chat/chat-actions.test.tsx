@@ -4,7 +4,9 @@ import { act, createRef } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
 
-mock.module('sonner', { namedExports: { toast: { success: () => {}, error: () => {} } } })
+const copySuccess = mock.fn()
+const copyError = mock.fn()
+mock.module('sonner', { namedExports: { toast: { success: copySuccess, error: copyError } } })
 mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
 
 const browser = new Window({ url: 'https://fixture.example/mikka' })
@@ -85,6 +87,29 @@ test('引用 / 复制 shows once the pointer lets go of a selection and hands th
   assert.deepEqual(buttons.map(button => button.textContent), ['Artifact.quote', 'Artifact.copy'])
   await act(async () => { buttons[0].click(); await frame() })
   assert.deepEqual(quoted, ['要整宽还是半宽'])
+  assert.equal(document.querySelector('[data-slot="selection-actions"]'), null)
+})
+
+test('a refused copy of selected words preserves the action and can be retried', async () => {
+  const holder = createRef<HTMLDivElement>()
+  await act(async () => root.render(<div ref={holder}><p data-quote-source="">Selected words</p><SelectionQuote root={holder} onQuote={() => {}} /></div>))
+  await act(async () => { select(container.querySelector('p')!); document.dispatchEvent(new browser.PointerEvent('pointerup') as unknown as Event); await frame() })
+  const copy = document.querySelectorAll<HTMLButtonElement>('[data-slot="selection-actions"] button')[1]
+  refuse = true
+  await act(async () => { copy.click(); await frame() })
+  assert.deepEqual(written, [])
+  assert.equal(copySuccess.mock.callCount(), 0)
+  assert.equal(copyError.mock.calls.at(-1)?.arguments[0], 'Artifact.copyFailed')
+  assert.ok(copy.isConnected)
+  assert.equal(document.getSelection()?.toString(), 'Selected words')
+
+  refuse = false
+  await act(async () => { copy.click(); await frame() })
+  assert.deepEqual(written, ['Selected words'])
+  assert.equal(copySuccess.mock.calls.at(-1)?.arguments[0], 'Artifact.copied')
+  const failureToast = copyError.mock.calls.at(-1)?.arguments[1]
+  assert.ok(failureToast?.id)
+  assert.deepEqual(copySuccess.mock.calls.at(-1)?.arguments[1], failureToast)
   assert.equal(document.querySelector('[data-slot="selection-actions"]'), null)
 })
 

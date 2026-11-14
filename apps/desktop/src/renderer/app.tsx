@@ -66,7 +66,8 @@ function SessionApplication() {
   const [pending, setPending] = useState(true)
   const location = useLocation()
   const requestedScope = bootstrapScope(location)
-  const requestedWorkspace = requestedScope === 'workspace' ? location.searchParams.get('workspace') : null
+  const workspacePage = ['/', '/dashboard', '/settings', '/settings/teams', '/settings/members'].includes(withoutLocale(location.pathname))
+  const requestedWorkspace = requestedScope === 'workspace' && workspacePage && !serverDocumentKind() ? location.searchParams.get('workspace') : null
   const requested = useRef({ scope: requestedScope, workspace: requestedWorkspace })
   requested.current = { scope: requestedScope, workspace: requestedWorkspace }
   const lastRequested = useRef(requested.current)
@@ -200,8 +201,17 @@ function Routes({ bootstrap }: { bootstrap: ApplicationBootstrap }) {
   if (serverDocument && serverPageKind(location) === 'github') return <Suspense fallback={<WorkspaceLoading />}><GitHubHandoff /></Suspense>
   if (serverDocument) return <WorkspaceLoading />
   if (path !== '/' && path !== '/dashboard' && !['/settings', '/settings/teams', '/settings/members'].includes(path)) return <NotFound />
+  if (bootstrap.value.workspaceError) return <WorkspaceSelectionError message={bootstrap.value.workspaceError} />
   if (platform === 'desktop') return <InstalledWorkspace user={user} bootstrap={bootstrap.value} />
   return <Suspense fallback={<WorkspaceLoading />}><Workspace user={user} bootstrap={bootstrap.value} /></Suspense>
+}
+
+function WorkspaceSelectionError({ message }: { message: string | true }) {
+  const t = useTranslations()
+  return <Auth><AuthCard title={t('Issue.scope.workspaceUnavailable')} description={message === true ? t('Members.noAccessDescription') : message}>
+    <Button onClick={() => window.dispatchEvent(new Event(REFRESH_EVENT))}>{t('Common.retry')}</Button>
+    <Link href="/" className={buttonVariants({ variant: 'outline' })}>{t('Members.backToAccessible')}</Link>
+  </AuthCard></Auth>
 }
 
 function NewWorkspace({ email }: { email: string }) {

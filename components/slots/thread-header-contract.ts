@@ -49,6 +49,7 @@ export type ThreadHeaderProps = {
 }
 
 export type ThreadStatusLineProps = {
+  pauseReason?: import('@/lib/task-state').TaskStateRun['pauseReason']
   status: string
   outcome: ThreadOutcome | string | null | undefined
   /** A stop was asked for and has not landed. */

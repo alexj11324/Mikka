@@ -4876,6 +4876,9 @@
       "open": "Open {name}",
       "download": "Download {name}",
       "remove": "Remove {name}",
+      "removeFailed": "Could not remove {name}",
+      "retryRemoval": "Retry",
+      "keep": "Keep attachment",
       "retry": "Retry uploading {name}",
       "errors": {
         "unsupported": "Unsupported file format",
@@ -6805,7 +6808,8 @@
         "kinds": {
           "subscription": "Model subscription",
           "api_key": "API key",
-          "mcp": "MCP server"
+          "mcp": "MCP server",
+          "skill": "Skill"
         },
         "status": {
           "pending": "Pending",
@@ -7464,6 +7468,19 @@
     }
   },
   "MobileCore": {
+    "notifications": {
+      "on": "On",
+      "off": "Off",
+      "pushTypes": "Send notifications for",
+      "unavailable": "Push notifications are unavailable",
+      "openSettings": "Open settings",
+      "allow": "Allow notifications",
+      "savingOn": "Turning on",
+      "savingOff": "Turning off",
+      "unconfirmedOn": "Not confirmed on",
+      "unconfirmedOff": "Not confirmed off",
+      "retrySave": "Retry save"
+    },
     "pin": "Pin",
     "unpin": "Unpin",
     "hide": "Hide",
@@ -7478,6 +7495,8 @@
     "message": "Message",
     "replySelection": "Reply to selected text",
     "messageTask": "Message this task",
+    "messageThread": "Message this thread",
+    "lastThreadStatus": "Last status: {status}",
     "noTasks": "No tasks",
     "notStarted": "Not started",
     "allTasks": "All tasks",

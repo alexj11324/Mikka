@@ -18,6 +18,10 @@ on:
         description: Accepted UI Overlay commit SHA
         type: string
         required: true
+      maintenance_owner_release:
+        description: Existing Eve owner routing release to maintain with this accepted API build
+        type: string
+        required: false
   pull_request:
     paths:
       - 'apps/eve/**'
@@ -146,6 +150,7 @@ jobs:
           mode: read
       - name: Prepare the source-bound runtime release
         env:
+          MAINTENANCE_OWNER_RELEASE: ${{ inputs.maintenance_owner_release }}
           API_RUN_ID: ${{ inputs.api_run_id }}
           API_RUN_ATTEMPT: ${{ inputs.api_run_attempt }}
           API_IMAGE_DIGEST: ${{ inputs.api_image_digest }}
@@ -153,6 +158,13 @@ jobs:
           CF_RUNTIME_REGISTRY_USERNAME: ${{ steps.registry-read.outputs.username }}
           CF_RUNTIME_REGISTRY_PASSWORD: ${{ steps.registry-read.outputs.password }}
         run: node scripts/cloudflare-runtime-release.mjs prepare eve
+      - name: Verify the explicit maintenance owner selection
+        if: inputs.maintenance_owner_release != ''
+        env:
+          MAINTENANCE_OWNER_RELEASE: ${{ inputs.maintenance_owner_release }}
+        run: |
+          test "$MIKKA_RUNTIME_RELEASE" = "$MAINTENANCE_OWNER_RELEASE"
+          test "$RUNTIME_IMAGE_TAG" = "$MIKKA_DEPLOYMENT_ID-maintenance-$MAINTENANCE_OWNER_RELEASE"
       - name: Bundle the private World authority from the locked public source
         env:
           WRANGLER_SEND_METRICS: 'false'
@@ -180,8 +192,13 @@ jobs:
         run: bash scripts/build-cloudflare-eve-image.sh --prebuilt-api
       - name: Build the portable Node 24 image
         run: |
-          docker build -f cloudflare/eve-runtime/Dockerfile --label "org.opencontainers.image.revision=$MIKKA_BUILD_REVISION" --label "com.mikka.overlay=$MIKKA_UI_OVERLAY_SHA" --label "com.mikka.release=$MIKKA_DEPLOYMENT_ID" -t "mikka-eve:$MIKKA_DEPLOYMENT_ID" .
-          image_id=$(docker image inspect --format '{{.Id}}' "mikka-eve:$MIKKA_DEPLOYMENT_ID")
+          image_tag="${RUNTIME_IMAGE_TAG:-$MIKKA_DEPLOYMENT_ID}"
+          labels=()
+          if [[ -n "${MIKKA_RUNTIME_RELEASE:-}" ]]; then
+            labels+=(--label "com.mikka.runtime-release=$MIKKA_RUNTIME_RELEASE")
+          fi
+          docker build -f cloudflare/eve-runtime/Dockerfile --label "org.opencontainers.image.revision=$MIKKA_BUILD_REVISION" --label "com.mikka.overlay=$MIKKA_UI_OVERLAY_SHA" --label "com.mikka.release=$MIKKA_DEPLOYMENT_ID" "${labels[@]}" -t "mikka-eve:$image_tag" .
+          image_id=$(docker image inspect --format '{{.Id}}' "mikka-eve:$image_tag")
           echo "RUNTIME_TESTED_IMAGE_ID=$image_id" >> "$GITHUB_ENV"
       - name: Start the compiled host and require the native World
         run: |
@@ -195,6 +212,7 @@ jobs:
           mode: publish
       - name: Publish the verified runtime image
         env:
+          MAINTENANCE_OWNER_RELEASE: ${{ inputs.maintenance_owner_release }}
           API_RUN_ID: ${{ inputs.api_run_id }}
           API_RUN_ATTEMPT: ${{ inputs.api_run_attempt }}
           API_IMAGE_DIGEST: ${{ inputs.api_image_digest }}

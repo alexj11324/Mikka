@@ -37,5 +37,5 @@ export function useNotificationSettings() {
     }
   }
 
-  return { data, error, set, failed, retry: () => { if (failed) void set(failed) } }
+  return { data, error, reload: mutate, set, failed, retry: () => { if (failed) void set(failed) } }
 }

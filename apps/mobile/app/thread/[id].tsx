@@ -14,6 +14,7 @@ import { Markdown } from '@/components/Markdown'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import { Text } from '@/components/Text'
 import { NavBar, underBar } from '@/components/NavBar'
+import { mobileMessages } from '@/lib/messages'
 import { useScrolledUnderBar } from '@/components/BarBackdrop'
 import { ThreadSteps } from '@/features/tasks/components/thread-steps'
 import { Composer } from '@/features/chat/components/chat-composer'
@@ -28,7 +29,12 @@ import { useLiveApi } from '@/lib/useApi'
 import { threadLive } from '@/lib/live-keys'
 import { colors } from '@/lib/theme'
 
-const STATUS_WORD = { running: '运行中', waiting: '等待你', paused: '已暂停', failed: '失败', done: '完成', stopped: '已停止' } as const
+const { MobileCore, Coordinator, IssueThreads } = mobileMessages
+const STATUS_WORD = {
+  running: MobileCore.states.running, waiting: MobileCore.states.waiting,
+  paused: Coordinator.citation.runStatus.paused, failed: MobileCore.states.failed,
+  done: MobileCore.attempts.done, stopped: Coordinator.citation.runStatus.stopped,
+}
 
 /** A thread without a task, pushed from its card; a task's threads open as the task's one conversation (app/task/[id]/conversation.tsx). */
 export default function ThreadScreen() {
@@ -62,18 +68,18 @@ export default function ThreadScreen() {
               <Text style={styles.title} numberOfLines={1}>{thread.name}</Text>
               <View style={styles.subtitleRow}>
                 {/* Icons only after the state: where it runs; a tap names the machine (Alex, 2026-11-06). */}
-                <Text style={styles.subtitle} numberOfLines={1}>{error ? '上次状态：' : ''}{STATUS_WORD[thread.status]}{thread.device ? ' ·' : ''}</Text>
+                <Text style={styles.subtitle} numberOfLines={1}>{error ? MobileCore.lastThreadStatus.replace('{status}', STATUS_WORD[thread.status]) : STATUS_WORD[thread.status]}{thread.device ? ' ·' : ''}</Text>
                 {thread.device ? <ThreadPlace threadId={id} kind={thread.device.kind} /> : null}
               </View>
             </View>
           </View>
         ) : undefined}
         // Stop for every live thread, also one waiting for your answer, whose composer sends (N1).
-        right={data?.active && !stopper.sending ? { icon: 'stop.fill', label: '停止', web: <Square size={18} color={colors.ink} fill={colors.ink} />, onPress: () => void stopper.stop() } : undefined}
+        right={data?.active && !stopper.sending ? { icon: 'stop.fill', label: IssueThreads.stop, web: <Square size={18} color={colors.ink} fill={colors.ink} />, onPress: () => void stopper.stop() } : undefined}
       />
       <KeyboardChatScrollView {...readEnd} scrollEventThrottle={16} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
         {!data && !error ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : null}
-        <ReadNotice error={error} hasData={Boolean(data)} label="线程" onRetry={reload} />
+        <ReadNotice error={error} hasData={Boolean(data)} label={IssueThreads.hidden} onRetry={reload} />
         {data?.items.map((item, index) => {
           switch (item.kind) {
             case 'steps':
@@ -91,7 +97,7 @@ export default function ThreadScreen() {
       <OfflineBanner top={insets.top + 66} />
       {/* R-10: a thread ends in the composer, finished or not; a message to an ended thread runs it again (R-81). */}
       {controls.controls}
-      {data ? <Composer placeholder="给这个线程发消息" onSend={text => delivery.send(text)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'thread', id }} onStop={composerStops(data) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
+      {data ? <Composer placeholder={MobileCore.messageThread} onSend={text => delivery.send(text)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'thread', id }} onStop={composerStops(data) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
     </View>
   )
 }

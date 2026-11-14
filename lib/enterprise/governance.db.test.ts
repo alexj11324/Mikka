@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
 import { Pool } from 'pg'
@@ -192,6 +192,25 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
     assert.equal(await organizationResourceAllowed(wsA, 'subscription', member.id, member.id), false)
     await requestOrganizationResourceApproval(organizationId, member.id, { workspaceId: wsA, kind: 'subscription', resourceId: member.id })
     assert.equal(await organizationResourceAllowed(wsA, 'subscription', member.id, member.id), false, 'replay cannot erase a denial')
+  })
+  await t.test('a member can request approval for their own installed Skill and an administrator can decide it', async () => {
+    const skillId = randomUUID()
+    await pool.query(`insert into personal_skills (id,user_id,name,source,slug,source_kind,source_revision,source_path,body,sha256)
+      values ($1,$2,'Review notes','skills.sh','review-notes','skills.sh','rev-1','SKILL.md',$3,$4)`,
+      [skillId, member.id, 'Review notes', createHash('sha256').update('Review notes').digest('hex')])
+    try {
+      const input = { workspaceId: wsA, kind: 'skill', resourceId: skillId }
+      await assert.rejects(requestOrganizationResourceApproval(organizationId, owner.id, input))
+      const approval = await requestOrganizationResourceApproval(organizationId, member.id, input)
+      assert.equal(await organizationResourceAllowed(wsA, 'skill', skillId, member.id), false)
+      await assert.rejects(decideOrganizationResourceApproval(organizationId, member.id, { id: approval.id, status: 'approved' }))
+      await decideOrganizationResourceApproval(organizationId, admin.id, { id: approval.id, status: 'approved' })
+      assert.equal(await organizationResourceAllowed(wsA, 'skill', skillId, member.id), true)
+      await decideOrganizationResourceApproval(organizationId, admin.id, { id: approval.id, status: 'denied' })
+      assert.equal(await organizationResourceAllowed(wsA, 'skill', skillId, member.id), false)
+    } finally {
+      await pool.query('delete from personal_skills where id=$1', [skillId])
+    }
   })
   await t.test('removing Org membership suspends only its Workspaces and revokes scoped PATs without deleting identity', async () => {
     const scoped = randomUUID(), other = randomUUID()

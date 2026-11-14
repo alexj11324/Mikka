@@ -104,7 +104,11 @@ export async function factoryTaskDetail(
   task: Task,
 ): Promise<FactoryTaskDetail> {
   const { rows } = await tx.query<{ id: string; stage: FactoryCheckResult["stage"]; status: string; candidateId: string | null; candidateSha: string | null; runId: string | null; report: unknown; check: unknown }>(
-    `SELECT a.id,a.stage,a.status,a."candidateId",c.sha AS "candidateSha",a."runId",r.report,a.output->'check' AS check FROM factory_attempts a
+    `SELECT a.id,a.stage,a.status,a."candidateId",c.sha AS "candidateSha",a."runId",
+            jsonb_build_object('criteria',r.report->'criteria','verify',jsonb_build_object(
+              'status',r.report#>'{verify,status}','command',r.report#>'{verify,command}',
+              'exitCode',r.report#>'{verify,exitCode}')) AS report,
+            a.output->'check' AS check FROM factory_attempts a
        LEFT JOIN factory_candidates c ON c.id=a."candidateId" AND c."taskId"=a."taskId"
        LEFT JOIN agent_runs r ON r.id=a."runId" AND r."userId"=$2
       WHERE a."taskId"=$1 AND a.stage IN ('review','verify','monitor') ORDER BY a.position`,

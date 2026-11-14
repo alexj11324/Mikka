@@ -11,17 +11,21 @@ const browser = new Window({ url: 'https://mikka.example/mikka' })
 const noop = () => {}
 const translate = Object.assign(key => key, { has: () => true })
 const stub = (path, namedExports) => mock.module(new URL('../' + path, import.meta.url).href, { namedExports })
-let teamId, response, issue, child, frame, teamWrites, favoriteDenied, moves, reads, optionsRead
+let teamId, response, issue, child, frame, teamWrites, favoriteDenied, saveMetadata, createChild, connectionsError, moves, reads, optionsRead
 const teams = ['existing', 'another'].map(id => ({ id, identifier: id, name: id }))
-mock.module('next-intl', { namedExports: { useTranslations: () => translate, useMessages: () => ({ IssueDetail: { work: { states: {} } }, GroupTask: { stage: {}, status: {} } }), useFormatter: () => ({ relativeTime: noop, dateTime: noop }), useNow: () => new Date() } })
+mock.module('next-intl', { namedExports: { useTranslations: () => translate, useMessages: () => ({ IssueDetail: { work: { states: {} } }, GroupTask: { stage: {}, status: {} } }), useFormatter: () => ({ relativeTime: noop, dateTime: date => date.toISOString().slice(0, 10) }), useNow: () => new Date() } })
 mock.module('sonner', { namedExports: { toast: { error: noop, success: noop } } })
 mock.module('swr', { defaultExport: key => {
   if (key?.[0] === 'issue-property-options') return optionsRead
   if (key === 'teams') return { data: teams }
   if (key?.[0] === 'issue-team') return { data: teamId, mutate: async value => { teamId = value } }
-  if (key?.[0] === 'issue-connections') return { data: [issue, child], mutate: async () => reads.push('connections') }
+  if (key?.[0] === 'issue-connections') return { data: [issue, child], error: connectionsError, mutate: async () => reads.push('connections') }
   return {}
 }, namedExports: { unstable_serialize: JSON.stringify, useSWRConfig: () => ({ mutate: async key => {
+  if (Array.isArray(key) && key[0] === 'issue') {
+    reads.push('issue-detail')
+    return issue
+  }
   if (Array.isArray(key) && key[0] === 'issue-connections') reads.push('revalidate-connections')
   if (typeof key === 'function') {
     assert.equal(key(['issues', 'another-owner', 'workspace']), false)
@@ -38,9 +42,9 @@ stub('app/actions/issues.ts', {
   setIssueScope: noop, promoteIssueToTeam: noop,
   moveIssue: async input => { moves.push(input); child = { ...child, status: input.status, revision: child.revision + 1 }; return { issue: child } },
 })
-stub('app/actions/issue-metadata.ts', { getIssuePropertyOptions: noop, updateIssueMetadata: noop })
+stub('app/actions/issue-metadata.ts', { getIssuePropertyOptions: noop, updateIssueMetadata: input => saveMetadata(input) })
 stub('app/actions/issue-operations.ts', {
-  createLinkedIssue: noop, setIssueDeleted: async () => ({ issue }), updateIssueRelation: noop, listIssueConnections: noop,
+  createLinkedIssue: input => createChild(input), setIssueDeleted: async () => ({ issue }), updateIssueRelation: noop, listIssueConnections: noop,
   toggleIssuePreference: async () => {
     if (favoriteDenied) return { error: 'issueUnavailable' }
     const favorites = issue.metadata.favoriteUserIds.length ? [] : ['owner']
@@ -76,7 +80,7 @@ beforeEach(() => {
     metadata: metadataSchema.parse({ delegate: { id: 'bot', name: 'Assigned bot', kind: 'bot', image: null } }) }
   child = { ...issue, id: 'child', title: 'Child', revision: 2, metadata: { ...issue.metadata, parentId: issue.id } }
   optionsRead = {}
-  teamId = 'existing'; response = null; favoriteDenied = false; teamWrites = []; reads = []; moves = []
+  teamId = 'existing'; response = null; favoriteDenied = false; saveMetadata = noop; createChild = noop; connectionsError = null; teamWrites = []; reads = []; moves = []
 })
 after(() => browser.close())
 
@@ -220,5 +224,100 @@ test('label and project placeholders report the options read and retry it', asyn
       await act(async () => retry.onSelect())
     }
     assert.deepEqual(reads, ['property-options', 'property-options'])
+  } finally { await dispose() }
+})
+
+
+test('a stale Task property write reloads the detail and keeps the draft for one explicit retry', async () => {
+  const writes = []
+  saveMetadata = async ({ revision, patch }) => {
+    writes.push({ revision, patch })
+    if (writes.length === 1) {
+      issue = { ...issue, revision: issue.revision + 1, metadata: { ...issue.metadata, estimate: 13 } }
+      return { error: 'issueOutdated' }
+    }
+    return { issue: { ...issue, revision: revision + 1, metadata: { ...issue.metadata, ...patch } } }
+  }
+  const dispose = await mount({ showDialogs: true })
+  try {
+    await act(async () => frame.menu.items.find(item => item.id === 'dueDate').onSelect())
+    const field = document.querySelector('#issue-action-value')
+    field.value = '2027-04-02'
+    const submit = () => act(async () => field.form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true })))
+    await submit()
+    assert.deepEqual(reads, ['issue-detail'])
+    assert.equal(writes.length, 1)
+    assert.equal(document.querySelector('#issue-action-value'), field)
+    assert.equal(field.value, '2027-04-02')
+    await submit()
+    assert.deepEqual(writes, [
+      { revision: 3, patch: { dueDate: '2027-04-02' } },
+      { revision: 4, patch: { dueDate: '2027-04-02' } },
+    ])
+    assert.equal(issue.metadata.estimate, 13)
+    assert.equal(issue.metadata.dueDate, '2027-04-02')
+  } finally { await dispose() }
+})
+
+test('inline and menu subtask creation refresh a stale parent and save once on explicit retry', async () => {
+  for (const entry of ['inline', 'menu']) {
+    const writes = []
+    const startingRevision = issue.revision
+    createChild = async input => {
+      writes.push(input)
+      if (writes.length === 1) {
+        issue = { ...issue, revision: issue.revision + 1, priority: 'high' }
+        return { error: 'issueOutdated' }
+      }
+      return { issue: child }
+    }
+    reads = []
+    const dispose = await mount({ showDialogs: true })
+    try {
+      const title = 'Keep this subtask draft'
+      let submit
+      if (entry === 'menu') {
+        await act(async () => frame.menu.items.find(item => item.id === 'createChild').onSelect())
+        const field = document.querySelector('#issue-action-value')
+        field.value = title
+        submit = () => act(async () => field.form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true })))
+      } else {
+        submit = () => act(async () => { await frame.subtasks.onCreate(title) })
+      }
+      await submit()
+      assert.deepEqual(reads, ['issue-detail'], entry)
+      assert.equal(writes.length, 1)
+      if (entry === 'menu') assert.equal(document.querySelector('#issue-action-value').value, title)
+      await submit()
+      assert.deepEqual(writes, [startingRevision, startingRevision + 1].map(revision => ({
+        id: issue.id, revision, kind: 'child', title, includeSubissues: false,
+      })))
+      assert.deepEqual(reads, ['issue-detail', 'revalidate-connections', 'viewer-list'])
+      assert.equal(issue.priority, 'high')
+      assert.notEqual(issue.id, child.id)
+    } finally { await dispose() }
+  }
+})
+
+test('a failed inline relation read does not block the independent menu form or its validation', async () => {
+  connectionsError = new Error('relations unavailable')
+  createChild = mock.fn(async input => input.title.trim() ? { issue: child } : { error: 'issueTitleInvalid' })
+  const dispose = await mount({ showDialogs: true })
+  try {
+    assert.equal(frame.subtasks.disabled, true)
+    assert.ok(frame.subtasks.failed)
+    await act(async () => { assert.equal(await frame.subtasks.onCreate('keep this title'), false) })
+    assert.equal(createChild.mock.callCount(), 0)
+    await act(async () => frame.menu.items.find(item => item.id === 'createChild').onSelect())
+    const field = document.querySelector('#issue-action-value')
+    const submit = () => act(async () => field.form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true })))
+    field.value = '   '
+    await submit()
+    assert.equal(field.value, '   ')
+    assert.ok(field.form.textContent.includes('issueTitleInvalid'))
+    field.value = 'Valid title'
+    await submit()
+    assert.deepEqual(createChild.mock.calls.map(call => call.arguments[0].title), ['   ', 'Valid title'])
+    assert.deepEqual(reads, ['revalidate-connections', 'viewer-list'])
   } finally { await dispose() }
 })

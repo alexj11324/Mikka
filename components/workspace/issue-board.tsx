@@ -224,9 +224,9 @@ export function useIssueBoardSaves({ issues, blocks, newestRuns, onUpdated, onBu
     return save(issue, from, to, columns)
   }
   function metadataBusy(busy: boolean) { saving.current = busy; setPending(busy); onBusyChange(busy) }
-  function metadataSaved(savedIssue: MetadataSavedIssue) {
-    setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.map(item => item.id === savedIssue.id ? { ...item, metadata: savedIssue.metadata, revision: savedIssue.revision, updatedAt: savedIssue.updatedAt } : item)])))
-    setMessage(t('propertiesSaved'))
+  function metadataSaved(savedIssue: MetadataSavedIssue, source: 'save' | 'refresh') {
+    setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.map(item => item.id === savedIssue.id && item.revision <= savedIssue.revision ? { ...item, metadata: savedIssue.metadata, revision: savedIssue.revision, updatedAt: savedIssue.updatedAt } : item)])))
+    setMessage(source === 'save' ? t('propertiesSaved') : '')
     void onUpdated().catch(() => {})
   }
   return { columns, setColumns, pending, dragging, setDragging, message, cardMotion, saving, changeStatus, changeBlock, changePriority, remove, commit, moveTo, metadataBusy, metadataSaved }

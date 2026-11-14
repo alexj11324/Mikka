@@ -19,22 +19,30 @@ export function useReviewDiff(taskId: string | null | undefined, options: { comm
     revalidateOnFocus: false, revalidateOnReconnect: true, shouldRetryOnError: false,
   })
   useReviewLive(taskId ?? null, result.data?.summary.live?.workspaceId, key ? [unstable_serialize(key)] : [])
-  const [pages, setPages] = useState<{ after: ReviewRead; files: ReviewFile[]; nextCursor?: string } | null>(null)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const first = result.data
+  const [pages, setPages] = useState<{
+    after: ReviewRead; files: ReviewFile[]; nextCursor?: string; status: 'idle' | 'loading' | 'failed'
+  } | null>(null)
+  const first = result.error ? undefined : result.data
   const extra = pages && pages.after === first ? pages : null
   const nextCursor = extra ? extra.nextCursor : first?.diff.nextCursor
+  const loadingMore = extra?.status === 'loading'
   const loadMore = useCallback(async () => {
     if (!taskId || !first || !nextCursor || loadingMore) return
-    setLoadingMore(true)
+    setPages({ after: first, files: extra?.files ?? [], nextCursor, status: 'loading' })
     try {
       const page = await getReviewDiff(taskId, { cursor: nextCursor, reference: first.diff.reviewRef ?? undefined })
-      if (!page) return
-      setPages(current => ({ after: first, files: [...(current?.after === first ? current.files : []), ...page.diff.files], nextCursor: page.diff.nextCursor }))
-    } finally { setLoadingMore(false) }
-  }, [taskId, first, nextCursor, loadingMore])
+      setPages(current => current?.after === first ? {
+        after: first,
+        files: [...current.files, ...(page?.diff.files ?? [])],
+        nextCursor: page?.diff.nextCursor,
+        status: 'idle',
+      } : current)
+    } catch {
+      setPages(current => current?.after === first ? { ...current, status: 'failed' } : current)
+    }
+  }, [taskId, first, extra, nextCursor, loadingMore])
   const files = first ? [...first.diff.files, ...(extra?.files ?? [])] : []
-  return { ...result, files, nextCursor, loadMore, loadingMore }
+  return { ...result, data: first, files, nextCursor, loadMore, loadingMore, loadMoreError: extra?.status === 'failed' }
 }
 
 /** One file's patch, for a file paged out or too large (R12 「按文件加载」); null path reads nothing. */

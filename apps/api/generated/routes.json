@@ -390,7 +390,7 @@
         "POST"
       ],
       "maxDuration": 120,
-      "sourceHash": "2885d169e6fa4b72b4b28ea8d15a7f69f56910a344de754093d0d45e69e9c5f8"
+      "sourceHash": "5a4e2845a21067c99d61e54c7ee26729f49366f52232290a3768ab89d2cb9e2f"
     },
     {
       "path": "/mikka/api/chat/attachments/[id]",
@@ -400,7 +400,7 @@
         "DELETE",
         "GET"
       ],
-      "sourceHash": "e3c8d68148a951501ab4b0beef0ba49410c8123dc07f877d875cebcff0d53a90"
+      "sourceHash": "5ec6bb6135692efbb0166d8bddea60d39bbb684a0ffc322d40a560ba67624d20"
     },
     {
       "path": "/mikka/api/cloud/callback",
@@ -1458,7 +1458,7 @@
         "GET",
         "PATCH"
       ],
-      "sourceHash": "c53c7cd44ff37cc47e024b7bae32ba446acf09a295bd645b9ae671f9c488b2be"
+      "sourceHash": "f11fa6662a2614f5a01393bf378c0bf45e4c515569e3903f3a5dd64f8c370d91"
     },
     {
       "path": "/mikka/api/mobile/chat",

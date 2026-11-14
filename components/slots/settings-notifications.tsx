@@ -4,15 +4,14 @@ import { useTranslations } from 'next-intl'
 import { Switch } from '@/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
-import { FieldError } from '@/components/ui/field'
 import { NOTIFICATION_SWITCHES, useNotificationSettings } from '@/hooks/settings/use-notification-settings'
 
 /** D16: the notification settings the phone already has, on the web Settings page. */
 export function NotificationSettings() {
   const t = useTranslations('Settings.notifications')
-  const { data, error, set, failed, retry } = useNotificationSettings()
+  const { data, error, reload, set, failed, retry } = useNotificationSettings()
 
-  if (error) return <FieldError className="text-xs">{t('loadError')}</FieldError>
+  if (error) return <SettingsSaveError message={t('loadError')} retryLabel={t('retry')} onRetry={() => { void reload() }} />
   if (!data) return <SettingsLoading label={t('loading')} rows={6} />
 
   const switches = NOTIFICATION_SWITCHES.map(key => ({ key, title: t(key) }))

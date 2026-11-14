@@ -28,7 +28,7 @@ import type { PresenceProps } from '@/lib/use-presence'
 
 const FIELDS: ProjectControlField[] = ['status', 'priority', 'lead', 'members', 'startDate', 'targetDate', 'labels', 'dependencyIds']
 
-export function ProjectForm({ project, initialTeamId = '', projects = [], directory, onClose, onSaved, open = true, onOpenChangeComplete }: { project?: Project; initialTeamId?: string; projects?: Project[]; directory: ProjectDirectory; onClose: () => void; onSaved: (project: Project) => void } & PresenceProps) {
+export function ProjectForm({ project, initialTeamId = '', projects = [], directory, onClose, onSaved, open = true, onOpenChangeComplete }: { project?: Project; initialTeamId?: string; projects?: Project[]; directory: ProjectDirectory; onClose: () => void; onSaved: (project: Project, attachedTeamId: string | null) => void } & PresenceProps) {
   const i18nText = useTranslations();
   const [initial] = useState<ProjectDraft>(() => ({ name: project?.name ?? '', summary: project?.summary ?? '', description: project?.description || project?.summary || '', status: (project?.status ?? 'backlog') as ProjectDraft['status'], priority: (project?.priority ?? 'none') as ProjectDraft['priority'], lead: project?.lead ?? '', ...(project ? projectPeople(project, project.userId) : { memberIds: [], leadUserId: null }), team: WORKSPACE_NAME, startDate: project?.startDate ?? '', targetDate: project?.targetDate ?? '', properties: project?.properties ?? DEFAULT_PROJECT_PROPERTIES }))
   const { data: teams = [], error: teamsError } = useSWR('teams', listTeams)
@@ -55,11 +55,11 @@ export function ProjectForm({ project, initialTeamId = '', projects = [], direct
       if (!project && teamId) {
         try {
           const relation = await setProjectTeams({ projectId: result.project.id, revision: result.project.revision, teamIds: [teamId], primaryTeamId: teamId })
-          if (relation.ok) { onSaved(relation.data); return }
+          if (relation.ok) { onSaved(relation.data, teamId); return }
           toast.warning(i18nText("FeatureCopy.c_fdab9a02", { value0: (relation.error) }))
         } catch { toast.warning(i18nText("FeatureCopy.c_04e26acf")) }
       }
-      onSaved(result.project)
+      onSaved(result.project, null)
     } catch { setError(i18nText("FeatureCopy.c_85f5c4d3")) }
     finally { submitting.current = false; setPending(false) }
   }

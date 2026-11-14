@@ -25,6 +25,14 @@ let groupList: { id: string; title: string; workspaceId: string }[] = []
 let groupListError: Error | undefined
 let groupListRetries = 0
 const teamIssuesId = '8055a7ae-204f-4045-8780-66b9c93ce229'
+const projectReads = { projects: 0, links: 0 }
+let projectsFailed = false
+let projectsPending = false
+let projectTeamsFailed = false
+let projectTeamsPending = false
+let teamDirectoryError = false
+let teamDirectoryPending = false
+let teamDirectoryRetries = 0
 let scopedTeamFixture = false
 let workspaceTasksPending = false
 let refreshGlobalTasks = refreshed
@@ -41,18 +49,29 @@ const router = { push: (href: string) => browser.history.pushState({}, '', href)
 mock.module('next-intl', { namedExports: { useLocale: () => 'en', useTranslations: (namespace?: string) => Object.assign((key: string) => namespace ? `${namespace}.${key}` : key, { has: () => false }), useMessages: () => ({ IssueDetail: { work: { states: {} } }, GroupTask: { stage: {}, status: {} } }), useFormatter: () => ({ dateTime: () => '' }) } })
 mock.module('next/navigation', { namedExports: { useSearchParams: () => new URLSearchParams(browser.location.search) } })
 mock.module('@/i18n/navigation', { namedExports: { getPathname: ({ href }: { href: string }) => href, usePathname: () => browser.location.pathname, useRouter: () => router } })
+mock.module('../settings/settings-link.tsx', { namedExports: { SettingsLink: ({ href, children }: { href: string; children?: ReactNode }) => <a href={href}>{children}</a> } })
 mock.module('sonner', { namedExports: { toast: { error: nothing, dismiss: nothing } } })
 mock.module('swr', { defaultExport: (key: unknown, _read?: unknown, options?: { isPaused?: () => boolean }) => ({
   data: key === '/api/workspace/switcher' ? { ...workspace(), live: { ownerId: user.id } }
     : key === 'teams' && scopedTeamFixture ? [{ id: teamIssuesId, name: 'Scoped Team' }]
+    : Array.isArray(key) && key[0] === 'team-home' ? { members: [], taskCount: 0 }
+    : Array.isArray(key) && key[0] === 'projects' ? [{ id: 'known-project', name: 'Known project', summary: '' }]
+    : key === 'project-teams' ? [{ projectId: 'known-project', teamId: teamIssuesId }]
     : Array.isArray(key) && key[0] === 'team-issues-page' ? { items: [], next: null }
     : [],
-  isLoading: Array.isArray(key) && key[0] === 'team-issues-page' ? scopedTasksPending : false,
-  mutate: Array.isArray(key) && key[0] === 'team-issues-page' ? async () => { if (!options?.isPaused?.()) scopedTeamPageMutations++ } : refreshed,
+  error: ((key === 'teams' && teamDirectoryError) || (key === 'project-teams' && projectTeamsFailed) || (Array.isArray(key) && key[0] === 'projects' && projectsFailed)) ? new Error('unavailable') : undefined,
+  isLoading: key === 'teams' ? teamDirectoryPending : key === 'project-teams' ? projectTeamsPending : Array.isArray(key) && key[0] === 'projects' ? projectsPending : Array.isArray(key) && key[0] === 'team-issues-page' ? scopedTasksPending : false,
+  mutate: key === 'teams' ? async () => { teamDirectoryRetries++ } : key === 'project-teams' ? async () => { projectReads.links++ }
+    : Array.isArray(key) && key[0] === 'projects' ? async () => { projectReads.projects++ }
+    : Array.isArray(key) && key[0] === 'team-issues-page' ? async () => { if (!options?.isPaused?.()) scopedTeamPageMutations++ } : refreshed,
 }), namedExports: { SWRConfig: swr.SWRConfig, unstable_serialize: swr.unstable_serialize, useSWRConfig: swr.useSWRConfig } })
 mock.module('@/lib/app-build', { namedExports: { APP_BUILD: '' } })
+mock.module('./project-workspace.tsx', { namedExports: {
+  ProjectWorkspace: ({ loading, error }: { loading: boolean; error: boolean }) =>
+    <section data-project-list-state={error ? 'failed' : loading ? 'pending' : 'ready'} />,
+} })
 mock.module('@/lib/auth-client', { namedExports: { endSession: async () => ({}), authClient: { getSession: async () => ({ data: { user } }), useSession: () => ({ data: null }) } } })
-mock.module('@/lib/settings-data', { namedExports: { fetchSettingsData: refreshed } })
+mock.module('@/lib/settings-data', { namedExports: { fetchSettingsData: refreshed, fetchTeamHome: refreshed, teamHomeKey: (actor: string, team: string) => ['team-home', actor, team], settingsReadOptions: {} } })
 mock.module('@/lib/use-presence', { namedExports: { usePresence: (open: boolean) => ({ value: open, open, onOpenChangeComplete: nothing }) } })
 mock.module('@/hooks/use-workspace', { namedExports: { useWorkspace: () => ({ data: workspaceReady ? workspace() : undefined, error: workspaceError, mutate: async () => { workspaceError = undefined; workspaceReady = true } }) } })
 mock.module('@/hooks/use-agent-history', { namedExports: { useAgentHistory: () => ({ data: { sessions: [] } }) } })
@@ -82,7 +101,7 @@ for (const [file, names] of [
   // The real app-frame slot also exports an unused rail; its account menu is outside this shell-state fixture.
   ['../workspace-menu.tsx', ['WorkspaceMenu']],
   ['../nav/new-bot-dialog.tsx', ['NewBotDialog']],
-  ['../onboarding/onboarding.tsx', ['Onboarding']], ['../teams/team-home.tsx', ['TeamHome']],
+  ['../onboarding/onboarding.tsx', ['Onboarding']],
   ['./issue-list.tsx', ['IssueList']],
   ['../nav/context-panel.tsx', ['ContextPanel']],
   ['../nav/group-panel.tsx', ['GroupPanel']], ['../nav/conversation-pill.tsx', ['ConversationPillButton']],
@@ -114,8 +133,9 @@ mock.module('@/components/nav/bot-list', { namedExports: { BotList: () => <div d
 mock.module('@/components/nav/thread-list', { namedExports: { threadName: () => '' } })
 mock.module('@/components/nav/bot-avatar', { namedExports: { BotAvatar: empty, COORDINATOR_AVATAR: {} } })
 mock.module('@/components/nav/all-threads', { namedExports: { AllThreadsColumn: empty, AllThreadsToggle: empty } })
-mock.module('@/components/browser/browser-toggle', { namedExports: { useBrowserFits: () => true, BrowserToggle: ({ onToggle }: { onToggle: () => void }) => <Button onClick={onToggle}>browser</Button> } })
-mock.module('@/components/ui/sheet', { namedExports: { Sheet: empty, SheetContent: plain, SheetHeader: plain, SheetTitle: plain, SheetDescription: plain } })
+let browserFits = true
+mock.module('@/components/browser/browser-toggle', { namedExports: { useBrowserFits: () => browserFits, BrowserToggle: ({ onToggle }: { onToggle: () => void }) => <Button onClick={onToggle}>browser</Button> } })
+mock.module('@/components/ui/sheet', { namedExports: { Sheet: ({ open, children }: { open?: boolean; children?: ReactNode }) => open ? <aside data-panel-sheet="">{children}</aside> : null, SheetContent: plain, SheetHeader: plain, SheetTitle: plain, SheetDescription: plain } })
 mock.module('@/components/nav/global-search', { namedExports: { GlobalSearch: ({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) => open ? <div data-search-open=""><Button onClick={() => onOpenChange(false)}>dismiss search</Button></div> : null, SearchPill: ({ onSearch }: { onSearch: () => void }) => <Button onClick={onSearch}>search</Button> } })
 mock.module('@/components/coordinator/new-task-dialog', { namedExports: { NewTaskDialog: ({ open, onCreated }: { open: boolean; onCreated: (id: string) => void }) => {
   acknowledgeNewTask = onCreated
@@ -213,9 +233,13 @@ beforeEach(() => {
   groupList = []
   groupListError = undefined
   groupListRetries = 0
+  projectTeamsFailed = false; projectTeamsPending = false; projectsFailed = false; projectsPending = false
+  projectReads.projects = 0; projectReads.links = 0
+  teamDirectoryError = false; teamDirectoryPending = false; teamDirectoryRetries = 0
   scopedTeamFixture = false; workspaceTasksPending = false; scopedTasksPending = false; scopedTeamPageMutations = 0; acknowledgeNewTask = null; probeEmbeddedAck = false
   browser.history.replaceState({}, '', '/?workspace=workspace-one')
   browser.localStorage.clear(); browser.sessionStorage.clear()
+  browserFits = true
   notes = null; railMounts = 0; composerMounts = 0; composerUnmounts = 0
   registerComputer = false; computerThread = null
   chunkReady = new Promise(resolve => { releaseChunk = resolve })
@@ -236,6 +260,17 @@ test('a valid browser request from a board clears only competing columns and ope
   assert.equal(params.get('workspace'), 'workspace-one')
   assert.equal(params.get('account'), 'active')
   for (const key of ['task', 'thread', 'threads']) assert.equal(params.has(key), false)
+})
+
+test('a narrow board opens an explicitly requested preview in the existing browser sheet', async () => {
+  browserFits = false
+  browser.localStorage.setItem('mikka:browser', '1')
+  browser.history.replaceState({}, '', '/?section=all-issues&workspace=workspace-one')
+  await act(async () => root.render(<OfficialIssueWorkspace user={user} initialSection="all-issues" />))
+  assert.equal(container.querySelectorAll('[data-browser-pane]').length, 0, 'a saved desktop column leaves the phone unobstructed')
+  await act(async () => assert.equal(openBrowserAddress('/preview'), true))
+  assert.equal(container.querySelectorAll('[data-browser-pane]').length, 1)
+  assert.ok(container.querySelector('[data-panel-sheet] [data-browser-pane]'))
 })
 
 test('a valid browser request reveals the conversation browser tab without changing the selected Bot', async () => {
@@ -287,6 +322,86 @@ async function popTo(href: string) {
   browser.history.replaceState({}, '', href)
   await act(async () => { browser.dispatchEvent(new browser.PopStateEvent('popstate')) })
   await render()
+}
+
+test('Team Projects distinguishes unavailable associations from an empty list and keeps Workspace Projects independent', async () => {
+  scopedTeamFixture = true
+  projectTeamsPending = true
+  browser.history.replaceState({}, '', `/?workspace=${workspaceId}&team=${teamIssuesId}&section=team-projects`)
+  await act(async () => { releaseChunk(); await chunkReady })
+  await render({ initialSection: 'team-projects' })
+  assert.ok(container.querySelector('[data-project-list-state="pending"]'))
+  projectTeamsPending = false
+  projectTeamsFailed = true
+  await render({ initialSection: 'team-projects' })
+  assert.ok(container.querySelector('[data-project-list-state="failed"]'))
+
+  await act(async () => { root.render(null) })
+  browser.history.replaceState({}, '', `/?workspace=${workspaceId}&section=projects`)
+  await render({ initialSection: 'projects' })
+  assert.ok(container.querySelector('[data-project-list-state="ready"]'))
+})
+
+test('Team Home distinguishes either pending or failed project read from its last known count and retries both', async () => {
+  scopedTeamFixture = true
+  browser.history.replaceState({}, '', `/?workspace=${workspaceId}&team=${teamIssuesId}&section=team-home`)
+  await act(async () => { releaseChunk(); await chunkReady })
+  const show = () => render({ initialSection: 'team-home' })
+  const projects = () => container.querySelector('section[aria-labelledby="team-resources-heading"]')!
+  const shortcut = () => [...container.querySelectorAll('aside button')].find(button => button.textContent?.includes('Projects.title'))!
+  await show()
+  assert.match(projects().textContent!, /Known project/)
+  assert.match(shortcut().textContent!, /1$/)
+  for (const source of ['projects', 'links']) {
+    projectsPending = source === 'projects'; projectTeamsPending = source === 'links'
+    await show()
+    assert.ok(projects().querySelector('[data-slot="skeleton"]'))
+    assert.doesNotMatch(projects().textContent!, /Known project|FeatureCopy.c_174759ae/)
+    assert.match(shortcut().textContent!, /—$/)
+    projectsPending = false; projectTeamsPending = false
+    projectsFailed = source === 'projects'; projectTeamsFailed = source === 'links'
+    await show()
+    assert.doesNotMatch(projects().textContent!, /Known project|FeatureCopy.c_174759ae/)
+    assert.match(shortcut().textContent!, /—$/)
+    const retry = projects().querySelector<HTMLButtonElement>('[role="alert"] button')
+    assert.ok(retry)
+    await act(async () => { retry.click() })
+    projectsFailed = false; projectTeamsFailed = false
+    await show()
+    assert.match(projects().textContent!, /Known project/)
+    assert.match(shortcut().textContent!, /1$/)
+  }
+  assert.deepEqual(projectReads, { projects: 2, links: 2 })
+})
+
+for (const section of ['team-home', 'team-projects', 'team-issues'] as const) {
+  test(`${section} requires its own team directory and can retry a failed or missing team`, async () => {
+    browser.history.replaceState({}, '', `/?workspace=${workspaceId}&team=${teamIssuesId}&section=${section}`)
+    await act(async () => { releaseChunk(); await chunkReady })
+    const show = () => render({ initialSection: section })
+    const pageSelector = { 'team-home': '#team-resources-heading', 'team-projects': '[data-project-list-state]', 'team-issues': '[data-team-board-visible]' }[section]
+    teamDirectoryPending = true
+    await show()
+    assert.ok(container.querySelector('[role="status"][aria-label="Workspace.loading"]'))
+    assert.equal(container.querySelector(pageSelector), null)
+    teamDirectoryPending = false
+    teamDirectoryError = true
+    scopedTeamFixture = true // SWR can still hold the previous Team after failing to refresh it.
+    await show()
+    const alert = () => container.querySelector('[role="alert"]')
+    assert.match(alert()?.textContent ?? '', /FeatureCopy.c_f4ae1a97/)
+    assert.equal(container.querySelector(pageSelector), null)
+    await act(async () => { alert()!.querySelector('button')!.click() })
+    assert.equal(teamDirectoryRetries, 1)
+    teamDirectoryError = false; scopedTeamFixture = false
+    await show()
+    assert.match(alert()?.textContent ?? '', /FeatureCopy.c_19b23b31/)
+    assert.equal(container.querySelector(pageSelector), null)
+    scopedTeamFixture = true
+    await show()
+    assert.equal(alert(), null)
+    assert.ok(container.querySelector(pageSelector))
+  })
 }
 
 test('Team Issues first-page readiness is independent of the unrelated workspace-wide list', async () => {
