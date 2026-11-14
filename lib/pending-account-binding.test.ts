@@ -41,7 +41,6 @@ stub('./composio.ts', {
     return actionError ? { error: actionError } : { data: { summary: 'event' }, accountId: args[3] } },
 })
 stub('./coordinator-event-store.ts', { recordCoordinatorEvent: async () => {} })
-stub('./coordinator/wake.ts', { wakeCoordinator: async () => {} })
 stub('./cloud-computer/credential-reviews.ts', { executeCredentialOperation: async (...args: unknown[]) => { reviews.push(['credential', ...args.slice(1)]); return { data: {} } } })
 stub('./cloud-computer/action-reviews.ts', { executeApprovedBrowserAction: async (...args: unknown[]) => { reviews.push(['browser', ...args.slice(1)]); return { data: {} } } })
 const appCalls: unknown[][] = []

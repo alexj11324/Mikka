@@ -20,7 +20,8 @@ test('legacy pending producers invalidate only their committed owner-personal li
   const queued: (() => Promise<void>)[] = []
   const next = await import('next/server')
   const scheduler = mock.module('next/server', { namedExports: { ...next, after: (work: () => Promise<void>) => { queued.push(work) } } })
-  const wake = mock.module(new URL('../coordinator/wake.ts', import.meta.url).href, { namedExports: { wakeCoordinator: async () => {} } })
+  const ownerWakes: string[] = []
+  const wake = mock.module(new URL('../coordinator/wake.ts', import.meta.url).href, { namedExports: { wakeCoordinator: async (userId: string) => { ownerWakes.push(userId) } } })
   const sent: { path: string; events: unknown }[] = []
   const receiver = createServer(async (request, response) => {
     let body = ''; for await (const part of request) body += part
@@ -114,6 +115,7 @@ test('legacy pending producers invalidate only their committed owner-personal li
     })
 
     await t.test('actual account proposal and owner decline invalidate; repeated/foreign decisions execute nothing', async () => {
+      ownerWakes.length = 0
       const result = await proposeAction(owner, 'send_email', { to: ['fixture@example.invalid'], subject: 'Pending fixture', body: 'Never sent.' })
       assert.ok('actionId' in result && typeof result.actionId === 'string'); await drain(); const before = sent.length
       await assert.rejects(decidePendingAction(other, result.actionId, false), /pendingActionUnavailable/)
@@ -122,6 +124,8 @@ test('legacy pending producers invalidate only their committed owner-personal li
       // send a chat key. The committed owner-personal pending list still updates.
       await drain(); assert.deepEqual(sent.slice(before), [expected(owner)])
       await assert.rejects(decidePendingAction(owner, result.actionId, false), /pendingActionUnavailable/)
+      await drain()
+      assert.deepEqual(ownerWakes, [owner], 'the persisted decision wakes the owner once, including across a rejected replay')
       await drain(); assert.equal(sent.length, before + 1); assert.equal(externalCalls, 0)
       assert.equal((await listPendingActions(owner)).some(item => item.id === result.actionId), false)
     })
