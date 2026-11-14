@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { readAccessFailure } from '@/lib/swr/persistent-cache'
 import { useSWRConfig } from 'swr'
 import { inboxCountKey } from './use-inbox-count'
@@ -18,8 +19,18 @@ export function useInboxQueue(ownerId: string | undefined, workspaceId: string |
     return ['inbox-queue', version, ownerId, workspaceId, tab, index ? previous!.nextCursor : null] as const
   }
   const read = useSWRInfinite<InboxPage, Error, typeof getKey>(getKey, ([, selected, , workspace, list, cursor]) => readInboxPage(workspace, list, cursor, selected), {
-    revalidateOnFocus: false, shouldRetryOnError: false,
+    revalidateOnFocus: false, shouldRetryOnError: false, revalidateOnMount: true, dedupingInterval: 0,
   })
+  // The thread or Task can open beside Inbox without unmounting its list.
+  // Returning to the list must re-read the same authorized pages even without live delivery.
+  const params = useSearchParams()
+  const showingDetail = Boolean(params.get('thread') || params.get('task') || params.get('issue') || params.get('artifact') || params.get('threads'))
+  const wasShowingDetail = useRef(showingDetail)
+  const reload = read.mutate
+  useEffect(() => {
+    if (wasShowingDetail.current && !showingDetail) void reload(undefined, { revalidate: true })
+    wasShowingDetail.current = showingDetail
+  }, [showingDetail, reload])
   useLiveKeys(ownerId && workspaceId ? [
     { kind: 'pending_actions', id: workspaceId }, { kind: 'issue_list', id: workspaceId },
   ] : [], [unstable_serialize(getKey)], workspaceId)
@@ -31,8 +42,9 @@ export function useInboxQueue(ownerId: string | undefined, workspaceId: string |
     else if (!read.error && read.data) setDeniedScope(null)
   }, [scope, denied, read.error, read.data])
   const forbidden = denied || deniedScope === scope
-  const items = forbidden ? [] : read.data?.flatMap(page => page.items) ?? []
-  const more = Boolean(read.data?.at(-1)?.nextCursor)
+  const unreadable = Boolean(read.error) || forbidden
+  const items = unreadable ? [] : read.data?.flatMap(page => page.items) ?? []
+  const more = !unreadable && Boolean(read.data?.at(-1)?.nextCursor)
   function refreshAfterWrite() {
     if (!ownerId || !workspaceId || version !== webSelectionVersion()) return
     // The local reader must also converge on installations without a live gateway.
@@ -40,7 +52,7 @@ export function useInboxQueue(ownerId: string | undefined, workspaceId: string |
     void Promise.allSettled([mutate(unstable_serialize(getKey)), mutate(inboxCountKey(version, ownerId, workspaceId))])
   }
   async function command(entry: InboxEntry, action: 'reject' | 'undo_reject' | 'reopen' | 'snooze' | 'dismiss', until?: string) {
-    if (!ownerId || !workspaceId || forbidden || !entry.actions.includes(action)) throw new Error('decisionUnavailable')
+    if (!ownerId || !workspaceId || unreadable || !entry.actions.includes(action)) throw new Error('decisionUnavailable')
     const target = { workspaceId, type: entry.type, id: entry.id }
     let operation: InboxCommand
     if (action === 'snooze') {
