@@ -257,7 +257,9 @@
   },
   "drizzle/20261113165037_inbox_conversations.sql": {
     "mode": "built-in",
-    "environment": ["MIKKA_DATABASE_URL"],
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
     "behavior": "Use the installation PostgreSQL database for per-user Inbox dismissals and standalone conversation snoozes. An authorized new run or changed cause can request attention again.",
     "test": "lib/inbox/store.db.test.ts",
     "suite": "test:inbox-db"
@@ -611,7 +613,13 @@
   },
   "lib/eve/auth.ts": {
     "mode": "operator-configured",
-    "environment": ["BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "MIKKA_APP_ORIGIN", "MIKKA_API_INGRESS", "MIKKA_EVE_HOST"],
+    "environment": [
+      "BETTER_AUTH_SECRET",
+      "BETTER_AUTH_URL",
+      "MIKKA_APP_ORIGIN",
+      "MIKKA_API_INGRESS",
+      "MIKKA_EVE_HOST"
+    ],
     "behavior": "Self-hosted installations retain their existing signed internal scope and configured application origin. Cloudflare uses private service binding provenance and rejects legacy internal token fallback.",
     "test": "lib/eve/product-tool.test.ts",
     "suite": "test:eve-product-tool"
@@ -1242,7 +1250,9 @@
   },
   "lib/inbox/store.ts": {
     "mode": "built-in",
-    "environment": ["MIKKA_DATABASE_URL"],
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
     "behavior": "Read the same authorized pending requests for board cards, inbox rows and badge counts in the selected workspace.",
     "test": "lib/inbox/store.db.test.ts",
     "suite": "test:inbox-db"
@@ -1702,5 +1712,33 @@
     "behavior": "Recognize and encode supported conversation citations using installation routes.",
     "test": "tests/thread-references.db.test.ts",
     "suite": "test:bot-threads-db"
+  },
+  "lib/standalone-chat-directory.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Keep owner-created standalone chats in installation PostgreSQL and reopen them only through their active participant and workspace authorization.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "drizzle/20261113180454_standalone_bot_conversations.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Keep owner-created standalone chats in installation PostgreSQL and reopen them only through their active participant and workspace authorization.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "lib/standalone-chat-controls.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Apply the same title, pin and archive menu to owned independent conversations, rechecking personal membership and the selected workspace on every change. Explicit regeneration uses the existing workspace title provider.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "drizzle/20261113193638_standalone_conversation_organization.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Add nullable organization timestamps to independent conversations. Existing rows remain available without backfilling.",
+    "test": "tests/conversation-title.db.test.ts",
+    "suite": "test:run-publication-db"
   }
 }

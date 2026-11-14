@@ -11,7 +11,7 @@ import { groupListChanged, groupListReadChanged } from './live/lists'
 import { groupChatChanged } from './live/groups'
 
 const member = z.object({ memberType: z.enum(['user', 'agent', 'bot']), memberId: z.string().min(1).max(256) }).strict()
-const create = z.object({ workspaceId: z.uuid(), title: z.string().trim().min(1).max(200), members: z.array(member).max(100).default([]), leadAgentId: z.uuid().nullable().optional(), leadBotId: z.uuid().nullable().optional() }).strict().refine(input => !input.leadAgentId || !input.leadBotId)
+const create = z.object({ purpose: z.literal('conversation').optional(), workspaceId: z.uuid(), title: z.string().trim().min(1).max(200), members: z.array(member).max(100).default([]), leadAgentId: z.uuid().nullable().optional(), leadBotId: z.uuid().nullable().optional() }).strict().refine(input => !input.leadAgentId || !input.leadBotId)
 const configure = z.union([z.object({ leadAgentId: z.uuid().nullable() }).strict(), z.object({ leadBotId: z.uuid().nullable() }).strict()])
 const message = z.object({ requestId: z.uuid().optional(), expectedOwnerId: z.string().min(1).max(256).optional(), expectedWorkspaceId: z.uuid().optional(), body: z.string().trim().min(1).max(32000), mentions: z.array(member).max(100).default([]), replyToId: z.uuid().nullable().optional() }).strict()
 const read = z.object({ messageId: z.string().min(1).max(64) }).strict()
@@ -54,12 +54,14 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
     let status = 200
     if (req.resource === 'conversations' && req.method === 'POST') {
       const input = parse(create, req.body)
+      if (input.purpose && (!input.members.length || input.members.some(member => member.memberType !== 'bot') || !input.leadBotId)) return fail(422)
       if (!await directory(input.workspaceId, userId, input.members)) return fail(404)
       if (input.leadAgentId && (!queueAgents || !input.members.some(m => m.memberType === 'agent' && m.memberId === input.leadAgentId))) return fail(422)
       if (input.leadBotId && (!queueAgents || !input.members.some(m => m.memberType === 'bot' && m.memberId === input.leadBotId))) return fail(422)
       const id = randomUUID()
       await q('INSERT INTO conversations (id,"workspaceId",kind,title,"createdBy") VALUES ($1,$2,\'group\',$3,$4)', [id, input.workspaceId, input.title, userId])
       await q('INSERT INTO conversation_members ("conversationId","memberType","memberId",role) VALUES ($1,\'user\',$2,\'owner\')', [id, userId])
+      if (input.purpose) await q('UPDATE conversations SET "creationPurpose"=$2 WHERE id=$1', [id, input.purpose])
       for (const m of input.members) await q('INSERT INTO conversation_members ("conversationId","memberType","memberId",role) VALUES ($1,$2,$3,\'member\') ON CONFLICT DO NOTHING', [id, m.memberType, m.memberId])
       if (queueAgents && input.leadAgentId) await q('UPDATE conversations SET "leadAgentId"=$2 WHERE id=$1', [id, input.leadAgentId])
       if (queueAgents && input.leadBotId) await q('UPDATE conversations SET "leadBotId"=$2 WHERE id=$1', [id, input.leadBotId])
@@ -74,7 +76,8 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         LEFT JOIN conversation_reads r ON r."conversationId"=c.id::text AND r."userId"=$1
         LEFT JOIN chat_preferences pref ON pref."userId"=$1 AND pref."chatKey"=c.id::text
         LEFT JOIN LATERAL (SELECT to_jsonb(m) || jsonb_build_object('position', m.position::text) AS message FROM conversation_messages m WHERE m."conversationId"=c.id ORDER BY position DESC LIMIT 1) last ON true
-        WHERE c.kind='group' AND ($2::uuid IS NULL OR c."workspaceId"=$2) ORDER BY c."createdAt" DESC,c.id DESC`, [userId, req.workspaceId ?? null])
+        WHERE c.kind='group' AND (c."creationPurpose"<>'conversation' OR c."createdBy"=$1)
+          AND ($2::uuid IS NULL OR c."workspaceId"=$2) ORDER BY c."createdAt" DESC,c.id DESC`, [userId, req.workspaceId ?? null])
       const accessible = []
       for (const row of rows) if (await directory(row.workspaceId, userId, [])) accessible.push(row)
       result = { conversations: accessible, viewerId: userId, workspaceId: req.workspaceId ?? null }
@@ -92,7 +95,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
       const { rows: groups } = await q(`SELECT * FROM conversations WHERE id=$1 AND kind='group'${req.method === 'GET' ? '' : ' FOR UPDATE'}`, [groupId])
       const group = groups[0]
       const { rows: memberships } = await q(`SELECT role FROM conversation_members WHERE "conversationId"=$1 AND "memberType"='user' AND "memberId"=$2 AND "leftAt" IS NULL`, [groupId, userId])
-      if (!group || !memberships.length || !await directory(group.workspaceId, userId, [])) return fail(404)
+      if (!group || !memberships.length || (group.creationPurpose === 'conversation' && group.createdBy !== userId) || !await directory(group.workspaceId, userId, [])) return fail(404)
       group.role = memberships[0].role
       if (req.resource === 'links' && req.method === 'GET') {
         const { rows: [link] } = await q(`SELECT l."linkedConversationId",l."firstPosition"::text,l."lastPosition"::text,l."messageCount"::text
@@ -250,6 +253,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         if (req.method === 'POST' && group.role !== 'owner') return fail(403)
         const input = parse(member, req.body)
         if (req.method === 'POST') {
+          if (group.creationPurpose === 'conversation' && input.memberType !== 'bot') return fail(422)
           if (!await directory(group.workspaceId, userId, [input])) return fail(404)
           await q(`INSERT INTO conversation_members ("conversationId","memberType","memberId",role) VALUES ($1,$2,$3,'member')
             ON CONFLICT ("conversationId","memberType","memberId") DO UPDATE SET "leftAt"=NULL,"joinedAt"=CASE WHEN conversation_members."leftAt" IS NULL THEN conversation_members."joinedAt" ELSE now() END`, [req.id, input.memberType, input.memberId])

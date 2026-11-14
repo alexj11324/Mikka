@@ -15,12 +15,12 @@ import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { useLiveKey } from '@/hooks/use-live-key'
 import type { DirectoryState } from '@/lib/conversation-directory-input'
-import { openThread } from './workspace-navigation'
+import { navigate, openThread } from './workspace-navigation'
 
 type Page = Awaited<ReturnType<typeof listConversations>>
 const states = ['all', 'working', 'waiting', 'idle', 'failed'] as const
 
-export function ConversationDirectory({ ownerId, workspaceId, botId }: { ownerId: string; workspaceId: string | null; botId: string | null }) {
+export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 0 }: { ownerId: string; workspaceId: string | null; botId: string | null; revision?: number }) {
   const t = useTranslations('ConversationDirectory')
   const format = useFormatter()
   const { mutate: refresh } = useSWRConfig()
@@ -35,11 +35,12 @@ export function ConversationDirectory({ ownerId, workspaceId, botId }: { ownerId
   const [archived, setArchived] = useState(false)
   const query = useDeferredValue(search.trim())
   const getKey = (index: number, previous: Page | null) => !workspaceId || (index > 0 && !previous?.cursor)
-    ? null : ['conversation-directory', ownerId, workspaceId, botId, query, state, archived, previous?.cursor ?? null] as const
+    ? null : ['conversation-directory', ownerId, workspaceId, botId, query, state, archived, previous?.cursor ?? null, revision] as const
   const { data, error, mutate, size, setSize, isValidating } = useSWRInfinite<Page, Error, typeof getKey>(getKey,
     ([, , , selectedBot, text, selected, showArchive, cursor]) => listConversations({ botId:selectedBot ?? undefined, search: text, state: selected, archived: showArchive, cursor: cursor ?? undefined }),
     { revalidateOnFocus: false, shouldRetryOnError: false })
   useLiveKey('thread_list', workspaceId, workspaceId ? [unstable_serialize(getKey)] : [], workspaceId)
+  useLiveKey('group_list', workspaceId, workspaceId ? [unstable_serialize(getKey)] : [], workspaceId)
   const rows = [...new Map(data?.flatMap(page => page.items).map(item => [item.id, item])).values()]
   const more = Boolean(data?.at(-1)?.cursor)
   async function mark(runId?: string) {
@@ -82,14 +83,14 @@ export function ConversationDirectory({ ownerId, workspaceId, botId }: { ownerId
     {!error && !data && <p role="status">{t('loading')}</p>}
     {data && !rows.length && !more && !error && <p role="status">{t('empty')}</p>}
     <ul className="flex flex-col gap-1">
-      {rows.map(row => <li key={row.id} className="flex items-center gap-2"><Button type="button" variant="ghost" onClick={() => openThread(row.id)}
+      {rows.map(row => <li key={row.id} className="flex items-center gap-2"><Button variant="ghost" type="button" onClick={() => row.kind === 'chat' ? navigate({ section: 'group', group: row.id, issue: null, thread: null, task: null }) : openThread(row.id)}
         className="h-auto min-w-0 flex-1 flex-wrap justify-start gap-x-3 gap-y-1 py-3 text-start">
         <span className="min-w-0 flex-1 break-words font-medium">{row.title || t('untitled')}</span>
-        {row.unread && <span className="size-2 rounded-full bg-primary" role="img" aria-label={t('unread')} />}
+        {row.kind === 'run' && row.unread && <span className="size-2 rounded-full bg-primary" role="img" aria-label={t('unread')} />}
         {row.identifier && <bdi>{row.identifier}</bdi>}
         <span>{t(row.state)}</span><time dateTime={row.at}>{format.dateTime(new Date(row.at), { dateStyle: 'medium', timeStyle: 'short' })}</time>
       </Button>
-        {!row.unread && <Button size="sm" variant="ghost" disabled={writing} onClick={() => void mark(row.id)}>{t('markUnread')}</Button>}
+        {row.kind === 'run' && !row.unread && <Button size="sm" variant="ghost" disabled={writing} onClick={() => void mark(row.id)}>{t('markUnread')}</Button>}
       </li>)}
     </ul>
     {more && <Button variant="outline" disabled={isValidating} onClick={() => void setSize(size + 1)}>{t('more')}</Button>}

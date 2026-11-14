@@ -1,4 +1,5 @@
 import 'server-only'
+import { standaloneChatDirectory } from './standalone-chat-directory'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import { directoryInput, type DirectoryInput, type DirectoryState } from './conversation-directory-input'
@@ -76,7 +77,7 @@ export async function effectiveConversationArchive(database: RunChainQueryable, 
 }
 
 function item(row: Row) {
-  return { id: row.id, issueId: row.issueId, identifier: row.identifier, title: conversationTitle({ title: row.title,
+  return { kind: 'run' as const, id: row.id, issueId: row.issueId, identifier: row.identifier, title: conversationTitle({ title: row.title,
     name: threadName(row.asked, ''), issue: { title: row.taskTitle || row.agentName } }), state: row.state, unread:row.unread, at: row.at, pinned: row.pinned }
 }
 
@@ -91,9 +92,17 @@ export async function conversationDirectory(database: RunChainQueryable, userId:
     ORDER BY pinned DESC,touched DESC,visible.id DESC LIMIT 101`
   const rows = (await database.query(statement,[...facts.params,userId,workspaceId,RUN_CHAIN_MAX_DEPTH,input.archived,input.botId ?? null,
     input.search,input.state,input.cursor?.id ?? null,input.cursor?.pinned ?? null,input.cursor?.at ?? null])).rows as Row[]
-  const page = rows.slice(0,100), last = page.at(-1)
-  return { items: page.map(item).filter(row=>!input.search || row.title.toLowerCase().includes(input.search.toLowerCase())),
-    cursor: rows.length>page.length && last ? {id:last.id,at:last.at,pinned:last.pinned} : null }
+  const batch = rows.slice(0,100)
+  const items = batch.map(item).filter(row=>!input.search || row.title.toLowerCase().includes(input.search.toLowerCase()))
+  const chats = await standaloneChatDirectory(database, userId, workspaceId, input)
+  const order = (a: { pinned: boolean; at: string; id: string }, b: typeof a) =>
+    Number(b.pinned) - Number(a.pinned) || b.at.localeCompare(a.at) || b.id.localeCompare(a.id)
+  const merged = [...items, ...chats].sort(order)
+  const boundary = rows.length > batch.length ? batch.at(-1) : undefined
+  const eligible = boundary ? merged.filter(row => order(row, boundary) <= 0) : merged
+  const page = eligible.slice(0,100)
+  const last = page.length === 100 ? page.at(-1) : boundary
+  return { items: page, cursor: (boundary || merged.length > page.length) && last ? {id:last.id,at:last.at,pinned:last.pinned} : null }
 }
 
 /** A single bounded result per visible Bot, independent of thread-list paging. */
