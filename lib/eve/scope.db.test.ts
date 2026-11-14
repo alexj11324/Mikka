@@ -20,6 +20,25 @@ test('eve sessions keep Bot, Workspace, owner and surface authorization after im
     for(const owner of [ownerId,other])await pool.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role)VALUES($1,$2,'Owner',$3,'admin')`,[workspaceId,owner,owner+'@example.invalid'])
     for(const [id,owner]of [[botId,ownerId],[otherBot,other]])await pool.query('INSERT INTO bots(id,"ownerId","workspaceId",name)VALUES($1,$2,$3,\'Eve bot fixture\')',[id,owner,workspaceId])
     await registerSession(scope,sessionId)
+    await t.test('replayed registrations keep the original physical row while concurrent initial registrations arbitrate ownership', async () => {
+      const physical = async (id: string) => (await pool.query('SELECT xmin::text AS revision FROM eve_sessions WHERE session_id=$1', [id])).rows[0].revision
+      const before = await physical(sessionId)
+      await Promise.all(Array.from({ length: 6 }, () => registerSession(scope, sessionId)))
+      assert.equal(await physical(sessionId), before, 'an existing identity is verified without rewriting the mapping')
+
+      const fresh = 'wrun_concurrent_' + randomUUID()
+      const otherScope = { ...scope, ownerId: other, botId: otherBot }
+      const inputs = [scope, otherScope, scope, otherScope]
+      const results = await Promise.allSettled(inputs.map(input => registerSession(input, fresh)))
+      const winner = (await pool.query('SELECT owner_id FROM eve_sessions WHERE session_id=$1', [fresh])).rows[0].owner_id
+      for (const [i, result] of results.entries()) {
+        if (inputs[i].ownerId === winner) assert.equal(result.status, 'fulfilled')
+        else {
+          assert.equal(result.status, 'rejected')
+          assert.match(String(result.reason), /workspaceAccessDenied/)
+        }
+      }
+    })
     await t.test('event ingress registers its session once before native delivery', async t => {
       const { mikkaEveChannel } = await import('./channel')
       const { internalEveAuthorization } = await import('./auth')
