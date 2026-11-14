@@ -203,23 +203,26 @@ export function useIssueMetadataSave({ task, disabled = false, onSaved, onBusyCh
   const [pending, setPending] = useState(false)
   const saving = useRef(false)
   const [error, setError] = useState('')
+  async function refreshConflict(revision: number, refreshDraft?: (issue: MetadataSavedIssue) => void) {
+    const latest = await pollIssue(task.id)
+    if (latest.error) { setError(actionError(latest.error)); return false }
+    if (!latest.issue || latest.issue.id !== task.id || latest.issue.revision <= revision) {
+      setError(actionError('issueOutdated'))
+      return false
+    }
+    onSaved(latest.issue, 'refresh')
+    if (latest.issue.canSteer === false) { setError(actionError('issueAccessChanged')); return false }
+    refreshDraft?.(latest.issue)
+    setError(actionError('issueStale'))
+    return false
+  }
   async function persist(patch: IssueMetadataPatch, inviteEmail?: string, edit?: { revision: number; refreshDraft: (issue: MetadataSavedIssue) => void }) {
     if (saving.current || disabled) return false
     saving.current = true; setPending(true); setError(''); onBusyChange?.(true)
     try {
       const revision = edit?.revision ?? task.revision
       const result = await updateIssueMetadata({ id: task.id, revision, patch, inviteEmail })
-      if (result.error === 'issueOutdated') {
-        const latest = await pollIssue(task.id)
-        if (latest.error) { setError(actionError(latest.error)); return false }
-        if (latest.issue?.id === task.id && latest.issue.revision > revision) {
-          onSaved(latest.issue, 'refresh')
-          if (latest.issue.canSteer === false) { setError(actionError('issueAccessChanged')); return false }
-          edit?.refreshDraft(latest.issue)
-          setError(actionError('issueStale'))
-          return false
-        }
-      }
+      if (result.error === 'issueOutdated') return await refreshConflict(revision, edit?.refreshDraft)
       if (!('issue' in result) || !result.issue) { setError(actionError(result.error ?? 'issueMetadataSaveFailed')); return false }
       onSaved(result.issue, 'save')
       return true
@@ -227,16 +230,18 @@ export function useIssueMetadataSave({ task, disabled = false, onSaved, onBusyCh
     finally { saving.current = false; setPending(false); onBusyChange?.(false) }
   }
   /** A project move the server refused until the person confirms who it removes. */
-  const [accessChange, setAccessChange] = useState<{ projectId: string | null; tasks: number } | null>(null)
-  async function project(projectId: string | null, confirmAccess = false) {
+  type Move = Parameters<typeof moveIssueToProject>[0]
+  const [accessChange, setAccessChange] = useState<{ move: Move; tasks: number } | null>(null)
+  async function move(input: Move) {
     if (saving.current || disabled) return false
     saving.current = true; setPending(true); setError(''); onBusyChange?.(true)
     try {
-      const result = await moveIssueToProject({ issueId: task.id, revision: task.revision, projectId, ...(task.workspaceId ? { workspaceId: task.workspaceId } : {}), ...(confirmAccess ? { confirmAccess } : {}) })
+      const result = await moveIssueToProject(input)
+      if (result.error === 'issueOutdated') return await refreshConflict(input.revision)
       // The move changes who can read the task: nothing was written, and the same
       // move replays once the person confirms.
       if (result.error && 'confirmable' in result && result.confirmable) {
-        setAccessChange({ projectId, tasks: Number(result.params?.tasks ?? 1) })
+        setAccessChange({ move: input, tasks: Number(result.params?.tasks ?? 1) })
         return false
       }
       if (!('issue' in result) || !result.issue) { setError(actionError(result.error ?? 'projectMoveFailed')); return false }
@@ -244,8 +249,16 @@ export function useIssueMetadataSave({ task, disabled = false, onSaved, onBusyCh
     } catch { setError(tProperty('projectLinkFailedRetry')); return false }
     finally { saving.current = false; setPending(false); onBusyChange?.(false) }
   }
+  function project(projectId: string | null) {
+    return move({ issueId: task.id, revision: task.revision, projectId, workspaceId: task.workspaceId ?? undefined })
+  }
   return { pending, error, setError, persist, project, accessChange,
     /** Replays the refused move with the confirmation the server asked for. */
-    confirmAccess: async () => { const pendingMove = accessChange; setAccessChange(null); if (!pendingMove) return false; return project(pendingMove.projectId, true) },
+    confirmAccess: async () => {
+      const request = accessChange?.move
+      setAccessChange(null)
+      if (!request || request.issueId !== task.id || request.workspaceId !== (task.workspaceId ?? undefined)) return false
+      return move({ ...request, confirmAccess: true })
+    },
     cancelAccessChange: () => setAccessChange(null) }
 }
