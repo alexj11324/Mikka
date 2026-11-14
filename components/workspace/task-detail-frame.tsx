@@ -19,7 +19,7 @@ import { ISSUE_PRIORITIES, ISSUE_STATUSES } from './issue-properties'
 import { useIssueConnections, type RelationKind } from './issue-relations'
 import { useTaskOwnershipRows } from './issue-scope-control'
 import { AgentSphere } from './issue-assignee-menu'
-import type { useAgentActivity } from './issue-threads'
+import type { useTaskWork } from './issue-threads'
 import { openGroupConversation } from './workspace-navigation'
 import { TaskWorkSection } from './task-work-section'
 import { useActivityEvents } from './issue-activity-feed'
@@ -61,7 +61,7 @@ export type FramedTaskProps = {
   acceptance: ReactNode
   versions: ActivityVersion[]
   historyFailed: (() => void) | null
-  agentActivity: ReturnType<typeof useAgentActivity>
+  agentActivity: ReturnType<typeof useTaskWork>
   documentTools: boolean
   actionRequest: IssueActionRequest | null
   propertyRequest: MetadataRequest | null

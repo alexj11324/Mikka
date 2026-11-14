@@ -224,6 +224,11 @@ test('task thread lists retain exact titles, summaries and privacy while details
     const work = await withActivitySession(owner, () => pollIssueThreads(issue, true), workspace)
     assert.ok('connections' in work)
     assert.deepEqual(work.connections.map(row => row.id), [issue])
+    assert.equal(work.viewerId, owner)
+    assert.ok('positions' in work.activity && Array.isArray(work.activity.positions))
+    const cursor = { version: work.activity.version, positions: work.activity.positions }
+    const unchanged = await withActivitySession(owner, () => pollIssueThreads(issue, true, cursor), workspace)
+    assert.ok('activity' in unchanged && 'unchanged' in unchanged.activity && unchanged.activity.unchanged)
     await assert.rejects(withActivitySession(outsider, () => pollIssueThreads(issue, true), workspace), { code: 'issueNotFound' })
     assert.ok(selected.bytes < baseline.reads[0].bytes / 20, 'list projection excludes full prompts, reports and error stacks')
     assert.equal(selected.route, '/actions/threads/issue-list')

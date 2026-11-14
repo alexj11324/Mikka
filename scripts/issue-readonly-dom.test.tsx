@@ -25,7 +25,7 @@ for (const [file, names] of [
   ['issue-members', ['IssueMembers']],
   ['issue-thread-panel', ['IssueThreadPanel']], ['factory-acceptance', ['FactoryAcceptance', 'FactoryAcceptancePanel']], ['issue-activity-feed', ['IssueActivityFeed']],
 ] as const) mock.module(u(`../components/workspace/${file}.tsx`), { namedExports: Object.fromEntries(names.map(name => [name, stub(name)])) })
-mock.module(u('../components/workspace/issue-threads.tsx'), { namedExports: { IssueThreads: stub('IssueThreads'), useAgentActivity: () => ({ rows: [], error: null }) } })
+mock.module(u('../components/workspace/issue-threads.tsx'), { namedExports: { IssueThreads: stub('IssueThreads'), useTaskWork: () => ({ rows: [], error: null }) } })
 mock.module(u('../components/workspace/task-detail-frame.tsx'), { namedExports: {
   FramedTask: (props: import('../components/workspace/task-detail-frame').FramedTaskProps) =>
     <><header data-save-label={props.saveLabel} />{props.editor(null, discussions =>
