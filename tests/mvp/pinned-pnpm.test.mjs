@@ -106,6 +106,7 @@ const scopeRoot = fileURLToPath(new URL('../..', import.meta.url))
 const sharedInstallPath = '.github/actions/pnpm-install/action.yml'
 const githubTokenExpression = '$' + '{{ github.token }}'
 const inputTokenExpression = '$' + '{{ inputs.ffmpeg-github-token }}'
+const publicWorldExpression = "env.PUBLISH_IMAGE != 'true' && '@workflow/world-postgres' || ''"
 const syntheticToken = 'fixture-only-not-a-real-token'
 const readYaml = path => yaml.load(readFileSync(join(scopeRoot, path), 'utf8'))
 const sharedAction = () => readYaml(sharedInstallPath)
@@ -146,7 +147,7 @@ function assertPublicImageBuild(build) {
     assert.match(line, /^[A-Za-z_][A-Za-z0-9_]*=/, 'PUBLIC_IMAGE_EXPLICIT_BUILD_ARG_REQUIRED')
     assert.doesNotMatch(line, /(?:ffmpeg[_-])?github[_-]token/i, 'PUBLIC_IMAGE_CREDENTIAL_BUILD_ARG')
     for (const match of line.matchAll(/\$\{\{(.*?)\}\}/g))
-      assert.ok(['github.sha', 'steps.image-inputs.outputs.worker-sha'].includes(match[1].trim()), 'PUBLIC_IMAGE_NONPUBLIC_BUILD_ARG')
+      assert.ok(['github.sha', 'steps.image-inputs.outputs.worker-sha', publicWorldExpression].includes(match[1].trim()), 'PUBLIC_IMAGE_NONPUBLIC_BUILD_ARG')
   }
 }
 function resolveInstallValue(value, inputs) {
@@ -237,6 +238,9 @@ test('the public image action refuses secret channels and credential-bearing bui
   assert.throws(() => assertPublicImageBuild(withInput({ 'build-args': 'IMPLICIT' })), /PUBLIC_IMAGE_EXPLICIT_BUILD_ARG_REQUIRED/)
   assert.throws(() => assertPublicImageBuild(withInput({ 'build-args': 'FFMPEG_GITHUB_TOKEN=fixture' })), /PUBLIC_IMAGE_CREDENTIAL_BUILD_ARG/)
   assert.throws(() => assertPublicImageBuild(withInput({ 'build-args': 'ALIAS=' + githubTokenExpression })), /PUBLIC_IMAGE_NONPUBLIC_BUILD_ARG/)
+  assert.doesNotThrow(() => assertPublicImageBuild(withInput({ 'build-args': 'WORKFLOW_TARGET_WORLD=${{ ' + publicWorldExpression + ' }}' })))
+  for (const expression of ['secrets.WORKFLOW_TARGET_WORLD', 'env.WORKFLOW_TARGET_WORLD', 'env.PUBLISH_IMAGE'])
+    assert.throws(() => assertPublicImageBuild(withInput({ 'build-args': 'WORKFLOW_TARGET_WORLD=${{ ' + expression + ' }}' })), /PUBLIC_IMAGE_NONPUBLIC_BUILD_ARG/)
   assert.throws(() => assertPublicImageBuild({ uses: 'docker/build-push-action@main' }), /PINNED_PUBLIC_IMAGE_ACTION_REQUIRED/)
   assert.throws(() => assertPublicImageBuild({ run: 'docker build --secret id=ffmpeg_github_token .' }))
 })

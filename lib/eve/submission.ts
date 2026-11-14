@@ -21,7 +21,6 @@ export const eveProductContext = z.object({
 
 const ingress = new WeakMap<Request, { scope:EveScope; eventId:string }>()
 export async function acceptEveMessage(scope:EveScope,message:MessageContent,context:unknown,request:Request) {
-  await assertEveScope(scope)
   const product = eveProductContext.parse(context ?? {})
   const retry=product.retryOf?await (await import('./retry-source')).loadEveRetrySource(scope,product.retryOf):null
   if (product.expectedOwnerId && product.expectedOwnerId !== scope.ownerId || product.expectedWorkspaceId && product.expectedWorkspaceId !== scope.workspaceId || product.botId && product.botId !== scope.botId) throw new Error('workspaceAccessDenied')

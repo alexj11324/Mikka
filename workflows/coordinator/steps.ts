@@ -11,7 +11,6 @@ import { FactoryError } from '@/lib/factory/contract'
 import { publicFactoryReceipt } from '@/lib/factory/public-receipt'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
 import type { MailboxToolRequest } from '@/lib/mailbox-tools'
-import type { DefinitionSnapshot } from '@/lib/agent-kit/definition'
 import type { AgentExecution } from '@/lib/agent-kit/store'
 import type { WorkerDefinitionSnapshot, WorkerModelDispatch } from '@/lib/agent-kit/worker'
 import { issueVisibility } from '@/lib/issue-visibility'
@@ -97,15 +96,6 @@ export async function recordAttention(userId: string, input: { matterId: string;
 }
 
 /** Product context only: eve supplies history and owns pruning and compaction. */
-export async function prepareEveInstructions(userId: string, botId: string, snapshot?: DefinitionSnapshot, nativeTurn?: { sessionId: string; turnId: string }) {
-  if (deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle')) {
-    const { factoryRuntimeForBot } = await import('@/lib/factory/runtime')
-    await factoryRuntimeForBot(botId).reconcile(userId)
-  }
-  const { composeEveInstructions } = await import('@/lib/coordinator/product-instructions')
-  return composeEveInstructions(userId, botId, snapshot, nativeTurn)
-}
-
 export async function personalWriteToolsEnabled() { 'use step'; const { personalWritesEnabled } = await import('@/lib/operations/write-feature'); return personalWritesEnabled() }
 
 export async function mailboxToolsEnabled() { 'use step'; return personalMailboxEnabled() }
