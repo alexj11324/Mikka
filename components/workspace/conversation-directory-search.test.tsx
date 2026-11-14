@@ -19,8 +19,7 @@ stub('../../hooks/use-live-key.tsx', { useLiveKey: () => {} })
 stub('../../app/actions/task-runs.ts', { listConversations: ({ search }: { search: string }) => { renderedQuery = search; return { items: [], cursor: null } } })
 const { ConversationDirectory } = await import('./conversation-directory')
 test('the active directory query follows the search input even before React can commit background work', async () => {
-  const host = document.createElement('div')
-  document.body.append(host)
+  const host = document.body
   const root = createRoot(host)
   try {
     await act(async () => root.render(<ConversationDirectory ownerId="owner" workspaceId="workspace" />))
@@ -36,5 +35,5 @@ test('the active directory query follows the search input even before React can 
       })
       assert.equal(renderedQuery, 'another conversation')
     })
-  } finally { await act(async () => root.unmount()); host.remove(); await browser.happyDOM.abort() }
+  } finally { await act(async () => root.unmount()); await browser.happyDOM.abort() }
 })
