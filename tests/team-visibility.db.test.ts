@@ -108,6 +108,18 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
       assert.equal(await readRun(user,privateRun),null)
       assert.equal(await readRun(user,orphanRun),null)
     }
+    await t.test('MCP stop uses the same owner and workspace checks as the stop operation', async subtest => {
+      const deniedAtAction = await measured(() => scoped(owner, personalWorkspace,
+        () => actions.stopRun(owner, sharedRun)))
+      const deniedAtRuntime = await measured(() => scoped(owner, personalWorkspace,
+        () => assert.rejects(requestRunStop(owner, sharedRun), /workspaceAccessDenied/)))
+      assert.deepEqual(deniedAtAction.value, { error: 'workspaceAccessDenied' })
+      assert.deepEqual(await scoped(foreign, otherWorkspace, () => actions.stopRun(foreign, sharedRun)), { error: 'runNotFound' })
+      assert.equal((await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [sharedRun])).rows[0].stopRequestedAt, null)
+      subtest.diagnostic(JSON.stringify({ mcpStatements: deniedAtAction.statements, runtimeStatements: deniedAtRuntime.statements }))
+      assert.ok(deniedAtRuntime.statements > 0)
+      assert.equal(deniedAtAction.statements, deniedAtRuntime.statements, 'the transport adds no second owner lookup')
+    })
     await assert.rejects(tools.getIssue(owner, shared), /workspaceAccessDenied/, 'an unscoped MCP call cannot aggregate memberships')
     assert.equal(await scoped(owner, personalWorkspace, () => tools.getIssue(owner, shared)), null, 'the same account cannot read a task outside its selected tenant')
     assert.equal((await scoped(owner, personalWorkspace, () => tools.listIssues(owner, {}))).some(row => row.id === shared), false)
