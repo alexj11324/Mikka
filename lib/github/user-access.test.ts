@@ -38,7 +38,7 @@ mock.module(new URL('../request-log.ts', import.meta.url).href, { namedExports: 
 
 const repository = { id: 91, full_name: 'Owner/Project', private: true }
 const installation = { id: 11, app_id: 4840908, suspended_at: null }
-const pullRequest = { number: 7, state: 'open', merged: false, merged_at: null, updated_at: '2026-10-27T12:00:00Z', base: { repo: repository } }
+const pullRequest = { number: 7, title: 'Add issue activity', state: 'open', merged: false, created_at: '2026-10-26T09:30:00Z', merged_at: null, updated_at: '2026-10-27T12:00:00Z', base: { repo: repository } }
 const json = (value: unknown, next = false) => Response.json(value, { headers: next ? { link: '<https://api.github.com/ignored?cursor=next>; rel="next"' } : {} })
 let answer: (url: URL) => Response | Promise<Response> = () => { throw new Error('Unexpected GitHub request') }
 let expectedToken = 'private-test-token'
@@ -372,10 +372,19 @@ test('permissions and upstream faults fail clearly without exposing provider bod
 test('PR state comes from the authorized repository and returns canonical data', async () => {
   for (const [state, merged, expected] of [['open', false, 'open'], ['closed', false, 'closed'], ['closed', true, 'merged']] as const) {
     const previous = answer
-    answer = url => url.pathname.startsWith('/repos/') ? json({ ...pullRequest, state, merged }) : previous(url)
+    answer = url => url.pathname.startsWith('/repos/') ? json({ ...pullRequest, state, merged, merged_at: state === 'closed' && merged ? '2026-10-27T11:00:00Z' : null }) : previous(url)
     const result = await access.readAuthorizedPullRequest(requestHeaders, 'https://github.com/owner/project/pull/7/')
-    assert.deepEqual(result, { userId: 'person-1', githubAccountId: '42', repoId: '91', installationId: '11', number: 7, url: 'https://github.com/Owner/Project/pull/7', state: expected, updatedAt: '2026-10-27T12:00:00Z' })
+    assert.deepEqual(result, { userId: 'person-1', githubAccountId: '42', repoId: '91', installationId: '11', number: 7, url: 'https://github.com/Owner/Project/pull/7', state: expected, updatedAt: '2026-10-27T12:00:00Z', title: 'Add issue activity', createdAt: '2026-10-26T09:30:00Z', mergedAt: state === 'closed' && merged ? '2026-10-27T11:00:00Z' : null })
   }
+})
+
+test('missing or malformed event clocks stay unavailable instead of falling back to updated_at', async () => {
+  const previous = answer
+  answer = url => url.pathname.startsWith('/repos/') ? json({ ...pullRequest, created_at: 'not-a-date', merged_at: 'bad' }) : previous(url)
+  const result = await access.readAuthorizedPullRequest(requestHeaders, 'https://github.com/Owner/Project/pull/7')
+  assert.equal(result.updatedAt, '2026-10-27T12:00:00Z')
+  assert.equal(result.createdAt, null)
+  assert.equal(result.mergedAt, null)
 })
 
 test('PR URLs cannot redirect credentials or select another host', async () => {

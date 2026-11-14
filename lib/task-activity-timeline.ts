@@ -37,6 +37,31 @@ export type TaskDiscussionEvent = {
   resolved: boolean
 }
 
+export type PullRequestActivitySource = { url: string; title: string | null; createdAt: string | null; mergedAt: string | null; state: 'open' | 'closed' | 'merged' }
+export type PullRequestTimelineEvent = { kind: 'event'; id: string; at: string; who: null; mark: { kind: 'icon'; icon: 'pullRequest' }; text: string; time: string }
+
+/** Build only events whose exact provider timestamps are available; updatedAt is deliberately not a fallback. */
+export function pullRequestActivityEvents(items: readonly PullRequestActivitySource[], labels: {
+  opened: (repo: string, number: string, title: string) => string
+  merged: (repo: string, number: string, title: string) => string
+  time: (at: string) => string
+}): PullRequestTimelineEvent[] {
+  const rows: PullRequestTimelineEvent[] = []
+  const seen = new Set<string>()
+  for (const item of items) {
+    const match = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/([1-9]\d*)\/?$/.exec(item.url)
+    if (!match || seen.has(item.url) || !item.title?.trim()) continue
+    seen.add(item.url)
+    const [, repo, number] = match
+    const validTime = (value: string | null) => value && Number.isFinite(Date.parse(value)) ? value : null
+    const createdAt = validTime(item.createdAt)
+    if (createdAt) rows.push({ kind: 'event', id: `pull:${item.url}:opened`, at: createdAt, who: null, mark: { kind: 'icon', icon: 'pullRequest' }, text: labels.opened(repo, number, item.title), time: labels.time(createdAt) })
+    const mergedAt = item.state === 'merged' ? validTime(item.mergedAt) : null
+    if (mergedAt) rows.push({ kind: 'event', id: `pull:${item.url}:merged`, at: mergedAt, who: null, mark: { kind: 'icon', icon: 'pullRequest' }, text: labels.merged(repo, number, item.title), time: labels.time(mergedAt) })
+  }
+  return rows
+}
+
 export type TaskActivityFact =
   | { kind: 'history'; id: string; at: string; event: IssueActivityEvent }
   | TaskDiscussionEvent

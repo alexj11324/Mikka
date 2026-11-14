@@ -13,6 +13,7 @@ import { useIssueTeam } from '@/components/teams/issue-team-control'
 import { formatDateOnly } from '@/lib/date-only'
 import { isIssueListKey } from '@/lib/live/list-read'
 import { issueKeys } from '@/lib/swr/keys'
+import { withBasePath } from '@/lib/base-path'
 import { taskProjectOptions } from '@/lib/task-project-options'
 import { useActionError } from '@/lib/use-action-error'
 import type { IssueDetailNavigation } from './issue-detail-header'
@@ -28,11 +29,48 @@ import { useSelectedTaskPresentation } from '@/hooks/use-selected-task-presentat
 import { useActivityEvents } from './issue-activity-feed'
 import { useActivityDrafts, type DiscussionSave } from './issue-activity'
 import type { IssueDiscussions } from './issue-editor'
-import { chronologicalActivity, taskDiscussionEvents } from '@/lib/task-activity-timeline'
+import { chronologicalActivity, pullRequestActivityEvents, taskDiscussionEvents, type PullRequestActivitySource } from '@/lib/task-activity-timeline'
 import type { ActivityVersion } from '@/lib/issue-activity'
 import { PullRequestStatus } from './issue-pull-request-link'
 
 type Issue = IssueView
+
+type PullRequestStatusPayload = {
+  viewerId: string
+  url: string
+  state: 'open' | 'closed' | 'merged'
+  title: string | null
+  createdAt: string | null
+  mergedAt: string | null
+}
+
+function isPullRequestStatusPayload(value: unknown): value is PullRequestStatusPayload {
+  if (!value || typeof value !== 'object') return false
+  const item = value as Record<string, unknown>
+  return typeof item.viewerId === 'string' && typeof item.url === 'string'
+    && (item.state === 'open' || item.state === 'closed' || item.state === 'merged')
+    && (item.title === null || typeof item.title === 'string')
+    && (item.createdAt === null || typeof item.createdAt === 'string')
+    && (item.mergedAt === null || typeof item.mergedAt === 'string')
+}
+
+async function pullRequestTimelineFetcher(key: readonly [string, string, string, string]) {
+  const [, viewerId, issueId, serializedUrls] = key
+  const urls: unknown = JSON.parse(serializedUrls)
+  if (!Array.isArray(urls) || !urls.every(url => typeof url === 'string')) return { items: [] as PullRequestActivitySource[], failed: true }
+  const results = await Promise.all(urls.map(async url => {
+    try {
+      const response = await fetch(withBasePath('/api/github/pull-request-status'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store', body: JSON.stringify({ issueId, url }),
+      })
+      if (!response.ok) return null
+      const value: unknown = await response.json()
+      if (!isPullRequestStatusPayload(value) || value.viewerId !== viewerId || value.url.replace(/\/$/, '').toLowerCase() !== url.replace(/\/$/, '').toLowerCase()) return null
+      return { url: value.url, title: value.title, state: value.state, createdAt: value.createdAt, mergedAt: value.mergedAt } satisfies PullRequestActivitySource
+    } catch { return null }
+  }))
+  return { items: results.filter((item): item is PullRequestActivitySource => item !== null), failed: results.some(item => item === null) }
+}
 
 /** Data and commands the shared Task controller supplies to the official renderer. */
 export type FramedTaskProps = {
@@ -122,6 +160,12 @@ export function FramedTask(props: FramedTaskProps) {
     : [{ id: 'loading', label: text }]
   const busy = locked || metadata.pending
   const meta = task.metadata
+  const pullRequestUrls = meta.pullRequests.map(pr => pr.url)
+  const pullRequestTimeline = useSWR(
+    !preview && pullRequestUrls.length ? ['issue-pull-request-timeline', userId, task.id, JSON.stringify(pullRequestUrls)] as const : null,
+    pullRequestTimelineFetcher,
+    { revalidateOnFocus: true },
+  )
 
   // 负责人 is a person; a Bot the task is handed to has its own line under it (R-60).
   const member = meta.assignee?.kind === 'member' ? meta.assignee : null
@@ -228,6 +272,11 @@ export function FramedTask(props: FramedTaskProps) {
     (id, body, operationId) => discussions.current ? discussions.current.onReply(id, body, operationId) : false,
     props.discussionSave)
   const time = (at: string) => format.dateTime(new Date(at), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  const pullRequestEvents: TaskActivityItem[] = pullRequestActivityEvents(pullRequestTimeline.data?.items ?? [], {
+    opened: (repo, number, title) => tActivity('timelinePullOpened', { repo, number, title }),
+    merged: (repo, number, title) => tActivity('timelinePullMerged', { repo, number, title }),
+    time,
+  })
   const activityItems = (current: IssueDiscussions, expandReplies = false, additional: readonly TaskActivityItem[] = []): TaskActivityItem[] => {
     const anchors = new Map(current.anchors.map(anchor => [anchor.id, anchor.excerpt]))
     const byId = new Map(current.threads.map(thread => [thread.id, thread]))
@@ -243,7 +292,7 @@ export function FramedTask(props: FramedTaskProps) {
     return chronologicalActivity<TaskActivityItem>([
       ...history.map((item): TaskActivityItem => ({ kind: 'event', id: `history:${item.id}`, at: item.at, who: item.actor?.name ?? null, mark: item.actor?.name ? (item.actor.type === 'agent' ? { kind: 'node', node: <AgentSphere name={item.actor.name} compact /> } : { kind: 'person', name: item.actor.name }) : undefined, text: item.text, time: item.time })),
       ...props.agentActivity.items.map((item): TaskActivityItem => ({ kind: 'agent', id: item.id, at: item.at, who: item.name, mark: { kind: 'node', node: item.mark }, text: item.result, time: item.time, open: item.open, onOpen: item.onOpen, openLabel: tFrame('openThread', { name: item.name }) })),
-      ...comments, ...additional,
+      ...comments, ...additional, ...pullRequestEvents,
     ])
   }
 
@@ -272,7 +321,7 @@ export function FramedTask(props: FramedTaskProps) {
     subtasks={preview ? null : { items: subtasks, done: subtasks.filter(item => item.done).length, total: subtasks.length, onCreate: createChild, disabled: locked || connections.pending, failed: connections.error ? { text: tRelations('readFailedRetry'), retry: () => { void connections.mutate() } } : null }}
     activity={preview ? null : {
       items: activityItems, timeline: (current, additional) => activityItems(current, true, additional),
-      failed: [...props.historyFailed ? [{ text: tDetail('activityFailed'), retry: props.historyFailed }] : [], ...props.agentActivity.failed ? [{ text: props.agentActivity.failed.label, retry: props.agentActivity.failed.retry }] : []],
+      failed: [...props.historyFailed ? [{ text: tDetail('activityFailed'), retry: props.historyFailed }] : [], ...props.agentActivity.failed ? [{ text: props.agentActivity.failed.label, retry: props.agentActivity.failed.retry }] : [], ...pullRequestTimeline.data?.failed ? [{ text: tActivity('timelinePullFailed'), retry: () => { void pullRequestTimeline.mutate() } }] : []],
       drafts, subscribed: menu.subscribed, onSubscribe: menu.toggleSubscribed, subscribeLabel: menu.subscribed ? tFrame('unsubscribe') : tFrame('subscribe'),
     }}
     rows={rows}

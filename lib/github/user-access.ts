@@ -241,7 +241,11 @@ export async function readAuthorizedPullRequest(headers: Headers, url: string) {
   const baseRepo = object(object(pr.base).repo)
   if (pr.number !== number || githubId(baseRepo.id) !== repo.id || (pr.state !== 'open' && pr.state !== 'closed') || typeof pr.updated_at !== 'string' || !Number.isFinite(Date.parse(pr.updated_at))) throw new GitHubAccessError('githubUnavailable', 502)
   const state: 'open' | 'closed' | 'merged' = pr.state === 'closed' && (pr.merged === true || typeof pr.merged_at === 'string') ? 'merged' : pr.state
-  return { userId: access.userId, githubAccountId: access.githubAccountId, repoId: repo.id, installationId: repo.installationId, number, url: `https://github.com/${repo.fullName}/pull/${number}`, state, updatedAt: pr.updated_at }
+  // These timestamps are the provider's event times, not the PR's mutable updated_at.
+  // Keep them nullable so consumers can omit an event whose source time is unavailable.
+  const eventTime = (value: unknown) => typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : null
+  const title = typeof pr.title === 'string' && pr.title.length <= 256 ? pr.title : null
+  return { userId: access.userId, githubAccountId: access.githubAccountId, repoId: repo.id, installationId: repo.installationId, number, url: `https://github.com/${repo.fullName}/pull/${number}`, state, updatedAt: pr.updated_at, title, createdAt: eventTime(pr.created_at), mergedAt: eventTime(pr.merged_at) }
 }
 
 /** Existing issue readback only. A repository selection or PR URL never proves

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import en from '../messages/en.json' with { type: 'json' }
 import zhCN from '../messages/zh-CN.json' with { type: 'json' }
-import { taskHistoryLabel, type IssueActivityEvent } from './task-activity-timeline'
+import { pullRequestActivityEvents, taskHistoryLabel, type IssueActivityEvent } from './task-activity-timeline'
 
 function renderHistory(event: IssueActivityEvent, messages: typeof en.Workspace.activity) {
   return taskHistoryLabel(event, {
@@ -64,4 +64,22 @@ test('timeline labels use Capy’s activity filters and earlier-history control'
   )
   assert.equal(en.Workspace.activity.timelineEarlier, 'Show {count} earlier')
   assert.equal(zhCN.Workspace.activity.timelineEarlier, '再显示更早的 {count} 条')
+})
+
+
+test('pull request activity uses provider event timestamps and appears only when its source time exists', () => {
+  const rows = pullRequestActivityEvents([
+    { url: 'https://github.com/acme/app/pull/12', title: 'Better activity', state: 'merged', createdAt: '2026-10-26T09:30:00Z', mergedAt: '2026-10-27T11:00:00Z' },
+    { url: 'https://github.com/acme/app/pull/13', title: 'No clocks', state: 'merged', createdAt: null, mergedAt: null },
+    { url: 'https://github.com/acme/app/pull/14', title: null, state: 'open', createdAt: '2026-10-26T10:00:00Z', mergedAt: null },
+    { url: 'https://github.com/acme/app/pull/15', title: 'Bad clock', state: 'open', createdAt: 'not-a-date', mergedAt: null },
+  ], {
+    opened: (repo, number, title) => `Opened ${repo}#${number} ${title}`,
+    merged: (repo, number, title) => `Merged ${repo}#${number} ${title}`,
+    time: at => at,
+  })
+  assert.deepEqual(rows.map(({ id, at, text }) => [id, at, text]), [
+    ['pull:https://github.com/acme/app/pull/12:opened', '2026-10-26T09:30:00Z', 'Opened acme/app#12 Better activity'],
+    ['pull:https://github.com/acme/app/pull/12:merged', '2026-10-27T11:00:00Z', 'Merged acme/app#12 Better activity'],
+  ])
 })
