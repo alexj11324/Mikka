@@ -38,6 +38,7 @@ import {
   RUN_CREDENTIALS_HEADER,
   INITIAL_REPOSITORY_HEADER,
   MAILBOX_NOTICE_HEADER,
+  ACTIVE_TURN_STEER_HEADER,
   DAEMON_RPC_ERRORS,
   devicePaths,
   fsPaths,
@@ -312,6 +313,7 @@ export class HttpServerLink implements ServerLink {
           ...(initialRepository ? { [INITIAL_REPOSITORY_HEADER]: '1' } : {}),
           [SUBSCRIPTION_MODEL_CATALOGUE_HEADER]: '1',
           [MAILBOX_NOTICE_HEADER]: '1',
+          [ACTIVE_TURN_STEER_HEADER]: '1',
           [WORKSPACE_REQUEST_HEADER]: '1',
           [WORKSPACE_DIFF_REQUEST_HEADER]: '1',
           [WORKSPACE_GIT_REQUEST_HEADER]: '1',
@@ -592,10 +594,10 @@ export class HttpServerLink implements ServerLink {
     }
   }
 
-  async ackCommands(deviceId: string, delivered: string[]) {
-    if (delivered.length === 0) return
+  async ackCommands(deviceId: string, delivered: string[], refusedSteers: string[] = []) {
+    if (!delivered.length && !refusedSteers.length) return
     await this.call("POST", devicePaths.commandsAck(checkId(deviceId)), {
-      body: { delivered },
+      body: { delivered, ...(refusedSteers.length ? { refusedSteers } : {}) },
     })
   }
 

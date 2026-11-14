@@ -115,6 +115,21 @@ before(async () => {
   } } } } })
   mock.module('next/headers', { namedExports: { headers: async () => requestHeaders } })
   mock.module('@/lib/db', { namedExports: { db: database, withDatabaseClient: () => { throw Error('Factory dispatch is outside thread-control fixture') }, pool: { async query(sql: string, params: unknown[]) {
+    if (sql.includes('AS "canSteer"')) {
+      const live = current.continuation ?? current.run
+      assert.equal(viewer, current.run.userId)
+      assert.deepEqual(params, [live.id, current.run.userId])
+      assert.match(sql, /r\.id=\$1 AND r\."userId"=\$2/)
+      assert.match(sql, /d\.id=r\."deviceId" AND d\."ownerId"=r\."userId"/)
+      return { rows: [{ workspaceId, status: live.status, stopRequestedAt: live.stopRequestedAt,
+        harness: live.harness, canSteer: false, continuable: Boolean(live.deviceRepoId), interrupt: false }] }
+    }
+    if (sql.startsWith('SELECT id,text,status,"failureCode","requestId" FROM (')) {
+      assert.equal(viewer, current.run.userId)
+      assert.deepEqual(params, [current.run.userId, workspaceId, current.run.id])
+      assert.match(sql, /"userId"=\$1 AND "workspaceId"=\$2 AND "rootRunId"=\$3/)
+      return { rows: [] }
+    }
     // These ordinary threads have no machine binding; still verify the scoped stop probe.
     if (sql === 'SELECT "workspaceId" FROM computer_run_bindings WHERE "runId"=$1 AND "ownerId"=$2') {
       assert.deepEqual(params, [current.run.id, current.run.userId])
@@ -280,6 +295,7 @@ test('actual thread actions preserve owner detail/Bot display and attribute an a
   current = fixture(); viewer = 'owner'
   const detail = await actions.getIssueThread(issueId, runId)
   assert.equal(detail.thread.detail?.agentName, 'Owned Bot')
+  assert.deepEqual(detail.delivery, { modes: [], queued: [] })
   assert.deepEqual(detail.live?.revisions, { [`run:${runId}`]: 7, [`thread:${runId}`]: 7 })
   await actions.sendIssueThreadMessage({ issueId, runId, text: '  continue  ' })
   assert.deepEqual(current.messages.map(({ runId: run, userId, text }) => ({ run, userId, text })), [{ run: runId, userId: 'owner', text: 'continue' }])

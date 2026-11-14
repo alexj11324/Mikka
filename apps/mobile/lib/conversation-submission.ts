@@ -3,7 +3,7 @@ import type { ChatSubmission } from '../../../lib/hooks/chat-delivery-state'
 import type { mentionsIn } from './group'
 
 type GroupTarget = { kind: 'group'; id: string }
-type ThreadTarget = { kind: 'thread'; id: string; issueId: string | null }
+type ThreadTarget = { kind: 'thread'; id: string; issueId: string | null; delivery?: import('../../../lib/thread-delivery').ThreadDeliveryMode }
 export type ConversationTarget = GroupTarget | ThreadTarget
 export type ConversationCommand = ChatSubmission & {
   target: ConversationTarget; expectedOwnerId: string; expectedWorkspaceId: string; mentions: ReturnType<typeof mentionsIn>
@@ -11,7 +11,7 @@ export type ConversationCommand = ChatSubmission & {
 
 export function sameConversationCommand(command: ConversationCommand, target: ConversationTarget, text: string, mentions: ConversationCommand['mentions']) {
   return command.text === text && command.target.kind === target.kind && command.target.id === target.id &&
-    (command.target.kind !== 'thread' || (target.kind === 'thread' && command.target.issueId === target.issueId)) &&
+    (command.target.kind !== 'thread' || (target.kind === 'thread' && command.target.issueId === target.issueId && command.target.delivery === target.delivery)) &&
     command.mentions.length === mentions.length && command.mentions.every((item, i) => item.memberId === mentions[i]?.memberId && item.memberType === mentions[i]?.memberType)
 }
 
@@ -30,7 +30,7 @@ export async function submitConversation(command: ConversationCommand, post: Pos
   }
   const receipt = await post('/api/rpc', { method: 'POST', body: {
     version: DESKTOP_RPC_VERSION, action: 'agents.sendIssueThreadReply',
-    args: [{ issueId: target.issueId, runId: target.id, text, requestId, expectedOwnerId, expectedWorkspaceId }],
+    args: [{ issueId: target.issueId, runId: target.id, ...(target.delivery ? { delivery: target.delivery } : {}), text, requestId, expectedOwnerId, expectedWorkspaceId }],
   } })
   if (receipt?.version === DESKTOP_RPC_VERSION) {
     const code = receipt.ok ? receipt.result?.error : receipt.error?.code
@@ -38,4 +38,17 @@ export async function submitConversation(command: ConversationCommand, post: Pos
     if (receipt.ok && receipt.result?.sent === true && receipt.result.runId) return
   }
   throw new Error('submissionUnconfirmed')
+}
+
+export async function changeMobileQueuedReply(target: ThreadTarget, messageId: string, action: 'cancel' | 'sendNow', post: Post) {
+  const receipt = await post('/api/rpc', { method: 'POST', body: {
+    version: DESKTOP_RPC_VERSION, action: 'agents.changeQueuedThreadReply', args: [{ issueId: target.issueId, runId: target.id, messageId, action }],
+  } })
+  const result = receipt?.result as { status?: string; error?: string } | undefined
+  if (receipt?.version !== DESKTOP_RPC_VERSION) throw Error('submissionUnconfirmed')
+  const code = receipt.ok ? result?.error : receipt.error?.code
+  if (code) throw Object.assign(Error(code), { code })
+  const status = result?.status
+  if (receipt.ok !== true || (status !== 'tooLate' && status !== (action === 'cancel' ? 'cancelled' : 'sent'))) throw Error('submissionUnconfirmed')
+  return status
 }

@@ -44,12 +44,13 @@ async function handleGET(request: Request, { params }: Params) {
   )
   // A run paused on its subscription's quota: when it resets and whether a key can take over (the web's ThreadQuotaPausedCard).
   const liveRunId = chain?.latestRunId ?? detail.run.id
-  const [{ paused }, runs] = await Promise.all([
+  const [{ paused }, runs, delivery] = await Promise.all([
     live === 'paused' ? threadQuotaView(user.id, [liveRunId], liveRunId) : { paused: null },
     // Where each run's thread and run keys arrive (the web's thread panel listens to the same).
     threadLiveReferences(pool, workspacePool, runIds, user.id),
+    chain ? (await import('@/lib/thread-delivery-queue')).threadDeliveryView(pool, user.id, chain.rootRunId, liveRunId) : undefined,
   ])
-  return json({ issueId: detail.run.issueId, canReply: Boolean(detail.run.agentId), confirmedSubmissionIds: messages.flatMap(message => message.submissionId ? [message.submissionId] : []), live: { runs }, thread, active: runIsActive(live), working: runIsWorking(live), paused, summary: detail.run.report && typeof detail.run.report.summary === 'string' ? detail.run.report.summary : null, error: detail.run.error, items })
+  return json({ liveRunId, delivery, issueId: detail.run.issueId, canReply: Boolean(detail.run.agentId), confirmedSubmissionIds: messages.flatMap(message => message.submissionId ? [message.submissionId] : []), live: { runs }, thread, active: runIsActive(live), working: runIsWorking(live), paused, summary: detail.run.report && typeof detail.run.report.summary === 'string' ? detail.run.report.summary : null, error: detail.run.error, items })
 }
 
 /** `POST /api/mobile/threads/:id` with `{ text }`: a message to the thread; the daemon delivers it, or an ended thread runs again. */

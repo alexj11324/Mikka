@@ -1,4 +1,5 @@
 import { workerDefinitionDigest } from '@/lib/agent-kit/worker-digest'
+import { scheduleConversationTitle } from '@/lib/conversation-title-schedule'
 import { personalMailboxEnabled } from '../personal-mailbox-config'
 import 'server-only'
 import { admitProfileSelection } from '@/lib/factory/profile-admission'
@@ -168,6 +169,8 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     const agentDefinition = push ? { ...frozen, repositoryAdmission: push.admission } : frozen
     const traceContext = captureTraceContext({ runId, threadId: input.threadRunId ?? runId, taskId: input.issueId, posthogDistinctId: actor.userId, ...(push?.publication.identifier ? { taskNumber: push.publication.identifier } : {}) })
     if (traceContext) agentDefinition.traceContext = traceContext
+    // The conversation is named once this commits (decision 2026-11-13-1405); a run that continues one takes its title.
+    scheduleConversationTitle(client, runId, actor.userId, 'created')
     await client.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,kind,"baseBranch",prompt,"botId","agentDefinition","dispatchFingerprint","promptTaskStart","promptTaskLength","workspaceId",origin,"originRef")
       VALUES ($1,$2,$3,$4,$5,$6,'queued','implement',$7,$8,$9,$10,$11,0,$12,$13,$14,$15)`, [runId, actor.userId, input.issueId, input.agentId, target.deviceId, input.deviceRepoId, effectiveBaseBranch, prompt, runBotId,JSON.stringify(agentDefinition), digest ? selectionFingerprint : null, promptTaskLength, actor.workspaceId, entry.origin, entry.originRef ? JSON.stringify(entry.originRef) : null])
     if (push) await client.query(`INSERT INTO run_publications ("runId","userId","issueId","scopeVersion","issueTitle","remoteUrl","remoteKey",identifier,branch,"baseBranch","pushApproved")

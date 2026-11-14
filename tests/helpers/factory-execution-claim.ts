@@ -4,6 +4,7 @@ import type { Pool, PoolClient } from "pg";
 import { FactoryError } from "../../lib/factory/contract";
 import type { FactoryAuthorize } from "../../lib/factory/store";
 import { runListChanged } from "../../lib/live/lists";
+import { advanceTaskAfterRunStart } from "../../lib/task-status-run-start";
 
 /** Ordinary runs retain their contract. Factory runs must have a current,
  * adopted spec/execute binding. Lock order matches cancellation: task, issue,
@@ -27,7 +28,7 @@ export function createExecutionClaim(pool: Pool, authorize: FactoryAuthorize) {
          WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3 AND status='queued' AND "stopRequestedAt" IS NULL RETURNING id`,
         [runId, userId, deviceId, leaseExpiresAt],
       );
-      if (rows.length) { await runListChanged(tx, runId); await runChanged(tx, runId); }
+      if (rows.length) { await runListChanged(tx, runId); await runChanged(tx, runId); advanceTaskAfterRunStart(tx, runId); }
       await tx.query("COMMIT");
       return rows;
     } catch (error) {

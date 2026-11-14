@@ -25,7 +25,7 @@ const isActionErrorCode = (code: string): code is ActionErrorCode => (ACTION_ERR
  * any dispatch (the device or cloud computer, the credential and its quota).
  * Only the thread's owner may send, as for a working thread.
  */
-export async function sendThreadMessage(userId: string, runId: string, text: string, source: Source = 'user', requestId?: string): Promise<{ runId: string; continued: boolean }> {
+export async function sendThreadMessage(userId: string, runId: string, text: string, source: Source = 'user', requestId?: string, delivery?: 'queue' | 'steer' | 'interrupt' | 'afterRun'): Promise<{ runId: string; continued: boolean }> {
   const parsed = z.object({ runId: z.uuid(), text: z.string().trim().min(1).max(10_000), requestId: z.uuid().optional() }).safeParse({ runId, text, requestId })
   if (!parsed.success) throw new ActionFailureError('messageRequired')
   // The owner's chain only: a teammate who can see a shared thread cannot run it.
@@ -35,6 +35,14 @@ export async function sendThreadMessage(userId: string, runId: string, text: str
     const { validateChatFiles } = await import('@/lib/chat-attachments/store')
     try { await validateChatFiles(userId, { kind: 'thread', id: parsed.data.runId }, parsed.data.text) } catch { throw new ActionFailureError('messageRequired') }
   }
+  const active = UNFINISHED_RUN_STATUSES.some(status => status === chain.attempts.at(-1)?.status)
+  if (delivery === 'queue' && requestId) {
+    const { queueThreadReply, readQueuedReplyReceipt } = await import('./thread-delivery-queue')
+    const receipt = await readQueuedReplyReceipt(pool, userId, chain, parsed.data.text, requestId, parsed.data.runId)
+    if (receipt) return receipt
+    if (active) return queueThreadReply(pool, userId, chain, parsed.data.text, requestId, parsed.data.runId)
+  }
+  if (delivery && !requestId) throw new ActionFailureError('validationGeneric')
   if (parsed.data.requestId) {
     // The client anchors its first attempt, even when a lost response has
     // already moved this chain. Resolve that receipt before choosing work.
@@ -45,9 +53,17 @@ export async function sendThreadMessage(userId: string, runId: string, text: str
     if (!scope) throw new ActionFailureError('runNotFound')
     const { submitThreadOnce } = await import('@/lib/thread-submission')
     return submitThreadOnce(pool, { userId, requestId: parsed.data.requestId, rootRunId: chain.rootRunId,
-      requestedRunId: parsed.data.runId, previousRunId: chain.latestRunId, issueId: scope.issueId, botId: scope.botId, text: parsed.data.text,
+      requestedRunId: parsed.data.runId, previousRunId: chain.latestRunId, issueId: scope.issueId, botId: scope.botId, text: parsed.data.text, delivery,
       mode: UNFINISHED_RUN_STATUSES.some(status => status === chain.attempts.find(attempt => attempt.runId === chain.latestRunId)?.status) ? 'message' : 'continuation' },
-    sourceEventId => continueThread(userId, parsed.data.text, source, chain, sourceEventId),
+    sourceEventId => {
+      if (delivery === 'afterRun' && (active || chain.latestRunId !== parsed.data.runId)) throw new ActionFailureError('threadReplaced')
+      // A queue intent that arrived after completion may continue its own
+      // successful anchor only. A stopped or replaced turn cannot restart it.
+      if (delivery === 'queue' && (chain.latestRunId !== parsed.data.runId || chain.attempts.at(-1)?.status !== 'succeeded')) throw new ActionFailureError('threadDeliveryUnavailable')
+      if (delivery === 'afterRun' && chain.attempts.at(-1)?.status !== 'succeeded') throw new ActionFailureError('threadDeliveryUnavailable')
+      if ((delivery === 'steer' || delivery === 'interrupt') && (!active || chain.latestRunId !== parsed.data.runId)) throw new ActionFailureError('runNotActive')
+      return continueThread(userId, parsed.data.text, source, chain, sourceEventId, delivery)
+    },
     typeof source === 'object' && source.source === 'human'
       ? (sourceEventId, previousRunId, receiptOnly) => recoverThreadQuestionAnswer(userId, previousRunId, parsed.data.text, source.sessionId, sourceEventId, scope, receiptOnly)
       : undefined)
@@ -137,18 +153,33 @@ async function recoverThreadQuestionAnswer(userId: string, previousRunId: string
 }
 
 async function continueThread(userId: string, text: string, source: Source,
-  chain: NonNullable<Awaited<ReturnType<typeof readRunChain>>>, sourceEventId?: string): Promise<{ runId: string; continued: boolean }> {
+  chain: NonNullable<Awaited<ReturnType<typeof readRunChain>>>, sourceEventId?: string, delivery?: 'queue' | 'steer' | 'interrupt' | 'afterRun'): Promise<{ runId: string; continued: boolean }> {
   const latest = chain.attempts.find(attempt => attempt.runId === chain.latestRunId)!
   if (UNFINISHED_RUN_STATUSES.some(status => status === latest.status)) {
+    if (delivery === 'steer') {
+      // Cursor queues during a prompt; Claude SDK may defer or fold an input.
+      // Only Codex exposes a native active-turn steer receipt.
+      const { rows: [run] } = await pool.query(`SELECT coalesce(r."agentDefinition"->>'harness',a.harness) AS harness
+        FROM agent_runs r JOIN agents a ON a.id=r."agentId" JOIN devices device ON device.id=r."deviceId" AND device."ownerId"=r."userId"
+        WHERE r.id=$1 AND r."userId"=$2 AND r.status='running' AND device.harnesses @> '[{"harness":"codex","installed":true,"activeTurnSteer":true}]'::jsonb
+        AND r."stopRequestedAt" IS NULL`, [latest.runId, userId])
+      if (run?.harness !== 'codex') throw new ActionFailureError('threadDeliveryUnavailable')
+      await addRunMessage(userId, { runId: latest.runId, text }, source, sourceEventId)
+      return { runId: latest.runId, continued: false }
+    }
     if (source === 'user' || (typeof source === 'object' && source.source === 'human'))
-      if (await (await import('@/lib/factory/request-epoch')).continueActiveFactoryRequest(pool, userId, latest.runId, text, sourceEventId, sourceEventId ? { recordOwnerMessage: true } : undefined))
+      if (await (await import('@/lib/factory/request-epoch')).continueActiveFactoryRequest(pool, userId, latest.runId, text, sourceEventId, sourceEventId ? { recordOwnerMessage: true, interrupt: delivery === 'interrupt' } : undefined))
         return { runId: latest.runId, continued: false }
+    if (delivery === 'interrupt') throw new ActionFailureError('threadDeliveryUnavailable')
     await addRunMessage(userId, { runId: latest.runId, text }, source, sourceEventId)
     return { runId: latest.runId, continued: false }
   }
   // An ended run that asked a Factory question is answered there, as before.
   const { rows: [question] } = await pool.query('SELECT 1 FROM factory_questions WHERE "originRunId"=$1 AND "userId"=$2 LIMIT 1', [latest.runId, userId])
   if (question) {
+    // A pre-existing queued instruction cannot answer a question the user
+    // had not seen when they wrote it.
+    if (delivery === 'afterRun') throw new ActionFailureError('factoryQuestionNeedsAnswerTool')
     await addRunMessage(userId, { runId: latest.runId, text }, source, sourceEventId)
     return { runId: latest.runId, continued: false }
   }

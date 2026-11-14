@@ -429,6 +429,11 @@ export const agentRuns = pgTable('agent_runs', {
   retryOf: uuid('retryOf').references((): AnyPgColumn => agentRuns.id, { onDelete: 'set null' }),
   /** The run of the same thread this one goes on from: a dispatch to a task whose thread had ended (lib/thread-dispatch.ts). */
   continuesRunId: uuid('continuesRunId').references((): AnyPgColumn => agentRuns.id, { onDelete: 'set null' }),
+  /**
+   * The conversation's own short title (decision 2026-11-13-1405), the same on every run of its chain; null until one
+   * is written. `titleSource` says who wrote it: a 'manual' title is the person's and is never overwritten.
+   */
+  title: varchar('title', { length: 60 }), titleSource: text('titleSource').$type<'generated' | 'manual'>(),
   /** On a thread's root run: the root of the thread that replaced it, when the person explicitly asked for a new one. */
   threadReplacedBy: uuid('threadReplacedBy').references((): AnyPgColumn => agentRuns.id, { onDelete: 'set null' }),
   stopRequestedAt: timestamp('stopRequestedAt', { withTimezone: true }),

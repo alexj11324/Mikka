@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { activityLabel, freshChunks, groupThreads, LAST_REPLY_CHARS, lastActivity, lastReplyUpdate, nextReply, pullRequestsOf, replyLine, THREAD_GROUPS, threadGroup, type GroupIssue, type StoredReply, type ThreadOutcome } from './thread-groups'
+import { activityLabel, botGlance, freshChunks, groupThreads, LAST_REPLY_CHARS, lastActivity, lastReplyUpdate, nextReply, pullRequestsOf, replyLine, THREAD_GROUPS, threadGroup, type GroupIssue, type StoredReply, type ThreadOutcome } from './thread-groups'
 
 const thread = (status: string, issueId: string | null = 'task', extra: { outcome?: ThreadOutcome | null; createdAt?: string; id?: string } = {}) =>
   ({ id: extra.id ?? status, status, issueId, createdAt: extra.createdAt ?? '2026-10-28T10:00:00Z', outcome: extra.outcome ?? null })
@@ -183,4 +183,19 @@ test('a bot\'s PRs come from the tasks its threads worked on', () => {
   ]
   const rows = pullRequestsOf([thread('succeeded', 'a'), thread('running', 'b'), thread('succeeded', 'c'), thread('succeeded', 'b'), thread('running', null)], issues)
   assert.deepEqual(rows.map(row => [row.number, row.group, row.issueId, row.state]), [[247, 'review', 'a', 'open'], [251, 'running', 'b', 'open'], [240, 'merged', 'c', 'merged']])
+})
+
+test('概览 at a glance: a task waiting only on its PR review counts on the PR row, not among 等你处理', () => {
+  const issues = [
+    { id: 'writing', ...task('doing') }, { id: 'checking', ...task('doing') }, { id: 'asking', ...task('doing') },
+    { id: 'release', ...task('review', pr(412, 'open')) }, { id: 'script', ...task('review', pr(409, 'open')) }, { id: 'patch', ...task('done', pr(398, 'merged')) },
+    { id: 'asking-with-pr', ...task('doing', pr(420, 'open')) }, { id: 'reviewed-by-hand', ...task('review') }, { id: 'still-coding', ...task('doing', pr(421, 'open')) },
+  ]
+  const sample = [thread('running', 'writing'), thread('running', 'checking'), thread('waiting_input', 'asking'),
+    thread('succeeded', 'release', { outcome: 'done' }), thread('succeeded', 'script', { outcome: 'done' }), thread('succeeded', 'patch', { outcome: 'done' })]
+  assert.deepEqual(botGlance(sample, issues), { running: 2, waiting: 1, pullRequests: { review: 2, running: 0 } })
+  // A question stays the person's even where the task has a PR; a review without a PR has no PR row to sit on.
+  assert.deepEqual(botGlance([thread('waiting_input', 'asking-with-pr'), thread('succeeded', 'reviewed-by-hand', { outcome: 'done' }), thread('running', 'still-coding')], issues),
+    { running: 1, waiting: 2, pullRequests: { review: 1, running: 1 } })
+  assert.deepEqual(botGlance([], issues), { running: 0, waiting: 0, pullRequests: { review: 0, running: 0 } })
 })

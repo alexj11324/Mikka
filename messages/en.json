@@ -143,7 +143,12 @@
       "emptyTitle": "No tasks yet",
       "newTask": "New task"
     },
-    "createdAtDate": "Created {date}"
+    "createdAtDate": "Created {date}",
+    "agentMark": {
+      "working": "Agent working",
+      "waiting": "Needs you",
+      "error": "Agent error"
+    }
   },
   "Nav": {
     "switchLanguage": "Switch language",
@@ -1367,6 +1372,7 @@
     "accountSoleAdmin": "You’re the only admin of {workspaces}. Make another member an admin before deleting your account.",
     "accountLastOrganizationOwner": "Keep at least one active organization owner.",
     "runChainEnded": "This task has already stopped; there is nothing left to stop.",
+    "threadDeliveryUnavailable": "This conversation cannot use that delivery mode right now.",
     "threadStopping": "The thread is stopping",
     "secretNotFound": "That secret or variable no longer exists.",
     "secretNameReserved": "This name is reserved by the runtime (for example PATH, HOME, proxy, TLS, loader, git, E2B or MIKKA variables). Choose another name.",
@@ -4414,6 +4420,18 @@
     "copyFailed": "Couldn't copy"
   },
   "IssueThreads": {
+    "deliveryMode": "While the agent is working",
+    "deliveryModes": {
+      "queue": "Queue for the next turn",
+      "steer": "Steer this turn",
+      "interrupt": "Interrupt and replace"
+    },
+    "deliveryQueued": "Queued",
+    "deliverySending": "Sending",
+    "deliveryFailed": "Delivery failed",
+    "deliverySendNow": "Send now",
+    "deliveryCancel": "Cancel",
+    "deliveryTooLate": "The agent has already claimed this message.",
     "title": "Threads",
     "modelSwitched": "Switched to",
     "agent": "Bot",
@@ -4613,7 +4631,14 @@
     },
     "errorDetails": "Details",
     "fullInstructions": "View full instructions",
-    "hideInstructions": "Hide full instructions"
+    "hideInstructions": "Hide full instructions",
+    "conversationTitle": {
+      "rename": "Rename",
+      "regenerate": "Regenerate title",
+      "label": "Title",
+      "renameFailed": "Title not saved",
+      "regenerateFailed": "Couldn't generate a new title"
+    }
   },
   "Computer": {
     "status": {
@@ -4803,11 +4828,22 @@
         "label": "Public role",
         "hint": "Group chats use this role to choose the bot. Tools still require authorization.",
         "placeholder": "Responsibilities in group chats; leave empty to clear",
-        "count": "{count} / {max}",
         "tooLong": "Public role can be at most {max} characters",
         "loadError": "Public role failed to load",
         "saveError": "Save not confirmed. Your draft is kept.",
-        "saved": "Saved"
+        "saved": "Saved",
+        "add": "Add a public role",
+        "edit": "Edit public role"
+      },
+      "glance": {
+        "running": "{count} in progress",
+        "waiting": "{count} waiting on you",
+        "idle": "Nothing in progress",
+        "prReview": "{count} waiting for review",
+        "prRunning": "{count} in progress",
+        "prNone": "No open PRs",
+        "computerScreen": "View screen",
+        "computerMissing": "Needs an E2B API key"
       },
       "threads": "Threads",
       "tasks": "Tasks",
@@ -4993,11 +5029,6 @@
     "board": {
       "toolbar": "Board toolbar",
       "scopeLabel": "Task scope",
-      "scope": {
-        "all": "All",
-        "workspace": "Workspace",
-        "personal": "Personal"
-      },
       "filter": "Filter",
       "filterField": {
         "status": "Status",
@@ -5006,7 +5037,7 @@
         "creator": "Created by me",
         "labels": "Labels",
         "project": "Project",
-        "agentState": "Thread status"
+        "agentState": "Agent activity"
       },
       "removeFilter": "Remove {field} filter",
       "me": "Me",
@@ -5037,7 +5068,7 @@
         "labels": "Labels",
         "pullRequests": "PR",
         "subtasks": "Subtasks",
-        "agentState": "Thread status",
+        "agentState": "Agent activity",
         "project": "Project",
         "dueDate": "Due date",
         "createdAt": "Created"
@@ -5051,8 +5082,6 @@
       "inlineTitle": "Task title",
       "discussPrefill": "Let's talk about {id} {title}: ",
       "card": {
-        "personal": "Personal task",
-        "personalHint": "Personal task · only you can see it",
         "status": "Status",
         "priority": "Priority",
         "subtasks": "Subtasks",
@@ -5063,9 +5092,9 @@
         "discuss": "Discuss",
         "delete": "Delete",
         "agent": {
-          "running": "Running",
-          "waiting": "Waiting for you",
-          "blocked": "Blocked"
+          "running": "Agent working",
+          "waiting": "Needs you",
+          "blocked": "Agent error"
         },
         "block": {
           "question": "Needs your answer",
