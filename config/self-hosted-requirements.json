@@ -862,6 +862,12 @@
     "behavior": "Recognize local authentication documents and valid Workspace and Organization invitations so invitees can sign in even when Workspace bootstrap is unavailable.",
     "test": "apps/frontend/scripts/auth-only-bootstrap.test.mjs"
   },
+  "lib/settings-navigation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Keep the departing workspace in browser history when an authenticated user changes workspaces. Preserve the existing task URL and history state.",
+    "test": "tests/settings-navigation.test.mjs"
+  },
   "lib/swr/keys.ts": {
     "mode": "built-in",
     "environment": [],
