@@ -236,6 +236,8 @@ async function completionTransaction(userId: string, runId: string, completion: 
         failureDetails: completionFailureDetails(completion, runId, { status, stopRequested: Boolean(run.stopRequestedAt), sensitiveText: [run.prompt, run.agentDefinition?.instructions ?? ''] }),
         ...(quota ? { quotaResetsAt: resetsAt ? new Date(resetsAt) : null } : {}),
         ...(paused ? { leaseExpiresAt: null, finishedAt: null } : { finishedAt: sql`clock_timestamp()` }), updatedAt: new Date() }).where(eq(agentRuns.id, runId)).returning()
+      // The daemon's first terminal completion has a report even when PR publication is still pending.
+      if (run.finishedAt) scheduleConversationTitle(tx, runId, userId, 'first_run_ended')
       await runListChanged(tx, runId)
       await runChanged(tx, runId)
       await tx.update(runTokens).set({ revokedAt: new Date() }).where(and(eq(runTokens.runId, runId), isNull(runTokens.revokedAt)))

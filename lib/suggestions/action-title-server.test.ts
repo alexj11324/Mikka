@@ -5,6 +5,14 @@ const saved={key:process.env.ZEROCAT_API_KEY,url:process.env.ZEROCAT_BASE_URL,ga
 let allowed=true
 const admitted:unknown[]=[],writes:unknown[]=[]
 const generateText=mock.fn(async()=>({text:JSON.stringify({titles:[{id:'item',title:'Review the change'}]})}))
+// This installation has no linked Cloud model service. The configured provider still runs through admission.
+mock.module(new URL('../cloud-services/runtime.ts', import.meta.url).href, { namedExports: { cloudClient: {
+  capability: async (userId: string, capability: string) => {
+    assert.equal(userId, 'owner')
+    assert.equal(capability, 'models')
+    return null
+  },
+} } })
 mock.module('ai',{namedExports:{generateText}})
 mock.module(new URL('../db/index.ts',import.meta.url).href,{namedExports:{db:{
   select:()=>({from:()=>({where:()=>({limit:async()=>[{locale:'en'}]})})}),
