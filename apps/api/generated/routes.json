@@ -1449,7 +1449,7 @@
         "GET",
         "PATCH"
       ],
-      "sourceHash": "c53c7cd44ff37cc47e024b7bae32ba446acf09a295bd645b9ae671f9c488b2be"
+      "sourceHash": "f11fa6662a2614f5a01393bf378c0bf45e4c515569e3903f3a5dd64f8c370d91"
     },
     {
       "path": "/mikka/api/mobile/chat",
