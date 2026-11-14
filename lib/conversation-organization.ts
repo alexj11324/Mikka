@@ -1,3 +1,4 @@
+import { withConversationWorkspace } from './conversation-workspace'
 import { effectiveConversationArchive } from './conversation-directory'
 import { readRunChain, type RunChainQueryable } from './run-chain'
 
@@ -12,6 +13,10 @@ export async function conversationOrganization(
   runId: string,
   change?: ConversationOrganizationChange,
 ): Promise<ConversationOrganization | null> {
+  return withConversationWorkspace(ownerId, workspaceId, () => organize(database, ownerId, workspaceId, runId, change))
+}
+
+async function organize(database: RunChainQueryable, ownerId: string, workspaceId: string, runId: string, change?: ConversationOrganizationChange) {
   const chain = await readRunChain(database, ownerId, runId)
   if (!chain) return null
   const projection = '"conversationArchivedAt" IS NOT NULL AS archived, "conversationPinnedAt" IS NOT NULL AS pinned'

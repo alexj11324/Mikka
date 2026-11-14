@@ -9,7 +9,7 @@ import test from 'node:test'
 import { Pool } from 'pg'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { ScheduleStore, SCHEDULE_LEASE_MS, type WorkspaceGuard } from './store'
-import { ScheduleError, type Actor, type Definition } from './contract'
+import { ScheduleError, scheduleListInput, type Actor, type Definition } from './contract'
 import { scheduleTools } from './tools'
 
 const target=process.env.E2E_DATABASE_URL
@@ -38,6 +38,49 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
   await members.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES($1,$2,'owner',$3,'admin'),($1,$4,'member',$5,'member')`,[workspace,owner,`${owner}@example.invalid`,member,`${member}@example.invalid`])
   await pool.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,$4),($5,$6,$3,$7)',[botId,owner,workspace,`Schedule ${botId}`,memberBot,member,`Schedule ${memberBot}`])
   await pool.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload,tier) VALUES($1,$2,$3,'user_message',$4,'{"text":"Please schedule the controlled task"}','attention'),($5,$6,$7,'user_message',$8,'{"text":"Member schedule request"}','attention')`,[sourceEventId,owner,botId,sourceEventId,memberEvent,member,memberBot,memberEvent])
+  await t.test('schedule_list pages the complete visible collection without mixing creators, bots or workspaces', async t => {
+    // No scheduler is armed: all data in this isolated database is paused.
+    const definition = def()
+    const insert = async (count: number, creator: string, bot: string | null, visibility: 'owner' | 'workspace', scope: string, instant: string) =>
+      (await pool.query<{id: string}>(`INSERT INTO user_schedules
+        (id,owner_id,workspace_id,bot_id,visibility,source_event_id,request_id,request_origin,definition,request_definition,status,created_at)
+        SELECT gen_random_uuid(),$1,$2,$3,$4,$5,gen_random_uuid()::text,COALESCE('bot:' || $3::uuid::text,'coordinator'),$6,$6,'paused',$7::timestamptz
+        FROM generate_series(1,$8::integer) RETURNING id`, [creator,scope,bot,visibility,sourceEventId,definition,instant,count])).rows.map(row => row.id)
+    const sameTime = '2035-01-02T03:04:05.123456Z', earlier = '2035-01-02T03:04:05.123455Z'
+    const shared = (await insert(100,owner,botId,'workspace',workspace,sameTime)).sort().reverse()
+    const oldest = await insert(1,member,memberBot,'workspace',workspace,earlier)
+    const own = await insert(1,owner,botId,'owner',workspace,earlier)
+    const privateMember = await insert(1,member,memberBot,'owner',workspace,earlier)
+    const coordinatorOnly = await insert(1,owner,null,'owner',workspace,earlier)
+    const foreignWorkspace = await insert(1,owner,botId,'workspace',randomUUID(),sameTime)
+    const fixtures = [...shared,...oldest,...own,...privateMember,...coordinatorOnly,...foreignWorkspace]
+    t.after(async () => { await pool.query('DELETE FROM user_schedules WHERE id=ANY($1::uuid[])',[fixtures]) })
+    const list = async (who: Actor, input: {limit?: number; cursor?: string} = {}) => {
+      const tools = scheduleTools(command => store().command(who,command))
+      return await tools.schedule_list.execute!(scheduleListInput.parse(input),{toolCallId:randomUUID(),messages:[],context:{}}) as {schedules: {id:string}[]; nextCursor: string | null}
+    }
+    const first = await list(actor)
+    assert.equal(first.schedules.length,100)
+    assert.ok(first.nextCursor,'the first 100 rows return a continuation for the remaining visible schedules')
+    assert.deepEqual(first.schedules.map(row => row.id),shared)
+    const later = await list(actor,{cursor:first.nextCursor})
+    assert.deepEqual(later.schedules.map(row => row.id),[...oldest,...own].sort().reverse())
+    assert.equal(later.nextCursor,null)
+    const tiny = await list(actor,{limit:1})
+    assert.ok(tiny.nextCursor)
+    assert.deepEqual(tiny.schedules.map(row => row.id),shared.slice(0,1))
+    assert.deepEqual((await list(actor,{limit:1,cursor:tiny.nextCursor})).schedules.map(row => row.id),shared.slice(1,2))
+    const memberPage = await list(memberActor,{cursor:first.nextCursor})
+    assert.deepEqual(memberPage.schedules.map(row => row.id),[...oldest,...privateMember].sort().reverse())
+    const coordinator = await list({...actor,botId:null},{cursor:first.nextCursor})
+    assert.deepEqual(coordinator.schedules.map(row => row.id),[...oldest,...coordinatorOnly].sort().reverse())
+    assert.ok(!first.schedules.some(row => foreignWorkspace.includes(row.id)))
+    await assert.rejects(list({...actor,ownerId:other},{cursor:first.nextCursor}),/scheduleWorkspaceAccessDenied/)
+    for (const input of [{limit:0},{limit:101},{cursor:'invalid'}]) {
+      assert.equal(scheduleListInput.safeParse(input).success,false)
+      await assert.rejects(store().command(actor,{action:'list',...input}),/invalidScheduleCommand/)
+    }
+  })
   await t.test('ten create retries and ten scans produce one occurrence, one chat result and stable operation',async()=>{
    const d=def(),requestId=randomUUID(),tools=scheduleTools(command=>store().command(actor,command))
    const results=await Promise.all(Array.from({length:10},()=>tools.schedule_create.execute!({definition:d},{toolCallId:requestId,messages:[],context:{}})))
@@ -52,6 +95,19 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
    assert.ok(done[0].operation_id,'history retains the operation identity')
    assert.equal((await create(d,requestId)).id,id)
    await assert.rejects(create({...d,title:'Different request'},requestId),/scheduleRequestConflict/)
+  })
+  await t.test('editing an untriggered schedule does not wait on another chat writer', async () => {
+    const row = await create()
+    const writer = await pool.connect()
+    try {
+      await writer.query('BEGIN')
+      await writer.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`bot-chat:${owner}:${botId}`])
+      await store().command(actor, { action: 'pause', scheduleId: row.id, version: 1 })
+      assert.deepEqual(await history(row.id), [])
+    } finally {
+      await writer.query('ROLLBACK')
+      writer.release()
+    }
   })
   await t.test('repeat slots persist across fresh stores; pause, timezone update, resume and cancel',async()=>{
    const d=def();d.timing={kind:'interval',start:new Date(now.getTime()+60_000).toISOString(),minutes:1};const row=await create(d)

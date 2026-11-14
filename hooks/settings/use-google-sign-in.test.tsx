@@ -76,3 +76,46 @@ test('a disabled Google integration reads nothing and cannot start linking', asy
   assert.equal(reads, 0)
   assert.equal(links, 0)
 })
+
+
+for (const previous of [true, false]) {
+  test(`failed revalidation of a previously ${previous ? 'linked' : 'unlinked'} Google account withdraws its cached state and retries`, async () => {
+    available = true
+    connected = previous
+    await render()
+    assert.equal(google.linked, previous)
+
+    available = false
+    await act(async () => { await google.reload() })
+    assert.equal(google.linked, null)
+    assert.equal(google.error, 'Settings.integrations.googleStatusFailed')
+    assert.ok(!container.textContent?.includes('Settings.integrations.googleLinked'))
+    const button = [...container.querySelectorAll('button')].find(item => item.textContent === 'Settings.integrations.linkGoogle')
+    assert.equal(button?.disabled, true)
+    await act(async () => { await google.link() })
+    assert.equal(links, 0)
+
+    available = true
+    connected = !previous
+    const retry = [...container.querySelectorAll('button')].find(item => item.textContent === 'Common.retry')
+    assert.ok(retry)
+    await act(async () => retry.click())
+    await settle()
+    assert.equal(google.linked, !previous)
+    assert.equal(google.error, '')
+  })
+}
+
+test('a returned linking operation rechecks the current account list', async () => {
+  available = true
+  connected = true
+  window.history.replaceState({}, '', '/?google=linked')
+  await render()
+  assert.equal(google.linked, true)
+  assert.equal(google.success, 'Settings.integrations.googleLinkSuccess')
+  assert.equal(new URL(window.location.href).searchParams.has('google'), false)
+
+  connected = false
+  await act(async () => { await google.reload() })
+  assert.equal(google.linked, false)
+})

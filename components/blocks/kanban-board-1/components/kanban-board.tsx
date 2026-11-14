@@ -19,7 +19,7 @@ import type { IssueMetadata } from '@/lib/issue-metadata'
 import { formatDateOnly } from '@/lib/date-only'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuShortcut, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { LabelDot, IssueMetadataControls, type MetadataRequest, type MetadataSavedIssue } from '@/components/workspace/issue-metadata-controls'
+import { LabelDot, IssueMetadataControls, type MetadataRequest, type OnMetadataChange } from '@/components/workspace/issue-metadata-controls'
 import { IssuePropertyMenu } from '@/components/workspace/issue-property-menu'
 import { IssuePullRequestLink } from '@/components/workspace/issue-pull-request-link'
 import { CardControlBoundary, CardCreatedAt } from '@/components/workspace/issue-card-controls'
@@ -71,7 +71,7 @@ export type CardHandlers = {
   onOpen: (id: string) => void
   onStatusChange: (task: BoardTask, status: IssueStatus) => void
   onPriorityChange: (task: BoardTask, priority: string) => void
-  onMetadataSaved: (issue: MetadataSavedIssue) => void
+  onMetadataSaved: OnMetadataChange
   onMetadataBusy: (busy: boolean) => void
   onDelete: (task: BoardTask) => void
   onDiscuss: (task: BoardTask) => void

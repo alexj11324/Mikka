@@ -1,4 +1,4 @@
-import { internalEveAuthorization } from '../eve/auth'
+import { internalEveHeaders } from '../eve/auth'
 import { slackGrantProof } from './grant-proof'
 import type { EveScope } from '../eve/scope'
 
@@ -12,7 +12,7 @@ export async function nativeSlackToken(scope: SlackGrantScope) {
     : (process.env.MIKKA_APP_ORIGIN ?? process.env.BETTER_AUTH_URL ?? 'http://127.0.0.1:3000')
   const capability = hosted ? process.env.MIKKA_EVE_PRODUCT_TOKEN : undefined
   if (hosted && !capability) throw new Error('slackUnavailable')
-  const auth = internalEveAuthorization({
+  const internal = internalEveHeaders({
     ownerId: scope.ownerId,
     workspaceId: scope.workspaceId,
     botId: scope.botId,
@@ -23,8 +23,8 @@ export async function nativeSlackToken(scope: SlackGrantScope) {
     redirect: 'error',
     cache: 'no-store',
     headers: {
-      authorization: auth,
-      'x-mikka-slack-grant': slackGrantProof(auth, scope),
+      ...internal,
+      'x-mikka-slack-grant': slackGrantProof(internal.authorization ?? internal['x-mikka-eve-scope'], scope),
       'content-type': 'application/json',
       ...(capability ? { 'x-mikka-product-capability': capability } : {}),
     },

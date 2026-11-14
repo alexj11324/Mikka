@@ -75,7 +75,7 @@ export async function consumeInstall(pool: Database, owner: string, state: strin
 export function acceptInstall(pool: Database, owner: string, workspace: string, grant: SlackGrant, env = process.env) {
   return transaction(pool, async (client) => {
     const proposed = { id: randomUUID(), workspace_id: workspace, app_id: grant.appId, team_id: grant.teamId }
-    const result = await client.query<Installation>(sqlInsertInstall, [
+    const result = await client.query<{ id: string }>(sqlInsertInstall, [
       proposed.id,
       workspace,
       grant.appId,
@@ -89,12 +89,13 @@ export function acceptInstall(pool: Database, owner: string, workspace: string, 
     const row =
       result.rows[0] ??
       (
-        await client.query<Installation>(
-          'SELECT * FROM mikka_slack_installations WHERE app_id=$1 AND team_id=$2 AND workspace_id=$3 FOR UPDATE',
-          [grant.appId, grant.teamId, workspace],
+        await client.query<{ id: string }>(
+          'SELECT id FROM mikka_slack_installations WHERE app_id=$1 AND team_id=$2 AND workspace_id=$3' +
+            ' AND bot_user_id=$4 AND NOT revoking FOR UPDATE',
+          [grant.appId, grant.teamId, workspace, grant.botUserId],
         )
       ).rows[0]
-    if (!row || row.revoking || row.bot_user_id !== grant.botUserId) throw new Error('slackInstallationConflict')
+    if (!row) throw new Error('slackInstallationConflict')
     const member = await client.query(
       'INSERT INTO mikka_slack_members (installation_id,user_id,slack_user_id) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING RETURNING 1',
       [row.id, owner, grant.slackUserId],
@@ -109,14 +110,14 @@ export function acceptInstall(pool: Database, owner: string, workspace: string, 
     if (!result.rowCount)
       await client.query(
         'UPDATE mikka_slack_installations SET bot_secret=$2, scopes=$3, team_name=$4, installed_at=now() WHERE id=$1',
-        [row.id, sealSecret(JSON.stringify(grant.credential), aad(row), env), grant.scopes, grant.teamName],
+        [row.id, sealSecret(JSON.stringify(grant.credential), aad({ ...proposed, id: row.id }), env), grant.scopes, grant.teamName],
       )
     return row.id
   })
 }
 const sqlInsertInstall =
   'INSERT INTO mikka_slack_installations(id,workspace_id,app_id,team_id,team_name,bot_user_id,installed_by,bot_secret,scopes)' +
-  ' VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT DO NOTHING RETURNING *'
+  ' VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT DO NOTHING RETURNING id'
 
 export async function signedSender(
   pool: Database,

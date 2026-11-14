@@ -740,10 +740,8 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     assert.equal(event.payload.postedToChat, true)
     assert.equal(event.tier, 'background')
     assert.ok(event.deliveredAt, 'provenance only: never a second Bot inbox turn')
-    const { createWakeRecovery } = await import('../lib/coordinator/wake-recovery')
-    const wake = createWakeRecovery(pool)
-    const claimed = await wake.claim({ userId: b.id, botId: b.botId })
-    assert.equal(claimed?.ids.includes(event.id) ?? false, false, 'wake recovery cannot claim the provenance event')
+    const { wakingChats } = await import('../lib/coordinator/store')
+    assert.ok(!(await wakingChats(b.id)).includes(b.botId), 'the current Coordinator does not wake for delivered provenance')
     const prompt = (await pool.query('SELECT prompt FROM agent_runs WHERE id=$1', [sent.runId])).rows[0].prompt
     assert.match(prompt, /Current owner request for this Factory task/)
     assert.ok(prompt.indexOf(request) < prompt.indexOf('Initial exact 53-byte file'))

@@ -394,7 +394,7 @@ let gate: UpdateGate | null = null
  * Closing the window while it holds the door quits the app; there is no way
  * in on the old version.
  */
-function runUpdateGate(open: () => void): void {
+function runUpdateGate(open: (retryCheck: boolean) => void): void {
   if (gate) return
   const copy = gateCopy(app.getLocale())
   const win = new BrowserWindow({
@@ -433,11 +433,11 @@ function runUpdateGate(open: () => void): void {
   })
   gate = new UpdateGate(autoUpdater, {
     onState: render,
-    onProceed: () => {
+    onProceed: retryCheck => {
       opened = true
       gate = null
       if (!win.isDestroyed()) win.close()
-      open()
+      open(retryCheck)
     },
   })
   void win.loadFile(join(__dirname, 'update.html'))
@@ -643,13 +643,13 @@ async function start(): Promise<void> {
     requireUpdate: enforceMinimumVersion,
   })
   installMenu()
-  const open = () => {
+  const open = (retryCheck = false) => {
     createMainWindow()
     if (!app.isPackaged || FLAVOR === 'dev') return
     // This app may just have updated: the daemon on this computer updates too, when idle (daemon-update.ts).
     void updateLocalDaemon(FLAVOR, { connect: connectForUpdate({ name: 'mikka-desktop', version: APP_VERSION }) })
-    // Background checks start once the app is open, so they never race the launch gate.
-    setTimeout(() => { void checkForUpdates(false) }, 15_000)
+    // An inconclusive launch check gets an early retry after the window opens.
+    if (retryCheck) setTimeout(() => { void checkForUpdates(false) }, 15_000)
     setInterval(() => { void checkForUpdates(false) }, UPDATE_CHECK_INTERVAL_MS)
   }
   // A cold start of the installed app installs any newer version first (launch-update.ts).

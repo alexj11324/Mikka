@@ -12,6 +12,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { EvidenceError as ReplayEvidenceError, publicEvidenceError, readEvidenceBody } from './posthog-evidence-response.mjs'
 import { POSTHOG_ORIGIN, PROJECT_ID, REPORT_DIRECTORY } from './posthog-export-evidence.mjs'
 
 const JSON_LIMIT = 1024 * 1024
@@ -27,15 +28,6 @@ Limits: 15 seconds/request, 45 seconds total, JSON 1 MiB, snapshot 8 MiB.
 Output: production-run-observability-report/posthog-replay-<session-id>.receipt.json.
 This proves one recording segment was read, not trace correlation or successful playback.
 `
-
-class ReplayEvidenceError extends Error {
-  constructor(code, { phase = 'input', httpStatus, cause } = {}) {
-    super(code, { cause })
-    this.code = code
-    this.phase = phase
-    this.httpStatus = httpStatus
-  }
-}
 
 function validateOptions({ sessionId, traceId, timeoutMs = TOTAL_TIMEOUT_MS }) {
   if (typeof sessionId !== 'string' || !SESSION_ID.test(sessionId) || /^0+$/.test(sessionId.replaceAll('-', ''))
@@ -60,12 +52,6 @@ export function parseReplayArguments(args) {
     values.set(flag, value)
   }
   return validateOptions({ sessionId: values.get('--session-id'), traceId: values.get('--trace-id') })
-}
-
-function publicError(error) {
-  // Never expose an exception message, cause, stack, response body, or Location.
-  if (!(error instanceof ReplayEvidenceError)) return { code: 'unexpected_error', phase: 'write' }
-  return { code: error.code, phase: error.phase, ...(error.httpStatus ? { http_status: error.httpStatus } : {}) }
 }
 
 function timestamp(value, phase) {
@@ -147,28 +133,6 @@ function snapshotSummary(bytes, source) {
   }
 }
 
-async function readBounded(response, limit, phase) {
-  if (Number(response.headers.get('content-length')) > limit)
-    throw new ReplayEvidenceError('response_too_large', { phase })
-  const reader = response.body?.getReader()
-  if (!reader) throw new ReplayEvidenceError('empty_response', { phase })
-  const chunks = []
-  let length = 0
-  try {
-    for (;;) {
-      const { value, done } = await reader.read()
-      if (done) break
-      length += value.byteLength
-      if (length > limit) throw new ReplayEvidenceError('response_too_large', { phase })
-      chunks.push(value)
-    }
-    return Buffer.concat(chunks, length)
-  } finally {
-    await reader.cancel().catch(() => {})
-    reader.releaseLock()
-  }
-}
-
 async function atomicReceipt(path, data) {
   const temporary = `${path}.${randomUUID()}.tmp`
   try {
@@ -218,7 +182,7 @@ export async function replayEvidence(options, {
           if (response.status >= 300 && response.status < 400)
             throw new ReplayEvidenceError('redirect_not_allowed', { phase, httpStatus: response.status })
           if (!response.ok) throw new ReplayEvidenceError('http_error', { phase, httpStatus: response.status })
-          const bytes = await readBounded(response, phase === 'snapshot' ? SNAPSHOT_LIMIT : JSON_LIMIT, phase)
+          const bytes = await readEvidenceBody(response, phase === 'snapshot' ? SNAPSHOT_LIMIT : JSON_LIMIT, phase)
           if (phase === 'snapshot') return bytes
           try { return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) }
           catch (cause) { throw new ReplayEvidenceError('invalid_json', { phase, cause }) }
@@ -251,7 +215,7 @@ export async function replayEvidence(options, {
     return receipt
   } catch (cause) {
     const error = cause instanceof ReplayEvidenceError ? cause : new ReplayEvidenceError('write_failed', { phase: 'write', cause })
-    try { await atomicReceipt(receiptPath, { ...baseReceipt(), status: 'failed', error: publicError(error) }) }
+    try { await atomicReceipt(receiptPath, { ...baseReceipt(), status: 'failed', error: publicEvidenceError(error) }) }
     catch (writeCause) { throw new ReplayEvidenceError('receipt_write_failed', { phase: 'write', cause: writeCause }) }
     throw error
   }
@@ -265,7 +229,7 @@ export async function main(args = process.argv.slice(2), { env = process.env, st
     stdout.write(`${JSON.stringify(receipt)}\n`)
     return 0
   } catch (error) {
-    stderr.write(`${JSON.stringify({ status: 'failed', error: publicError(error) })}\n`)
+    stderr.write(`${JSON.stringify({ status: 'failed', error: publicEvidenceError(error) })}\n`)
     return 1
   }
 }

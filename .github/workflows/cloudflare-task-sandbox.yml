@@ -88,7 +88,11 @@ jobs:
             python3 -I /opt/mikka/review-guest-image.test.py
           '
   publish:
-    if: github.repository == 'alexj11324/Mikka' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    if: github.repository == 'alexj11324/Mikka' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor_id == '183887963' && github.triggering_actor == 'alexj11324'
     runs-on: ubuntu-latest
     environment: cloudflare-runtime-release
     timeout-minutes: 20
@@ -96,18 +100,38 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 24
+      - name: Read the verified original public API build receipt
+        id: api
+        env:
+          GH_TOKEN: ${{ github.token }}
+          API_RUN_ID: ${{ inputs.api_run_id }}
+          API_RUN_ATTEMPT: ${{ inputs.api_run_attempt }}
+          API_IMAGE_DIGEST: ${{ inputs.api_image_digest }}
+          OVERLAY_SHA: ${{ inputs.overlay_sha }}
+        run: node scripts/load-cloudflare-api-receipt.mjs
+      - name: Check out the original API product source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ steps.api.outputs.source }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Issue a short-lived credential to read the original API image
+        id: registry-read
+        uses: ./.github/actions/cloudflare-registry-credentials
+        with:
+          mode: read
       - name: Prepare the source-bound runtime release
         env:
           API_RUN_ID: ${{ inputs.api_run_id }}
           API_RUN_ATTEMPT: ${{ inputs.api_run_attempt }}
           API_IMAGE_DIGEST: ${{ inputs.api_image_digest }}
           OVERLAY_SHA: ${{ inputs.overlay_sha }}
-          MIKKA_API_RECEIPT: ${{ secrets.MIKKA_API_RECEIPT }}
-          CF_RUNTIME_REGISTRY_USERNAME: ${{ vars.CF_RUNTIME_REGISTRY_USERNAME }}
-          CF_RUNTIME_REGISTRY_PASSWORD: ${{ secrets.CF_RUNTIME_REGISTRY_PASSWORD }}
+          CF_RUNTIME_REGISTRY_USERNAME: ${{ steps.registry-read.outputs.username }}
+          CF_RUNTIME_REGISTRY_PASSWORD: ${{ steps.registry-read.outputs.password }}
         run: node scripts/cloudflare-runtime-release.mjs prepare task
       - run: npm ci --ignore-scripts --prefix cloudflare/task-sandbox
       - run: node --test cloudflare/task-sandbox/*.test.mjs
@@ -146,16 +170,22 @@ jobs:
           '
       - name: Tag the verified task runtime for release
         run: docker tag mikka-task-sandbox "mikka-native-task:$MIKKA_DEPLOYMENT_ID"
+      - name: Issue a short-lived Registry publication credential
+        id: registry
+        uses: ./.github/actions/cloudflare-registry-credentials
+        with:
+          mode: publish
       - name: Publish the verified runtime image
         env:
           API_RUN_ID: ${{ inputs.api_run_id }}
           API_RUN_ATTEMPT: ${{ inputs.api_run_attempt }}
           API_IMAGE_DIGEST: ${{ inputs.api_image_digest }}
           OVERLAY_SHA: ${{ inputs.overlay_sha }}
-          MIKKA_API_RECEIPT: ${{ secrets.MIKKA_API_RECEIPT }}
-          CF_RUNTIME_REGISTRY_USERNAME: ${{ vars.CF_RUNTIME_REGISTRY_USERNAME }}
-          CF_RUNTIME_REGISTRY_PASSWORD: ${{ secrets.CF_RUNTIME_REGISTRY_PASSWORD }}
-        run: node scripts/cloudflare-runtime-release.mjs publish task
+          CF_RUNTIME_REGISTRY_USERNAME: ${{ steps.registry.outputs.username }}
+          CF_RUNTIME_REGISTRY_PASSWORD: ${{ steps.registry.outputs.password }}
+        run: |
+          printf '%s' "$CF_RUNTIME_REGISTRY_PASSWORD" | docker login registry.cloudflare.com --username "$CF_RUNTIME_REGISTRY_USERNAME" --password-stdin > /dev/null
+          node scripts/cloudflare-runtime-release.mjs publish task
       - name: Upload the runtime OCI receipt
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:

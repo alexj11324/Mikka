@@ -426,8 +426,6 @@ export async function changeOrder(pool: Pool, scope: OrderScope, change: OrderCh
       await client.query('COMMIT')
       return
     }
-    const candidates = await orderCandidates(client, scope)
-    const current = await readOrder(client, scope, candidates)
     if (change.kind === 'preferred') {
       const preferred = harnessSchema.parse(change.harness)
       await client.query(`INSERT INTO model_order_settings ("ownerId","workspaceId","preferredHarness") VALUES ($1,$2,$3)
@@ -436,6 +434,8 @@ export async function changeOrder(pool: Pool, scope: OrderScope, change: OrderCh
       await client.query('COMMIT')
       return
     }
+    const candidates = await orderCandidates(client, scope)
+    const current = await readOrder(client, scope, candidates)
     let entries = current.entries
     if (!current.customized) {
       // Store what the person saw, under real ids, before changing it.

@@ -132,7 +132,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     if (!['build', 'verify', 'publish'].includes(action) || extra.length) fail('CLOUD_PUBLIC_CI_ARGUMENT_INVALID')
     await runCloudCi({ verify: action !== 'build', publish: action === 'publish' })
   } catch (error) {
-    console.error(/^CLOUD_PUBLIC_CI_[A-Z_]+$/.test(error?.message ?? '') ? error.message : 'CLOUD_PUBLIC_CI_FAILED')
+    const code = error?.message ?? ''
+    const knownStage = stages.some(stage => code === 'CLOUD_CI_STAGE_FAILED_' + stage.toUpperCase().replaceAll('-', '_'))
+    console.error(knownStage || /^CLOUD_PUBLIC_CI_[A-Z_]+$/.test(code) ? code : 'CLOUD_PUBLIC_CI_FAILED')
     process.exitCode = 1
   }
 }

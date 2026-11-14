@@ -113,7 +113,10 @@ test('Group, Thread and Task composers give a new same-text draft its own pendin
         requests.length = 0
         let held!: ReturnType<typeof useConversationDelivery>
         const confirmed: string[] = []
-        function Probe() { held = useConversationDelivery(target, confirmed, async () => {}); return null }
+        function Probe({ revoked = false }: { revoked?: boolean }) {
+          held = useConversationDelivery(revoked ? null : target, confirmed, async () => {}, revoked ? target.id : undefined)
+          return null
+        }
         const root = createRoot(document.body)
         try {
           await act(async () => { root.render(createElement(Probe)) })
@@ -129,6 +132,16 @@ test('Group, Thread and Task composers give a new same-text draft its own pendin
           await send()
           assert.equal(requests[3].id, requests[0].id, 'same-text recovery still targets the failed operation')
           await act(async () => { await requests[3].accept() })
+          if (target.kind === 'group') {
+            const scope = JSON.stringify(['conversation-send', 'owner', 'workspace', 'group', target.id])
+            await send()
+            assert.equal(journal.read(scope).length, 1)
+            await act(async () => root.render(createElement(Probe, { revoked: true })))
+            assert.deepEqual(journal.read(scope), [], 'confirmed departure retires queued commands for this group')
+            await act(async () => { requests[4].reject() })
+            await act(async () => root.render(createElement(Probe)))
+            assert.deepEqual(held.bubbles, [], 'a delayed failure must not restore an old send after rejoining')
+          }
         } finally {
           await act(async () => { root.unmount() })
         }

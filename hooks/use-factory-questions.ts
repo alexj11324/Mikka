@@ -18,7 +18,7 @@ export type FactoryQuestionItem = {
   question: string
   recordedAnswer?: string
   options: { label: string; value: string }[]
-  reference: { questionRevision?: number; [key: string]: unknown }
+  reference: { questionRevision?: number; binding?: { issueId: string }; [key: string]: unknown }
   /** The task's title, read from its Factory task. */
   task: string
   /** The Mikka task (issue) it works on, when it has one. */
@@ -34,16 +34,15 @@ async function json(path: string) {
 async function readQuestions(): Promise<FactoryQuestionItem[]> {
   const body = await json('/api/factory/questions')
   const questions = (body?.questions ?? []) as Omit<FactoryQuestionItem, 'task' | 'issueId'>[]
-  const tasks = new Map<string, { title: string; issueId: string | null }>()
-  await Promise.all([...new Set(questions.map(question => question.taskId))].map(async taskId => {
-    const read = await json(`/api/factory/tasks/${taskId}`).catch(() => null)
-    const issueId = (read?.task as { issueId?: string | null } | undefined)?.issueId ?? null
-    // The task's words are its Mikka task's: its identifier and title.
-    const issue = issueId ? await getIssue(issueId).catch(() => null) : null
-    const view = issue && !issue.error ? issue.issue : null
-    tasks.set(taskId, { title: view ? [view.identifier, view.title].filter(Boolean).join(' ') : '', issueId })
+  const items = questions.map(question => ({ ...question, issueId: question.reference.binding?.issueId ?? null }))
+  // The answer reference supplies the Factory task's issue binding; its title still needs issue access.
+  const issueIds = new Set(items.map(item => item.issueId).filter((id): id is string => id !== null))
+  const titles = new Map<string, string>()
+  await Promise.all([...issueIds].map(async issueId => {
+    const issue = await getIssue(issueId).catch(() => null)
+    if (issue && !issue.error) titles.set(issueId, [issue.issue.identifier, issue.issue.title].filter(Boolean).join(' '))
   }))
-  return questions.map(question => ({ ...question, task: tasks.get(question.taskId)?.title ?? '', issueId: tasks.get(question.taskId)?.issueId ?? null }))
+  return items.map(item => ({ ...item, task: item.issueId ? titles.get(item.issueId) ?? '' : '' }))
 }
 
 const answerable = (status: string) => status === 'open' || status === 'waiting_user'

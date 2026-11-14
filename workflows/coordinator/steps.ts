@@ -6,19 +6,12 @@ import { cloudComputerRunsEnabled } from '@/lib/cloud-computer-flag'
 import { runInvalidDetail } from '@/lib/run-invalid-reason'
 import { taskDestinationSchema } from '@/lib/task-destination'
 import { FatalError } from 'workflow'
-import { SCHEDULE_INSTRUCTIONS } from '@/lib/schedules/contract'
-import { FACTORY_QUESTION_INSTRUCTIONS } from '@/lib/factory/instructions'
-import { FACTORY_CHECK_RECOVERY_INSTRUCTIONS } from '@/lib/factory/check-recovery'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 import { FactoryError } from '@/lib/factory/contract'
 import { publicFactoryReceipt } from '@/lib/factory/public-receipt'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
-import { personalMailboxInstructions } from '@/lib/personal-mailbox-instructions'
-import { snapshotMailboxTools } from '@/lib/personal-mailbox-capability'
 import type { MailboxToolRequest } from '@/lib/mailbox-tools'
-import type { MailboxToolName } from '@mikka/protocol/mailbox'
 import type { DefinitionSnapshot } from '@/lib/agent-kit/definition'
-import { executionInstructions } from '@/lib/agent-kit/execution-instructions'
 import type { AgentExecution } from '@/lib/agent-kit/store'
 import type { WorkerDefinitionSnapshot, WorkerModelDispatch } from '@/lib/agent-kit/worker'
 import { issueVisibility } from '@/lib/issue-visibility'
@@ -30,11 +23,7 @@ import { actAs } from '@/lib/acting-user'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { coordinatorTaskWorkspace } from '@/lib/coordinator/issue-team'
 import { addRunMessage, readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
-import { forgetNotes, cachedContextLines, promptWithCachedContext, rememberNote } from '@/lib/coordinator/context'
-import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
-import { withPersonalInstructionText } from '@/lib/coordinator/personal-instructions'
-import { botInstructions } from '@/lib/coordinator/bot-instructions'
-import { withCoordinatorPresentation } from '@/lib/coordinator/native-prompt'
+import { forgetNotes, rememberNote } from '@/lib/coordinator/context'
 import * as store from '@/lib/coordinator/store'
 import { db, pool } from '@/lib/db'
 import { webSearch } from '@/lib/search'
@@ -109,51 +98,12 @@ export async function recordAttention(userId: string, input: { matterId: string;
 
 /** Product context only: eve supplies history and owns pruning and compaction. */
 export async function prepareEveInstructions(userId: string, botId: string, snapshot?: DefinitionSnapshot, nativeTurn?: { sessionId: string; turnId: string }) {
-  const withoutSkills = snapshot ? { ...snapshot, personalPlugins: snapshot.personalPlugins ? { ...snapshot.personalPlugins, skills: [] } : undefined } : undefined
-  return prepareInstructions(userId, botId, withoutSkills, nativeTurn)
-}
-
-async function prepareInstructions(userId: string, botId: string, snapshot?: DefinitionSnapshot, nativeTurn?: { sessionId: string; turnId: string }) {
   if (deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle')) {
     const { factoryRuntimeForBot } = await import('@/lib/factory/runtime')
     await factoryRuntimeForBot(botId).reconcile(userId)
   }
-  const conversation = await store.loadProductPromptContext(userId, botId)
-  const { memory } = conversation
-  const mailboxTools: readonly MailboxToolName[] = []
-  const githubScope = { hosted: true, readOnly: false, effectiveTools: snapshot?.effectiveTools }
-  // The hosted Coordinator renders OpenUI like the native one, so it gets the same presentation rules and catalog.
-  const base = withCoordinatorPresentation(snapshot ? executionInstructions(snapshot) : await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS))
-  const instructions = personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, snapshotMailboxTools(snapshot).filter(name => mailboxTools.includes(name))) : base
-  const factoryPolicy = deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle') ? FACTORY_QUESTION_INSTRUCTIONS + FACTORY_CHECK_RECOVERY_INSTRUCTIONS : ''
-  // The person's 个人指令 sit after the rules and before the memory, marked as theirs.
-  // The person's own GitHub account, so the Bot looks a repository up instead of asking which account it is under.
-  const { githubPromptContext } = await import('@/lib/coordinator/github-context')
-  const { executionContextParts } = await import('@/lib/coordinator/execution-context')
-  const { memoryForBotPrompt } = await import('@/lib/profile/memory')
-  const [execution, rules, github, approvedFacts] = await Promise.all([
-    executionContextParts(userId, botId),
-    withPersonalInstructionText(userId, instructions, conversation.personalInstructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined),
-    githubPromptContext(userId, githubScope, undefined, undefined, botId),
-    conversation.memoryEnabled ? memoryForBotPrompt(userId, botId, conversation.memoryEnabled, nativeTurn) : Promise.resolve(''),
-  ])
-  // What Mikka has learnt about the person (R-73). It reaches only the chat's own
-  // repositories' facts, so one project's habits never surface in another's
-  // conversation. A profile read that fails leaves the section out; it never
-  // fails the turn. The `memory` switch governs it exactly as it governs the
-  // person's own notes: with 记忆 off, conversationWithMemory already emptied
-  // `memory`, and nothing learnt is stated either.
-  const profile = memory ? await (async () => {
-    const [{ profilePromptSection }, { usedRepositoriesForBot }] = await Promise.all([
-      import('@/lib/profile/store'), import('@/lib/coordinator/github-context'),
-    ])
-    return profilePromptSection(userId, await usedRepositoriesForBot(userId, botId))
-  })().catch(() => '') : ''
-  // Rules keep an earlier cache breakpoint. This context contains current model facts and either lazy GitHub discovery
-  // guidance or the complete legacy/fallback repository context; it can change between turns (lib/prompt-cache.ts).
-  // The person's memory and what Mikka knows about them ride together just after it, then live model availability.
-  const prompt = promptWithCachedContext(rules, cachedContextLines(github, execution.models), [memory, approvedFacts].filter(Boolean).join('\n'), factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''), profile)
-  return prompt.instructions
+  const { composeEveInstructions } = await import('@/lib/coordinator/product-instructions')
+  return composeEveInstructions(userId, botId, snapshot, nativeTurn)
 }
 
 export async function personalWriteToolsEnabled() { 'use step'; const { personalWritesEnabled } = await import('@/lib/operations/write-feature'); return personalWritesEnabled() }

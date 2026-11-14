@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { canonicalHref, closeThread, goTo, navigate, nextMark, openTask, openThread, setWorkAreaOpener, queryMoved, readLocation, readMark, sameLocation, sectionFor, sectionFromQuery, stepsToOrigin, taskOrigin, tidyAddress, workspaceHref, workspaceLink, workspaceSearch, writeSectionQuery, type EntryMark } from './workspace-navigation'
+import { canonicalHref, closeThread, goTo, navigate, nextMark, openTask, openThread, setWorkAreaOpener, workTabForEntry, rememberWorkTab, queryMoved, readLocation, readMark, sameLocation, sectionFor, sectionFromQuery, stepsToOrigin, taskOrigin, tidyAddress, workspaceHref, workspaceLink, workspaceSearch, writeSectionQuery, type EntryMark } from './workspace-navigation'
 import type { WorkspaceLocation } from './workspace-navigation'
 
 const BOT = '3f0c9d2e-5b1a-4c7e-9f00-1a2b3c4d5e6f'
@@ -322,4 +322,24 @@ test('an old 任务 link reads as the board: tasks have one entry', () => {
   const location = readLocation(new URLSearchParams(`section=tasks&issue=${ISSUE}`))
   assert.equal(location.section, 'all-issues')
   assert.equal(location.issue, ISSUE)
+})
+
+test('an active chat work tab survives a document reload only on the same entry and account scope', () => {
+  const browser = fakeBrowser('/?section=coordinator')
+  const scope = 'owner/workspace/coordinator'
+  rememberWorkTab(scope, `thread:${RUN}`)
+  assert.deepEqual(workTabForEntry(scope), { kind: 'thread', id: RUN })
+  assert.equal(workTabForEntry('another-owner/workspace/coordinator'), null)
+  assert.equal(workTabForEntry('owner/another-workspace/coordinator'), null)
+  assert.equal(workTabForEntry('owner/workspace/another-bot'), null)
+  assert.equal(browser.path(), '/?section=coordinator')
+  assert.equal(window.history.state.__NA, true)
+  goTo({ section: 'all-issues' })
+  assert.equal(workTabForEntry(scope), null)
+  window.history.back()
+  assert.deepEqual(workTabForEntry(scope), { kind: 'thread', id: RUN })
+  rememberWorkTab(scope, `task:${ISSUE}`)
+  assert.deepEqual(workTabForEntry(scope), { kind: 'task', id: ISSUE })
+  rememberWorkTab(scope, null)
+  assert.equal(workTabForEntry(scope), null)
 })

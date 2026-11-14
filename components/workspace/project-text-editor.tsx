@@ -23,7 +23,7 @@ type ProjectTextProps = {
 export function ProjectTextEditor({ readOnly, ...props }: ProjectTextProps & { readOnly: boolean }) {
   const t = useTranslations('Projects.textEditor')
   if (!readOnly) return <EditableProjectText {...props} />
-  if (props.field === 'name') return <h1 className="text-2xl leading-snug font-semibold tracking-tight">{props.value}</h1>
+  if (props.field === 'name') return <h1 className="max-w-full text-2xl leading-snug font-semibold tracking-tight wrap-anywhere">{props.value}</h1>
   return <IssueEditor key={props.value} layout="description" label={t('descriptionLabel')}
     content={readProjectDescription(props.value)} disabled onChange={() => {}} />
 }
