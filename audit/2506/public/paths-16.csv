@@ -101,8 +101,8 @@ lib/credentials/observed-cdp.fixture.mjs,100644,e2973a99b2286fa4131e5c645d25ed11
 lib/credentials/oidc.ts,100644,71452a4f9eabceb248a675e18096e620e4af7e99,code,module implementation,lib/credentials,unreviewed,,,
 lib/credentials/page-binding.ts,100644,f89cf01ce82ce422630377159ee7a351a227d384,code,module implementation,lib/credentials,unreviewed,,,
 lib/credentials/route.ts,100644,d46919237f88827bcabad478e37f116044bf1538,code,HTTP route,lib/credentials,unreviewed,,,
-lib/credentials/runtime-identity.test.mjs,100644,3cfc25ab30a79eec987a6593ccc19667bc14b432,code,"test, test support or fixture",lib/credentials,unreviewed,,,
-lib/credentials/runtime-identity.ts,100644,bedef9350343f6f7554c7f65cd17e623faf32c28,code,module implementation,lib/credentials,unreviewed,,,
+lib/credentials/runtime-identity.test.mjs,100644,3cfc25ab30a79eec987a6593ccc19667bc14b432,code,"test, test support or fixture",lib/credentials,complete,,- `lib/credentials/runtime-identity.test.mjs` · 已审。通过原 assumeVercelRole 入口，隔离控制 transport、签名 fixture，断言 Cloudflare/Vercel 选择、两个角色和 ARN、900 秒、环境标签、响应体及 malformed/oversized body、失败不暴露 upstream。该套件能证明应用端行为，真实 AWS trust 单列 #1950。 https://github.com/alexj11324/Mikka/issues/2506#issuecomment-6883429707,see path-specific disposition
+lib/credentials/runtime-identity.ts,100644,bedef9350343f6f7554c7f65cd17e623faf32c28,code,module implementation,lib/credentials,complete,,- `lib/credentials/runtime-identity.ts` · 已审。仅部署声明为 cloudflare 且提供环境时选用；未选择返回 null，其余非法状态抛错。短时受限身份请求到固定私有域，明确无缓存/重定向和 10 秒 timeout；非成功释放响应，成功只接收限长 token。真实 consumer kms.ts: assumeVercelRole runtime 选择前往 AWS STS 900 秒短期凭据；供应商失败不会退回旧 provider。 https://github.com/alexj11324/Mikka/issues/2506#issuecomment-6883429707,see path-specific disposition
 lib/credentials/runtime.ts,100644,741fcf38086519fa68903d91685ee46f68bd894a,code,module implementation,lib/credentials,unreviewed,,,
 lib/credentials/store.db.test.ts,100644,253bbbf5f48ebfa101600ccc01a1967f5c881442,code,"test, test support or fixture",lib/credentials,unreviewed,,,
 lib/credentials/store.ts,100644,aca71fa8f51ccf0fa6c9960f6c4b8475688b512f,code,module implementation,lib/credentials,unreviewed,,,
