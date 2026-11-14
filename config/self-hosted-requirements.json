@@ -1849,5 +1849,12 @@
     "environment": [],
     "behavior": "Use the same default workspace identity in project validation and presentation without loading browser components into server workflows.",
     "test": "apps/api/scripts/workflow-source-boundary.test.mjs"
+  },
+  "lib/desktop-rpc/version.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Expose the existing Desktop RPC wire version to native and Web callers without loading browser FormData encoders on native clients.",
+    "test": "lib/desktop-rpc/wire.test.ts",
+    "suite": "test:desktop-auth"
   }
 }

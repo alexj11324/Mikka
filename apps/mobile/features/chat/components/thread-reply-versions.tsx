@@ -6,7 +6,7 @@ import { Text } from '@/components/Text'
 import { api } from '@/lib/api'
 import { mobileMessages } from '@/lib/messages'
 import type { ThreadDetail } from '@/lib/types'
-import { DESKTOP_RPC_VERSION } from '../../../../../lib/desktop-rpc/wire'
+import { DESKTOP_RPC_VERSION } from '../../../../../lib/desktop-rpc/version'
 
 type Version = {id:string; text:string; anchorRunId:string; anchorKey:string; output:string|null; originalOutput:string|null; pullRequest:string|null; originalPullRequest:string|null}
 async function rpc<T>(action:string,args:unknown[]): Promise<T> {

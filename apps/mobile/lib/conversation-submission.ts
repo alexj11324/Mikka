@@ -1,4 +1,4 @@
-import { DESKTOP_RPC_VERSION } from '../../../lib/desktop-rpc/wire'
+import { DESKTOP_RPC_VERSION } from '../../../lib/desktop-rpc/version'
 import type { ChatSubmission } from '../../../lib/hooks/chat-delivery-state'
 import type { mentionsIn } from './group'
 

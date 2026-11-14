@@ -1,4 +1,4 @@
-import { DESKTOP_RPC_VERSION } from '../../../lib/desktop-rpc/wire'
+import { DESKTOP_RPC_VERSION } from '../../../lib/desktop-rpc/version'
 import type { DecisionReceipt } from '../../../hooks/decision-submission'
 
 type Response = {
