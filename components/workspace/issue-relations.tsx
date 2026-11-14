@@ -89,7 +89,10 @@ export function useIssueConnections({ liveWorkspaceId = null, viewerId, task, ge
       if (!latest) return
       const result = await updateIssueRelation({ id: task.id, revision: latest.revision, kind, targetId, remove: true })
       if (!('issue' in result) || !result.issue) {
-        if (result.error === 'issueOutdated') await Promise.all([refresh(issueKeys.detail(task.id)), mutate()])
+        if (result.error === 'issueOutdated') {
+          const [refreshed] = await Promise.all([refresh<Issue>(issueKeys.detail(task.id)), mutate()])
+          if (refreshed?.id === latest.id && refreshed.revision > latest.revision) throw new Error(actionError('issueStale'))
+        }
         throw new Error(actionError(result.error))
       }
       onSaved(result.issue); await Promise.all([mutate(), refresh(key => isIssueListKey(key, viewerId))]); toast.success(t('removed'))
@@ -102,7 +105,10 @@ export function useIssueConnections({ liveWorkspaceId = null, viewerId, task, ge
     try {
       const result = await moveIssue({ id, revision, status })
       if (!('issue' in result) || !result.issue) {
-        if (result.error === 'issueStale') await mutate()
+        if (result.error === 'issueStale') {
+          const refreshed = await mutate()
+          if (!refreshed?.some(row => row.id === id && row.revision > revision)) throw new Error(actionError('issueOutdated'))
+        }
         throw new Error(actionError(result.error))
       }
       const saved = result.issue

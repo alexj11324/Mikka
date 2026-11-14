@@ -17,6 +17,8 @@ const read = async () => {
   if (!available) throw new Error('Task relations unavailable')
   return rows
 }
+const errorToast = mock.fn((message: string) => message)
+mock.module('sonner', { namedExports: { toast: { error: errorToast, success() {} } } })
 const save = mock.fn(async (_input: { revision: number }): Promise<{ issue?: IssueView; error?: string }> => ({}))
 mock.module(new URL('../../app/actions/issue-operations.ts', import.meta.url).href, {
   namedExports: { listIssueConnections: read, updateIssueRelation: save },
@@ -73,6 +75,7 @@ test('a stale unlink refreshes the parent before the next explicit removal', asy
   save.mock.mockImplementationOnce(async () => ({ error: 'issueOutdated' }))
   await act(async () => { await state.remove('child', child.id) })
   assert.equal(save.mock.callCount(), 1)
+  assert.equal(errorToast.mock.calls.at(-1)?.arguments[0], 'issueStale')
   assert.equal(save.mock.calls[0].arguments[0].revision, 1)
   save.mock.mockImplementationOnce(async () => ({ issue: savedParent }))
   await act(async () => { await state.remove('child', child.id) })
@@ -89,6 +92,7 @@ test('a stale status save refreshes the child revision without resubmitting', as
   save.mock.mockImplementationOnce(async () => ({ error: 'issueStale' }))
   await act(async () => { await state.status(child.id, state.children[0].revision, 'done') })
   assert.equal(save.mock.callCount(), 1)
+  assert.equal(errorToast.mock.calls.at(-1)?.arguments[0], 'issueStale')
   assert.equal(state.children[0].revision, 2)
   save.mock.mockImplementationOnce(async () => ({ issue: { ...child, revision: 3, status: 'done' } }))
   await act(async () => { await state.status(child.id, state.children[0].revision, 'done') })
