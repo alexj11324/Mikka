@@ -10,7 +10,7 @@ on:
         description: Reviewed deployment phase; never compiles product source
         type: choice
         required: true
-        options: [stage-all, stage-verify, stage-worlds, stage-task, stage-eve, stage-api, stage-web, stage-sessions, production-reserve, production-eve, production-worlds-prepare, production-api, production-worlds-register, production-web, production-verify, production-migrate-database, gateway-prepare, gateway-observe]
+        options: [stage-all, stage-verify, stage-worlds, stage-task, stage-eve, stage-api, stage-web, stage-sessions, production-reserve, production-eve, production-eve-maintenance, production-worlds-prepare, production-api, production-worlds-register, production-web, production-verify, production-migrate-database, gateway-prepare, gateway-observe]
       database_window:
         description: Existing reviewed database migration window; used only by production-migrate-database
         type: string
