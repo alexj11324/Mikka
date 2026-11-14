@@ -32,7 +32,7 @@ beforeEach(() => {
   requests.length = 0
   status = 200
   failOnlyNextPage = false
-  root = createRoot(document.createElement('div'))
+  root = createRoot(browser.document.createElement('div') as unknown as HTMLDivElement)
 })
 afterEach(async () => { await act(async () => root.unmount()) })
 after(() => browser.happyDOM.close())
