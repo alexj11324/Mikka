@@ -782,6 +782,13 @@
     "test": "tests/organization-invitations.db.test.ts",
     "suite": "test:organization-invitations-db"
   },
+  "lib/governance/policy.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The built-in organization policy catalog supplies the same model source values to settings and server validation in a self-hosted deployment. Selecting a source does not provision that provider.",
+    "test": "lib/governance/policy.test.ts",
+    "suite": "test:governance"
+  },
   "lib/governance/service-credentials.ts": {
     "mode": "built-in",
     "environment": [],

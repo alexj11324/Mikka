@@ -10,12 +10,12 @@ import { requireOrganizationAdmin, getOrganizationWorkspaceIds } from './organiz
 import { enqueueOrganizationAudit } from './audit'
 import { GovernanceError } from './errors'
 import { deploymentMode } from './edition'
-import { resolveEntitlements } from './policy'
+import { ORGANIZATION_MODEL_PROVIDERS, resolveEntitlements } from './policy'
 import { armDueTimerAfterCommit } from '@/lib/due-timer'
 
 export const organizationResourcePolicyInput = z.object({
   modelCredentialSharing: z.enum(['allow', 'approval_required', 'deny']), mcpSharing: z.enum(['allow', 'approval_required', 'deny']),
-  allowedModelProviders: z.array(z.enum(['vercel-gateway', 'zerocat', 'cloudflare-workers-ai', 'openai-subscription', 'anthropic-subscription', 'api-key'])).max(6).nullable(),
+  allowedModelProviders: z.array(z.enum(ORGANIZATION_MODEL_PROVIDERS)).max(ORGANIZATION_MODEL_PROVIDERS.length).nullable(),
   auditRetentionDays: z.number().int().min(1).max(36500).nullable(), legalHold: z.boolean(),
 }).strict()
 
