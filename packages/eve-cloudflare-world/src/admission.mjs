@@ -176,21 +176,27 @@ function changeHook(storage, runId, request, now, params) {
     const prior = readHookById(storage, hookId, now)
     if (prior) return fail(409, 'ENTITY_CONFLICT')
     const { token } = eventData
+    const { forceClaimedFrom: _callerReceipt, ...fields } = eventData
+    let claimedFrom
     cleanReleasedToken(storage, token, now)
     const owner = readHookByToken(storage, token, now)
     if (owner) {
       const victim = eventData.force ? readRun(storage, owner.runId) : undefined
-      const compatible = victim && victim.specVersion >= SPEC_VERSION_SUPPORTS_HOOK_FORCE_CLAIM
+      const running = victim && !isTerminalWorkflowRunStatus(victim.status)
+      const compatible = victim && (!running || victim.specVersion >= SPEC_VERSION_SUPPORTS_HOOK_FORCE_CLAIM)
       if (!compatible) {
-        const conflict = { token, conflictingRunId: owner.runId, ...(eventData.force ? { forceDeclined: 'victim-spec-version' } : {}) }
+        const conflict = { token, conflictingRunId: owner.runId, ...(eventData.force ? { forceRefusedReason: 'victim-spec-version' } : {}) }
         return { ok: true, event: appendEvent(storage, runId, { eventType: 'hook_conflict', correlationId: hookId, specVersion, eventData: conflict }, now) }
       }
+      claimedFrom = { runId: owner.runId, hookId: owner.hookId,
+        ...(running ? { workflowName: victim.workflowName, deploymentId: victim.deploymentId, runSpecVersion: victim.specVersion } : {}) }
       storage.sql.exec('DELETE FROM world_hooks WHERE hook_id=?', owner.hookId)
       appendEvent(storage, owner.runId, { eventType: 'hook_disposed', correlationId: owner.hookId, specVersion: victim.specVersion,
         eventData: { token, forceClaimedBy: { runId, hookId } } }, now)
     }
-    const hook = saveHook(storage, runId, hookId, eventData, specVersion, now)
-    return { ok: true, hook, event: appendEvent(storage, runId, request, now) }
+    const hook = saveHook(storage, runId, hookId, { ...fields, ...(claimedFrom ? { claimedFrom } : {}) }, specVersion, now)
+    return { ok: true, hook, event: appendEvent(storage, runId, { ...request,
+      eventData: { ...fields, ...(claimedFrom ? { forceClaimedFrom: claimedFrom } : {}) } }, now) }
   }
   const hook = readHookById(storage, hookId, now)
   if (!hook || hook.runId !== runId || (eventData?.token && eventData.token !== hook.token)) return fail(404, 'HOOK_NOT_FOUND')
@@ -226,6 +232,15 @@ export function applyWorldEvent(storage, runId, request, now = Date.now(), param
             return fail(409, 'ENTITY_CONFLICT')
           }
           return { ok: true, event: readEvent(storage, runId, prior.slot) }
+        }
+      }
+      if (event.eventType === 'hook_received' || event.eventType === 'hook_created') {
+        const prior = listEvents(storage, runId, { limit: 1, sortOrder: 'desc' }, event.correlationId).data[0]
+        const claimedBy = prior?.eventType === 'hook_disposed' && prior.eventData?.forceClaimedBy
+        if (claimedBy) {
+          if (event.eventType === 'hook_created') return fail(409, 'ENTITY_CONFLICT')
+          if (event.eventData?.token && event.eventData.token !== prior.eventData.token) return fail(404, 'HOOK_NOT_FOUND')
+          return fail(409, 'HOOK_FORCE_CLAIMED', { token: prior.eventData.token, claimedByRunId: claimedBy.runId, claimedByHookId: claimedBy.hookId })
         }
       }
       if (isTerminalWorkflowRunStatus(run.status)) return fail(410, 'RUN_EXPIRED')
