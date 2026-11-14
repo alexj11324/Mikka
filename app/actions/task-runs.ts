@@ -16,7 +16,7 @@ import { ActionFailureError } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { agents, agentRuns, bots, devices, issues, type RunOutcome, type RunStatus } from '@/lib/db/schema'
+import { agents, agentRuns, bots, conversationReads, devices, issues, type RunOutcome, type RunStatus } from '@/lib/db/schema'
 import { runAgentName, runBotId, runBotName, runTaskPrompt } from '@/lib/run-bot-name'
 import { replyLine } from '@/lib/thread-groups'
 import { queryVersionWithExpiry } from '@/lib/db/query-version'
@@ -31,6 +31,7 @@ import { issueShortTitle } from '@/lib/short-title-sql'
 import { conversationTitle } from '@/lib/short-title'
 import { threadName } from '@/lib/issue-threads'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
+import { joinThreadRead, threadUnread } from '@/lib/thread-reads'
 import { issueVisibility } from '@/lib/issue-visibility'
 
 /** The newest run on each issue, for the right column's 我的任务 groups (MIK-38). */
@@ -99,6 +100,7 @@ async function readTaskRuns() {
 
 /** A thread: one run, newest first. Its name comes from its task, else its prompt. */
 export interface Thread {
+  unread?: boolean
   pauseReason?: 'human_control' | 'quota_exhausted' | null
   stopReason?: string | null
   awaitingApproval?: boolean
@@ -172,6 +174,7 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
       (${devices.enabled} is false or (${gatewayOffline} and (${devices.lastSeenAt} is null or
        ${devices.lastSeenAt}>statement_timestamp() OR ${devices.lastSeenAt}<statement_timestamp()-(${DEVICE_ONLINE_WINDOW_MS} * interval '1 millisecond'))))`
     const snapshot = db.select({
+      unread: threadUnread.as('unread'),
       id: agentRuns.id, botId: agentRuns.botId, agentName: runBotName.as('agentName'), issueId: agentRuns.issueId, prompt: sql<string>`left(${runTaskPrompt}, 200)`.as('prompt'), title: agentRuns.title,
       status: agentRuns.status, createdAt: agentRuns.createdAt, updatedAt: agentRuns.updatedAt,
       lastReply: agentRuns.lastReply, lastReplyAt: agentRuns.lastReplyAt, source: agentRuns.source,
@@ -183,6 +186,7 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
       outcome: agentRuns.outcome, failureDetails: runFailureBrief.as('failureDetails'),
       pauseReason: agentRuns.pauseReason, stopReason: agentRuns.stopReason, awaitingApproval: runAwaitingApproval.as('awaitingApproval'), threadReplacedBy: agentRuns.threadReplacedBy,
     }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(devices, eq(devices.id, agentRuns.deviceId))
+      .leftJoin(conversationReads, joinThreadRead(session.user.id))
       .where(and(eq(agentRuns.userId, session.user.id), eq(agentRuns.workspaceId, context.workspace.id), sql`${agentRuns.createdAt} > now() - ${runHistoryWindow}`))
       .orderBy(desc(sql`greatest(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt})`), desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200)
     const signature = await queryVersionWithExpiry(snapshot, sql`min(snapshot."createdAt")+${runHistoryWindow}`)

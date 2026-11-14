@@ -16,6 +16,7 @@ import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
+import { threadReadReceipts } from '@/lib/thread-reads'
 import { db, pool } from '@/lib/db'
 import {
   agents, agentRuns, coordinatorEvents, deviceRepos, devices, runMessages, users,
@@ -337,6 +338,7 @@ async function readThreadIssue(runId: string): Promise<{ issueId: string | null 
 }
 
 export interface IssueThreadDetail {
+  readReceipts?: Awaited<ReturnType<typeof threadReadReceipts>>
   /** Authorized scopes for every attempt; browser state never guesses them. */
   live?: { viewerId?: string; runs: import('@/lib/live/panels').ThreadLiveReference[]; issueWorkspaceId: string | null; questionDeadline: ThreadQuestionDeadline | null; revisions?: Record<string, number> }
   /** The owner sees the stop deadline too, so a reload does not reset the timeout. */
@@ -470,6 +472,9 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
   const from = chain ? Math.max(0, chain.attempts.findIndex(attempt => attempt.runId === row.id)) : 0
   const runIds = chain ? chain.attempts.slice(from).map(attempt => attempt.runId) : [row.id]
   // Invalidation reads retain the cursor: only later chunks, not the whole chain again.
+  // Capture exactly what this read could display. An arriving reply after this
+  // point stays unread until a subsequent transcript is visible.
+  const readReceipts = await threadReadReceipts(user.id, runIds)
   const read = await readThreadChunks(runIds, cursor)
   const chunks = read.chunks
   // The client keeps its held prompt only when it keeps its held chunks; any other read sends the whole prompt.
@@ -538,6 +543,7 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
     readContextUsage(chainRunIds, row.id, chain?.latestRunId ?? row.id),
   ])
   return {
+    readReceipts,
     live: { viewerId: user.id, runs, issueWorkspaceId, questionDeadline, ...(Object.keys(revisions).length ? { revisions } : {}) },
     thread: { ...thread, failureDetails, questionWake, prompt: promptOmitted ? '' : prompt, ...(!promptOmitted && hasInstructions ? { hasInstructions: true as const } : {}), stopRequestedAt, replyAvailable, retryAvailable, quota, modelFallback: modelFallback?.notices ?? null, modelFallbackPending: modelFallback?.pending ?? false, error, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,

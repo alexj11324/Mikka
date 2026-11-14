@@ -39,7 +39,7 @@ export function botPageLive(_data: BotPage | null, botId: string | null | undefi
   return {
     minIntervalMs: LIST_MERGE_MS,
     refs: [
-      listRef('thread_list', home),
+      listRef('thread_list', open),
       { kind: 'bot_chat', id: botId && home ? botId : UNRESOLVED_LIVE_ID, scope: home || null },
       listRef('bot_list', open),
     ],
