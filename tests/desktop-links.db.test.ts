@@ -60,6 +60,20 @@ test('desktop links preserve real workspace membership and public share permissi
     const markdown = await artifact('markdown'), html = await artifact('html')
     const get = (token: string) => withDatabaseClient(measuredClient, () => GET(new Request(`http://127.0.0.1/mikka/api/artifacts/shared/${encodeURIComponent(token)}`), { params: Promise.resolve({ token }) }))
 
+    await t.test('signed reads select an authorized artifact and its requested version together', async () => {
+      const { readArtifactContent } = await import('../lib/artifacts/store')
+      const { tokenWorkspace } = await import('../lib/tokens/principal')
+      const read = (userId: string, tenant: string, version: number) => withDatabaseClient(measuredClient, () =>
+        readArtifactContent({ id: userId, [tokenWorkspace]: tenant }, markdown.id, version))
+      queries.length = 0
+      assert.deepEqual(await read(owner, workspaceId, 1), { kind: 'markdown', title: 'Shared fixture', content: markdown.content })
+      const versionReads = queries.filter(query => /from "(?:artifacts|artifact_versions)"/i.test(query))
+      assert.equal(versionReads.length, 1, 'one statement retrieves metadata and bytes after the workspace gate')
+      assert.match(versionReads[0], /join "artifact_versions"/i)
+      assert.equal(await read(owner, workspaceId, 2), null)
+      assert.equal(await read(peer, foreignWorkspaceId, 1), null)
+      assert.equal(await read(owner, foreignWorkspaceId, 1), null)
+    })
     await t.test('current and historical workspace links keep the original member reads and byte budget', async () => {
       const before = stream.bytesRead
       assert.equal(await readWorkspaceSlug(owner, oldSlug), null)
