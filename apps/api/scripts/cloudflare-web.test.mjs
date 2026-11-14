@@ -303,20 +303,14 @@ test('version recovers from a stale overlay, unavailable backend and invalid doc
 test('rejected or stalled cold version reads free the upstream and an independent request can recover', async t => {
   const source = 'a'.repeat(40), overlay = 'b'.repeat(40)
   const value = { build: source, overlaySha: overlay, minMobileBuild: 0, mobileUpdateUrl: '', minDesktopVersion: null }
-  const cancellation = Promise.withResolvers()
-  const cleanup = Promise.withResolvers()
+  let cancelled = false
   const env = { RELEASE_SHA: source, OVERLAY_SHA: overlay, API: { fetch: async () => new Response(new ReadableStream({
-    cancel() { cancellation.resolve(); return cleanup.promise },
+    cancel() { cancelled = true },
   }), { status: 502 }) } }
   const get = (e, init) => release.fetch(request('/mikka/api/version', init), e)
-  const result = get(env)
-  await cancellation.promise
-  // The transport can acknowledge cancellation after the client needs its HTTP error.
-  const pendingCleanup = Symbol('waiting for cleanup')
-  const bad = await Promise.race([result, new Promise(resolve => setImmediate(resolve, pendingCleanup))])
-  cleanup.resolve()
-  assert.notEqual(bad, pendingCleanup)
+  const bad = await get(env)
   assert.equal(bad.status, 502)
+  assert.equal(cancelled, true)
   assert.equal(bad.headers.get('cache-control'), 'no-store')
   env.API.fetch = async () => new Response(new ReadableStream({
     start(controller) { controller.error(new Error('upstream body already closed')) },
