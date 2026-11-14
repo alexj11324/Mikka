@@ -318,10 +318,10 @@ async function go(href: string) {
   browser.history.pushState({}, '', href)
   await render()
 }
-async function popTo(href: string) {
+async function popTo(href: string, renderFrame = render) {
   browser.history.replaceState({}, '', href)
   await act(async () => { browser.dispatchEvent(new browser.PopStateEvent('popstate')) })
-  await render()
+  await renderFrame()
 }
 
 test('Team Projects distinguishes unavailable associations from an empty list and keeps Workspace Projects independent', async () => {
@@ -628,8 +628,7 @@ test('hosted Settings preserves pending browser notes and the computer registry 
   const duringSettings = { notes: notes?.notes.length ?? null, hasComposer: notes?.hasComposer ?? null, computerRun: computerThread?.runId ?? null }
 
   // The Chats rail opens the directory; return with browser Back to the prior chat.
-  await popTo('/?workspace=workspace-one')
-  await renderHosted()
+  await popTo('/?workspace=workspace-one', renderHosted)
   const after = { draft: container.querySelector('textarea')?.value, notes: notes?.notes.map(note => [note.n, note.note]), computerRun: computerThread?.runId ?? null }
   t.diagnostic(JSON.stringify({ duringSettings, after }))
   assert.deepEqual(after, { draft: 'hosted unsent draft', notes: [[1, 'keep hosted annotation']], computerRun: registeredComputerThread.runId })

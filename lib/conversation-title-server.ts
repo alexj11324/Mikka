@@ -26,8 +26,8 @@ async function chainOf(database: Query, ownerId: string, runId: string) {
   return chain ? chain.attempts.map(attempt => attempt.runId) : [runId]
 }
 
-async function write(database: Query, ownerId: string, runIds: string[], title: string, source: ConversationTitleSource, overManual: boolean) {
-  const { rows } = await database.query(WRITE_CONVERSATION_TITLE, [title, source, runIds, ownerId, overManual])
+async function write(database: Query, ownerId: string, runIds: string[], title: string, source: ConversationTitleSource, overManual: boolean, observedManual?: string | null) {
+  const { rows } = await database.query(WRITE_CONVERSATION_TITLE, [title, source, runIds, ownerId, overManual, observedManual !== undefined, observedManual ?? null])
   return rows.length > 0
 }
 
@@ -51,7 +51,7 @@ export async function nameConversation(database: Query, runId: string, ownerId: 
   const title = await generate(ownerId, { title: first, body }, run.workspaceId)
   if (!title) return null
   // Checked again in the statement: a rename that landed while the model was answering is kept.
-  return await write(database, ownerId, runIds, title, 'generated', trigger === 'regenerate') ? title : null
+  return await write(database, ownerId, runIds, title, 'generated', trigger === 'regenerate', chain.titleSource === 'manual' ? chain.title : null) ? title : null
 }
 
 /** The background job behind scheduleConversationTitle. Never throws. */
@@ -70,8 +70,14 @@ export async function writeConversationTitle(runId: string, ownerId: string, tri
 export async function renameConversationTitle(database: Query, runId: string, ownerId: string, raw: string, workspaceId: string): Promise<string | null> {
   const title = manualConversationTitle(raw)
   if (!title) return null
-  const owned = (await database.query('SELECT 1 FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "workspaceId"=$3', [runId, ownerId, workspaceId])).rows[0]
-  if (!owned) return null
-  await write(database, ownerId, await chainOf(database, ownerId, runId), title, 'manual', true)
-  return title
+  const runIds = await chainOf(database, ownerId, runId)
+  const authorized = `SELECT r.title, r."titleSource" FROM agent_runs r
+    JOIN mikka_workspace_members m ON m."workspaceId"=r."workspaceId" AND m."userId"=r."userId" AND m.status='active'
+    WHERE r.id=$1 AND r."userId"=$2 AND r."workspaceId"=$3`
+  const keys = [runId, ownerId, workspaceId]
+  if (!(await database.query(authorized, keys)).rows.length) return null
+  if (await write(database, ownerId, runIds, title, 'manual', true)) return title
+  // A no-op can also mean access was revoked between the read and the write.
+  const current = (await database.query(authorized, keys)).rows[0]
+  return current?.title === title && current.titleSource === 'manual' ? title : null
 }

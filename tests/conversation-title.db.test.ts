@@ -272,6 +272,13 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     // Regenerate is the person asking for a generated title again.
     assert.equal(await nameConversation(pool, first, 'owner', 'regenerate', model('登录回调与前缀')), '登录回调与前缀')
     assert.deepEqual([await stored(first), await stored(second), await stored(third)], Array(3).fill({ title: '登录回调与前缀', titleSource: 'generated' }))
+    assert.equal(await renameConversationTitle(pool, first, 'owner', 'Initial manual', workspaceId), 'Initial manual')
+    assert.equal(await nameConversation(pool, first, 'owner', 'regenerate', async () => {
+      assert.equal(await renameConversationTitle(pool, first, 'owner', 'Later manual', workspaceId), 'Later manual')
+      return 'Stale generated title'
+    }), null)
+    assert.deepEqual(await stored(first), { title: 'Later manual', titleSource: 'manual' })
+    assert.equal(await renameConversationTitle(pool, first, 'owner', 'Later manual', workspaceId), 'Later manual')
     const revoked = await run({ prompt: 'A pending workspace title' })
     const suspend = () => pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"='owner'`, [workspaceId])
     assert.equal(await nameConversation(pool, revoked, 'owner', 'created', async () => {
@@ -281,6 +288,7 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     assert.equal(await nameConversation(pool, revoked, 'owner', 'created', async () => {
       assert.fail('revoked workspace must not invoke the model')
     }), null)
+    assert.equal(await renameConversationTitle(pool, revoked, 'owner', 'No access', workspaceId), null)
     assert.deepEqual(await stored(revoked), { title: null, titleSource: null })
   } finally {
     await dropTestDatabase(adminPool, name, pool)
