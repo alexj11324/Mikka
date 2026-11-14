@@ -197,6 +197,10 @@ let checkedOutClient
 export const db={select:query,update,transaction:async fn=>{const p=globalThis.claimResponseProbe;assert.equal(p.appActive,1,'claim transaction uses the checked-out APP client');p.transactions++;const error=p.transactionErrors.shift();if(error)throw error;return fn({select:query})}}
 export const pool={async query(sql,args){
   const p=globalThis.claimResponseProbe
+  if (sql === 'SELECT 1 FROM thread_reply_versions WHERE "resultRunId"=$1 AND "userId"=$2 AND "workspaceId"=$3') {
+    assert.deepEqual(args,[p.run.id,p.run.userId,p.run.workspaceId])
+    return {rows:p.historicalReplyVersion ? [{}] : [],rowCount:p.historicalReplyVersion ? 1 : 0}
+  }
   assert.equal(p.appActive,1,'execution identity remains inside the checked-out APP transaction')
   assert.equal(sql,'SELECT "ownerId",kind,enabled FROM devices WHERE id=$1')
   assert.deepEqual(args,[p.device.id]);return {rows:[p.device]}

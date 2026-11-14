@@ -868,3 +868,5 @@ dark, status/10 in light):
 
 The drift rows are open in `decisions.md`. Until they are settled, the code
 value is what ships and Figma is updated to match.
+
+- A conversation owner can edit a delivered personal message or rerun a reply. Versions keep their original output and publication receipts. Switching versions only reads history. An explicit new execution uses its own native session and worktree. [Decision](decisions/2026-11-13-1730-conversation-message-versions.md)

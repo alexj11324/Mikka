@@ -344,7 +344,7 @@ export interface IssueThreadDetail {
   /** The owner sees the stop deadline too, so a reload does not reset the timeout. */
   thread: IssueThread & { failureDetails: RunFailure | null; prompt: string; /** `prompt` is the task alone; the Agent also received system instructions (getThreadInstructions). */ hasInstructions?: true; stopRequestedAt: Date | null; /** Host projection for the existing controls; mutations still revalidate. */ replyAvailable: boolean; retryAvailable: boolean; feedbackEligible:boolean; /** The latest masked run error or the host's fixed wake failure. */ error: string | null; /** The owner's own: quota switches and a quota pause (lib/run-quota-view.ts). */ quota: import('@/lib/run-quota-view').ThreadQuotaView | null; /** Host-confirmed provider recovery, within this owner's thread chain. */ modelFallback?: import('@/lib/run-model-fallback-view').ThreadModelFallbackView[] | null; /** Keep polling while the host prepares a continuation; no uncommitted switch is displayed. */ modelFallbackPending?: boolean }
   chunks: { chunk: Record<string, unknown>; at: Date }[]
-  messages: { id: string; submissionId?: string; text: string; at: Date; author: string; image: string | null; mine: boolean }[]
+  messages: { id: string; sourceRunId?:string|null; editable?:boolean; submissionId?: string; text: string; at: Date; author: string; image: string | null; mine: boolean }[]
   /** Where `chunks` ends; passed back, the next read returns only later chunks. */
   chunkCursor: ThreadChunkCursor | null
   /** `chunks` holds only the chunks after the cursor that was passed: append them to the ones held. */
@@ -478,7 +478,7 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
   const stored = cursor && !read.append ? (await db.select({ prompt: agentRuns.prompt, promptTaskStart: agentRuns.promptTaskStart, promptTaskLength: agentRuns.promptTaskLength }).from(agentRuns).where(eq(agentRuns.id, row.id)).limit(1))[0] ?? { prompt: '', promptTaskStart: null, promptTaskLength: null } : row
   // The thread shows the task it was given; the Agent's full instructions open on request (getThreadInstructions).
   const { task: prompt, hasInstructions } = threadPromptView(stored.prompt, stored.promptTaskStart, stored.promptTaskLength)
-  const messages = await db.select({ id: runMessages.id,
+  const messages = await db.select({ id: runMessages.id, sourceRunId:runMessages.runId, editable:sql<boolean>`${runMessages.origin}='owner' AND ${runMessages.deliveredAt} IS NOT NULL AND failure IS NULL`,
     submissionId: sql<string | null>`${coordinatorEvents.payload}#>>'{threadSubmission,requestId}'`,
     text: runMessages.text, at: runMessages.createdAt, userId: runMessages.userId, name: users.name, email: users.email, image: users.image })
     .from(runMessages).leftJoin(users, eq(users.id, runMessages.userId))
@@ -545,7 +545,7 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
     live: { viewerId: user.id, runs, issueWorkspaceId, questionDeadline, ...(Object.keys(revisions).length ? { revisions } : {}) },
     thread: { ...thread, failureDetails, questionWake, prompt: promptOmitted ? '' : prompt, ...(!promptOmitted && hasInstructions ? { hasInstructions: true as const } : {}), stopRequestedAt, replyAvailable, retryAvailable, quota, modelFallback: modelFallback?.notices ?? null, modelFallbackPending: modelFallback?.pending ?? false, error, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
-    messages: messages.map(message => ({ id: message.id, ...(message.submissionId ? { submissionId: message.submissionId } : {}), text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
+    messages: messages.map(message => ({ sourceRunId:message.sourceRunId, editable:message.editable && message.userId===user.id, id: message.id, ...(message.submissionId ? { submissionId: message.submissionId } : {}), text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
     chunkCursor: read.cursor,
     chunksAppend: read.append,
     context,
@@ -651,6 +651,23 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
  */
 export async function sendIssueThreadReply(input: { issueId: string | null; runId: string; text: string; requestId?: string; delivery?: import('@/lib/thread-delivery').ThreadDeliveryMode; expectedOwnerId?: string; expectedWorkspaceId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<ActionResult<{ sent: true; runId: string; continued: boolean }>> {
   return runAction(async () => { const result=await sendIssueThreadMessage(input); return { sent: true as const,...result } })
+}
+
+export async function createThreadReplyVersion(input: { issueId: string | null; runId: string; change: import('@/lib/thread-reply-versions').ReplyVersionInput }) {
+  return runAction(async () => {
+    const { row,user } = await readableThread(input.issueId,input.runId,threadColumns)
+    const requestHeaders = await headers()
+    if (!desktopHumanSessionId() && (requestHeaders.has('authorization') || !requestHeaders.get('cookie'))) throw new ActionFailureError('authRequired')
+    const session = await auth.api.getSession({headers:requestHeaders,query:{disableCookieCache:true}})
+    if (!session?.session?.id || session.user.id !== user.id || row.userId !== user.id) throw new ActionFailureError('runNotFound')
+    return (await import('@/lib/thread-reply-versions')).createReplyVersion(pool,user.id,row.id,input.change)
+  })
+}
+
+export async function getThreadReplyVersions(issueId:string|null,runId:string) {
+  const { row,user } = await readableThread(issueId,runId,threadColumns)
+  if (row.userId !== user.id) throw new ActionFailureError('runNotFound')
+  return (await import('@/lib/thread-reply-versions')).readReplyVersions(pool,user.id,row.id)
 }
 
 export async function changeQueuedThreadReply(input: { issueId: string | null; runId: string; messageId: string; action: 'cancel' | 'sendNow' }) {

@@ -25,7 +25,7 @@ const isActionErrorCode = (code: string): code is ActionErrorCode => (ACTION_ERR
  * any dispatch (the device or cloud computer, the credential and its quota).
  * Only the thread's owner may send, as for a working thread.
  */
-export async function sendThreadMessage(userId: string, runId: string, text: string, source: Source = 'user', requestId?: string, delivery?: 'queue' | 'steer' | 'interrupt' | 'afterRun'): Promise<{ runId: string; continued: boolean }> {
+export async function sendThreadMessage(userId: string, runId: string, text: string, source: Source = 'user', requestId?: string, delivery?: 'queue' | 'steer' | 'interrupt' | 'afterRun' | 'version'): Promise<{ runId: string; continued: boolean }> {
   const parsed = z.object({ runId: z.uuid(), text: z.string().trim().min(1).max(10_000), requestId: z.uuid().optional() }).safeParse({ runId, text, requestId })
   if (!parsed.success) throw new ActionFailureError('messageRequired')
   // The owner's chain only: a teammate who can see a shared thread cannot run it.
@@ -56,7 +56,7 @@ export async function sendThreadMessage(userId: string, runId: string, text: str
       requestedRunId: parsed.data.runId, previousRunId: chain.latestRunId, issueId: scope.issueId, botId: scope.botId, text: parsed.data.text, delivery,
       mode: UNFINISHED_RUN_STATUSES.some(status => status === chain.attempts.find(attempt => attempt.runId === chain.latestRunId)?.status) ? 'message' : 'continuation' },
     sourceEventId => {
-      if (delivery === 'afterRun' && (active || chain.latestRunId !== parsed.data.runId)) throw new ActionFailureError('threadReplaced')
+      if ((delivery === 'afterRun' || delivery === 'version') && (active || chain.latestRunId !== parsed.data.runId)) throw new ActionFailureError('threadReplaced')
       if (delivery === 'afterRun' && chain.attempts.at(-1)?.status !== 'succeeded') throw new ActionFailureError('threadDeliveryUnavailable')
       if ((delivery === 'steer' || delivery === 'interrupt') && (!active || chain.latestRunId !== parsed.data.runId)) throw new ActionFailureError('runNotActive')
       return continueThread(userId, parsed.data.text, source, chain, sourceEventId, delivery)
@@ -150,7 +150,7 @@ async function recoverThreadQuestionAnswer(userId: string, previousRunId: string
 }
 
 async function continueThread(userId: string, text: string, source: Source,
-  chain: NonNullable<Awaited<ReturnType<typeof readRunChain>>>, sourceEventId?: string, delivery?: 'queue' | 'steer' | 'interrupt' | 'afterRun'): Promise<{ runId: string; continued: boolean }> {
+  chain: NonNullable<Awaited<ReturnType<typeof readRunChain>>>, sourceEventId?: string, delivery?: 'queue' | 'steer' | 'interrupt' | 'afterRun' | 'version'): Promise<{ runId: string; continued: boolean }> {
   const latest = chain.attempts.find(attempt => attempt.runId === chain.latestRunId)!
   if (UNFINISHED_RUN_STATUSES.some(status => status === latest.status)) {
     if (delivery === 'steer') {
@@ -176,7 +176,7 @@ async function continueThread(userId: string, text: string, source: Source,
   if (question) {
     // A pre-existing queued instruction cannot answer a question the user
     // had not seen when they wrote it.
-    if (delivery === 'afterRun') throw new ActionFailureError('factoryQuestionNeedsAnswerTool')
+    if (delivery === 'afterRun' || delivery === 'version') throw new ActionFailureError('factoryQuestionNeedsAnswerTool')
     await addRunMessage(userId, { runId: latest.runId, text }, source, sourceEventId)
     return { runId: latest.runId, continued: false }
   }
@@ -192,6 +192,10 @@ async function continueThread(userId: string, text: string, source: Source,
   const { dispatchToTask, latestTaskRun } = await import('@/lib/thread-dispatch')
   // Another thread took the task over (a new thread was asked for): this one is history now.
   if ((await latestTaskRun(pool, userId, issueId))?.id !== run.id) throw new ActionFailureError('threadReplaced')
+  const version = delivery === 'version' ? (await pool.query<{ executionNote:string }>(
+    'SELECT "executionNote" FROM thread_reply_versions WHERE "sourceEventId"=$1 AND "userId"=$2 AND "workspaceId"=$3 AND "admissionRunId"=$4 AND text=$5',
+    [sourceEventId,userId,run.workspaceId,run.id,text])).rows[0] : undefined
+  if (delivery === 'version' && !version) throw new ActionFailureError('submissionConflict')
   const result = await dispatchToTask(userId, issueId, {
     note: text,
     ...(sourceEventId ? { expectedRunId: run.id } : {}),
@@ -209,7 +213,7 @@ async function continueThread(userId: string, text: string, source: Source,
           [eventId, userId, botId, issueId, `thread-continuation:${eventId}`, JSON.stringify({ text, source: 'thread_continuation', previousRunId: run.id, postedToChat: true })])
         request = { sourceEventId: eventId, botId }
       }
-      return queueNextRun(userId, run, previous, note, request)
+      return queueNextRun(userId, run, previous, version?.executionNote ?? note, request)
     },
   })
   // A dispatch the person can act on (no machine, say) queued nothing.
