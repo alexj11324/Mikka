@@ -31,7 +31,7 @@ test('Agent Kit evaluations run through compiled public Eve sessions with inert 
   await logs.close();await runtimeLog.close();if(!process.env.MIKKA_TEST_KEEP_EVAL)await rm(fixture,{recursive:true,force:true});else t.diagnostic(fixture)
   for(const [key,value]of Object.entries(saved))if(value===undefined)delete process.env[key];else process.env[key]=value
  })
- for(const folder of ['apps/eve/agent/channels','apps/eve/agent/tools','apps/eve/agent/hooks','apps/eve/agent/connections','apps/eve/agent/skills','lib/eve','lib/abuse','lib/agent-kit','node_modules','bindings'])await mkdir(join(fixture,folder),{recursive:true})
+ for(const folder of ['apps/eve/agent/channels','apps/eve/agent/tools','apps/eve/agent/hooks','apps/eve/agent/connections','apps/eve/agent/skills','lib/eve','lib/abuse','lib/agent-kit','lib/factory','node_modules','bindings'])await mkdir(join(fixture,folder),{recursive:true})
  for(const name of await readdir(join(root,'node_modules')))if(name!=='.cache')await symlink(join(root,'node_modules',name),join(fixture,'node_modules',name))
  await writeFile(join(fixture,'package.json'),JSON.stringify({private:true,type:'module',dependencies:{eve:'1.0.0-rc.9'}}))
  await writeFile(join(cwd,'package.json'),JSON.stringify({private:true,type:'module',dependencies:{eve:'1.0.0-rc.9'}}))
@@ -50,7 +50,9 @@ test('Agent Kit evaluations run through compiled public Eve sessions with inert 
  await writeFile(join(fixture,'lib/eve/auth-bot.ts'),`export function resolveEveRequestBot(){throw Error('Human auth cannot enable evaluation')}`)
  await writeFile(join(fixture,'lib/task-workspace.ts'),`export async function requireTaskWorkspace(owner,workspace){if(owner!=='${scope.ownerId}'||workspace!=='${scope.workspaceId}')throw Error('workspaceAccessDenied')}`)
  await writeFile(join(fixture,'lib/eve/product-rpc.ts'),`export async function productRpc(){throw Error('Real business effects forbidden')}`)
- await writeFile(join(fixture,'lib/eve/product-definitions.ts'),`export async function prepareEveExecution(){throw Error('Real business preparation forbidden')}export async function productCatalogue(){throw Error('Real product catalogue forbidden')}`)
+ await writeFile(join(fixture,'lib/eve/product-definitions.ts'),`export async function prepareEveExecution(){throw Error('Real business preparation forbidden')}export async function productCatalogue(){throw Error('Real product catalogue forbidden')}export async function asProductPrincipal(){throw Error('Real product principal forbidden')}export async function checkedPreparedEveExecution(){throw Error('Real execution admission forbidden')}`)
+ await writeFile(join(fixture,'lib/deployment-switches.ts'),`export function deploymentSwitch(){throw Error('Real product switches forbidden')}`)
+ await writeFile(join(fixture,'lib/factory/reconcile-pending.ts'),`export async function pendingFactoryReconciliation(){throw Error('Real Factory reconciliation forbidden')}`)
  await writeFile(join(fixture,'lib/eve/product-tool.ts'),`export function createProductTool(){throw Error('Real product tools forbidden')}`)
  await writeFile(join(fixture,'lib/eve/projection.ts'),`export function projectEveTurn(){throw Error('Chat projection forbidden')}export const projectTurnState=projectEveTurn`)
  await writeFile(join(fixture,'lib/eve/scheduled-read.ts'),`export async function loadScheduledRead(){throw Error('Scheduled authority forbidden')}`)
@@ -67,6 +69,7 @@ test('Agent Kit evaluations run through compiled public Eve sessions with inert 
  // Imports in unused normal branches are resolved at build time, and remain forbidden.
  await mkdir(join(fixture,'lib/coordinator'),{recursive:true})
  await writeFile(join(fixture,'lib/coordinator/instructions.ts'),`export const COORDINATOR_INSTRUCTIONS='Unused private chat instructions'`)
+ await writeFile(join(fixture,'lib/coordinator/product-instructions.ts'),`export async function composeEveInstructions(){throw Error('Private product instructions forbidden')}`)
  const probe=createServer();probe.listen(0,'127.0.0.1');await once(probe,'listening');const origin=`http://127.0.0.1:${(probe.address()as{port:number}).port}`;await new Promise<void>(resolve=>probe.close(()=>resolve()))
  const env={PATH:process.env.PATH,HOME:process.env.HOME,TMPDIR:process.env.TMPDIR,NODE_ENV:'production',NITRO_PRESET:'node-server',WORKFLOW_LOCAL_BASE_URL:origin,BETTER_AUTH_SECRET:secret,FIXTURE_BINDINGS:join(fixture,'bindings')}
  const build=spawn(process.execPath,[join(root,'node_modules/eve/bin/eve.js'),'build'],{cwd,env,stdio:['ignore',logs.fd,logs.fd]})
@@ -83,11 +86,13 @@ test('Agent Kit evaluations run through compiled public Eve sessions with inert 
   await writeFile(join(fixture,'bindings',id+'.json'),JSON.stringify({id,session_id:null,plan}))
   let endStreamPath: string | undefined
   let teardownReads = 0
+  let deliveryReads = 0
   const nativeFetch = globalThis.fetch
   const requests = t.mock.method(globalThis, 'fetch', (input: RequestInfo | URL, init?: RequestInit) => {
     const path = new URL(input instanceof Request ? input.url : input.toString()).pathname
     if (init?.method === 'POST' && path.endsWith('/end')) endStreamPath = path.slice(0, -4) + '/stream'
     if (path === endStreamPath) teardownReads++
+    else if (path.endsWith('/stream')) deliveryReads++
     return nativeFetch(input, init)
   })
   if(kind==='abort') {
@@ -96,6 +101,7 @@ test('Agent Kit evaluations run through compiled public Eve sessions with inert 
   } else if(kind==='provider-failure')await assert.rejects(runEveEvaluation(scope,id,plan,AbortSignal.timeout(20000)),/agentEvaluationGenerationFailed/)
   else{const trace=await runEveEvaluation(scope,id,plan,AbortSignal.timeout(20000));assert.equal(trace.tools.length,1);assert.equal(trace.tools[0].effectPerformed,false);assert.equal(trace.tools[0].name,kind==='native-blocked'?'agent':'web_search');assert.equal(trace.tools[0].outcome,kind==='native-blocked'?'error':'ok');assert.match(trace.text,kind==='candidate'?/^Candidate:/ : /^Baseline:/)}
   requests.mock.restore()
+  if (kind !== 'abort') assert.equal(deliveryReads, 1, 'one native stream supplies evidence and the delivery result')
   assert.equal(teardownReads, 1, 'one native stream observes the durable session end')
   const binding=JSON.parse(await readFile(join(fixture,'bindings',id+'.json'),'utf8'));assert.ok(binding.session_id);ids.push(binding.session_id)
   const client=new Client({baseUrl:origin+'/mikka/evaluations',headers:()=>({authorization:internalEveAuthorization(scope),'x-mikka-evaluation-id':id})})
