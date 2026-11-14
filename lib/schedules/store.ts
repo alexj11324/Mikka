@@ -1,7 +1,7 @@
 import { isDeepStrictEqual } from 'node:util'
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
-import { commandSchema, definitionSchema, ScheduleError, type Actor, type Definition, type ScheduledRead } from './contract'
+import { commandSchema, definitionSchema, ScheduleError, SCHEDULE_PAGE_MAX, type Actor, type Definition, type ScheduledRead } from './contract'
 import { nextTime, timezone } from './time'
 import { botChatChanged } from '../live/chats'
 import { observePoolCommits } from '../db/commit-effects'
@@ -72,7 +72,24 @@ export class ScheduleStore {
     return this.workspace(actor.ownerId,actor.workspaceId,access=>this.transaction(async tx=>{
       await this.conversation(tx,actor)
       await this.safeMessage(tx,actor.ownerId,cmd)
-      if (cmd.action==='list') return { schedules:(await tx.query<Schedule>(`SELECT ${SCHEDULE_COLUMNS} FROM user_schedules WHERE workspace_id IS NOT DISTINCT FROM $1::uuid AND ((visibility='workspace' AND $1::uuid IS NOT NULL) OR (visibility='owner' AND owner_id=$2 AND bot_id IS NOT DISTINCT FROM $3::uuid)) ORDER BY created_at DESC LIMIT 100`,[actor.workspaceId,actor.ownerId,actor.botId])).rows }
+      if (cmd.action === 'list') {
+        const limit = cmd.limit ?? SCHEDULE_PAGE_MAX
+        const [at, id] = cmd.cursor?.split('/') ?? []
+        const { rows } = await tx.query<Schedule & { page_cursor: string }>(`
+          SELECT ${SCHEDULE_COLUMNS}, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') || '/' || id AS page_cursor
+          FROM user_schedules
+          WHERE workspace_id IS NOT DISTINCT FROM $1::uuid
+            AND ((visibility = 'workspace' AND $1::uuid IS NOT NULL)
+              OR (visibility = 'owner' AND owner_id = $2 AND bot_id IS NOT DISTINCT FROM $3::uuid))
+            AND ($4::timestamptz IS NULL OR (created_at, id) < ($4::timestamptz, $5::uuid))
+          ORDER BY created_at DESC, id DESC
+          LIMIT $6`, [actor.workspaceId, actor.ownerId, actor.botId, at ?? null, id ?? null, limit + 1])
+        const page = rows.slice(0, limit)
+        return {
+          schedules: page.map(({ page_cursor: _cursor, ...schedule }) => schedule),
+          nextCursor: rows.length > limit ? page[limit - 1]!.page_cursor : null,
+        }
+      }
       if (cmd.action==='create') {
         if (!actor.workspaceId) throw new ScheduleError('scheduleWorkspaceRequired',400)
         await this.source(tx,actor,actor.workspaceId)
