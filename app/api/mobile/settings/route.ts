@@ -1,4 +1,4 @@
-import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
+import { chatBotId } from '@/lib/coordinator/coordinator-bot'
 import { and, eq, isNull } from 'drizzle-orm'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
 import { db } from '@/lib/db'
@@ -45,9 +45,9 @@ async function handleGET(request: Request) {
   const view = new URL(request.url).searchParams.get('view')
   if (view === 'pluginConnections') return json(await mobilePluginConnections(user.id, request.headers))
   // 记忆 is the memory of the Coordinator of the workspace the app has open.
-  const coordinator = await openChatBotId(user, null)
-  const [context, preferences, [profile], apps] = await Promise.all([
-    loadWorkspaceContext(undefined, user),
+  const context = await loadWorkspaceContext(undefined, user)
+  const coordinator = await chatBotId(user.id, null, context.workspace.id)
+  const [preferences, [profile], apps] = await Promise.all([
     readPreferences(user.id),
     db.select({ id: users.id, name: users.name, email: users.email, image: users.image, memory: coordinatorSessions.memory })
       .from(users)

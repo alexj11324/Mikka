@@ -50,7 +50,7 @@ mock.module(new URL('../components/ui/dialog.tsx', import.meta.url).href, { name
 mock.module(new URL('../hooks/use-mobile.ts', import.meta.url).href, { namedExports: { useIsMobile: () => false } })
 mock.module(new URL('../hooks/use-live-key.tsx', import.meta.url).href, { namedExports: { useLiveKey: () => {} } })
 mock.module(new URL('../components/workspace/issue-thread-panel.tsx', import.meta.url).href, { namedExports: { IssueThreadPanel: ({ runId }: { runId: string }) => <div data-producer={runId} /> } })
-mock.module(new URL('../app/actions/agents.ts', import.meta.url).href, { namedExports: { getIssueThread: async () => undefined, getThreadChanges: async () => ({ state: 'none' }) } })
+mock.module(new URL('../app/actions/agents.ts', import.meta.url).href, { namedExports: { getIssueThread: async () => undefined, getThreadMachine: async () => null, getThreadChanges: async () => ({ state: 'none' }) } })
 // The report's diff rows use @pierre/diffs, which registers a web component on import; they draw only in a browser.
 mock.module(new URL('../components/workspace/thread-changes.tsx', import.meta.url).href, { namedExports: {
   ThreadChangesPane: () => null, ThreadChangesView: () => null, ChangesTabLabel: () => null, Counts: () => null, FileSection: () => null,

@@ -9,7 +9,7 @@ import {
   FACTORY_HEALTH_PATH,
   MIKKA_PRODUCTION_ORIGIN,
 } from "./vercel-monitor";
-import { MIKKA_VERCEL, vercelTarget } from "./vercel-publication";
+import { MIKKA_VERCEL, vercelTarget } from "./vercel-target";
 import type { MonitorPublication } from "./monitor-probe";
 
 function receipt(

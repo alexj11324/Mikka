@@ -62,11 +62,18 @@ const validSubscriber = id => typeof id === 'string' && /^[a-f0-9]{8}(?:-[a-f0-9
 async function liveChunks(stub, start, signal, subscriptionId) {
   if (!Number.isSafeInteger(start)) throw new RangeError('Invalid stream index')
   signal?.throwIfAborted()
-  // Subscribe before reading the tail. A commit that races the read is seen
-  // by the read, by the subscription, or by both.
-  const response = await stub.fetch('https://stream.internal/changes?subscriber=' + subscriptionId, { headers: { upgrade: 'websocket' } })
-  const socket = response.webSocket
-  if (!socket) throw new Error('Cloudflare stream subscription unavailable')
+  let cursor = start < 0 ? Math.max(0, (await stub.getInfo()).tailIndex + 1 + start) : start
+  let firstPage = await stub.getChunks({ startIndex: cursor, limit: batchSize })
+  signal?.throwIfAborted()
+  let socket
+  if (!firstPage.done) {
+    const response = await stub.fetch('https://stream.internal/changes?subscriber=' + subscriptionId, { headers: { upgrade: 'websocket' } })
+    socket = response.webSocket
+    if (!socket) throw new Error('Cloudflare stream subscription unavailable')
+    // An append or close can race subscription. After an empty first page,
+    // read from the same cursor again before waiting for a wake.
+    if (!firstPage.chunks.length) firstPage = undefined
+  }
   let revision = 0
   let wake
   let closed = false
@@ -84,25 +91,22 @@ async function liveChunks(stub, start, signal, subscriptionId) {
     released = true
     signal?.removeEventListener('abort', stop)
     disconnected()
-    if (socket.readyState === WebSocket.OPEN) socket.close(1000, 'Reader closed')
+    if (socket?.readyState === WebSocket.OPEN) socket.close(1000, 'Reader closed')
   }
-  socket.addEventListener('message', changed)
-  socket.addEventListener('close', disconnected)
-  socket.addEventListener('error', disconnected)
-  socket.accept()
+  socket?.addEventListener('message', changed)
+  socket?.addEventListener('close', disconnected)
+  socket?.addEventListener('error', disconnected)
+  socket?.accept()
   signal?.addEventListener('abort', stop, { once: true })
   if (signal?.aborted) { stop(); signal.throwIfAborted() }
-  let cursor
-  try {
-    cursor = start < 0 ? Math.max(0, (await stub.getInfo()).tailIndex + 1 + start) : start
-  } catch (error) { stop(); throw error }
   return new ReadableStream({
     type: 'bytes',
     async pull(controller) {
       try {
         while (!closed) {
           const before = revision
-          const { chunks, done } = await stub.getChunks({ startIndex: cursor, limit: batchSize })
+          const { chunks, done } = firstPage ?? await stub.getChunks({ startIndex: cursor, limit: batchSize })
+          firstPage = undefined
           if (closed) break
           if (chunks.length) {
             cursor += chunks.length

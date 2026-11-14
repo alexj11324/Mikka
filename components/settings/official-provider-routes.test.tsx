@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
 import type { ReactNode } from 'react'
+import { SettingsReadError } from '@/lib/settings-data'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { SWRConfig, type Middleware } from 'swr'
 import { NextIntlClientProvider } from 'next-intl'
@@ -126,4 +127,28 @@ test('Settings routes team and member state only through the resolved official p
   workspace = undefined
   assert.match(render(<SettingsView {...props} activeSection="teams" />), /role="status"/)
   assert.equal(members, undefined)
+})
+
+test('Members and Teams offer the scoped workspace retry after a denied or failed read', () => {
+  const props = { user: { name: 'Member', email: 'member@example.test' }, workspaceId: team.workspace.id, onRail: none, onSignOut: none, signingOut: false, accountError: '' }
+  try {
+    for (const status of [403, 500]) {
+      readError = new SettingsReadError('failed workspace response', status)
+      for (const cached of [team, undefined]) {
+        workspace = cached
+        for (const section of ['members', 'teams'] as const) {
+          members = undefined
+          const html = render(<SettingsView {...props} activeSection={section} />)
+          assert.match(html, /<button[^>]*>Retry<\/button>/)
+          assert.match(html, status === 403 ? /permission to view this workspace/ : /load the workspace/)
+          assert.equal(members, undefined)
+        }
+      }
+    }
+    const preview = render(<SettingsView {...props} activeSection="members" preview />)
+    assert.doesNotMatch(preview, /<button[^>]*>Retry<\/button>/)
+  } finally {
+    workspace = team
+    readError = undefined
+  }
 })

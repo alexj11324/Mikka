@@ -15,6 +15,7 @@ import { mobileMessages as messages, mobileLocale } from '@/lib/messages'
 import { colors } from '@/lib/theme'
 import { billingManagementPath } from '../../../../../lib/billing/management-path'
 import { budgetDraft, budgetInput, wholeNumber } from '../../../../../lib/billing/budget-draft'
+import { POINTS_PURCHASE_AMOUNTS } from '../../../../../lib/billing/points'
 import { receiptAmount } from '../../../../../lib/billing/presentation'
 import type { BillingManagementOperation, BillingManagementView, BillingScope } from '../../../../../lib/billing/management-contract'
 import type { ResourceBudgetView, BudgetScope, BudgetPeriod } from '../../../../../lib/billing/contract'
@@ -93,7 +94,7 @@ function BillingContext({ initial }: { initial: BillingScope }) {
         {!plan.configured ? <NativeText>{messages.Errors.billingNotConfigured}</NativeText> : !data.canManagePayments ? <NativeText>{copy.readOnly}</NativeText> : <>
           {plan.hasCustomer ? <Button label={planCopy.managePayment} variant="outlined" disabled={busy} onPress={() => void save({ action: 'portal' })} /> : null}
           {!plan.live && data.canPurchasePlatform ? plan.resourceCheckoutAvailable ? <Button label={planCopy.subscribe} disabled={busy} onPress={() => void save({ action: 'checkout' })} /> : <NativeText>{copy.newSubscriptionUnavailable}</NativeText> : null}
-          {data.canPurchasePlatform ? [10, 25, 50].map(amount => <Button key={amount} variant="outlined" disabled={busy} label={`${messages.Billing.balance.topUp} · ${money(amount * 1_000_000)} / ${number(amount * 100)} ${planCopy.points}`}
+          {data.canPurchasePlatform ? POINTS_PURCHASE_AMOUNTS.map(amount => <Button key={amount} variant="outlined" disabled={busy} label={`${messages.Billing.balance.topUp} · ${money(amount * 1_000_000)} / ${number(amount * 100)} ${planCopy.points}`}
             onPress={() => void save({ action: 'topup', amount, locale: mobileLocale })} />) : null}
         </>}
       </FieldGroup.Section>}

@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { auditSource, auditCss, isComponentLibrarySource, exemptAsShipped } from './ui-policy.mjs'
-import { auditInteractions } from './interaction-policy.mjs'
+import { auditActionBindings, auditInteractions } from './interaction-policy.mjs'
 import { auditSettingsSurface } from './settings-policy.mjs'
 import { auditIconButtons } from './icon-button-policy.mjs'
 import { auditBasePath } from './base-path-policy.mjs'
@@ -28,6 +28,8 @@ for (const file of businessFiles) {
 for (const file of tracked.filter(file => /^apps\/(?:mobile|desktop)\/.*\.[jt]sx?$/.test(file) && existsSync(file))) {
   diagnostics.push(...auditEntityDetail(file, readFileSync(file, 'utf8')))
 }
+const clientFiles = tracked.filter(file => /^apps\/(?:mobile\/(?:app|components|features|shared|slots)|desktop\/src\/renderer|frontend\/src)\/.*\.[jt]sx$/.test(file) && existsSync(file))
+for (const file of clientFiles) diagnostics.push(...auditActionBindings(file, readFileSync(file, 'utf8')))
 const interactionFiles = files.filter(file => /\.[jt]sx$/.test(file) && !['components/ui/', 'components/reui/'].some(root => file.startsWith(root)))
 for (const file of interactionFiles) {
   const text = readFileSync(file, 'utf8')
@@ -40,11 +42,11 @@ diagnostics.push(...auditPollingRepository())
 // entries fail in scripts/error-cause-policy.test.mjs (docs/design/decisions/2026-11-05-0330-error-causes.md).
 diagnostics.push(...auditErrorCauseRepository())
 const counts = Object.fromEntries([...new Set(diagnostics.map(d => d.rule))].sort().map(rule => [rule, diagnostics.filter(d => d.rule === rule).length]))
-if (process.argv.includes('--json')) console.log(JSON.stringify({ files: businessFiles.length, libraryFiles: files.length - businessFiles.length, interactionFiles: interactionFiles.length, errors: diagnostics.length, counts, diagnostics }, null, 2))
+if (process.argv.includes('--json')) console.log(JSON.stringify({ files: businessFiles.length, libraryFiles: files.length - businessFiles.length, interactionFiles: interactionFiles.length, clientInteractionFiles: clientFiles.length, errors: diagnostics.length, counts, diagnostics }, null, 2))
 else {
   for (const diagnostic of diagnostics) console.error(`${diagnostic.file}:${diagnostic.line}:${diagnostic.column} error [${diagnostic.rule}] ${diagnostic.message}`)
   console.log(`\nUI policy: ${businessFiles.length} business files, ${diagnostics.length} errors; ${files.length - businessFiles.length} component-library files excluded (no source verification).`)
-  console.log(`Interaction policy: ${interactionFiles.length} files, including downloaded business blocks; only UI/ReUI primitives excluded.`)
+  console.log(`Interaction policy: ${interactionFiles.length} files, including downloaded business blocks; plus ${clientFiles.length} native and renderer files checked for action bindings.`)
   console.log(JSON.stringify(counts, null, 2))
 }
 process.exitCode = diagnostics.length ? 1 : 0

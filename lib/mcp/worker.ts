@@ -1,15 +1,13 @@
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
-import { afterJob } from '@/lib/background'
 import { and, eq, gt, inArray, isNull, notInArray, or } from 'drizzle-orm'
 import type { AuthInfo } from '@modelcontextprotocol/server'
 import { db, pool } from '@/lib/db'
 import { revalidateExecutionIdentity, ExecutionIdentityError } from '@/lib/execution-identity'
 import { agentRuns, runTokens } from '@/lib/db/schema'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
-import { runBlockedEvent, runQuestionEvent, runReportEvent, type CoordinatorEventInput } from '@/lib/coordinator-events'
+import { runBlockedEvent, runQuestionEvent, runReportEvent } from '@/lib/coordinator-events'
 import { maskForRun } from '@/lib/secrets/runtime'
-import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { issueForUser } from '@/lib/issue-access'
 import { agentScope } from '@/lib/agent-kit/service'
 import { AgentKitError } from '@/lib/agent-kit/store'
@@ -107,23 +105,18 @@ export function workerRun(authInfo: AuthInfo | undefined): { id: string; userId:
       ? { kind: 'delegation', credentialKind: 'run', credentialId: extra.credentialId, workspaceId: typeof extra.workspaceId === 'string' ? extra.workspaceId : undefined } : undefined }
 }
 
-async function deliver(event: CoordinatorEventInput): Promise<void> {
-  await recordCoordinatorEvent(db, event)
-  afterJob('after:coordinator-wake', () => wakeCoordinator(event.userId))
-}
-
 // 4e2 item 4: report/ask/blocked text is agent output persisted as coordinator events; masked with the run's secret set.
 export async function report(run: ReturnType<typeof workerRun>, text: string) {
-  await deliver(runReportEvent(run, await maskForRun(run.id, text)))
+  await recordCoordinatorEvent(db, runReportEvent(run, await maskForRun(run.id, text)))
   return 'Reported.'
 }
 
 export async function ask(run: ReturnType<typeof workerRun>, question: { question: string; options?: string[]; context?: string }) {
-  await deliver(runQuestionEvent(run, await maskForRun(run.id, question)))
+  await recordCoordinatorEvent(db, runQuestionEvent(run, await maskForRun(run.id, question)))
   return 'Asked. The answer will come as a follow-up instruction.'
 }
 
 export async function blocked(run: ReturnType<typeof workerRun>, reason: string) {
-  await deliver(runBlockedEvent(run, await maskForRun(run.id, reason)))
+  await recordCoordinatorEvent(db, runBlockedEvent(run, await maskForRun(run.id, reason)))
   return 'Noted. The Coordinator will tell the person.'
 }

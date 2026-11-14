@@ -17,7 +17,8 @@ mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { p
     return { rows: [{ enabled: true }] }
   }
   assert.deepEqual(args, ['alice', workspaceId, botId])
-  return { rows: selected === undefined ? [] : [{ bindingId: selected }] }
+  if (key) return { rows: [{ bindingId: null, apiKeyId: key.keyId, apiKeyModel: key.model }] }
+  return { rows: selected === undefined ? [] : [{ bindingId: selected, apiKeyId: null, apiKeyModel: null }] }
 } } } })
 mock.module(new URL('../execution-settings.ts', import.meta.url).href, { namedExports: {
   executionWorkspace: async (owner: string, bot: string | null) => {
@@ -31,7 +32,7 @@ mock.module(new URL('../execution-settings.ts', import.meta.url).href, { namedEx
   },
 } })
 mock.module(new URL('../model-api-keys.ts', import.meta.url).href, { namedExports: {
-  botApiKeyChoice: async () => key, usableApiKeys: async () => keys,
+  usableApiKeys: async () => keys,
 } })
 mock.module(new URL('../quota-fallback.ts', import.meta.url).href, { namedExports: { quotaFallbackKey: async () => fallback } })
 // The existing core hosted ledger admits an unmetered community default;

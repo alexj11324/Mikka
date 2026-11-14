@@ -72,7 +72,7 @@ export function useAgentActivity(issueId: string, openId: string | null, onOpen:
     const view = threadQuestionView(last)
     const outcome = acceptedProducerOutcome(last, issueId, allTasks)
     // The stretch's latest run, in the run-result words the right column and iOS use (glossary: Run result).
-    const { result, reason } = runResult({ status: view.waiting ? 'waiting_input' : view.status, outcome }, index === stretches.length - 1)
+    const { result, reason } = runResult({ pauseReason: view.pauseReason, status: view.waiting ? 'waiting_input' : view.status, outcome }, index === stretches.length - 1)
     const group = RESULT_GROUP[result]
     const open = openId !== null && ids.includes(openId)
     const body = <>

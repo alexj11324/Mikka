@@ -466,5 +466,4 @@ export function createFactoryCheckRecovery(
     });
   };
 }
-export const FACTORY_CHECK_RECOVERY_INSTRUCTIONS = `
-Use recover_factory_check with only the current binding. The host invokes the existing vision-capable Decisions model over original persisted evidence. It chooses retry_check, repair_code or defer. No fixed error classifier or universal new-commit/human-confirmation rule applies. Visual judgments require actual collected pixels. Missing/refused/mismatched results keep the observation pending. Existing grants, ask/deny, identity, cancellation, budgets and sandbox remain authoritative. No model answer grants permission or publication authority.`;
+export { FACTORY_CHECK_RECOVERY_INSTRUCTIONS } from './instructions'

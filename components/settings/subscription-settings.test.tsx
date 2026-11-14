@@ -268,3 +268,33 @@ test('a late resume refusal cannot put retry back beside an already connected ro
   assert.equal(button('retry'), undefined)
   assert.equal(button('reconnect'), undefined)
 })
+
+test('copying a device sign-in code reports denial and allows a confirmed retry', async () => {
+  await render()
+  await click('resume')
+  const copyButton = () => container.querySelector<HTMLButtonElement>('button[aria-label="copy"]')
+  const original = Object.getOwnPropertyDescriptor(browser.navigator, 'clipboard')
+  const written: string[] = []
+  let denied = true
+  Object.defineProperty(browser.navigator, 'clipboard', { configurable: true, value: {
+    async writeText(value: string) {
+      if (denied) throw new Error('Clipboard denied')
+      written.push(value)
+    },
+  } })
+  try {
+    const trigger = copyButton()
+    assert.ok(trigger)
+    await act(async () => trigger.click())
+    assert.equal(container.querySelector('[role="alert"]')?.textContent, 'copyFailed')
+    assert.equal(container.querySelector('button[aria-label="copied"]'), null)
+    denied = false
+    await act(async () => trigger.click())
+    assert.deepEqual(written, ['ABCD-EFGH'])
+    assert.ok(container.querySelector('button[aria-label="copied"]'))
+    assert.equal(container.querySelector('[role="alert"]'), null)
+  } finally {
+    if (original) Object.defineProperty(browser.navigator, 'clipboard', original)
+    else Reflect.deleteProperty(browser.navigator, 'clipboard')
+  }
+})

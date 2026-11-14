@@ -178,6 +178,14 @@ test('Plugins → GitHub connections are per Mikka user and leave the login iden
     assert.equal(connection.githubConnectUser(state, undefined), null)
     const callback = `http://localhost${connection.GITHUB_CALLBACK_PATH}?code=abc&state=better-auth-state`
     assert.equal(await handleGitHubConnectCallback(new Request(callback, { headers: { cookie: `${cookie.name}=${cookie.value}` } })), null)
+    // A corrupted app-scoped cookie must never turn an unrelated GitHub
+    // sign-in callback into a 500, nor select a later duplicate cookie.
+    for (const malformed of ['%', '%E0%A4%A', '%FF']) {
+      const malformedCookie = `${cookie.name}=${malformed}`
+      assert.equal(await handleGitHubConnectCallback(new Request(callback, { headers: { cookie: malformedCookie } })), null)
+      assert.equal(await handleGitHubConnectCallback(new Request(`http://localhost${connection.GITHUB_CALLBACK_PATH}?code=abc&state=${state}`, { headers: { cookie: malformedCookie } })), null)
+      assert.equal(await handleGitHubConnectCallback(new Request(`http://localhost${connection.GITHUB_CALLBACK_PATH}?code=abc&state=${state}`, { headers: { cookie: `${malformedCookie}; ${cookie.name}=${cookie.value}` } })), null)
+    }
     assert.equal(await handleGitHubConnectCallback(new Request(`http://localhost${connection.GITHUB_CALLBACK_PATH}?code=abc&state=${state}`)), null)
   })
 

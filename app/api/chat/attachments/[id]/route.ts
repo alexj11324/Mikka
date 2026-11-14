@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
+import { ChatFileError } from '@/lib/chat-attachments/extract'
 import { writeAllowed } from '@/lib/mobile-api'
 import {
   authorizeFileScope,
@@ -12,6 +13,10 @@ import {
 
 export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }
+function fileErrorResponse(error: unknown) {
+  const missing = error instanceof ChatFileError && error.code === 'notFound'
+  return Response.json({ error: missing ? 'notFound' : 'unavailable' }, { status: missing ? 404 : 503, headers })
+}
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const session = await auth.api.getSession({ headers: request.headers })
   if (!session) return Response.json({ error: 'authRequired' }, { status: 401, headers })
@@ -20,7 +25,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   try {
     const file = await readChatFile(session.user.id, parsed.data)
     if (!apiWorkspaceAllowed(session, await authorizeFileScope(session.user.id, fileScope(file))))
-      throw Error('scope')
+      throw new ChatFileError('notFound')
     if (new URL(request.url).searchParams.has('info'))
       return Response.json(
         { id: file.id, name: file.name, mediaType: file.mediaType, size: file.size },
@@ -49,8 +54,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         'Content-Security-Policy': "default-src 'none'; sandbox",
       },
     })
-  } catch {
-    return Response.json({ error: 'notFound' }, { status: 404, headers })
+  } catch (error) {
+    return fileErrorResponse(error)
   }
 }
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -62,7 +67,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   try {
     await removeChatFile(session.user.id, parsed.data, session.tokenWorkspaceId)
     return Response.json({ removed: true }, { headers })
-  } catch {
-    return Response.json({ error: 'notFound' }, { status: 404, headers })
+  } catch (error) {
+    return fileErrorResponse(error)
   }
 }

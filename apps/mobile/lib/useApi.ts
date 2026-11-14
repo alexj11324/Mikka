@@ -58,13 +58,13 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
   const revision = path ? cache.revision(path) : 0
   const setData = useCallback((next: T | null | ((current: T | null) => T | null)) => {
     cache.commit(context, () => {
-      if (path && cache.revision(path) !== revision) return
+      if (path && (cache.revision(path) !== revision || cache.denial(path))) return
       // A saved mutation is newer than a read already in flight.
       request.current++; pending.current = null; setLoading(false); setError(null); failed.current = false
       setStored(current => {
         let value = current
         cache.commit(context, () => {
-          if (path && cache.revision(path) !== revision) return
+          if (path && (cache.revision(path) !== revision || cache.denial(path))) return
           value = typeof next === 'function' ? (next as (current: T | null) => T | null)(current) : next
           if (path && value !== null) cache.set(path, value, context)
         })
@@ -91,7 +91,7 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
     const promise = (async () => {
       try {
         const next = await read(path)
-        accept(() => { cache.set(path, next, context); setStored(next); setError(null); failed.current = false; loadedAt.current = Date.now(); setRequestedAt(started) })
+        accept(() => { cache.storeRead(path, next, context); setStored(next); setError(null); failed.current = false; loadedAt.current = Date.now(); setRequestedAt(started) })
       } catch (failure) {
         accept(() => {
           if (failure instanceof ApiError && withholdsCachedRead(failure.status)) {
@@ -159,7 +159,8 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
   }, [load, path, pushed])
 
   const sameSource = source.path === path && source.context === context
-  return { data: sameSource ? data : path ? cache.get<T>(path) : null, error: sameSource ? error : null, loading: sameSource ? loading : Boolean(path), reload: load, reloadAfterWrite, setData, requestedAt: sameSource ? requestedAt : null }
+  const denial = path ? cache.denial(path) : null
+  return { data: denial ? null : sameSource ? data : path ? cache.get<T>(path) : null, error: denial ?? (sameSource ? error : null), loading: sameSource ? loading : Boolean(path), reload: load, reloadAfterWrite, setData, requestedAt: sameSource ? requestedAt : null }
 }
 
 /** Pull to refresh for a list (the system's RefreshControl): reloads and shows the spinner until the data is back. */

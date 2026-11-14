@@ -9,11 +9,14 @@ import { withBasePath } from '@/lib/base-path'
 /** Inlined at build time (apps/frontend/vite.config.mjs); empty without one. */
 export const APP_BUILD = process.env.NEXT_PUBLIC_MIKKA_BUILD ?? ''
 
-let refreshRequired = false
 const refreshAbort = new AbortController()
 export const pageRefreshSignal = () => refreshAbort.signal
-export const pageNeedsRefresh = () => refreshRequired
-export function markPageNeedsRefresh() { refreshRequired = true; refreshAbort.abort() }
+export const pageNeedsRefresh = () => refreshAbort.signal.aborted
+export function markPageNeedsRefresh(target?: Pick<Window, 'dispatchEvent'>) {
+  if (pageNeedsRefresh()) return
+  refreshAbort.abort()
+  target?.dispatchEvent(new Event(STALE_BUILD_EVENT))
+}
 
 /** True only when both builds are known and differ. */
 export function isStaleBuild(page: string, server: unknown): boolean {
@@ -56,10 +59,8 @@ export async function checkPageBuildBeforeAction(): Promise<boolean> {
   if (pageNeedsRefresh()) return false
   if (!APP_BUILD || typeof window === 'undefined') return true
   const version = await readAppVersion()
-  if (!isStaleBuild(APP_BUILD, version?.build)) return true
-  markPageNeedsRefresh()
-  window.dispatchEvent(new Event(STALE_BUILD_EVENT))
-  return false
+  if (isStaleBuild(APP_BUILD, version?.build)) markPageNeedsRefresh(window)
+  return !pageNeedsRefresh()
 }
 
 /** Next answers a server action it does not have with this response header. */
@@ -93,8 +94,7 @@ export function watchRemovedActions(target: Window) {
     if (business && response.headers.has(ACTION_NOT_FOUND_HEADER)) {
       // Retire the old request stream, not the page. A background response must
       // never discard unsaved input by reloading or replaying the user's action.
-      markPageNeedsRefresh()
-      target.dispatchEvent(new Event(STALE_BUILD_EVENT))
+      markPageNeedsRefresh(target)
     }
     return response
   }

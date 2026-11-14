@@ -10,6 +10,19 @@ export class ClockedAuthority extends DurableObject {
     initializeWorldStorage(ctx.storage)
   }
   create(now, runId, event) { return applyWorldEvent(this.ctx.storage, runId, event, now) }
+  measureHook(now, runId, event, options) {
+    const storage = this.ctx.storage
+    const parentRows = []
+    const sql = {exec(statement, ...bindings) {
+      const cursor = storage.sql.exec(statement, ...bindings)
+      if (!/^SELECT .* FROM world_runs WHERE run_id=/i.test(statement)) return cursor
+      const rows = cursor.toArray()
+      parentRows.push(...rows)
+      return {toArray: () => rows}
+    }}
+    const result = applyWorldEvent({sql,transactionSync: fn => storage.transactionSync(fn)}, runId, event, now, options)
+    return {result, parentBytes:encode(parentRows).byteLength, parentRows:parentRows.length}
+  }
   run(_now, id) { return readRun(this.ctx.storage, id) }
   hook(now, id) { return readHookById(this.ctx.storage, id, now) }
   hookByToken(now, token) { return readHookByToken(this.ctx.storage, token, now) }
