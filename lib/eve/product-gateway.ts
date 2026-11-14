@@ -3,6 +3,7 @@ import { asSchema, type ToolSet } from 'ai'
 import { z } from 'zod'
 import type { AgentExecution } from '../agent-kit/store'
 import { requiresEveProductApproval } from './approval-bridge'
+import { snapshotMailboxTools } from '../personal-mailbox-capability'
 
 const id = z.string().min(1).max(256)
 const common = { sessionId: id, turnId: id, executionId: z.uuid().nullable().optional() }
@@ -151,7 +152,7 @@ async function gatewayExecution(scope: Scope, input: Input): Promise<AgentExecut
 async function productTools(scope: Scope, execution: AgentExecution | null, sourceEventId: string | undefined, scheduledRead: import('../schedules/contract').ScheduledRead | null, taskEventId: string | undefined,entryOrigin:import('../run-origin').ResolvedRunOrigin): Promise<ToolSet> {
   const steps = await import('../../workflows/coordinator/steps')
   const { coordinatorTools, readCoordinatorSwitches } = await import('../../workflows/coordinator/tools')
-  const mailboxEnabled = !scheduledRead && await steps.mailboxToolsEnabled()
+  const mailboxEnabled = !scheduledRead && snapshotMailboxTools(execution?.snapshot).length > 0 && await steps.mailboxToolsEnabled()
   const tools = coordinatorTools(scope.ownerId, scope.botId, scheduledRead ? { scheduledRead: { botId: scope.botId, occurrence: scheduledRead } } : undefined, {
     execution, sourceEventId, ...(taskEventId ? { taskEventId } : {}),...entryOrigin,
     switches: readCoordinatorSwitches(), coordinator: await steps.isCoordinatorChat(scope.ownerId, scope.botId),
