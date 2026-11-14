@@ -1,7 +1,7 @@
 import { presentedFactoryEvents, taskEvidenceHref } from '../../../../../lib/task-factory-events'
 import { mobileMessages } from '@/lib/messages'
 import { useEffect, useRef, type ReactNode } from 'react'
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { CalendarClock, ChevronRight, Sparkles } from 'lucide-react-native'
@@ -90,6 +90,13 @@ export function TaskScreen() {
             </View>
             <Row label={mobileMessages.MobileCore.taskPropertiesOnWeb} onPress={openTaskOnWeb} />
             {task.description ? <View style={styles.description}><Markdown text={task.description} /></View> : null}
+            {data?.work && (data.work.linkedChats.length > 0 || data.work.pullRequests.length > 0) ? <View>
+              <Text accessibilityRole="header" style={styles.section}>{mobileMessages.IssueDetail.work.heading}</Text>
+              {data.work.linkedChats.map(chat => <Row key={chat.id} label={chat.title || mobileMessages.ConversationDirectory.untitled}
+                onPress={() => router.push(`/groups/${chat.id}`)} />)}
+              {data.work.pullRequests.map(pull => <Row key={pull.url} label={pull.title || pull.url}
+                onPress={() => { void Linking.openURL(pull.url) }} />)}
+            </View> : null}
             {activity.length ? <Text accessibilityRole="header" style={styles.section}>{mobileMessages.MobileCore.activity}</Text> : null}
             {activity.map((item, index) => <ActivityRow key={activityEntryId(item)} item={item} first={index === 0} last={index === activity.length - 1}
 

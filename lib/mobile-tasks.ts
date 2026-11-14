@@ -29,14 +29,29 @@ import { taskReviewSourceHint } from '@/lib/coding-workspace/task-review/summary
 
 /** Locate the persisted tenant through the full reader, then hold fresh
  * membership and re-read every projection. Cookie/default choices are not pins. */
-export async function mobileTask(user: Exclude<IssueReader, string>, id: string, explicitWorkspaceId?: string) {
+export async function mobileTask(user: Exclude<IssueReader, string>, id: string, explicitWorkspaceId?: string, includeWork = false) {
   const candidate = await issueForUser(user, id, false, db, { withoutBody: true })
   if (!candidate || candidate.ownershipState !== 'bound' || !candidate.workspaceId
     || (explicitWorkspaceId !== undefined && candidate.workspaceId !== explicitWorkspaceId)) return null
   const workspaceId = candidate.workspaceId
-  return withIssueWorkspace(user, workspaceId, { issueId: id, action: 'canReadContent' }, () => readMobileTask({
-    ...user, [tokenWorkspace]: workspaceId, [enterprisePrincipal]: user[enterprisePrincipal],
-  }, workspaceId, id))
+  const reader = { ...user, [tokenWorkspace]: workspaceId, [enterprisePrincipal]: user[enterprisePrincipal] }
+  const read = () => withIssueWorkspace(reader, workspaceId, { issueId: id, action: 'canReadContent' }, () => readMobileTask(reader, workspaceId, id))
+  if (!includeWork) return read()
+  const { withTaskWorkspace } = await import('./task-workspace')
+  const { readTaskWork } = await import('./task-work-read')
+  // Hold the tenant across both canonical reads. Recheck the task ACL on the
+  // final document read before returning shared web/mobile work to the caller.
+  return withTaskWorkspace(reader, workspaceId, async () => {
+    const { presentation, factory } = await readTaskWork(reader, workspaceId, id)
+    if (!presentation) return null
+    const detail = await read()
+    if (!detail) return null
+    return { ...detail, task: { ...detail.task, status: presentation.primaryStatus, group: presentation.group,
+      state: presentation.state, reason: presentation.reason, blockedBy: presentation.blockedBy,
+      ...(factory ? { factoryTaskId: factory.task.id } : {}) },
+      work: { version: 1 as const, linkedChats: presentation.linkedChats ?? [], pullRequests: presentation.pullRequests ?? [] },
+      ...(factory ? { factoryEvents: factory.events } : {}) }
+  })
 }
 
 async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: string, id: string) {

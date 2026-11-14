@@ -128,6 +128,19 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     (select coalesce(jsonb_agg(jsonb_build_array(id,"workspaceId","issueId","runId") order by id),'[]') from artifacts where "userId"=$1) as artifacts,
     (select coalesce(jsonb_agg(jsonb_build_array(id,workspace_id,status,next_at) order by id),'[]') from user_schedules where owner_id=$1) as schedules`, [owner])).rows[0]
 
+  await t.test('the versioned work request returns task state, readable PRs and chat links in one owner-authorized detail', async () => {
+    const load = (options?: ReadOptions) => run('/api/mobile/tasks/' + issueId + '?work=1', req => GET(req, { params: Promise.resolve({ id: issueId }) }), options)
+    const response = await load()
+    assert.equal(response.status, 200)
+    const detail = await response.json()
+    assert.equal(detail.work.version, 1)
+    assert.deepEqual(detail.work.pullRequests, [{ url: 'https://github.com/acme/app/pull/1', state: 'open' }])
+    assert.deepEqual(detail.work.linkedChats, [])
+    assert.equal(detail.task.id, issueId)
+    assert.ok(Array.isArray(detail.timeline))
+    assert.equal((await load({ bearer: null })).status, 401)
+    assert.equal((await load({ bearer: peer.token, workspaceId: secondWorkspace.id })).status, 404)
+  })
   await t.test('detail includes contract fields, every attempt, replacement time and creation; excludes raw errors', async () => {
     const response = await request(issueId)
     assert.equal(response.status, 200)
