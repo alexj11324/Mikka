@@ -4,6 +4,7 @@
 // preload that sends GitHub's API to the fake, and the daemon from source with
 // tsx. A workspace's own model key stays real; without a real AI_GATEWAY_API_KEY
 // or RESEND_API_KEY, Mikka 默认, Decisions and mail use the local substitutes.
+import { once } from 'node:events'
 import { spawn, execFileSync } from 'node:child_process'
 import { generateKeyPairSync, randomUUID } from 'node:crypto'
 import { chmodSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -113,8 +114,8 @@ async function infisicalSecret(name) {
 }
 const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
 const preload = pathToFileURL(join(root, 'scripts/dev-local/preload.mjs')).href
-watch(spawn(process.execPath, ['apps/api/scripts/dev.mjs', '--port', String(port)], {
-  cwd: root, stdio: 'inherit',
+const apiProcess = watch(spawn(process.execPath, ['apps/api/scripts/dev.mjs', '--port', String(port)], {
+  cwd: root, stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
   env: { ...childEnv, NODE_ENV: 'development', NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import ${preload}`.trim(),
     // A real key keeps the real service; without one the preload uses the local substitute.
     AI_GATEWAY_API_KEY: process.env.AI_GATEWAY_API_KEY || MVP_DECISION_KEY,
@@ -127,6 +128,9 @@ watch(spawn(process.execPath, ['apps/api/scripts/dev.mjs', '--port', String(port
     WORKSPACE_SECRETS_KEY: secretsKey,
     GITHUB_APP_ID: '123', GITHUB_APP_PRIVATE_KEY: privateKey.export({ format: 'pem', type: 'pkcs8' }).toString() },
 }), 'Vite + API')
+// Only the owned API child can announce its compiled worker and successful
+// public /api/version response. A Vite HTML shell can be available much earlier.
+const apiReady = once(apiProcess, 'message', { signal: AbortSignal.timeout(120_000) })
 mkdirSync(dataDir, { recursive: true, mode: 0o700 })
 if (daemonUser) execFileSync('chown', [daemonUser, dataDir])
 // Download only through the existing official pins and integrity validator.
@@ -153,13 +157,10 @@ const grantCredits = async () => {
   const count = await grantLocalCredits(db, workspaceDb)
   if (count) log(`granted local credit to ${count} workspace(s)`)
 }
-let serverReady = false
-const readinessDeadline = Date.now() + 120_000
-while (Date.now() < readinessDeadline) {
-  if (await fetch(`${server}/sign-in`, { signal: AbortSignal.timeout(Math.max(1, Math.min(15_000, readinessDeadline - Date.now()))) }).then(r => r.ok, () => false)) { serverReady = true; break }
-  await new Promise(r => setTimeout(r, 1000))
+const [apiState] = await apiReady
+if (apiState?.type !== 'api-ready' || apiState.origin !== new URL(server).origin) {
+  throw new Error('dev:local received an invalid API readiness event')
 }
-if (!serverReady) throw new Error('dev:local server did not become ready')
 // Every local account gets the model key through lib/model-api-keys.ts (scripts/dev-local/seed-model-keys.ts).
 let seeder
 let seederReady
