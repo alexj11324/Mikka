@@ -85,9 +85,11 @@ function poolFor(state: FakeState) {
         const found = state.volumes.filter(v => v.id === values[0])
         return { rows: found.map(v => ({ ownerId: v.ownerId })), rowCount: found.length }
       }
-      if (text.includes('FROM drive_volume_versions') && text.includes('ORDER BY id DESC')) {
-        const found = state.versions.filter(v => v.volumeId === values[0] && (!values[1] || v.id < (values[1] as string)))
-          .sort((a, b) => (a.id < b.id ? 1 : -1)).slice(0, values[2] as number)
+      if (text.includes('FROM drive_volume_versions') && text.includes('ORDER BY seq DESC')) {
+        const versions = state.versions.filter(v => v.volumeId === values[0])
+        const cursor = versions.find(v => v.id === values[1])
+        const found = versions.filter(v => values[1] == null || (cursor !== undefined && v.seq < cursor.seq))
+          .sort((a, b) => b.seq - a.seq).slice(0, values[2] as number)
         return { rows: found.map(v => ({ ...v, totalBytes: String(v.totalBytes) })), rowCount: found.length }
       }
       if (text.includes('coalesce(max(seq),0)+1')) {

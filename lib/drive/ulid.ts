@@ -1,12 +1,11 @@
 // ULIDs for Drive ids: a 48-bit millisecond timestamp then 80 bits of
 // randomness, in Crockford base32 (I, L, O and U left out so an id cannot be
-// misread as 1 or 0). Lexicographic order is time order, which is what lets a
-// version list sort by id and a cursor stay stable.
+// misread as 1 or 0). IDs with distinct millisecond timestamps sort chronologically.
 //
 // The generator is monotonic within one millisecond: a second id in the same
 // millisecond is the previous one plus one, so two rows written in the same
-// tick still order deterministically rather than by luck. That matters because
-// a version's id is its tiebreak against everything else in the table.
+// tick on that generator still sort in creation order. Per-volume commit order
+// across independent generators is recorded by the version sequence.
 //
 // Dependency-free and I/O-free, so it runs as plain source under node:test.
 
