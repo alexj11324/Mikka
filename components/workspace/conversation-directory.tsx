@@ -1,6 +1,6 @@
 'use client'
 
-import { useDeferredValue, useState } from 'react'
+import { useState } from 'react'
 import { useSWRConfig } from 'swr'
 import { setThreadRead } from '@/lib/thread-read-client'
 import { threadKeys } from '@/lib/swr/keys'
@@ -26,7 +26,7 @@ export function ConversationDirectory({ ownerId, workspaceId }: { ownerId: strin
   const [search, setSearch] = useState('')
   const [state, setState] = useState<DirectoryState | 'all'>('all')
   const [archived, setArchived] = useState(false)
-  const query = useDeferredValue(search.trim())
+  const query = search.trim()
   const getKey = (index: number, previous: Page | null) => !workspaceId || (index > 0 && !previous?.cursor)
     ? null : ['conversation-directory', ownerId, workspaceId, query, state, archived, previous?.cursor ?? null] as const
   const { data, error, mutate, size, setSize, isValidating } = useSWRInfinite<Page, Error, typeof getKey>(getKey,
