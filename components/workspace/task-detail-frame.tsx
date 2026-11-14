@@ -158,8 +158,12 @@ export function FramedTask(props: FramedTaskProps) {
       const view = threadQuestionView(thread)
       const run = { status: view.waiting ? 'waiting_input' : view.status, outcome: view.outcome }
       const { result, reason } = runResult(run, true)
+      // The Factory's own gate says the stage and how it stands; without one, the stage the run was dispatched for.
       const gate = [thread.id, ...thread.attempts.map(attempt => attempt.runId)].map(id => stageOf.get(id)).find(Boolean)
-      const detail = gate ? [labelStage(gate.stage), labelGate(gate.status)].filter(Boolean).join(' · ') : view.stopping ? tThreads('stopping') : resultLabel(result, reason)
+      const stage = thread.attempts.at(-1)?.stage ?? thread.attempts[0]?.stage
+      const detail = gate ? [labelStage(gate.stage), labelGate(gate.status)].filter(Boolean).join(' · ')
+        : stage ? [labelStage(stage), view.stopping ? tThreads('stopping') : resultLabel(result, reason)].join(' · ')
+        : view.stopping ? tThreads('stopping') : resultLabel(result, reason)
       return [{ id: 'run:' + thread.id, text: thread.detail.name || tDirectory('untitled'), detail, mark: <TaskRunMark indicator={conversationIndicatorOf(run)} /> as ReactNode, open: () => props.agentActivity.openThread(thread.id) }]
     }),
   ]

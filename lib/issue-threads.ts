@@ -54,6 +54,8 @@ export interface IssueThread {
 
 export interface IssueThreadAttempt {
   pauseReason?: RunAttempt['pauseReason']
+  /** The Factory stage this run works on, shown where the conversation reaches it (2026-11-04-2200). */
+  stage?: RunAttempt['stage']
   failureDetails?: CompactRunFailure | null
   runId: string
   /** 1-based; the root run is attempt 1. */
@@ -70,7 +72,7 @@ export type ThreadQuestion = 'waiting' | 'resuming' | null
 /** Attach the run's resolved chain; without one the thread is a one-attempt chain. */
 export function withRunChain(thread: IssueThread, chain: RunChain | null | undefined): IssueThread {
   if (!chain) return thread
-  const attempts = chain.attempts.map(attempt => ({ ...(attempt.pauseReason ? { pauseReason: attempt.pauseReason } : {}), ...(attempt.failureDetails ? { failureDetails: readCompactRunFailure(attempt.failureDetails) } : {}), runId: attempt.runId, attempt: attempt.attempt, status: attempt.status, outcome: attempt.outcome ?? null,
+  const attempts = chain.attempts.map(attempt => ({ ...(attempt.pauseReason ? { pauseReason: attempt.pauseReason } : {}), ...(attempt.failureDetails ? { failureDetails: readCompactRunFailure(attempt.failureDetails) } : {}), ...(attempt.stage ? { stage: attempt.stage } : {}), runId: attempt.runId, attempt: attempt.attempt, status: attempt.status, outcome: attempt.outcome ?? null,
     stopping: runIsActive(attempt.status) && !!attempt.stopRequestedAt, createdAt: attempt.createdAt, finishedAt: attempt.finishedAt }))
   const latest = attempts.find(attempt => attempt.runId === chain.latestRunId)
   return {
