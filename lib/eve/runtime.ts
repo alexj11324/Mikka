@@ -1,24 +1,38 @@
 import type { DynamicModelContext } from 'eve'
+import { defineState } from 'eve/context'
 import {evaluationForSession,evaluationModel} from './evaluation-runtime'
 import { HostedWorkflowModel } from '../abuse/workflow-model'
 import { SubscriptionWorkflowModel } from '../subscription-workflow-model'
 import { assertEveScope, scopeFromAuth } from './scope'
 import { streamingModel } from './streaming-model'
-import { prepareEveExecution, productRpc } from './product-rpc'
+import { prepareEveExecution, productRpc, type PreparedProductExecution } from './product-rpc'
+
+// Eve memos belong to one definition. Session state shares the immutable
+// preparation across model, tools, connections, skills and instructions.
+const turnPreparation = defineState<{
+  key: string; prepared: PreparedProductExecution; sourceEventId: string | null
+} | null>('mikka.turn-preparation', () => null)
 
 /** The immutable execution is a Mikka policy/model grant, not model history. */
 export async function executionForSession(ctx: DynamicModelContext) {
   const scope = await assertEveScope(scopeFromAuth(ctx.session.auth.current))
   if (!ctx.turn) throw new Error('agentExecutionClosed')
-  const prepared = await ctx.memo(['mikka-execution', ctx.turn.id], async () => {
-    return prepareEveExecution(scope,ctx.session.id,ctx.turn!.id)
-  })
-  // Answers retain the original request's authority, rather than creating a
-  // new human request. This memo is owned by the native eve turn.
-  const sourceEventId = await ctx.memo(['mikka-source',ctx.turn.id], async () => {
-    const {pool} = await import('../db')
-    return (await pool.query<{source_event_id:string}>('SELECT source_event_id FROM eve_turn_sources WHERE session_id=$1 AND turn_id=$2',[ctx.session.id,ctx.turn!.id])).rows[0]?.source_event_id ?? null
-  })
+  const key = JSON.stringify([ctx.session.id, ctx.turn.id, scope.ownerId, scope.botId, scope.workspaceId, scope.surface])
+  let saved = turnPreparation.get()
+  if (saved?.key !== key) {
+    const prepared = await ctx.memo(['mikka-execution', key], async () => {
+      return prepareEveExecution(scope,ctx.session.id,ctx.turn!.id)
+    })
+    // Answers retain the original request's authority across native replay.
+    const sourceEventId = await ctx.memo(['mikka-source', key], async () => {
+      const {pool} = await import('../db')
+      return (await pool.query<{source_event_id:string}>('SELECT source_event_id FROM eve_turn_sources WHERE session_id=$1 AND turn_id=$2',[ctx.session.id,ctx.turn!.id])).rows[0]?.source_event_id ?? null
+    })
+    saved = { key, prepared, sourceEventId }
+    turnPreparation.update(() => saved)
+  }
+  // Keep each consumer's JSON independent, as ctx.memo does on every read.
+  const { prepared, sourceEventId } = structuredClone(saved)
   const scheduledRead = sourceEventId ? await (await import('./scheduled-read')).loadScheduledRead(scope,sourceEventId) : null
   return { scope, ...prepared, sourceEventId, scheduledRead }
 }
