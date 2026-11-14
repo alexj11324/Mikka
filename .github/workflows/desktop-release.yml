@@ -48,7 +48,7 @@ on:
         type: string
         default: ''
       cloudflare_receipt:
-        description: Approved issue 1954 post-promotion comment ID and full body SHA-256
+        description: 'Promoted Web evidence (actions:RUN:ATTEMPT or historical issue 1954 comment ID and body SHA-256)'
         type: string
         required: false
       skip_notarization:

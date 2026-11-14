@@ -63,7 +63,7 @@ on:
         type: string
         required: true
       cloudflare_receipt:
-        description: Promoted Cloudflare Web receipt on Mikka issue 1954 (comment ID and body SHA-256)
+        description: 'Promoted Web evidence (actions:RUN:ATTEMPT or historical issue 1954 comment ID and body SHA-256)'
         type: string
 permissions:
   contents: read
