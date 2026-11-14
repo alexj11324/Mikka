@@ -51,6 +51,7 @@ export async function changeMobileQueuedReply(target: ThreadTarget, messageId: s
   if (receipt?.version !== DESKTOP_RPC_VERSION) throw Error('submissionUnconfirmed')
   const code = receipt.ok ? result?.error : receipt.error?.code
   if (code) throw Object.assign(Error(code), { code })
-  if (!receipt.ok || !['cancelled','sent','tooLate'].includes(result?.status ?? '')) throw Error('submissionUnconfirmed')
-  return result?.status
+  const status = result?.status
+  if (receipt.ok !== true || (status !== 'tooLate' && status !== (action === 'cancel' ? 'cancelled' : 'sent'))) throw Error('submissionUnconfirmed')
+  return status
 }
