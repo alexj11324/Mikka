@@ -9,7 +9,7 @@ import test from 'node:test'
 import { Pool } from 'pg'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { ScheduleStore, SCHEDULE_LEASE_MS, type WorkspaceGuard } from './store'
-import { ScheduleError, type Actor, type Definition } from './contract'
+import { ScheduleError, scheduleListInput, type Actor, type Definition } from './contract'
 import { scheduleTools } from './tools'
 
 const target=process.env.E2E_DATABASE_URL
@@ -57,7 +57,7 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
     t.after(async () => { await pool.query('DELETE FROM user_schedules WHERE id=ANY($1::uuid[])',[fixtures]) })
     const list = async (who: Actor, input: {limit?: number; cursor?: string} = {}) => {
       const tools = scheduleTools(command => store().command(who,command))
-      return await tools.schedule_list.execute!(input,{toolCallId:randomUUID(),messages:[],context:{}}) as {schedules: {id:string}[]; nextCursor: string | null}
+      return await tools.schedule_list.execute!(scheduleListInput.parse(input),{toolCallId:randomUUID(),messages:[],context:{}}) as {schedules: {id:string}[]; nextCursor: string | null}
     }
     const first = await list(actor)
     assert.equal(first.schedules.length,100)
@@ -77,7 +77,8 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
     assert.ok(!first.schedules.some(row => foreignWorkspace.includes(row.id)))
     await assert.rejects(list({...actor,ownerId:other},{cursor:first.nextCursor}),/scheduleWorkspaceAccessDenied/)
     for (const input of [{limit:0},{limit:101},{cursor:'invalid'}]) {
-      await assert.rejects(list(actor,input),/invalidScheduleCommand/)
+      assert.equal(scheduleListInput.safeParse(input).success,false)
+      await assert.rejects(store().command(actor,{action:'list',...input}),/invalidScheduleCommand/)
     }
   })
   await t.test('ten create retries and ten scans produce one occurrence, one chat result and stable operation',async()=>{
