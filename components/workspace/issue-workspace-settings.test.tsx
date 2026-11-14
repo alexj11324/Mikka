@@ -114,8 +114,9 @@ mock.module('@/components/nav/bot-list', { namedExports: { BotList: () => <div d
 mock.module('@/components/nav/thread-list', { namedExports: { threadName: () => '' } })
 mock.module('@/components/nav/bot-avatar', { namedExports: { BotAvatar: empty, COORDINATOR_AVATAR: {} } })
 mock.module('@/components/nav/all-threads', { namedExports: { AllThreadsColumn: empty, AllThreadsToggle: empty } })
-mock.module('@/components/browser/browser-toggle', { namedExports: { useBrowserFits: () => true, BrowserToggle: ({ onToggle }: { onToggle: () => void }) => <Button onClick={onToggle}>browser</Button> } })
-mock.module('@/components/ui/sheet', { namedExports: { Sheet: empty, SheetContent: plain, SheetHeader: plain, SheetTitle: plain, SheetDescription: plain } })
+let browserFits = true
+mock.module('@/components/browser/browser-toggle', { namedExports: { useBrowserFits: () => browserFits, BrowserToggle: ({ onToggle }: { onToggle: () => void }) => <Button onClick={onToggle}>browser</Button> } })
+mock.module('@/components/ui/sheet', { namedExports: { Sheet: ({ open, children }: { open?: boolean; children?: ReactNode }) => open ? <aside data-panel-sheet="">{children}</aside> : null, SheetContent: plain, SheetHeader: plain, SheetTitle: plain, SheetDescription: plain } })
 mock.module('@/components/nav/global-search', { namedExports: { GlobalSearch: ({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) => open ? <div data-search-open=""><Button onClick={() => onOpenChange(false)}>dismiss search</Button></div> : null, SearchPill: ({ onSearch }: { onSearch: () => void }) => <Button onClick={onSearch}>search</Button> } })
 mock.module('@/components/coordinator/new-task-dialog', { namedExports: { NewTaskDialog: ({ open, onCreated }: { open: boolean; onCreated: (id: string) => void }) => {
   acknowledgeNewTask = onCreated
@@ -216,6 +217,7 @@ beforeEach(() => {
   scopedTeamFixture = false; workspaceTasksPending = false; scopedTasksPending = false; scopedTeamPageMutations = 0; acknowledgeNewTask = null; probeEmbeddedAck = false
   browser.history.replaceState({}, '', '/?workspace=workspace-one')
   browser.localStorage.clear(); browser.sessionStorage.clear()
+  browserFits = true
   notes = null; railMounts = 0; composerMounts = 0; composerUnmounts = 0
   registerComputer = false; computerThread = null
   chunkReady = new Promise(resolve => { releaseChunk = resolve })
@@ -236,6 +238,17 @@ test('a valid browser request from a board clears only competing columns and ope
   assert.equal(params.get('workspace'), 'workspace-one')
   assert.equal(params.get('account'), 'active')
   for (const key of ['task', 'thread', 'threads']) assert.equal(params.has(key), false)
+})
+
+test('a narrow board opens an explicitly requested preview in the existing browser sheet', async () => {
+  browserFits = false
+  browser.localStorage.setItem('mikka:browser', '1')
+  browser.history.replaceState({}, '', '/?section=all-issues&workspace=workspace-one')
+  await act(async () => root.render(<OfficialIssueWorkspace user={user} initialSection="all-issues" />))
+  assert.equal(container.querySelectorAll('[data-browser-pane]').length, 0, 'a saved desktop column leaves the phone unobstructed')
+  await act(async () => assert.equal(openBrowserAddress('/preview'), true))
+  assert.equal(container.querySelectorAll('[data-browser-pane]').length, 1)
+  assert.ok(container.querySelector('[data-panel-sheet] [data-browser-pane]'))
 })
 
 test('a valid browser request reveals the conversation browser tab without changing the selected Bot', async () => {
