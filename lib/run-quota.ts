@@ -368,7 +368,10 @@ async function continuePausedRun(userId: string, runId: string, mode: 'apiKey' |
   if (!pending) throw new ActionFailureError('runNotActive')
   let retryRunId: string
   try { retryRunId = await queueCloudQuotaContinuation(pending.run, pending.plan.cloud!, pending.key) }
-  catch (error) { if (error instanceof ActionFailureError) throw error; throw new ActionFailureError('runInvalid') }
+  catch (cause) {
+    if (cause instanceof ActionFailureError) throw cause
+    throw new ActionFailureError('runInvalid', undefined, undefined, { cause })
+  }
   await db.transaction(async tx => {
     const ended = await endPausedRun(tx, pending.run.id, userId, workspaceId)
     if (ended && pending.key)
