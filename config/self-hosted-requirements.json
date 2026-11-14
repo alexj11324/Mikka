@@ -1498,9 +1498,9 @@
   "lib/preferences.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Rank only the current member’s authorized conversation roots by Bot, read their per-account idle policy, and preserve manual or automatic archive visibility in installation PostgreSQL.",
-    "test": "tests/conversation-title.db.test.ts",
-    "suite": "test:run-publication-db"
+    "behavior": "Save personal preferences to installation PostgreSQL. Changing the archive interval invalidates the authorized owner’s active conversation lists after commit using the existing live transport.",
+    "test": "lib/live/chat-preferences.db.test.ts",
+    "suite": "test:live-db"
   },
   "lib/pull-request-appearance.ts": {
     "mode": "built-in",

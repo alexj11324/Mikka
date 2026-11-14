@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { mock, test } from 'node:test'
-import { act, createElement, Fragment, type ReactNode } from 'react'
+import { act, createElement, Fragment, useEffect, type ReactNode } from 'react'
 import { Window } from 'happy-dom'
 import type { ConversationDirectoryPage } from '../../../lib/conversation-directory-input'
 import { mobileMessages } from '../lib/messages.ts'
@@ -14,16 +14,31 @@ const navigation: string[] = []
 const requested: string[] = []
 let view: string | undefined
 const writes: unknown[] = []
+let archiveDays: number | undefined = 30
+let archivePending = false
+let settingReads = 0
+const reloadSettings = () => { settingReads++ }
 const none = () => null
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL('../' + path, import.meta.url).href, { namedExports })
-mock.module('expo-router', { namedExports: { useRouter: () => ({ push: (path: string) => navigation.push(path) }), useLocalSearchParams: () => ({ view }) } })
+mock.module('expo-router', { namedExports: { useRouter: () => ({ push: (path: string) => navigation.push(path) }), useLocalSearchParams: () => ({ view }), useFocusEffect: (read: () => void) => useEffect(read, [read]) } })
 mock.module('react-native', { namedExports: {
   StyleSheet: { create: (styles: unknown) => styles }, View: 'div', RefreshControl: none, Linking: { openURL: (url: string) => navigation.push(url) },
   FlatList: ({ data, renderItem, ListHeaderComponent }: { data: { key: string; conversation?: Item; pull?: { title: string } }[]; renderItem: (props: { item: unknown }) => ReactNode; ListHeaderComponent: ReactNode }) =>
     createElement(Fragment, null, ListHeaderComponent, ...data.map(item => createElement('section', { key: item.key, 'aria-label': item.conversation?.title ?? item.pull?.title }, renderItem({ item })))),
 } })
-stub('components/settings.tsx', { Row: ({ label, value, detail, onPress }: { label: string; value?: string; detail?: string; onPress?: () => void }) =>
+stub('components/settings.tsx', {
+  SettingsPage: ({ children }: { children: ReactNode }) => children,
+  ChoiceRow: ({ label, selected, disabled, onPress }: { label: string; selected: boolean; disabled: boolean; onPress: () => void }) =>
+    createElement('button', { 'aria-pressed': selected, disabled, onClick: onPress }, label),
+  Row: ({ label, value, detail, onPress }: { label: string; value?: string; detail?: string; onPress?: () => void }) =>
   createElement('a', { onClick: onPress }, label, value, detail) })
+stub('components/ui.tsx', { Group: ({ children }: { children: ReactNode }) => children })
+stub('components/PreferenceSaveNotice.tsx', { PreferenceSaveNotice: none })
+stub('lib/settings.tsx', { useSettings: () => ({
+  data: { preferences: { archiveIdleAfterDays: archiveDays } }, reload: reloadSettings,
+  preferenceSave: { status: archivePending ? 'saving' : 'idle', intent: archivePending ? { archiveIdleAfterDays: 0 } : {} },
+  savePreferences: (patch: unknown) => writes.push(patch),
+}) })
 stub('components/GlassButton.tsx', { GlassButton: ({ label, onPress }: { label: string; onPress: () => void }) => createElement('button', { onClick: onPress }, label) })
 stub('components/NavBar.tsx', { NavBar: none, underBar: {} })
 stub('components/ReadNotice.tsx', { ReadNotice: none })
@@ -36,6 +51,7 @@ stub('lib/live.ts', { listRef: none })
 stub('lib/theme.ts', { colors: {}, LIST_INSET: 0 })
 stub('lib/useApi.ts', { useRefresh: () => ({}), useLiveApi: (path: string) => { requested.push(path); return { data: { items, workspaceId: 'workspace' }, reload: none } } })
 stub('../../lib/hooks/use-task-continuation.ts', { useTaskContinuation: (items: Item[]) => ({ items, hasMore: false }) })
+const { default: ArchivePreferences } = await import('../app/(tabs)/settings/conversations.tsx')
 const { default: Conversations } = await import('../app/conversations.tsx')
 
 test('the native directory marks each conversation kind and all rows using their own write receipts', async () => {
@@ -98,6 +114,46 @@ test('native PR view loads archived and active rows and links one publication to
     view = undefined
     items.forEach(item => { item.pulls = []; item.issueId = null; item.identifier = null })
     navigation.length = 0
+    await browser.happyDOM.close()
+  }
+})
+
+test('the directory opens the personal archive interval and only the confirmed value is selected', async () => {
+  const browser = new Window()
+  Object.assign(globalThis, { window: browser, document: browser.document, IS_REACT_ACT_ENVIRONMENT: true })
+  const { createRoot } = await import('react-dom/client')
+  const host = document.createElement('div')
+  const root = createRoot(host)
+  try {
+    await act(async () => root.render(createElement(Conversations)))
+    const link = [...host.querySelectorAll('a')].find(row => row.textContent === mobileMessages.ConversationDirectory.archiveIdle)
+    assert.ok(link)
+    await act(async () => link.click())
+    assert.equal(navigation.pop(), '/settings/conversations')
+    await act(async () => root.render(createElement(ArchivePreferences)))
+    const rows = () => [...host.querySelectorAll('button')]
+    assert.equal(settingReads, 1)
+    assert.equal(rows().length, 6)
+    assert.equal(rows()[4]!.getAttribute('aria-pressed'), 'true')
+    await act(async () => rows()[0]!.click())
+    assert.deepEqual(writes.pop(), { archiveIdleAfterDays: 0 })
+    archivePending = true
+    await act(async () => root.render(createElement(ArchivePreferences)))
+    assert.ok(rows().every(row => row.disabled))
+    assert.equal(rows()[4]!.getAttribute('aria-pressed'), 'true')
+    archiveDays = 0
+    archivePending = false
+    await act(async () => root.render(createElement(ArchivePreferences)))
+    assert.equal(rows()[0]!.getAttribute('aria-pressed'), 'true')
+    assert.equal(rows()[0]!.textContent, mobileMessages.ConversationDirectory.archiveOff)
+    archiveDays = undefined
+    await act(async () => root.render(createElement(ArchivePreferences)))
+    assert.equal(rows().length, 0)
+    assert.match(host.textContent ?? '', new RegExp(mobileMessages.ConversationDirectory.archiveUnavailable))
+  } finally {
+    archiveDays = 30
+    archivePending = false
+    await act(async () => root.unmount())
     await browser.happyDOM.close()
   }
 })

@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import type { IssuePullRequest } from './issue-metadata'
 
+export const archiveIdleDays = [0, 3, 7, 14, 30, 90] as const
+
 export const directoryInput = z.strictObject({
   search: z.string().trim().max(120).default(''),
   state: z.enum(['all', 'working', 'waiting', 'idle', 'failed']).default('all'),

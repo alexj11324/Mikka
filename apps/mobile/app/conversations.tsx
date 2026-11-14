@@ -81,6 +81,7 @@ export default function Conversations() {
       ListHeaderComponent={<View style={styles.controls}>
         {!pullsOnly && <Segmented options={states.map(value => ({ value, label: labels[value] }))} value={state} onChange={setState} />}
         <Segmented options={directoryPullStates.map(value => ({ value, label: value === 'all' ? mobileMessages.ArtifactsPage.category.pullRequests : mobileMessages.Metadata.prState[value] }))} value={pullState} onChange={setPullState} />
+        {!pullsOnly && <Row label={labels.archiveIdle} onPress={() => router.push('/settings/conversations')} />}
         {!pullsOnly && <Row label={labels.archived} value={archived ? '✓' : undefined} onPress={() => setArchived(!archived)} />}
         {!pullsOnly && <GlassButton label={labels.readAll} busy={writing} disabled={!page} onPress={() => void mark({ action: 'readAll' })} />}
         {writeError && <Text accessibilityRole="alert">{labels.writeError}</Text>}

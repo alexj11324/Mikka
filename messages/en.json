@@ -4441,6 +4441,8 @@
     "archiveIdle": "Automatically archive idle conversations",
     "archiveDays": "{days, plural, one {# day} other {# days}}",
     "archiveOff": "Off",
+    "archiveUnavailable": "This server does not support automatic archiving.",
+    "archiveSaveError": "The archive preference could not be saved.",
     "viewAll": "View all",
     "title": "Conversations",
     "search": "Search conversations",
