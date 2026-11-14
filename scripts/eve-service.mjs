@@ -17,6 +17,9 @@ export async function startEveService({ root = process.cwd(), env = process.env,
   spawnProcess = spawn, allocatePort = availableEvePort } = {}) {
   if (env.VERCEL || env.MIKKA_EVE_ORIGIN) return { close: async () => {} }
   const directory = development ? join(root, 'apps/eve') : await packagedEveDirectory(root)
+  const world = development ? env.WORKFLOW_TARGET_WORLD
+    : JSON.parse(await readFile(join(directory, 'mikka-eve-build.json'), 'utf8')).world
+  const local = !world || world === 'local'
   const port = await allocatePort()
   const origin = `http://127.0.0.1:${port}`
   const childEnv = { ...env, HOST: '127.0.0.1', NITRO_HOST: '127.0.0.1', PORT: String(port), NITRO_PORT: String(port),
@@ -24,27 +27,32 @@ export async function startEveService({ root = process.cwd(), env = process.env,
     // For the local World its delivery base already contains the mount.
     // An additional prefix would duplicate it in browser callback URLs.
     EVE_PUBLIC_ROUTE_PREFIX: '',
-    WORKFLOW_TARGET_WORLD: 'local',
+    WORKFLOW_TARGET_WORLD: world ?? env.WORKFLOW_TARGET_WORLD ?? 'local',
     WORKFLOW_LOCAL_DATA_DIR: env.MIKKA_EVE_DATA_DIR ?? join(env.MIKKA_DATA_DIR ?? join(root, '.cache'), 'eve-workflow') }
   // This peer has its own HTTP loopback listener. The installation's public
   // TLS certificate, key and optional socket belong only to the outer listener.
   delete childEnv.NITRO_SSL_CERT
   delete childEnv.NITRO_SSL_KEY
   delete childEnv.NITRO_UNIX_SOCKET
-  // eve's local World deliberately uses cwd/.eve/.workflow-data rather than
-  // WORKFLOW_LOCAL_DATA_DIR. Bind that documented mount to persistent storage.
-  await mkdir(childEnv.WORKFLOW_LOCAL_DATA_DIR, { recursive: true, mode: 0o700 })
-  await mkdir(join(directory, '.eve'), { recursive: true })
-  const storage = join(directory, '.eve/.workflow-data')
-  const persistent = await realpath(childEnv.WORKFLOW_LOCAL_DATA_DIR)
-  try { await symlink(persistent, storage, 'dir') }
-  catch (error) {
-    if (error.code !== 'EEXIST') throw error
-    if (await realpath(storage) !== persistent) throw new Error('EVE_SERVICE_STORAGE_MISMATCH', { cause: error })
+  if (local) {
+    // eve's local World deliberately uses cwd/.eve/.workflow-data rather than
+    // WORKFLOW_LOCAL_DATA_DIR. Bind that documented mount to persistent storage.
+    await mkdir(childEnv.WORKFLOW_LOCAL_DATA_DIR, { recursive: true, mode: 0o700 })
+    await mkdir(join(directory, '.eve'), { recursive: true })
+    const storage = join(directory, '.eve/.workflow-data')
+    const persistent = await realpath(childEnv.WORKFLOW_LOCAL_DATA_DIR)
+    try { await symlink(persistent, storage, 'dir') }
+    catch (error) {
+      if (error.code !== 'EEXIST') throw error
+      if (await realpath(storage) !== persistent) throw new Error('EVE_SERVICE_STORAGE_MISMATCH', { cause: error })
+    }
+    // Both the local World's deliveries and OAuth callbacks use eve's public
+    // namespaced mount, never the main application's root Workflow consumer.
+    childEnv.WORKFLOW_LOCAL_BASE_URL = new URL('/mikka/api/agents', env.BETTER_AUTH_URL ?? env.MIKKA_APP_ORIGIN ?? 'http://127.0.0.1:3000').href
+  } else {
+    childEnv.WORKFLOW_LOCAL_BASE_URL = origin
+    delete childEnv.WORKFLOW_LOCAL_DATA_DIR
   }
-  // Both the local World's deliveries and OAuth callbacks use eve's public
-  // namespaced mount, never the main application's root Workflow consumer.
-  childEnv.WORKFLOW_LOCAL_BASE_URL = new URL('/mikka/api/agents', env.BETTER_AUTH_URL ?? env.MIKKA_APP_ORIGIN ?? 'http://127.0.0.1:3000').href
   const args = development
     ? [join(root, 'node_modules/eve/bin/eve.js'), 'dev', '--no-ui', '--host', '127.0.0.1', '--port', String(port)]
     : [join(directory, 'server/index.mjs')]
@@ -84,8 +92,6 @@ export async function startEveService({ root = process.cwd(), env = process.env,
 export async function packagedEveDirectory(root) {
   for (const directory of [join(root, 'eve'), join(root, '.output/eve')]) {
     try {
-      const manifest = JSON.parse(await readFile(join(directory, 'mikka-eve-build.json'), 'utf8'))
-      if (manifest.version !== 1 || manifest.eve !== '1.0.0-rc.9' || !/^[a-f0-9]{40}$/.test(manifest.revision)) throw new Error('EVE_SERVICE_BUILD_INVALID')
       await readFile(join(directory, 'server/index.mjs'))
       return directory
     } catch (error) { if (error.code !== 'ENOENT') throw error }
