@@ -85,7 +85,7 @@ lib/credentials/broker.ts,100644,c83dfb7e6897293ad3f62145dbba28626534f6e8,code,m
 lib/credentials/browser.ts,100644,f44d40f58754c433d5472450a3c2df766d6250b2,code,module implementation,lib/credentials,unreviewed,,,
 lib/credentials/chat-guard.test.ts,100644,8203cc08bdc46173b405838e927041c42a863ad3,code,"test, test support or fixture",lib/credentials,unreviewed,,,
 lib/credentials/chat-guard.ts,100644,ec5806e0544ca3b881fd54d3eb761322d9c911c5,code,module implementation,lib/credentials,unreviewed,,,
-lib/credentials/cleanup.ts,100644,5626a6977ad9c58407f9d3f60c88d6352d194db5,code,module implementation,lib/credentials,unreviewed,,,
+lib/credentials/cleanup.ts,100644,5626a6977ad9c58407f9d3f60c88d6352d194db5,code,module implementation,lib/credentials,complete,,历史 73c002f5 合入数据保留 hold，仅导出恒定 async 函数，无 DB、env、调度、取消或副作用，只有手工兼容 credential-cleanup GET 调用。保留原持有政策，#2544 整体删除此模块及唯一引用。,整改 G-040；普通合并和精确合后回执仍待。
 lib/credentials/contracts.ts,100644,dcb57adc56b999730dbc868ed4c4206fa091f195,code,module implementation,lib/credentials,unreviewed,,,
 lib/credentials/credentials.test.ts,100644,9cc5f024937d1781eb467404467d8fb9ebdebdd3,code,"test, test support or fixture",lib/credentials,unreviewed,,,
 lib/credentials/feature.ts,100644,1a6d42f4d64c5a67ec0386cd8428e118b0b58625,code,module implementation,lib/credentials,unreviewed,,,
@@ -107,8 +107,8 @@ lib/credentials/runtime.ts,100644,741fcf38086519fa68903d91685ee46f68bd894a,code,
 lib/credentials/store.db.test.ts,100644,253bbbf5f48ebfa101600ccc01a1967f5c881442,code,"test, test support or fixture",lib/credentials,unreviewed,,,
 lib/credentials/store.ts,100644,aca71fa8f51ccf0fa6c9960f6c4b8475688b512f,code,module implementation,lib/credentials,unreviewed,,,
 lib/credit-shares.ts,100644,d0e158f1b10a5646de848db20defaad9cff0e40c,code,module implementation,lib,unreviewed,,,
-lib/cron-auth.test.ts,100644,cb9e79be1e985f283ef59bbb1e9be3a45bd5bce1,code,"test, test support or fixture",lib,unreviewed,,,
-lib/cron-auth.ts,100644,83ceb48dd76e88eb038115424181b082b2cd309c,code,module implementation,lib,unreviewed,,,
+lib/cron-auth.test.ts,100644,cb9e79be1e985f283ef59bbb1e9be3a45bd5bce1,code,"test, test support or fixture",lib,complete,,afterEach 还原原环境与 crypto spy；缺配置、缺请求头、长短错误/格式错误、正确 token、签两个固定摘要（空输入零签）覆盖共享 verifier。随 pnpm test:linear-sync 真正执行，两种运行时使用同一 server module。,按逐文件结论保留；对应排程与业务持久化分开登记。
+lib/cron-auth.ts,100644,83ceb48dd76e88eb038115424181b082b2cd309c,code,module implementation,lib,complete,,verifyBearer 解析严格 bearer，现有两枚固定宽度 HMAC 并行签名，原 JS XOR/两视图由 #2542 直接换官方 timingSafeEqual；cronUnauthorized 缺 secret 503/错401、no-store，成功 null。所有13路由和 Linear Worker、企业权限域均使用同一已验证合同。,整改 G-036；普通合并和精确合后回执仍待。
 lib/cua/local-review.test.ts,100644,2ab8ff3339827a0858959edf1f9820157f35bfe8,code,"test, test support or fixture",lib/cua,unreviewed,,,
 lib/cua/local-review.ts,100644,53e33781b21916f2f47016dd83da662f36cdf6ef,code,module implementation,lib/cua,unreviewed,,,
 lib/daemon-authorization.test.ts,100644,41ac3c12fa9e2b25da85618e57890f292f4996f9,code,"test, test support or fixture",lib,unreviewed,,,
@@ -165,7 +165,7 @@ lib/default-model-config.ts,100644,c97ea1fda8bf4db6cd442b59fc32319163d4adbe,code
 lib/default-model.ts,100644,6b344021a9430269b21a902a0f10beae748d8d5e,code,module implementation,lib,unreviewed,,,
 lib/demo-device-cleanup.db.test.ts,100644,9de1b943df8bb2ba425b490c0dd95790c4120cf5,code,"test, test support or fixture",lib,unreviewed,,,
 lib/demo-device-cleanup.ts,100644,6bbfa420bbd900f9ae015095ec7a0ee63abc3345,code,module implementation,lib,unreviewed,,,
-lib/deployment-id.mjs,100644,5ac61be37acadb72cd7817dcf686795e426812a7,code,module implementation,lib,complete,,buildDeploymentId 由 SHA 与 GitHub run/attempt 核成最长32字符的稳定发布 ID，保留 run/attempt 优先，SHA 保留最少7最多12；配置环节拒绝与 NX/Next 的独立变量不符，CLI 与 Vite/Nitro 及云 OCI 发布共用。这是产品预构建发布之前就需要的版本合同；Cloudflare 对单 Worker 发布的 native version id 产生在上传后，不能替代跨 renderer/API 的预构建 pin。原历史 79349d69，跨仓配对一并验证。,保留现有发布身份和产物合同，G-021 合后回执见总单。
+lib/deployment-id.mjs,100644,5ac61be37acadb72cd7817dcf686795e426812a7,code,module implementation,lib,complete,,buildDeploymentId 由 SHA 与 GitHub run/attempt 核成最长32字符的稳定发布 ID，保留 run/attempt 优先，SHA 保留最少7最多12；配置环节拒绝与 NEXT_DEPLOYMENT_ID 等独立变量不符，CLI 与 Vite/Nitro 及云 OCI 发布共用。这是产品预构建发布之前就需要的版本合同；Cloudflare 对单 Worker 发布的 native version id 产生在上传后，不能替代跨 renderer/API 的预构建 pin。原历史 79349d69，跨仓配对一并验证。,保留现有发布身份和产物合同，G-021 合后回执见总单。
 lib/deployment-id.test.mjs,100644,4ca282d5299a08348160f2d0659fb8b822b5db17,code,"test, test support or fixture",lib,complete,,覆盖有效字符、保留前缀、截断、每次重跑唯一、无效输入、无配置的开发 build 和两个部署变量冲突，并在实际 Node 子进程读取 GitHub 环境输出 ID。应用独立生产版本选择的测试，不以此推断正式供应商发布。,保留现有发布身份和产物合同，G-021 合后回执见总单。
 lib/deployment-stage.mjs,100644,5fbd1c538d36dcf9d2489064afd304d93b166e31,code,module implementation,lib,complete,,明确优先 canonical MIKKA_DEPLOYMENT_STAGE，再过往别名、Vercel 旧部署名；NODE_ENV 本身不能令本地构建成为生产。V8 直接运行固定实现验证五种典型输入返回 undefined/preview/development/production 或固定错误码；真实下游 signup、tracing、artifact store、开关部署身份和 Nitro/Vite。平台无统一的跨自托管/多供应商产品 stage。,保留现有发布身份和产物合同，G-021 合后回执见总单。
 lib/deployment-stage.test.mjs,100644,7a39f305bde096863713a38fe5bf0a0ab65df3de,code,"test, test support or fixture",lib,complete,,跨平台显式/回退、大小写、空/非法与已选 canonical 覆盖 alias、异常不暴露变量值，分别验证云 preview 与本地 production 编译。由既有 release-security suite 消费。,保留现有发布身份和产物合同，G-021 合后回执见总单。
