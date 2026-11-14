@@ -1,6 +1,6 @@
 'use server'
 
-import { conversationOrganization, type ConversationOrganizationChange } from '@/lib/conversation-organization'
+import type { ConversationOrganizationChange } from '@/lib/conversation-organization'
 import { runAwaitingApproval, runHistoryWindow } from '@/lib/task-state-query'
 import { singleFlight } from '@/lib/single-flight'
 import { readCompactRunFailure, runFailureBrief, type CompactRunFailure } from '@/lib/run-failure-projection'
@@ -269,6 +269,7 @@ export async function regenerateConversationTitle(runId: string): Promise<Action
 export async function readConversationOrganization(runId: string) {
   const { ownerId, workspaceId } = await conversationActor()
   const { pool } = await import('@/lib/db')
+  const { conversationOrganization } = await import('@/lib/conversation-organization')
   return conversationOrganization(pool, ownerId, workspaceId, runId)
 }
 
@@ -278,6 +279,7 @@ export async function setConversationOrganization(runId: string, change: Convers
     throw new ActionFailureError('validationGeneric')
   }
   const { pool } = await import('@/lib/db')
+  const { conversationOrganization } = await import('@/lib/conversation-organization')
   const state = await conversationOrganization(pool, ownerId, workspaceId, runId, change)
   if (state) await (await import('@/lib/live/lists')).runListChanged(pool, runId)
   return state
