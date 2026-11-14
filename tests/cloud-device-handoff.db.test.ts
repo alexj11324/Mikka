@@ -1,4 +1,3 @@
-import { observePoolCommits } from '../lib/db/commit-effects'
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
@@ -23,7 +22,6 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
   await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
   const target = new URL(url!); target.pathname = `/${database}`
   const pool = new Pool({ connectionString: target.toString(), max: 8 })
-  observePoolCommits(pool)
   observePoolCommits(pool)
   let appPool: Pool | undefined, workspacePool: Pool | undefined
   let machines: Awaited<ReturnType<typeof fakeThreadMachines>> | undefined
