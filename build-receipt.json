@@ -1,0 +1,25 @@
+{
+  "publicSha": "3a25432617426d3bce326904d9b15c7869c6c9e8",
+  "privateSha": "d4e39617442955c36b6698897d548a74203f015b",
+  "renderer": "8152f9c7444fd798ed39405f913d99398ba0721ecb6a935b3ad2c657b52bf388",
+  "start": "2026-11-14T22:15:20Z",
+  "end": "2026-11-14T22:16:40Z",
+  "exit": 0,
+  "privateLockSha256": "b9151836ba4f0d8dce826e9e03daeb9ebc7e9c902ac9cce6f99a7f8d0c065cb5",
+  "nitroStart": "2026-11-14T22:16:40Z",
+  "nitroEnd": "2026-11-14T22:29:00Z",
+  "nitroExit": 0,
+  "resourceCount": 61,
+  "allResourceDigestsVerified": true,
+  "routes": 325,
+  "routeMethods": 431,
+  "workflowCount": 7,
+  "workflowSteps": 132,
+  "hashes": {
+    "mikka-build.json": "8b04a5c0cd434967fc61638b311e4b6c6e7a348aea705c4e90deed229e792222",
+    "nitro.json": "24557e7a0514a700c231d13a10f20be4781036f5451ab951073b0843875f4348",
+    "server/index.mjs": "995384a1080c4e0d05cc75ad4c53852b2404c80f437e3fe31601dcab4e960265",
+    "server/docker-entry.mjs": "53cea7a380fbaa235f549343ae847a6ff12e9d14bf66a43749bfea1315b19ee8",
+    "public/mikka/renderer-manifest.json": "463a55a9d31cd79145f99ac37fd7ebd50d40cc19e8c9139b17ff0f0df68ad912"
+  }
+}

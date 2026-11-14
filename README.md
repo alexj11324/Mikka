@@ -1,9 +1,3 @@
-# #2254 sidebar receipt on the original conversation prerequisite
+## #2254 官方 Web/Nitro 未读验收
 
-Public #2268 ed7d01878d49563c99bc0ced1484b91d9f8be6ba paired with the scoped, immutable original #131 + #132 private verification revision d4e39617442955c36b6698897d548a74203f015b. The private combination adds only the public-facing count behavior and its existing mounted fixture to original private #131. Its normal private merge SHA is tracked separately at #132.
-
-On 2026-11-14 UTC, the public production Web builder exited 0 at 20:59:48, renderer e8ebf8b740208210aa381dc5cbe01ca5d8e4675734cfcc0347f71cc107e67443. Both complete TypeScript projects and all 251 private tests passed.
-
-Chromium 153.0.8010.0 used this production Web bundle and the real application API fetch entry through a disposable same-origin source adapter. Two users signed into the isolated PostgreSQL 17 fixture. Between 21:15:20 and 21:16:03 UTC, the member write returned 404. For each light/dark desktop and phone-sized Web viewport the owner marked two rows unread, opened one, received 200, reloaded, and verified the database and the displayed counts (bot 2 to 1, children [1,1] to [0,1]). The receipt records a SHA-256 digest for each screenshot.
-
-The production Nitro build completed 325 routes, 431 methods and 132 steps (7 workflows). Its final Rolldown process exited 137 at 21:03:33 UTC. No formal Nitro acceptance, native device, model run, deployment or customer data is included in these receipts.
+2026-11-14 22:29:28–22:30:05 UTC。公共 `3a25432617426d3bce326904d9b15c7869c6c9e8` × 官方私有 UI `d4e39617442955c36b6698897d548a74203f015b`，正式 `node apps/frontend/scripts/build.mjs`、`node apps/api/scripts/build.mjs` 与 `scripts/start-app.mjs`。原厂 Linux Chromium 153.0.8010.0 的 1440×900、390×844 各浅/深色均实际操作。隔离 PostgreSQL 17，两测试身份与独立 session；Member 对 Owner Run 拒绝，Owner 实际打开一条对话后两个独立读水位从 `[1,1]` 到 `[0,1]`，Bot 从2到1，刷新后数据库和侧栏读回一致。截图仅含合成数据。真实 Apple iPhone 和 Desktop 平台交互另行记录。用于此项加载的独立 Eve 服务通过原健康端点，此项未执行模型。生产 pending。
