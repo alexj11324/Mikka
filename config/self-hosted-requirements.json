@@ -1,4 +1,25 @@
 {
+  "lib/context-usage.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Estimate context usage from stored run text and segment counts inside the installation.",
+    "test": "lib/context-usage.test.ts",
+    "suite": "test:thread-changes"
+  },
+  "lib/conversation-workspace.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Hold the installed workspace membership lease while reading or changing authorized conversation state.",
+    "test": "lib/thread-reads.db.test.ts",
+    "suite": "test:conversation-reads"
+  },
+  "lib/coordinator/citation-parts.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Parse citation markers and web links in message text locally on web and native clients.",
+    "test": "lib/coordinator/citations.test.ts",
+    "suite": "test:coordinator-events"
+  },
   "lib/coordinator/issue-input.ts": {
     "mode": "built-in",
     "environment": [],
