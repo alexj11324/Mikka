@@ -5,7 +5,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { gunzipSync, gzipSync } from 'node:zlib'
 import test from 'node:test'
 import { dbUrl, seedBot, seedUser, seedWorkspace } from './support/workspace-admin-db'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 
 test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
   const saved = { key: process.env.WORKSPACE_SECRETS_KEY, flag: process.env.MIKKA_BYO_E2B_KEY }
@@ -251,7 +251,7 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
     const base = new URL(dbUrl!)
     const name = `mailbox_mask_${randomBytes(8).toString('hex')}_e2e`
     const throwaway = new URL(base); throwaway.pathname = `/${name}`
-    await pool.query(`create database ${name}`)
+    await createTestDatabase(pool, name)
     const mailboxPool = new Pool({ connectionString: throwaway.toString(), max: 3 })
     try {
       execFileSync(process.execPath, ['scripts/setup-e2e-db.mjs'], { env: { ...process.env, E2E_DATABASE_URL: throwaway.toString() }, stdio: 'ignore' })
