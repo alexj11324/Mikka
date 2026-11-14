@@ -4,6 +4,8 @@ import { z } from 'zod'
 import type { AgentExecution } from '../agent-kit/store'
 import { requiresEveProductApproval } from './approval-bridge'
 import { snapshotMailboxTools } from '../personal-mailbox-capability'
+import type { EveScope } from './scope'
+import type { ProductCatalogueEntry } from './product-rpc'
 
 const id = z.string().min(1).max(256)
 const common = { sessionId: id, turnId: id, executionId: z.uuid().nullable().optional() }
@@ -21,7 +23,45 @@ const requestSchema = z.discriminatedUnion('operation', [
   z.object({ ...common, operation: z.literal('finish'), outcome: z.enum(['completed', 'failed', 'cancelled']), messages: z.array(z.unknown()).optional() }).strict(),
 ])
 type Input = z.infer<typeof requestSchema>
-type Scope = { ownerId: string; botId: string; workspaceId: string; surface: 'web' | 'slack' }
+type Scope = EveScope
+type ExecutionBinding = { sessionId: string; turnId: string; executionId?: string | null }
+
+async function asProductPrincipal<T>(scope: Scope, work: () => Promise<T>) {
+  const { actAs } = await import('../acting-user')
+  const { tokenWorkspace } = await import('../tokens/principal')
+  return actAs({ id: scope.ownerId, [tokenWorkspace]: scope.workspaceId }, work)
+}
+
+/** Eve's dynamic definitions run in Node and use the product's existing stores. */
+export async function prepareEveExecution(scope: Scope, sessionId: string, turnId: string) {
+  const { assertSessionScope } = await import('./scope')
+  await assertSessionScope(scope, sessionId)
+  return asProductPrincipal(scope, () => beginProductExecution(scope, sessionId, turnId))
+}
+
+async function beginProductExecution(scope: Scope, sessionId: string, turnId: string) {
+  const kit = await import('../../workflows/coordinator/agent-kit-steps')
+  const execution = await kit.beginAgentExecution(scope.ownerId, scope.botId, `${sessionId}:${turnId}`, 0, { harness: 'ai_sdk' })
+  return { execution, runtime: execution?.snapshot.runtime ?? await kit.botRuntime(scope.ownerId, scope.botId) }
+}
+
+const describeProductTools = (tools: ToolSet): Promise<ProductCatalogueEntry[]> => Promise.all(
+  Object.entries(tools).map(async ([name, definition]) => ({
+    name, description: definition.description ?? name, inputSchema: await asSchema(definition.inputSchema).jsonSchema,
+    needsApprovalReview: requiresEveProductApproval(name),
+  })),
+)
+
+/** Refresh discovery before each native model call. Execution rechecks every action. */
+export async function productCatalogue(scope: Scope, binding: ExecutionBinding): Promise<ProductCatalogueEntry[]> {
+  const { assertSessionScope } = await import('./scope')
+  await assertSessionScope(scope, binding.sessionId)
+  return asProductPrincipal(scope, async () => {
+    const { execution, sourceEventId, scheduledRead, taskEventId, entryOrigin } = await productContext(scope, binding)
+    const tools = await productTools(scope, execution, sourceEventId, scheduledRead, taskEventId, entryOrigin)
+    return describeProductTools(tools)
+  })
+}
 
 /** Test seam is the authenticated product boundary, independent of eve's model/tool loop. */
 export interface EveProductGatewayServices {
@@ -76,29 +116,14 @@ const defaultServices: EveProductGatewayServices = {
     await assertSessionScope(scope, sessionId)
   },
   async run(scope, input, signal, request) {
-    const { actAs } = await import('../acting-user')
-    const { tokenWorkspace } = await import('../tokens/principal')
-    return actAs({ id: scope.ownerId, [tokenWorkspace]: scope.workspaceId }, async () => {
-      if (input.operation === 'prepare') {
-        const kit = await import('../../workflows/coordinator/agent-kit-steps')
-        const execution = await kit.beginAgentExecution(scope.ownerId, scope.botId, `${input.sessionId}:${input.turnId}`, 0, { harness: 'ai_sdk' })
-        return { execution, runtime: execution?.snapshot.runtime ?? await kit.botRuntime(scope.ownerId, scope.botId) }
-      }
+    return asProductPrincipal(scope, async () => {
+      // Existing Eve releases can retain these callbacks during an API upgrade.
+      if (input.operation === 'prepare') return beginProductExecution(scope, input.sessionId, input.turnId)
       if (input.operation === 'finish') {
         const { finishEveTurn } = await import('./settlement')
         return finishEveTurn(scope, input)
       }
-      const execution = await gatewayExecution(scope, input)
-      const { pool } = await import('../db')
-      const source = (await pool.query<{ source_event_id: string; id: string | null; payload: Record<string, unknown> }>(`SELECT t.source_event_id,e.id,e.payload FROM eve_turn_sources t
-        LEFT JOIN coordinator_events e ON e.id=t.source_event_id AND e."userId"=$3 AND e."botId"=$4
-        WHERE t.session_id=$1 AND t.turn_id=$2`, [input.sessionId, input.turnId, scope.ownerId, scope.botId])).rows[0]
-      if (source && !source.id) throw new Error('notFound')
-      const sourceEventId = source?.source_event_id
-      const requestSource = source ? await (await import('./retry-source')).eveOriginalRequestSource(scope,source.source_event_id,source.payload) : undefined
-      const taskEventId = requestSource ? await (await import('./retry-source')).eveTaskRequestSource(scope,requestSource.id,requestSource.payload) : undefined
-      const scheduledRead = sourceEventId ? await (await import('./scheduled-read')).loadScheduledRead(scope, sourceEventId) : null
-      const entryOrigin = (await import('./run-origin')).eveRunOrigin(scope.surface,requestSource?.payload,Boolean(scheduledRead))
+      const { execution, sourceEventId, scheduledRead, taskEventId, entryOrigin } = await productContext(scope, input)
       if (input.operation === 'instructions') {
         if (scheduledRead) return { instructions: `This is a scheduled read-only task. Use only its allowed read tools, perform no writes and request no approval.\n${scheduledRead.prompt}` }
         if (scope.surface === 'slack') {
@@ -109,12 +134,7 @@ const defaultServices: EveProductGatewayServices = {
         return { instructions: await prepareEveInstructions(scope.ownerId, scope.botId, execution?.snapshot, { sessionId: input.sessionId, turnId: input.turnId }) }
       }
       const tools = await productTools(scope, execution, sourceEventId, scheduledRead, taskEventId,entryOrigin)
-      if (input.operation === 'catalogue') {
-        return { tools: await Promise.all(Object.entries(tools).map(async ([name, definition]) => ({
-          name, description: definition.description ?? name, inputSchema: await asSchema(definition.inputSchema).jsonSchema,
-          needsApprovalReview: requiresEveProductApproval(name),
-        }))) }
-      }
+      if (input.operation === 'catalogue') return { tools: await describeProductTools(tools) }
       const tool = Object.hasOwn(tools, input.name) ? tools[input.name] : undefined
       if (!tool?.execute) throw new Error('notFound')
       const validator = asSchema(tool.inputSchema).validate
@@ -140,13 +160,28 @@ const defaultServices: EveProductGatewayServices = {
   },
 }
 
-async function gatewayExecution(scope: Scope, input: Input): Promise<AgentExecution | null> {
+async function gatewayExecution(scope: Scope, input: ExecutionBinding): Promise<AgentExecution | null> {
   const { agentKitEnabled, agentKitStore, agentScope } = await import('../agent-kit/service')
   if (!input.executionId) {
     if (agentKitEnabled()) throw new Error('agentExecutionClosed')
     return null
   }
   return agentKitStore.readExecution(await agentScope(scope.ownerId, scope.botId), input.executionId, `${input.sessionId}:${input.turnId}:0`)
+}
+
+async function productContext(scope: Scope, binding: ExecutionBinding) {
+  const execution = await gatewayExecution(scope, binding)
+  const { pool } = await import('../db')
+  const source = (await pool.query<{ source_event_id: string; id: string | null; payload: Record<string, unknown> }>(`SELECT t.source_event_id,e.id,e.payload FROM eve_turn_sources t
+    LEFT JOIN coordinator_events e ON e.id=t.source_event_id AND e."userId"=$3 AND e."botId"=$4
+    WHERE t.session_id=$1 AND t.turn_id=$2`, [binding.sessionId, binding.turnId, scope.ownerId, scope.botId])).rows[0]
+  if (source && !source.id) throw new Error('notFound')
+  const sourceEventId = source?.source_event_id
+  const requestSource = source ? await (await import('./retry-source')).eveOriginalRequestSource(scope, source.source_event_id, source.payload) : undefined
+  const taskEventId = requestSource ? await (await import('./retry-source')).eveTaskRequestSource(scope, requestSource.id, requestSource.payload) : undefined
+  const scheduledRead = sourceEventId ? await (await import('./scheduled-read')).loadScheduledRead(scope, sourceEventId) : null
+  const entryOrigin = (await import('./run-origin')).eveRunOrigin(scope.surface, requestSource?.payload, Boolean(scheduledRead))
+  return { execution, sourceEventId, scheduledRead, taskEventId, entryOrigin }
 }
 
 async function productTools(scope: Scope, execution: AgentExecution | null, sourceEventId: string | undefined, scheduledRead: import('../schedules/contract').ScheduledRead | null, taskEventId: string | undefined,entryOrigin:import('../run-origin').ResolvedRunOrigin): Promise<ToolSet> {

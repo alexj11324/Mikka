@@ -19,12 +19,14 @@ mock.module(new URL('./scope.ts', import.meta.url).href, { namedExports: {
   },
 } })
 mock.module(new URL('./product-rpc.ts', import.meta.url).href, { namedExports: {
+  productRpc: async () => { throw new Error('unexpected product operation') },
+} })
+mock.module(new URL('./product-gateway.ts', import.meta.url).href, { namedExports: {
   async prepareEveExecution() {
     prepareCalls++
     if (prepareFails) throw new Error('preparation unavailable')
     return { execution: null, runtime: { harness: 'ai_sdk', model: 'frozen-model-' + prepareCalls } }
   },
-  productRpc: async () => { throw new Error('unexpected product operation') },
 } })
 mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { pool: {
   async query() {
@@ -48,7 +50,7 @@ mock.module(new URL('../subscription-workflow-model.ts', import.meta.url).href, 
 
 // Use Eve's real session-local state container. Product dependencies stay inert.
 const { ContextContainer, contextStorage } = await import(new URL('./context/container.js', import.meta.resolve('eve')).href)
-const { executionForSession } = await import('./runtime')
+const { executionForSession, modelForSession } = await import('./runtime')
 
 function definitionContext({ sessionId = 'fixture-session', turnId = 'turn_1', currentScope = scope,
   memos = new Map<string, unknown>() } = {}): DynamicModelContext {
@@ -68,7 +70,7 @@ beforeEach(() => {
   prepareFails = sourceFails = scopeDenied = leaseDenied = false
 })
 
-test('distinct dynamic definition memos share one preparation while scope and lease checks stay fresh', async () => {
+test('distinct dynamic definition memos share one preparation without repeated scope reads', async () => {
   await contextStorage.run(new ContextContainer(), async () => {
     const results = []
     for (let definition = 0; definition < 5; definition++) {
@@ -76,7 +78,7 @@ test('distinct dynamic definition memos share one preparation while scope and le
     }
     assert.equal(prepareCalls, 1)
     assert.equal(sourceReads, 1)
-    assert.equal(scopeChecks, 5)
+    assert.equal(scopeChecks, 0)
     assert.equal(leaseChecks, 5)
     assert.ok(results.every(result => result.runtime.model === 'frozen-model-1'))
     results[0].runtime.model = 'changed by one consumer'
@@ -91,7 +93,7 @@ test('native durable state survives a new context with new definition memos and 
   for (const [key, value] of original.entries()) restored.set(key, structuredClone(value))
   await contextStorage.run(restored, () => executionForSession(definitionContext()))
   assert.equal(prepareCalls, 1)
-  assert.equal(scopeChecks, 2)
+  assert.equal(scopeChecks, 0)
   assert.equal(leaseChecks, 2)
   await contextStorage.run(new ContextContainer(), () => executionForSession(definitionContext()))
   assert.equal(prepareCalls, 2)
@@ -116,17 +118,17 @@ test('a new session, turn or exact scope cannot reuse another preparation even w
   }
 })
 
-test('a reused preparation cannot bypass current scope or scheduled-read authority', async () => {
+test('each native model evaluation checks current scope and scheduled-read authority before reusing preparation', async () => {
   await contextStorage.run(new ContextContainer(), async () => {
-    await executionForSession(definitionContext())
+    await modelForSession(definitionContext())
     scopeDenied = true
-    await assert.rejects(executionForSession(definitionContext()), /workspaceAccessDenied/)
+    await assert.rejects(modelForSession(definitionContext()), /workspaceAccessDenied/)
     assert.equal(leaseChecks, 1)
     scopeDenied = false
     leaseDenied = true
-    await assert.rejects(executionForSession(definitionContext()), /scheduleReadAuthorityLost/)
+    await assert.rejects(modelForSession(definitionContext()), /scheduleReadAuthorityLost/)
     leaseDenied = false
-    await executionForSession(definitionContext())
+    await modelForSession(definitionContext())
     assert.equal(prepareCalls, 1)
     assert.equal(scopeChecks, 4)
     assert.equal(leaseChecks, 3)

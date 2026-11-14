@@ -5,17 +5,18 @@ import { HostedWorkflowModel } from '../abuse/workflow-model'
 import { SubscriptionWorkflowModel } from '../subscription-workflow-model'
 import { assertEveScope, scopeFromAuth } from './scope'
 import { streamingModel } from './streaming-model'
-import { prepareEveExecution, productRpc, type PreparedProductExecution } from './product-rpc'
+import { productRpc } from './product-rpc'
+import { prepareEveExecution } from './product-gateway'
 
 // Eve memos belong to one definition. Session state shares the immutable
 // preparation across model, tools, connections, skills and instructions.
 const turnPreparation = defineState<{
-  key: string; prepared: PreparedProductExecution; sourceEventId: string | null
+  key: string; prepared: Awaited<ReturnType<typeof prepareEveExecution>>; sourceEventId: string | null
 } | null>('mikka.turn-preparation', () => null)
 
 /** The immutable execution is a Mikka policy/model grant, not model history. */
 export async function executionForSession(ctx: DynamicModelContext) {
-  const scope = await assertEveScope(scopeFromAuth(ctx.session.auth.current))
+  const scope = scopeFromAuth(ctx.session.auth.current)
   if (!ctx.turn) throw new Error('agentExecutionClosed')
   const key = JSON.stringify([ctx.session.id, ctx.turn.id, scope.ownerId, scope.botId, scope.workspaceId, scope.surface])
   let saved = turnPreparation.get()
@@ -40,6 +41,7 @@ export async function executionForSession(ctx: DynamicModelContext) {
 export async function modelForSession(ctx: DynamicModelContext) {
   const evaluation=await evaluationForSession(ctx)
   if(evaluation)return evaluationModel(evaluation)
+  await assertEveScope(scopeFromAuth(ctx.session.auth.current))
   const { scope, runtime } = await executionForSession(ctx)
   if (runtime.harness !== 'ai_sdk' || !runtime.model) throw new Error('subscription_model_unavailable')
   return runtime.modelSelection ? streamingModel(new SubscriptionWorkflowModel(runtime.modelSelection)) : new HostedWorkflowModel(scope.ownerId, scope.botId, runtime.model)
