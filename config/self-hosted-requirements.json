@@ -41,6 +41,13 @@
     "test": "tests/task-create-only.db.test.ts",
     "suite": "test:coordinator-issue-create-db"
   },
+  "app/api/drive/volumes/[volumeId]/archive/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Archive the active personal folder of the signed-in owner in the selected workspace while retaining its versions.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "app/api/drive/volumes/[volumeId]/blobs/route.ts": {
     "mode": "built-in",
     "environment": [],
@@ -73,6 +80,13 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Read the head of an authorized private volume in the requested workspace.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "app/api/drive/volumes/[volumeId]/unarchive/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Return an archived personal folder to its owner in the selected workspace with the original head and history.",
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
@@ -115,6 +129,13 @@
     "behavior": "Confirm the signed-in native account on its issuing origin. Self-hosted Task destinations use the configured official client, an expiring single-use record in the existing auth database, and a fresh Task access check.",
     "test": "tests/mobile-handoff.test.ts",
     "suite": "test:desktop-auth"
+  },
+  "app/api/me/invitations/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Show the authenticated recipient's actionable Organization invitations using the verified account email and active issuer membership.",
+    "test": "tests/organization-invitations.db.test.ts",
+    "suite": "test:organization-invitations-db"
   },
   "app/api/organization-invitations/accept/route.ts": {
     "mode": "built-in",
@@ -312,6 +333,15 @@
       "MIKKA_DATABASE_URL"
     ],
     "behavior": "Keep personal volume names unique within their workspace while allowing the same owner to use a name in a different workspace.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "drizzle/20261114152243_archive_personal_drive_volumes.sql": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "Store the reversible archive timestamp in the application database. Existing folders remain active and their manifests are preserved.",
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
@@ -612,6 +642,13 @@
     "behavior": "Use the installed same-origin Drive API, scope caches by workspace and account, and upload bytes before publishing the manifest.",
     "test": "lib/drive/client.test.ts",
     "suite": "test:drive"
+  },
+  "lib/drive/volumes.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Lock the owner's personal volume in its selected workspace and change its archival state independently of immutable content revisions.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
   },
   "lib/drive/server.ts": {
     "mode": "built-in",

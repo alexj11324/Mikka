@@ -30,6 +30,7 @@ export type OrganizationInvitation = {
 export type OrganizationInvitationOutcome =
   | { email: string; created: true; id: string; path: string }
   | { email: string; created: false; reason: 'duplicate' | 'alreadyMember' | 'pending' }
+type ReceivedOrganizationInvitation = { id: string; organizationName: string; expiresAt: string }
 export type OrganizationAuditEvent = {
   id: string; organizationId?: string; actorId: string; action: string; result: 'success' | 'denied' | 'failure'
   correlationId?: string; targetId: string | null; metadata: Record<string, string | number | boolean | null>; createdAt: string
@@ -147,6 +148,12 @@ export function useJoinableOrganizations() {
     () => request<{ organizations: JoinableOrganization[] }>('/api/me/joinable-organizations').then(value => value.organizations))
 }
 
+export function useReceivedOrganizationInvitations() {
+  const { data, isPending } = authClient.useSession()
+  return useSWR(isPending || !data || data.user.emailVerified === false ? null : ['received-organization-invitations', data.user.id, data.user.email, data.session.id],
+    () => request<{ invitations: ReceivedOrganizationInvitation[] }>('/api/me/invitations').then(value => value.invitations))
+}
+
 export function useOrganizationDomains(organizationId: string) {
   const { data, isPending } = authClient.useSession()
   return useSWR(isPending || !data ? null : ['organization-domains', organizationId, data.user.id],
@@ -185,6 +192,8 @@ export type OrganizationServiceKey = {
 }
 
 export const organizationApi = {
+  acceptReceivedInvitation: (invitationId: string) =>
+    send<{ organizationId: string; joined: true }>('/api/organization-invitations/accept', 'POST', { invitationId }),
   addDomain: (id: string, domain: string) =>
     send<{ domain: OrganizationDomain }>(org(id, '/allowed-domains'), 'POST', { domain }),
   removeDomain: (id: string, domainId: string) =>
