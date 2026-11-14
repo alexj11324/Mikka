@@ -76,6 +76,18 @@ test('a thread is named by the first line it was asked, shortened, else by its a
   assert.equal(Array.from(threadName('长'.repeat(80), 'x')).length, 12, 'held to the short-title bound, as every surface names it')
 })
 
+test('the conversation and activity read the pause reason from the displayed attempt', () => {
+  const root = { ...make('root', 'viewer'), status: 'paused', pauseReason: 'quota_exhausted' as const }
+  const [thread] = projectIssueThreads([root], 'issue', 'viewer', new Set(['viewer']))
+  assert.equal(threadQuestionView(thread).pauseReason, 'quota_exhausted')
+  const tail = { ...thread.attempts[0], runId: 'child', attempt: 2, pauseReason: 'human_control' as const, stopRequestedAt: null }
+  const resumed = withRunChain(thread, { rootRunId: 'root', latestRunId: 'child', attempts: [
+    { ...thread.attempts[0], stopRequestedAt: null }, tail,
+  ] })
+  assert.equal(threadQuestionView(resumed).pauseReason, 'human_control')
+  assert.equal(resumed.attempts[0].pauseReason, 'quota_exhausted')
+})
+
 test('a resumed question is one thread: its run chain folds the continuation into the origin row, named as the origin', () => {
   const members = new Set(['viewer'])
   const origin = { ...make('origin', 'viewer'), status: 'succeeded', prompt: 'Speed up the home page', createdAt: new Date('2026-01-01T00:00:00Z') }

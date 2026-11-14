@@ -105,5 +105,7 @@ export type DesktopConfig = {
 export type DesktopBootstrap = DesktopSession & DesktopConfig & {
   onboarding: boolean
   computer: 'none' | 'ask'
+  /** Whether subsequent reads already use the explicit workspace in this bootstrap request. */
+  requestedWorkspaceSelected?: boolean
   cacheWorkspace: { workspaceId: string; role: 'admin' | 'member' } | null
 }

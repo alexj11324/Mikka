@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { spawnSync } from 'node:child_process'
-import { readFile } from 'node:fs/promises'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import {tmpdir} from 'node:os'
+import {join} from 'node:path'
+import {pathToFileURL} from 'node:url'
 import test from 'node:test'
 import { sourceContext } from './cloudflare-ci.mjs'
-import { buildEnvironment, digestFromRepoDigests, releaseDockerfile, releaseId, releaseSelection, validatePrepared, publicReceipt } from './cloudflare-native-oci.mjs'
+import { buildEnvironment, digestFromRepoDigests, releaseDockerfile, releaseId, releaseSelection, validatePrepared, publicReceipt, verifyOverlayMain } from './cloudflare-native-oci.mjs'
 
 const publicSha = 'a'.repeat(40)
 const privateSha = 'b'.repeat(40)
@@ -42,6 +45,35 @@ test('publication requires the public main build and exact selected overlay', ()
   assert.throws(() => releaseSelection(env, { ...receipt, publicSha: privateSha }), /CI_RECEIPT_INVALID/)
   assert.throws(() => releaseSelection({ ...env, GITHUB_RUN_ATTEMPT: '3' }, receipt), /CI_RECEIPT_SOURCE_MISMATCH/)
   assert.throws(() => releaseSelection(env, { ...receipt, target: 'renderers' }), /CI_BUILD_TARGET_INVALID/)
+})
+
+test('a selected main overlay survives later merges while an unmerged overlay is rejected without changing the checkout', async () => {
+  const directory = await mkdtemp(join(tmpdir(),'mikka-overlay-main-'))
+  const upstream = join(directory,'upstream'), checkout = join(directory,'checkout')
+  const git = (cwd,...args) => execFileSync('git',args,{cwd,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim()
+  try {
+    git(directory,'init','--initial-branch=main',upstream)
+    git(upstream,'config','user.name','Fixture')
+    git(upstream,'config','user.email','fixture@example.invalid')
+    await writeFile(join(upstream,'source.txt'),'reviewed overlay\n')
+    git(upstream,'add','source.txt');git(upstream,'commit','-m','Reviewed main')
+    const pinned = git(upstream,'rev-parse','HEAD')
+    git(directory,'clone','--depth=1',pathToFileURL(upstream).href,checkout)
+    git(checkout,'config','url.'+pathToFileURL(upstream).href+'.insteadOf','git@github.com:alexj11324/mikka-hosted-ui.git')
+    await writeFile(join(upstream,'source.txt'),'newer main\n')
+    git(upstream,'commit','-am','Later main merge')
+    verifyOverlayMain(checkout,pinned)
+    assert.equal(git(checkout,'rev-parse','HEAD'),pinned)
+    assert.equal(await readFile(join(checkout,'source.txt'),'utf8'),'reviewed overlay\n')
+    git(checkout,'config','user.name','Fixture')
+    git(checkout,'config','user.email','fixture@example.invalid')
+    git(checkout,'checkout','-b','unmerged')
+    await writeFile(join(checkout,'source.txt'),'unmerged overlay\n')
+    git(checkout,'commit','-am','Unmerged source')
+    const unmerged = git(checkout,'rev-parse','HEAD')
+    assert.throws(()=>verifyOverlayMain(checkout,unmerged),/CF_OCI_STAGE_OVERLAY_MAIN_ANCESTRY_FAILED/)
+    assert.equal(git(checkout,'rev-parse','HEAD'),unmerged)
+  } finally { await rm(directory,{recursive:true,force:true}) }
 })
 
 test('production compilation receives public settings and no read key', () => {

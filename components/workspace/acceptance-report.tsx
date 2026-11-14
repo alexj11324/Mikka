@@ -6,7 +6,7 @@ import useSWR from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { ArrowRight, ChevronRight, CircleCheck, CircleX, ExternalLink, Play } from 'lucide-react'
 import { getArtifact } from '@/app/actions/artifacts'
-import { getThreadChanges } from '@/app/actions/agents'
+import { useThreadChanges } from '@/hooks/use-thread-run-reads'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
@@ -61,7 +61,7 @@ export function AcceptanceReport({ artifactId, issueId, runId, detail, flow, res
   const number = pullNumberOf(pr?.url)
   const sha = delivery?.candidateSha ?? null
   const { data: artifact } = useSWR(['artifact', artifactId], () => getArtifact(artifactId))
-  const { data: changes } = useSWR(runId ? ['thread-changes', issueId, runId] : null, () => getThreadChanges(issueId, runId!))
+  const { data: changes } = useThreadChanges(issueId, runId ?? null)
   const [allChanges, setAllChanges] = useState(false)
   const [open, setOpen] = useState<readonly string[] | null>(null)
   const [viewing, setViewing] = useState<ArtifactMedia | null>(null)

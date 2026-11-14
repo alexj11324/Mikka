@@ -5,11 +5,16 @@ import type { Root } from 'react-dom/client'
 import { SWRConfig, type Cache } from 'swr'
 import { Window } from 'happy-dom'
 
-const question = { questionId: 'question-one', taskId: 'factory-one', runId: 'run-one', status: 'waiting_user', type: 'decision', question: 'Which branch?', options: [{ label: 'Main', value: 'main' }], reference: { protocol: 'fixture', id: 'reference-one' } }
-let failure: number | Error | null, pending: boolean, taskFailure: boolean
+const question = { questionId: 'question-one', taskId: 'factory-one', runId: 'run-one', status: 'waiting_user', type: 'decision', question: 'Which branch?', options: [{ label: 'Main', value: 'main' }], reference: { questionRevision: 1, binding: { taskId: 'factory-one', issueId: 'issue-one' } } }
+let failure: number | Error | null, pending: boolean
 let afterAnswerFailure: boolean
+let rows: (typeof question)[], deniedIssue: boolean
+const issueReads: string[] = []
 const requests: { path: string; init?: RequestInit }[] = []
-mock.module('@/app/actions/issues', { namedExports: { getIssue: async () => ({ issue: { identifier: 'MIK-1', title: 'Task' } }) } })
+mock.module('@/app/actions/issues', { namedExports: { getIssue: async (id: string) => {
+  issueReads.push(id)
+  return deniedIssue ? { error: 'issueNotFound' } : { issue: { identifier: 'MIK-1', title: 'Task' } }
+} } })
 const browser = new Window({ url: 'https://fixture.example/' })
 let container: HTMLDivElement, root: Root, cache: Cache
 let createRoot: typeof import('react-dom/client')['createRoot']
@@ -25,16 +30,15 @@ before(async () => {
     if (path.endsWith('/api/factory/questions')) {
       if (failure instanceof Error) throw failure
       if (failure) return Response.json({ error: 'unavailable' }, { status: failure })
-      return Response.json({ questions: pending ? [question] : [] })
+      return Response.json({ questions: pending ? rows : [] })
     }
-    if (path.endsWith('/api/factory/tasks/factory-one')) return Response.json(taskFailure ? { error: 'missing' } : { task: { issueId: 'issue-one' } }, { status: taskFailure ? 404 : 200 })
     throw new Error('Unexpected local fixture request')
   }) as typeof fetch
   ;({ createRoot } = await import('react-dom/client'))
   ;({ useFactoryQuestions } = await import('./use-factory-questions'))
 })
 beforeEach(() => {
-  failure = null; pending = true; taskFailure = false; afterAnswerFailure = false; requests.length = 0; cache = new Map()
+  failure = null; pending = true; rows = [question]; deniedIssue = false; issueReads.length = 0; afterAnswerFailure = false; requests.length = 0; cache = new Map()
   container = browser.document.createElement('div') as unknown as HTMLDivElement
   document.body.append(container); root = createRoot(container)
 })
@@ -77,11 +81,22 @@ test('answering retains the existing reference, fresh answer id and refresh prot
   assert.match(body.answerId, /^[0-9a-f-]{36}$/)
   assert.deepEqual(state.questions, [])
 })
-test('optional task metadata failure retains the pending question', async () => {
-  taskFailure = true
+test('Factory questions share their issue label without reading Factory task details', async () => {
+  rows = [question, { ...question, questionId: 'question-two', taskId: 'factory-two',
+    reference: { ...question.reference, binding: { taskId: 'factory-two', issueId: 'issue-one' } } }]
+  await render()
+  assert.deepEqual(state.questions.map(({ issueId, task }) => [issueId, task]), [
+    ['issue-one', 'MIK-1 Task'], ['issue-one', 'MIK-1 Task'],
+  ])
+  assert.deepEqual(requests.map(request => request.path), ['/api/factory/questions'])
+  assert.deepEqual(issueReads, ['issue-one'])
+})
+test('an unavailable issue label retains the pending question without exposing its title', async () => {
+  deniedIssue = true
   await render()
   assert.equal(state.questions[0].questionId, 'question-one')
-  assert.equal(state.questions[0].issueId, null)
+  assert.equal(state.questions[0].task, '')
+  assert.equal(state.questions[0].issueId, 'issue-one')
   assert.equal(state.error, null)
 })
 test('an accepted answer with a failed refresh exposes the read error without resending the answer', async () => {
@@ -144,7 +159,7 @@ for (const scenario of [
     calls.push(init?.method || 'GET')
     if (init?.method === 'POST') return Response.json({ error: scenario.error }, { status: scenario.write })
     assert.notEqual(scenario.read, 0)
-    return Response.json({ id: question.questionId, ...scenario.current }, { status: scenario.read })
+    return Response.json({ id: question.questionId, reference: question.reference, ...scenario.current }, { status: scenario.read })
   }
   try {
     await act(async () => {

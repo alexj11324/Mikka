@@ -155,7 +155,11 @@ test('Drive CAS on PG17: conflicts refuse with zero side effects, replays land o
 
   // A second volume with the same name in another scope is allowed, and one of
   // another owner is never listed.
-  const project = await createDriveVolume(pool as never, actor, { driveScope: 'project', scopeId: 'proj-1', name: 'notes' }, sha256)
+  const workspaceId = randomUUID()
+  const project = await createDriveVolume(pool as never, actor, { driveScope: 'project', scopeId: 'proj-1', workspaceId, name: 'notes' }, sha256)
+  assert.equal((await readDriveVolume(pool as never, actor, project.id)).id, project.id)
+  await assert.rejects(() => readDriveVolume(pool as never, { ownerId: actor.ownerId, workspaceId }, project.id),
+    (error: unknown) => error instanceof Error && (error as { code?: string }).code === 'drive_not_found')
   assert.equal((await listDriveVolumes(pool as never, actor, { driveScope: 'user', scopeId: 'drive-owner' })).length, 1)
   assert.equal((await listDriveVolumes(pool as never, { ownerId: 'someone-else' }, { driveScope: 'project', scopeId: 'proj-1' })).length, 0)
   await assert.rejects(() => readDriveVolume(pool as never, { ownerId: 'someone' }, project.id),

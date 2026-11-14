@@ -157,6 +157,18 @@ test('two mounted readers remove denied rows, ignore a late success, and retain 
     await act(async () => { void previousRouteWrite() })
     assert.equal(requests.length, 11, 'a late ACK must not read a previous route into the current chat')
     assert.equal(reads[1].data, 'current bot')
+    // Reopen the denied path while offline. A new reader must inherit the
+    // server's last decision until a successful read of this same path.
+    await act(async () => root.render(createElement(Reader, { key: 'reopen', index: 0 })))
+    assert.equal((reads[0].error as ApiError)?.status, 403)
+    await act(async () => { requests[11].reject(new TypeError('offline')) })
+    assert.equal((reads[0].error as ApiError)?.status, 403)
+    await act(async () => { reads[0].setData('local change while offline') })
+    assert.equal(reads[0].data, null)
+    assert.equal((reads[0].error as ApiError)?.status, 403)
+    await act(async () => { void reads[0].reload(); requests[12].resolve('read after rejoin') })
+    assert.equal(reads[0].data, 'read after rejoin')
+    assert.equal(reads[0].error, null)
   } finally {
     await act(async () => root.unmount())
     apiCache.setIdentity(null)

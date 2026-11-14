@@ -2,15 +2,14 @@ import type { Pool } from 'pg'
 import { z } from 'zod'
 import { executionIdentitySchema } from '../execution-identity'
 import type { WorkerDefinitionSnapshot } from '../agent-kit/worker'
-import { anonymousClaudeStartupHint, firstAnonymousClaudeTask } from '../computer/claude-startup-hint'
-import { anonymousCodexStartupHint } from '../computer/codex-startup-hint'
+import { anonymousStartupHint, firstAnonymousTask } from '../computer/anonymous-startup-hint'
 
 export const bootstrapEvidenceQuery = z.object({
   bootstrap: z.literal('1'), deviceId: z.uuid(), workspaceId: z.uuid(),
   bootstrapSha256: z.string().regex(/^[a-f0-9]{64}$/),
 }).strict()
 type Input = z.infer<typeof bootstrapEvidenceQuery>
-type Row = Parameters<typeof firstAnonymousClaudeTask>[1] & {
+type Row = Parameters<typeof firstAnonymousTask>[1] & {
   id: string; userId: string; botId: string; deviceId: string; kind: string
   repository: string | null; definition: WorkerDefinitionSnapshot | null
 }
@@ -40,16 +39,14 @@ export async function readRunBootstrapEvidence(pool: Pick<Pool, 'query'>, userId
     JOIN bots b ON b.id=r."botId" AND b."ownerId"=$2 AND b."workspaceId"=$4 AND b."archivedAt" IS NULL
     WHERE r.id=$1 AND r."userId"=$2 AND r."deviceId"=$3`, [runId, userId, input.deviceId, input.workspaceId])
   if (!run || run.id !== runId || run.userId !== userId || run.deviceId !== input.deviceId ||
-    run.definition?.readOnly !== true || !firstAnonymousClaudeTask({ created: true, refresh: false, retained: false, question: false }, run)) return null
+    run.definition?.readOnly !== true || !firstAnonymousTask({ created: true, refresh: false, retained: false, question: false }, run)) return null
   const identity = executionIdentitySchema.safeParse(run.definition.executionIdentity)
   if (!identity.success || identity.data.requester !== userId || identity.data.executionPrincipal !== userId ||
     identity.data.outputOwner !== userId || identity.data.workspaceId !== input.workspaceId || identity.data.botId !== run.botId ||
     identity.data.resourceBindings.filter(row => row.kind === 'device').length !== 1 ||
     !identity.data.resourceBindings.some(row => row.kind === 'device' && row.id === input.deviceId && row.ownerId === userId && row.access === 'owner')) return null
   const harness = run.definition.harness
-  const builder = harness === 'claude_code' ? anonymousClaudeStartupHint : harness === 'codex' ? anonymousCodexStartupHint : null
-  if (!builder) return null
-  const encoded = builder({ runId, bootstrap: { sha256: input.bootstrapSha256 }, kind: run.kind, repository: run.repository,
+  const encoded = anonymousStartupHint({ runId, bootstrap: { sha256: input.bootstrapSha256 }, kind: run.kind, repository: run.repository,
     userId, botId: run.botId, definition: run.definition, freshTask: true, diagnostics: true })
   if (!encoded) return null
   return { version: 1 as const, authority: 'none' as const, deviceId: input.deviceId, workspaceId: input.workspaceId,

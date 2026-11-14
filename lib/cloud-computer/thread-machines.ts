@@ -1,5 +1,4 @@
-import { anonymousCodexStartupHint } from '../computer/codex-startup-hint'
-import { anonymousClaudeStartupHint, firstAnonymousClaudeTask } from '../computer/claude-startup-hint'
+import { anonymousStartupHint, firstAnonymousTask } from '../computer/anonymous-startup-hint'
 import { runChanged } from '../live/panels'
 import { taskActivityChanged } from '../factory/activity-live'
 import { recordCancelledThreadSessionEnd } from './thread-machine-sessions'
@@ -1144,15 +1143,15 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     // and rollback. This optional locator binds to the same one-use bytes; it
     // carries no assignment or usable credential. String multipart is one RPC.
     const initialRun = refreshRuntime ? '' : JSON.stringify({ version: 1, runId, bootstrapSha256: createHash('sha256').update(bootstrap).digest('hex') })
-    const anonymousClaude = anonymousClaudeStartupHint({
-      freshTask: firstAnonymousClaudeTask({ created: anonymousFreshMachine, refresh: refreshRuntime, retained: Boolean(retainedSandboxId), question: exactQuestionMachine }, current),
+    const hint = anonymousStartupHint({
+      freshTask: firstAnonymousTask({ created: anonymousFreshMachine, refresh: refreshRuntime, retained: Boolean(retainedSandboxId), question: exactQuestionMachine }, current),
       runId, bootstrap, kind: current.kind, repository: run.repoPath, definition, userId: actor.userId, botId: current.botId,
     })
-    const anonymousCodex = anonymousCodexStartupHint({
-      freshTask: firstAnonymousClaudeTask({ created: anonymousFreshMachine, refresh: refreshRuntime, retained: Boolean(retainedSandboxId), question: exactQuestionMachine }, current),
-      runId, bootstrap, kind: current.kind, repository: run.repoPath, definition, userId: actor.userId, botId: current.botId,
-    })
-    const uploads = [{ path: handoff, data: bootstrap }, { path: `${handoff}.run`, data: initialRun }, { path: `${handoff}.claude`, data: anonymousClaude }, { path: `${handoff}.codex`, data: anonymousCodex }]
+    const uploads = [
+      { path: handoff, data: bootstrap }, { path: `${handoff}.run`, data: initialRun },
+      { path: `${handoff}.claude`, data: definition?.harness === 'claude_code' ? hint : '' },
+      { path: `${handoff}.codex`, data: definition?.harness === 'codex' ? hint : '' },
+    ]
     if (workerBroker?.active) workerBroker.assertAwaitingUpload()
     await sandbox.files.write(uploads, { user: 'root', useOctetStream: false, ...runtimeRequestOptions(refreshBudget) })
     // The foreground command must finish the atomic publication before waking

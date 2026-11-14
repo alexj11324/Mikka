@@ -86,6 +86,15 @@ test('run chains: folding, LIMIT on roots, stop forwarding and isolation', { ski
     assert.equal(await stopRequested(c), true)
   })
 
+  await t.test('a human-controlled pause follows its attempt without changing an earlier quota pause', async () => {
+    const me = await owner(), issueId = await me.issue()
+    const root = await run(me, issueId, 'paused'), tail = await run(me, issueId, 'paused', cont(root))
+    await pool.query(`UPDATE agent_runs SET "pauseReason"=CASE WHEN id=$1 THEN 'quota_exhausted' ELSE 'human_control' END WHERE id IN ($1,$2)`, [root, tail])
+    const [listed] = await listIssueRunChains(pool, issueId, [me.userId], 20)
+    const detail = await readRunChain(pool, me.userId, root)
+    for (const chain of [listed, detail]) assert.deepEqual(chain?.attempts.map(attempt => attempt.pauseReason), ['quota_exhausted', 'human_control'])
+  })
+
   await t.test('failure details follow the latest attempt without provider text in chain lists', async () => {
     const me = await owner(), issueId = await me.issue()
     const a = await run(me, issueId, 'failed'), b = await run(me, issueId, 'failed', cont(a))
@@ -268,7 +277,7 @@ test('run chains: folding, LIMIT on roots, stop forwarding and isolation', { ski
       // This connection-local table represents pre-migration history. The
       // production guard remains enabled on the real table throughout.
       await history.query(`CREATE TEMP TABLE agent_runs (
-        id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"workspaceId" uuid,"botId" uuid,status text,outcome text,"failureDetails" jsonb,
+        id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"workspaceId" uuid,"botId" uuid,status text,outcome text,"pauseReason" text,"failureDetails" jsonb,
         "createdAt" timestamptz DEFAULT now(),"finishedAt" timestamptz,"stopRequestedAt" timestamptz,
         "questionContinuation" jsonb,"retryOf" uuid,"continuesRunId" uuid) ON COMMIT DROP`)
       await history.query(`INSERT INTO agent_runs (id,"userId","workspaceId",status,"retryOf","continuesRunId","questionContinuation","createdAt") VALUES

@@ -26,8 +26,8 @@ export type GateState =
 export interface GateOptions {
   /** Each state the window shows. */
   onState(state: GateState): void
-  /** No update to install: open the app. Called at most once. */
-  onProceed(): void
+  /** Open once. Retry in the background only if the launch check was inconclusive. */
+  onProceed(retryCheck: boolean): void
   timeoutMs?: number
   setTimer?: (run: () => void, ms: number) => unknown
   clearTimer?: (timer: unknown) => void
@@ -55,7 +55,7 @@ export class UpdateGate {
       this.stopTimer()
       this.show({ kind: 'downloading', version: info.version, percent: 0 })
     })
-    this.listen('update-not-available', () => { if (this.state.kind === 'checking') this.proceed() })
+    this.listen('update-not-available', () => { if (this.state.kind === 'checking') this.proceed(false) })
     this.listen('download-progress', (progress: { percent: number }) => {
       if (this.state.kind !== 'downloading') return
       const percent = Math.max(0, Math.min(100, Math.floor(progress.percent)))
@@ -75,7 +75,7 @@ export class UpdateGate {
   /** Starts the check; the timeout applies only until an update is found. */
   start(): void {
     this.show({ kind: 'checking' })
-    this.timer = this.setTimer(() => { if (this.state.kind === 'checking') this.proceed() }, this.options.timeoutMs ?? CHECK_TIMEOUT_MS)
+    this.timer = this.setTimer(() => { if (this.state.kind === 'checking') this.proceed(true) }, this.options.timeoutMs ?? CHECK_TIMEOUT_MS)
     this.check()
   }
 
@@ -94,16 +94,16 @@ export class UpdateGate {
     if (this.finished) return
     // A check that cannot reach the server lets the person in; only a found
     // update that will not download holds the door.
-    if (this.state.kind === 'checking') return this.proceed()
+    if (this.state.kind === 'checking') return this.proceed(true)
     if (this.state.kind === 'downloading') this.show({ kind: 'failed', version: this.state.version, reason: failureReason(error) })
   }
 
-  private proceed(): void {
+  private proceed(retryCheck: boolean): void {
     if (this.finished) return
     this.finished = true
     this.stopTimer()
     this.detach()
-    this.options.onProceed()
+    this.options.onProceed(retryCheck)
   }
 
   private show(state: GateState): void {

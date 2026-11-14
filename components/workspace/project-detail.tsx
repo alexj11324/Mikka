@@ -6,6 +6,7 @@ import useSWR, { unstable_serialize } from 'swr'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { useTaskContinuation } from '@/lib/hooks/use-task-continuation'
 import { ArrowLeft, Box, PanelRight, Pencil, Plus, Link2, History } from 'lucide-react'
+import { ProjectLifecycleControls } from './project-lifecycle-controls'
 import { ProjectTeamControl } from '@/components/teams/project-team-control'
 import { listProjectEvents } from '@/app/actions/projects'
 import { listWorkspaceTaskPage, type listIssues } from '@/app/actions/issues'
@@ -48,9 +49,9 @@ function ProjectTaskList({ project, readerId, onOpen, onCreate }: { project: Pro
   </>
 }
 
-export function ProjectDetail({ readerId, paging, project, projects, issues, directory, onBack, onOpenIssue, onCreateIssue, onUpdated }: { readerId: string; paging: ProjectTaskPaging; project: Project; projects: Project[]; issues: Awaited<ReturnType<typeof listIssues>>; directory: ProjectDirectory; onBack: () => void; onOpenTeam: () => void; onOpenIssue: (id: string) => boolean; onCreateIssue: () => void; onUpdated: () => void }) {
+export function ProjectDetail({ readerId, paging, project, projects, issues, directory, admin, onBack, onOpenIssue, onCreateIssue, onUpdated }: { readerId: string; paging: ProjectTaskPaging; project: Project; projects: Project[]; issues: Awaited<ReturnType<typeof listIssues>>; directory: ProjectDirectory; admin: boolean; onBack: () => void; onOpenTeam: () => void; onOpenIssue: (id: string) => boolean; onCreateIssue: () => void; onUpdated: () => void }) {
   const i18nText = useTranslations();
-  const readOnly = project.canEditProperties === false
+  const readOnly = project.canEditProperties === false || Boolean(project.archivedAt)
   const [editing, setEditing] = useState(false)
   const editDialog = usePresence(editing)
   const [linking, setLinking] = useState(false)
@@ -59,9 +60,12 @@ export function ProjectDetail({ readerId, paging, project, projects, issues, dir
   const [tab, setTab] = useViewState(`project:${project.id}:tab`, 'overview')
   const { update, pending, error: saveError } = useProjectUpdate(onUpdated)
   const flushes = useRef(new Map<string, () => Promise<boolean>>())
-  async function afterSave(action: () => void) {
+  async function flushChanges() {
     const results = await Promise.all([...flushes.current.values()].map(flush => flush()))
-    if (results.every(Boolean)) action()
+    return results.every(Boolean)
+  }
+  async function afterSave(action: () => void) {
+    if (await flushChanges()) action()
   }
   function registerFlush(field: string, flush: (() => Promise<boolean>) | null) {
     if (flush) flushes.current.set(field, flush)
@@ -81,7 +85,7 @@ export function ProjectDetail({ readerId, paging, project, projects, issues, dir
   const progress = counts ? (counts.total ? Math.round(counts.done / counts.total * 100) : 0) : null
   const activity = <div className="flex flex-col gap-5">{error ? <Button variant="outline" onClick={() => void mutate()}>{i18nText("Projects.detail.activityFailed")}</Button> : !events ? <p role="status" className="text-sm text-muted-foreground">{i18nText("Projects.detail.readingActivity")}</p> : events.map(event => <div key={event.id} className="flex items-start gap-3 text-sm"><History className="mt-1 size-4 shrink-0 text-muted-foreground" /><div className="flex flex-col gap-1"><p>{event.actorName && <><bdi>{event.actorName}</bdi>{' '}</>}{event.message}</p><time className="text-xs text-muted-foreground" dateTime={new Date(event.createdAt).toISOString()}>{new Date(event.createdAt).toLocaleString('zh-CN')}</time></div></div>)}</div>
   return <div className="flex min-w-0 flex-1 flex-col">
-    <div className="flex items-center justify-between gap-2 px-4 py-2"><div className="flex min-w-0 items-center gap-2"><Button variant="ghost" size="icon-sm" aria-label={i18nText("Projects.detail.backToList")} onClick={() => { void afterSave(onBack) }}><ArrowLeft data-icon="inline-start" /></Button><Box className={cn('size-4 shrink-0', PROJECT_ICON_TINTS[project.properties.color])} /><span className="truncate text-sm">{project.name}</span></div><Button variant="ghost" size="sm" disabled={readOnly} onClick={() => { void afterSave(() => setEditing(true)) }}><Pencil data-icon="inline-start" />{i18nText("Projects.form.editTitle")}</Button></div>
+    <div className="flex items-center justify-between gap-2 px-4 py-2"><div className="flex min-w-0 items-center gap-2"><Button variant="ghost" size="icon-sm" aria-label={i18nText("Projects.detail.backToList")} onClick={() => { void afterSave(onBack) }}><ArrowLeft data-icon="inline-start" /></Button><Box className={cn('size-4 shrink-0', PROJECT_ICON_TINTS[project.properties.color])} /><span className="truncate text-sm">{project.name}</span>{project.archivedAt && <Badge variant="secondary">{i18nText("Projects.lifecycle.archived")}</Badge>}</div><div className="flex flex-wrap justify-end gap-2"><ProjectLifecycleControls key={`${readerId}:${project.workspaceId}:${project.id}`} project={project} readerId={readerId} admin={admin} beforeOpen={flushChanges} onUpdated={onUpdated} onDeleted={onBack} /><Button variant="ghost" size="sm" disabled={readOnly} onClick={() => { void afterSave(() => setEditing(true)) }}><Pencil data-icon="inline-start" />{i18nText("Projects.form.editTitle")}</Button></div></div>
     <Tabs value={tab} onValueChange={value => { void afterSave(() => setTab(String(value))) }} className="min-w-0 flex-1 gap-0">
       <div className="flex items-center justify-between gap-3 px-4 py-3"><TabsList><TabsTrigger value="overview">{i18nText("Projects.detail.overview")}</TabsTrigger><TabsTrigger value="activity">{i18nText("Projects.detail.activity")}</TabsTrigger><TabsTrigger value="issues">{i18nText("Projects.detail.issues")}<Badge variant="secondary">{counts?.total ?? '—'}</Badge></TabsTrigger></TabsList><Button variant="ghost" size="icon-sm" aria-label={i18nText("Projects.detail.toggleDetails")} aria-pressed={showDetails} title={detailsShortcut} onClick={() => setShowDetails(value => !value)}><PanelRight data-icon="inline-start" /></Button></div>
       <div className="flex min-w-0 flex-1 flex-col lg:flex-row">

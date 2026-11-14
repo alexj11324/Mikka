@@ -201,6 +201,7 @@ export class TaskMachine extends DurableObject {
           if (await this.ctx.storage.get('nativeWriter') !== nonce) return
           await this.saveNativeWorkspace(container)
           await this.ctx.storage.delete('nativeWriter')
+          await this.workspace.prune()
         }))
       } catch (error) {
         await this.stop(run, 'interrupted', true)
@@ -217,9 +218,7 @@ export class TaskMachine extends DurableObject {
   async saveNativeWorkspace(container) {
     await stopTaskProcesses(container)
     if (this.env.NATIVE_TASK_EGRESS === 'direct') await this.transferNativeHistory('save')
-    const checkpoint = await this.workspace.checkpoint()
-    await this.workspace.prune()
-    return checkpoint
+    return this.workspace.checkpoint()
   }
   withFiles(identity, operation) { return this.withMachine(identity, c => operation(new TaskFiles(c))) }
   readFile(identity, path) { return this.withFiles(identity, files => files.read(path)) }

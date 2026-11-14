@@ -8,8 +8,9 @@ export function projectEveTurn(view:SessionView,sessionId:string,turnId:string,o
   const code=turn(view,turnId)?.error?.code
   const failure=typeof code==='string' && /^[a-zA-Z][a-zA-Z0-9_.:-]{0,127}$/.test(code) ? code : 'turn_failed'
   const content = parts(view,{turnId}).flatMap(part => (part.kind === 'text' || part.kind === 'reasoning') && typeof part.value === 'string' ? [{type:part.kind,text:part.value}] : [])
-  const toolCalls = calls(view,{turnId}).filter(call => call.kind === 'tool').map(call => ({ type:'tool-call',toolCallId:call.callId,toolName:call.name,input:call.input ?? {} }))
-  const output = calls(view,{turnId}).filter(call => call.kind === 'tool' && ['completed','failed','cancelled','rejected'].includes(call.state)).map(call => ({type:'tool-result',toolCallId:call.callId,toolName:call.name,output:{type:'json',value:call.output ?? {error:call.error?.code ?? call.state}}}))
+  const tools = calls(view,{turnId,kind:'tool'})
+  const toolCalls = tools.map(call => ({ type:'tool-call',toolCallId:call.callId,toolName:call.name,input:call.input ?? {} }))
+  const output = tools.filter(call => ['completed','failed','cancelled','rejected'].includes(call.state)).map(call => ({type:'tool-result',toolCallId:call.callId,toolName:call.name,output:{type:'json',value:call.output ?? {error:call.error?.code ?? call.state}}}))
   return [
     {role:'assistant',content:[...content,...toolCalls],mikkaStreamId:eveStreamId(sessionId,turnId),...(outcome === 'cancelled' ? {mikkaStopped:true} : {}),...(outcome === 'failed' ? {mikkaFailure:failure} : {})},
     ...(output.length ? [{role:'tool',content:output}] : []),

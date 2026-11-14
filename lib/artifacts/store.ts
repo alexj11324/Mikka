@@ -1,6 +1,5 @@
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
-import { afterJob } from '@/lib/background'
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { db, pool } from '@/lib/db'
 import { executionIdentityForRun } from '@/lib/execution-identity'
@@ -8,7 +7,6 @@ import { agentRuns, agents, artifactShares, artifactVersions, artifacts, bots, i
 import { runAgentName, runBotName } from '@/lib/run-bot-name'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { artifactSubmittedEvent } from '@/lib/coordinator-events'
-import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { ARTIFACT_CONTENT_TYPES, ARTIFACT_EXTENSIONS, ARTIFACT_MAX_BYTES, cleanTitle, utf8Bytes } from '@/lib/artifacts/limits'
 import { stripDiffMarkers } from '@/lib/artifacts/diff'
 import type { ArtifactDetail, ArtifactListItem, ArtifactMedia, ArtifactSummary } from '@/lib/artifacts/types'
@@ -62,7 +60,7 @@ export async function submitArtifact(submitter: ArtifactSubmitter, input: { titl
   const hash = sha256(content)
 
   const workspaceId = await submissionWorkspace(submitter)
-  const result = await withTaskWorkspace({ id: submitter.userId, [enterprisePrincipal]: submitter[enterprisePrincipal] }, workspaceId, () => db.transaction(async tx => {
+  return withTaskWorkspace({ id: submitter.userId, [enterprisePrincipal]: submitter[enterprisePrincipal] }, workspaceId, () => db.transaction(async tx => {
     await tx.execute(sql`select mikka_account_assert_writable(${submitter.userId})`)
     let artifactId = input.artifactId
     let version = 1
@@ -92,9 +90,6 @@ export async function submitArtifact(submitter: ArtifactSubmitter, input: { titl
     if (submitter.runId) taskActivityChanged(tx, submitter.runId)
     return submitted
   }))
-  if ('error' in result) return result
-  afterJob('after:coordinator-wake', () => wakeCoordinator(submitter.userId))
-  return result
 }
 
 /** Titles and latest versions of the person's artifacts among `ids`, for cards in the chat. */
@@ -241,11 +236,12 @@ async function versionContent(artifactId: string, version: number): Promise<stri
 
 /** The person's artifact file at `version`. */
 export async function readArtifactContent(reader: ArtifactReader, artifactId: string, version: number): Promise<{ kind: ArtifactKind; title: string; content: string } | null> {
-  const [row] = await db.select({ kind: artifacts.kind, title: artifacts.title }).from(artifacts)
+  const [row] = await db.select({ kind: artifacts.kind, title: artifacts.title,
+    storageKey: artifactVersions.storageKey, inlineContent: artifactVersions.inlineContent }).from(artifacts)
+    .innerJoin(artifactVersions, and(eq(artifactVersions.artifactId, artifacts.id), eq(artifactVersions.version, version)))
     .where(and(eq(artifacts.id, artifactId), await artifactAccess(reader))).limit(1)
   if (!row) return null
-  const content = await versionContent(artifactId, version)
-  return content === null ? null : { ...row, content }
+  return { kind: row.kind, title: row.title, content: row.inlineContent ?? await getArtifactObject(row.storageKey) }
 }
 
 // --- Share links ----------------------------------------------------------
@@ -279,15 +275,32 @@ export async function revokeShares(reader: ArtifactReader, artifactId: string): 
   })
 }
 
-/** The artifact a live share token opens, at its latest version. */
-export async function sharedArtifact(token: string): Promise<(ArtifactDetail & { content: string }) | null> {
+async function sharedArtifactAccess(token: string) {
   if (!token.startsWith(SHARE_PREFIX)) return null
   const [share] = await db.select({ artifactId: artifactShares.artifactId, createdBy: artifactShares.createdBy }).from(artifactShares)
     .where(and(eq(artifactShares.tokenHash, sha256(token)), isNull(artifactShares.revokedAt))).limit(1)
   if (!share) return null
   // A removed/suspended issuer cannot leave an anonymous back door into a tenant.
-  const found = await detail(and(eq(artifacts.id, share.artifactId), await artifactAccess(share.createdBy)))
+  return and(eq(artifacts.id, share.artifactId), await artifactAccess(share.createdBy))
+}
+
+/** Markdown is rendered inline. An HTML share's iframe reads its own body. */
+export async function sharedArtifact(token: string): Promise<(ArtifactDetail & { content: string | null }) | null> {
+  const access = await sharedArtifactAccess(token)
+  if (!access) return null
+  const found = await detail(access)
   if (!found) return null
+  if (found.kind === 'html') return found.versions.some(row => row.version === found.latestVersion) ? { ...found, content: null } : null
   const content = await versionContent(found.id, found.latestVersion)
   return content === null ? null : { ...found, content }
+}
+
+/** The sandboxed frame needs the latest HTML body without author/version history. */
+export async function sharedArtifactFrame(token: string): Promise<string | null> {
+  const access = await sharedArtifactAccess(token)
+  if (!access) return null
+  const [row] = await db.select({ storageKey: artifactVersions.storageKey, inlineContent: artifactVersions.inlineContent })
+    .from(artifacts).innerJoin(artifactVersions, and(eq(artifactVersions.artifactId, artifacts.id), eq(artifactVersions.version, artifacts.latestVersion)))
+    .where(and(access, eq(artifacts.kind, 'html'))).limit(1)
+  return row ? row.inlineContent ?? await getArtifactObject(row.storageKey) : null
 }
