@@ -12,20 +12,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      MIKKA_BUILD_REVISION: 515afb30a7c87f19f1d3740893e3bcc2c78d319a
-      MIKKA_TEST_DEPLOYMENT_SHA: 515afb30a7c87f19f1d3740893e3bcc2c78d319a
+      MIKKA_BUILD_REVISION: e53c7a6edf301324b4db64291ff8241bec3a5158
+      MIKKA_TEST_DEPLOYMENT_SHA: e53c7a6edf301324b4db64291ff8241bec3a5158
       NITRO_PRESET: node-server
       NODE_OPTIONS: --max-old-space-size=6144
     steps:
       - name: Check out the fixed public product revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: 515afb30a7c87f19f1d3740893e3bcc2c78d319a
+          ref: e53c7a6edf301324b4db64291ff8241bec3a5158
           persist-credentials: false
       - name: Verify source commit and tree
         run: |
           test "$(git rev-parse HEAD)" = "$MIKKA_BUILD_REVISION"
-          test "$(git rev-parse 'HEAD^{tree}')" = f34c639917624be74914ac93e01e4a96eab84905
+          test "$(git rev-parse 'HEAD^{tree}')" = 90a1b11a5427e9a6ea0a840e7e9ed47a081e8a61
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
         with:
           version: 10.34.3
@@ -57,7 +57,7 @@ jobs:
           assert.equal(build.basePath,'/mikka')
           assert.ok(build.resources.length>0)
           assert.ok(!fs.existsSync('.hosted-ui'))
-          fs.writeFileSync(path.join(process.env.RUNNER_TEMP,'api-receipt','source.json'),JSON.stringify({source:rev,tree:'f34c639917624be74914ac93e01e4a96eab84905',qualificationRun:process.env.GITHUB_RUN_ID,mode:'public-test-fixture',resources:build.resources.length},null,2)+'\n')
+          fs.writeFileSync(path.join(process.env.RUNNER_TEMP,'api-receipt','source.json'),JSON.stringify({source:rev,tree:'90a1b11a5427e9a6ea0a840e7e9ed47a081e8a61',qualificationRun:process.env.GITHUB_RUN_ID,mode:'public-test-fixture',resources:build.resources.length},null,2)+'\n')
           JS
           tar -C .output -czf "$RUNNER_TEMP/api-receipt/public-api.tar.gz" .
           cd "$RUNNER_TEMP/api-receipt"
@@ -65,7 +65,7 @@ jobs:
           sha256sum --check SHA256SUMS
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: public-api-2265-515afb30a7c87f19f1d3740893e3bcc2c78d319a
+          name: public-api-2265-e53c7a6edf301324b4db64291ff8241bec3a5158
           path: ${{ runner.temp }}/api-receipt/
           if-no-files-found: error
           retention-days: 2
