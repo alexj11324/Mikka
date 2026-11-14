@@ -6728,6 +6728,7 @@
         "names": {
           "vercel-gateway": "Mikka hosted models (Gateway)",
           "zerocat": "Mikka hosted models (ZeroCat)",
+          "cloudflare-workers-ai": "Mikka hosted models (Cloudflare Workers AI)",
           "openai-subscription": "OpenAI subscription",
           "anthropic-subscription": "Anthropic subscription",
           "api-key": "Your own API key"
