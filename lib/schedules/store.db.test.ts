@@ -53,6 +53,19 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
    assert.equal((await create(d,requestId)).id,id)
    await assert.rejects(create({...d,title:'Different request'},requestId),/scheduleRequestConflict/)
   })
+  await t.test('editing an untriggered schedule does not wait on another chat writer', async () => {
+    const row = await create()
+    const writer = await pool.connect()
+    try {
+      await writer.query('BEGIN')
+      await writer.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`bot-chat:${owner}:${botId}`])
+      await store().command(actor, { action: 'pause', scheduleId: row.id, version: 1 })
+      assert.deepEqual(await history(row.id), [])
+    } finally {
+      await writer.query('ROLLBACK')
+      writer.release()
+    }
+  })
   await t.test('repeat slots persist across fresh stores; pause, timezone update, resume and cancel',async()=>{
    const d=def();d.timing={kind:'interval',start:new Date(now.getTime()+60_000).toISOString(),minutes:1};const row=await create(d)
    now=new Date(now.getTime()+60_000);await store().tick();now=new Date(now.getTime()+60_000);await store().tick()
