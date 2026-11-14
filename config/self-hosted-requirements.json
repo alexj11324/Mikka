@@ -753,6 +753,13 @@
     "test": "lib/hooks/view-state.test.tsx",
     "suite": "test:view-state"
   },
+  "lib/issue-metadata.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Deleted Task metadata supplies the same 30-day recovery deadline to the owner-facing detail and the server restore command. No external service or configuration is required.",
+    "test": "scripts/task-detail-live.test.tsx",
+    "suite": "test:issue-readonly-dom"
+  },
   "lib/issue-threads.ts": {
     "mode": "built-in",
     "environment": [],
