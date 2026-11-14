@@ -106,12 +106,17 @@ export function useWorkspaceGeneral(workspaceId: string | undefined) {
 export function useTransferWorkspace(workspaceId: string) {
   const actionError = useActionError()
   const targets = useSWR(settingsKeys.transferTargets(workspaceId), () => settingsRead<Awaited<ReturnType<typeof getWorkspaceTransferTargets>>>('transfer-targets', { workspace: workspaceId }))
-  const people = targets.data && !targets.data.error ? targets.data : null
+  const people = !targets.error && targets.data && !targets.data.error ? targets.data : null
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   /** The new owner's name or email once transferred, or null */
+  function canTransferTo(to: string | null): to is string {
+    return !!people?.some(person => person.userId === to)
+  }
+
   async function transfer(to: string): Promise<string | null> {
+    if (pending || !canTransferTo(to)) return null
     setPending(true)
     setError(null)
     try {
@@ -125,7 +130,7 @@ export function useTransferWorkspace(workspaceId: string) {
     }
   }
 
-  return { people, readError: targets.error || targets.data?.error ? actionError(targets.data?.error) : null,
+  return { people, canTransferTo, readError: targets.error || targets.data?.error ? actionError(targets.data?.error) : null,
     reload: () => targets.mutate(), pending, error, transfer }
 }
 
@@ -133,11 +138,12 @@ export function useTransferWorkspace(workspaceId: string) {
 export function useDeleteWorkspace(workspaceId: string) {
   const actionError = useActionError()
   const impact = useSWR(settingsKeys.deletionImpact(workspaceId), () => settingsRead<Awaited<ReturnType<typeof getWorkspaceDeletionImpact>>>('deletion-impact', { workspace: workspaceId }))
-  const counts = impact.data && !impact.data.error ? impact.data : null
+  const counts = !impact.error && impact.data && !impact.data.error ? impact.data : null
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function remove(typed: string) {
+    if (pending || !counts) return
     setPending(true)
     setError(null)
     try {
