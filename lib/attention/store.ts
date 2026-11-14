@@ -9,7 +9,6 @@ import { mergeEvidence, notice, stateAfterNotice, type BudgetView, type HandoffP
 import { interruptInput, interruptQuestions, nextHandoffInput, nextHandoffQuestions, readInterrupt, readNextHandoff, readSettle, settleInput, settleQuestions, UNDECIDED_RETRY_MS, type MatterBrief, type NotifyHistory } from './interrupt'
 import type { DecisionAnswer, DecisionQuestion } from '@/lib/coordinator/decision'
 import type { MatterContext } from './judgment'
-import { onPersonTold } from './push'
 import type { Score } from './score'
 
 // The person's matters from connected apps, their two budgets and the
@@ -276,7 +275,7 @@ export type DecisionResult = { ok: true; state: AttentionMatterState } | { error
 export async function recordDecision(userId: string, input: AttentionDecision, now = new Date(), call: AttentionDecide = decisionsCall): Promise<DecisionResult> {
   let declined: Date | null = null
   if (input.decision === 'notify') {
-    const [matter] = await db.select().from(attentionMatters).where(and(eq(attentionMatters.id, input.matterId), eq(attentionMatters.userId, userId))).limit(1)
+    const [matter] = await db.select(briefColumns).from(attentionMatters).where(and(eq(attentionMatters.id, input.matterId), eq(attentionMatters.userId, userId))).limit(1)
     if (matter?.state === 'handed' && !matter.personAsked) {
       const answers = await call(userId, 'attention-interrupt', interruptInput(brief(matter, now), await notifyHistory(db, userId, now), now), interruptQuestions())
       const verdict = answers && readInterrupt(answers, now)
@@ -284,43 +283,43 @@ export async function recordDecision(userId: string, input: AttentionDecision, n
       else if (!verdict.interrupt) declined = verdict.retryAt
     }
   }
-  const result = await db.transaction(async (tx): Promise<{ result: DecisionResult; told?: Matter }> => {
+  const result = await db.transaction(async (tx): Promise<DecisionResult> => {
     await lock(tx, userId)
-    const [matter] = await tx.select().from(attentionMatters).where(and(eq(attentionMatters.id, input.matterId), eq(attentionMatters.userId, userId))).limit(1)
-    if (!matter) return { result: { error: 'matterNotFound' } }
+    const [matter] = await tx.select({ id: attentionMatters.id, userId: attentionMatters.userId, state: attentionMatters.state,
+      personAsked: attentionMatters.personAsked, level: attentionMatters.level }).from(attentionMatters).where(and(eq(attentionMatters.id, input.matterId), eq(attentionMatters.userId, userId))).limit(1)
+    if (!matter) return { error: 'matterNotFound' }
     const reason = input.reason?.trim() || null
     switch (input.decision) {
       case 'notify': {
-        if (matter.state !== 'handed') return { result: { error: 'matterNotInHand' } }
-        if (declined && !matter.personAsked) return { result: { error: 'notifyDeclined', nextAt: declined.toISOString() } }
+        if (matter.state !== 'handed') return { error: 'matterNotInHand' }
+        if (declined && !matter.personAsked) return { error: 'notifyDeclined', nextAt: declined.toISOString() }
         if (!matter.personAsked) {
           const budget = budgetState('notify', await spends(tx, userId, 'notify', now), now, matter.level)
-          if (!budget.open) return { result: { error: 'notificationBudgetClosed', nextAt: budget.nextAt.toISOString() } }
+          if (!budget.open) return { error: 'notificationBudgetClosed', nextAt: budget.nextAt.toISOString() }
         }
         await tx.update(attentionMatters).set({ state: 'notified', reason, personAsked: false, updatedAt: now }).where(eq(attentionMatters.id, matter.id))
         await log(tx, matter, 'notify', !matter.personAsked, { reason })
-        return { result: { ok: true, state: 'notified' }, told: matter }
+        return { ok: true, state: 'notified' }
       }
       case 'quiet':
-        if (matter.state !== 'handed') return { result: { error: 'matterNotInHand' } }
+        if (matter.state !== 'handed') return { error: 'matterNotInHand' }
         await tx.update(attentionMatters).set({ state: 'quiet', reason, updatedAt: now }).where(eq(attentionMatters.id, matter.id))
         await log(tx, matter, 'quiet', false, { reason })
-        return { result: { ok: true, state: 'quiet' } }
+        return { ok: true, state: 'quiet' }
       case 'snooze':
-        if (input.runAt.getTime() <= now.getTime()) return { result: { error: 'runAtNotInFuture' } }
+        if (input.runAt.getTime() <= now.getTime()) return { error: 'runAtNotInFuture' }
         await tx.update(attentionMatters).set({ state: 'snoozed', reason, runAt: input.runAt, personAsked: input.personAsked ?? matter.personAsked, updatedAt: now }).where(eq(attentionMatters.id, matter.id))
         await log(tx, matter, 'snooze', false, { reason, runAt: input.runAt })
-        return { result: { ok: true, state: 'snoozed' } }
+        return { ok: true, state: 'snoozed' }
       case 'handled':
         await tx.update(attentionMatters).set({ state: 'handled', reason, runAt: null, personAsked: false, updatedAt: now }).where(eq(attentionMatters.id, matter.id))
         await log(tx, matter, 'handled', false, { reason })
-        return { result: { ok: true, state: 'handled' } }
+        return { ok: true, state: 'handled' }
     }
   })
-  if (result.told) await onPersonTold(result.told)
   // The next waiting matter can go over now; the running turn takes it in its next round.
-  if ('ok' in result.result) await releaseAttention(userId, now, call)
-  return result.result
+  if ('ok' in result) await releaseAttention(userId, now, call)
+  return result
 }
 
 /**
@@ -334,7 +333,6 @@ export async function settleTurn(userId: string, matterIds: readonly string[], t
   const open = await db.select().from(attentionMatters).where(and(eq(attentionMatters.userId, userId), inArray(attentionMatters.id, [...matterIds]), eq(attentionMatters.state, 'handed')))
   if (!open.length) return
   const settled = toldPerson ? [] : await settlements(userId, open, now, call)
-  const told: Matter[] = []
   await db.transaction(async tx => {
     await lock(tx, userId)
     if (toldPerson) {
@@ -342,10 +340,8 @@ export async function settleTurn(userId: string, matterIds: readonly string[], t
         const rows = await tx.update(attentionMatters).set({ state: 'notified', reason: 'told without recording', personAsked: false, updatedAt: now }).where(and(eq(attentionMatters.id, matter.id), eq(attentionMatters.state, 'handed'))).returning({ id: attentionMatters.id })
         if (!rows.length) continue
         await log(tx, matter, 'notify', !matter.personAsked, { reason: 'told without recording' })
-        told.push(matter)
       }
     } else for (const item of settled) await applySettlement(tx, item, now)
   })
-  for (const matter of told) await onPersonTold(matter)
   await releaseAttention(userId, now, call)
 }
