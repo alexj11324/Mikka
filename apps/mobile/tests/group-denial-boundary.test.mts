@@ -32,3 +32,14 @@ test('a revoked group cannot expose a stale title, attachment composer, reaction
   assert.match(source, /historyRequest\.current = null/)
   assert.match(source, /reactionPending\.current\.clear\(\)/)
 })
+
+test('an in-place group or account transition does not reuse the previous draft and quote', () => {
+  assert.match(source, /const identity = `\$\{id\}:\$\{apiContext\}`/)
+  assert.match(source, /const draftMatches = !accessDenied && composerDraft\.identity === identity/)
+  assert.match(source, /const text = draftMatches \? composerDraft\.text : ''/)
+  assert.match(source, /const quote = draftMatches \? composerDraft\.quote : null/)
+  assert.match(source, /const setText = \(value: string\) => setComposerDraft\(current => \(\{/)
+  assert.match(source, /identity, text: value, quote: current\.identity === identity \? current\.quote : null/)
+  assert.match(source, /const setQuote = \(value: string \| null\) => setComposerDraft\(current => \(\{/)
+  assert.match(source, /identity, text: current\.identity === identity \? current\.text : '', quote: value/)
+})
