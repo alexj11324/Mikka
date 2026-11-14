@@ -103,22 +103,25 @@ mock.module(at('app/actions/issue-operations.ts'), { namedExports: {
 } })
 const none = () => null
 for (const [file, names] of [
-  ['issue-description-history', ['IssueDescriptionHistory']],
   ['issue-relations', ['IssueRelations']], ['issue-members', ['IssueMembers']], ['issue-thread-panel', ['IssueThreadPanel']],
   ['factory-acceptance', ['FactoryAcceptance', 'FactoryAcceptancePanel']],
 ] as const) mock.module(at(`components/workspace/${file}.tsx`), { namedExports: Object.fromEntries(names.map(name => [name, none])) })
+mock.module(at('components/workspace/issue-description-history.tsx'), { namedExports: {
+  IssueDescriptionHistory: ({ open, onRestore }: import('react').ComponentProps<typeof import('../components/workspace/issue-description-history').IssueDescriptionHistory>) =>
+    open ? <output data-restore-available={String(Boolean(onRestore))} /> : null,
+} })
 const emptyThreads = { data: [] }
 mock.module(at('components/workspace/issue-threads.tsx'), { namedExports: { IssueThreads: none, ThreadEventRow: none, useIssueThreads: () => emptyThreads, useAgentActivity: () => ({ rows: [], error: null }) } })
 // The controller is mounted with a minimal renderer for the official frame contract.
 const { IssueActivityFeed } = await import('../components/workspace/issue-activity-feed')
 mock.module(at('components/workspace/task-detail-frame.tsx'), { namedExports: {
   FramedTask: (props: import('../components/workspace/task-detail-frame').FramedTaskProps) => {
-    const { rootRef, onKeyDown, preview, locked, status, priority, titleField, onHistory, task } = props
+    const { rootRef, onKeyDown, preview, status, priority, titleField, onHistory, task } = props
     return <div ref={rootRef} onKeyDown={onKeyDown} role="region" aria-busy={preview}>
       <textarea id="task-title" value={titleField.value} readOnly={titleField.readOnly}
         onChange={event => titleField.onChange(event.currentTarget.value)} onBlur={titleField.onBlur}
         onCompositionStart={titleField.onCompositionStart} onCompositionEnd={titleField.onCompositionEnd} onKeyDown={titleField.onKeyDown} />
-      <button data-history="" disabled={locked} onClick={onHistory}>History</button>
+      <button data-history="" disabled={preview} onClick={onHistory}>History</button>
       {props.saveError && <button data-retry-save="" onClick={props.saveError.onRetry}>Retry autosave</button>}
       <button data-complete="" onClick={() => props.onStatus('done')}>Done</button>
       <button data-reopen="" onClick={() => props.onStatus('todo')}>Reopen</button>
@@ -459,6 +462,17 @@ test('a confirmed read-only grant shows activity without enabling title, body or
   await emit()
   await until(() => properties().textContent === 'done:normal', 'a read grant continues to observe the task')
   assert.equal(documentReads, 0)
+})
+
+test('a confirmed read grant opens description history without a restore command or document exchange', async () => {
+  stored = { ...stored, workspaceId, canSteer: false, readOnlyDiscussions: [] }
+  await mount()
+  const history = container.querySelector<HTMLButtonElement>('[data-history]')!
+  await act(async () => history.click())
+  await until(() => fullVersionReads === 1, 'a reader can fetch historical bodies')
+  assert.equal(container.querySelector('[data-restore-available]')?.getAttribute('data-restore-available'), 'false')
+  assert.equal(documentReads, 0)
+  assert.deepEqual(writes, [])
 })
 
 test('a lost Task save response is recovered by an authorized read without losing a newer local edit or concurrent remote fields', async () => {

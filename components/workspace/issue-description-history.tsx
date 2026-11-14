@@ -35,7 +35,7 @@ function DescriptionPreview({ content }: { content: JSONContent }) {
 }
 
 export function IssueDescriptionHistory({ open, onOpenChange, identifier, title, currentContent, versions, loadingError, onRetry, onRestore }: {
-  open: boolean; onOpenChange: (open: boolean) => void; identifier: string | null; title: string; currentContent: JSONContent; versions?: Version[]; loadingError: boolean; onRetry: () => void; onRestore: (version: Version) => Promise<boolean>
+  open: boolean; onOpenChange: (open: boolean) => void; identifier: string | null; title: string; currentContent: JSONContent; versions?: Version[]; loadingError: boolean; onRetry: () => void; onRestore?: (version: Version) => Promise<boolean>
 }) {
   const t = useTranslations('IssueDetail.history')
   const tCommon = useTranslations('Common')
@@ -60,7 +60,7 @@ export function IssueDescriptionHistory({ open, onOpenChange, identifier, title,
     viewport.current?.querySelector(`[data-history-group="${next}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }
   async function restore() {
-    if (!selected || pending) return
+    if (!onRestore || !selected || pending) return
     setConfirm(false); setPending(true); setError('')
     try { if (await onRestore(selected)) onOpenChange(false); else setError(t('restoreIncomplete')) }
     catch { setError(t('restoreFailed')) }
@@ -80,7 +80,7 @@ export function IssueDescriptionHistory({ open, onOpenChange, identifier, title,
               <FieldLabel className="flex min-h-11 cursor-pointer items-center gap-2 px-1"><Switch size="sm" checked={highlight} onCheckedChange={value => { setHighlight(value); setChangeIndex(1) }} />{t('highlight')}</FieldLabel>
               <span className="px-2 text-xs tabular-nums text-muted-foreground">{compared.changes ? t('changeCounter', { current: Math.min(changeIndex, compared.changes), total: compared.changes }) : t('noChanges')}</span>
               <Button size="icon-xs" variant="ghost" aria-label={t('previousChange')} disabled={!highlight || !compared.changes} onClick={() => jump(-1)}><ArrowUp data-icon="inline-start" /></Button><Button size="icon-xs" variant="ghost" aria-label={t('nextChange')} disabled={!highlight || !compared.changes} onClick={() => jump(1)}><ArrowDown data-icon="inline-start" /></Button>
-              <Button size="sm" disabled={!selected || isCurrent || pending} onClick={() => setConfirm(true)}>{pending ? t('restoring') : t('restore')}</Button>
+              {onRestore && <Button size="sm" disabled={!selected || isCurrent || pending} onClick={() => setConfirm(true)}>{pending ? t('restoring') : t('restore')}</Button>}
             </div>
             {error && <FieldError className="px-4 pb-3 text-xs">{error}</FieldError>}
           </div>

@@ -401,6 +401,9 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     void refreshVersions().catch(() => {}); publishSaved(issue, previousStatus)
   }
   async function getCurrent() { return await save() ? savedRef.current : null }
+  async function openHistory() {
+    if (!preview && (reader || await save())) setHistory(true)
+  }
   async function restore(version: NonNullable<typeof historyVersions>[number]) {
     if (!await save()) return false
     return new Promise<boolean>(resolve => {
@@ -434,7 +437,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   </>
   const dialogs = <>
     <Dialog open={members} onOpenChange={setMembers}><DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>{t('membersTitle')}</DialogTitle><DialogDescription>{tDetail('membersDialogDescription')}</DialogDescription></DialogHeader><IssueMembers id={saved.id} onChanged={async () => { adopt(await loadIssue(saved.id, user.id)) }} /></DialogContent></Dialog>
-    <IssueDescriptionHistory open={history} onOpenChange={setHistory} identifier={saved.identifier} title={title} currentContent={content} versions={historyVersions} loadingError={!!historyBodyError} onRetry={() => { void refreshHistoryVersions() }} onRestore={restore} />
+    <IssueDescriptionHistory open={history} onOpenChange={setHistory} identifier={saved.identifier} title={title} currentContent={content} versions={historyVersions} loadingError={!!historyBodyError} onRetry={() => { void refreshHistoryVersions() }} onRestore={locked ? undefined : restore} />
   </>
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => closeOnEscape(event, rootRef.current, onClose)
   const titleChange = (value: string) => changed({ title: value })
@@ -448,7 +451,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     versions={versions ?? []} historyFailed={historyError ? () => { void refreshVersions() } : null} agentActivity={agentActivity}
     documentTools={documentTools} actionRequest={actionRequest} propertyRequest={propertyRequest} requestAction={requestAction} requestProperty={requestProperty} getCurrent={getCurrent} adopt={adopt} onMetadataBusy={setMetadataSaving}
     onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }}
-    onHistory={() => { void save().then(success => { if (success) setHistory(true) }) }} onMembers={() => setMembers(true)} onDocumentTools={() => setDocumentTools(value => !value)}
+    onHistory={() => { void openHistory() }} onMembers={() => setMembers(true)} onDocumentTools={() => setDocumentTools(value => !value)}
     panel={threadPanel || null} wide={wide} resize={{ handle: wide && threadPanel ? <ResizeHandle resize={threadWidth} label={tCommon('resize.taskPanel')} edge="start" /> : null, width: threadWidth.width, dragging: threadWidth.dragging }} dialogs={dialogs} />
 
 }

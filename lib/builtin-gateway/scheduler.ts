@@ -1,4 +1,4 @@
-import { runSchedule } from '../../cloudflare/suggestions-cron/src/index.mjs'
+import { QUARTER_HOUR, runSchedule } from '../../cloudflare/suggestions-cron/src/schedule.mjs'
 import { isCloudEdition } from '../edition'
 
 type Environment = Readonly<Record<string, string | undefined>>
@@ -12,7 +12,7 @@ export function schedulerConfig(env: Environment = process.env) {
   } catch { return null }
 }
 
-/** Replaces the Cloudflare minute trigger. Existing due-timer work remains
+/** Provides a quarter-hour tick on self-hosted installations. Existing due-timer work remains
  * push-driven and the safety sweep keeps its existing 15 minute cadence. */
 export function startBuiltinScheduler(options: {
   env?: Environment
@@ -34,7 +34,7 @@ export function startBuiltinScheduler(options: {
     if (new Date(timestamp).getUTCMinutes() % 15 !== 0) return
     running = true
     try {
-      if (await options.leader()) await runSchedule('* * * * *', config, options.fetch, timestamp)
+      if (await options.leader()) await runSchedule(QUARTER_HOUR, config, options.fetch, timestamp)
     } catch { console.warn('[builtin-cron] scheduled invocation failed') }
     finally { running = false }
   }
