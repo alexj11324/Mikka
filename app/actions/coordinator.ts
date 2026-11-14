@@ -324,7 +324,6 @@ export async function welcomeCoordinator(botId: string | null = null): Promise<A
     const locale = (await cookies()).get('NEXT_LOCALE')?.value ?? 'zh-CN'
     const event = userMessageEvent(session.user.id, coordinatorWelcome(session.user.name ?? '', locale, bot.coordinator ? undefined : bot.name), { botId: bot.id })
     await recordCoordinatorEvent(db, { ...event, payload: { ...event.payload, source: 'coordinator_welcome' } })
-    afterJob('after:coordinator-wake', () => wakeCoordinator(session.user.id))
     return { queued: true }
   })
 }
