@@ -25,6 +25,7 @@ const browser = new Window({ url: 'https://fixture.example/' })
 let root: Root
 let useReviewDiff: typeof import('./use-review-diff')['useReviewDiff']
 let state: ReturnType<typeof useReviewDiff>
+const paths = () => state.files.map(file => file.path)
 function Probe() { state = useReviewDiff('task'); return null }
 before(async () => {
   Object.assign(globalThis, { window: browser, document: browser.document, IS_REACT_ACT_ENVIRONMENT: true })
@@ -36,15 +37,15 @@ after(async () => { await act(async () => root.unmount()); await browser.happyDO
 
 test('a refused current Review withdraws its summary, diff and loaded file pages until a successful retry', async () => {
   await act(async () => root.render(<SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}><Probe /></SWRConfig>))
-  assert.deepEqual(state.files.map(file => file.path), ['first'])
+  assert.deepEqual(paths(), ['first'])
   await act(async () => { await state.loadMore() })
-  assert.deepEqual(state.files.map(file => file.path), ['first', 'additional'])
+  assert.deepEqual(paths(), ['first', 'additional'])
 
   failure = true
   await act(async () => { await state.mutate() })
   assert.ok(state.error)
   assert.equal(state.data, undefined)
-  assert.deepEqual(state.files, [])
+  assert.deepEqual(paths(), [])
   assert.equal(state.nextCursor, undefined)
   await act(async () => { await state.loadMore() })
   assert.deepEqual(reads, ['root', 'additional', 'root'])
@@ -53,6 +54,6 @@ test('a refused current Review withdraws its summary, diff and loaded file pages
   revision = 'replacement'
   await act(async () => { await state.mutate() })
   assert.equal(state.error, undefined)
-  assert.deepEqual(state.files.map(file => file.path), ['replacement'])
+  assert.deepEqual(paths(), ['replacement'])
   assert.equal(state.nextCursor, 'additional')
 })
