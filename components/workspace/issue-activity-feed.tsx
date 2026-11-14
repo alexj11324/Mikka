@@ -32,7 +32,6 @@ export type ActivityEventItem = { id: string; at: string; actor: ActivityActorVi
 /** The task's own events as words, oldest first, for IssueActivityFeed and a layer that draws the log. */
 export function useActivityEvents(versions: ActivityVersion[], children: ActivityChild[], issueCode?: string | null) {
   const t = useTranslations('Workspace.activity')
-  const tDetail = useTranslations('Workspace.detail')
   const tIssue = useTranslations('Issue')
   const format = useFormatter()
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
