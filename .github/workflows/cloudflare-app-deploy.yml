@@ -132,9 +132,11 @@ jobs:
           node --input-type=module <<'JS'
           import {readFile, appendFile} from 'node:fs/promises'
           import assert from 'node:assert/strict'
-          const plan = JSON.parse(await readFile('docs/operations/releases/hosted-api-staging.json', 'utf8'))
-          assert.match(plan.publicSource, /^[a-f0-9]{40}$/)
-          await appendFile(process.env.GITHUB_OUTPUT, 'source=' + plan.publicSource + '\n')
+          const postgres = process.env.MIKKA_DEPLOYMENT_PHASE === 'production-eve-postgres'
+          const plan = JSON.parse(await readFile('docs/operations/releases/' + (postgres ? 'eve-runtime-production.json' : 'hosted-api-staging.json'), 'utf8'))
+          const source = postgres ? plan.maintenancePublication.publicSource : plan.publicSource
+          assert.match(source, /^[a-f0-9]{40}$/)
+          await appendFile(process.env.GITHUB_OUTPUT, 'source=' + source + '\n')
           JS
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
