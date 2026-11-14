@@ -98,6 +98,28 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
     const a = await asked("decision", "Which API should we keep?", ["REST", "GraphQL"]);
     const b = await asked("context", "Where is the staging config?", []);
 
+    await t.test("a reassigned question is omitted from the earlier authorized task read", async (st) => {
+      const move = (tx: Pick<PoolClient, "query">, taskId: string) =>
+        tx.query(
+          `UPDATE factory_questions q
+              SET "taskId"=t.id, "attemptId"=t."attemptId", "candidateId"=t."candidateId"
+             FROM factory_tasks t WHERE q.id=$1 AND t.id=$2`,
+          [a.questionId, taskId],
+        );
+      const readTask = store.readTaskForUser.bind(store);
+      st.mock.method(store, "readTaskForUser", async (tx: PoolClient, userId: string, taskId: string) => {
+        const task = await readTask(tx, userId, taskId);
+        if (taskId === a.taskId) await move(tx, b.taskId);
+        return task;
+      });
+      try {
+        const visible = await questions.pending("owner", a.runId, "user");
+        assert.deepEqual(visible, []);
+      } finally {
+        await move(pool, a.taskId);
+      }
+    });
+
     await t.test("by task: exact AskUserQuestion fields plus type and original text", async () => {
       const res = await get("owner", `?taskId=${a.taskId}`);
       assert.equal(res.status, 200);

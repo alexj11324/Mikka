@@ -175,26 +175,26 @@ export function createFactoryQuestions(
       : readScope === "user" ? store.readTaskForUser(tx, userId, taskId) : store.readTask(tx, userId, taskId);
   }
 
-  /** lock=false for GETs (pending/read/list): no FOR UPDATE on the task or question. */
-  async function owned(tx: PoolClient, userId: string, questionId: string, lock = true, readScope: "bot" | "user" = "bot") {
+  /** Keep the task-before-question lock order for writes. */
+  async function owned(tx: PoolClient, userId: string, questionId: string, lock = true) {
     if (!z.uuid().safeParse(questionId).success) fail("factoryInvalid");
-    const {
-      rows: [identity],
-    } = await tx.query(
+    const { rows: [identity] } = await tx.query<{ taskId: string }>(
       'SELECT "taskId" FROM factory_questions WHERE id=$1 AND "userId"=$2',
       [questionId, userId],
     );
     if (!identity) fail("factoryNotFound");
-    const task = await ownedTask(tx, userId, identity.taskId, lock, readScope);
-    const {
-      rows: [q],
-    } = await tx.query<FactoryQuestion>(
+    return ownedForTask(tx, userId, questionId, identity.taskId, lock);
+  }
+
+  async function ownedForTask(tx: PoolClient, userId: string, questionId: string, taskId: string, lock: boolean, readScope: "bot" | "user" = "bot") {
+    const task = await ownedTask(tx, userId, taskId, lock, readScope);
+    const { rows: [q] } = await tx.query<FactoryQuestion>(
       lock
         ? 'SELECT * FROM factory_questions WHERE id=$1 AND "userId"=$2 FOR UPDATE'
         : 'SELECT * FROM factory_questions WHERE id=$1 AND "userId"=$2',
       [questionId, userId],
     );
-    if (!q || q.issueId !== task.issueId) fail("factoryNotFound");
+    if (!q || q.taskId !== task.id || q.issueId !== task.issueId) fail("factoryNotFound");
     return { task, q };
   }
   function fence(
@@ -280,8 +280,8 @@ export function createFactoryQuestions(
     async pending(userId: string, runId?: string, readScope: "bot" | "user" = "bot") {
       const actor = actingContext.getStore();
       const workspaceId = actor?.userId === userId ? actor.tokenWorkspaceId : undefined;
-      const { rows } = await pool.query(
-        `SELECT q.id FROM factory_questions q
+      const { rows } = await pool.query<{ id: string; taskId: string }>(
+        `SELECT q.id, q."taskId" FROM factory_questions q
           JOIN factory_tasks t ON t.id=q."taskId" AND t."userId"=q."userId" AND t."issueId"=q."issueId"
           JOIN issues i ON i.id=t."issueId" AND i."ownershipState"='bound' AND i."workspaceId"=t."workspaceId"
           WHERE q."userId"=$1 AND q.status IN ('open','waiting_user','resuming','blocked')
@@ -296,7 +296,7 @@ export function createFactoryQuestions(
         try {
           result.push(
             await transaction(async (tx) => {
-              const { task, q } = await owned(tx, userId, row.id, false, readScope);
+              const { task, q } = await ownedForTask(tx, userId, row.id, row.taskId, false, readScope);
               return currentView(tx, task, q, false);
             }),
           );
