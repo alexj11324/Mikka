@@ -142,9 +142,11 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
     const reads = t.mock.method(raw, 'query')
     raw.release()
     for (const bot of [personalBot, alphaBot, betaBot]) await push(bot)
-    const linkReads = reads.mock.calls.filter(({ arguments: [query] }) => {
-      const sql = typeof query === 'string' ? query : query?.text
-      return typeof sql === 'string' && /^select "organizationId" from "mikka_organization_workspaces" /i.test(sql)
+    const linkReads = reads.mock.calls.filter(call => {
+      // pg accepts a query config object as well as SQL text.
+      const query: unknown = call.arguments[0]
+      const sql = typeof query === 'object' && query !== null && 'text' in query ? query.text : query
+      return typeof sql === 'string' && sql.startsWith('select "organizationId" from "mikka_organization_workspaces" ')
     })
     assert.equal(linkReads.length, 3, 'each admitted phone reads its locked organization link once')
     assert.equal(sent.length, 3)
