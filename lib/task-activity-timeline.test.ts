@@ -6,7 +6,7 @@ import { taskHistoryLabel, type IssueActivityEvent } from './task-activity-timel
 
 function renderHistory(event: IssueActivityEvent, messages: typeof en.Workspace.activity) {
   return taskHistoryLabel(event, {
-    created: 'created this issue',
+    created: messages.created,
     activity: (key, values = {}) => Object.entries(values).reduce(
       (text, [name, value]) => text.replaceAll(`{${name}}`, value),
       messages[key],
@@ -17,14 +17,14 @@ function renderHistory(event: IssueActivityEvent, messages: typeof en.Workspace.
 }
 
 const cases: Array<[IssueActivityEvent, string, string]> = [
-  [{ id: 's', at: '', kind: 'status', status: 'In progress' }, 'changed status to In progress', '将状态改为In progress'],
-  [{ id: 'p', at: '', kind: 'priority', priority: 'High' }, 'changed priority to High', '将优先级改为High'],
-  [{ id: 't', at: '', kind: 'title', title: 'Fix timeline' }, 'renamed this issue to “Fix timeline”', '将标题改为「Fix timeline」'],
-  [{ id: 'a', at: '', kind: 'assigned', assigneeName: 'Ada' }, 'assigned to Ada', '指派给 Ada'],
-  [{ id: 'u', at: '', kind: 'unassigned' }, 'cleared the assignee', '移除了负责人'],
-  [{ id: 'd', at: '', kind: 'assigned', assignmentTarget: 'delegate', assigneeName: 'Codex' }, 'assigned Agent Codex', '指派 Agent Codex'],
-  [{ id: 'ud', at: '', kind: 'unassigned', assignmentTarget: 'delegate' }, 'cleared the assigned Agent', '移除了指派的 Agent'],
-  [{ id: 'st', at: '', kind: 'subtask', title: 'Add tests' }, 'added subtask: Add tests', '添加子任务：Add tests'],
+  [{ id: 's', at: '', kind: 'status', status: 'In progress' }, 'moved the issue to In progress', '将 Issue 移至 In progress'],
+  [{ id: 'p', at: '', kind: 'priority', priority: 'High' }, 'set priority to High', '将优先级设为 High'],
+  [{ id: 't', at: '', kind: 'title', title: 'Fix timeline' }, 'renamed the issue to “Fix timeline”', '将 Issue 重命名为「Fix timeline」'],
+  [{ id: 'a', at: '', kind: 'assigned', assigneeName: 'Ada' }, 'assigned Ada', '指派了 Ada'],
+  [{ id: 'u', at: '', kind: 'unassigned' }, 'unassigned the issue', '取消了 Issue 的负责人'],
+  [{ id: 'd', at: '', kind: 'assigned', assignmentTarget: 'delegate', assigneeName: 'Codex' }, 'assigned Agent Codex', '指派了 Agent Codex'],
+  [{ id: 'ud', at: '', kind: 'unassigned', assignmentTarget: 'delegate' }, 'unassigned the Agent', '取消指派的 Agent'],
+  [{ id: 'st', at: '', kind: 'subtask', title: 'Add tests' }, 'added sub-issue Add tests', '添加了子 Issue「Add tests」'],
   [{ id: 'la', at: '', kind: 'labelAdded', title: 'bug' }, 'added label bug', '添加标签 bug'],
   [{ id: 'lr', at: '', kind: 'labelRemoved', title: 'bug' }, 'removed label bug', '移除标签 bug'],
 ]
@@ -36,15 +36,15 @@ test('issue history summaries are concise and natural in English and Chinese', (
   }
 })
 
-test('timeline controls and empty states explain what each view contains', () => {
+test('timeline controls use Capy’s activity filters without invented counts or empty-state copy', () => {
   assert.deepEqual(
-    [en.Workspace.activity.timelineAll, en.Workspace.activity.timelineUpdates, en.Workspace.activity.timelineWork, en.Workspace.activity.timelineComments],
-    ['All', 'Changes', 'Agent runs', 'Discussion'],
+    [en.Workspace.activity.title, en.Workspace.activity.created, en.Workspace.activity.timelineAll, en.Workspace.activity.timelineComments, en.Workspace.activity.timelineBots],
+    ['Activity', 'created the issue', 'All', 'Comments', 'Agents & bots'],
   )
   assert.deepEqual(
-    [zhCN.Workspace.activity.timelineAll, zhCN.Workspace.activity.timelineUpdates, zhCN.Workspace.activity.timelineWork, zhCN.Workspace.activity.timelineComments],
-    ['全部', '变更', 'Agent 运行', '讨论'],
+    [zhCN.Workspace.activity.title, zhCN.Workspace.activity.created, zhCN.Workspace.activity.timelineAll, zhCN.Workspace.activity.timelineComments, zhCN.Workspace.activity.timelineBots],
+    ['活动', '创建了这个 Issue', '全部', '评论', 'Agent 与机器人'],
   )
-  assert.match(en.Workspace.activity.timelineEmpty, /Status changes.*Agent runs.*discussion/)
-  assert.equal(zhCN.Workspace.activity.timelineFilteredEmpty, '此筛选条件下没有匹配记录。')
+  assert.equal(en.Workspace.activity.timelineEarlier, 'Show {count} earlier')
+  assert.equal(zhCN.Workspace.activity.timelineEarlier, '再显示更早的 {count} 条')
 })

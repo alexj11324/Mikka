@@ -39,7 +39,7 @@ export function useActivityEvents(versions: ActivityVersion[], children: Activit
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
   const history = deriveIssueActivity(versions, children, Infinity)
   const labelOf = (event: IssueActivityEvent) => taskHistoryLabel(event, {
-    activity: t, created: tDetail('createdTask'), status: statusLabel, priority: priorityLabel,
+    activity: t, created: t('created'), status: statusLabel, priority: priorityLabel,
   })
   return (barriers: readonly { id: string; at: string }[]): ActivityEventItem[] => {
     const rows = activityTimeline(history, barriers.map(row => ({ id: row.id, createdAt: row.at })))
