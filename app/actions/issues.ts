@@ -323,7 +323,6 @@ async function persistIssue(input: SaveIssueInput, block?: BlockFlag): Promise<A
     const ownerId = existing?.userId ?? userId
     const observedScopeVersion = existing?.scopeVersion ?? null
     if (input.id && (!Number.isInteger(input.revision) || (input.revision ?? 0) < 1)) return { error: 'issueRevisionInvalid' }
-    let statusEvent = false
     // Status events stay in the task's stored tenant, including shared tasks.
     const coordinator = existing && parsed.data.status !== undefined && existing.status !== parsed.data.status ? (await coordinatorBot(ownerId, context.workspace.id, { backfill: false })).botId : null
     try {
@@ -339,10 +338,7 @@ async function persistIssue(input: SaveIssueInput, block?: BlockFlag): Promise<A
         const content = block ? withIssueMetadata(latest.content, { ...readIssueMetadata(latest.content), block }) : latest.content
         ;[issue] = await tx.update(issues).set({ ...parsed.data, content, revision: input.revision! + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, ownerId), eq(issues.revision, input.revision!))).returning()
         const changed = issue && coordinator && issueStatusEvent(latest, issue, coordinator)
-        if (changed) {
-          await recordCoordinatorEvent(tx, changed)
-          statusEvent = true
-        }
+        if (changed) await recordCoordinatorEvent(tx, changed)
         if (!issue) return { error: 'issueStale' }
         reviewTaskChanged(tx, latest, issue)
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority, ...activityActor(userId) })
@@ -353,7 +349,6 @@ async function persistIssue(input: SaveIssueInput, block?: BlockFlag): Promise<A
       })
       const result = existing ? await withIssueWorkspace(user, context.workspace.id, { issueId: existing.id, action: 'canSteer' }, save) : await withTaskWorkspace(user, context.workspace.id, save)
       if ('issue' in result && result.issue?.linearSyncPolicy === 'explicit' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })
-      if (statusEvent && 'issue' in result) scheduleIssueEffect({ kind: 'wake', userId: ownerId })
       return result
     } catch (error) {
       if (error instanceof ActionFailureError) throw error
