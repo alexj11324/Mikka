@@ -98,7 +98,12 @@ export function useBotModelPicker(botId: string | null) {
     return () => window.removeEventListener(OPEN_EVENT, listener)
   })
 
-  const shown = menu.data?.current
+  // The menu this bot showed last stays on screen while a read is under way, so the chip never drops out and comes
+  // back. Another bot's menu is never held over: its chip waits for its own.
+  const held = useRef<{ botId: string | null; menu: BotModelMenu } | null>(null)
+  if (menu.data) held.current = { botId, menu: menu.data }
+  const data = menu.data ?? (!menu.error && held.current?.botId === botId ? held.current.menu : undefined)
+  const shown = data?.current
   useEffect(() => {
     const key = lastChipKey(botId)
     try {
@@ -162,17 +167,17 @@ export function useBotModelPicker(botId: string | null) {
   /** What a person reads for an option: the hosted model's name, or the provider's id (callers format it). */
   const optionName = (option: ChipModel) => option.id === HOSTED_CHOICE ? t('hosted') : option.modelId || t('unknownModel')
 
-  const current = menu.data?.current
+  const current = data?.current
   const checking = current?.availability === 'checking'
   const chipLabel = current ? [optionName(current), current.fallback ? t('fallback') : null, checking ? t('checking') : null].filter(Boolean).join(' · ') : null
 
   return {
     t,
     /** The menu, once it has arrived; until then `last` is the chip's look only, not a control. */
-    menu: menu.data,
+    menu: data,
     /** Someone else's bot, or the menu failed: no chip at all. */
     error: !!menu.error,
-    last: menu.data || menu.error ? null : last,
+    last: data || menu.error ? null : last,
     open,
     /** Opening uses the cached menu; catalogue refresh is explicit. */
     // Model catalogue refresh is explicit; opening a cached menu must not

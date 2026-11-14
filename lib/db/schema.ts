@@ -429,6 +429,11 @@ export const agentRuns = pgTable('agent_runs', {
   retryOf: uuid('retryOf').references((): AnyPgColumn => agentRuns.id, { onDelete: 'set null' }),
   /** The run of the same thread this one goes on from: a dispatch to a task whose thread had ended (lib/thread-dispatch.ts). */
   continuesRunId: uuid('continuesRunId').references((): AnyPgColumn => agentRuns.id, { onDelete: 'set null' }),
+  /**
+   * The conversation's own short title (decision 2026-11-13-1405), the same on every run of its chain; null until one
+   * is written. `titleSource` says who wrote it: a 'manual' title is the person's and is never overwritten.
+   */
+  title: varchar('title', { length: 60 }), titleSource: text('titleSource').$type<'generated' | 'manual'>(),
   /** On a thread's root run: the root of the thread that replaced it, when the person explicitly asked for a new one. */
   threadReplacedBy: uuid('threadReplacedBy').references((): AnyPgColumn => agentRuns.id, { onDelete: 'set null' }),
   stopRequestedAt: timestamp('stopRequestedAt', { withTimezone: true }),
@@ -955,6 +960,7 @@ export const conversations = pgTable('conversations', {
   id: uuid('id').primaryKey(), workspaceId: uuid('workspaceId').notNull(),
   kind: text('kind').$type<'group' | 'agent_dm'>().notNull(), title: text('title').notNull(),
   createdBy: text('createdBy').notNull(), lastPosition: bigint('lastPosition', { mode: 'bigint' }).notNull().default(sql`0`),
+  creationPurpose: text('creationPurpose').notNull().default('group'),
   // Optional owner-designated current group agent; never inferred or backfilled.
   leadAgentId: uuid('leadAgentId'),
   leadBotId: uuid('leadBotId'),
@@ -992,6 +998,8 @@ export const messageReactions = pgTable('message_reactions', {
 export const conversationReads = pgTable('conversation_reads', {
   userId: text('userId').notNull(), conversationId: text('conversationId').notNull(),
   lastReadPosition: integer('lastReadPosition').notNull().default(0), lastReadMessageId: text('lastReadMessageId'),
+  runReadAt: timestamp('runReadAt', { withTimezone: true }), manuallyUnread: boolean('manuallyUnread').notNull().default(false),
+  unreadRevision: integer('unreadRevision').notNull().default(0),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, t => [primaryKey({ columns: [t.userId, t.conversationId] })])
 export const conversationLinks = pgTable('conversation_links', {

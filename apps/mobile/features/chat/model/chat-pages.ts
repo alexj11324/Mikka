@@ -127,7 +127,7 @@ export function groupPagePath(id: string, page: GroupRead | null, before?: strin
  */
 export function mergeGroupRead(previous: GroupRead | null, next: GroupRead): GroupRead {
   if (!previous) return next
-  if (next.unchanged) return { ...previous, agentStatus: next.agentStatus ?? null, routingError: next.routingError ?? null, stopped: next.stopped }
+  if (next.unchanged) return { ...previous, readRevision: next.readRevision, agentStatus: next.agentStatus ?? null, routingError: next.routingError ?? null, stopped: next.stopped }
   const { appended: _appended, unchanged: _unchanged, ...rest } = next
   if (next.appended) {
     const seen = new Set(previous.messages.map(message => message.id))

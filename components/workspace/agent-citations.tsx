@@ -6,7 +6,7 @@ import { Globe } from 'lucide-react'
 import { GitHubIcon } from '@/components/icons/brand-icons'
 import { useFormatter, useTranslations } from 'next-intl'
 import { getLinkPreview } from '@/app/actions/link-preview'
-import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource, runTitle } from '@/lib/coordinator/citations'
+import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource, runThreadName, runTitle } from '@/lib/coordinator/citations'
 import type { LinkPreview } from '@/lib/link-preview-parse'
 import { InlineCitation, InlineCitationBody, InlineCitationContent, InlineCitationDescription, InlineCitationFavicon, InlineCitationFooter, InlineCitationImage, InlineCitationLabel, InlineCitationMeta, InlineCitationSource, InlineCitationTitle, InlineCitationTrigger } from '@/components/ui/inline-citation'
 import { SourceAvatar, SourcesList, SourcesSummary, sourceTileClassName, type StreamingSource } from '@/components/ui/streaming-text'
@@ -16,7 +16,8 @@ import { OpenAI } from '@/components/ui/svgs/openai'
 import { useTaskCards } from '@/hooks/use-task-cards'
 import { TaskPresentationsContext } from '@/hooks/use-task-collection'
 import { ISSUE_PRIORITIES } from '@/components/workspace/issue-properties'
-import { TaskStateIcon, useTaskStateLabel } from '@/components/workspace/task-state-icon'
+import { TaskRunMark, TaskStatusIcon, useRunIndicatorLabel, useTaskStatusLabel } from '@/components/workspace/task-state-icon'
+import { conversationIndicatorOf, runIndicatorOf } from '@/lib/task-state'
 import { ThreadStatus } from '@/components/workspace/thread-status-icon'
 import { openThread } from '@/components/workspace/workspace-navigation'
 
@@ -34,11 +35,14 @@ export interface AgentCitations {
   /** A reply still arriving, or its cited issues and runs still being looked up: a chip not known yet holds its place. */
   pending?: boolean
   /**
-   * Tasks whose thread the same reply cites. No longer read when rendering (decision 2026-11-10): the task is always
-   * its own compact chip (state icon and code) and the thread its title, so neither repeats the other.
+   * Tasks whose thread the same reply cites. Not read when rendering: the task is always its own compact chip (status
+   * icon and code) and the thread its title, so neither repeats the other.
    */
   covered?: ReadonlySet<string>
-  /** Legacy reply metadata; references use the same compact task chip / thread link even beside a dispatch card. */
+  /**
+   * The threads whose dispatch card sits right under this reply. A thread cited straight after its own task's chip is
+   * left out of the words then: the chip and the card already say it (decision 2026-11-13-1405).
+   */
   carded?: ReadonlySet<string>
 }
 
@@ -88,11 +92,12 @@ export function useLinkPreviews(texts: readonly string[]): LinkPreviews {
 export function CitationAnchor({ href, children, className: _className, ...props }: ComponentProps<'a'>) {
   const citations = useAgentCitations()
   if (citations && href?.startsWith(CITATION_HREF)) {
-    const [kind, id] = href.slice(CITATION_HREF.length).split('/') as [CitationKind | 'any', string]
+    // `/after/<task id>` marks a thread cited right after a task (lib/coordinator/citations.ts pairCitations).
+    const [kind, id, , after] = href.slice(CITATION_HREF.length).split('/') as [CitationKind | 'any', string, string?, string?]
     const source = citations.sources[id]
     if (!source && citations.pending) return <PendingCitation />
     if (!source || (kind !== 'any' && kind !== source.kind)) return <>{children}</>
-    return <CitationChip id={id} kind={source.kind} />
+    return <CitationChip id={id} kind={source.kind} after={after} />
   }
   if (citations && href && /^https?:\/\//i.test(href)) return <WebCitation url={href} label={typeof children === 'string' && children !== href ? children : null} />
   return <a {...props} href={href} className="text-primary underline underline-offset-4" target="_blank" rel="noopener noreferrer">{children}</a>
@@ -122,21 +127,25 @@ export function PendingCitation() {
 }
 
 /**
- * A task mentioned in a reply shows its code or title and its authorized state.
+ * A task mentioned in a reply shows its status icon and its code (its title when it has none).
  * Older citations outside the workspace list share the mounted cards' batch.
  */
 export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (id: string) => void }) {
   const t = useTranslations('Coordinator.citation')
   const tIssue = useTranslations('Issue')
-  const stateLabel = useTaskStateLabel()
+  const statusLabel = useTaskStatusLabel()
+  const runLabel = useRunIndicatorLabel()
   const resident = useContext(TaskPresentationsContext)[issue.id]
   const cards = useTaskCards(resident ? [] : [issue.id])
   const presentation = resident ?? cards[issue.id]
   const priority = ISSUE_PRIORITIES.find(item => item.value === issue.priority)
   const identifier = issue.identifier
-  const icon = presentation && <TaskStateIcon state={presentation.state} />
+  // A chip has one icon, the task's status (2026-11-13-1405). What an Agent is doing is the conversation's: its mark
+  // sits on the thread's title and its card, and here only as a line of words in the hover card.
+  const icon = presentation && <TaskStatusIcon status={presentation.primaryStatus} />
+  const indicator = presentation ? runIndicatorOf(presentation.state) : null
   return <InlineCitation>
-    <InlineCitationTrigger variant="object" aria-label={t('openIssue', { title: issue.title })} data-focus-id={issue.id} data-task-chip={presentation?.state ?? ''} onClick={() => onOpen(issue.id)}>
+    <InlineCitationTrigger variant="object" aria-label={t('openIssue', { title: issue.title })} data-focus-id={issue.id} data-task-chip={presentation?.primaryStatus ?? ''} onClick={() => onOpen(issue.id)}>
       {identifier
         // A code never breaks: the icon and the code are one unit.
         ? <InlineCitationLabel><span data-slot="chip-head" className="whitespace-nowrap"><span data-slot="chip-icon" className="me-1 inline-flex align-[-0.125em]">{icon}</span>{identifier}</span></InlineCitationLabel>
@@ -147,7 +156,8 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
         <InlineCitationSource><Mikka />{identifier ? `Mikka · ${identifier}` : 'Mikka'}</InlineCitationSource>
         <InlineCitationTitle>{issue.title}</InlineCitationTitle>
         <InlineCitationMeta>
-          {presentation && <span data-task-state-label={presentation.state}>{icon}{stateLabel(presentation.state, presentation.reason)}</span>}
+          {presentation && <span data-task-status-label={presentation.primaryStatus}><TaskStatusIcon status={presentation.primaryStatus} />{statusLabel(presentation.primaryStatus)}</span>}
+          {indicator && <span data-run-indicator-label={indicator}>{runLabel(indicator)}</span>}
           {priority && <span><priority.icon {...priority.iconProps} />{tIssue(`priority.${priority.value}`)}</span>}
         </InlineCitationMeta>
       </InlineCitationBody>
@@ -156,14 +166,16 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
 }
 
 /** A cited issue or run by id, as a chip; the raw id when the conversation cannot show it. */
-export function CitationChip({ id, kind }: { id: string; kind: CitationKind }) {
+export function CitationChip({ id, kind, after }: { id: string; kind: CitationKind; after?: string }) {
   const citations = useAgentCitations()
   const source = citations?.sources[id]
   if (!source && citations?.pending) return <PendingCitation />
   if (!citations || source?.kind !== kind) return <>{id}</>
-  return source.kind === 'issue'
-    ? <IssueCitation issue={source} onOpen={citations.onOpenIssue} />
-    : <RunCitation run={source} />
+  if (source.kind === 'issue') return <IssueCitation issue={source} onOpen={citations.onOpenIssue} />
+  // A thread named straight after its own task is one reference with it: the chip, then the thread's short title.
+  const paired = !!after && source.issue?.id === after
+  if (paired && citations.carded?.has(id)) return null
+  return paired ? <>{' '}<RunCitation run={source} paired /></> : <RunCitation run={source} />
 }
 
 /** A cited web page as a chip with its link preview; a plain link outside a conversation that cites. */
@@ -174,37 +186,39 @@ export function WebCitation({ url, label }: { url: string; label: string | null 
 }
 
 /**
- * The look of a thread named in a sentence (decision 2026-11-10): its title in the link colour, with no box, icon,
- * accent or state badge. Still the object chip's inline `span` button, so a long title wraps and the focus ring shows.
+ * The look of a thread named in a sentence: its title in the link colour, with no box, accent or state badge, and one
+ * small activity mark after it only while it is working, waiting or failed (decision 2026-11-13-1405). Still the object chip's inline `span` button, so a long title wraps and the focus ring shows.
  */
 const runLinkClassName = 'mx-0 rounded-sm bg-transparent px-0 text-object-chip-foreground underline-offset-4 hover:bg-transparent hover:underline data-popup-open:bg-transparent data-popup-open:underline'
 
 /**
- * A thread mentioned in a reply: its title alone, as a link (its task's title without the code, since the task has
- * its own chip; else what it was asked). It opens the thread's conversation, never the task. The Agent, its coding
+ * A thread mentioned in a reply: its title alone, as a link: the conversation's one short title (runTitle), the same
+ * in its hover card. It opens the thread's conversation, never the task. The Agent, its coding
  * agent's mark, its state and time are in the hover card.
  */
-export function RunCitation({ run }: { run: RunSource }) {
+export function RunCitation({ run, paired = false }: { run: RunSource; paired?: boolean }) {
   const t = useTranslations('Coordinator.citation')
   const format = useFormatter()
   const HarnessIcon = run.harness === 'claude_code' ? Claude : OpenAI
   const harness = run.harness === 'claude_code' ? 'Claude Code' : 'Codex'
-  const issue = run.issue
   const title = runTitle(run)
+  const activity = conversationIndicatorOf(run)
   return <InlineCitation>
     <InlineCitationTrigger
       variant="object"
       className={runLinkClassName}
       data-thread-link=""
+      data-thread-pair={paired ? '' : undefined}
       aria-label={t('openThread', { name: title })}
       onClick={() => openThread(run.id)}
     >
-      <InlineCitationLabel>{title}</InlineCitationLabel>
+      {/* One small mark after the title while the conversation is working, waiting or failed; nothing when idle or finished. After, so it never sits beside its task chip's status icon. */}
+      <InlineCitationLabel>{title}{activity && <span data-slot="thread-activity" className="ms-1 inline-flex align-[-0.125em]"><TaskRunMark indicator={activity} /></span>}</InlineCitationLabel>
     </InlineCitationTrigger>
     <InlineCitationContent>
       <InlineCitationBody>
         <InlineCitationSource>{run.agentName} · <HarnessIcon />{harness}</InlineCitationSource>
-        <InlineCitationTitle>{issue ? `${issue.identifier ? `${issue.identifier} ` : ''}${issue.title}` : t('noIssue')}</InlineCitationTitle>
+        <InlineCitationTitle>{runThreadName(run) || t('noIssue')}</InlineCitationTitle>
         <InlineCitationMeta>
           <ThreadStatus status={run.status} outcome={run.outcome} />
           <span>{format.dateTime(new Date(run.finishedAt ?? run.createdAt), { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>

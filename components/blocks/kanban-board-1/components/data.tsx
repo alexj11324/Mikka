@@ -1,6 +1,7 @@
 import type { listIssues } from '@/app/actions/issues'
 import type { TaskRun } from '@/app/actions/task-runs'
 import type { TaskState } from '@/hooks/use-bot-tasks'
+import { runIndicatorOf, type RunIndicator } from '@/lib/task-state'
 import { threadGroup, type GroupIssue } from '@/lib/thread-groups'
 import { CircleStop } from 'lucide-react'
 import { ISSUE_STATUSES, type IssueStatus } from '@/components/workspace/issue-properties'
@@ -40,20 +41,18 @@ export const DEFAULT_CARD_PROPERTIES: CardProperty[] = ['identifier', 'priority'
 /** Who works a task beyond its assignee: the Bot of its newest thread and the coding agents of its threads. */
 export type RunOwner = Pick<TaskRun, 'bot' | 'harnesses'>
 
-/** The task's newest thread, by its group in the right column (R-52); a settled thread (空闲, 已解决) shows nothing. */
+/** What a task's Agent is doing, as the card's small mark: running (working), waiting for the person, blocked (error). */
 export type AgentState = 'running' | 'waiting' | 'blocked'
 export const AGENT_STATES: AgentState[] = ['running', 'waiting', 'blocked']
-/**
- * A card's status-line kind (the board's own state glyph) for the task's own state from localTaskState (decision #1864
- * point 6): 运行中 / 排队中 run, 等你处理 waits, 受阻 / 失败 block, the closed ones are done; 待办 and 暂不处理 draw no line
- * (the column already says so).
- */
-export function cardStateKind(state: TaskState): AgentState | 'done' | null {
-  if (state === 'running' || state === 'queued') return 'running'
-  if (state === 'waiting') return 'waiting'
-  if (state === 'blocked' || state === 'failed') return 'blocked'
-  if (state === 'done' || state === 'canceled' || state === 'duplicate') return 'done'
-  return null
+/** The board's mark for what a task's Agent is doing (lib/task-state.ts runIndicatorOf): never a status or a column. */
+export function runMarkKind(indicator: RunIndicator): AgentState {
+  return indicator === 'working' ? 'running' : indicator === 'waiting' ? 'waiting' : 'blocked'
+}
+
+/** The Agent's mark for a task's presented state; null when no run is under way, waiting or failed. */
+export function cardStateKind(state: TaskState): AgentState | null {
+  const indicator = runIndicatorOf(state)
+  return indicator ? runMarkKind(indicator) : null
 }
 
 export function agentStateOf(run: Pick<TaskRun, 'status' | 'outcome'> | undefined, issue: GroupIssue | undefined): AgentState | null {

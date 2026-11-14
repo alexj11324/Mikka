@@ -1,20 +1,20 @@
 import type { Thread } from '@/app/actions/task-runs'
 import type { listIssues } from '@/app/actions/issues'
-import type { TaskReason, TaskState } from '@/lib/task-state'
+import { conversationIndicatorOf, type RunIndicator, type TaskReason, type TaskState } from '@/lib/task-state'
 import type { TaskPresentation } from '@/lib/task-presentation'
 import { issueIdentifier } from '@/components/workspace/issue-properties'
-import { compactTaskTitle } from '@/lib/short-title'
+import { compactTaskTitle, conversationTitle } from '@/lib/short-title'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 export type BotWorkRun = { id: string; name: string; harness: string | null }
-export type BotWorkTask = { id: string; issueId: string | null; name: string; fullName: string; state: TaskState | null; reason: TaskReason | null; runs: BotWorkRun[] }
+export type BotWorkTask = { unreadCount?: number; id: string; issueId: string | null; name: string; fullName: string; /** The task's status field; null for a run that has no task. */ status: string | null; /** What a conversation with no task is doing, for its one mark; null for a task row, whose one icon is its status. */ activity: RunIndicator | null; state: TaskState | null; reason: TaskReason | null; runs: BotWorkRun[] }
 
 type Dispatch = NonNullable<TaskPresentation['botDispatches']>[number]
 const taskRow = (issue: Issue, presentation: TaskPresentation, dispatch: Dispatch): BotWorkTask => ({
   id: issue.id, issueId: issue.id,
   name: [issueIdentifier(issue), compactTaskTitle(issue)].filter(Boolean).join(' '),
   fullName: [issueIdentifier(issue), issue.title].filter(Boolean).join(' '),
-  state: presentation.state, reason: presentation.reason, runs: [{ id: dispatch.runId, name: dispatch.name, harness: dispatch.harness }],
+  status: issue.status, state: presentation.state, reason: presentation.reason, activity: null, runs: [{ id: dispatch.runId, name: dispatch.name, harness: dispatch.harness }],
 })
 
 /** Reuse the shell's authorized Task membership and state. Standalone Runs
@@ -39,9 +39,10 @@ export function botWorkTree(workspaceId: string | null, botIds: readonly string[
     if (!botId || !allowed.has(botId) || run.source === 'mcp') continue
     const child = { id: run.id, name: run.agentName, harness: run.harness }
     if (!run.issueId) {
-      const title = run.prompt.split('\n').find(line => line.trim())?.trim() || run.agentName
-      rowsFor(botId).set(run.id, { id: run.id, issueId: null, name: compactTaskTitle({ title }), fullName: title,
-        state: null, reason: null, runs: [child] })
+      // A conversation with no task is named by its own short title: the stored one (a rename shows here), else what it was asked.
+      const title = conversationTitle({ title: run.title, name: run.prompt.split('\n').find(line => line.trim())?.trim() }) || run.agentName
+      rowsFor(botId).set(run.id, { id: run.id, issueId: null, name: title, fullName: title,
+        status: null, state: null, reason: null, activity: conversationIndicatorOf(run), runs: [child] })
       continue
     }
     const issue = tasks.get(run.issueId), projected = presentations[run.issueId]
@@ -64,9 +65,12 @@ export function botWorkTree(workspaceId: string | null, botIds: readonly string[
       if (!rows.has(issue.id)) rows.set(issue.id, taskRow(issue, projected, dispatch))
     }
   }
+  const unread = new Set(threads.filter(run => run.unread).map(run => run.id))
   const createdAt = new Map(threads.map(run => [run.id, run.createdAt]))
   for (const [botId, rows] of grouped) {
     for (const row of rows.values()) {
+      const unreadCount = row.runs.filter(run => unread.has(run.id)).length
+      if (unreadCount) row.unreadCount = unreadCount
       const [latest, ...older] = row.runs
       row.runs = [latest, ...older.sort((a, b) => (createdAt.get(b.id) ?? '').localeCompare(createdAt.get(a.id) ?? '') || b.id.localeCompare(a.id))]
     }

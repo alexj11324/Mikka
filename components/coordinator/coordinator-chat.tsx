@@ -59,12 +59,13 @@ import { noteChipText } from '@/lib/browser/note'
 import { PERSON_BUBBLE } from '@/components/slots/chat-message'
 import type { ChatSpeaker } from '@/components/slots/chat-message-contract'
 import { replySegments, type ReplySegment } from '@/lib/coordinator/reply-segments'
-import { runThreadName } from '@/lib/coordinator/citations'
+import { runThreadName, runTitle } from '@/lib/coordinator/citations'
 import { MessageReactions, useMessageReactions } from '@/components/workspace/message-reactions'
 import { PendingActions } from './pending-actions'
 import { SubagentLoginNeeds } from './subagent-login-needs'
 import { UnreadDivider } from '@/components/chat/unread-divider'
 import { UnreadPill } from '@/components/chat/unread-pill'
+import { VisibleReadEnd } from '@/components/workspace/visible-read-end'
 import { MESSAGE_POSITION_ATTR, useUnreadIndicators } from '@/lib/hooks/use-unread-indicators'
 import { useArrivals } from '@/lib/hooks/use-arrivals'
 import { openArtifact as openArtifactWindow } from '@/components/workspace/workspace-navigation'
@@ -279,6 +280,8 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
     inputRef.current?.focus()
   }
   const deliveryInFlight = useRef(false)
+  // Why the last send did not go, for a card that answers through this chat (agent-interaction.tsx `answer`).
+  const lastSendFailure = useRef<string | undefined>(undefined)
   const delivery = useChatDelivery<PersonalChatSend>(stateKey, t('sendUncertain'))
   const [retrying, setRetrying] = useState<ReadonlySet<number>>(() => new Set())
   const { submit, failureMessage } = useCoordinatorSubmit(stream)
@@ -432,7 +435,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
     thread: id => {
       const run = sources?.[id]
       if (run?.kind !== 'run') return { title: t('citation.run') }
-      return { title: run.issue?.identifier ? `${run.issue.identifier} › ${run.name || runThreadName(run)}` : runThreadName(run), issueId: run.issue?.id ?? null, name: runThreadName(run) }
+      return { title: run.issue?.identifier ? `${run.issue.identifier} › ${runTitle(run) || runThreadName(run)}` : runThreadName(run), issueId: run.issue?.id ?? null, name: runThreadName(run) }
     },
   }, name, owner && selectedWorkspaceId ? JSON.stringify([owner, selectedWorkspaceId, botId]) : null)
   const openIssue = work.work ? work.openTask : onOpenIssue
@@ -484,7 +487,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
     deliveryInFlight.current = true
     setSending(true)
     releaseDraft?.()
-    const fail = (message: string) => { delivery.finish(command.id, { error: message }); return 'failed' as const }
+    const fail = (message: string) => { lastSendFailure.current = message; delivery.finish(command.id, { error: message }); return 'failed' as const }
     try {
       if (isWebChatOffline()) return fail(t('sendOffline'))
       if (!await checkPageBuildBeforeAction()) return fail(t('sendUpdateRequired'))
@@ -500,6 +503,12 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
   /** Sends `text`; false if it did not go. */
   async function post(text: string, withNotes = false) {
     return await deliver(text, withNotes) === 'sent'
+  }
+  /** Sends a card's answer and says why it did not go, in the words the failed message itself shows. */
+  async function answer(text: string): Promise<{ sent: true } | { sent: false; reason?: string }> {
+    lastSendFailure.current = undefined
+    const outcome = await deliver(text)
+    return outcome === 'sent' ? { sent: true } : { sent: false, reason: outcome === 'failed' ? lastSendFailure.current : undefined }
   }
   async function send(event?: FormEvent) {
     event?.preventDefault()
@@ -570,6 +579,8 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
       const artifacts = item.artifacts.flatMap(id => data?.artifacts[id] ? [{ id, name: data.artifacts[id].title }] : [])
       if (artifacts.length) parts.push({ kind: 'artifacts', items: artifacts, onOpen: openArtifact })
       if (item.failure) parts.push(item.position === failedAt ? liveFailurePart : { kind: 'error', text: t('failedTitle'), actions: <FailureReason retry={item.welcome} failure={item.failure} botId={botId} sending={sending} onResend={() => { void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate()) }} /> })
+      if (!live && item.position === unreadItems.findLast(row => row.reportable)?.position)
+        parts.push({ kind: 'text', text: '', node: <VisibleReadEnd onSeen={unread.reportEnd} /> })
       entries.push({ id: key, role: 'bot', at, parts, streaming, ...(item.stopped ? { stopped: true } : {}),
         actions: item.text && !streaming ? <MessageActions className={cn('items-start', REPLY_ACTIONS)}>
           <CopyAction text={replyCopyText(item.text)} />
@@ -606,7 +617,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
       </p>}
       <PendingActions />
     </>
-    return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(working), continueFromAnswer: prompt => post(prompt.trim()) }}>
+    return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(working), continueFromAnswer: prompt => post(prompt.trim()), answer: prompt => answer(prompt.trim()) }}>
       {/* The page's floating title pill sits over the top 56px on wide screens: the screen starts below it. Without one (the
           hosted shell owns the header and the thread names itself) no band is left. */}
       <section ref={rootRef} aria-label={name} className={cn('mikka-agent flex min-h-0 min-w-0 flex-1 flex-col', pill && 'md:pt-14')}>
@@ -638,7 +649,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
     </AgentInteractionContext></AgentThemeProvider>
   }
 
-  return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(working), continueFromAnswer: prompt => post(prompt.trim()) }}>
+  return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(working), continueFromAnswer: prompt => post(prompt.trim()), answer: prompt => answer(prompt.trim()) }}>
   {/* The chat never widens what holds it: whatever a message carries scrolls or wraps inside its own box, and anything that still
       reaches past the column is clipped here instead of scrolling the whole page sideways. */}
   <section ref={rootRef} aria-label={name} className={cn('mikka-agent flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip', CHAT_SURFACE)}>

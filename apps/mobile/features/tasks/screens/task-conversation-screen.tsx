@@ -1,3 +1,4 @@
+import { useThreadReadEnd } from '@/features/chat/model/use-thread-read-end'
 import { conversationAccessDenied, useConversationDelivery } from '@/features/chat/components/conversation-delivery'
 import { mobileMessages } from '@/lib/messages'
 import { useCallback, useRef, useState, type ReactNode } from 'react'
@@ -72,6 +73,7 @@ export function TaskConversationScreen() {
     if (!(failure instanceof ApiError && failure.status === 409)) throw failure
   }), Boolean(live?.active), reload)
 
+  const readEnd = useThreadReadEnd(id, error ? undefined : Object.values(data?.threads ?? {}).flatMap(thread => thread.readReceipts ?? []), bar.onScroll)
   const task = data?.detail.task
   const agent = currentAgent(segments)
   // Opened on an attempt from 活动: scrolled to its part, once. Opened plainly: at the newest, at the bottom, as a chat.
@@ -98,7 +100,7 @@ export function TaskConversationScreen() {
           </View>
         ) : undefined}
       />
-      <KeyboardChatScrollView onScroll={bar.onScroll} scrollEventThrottle={16} ref={scroller as never} onContentSizeChange={place} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
+      <KeyboardChatScrollView key={id} {...readEnd} scrollEventThrottle={16} ref={scroller as never} onContentSizeChange={(width, height) => { readEnd.onContentSizeChange(width, height); place() }} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
         {!data && !error ? <View style={styles.center}><Spinner /></View> : null}
         <ReadNotice error={error} hasData={Boolean(data)} label={mobileMessages.Coordinator.conversation} onRetry={reload} />
         {/* A factory task's one stage, and what it needs from you (2026-11-04-2200); nothing without a flow. */}
