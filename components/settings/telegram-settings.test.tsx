@@ -17,7 +17,7 @@ test('Telegram settings withdraw unavailable status and retry the original accou
   } })
   const { createRoot } = await import('react-dom/client')
   const { TelegramSettings } = await import('./telegram-settings')
-  const container = document.createElement('div')
+  const container = document.body
   const root = createRoot(container)
   try {
     await act(async () => root.render(<TelegramSettings />))
