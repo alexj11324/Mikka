@@ -1,7 +1,8 @@
 import 'server-only'
 import { and, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm'
+import { joinThreadRead, threadUnread } from '@/lib/thread-reads'
 import { db, pool } from '@/lib/db'
-import { agentRuns, agents, devices, issues } from '@/lib/db/schema'
+import { agentRuns, agents, conversationReads, devices, issues } from '@/lib/db/schema'
 import { citationSources } from '@/lib/coordinator/store'
 import { runHistoryWindow } from '@/lib/task-state-query'
 import { deviceOnlineStates } from '@/lib/device-presence'
@@ -32,6 +33,7 @@ export function machineKind(device: { name: string | null; platform: string | nu
 }
 
 export interface MobileThread {
+  unread: boolean
   id: string
   name: string
   status: MobileThreadStatus
@@ -79,12 +81,13 @@ function listed(rows: Awaited<ReturnType<typeof runRows>>): MobileThread[] {
 /** Threads with what their task links: its id, title and pull requests, as far as this person can see it. */
 async function runRows(userId: string, filter: SQL | undefined, limit: number) {
   const rows = await db.select({
-    id: agentRuns.id, title: agentRuns.title, prompt: sql<string>`left(${runTaskPrompt}, 300)`, status: agentRuns.status,
+    unread: threadUnread, id: agentRuns.id, title: agentRuns.title, prompt: sql<string>`left(${runTaskPrompt}, 300)`, status: agentRuns.status,
     agentName: runBotName, harness: agents.harness,
     deviceId: devices.id, deviceName: devices.name, platform: devices.platform, deviceKind: devices.kind,
     createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt, outcome: agentRuns.outcome,
   }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
     .leftJoin(devices, eq(devices.id, agentRuns.deviceId))
+    .leftJoin(conversationReads, joinThreadRead(userId))
     .where(and(eq(agentRuns.userId, userId), filter))
     .orderBy(desc(agentRuns.createdAt)).limit(limit)
   const sources = rows.length ? await citationSources(userId, [], rows.map(row => row.id)) : {}
@@ -98,7 +101,7 @@ async function runRows(userId: string, filter: SQL | undefined, limit: number) {
     const found = sources[row.id]
     const source = found?.kind === 'run' ? found : undefined
     const thread: MobileThread = {
-      id: row.id,
+      id: row.id, unread: row.unread,
       name: row.title || nameOf(source, row.prompt, row.agentName),
       status: mobileThreadStatus(row.status),
       by: row.agentName,

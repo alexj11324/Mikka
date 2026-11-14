@@ -109,6 +109,8 @@ async function runChainQuery(sql: string, params: unknown[]) {
 }
 let actions: typeof import('../app/actions/agents')
 before(async () => {
+  // The receipt store has its own PostgreSQL coverage. This fixture models run controls.
+  mock.module('@/lib/thread-reads', { namedExports: { threadReadReceipts: async () => [] } })
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async (input?: { query?: { disableCookieCache?: boolean } }) => {
     if (input?.query?.disableCookieCache && !freshSession) return null
     return viewer ? { user: { id: sessionUser ?? viewer }, session: { id: 'synthetic-session' } } : null

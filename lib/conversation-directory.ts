@@ -3,8 +3,9 @@ import { withConversationWorkspace, type ConversationReader } from './conversati
 import { requireTaskWorkspaceLease, taskReaderScope } from './task-workspace'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
-import { directoryInput, type DirectoryInput, type DirectoryState } from './conversation-directory-input'
+import { directoryInput, type DirectoryInput, type DirectoryState, type ConversationDirectoryPage } from './conversation-directory-input'
 import { runAwaitingApproval, runDeviceOffline } from './task-state-query'
+import { threadUnread } from './thread-reads'
 import { runBotId } from './run-bot-name'
 import { runChainSql, RUN_CHAIN_MAX_DEPTH, type RunChainQueryable } from './run-chain'
 import { threadName } from './issue-threads'
@@ -13,13 +14,14 @@ import { conversationTitle } from './short-title'
 type Row = {
   id: string; issueId: string | null; identifier: string | null; title: string | null; asked: string
   taskTitle: string | null; agentName: string; pinned: boolean; at: string; state: DirectoryState
-  botId: string | null; status: string | null; harness: string | null; position: number
+  botId: string | null; status: string | null; harness: string | null; position: number; unread: boolean
 }
 
 // Both readers resolve exactly one authorized conversation per root. A pin or
 // live question survives the idle threshold. A manual restore restarts its clock.
 const dialect = new PgDialect()
 const facts = dialect.sqlToQuery(sql`SELECT (${runAwaitingApproval}) AS approval, (${runDeviceOffline}) AS offline`)
+const unread = dialect.sqlToQuery(threadUnread)
 const attribution = dialect.sqlToQuery(sql`SELECT ${runBotId} AS id`)
 
 function conversationQuery() {
@@ -32,7 +34,9 @@ function conversationQuery() {
     FROM assigned a JOIN agent_runs r ON r.id=a.id WHERE NOT a."depthExceeded"
     ORDER BY a.root,r."createdAt" DESC,r.id DESC
   ), roots AS (
-    SELECT root.id,coalesce(agent_runs.title,root.title) AS title, agents.name AS "agentName",agents.harness,
+    SELECT root.id,EXISTS (SELECT 1 FROM assigned receipt JOIN agent_runs ON agent_runs.id=receipt.id
+      LEFT JOIN conversation_reads ON conversation_reads."userId"=${owner} AND conversation_reads."conversationId"='run:' || agent_runs.id::text
+      WHERE receipt.root=root.id AND NOT receipt."depthExceeded" AND (${unread.sql})) AS unread, coalesce(agent_runs.title,root.title) AS title, agents.name AS "agentName",agents.harness,
       root."issueId",i."issuedIdentifier" AS identifier,i.title AS "taskTitle",i.status,agent_runs.status AS "runStatus",
       root."conversationPinnedAt" IS NOT NULL AS pinned,root."conversationArchivedAt" AS manual,
       root."conversationRestoredAt" AS restored,latest.touched,root.source,
@@ -75,15 +79,15 @@ export async function effectiveConversationArchive(database: RunChainQueryable, 
 
 function item(row: Row) {
   return { id: row.id, issueId: row.issueId, identifier: row.identifier, title: conversationTitle({ title: row.title,
-    name: threadName(row.asked, ''), issue: { title: row.taskTitle || row.agentName } }), state: row.state, at: row.at, pinned: row.pinned }
+    name: threadName(row.asked, ''), issue: { title: row.taskTitle || row.agentName } }), state: row.state, unread: row.unread, at: row.at, pinned: row.pinned }
 }
 
-export async function conversationDirectory(database: RunChainQueryable, reader: ConversationReader, workspaceId: string, raw: DirectoryInput) {
+export async function conversationDirectory(database: RunChainQueryable, reader: ConversationReader, workspaceId: string, raw: DirectoryInput): Promise<ConversationDirectoryPage> {
   const { userId } = taskReaderScope(reader)
   return await withConversationWorkspace(reader, workspaceId, () => directoryPage(database, userId, workspaceId, raw)) ?? { items: [], cursor: null }
 }
 
-async function directoryPage(database: RunChainQueryable, userId: string, workspaceId: string, raw: DirectoryInput) {
+async function directoryPage(database: RunChainQueryable, userId: string, workspaceId: string, raw: DirectoryInput): Promise<ConversationDirectoryPage> {
   const input = directoryInput.parse(raw)
   const param = (i: number) => '$' + (facts.params.length + i)
   const [archived,bot,search,state,id,pinned,at] = Array.from({length:7}, (_,i) => param(4+i))

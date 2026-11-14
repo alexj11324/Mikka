@@ -67,11 +67,12 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
       result = { id, title: input.title, ...(queueAgents ? { leadAgentId: input.leadAgentId ?? null, leadBotId: input.leadBotId ?? null } : {}) }; status = 201
     } else if (req.resource === 'conversations' && req.method === 'GET') {
       if (req.workspaceId && (!z.uuid().safeParse(req.workspaceId).success || !await directory(req.workspaceId, userId, []))) return fail(404)
-      const { rows } = await q(`SELECT c.*, last.message AS "lastMessage",
+      const { rows } = await q(`SELECT c.*, last.message AS "lastMessage", coalesce(pref."markedUnread",false) as "markedUnread",
         (SELECT count(*)::text FROM conversation_messages m WHERE m."conversationId"=c.id
           AND m.position > COALESCE(r."lastReadPosition",0) AND NOT (m."authorType"='user' AND m."authorId"=$1)) AS "unreadCount"
         FROM conversations c JOIN conversation_members cm ON cm."conversationId"=c.id AND cm."memberType"='user' AND cm."memberId"=$1 AND cm."leftAt" IS NULL
         LEFT JOIN conversation_reads r ON r."conversationId"=c.id::text AND r."userId"=$1
+        LEFT JOIN chat_preferences pref ON pref."userId"=$1 AND pref."chatKey"=c.id::text
         LEFT JOIN LATERAL (SELECT to_jsonb(m) || jsonb_build_object('position', m.position::text) AS message FROM conversation_messages m WHERE m."conversationId"=c.id ORDER BY position DESC LIMIT 1) last ON true
         WHERE c.kind='group' AND ($2::uuid IS NULL OR c."workspaceId"=$2) ORDER BY c."createdAt" DESC,c.id DESC`, [userId, req.workspaceId ?? null])
       const accessible = []
@@ -124,7 +125,8 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
               "lastReadMessageId"=CASE WHEN EXCLUDED."lastReadPosition">r."lastReadPosition" THEN EXCLUDED."lastReadMessageId" ELSE r."lastReadMessageId" END,
               "updatedAt"=CASE WHEN EXCLUDED."lastReadPosition">r."lastReadPosition" THEN EXCLUDED."updatedAt" ELSE r."updatedAt" END
             WHERE EXCLUDED."lastReadPosition">r."lastReadPosition" RETURNING "conversationId"`, [userId, req.id, selected.position, selected.id])
-          if (advanced.rowCount) await groupListReadChanged(client, group.id, userId)
+          const cleared = await q('UPDATE chat_preferences SET "markedUnread"=false, "updatedAt"=now() WHERE "userId"=$1 AND "chatKey"=$2 AND "markedUnread"', [userId, req.id])
+          if (advanced.rowCount || cleared.rowCount) await groupListReadChanged(client, group.id, userId)
         }
         const { rows: [state] } = await q(`SELECT "lastReadPosition","lastReadMessageId" FROM conversation_reads WHERE "userId"=$1 AND "conversationId"=$2`, [userId, req.id])
         const { rows: [unread] } = await q(`SELECT count(*)::text AS n FROM conversation_messages WHERE "conversationId"=$1 AND position>$2 AND NOT ("authorType"='user' AND "authorId"=$3)`, [req.id, state?.lastReadPosition ?? 0, userId])

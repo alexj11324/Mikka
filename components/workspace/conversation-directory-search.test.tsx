@@ -16,15 +16,15 @@ mock.module('swr/infinite', { defaultExport: (getKey: (index: number, previous: 
 }, namedExports: { unstable_serialize: () => 'directory' } })
 const stub = (file: string, namedExports: Record<string, unknown>) => mock.module(new URL(file, import.meta.url).href, { namedExports })
 stub('../../hooks/use-live-key.tsx', { useLiveKey: () => {} })
+stub('../../app/actions/preferences.ts', { getPreferences: () => ({}), updatePreferences: () => ({}) })
 stub('../../app/actions/task-runs.ts', { listConversations: ({ search }: { search: string }) => { renderedQuery = search; return { items: [], cursor: null } } })
-stub('./workspace-navigation.ts', { openGroupConversation: () => {}, openThread: () => {}, openTask: () => {} })
 const { ConversationDirectory } = await import('./conversation-directory')
 test('the active directory query follows the search input even before React can commit background work', async () => {
   const host = document.createElement('div')
   document.body.append(host)
   const root = createRoot(host)
   try {
-    await act(async () => root.render(<ConversationDirectory ownerId="owner" workspaceId="workspace" />))
+    await act(async () => root.render(<ConversationDirectory ownerId="owner" workspaceId="workspace" botId={null} />))
     assert.equal(renderedQuery, '')
     const input = host.querySelector('input[type="search"]')
     assert.ok(input instanceof browser.HTMLInputElement)

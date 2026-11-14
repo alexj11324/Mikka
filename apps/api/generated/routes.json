@@ -494,6 +494,15 @@
       "sourceHash": "3d18fce6ff0759821f8482a5a9cf4cdcecaf312e7439c45ba47a10b0bac99118"
     },
     {
+      "path": "/mikka/api/conversations/read-state",
+      "template": "/api/conversations/read-state",
+      "source": "app/api/conversations/read-state/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "9f8b48b0eb78f548dc3e06c4992fe9407f1a1899ab519db0f98cfc82426af956"
+    },
+    {
       "path": "/mikka/api/conversations/[id]",
       "template": "/api/conversations/[id]",
       "source": "app/api/conversations/[id]/route.ts",
@@ -1536,6 +1545,15 @@
       "sourceHash": "b3407c3590b1e5488324cfa538c6e2245105c0c150938fb102579756d6187024"
     },
     {
+      "path": "/mikka/api/mobile/conversations",
+      "template": "/api/mobile/conversations",
+      "source": "app/api/mobile/conversations/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "4b8c5332c6e023d0daadbdbef717c87a404e13e5480dd025269ce64379fa08bd"
+    },
+    {
       "path": "/mikka/api/mobile/groups/[id]",
       "template": "/api/mobile/groups/[id]",
       "source": "app/api/mobile/groups/[id]/route.ts",
@@ -1551,7 +1569,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "6202ba06a2a0659533d0ee7cabf5abaa6cf4d7b222ca7bf095dff4a9201aefba"
+      "sourceHash": "05d1352299fb3b0e191049a97c5bc7c6e5784cac4808421b8f2dd1d520d0970c"
     },
     {
       "path": "/mikka/api/mobile/model",
@@ -1666,7 +1684,7 @@
         "GET",
         "POST"
       ],
-      "sourceHash": "7930331d4bd4c6a12ff68e85011e0c36d87e888b97831f091c4d9d6e9b32c95c"
+      "sourceHash": "2db166c2f3aa1b1b8c23d718c078f8a1715e24cb6888017e2a021fdfeefb70df"
     },
     {
       "path": "/mikka/api/mobile/threads/[id]/continue",

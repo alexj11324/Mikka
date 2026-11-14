@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router'
 import { ChevronRight, Plus } from 'lucide-react-native'
 import { Spinner } from '@/components/icons'
 import { NavBar, underBar } from '@/components/NavBar'
+import { Row } from '@/components/settings'
 import { ReadNotice } from '@/components/ReadNotice'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
@@ -70,6 +71,7 @@ export function HomeScreen() {
                 <Text style={styles.updateText}>{mobileMessages.MobileCore.restartToUpdate}</Text>
               </Pressable>
             ) : null}
+            <Row label={mobileMessages.ConversationDirectory.title} onPress={() => router.push('/conversations')} />
             <PinnedGrid pinned={pinned} actions={actions} />
           </View>
         }

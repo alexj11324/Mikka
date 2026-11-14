@@ -146,6 +146,10 @@ export const archivePreferenceChanged = (executor: object, ownerId: string) => c
     WHERE m."userId"=$1 AND m.status='active' AND (w.kind='team' OR w."userId"=$1)`, [ownerId])
   return rows.map(scope => target(scope, ['thread_list', 'group_list']))
 })
+/** Only the reader's channel in the selected workspace consumes this receipt. */
+export const threadReadChanged = (executor: object, ownerId: string, workspaceId: string) =>
+  changed(executor, `thread-read:${workspaceId}:${ownerId}`, async (_db, workspace) =>
+    (await workspaceScopes(workspace, workspaceId, [ownerId])).map(scope => target(scope, ['thread_list'])))
 export const ownerListChanged = (executor: object, ownerId: string, kinds: readonly OwnerListKind[]) => changed(executor, `owner:${ownerId}:${[...kinds].sort().join(',')}`, (_db, workspace) => ownerListTargets(workspace, ownerId, kinds))
 export const workspaceListChanged = (executor: object, workspaceId: string, kinds: readonly WorkspaceListKind[]) => changed(executor, `workspace:${workspaceId}:${[...kinds].sort().join(',')}`, (_db, workspace) => workspaceListTargets(workspace, workspaceId, kinds))
 

@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { setThreadRead } from '@/lib/thread-read-client'
+import { threadKeys } from '@/lib/swr/keys'
 import useSWRInfinite from 'swr/infinite'
 import useSWR, {useSWRConfig} from 'swr'
 import { getPreferences, updatePreferences } from '@/app/actions/preferences'
@@ -12,7 +14,7 @@ import { SearchInput } from '@/components/ui/search-input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { useLiveKey } from '@/hooks/use-live-key'
-import { archiveIdleDays, type DirectoryState } from '@/lib/conversation-directory-input'
+import type { DirectoryState } from '@/lib/conversation-directory-input'
 import { openThread } from './workspace-navigation'
 
 type Page = Awaited<ReturnType<typeof listConversations>>
@@ -21,6 +23,9 @@ const states = ['all', 'working', 'waiting', 'idle', 'failed'] as const
 export function ConversationDirectory({ ownerId, workspaceId, botId }: { ownerId: string; workspaceId: string | null; botId: string | null }) {
   const t = useTranslations('ConversationDirectory')
   const format = useFormatter()
+  const { mutate: refresh } = useSWRConfig()
+  const [writing, setWriting] = useState(false)
+  const [writeError, setWriteError] = useState(false)
   const prefs = useSWR(['conversation-archive-preferences',ownerId], () => getPreferences())
   const cache = useSWRConfig()
   const [saving,setSaving] = useState(false)
@@ -37,6 +42,16 @@ export function ConversationDirectory({ ownerId, workspaceId, botId }: { ownerId
   useLiveKey('thread_list', workspaceId, workspaceId ? [unstable_serialize(getKey)] : [], workspaceId)
   const rows = [...new Map(data?.flatMap(page => page.items).map(item => [item.id, item])).values()]
   const more = Boolean(data?.at(-1)?.cursor)
+  async function mark(runId?: string) {
+    if (writing) return
+    setWriting(true)
+    setWriteError(false)
+    try {
+      await setThreadRead(runId ? { action: 'unread', runId } : { action: 'readAll' })
+      await Promise.all([mutate(), refresh(threadKeys.list(ownerId))])
+    } catch { setWriteError(true) }
+    finally { setWriting(false) }
+  }
   async function changeDays(days:number) {
     setSaving(true); setFailed(false)
     try {
@@ -50,7 +65,7 @@ export function ConversationDirectory({ ownerId, workspaceId, botId }: { ownerId
     <Label className="flex items-center gap-2 text-sm">{t('archiveIdle')}
       <NativeSelect value={prefs.data?.archiveIdleAfterDays ?? 30} disabled={!prefs.data || saving}
         onChange={event=>void changeDays(Number(event.target.value))}>
-        {archiveIdleDays.map(days=><NativeSelectOption key={days} value={days}>{days ? t('archiveDays',{days}) : t('archiveOff')}</NativeSelectOption>)}
+        {[0,3,7,14,30,90].map(days=><NativeSelectOption key={days} value={days}>{days ? t('archiveDays',{days}) : t('archiveOff')}</NativeSelectOption>)}
       </NativeSelect>
     </Label>
     {(failed || prefs.error) && <p role="alert">{t('loadError')} <Button size="sm" variant="ghost" onClick={()=>void prefs.mutate()}>{t('retry')}</Button></p>}
@@ -60,7 +75,9 @@ export function ConversationDirectory({ ownerId, workspaceId, botId }: { ownerId
       {states.map(value => <Button key={value} size="sm" variant={value === state ? 'secondary' : 'ghost'}
         aria-pressed={value === state} onClick={() => setState(value)}>{t(value)}</Button>)}
       <Button size="sm" variant="outline" aria-pressed={archived} onClick={() => setArchived(!archived)}>{t('archived')}</Button>
+      <Button size="sm" variant="ghost" disabled={writing || !workspaceId} onClick={() => void mark()}>{t('readAll')}</Button>
     </div>
+    {writeError && <p role="alert">{t('writeError')}</p>}
     {error && <div role="alert">{t('loadError')} <Button size="sm" variant="ghost" onClick={() => void mutate()}>{t('retry')}</Button></div>}
     {!error && !data && <p role="status">{t('loading')}</p>}
     {data && !rows.length && !more && !error && <p role="status">{t('empty')}</p>}
@@ -68,9 +85,12 @@ export function ConversationDirectory({ ownerId, workspaceId, botId }: { ownerId
       {rows.map(row => <li key={row.id} className="flex items-center gap-2"><Button type="button" variant="ghost" onClick={() => openThread(row.id)}
         className="h-auto min-w-0 flex-1 flex-wrap justify-start gap-x-3 gap-y-1 py-3 text-start">
         <span className="min-w-0 flex-1 break-words font-medium">{row.title || t('untitled')}</span>
+        {row.unread && <span className="size-2 rounded-full bg-primary" role="img" aria-label={t('unread')} />}
         {row.identifier && <bdi>{row.identifier}</bdi>}
         <span>{t(row.state)}</span><time dateTime={row.at}>{format.dateTime(new Date(row.at), { dateStyle: 'medium', timeStyle: 'short' })}</time>
-      </Button></li>)}
+      </Button>
+        {!row.unread && <Button size="sm" variant="ghost" disabled={writing} onClick={() => void mark(row.id)}>{t('markUnread')}</Button>}
+      </li>)}
     </ul>
     {more && <Button variant="outline" disabled={isValidating} onClick={() => void setSize(size + 1)}>{t('more')}</Button>}
   </section>

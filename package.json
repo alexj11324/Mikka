@@ -109,7 +109,7 @@
     "test:active-agents": "node --import ./tests/support/server-only.mjs --import tsx --test lib/active-agents.test.ts",
     "test:request-log": "node --import tsx --test lib/request-log.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test \"app/v1/devices/*/commands/route.test.ts\" \"app/v1/devices/*/fs/requests/route.test.ts\"",
     "test:legacy-reads": "node --import ./scripts/server-test.mjs --import tsx --experimental-test-module-mocks --test lib/agent-image-loader.test.ts tests/legacy-read-routes.test.ts",
-    "test:conversation-reads": "node --import ./scripts/server-test.mjs --import tsx --experimental-test-module-mocks --test lib/conversation-reads-store.test.ts lib/conversation-reads-route.test.ts lib/group-reads.db.test.ts",
+    "test:conversation-reads": "node --import ./scripts/server-test.mjs --import tsx --experimental-test-module-mocks --test lib/conversation-reads-store.test.ts lib/conversation-reads-route.test.ts lib/group-reads.db.test.ts lib/thread-reads.db.test.ts",
     "test:slack-installation-db": "node --experimental-test-module-mocks --test-force-exit --import ./tests/support/server-only.mjs --import tsx --test tests/slack-installation.db.test.ts",
     "test:db": "node scripts/run-db-tests.mjs",
     "test:agent-tool-approval-db": "node scripts/test-agent-tool-approval-db.mjs lib/agent-tool-approval/store.db.test.ts lib/agent-tool-approval/http.db.test.mts",
