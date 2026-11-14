@@ -197,6 +197,16 @@ export function createFactoryQuestions(
     if (!q || q.taskId !== task.id || q.issueId !== task.issueId) fail("factoryNotFound");
     return { task, q };
   }
+  async function ownedContinuation(tx: PoolClient, userId: string, runId: string) {
+    const { rows: [identity] } = await tx.query<{ id: string; taskId: string }>(
+      'SELECT id, "taskId" FROM factory_questions WHERE "continuationRunId"=$1 AND "userId"=$2',
+      [runId, userId],
+    );
+    if (!identity) return null;
+    const current = await ownedForTask(tx, userId, identity.id, identity.taskId, true);
+    return current.q.continuationRunId === runId ? current : null;
+  }
+
   function fence(
     task: FactoryTask,
     q: FactoryQuestion,
@@ -854,14 +864,9 @@ export function createFactoryQuestions(
     ) {
       const existing = typeof existingOrClaim === "function" ? undefined : existingOrClaim;
       return transaction(async (tx) => {
-        const {
-          rows: [identity],
-        } = await tx.query(
-          'SELECT id FROM factory_questions WHERE "continuationRunId"=$1 AND "userId"=$2',
-          [runId, userId],
-        );
-        if (!identity) fail("factoryQuestionContinuationUnavailable");
-        const { task, q } = await owned(tx, userId, identity.id);
+        const current = await ownedContinuation(tx, userId, runId);
+        if (!current) fail("factoryQuestionContinuationUnavailable");
+        const { task, q } = current;
         if (stopped(task)) fail("factoryStopped");
         if (
           q.status !== "resuming" ||
@@ -964,14 +969,9 @@ export function createFactoryQuestions(
     },
     async settle(userId: string, runId: string, existing?: PoolClient) {
       return transaction(async (tx) => {
-        const {
-          rows: [identity],
-        } = await tx.query(
-          'SELECT id FROM factory_questions WHERE "continuationRunId"=$1 AND "userId"=$2',
-          [runId, userId],
-        );
-        if (!identity) return null;
-        const { task, q } = await owned(tx, userId, identity.id);
+        const current = await ownedContinuation(tx, userId, runId);
+        if (!current) return null;
+        const { task, q } = current;
         if (questionClosed(q.status)) return currentView(tx,task,q,false);
         const {
           rows: [run],
