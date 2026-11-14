@@ -106,7 +106,7 @@ mock.module(new URL('./product-tool.ts', import.meta.url).href, { namedExports: 
   },
 } })
 
-const { productCatalogue, productContext } = await import('./product-definitions')
+const { beginProductAction, productCatalogue, productContext } = await import('./product-definitions')
 const { turnModel, turnPolicy, turnRequest } = await import('./runtime')
 const { ContextContainer, contextStorage } = await import(new URL('./context/container.js', import.meta.resolve('eve')).href)
 const { default: nativeProductTools } = await import('../../apps/eve/agent/tools/product')
@@ -154,11 +154,12 @@ test('native catalogue preserves schemas and supplies the scheduled occurrence d
 
 test('the first action allocates its existing business execution and binds the current running key', async () => {
   const action = { sessionId: binding.sessionId, turnId: binding.turnId }
-  await productContext(scope, action)
+  assert.equal(await beginProductAction(scope, action), binding.executionId)
   assert.deepEqual(reservations, [[scope.ownerId, scope.botId, `${binding.sessionId}:${binding.turnId}`, 0, { harness: 'ai_sdk' }]])
-  assert.deepEqual(reads, [[{ ownerId: scope.ownerId, botId: scope.botId, workspaceId: scope.workspaceId }, binding.executionId, `${binding.sessionId}:${binding.turnId}:0`]])
+  assert.equal(reads.length, 0)
   assert.equal(allocationQueries.length, 2)
-  executionClosed = true
+  assert.equal(await beginProductAction(scope, action), binding.executionId)
+  assert.equal(reservations.length, 2)
   await assert.rejects(productContext(scope, action), /agentExecutionClosed/)
 })
 
@@ -174,7 +175,7 @@ test('existing action bindings retain current execution and scheduled authority'
 
 test('a delayed first action cannot allocate an execution after the turn has settled', async () => {
   settled = true
-  await assert.rejects(productContext(scope, { sessionId: binding.sessionId, turnId: binding.turnId }), /agentExecutionClosed/)
+  await assert.rejects(beginProductAction(scope, { sessionId: binding.sessionId, turnId: binding.turnId }), /agentExecutionClosed/)
   assert.equal(reservations.length + reads.length, 0)
   assert.equal(allocationQueries.length, 2)
 })
@@ -189,6 +190,7 @@ test('AgentKit-off discovery and actions keep their existing execution-free beha
     assert.deepEqual(Object.keys(await evaluate(context)), ['list_issues', 'inspect_computer'])
     assert.equal((toolOptions[0] as { writeEnabled: boolean }).writeEnabled, false)
   })
+  assert.equal(await beginProductAction(scope, binding), undefined)
   const result = await productContext(scope, { sessionId: binding.sessionId, turnId: binding.turnId })
   assert.equal(result.execution, null)
   assert.equal(reservations.length + reads.length, 0)
