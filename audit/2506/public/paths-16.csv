@@ -165,10 +165,10 @@ lib/default-model-config.ts,100644,c97ea1fda8bf4db6cd442b59fc32319163d4adbe,code
 lib/default-model.ts,100644,6b344021a9430269b21a902a0f10beae748d8d5e,code,module implementation,lib,unreviewed,,,
 lib/demo-device-cleanup.db.test.ts,100644,9de1b943df8bb2ba425b490c0dd95790c4120cf5,code,"test, test support or fixture",lib,unreviewed,,,
 lib/demo-device-cleanup.ts,100644,6bbfa420bbd900f9ae015095ec7a0ee63abc3345,code,module implementation,lib,unreviewed,,,
-lib/deployment-id.mjs,100644,5ac61be37acadb72cd7817dcf686795e426812a7,code,module implementation,lib,unreviewed,,,
-lib/deployment-id.test.mjs,100644,4ca282d5299a08348160f2d0659fb8b822b5db17,code,"test, test support or fixture",lib,unreviewed,,,
-lib/deployment-stage.mjs,100644,5fbd1c538d36dcf9d2489064afd304d93b166e31,code,module implementation,lib,unreviewed,,,
-lib/deployment-stage.test.mjs,100644,7a39f305bde096863713a38fe5bf0a0ab65df3de,code,"test, test support or fixture",lib,unreviewed,,,
+lib/deployment-id.mjs,100644,5ac61be37acadb72cd7817dcf686795e426812a7,code,module implementation,lib,complete,,buildDeploymentId 由 SHA 与 GitHub run/attempt 核成最长32字符的稳定发布 ID，保留 run/attempt 优先，SHA 保留最少7最多12；配置环节拒绝与 NX/Next 的独立变量不符，CLI 与 Vite/Nitro 及云 OCI 发布共用。这是产品预构建发布之前就需要的版本合同；Cloudflare 对单 Worker 发布的 native version id 产生在上传后，不能替代跨 renderer/API 的预构建 pin。原历史 79349d69，跨仓配对一并验证。,保留现有发布身份和产物合同，G-021 合后回执见总单。
+lib/deployment-id.test.mjs,100644,4ca282d5299a08348160f2d0659fb8b822b5db17,code,"test, test support or fixture",lib,complete,,覆盖有效字符、保留前缀、截断、每次重跑唯一、无效输入、无配置的开发 build 和两个部署变量冲突，并在实际 Node 子进程读取 GitHub 环境输出 ID。应用独立生产版本选择的测试，不以此推断正式供应商发布。,保留现有发布身份和产物合同，G-021 合后回执见总单。
+lib/deployment-stage.mjs,100644,5fbd1c538d36dcf9d2489064afd304d93b166e31,code,module implementation,lib,complete,,明确优先 canonical MIKKA_DEPLOYMENT_STAGE，再过往别名、Vercel 旧部署名；NODE_ENV 本身不能令本地构建成为生产。V8 直接运行固定实现验证五种典型输入返回 undefined/preview/development/production 或固定错误码；真实下游 signup、tracing、artifact store、开关部署身份和 Nitro/Vite。平台无统一的跨自托管/多供应商产品 stage。,保留现有发布身份和产物合同，G-021 合后回执见总单。
+lib/deployment-stage.test.mjs,100644,7a39f305bde096863713a38fe5bf0a0ab65df3de,code,"test, test support or fixture",lib,complete,,跨平台显式/回退、大小写、空/非法与已选 canonical 覆盖 alias、异常不暴露变量值，分别验证云 preview 与本地 production 编译。由既有 release-security suite 消费。,保留现有发布身份和产物合同，G-021 合后回执见总单。
 lib/deployment-switches.test.ts,100644,f0847000c4364877b03163f845eb5354a12b3ea6,code,"test, test support or fixture",lib,unreviewed,,,
 lib/deployment-switches.ts,100644,923651e0c6fee5714e87daab6e7fbed7f3eb8319,code,module implementation,lib,unreviewed,,,
 lib/desktop-auth-server.ts,100644,2676a539dfd9f6f85485b978fc026765ad1751d2,code,module implementation,lib,unreviewed,,,

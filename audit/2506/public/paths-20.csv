@@ -26,7 +26,7 @@ lib/reactions.ts,100644,b0259f28dd98aa6fa66cde8ae0b7c5ebc48b6d20,code,module imp
 lib/reconcile-due.db.test.ts,100644,88ec593242456664289482dbdd3faedc3d4426f3,code,"test, test support or fixture",lib,unreviewed,,,
 lib/reconcile-due.ts,100644,109422be37482581f485c1dc33a7f7a8c9be5825,code,module implementation,lib,unreviewed,,,
 lib/relative-time.ts,100644,2119368692b65ed8d2b40d5e8c5c19a7aab25fe8,code,module implementation,lib,unreviewed,,,
-lib/renderer-actions.mjs,100644,92b26dae6eda3ecb11a850200e5077fa21eeac26,code,module implementation,lib,unreviewed,,,
+lib/renderer-actions.mjs,100644,92b26dae6eda3ecb11a850200e5077fa21eeac26,code,module implementation,lib,complete,,publishedActions 校验每个声明动作且唯一；rendererActionContract 由已编译模块的准确 export 选择形成公开白名单。readRendererActions 兼容历史完整编译清单与只暴露 actions 的版本：404 才换路径，先取消旧响应，其他状态原样透传，pin 经编码两端一致。固定代码实跑200/401/403/404/500，只有404两个请求且取消旧响应。五个 read-cache/readiness/mobile/preflight/welcome 验收消费者曾跨旧发布使用，G-021 消除的是 prepareRelease 自己再次读取同一文件。,保留现有发布身份和产物合同，G-021 合后回执见总单。
 lib/replay-readiness.ts,100644,899a9dcf33af282913c3e25c99b0826566b2c56b,code,module implementation,lib,unreviewed,,,
 lib/repository-admission.ts,100644,991a7165a01139c0538ec65740dae3b1801c2b3f,code,module implementation,lib,unreviewed,,,
 lib/request-budget.ts,100644,02be4f85cb9d7618ce64e22687f30a3178c8d08b,code,module implementation,lib,unreviewed,,,
