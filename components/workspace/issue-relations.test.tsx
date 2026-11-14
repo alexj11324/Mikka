@@ -2,21 +2,22 @@ import assert from 'node:assert/strict'
 import { after, before, mock, test } from 'node:test'
 import { act } from 'react'
 import { Window } from 'happy-dom'
-import { SWRConfig } from 'swr'
+import useSWR, { SWRConfig } from 'swr'
+import { issueKeys } from '@/lib/swr/keys'
 import type { Root } from 'react-dom/client'
 import type { IssueView } from '@/app/actions/issues'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 
 const metadata = readIssueMetadata({ type: 'doc' })
-const parent = { id: 'parent', status: 'todo', metadata } as IssueView
-const child = { id: 'child', status: 'todo', metadata: { ...metadata, parentId: parent.id } } as IssueView
+const parent = { id: 'parent', revision: 1, status: 'todo', metadata } as IssueView
+const child = { id: 'child', revision: 1, status: 'todo', metadata: { ...metadata, parentId: parent.id } } as IssueView
 let rows = [parent, child]
 let available = true
 const read = async () => {
   if (!available) throw new Error('Task relations unavailable')
   return rows
 }
-const save = mock.fn()
+const save = mock.fn(async (_input: { revision: number }): Promise<{ issue?: IssueView; error?: string }> => ({}))
 mock.module(new URL('../../app/actions/issue-operations.ts', import.meta.url).href, {
   namedExports: { listIssueConnections: read, updateIssueRelation: save },
 })
@@ -37,8 +38,10 @@ before(async () => {
 })
 after(async () => { if (root) await act(async () => root.unmount()); await win.happyDOM.abort() })
 
+let savedParent = parent
 function Probe() {
-  state = useIssueConnections({ viewerId: 'viewer', task: parent, getCurrent: async () => parent, onSaved() {}, disabled: false })
+  const { data = parent } = useSWR(issueKeys.detail(parent.id), async () => savedParent)
+  state = useIssueConnections({ viewerId: 'viewer', task: data, getCurrent: async () => data, onSaved() {}, disabled: false })
   return null
 }
 
@@ -59,4 +62,36 @@ test('failed warm task relations withdraw child rows and actions until a success
   await act(async () => { await state.mutate() })
   assert.equal(state.error, undefined)
   assert.deepEqual(state.rows, [parent])
+})
+
+test('a stale unlink refreshes the parent before the next explicit removal', async () => {
+  savedParent = parent
+  rows = [parent, child]
+  save.mock.resetCalls()
+  await act(async () => root.render(<SWRConfig key="unlink" value={{ provider: () => new Map() }}><Probe /></SWRConfig>))
+  savedParent = { ...parent, revision: 2 }
+  save.mock.mockImplementationOnce(async () => ({ error: 'issueOutdated' }))
+  await act(async () => { await state.remove('child', child.id) })
+  assert.equal(save.mock.callCount(), 1)
+  assert.equal(save.mock.calls[0].arguments[0].revision, 1)
+  save.mock.mockImplementationOnce(async () => ({ issue: savedParent }))
+  await act(async () => { await state.remove('child', child.id) })
+  assert.equal(save.mock.callCount(), 2)
+  assert.equal(save.mock.calls[1].arguments[0].revision, 2)
+})
+
+test('a stale status save refreshes the child revision without resubmitting', async () => {
+  savedParent = parent
+  rows = [parent, child]
+  save.mock.resetCalls()
+  await act(async () => root.render(<SWRConfig key="status" value={{ provider: () => new Map() }}><Probe /></SWRConfig>))
+  rows = [parent, { ...child, revision: 2 }]
+  save.mock.mockImplementationOnce(async () => ({ error: 'issueStale' }))
+  await act(async () => { await state.status(child.id, state.children[0].revision, 'done') })
+  assert.equal(save.mock.callCount(), 1)
+  assert.equal(state.children[0].revision, 2)
+  save.mock.mockImplementationOnce(async () => ({ issue: { ...child, revision: 3, status: 'done' } }))
+  await act(async () => { await state.status(child.id, state.children[0].revision, 'done') })
+  assert.equal(save.mock.callCount(), 2)
+  assert.equal(save.mock.calls[1].arguments[0].revision, 2)
 })

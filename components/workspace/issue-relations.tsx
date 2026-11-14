@@ -88,7 +88,10 @@ export function useIssueConnections({ liveWorkspaceId = null, viewerId, task, ge
       const latest = await getCurrent()
       if (!latest) return
       const result = await updateIssueRelation({ id: task.id, revision: latest.revision, kind, targetId, remove: true })
-      if (!('issue' in result) || !result.issue) throw new Error(actionError(result.error))
+      if (!('issue' in result) || !result.issue) {
+        if (result.error === 'issueOutdated') await Promise.all([refresh(issueKeys.detail(task.id)), mutate()])
+        throw new Error(actionError(result.error))
+      }
       onSaved(result.issue); await Promise.all([mutate(), refresh(key => isIssueListKey(key, viewerId))]); toast.success(t('removed'))
     } catch (error) { toast.error(error instanceof Error ? error.message : t('removeFailed')) }
     finally { busy.current = false; setPending(false) }
@@ -98,7 +101,10 @@ export function useIssueConnections({ liveWorkspaceId = null, viewerId, task, ge
     busy.current = true; setPending(true)
     try {
       const result = await moveIssue({ id, revision, status })
-      if (!('issue' in result) || !result.issue) throw new Error(actionError(result.error))
+      if (!('issue' in result) || !result.issue) {
+        if (result.error === 'issueStale') await mutate()
+        throw new Error(actionError(result.error))
+      }
       const saved = result.issue
       const previous = rows?.find(row => row.id === id)
       await Promise.all([mutate(), refresh(key => isIssueListKey(key, viewerId)),
