@@ -60,6 +60,7 @@ mock.module(at('app/actions/task-domain.ts'), { namedExports: {
     return { version: 1, workspaceId, items: Object.fromEntries(issueIds.map(id => [id, view])) }
   },
 } })
+let afterCommit: (() => void) | undefined
 let writes: Parameters<typeof import('../app/actions/issues')['saveIssue']>[0][]
 mock.module(at('app/actions/issues.ts'), { namedExports: {
   pollIssue: async (id: string, known?: string) => {
@@ -78,6 +79,7 @@ mock.module(at('app/actions/issues.ts'), { namedExports: {
     writes.push(structuredClone(input))
     if (input.revision !== stored.revision) return { error: 'issueStale' }
     stored = { ...stored, title: input.title, status: input.status, priority: input.priority, revision: stored.revision + 1 }
+    afterCommit?.()
     return { issue: structuredClone(stored) }
   },
 } })
@@ -120,6 +122,7 @@ mock.module(at('components/workspace/task-detail-frame.tsx'), { namedExports: {
         onChange={event => titleField.onChange(event.currentTarget.value)} onBlur={titleField.onBlur}
         onCompositionStart={titleField.onCompositionStart} onCompositionEnd={titleField.onCompositionEnd} onKeyDown={titleField.onKeyDown} />
       <button data-history="" disabled={preview} onClick={onHistory}>History</button>
+      {props.saveError && <button data-retry-save="" onClick={props.saveError.onRetry}>Retry autosave</button>}
       <button data-complete="" onClick={() => props.onStatus('done')}>Done</button>
       <button data-reopen="" onClick={() => props.onStatus('todo')}>Reopen</button>
       <button data-priority="" onClick={() => props.onPriority('high')}>High</button>
@@ -189,6 +192,7 @@ beforeEach(() => {
   deletedTask = null
   restoreOverride = null
   versions = [version(stored)]; writes = []; issueReads = 0; versionReads = 0; fullVersionReads = 0; documentReads = 0; knownVersions = []; readFailure = null; readViewerId = owner; readOverride = null; documentHold = null; documentWaits = 0; latestDocumentUpdate = undefined; flush = null; cache = new Map(); sockets.length = 0
+  afterCommit = undefined
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
   globalThis.fetch = async (input, options) => {
@@ -469,6 +473,80 @@ test('a confirmed read grant opens description history without a restore command
   assert.equal(container.querySelector('[data-restore-available]')?.getAttribute('data-restore-available'), 'false')
   assert.equal(documentReads, 0)
   assert.deepEqual(writes, [])
+})
+
+test('a lost Task save response is recovered by an authorized read without losing a newer local edit or concurrent remote fields', async () => {
+  await mount()
+  await input(title(), 'First rename')
+  let release!: () => void
+  const hold = new Promise<void>(resolve => { release = resolve })
+  let reading = false
+  afterCommit = () => {
+    afterCommit = undefined
+    stored = { ...stored, priority: 'high', revision: stored.revision + 1 }
+    readOverride = async () => { reading = true; await hold; return structuredClone(stored) }
+    throw new TypeError('Connection closed after commit')
+  }
+  let saving!: Promise<boolean>
+  try {
+    await act(async () => { saving = flush!() })
+    await until(() => reading, 'lost reply starts a read, not another write')
+    await input(title(), 'Next rename')
+    release()
+    await act(async () => { assert.equal(await saving, true) })
+    assert.deepEqual(writes.map(write => [write.revision, write.title, write.priority]),
+      [[1, 'First rename', 'normal'], [3, 'Next rename', 'high']])
+    assert.equal(stored.revision, 4)
+    assert.equal(properties().textContent, 'review:high')
+  } finally { release() }
+})
+
+test('a lost response followed by a competing Task edit preserves both the remote value and the local draft', async () => {
+  await mount()
+  await input(title(), 'My draft')
+  afterCommit = () => {
+    afterCommit = undefined
+    stored = { ...stored, title: 'Their newer title', revision: stored.revision + 1 }
+    throw new TypeError('Connection closed after commit')
+  }
+  await act(async () => { assert.equal(await flush!(), false) })
+  assert.equal(stored.revision, 3)
+  assert.equal(stored.title, 'Their newer title')
+  assert.equal(title().value, 'My draft')
+  assert.deepEqual(writes.map(write => write.revision), [1])
+  // The live transport can recover and notify SWR before the user chooses to retry.
+  await emit()
+  await until(() => properties().getAttribute('data-revision') === '3', 'the reconnect delivers the competing value')
+  await act(async () => { assert.equal(await flush!(), false) })
+  assert.equal(stored.title, 'Their newer title')
+  assert.equal(title().value, 'My draft')
+  assert.deepEqual(writes.map(write => write.revision), [1])
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-retry-save]')!.click())
+  await until(() => stored.title === 'My draft', 'the explicit retry uses the refreshed revision')
+  assert.deepEqual(writes.map(write => write.revision), [1, 3])
+})
+
+test('a lost Task save response cannot be confirmed by the next signed-in account', async () => {
+  await mount()
+  await input(title(), 'My draft')
+  afterCommit = () => { afterCommit = undefined; readViewerId = 'different-viewer'; throw new TypeError('Connection closed') }
+  await act(async () => { assert.equal(await flush!(), false) })
+  assert.equal(stored.revision, 2)
+  assert.deepEqual(writes.map(write => write.revision), [1])
+})
+
+test('a lost response to a body save checks the persisted description before accepting a revision', async () => {
+  await mount()
+  await input(description(), 'Edited body')
+  afterCommit = () => {
+    afterCommit = undefined
+    stored = { ...stored, content: body('Different persisted body') }
+    throw new TypeError('Connection closed')
+  }
+  await act(async () => { assert.equal(await flush!(), false) })
+  assert.equal(bodyText(stored.content), 'Different persisted body')
+  assert.equal(description().value, 'Edited body')
+  assert.deepEqual(writes.map(write => write.revision), [1])
 })
 
 test('a confirmed status write refreshes only this viewer’s Task projections without a live event', async () => {
