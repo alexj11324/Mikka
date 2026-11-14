@@ -13,7 +13,7 @@ const translate = Object.assign(key => key, { has: () => true })
 const stub = (path, namedExports) => mock.module(new URL('../' + path, import.meta.url).href, { namedExports })
 let teamId, response, issue, child, frame, teamWrites, favoriteDenied, moves, reads, optionsRead
 const teams = ['existing', 'another'].map(id => ({ id, identifier: id, name: id }))
-mock.module('next-intl', { namedExports: { useTranslations: () => translate, useFormatter: () => ({ relativeTime: noop }), useNow: () => new Date() } })
+mock.module('next-intl', { namedExports: { useTranslations: () => translate, useMessages: () => ({ IssueDetail: { work: { states: {} } }, GroupTask: { stage: {}, status: {} } }), useFormatter: () => ({ relativeTime: noop, dateTime: noop }), useNow: () => new Date() } })
 mock.module('sonner', { namedExports: { toast: { error: noop, success: noop } } })
 mock.module('swr', { defaultExport: key => {
   if (key?.[0] === 'issue-property-options') return optionsRead
