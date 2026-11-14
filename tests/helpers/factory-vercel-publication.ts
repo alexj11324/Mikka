@@ -1,17 +1,16 @@
-import { deploymentSwitch } from '@/lib/deployment-switches'
 import { z } from "zod";
-import { FactoryError } from "./approval-contract";
-import type { PublicationAdapter } from "./approval";
+import { FactoryError } from "../../lib/factory/approval-contract";
+import type { PublicationAdapter } from "../../lib/factory/approval";
 import {
   PublicationDeferred,
   publicationBindingHash,
   type PublicationInput,
-} from "./publication-operation";
-import { MIKKA_VERCEL, vercelTarget } from "./vercel-target";
-import { isLoopbackHost } from "../loopback";
+} from "../../lib/factory/publication-operation";
+import { vercelTarget } from "../../lib/factory/vercel-target";
+import { isLoopbackHost } from "../../lib/loopback";
 
-// Re-exported for the existing tests and server composition.
-export { MIKKA_VERCEL, vercelTarget } from "./vercel-target";
+// Historical publication fixtures share the target checked by the read-only monitor.
+export { MIKKA_VERCEL, vercelTarget } from "../../lib/factory/vercel-target";
 const configSchema = z
   .object({
     teamId: z.string().regex(/^team_[\w]+$/),
@@ -30,25 +29,18 @@ export interface VercelClient {
     body?: unknown,
   ): Promise<unknown>;
 }
-/** Runtime token is injected through the existing secret-managed binding. No CLI
- * account files, token creation, redirects, response bodies or credentials logged. */
+/** Exercise the historical receipt protocol against the fixture’s loopback server. */
 export function createVercelClient(
   token: () => string | undefined,
   options: {
     fetch?: typeof fetch;
-    testOrigin?: string;
+    testOrigin: string;
     timeoutMs?: number;
-  } = {},
+  },
 ): VercelClient {
-  const origin = options.testOrigin ?? "https://api.vercel.com";
-  if (options.testOrigin) {
-    const u = new URL(origin);
-    if (
-      u.protocol !== "http:" ||
-      !isLoopbackHost(u.hostname) ||
-      u.origin !== origin
-    )
-      throw new FactoryError("factoryVercelOriginInvalid");
+  const origin = new URL(options.testOrigin);
+  if (origin.protocol !== "http:" || !isLoopbackHost(origin.hostname) || origin.origin !== options.testOrigin) {
+    throw new FactoryError("factoryVercelOriginInvalid");
   }
   return {
     async request(path, method = "GET", body) {
@@ -59,7 +51,7 @@ export function createVercelClient(
         throw new FactoryError("factoryVercelCredentialUnavailable");
       let response: Response;
       try {
-        response = await (options.fetch ?? fetch)(origin + path, {
+        response = await (options.fetch ?? fetch)(origin.origin + path, {
           method,
           redirect: "error",
           signal: AbortSignal.timeout(options.timeoutMs ?? 15000),
@@ -69,15 +61,15 @@ export function createVercelClient(
           },
           ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         });
-      } catch {
-        throw new FactoryError("factoryVercelTransportUncertain");
+      } catch (cause) {
+        throw new FactoryError("factoryVercelTransportUncertain", { cause });
       }
       if (!response.ok)
         throw new FactoryError(`factoryVercelHttp${response.status}`);
       try {
         return await response.json();
-      } catch {
-        throw new FactoryError("factoryVercelResponseInvalid");
+      } catch (cause) {
+        throw new FactoryError("factoryVercelResponseInvalid", { cause });
       }
     },
   };
@@ -324,28 +316,4 @@ export function createVercelPublicationAdapter(
     },
     reconcile,
   };
-}
-
-export function configuredVercelPublicationAdapters(
-  env: Record<string, string | undefined>,
-): PublicationAdapter[] {
-  if (!deploymentSwitch('factoryVercelPublication', env)) return [];
-  if (!env.VERCEL_TOKEN)
-    throw new FactoryError("factoryVercelCredentialUnavailable");
-  const client = createVercelClient(() => env.VERCEL_TOKEN);
-  // Existing mikka resources only; enabling production is a separate explicit flag.
-  return [
-    createVercelPublicationAdapter(
-      { ...MIKKA_VERCEL, environment: "preview" },
-      client,
-    ),
-    ...(deploymentSwitch('factoryVercelProduction', env)
-      ? [
-          createVercelPublicationAdapter(
-            { ...MIKKA_VERCEL, environment: "production" },
-            client,
-          ),
-        ]
-      : []),
-  ];
 }

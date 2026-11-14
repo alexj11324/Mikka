@@ -32,7 +32,7 @@ import {
   createVercelPublicationAdapter,
   MIKKA_VERCEL,
   vercelTarget,
-} from "./vercel-publication";
+} from "../../tests/helpers/factory-vercel-publication";
 import { createVercelMonitorProbe } from "./vercel-monitor";
 import { vercelProtocolFixture } from "../../tests/helpers/factory-vercel";
 import { createLocalMonitorProbe } from "./monitor-probe";
@@ -184,6 +184,7 @@ test(
       max: 16,
       options: `-c search_path=${schema}`,
     });
+    observePoolCommits(pool);
     const closeWorkspace = await bindFixtureWorkspaceDatabase(pool);
     const scopes = new Map<string, string>();
     const workspaceFixtures = new Map<string, string>();
