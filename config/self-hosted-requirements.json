@@ -822,6 +822,13 @@
     "test": "lib/linear-sync/run-comment.test.ts",
     "suite": "test:linear-sync"
   },
+  "lib/live/panels.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Resolve bound, undeleted task IDs in the application database and their active recipients in the workspace database. Personal task notifications reach only the owner.",
+    "test": "lib/live/notify-workspace.db.test.ts",
+    "suite": "test:live-db"
+  },
   "lib/mobile-task-handoff.ts": {
     "mode": "built-in",
     "environment": [],
