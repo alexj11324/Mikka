@@ -392,6 +392,13 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
       assert.ok(!('error' in verified))
       await fetch(r2.upload.url, { method: 'PUT', headers: r2.upload.headers, body: swapped })
       assert.deepEqual((await store.readCapture(alice, r2.captureId))?.bytes, PNG, 'replayed signed PUT cannot replace verified evidence')
+      const objectShare = await store.createCaptureShare(alice, r2.captureId)
+      assert.ok(objectShare)
+      const sharedObject = await measured(() => store.sharedCapture(objectShare.token))
+      assert.deepEqual(sharedObject.value?.bytes, PNG, 'the authorized shared object still uses its normal storage reader')
+      assert.equal(sharedObject.statements, 1)
+      assert.equal(await store.revokeCaptureShares(alice, r2.captureId), 1)
+      assert.equal(await store.sharedCapture(objectShare.token), null)
     } finally {
       globalThis.fetch = originalFetch
       for (const name of names) if (previous[name] === undefined) delete process.env[name]; else process.env[name] = previous[name]
@@ -417,7 +424,12 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     assert.equal(await store.createCaptureShare(bob, saved.id), null)
     const share = await store.createCaptureShare(alice, saved.id)
     assert.ok(share?.token.startsWith('mkc_'))
-    assert.deepEqual((await store.sharedCapture(share!.token))?.bytes, PNG)
+    const linked = await measured(() => store.sharedCapture(share!.token))
+    assert.deepEqual(linked.value?.bytes, PNG)
+    assert.equal(linked.statements, 1, 'share authority and ready media must be read in one statement')
+    await pool.query("UPDATE run_captures SET status='failed' WHERE id=$1", [saved.id])
+    try { assert.equal(await store.sharedCapture(share!.token), null, 'a live link cannot reveal an unready capture') }
+    finally { await pool.query("UPDATE run_captures SET status='ready' WHERE id=$1", [saved.id]) }
     assert.equal(await store.revokeCaptureShares(bob, saved.id), 0)
     assert.equal(await store.revokeCaptureShares(alice, saved.id), 1)
     assert.equal(await store.sharedCapture(share!.token), null)

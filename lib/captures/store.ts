@@ -6,7 +6,7 @@ import { causeFields } from '@mikka/protocol/coded-error'
 import 'server-only'
 import { z } from 'zod'
 import { createHash, randomBytes } from 'node:crypto'
-import { and, asc, eq, inArray, isNull, lt, sql } from 'drizzle-orm'
+import { and, asc, eq, getTableColumns, inArray, isNull, lt, sql } from 'drizzle-orm'
 import {
   CAPTURE_EXTENSIONS, CAPTURE_MAX_BYTES, captureKind, captureProblem, cleanCaptureTitle, sniffCaptureType,
   type CaptureContentType, type CaptureSource, type CaptureUploadRequest, type CaptureUploadResponse, type CaptureView,
@@ -436,10 +436,9 @@ export async function revokeCaptureShares(userId: string, captureId: string): Pr
 /** The capture a live share token opens. */
 export async function sharedCapture(token: string) {
   if (!token.startsWith(SHARE_PREFIX)) return null
-  const [share] = await db.select({ captureId: runCaptureShares.captureId }).from(runCaptureShares)
-    .where(and(eq(runCaptureShares.tokenHash, hashToken(token)), isNull(runCaptureShares.revokedAt))).limit(1)
-  if (!share) return null
-  const [row] = await db.select().from(runCaptures).where(and(eq(runCaptures.id, share.captureId), eq(runCaptures.status, 'ready'))).limit(1)
+  const [row] = await db.select(getTableColumns(runCaptures)).from(runCaptureShares)
+    .innerJoin(runCaptures, eq(runCaptures.id, runCaptureShares.captureId))
+    .where(and(eq(runCaptureShares.tokenHash, hashToken(token)), isNull(runCaptureShares.revokedAt), eq(runCaptures.status, 'ready'))).limit(1)
   if (!row) return null
   const bytes = await fileOf(row)
   return bytes ? { ...captureView(row), bytes } : null
