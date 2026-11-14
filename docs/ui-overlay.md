@@ -24,7 +24,7 @@ checkout or credentials. See the [self-hosting guide](self-hosting.md).
 | Binding | Public server and compile-time contracts | Official Web and Desktop |
 | --- | --- | --- |
 | `MIKKA_UI_OVERLAY_DIR` | unset | path of the `mikka-hosted-ui` checkout, inside this repository (CI uses `.hosted-ui/`, which is gitignored) |
-| `@ui-slot/<name>` | `components/slots/<name>.tsx` | `$MIKKA_UI_OVERLAY_DIR/slots/<name>.tsx` for all 51 slots in an official release |
+| `@ui-slot/<name>` | `components/slots/<name>.tsx` | `$MIKKA_UI_OVERLAY_DIR/slots/<name>.tsx` for all 50 slots in an official release |
 | `@hosted/*` | does not resolve | `$MIKKA_UI_OVERLAY_DIR/*` |
 
 `lib/ui-overlay.mjs` decides this once. The shared Vite plugin
@@ -50,7 +50,6 @@ build. Unpinned development layers may use the public no-content contracts for
 | `app-frame` | 外框: the app window around every page (frame, window bar slot, the rounded card) and the icon rail; the window bar's content, the pages and the right-hand panel are not part of it | `AppFrameProps`, `IconRailProps` in `components/slots/app-frame-contract.ts`; `RAIL_ITEMS` in `components/nav/rail-items.ts`; `UpdateButton` in `components/nav/icon-rail-view.tsx`; `SETTINGS_COLORS` in `components/app-frame-view.tsx`; `FRAME_LISTS_CHATS`, `FRAME_OWNS_PANEL` (the chat's Overview and the browser are tabs of the conversation's work area, `ThreadScreenProps.panels`) and `FRAME_OWNS_HEADER` (the window bar keeps only ← →; the waiting count arrives as `RailProps.inboxCount`) | `AppFrame` from `@/components/app-shell`, `IconRail` from `@/components/nav/icon-rail` |
 | `artifacts` | the Artifact page's body (the library: categories and the table) | `ArtifactsPageProps` in `components/slots/artifacts-contract.ts` (the workspace's tasks, to name folders) | `IssueWorkspace`, through `@ui-slot/artifacts` |
 | `inbox` | 收件箱 and its suggestion feed | `InboxPageProps` in `components/slots/inbox-contract.ts` (the live threads and tasks, opening a task, 连接应用); suggestions from `useSuggestions` | `IssueWorkspace`, through `@ui-slot/inbox` |
-| `tasks` | 任务 page at `?section=tasks` | `TasksPageProps` in `components/slots/tasks-contract.ts` (the live threads and tasks, opening a task, 新建任务, 收件箱) | `IssueWorkspace`, through `@ui-slot/tasks` |
 | `new-task` | 新建任务 dialog | `NewTaskProps` in `components/slots/new-task-contract.ts` (the request and its files, the machines with their icons, the Bots to hand to, the Agent 配置 choices from `useTaskProfileChoices`, notices, sending); exports `NewTask`, shown while the dialog is open; E2B Key's dialog stays Mikka's | `NewTaskDialog` |
 | `new-bot` | Official New Bot dialog | `NewBotProps` in `components/slots/new-bot-contract.ts`; requires `NewBot` | `NewBotDialog` owns the form state and the create command |
 | `memory` | 记忆 page at `?section=memory` | `MemoryPageProps` in `components/slots/memory-contract.ts` (nothing: reads and saves come from `hooks/settings/use-memory-settings.ts`) | `IssueWorkspace`, through `@ui-slot/memory` |

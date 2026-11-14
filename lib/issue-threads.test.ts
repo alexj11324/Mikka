@@ -73,7 +73,7 @@ test('threads are latest first and bounded to twenty', () => {
 test('a thread is named by the first line it was asked, shortened, else by its agent', () => {
   assert.equal(threadName('\n  Fix the board  \nmore', 'Agent'), 'Fix the board')
   assert.equal(threadName('', 'Mikka Backend'), 'Mikka Backend')
-  assert.equal(Array.from(threadName('长'.repeat(80), 'x')).length, 60)
+  assert.equal(Array.from(threadName('长'.repeat(80), 'x')).length, 12, 'held to the short-title bound, as every surface names it')
 })
 
 test('the conversation and activity read the pause reason from the displayed attempt', () => {

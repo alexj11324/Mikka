@@ -1,10 +1,13 @@
 import 'server-only'
 import { completionFailureDetails } from './run-failure-details'
-import { and, eq, inArray, isNull } from 'drizzle-orm'
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { runStateForStop } from '@mikka/protocol/daemon'
 import { reachesReview, type RunCompleteRequest } from '@mikka/protocol/run'
 import { db, pool, withDatabaseClient } from '@/lib/db'
-import { agentRuns, devices, issues, runTokens, type RunStatus } from '@/lib/db/schema'
+import { agentRuns, devices, issues, issueVersions, runTokens, type RunStatus } from '@/lib/db/schema'
+import { systemActor } from '@/lib/activity-actor'
+import { advancesTo, personChangedStatusSince } from '@/lib/task-status-advance'
+import { scheduleConversationTitle } from '@/lib/conversation-title-schedule'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { requireTaskWorkspace, withTaskWorkspace } from '@/lib/task-workspace'
 import { ActionFailureError } from '@/lib/action-error'
@@ -75,15 +78,21 @@ async function completeRunTransaction(userId: string, hint: { id: string; issueI
         failureDetails: completionFailureDetails(input, hint.id, { status, stopRequested: Boolean(run.run.stopRequestedAt), sensitiveText: [run.run.prompt, run.run.agentDefinition?.instructions ?? ''] }), finishedAt: new Date(), updatedAt: new Date() })
         .where(and(eq(agentRuns.id, hint.id), inArray(agentRuns.status, [...LIVE_STATUSES]))).returning({ id: agentRuns.id })
       if (!ended) return null
+      // Its real content is known now: the first run's end names the conversation again while its title is a generated one.
+      scheduleConversationTitle(tx, ended.id, run.run.userId, 'first_run_ended')
       await runListChanged(tx, ended.id)
       await runChanged(tx, ended.id)
       await tx.update(runTokens).set({ revokedAt: new Date() }).where(and(eq(runTokens.runId, ended.id), isNull(runTokens.revokedAt)))
       await recordCoordinatorEvent(tx, runFinishedEvent({ ...run.run, status, stopReason, report }))
-      const review = issue && reachesReview(stopReason, report)
-        ? (await tx.update(issues).set({ status: 'review', updatedAt: new Date() }).where(eq(issues.id, issue.id)).returning({ id: issues.id, scopeVersion: issues.scopeVersion }))[0]
-        : null
+      // 评审中 only as a step forward, and never over a status the person set after this run was asked for
+      // (lib/task-status-advance.ts). The move is a versioned system change.
+      const since = run.run.createdAt
+      const moves = issue && reachesReview(stopReason, report) && advancesTo(issue.status, 'review')
+        && !(await tx.execute<{ changed: boolean }>(sql`SELECT ${personChangedStatusSince(issue.id, since)} AS changed`)).rows[0]?.changed
+      const [review] = moves ? await tx.update(issues).set({ status: 'review', revision: issue.revision + 1, updatedAt: new Date() }).where(eq(issues.id, issue.id)).returning() : []
+      if (review) await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: review.id, userId: review.userId, revision: review.revision, title: review.title, content: review.content, status: review.status, priority: review.priority, ...systemActor('run-review') })
       if (review) { await issueListChanged(tx, review.id); await issueRelationsChanged(tx, [review.id]) }
-      return { userId: run.run.userId, review }
+      return { userId: run.run.userId, review: review ? { id: review.id, scopeVersion: review.scopeVersion } : null }
     }))
   } finally { client.release() }
 }

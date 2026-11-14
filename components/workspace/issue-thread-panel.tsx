@@ -463,7 +463,9 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     </div>}
     </>
   // Esc inside the thread is ←; in its composer or another field it only leaves the field (decision 0301). A window opened from it keeps its own Esc.
-  return <section ref={rootRef} aria-label={title} className="flex h-full min-h-0 flex-col" onKeyDown={bare || !onBack ? undefined : event => closeOnEscape(event, headingRef.current, onBack)}>
+  // data-own-scroll: the messages scroll inside and the composer stays at the bottom, so a frame whose one scroller
+  // holds this panel (the official work area) gives it the scroller's height instead of growing with it.
+  return <section ref={rootRef} aria-label={title} data-own-scroll="" className="flex h-full min-h-0 flex-col" onKeyDown={bare || !onBack ? undefined : event => closeOnEscape(event, headingRef.current, onBack)}>
     {!bare && <ThreadHeader issueId={issueId} runId={runId} title={title} headingRef={headingRef} onBack={onBack} onClose={onClose}
       onStop={canStop ? () => { void stop() } : null} onOpenTask={onOpenTask} wraps={!!acceptance}
       widen={widen ?? undefined} liveRunId={liveRunId} status={data?.thread.status ?? ''} acceptanceTaskId={acceptance?.id ?? null}

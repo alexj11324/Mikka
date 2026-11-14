@@ -40,14 +40,14 @@ const sources = (entries: Record<string, CitationSource>) => entries
 test('an ended run judged needs_input is still waiting: the live shape of a question', () => {
   assert.deepEqual(
     waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { issue: 'i1' }) }), new Set()),
-    [{ runId: 'r1', title: '登录页白屏' }],
+    [{ runId: 'r1', title: 'what r1 was asked' }],
   )
 })
 
 test('a run still waiting inside its turn is waiting', () => {
   assert.deepEqual(
     waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { status: 'waiting_input', issue: 'i1' }) }), new Set()),
-    [{ runId: 'r1', title: '登录页白屏' }],
+    [{ runId: 'r1', title: 'what r1 was asked' }],
   )
 })
 
@@ -65,7 +65,7 @@ test('a run judged done, idle or blocked is not waiting', () => {
 test('the judge can hand a succeeded run back as needs_input; the inbox waits on that too', () => {
   assert.deepEqual(
     waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { status: 'succeeded', outcome: 'needs_input', issue: 'i1' }) }), new Set()),
-    [{ runId: 'r1', title: '登录页白屏' }],
+    [{ runId: 'r1', title: 'what r1 was asked' }],
   )
 })
 
@@ -83,7 +83,7 @@ test('two threads of one task answer the same question: the newest event wins an
     sources({ r1: run('r1', { issue: 'i1' }), r2: run('r2', { issue: 'i1' }) }),
     new Set(),
   )
-  assert.deepEqual(result, [{ runId: 'r2', title: '登录页白屏' }])
+  assert.deepEqual(result, [{ runId: 'r2', title: 'what r2 was asked' }])
 })
 
 test('the task that has waited longest comes first', () => {
@@ -107,7 +107,7 @@ test('the latest question for one run replaces an earlier one', () => {
 test('a run that just ended on asked_human shows before the outcome judge answers', () => {
   assert.deepEqual(
     waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { issue: 'i1', outcome: null, stopReason: 'asked_human' }) }), new Set()),
-    [{ runId: 'r1', title: '登录页白屏' }],
+    [{ runId: 'r1', title: 'what r1 was asked' }],
   )
 })
 
@@ -138,7 +138,7 @@ test('quota and failed runs are not questions the person owes an answer to', () 
 test('a live waiting_input still shows on a merged task, as the thread badge does', () => {
   assert.deepEqual(
     waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { status: 'waiting_input', issue: 'i1', merged: true }) }), new Set()),
-    [{ runId: 'r1', title: '登录页白屏' }],
+    [{ runId: 'r1', title: 'what r1 was asked' }],
   )
 })
 
