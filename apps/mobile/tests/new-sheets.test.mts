@@ -16,7 +16,7 @@ const Pressable = ({ children, accessibilityLabel, onPress }: Props) => createEl
 const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports: exports })
 mock.module('react-native', { namedExports: { View, ScrollView: View, Text, TextInput, Pressable, Platform: { OS: 'ios' }, StyleSheet: { create: (s: unknown) => s } } })
 let purpose: string | undefined
-mock.module('expo-router', { namedExports: { useLocalSearchParams: () => ({ purpose }), useRouter: () => ({ back: () => {} }) } })
+mock.module('expo-router', { namedExports: { useLocalSearchParams: () => ({ purpose }), useRouter: () => ({ back: () => {}, replace: (path: string) => opened.push(path) }) } })
 mock.module(require.resolve('lucide-react-native'), { namedExports: { Check: () => null, X: () => null } })
 stub('../components/icons.tsx', { BotAvatar: () => createElement('i'), Spinner: () => null, BOT_COLORS: { encre: '#000', bleu: '#00f' }, BOT_PICKER_SHAPES: ['cercle', 'fleur'] })
 stub('../components/NavBar.tsx', { NavBar: ({ title, right }: { title: string; right: { label: string; disabled: boolean; onPress: () => void } }) =>
@@ -27,7 +27,12 @@ stub('../components/Text.tsx', { Text })
 stub('../components/ui.tsx', { Field: View, Group: ({ label, children }: { label: string; children: ReactNode }) => createElement('section', null, label, children) })
 const writes: Array<{ path: string; input: unknown }> = []
 const opened: string[] = []
-stub('../lib/api.ts', { api: async (path: string, input: unknown) => { writes.push({path, input}); return { id: 'created-id' } }, ApiError: class extends Error {} })
+const newId = '50000000-0000-4000-8000-000000000099'
+let receipt = async (): Promise<unknown> => ({ id: newId, title: 'A separate conversation' })
+let generation = 1
+stub('../lib/api-cache.ts', { apiCache: { context: () => generation } })
+stub('../components/GlassButton.tsx', { GlassButton: ({ label, onPress }: { label: string; onPress: () => void }) => createElement('button', { onClick: onPress }, label) })
+stub('../lib/api.ts', { api: async (path: string, input: unknown) => { writes.push({path, input}); return receipt() }, ApiError: class extends Error {} })
 stub('../lib/haptics.ts', { tap: () => {} })
 stub('../lib/navigate.ts', { openChat: (path: string) => { opened.push(path) }, chatPath: (id: string) => `/bots/${id}` })
 stub('../lib/theme.ts', { colors: {}, font: 'System' })
@@ -72,7 +77,7 @@ test('the standalone conversation sheet keeps the first selected Bot as lead and
       workspaceId: 'w', title: 'A separate conversation', purpose: 'conversation', leadBotId: 'c',
       members: [{ memberType: 'bot', memberId: 'c' }, { memberType: 'bot', memberId: 'a' }],
     } } }])
-    assert.deepEqual(opened, ['/groups/created-id'])
+    assert.deepEqual(opened, ['/groups/' + newId])
   } finally {
     purpose = undefined
     await act(async () => root.unmount())
@@ -94,4 +99,50 @@ test('both sheets are full-height form sheets under an opaque header', () => {
   assert.deepEqual(options.sheetAllowedDetents, [1])
   assert.equal(options.headerTransparent, false)
   assert.deepEqual(options.contentStyle, { backgroundColor: 'page' })
+})
+
+test('a lost create acknowledgement opens the directory for recovery and a stale response never navigates the new workspace', async () => {
+  const browser = new Window()
+  Object.assign(globalThis, { window: browser, document: browser.document, IS_REACT_ACT_ENVIRONMENT: true })
+  const { createRoot } = await import('react-dom/client')
+  const host = document.createElement('div')
+  const root = createRoot(host)
+  purpose = 'conversation'
+  async function fill(formKey: string) {
+    await act(async () => root.render(createElement(NewGroup, { key: formKey })))
+    const field = host.querySelector('input')!
+    await act(async () => {
+      field.value = 'Conversation'
+      field.dispatchEvent(new browser.Event('input', { bubbles: true }) as unknown as Event)
+      host.querySelector<HTMLButtonElement>('button[aria-label="设计师"]')!.click()
+    })
+    return host.querySelector('header button') as HTMLButtonElement
+  }
+  try {
+    writes.length = 0
+    opened.length = 0
+    const submit = await fill('initial')
+    receipt = async () => ({ id: 'malformed', title: 'Conversation' })
+    await act(async () => submit.click())
+    assert.ok(host.textContent?.includes(mobileMessages.Shell.createConversation.unconfirmed))
+    assert.equal(submit.disabled, true)
+    await act(async () => submit.click())
+    assert.equal(writes.length, 1)
+    const review = [...host.querySelectorAll('button')].find(button => button.textContent === mobileMessages.Shell.createConversation.reviewGroups)
+    assert.ok(review)
+    await act(async () => review.click())
+    assert.deepEqual(opened, ['/conversations'])
+    const next = await fill('next')
+    let finish!: (value: unknown) => void
+    receipt = () => new Promise(resolve => { finish = resolve })
+    await act(async () => next.click())
+    generation++
+    await act(async () => finish({ id: newId, title: 'Conversation' }))
+    assert.deepEqual(opened, ['/conversations'])
+  } finally {
+    purpose = undefined
+    receipt = async () => ({ id: newId, title: 'A separate conversation' })
+    await act(async () => root.unmount())
+    await browser.happyDOM.close()
+  }
 })

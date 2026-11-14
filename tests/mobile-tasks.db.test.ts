@@ -215,7 +215,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
         'Bot conversation '||n,'manual',now()-n*interval '1 hour',now()-n*interval '1 hour',
         CASE WHEN n=48 THEN now() END,CASE WHEN n=1 THEN now() END
       FROM unnest($1::uuid[]) WITH ORDINALITY input(id,n)`, [ids, owner, teamWorkspace.id, agent, childBot])
-    const read = (options?: ReadOptions, id = childBot) => run('/api/mobile/conversations?' + new URLSearchParams({
+    const read = (options?: ReadOptions, id: string = childBot) => run('/api/mobile/conversations?' + new URLSearchParams({
       view: 'botChildren', workspaceId: teamWorkspace.id, botId: id,
     }), directory, { workspaceId: teamWorkspace.id, ...options })
     try {

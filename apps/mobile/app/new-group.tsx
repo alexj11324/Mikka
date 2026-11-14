@@ -1,6 +1,8 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { z } from 'zod'
+import { GlassButton } from '@/components/GlassButton'
 import { Check, X } from 'lucide-react-native'
 import { BotAvatar, Spinner } from '@/components/icons'
 import { NavBar } from '@/components/NavBar'
@@ -8,7 +10,8 @@ import { ReadNotice } from '@/components/ReadNotice'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { Field, Group } from '@/components/ui'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
+import { apiCache } from '@/lib/api-cache'
 import { tap } from '@/lib/haptics'
 import { mobileMessages } from '@/lib/messages'
 import { useHome } from '@/lib/home'
@@ -31,27 +34,39 @@ export default function NewGroup() {
   const [title, setTitle] = useState('')
   const [picked, setPicked] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
-  const [failed, setFailed] = useState(false)
+  const [problem, setProblem] = useState<'failed' | 'unconfirmed' | null>(null)
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
   const selected = picked.filter(id => bots.some(bot => bot.id === id))
-  const ready = Boolean(title.trim() && selected.length && selected.length <= 100 && home.data)
+  const ready = problem !== 'unconfirmed' && Boolean(title.trim() && selected.length && selected.length <= 100 && home.data)
   const create = async () => {
     if (!ready || pending.current || !home.data) return
+    const context = apiCache.context()
+    const current = () => mounted.current && context === apiCache.context()
     pending.current = true
     setBusy(true)
-    setFailed(false)
+    setProblem(null)
     try {
-      const group = await api<{ id: string }>('/api/conversations', { method: 'POST', body: {
+      const group = await api<{ id: string; title: string }>('/api/conversations', { method: 'POST', body: {
         workspaceId: home.data.workspace.id, title: title.trim(),
         ...(standalone ? { purpose: 'conversation', leadBotId: selected[0] } : {}),
         members: selected.map(id => ({ memberType: 'bot', memberId: id })),
       } })
+      if (!current()) return
+      if (!z.uuid().safeParse(group?.id).success || typeof group?.title !== 'string') {
+        setProblem('unconfirmed')
+        return
+      }
       tap()
       openChat(`/groups/${group.id}`)
-    } catch {
-      setFailed(true)
+    } catch (error) {
+      if (current()) setProblem(error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 408 ? 'failed' : 'unconfirmed')
     } finally {
       pending.current = false
-      setBusy(false)
+      if (mounted.current) setBusy(false)
     }
   }
   const toggle = (id: string) => { tap(); setPicked(list => list.includes(id) ? list.filter(item => item !== id) : [...list, id]) }
@@ -62,17 +77,19 @@ export default function NewGroup() {
         right={{ icon: 'checkmark', label: busy ? mobileMessages.Common.loading : words.create, disabled: !ready || busy, busy, prominent: true, web: <Check size={20} color={colors.accent} strokeWidth={2.4} />, onPress: () => void create() }} />
       <ScrollView style={styles.screen} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
         <Field style={styles.field}>
-          <TextInput editable={!busy} value={title} onChangeText={setTitle} placeholder={words.name} placeholderTextColor={colors.secondary} maxLength={200} autoFocus
+          <TextInput editable={!busy && problem !== 'unconfirmed'} value={title} onChangeText={setTitle} placeholder={words.name} placeholderTextColor={colors.secondary} maxLength={200} autoFocus
             style={styles.input} accessibilityLabel={words.name} />
         </Field>
-        {failed ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.problem}>{words.failed}</Text> : null}
+        {problem ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.problem}>{words[problem]}</Text> : null}
+        {problem === 'unconfirmed' && <GlassButton label={words.reviewGroups} onPress={() => router.replace(standalone ? '/conversations' : '/')} />}
         <ReadNotice error={home.error} hasData={Boolean(home.data)} label={mobileMessages.Nav.bots} onRetry={home.reload} />
         {home.loading && !home.data ? <View style={{ alignItems: 'center', paddingVertical: 16 }}><Spinner /></View> : null}
         <Group label={words.bots} backgroundColor={colors.bubble}>
           {bots.map(bot => {
             const on = picked.includes(bot.id)
+            const disabled = busy || problem === 'unconfirmed'
             return (
-              <Pressable key={bot.id} accessibilityRole="checkbox" accessibilityLabel={bot.name} accessibilityState={{ checked: on, disabled: busy }} aria-checked={Platform.OS === 'web' ? on : undefined} aria-disabled={Platform.OS === 'web' ? busy : undefined} disabled={busy} onPress={() => toggle(bot.id)}
+              <Pressable key={bot.id} accessibilityRole="checkbox" accessibilityLabel={bot.name} accessibilityState={{ checked: on, disabled }} aria-checked={Platform.OS === 'web' ? on : undefined} aria-disabled={Platform.OS === 'web' ? disabled : undefined} disabled={disabled} onPress={() => toggle(bot.id)}
                 style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
                 <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size={30} />
                 <Text style={styles.name} numberOfLines={1}>{bot.name}</Text>
