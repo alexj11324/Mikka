@@ -24,11 +24,11 @@ mock.module('../app/actions/team-relations.ts', { namedExports: {
     return relation === 'denied' ? { ok: false, error: 'denied' } : { ok: true, data: { ...saved, revision: 2 } }
   },
 } })
-mock.module('next-intl', { namedExports: { useTranslations: () => key => key } })
+mock.module('next-intl', { namedExports: { useTranslations: () => key => key, useMessages: () => ({}) } })
 mock.module('../components/ui/dialog.tsx', { namedExports: {
   Dialog: children, DialogContent: children, DialogHeader: children, DialogTitle: children, DialogDescription: children,
 } })
-mock.module('../components/workspace/project-property-controls.tsx', { namedExports: { ProjectPicker: empty, ProjectPropertyControl: empty } })
+mock.module('../components/workspace/project-property-controls.tsx', { namedExports: { ProjectPicker: empty, ProjectPropertyControl: empty, projectDirectory: () => [] } })
 mock.module('../components/workspace/project-milestones.tsx', { namedExports: { ProjectMilestones: empty } })
 mock.module('../components/workspace/issue-editor.tsx', { namedExports: { IssueEditor: empty } })
 mock.module('sonner', { namedExports: { toast: { warning: () => calls.push('warning') } } })
@@ -63,5 +63,42 @@ test('project creation reports the team actually attached so the saved project o
       await act(async () => root.unmount())
       host.remove()
     }
+  }
+})
+
+test('a selected project missing from the current directory retains an explicit Retry and an exit to its own list', async () => {
+  const { ProjectWorkspace } = await import('../components/workspace/project-workspace.tsx')
+  const { ViewStateProvider } = await import('../lib/hooks/view-state.tsx')
+  const host = page.document.createElement('div')
+  page.document.body.append(host)
+  const root = createRoot(host)
+  let retries = 0
+  let selected = saved.id
+  const render = async (loading = false, error = false) => act(async () => {
+    root.render(createElement(ViewStateProvider, { scope: 'test-project' }, createElement(ProjectWorkspace, {
+      readerId: 'reader', projects: [], projectId: selected, loading, error, issues: [], team: 'Design', initialTeamId: team,
+      onUpdated: () => { retries++ }, onSelect: id => { selected = id },
+    })))
+  })
+  const button = label => [...host.querySelectorAll('button')].find(node => node.textContent === label)
+  try {
+    await render(true)
+    assert.ok(host.querySelector('[role="status"]'))
+    await render(false, true)
+    assert.match(host.textContent, /Projects.loadErrorTitle/)
+    await render()
+    assert.match(host.textContent, /Errors.projectNotFound/)
+    assert.equal(button('Projects.form.createTitle'), undefined)
+    await act(async () => { button('Common.retry').click() })
+    assert.equal(retries, 1)
+    assert.equal(selected, saved.id)
+    await act(async () => { button('Overview.viewProjects').click() })
+    assert.equal(selected, null)
+    await render()
+    assert.doesNotMatch(host.textContent, /Errors.projectNotFound/)
+    assert.ok(button('Projects.form.createTitle'))
+  } finally {
+    await act(async () => root.unmount())
+    host.remove()
   }
 })

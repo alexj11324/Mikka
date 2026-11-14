@@ -45,6 +45,13 @@ export function ProjectWorkspace({ readerId, paging, projects, loading, error, p
   const filtered = projects.filter(item => Boolean(item.archivedAt) === archived && (status === 'all' || item.status === status) && item.name.toLowerCase().includes(query.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name, 'zh-CN') * (ascending ? 1 : -1))
   if (error) return <Empty><EmptyHeader><EmptyTitle>{i18nText("Projects.loadErrorTitle")}</EmptyTitle></EmptyHeader><Button variant="outline" onClick={onUpdated}>{i18nText("Projects.reload")}</Button></Empty>
   if (loading) return <div role="status" aria-label={i18nText("Projects.loading")} className="flex flex-col gap-4 p-6"><Skeleton className="h-8 w-48" /><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>
+  if (projectId && !project) return <Empty>
+    <EmptyHeader><EmptyTitle role="status">{i18nText('Errors.projectNotFound')}</EmptyTitle></EmptyHeader>
+    <EmptyContent><div className="flex flex-wrap justify-center gap-2">
+      <Button variant="outline" onClick={onUpdated}>{i18nText('Common.retry')}</Button>
+      <Button variant="ghost" onClick={() => onSelect(null)}>{i18nText('Overview.viewProjects')}</Button>
+    </div></EmptyContent>
+  </Empty>
   if (project) return <ProjectDetail key={project.id} readerId={readerId} paging={paging} project={project} projects={projects} issues={issues} directory={directory} admin={workspace?.role === 'admin' && workspace.workspace.id === project.workspaceId} onBack={() => onSelect(null)} onOpenTeam={onOpenTeam} onOpenIssue={onOpenIssue} onCreateIssue={onCreateIssue} onUpdated={onUpdated} />
   return <div className="flex min-w-0 flex-1 flex-col">
     <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><h1 className="text-sm font-medium">{team ? i18nText("FeatureCopy.c_4099b448", { value0: (team) }) : i18nText("Projects.title")}</h1><Button size="sm" variant="ghost" onClick={() => setCreating(true)}><Plus data-icon="inline-start" />{i18nText("Projects.form.createTitle")}</Button></div>
