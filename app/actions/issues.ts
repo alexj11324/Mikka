@@ -116,10 +116,10 @@ async function readIssues(workspaceId?: string, known?: string, previous?: ListP
 }
 
 export async function listWorkspaceTaskPage(input: TaskListPageInput) {
-  const { workspaceId, after, dispatchedBy, projectId } = taskListPageInput.parse(input)
+  const { workspaceId, after, dispatchedBy, projectId, teamId } = taskListPageInput.parse(input)
   if (await effectiveRequestWorkspace(await requireUser()) !== workspaceId) throw new ActionFailureError('workspaceAccessDenied')
   try {
-    const snapshot = await withDatabaseOperation('/actions/issues/page', () => readIssueSnapshot(workspaceId, undefined, undefined, after, dispatchedBy, projectId))
+    const snapshot = await withDatabaseOperation('/actions/issues/page', () => readIssueSnapshot(workspaceId, undefined, undefined, after, dispatchedBy, projectId, teamId))
     const items = snapshot.items ?? []
     return { workspaceId, items, next: nextTaskListCursor(items), reset: false }
   } catch (error) {
@@ -128,7 +128,7 @@ export async function listWorkspaceTaskPage(input: TaskListPageInput) {
   }
 }
 
-async function readIssueSnapshot(workspaceId?: string, known?: string, previous?: ListPosition[], after?: TaskListPageInput['after'], dispatchedBy?: string, projectId?: string) {
+async function readIssueSnapshot(workspaceId?: string, known?: string, previous?: ListPosition[], after?: TaskListPageInput['after'], dispatchedBy?: string, projectId?: string, teamId?: string) {
   const userId = await getUserId()
   const context = await loadWorkspaceContext(workspaceId)
   // Before the list: the selected workspace's key and the home's key, both of which this list listens to.
@@ -168,18 +168,23 @@ async function readIssueSnapshot(workspaceId?: string, known?: string, previous?
   const project = projectId ? (await accessibleProjects(userId, projectDb, context.workspace.id, projectId))[0] : undefined
   if (projectId && !project) throw new ActionFailureError('projectNotFound')
   const inProject = project ? sql`${issues.id} = any(${sql.param(project.issueIds)}::uuid[])` : undefined
+  // Team scope is applied before LIMIT and checked again for the cursor anchor.
+  // A client-side filter over the global first 100 rows misses older Team Tasks.
+  if (teamId && !teams.some(team => team.id === teamId)) throw new ActionFailureError('teamNotFound')
+  const teamIssueIds = teamId ? visibility.links.filter(link => link.teamId === teamId && link.workspaceId === context.workspace.id).map(link => link.issueId) : null
+  const inTeam = teamIssueIds ? inArray(issues.id, teamIssueIds) : undefined
   let continuation
   if (after) {
     // JavaScript timestamps carry milliseconds; PostgreSQL orders the exact
     // microsecond and UUID. Re-read the visible anchor before continuing.
     const [anchor] = await db.select({ time: sql<string>`${issues.updatedAt}::text` }).from(issues)
       .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-      .where(and(visibility.predicate, dispatched, inProject, eq(issues.id, after.id), eq(issues.workspaceId, context.workspace.id),
+      .where(and(visibility.predicate, dispatched, inProject, inTeam, eq(issues.id, after.id), eq(issues.workspaceId, context.workspace.id),
         sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).limit(1)
     if (!anchor || new Date(anchor.time).getTime() !== Date.parse(after.updatedAt)) throw new ActionFailureError('issueStale')
     continuation = sql`(${issues.updatedAt}, ${issues.id}) < (${anchor.time}::timestamptz, ${after.id}::uuid)`
   }
-  const candidates = db.select({ id: issues.id, ownerId: issues.userId, issuedIdentifier: issues.issuedIdentifier, ownerName: users.name, ownerImage: users.image, title: issues.title, shortTitle: issueShortTitle.as('shortTitle'), content: issueAttrsContent.as('content'), checklistTotal: issueChecklistTotal.as('checklistTotal'), checklistChecked: issueChecklistChecked.as('checklistChecked'), status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, dispatched, inProject, continuation, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt), desc(issues.id)).limit(TASK_LIST_PAGE_SIZE).as('task_list')
+  const candidates = db.select({ id: issues.id, ownerId: issues.userId, issuedIdentifier: issues.issuedIdentifier, ownerName: users.name, ownerImage: users.image, title: issues.title, shortTitle: issueShortTitle.as('shortTitle'), content: issueAttrsContent.as('content'), checklistTotal: issueChecklistTotal.as('checklistTotal'), checklistChecked: issueChecklistChecked.as('checklistChecked'), status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, dispatched, inProject, inTeam, continuation, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt), desc(issues.id)).limit(TASK_LIST_PAGE_SIZE).as('task_list')
   // Issued identifiers are part of the Task row and do not follow Team,
   // personal-prefix or provider renames. Current human profile changes still
   // invalidate responsibility without rewriting historical Task metadata.
@@ -187,7 +192,7 @@ async function readIssueSnapshot(workspaceId?: string, known?: string, previous?
     (select jsonb_build_array(person.name,person.image) from "user" person where person.id = coalesce(task_list.content->'attrs'->'mikka',task_list.content->'attrs'->'orvilo')->'assignee'->>'id')
   )`.as('identifiers') }).from(candidates)
   const tasksVersion = await queryVersion(signature)
-  const version = createHash('sha256').update(JSON.stringify([userId, context.workspace.id, teams.map(team => team.id).sort(), tasksVersion, linksVersion, membersVersion, projectsVersion])).digest('hex').slice(0, 32)
+  const version = createHash('sha256').update(JSON.stringify([userId, context.workspace.id, teamId ?? null, teams.map(team => team.id).sort(), tasksVersion, linksVersion, membersVersion, projectsVersion])).digest('hex').slice(0, 32)
   if (known === version) return { ...unchangedList(version), live }
   // Read the version first: a concurrent change is picked up on the next poll, never acknowledged unseen.
   const signed = signature.as('task_signatures')
@@ -215,7 +220,7 @@ async function readIssueSnapshot(workspaceId?: string, known?: string, previous?
   // A workspace token also has a narrower predicate than a browser session.
   return singleFlight(['/actions/issues/poll', userId, context.workspace.id, context.role,
     actingContext.getStore()?.tokenWorkspaceId ?? null, allTeams.map(team => `${team.id}:${team.workspaceId}`).sort().join(','),
-    version, known ?? null, listPositionKey(previous), JSON.stringify(positions)], async () => {
+    teamId ?? null, version, known ?? null, listPositionKey(previous), JSON.stringify(positions)], async () => {
     const changedIds = changedListIds(positions, previous)
     const rows = changedIds.length ? await db.select().from(candidates).where(inArray(candidates.id, changedIds)).orderBy(desc(candidates.updatedAt), desc(candidates.id)) : []
     const liveRows = rows.filter(row => !readIssueMetadata(row.content).deletedAt).map(row => ({ ...row, workspaceId: context.workspace.id }))
@@ -318,7 +323,6 @@ async function persistIssue(input: SaveIssueInput, block?: BlockFlag): Promise<A
     const ownerId = existing?.userId ?? userId
     const observedScopeVersion = existing?.scopeVersion ?? null
     if (input.id && (!Number.isInteger(input.revision) || (input.revision ?? 0) < 1)) return { error: 'issueRevisionInvalid' }
-    let statusEvent = false
     // Status events stay in the task's stored tenant, including shared tasks.
     const coordinator = existing && parsed.data.status !== undefined && existing.status !== parsed.data.status ? (await coordinatorBot(ownerId, context.workspace.id, { backfill: false })).botId : null
     try {
@@ -334,10 +338,7 @@ async function persistIssue(input: SaveIssueInput, block?: BlockFlag): Promise<A
         const content = block ? withIssueMetadata(latest.content, { ...readIssueMetadata(latest.content), block }) : latest.content
         ;[issue] = await tx.update(issues).set({ ...parsed.data, content, revision: input.revision! + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, ownerId), eq(issues.revision, input.revision!))).returning()
         const changed = issue && coordinator && issueStatusEvent(latest, issue, coordinator)
-        if (changed) {
-          await recordCoordinatorEvent(tx, changed)
-          statusEvent = true
-        }
+        if (changed) await recordCoordinatorEvent(tx, changed)
         if (!issue) return { error: 'issueStale' }
         reviewTaskChanged(tx, latest, issue)
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority, ...activityActor(userId) })
@@ -348,7 +349,6 @@ async function persistIssue(input: SaveIssueInput, block?: BlockFlag): Promise<A
       })
       const result = existing ? await withIssueWorkspace(user, context.workspace.id, { issueId: existing.id, action: 'canSteer' }, save) : await withTaskWorkspace(user, context.workspace.id, save)
       if ('issue' in result && result.issue?.linearSyncPolicy === 'explicit' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })
-      if (statusEvent && 'issue' in result) scheduleIssueEffect({ kind: 'wake', userId: ownerId })
       return result
     } catch (error) {
       if (error instanceof ActionFailureError) throw error

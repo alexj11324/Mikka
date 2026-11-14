@@ -1,3 +1,4 @@
+import { observePoolCommits } from './db/commit-effects'
 import assert from 'node:assert/strict'
 import test, { mock } from 'node:test'
 import { randomBytes, randomUUID } from 'node:crypto'
@@ -8,7 +9,7 @@ import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 import { dropTestDatabase } from '../tests/support/drop-test-database'
 import { freezeWorkerDefinition } from './agent-kit/worker'
 import { freezeExecutionIdentity, ExecutionIdentityError } from './execution-identity'
-import { createExecutionClaim } from './factory/execution-claim'
+import { createExecutionClaim } from '../tests/helpers/factory-execution-claim'
 import { sealSecret } from './secrets/crypto'
 
 const url = process.env.E2E_DATABASE_URL
@@ -22,6 +23,7 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
   const target = new URL(url!); target.pathname = `/${database}`
   const databaseUrl = target.toString()
   const pool = new Pool({ connectionString: databaseUrl, max: 5 })
+  observePoolCommits(pool)
   let appPool: Pool | undefined, workspacePool: Pool | undefined
   const previous = { MIKKA_DATABASE_URL: process.env.MIKKA_DATABASE_URL, DATABASE_URL: process.env.DATABASE_URL }
   Object.assign(process.env, { MIKKA_DATABASE_URL: databaseUrl, DATABASE_URL: databaseUrl })
@@ -53,7 +55,7 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
     await pool.query('INSERT INTO model_api_key_shares("keyId","workspaceId") VALUES($1,$2)', [sharedKey, workspace])
     const definition = freezeWorkerDefinition({ harness: 'codex', instructions: '', prompt: 'Task', parent: null, executionId: null, model: 'example-model', apiKey: { keyId: sharedKey, model: 'example-model' } })
     definition.executionIdentity = await freezeExecutionIdentity(pool, { userId: requester, botId: bot, deviceId: device, agentDefinition: definition }, pool)
-    await pool.query('INSERT INTO agent_runs(id,"userId","botId","deviceId","agentId","issueId",status,"agentDefinition") VALUES($1,$2,$3,$4,$5,$6,\'queued\',$7)', [runId, requester, bot, device, agent, issue, JSON.stringify(definition)])
+    await pool.query('INSERT INTO agent_runs(id,"userId","botId","deviceId","agentId","issueId",status,"agentDefinition","workspaceId") VALUES($1,$2,$3,$4,$5,$6,\'queued\',$7,$8)', [runId, requester, bot, device, agent, issue, JSON.stringify(definition), workspace])
     const claim = createExecutionClaim(pool, async () => true)
     const lease = () => new Date(Date.now() + 300_000).toISOString()
     const { token } = await issueRunToken({ id: runId, userId: requester })
@@ -248,6 +250,7 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
   } finally {
     mock.restoreAll()
     for (const [name, value] of Object.entries(previous)) { if (value === undefined) delete process.env[name]; else process.env[name] = value }
+    await (await import('./builtin-gateway/runtime')).builtinGateway()?.stop()
     await dropTestDatabase(admin, database, pool, appPool, workspacePool)
     await admin.end()
   }

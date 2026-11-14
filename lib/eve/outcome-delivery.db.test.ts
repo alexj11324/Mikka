@@ -14,6 +14,9 @@ const pushes:Array<{owner:string;bot:string;text:string|null;reasons:unknown;tas
 mock.module(new URL('../coordinator/decide.ts',import.meta.url).href,{namedExports:{decide:async(_purpose:string,input:string)=>{decisions++;decisionInputs.push(input);return new Map([['push',{type:'choice',choice}]])}}})
 mock.module(new URL('../mobile-push.ts',import.meta.url).href,{namedExports:{pushReply:async(owner:string,bot:string,text:string|null,reasons:unknown,task:unknown)=>{pushes.push({owner,bot,text,reasons,task})}}})
 mock.module(new URL('../execution-settings.ts',import.meta.url).href,{namedExports:{executionWorkspace:async()=>null}})
+const messages=await import('../telegram/messages')
+const splits=mock.fn(messages.splitTelegramText)
+mock.module(new URL('../telegram/messages.ts',import.meta.url).href,{namedExports:{...messages,splitTelegramText:splits}})
 const {createEveOutcomeDelivery}=await import('./outcome-delivery')
 const url=process.env.E2E_DATABASE_URL
 if(url)assert.ok(isE2eTarget(url),E2E_DB_RULE)
@@ -67,9 +70,48 @@ test('committed native outcomes deliver Telegram and existing phone Decisions on
    const receipts=(await app.query('SELECT kind,status FROM eve_outcome_deliveries WHERE session_id=$1 ORDER BY kind',[f.session])).rows
    assert.deepEqual(receipts,[{kind:'phone',status:'completed'},{kind:'telegram',status:'completed'}])
   })
-  await t.test('each Unicode-safe Telegram chunk has its own durable claim and never repeats',async()=>{
-   const text='😀'.repeat(4200),f=await fixture({text});await f.deliver(f.scope,f.input);await f.deliver(f.scope,f.input)
+  await t.test('each Unicode-safe Telegram chunk has its own durable claim and never repeats',async t=>{
+   const text='😀'.repeat(4200),f=await fixture({text})
+   const attachment = 'synthetic attachment '.repeat(2048)
+   await app.query('UPDATE coordinator_events SET payload=payload || $2::jsonb WHERE id=$1',[f.source, JSON.stringify({images:[{dataUrl:attachment}]})])
+   const queries = t.mock.method(app, 'query')
+   await f.deliver(f.scope,f.input)
+   const reads = queries.mock.calls.filter(call => String(call.arguments[0]).includes('FROM eve_sessions s'))
+   const eventPayloads = await Promise.all(reads.map(async call => {
+     const {rows} = await (call.result as unknown as Promise<{rows:{payload:unknown}[]}>)
+     return JSON.stringify(rows[0]!.payload)
+   }))
+   queries.mock.restore()
+   assert.ok(reads.length > 1, 'refresh the current source before delivery')
+   t.diagnostic(`Notification event payloads across ${reads.length} reads: ${eventPayloads.reduce((n, value) => n + Buffer.byteLength(value), 0)} JSON bytes`)
+   assert.ok(eventPayloads.every(value => !value.includes(attachment)), 'never transfer the original attachment for notification routing')
+   await f.deliver(f.scope,f.input)
    assert.equal(telegram.length,3);assert.equal(telegram.map(c=>c.text).join(''),text);assert.ok(telegram.every(c=>c.text.length<=4096));assert.equal(decisions,1)
+   assert.equal((await app.query("SELECT 1 FROM eve_outcome_deliveries WHERE session_id=$1 AND kind='telegram' AND status='completed'",[f.session])).rowCount,3)
+  })
+  await t.test('the Telegram adapter posts each claimed Unicode chunk exactly once', async t => {
+   const oldEnv = { TELEGRAM_BOT_TOKEN:process.env.TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET_TOKEN:process.env.TELEGRAM_WEBHOOK_SECRET_TOKEN, TELEGRAM_BOT_USERNAME:process.env.TELEGRAM_BOT_USERNAME }
+   Object.assign(process.env,{TELEGRAM_BOT_TOKEN:'123:synthetic',TELEGRAM_WEBHOOK_SECRET_TOKEN:'synthetic-hook',TELEGRAM_BOT_USERNAME:'fixture_bot'})
+   t.after(() => { for (const [name, value] of Object.entries(oldEnv)) { if (value === undefined) delete process.env[name]; else process.env[name] = value } })
+   const sent:string[]=[]
+   t.mock.method(globalThis,'fetch',async (url:string,init:RequestInit)=>{
+    const method=new URL(url).pathname.split('/').pop()
+    if(method==='getMe')return Response.json({ok:true,result:{id:123,is_bot:true,first_name:'Fixture',username:'fixture_bot'}})
+    assert.equal(method,'sendMessage')
+    const post=JSON.parse(String(init.body))
+    sent.push(post.text)
+    return Response.json({ok:true,result:{message_id:sent.length,date:1700000000,chat:{id:99,type:'private'},text:post.text}})
+   })
+   const text='😀'.repeat(4200), f=await fixture({text})
+   const deliver=createEveOutcomeDelivery(app,app,{safe:async()=>{}})
+   const before=splits.mock.callCount()
+   await deliver(f.scope,f.input)
+   const firstPass=splits.mock.callCount()-before
+   t.diagnostic('Split passes for an 8,400-unit Telegram reply: '+firstPass)
+   assert.equal(firstPass,1)
+   await deliver(f.scope,f.input)
+   assert.deepEqual(sent.map(chunk=>chunk.length),[4096,4096,208])
+   assert.equal(sent.join(''),text)
    assert.equal((await app.query("SELECT 1 FROM eve_outcome_deliveries WHERE session_id=$1 AND kind='telegram' AND status='completed'",[f.session])).rowCount,3)
   })
   await t.test('an uncertain provider post is not retried and later chunks are not posted on replay',async()=>{

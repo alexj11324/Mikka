@@ -2,6 +2,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm'
 import { listOwnerBots } from '@/lib/coordinator/coordinator-bot'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
 import { db } from '@/lib/db'
+import { runHistoryWindow } from '@/lib/task-state-query'
 import { agentRuns } from '@/lib/db/schema'
 import { botChats } from '@/lib/coordinator/store'
 import { chatPreview } from '@/lib/agent-history'
@@ -32,7 +33,7 @@ async function handleGET(request: Request) {
   if (!user) return unauthorized()
   const context = await loadWorkspaceContext(undefined, user)
   const recent = and(eq(agentRuns.userId, user.id), eq(agentRuns.workspaceId, context.workspace.id),
-    sql`${agentRuns.createdAt} > now() - interval '30 days'`)
+    sql`${agentRuns.createdAt} > now() - ${runHistoryWindow}`)
   const [botRows, chats, suggestions, perBot, preferences, live] = await Promise.all([
     // The Coordinator first, marked `coordinator` (lib/coordinator/coordinator-bot.ts listOwnerBots).
     listOwnerBots(user.id, context.workspace.id),

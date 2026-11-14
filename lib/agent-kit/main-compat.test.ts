@@ -220,8 +220,7 @@ stub('../computer/native-run-binding.ts',{nativeRunBinding:scopedBinding})
 // Skill assignment SQL, terminal fences and native binding CAS have their own
 // PostgreSQL composition regressions; do not initialize auth/provider services here.
 stub('../factory/server.ts',{
- guardExecutionRun:async()=>{throw Error('Mocked ordinary claim must not execute a transaction callback')},
- claimFactoryCheckRun:async()=>{throw Error('No Factory check in this fixture')},factoryQuestions:{},
+ factoryQuestions:{},
 })
 stub('../self-improvement/server.ts',{
  skillAssignments:{preflight:async()=>undefined,recordClaim:async()=>undefined},

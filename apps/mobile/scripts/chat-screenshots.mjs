@@ -3,7 +3,7 @@
 //
 //   MOBILE_WEB_DIST=/path/to/expo-web-export SCREENSHOT_OUT=/path/to/out [SCREENSHOT_SET=before] node apps/mobile/scripts/chat-screenshots.mjs
 //
-// SCREENSHOT_SET=before shoots only the chat as it was (an export of main), for the before/after pair.
+// SCREENSHOT_SET=before shoots only the baseline chat. SCREENSHOT_SET=attachment-overlap checks the composer above scrolling text.
 import { createReadStream, existsSync, mkdirSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { extname, join } from 'node:path'
@@ -13,6 +13,7 @@ const dist = process.env.MOBILE_WEB_DIST || '/tmp/mikka-mobile-web'
 const outDir = process.env.SCREENSHOT_OUT || '/tmp/mikka-mobile-chat'
 const port = Number(process.env.SCREENSHOT_PORT || 4176)
 const before = process.env.SCREENSHOT_SET === 'before'
+const checkOverlap = process.env.SCREENSHOT_SET === 'attachment-overlap'
 
 const USER = '11111111-1111-4111-8111-111111111111'
 const WORKSPACE = '22222222-2222-4222-8222-222222222222'
@@ -90,6 +91,38 @@ async function longPress(page, locator) {
   await page.mouse.down(); await page.waitForTimeout(800); await page.mouse.up()
 }
 
+/** Text scrolling under the floating composer must not change any pixels of its attachment alert. */
+async function checkAttachmentOverlap(page, theme) {
+  const draft = page.getByRole('textbox').last()
+  await draft.fill('保留这份待发草稿')
+  await page.getByRole('button', { name: '添加', exact: true }).click()
+  const chooser = page.waitForEvent('filechooser')
+  await page.getByRole('button', { name: '文件', exact: true }).click()
+  await (await chooser).setFiles({ name: 'example.bin', mimeType: 'application/octet-stream', buffer: Buffer.from('example') })
+  const alert = page.getByRole('alert').filter({ hasText: /文件/ }).last()
+  await alert.waitFor()
+  const clip = await alert.boundingBox()
+  if (!clip) throw new Error('The attachment alert has no visible bounds')
+
+  const line = page.getByText(items.at(-1).text, { exact: true }).first()
+  const position = await line.evaluate((element, y) => {
+    let scroll = element.parentElement
+    while (scroll && !['auto', 'scroll'].includes(getComputedStyle(scroll).overflowY)) scroll = scroll.parentElement
+    if (!scroll) throw new Error('The conversation has no scroll container')
+    scroll.scrollTop += element.getBoundingClientRect().top - y
+    const rect = element.getBoundingClientRect()
+    return { top: rect.top, bottom: rect.bottom }
+  }, clip.y)
+  if (position.top >= clip.y + clip.height || position.bottom <= clip.y) throw new Error('The transcript and alert do not overlap in this fixture')
+  const withText = await page.screenshot({ clip, caret: 'hide' })
+  // Keep layout fixed and remove only the underlying glyphs to measure their contribution.
+  await line.evaluate(element => { element.style.visibility = 'hidden' })
+  const withoutText = await page.screenshot({ clip, caret: 'hide' })
+  await line.evaluate(element => { element.style.visibility = '' })
+  await page.screenshot({ path: join(outDir, `${theme}-attachment-overlap.png`), caret: 'hide' })
+  if (!withText.equals(withoutText)) throw new Error(`${theme}: conversation text shows through the attachment alert`)
+}
+
 async function run() {
   if (!existsSync(join(dist, 'index.html'))) throw new Error(`No Expo Web export at ${dist}`)
   mkdirSync(outDir, { recursive: true })
@@ -100,7 +133,7 @@ async function run() {
   const shot = (page, theme, name) => page.screenshot({ path: join(outDir, `${theme}-${name}.png`) })
   try {
     for (const theme of ['light', 'dark']) {
-      const context = await browser.newContext({ viewport: { width: 393, height: 852 }, deviceScaleFactor: 2, colorScheme: theme, locale: 'zh-CN' })
+      const context = await browser.newContext({ viewport: { width: 393, height: 852 }, deviceScaleFactor: checkOverlap ? 1 : 2, colorScheme: theme, locale: 'zh-CN' })
       const page = await context.newPage()
       page.on('pageerror', error => problems.push(`${theme}: ${error}`))
       await page.route('**/*', async route => {
@@ -110,6 +143,11 @@ async function run() {
         return hit ? route.fulfill(hit) : route.continue()
       })
       await open(page, origin, `/bots/${BOT}`, '构建排上了')
+      if (checkOverlap) {
+        await checkAttachmentOverlap(page, theme)
+        await context.close()
+        continue
+      }
       if (before) { await shot(page, theme, 'chat-before'); await context.close(); continue }
       await shot(page, theme, 'chat')
       // Part way up: messages dissolve under the title pill rather than being cut at the bar.

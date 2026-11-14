@@ -237,6 +237,28 @@ const OPENED = 'mikkaOpenedThread'
 type OpenedTask = { issueId: string; from: string }
 const OPENED_TASK = 'mikkaOpenedTask'
 
+const WORK_TAB = 'mikkaWorkTab'
+export function workTabForEntry(scope: string) {
+  const saved = window.history.state?.[WORK_TAB]
+  if (saved?.scope !== scope || saved.href !== here()) return null
+  return workTab(saved.tab)
+}
+
+function workTab(tab: unknown): { kind: 'task' | 'thread'; id: string } | null {
+  if (typeof tab !== 'string') return null
+  const [kind, id, extra] = tab.split(':')
+  return (kind === 'task' || kind === 'thread') && UUID.test(id) && extra === undefined ? { kind, id } : null
+}
+
+/** Keep only the active work tab in this chat's browser entry. Its content is read afresh on restore. */
+export function rememberWorkTab(scope: string, tab: string | null) {
+  const state = { ...window.history.state }
+  if (workTab(tab)) state[WORK_TAB] = { scope, tab, href: here() }
+  else if (state[WORK_TAB]?.scope === scope) delete state[WORK_TAB]
+  else return
+  window.history.replaceState(state, '', here())
+}
+
 function write(href: string, mode: 'push' | 'replace', list = false) {
   const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
   // A no-op tidy during the router's render has not shown a restored address.
@@ -246,7 +268,7 @@ function write(href: string, mode: 'push' | 'replace', list = false) {
     const mark = nextMark(readMark(window.history.state), issue(new URL(window.location.href)), issue(new URL(href, window.location.href)), mode, DOC, list)
     const state: Record<string, unknown> = { ...window.history.state, [MARK]: mark }
     // Only the entry openThread wrote says where its thread came from; a later entry (an Artifact over it) must not inherit it, or ← would step back onto that entry.
-    if (mode === 'push') delete state[OPENED]
+    if (mode === 'push') { delete state[OPENED]; delete state[WORK_TAB] }
     if (mode === 'push') window.history.pushState(state, '', href)
     else window.history.replaceState(state, '', href)
     seenQuery = window.location.search

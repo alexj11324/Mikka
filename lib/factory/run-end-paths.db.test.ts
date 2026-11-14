@@ -143,6 +143,40 @@ test("cancel and thread end reach a terminal run, then afterRunEnded finalizes t
     };
     const startupState = async (runId: string) => (await pool.query('SELECT status,"stopReason","stopRequestedAt","startedAt","finishedAt","sessionId","agentDefinition","leaseExpiresAt" FROM agent_runs WHERE id=$1', [runId])).rows[0];
 
+    await t.test('a rejected Factory failure notice rolls back its run; scoped retries then commit one failure', async () => {
+      const { failFactoryCloudStage } = await import('./cloud-stage-handoff');
+      const f = await queuedCloudTask(false);
+      const actor = { userId: 'owner', workspaceId };
+      await pool.query('UPDATE agent_runs SET report=$2 WHERE id=$1', [f.runId, { summary: 'Retained failure report', verify: { status: 'not_run' } }]);
+      const row = () => pool.query('SELECT status,error FROM agent_runs WHERE id=$1', [f.runId]).then(r => r.rows[0]);
+      const notice = () => pool.query(`SELECT payload FROM coordinator_events WHERE "runId"=$1 AND kind='run_finished'`, [f.runId]);
+      const fail = (scope = actor) => failFactoryCloudStage(db.pool, scope, f.runId, 'Repository handoff could not be queued');
+      await fail({ ...actor, workspaceId: randomUUID() });
+      await fail({ ...actor, userId: 'another-owner' });
+      assert.deepEqual(await row(), { status: 'queued', error: null });
+      await pool.query(`CREATE FUNCTION reject_failure_notice() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN IF NEW."runId"='${f.runId}'::uuid AND NEW.kind='run_finished' THEN RAISE EXCEPTION 'fixture refused failure notice'; END IF; RETURN NEW; END $$`);
+      try {
+        await pool.query(`CREATE CONSTRAINT TRIGGER reject_failure_notice AFTER INSERT ON coordinator_events
+          DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION reject_failure_notice()`);
+        await assert.rejects(fail(), error => String((error as { cause?: unknown }).cause ?? error).includes('fixture refused failure notice'));
+        assert.deepEqual(await row(), { status: 'queued', error: null });
+        assert.equal((await notice()).rowCount, 0);
+        assert.deepEqual(await task(f.taskId), { stage: 'execute', status: 'running' });
+      } finally {
+        await pool.query('DROP TRIGGER IF EXISTS reject_failure_notice ON coordinator_events');
+        await pool.query('DROP FUNCTION reject_failure_notice()');
+      }
+      await Promise.all([fail(), fail(), fail(), fail()]);
+      assert.deepEqual(await row(), { status: 'failed', error: 'Repository handoff could not be queued' });
+      const event = await notice();
+      assert.equal(event.rowCount, 1);
+      assert.equal(event.rows[0].payload.stopReason, 'device_lost');
+      assert.equal(event.rows[0].payload.summary, 'Retained failure report');
+      assert.equal(event.rows[0].payload.verification, 'not_run');
+      assert.deepEqual(await task(f.taskId), { stage: 'execute', status: 'blocked' });
+    });
+
     for (const machine of [true, false]) await t.test(`an unclaimed cloud startup failure is recoverable infrastructure failure, with machine=${machine}`, async () => {
       const f = await queuedCloudTask(machine), frozen = (await startupState(f.runId)).agentDefinition;
       await Promise.all([startThreadMachine({ userId: 'owner', workspaceId }, f.runId, false), startThreadMachine({ userId: 'owner', workspaceId }, f.runId, false)]);

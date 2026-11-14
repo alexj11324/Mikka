@@ -31,7 +31,10 @@ export async function handleRequest(request: Request, env: GatewayEnv): Promise<
   if (url.pathname.startsWith('/v1/live/')) return handleLiveRequest(request, env)
   const match = url.pathname.match(/^\/v1\/devices\/([^/]+)\/(socket|push|status)$/)
   if (!match) return new Response(null, { status: 404 })
-  const deviceId = decodeURIComponent(match[1] ?? '')
+  // Invalid percent escapes and invalid UTF-8 are bad identifiers, not Worker errors.
+  let deviceId: string
+  try { deviceId = decodeURIComponent(match[1] ?? '') }
+  catch { return new Response(null, { status: 400 }) }
   if (!DEVICE.test(deviceId)) return new Response(null, { status: 400 })
   const secret = env.GATEWAY_PUSH_SECRET ?? ''
   if (match[2] === 'status') {

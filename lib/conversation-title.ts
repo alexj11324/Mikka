@@ -40,12 +40,11 @@ export function manualConversationTitle(raw: string): string | null {
 
 /**
  * Writes a title on every run of a conversation: $1 title, $2 source, $3 the chain's run ids, $4 owner, $5 whether a
- * manual title may be replaced (a rename or a regenerate the person asked for). Returns the runs that changed.
+ * manual title may be replaced, $6 whether this is a regeneration, $7 the manual title observed before generation, $8 the admitted workspace.
  */
 export const WRITE_CONVERSATION_TITLE = `UPDATE agent_runs SET title=$1, "titleSource"=$2
-  WHERE id=ANY($3::uuid[]) AND "userId"=$4 AND ($5::boolean OR "titleSource" IS DISTINCT FROM 'manual')
-    AND EXISTS (SELECT 1 FROM mikka_workspace_members m WHERE m."workspaceId"=agent_runs."workspaceId"
-      AND m."userId"=agent_runs."userId" AND m.status='active')
+  WHERE id=ANY($3::uuid[]) AND "userId"=$4 AND ("titleSource" IS DISTINCT FROM 'manual' OR ($5::boolean AND (NOT $6::boolean OR title IS NOT DISTINCT FROM $7::text)))
+    AND "workspaceId"=$8
     AND (title IS DISTINCT FROM $1 OR "titleSource" IS DISTINCT FROM $2)
   RETURNING id`
 

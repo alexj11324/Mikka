@@ -75,13 +75,14 @@ export async function pickText(): Promise<Attachment | 'notText' | 'tooLong' | n
 }
 
 /** The system file picker, shared by bot chats, groups and Agent threads. */
-export async function pickChatFile(): Promise<Extract<Attachment, { kind: 'file' }> | null> {
+export async function pickChatFile(): Promise<Extract<Attachment, { kind: 'file' }> | 'unsupported' | 'unreadable' | 'tooLarge' | null> {
   const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true, multiple: false })
   if (result.canceled || !result.assets[0]) return null
   const asset = result.assets[0]
+  if (!supportedChatFile(asset.name, asset.mimeType)) return 'unsupported'
   const size = asset.size ?? asset.file?.size ?? new File(asset.uri).size
-  if (!supportedChatFile(asset.name, asset.mimeType)) throw Error('unsupported')
-  if (!size || size > CHAT_FILE_MAX_BYTES) throw Error('tooLarge')
+  if (!size) return 'unreadable'
+  if (size > CHAT_FILE_MAX_BYTES) return 'tooLarge'
   return { key: key(), kind: 'file', name: asset.name, uri: asset.uri, mediaType: asset.mimeType ?? '', size, file: asset.file, state: 'uploading' }
 }
 interface UploadTicket { id: string; chunkSize?: number; nextPart?: number; uploadUrl?: string; headers?: Record<string, string>; uploaded?: boolean }

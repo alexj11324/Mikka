@@ -41,14 +41,14 @@ test('private ingress keeps authority, body, cookies and upgrades while replacin
   const origin = 'https://app.example'
   const request = new Request(origin + '/mikka/api/rpc', { method: 'POST', body: 'payload',
     headers: { authorization: 'Bearer fixture', cookie: 'fixture', 'cf-connecting-ip': '192.0.2.31',
-      forwarded: 'for=bad', 'x-forwarded-host': 'other.example', 'x-mikka-edge-ip': '192.0.2.99',
+      'x-mikka-eve-scope': 'forged', 'x-mikka-eve-binding-scope': 'forged', forwarded: 'for=bad', 'x-forwarded-host': 'other.example', 'x-mikka-edge-ip': '192.0.2.99',
       'cf-container-target-port': '9000', 'x-vercel-ip-city': 'bad', 'x-forwarded-for': '192.0.2.10' } })
   assert.equal(apiRequest(request, 'https://other.example'), null)
   const forwarded = apiRequest(request, origin)
   assert.equal(await forwarded.text(), 'payload')
   for (const [key, value] of Object.entries({ host: 'app.example', authorization: 'Bearer fixture', cookie: 'fixture',
     'x-forwarded-host': 'app.example', 'x-forwarded-proto': 'https', 'x-mikka-edge-ip': '192.0.2.31' })) assert.equal(forwarded.headers.get(key), value)
-  for (const key of ['forwarded', 'x-vercel-ip-city', 'x-forwarded-for', 'cf-container-target-port', 'cf-connecting-ip']) assert.equal(forwarded.headers.has(key), false)
+  for (const key of ['x-mikka-eve-scope', 'x-mikka-eve-binding-scope', 'forwarded', 'x-vercel-ip-city', 'x-forwarded-for', 'cf-container-target-port', 'cf-connecting-ip']) assert.equal(forwarded.headers.has(key), false)
   const upgrade = apiRequest(new Request(origin + '/mikka/api/stream', { headers: { upgrade: 'websocket' } }), origin)
   assert.equal(upgrade.headers.get('upgrade'), 'websocket')
   assert.equal(upgrade.headers.get('x-mikka-edge-ip'), null)

@@ -138,6 +138,9 @@ test('MCP waits use committed PG notifications; independent web observers still 
       await app.pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$2,$3,true,now(),now())', [owner, 'MCP reply fixture', `${owner}@example.invalid`])
       const identity = { owner, ...await seedCoordinator(owner) }
       await app.pool.query('INSERT INTO coordinator_sessions("userId","botId","leaseHolder","leaseUntil") VALUES ($1,$2,\'mcp-fixture-holder\',now()+interval \'10 minutes\') ON CONFLICT ("userId","botId") DO UPDATE SET "leaseHolder"=EXCLUDED."leaseHolder","leaseUntil"=EXCLUDED."leaseUntil"', [owner, identity.botId])
+      // Coordinator creation publishes its own list update. Complete that transaction's
+      // delivery before a test measures the effects of appending a reply.
+      await flush()
       chats.push(identity)
       return identity
     })

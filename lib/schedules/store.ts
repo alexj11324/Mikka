@@ -1,7 +1,7 @@
 import { isDeepStrictEqual } from 'node:util'
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
-import { commandSchema, definitionSchema, ScheduleError, type Actor, type Definition, type ScheduledRead } from './contract'
+import { commandSchema, definitionSchema, ScheduleError, SCHEDULE_PAGE_MAX, type Actor, type Definition, type ScheduledRead } from './contract'
 import { nextTime, timezone } from './time'
 import { botChatChanged } from '../live/chats'
 import { observePoolCommits } from '../db/commit-effects'
@@ -26,7 +26,8 @@ export const SCHEDULE_DUE_SQL=`SELECT min(next_at) AS at FROM user_schedules WHE
     UNION ALL SELECT min(next_retry_at) FROM schedule_occurrences WHERE status='pending'
     UNION ALL SELECT min(lease_until) FROM schedule_occurrences WHERE status='running'
     UNION ALL SELECT min(report_next_at) FROM schedule_occurrences WHERE status='failed' AND reported_at IS NULL
-    UNION ALL SELECT min("snoozedUntil") FROM inbox_snoozes`
+    UNION ALL SELECT min("snoozedUntil") FROM inbox_snoozes
+    UNION ALL SELECT min("snoozedUntil") FROM inbox_conversation_snoozes`
 export async function nextScheduleDue(executor:Pick<Pool,'query'>):Promise<number|null>{
   const {rows}=await executor.query<{at:string|null}>(`SELECT ceil(extract(epoch FROM min(at))*1000)::bigint::text AS at FROM (${SCHEDULE_DUE_SQL}) due`)
   return rows[0]?.at==null?null:Number(rows[0].at)
@@ -71,7 +72,24 @@ export class ScheduleStore {
     return this.workspace(actor.ownerId,actor.workspaceId,access=>this.transaction(async tx=>{
       await this.conversation(tx,actor)
       await this.safeMessage(tx,actor.ownerId,cmd)
-      if (cmd.action==='list') return { schedules:(await tx.query<Schedule>(`SELECT ${SCHEDULE_COLUMNS} FROM user_schedules WHERE workspace_id IS NOT DISTINCT FROM $1::uuid AND ((visibility='workspace' AND $1::uuid IS NOT NULL) OR (visibility='owner' AND owner_id=$2 AND bot_id IS NOT DISTINCT FROM $3::uuid)) ORDER BY created_at DESC LIMIT 100`,[actor.workspaceId,actor.ownerId,actor.botId])).rows }
+      if (cmd.action === 'list') {
+        const limit = cmd.limit ?? SCHEDULE_PAGE_MAX
+        const [at, id] = cmd.cursor?.split('/') ?? []
+        const { rows } = await tx.query<Schedule & { page_cursor: string }>(`
+          SELECT ${SCHEDULE_COLUMNS}, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') || '/' || id AS page_cursor
+          FROM user_schedules
+          WHERE workspace_id IS NOT DISTINCT FROM $1::uuid
+            AND ((visibility = 'workspace' AND $1::uuid IS NOT NULL)
+              OR (visibility = 'owner' AND owner_id = $2 AND bot_id IS NOT DISTINCT FROM $3::uuid))
+            AND ($4::timestamptz IS NULL OR (created_at, id) < ($4::timestamptz, $5::uuid))
+          ORDER BY created_at DESC, id DESC
+          LIMIT $6`, [actor.workspaceId, actor.ownerId, actor.botId, at ?? null, id ?? null, limit + 1])
+        const page = rows.slice(0, limit)
+        return {
+          schedules: page.map(({ page_cursor: _cursor, ...schedule }) => schedule),
+          nextCursor: rows.length > limit ? page[limit - 1]!.page_cursor : null,
+        }
+      }
       if (cmd.action==='create') {
         if (!actor.workspaceId) throw new ScheduleError('scheduleWorkspaceRequired',400)
         await this.source(tx,actor,actor.workspaceId)
@@ -107,8 +125,13 @@ export class ScheduleStore {
       else if(cmd.action==='cancel'){status='cancelled';next=null}
       else {if(status!=='paused')throw new ScheduleError('scheduleNotPaused');await this.permission(tx,row.owner_id,row.bot_id,def);next=nextTime(def,this.clock());status=next?'active':'completed'}
       const stale=await tx.query<Occurrence>(`UPDATE schedule_occurrences SET status='cancelled',error='scheduleChanged',lease_token=NULL,lease_until=NULL,finished_at=$2 WHERE schedule_id=$1 AND status IN ('pending','running') RETURNING *`,[row.id,this.clock()])
-      await this.lockChat(tx,row)
-      for(const item of stale.rows){await this.retireEvent(tx,item.event_id);await this.report(tx,row,item,'cancelled',null,'scheduleChanged')}
+      if (stale.rows.length) {
+        await this.lockChat(tx,row)
+        for (const item of stale.rows) {
+          await this.retireEvent(tx,item.event_id)
+          await this.report(tx,row,item,'cancelled',null,'scheduleChanged')
+        }
+      }
       return {schedule:(await tx.query<Schedule>(`UPDATE user_schedules SET definition=$2,status=$3,next_at=$4,version=version+1,updated_at=$5 WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,def,status,next,this.clock()])).rows[0]}
     }))
   }
@@ -127,10 +150,10 @@ export class ScheduleStore {
   })}
   private async lockChat(tx:PoolClient,row:Schedule){await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`bot-chat:${row.owner_id}:${row.bot_id??'coordinator'}`])}
   private async retireEvent(tx:PoolClient,id:string|null){if(id)await tx.query(`UPDATE coordinator_events SET "deliveredAt"=COALESCE("deliveredAt",$2),tier='background' WHERE id=$1`,[id,this.clock()])}
+  /** Called with the original chat locked through the occurrence's event and report writes. */
   private async report(tx:PoolClient,row:Schedule,o:Occurrence,status:string,result:unknown,error:string|null,streamId?:string){
     const message=scheduleChatMessage(o.definition.title,status,result)
     await this.safeMessage(tx,row.owner_id,message)
-    await this.lockChat(tx,row)
     const inserted = await tx.query(`INSERT INTO coordinator_messages(id,"userId","botId",position,message) SELECT $1,$2,$3,COALESCE(MAX(position),0)+1,$4 FROM coordinator_messages WHERE "userId"=$2 AND "botId" IS NOT DISTINCT FROM $3::uuid ON CONFLICT(id) DO NOTHING`,[o.operation_id,row.owner_id,row.bot_id,{...message,...(streamId?{mikkaStreamId:streamId}:{})}])
     if (inserted.rowCount) await botChatChanged(tx, row.owner_id, row.bot_id)
     if (inserted.rowCount) await coordinatorSessionChanged(tx, row.owner_id, row.bot_id)
@@ -148,7 +171,11 @@ export class ScheduleStore {
   async execute(claim:Occurrence){
     const row=(await this.pool.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1',[claim.schedule_id])).rows[0]
     if(!row)return
-    if(claim.status==='failed'){await this.transaction(async tx=>{await this.lockChat(tx,row);await this.retireEvent(tx,claim.event_id)});await this.publishFailedReport(claim);return}
+    if(claim.status==='failed'){
+      if (claim.event_id) await this.transaction(async tx=>{await this.lockChat(tx,row);await this.retireEvent(tx,claim.event_id)})
+      await this.publishFailedReport(claim)
+      return
+    }
     try{return await this.workspace(row.owner_id,row.workspace_id,()=>this.transaction(async tx=>{
       const current=(await tx.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1 FOR UPDATE',[row.id])).rows[0]
       const o=(await tx.query<Occurrence>(`SELECT * FROM schedule_occurrences WHERE id=$1 AND status='running' AND lease_token=$2 AND lease_until>$3 FOR UPDATE`,[claim.id,claim.lease_token,this.clock()])).rows[0]
@@ -181,7 +208,7 @@ export class ScheduleStore {
     const code=error instanceof ScheduleError?error.code:'scheduleExecutionUnavailable'
     const failed=await this.transaction(async tx=>{
       const row=(await tx.query<Occurrence>(`UPDATE schedule_occurrences SET status=CASE WHEN $3 OR attempts >= $4 THEN 'failed' ELSE 'pending' END,error=$5,next_retry_at=$6,finished_at=CASE WHEN $3 OR attempts >= $4 THEN $7::timestamptz ELSE NULL END,lease_token=NULL,lease_until=NULL,report_next_at=$7 WHERE id=$1 AND status='running' AND lease_token=$2 RETURNING *`,[claim.id,claim.lease_token,terminal,MAX_ATTEMPTS,code,new Date(this.clock().getTime()+30_000),this.clock()])).rows[0]
-      if(row){const schedule=(await tx.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1',[row.schedule_id])).rows[0];if(schedule)await this.lockChat(tx,schedule);await this.retireEvent(tx,row.event_id)}
+      if(row?.event_id){const schedule=(await tx.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1',[row.schedule_id])).rows[0];if(schedule)await this.lockChat(tx,schedule);await this.retireEvent(tx,row.event_id)}
       return row?.status==='failed'?row:null
     })
     if(failed)await this.publishFailedReport(failed)
@@ -193,7 +220,11 @@ export class ScheduleStore {
     try{await this.workspace(row.owner_id,row.workspace_id,()=>this.transaction(async tx=>{
       await tx.query('SELECT id FROM user_schedules WHERE id=$1 FOR UPDATE',[row.id])
       const current=(await tx.query<Occurrence>(`SELECT * FROM schedule_occurrences WHERE id=$1 AND status='failed' AND reported_at IS NULL AND report_next_at<=$2 FOR UPDATE SKIP LOCKED`,[o.id,now])).rows[0]
-      if(current){await this.conversation(tx,{ownerId:row.owner_id,workspaceId:row.workspace_id,botId:row.bot_id});await this.report(tx,row,current,'failed',null,current.error)}
+      if(current){
+        await this.conversation(tx,{ownerId:row.owner_id,workspaceId:row.workspace_id,botId:row.bot_id})
+        await this.lockChat(tx,row)
+        await this.report(tx,row,current,'failed',null,current.error)
+      }
     }))}catch{await this.pool.query(`UPDATE schedule_occurrences SET report_attempts=report_attempts+1,report_next_at=$2::timestamptz+LEAST(21600,60*power(2,LEAST(report_attempts,9)))*interval '1 second' WHERE id=$1 AND status='failed' AND reported_at IS NULL AND report_next_at<=$2`,[o.id,now])}
   }
   async flushFailedReports(limit=50){for(const row of(await this.pool.query<Occurrence>(`SELECT * FROM schedule_occurrences WHERE status='failed' AND reported_at IS NULL AND report_next_at<=$2 ORDER BY report_next_at,finished_at,id LIMIT $1`,[limit,this.clock()])).rows)await this.publishFailedReport(row)}

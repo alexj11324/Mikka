@@ -226,12 +226,16 @@ test('handoff shows the report counts and opens the acceptance Artifact', async 
   assert.deepEqual(navigated, [{ artifact: 'art-1' }])
 })
 
-test('a waiting question sends the person to the Bot chat (R-86)', async () => {
-  flow = specFlow({ stage: 'implement', stages: ['implement'], needsYou: { kind: 'question', since: '2026-11-05T00:00:00.000Z' } })
-  await render()
-  await act(async () => { button('去回答')!.click() })
-  assert.deepEqual(navigated, [{ section: 'coordinator', bot: 'bot-1', issue: null }])
-})
+for (const botId of ['bot-1', null]) {
+  test(`a waiting question opens the ${botId ? 'issuing Bot' : 'default Coordinator'} chat (R-86)`, async () => {
+    flow = specFlow({ botId, stage: 'implement', stages: ['implement'], needsYou: { kind: 'question', since: '2026-11-05T00:00:00.000Z' } })
+    await render()
+    const answer = button('去回答')
+    assert.ok(answer)
+    await act(async () => { answer.click() })
+    assert.deepEqual(navigated, [{ section: 'coordinator', bot: botId, issue: null }])
+  })
+}
 
 test('an older task keeps its acceptance row, not a flow block', async () => {
   detail = { task: { id: TASK, attemptId: 'a', route: {} } }

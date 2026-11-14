@@ -4,7 +4,7 @@ const previousBase = process.env.MIKKA_BASE_PATH
 process.env.MIKKA_BASE_PATH = '/mikka'
 const {
   driveFileURL, driveHeadKey, driveHistoryKey, driveVolumesKey, DriveRequestError,
-  readDriveVolumes, restoreDriveVersion, uploadDriveFiles,
+  readDriveFileHistory, readDriveVolumes, restoreDriveVersion, uploadDriveFiles,
 } = await import('./client')
 if (previousBase === undefined) delete process.env.MIKKA_BASE_PATH
 else process.env.MIKKA_BASE_PATH = previousBase
@@ -69,4 +69,16 @@ test('transport failures keep their cause and do not become an empty file listin
   const cause = new Error('synthetic transport')
   await assert.rejects(readDriveVolumes('workspace-a', undefined, async () => { throw cause }),
     (error: unknown) => error instanceof DriveRequestError && error.cause === cause)
+})
+
+test('the file history reader preserves literal path characters, cursor and workspace scope', async () => {
+  const path = 'notes/a & + #%.md'
+  const page = await readDriveFileHistory('workspace-a', 'folder', path, 'cursor', async (input, init) => {
+    const url = new URL(String(input), 'https://example.invalid')
+    assert.equal(url.pathname, '/mikka/api/drive/volumes/folder/versions')
+    assert.deepEqual(Object.fromEntries(url.searchParams), { workspaceId: 'workspace-a', path, before: 'cursor' })
+    assert.equal(init?.credentials, 'same-origin')
+    return Response.json({ versions: [], nextCursor: null })
+  })
+  assert.deepEqual(page, { versions: [], nextCursor: null })
 })

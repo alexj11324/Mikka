@@ -176,19 +176,20 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
     if (!claimed.rowCount) return true
     await groupChatChanged(client, conversationId)
     const authorized = async () => {
-      if (!await runtime.authorized(root.workspaceId, root.userId) || !await runtime.authorized(root.workspaceId, root.createdBy)) return false
+      if (!await runtime.authorized(root.workspaceId, root.userId)) return false
+      if (root.createdBy !== root.userId && !await runtime.authorized(root.workspaceId, root.createdBy)) return false
       const member = await client.query(`SELECT 1 FROM conversation_members WHERE "conversationId"=$1 AND "memberType"='user' AND "memberId"=$2 AND "leftAt" IS NULL`, [conversationId, root.userId])
       return Boolean(member.rowCount)
     }
-    if (!await authorized()) throw new Error('group_actor_no_longer_authorized')
-    const eligible = async () => {
-      if (!await authorized()) return []
+    const currentMembers = async () => {
       const members = (await client.query(`SELECT "memberType","memberId" FROM conversation_members WHERE "conversationId"=$1 AND "memberType" IN ('agent','bot') AND "leftAt" IS NULL ORDER BY "joinedAt","memberId"`, [conversationId])).rows
       const agents = await runtime.agents(root.createdBy, members.filter(m => m.memberType === 'agent').map(m => m.memberId), client)
       const bots = members.some(m => m.memberType === 'bot') && runtime.bots ? await runtime.bots(root.userId, root.workspaceId, members.filter(m => m.memberType === 'bot').map(m => m.memberId), client) : []
       return members.flatMap(m => { const actor = (m.memberType === 'bot' ? bots : agents).find(a => a.id === m.memberId); return actor ? [{ ...actor, ...(m.memberType === 'bot' ? { memberType: 'bot' as const } : {}) }] : [] })
     }
-    const members = await eligible()
+    const eligible = async () => await authorized() ? currentMembers() : []
+    if (!await authorized()) throw new Error('group_actor_no_longer_authorized')
+    const members = await currentMembers()
     const recent = await client.query(`SELECT id,"authorId" AS author,body AS text FROM conversation_messages m WHERE "conversationId"=$1 AND
       (position<$2 OR ("authorType" IN ('agent','bot') AND "replyToId" IN (SELECT id FROM conversation_messages WHERE "conversationId"=$1 AND position<$2))) ORDER BY position DESC LIMIT 10`, [conversationId, root.position])
     await initializeGroupDecisionTrace(client, messageId!, members, recent.rows.map(row => row.id).reverse())

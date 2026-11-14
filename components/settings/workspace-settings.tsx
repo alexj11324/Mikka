@@ -124,12 +124,12 @@ export function ReplayOnboarding() {
 function TransferWorkspaceDialog({ workspaceId, name, onClose, onDone, open = true, onOpenChangeComplete }: { workspaceId: string; name: string; onClose: () => void; onDone: (owner: string) => void } & PresenceProps) {
   const t = useTranslations('Settings.workspaceForm')
   const commonT = useTranslations('Common')
-  const { people, readError, reload, pending, error, transfer } = useTransferWorkspace(workspaceId)
+  const { people, canTransferTo, readError, reload, pending, error, transfer } = useTransferWorkspace(workspaceId)
   const [to, setTo] = useState<string | null>(null)
   const items = (people ?? []).map(person => ({ value: person.userId, label: person.name ? `${person.name} · ${person.email}` : person.email }))
 
   async function confirm() {
-    if (!to) return
+    if (!canTransferTo(to)) return
     const owner = await transfer(to)
     if (owner) onDone(owner)
   }
@@ -152,7 +152,7 @@ function TransferWorkspaceDialog({ workspaceId, name, onClose, onDone, open = tr
       </div>
       <DialogFooter>
         <Button type="button" variant="outline" disabled={pending} onClick={onClose}>{commonT('cancel')}</Button>
-        <Button type="button" disabled={pending || !to} onClick={() => void confirm()}>{pending ? t('transferring') : t('transfer')}</Button>
+        <Button type="button" disabled={pending || !canTransferTo(to)} onClick={() => void confirm()}>{pending ? t('transferring') : t('transfer')}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>
@@ -191,7 +191,7 @@ function DeleteWorkspaceDialog({ workspaceId, name, onClose, open = true, onOpen
       </div>
       <DialogFooter>
         <Button type="button" variant="outline" disabled={pending} onClick={onClose}>{commonT('cancel')}</Button>
-        <Button type="button" variant="destructive" disabled={pending || typed.trim() !== name} onClick={() => void confirm()}>{pending ? t('deleting') : t('deleteWorkspace')}</Button>
+        <Button type="button" variant="destructive" disabled={!counts || pending || typed.trim() !== name} onClick={() => void confirm()}>{pending ? t('deleting') : t('deleteWorkspace')}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

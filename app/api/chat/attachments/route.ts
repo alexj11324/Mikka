@@ -81,7 +81,7 @@ export async function POST(request: Request) {
           : 'unavailable'
     return Response.json(
       { error: code },
-      { status: code === 'notFound' ? 404 : code === 'tooLarge' ? 413 : 400, headers },
+      { status: code === 'notFound' ? 404 : code === 'tooLarge' ? 413 : code === 'unavailable' ? 503 : 400, headers },
     )
   }
 }

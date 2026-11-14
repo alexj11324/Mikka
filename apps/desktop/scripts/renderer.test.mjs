@@ -167,6 +167,35 @@ test('bootstrap only transports a workspace selector and uses server-proved cach
   assert.deepEqual(requests[2].args, [])
 }))
 
+test('an explicit workspace restores the server selection before returning its freshly authorized cache', () => browser(async () => {
+  const { readBootstrap } = await moduleFrom({ entry: 'bootstrap.ts' })
+  const id = 'bf0f49e9-60ef-42a2-9e46-519b6010d7ef'
+  const requests = []
+  let selected = false, allowed = true
+  globalThis.fetch = async (_path, init) => {
+    const request = JSON.parse(init.body)
+    requests.push([request.action, request.args])
+    if (request.action === 'workspace.switchWorkspace') {
+      selected = allowed
+      return Response.json({ version: 1, ok: true, result: allowed ? { ok: true } : { ok: false, error: 'Membership suspended' } })
+    }
+    return Response.json({ version: 1, ok: true, result: {
+      requestedWorkspaceSelected: selected, cacheWorkspace: allowed ? { workspaceId: id, role: selected ? 'member' : 'admin' } : null,
+    } })
+  }
+  assert.deepEqual((await readBootstrap(id)).cacheWorkspace, { workspaceId: id, role: 'member' })
+  assert.deepEqual(requests, [['desktop.bootstrap', [id]], ['workspace.switchWorkspace', [id]], ['desktop.bootstrap', [id]]])
+  requests.length = 0
+  await readBootstrap(id)
+  assert.deepEqual(requests, [['desktop.bootstrap', [id]]], 'ordinary same-scope navigation needs just one read')
+  allowed = false
+  assert.equal((await readBootstrap(id)).workspaceError, true, 'a revoked current scope cannot mount')
+  selected = false
+  const denied = await readBootstrap(id)
+  assert.equal(denied.cacheWorkspace, null)
+  assert.equal(denied.workspaceError, 'Membership suspended')
+}))
+
 test('a pinned expired Web installation can reopen its own sign-in control while an actual outage stays unavailable', () => browser(async () => {
   const { readBootstrap, readAuthentication } = await moduleFrom({ entry: 'bootstrap.ts' })
   let configuration = () => Response.json({ error: 'web_auth_session_expired' }, { status: 401 })
@@ -304,6 +333,17 @@ test('viewer HTTP seam retains shared response errors and routes ordinary reques
   const { computerRequest } = await moduleFrom({ entry: 'computer-request.ts', plugins: [applicationBoundary(new Map())] })
   await assert.rejects(computerRequest('/api/bots/bot-id/computer/viewer', { method: 'POST', json: { mode: 'view' } }), error => error.status === 403 && error.body.error === 'computer_not_available')
   assert.deepEqual(calls[0], { botId: 'bot-id', mode: 'view' })
+  // Invalid percent escapes are untrusted route values: preserve the shared
+  // typed 400 response without calling the privileged local viewer bridge.
+  for (const malformed of ['%', '%FF', '%E0%A4%A']) {
+    for (const endpoint of ['viewer', 'takeover']) {
+      await assert.rejects(
+        computerRequest(`/api/bots/${malformed}/computer/${endpoint}`, { method: 'POST', json: { mode: 'view' } }),
+        error => error.status === 400 && error.body?.error === 'invalid_request' && error.cause instanceof URIError,
+      )
+    }
+  }
+  assert.equal(calls.length, 1, 'malformed bot IDs cannot reach the viewer IPC')
   assert.deepEqual(await computerRequest('/api/bots/bot-id/computer'), { machine: 'sleeping' })
   assert.equal(calls[1].path, '/mikka/api/bots/bot-id/computer')
 }))

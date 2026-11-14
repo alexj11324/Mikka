@@ -6,9 +6,10 @@ import { ClientError } from 'eve/client'
 import type { UseEveAgentReturn } from 'eve/react'
 
 let owner = 'owner-a'
+let sessionReads = 0
 mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) => key } })
 mock.module(new URL('../lib/auth-client.ts', import.meta.url).href, { namedExports: { authClient: {
-  getSession: async () => ({ data: { user: { id: owner } }, error: null }),
+  getSession: async () => { sessionReads++; return { data: { user: { id: owner } }, error: null } },
 } } })
 const receiptKeys: string[] = []
 let returnReceipt = true
@@ -105,5 +106,29 @@ test('confirming a hosted Project scope retries the same submission ID', async (
     assert.deepEqual(await hook.submit('Do work', context), { kind: 'rejected', error: 'accessChangeConfirmationRequired' })
     assert.equal((await hook.submit('Do work', { ...context, confirmTaskAccess: true })).kind, 'accepted')
     assert.deepEqual(sent, [{ id: sent[0].id, approved: false }, { id: sent[0].id, approved: true }])
+  } finally { await act(async () => root.unmount()) }
+})
+
+test('an ordinary chat sends its captured owner to Eve without fetching a second account snapshot', async () => {
+  const scopes: string[] = []
+  const agent = { send: async (_text: string, options: { clientContext: { expectedOwnerId: string } }) => {
+    scopes.push(options.clientContext.expectedOwnerId)
+    if (options.clientContext.expectedOwnerId && options.clientContext.expectedOwnerId !== owner) {
+      throw new ClientError(500, 'onMessage handler failed')
+    }
+  } } as unknown as Pick<UseEveAgentReturn, 'send'>
+  const root = createRoot(browser.document.createElement('div') as unknown as HTMLDivElement)
+  let hook!: ReturnType<typeof useCoordinatorSubmit>
+  function Probe() { hook = useCoordinatorSubmit(agent); return null }
+  try {
+    await act(async () => root.render(<Probe />))
+    const before = sessionReads
+    assert.equal((await hook.submit('Message', { expectedOwnerId: owner })).kind, 'accepted')
+    assert.deepEqual(scopes, [owner])
+    assert.equal(sessionReads, before)
+    assert.equal((await hook.submit('Another message')).kind, 'accepted')
+    assert.equal(sessionReads, before + 1)
+    assert.deepEqual(await hook.submit('Changed account', { expectedOwnerId: 'signed-out-owner' }), { kind: 'authRequired' })
+    assert.equal(sessionReads, before + 2)
   } finally { await act(async () => root.unmount()) }
 })

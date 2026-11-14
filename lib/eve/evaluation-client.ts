@@ -1,7 +1,8 @@
 import {Client,type ClientSession,type SessionStreamEvent} from 'eve/client'
 import type {Delivery} from 'eve/sessions'
+import {delivery as readDelivery, emptySessionView, foldEvents, parts, reply as turnReply, turn} from 'eve/events'
 import {z} from 'zod'
-import {internalEveAuthorization} from './auth'
+import {internalEveHeaders} from './auth'
 import {eveInternalOrigin} from './server-client'
 import type {EveScope} from './scope'
 import type {EvaluationPlan} from './evaluation-store'
@@ -15,11 +16,17 @@ export const evaluationReplySchema=z.strictObject({text:z.string().max(16000),ou
 export async function evaluationDeliveryTrace(delivery:Delivery,plan:EvaluationPlan,signal:AbortSignal):Promise<EvalTrace> {
   const events:SessionStreamEvent[]=[]
   for await(const event of delivery.stream({signal}))events.push(event)
-  const result=await delivery.result({signal})
   signal.throwIfAborted()
-  const settled=events.find(event=>event.type==='turn.settled')
-  if(result.status!=='completed'||settled?.data.outcome!=='completed')throw new Error('agentEvaluationGenerationFailed')
-  const reply=evaluationReplySchema.parse(result.data??JSON.parse(result.reply??''))
+  const view = foldEvents(emptySessionView(), events)
+  const receipt = readDelivery(view, delivery.deliveryId)
+  if (receipt?.outcome !== 'handled' || !receipt.turnId || turn(view, receipt.turnId)?.outcome !== 'completed') {
+    throw new Error('agentEvaluationGenerationFailed')
+  }
+  const replyParts = turnReply(view, receipt.turnId)
+  const structured = replyParts.filter(part => part.kind === 'result').at(-1)
+    ?? parts(view, { turnId: receipt.turnId, kind: 'result' }).at(-1)
+  const text = replyParts.filter(part => part.kind === 'text' && typeof part.value === 'string').map(part => part.value).join('\n')
+  const reply = evaluationReplySchema.parse(structured?.value ?? JSON.parse(text))
   const tools:ToolObservation[]=[]
   for(const event of events) {
     if(event.type!=='call.requested')continue
@@ -41,20 +48,19 @@ export async function evaluationDeliveryTrace(delivery:Delivery,plan:EvaluationP
  * completes before the terminal commit; there is no timer/polling loop. */
 async function endEvaluationSession(session:ClientSession) {
   const signal=AbortSignal.timeout(30000)
-  const end=await session.end({reason:'Agent Kit evaluation complete',signal})
-  await end.result({signal}).catch(()=>{})
-  const snapshot=await session.snapshot({signal})
-  if(!snapshot.events.some(event=>event.type==='session.ended')) {
-    for await(const event of session.stream({startIndex:snapshot.session.streamIndex,signal}))if(event.type==='session.ended')break
+  await session.end({reason:'Agent Kit evaluation complete',signal})
+  for await (const event of session.stream({startIndex:0,signal})) {
+    if (event.type === 'session.ended') return
   }
-  if(!(await session.snapshot({signal})).events.some(event=>event.type==='session.ended'))throw new Error('agentEvaluationGenerationFailed')
+  signal.throwIfAborted()
+  throw new Error('agentEvaluationGenerationFailed')
 }
 
 /** Public Client owns sends, streaming, settlement, cancellation and teardown. */
 export async function runEveEvaluation(scope:EveScope,bindingId:string,plan:EvaluationPlan,signal:AbortSignal) {
   const base=new URL(eveInternalOrigin())
   base.pathname=base.pathname.replace(/\/$/,'')+'/mikka/evaluations'
-  const client=new Client({baseUrl:base.toString(),headers:()=>({authorization:internalEveAuthorization(scope),'x-mikka-evaluation-id':bindingId})})
+  const client=new Client({baseUrl:base.toString(),headers:()=>({...internalEveHeaders(scope),'x-mikka-evaluation-id':bindingId})})
   let session:ClientSession|undefined,trace:EvalTrace|undefined,failure:{error:unknown}|undefined
   try {
     session=(await client.sessions.create({signal})).session

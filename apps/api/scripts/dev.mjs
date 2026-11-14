@@ -33,7 +33,9 @@ export function developmentOptions(args = [], env = process.env) {
   return { port: Number(port), host, allowStaleRoutes, origin: `http://${browserHost}:${Number(port)}` }
 }
 
-export function developmentTracing(nitro, tracing) {
+export function configureDevelopmentWorker(nitro, tracing) {
+  // Nitro keeps the old worker until its admitted HTTP exchanges finish.
+  nitro.options.devServer.drain = true
   const config = nitro.options.rolldownConfig ?? {}
   nitro.options.rolldownConfig = {
     ...config,
@@ -236,7 +238,7 @@ export async function startDevelopment({ args = [], root = repository, log = con
     // Config merging appends arrays; explicitly remove production public assets
     // so a clean development checkout needs no previous frontend build.
     nitro.options.publicAssets = []
-    developmentTracing(nitro, await compileTracing(root))
+    configureDevelopmentWorker(nitro, await compileTracing(root))
     const api = createDevServer(nitro)
     workerReady = developmentWorkerReady(api)
     const compiled = Promise.withResolvers()
@@ -298,6 +300,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     development = await startDevelopment({ args: process.argv.slice(2) })
     if (stopping) await development.close()
+    else if (process.send) process.send({ type: 'api-ready', origin: development.origin })
   } catch (error) {
     // A stale route manifest is a condition the developer can fix, and the
     // refusal text is the whole value of stopping: print it as written rather
