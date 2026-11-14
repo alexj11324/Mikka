@@ -45,3 +45,51 @@ test('parking a native writer prunes archives once, after persisting its stop an
   assert.equal(result.state, 'stopped')
   assert.deepEqual(events, ['quiesce', 'backup', 'destroy', 'release', 'prune'])
 })
+
+test('an uncommitted first checkpoint is reclaimed without removing a committed checkpoint or other files', async () => {
+  const hooks = registerHooks({ resolve(specifier, context, next) {
+    if (specifier === '@cloudflare/sandbox') return {
+      shortCircuit: true, url: 'data:text/javascript,export class DirectoryBackup {}',
+    }
+    return next(specifier, context)
+  } })
+  let TaskWorkspace
+  try { ({ TaskWorkspace } = await import('./workspace.mjs')) } finally { hooks.deregister() }
+
+  const prefix = 'task-workspaces/v1/this-task/'
+  const id = randomUUID()
+  const orphan = prefix + id + '.tar.zst'
+  const otherTask = 'task-workspaces/v1/other-task/' + id + '.tar.zst'
+  const note = prefix + 'other-format'
+  const objects = new Set([otherTask, note])
+  let manifest
+  const workspace = Object.assign(Object.create(TaskWorkspace.prototype), {
+    prefix,
+    storage: {
+      get() { return manifest },
+      put() { throw Error('manifest write interrupted') },
+    },
+    backups: { async backup() {
+      objects.add(orphan)
+      return { id, size: 3, sha256: 'a'.repeat(64) }
+    } },
+    bucket: {
+      async list({ prefix }) {
+        return { objects: [...objects].filter(key => key.startsWith(prefix)).map(key => ({ key })), truncated: false }
+      },
+      async delete(keys) { for (const key of keys) objects.delete(key) },
+    },
+  })
+  await assert.rejects(workspace.checkpoint(), /manifest write interrupted/)
+  assert.equal(await workspace.restore(), false)
+  await workspace.prune()
+  assert.deepEqual(objects, new Set([otherTask, note]))
+
+  manifest = { id: randomUUID(), size: 3, sha256: 'b'.repeat(64) }
+  const committed = prefix + manifest.id + '.tar.zst'
+  objects.add(committed)
+  objects.add(orphan)
+  await workspace.prune()
+  await workspace.prune()
+  assert.deepEqual(objects, new Set([otherTask, note, committed]))
+})
