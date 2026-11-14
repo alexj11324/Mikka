@@ -41,6 +41,11 @@ export type IssueLabel = z.infer<typeof labelSchema>
 export type IssuePullRequest = z.infer<typeof pullRequestSchema>
 export type IssueDelegate = z.infer<typeof delegateSchema>
 
+/** A named member owns the task when assigned; otherwise its admitted delegate provides the human-facing work owner. */
+export function taskWorkOwner(metadata: Pick<IssueMetadata, 'assignee' | 'delegate'>) {
+  return metadata.assignee ?? metadata.delegate
+}
+
 export const labelKey = (label: IssueLabel) => label.name.toLowerCase()
 export const githubPullRequestKey = (url: string) => url.toLowerCase().replace(/\/$/, '')
 export const pullRequestKey = (pr: IssuePullRequest) => pr.url.replace(/\/$/, '')

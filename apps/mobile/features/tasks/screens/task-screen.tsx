@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { CalendarClock, ChevronRight, Sparkles } from 'lucide-react-native'
+import { CalendarClock, ChevronRight, Sparkles, UserRound } from 'lucide-react-native'
 import { BotAvatar, MachineIcon, Spinner } from '@/components/icons'
 import { TaskDescription } from '../components/task-description'
 import { NavBar, underBar } from '@/components/NavBar'
@@ -88,6 +88,8 @@ export function TaskScreen() {
               <Chip icon={<TaskStateIcon state={shown?.state ?? null} status={task.status} size={15} />}
                 label={shown?.reason ?? (shown?.state === 'waiting' ? mobileMessages.MobileCore.groups.pending : shown?.state ? STATE_LABEL[shown.state] : BOARD_LABEL[task.status] ?? task.status)} />
               <Chip icon={<PriorityIcon priority={task.priority} size={15} />} label={mobileMessages.MobileCore.priority.replace('{priority}', priorityLabel(task.priority))} />
+              {task.workOwner ? <Chip icon={task.workOwner.kind === 'member' ? <UserRound size={14} color={colors.secondary} /> : <Sparkles size={14} color={colors.secondary} />}
+                label={mobileMessages.Metadata.assignee.aria.replace('{name}', task.workOwner.name)} /> : null}
               {task.bot ? <Chip icon={<BotAvatar id={task.bot.id} color={task.bot.color} shape={task.bot.shape} size={16} />} label={task.bot.name} /> : null}
               {task.agent ? <Chip icon={<Sparkles size={14} color={colors.secondary} strokeWidth={2} />} label={[HARNESS[task.agent.harness] ?? task.agent.harness, task.agent.model].filter(Boolean).join(' · ')} /> : null}
               {task.place ? <Chip icon={<MachineIcon machine={task.place.kind} size={15} />} label={task.place.name} /> : null}

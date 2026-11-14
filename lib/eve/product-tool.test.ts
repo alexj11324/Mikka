@@ -130,9 +130,9 @@ test('actual native approval and execution bind the existing app contract only w
   assert.deepEqual(requests.map(request => request.operation), ['execute', 'approval', 'execute'])
   const aborted = new AbortController()
   aborted.abort()
-  await assert.rejects(resumed.execute!(input as never, { ...context, abortSignal: aborted.signal } as never), { name: 'AbortError' })
+  await assert.rejects(async () => resumed.execute!(input as never, { ...context, abortSignal: aborted.signal } as never), { name: 'AbortError' })
   assert.equal(allocations.length, 3)
   closed = true
-  await assert.rejects(resumed.execute!(input as never, context as never), /agentExecutionClosed/)
+  await assert.rejects(async () => resumed.execute!(input as never, context as never), /agentExecutionClosed/)
   assert.equal(requests.length, 3)
 })

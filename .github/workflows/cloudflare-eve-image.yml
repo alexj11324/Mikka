@@ -72,6 +72,30 @@ jobs:
           skip-electron: 'true'
       - name: Bind the existing release format
         run: echo "MIKKA_DEPLOYMENT_ID=$(node lib/deployment-id.mjs)" >> "$GITHUB_ENV"
+      # The business API publisher consumes this existing World artifact.
+      - name: Bundle the private World authority from the locked public source
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          set -euo pipefail
+          world="$RUNNER_TEMP/eve-world"
+          pnpm exec wrangler deploy --dry-run --config packages/eve-cloudflare-world/wrangler.jsonc --outdir "$world"
+          artifact="$RUNNER_TEMP/eve-world-artifact"
+          mkdir -p "$artifact/modules"
+          cp -a "$world/." "$artifact/modules/"
+          rm -f "$artifact/modules/README.md"
+          cd "$artifact"
+          find modules -type f -print -quit | grep -q .
+          git -C "$GITHUB_WORKSPACE" rev-parse HEAD > source.txt
+          find modules -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS
+          sha256sum source.txt >> SHA256SUMS
+          sha256sum --check --status SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: eve-world-authority-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/eve-world-artifact/
+          if-no-files-found: error
+          retention-days: 1
       - name: Compile the official Eve runtime and shared product resources offline
         run: bash scripts/build-cloudflare-eve-image.sh
       - name: Build the portable Node 24 image
@@ -137,6 +161,30 @@ jobs:
         run: |
           test "$MIKKA_RUNTIME_RELEASE" = "$MAINTENANCE_OWNER_RELEASE"
           test "$RUNTIME_IMAGE_TAG" = "$MIKKA_DEPLOYMENT_ID-maintenance-$MAINTENANCE_OWNER_RELEASE"
+      # The business API publisher consumes this existing World artifact.
+      - name: Bundle the private World authority from the locked public source
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          set -euo pipefail
+          world="$RUNNER_TEMP/eve-world"
+          pnpm exec wrangler deploy --dry-run --config packages/eve-cloudflare-world/wrangler.jsonc --outdir "$world"
+          artifact="$RUNNER_TEMP/eve-world-artifact"
+          mkdir -p "$artifact/modules"
+          cp -a "$world/." "$artifact/modules/"
+          rm -f "$artifact/modules/README.md"
+          cd "$artifact"
+          find modules -type f -print -quit | grep -q .
+          git -C "$GITHUB_WORKSPACE" rev-parse HEAD > source.txt
+          find modules -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS
+          sha256sum source.txt >> SHA256SUMS
+          sha256sum --check --status SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: eve-world-authority-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/eve-world-artifact/
+          if-no-files-found: error
+          retention-days: 1
       - name: Compile the official Eve runtime and shared product resources offline
         run: bash scripts/build-cloudflare-eve-image.sh --prebuilt-api
       - name: Build the portable Node 24 image

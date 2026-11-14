@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const bot = directoryInput.shape.botId.unwrap().safeParse(params.get('botId'))
     if (!bot.success) return json({ error: 'invalidInput' }, 422)
     const groups = await conversationSidebar(pool, user, workspaceId, bot.data)
-    return json({ workspaceId, botId: bot.data, ...(groups[bot.data] ?? { items: [], more: false }) })
+    return json({ workspaceId, botId: bot.data, ...(groups[bot.data] ?? { items: [], more: false, unreadCount: 0 }) })
   }
   const pinned = params.get('pinned')
   const archived = params.get('archived')

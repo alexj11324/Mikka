@@ -128,6 +128,26 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     (select coalesce(jsonb_agg(jsonb_build_array(id,"workspaceId","issueId","runId") order by id),'[]') from artifacts where "userId"=$1) as artifacts,
     (select coalesce(jsonb_agg(jsonb_build_array(id,workspace_id,status,next_at) order by id),'[]') from user_schedules where owner_id=$1) as schedules`, [owner])).rows[0]
 
+  await t.test('an authorized task owner label follows its member or admitted Agent, with no private run access for the teammate', async () => {
+    const task = await workspaceTask()
+    const delegate = { kind: 'agent', id: randomUUID(), name: 'Builder', image: null }
+    const member = { kind: 'member', id: owner, name: 'Task owner', image: null }
+    async function setOwner(assignee: typeof member | null) {
+      const content = { type: 'doc', attrs: { mikka: { delegate, assignee } } }
+      await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [task, JSON.stringify(content)])
+    }
+    try {
+      await setOwner(null)
+      assert.deepEqual((await (await request(task)).json()).task.workOwner, { kind: 'agent', name: 'Builder' })
+      assert.deepEqual((await (await request(task, { bearer: peer.token, workspaceId: teamWorkspace.id })).json()).task.workOwner, { kind: 'agent', name: 'Builder' })
+      assert.equal((await request(task, { bearer: peer.token, workspaceId: secondWorkspace.id })).status, 404)
+      await setOwner(member)
+      assert.deepEqual((await (await request(task)).json()).task.workOwner, { kind: 'member', name: 'Task owner' })
+    } finally {
+      await pool.query('DELETE FROM issues WHERE id=$1', [task])
+    }
+  })
+
   await t.test('the versioned work request returns task state, readable PRs and chat links in one owner-authorized detail', async () => {
     const load = (options?: ReadOptions) => run('/api/mobile/tasks/' + issueId + '?work=1', req => GET(req, { params: Promise.resolve({ id: issueId }) }), options)
     const child = await workspaceTask()
@@ -219,14 +239,28 @@ test('mobile task endpoints with real task ACL, current workspace membership and
       view: 'botChildren', workspaceId: teamWorkspace.id, botId: id,
     }), directory, { workspaceId: teamWorkspace.id, ...options })
     try {
+      const { changeThreadRead } = await import('../lib/thread-reads')
+      // Eleven marked roots include one archived row and several outside the visible eight.
+      for (const runId of ids.slice(0, 11)) {
+        assert.equal(await changeThreadRead(owner, teamWorkspace.id, { action: 'unread', runId }), true)
+      }
       const response = await read()
       assert.equal(response.status, 200)
       const group = await response.json()
+      assert.equal(group.unreadCount, 10)
+      const { GET: home } = await import('../app/api/mobile/home/route')
+      const homeResponse = await run('/api/mobile/home', home, { workspaceId: teamWorkspace.id })
+      assert.equal(homeResponse.status, 200)
+      const homeData = await homeResponse.json()
+      assert.equal(homeData.workspace.id, teamWorkspace.id)
+      assert.equal(homeData.bots.find((entry: { id: string }) => entry.id === childBot)?.unreadCount, 10)
       assert.equal(group.workspaceId, teamWorkspace.id)
       assert.equal(group.botId, childBot)
       assert.equal(group.more, true)
       assert.deepEqual(group.items.map((row: { id: string }) => row.id), [47, 6, 2, 1, 3, 4, 5, 7].map(index => ids[index]))
-      assert.deepEqual((await (await read({ bearer: peer.token })).json()).items, [])
+      const memberGroup = await (await read({ bearer: peer.token })).json()
+      assert.deepEqual(memberGroup.items, [])
+      assert.equal(memberGroup.unreadCount, 0)
       assert.deepEqual((await (await read({}, secondBot)).json()).items, [])
       assert.equal((await read({ workspaceId: secondWorkspace.id })).status, 403)
       assert.equal((await read({ bearer: null })).status, 401)
@@ -234,6 +268,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
       await pool.query('UPDATE agent_runs SET "conversationArchivedAt"=now() WHERE id=ANY($1::uuid[])', [ids.slice(3)])
       const remainder = await (await read()).json()
       assert.equal(remainder.more, false)
+      assert.equal(remainder.unreadCount, 2)
       assert.deepEqual(remainder.items.map((row: { id: string }) => row.id), [ids[2], ids[1]])
     } finally {
       await pool.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[])', [ids])
@@ -736,7 +771,8 @@ test('mobile task endpoints with real task ACL, current workspace membership and
       const waitBlockedBy = async () => {
         for (let attempt = 0; attempt < 300; attempt++) {
           const { rows } = await pool.query<{ query: string }>(`select query from pg_stat_activity
-            where datname=current_database() and $1::int=any(pg_blocking_pids(pid))`, [pid])
+            where datname=current_database() and state='active' and wait_event_type='Lock'
+              and query ilike '%mikka_workspace_members%for share%' and $1::int=any(pg_blocking_pids(pid))`, [pid])
           if (rows.length) return rows[0]
           await new Promise(resolve => setTimeout(resolve, 10))
         }

@@ -1,4 +1,3 @@
-import { measured } from '../../tests/helpers/read-metrics'
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'

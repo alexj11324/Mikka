@@ -11,7 +11,7 @@ import { withIssueWorkspace } from '@/lib/issue-scope-authorization'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { enterprisePrincipal } from '@/lib/enterprise/principal'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
-import { githubPullRequestKey, readIssueMetadata } from '@/lib/issue-metadata'
+import { githubPullRequestKey, readIssueMetadata, taskWorkOwner } from '@/lib/issue-metadata'
 import { taskRelationKinds } from './issue-relations'
 import { taskPullConversations } from './task-work-pulls'
 import { displayTaskTitle } from '@/lib/short-title'
@@ -83,6 +83,7 @@ async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: s
   const issue = await issueForUser(user, id)
   if (!issue || issue.ownershipState !== 'bound' || issue.workspaceId !== workspaceId) return null
   const metadata = readIssueMetadata(issue.content)
+  const owner = taskWorkOwner(metadata)
   const blockerIds = metadata.blockedByIds ?? []
   const visibleBlockers = blockerIds.length ? await issueVisibility(user, false, workspaceId, db, { onlyIssueIds: blockerIds }) : null
   const [identifiers, runs, [decoration], versions, [document], labels, blockers] = await Promise.all([
@@ -135,6 +136,7 @@ async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: s
   return {
     task: {
       id, identifier: identifiers.get(id) ?? null, title: displayTaskTitle({ ...issue, shortTitle: issue.shortTitleFrom === issue.title ? issue.shortTitle : null }), description: issueContentToMarkdown(issue.content).trim() || null,
+      workOwner: owner ? { kind: owner.kind, name: owner.name } : null,
       status: issue.status, priority: issue.priority, ...taskStateOf(task, newest, { block, schedule }), bot: newest?.bot ?? null,
       replyRunId: latestConversationRun(runs),
       agent: newest ? { harness: newest.harness, model: newest.model } : null, place, schedule,

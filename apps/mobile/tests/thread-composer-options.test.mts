@@ -54,6 +54,18 @@ test('the native composer selects a funded continuation, inserts the authorized 
     await act(async () => render(standalone))
     assert.equal(host.querySelector('#choose'), null)
     assert.ok(host.textContent?.includes('served-model'))
+    // A standalone conversation has no authorized repository binding. A source
+    // mention stays literal, and never enters the task/PR directory endpoint.
+    for (const value of ['@file:src/private.ts', '@folder:src/private']) {
+      const input = host.querySelector('input')!
+      const before = requests.length
+      await act(async () => { input.value = value; input.selectionEnd = value.length; input.dispatchEvent(new browser.Event('input', { bubbles: true }) as never) })
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 220)) })
+      assert.ok(host.textContent?.includes(mobileMessages.ThreadReferences.sourceUnavailable))
+      assert.equal(requests.length, before)
+      assert.equal(input.value, value)
+      assert.ok(!host.textContent?.includes('Saved task'))
+    }
   } finally { await act(async () => root.unmount()); host.remove(); await browser.happyDOM.close() }
 })
 
