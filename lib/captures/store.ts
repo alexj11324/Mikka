@@ -175,17 +175,20 @@ export async function completeUpload(owner: CaptureOwner, captureId: string): Pr
 
 async function writableCompleteUpload(owner: CaptureOwner, captureId: string): Promise<CaptureView | CaptureError> {
   // A lost success response is safe to retry for the original upload window.
-  const readyUpload = async () => (await db.select().from(runCaptures).where(and(
-    eq(runCaptures.id, captureId), eq(runCaptures.runId, owner.runId), eq(runCaptures.userId, owner.userId),
-    eq(runCaptures.source, 'local'), eq(runCaptures.status, 'ready'), sql`${runCaptures.expiresAt} > now()`,
-  )).limit(1))[0]
-  const completed = await readyUpload()
-  if (completed) return captureView(completed)
-  const row = await openUpload(owner, captureId)
-  if (!row || !row.storageKey) {
-    const winner = await readyUpload()
-    return winner ? captureView(winner) : { error: 'not_found', message: 'No open upload with that id for this run.' }
+  const ownedUpload = and(eq(runCaptures.id, captureId), eq(runCaptures.runId, owner.runId),
+    eq(runCaptures.userId, owner.userId), eq(runCaptures.source, 'local'))
+  const unexpired = sql`${runCaptures.expiresAt} > now()`
+  const [row] = await db.select().from(runCaptures).where(and(ownedUpload, unexpired,
+    inArray(runCaptures.status, ['uploading', 'ready']))).limit(1)
+  if (row?.status === 'ready') return captureView(row)
+  if (!row?.storageKey || !row.expiresAt || row.expiresAt.getTime() <= Date.now()) {
+    return { error: 'not_found', message: 'No open upload with that id for this run.' }
   }
+
+  // Only a lost conditional update needs a fresh read of the other writer's result.
+  const readyUpload = async () => (await db.select().from(runCaptures).where(and(
+    ownedUpload, unexpired, eq(runCaptures.status, 'ready'),
+  )).limit(1))[0]
   const storage = artifactStorage()
   let bytes = row.inlineContent ? new Uint8Array(row.inlineContent) : null
   if (!bytes && storage === 'r2') {
