@@ -3,17 +3,26 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { seedFixtureWorkspace } from './helpers/task-workspace'
-import { mentionAt, personReferenceParts, referenceMarker } from '../lib/thread-references'
+import { mentionAt, personReferenceParts, referenceMarker, sourceMentionAt } from '../lib/thread-references'
 
 test('an inline mention replaces only the active word at the caret and keeps unrelated human text literal', () => {
   const text = 'Please see @thread:checkout and the log'
   assert.deepEqual(mentionAt(text, text.indexOf(' and')), { from: 11, end: 27, kind: 'thread', query: 'checkout' })
   assert.equal(mentionAt('mail@example', 12), null)
+  for (const query of ['@file', 'See @folder:', 'See @FILE:src/index.ts']) {
+    assert.equal(sourceMentionAt(query, query.length), true)
+    assert.equal(mentionAt(query, query.length), null)
+  }
+  assert.equal(sourceMentionAt('See @file:src/a.ts later', 24), false)
+  assert.equal(mentionAt('@filename', 9)?.query, 'filename')
   const id = randomUUID()
   const marker = referenceMarker({ kind: 'thread', id, title: 'Checkout' })
   assert.deepEqual(personReferenceParts(`ref ${marker} ${id}`), [
     { kind: 'text', text: 'ref ' }, { kind: 'thread', id }, { kind: 'text', text: ' ' }, { kind: 'text', text: id },
   ])
+  const chat = referenceMarker({ kind: 'thread', conversationKind: 'chat', id, title: 'Independent chat' })
+  assert.equal(chat, `[[chat:${id}]]`)
+  assert.deepEqual(personReferenceParts(`${chat} ${marker}`), [{ kind: 'chat', id }, { kind: 'text', text: ' ' }, { kind: 'thread', id }])
   assert.deepEqual(personReferenceParts('https://github.com/org/repo/pull/2'), [{ kind: 'pr', id: 'https://github.com/org/repo/pull/2' }])
   assert.equal(personReferenceParts('https://github.com.example/org/repo/pull/2')[0].kind, 'text')
 })
@@ -35,6 +44,9 @@ test('reference search scopes tasks, conversation roots, and PRs to the active v
     const items = await searchThreadReferences(owner, workspace, 'checkout')
     assert.deepEqual(items.map(item => [item.kind, item.id]), [['task', issue], ['thread', run], ['pr', url]])
     assert.deepEqual((await searchThreadReferences(owner, workspace, '#2259', 'pr')).map(item => item.id), [url])
+    const { tokenWorkspace } = await import('../lib/tokens/principal')
+    assert.deepEqual(await searchThreadReferences({ id: owner, [tokenWorkspace]: workspace }, workspace, 'checkout'), items)
+    await assert.rejects(searchThreadReferences({ id: owner, [tokenWorkspace]: foreign }, workspace, 'checkout'), { code: 'workspaceAccessDenied' })
     assert.deepEqual(await searchThreadReferences(other, foreign, 'checkout'), [])
     await assert.rejects(searchThreadReferences(other, workspace, 'checkout'))
     await pool.query(`UPDATE issues SET content=jsonb_set(content,'{attrs,mikka,deletedAt}',to_jsonb(now())) WHERE id=$1`, [issue])

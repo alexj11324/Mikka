@@ -2,8 +2,10 @@ import { DESKTOP_RPC_VERSION } from '../../../lib/desktop-rpc/wire'
 import type { ChatSubmission } from '../../../lib/hooks/chat-delivery-state'
 import type { mentionsIn } from './group'
 
+import { threadModelKey, type ThreadModelChoice } from '../../../lib/thread-model-choice'
+
 type GroupTarget = { kind: 'group'; id: string }
-type ThreadTarget = { kind: 'thread'; id: string; issueId: string | null }
+type ThreadTarget = { kind: 'thread'; id: string; issueId: string | null; modelChoice?: ThreadModelChoice }
 export type ConversationTarget = GroupTarget | ThreadTarget
 export type ConversationCommand = ChatSubmission & {
   target: ConversationTarget; expectedOwnerId: string; expectedWorkspaceId: string; mentions: ReturnType<typeof mentionsIn>
@@ -11,7 +13,8 @@ export type ConversationCommand = ChatSubmission & {
 
 export function sameConversationCommand(command: ConversationCommand, target: ConversationTarget, text: string, mentions: ConversationCommand['mentions']) {
   return command.text === text && command.target.kind === target.kind && command.target.id === target.id &&
-    (command.target.kind !== 'thread' || (target.kind === 'thread' && command.target.issueId === target.issueId)) &&
+    (command.target.kind !== 'thread' || (target.kind === 'thread' && command.target.issueId === target.issueId &&
+      (command.target.modelChoice ? threadModelKey(command.target.modelChoice) : null) === (target.modelChoice ? threadModelKey(target.modelChoice) : null))) &&
     command.mentions.length === mentions.length && command.mentions.every((item, i) => item.memberId === mentions[i]?.memberId && item.memberType === mentions[i]?.memberType)
 }
 
@@ -30,7 +33,7 @@ export async function submitConversation(command: ConversationCommand, post: Pos
   }
   const receipt = await post('/api/rpc', { method: 'POST', body: {
     version: DESKTOP_RPC_VERSION, action: 'agents.sendIssueThreadReply',
-    args: [{ issueId: target.issueId, runId: target.id, text, requestId, expectedOwnerId, expectedWorkspaceId }],
+    args: [{ issueId: target.issueId, runId: target.id, ...(target.modelChoice ? { modelChoice: target.modelChoice } : {}), text, requestId, expectedOwnerId, expectedWorkspaceId }],
   } })
   if (receipt?.version === DESKTOP_RPC_VERSION) {
     const code = receipt.ok ? receipt.result?.error : receipt.error?.code

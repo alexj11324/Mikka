@@ -173,6 +173,10 @@ export function workspaceSearch(place: Partial<WorkspaceLocation>): string {
   return href.slice(1)
 }
 
+export function openGroupConversation(id: string) {
+  navigate({ section: 'group', group: id, issue: null, thread: null, task: null })
+}
+
 /** An app-root link to a place, e.g. `/?issue=<id>`; prefix the base path and locale where the caller needs them. */
 export function workspaceLink(place: Partial<WorkspaceLocation>): string {
   return `/${workspaceSearch(place)}`

@@ -12,6 +12,8 @@ import { sameConversationCommand, submitConversation, type ConversationCommand, 
 import { groupSubmissionMessageId } from '../../../../../lib/group-submission'
 import { useChatDeliveryState, type ChatDelivery } from '../../../../../lib/hooks/chat-delivery-state'
 
+import type { ThreadModelChoice } from '../../../../../lib/thread-model-choice'
+
 type Row = ChatDelivery<ConversationCommand>
 const empty: Row[] = []
 const uncertain = copy.Coordinator.sendUncertain
@@ -104,10 +106,11 @@ export function useConversationDelivery(target: ConversationTarget | null, recei
     if (current()) void reload().catch(() => undefined)
   }
 
-  function send(text: string, mentions: ConversationCommand['mentions'] = []) {
+  function send(text: string, mentions: ConversationCommand['mentions'] = [], modelChoice?: ThreadModelChoice) {
     if (!target || !owner || !workspace || !current() || apiCache.denial(key) || !text.trim()) return false
-    const previous = read().find(row => row.phase === 'failed' && sameConversationCommand(row, target, text, mentions))
-    void deliver(previous ?? { target, id: uuid.v4(), text, at: Date.now(), expectedOwnerId: owner, expectedWorkspaceId: workspace, mentions })
+    const original = target.kind === 'thread' && modelChoice ? { ...target, modelChoice } : target
+    const previous = read().find(row => row.phase === 'failed' && sameConversationCommand(row, original, text, mentions))
+    void deliver(previous ?? { target: original, id: uuid.v4(), text, at: Date.now(), expectedOwnerId: owner, expectedWorkspaceId: workspace, mentions })
     return true
   }
 

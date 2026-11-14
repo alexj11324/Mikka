@@ -653,7 +653,9 @@ export async function getThreadContinuationModels(issueId: string, runId: string
   const { row, user } = await readableThread(issueId, runId, threadIdentityColumns)
   if (row.userId !== user.id) throw new ActionFailureError('runNotFound')
   const { threadModelMenu } = await import('@/lib/thread-model-menu')
-  return threadModelMenu(user.id, issueId, row.id)
+  const reader = await getWorkspaceReader()
+  if (reader.id !== user.id) throw new ActionFailureError('runNotFound')
+  return threadModelMenu(reader, reader[tokenWorkspace], issueId, row.id)
 }
 
 /**

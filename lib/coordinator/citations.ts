@@ -5,14 +5,8 @@
 
 import { conversationTitle } from '../short-title'
 
-export type CitationKind = 'issue' | 'run'
-
-export type CitationPart =
-  | { type: 'text'; text: string }
-  /** `kind` is null for a bare id, which may be either. */
-  | { type: 'citation'; kind: CitationKind | null; id: string; raw: string }
-  /** A web page; `label` is the Markdown link text, if any. */
-  | { type: 'link'; url: string; label: string | null; raw: string }
+import { splitCitations, type CitationPart } from './citation-parts'
+export { splitCitations, type CitationPart, type CitationKind } from './citation-parts'
 
 export interface IssueSource {
   kind: 'issue'
@@ -89,31 +83,6 @@ export function pairCitations(parts: readonly CitationPart[]): (CitationPart & {
     } else out.push(part)
   }
   return out
-}
-
-const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
-/** ASCII only, so a URL followed by Chinese text with no space still ends at the URL. */
-const URL_CHARS = '[^\\s<>()\\[\\]"\'`\\u0080-\\uffff]+'
-const CITATION = new RegExp(`\\[([^\\]\\n]{1,200})\\]\\((https?://${URL_CHARS})\\)|(https?://${URL_CHARS})|\\[\\[(issue|run):(${UUID})\\]\\]|\\b(${UUID})\\b`, 'gi')
-/** Punctuation that ends a sentence rather than a bare URL. */
-const TRAILING = /[.,;:!?。，；：！？、）]+$/
-
-/** Splits reply text into plain text and citations, in order. */
-export function splitCitations(text: string): CitationPart[] {
-  const parts: CitationPart[] = []
-  let last = 0
-  for (const match of text.matchAll(CITATION)) {
-    if (match.index > last) parts.push({ type: 'text', text: text.slice(last, match.index) })
-    let raw = match[0]
-    if (match[2]) parts.push({ type: 'link', url: match[2], label: match[1].trim() || null, raw })
-    else if (match[3]) {
-      raw = match[3].replace(TRAILING, '')
-      parts.push({ type: 'link', url: raw, label: null, raw })
-    } else parts.push({ type: 'citation', kind: match[4] ? match[4].toLowerCase() as CitationKind : null, id: (match[5] ?? match[6]).toLowerCase(), raw })
-    last = match.index + raw.length
-  }
-  if (last < text.length) parts.push({ type: 'text', text: text.slice(last) })
-  return parts
 }
 
 /** The start of a `[[issue:<id>]]` or `[[run:<id>]]` at the very end of the text, up to its last `]`. */

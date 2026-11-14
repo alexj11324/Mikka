@@ -430,7 +430,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     status: row.phase === 'accepted' ? 'sent' : row.phase, deliveryMessage: row.error,
     ...(row.phase === 'failed' && (!replyBlocked || row.review) ? { onRetry: () => { void send(undefined, undefined, row) } } : {}) })
   for (const entry of entries) {
-    if (entry.role === 'person' && /\[\[(?:issue|run):|https:\/\/github\.com\//i.test(entry.text)) entry.body = <PersonReferences text={entry.text} />
+    if (entry.role === 'person' && /\[\[(?:issue|run|chat):|https:\/\/github\.com\//i.test(entry.text)) entry.body = <PersonReferences text={entry.text} />
   }
   // Re-publish the admitted read itself. Identical message lengths or tool
   // counts do not prove the content, grant or attempt result is unchanged.
