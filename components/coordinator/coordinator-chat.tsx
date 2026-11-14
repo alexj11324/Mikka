@@ -185,7 +185,9 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const actionError = useActionError()
   const { cache, mutate: mutateAll } = useSWRConfig()
-  const selectedWorkspaceId = useLiveScope()?.workspaceId
+  const liveScope = useLiveScope()
+  const selectedWorkspaceId = liveScope?.workspaceId
+  const owner = userId ?? liveScope?.ownerId
   const reconnectStream = useRef<() => void>(() => {})
   // A read names the version it shows; an unchanged chat comes back as its live state only (lib/coordinator/chat-poll.ts).
   const shown = useRef<{ chat?: ChatRead; metadataStale: boolean; fullReadAt: number }>({ metadataStale: false, fullReadAt: -Infinity })
@@ -432,7 +434,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
       if (run?.kind !== 'run') return { title: t('citation.run') }
       return { title: run.issue?.identifier ? `${run.issue.identifier} › ${run.name || runThreadName(run)}` : runThreadName(run), issueId: run.issue?.id ?? null, name: runThreadName(run) }
     },
-  }, name)
+  }, name, owner && selectedWorkspaceId ? JSON.stringify([owner, selectedWorkspaceId, botId]) : null)
   const openIssue = work.work ? work.openTask : onOpenIssue
   const citations = useMemo<AgentCitations>(() => ({ sources: sources ?? {}, previews, onOpenIssue: openIssue }), [sources, previews, openIssue])
   // A live reply cites tasks and threads the stored chat may not know yet; they are looked up as it streams.
