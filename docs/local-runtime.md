@@ -151,7 +151,7 @@ What is fake and what is real:
 | Decisions (AI Gateway Decision API: triage, run outcome, push) | Local runs set no `AI_GATEWAY_API_KEY`, so the first choice of each question, `0.5` for a predicate |
 | Card verification and credit for Mikka 默认 (Stripe) | Every local workspace gets a verification and a $1000 local allowance, checked every 5 seconds |
 | Verification and password-reset mail ([Resend](https://resend.com/docs/api-reference/emails/send-email)) | Real with a real `RESEND_API_KEY`; otherwise a local outbox at `http://127.0.0.1:3191/mail` (JSON at `/mail.json`), one terminal line per mail |
-| Cron (the production minute Worker, `cloudflare/suggestions-cron`) | `scripts/dev-local/cron.mjs` calls the same `/api/cron/*` endpoints on the same schedule against the local API, with `CRON_SECRET` or a local placeholder ([securing cron jobs](https://vercel.com/docs/cron-jobs/manage-cron-jobs#securing-cron-jobs)) |
+| Cron (the production quarter-hour Worker, `cloudflare/suggestions-cron`) | `scripts/dev-local/cron.mjs` calls the same `/api/cron/*` endpoints on the same schedule against the local API, with `CRON_SECRET` or a local placeholder ([securing cron jobs](https://vercel.com/docs/cron-jobs/manage-cron-jobs#securing-cron-jobs)) |
 | [Vercel Workflow](https://useworkflow.dev/docs/deploying/world/local-world) | The local world configured by `apps/api/scripts/dev.mjs` |
 | Database, auth, daemon, git clone/worktree/commit/push | Real |
 
