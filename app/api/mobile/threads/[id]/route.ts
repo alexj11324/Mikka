@@ -63,7 +63,7 @@ async function handleGET(request: Request, { params }: Params) {
     const source=sourceRuns.length===1 ? sourceRuns[0] : sourceRuns.find(id=>part.startsWith(id+':'))
     return source ? [[item.id,{runId:source,key:sourceRuns.length===1 ? part : part.slice(source.length+1),operation:'rerun'}]] : []
   }))
-  return json({ versionAnchors, delivery, issueId: detail.run.issueId, canReply: Boolean(detail.run.agentId), confirmedSubmissionIds: messages.flatMap(message => message.submissionId ? [message.submissionId] : []), live: { runs }, thread, active: runIsActive(live), working: runIsWorking(live), paused, summary: detail.run.report && typeof detail.run.report.summary === 'string' ? detail.run.report.summary : null, error: detail.run.error, items })
+  return json({ versionAnchors, liveRunId, delivery, issueId: detail.run.issueId, canReply: Boolean(detail.run.agentId), confirmedSubmissionIds: messages.flatMap(message => message.submissionId ? [message.submissionId] : []), live: { runs }, thread, active: runIsActive(live), working: runIsWorking(live), paused, summary: detail.run.report && typeof detail.run.report.summary === 'string' ? detail.run.report.summary : null, error: detail.run.error, items })
 }
 
 /** `POST /api/mobile/threads/:id` with `{ text }`: a message to the thread; the daemon delivers it, or an ended thread runs again. */
