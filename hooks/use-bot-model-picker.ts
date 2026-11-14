@@ -181,8 +181,8 @@ export function useBotModelPicker(botId: string | null) {
     choose,
     saving,
     waitForSave,
-    /** Choosing the item that is already current only saves when it was not chosen yet (it was the default). */
-    chooseItem(id: string) { if (current && id === current.id && !current.chosen) void choose(id) },
+    /** Queue current-item clicks too: an earlier queued choice may still replace the preview. */
+    chooseItem(id: string) { if (current && id === current.id) void choose(id) },
     refresh,
     refreshing,
     refreshFailed,

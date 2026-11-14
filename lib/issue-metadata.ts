@@ -49,6 +49,10 @@ function canonicalMetadata(value: unknown): unknown {
   return { ...metadata, assignee: null, delegate: Object.hasOwn(metadata, 'delegate') ? metadata.delegate : assignee.data }
 }
 
+export function issueRestoreDeadline(deletedAt: string): number {
+  return Date.parse(deletedAt) + 30 * 86_400_000
+}
+
 export function readIssueMetadata(content: JSONContent): IssueMetadata {
   // `orvilo` is the pre-rename key; drizzle/0005 moves stored issues to `mikka`.
   const parsed = metadataSchema.safeParse(canonicalMetadata(content.attrs?.mikka ?? content.attrs?.orvilo))

@@ -1,5 +1,6 @@
 'use client'
 
+import { boardActivityState } from '@/lib/task-presentation'
 import { useViewState } from '@/lib/hooks/view-state'
 import { useContext, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { InlineLoadError } from '@/components/load-error'
@@ -160,7 +161,7 @@ export function BoardPage({ issues, userId, workspaceId, teamId, personalWorkspa
   const myAgents = useMemo(() => new Set((agents ?? []).map(agent => agent.id)), [agents])
   const owners = useMemo(() => new Map((runs ?? []).map(run => [run.issueId, { bot: run.bot, harnesses: run.harnesses }] as const)), [runs])
   const presentation = useContext(TaskPresentationsContext)
-  const taskStates = useMemo(() => new Map(Object.entries(presentation)), [presentation])
+  const taskStates = useMemo(() => new Map(Object.entries(presentation).map(([id, task]) => [id, { ...task, ...boardActivityState(task) }])), [presentation])
   const agentStates = useMemo(() => {
     const result = new Map<string, AgentState>()
     for (const [id, task] of taskStates) {

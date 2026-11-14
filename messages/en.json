@@ -65,6 +65,12 @@
   },
   "Issue": {
     "scope": {
+      "workspaceUnavailable": "Workspace unavailable",
+      "linearSync": "Linear sync",
+      "linearEnabled": "Enabled",
+      "disableLinear": "Turn off Linear sync",
+      "disableLinkedLinear": "Turn off sync and archive the linked Linear issue",
+      "linearDisabled": "Linear sync turned off.",
       "label": "Scope",
       "workspace": "Workspace",
       "personal": "Personal",
@@ -1698,6 +1704,41 @@
     "backToAccessible": "Back to an accessible workspace"
   },
   "Projects": {
+    "lifecycle": {
+      "actions": "Project actions",
+      "impact": "Project impact",
+      "archived": "Archived",
+      "archive": "Archive project",
+      "restore": "Restore project",
+      "delete": "Delete project",
+      "deleteNamed": "Delete {name}?",
+      "permanent": "This permanently removes the project.",
+      "confirmName": "Type {name} to confirm deletion",
+      "archiveHint": "Archiving keeps tasks and history. Restore the project to resume work.",
+      "restoreHint": "Restoring allows new work in this project.",
+      "deleteBlocked": "Only an empty project without history can be deleted.",
+      "noLinks": "No linked items or history.",
+      "loadFailed": "The project impact could not be verified. Refresh and try again.",
+      "saveFailed": "The change could not be confirmed. Refresh the project and try again.",
+      "loading": "Checking project impact…",
+      "counts": {
+        "teams": "Teams",
+        "members": "Members",
+        "repositories": "Repository bindings",
+        "environments": "Environment bindings",
+        "events": "Project activity",
+        "resourceEvents": "Resource activity",
+        "incomingDependencies": "Projects depending on this project",
+        "runs": "Runs",
+        "activeRuns": "Active runs",
+        "factoryTasks": "Factory tasks",
+        "decisions": "Decisions",
+        "tasks": "Tasks",
+        "dependencies": "Dependencies",
+        "milestones": "Milestones",
+        "legacyTaskReferences": "Legacy task links"
+      }
+    },
     "title": "Projects",
     "teamTitle": "{team} · Projects",
     "newProject": "New project",
@@ -6460,7 +6501,7 @@
       "revoked": "Invitation revoked",
       "expired": "Expired",
       "expires": "Expires {date}",
-      "sent": "New invitation links are shown once. Deliver them privately; they are not sent by email yet.",
+      "sent": "Invitation links are shown only once. Copy and share them securely. Configured email delivery is attempted separately and is not confirmed by this response.",
       "copy": "Copy link",
       "copyFailed": "Could not copy the invitation link.",
       "failed": "Invitation request failed."
@@ -6961,6 +7002,20 @@
     "noTasks": "No tasks"
   },
   "HostedInbox": {
+    "dismiss": "Dismiss",
+    "dismissed": "Dismissed",
+    "reason": {
+      "needsReply": "Open the conversation to answer.",
+      "confirm": "Open the conversation to review the request.",
+      "review": "Open the task to review the changes.",
+      "offline": "Reconnect the device, then resume the run.",
+      "quota": "Check the model quota, then resume the run.",
+      "api_key": "Update the model credential, then retry.",
+      "access_denied": "Check the execution identity’s permissions, then retry.",
+      "subscription": "Reconnect the model subscription, then retry.",
+      "blocked": "Open the run to resolve the blocker.",
+      "failed": "Review the run error, then retry."
+    },
     "snoozed": "Snoozed",
     "until": "Remind me at",
     "done": "Done",
@@ -7228,9 +7283,15 @@
     "deleteTeam": "Delete team",
     "deleteConfirm": "Type {name} to confirm",
     "deleteTitle": "Delete {name}?",
-    "deleteImpact": "{tasks, plural, one {# task} other {# tasks}} and {projects, plural, one {# project} other {# projects}} go with it. A project shared with another team only loses the link.",
-    "deleteCounting": "Counting what goes with it…",
+    "deleteImpact": "{tasks, plural, one {# task} other {# tasks}} and {projects, plural, one {# project} other {# projects}} are linked to this team. Permanent deletion requires an empty team with no execution history.",
+    "deleteCounting": "Checking team links and execution history…",
     "deleting": "Deleting…",
+    "ungroup": "Remove grouping…",
+    "ungroupTitle": "Remove {name} as a team grouping?",
+    "ungroupImpact": "{tasks, plural, one {# task becomes} other {# tasks become}} ungrouped in this workspace. {projects, plural, one {# project loses} other {# projects lose}} this team link. The tasks, projects and their history are kept.",
+    "ungroupConfirm": "Remove grouping",
+    "ungroupPending": "Removing grouping…",
+    "teamUngrouped": "{name} grouping removed.",
     "teamDeleted": "{name} deleted."
   },
   "HostedSettings": {
@@ -7360,6 +7421,7 @@
     "priority": "{priority} priority",
     "noPriority": "No",
     "activity": "Activity",
+    "taskPropertiesOnWeb": "Status and priority (web)",
     "comment": "+ Comment",
     "conversation": {
       "fix": "Fix",

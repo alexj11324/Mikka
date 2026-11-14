@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import {randomUUID} from 'node:crypto'
 import test,{mock} from 'node:test'
+import { measured } from '../../tests/helpers/read-metrics'
 import {disposableDatabase} from '../../tests/helpers/e2e-target.mjs'
 
 const valid=disposableDatabase()&&process.env.E2E_DATABASE_URL===process.env.MIKKA_DATABASE_URL&&process.env.E2E_DATABASE_URL===process.env.DATABASE_URL
@@ -29,7 +30,11 @@ test('native default Bot uses the authenticated active Workspace and rejects sup
     assert.ok(home);assert.equal(home.workspaceId,personal)
     const selected=await resolveEveRequestBot(request({'x-mikka-workspace-id':team}),session)
     assert.ok(selected);assert.equal(selected.workspaceId,team);assert.notEqual(selected.botId,home.botId)
-    assert.deepEqual(await resolveEveRequestBot(request({cookie:'mikka-workspace='+team}),session),selected)
+    const defaultBot = await measured(() => resolveEveRequestBot(request({cookie:'mikka-workspace='+team}),session))
+    const explicitBot = await measured(() => resolveEveRequestBot(request({cookie:'mikka-workspace='+team},'?botId='+selected.botId),session))
+    assert.deepEqual(defaultBot.value, selected)
+    assert.deepEqual(explicitBot.value, selected)
+    assert.equal(defaultBot.statements, explicitBot.statements, 'a warm default Bot selection should resolve the active Workspace only once')
     assert.deepEqual(await resolveEveRequestBot(request({'x-mikka-workspace-id':personal}),session),home)
     const denied:HeadersInit[]=[{'x-mikka-workspace-id':'bad'},{'x-mikka-workspace-id':foreign}]
     for(const headers of denied)assert.equal(await resolveEveRequestBot(request(headers),session),null)

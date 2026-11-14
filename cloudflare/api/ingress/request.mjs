@@ -6,7 +6,7 @@ export function apiRequest(request, origin) {
   const outbound = new Request(request, { redirect: 'manual' })
   const ip = outbound.headers.get('cf-connecting-ip')
   for (const key of request.headers.keys()) {
-    if (key === 'forwarded' || key === 'x-real-ip' || key === 'cf-connecting-ip'
+    if (key === 'x-mikka-eve-scope' || key === 'x-mikka-eve-binding-scope' || key === 'forwarded' || key === 'x-real-ip' || key === 'cf-connecting-ip'
       || key === 'cf-container-target-port' || key.startsWith('x-forwarded-')
       || key.startsWith('x-vercel-') || key.startsWith('x-mikka-edge-')) outbound.headers.delete(key)
   }

@@ -11,7 +11,8 @@ import { db } from '@/lib/db'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { coordinatorBot } from '@/lib/coordinator/coordinator-bot'
 import { userMessageEvent } from '@/lib/coordinator-events'
-import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
+import { coordinatorEnabled } from '@/lib/coordinator/wake'
+import { wakeCoordinatorAfterCommit } from '@/lib/coordinator/wake-after-commit'
 import { issues, telegramConversations, telegramLinkTokens, telegramLinks } from '@/lib/db/schema'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
 import { withTaskWorkspace } from '@/lib/task-workspace'
@@ -176,7 +177,7 @@ async function linkAccessibleIssue(tx: Transaction, userId: string, workspaceId:
   return issue ?? null
 }
 
-async function handleCommand(tx: Transaction, conversation: typeof telegramConversations.$inferSelect, userId: string, workspaceId: string, command: { name: string; args: string }, t: Translator): Promise<string | { reply: string; issueId: string }> {
+async function handleCommand(tx: Transaction, conversation: typeof telegramConversations.$inferSelect, userId: string, workspaceId: string, command: { name: string; args: string }, t: Translator): Promise<string> {
   switch (command.name) {
     case 'help':
     case 'start':
@@ -212,7 +213,7 @@ async function handleCommand(tx: Transaction, conversation: typeof telegramConve
         draftDescription: '',
         updatedAt: new Date(),
       }).where(eq(telegramConversations.threadId, conversation.threadId))
-      return { reply: t('created', { issue: await issueLabel(tx, issue), title: issue.title }), issueId: issue.id }
+      return t('created', { issue: await issueLabel(tx, issue), title: issue.title })
     }
     case 'issues': {
       const visible = await findAccessibleIssues(tx, userId, workspaceId)
@@ -332,17 +333,11 @@ async function handleTelegramMessage(input: {
       issueId: conversation.issueId,
       telegram: { threadId: conversation.threadId, telegramUserId, messageId: input.messageId },
     }))
-    return { coordinator: true as const }
+    // Telegram can resend a stored message. A fresh event registers the same
+    // owner key; the commit observer delivers one wake in either case.
+    wakeCoordinatorAfterCommit(tx, link.userId)
+    return t('coordinatorQueued')
   }))
-  if (typeof result !== 'string') {
-    if ('coordinator' in result) {
-      await wakeCoordinator(link.userId)
-      await input.post(t('coordinatorQueued'))
-      return
-    }
-    await input.post(result.reply)
-    return
-  }
   await input.post(result)
 }
 

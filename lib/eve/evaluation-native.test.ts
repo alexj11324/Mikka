@@ -41,8 +41,8 @@ test('Agent Kit evaluations run through compiled public Eve sessions with inert 
  for(const source of sources)await writeFile(join(fixture,source),await readFile(join(root,source)))
  // Only provider/account boundaries and storage are synthetic. Channel, auth,
  // dynamic capabilities, approvals, hooks and the native Client are unchanged.
- await writeFile(join(fixture,'lib/eve/evaluation-store.ts'),`import{readFile,writeFile}from'node:fs/promises';import{join}from'node:path';
- export async function loadEvaluationBinding(_pool,scope,id){try{const row=JSON.parse(await readFile(join(process.env.FIXTURE_BINDINGS,id+'.json'),'utf8'));return scope.ownerId==='${scope.ownerId}'&&scope.botId==='${scope.botId}'&&scope.workspaceId==='${scope.workspaceId}'?row:null}catch{return null}}
+ await writeFile(join(fixture,'lib/eve/evaluation-store.ts'),`import{appendFile,readFile,writeFile}from'node:fs/promises';import{join}from'node:path';
+ export async function loadEvaluationBinding(_pool,scope,id){try{await appendFile(join(process.env.FIXTURE_BINDINGS,id+'.reads'),'1');const row=JSON.parse(await readFile(join(process.env.FIXTURE_BINDINGS,id+'.json'),'utf8'));return scope.ownerId==='${scope.ownerId}'&&scope.botId==='${scope.botId}'&&scope.workspaceId==='${scope.workspaceId}'?row:null}catch{return null}}
  export async function bindEvaluationSession(_pool,id,sessionId){const path=join(process.env.FIXTURE_BINDINGS,id+'.json'),row=JSON.parse(await readFile(path,'utf8'));if(row.session_id&&row.session_id!==sessionId)throw Error('agentEvaluationMismatch');row.session_id=sessionId;await writeFile(path,JSON.stringify(row))}
  `)
  await writeFile(join(fixture,'lib/db.ts'),`export const pool={async query(_sql,values){return{rowCount:values?.[0]==='${scope.botId}'&&values?.[1]==='${scope.ownerId}'&&values?.[2]==='${scope.workspaceId}'?1:0,rows:[]}}}`)
@@ -76,15 +76,26 @@ test('Agent Kit evaluations run through compiled public Eve sessions with inert 
  process.env.BETTER_AUTH_SECRET=secret;process.env.MIKKA_EVE_ORIGIN=origin
  const definition={...DEFAULT_AGENT_DEFINITION,tools:['web_search'] as typeof DEFAULT_AGENT_DEFINITION.tools}
  const ids:string[]=[]
- for(const kind of ['baseline','candidate','subscription','native-blocked','provider-failure','abort'])await t.test(kind,async()=>{
+ for(const kind of ['baseline','candidate','subscription','native-blocked','provider-failure','abort'])await t.test(kind,async t=>{
   const id=randomUUID(),snapshot=makeSnapshot(randomUUID(),kind==='candidate'?2:1,{...definition,instructions:kind==='candidate'?'Candidate guidance':''},'Frozen host',{harness:'ai_sdk',model:kind==='subscription'?'frozen-subscription-model':'frozen-shared-model',...kind==='subscription'?{modelSelection:{type:'subscription',bindingId:randomUUID(),ownerId:scope.ownerId,consumerId:scope.botId,workspaceId:scope.workspaceId,connectionId:randomUUID(),connectionRevision:7,modelId:'frozen-subscription-model',route:'codex_cpa'}}:{}})
   const plan:EvaluationPlan={scope,snapshot,testCase:{...CORE_EVAL_CASES[0],input:['native-blocked','provider-failure','abort'].includes(kind)?kind:'grounded-search'},instructions:snapshot.hostInstructions+'\n'+snapshot.definition.instructions,tools:[{name:'web_search',description:'Inert search fixture',inputSchema:{type:'object',properties:{query:{type:'string'}},required:['query'],additionalProperties:false}}]}
   await writeFile(join(fixture,'bindings',id+'.json'),JSON.stringify({id,session_id:null,plan}))
+  let endStreamPath: string | undefined
+  let teardownReads = 0
+  const nativeFetch = globalThis.fetch
+  const requests = t.mock.method(globalThis, 'fetch', (input: RequestInfo | URL, init?: RequestInit) => {
+    const path = new URL(input instanceof Request ? input.url : input.toString()).pathname
+    if (init?.method === 'POST' && path.endsWith('/end')) endStreamPath = path.slice(0, -4) + '/stream'
+    if (path === endStreamPath) teardownReads++
+    return nativeFetch(input, init)
+  })
   if(kind==='abort') {
    const controller=new AbortController(),watcher=watch(join(fixture,'bindings'),(_event,file)=>{if(file==='abort-started')controller.abort()})
    try{await assert.rejects(runEveEvaluation(scope,id,plan,controller.signal),{name:'AbortError'})}finally{watcher.close()}
   } else if(kind==='provider-failure')await assert.rejects(runEveEvaluation(scope,id,plan,AbortSignal.timeout(20000)),/agentEvaluationGenerationFailed/)
   else{const trace=await runEveEvaluation(scope,id,plan,AbortSignal.timeout(20000));assert.equal(trace.tools.length,1);assert.equal(trace.tools[0].effectPerformed,false);assert.equal(trace.tools[0].name,kind==='native-blocked'?'agent':'web_search');assert.equal(trace.tools[0].outcome,kind==='native-blocked'?'error':'ok');assert.match(trace.text,kind==='candidate'?/^Candidate:/ : /^Baseline:/)}
+  requests.mock.restore()
+  assert.equal(teardownReads, 1, 'one native stream observes the durable session end')
   const binding=JSON.parse(await readFile(join(fixture,'bindings',id+'.json'),'utf8'));assert.ok(binding.session_id);ids.push(binding.session_id)
   const client=new Client({baseUrl:origin+'/mikka/evaluations',headers:()=>({authorization:internalEveAuthorization(scope),'x-mikka-evaluation-id':id})})
   const snapshotResult=await client.sessions.attach(binding.session_id).snapshot()
@@ -97,6 +108,15 @@ test('Agent Kit evaluations run through compiled public Eve sessions with inert 
   assert.equal(foreign.status,404)
   const unauthenticated=await fetch(origin+'/mikka/evaluations/eve/v1/session',{method:'POST',headers:{'content-type':'application/json','x-mikka-evaluation-id':id},body:'{}'})
   assert.equal(unauthenticated.status,401)
+  const readCount = async () => (await readFile(join(fixture, 'bindings', id + '.reads'))).length
+  const before = await readCount()
+  assert.equal((await client.sessions.create()).session.id, binding.session_id)
+  assert.equal(await readCount() - before, 1, 'a repeated create reads its current owned binding once')
+  await rm(join(fixture, 'bindings', id + '.json'))
+  const removed = await fetch(origin+'/mikka/evaluations/eve/v1/session', {
+    method:'POST', headers:{authorization:internalEveAuthorization(scope),'x-mikka-evaluation-id':id},
+  })
+  assert.equal(removed.status, 401, 'the next request observes binding removal')
  })
  assert.equal(new Set(ids).size,6,'each case and revision gets an isolated native session')
 })

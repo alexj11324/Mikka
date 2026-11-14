@@ -1,5 +1,5 @@
 import 'server-only'
-import { taskStateRunColumns } from './task-state-query'
+import { runHistoryWindow, taskStateRunColumns } from './task-state-query'
 import { withTaskDevicePresence } from './task-state-presence'
 import type { TaskStateRun } from './task-state'
 
@@ -52,7 +52,7 @@ export async function newestTaskRuns(userId: string, issueIds: readonly string[]
     .from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
     .innerJoin(issues, and(eq(issues.id, agentRuns.issueId), eq(issues.ownershipState, 'bound'), eq(agentRuns.workspaceId, issues.workspaceId)))
     .where(and(eq(agentRuns.userId, userId), inArray(agentRuns.issueId, [...issueIds]), workspaceId ? eq(issues.workspaceId, workspaceId) : undefined,
-      sql`${agentRuns.createdAt} > now() - interval '30 days'`))
+      sql`${agentRuns.createdAt} > now() - ${runHistoryWindow}`))
     .orderBy(agentRuns.issueId, desc(agentRuns.createdAt), desc(agentRuns.id)).as('newest_task_runs')
   // Callers supply already-authorized task IDs. Keep every source on each
   // task's persisted tenant, including pending/legacy run exclusion, even when

@@ -7,7 +7,8 @@ import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { MessageSquareDiff } from 'lucide-react'
-import { getIssueThread, getThreadChanges, getThreadInstructions, stopRun, type IssueThreadDetail } from '@/app/actions/agents'
+import { getIssueThread, getThreadInstructions, stopRun, type IssueThreadDetail } from '@/app/actions/agents'
+import { useThreadChanges } from '@/hooks/use-thread-run-reads'
 import { useActionError } from '@/lib/use-action-error'
 import { sendReviewChange, type ReviewChangeTarget } from '@/lib/factory/review-change'
 import { RequestError } from '@/lib/factory/browser-request'
@@ -160,7 +161,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const [tab, setTab] = useViewState<ThreadTab>(`thread:${runId}:tab:${initialTab}`, initialTab)
   const accepting = !bare && Boolean(acceptance) && tab === 'acceptance'
   // 改动 (Figma 820:4843): the agent's work tree diff, read-only, once the run saved one.
-  const { data: changes, mutate: mutateChanges } = useSWR(bare ? null : ['thread-changes', issueId, runId], () => getThreadChanges(issueId, runId))
+  const view = data ? threadQuestionView(data.thread) : null
+  const { data: changes } = useThreadChanges(issueId, bare ? null : runId, view?.status)
   const hasChanges = !readRejected && !!changes && changes.state !== 'none'
   const viewingChanges = hasChanges && tab === 'changes'
   const transcript = useViewScroll<HTMLDivElement>(`thread:${runId}:chat`, !!data && !viewingChanges && !accepting)
@@ -191,7 +193,6 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   // 等你回复: the run ended on a question; the composer answers it (lib/agent-runs.ts addRunMessage).
   // Once answered it reads as the running thread it continues, with nothing to send or stop yet;
   // as soon as the resumed run starts, messages and stop go to that run.
-  const view = data ? threadQuestionView(data.thread) : null
   const displayOutcome = data ? acceptedProducerOutcome(data.thread, issueId, allTasks) : null
   const question = view?.question ?? null
   const liveRunId = view?.runId ?? runId
@@ -231,8 +232,6 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     const timer = setTimeout(() => setStopFailed(true), runStopTimeoutRemaining(requestedAt))
     return () => clearTimeout(timer)
   }, [active, requestedAt])
-  // The run saves its work as it goes; read it again when its state moves.
-  useEffect(() => { void mutateChanges() }, [view?.status, mutateChanges])
   useEffect(() => {
     // Acknowledgement updates the task's thread list as soon as this panel sees it.
     void mutateCache(['issue-threads', issueId])

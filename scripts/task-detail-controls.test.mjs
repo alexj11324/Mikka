@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import { after, before, beforeEach, mock, test } from 'node:test'
 import { Window } from 'happy-dom'
+import { z } from 'zod'
 import { act, createElement, useState } from 'react'
+import { desktopActionSchemas } from '../lib/desktop-rpc/schemas.ts'
+import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '../lib/issue-meta.ts'
 import { metadataSchema } from '../lib/issue-metadata.ts'
 
 const browser = new Window({ url: 'https://mikka.example/mikka' })
@@ -19,6 +22,7 @@ mock.module('swr', { defaultExport: key => {
   if (key?.[0] === 'issue-connections') return { data: [issue, child], mutate: async () => reads.push('connections') }
   return {}
 }, namedExports: { unstable_serialize: JSON.stringify, useSWRConfig: () => ({ mutate: async key => {
+  if (Array.isArray(key) && key[0] === 'issue-connections') reads.push('revalidate-connections')
   if (typeof key === 'function') {
     assert.equal(key(['issues', 'another-owner', 'workspace']), false)
     if (key(['issues', 'owner', 'workspace'])) reads.push('viewer-list')
@@ -36,7 +40,7 @@ stub('app/actions/issues.ts', {
 })
 stub('app/actions/issue-metadata.ts', { getIssuePropertyOptions: noop, updateIssueMetadata: noop })
 stub('app/actions/issue-operations.ts', {
-  createLinkedIssue: noop, setIssueDeleted: noop, updateIssueRelation: noop, listIssueConnections: noop,
+  createLinkedIssue: noop, setIssueDeleted: async () => ({ issue }), updateIssueRelation: noop, listIssueConnections: noop,
   toggleIssuePreference: async () => {
     if (favoriteDenied) return { error: 'issueUnavailable' }
     const favorites = issue.metadata.favoriteUserIds.length ? [] : ['owner']
@@ -61,6 +65,8 @@ before(async () => {
   for (const name of ['window', 'document', 'navigator', 'Node', 'Element', 'HTMLElement']) {
     Object.defineProperty(globalThis, name, { value: name === 'window' ? browser : browser[name], configurable: true })
   }
+  globalThis.requestAnimationFrame = browser.requestAnimationFrame.bind(browser)
+  globalThis.cancelAnimationFrame = browser.cancelAnimationFrame.bind(browser)
   globalThis.IS_REACT_ACT_ENVIRONMENT = true
   ;({ createRoot } = await import('react-dom/client'))
   ;({ FramedTask } = await import('../components/workspace/task-detail-frame.tsx'))
@@ -74,14 +80,14 @@ beforeEach(() => {
 })
 after(() => browser.close())
 
-async function mount() {
+async function mount({ showDialogs = false, ...props } = {}) {
   const host = document.createElement('div')
   document.body.append(host)
   const root = createRoot(host)
-  const Capture = props => { frame = props; return null }
+  const Capture = props => { frame = props; return showDialogs ? props.dialogs : null }
   function Task() {
     const [task, setTask] = useState(issue)
-    return createElement(FramedTask, { Frame: Capture, task, userId: 'owner', title: task.title, status: task.status, priority: 'normal',
+    return createElement(FramedTask, { Frame: Capture, task, userId: 'owner', title: task.title, status: task.status, priority: 'normal', locked: false, ...props,
       agentActivity: { items: [] }, versions: [], getCurrent: async () => issue, adopt: saved => { issue = saved; setTask(saved) } })
   }
   await act(async () => root.render(createElement(Task)))
@@ -90,20 +96,75 @@ async function mount() {
 const row = id => frame.rows.find(item => item.id === id)
 const pickTeam = id => act(async () => row('team').menu.find(item => item.id === id).onSelect())
 
-test('team selection confirms the current team once after reopen and rejected changes retain the saved team', async () => {
+test('confirmed deletion refreshes the viewer list without reading connections for the deleted task', async () => {
+  let deleted = false
+  const dispose = await mount({ showDialogs: true, onDeleted: () => { deleted = true } })
+  try {
+    await act(async () => frame.menu.items.find(item => item.id === 'delete').onSelect())
+    const confirm = [...document.querySelectorAll('button')].find(button => button.textContent === 'deleteAction')
+    assert.ok(confirm, 'delete confirmation must be available')
+    await act(async () => confirm.click())
+    assert.equal(deleted, true)
+    assert.deepEqual(reads, ['viewer-list'])
+  } finally { await dispose() }
+})
+
+test('Task property menus expose every writable value, send precisely that value and lock for readers', async () => {
+  const selected = { status: [], priority: [] }
+  const save = desktopActionSchemas['issues.saveIssue']
+  // The title and document use the inline editors exercised by task-detail-live.
+  // Request coordinates are not editable properties.
+  const propertyCodes = { status: ISSUE_STATUS_CODES, priority: ISSUE_PRIORITY_CODES }
+  const saveInput = z.toJSONSchema(save, { io: 'input', unrepresentable: 'any' }).prefixItems[0]
+  assert.deepEqual(Object.keys(saveInput.properties).sort(),
+    ['id', 'revision', 'workspaceId', 'title', 'content', ...Object.keys(propertyCodes)].sort(),
+    'classify each new save field and cover its consumer')
+  const input = { title: 'Task', content: { type: 'doc', content: [] }, status: 'todo', priority: 'normal' }
+  const dispose = await mount({
+    onStatus: value => selected.status.push(value),
+    onPriority: value => selected.priority.push(value),
+  })
+  try {
+    for (const [field, codes] of Object.entries(propertyCodes)) {
+      const property = row(field)
+      assert.equal(property.disabled, false)
+      assert.deepEqual(property.menu.map(choice => choice.id), [...codes])
+      assert.deepEqual(property.menu.filter(choice => choice.checked).map(choice => choice.id), [input[field]])
+      for (const choice of property.menu) {
+        choice.onSelect()
+        assert.equal(selected[field].at(-1), choice.id)
+        assert.equal(save.safeParse([{ ...input, [field]: choice.id }]).success, true, choice.id)
+      }
+      assert.deepEqual(selected[field], [...codes])
+    }
+    for (const state of ['queued', 'running', 'waiting', 'blocked', 'failed']) {
+      assert.ok(!row('status').menu.some(choice => choice.id === state), state)
+      assert.equal(save.safeParse([{ ...input, status: state }]).success, false, state)
+    }
+  } finally { await dispose() }
+  const closeReadOnly = await mount({ locked: true })
+  try {
+    for (const field of ['status', 'priority']) assert.equal(row(field).disabled, true, field)
+  } finally { await closeReadOnly() }
+})
+
+test('reselecting the current team does not write and rejected changes retain the saved team', async () => {
   const dispose = await mount()
   try {
     await pickTeam('existing')
-    assert.deepEqual(teamWrites, [{ issueId: 'task', teamId: 'existing', expectedTeamId: 'existing' }])
     await pickTeam('existing')
-    assert.equal(teamWrites.length, 1)
+    assert.deepEqual(teamWrites, [])
     assert.deepEqual(reads, [])
+    const change = { issueId: 'task', teamId: 'another', expectedTeamId: 'existing' }
     response = { ok: false, error: 'denied' }
     await pickTeam('another')
+    assert.deepEqual(teamWrites, [change])
+    assert.deepEqual(reads, [])
     assert.equal(row('team').menu.find(item => item.checked).id, 'existing')
     assert.equal(frame.rowsError, 'denied')
     response = null
     await pickTeam('another')
+    assert.deepEqual(teamWrites, [change, change])
     assert.equal(row('team').menu.find(item => item.checked).id, 'another')
     assert.deepEqual(reads, ['viewer-list'])
   } finally { await dispose() }

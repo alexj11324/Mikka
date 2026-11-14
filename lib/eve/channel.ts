@@ -2,7 +2,7 @@ import { eveChannel } from 'eve/channels/eve'
 import { POST, type RouteHandlerArgs, type HttpRouteDefinition } from 'eve/channels'
 import { z } from 'zod'
 import { ActionFailureError } from '../action-error'
-import { authenticateEveRequest, internalEveScope } from './auth'
+import { authenticateEveRequest, internalEveRequestScope } from './auth'
 import { assertSessionScope, conversationAddress, registerSession, scopeFromAuth, scopeAuth, type EveScope } from './scope'
 import { priorHistory } from './history'
 import { withSessionControlDelivery } from './session-control-delivery.mjs'
@@ -12,7 +12,6 @@ const body = z.object({ message: z.unknown().optional(), operationId: z.string()
 
 async function sessionFor(args: RouteHandlerArgs, scope: EveScope) {
   const result = await args.from(conversationAddress(scope)).create({ auth: scopeAuth(scope), history: await priorHistory(scope) })
-  await registerSession(scope, result.session.id)
   return result.session
 }
 
@@ -54,6 +53,7 @@ export function mikkaEveChannel() {
         if (route.method === 'POST' && route.path === '/eve/v1/session') {
           const input = body.parse(await request.clone().json().catch(() => ({})))
           const session = await sessionFor(args,scope)
+          await registerSession(scope,session.id)
           if (input.message === undefined) return Response.json({ ok:true, sessionId:session.id })
           const { operationId: _operation, ...payload } = input
           const submission = request.headers.get('x-mikka-submission-id')
@@ -93,14 +93,17 @@ export function mikkaEveChannel() {
       },
     }),
     POST('/eve/v1/mikka/events', async (request,args) => {
-      const scope = internalEveScope(request.headers.get('authorization'))
+      const scope = internalEveRequestScope(request)
       if (!scope) return Response.json({ok:false,error:'authRequired'},{status:401})
       const input = z.object({eventId:z.uuid()}).strict().parse(await request.json())
       const { deliverEveEvent } = await import('./submission')
       const {pool} = await import('../db')
-      const event = (await pool.query('SELECT payload FROM coordinator_events WHERE id=$1 AND "userId"=$2 AND "botId"=$3',[input.eventId,scope.ownerId,scope.botId])).rows[0]
+      const event = (await pool.query<{ scheduled: boolean }>(
+        `SELECT coalesce(payload->>'source' = 'schedule_due', false) AS scheduled FROM coordinator_events WHERE id=$1 AND "userId"=$2 AND "botId"=$3`,
+        [input.eventId, scope.ownerId, scope.botId],
+      )).rows[0]
       if (!event) return Response.json({ok:false,error:'notFound'},{status:404})
-      const session = event.payload?.source === 'schedule_due'
+      const session = event.scheduled
         ? (await args.from(conversationAddress(scope)+':schedule:'+input.eventId).create({auth:scopeAuth(scope)})).session
         : await sessionFor(args,scope)
       await registerSession(scope,session.id)

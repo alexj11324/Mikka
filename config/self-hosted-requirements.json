@@ -175,6 +175,12 @@
     "behavior": "The Vercel packaging step deduplicates byte-identical function trees only when deployment configuration and resolved dependencies agree. Compose uses the Node server target.",
     "test": "apps/api/scripts/dedupe-functions.test.mjs"
   },
+  "apps/api/scripts/dev.mjs": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The development server uses Nitro's native drain during worker replacement so admitted requests can finish with their original worker.",
+    "test": "apps/api/runtime/dev-tracing.test.mjs"
+  },
   "apps/api/scripts/finalize-build.mjs": {
     "mode": "built-in",
     "environment": [
@@ -205,6 +211,13 @@
     "behavior": "Allow an existing owner-bound custody worker to revoke a frozen subscription only while its coordinator retains the exclusive deletion session. Preserve unsettled custody and ordinary write refusals.",
     "test": "lib/account/deletion-lock.db.test.ts",
     "suite": "test:account-db"
+  },
+  "drizzle/20261113165037_inbox_conversations.sql": {
+    "mode": "built-in",
+    "environment": ["MIKKA_DATABASE_URL"],
+    "behavior": "Use the installation PostgreSQL database for per-user Inbox dismissals and standalone conversation snoozes. An authorized new run or changed cause can request attention again.",
+    "test": "lib/inbox/store.db.test.ts",
+    "suite": "test:inbox-db"
   },
   "drizzle/20261112090914_workspace_subscription_custody.sql": {
     "mode": "built-in",
@@ -340,6 +353,13 @@
     "behavior": "Present local history with stable user, agent and system identities, including deleted actors.",
     "test": "lib/activity-actor-view.test.ts",
     "suite": "test:issues"
+  },
+  "lib/artifacts/store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Authorize each request to a shared artifact against the installation's PostgreSQL share and workspace records. Markdown is delivered with metadata and HTML through its sandbox frame. Both use the configured artifact storage, including inline PostgreSQL on community installations.",
+    "test": "tests/desktop-links.db.test.ts",
+    "suite": "test:desktop-auth"
   },
   "lib/artifacts/storage.ts": {
     "mode": "operator-configured",
@@ -523,6 +543,13 @@
     "behavior": "The application stage is optional on local Compose. Explicit production, preview or development stages take precedence over a provider's stage and invalid values fail validation.",
     "test": "lib/deployment-stage.test.mjs"
   },
+  "lib/device-name.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the persisted 60-character limit when renaming a device. Only a changed, nonempty trimmed name can be submitted from Settings.",
+    "test": "tests/settings-activity.db.test.ts",
+    "suite": "test:settings-activity-db"
+  },
   "lib/device-removal.ts": {
     "mode": "built-in",
     "environment": [],
@@ -559,6 +586,13 @@
     "behavior": "Hold the shared organization policy lock while admitting a service credential.",
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
+  },
+  "lib/eve/auth.ts": {
+    "mode": "operator-configured",
+    "environment": ["BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "MIKKA_APP_ORIGIN", "MIKKA_API_INGRESS", "MIKKA_EVE_HOST"],
+    "behavior": "Self-hosted installations retain their existing signed internal scope and configured application origin. Cloudflare uses private service binding provenance and rejects legacy internal token fallback.",
+    "test": "lib/eve/product-tool.test.ts",
+    "suite": "test:eve-product-tool"
   },
   "lib/eve/cloudflare-task-bridge.ts": {
     "mode": "optional-cloud",
@@ -600,6 +634,13 @@
     "behavior": "Project current Factory attention and completion from authorized PostgreSQL source and candidate receipts on the selected server.",
     "test": "tests/task-presentation.db.test.ts",
     "suite": "test:task-presentation-db"
+  },
+  "lib/factory/questions/schema.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The selected server uses its existing PostgreSQL database and Factory question contract to return pending items before the newest-50 limit, while retaining complete task-history reads.",
+    "test": "lib/factory/questions/ask-user.db.test.ts",
+    "suite": "test:factory-routing-db"
   },
   "lib/factory/review-change.ts": {
     "mode": "built-in",
@@ -656,6 +697,18 @@
     "behavior": "Read only current, explicitly bound service keys visible under both admin roles and rename by the ID of a single issuance.",
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
+  },
+  "lib/governance/organization-invitation-mail.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "MIKKA_ORG_INVITE_EMAIL_ENABLED",
+      "MIKKA_EMAIL_FROM",
+      "SMTP_URL",
+      "RESEND_API_KEY"
+    ],
+    "behavior": "Organization invitation email is an explicit opt-in side effect after the Member-only invitation is committed. The canonical application origin anchors bearer links, and provider failure preserves the manual invite without granting Workspace access.",
+    "test": "lib/governance/organization-invitation-mail.test.ts",
+    "suite": "test:governance"
   },
   "lib/governance/organization-invitations.ts": {
     "mode": "built-in",
@@ -727,6 +780,13 @@
     "test": "lib/hooks/view-state.test.tsx",
     "suite": "test:view-state"
   },
+  "lib/issue-metadata.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Deleted Task metadata supplies the same 30-day recovery deadline to the owner-facing detail and the server restore command. No external service or configuration is required.",
+    "test": "scripts/task-detail-live.test.tsx",
+    "suite": "test:issue-readonly-dom"
+  },
   "lib/issue-threads.ts": {
     "mode": "built-in",
     "environment": [],
@@ -795,21 +855,12 @@
     "behavior": "Recognize local authentication documents and valid Workspace and Organization invitations so invitees can sign in even when Workspace bootstrap is unavailable.",
     "test": "apps/frontend/scripts/auth-only-bootstrap.test.mjs"
   },
-  "lib/slack/api.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "SLACK_BOT_TOKEN"
-    ],
-    "behavior": "An enabled Slack integration supplies its bot token to post a completion to the bound channel and thread. The client classifies Slack errors and retry timing without exposing the token.",
-    "test": "lib/slack/api.test.ts",
-    "suite": "test:slack"
-  },
-  "lib/slack/completion-message.ts": {
+  "lib/swr/keys.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Formats a localized completion from the visible task label and status, escapes Slack mentions, and builds a link using the caller's installation origin and base path.",
-    "test": "lib/slack/completion-message.test.ts",
-    "suite": "test:slack"
+    "behavior": "A confirmed Task status change revalidates the current viewer’s mounted Task presentation reads in its workspace.",
+    "test": "scripts/task-detail-live.test.tsx",
+    "suite": "test:issue-readonly-dom"
   },
   "lib/task-activity-timeline.ts": {
     "mode": "built-in",
@@ -1172,6 +1223,20 @@
     "test": "tests/team-visibility.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "lib/inbox/store.ts": {
+    "mode": "built-in",
+    "environment": ["MIKKA_DATABASE_URL"],
+    "behavior": "Read the same authorized pending requests for board cards, inbox rows and badge counts in the selected workspace.",
+    "test": "lib/inbox/store.db.test.ts",
+    "suite": "test:inbox-db"
+  },
+  "lib/task-presentation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Project the viewer's pending Inbox reason into the board's Agent activity mark while preserving the underlying task lifecycle.",
+    "test": "lib/task-presentation.test.ts",
+    "suite": "test:issues"
+  },
   "lib/inbox/client.ts": {
     "mode": "built-in",
     "environment": [],
@@ -1199,6 +1264,13 @@
     "behavior": "Invalidate existing leases for an actual replacement Task run after the Factory binding transaction finishes.",
     "test": "lib/coding-workspace/review-authority.db.test.ts",
     "suite": "test:coding-workspace-db"
+  },
+  "lib/computer/anonymous-startup-hint.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Build the selected harness's speculative hint from the frozen run configuration. Unsupported or ineligible self-hosted runs use their ordinary worker claim.",
+    "test": "lib/computer/anonymous-startup-hint.test.ts",
+    "suite": "test:cloud-limits"
   },
   "lib/cloud-computer/thread-machines.ts": {
     "mode": "built-in",
@@ -1350,6 +1422,13 @@
     "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
     "test": "lib/coding-workspace/terminal/http.test.ts",
     "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/task-state-query.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the same elapsed-time run history and deadline from the installation's PostgreSQL database in every server time zone, including across daylight-saving changes.",
+    "test": "tests/action-read-egress.db.test.ts",
+    "suite": "test:activity-actor-db"
   },
   "lib/agent-runs.ts": {
     "mode": "built-in",

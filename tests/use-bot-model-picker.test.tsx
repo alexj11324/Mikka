@@ -63,11 +63,11 @@ test('rapid choices are saved in order and sending waits for the last requested 
   const haiku: BotModelMenu = { ...initial, current: { ...initial.current, id: 'haiku', modelId: 'claude-haiku-5-5', provider: 'claude' } }
   try {
     await act(async () => { root.render(<Probe />) })
-    let first!: Promise<boolean>, second!: Promise<boolean>, third!: Promise<boolean>
+    let first!: Promise<boolean>, second!: Promise<boolean>
     await act(async () => { first = picker.choose('haiku') })
     let ready = false
     const send = picker.waitForSave().then(() => { ready = true })
-    await act(async () => { second = picker.choose('old'); third = picker.choose('haiku') })
+    await act(async () => { second = picker.choose('old'); picker.chooseItem('haiku') })
     assert.deepEqual(choices, ['haiku'])
     chooseResult = deferred()
     await act(async () => { releases[0](haiku); await first })
@@ -78,8 +78,10 @@ test('rapid choices are saved in order and sending waits for the last requested 
     assert.deepEqual(choices, ['haiku', 'old', 'haiku'], 'the final choice cannot be skipped against a stale optimistic menu')
     await Promise.resolve()
     assert.equal(ready, false)
-    await act(async () => { releases[2](haiku); await third; await send })
+    await act(async () => { releases[2](haiku); await send })
     assert.equal(picker.menu?.current.id, 'haiku')
+    await act(async () => { picker.chooseItem('haiku'); await picker.waitForSave() })
+    assert.deepEqual(choices, ['haiku', 'old', 'haiku'], 'a confirmed current selection does not write again')
   } finally { await act(async () => root.unmount()) }
 })
 

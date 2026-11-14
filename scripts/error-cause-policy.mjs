@@ -151,7 +151,6 @@ export const droppedCauseAllowlist = {
   'lib/plugins/skill-source.ts': 1,
   'lib/run-control.ts': 1,
   'lib/run-publications.ts': 3,
-  'lib/run-quota.ts': 1,
   'lib/run-repository-retry.ts': 1,
   'lib/schedules/time.ts': 1,
   'lib/search/firecrawl.ts': 1,

@@ -221,7 +221,14 @@ function NewWorkspace({ email }: { email: string }) {
 function ConnectionStatus({ offline, retry }: { offline: boolean; retry: () => void }) {
   const t = useTranslations('DesktopRenderer')
   useEffect(() => {
-    if (offline) toast.error(t('serverUnavailable'), { id: 'desktop-offline', duration: Infinity, description: t('offlineHint'), action: { label: t('retry'), onClick: event => { event.preventDefault(); retry() } } })
+    if (offline) toast.error(t('serverUnavailable'), {
+      id: 'desktop-offline',
+      duration: Infinity,
+      position: 'top-center',
+      closeButton: true,
+      description: t('offlineHint'),
+      action: { label: t('retry'), onClick: event => { event.preventDefault(); retry() } },
+    })
     else toast.dismiss('desktop-offline')
     return () => { toast.dismiss('desktop-offline') }
   }, [offline, t])

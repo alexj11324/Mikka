@@ -175,3 +175,17 @@ test('missing/project tokens and network exception text never enter CLI output',
     assert.doesNotMatch(output.join(''), /phx_|phc_|secret=|example\.com|stack/)
   }
 })
+
+test('an oversized response releases its stream and preserves the refusal reason', async t => {
+  const cwd = await temporaryDirectory(t)
+  let cancelled = false
+  const body = new ReadableStream({
+    start(controller) { controller.enqueue(new Uint8Array(1024 * 1024 + 1)) },
+    cancel() { cancelled = true; return new Promise(() => {}) },
+  })
+  const fake = recordingFetch([new Response(body)])
+  await assert.rejects(exportEvidence({ ...target, timeoutMs: 1000 }, { cwd, key, fetchImpl: fake.fetchImpl }),
+    error => error.code === 'response_too_large' && error.phase === 'create')
+  assert.equal(cancelled, true)
+  assert.equal(body.locked, false)
+})
