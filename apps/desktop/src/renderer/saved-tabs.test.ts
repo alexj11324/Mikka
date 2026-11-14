@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  activeHref, activateTab, addTab, closeTab, createSavedTabs, readSavedTabs,
+  activeHref, activateTab, addTab, closeTab, createSavedTabs, moveHistory, nextTabIndex, readSavedTabs,
   persistableHref, recordHistoryLocation, recordNavigation, SAVED_TABS_KEY, writeSavedTabs,
 } from './saved-tabs.ts'
 
@@ -16,9 +16,14 @@ function storage(initial: Record<string, string> = {}) {
 
 test('saved tabs round-trip and reject malformed or empty stores', () => {
   const store = storage()
-  const tabs = createSavedTabs('/mikka/settings')
+  let tabs = createSavedTabs('/mikka/settings')
+  tabs = recordNavigation(tabs, '/mikka/devices', 'push')
+  tabs = addTab(tabs, '/mikka/teams')
+  tabs = activateTab(tabs, 0)
   assert.equal(writeSavedTabs(store, tabs), true)
-  assert.deepEqual(readSavedTabs(store), tabs)
+  const restored = readSavedTabs(store)
+  assert.deepEqual(restored, tabs)
+  assert.equal(activeHref(restored!), '/mikka/devices')
   assert.equal(readSavedTabs(storage({ [SAVED_TABS_KEY]: '{bad' })), null)
   assert.equal(readSavedTabs(storage({ [SAVED_TABS_KEY]: JSON.stringify({ items: [], active: 0 }) })), null)
   assert.equal(writeSavedTabs(storage(), { items: [], active: 0 }), false)
@@ -35,6 +40,11 @@ test('navigation maintains each tab history, truncates forward history, and trac
   assert.equal(activeHref(tabs), '/mikka/devices')
   tabs = recordNavigation(tabs, '/mikka/devices?filter=mine', 'replace')
   assert.equal(activeHref(tabs), '/mikka/devices?filter=mine')
+  assert.equal(moveHistory(tabs, 'forward'), tabs)
+  const back = moveHistory(tabs, 'back')
+  assert.equal(activeHref(back), '/mikka/settings')
+  assert.equal(back.items[0]?.index, 1)
+  assert.equal(activeHref(moveHistory(back, 'forward')), '/mikka/devices?filter=mine')
 })
 
 test('tabs can be added, activated and closed without losing the remaining active route', () => {
@@ -59,4 +69,13 @@ test('tab recovery excludes authentication, invitation and credential-bearing UR
   assert.equal(persistableHref('/settings?access_token=secret'), null)
   assert.equal(persistableHref('https://example.com/'), null)
   assert.equal(persistableHref('//example.com/path'), null)
+})
+
+test('tablist keyboard navigation wraps and supports Home/End', () => {
+  assert.equal(nextTabIndex(3, 0, 'ArrowLeft'), 2)
+  assert.equal(nextTabIndex(3, 2, 'ArrowRight'), 0)
+  assert.equal(nextTabIndex(3, 1, 'Home'), 0)
+  assert.equal(nextTabIndex(3, 1, 'End'), 2)
+  assert.equal(nextTabIndex(3, 1, 'Enter'), null)
+  assert.equal(nextTabIndex(0, 0, 'ArrowRight'), null)
 })

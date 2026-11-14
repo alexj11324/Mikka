@@ -6379,6 +6379,8 @@
     }
   },
   "DesktopRenderer": {
+    "back": "后退",
+    "forward": "前进",
     "tabsLabel": "已保存的标签页",
     "newTab": "新建标签页",
     "closeTab": "关闭{title}",

@@ -112,6 +112,24 @@ export function closeTab(tabs: SavedTabs, index: number, fallbackHref: string): 
   return { items, active }
 }
 
+export function nextTabIndex(count: number, current: number, key: string): number | null {
+  if (count < 1 || current < 0 || current >= count) return null
+  if (key === 'Home') return 0
+  if (key === 'End') return count - 1
+  if (key === 'ArrowRight') return (current + 1) % count
+  if (key === 'ArrowLeft') return (current - 1 + count) % count
+  return null
+}
+
+export function moveHistory(tabs: SavedTabs, direction: 'back' | 'forward'): SavedTabs {
+  const tab = tabs.items[tabs.active]
+  if (!tab) return tabs
+  const index = tab.index + (direction === 'back' ? -1 : 1)
+  if (index < 0 || index >= tab.entries.length) return tabs
+  const items = tabs.items.map((item, itemIndex) => itemIndex === tabs.active ? { ...item, index } : item)
+  return { items, active: tabs.active }
+}
+
 export function activeHref(tabs: SavedTabs): string {
   const tab = tabs.items[tabs.active]
   return tab?.entries[tab.index] ?? '/'
