@@ -1664,5 +1664,33 @@
     "behavior": "The separately deployed broker uses its configured PostgreSQL database for credential leases. The Vercel handler verifies caller identity, and the private Cloudflare transport requires an explicit runtime environment before validating the bounded lease request.",
     "test": "services/credential-broker/server.test.mjs",
     "suite": "test:self-hosted-broker"
+  },
+  "lib/coordinator/product-instructions.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Native Eve and the application host compose the same current instruction context from the installation scoped stores, preserving memory settings and usage receipts.",
+    "test": "lib/coordinator/prompt-preferences.test.ts",
+    "suite": "test:agent-kit-model"
+  },
+  "lib/coordinator/prompt-context.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The instruction context reads the current owner and Bot memory alongside the existing current prompt preferences without loading chat history.",
+    "test": "lib/coordinator/prompt-preferences.test.ts",
+    "suite": "test:agent-kit-model"
+  },
+  "lib/factory/reconcile-pending.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Native instruction routing and Factory reconciliation use the same owner and Bot scoped eligibility query over the installation database.",
+    "test": "lib/factory/reconcile-pending.test.ts",
+    "suite": "test:factory"
+  },
+  "lib/factory/instructions.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The existing Factory question and check recovery instructions are shared as product policy text with no external service dependency.",
+    "test": "lib/coordinator/prompt-context-concurrency.test.ts",
+    "suite": "test:agent-kit-model"
   }
 }

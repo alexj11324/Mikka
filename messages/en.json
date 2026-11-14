@@ -886,7 +886,7 @@
     "title": "Devices",
     "description": "Connected computers and their available tools.",
     "summary": "{total} devices on this page · {online} online",
-    "listError": "Could not refresh the device list. The previous results are kept.",
+    "listError": "Could not load your devices.",
     "emptyTitle": "No devices yet",
     "emptyDescription": "Install and start Mikka on a computer. It will appear here when it connects.",
     "footer": "A passing check means the latest availability check succeeded; it does not mean the tool is running. Wait for a new result after a check expires.",

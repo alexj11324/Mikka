@@ -4,7 +4,8 @@ import { executionForSession } from '../../../../lib/eve/runtime'
 
 export default defineDynamic(async ctx => {
   if(evaluationBindingId(ctx.session.auth.current))return null
-  const { scope, execution, scheduledRead } = await executionForSession(ctx)
+  const { scope, execution, sourceEventId } = await executionForSession(ctx)
+  const scheduledRead = sourceEventId ? await (await import('../../../../lib/eve/scheduled-read')).loadScheduledRead(scope,sourceEventId) : null
   if (scheduledRead) return null
   const { personalPlugins } = await import('../../../../lib/plugins/runtime')
   const snapshot = execution?.snapshot.personalPlugins ?? await personalPlugins.snapshot(scope.ownerId, undefined, scope.workspaceId)
