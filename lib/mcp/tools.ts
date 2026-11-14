@@ -7,7 +7,7 @@ import type { ModelMessage } from 'ai'
 import { readRun, visibleRuns } from '@/lib/agent-runs'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { peerCoordinatorMessageEvent } from '@/lib/coordinator-events'
-import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
+import { coordinatorEnabled } from '@/lib/coordinator/wake'
 import { db, pool } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
 import { coordinatorSessionScope } from '@/lib/live/coordinator-session'
@@ -34,9 +34,9 @@ const coordinatorChat = (userId: string) => {
   return chatBotId(userId, null, workspaceId)
 }
 
-async function lastPosition(userId: string): Promise<number> {
+async function lastPosition(userId: string, botId: string): Promise<number> {
   const [row] = await db.select({ last: sql<number>`coalesce(max(${coordinatorMessages.position}), 0)` })
-    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, await coordinatorChat(userId))))
+    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, botId)))
   return Number(row?.last ?? 0)
 }
 
@@ -47,9 +47,8 @@ async function lastPosition(userId: string): Promise<number> {
  */
 export async function sendToCoordinator(userId: string, text: string) {
   const botId = await coordinatorChat(userId)
-  const after = await lastPosition(userId)
+  const after = await lastPosition(userId, botId)
   await recordCoordinatorEvent(db, peerCoordinatorMessageEvent(userId, botId, text))
-  await wakeCoordinator(userId)
   return { queued: true, coordinatorRunning: await coordinatorEnabled(userId, botId), after }
 }
 
