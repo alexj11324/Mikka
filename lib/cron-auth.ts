@@ -1,7 +1,9 @@
+import { timingSafeEqual } from 'node:crypto'
+
 const encoder = new TextEncoder()
 const headers = { 'cache-control': 'no-store' }
 
-/** True when `value` is exactly `Bearer <secret>`, compared in constant time (HMACs of both, then XOR). */
+/** True when `value` is exactly `Bearer <secret>`, comparing fixed-size HMACs in constant time. */
 export async function verifyBearer(value: string | null, secret: string) {
   const match = value?.match(/^Bearer (.+)$/)
   if (!match || !secret) return false
@@ -10,11 +12,7 @@ export async function verifyBearer(value: string | null, secret: string) {
     crypto.subtle.sign('HMAC', key, encoder.encode(match[1]!)),
     crypto.subtle.sign('HMAC', key, encoder.encode(secret)),
   ])
-  const actualBytes = new Uint8Array(actual)
-  const expectedBytes = new Uint8Array(expected)
-  let difference = 0
-  for (let index = 0; index < expectedBytes.length; index++) difference |= actualBytes[index]! ^ expectedBytes[index]!
-  return difference === 0
+  return timingSafeEqual(actual, expected)
 }
 
 /**
