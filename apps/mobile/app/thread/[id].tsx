@@ -44,12 +44,13 @@ export default function ThreadScreen() {
   // ended thread changes only when it runs again. Each read is the whole conversation.
   const { data, error, reload } = useLiveApi<ThreadDetail>(`/api/mobile/threads/${id}`, current => threadLive(current, id))
   const canSend = Boolean(data && data.canReply !== false && !conversationAccessDenied(error))
-  const controls = useThreadDeliveryControls(id, data?.issueId ?? null, canSend ? data?.delivery : undefined, reload)
-  const delivery = useConversationDelivery(canSend ? { kind: 'thread', id, issueId: data?.issueId ?? null, delivery: controls.mode } : null,
+  const liveRunId = data?.liveRunId ?? id
+  const controls = useThreadDeliveryControls(liveRunId, data?.issueId ?? null, canSend ? data?.delivery : undefined, reload)
+  const delivery = useConversationDelivery(canSend ? { kind: 'thread', id: liveRunId, issueId: data?.issueId ?? null, delivery: controls.mode } : null,
     [...(data?.confirmedSubmissionIds ?? []), ...(data?.delivery?.queued.map(row => row.requestId) ?? [])], reload)
   const thread = data?.thread
   // 停止 a working thread, as on the web; a thread that ended meanwhile (409) has nothing left to stop.
-  const stopper = useStop(() => api(`/api/mobile/threads/${id}/stop`, { method: 'POST' }).catch(failure => {
+  const stopper = useStop(() => api(`/api/mobile/threads/${liveRunId}/stop`, { method: 'POST' }).catch(failure => {
     if (!(failure instanceof ApiError && failure.status === 409)) throw failure
   }), Boolean(data?.active), reload)
 
@@ -94,7 +95,7 @@ export default function ThreadScreen() {
       <OfflineBanner top={insets.top + 66} />
       {/* R-10: a thread ends in the composer, finished or not; a message to an ended thread runs it again (R-81). */}
       {controls.controls}
-      {data ? <Composer placeholder={MobileCore.messageThread} onSend={text => delivery.send(text)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'thread', id }} onStop={composerStops(data) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
+      {data ? <Composer placeholder={MobileCore.messageThread} onSend={text => delivery.send(text)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'thread', id: liveRunId }} onStop={composerStops(data) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
     </View>
   )
 }
