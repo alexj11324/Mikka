@@ -212,9 +212,19 @@ test('clearing current delegation leaves historical Bot runs out of the Task del
   } finally { await dispose() }
 })
 
-test('the saved delegate is visible before its first run and favorites immediately adopt the server revision', async () => {
+test('a saved Bot is the only displayed assignee before its first run when no member owns the Task', async () => {
   const dispose = await mount()
   try {
+    assert.equal(row('assignee').value.text, 'Assigned bot')
+    assert.equal(row('delegate'), undefined)
+  } finally { await dispose() }
+})
+
+test('the saved delegate is visible before its first run and favorites immediately adopt the server revision', async () => {
+  issue.metadata = { ...issue.metadata, assignee: { kind: 'member', id: 'member', name: 'Assigned member', image: null } }
+  const dispose = await mount()
+  try {
+    assert.equal(row('assignee').value.text, 'Assigned member')
     assert.equal(row('delegate').value.text, 'Assigned bot')
     await act(async () => frame.favorite.toggle())
     assert.equal(issue.revision, 4)
