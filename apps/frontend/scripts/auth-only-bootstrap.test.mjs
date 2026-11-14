@@ -22,7 +22,7 @@ const stateAccess = 'globalThis[Symbol.for("mikka.test.auth-only-bootstrap")]'
 const wrapper = '({ children }) => children'
 const fixtureModules = new Map([
   ['next-intl', `export const NextIntlClientProvider = ${wrapper}; export const useTranslations = () => value => value; export const useLocale = () => 'en';`],
-  ['lucide-react', 'export const ArrowLeft = () => null;'],
+  ['lucide-react', 'export const ArrowLeft = () => null; export const ArrowRight = () => null; export const Plus = () => null; export const X = () => null;'],
   ['sonner', 'export const toast = { error() {}, dismiss() {} };'],
   ['@/messages/en.json', 'export default {};'], ['@/messages/zh-CN.json', 'export default {};'],
   ['@/components/theme-provider', `export const ThemeProvider = ${wrapper};`],

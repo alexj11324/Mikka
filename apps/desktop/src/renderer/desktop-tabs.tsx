@@ -29,6 +29,7 @@ export function DesktopTabs() {
   const safeLocation = persistableHref(`${location.pathname}${location.search}${location.hash}`)
   const enabled = platform === 'desktop' && document.documentElement.dataset.desktopWindow === 'main' && safeLocation !== null
   const initialStoredTabs = useRef<SavedTabs | null>(null)
+  const initialRestoreHandled = useRef(false)
   const [tabs, setTabs] = useState<SavedTabs>(() => {
     initialStoredTabs.current = readStoredTabs()
     return initialStoredTabs.current ?? readInitialTabs(safeLocation ?? '/')
@@ -69,7 +70,8 @@ export function DesktopTabs() {
   }, [enabled])
 
   useEffect(() => {
-    if (!enabled || !safeLocation) return
+    if (!enabled || !safeLocation || initialRestoreHandled.current) return
+    initialRestoreHandled.current = true
     if (initialStoredTabs.current) {
       const restoredHref = activeHref(initialStoredTabs.current)
       if (restoredHref !== safeLocation) {
