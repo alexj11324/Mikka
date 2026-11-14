@@ -1,3 +1,4 @@
+import { connectForCommitEffects } from '../db/commit-effects'
 import 'server-only'
 import { withRunWorkspace } from '@/lib/run-completion'
 import { assertLockedRunProfileClaim, assertRunProfileClaim, refreshCloudRunProfileClaim } from '@/lib/factory/profile-admission'
@@ -19,7 +20,7 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
       WHERE r.id=$1 AND r."deviceId"=$2`, [runId, deviceId])
   if (!stored?.workspaceId) return 'unavailable'
   return await withRunWorkspace<'claimed' | 'unavailable' | 'cloud-required'>(stored.userId, stored.workspaceId, async () => {
-  const client = await pool.connect()
+  const client = await connectForCommitEffects(pool)
   try {
     await client.query('BEGIN')
     await executionIdentityForRun(client, runId)
@@ -57,7 +58,7 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
   if (!stored?.workspaceId || stored.workspaceId !== actor.workspaceId) return null
   return withRunWorkspace(actor.userId, stored.workspaceId, async () => {
   await refreshCloudRunProfileClaim(pool, actor, runId, deviceId, subscriptionBindingId)
-  const client = await pool.connect()
+  const client = await connectForCommitEffects(pool)
   try {
     await client.query('BEGIN')
     // Bot binding takes policy -> run locks. Acquire that same policy lock

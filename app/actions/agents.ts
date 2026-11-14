@@ -263,7 +263,10 @@ export async function pollIssueThreads(issueId: string, includeTaskWork = false)
     const work = includeTaskWork && issue.workspaceId
       ? await (await import('@/lib/task-work-read')).readTaskWork(user, issue.workspaceId, issue.id)
       : null
-    return { threads, live: { workspaceId }, work }
+    const snapshot = { threads, live: { workspaceId }, work }
+    if (!includeTaskWork) return snapshot
+    const { listIssueConnections } = await import('@/app/actions/issue-operations')
+    return { ...snapshot, connections: await listIssueConnections(issue.id) }
   })
 }
 

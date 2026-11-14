@@ -114,7 +114,7 @@ export function FramedTask(props: FramedTaskProps) {
   const team = useIssueTeam({ issueId: task.id, viewerId: userId, disabled: locked })
   const presentation = { data: props.agentActivity.work?.presentation, error: props.agentActivity.failed, retry: props.agentActivity.retry }
 
-  const connections = useIssueConnections({ liveWorkspaceId: props.liveWorkspaceId, viewerId: userId, task, getCurrent, onSaved: adopt, disabled: locked, enabled: !preview })
+  const connections = useIssueConnections({ snapshot: props.agentActivity.connections, liveWorkspaceId: props.liveWorkspaceId, viewerId: userId, task, getCurrent, onSaved: adopt, disabled: locked, enabled: !preview })
 
   const loading = (text = tCommon('loading')): TaskMenuItem[] => optionsError
     ? [{ id: 'reload', label: tCommon('retry'), onSelect: () => { void reloadOptions() } }]

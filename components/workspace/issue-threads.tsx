@@ -33,7 +33,18 @@ export function useIssueThreads(issueId: string, enabled = true) {
   useLiveKey('issue_threads', scope ? issueId : UNRESOLVED_LIST_SCOPE, [unstable_serialize(key)], scope, { minIntervalMs: 2_000 })
   useLiveKey('factory_issue', enabled && scope ? issueId : null, [unstable_serialize(key)], scope, { minIntervalMs: 2_000 })
   useLiveKey('issue_list', enabled && scope ? scope : null, [unstable_serialize(key)], scope, { minIntervalMs: 2_000 })
-  return { ...result, data: result.data?.threads, work: result.error ? undefined : result.data?.work }
+  const hasConnections = result.data && 'connections' in result.data
+  useLiveKey('issue_relations', hasConnections && scope ? issueId : null, [unstable_serialize(key)], scope, { minIntervalMs: 2_000 })
+  // A cached client can still meet an earlier server during a rolling upgrade.
+  const connections = !result.error && result.data && !hasConnections ? undefined : {
+    rows: !result.error && result.data && 'connections' in result.data ? result.data.connections : undefined,
+    error: result.error,
+    refresh: async () => {
+      const updated = await result.mutate()
+      return updated && 'connections' in updated ? updated.connections : undefined
+    },
+  }
+  return { ...result, connections, data: result.data?.threads, work: result.error ? undefined : result.data?.work }
 }
 
 export function harnessLabel(harness: string) {
@@ -60,8 +71,8 @@ export function useAgentActivity(issueId: string, openId: string | null, onOpen:
   const resultLabel = useRunResultLabel()
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
-  const { data, error, mutate, work } = useIssueThreads(issueId, enabled)
-  const snapshot = { work, threads: error ? [] : data ?? [], openThread: onOpen, retry: () => { void mutate() } }
+  const { data, error, mutate, work, connections } = useIssueThreads(issueId, enabled)
+  const snapshot = { work, connections, threads: error ? [] : data ?? [], openThread: onOpen, retry: () => { void mutate() } }
   const { allTasks } = useAcceptanceTasks(enabled ? issueId : null)
   if (!enabled) return { ...snapshot, rows: [], items: [], error: null, failed: null }
   if (error) return { ...snapshot, rows: [], items: [], error: <InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />, failed: { label: t('loadFailed'), retry: () => { void mutate() } } }

@@ -1,3 +1,4 @@
+import { connectForCommitEffects } from '../db/commit-effects'
 import { randomUUID } from "node:crypto";
 import { factoryChanged, factoryCommitted } from '../live/factory';
 import { issueListChanged } from '../live/lists';
@@ -190,7 +191,7 @@ export function createFactoryMerges(
   github: GitHubMergePort,
 ) {
   async function transaction<T>(fn: (tx: PoolClient) => Promise<T>) {
-    const tx = await pool.connect();
+    const tx = await connectForCommitEffects(pool);
     try {
       await tx.query("BEGIN");
       const result = await fn(tx);
