@@ -103,6 +103,15 @@ export async function uploadDriveFiles(workspaceId: string, volumeId: string, ex
   }, send)
 }
 
+/** Remove one path from the displayed head and retain all earlier immutable versions. */
+export function deleteDriveFile(workspaceId: string, volumeId: string, path: string, expectedDigest: string,
+  mutationId: string, send?: typeof fetch) {
+  return request<{ headDigest: string; headVersionId: string }>(url(workspaceId, `/${encodeURIComponent(volumeId)}/entries`), {
+    method: 'PATCH', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ expectedDigest, mutationId, changes: [{ op: 'delete', path }] }),
+  }, send)
+}
+
 export function restoreDriveVersion(workspaceId: string, volumeId: string, versionId: string, expectedDigest: string,
   mutationId: string, send?: typeof fetch) {
   return request<{ headDigest: string; headVersionId: string }>(url(workspaceId, `/${encodeURIComponent(volumeId)}/restore`), {
