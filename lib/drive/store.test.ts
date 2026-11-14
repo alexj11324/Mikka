@@ -58,7 +58,7 @@ function poolFor(state: FakeState) {
     async query(text: string, values: unknown[] = []) {
       state.statements.push(text.replace(/\s+/g, ' ').trim())
       if (text === 'BEGIN' || text === 'COMMIT' || text === 'ROLLBACK') return { rows: [], rowCount: 0 }
-      if (text.includes('FROM drive_volumes WHERE id=$1 FOR UPDATE')) {
+      if (text.includes('FROM drive_volumes WHERE id=$1') && text.endsWith('FOR UPDATE')) {
         const found = state.volumes.filter(v => v.id === values[0])
         return { rows: found.map(v => ({ ...v, totalBytes: String(v.totalBytes) })), rowCount: found.length }
       }
