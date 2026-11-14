@@ -7,7 +7,7 @@ export const workerMailboxScope = z.strictObject({ botId: z.uuid().nullable(), w
 export type WorkerMailboxScope = z.infer<typeof workerMailboxScope>
 export interface WorkerMailboxGrant { version: 2; tools: MailboxToolName[]; scope: WorkerMailboxScope }
 const MAILBOX_TOOL_NAMES = Object.keys(mailboxInputs) as MailboxToolName[]
-export function snapshotMailboxTools(snapshot: DefinitionSnapshot | null | undefined): MailboxToolName[] {
+export function snapshotMailboxTools(snapshot: Pick<DefinitionSnapshot, 'definition' | 'effectiveTools'> | null | undefined): MailboxToolName[] {
   return MAILBOX_TOOL_NAMES.filter(name => snapshot?.effectiveTools?.includes(name) && snapshot.definition?.tools?.includes(name))
 }
 /** Reads trusted stored snapshots only. A parsed model body is never a grant. */

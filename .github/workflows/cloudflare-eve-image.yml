@@ -58,7 +58,7 @@ jobs:
     timeout-minutes: 60
     env:
       NITRO_PRESET: node-server
-      MIKKA_EVE_WORKFLOW_WORLD: cloudflare
+      WORKFLOW_TARGET_WORLD: '@workflow/world-postgres'
       NODE_OPTIONS: --max-old-space-size=6144
       MIKKA_BUILD_REVISION: ${{ github.sha }}
       # Ordinary qualification builds the public server resources.
@@ -72,6 +72,7 @@ jobs:
           skip-electron: 'true'
       - name: Bind the existing release format
         run: echo "MIKKA_DEPLOYMENT_ID=$(node lib/deployment-id.mjs)" >> "$GITHUB_ENV"
+      # The business API publisher consumes this existing World artifact.
       - name: Bundle the private World authority from the locked public source
         env:
           WRANGLER_SEND_METRICS: 'false'
@@ -99,11 +100,6 @@ jobs:
         run: bash scripts/build-cloudflare-eve-image.sh
       - name: Build the portable Node 24 image
         run: docker build -f cloudflare/eve-runtime/Dockerfile -t mikka-eve-qualification .
-      - name: Start the compiled host and require the native World
-        run: |
-          docker run --rm --network none \
-            --mount "type=bind,src=$PWD/cloudflare/eve-runtime/test/compiled-host.mjs,dst=/acceptance.mjs,readonly" \
-            mikka-eve-qualification node /acceptance.mjs
   publish:
     permissions:
       contents: read
@@ -115,7 +111,7 @@ jobs:
     timeout-minutes: 60
     env:
       NITRO_PRESET: node-server
-      MIKKA_EVE_WORKFLOW_WORLD: cloudflare
+      WORKFLOW_TARGET_WORLD: '@workflow/world-postgres'
       NODE_OPTIONS: --max-old-space-size=6144
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -165,6 +161,7 @@ jobs:
         run: |
           test "$MIKKA_RUNTIME_RELEASE" = "$MAINTENANCE_OWNER_RELEASE"
           test "$RUNTIME_IMAGE_TAG" = "$MIKKA_DEPLOYMENT_ID-maintenance-$MAINTENANCE_OWNER_RELEASE"
+      # The business API publisher consumes this existing World artifact.
       - name: Bundle the private World authority from the locked public source
         env:
           WRANGLER_SEND_METRICS: 'false'
@@ -200,11 +197,6 @@ jobs:
           docker build -f cloudflare/eve-runtime/Dockerfile --label "org.opencontainers.image.revision=$MIKKA_BUILD_REVISION" --label "com.mikka.overlay=$MIKKA_UI_OVERLAY_SHA" --label "com.mikka.release=$MIKKA_DEPLOYMENT_ID" "${labels[@]}" -t "mikka-eve:$image_tag" .
           image_id=$(docker image inspect --format '{{.Id}}' "mikka-eve:$image_tag")
           echo "RUNTIME_TESTED_IMAGE_ID=$image_id" >> "$GITHUB_ENV"
-      - name: Start the compiled host and require the native World
-        run: |
-          docker run --rm --network none \
-            --mount "type=bind,src=$PWD/cloudflare/eve-runtime/test/compiled-host.mjs,dst=/acceptance.mjs,readonly" \
-            "$RUNTIME_TESTED_IMAGE_ID" node /acceptance.mjs
       - name: Issue a short-lived Registry publication credential
         id: registry
         uses: ./.github/actions/cloudflare-registry-credentials

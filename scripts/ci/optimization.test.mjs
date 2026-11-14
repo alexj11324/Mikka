@@ -110,3 +110,27 @@ test('installed cache writes are main-only and a miss installs; hits do not inst
   assert.equal(checksInstall.env.ELECTRON_SKIP_BINARY_DOWNLOAD, '1')
   for (const step of installerJobs) assert.equal(step.env.ELECTRON_SKIP_BINARY_DOWNLOAD, undefined)
 })
+
+
+test('Eve migration and maintenance check out the Eve publication source and other phases keep the application source', async () => {
+  const { mkdtemp, mkdir, writeFile, readFile, rm } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const step = workflow('cloudflare-app-deploy').jobs['deploy-application'].steps.find(step => step.id === 'product')
+  const script = step.run.split("<<'JS'\n")[1].replace(/\nJS\s*$/, '')
+  const directory = await mkdtemp(join(tmpdir(), 'eve-release-source-'))
+  try {
+    await mkdir(join(directory, 'docs/operations/releases'), { recursive: true })
+    const application = 'a'.repeat(40), eve = 'b'.repeat(40)
+    await writeFile(join(directory, 'docs/operations/releases/hosted-api-staging.json'), JSON.stringify({ publicSource: application }))
+    await writeFile(join(directory, 'docs/operations/releases/eve-runtime-production.json'), JSON.stringify({ maintenancePublication: { publicSource: eve } }))
+    for (const phase of ['production-eve-postgres', 'production-eve-maintenance', 'production-api', 'stage-all']) {
+      const output = join(directory, 'output')
+      await writeFile(output, '')
+      const child = spawnSync(process.execPath, ['--input-type=module'], { input: script, cwd: directory,
+        env: { PATH: process.env.PATH, MIKKA_DEPLOYMENT_PHASE: phase, GITHUB_OUTPUT: output }, encoding: 'utf8' })
+      assert.equal(child.status, 0, child.stderr)
+      assert.equal(await readFile(output, 'utf8'), 'source=' + (['production-eve-postgres', 'production-eve-maintenance'].includes(phase) ? eve : application) + '\n')
+    }
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})

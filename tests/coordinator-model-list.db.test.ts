@@ -1,5 +1,5 @@
 // Every turn the Coordinator and every Bot are told the allowed models (优先使用的模型) before they dispatch, and the
-// host takes only those: against a real PostgreSQL, through prepareEveInstructions and the dispatch steps. Model ids are
+// host takes only those: against a real PostgreSQL, through composeEveInstructions and the dispatch steps. Model ids are
 // fixtures standing for what an account reported.
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
@@ -15,6 +15,7 @@ test('allowed models: every entry in every Bot\'s cached prompt, and a model out
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const steps = await import('../workflows/coordinator/steps')
+  const { composeEveInstructions } = await import('../lib/coordinator/product-instructions')
   const order = await import('../lib/model-order')
   const { chatBotId } = await import('../lib/coordinator/coordinator-bot')
   const github = githubAppStub()
@@ -77,7 +78,7 @@ test('allowed models: every entry in every Bot\'s cached prompt, and a model out
 
   await t.test('the Coordinator and a Bot both get the whole list, in the cached prefix, byte for byte the same on the next turn', async () => {
     for (const botId of [coordinator, bot]) {
-      const instructions = await steps.prepareEveInstructions(userId, botId)
+      const instructions = await composeEveInstructions(userId, botId)
       const head = instructions.indexOf('Allowed models (优先使用的模型), in the order a new thread tries them')
       assert.ok(head >= 0, `the list reaches ${botId === bot ? 'the Bot' : 'the Coordinator'}`)
       const lines = instructions.slice(head).split('\n').slice(1, 6)
@@ -87,7 +88,7 @@ test('allowed models: every entry in every Bot\'s cached prompt, and a model out
       assert.equal(lines[0], `1. Codex (codex) fx-codex-a · codex subscription · runs on: Fixture Mac (computer) · not on: ${old}`)
       assert.equal(lines[2], `3. Codex (codex) fx-codex-c · codex subscription · runs on: Fixture Mac (computer) · not on: ${old}`)
       assert.equal(lines[3], '4. Claude Code (claude_code) fx-claude-a · claude subscription · runs on: nowhere yet · not on: Fixture Mac (computer): Agent not installed; Old Mac (computer): Agent not installed')
-      assert.equal(await steps.prepareEveInstructions(userId, botId), instructions, 'unchanged product context is stable across turns')
+      assert.equal(await composeEveInstructions(userId, botId), instructions, 'unchanged product context is stable across turns')
     }
   })
 
