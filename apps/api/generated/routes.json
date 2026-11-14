@@ -886,6 +886,16 @@
       "sourceHash": "b98372d049ac5668b2a781ac9dd9ecae11cb9ee35fbe22c2ff99d9c54f5fd0c2"
     },
     {
+      "path": "/mikka/api/drive/volumes/[volumeId]/archive",
+      "template": "/api/drive/volumes/[volumeId]/archive",
+      "source": "app/api/drive/volumes/[volumeId]/archive/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": 60,
+      "sourceHash": "bbaa3c3b86bf682d984db8cc38ad05ebd66dd7a5f2db215ce4cfc73475a892b3"
+    },
+    {
       "path": "/mikka/api/drive/volumes/[volumeId]/blobs",
       "template": "/api/drive/volumes/[volumeId]/blobs",
       "source": "app/api/drive/volumes/[volumeId]/blobs/route.ts",
@@ -924,6 +934,16 @@
       ],
       "maxDuration": 60,
       "sourceHash": "2db93bc30c9850d560d9a0c3e2dbc6f477c4510db113173ed91dd3fa7d3f66ee"
+    },
+    {
+      "path": "/mikka/api/drive/volumes/[volumeId]/unarchive",
+      "template": "/api/drive/volumes/[volumeId]/unarchive",
+      "source": "app/api/drive/volumes/[volumeId]/unarchive/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": 60,
+      "sourceHash": "4494a0b1fae5e272164446c1497e1406aa5656d0fe31324b8843ef4a959adc70"
     },
     {
       "path": "/mikka/api/drive/volumes/[volumeId]/versions",

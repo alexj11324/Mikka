@@ -28,7 +28,9 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
   const history = await import('../../app/api/drive/volumes/[volumeId]/versions/route')
   const version = await import('../../app/api/drive/volumes/[volumeId]/versions/[versionId]/route')
   const restore = await import('../../app/api/drive/volumes/[volumeId]/restore/route')
-  const handlers = { blobs: upload.POST, entries: entries.PATCH, files: file.GET, versions: history.GET, restore: restore.POST }
+  const archive = await import('../../app/api/drive/volumes/[volumeId]/archive/route')
+  const unarchive = await import('../../app/api/drive/volumes/[volumeId]/unarchive/route')
+  const handlers = { archive: archive.POST, unarchive: unarchive.POST, blobs: upload.POST, entries: entries.PATCH, files: file.GET, versions: history.GET, restore: restore.POST }
   const server = createServer(async (incoming, outgoing) => {
     try {
       const chunks: Buffer[] = []
@@ -199,6 +201,41 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
   const nextPage = await (await call(`?limit=1&before=${firstPage.nextCursor}`)).json()
   assert.equal(nextPage.volumes[0].id, volume.id)
   assert.equal(nextPage.nextCursor, null)
+  await t.test('archive retains a personal volume and its immutable versions until its owner reopens it', async () => {
+    const active = await (await call(`/${volume.id}`)).json()
+    const versions = (await (await call(`/${volume.id}/versions`)).json()).versions
+    for (const action of ['archive', 'unarchive']) {
+      assert.equal((await call(`/${volume.id}/${action}`, { method: 'POST', token: null })).status, 401)
+      assert.equal((await call(`/${volume.id}/${action}`, { method: 'POST', token: sharedToken, workspaceId: team.id })).status, 404)
+      assert.equal((await call(`/${otherVolume.id}/${action}`, { method: 'POST', token: peerToken, workspaceId: team.id })).status, 404)
+      assert.equal((await call(`/${volume.id}/${action}`, { method: 'POST', origin: 'https://other.invalid' })).status, 403)
+    }
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const result = await call(`/${volume.id}/archive`, { method: 'POST' })
+      assert.equal(result.status, 200)
+      assert.deepEqual(await result.json(), { archived: true })
+    }
+    const listIds = async (path: string) => (await (await call(path)).json()).volumes.map((v: { id: string }) => v.id)
+    assert.ok(!(await listIds('')).includes(volume.id))
+    assert.deepEqual(await listIds('?archived=true'), [volume.id])
+    for (const suffix of ['', '/versions', `/versions/${first.headVersionId}`, '/files?path=notes%2Fresult.txt']) {
+      assert.equal((await call(`/${volume.id}${suffix}`)).status, 404)
+    }
+    assert.equal((await call(`/${volume.id}/entries`, { method: 'PATCH', body: writeA })).status, 404)
+    assert.equal((await call(`/${volume.id}/restore`, { method: 'POST', body: { versionId: first.headVersionId, expectedDigest: active.head.headDigest, mutationId: randomUUID() } })).status, 404)
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const result = await call(`/${volume.id}/unarchive`, { method: 'POST' })
+      assert.equal(result.status, 200)
+      assert.deepEqual(await result.json(), { archived: false })
+    }
+    assert.ok((await listIds('')).includes(volume.id))
+    assert.deepEqual(await listIds('?archived=true'), [])
+    assert.deepEqual((await (await call(`/${volume.id}`)).json()).head, active.head)
+    assert.deepEqual((await (await call(`/${volume.id}/versions`)).json()).versions, versions)
+    const oldFile = await call(`/${volume.id}/files?path=notes%2Fresult.txt&versionId=${first.headVersionId}`)
+    assert.equal(oldFile.status, 200)
+    assert.equal(await oldFile.text(), 'first file bytes')
+  })
   await fixture.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [team.id, owner])
   assert.equal((await call(`/${otherVolume.id}`, { token: sharedToken, workspaceId: team.id })).status, 401)
   await fixture.query(`UPDATE personal_access_tokens SET "revokedAt"=now() WHERE "userId"=$1`, [owner])

@@ -166,7 +166,7 @@ export async function applyDriveWrite(
     // move between the comparison and the write that depends on it.
     const { rows: [volume] } = await client.query<{
       id: string; ownerId: string; driveScope: DriveScope; headVersionId: string; headDigest: string; entryCount: number; totalBytes: string
-    }>('SELECT id,"ownerId","driveScope","headVersionId","headDigest","entryCount","totalBytes" FROM drive_volumes WHERE id=$1 FOR UPDATE', [scope.volumeId])
+    }>('SELECT id,"ownerId","driveScope","headVersionId","headDigest","entryCount","totalBytes" FROM drive_volumes WHERE id=$1 AND "archivedAt" IS NULL FOR UPDATE', [scope.volumeId])
     if (!volume || volume.ownerId !== scope.ownerId) throw new DriveError('drive_not_found', 404)
     if (scope.driveScope && volume.driveScope !== scope.driveScope) throw new DriveError('drive_not_found', 404)
 
@@ -282,7 +282,7 @@ const versionIdFor = () => `vver_${nextVersionId()}`
 export async function readDriveHead(database: { query: Pool['query'] }, scope: { ownerId: string; volumeId: string }):
   Promise<{ headVersionId: string; headDigest: string; entries: DriveManifestEntry[] }> {
   const { rows: [volume] } = await database.query<{ ownerId: string; headVersionId: string; headDigest: string }>(
-    'SELECT "ownerId","headVersionId","headDigest" FROM drive_volumes WHERE id=$1', [scope.volumeId])
+    'SELECT "ownerId","headVersionId","headDigest" FROM drive_volumes WHERE id=$1 AND "archivedAt" IS NULL', [scope.volumeId])
   if (!volume || volume.ownerId !== scope.ownerId) throw new DriveError('drive_not_found', 404)
   const { rows } = await database.query<{ path: string; mode: number; sizeBytes: number; sha256: string }>(
     'SELECT path,mode,"sizeBytes",sha256 FROM drive_volume_entries WHERE "volumeId"=$1 ORDER BY path', [scope.volumeId])
@@ -304,7 +304,7 @@ export async function readDriveHistory(
   options: { limit?: number; beforeId?: string } = {},
 ): Promise<DriveVersionSummary[]> {
   const limit = Math.min(Math.max(options.limit ?? 50, 1), 200)
-  const { rows: [volume] } = await database.query<{ ownerId: string }>('SELECT "ownerId" FROM drive_volumes WHERE id=$1', [volumeId])
+  const { rows: [volume] } = await database.query<{ ownerId: string }>('SELECT "ownerId" FROM drive_volumes WHERE id=$1 AND "archivedAt" IS NULL', [volumeId])
   if (!volume || volume.ownerId !== actor.ownerId) throw new DriveError('drive_not_found', 404)
   // A cursor is the last id already seen; ULIDs sort by time, so it doubles as
   // a stable page boundary without an offset that shifts under new writes.
@@ -332,7 +332,7 @@ export async function readDriveVersion(
   }>(`SELECT v.id,v."volumeId",v.seq,v.kind,v."fileCount",v."totalBytes",v.digest,v.manifest,v."threadId",v."threadTitle",
         v."authorName",v."restoredFromVersionId",v."createdAt",d."ownerId"
       FROM drive_volume_versions v JOIN drive_volumes d ON d.id=v."volumeId"
-      WHERE v.id=$1 AND v."volumeId"=$2`, [versionId, volumeId])
+      WHERE v.id=$1 AND v."volumeId"=$2 AND d."archivedAt" IS NULL`, [versionId, volumeId])
   if (!version || version.ownerId !== actor.ownerId) throw new DriveError('drive_not_found', 404)
   return { id: version.id, seq: version.seq, kind: version.kind, fileCount: version.fileCount,
     totalBytes: Number(version.totalBytes), digest: version.digest, threadId: version.threadId,
@@ -359,7 +359,7 @@ export async function restoreDriveVersion(
   return withTransaction(database, async client => {
     const { rows: [volume] } = await client.query<{
       id: string; ownerId: string; headVersionId: string; headDigest: string
-    }>('SELECT id,"ownerId","headVersionId","headDigest" FROM drive_volumes WHERE id=$1 FOR UPDATE', [scope.volumeId])
+    }>('SELECT id,"ownerId","headVersionId","headDigest" FROM drive_volumes WHERE id=$1 AND "archivedAt" IS NULL FOR UPDATE', [scope.volumeId])
     if (!volume || volume.ownerId !== scope.ownerId) throw new DriveError('drive_not_found', 404)
 
     // A restore is idempotent for the same reason a write is.
