@@ -1,5 +1,7 @@
+import { threadModelProjection } from '@/lib/context-usage'
 import { asc, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
+import { threadReadReceipts } from '@/lib/thread-reads'
 import { db, pool } from '@/lib/db'
 import { agentRuns, runChunks } from '@/lib/db/schema'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
@@ -34,6 +36,7 @@ async function handleGET(request: Request, { params }: Params) {
   const from = chain ? Math.max(0, chain.attempts.findIndex(attempt => attempt.runId === detail.run.id)) : 0
   const runIds = chain ? chain.attempts.slice(from).map(attempt => attempt.runId) : [detail.run.id]
   const live = chain?.attempts.find(attempt => attempt.runId === chain.latestRunId)?.status ?? detail.run.status
+  const readReceipts = detail.run.agentId ? await threadReadReceipts(user.id, runIds) : []
   const chunks = chainChunks(await db.select({ runId: runChunks.runId, chunk: runChunks.chunk, at: runChunks.createdAt }).from(runChunks)
     .innerJoin(agentRuns, eq(agentRuns.id, runChunks.runId))
     .where(inArray(runChunks.runId, runIds)).orderBy(asc(agentRuns.createdAt), asc(runChunks.seq)))
@@ -44,12 +47,14 @@ async function handleGET(request: Request, { params }: Params) {
   )
   // A run paused on its subscription's quota: when it resets and whether a key can take over (the web's ThreadQuotaPausedCard).
   const liveRunId = chain?.latestRunId ?? detail.run.id
-  const [{ paused }, runs] = await Promise.all([
+  const [model, { paused }, runs] = await Promise.all([
+    pool.query<{ selectedModel: string | null; servedModel: string | null }>(
+      `SELECT ${threadModelProjection} FROM agent_runs latest WHERE latest.id=$1 AND latest."userId"=$2`, [liveRunId, user.id]),
     live === 'paused' ? threadQuotaView(user.id, [liveRunId], liveRunId) : { paused: null },
     // Where each run's thread and run keys arrive (the web's thread panel listens to the same).
     threadLiveReferences(pool, workspacePool, runIds, user.id),
   ])
-  return json({ issueId: detail.run.issueId, canReply: Boolean(detail.run.agentId), confirmedSubmissionIds: messages.flatMap(message => message.submissionId ? [message.submissionId] : []), live: { runs }, thread, active: runIsActive(live), working: runIsWorking(live), paused, summary: detail.run.report && typeof detail.run.report.summary === 'string' ? detail.run.report.summary : null, error: detail.run.error, items })
+  return json({ readReceipts, liveRunId, composerModel: model.rows[0] ?? null, issueId: detail.run.issueId, canReply: Boolean(detail.run.agentId), confirmedSubmissionIds: messages.flatMap(message => message.submissionId ? [message.submissionId] : []), live: { runs }, thread, active: runIsActive(live), working: runIsWorking(live), paused, summary: detail.run.report && typeof detail.run.report.summary === 'string' ? detail.run.report.summary : null, error: detail.run.error, items })
 }
 
 /** `POST /api/mobile/threads/:id` with `{ text }`: a message to the thread; the daemon delivers it, or an ended thread runs again. */

@@ -1,3 +1,4 @@
+import { useThreadReadEnd } from '@/features/chat/model/use-thread-read-end'
 import { conversationAccessDenied, useConversationDelivery } from '@/features/chat/components/conversation-delivery'
 import { mobileMessages } from '@/lib/messages'
 import { useCallback, useRef, useState, type ReactNode } from 'react'
@@ -18,7 +19,7 @@ import { ReadNotice } from '@/components/ReadNotice'
 import { StopFailed } from '@/components/StopFailed'
 import { Text } from '@/components/Text'
 import { ThreadQuotaPaused } from '@/components/ThreadQuotaPaused'
-import { Composer } from '@/features/chat/components/chat-composer'
+import { ThreadComposer } from '@/features/chat/components/thread-composer'
 import { api, ApiError } from '@/lib/api'
 import { useHome } from '@/lib/home'
 import { tasksLive, threadLive } from '@/lib/live-keys'
@@ -72,6 +73,7 @@ export function TaskConversationScreen() {
     if (!(failure instanceof ApiError && failure.status === 409)) throw failure
   }), Boolean(live?.active), reload)
 
+  const readEnd = useThreadReadEnd(error ? undefined : Object.values(data?.threads ?? {}).flatMap(thread => thread.readReceipts ?? []), bar.onScroll)
   const task = data?.detail.task
   const agent = currentAgent(segments)
   // Opened on an attempt from 活动: scrolled to its part, once. Opened plainly: at the newest, at the bottom, as a chat.
@@ -98,7 +100,7 @@ export function TaskConversationScreen() {
           </View>
         ) : undefined}
       />
-      <KeyboardChatScrollView onScroll={bar.onScroll} scrollEventThrottle={16} ref={scroller as never} onContentSizeChange={place} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
+      <KeyboardChatScrollView {...readEnd} scrollEventThrottle={16} ref={scroller as never} onContentSizeChange={(width, height) => { readEnd.onContentSizeChange(width, height); place() }} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
         {!data && !error ? <View style={styles.center}><Spinner /></View> : null}
         <ReadNotice error={error} hasData={Boolean(data)} label={mobileMessages.Coordinator.conversation} onRetry={reload} />
         {/* A factory task's one stage, and what it needs from you (2026-11-04-2200); nothing without a flow. */}
@@ -123,7 +125,7 @@ export function TaskConversationScreen() {
       </KeyboardChatScrollView>
       <OfflineBanner top={insets.top + 66} />
       {/* R-10: the conversation ends in the composer; a message to an ended attempt runs it again (R-81). */}
-      {live && newest ? <Composer placeholder={mobileMessages.MobileCore.messageTask} onSend={text => delivery.send(text)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'thread', id: newest }}
+      {live && newest ? <ThreadComposer detail={live} runId={newest} placeholder={mobileMessages.MobileCore.messageTask} onSend={(text, choice) => delivery.send(text, [], choice)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'thread', id: newest }}
         onStop={composerStops(live) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
     </View>
   )
@@ -135,7 +137,7 @@ function Item({ item, live }: { item: ThreadItem; live: boolean }) {
       return <ThreadSteps steps={item.steps} count={item.count} live={live} />
     case 'agent': return <View style={styles.message}><BotBubble><Markdown text={item.text} /></BotBubble></View>
     case 'error': return <AttemptError raw={item.text} />
-    case 'person': return <View style={styles.message}><MyBubble text={item.text} /></View>
+    case 'person': return <View style={styles.message}><MyBubble text={item.text} threadReferences /></View>
   }
 }
 

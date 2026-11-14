@@ -31,7 +31,7 @@ export function useHomeChats(needle = '') {
       hidden: Boolean(own?.hidden), markedUnread: Boolean(own?.markedUnread),
       pinOrder: own?.pinOrder ?? null, listOrder: own?.listOrder ?? null,
       coordinator: row.kind === 'bot' && Boolean(row.bot.coordinator), working: row.kind === 'bot' && row.bot.working,
-      unread: row.kind === 'group' ? Number(row.group.unreadCount) || 0 : 0,
+      unread: row.kind === 'group' ? Number(row.group.unreadCount) || 0 : row.bot.unreadCount ?? 0,
       waiting: row.kind === 'bot' ? row.bot.waiting ?? 0 : 0,
     }
     return { ...base, ...pending[key] }

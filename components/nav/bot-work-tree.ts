@@ -7,7 +7,7 @@ import { compactTaskTitle, conversationTitle } from '@/lib/short-title'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 export type BotWorkRun = { id: string; name: string; harness: string | null }
-export type BotWorkTask = { id: string; issueId: string | null; name: string; fullName: string; /** The task's status field; null for a run that has no task. */ status: string | null; /** What a conversation with no task is doing, for its one mark; null for a task row, whose one icon is its status. */ activity: RunIndicator | null; state: TaskState | null; reason: TaskReason | null; runs: BotWorkRun[] }
+export type BotWorkTask = { unreadCount?: number; id: string; issueId: string | null; name: string; fullName: string; /** The task's status field; null for a run that has no task. */ status: string | null; /** What a conversation with no task is doing, for its one mark; null for a task row, whose one icon is its status. */ activity: RunIndicator | null; state: TaskState | null; reason: TaskReason | null; runs: BotWorkRun[] }
 
 type Dispatch = NonNullable<TaskPresentation['botDispatches']>[number]
 const taskRow = (issue: Issue, presentation: TaskPresentation, dispatch: Dispatch): BotWorkTask => ({
@@ -65,9 +65,12 @@ export function botWorkTree(workspaceId: string | null, botIds: readonly string[
       if (!rows.has(issue.id)) rows.set(issue.id, taskRow(issue, projected, dispatch))
     }
   }
+  const unread = new Set(threads.filter(run => run.unread).map(run => run.id))
   const createdAt = new Map(threads.map(run => [run.id, run.createdAt]))
   for (const [botId, rows] of grouped) {
     for (const row of rows.values()) {
+      const unreadCount = row.runs.filter(run => unread.has(run.id)).length
+      if (unreadCount) row.unreadCount = unreadCount
       const [latest, ...older] = row.runs
       row.runs = [latest, ...older.sort((a, b) => (createdAt.get(b.id) ?? '').localeCompare(createdAt.get(a.id) ?? '') || b.id.localeCompare(a.id))]
     }

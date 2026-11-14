@@ -73,13 +73,50 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'MacBook','local','laptop',true,now(),$3)`, [deviceId, id, JSON.stringify(mac)])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [randomUUID(), id, deviceId, `codex-${deviceId.slice(0, 8)}`])
     const botId = await chatBotId(id, null, ws.id)
-    return { id, issueId, botId, ws }
+    return { id, issueId, botId, ws, connection, deviceId }
   }
   const end = (runId: string, status: string) => pool.query(`UPDATE agent_runs SET status=$2,"finishedAt"=now(),"updatedAt"=now() WHERE id=$1`, [runId, status])
 
+  // An admitted test subscription reports a fresh allowance. Keep the original
+  // plan, limits and status when a later subtest reuses a long-lived account.
+  async function observeFixtureAllowance(account: { id: string; connection: string }) {
+    const result = await pool.query(
+      `UPDATE byos_connections SET quota=jsonb_set(quota,'{observedAt}',to_jsonb($3::text))
+       WHERE id=$1 AND "ownerId"=$2 AND state='connected'`,
+      [account.connection, account.id, new Date().toISOString()],
+    )
+    assert.equal(result.rowCount, 1)
+  }
   const a = await person()
   const first = await steps.dispatchRun(a.id, { issueId: a.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, a.botId) as unknown as { runId: string; thread: string }
   assert.equal(first.thread, 'new', JSON.stringify(first))
+
+  await t.test('a supported continuation freezes the selected model and subscription, including across a lost acknowledgement', async () => {
+    const b = await person()
+    const initial = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: 'picked:' + randomUUID() }, undefined, b.botId) as unknown as { runId: string }
+    const second = 'gpt-5.1', id = randomUUID()
+    const choice = { model: second, source: { kind: 'subscription' as const, connectionId: b.connection } }
+    const { threadModelMenu } = await import('../lib/thread-model-menu')
+    assert.equal(await threadModelMenu(b.id, b.ws.id, b.issueId, initial.runId), null)
+    await assert.rejects(sendThreadMessage(b.id, initial.runId, 'Running stays frozen.', 'user', randomUUID(), choice), /threadCannotContinue/)
+    await end(initial.runId, 'succeeded')
+    await pool.query(`UPDATE byos_connections SET "modelCatalog"=$2 WHERE id=$1`, [b.connection, JSON.stringify({ revision: '1', models: ['gpt-5', second] })])
+    await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa',$5)`, [randomUUID(), b.id, b.ws.id, b.connection, second])
+    await pool.query(`UPDATE devices SET harnesses=$2 WHERE id=$1`, [b.deviceId, JSON.stringify(mac.map(h => ({ ...h, modelSlots: [...h.modelSlots, { slot: second, model: second, name: second }] })))])
+    const menu = await threadModelMenu(b.id, b.ws.id, b.issueId, initial.runId)
+    assert.ok(menu?.groups.some(group => group.options.some(option => option.modelId === second)))
+    assert.equal(await threadModelMenu(a.id, a.ws.id, b.issueId, initial.runId), null)
+    assert.equal(await threadModelMenu(b.id, b.ws.id, a.issueId, initial.runId), null)
+    await assert.rejects(threadModelMenu(b.id, a.ws.id, b.issueId, initial.runId), (error: {code?: string}) => error.code === 'workspaceAccessDenied')
+    const receipt = await sendThreadMessage(b.id, initial.runId, 'Continue with this model.', 'user', id, choice)
+    assert.equal(receipt.continued, true)
+    const {rows: [frozen]} = await pool.query(`SELECT "agentDefinition" FROM agent_runs WHERE id=$1`, [receipt.runId])
+    assert.equal(frozen.agentDefinition.model, second)
+    assert.equal(frozen.agentDefinition.modelDispatch.entry.source.connectionId, b.connection)
+    assert.equal(frozen.agentDefinition.modelDispatch.mode, 'picked')
+    assert.deepEqual(await sendThreadMessage(b.id, initial.runId, 'Continue with this model.', 'user', id, choice), receipt)
+    await assert.rejects(sendThreadMessage(b.id, initial.runId, 'Continue with this model.', 'user', id, { ...choice, model: 'gpt-5' }), /submissionConflict/)
+  })
 
   await t.test('a dispatch records its entry and a person continuation is an app entry', async () => {
     const c = await person()
@@ -267,6 +304,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       await assert.rejects(sendThreadMessage(b.id, initial.runId, 'Changed answer.', human, requestId), { code: 'submissionConflict' })
       await assert.rejects(sendThreadMessage(a.id, initial.runId, text, human, requestId), { code: 'runNotFound' })
       await pool.query('UPDATE thread_machines SET "workerLeaseUntil"=NULL WHERE "runId"=$1', [initial.runId])
+      await observeFixtureAllowance(b)
       const retried = await Promise.all(Array.from({ length: 3 }, () => sendThreadMessage(b.id, initial.runId, text, human, requestId)))
       const accepted = retried[0]
       for (const result of retried) assert.deepEqual(result, accepted)
@@ -466,6 +504,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
   })
 
   await t.test('repeated owner text is a fresh request after an intervening target', async () => {
+    await observeFixtureAllowance(a)
     const epochs: string[] = [];
     for (const text of ['Use exactly 74 bytes.', 'Use exactly 77 bytes.', 'Use exactly 74 bytes.']) {
       await sendThreadMessage(a.id, first.runId, text);
@@ -480,6 +519,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     // executor. End the current run, while keeping the original thread URL.
     let last = (await readRunChain(pool, a.id, first.runId))!.latestRunId
     for (const status of ['succeeded', 'failed', 'stopped', 'cancelled']) {
+      await observeFixtureAllowance(a)
       await end(last, status)
       const text = `Go on after ${status}.`
       // Sent from the thread as it was opened: the first run's id, never the newest.

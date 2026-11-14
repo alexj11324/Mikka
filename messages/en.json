@@ -3882,6 +3882,7 @@
     "contextEstimated": "Estimated from stored text, not a provider token count",
     "contextNoWindow": "Mikka stores no model context window, so no share of one is shown",
     "modelPicker": {
+      "retryLoad": "Couldn’t load models. Retry",
       "label": "Model: {name}",
       "labelUnavailable": "Model: {name}, unavailable",
       "hosted": "Mikka Default",
@@ -4434,7 +4435,19 @@
     "untitled": "Untitled conversation",
     "more": "Load more"
   },
+  "ThreadReferences": {
+    "sourceUnavailable": "Source file and folder references are unavailable for this conversation.",
+    "references": "References",
+    "task": "Task",
+    "thread": "Conversation",
+    "pr": "Pull request",
+    "searching": "Searching…",
+    "error": "Couldn’t load references",
+    "empty": "No matching references"
+  },
   "IssueThreads": {
+    "composerModelUnknown": "Model not reported",
+    "composerModelRequested": "Requested {model}",
     "organization": {
       "archive": "Archive conversation",
       "unarchive": "Unarchive conversation",

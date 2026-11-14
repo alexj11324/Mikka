@@ -9,12 +9,14 @@ import { deploymentSwitch } from '@/lib/deployment-switches'
 import { createHash } from 'node:crypto'
 import { gunzipSync } from 'node:zlib'
 import { headers } from 'next/headers'
+import { threadModelChoice, type ThreadModelChoice } from '@/lib/thread-model-choice'
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import type { SelectResult } from 'drizzle-orm/query-builders/select.types'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
+import { threadReadReceipts } from '@/lib/thread-reads'
 import { db, pool } from '@/lib/db'
 import {
   agents, agentRuns, coordinatorEvents, deviceRepos, devices, runMessages, users,
@@ -336,6 +338,7 @@ async function readThreadIssue(runId: string): Promise<{ issueId: string | null 
 }
 
 export interface IssueThreadDetail {
+  readReceipts?: Awaited<ReturnType<typeof threadReadReceipts>>
   /** Authorized scopes for every attempt; browser state never guesses them. */
   live?: { viewerId?: string; runs: import('@/lib/live/panels').ThreadLiveReference[]; issueWorkspaceId: string | null; questionDeadline: ThreadQuestionDeadline | null; revisions?: Record<string, number> }
   /** The owner sees the stop deadline too, so a reload does not reset the timeout. */
@@ -429,9 +432,9 @@ export async function getThreadMachine(issueId: string | null, runId: string): P
  * It covers the whole run chain and the whole stored brief whatever the cursor
  * returned, so a cursor read reports the same usage as a full one.
  */
-async function readContextUsage(runIds: string[], rootRunId: string): Promise<import('@/lib/context-usage').ContextUsage> {
+async function readContextUsage(runIds: string[], rootRunId: string, latestRunId: string): Promise<import('@/lib/context-usage').ContextUsage> {
   const { CONTEXT_CHARS_SQL, contextUsageFromCounts } = await import('@/lib/context-usage')
-  const { rows: [counted] } = await pool.query<Record<string, string | number | null>>(CONTEXT_CHARS_SQL, [runIds, rootRunId])
+  const { rows: [counted] } = await pool.query<Record<string, string | number | null>>(CONTEXT_CHARS_SQL, [runIds, rootRunId, latestRunId])
   const count = (value: unknown) => Number(value ?? 0) || 0
   const counts = (ascii: unknown, other: unknown) => ({ ascii: count(ascii), other: count(other) })
   return contextUsageFromCounts({
@@ -441,6 +444,10 @@ async function readContextUsage(runIds: string[], rootRunId: string): Promise<im
     task: counts(counted?.taskAscii, counted?.taskOther),
     messages: counts(counted?.messageAscii, counted?.messageOther),
     conversation: counts(counted?.conversationAscii, counted?.conversationOther),
+    ...(typeof counted?.selectedModel === 'string' || typeof counted?.servedModel === 'string' ? { composerModel: {
+      selected: typeof counted?.selectedModel === 'string' ? counted.selectedModel : null,
+      served: typeof counted?.servedModel === 'string' ? counted.servedModel : null,
+    } } : {}),
     model: typeof counted?.model === 'string' ? counted.model : null,
   })
 }
@@ -465,6 +472,9 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
   const from = chain ? Math.max(0, chain.attempts.findIndex(attempt => attempt.runId === row.id)) : 0
   const runIds = chain ? chain.attempts.slice(from).map(attempt => attempt.runId) : [row.id]
   // Invalidation reads retain the cursor: only later chunks, not the whole chain again.
+  // Capture exactly what this read could display. An arriving reply after this
+  // point stays unread until a subsequent transcript is visible.
+  const readReceipts = await threadReadReceipts(user.id, runIds)
   const read = await readThreadChunks(runIds, cursor)
   const chunks = read.chunks
   // The client keeps its held prompt only when it keeps its held chunks; any other read sends the whole prompt.
@@ -530,9 +540,10 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
     threadLiveReferences(pool, workspacePool, runIds, user.id),
     row.issueId ? documentLiveWorkspace(pool, workspacePool, row.issueId, user.id) : null,
     // Over the whole chain and the whole brief, so a cursor read reports what a full one does.
-    readContextUsage(chainRunIds, row.id),
+    readContextUsage(chainRunIds, row.id, chain?.latestRunId ?? row.id),
   ])
   return {
+    readReceipts,
     live: { viewerId: user.id, runs, issueWorkspaceId, questionDeadline, ...(Object.keys(revisions).length ? { revisions } : {}) },
     thread: { ...thread, failureDetails, questionWake, prompt: promptOmitted ? '' : prompt, ...(!promptOmitted && hasInstructions ? { hasInstructions: true as const } : {}), stopRequestedAt, replyAvailable, retryAvailable, quota, modelFallback: modelFallback?.notices ?? null, modelFallbackPending: modelFallback?.pending ?? false, error, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
@@ -585,7 +596,7 @@ function safeHttpUrl(value: string) {
 }
 
 /** Something a person says in a running thread; the daemon delivers it to the agent. */
-export async function sendIssueThreadMessage(input: { issueId: string | null; runId: string; text: string; requestId?: string; expectedOwnerId?: string; expectedWorkspaceId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<{ runId: string; continued: boolean }> {
+export async function sendIssueThreadMessage(input: { issueId: string | null; runId: string; text: string; requestId?: string; modelChoice?: ThreadModelChoice; expectedOwnerId?: string; expectedWorkspaceId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<{ runId: string; continued: boolean }> {
   const text = z.string().trim().min(1).max(10_000).safeParse(input.text)
   if (!text.success) throw new ActionFailureError('messageRequired')
   const { row, user } = await readableThread(input.issueId, input.runId, threadColumns)
@@ -598,6 +609,7 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
   if(row.userId!==user.id)throw new ActionFailureError('runNotFound')
   if(input.retryOriginalSession!==undefined && input.retryOriginalSession!==true)throw new ActionFailureError('runInvalid')
   if(input.requestId!==undefined && !z.uuid().safeParse(input.requestId).success)throw new ActionFailureError('validationGeneric')
+  if(input.modelChoice !== undefined && (input.retryOriginalSession || !input.requestId || !threadModelChoice.safeParse(input.modelChoice).success))throw new ActionFailureError('validationGeneric')
   if(input.requestId!==undefined && input.retryOriginalSession)throw new ActionFailureError('validationGeneric')
   if(input.questionWakeGeneration!==undefined && (!input.retryOriginalSession || !z.uuid().safeParse(input.questionWakeGeneration).success))throw new ActionFailureError('validationGeneric')
   if(input.questionWakeGeneration!==undefined) {
@@ -630,7 +642,7 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
     }
   }
   // A working thread gets it as a message; an ended one runs again in the same thread (R-81, lib/thread-continue.ts).
-  return sendThreadMessage(user.id,row.id,text.data,{source:'human',sessionId:session.session.id},input.requestId)
+  return sendThreadMessage(user.id,row.id,text.data,{source:'human',sessionId:session.session.id},input.requestId,input.modelChoice)
 }
 
 /**
@@ -639,8 +651,17 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
  * dispatch with no machine or model) returned as its code, so the thread says
  * why instead of 「发送失败」. Other failures still throw.
  */
-export async function sendIssueThreadReply(input: { issueId: string | null; runId: string; text: string; requestId?: string; expectedOwnerId?: string; expectedWorkspaceId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<ActionResult<{ sent: true; runId: string; continued: boolean }>> {
+export async function sendIssueThreadReply(input: { issueId: string | null; runId: string; text: string; requestId?: string; modelChoice?: ThreadModelChoice; expectedOwnerId?: string; expectedWorkspaceId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<ActionResult<{ sent: true; runId: string; continued: boolean }>> {
   return runAction(async () => { const result=await sendIssueThreadMessage(input); return { sent: true as const,...result } })
+}
+
+export async function getThreadContinuationModels(issueId: string, runId: string) {
+  const { row, user } = await readableThread(issueId, runId, threadIdentityColumns)
+  if (row.userId !== user.id) throw new ActionFailureError('runNotFound')
+  const { threadModelMenu } = await import('@/lib/thread-model-menu')
+  const reader = await getWorkspaceReader()
+  if (reader.id !== user.id) throw new ActionFailureError('runNotFound')
+  return threadModelMenu(reader, reader[tokenWorkspace], issueId, row.id)
 }
 
 /**
