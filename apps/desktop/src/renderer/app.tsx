@@ -21,7 +21,7 @@ import { withBasePath } from '@/lib/base-path'
 import { clearPersistentReadCaches } from '@/lib/swr/persistent-cache'
 import { readAuthentication, readBootstrap, type AuthenticationBootstrap, type BootstrapScope, type DesktopBootstrap } from './bootstrap'
 import { Link } from './i18n-navigation'
-import { localeOf, navigate, refresh, REFRESH_EVENT, useLocation, withoutLocale } from './location'
+import { localeOf, navigate, REFRESH_EVENT, useLocation, withoutLocale } from './location'
 import { getTransportState, setTransportState, subscribeTransport } from './transport-state'
 import { resetReadBatchScope } from './read-batch'
 import { Offline } from './offline'
@@ -115,18 +115,15 @@ function SessionApplication() {
     void preloadWorkspace().catch(() => {})
     const changed = () => { void reload() }
     const sessionChanged = () => { void reload(true) }
-    const restored = (event: PageTransitionEvent) => { if (event.persisted) void reload(true) }
     const offline = () => setTransportState('offline')
     const stop = onSessionChanged(sessionChanged)
     window.addEventListener(REFRESH_EVENT, changed)
-    window.addEventListener('pageshow', restored)
     window.addEventListener('online', changed)
     window.addEventListener('offline', offline)
     return () => {
       generation.current++
       stop()
       window.removeEventListener(REFRESH_EVENT, changed)
-      window.removeEventListener('pageshow', restored)
       window.removeEventListener('online', changed)
       window.removeEventListener('offline', offline)
     }
@@ -212,7 +209,7 @@ function Routes({ bootstrap }: { bootstrap: ApplicationBootstrap }) {
 function WorkspaceSelectionError({ message }: { message: string | true }) {
   const t = useTranslations()
   return <Auth><AuthCard title={t('Issue.scope.workspaceUnavailable')} description={message === true ? t('Members.noAccessDescription') : message}>
-    <Button onClick={refresh}>{t('Common.retry')}</Button>
+    <Button onClick={() => window.dispatchEvent(new Event(REFRESH_EVENT))}>{t('Common.retry')}</Button>
     <Link href="/" className={buttonVariants({ variant: 'outline' })}>{t('Members.backToAccessible')}</Link>
   </AuthCard></Auth>
 }
