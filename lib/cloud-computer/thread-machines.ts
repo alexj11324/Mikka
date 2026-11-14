@@ -1,5 +1,6 @@
 import { anonymousStartupHint, firstAnonymousTask } from '../computer/anonymous-startup-hint'
 import { runChanged } from '../live/panels'
+import { connectForCommitEffects } from '../db/commit-effects'
 import { taskActivityChanged } from '../factory/activity-live'
 import { recordCancelledThreadSessionEnd } from './thread-machine-sessions'
 import { cloudStartupSpan, cloudStartupPhases, cloudStartupRunAttributes } from '@/lib/computer/startup-tracing'
@@ -255,7 +256,7 @@ async function releaseUnusableSnapshot(pool: Pool, actor: Actor, runId: string, 
  * to the official template. A snapshot never crosses tasks. */
 export async function restoreThreadMachineFromSnapshot(pool: Pool, actor: Actor, runId: string, leaseId: string,
   expected: { sandboxId: string | null; kind?: string | null }, template: string, provider: Pick<typeof threadMachineProvider, 'create'>) {
-  const client = await pool.connect()
+  const client = await connectForCommitEffects(pool)
   let transition: Record<string, any> | undefined
   try {
     await client.query('BEGIN')
@@ -412,7 +413,7 @@ export async function acknowledgeQueuedThreadStop(pool: Pool, actor: Actor, runI
   if (!candidate.rowCount) return false
   const sponsored = candidate.rows[0]?.snapshotId === hostedSnapshot
   const kill = sponsored ? undefined : provider.prepareKill ? await provider.prepareKill(actor.userId) : (sandboxId: string) => provider.kill(sandboxId, actor.userId)
-  const client = await pool.connect()
+  const client = await connectForCommitEffects(pool)
   try {
     await client.query('BEGIN')
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`thread-machine:${runId}`])
@@ -564,7 +565,7 @@ async function retainThreadMachineForHandoffLocked(client: PoolClient, actor: Ac
 }
 
 export async function retainThreadMachineForHandoff(pool: Pool, actor: Actor, runId: string, nextRunId: string, existing?: PoolClient): Promise<boolean> {
-  const client = existing ?? await pool.connect()
+  const client = existing ?? await connectForCommitEffects(pool)
   try {
     if (!existing) await client.query('BEGIN')
     const retained = await retainThreadMachineForHandoffLocked(client, actor, runId, nextRunId)
@@ -587,7 +588,7 @@ export async function parkThreadMachine(pool: Pool, actor: Actor, runId: string,
   // Keep the uploaded run/checkpoint evidence and any previously saved tail.
   readTail: (sandboxId: string) => Promise<string | null> = async () => null,
   existing?: PoolClient, expectedFence?: ThreadMachineFence) {
-  const client = existing ?? await pool.connect()
+  const client = existing ?? await connectForCommitEffects(pool)
   let intent: { sandboxId: string; epoch: number; failures: number } | undefined
   const locked = async () => {
     const run = (await client.query('SELECT status,"leaseExpiresAt","stopRequestedAt","stopReason","startedAt","sessionId","deviceTokenId","pauseReason",report FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])).rows[0]
@@ -737,7 +738,7 @@ const threadDesktop = { startDesktop, syncDesktopLease }
  * No person can watch or take over a thread desktop (decision 1050): the lease is never controlled. */
 async function startThreadDesktop(pool: Pool, actor: Actor, runId: string, leaseId: string, sandbox: Sandbox, runtime: typeof threadDesktop, budget?: RuntimeBudget) {
   await runtime.startDesktop(sandbox, 1, true, budget)
-  const client = await pool.connect()
+  const client = await connectForCommitEffects(pool)
   try {
     await client.query('BEGIN')
     await client.query("SET LOCAL lock_timeout = '5s'")
@@ -902,7 +903,7 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     return remaining
   }
   let refreshBudget = refreshDeadline ? budgetUntil(refreshDeadline) : undefined
-  const client = await pool.connect()
+  const client = await connectForCommitEffects(pool)
   const leaseId = randomUUID()
   const timings = cloudStartupPhases(cloudStartupRunAttributes(runId))
   let refreshPhase: RuntimeRefreshPhase = timings.next('admission')
@@ -1518,7 +1519,7 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
   if (action === 'end') {
     // Fence provisioning and revoke any existing token before provider I/O.
     // Retain the sandbox ID so a failed or lost kill response can be retried.
-    const client = await pool.connect()
+    const client = await connectForCommitEffects(pool)
     let sandboxId: string | null
     let filesystemSnapshotId: string | null = null
     let creationPending: boolean

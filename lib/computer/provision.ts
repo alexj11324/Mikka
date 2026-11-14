@@ -2,6 +2,7 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import * as provider from './e2b-provider'
+import { connectForCommitEffects } from '../db/commit-effects'
 import { machineChanged, machineCommitted } from '@/lib/live/computer-state'
 import { armDueTimerSoon } from '@/lib/due-timer'
 
@@ -13,7 +14,7 @@ const LIVE_RUNS=['preparing','running','paused','waiting_input','finishing']
  * Provider idempotency uses the persisted operationId across process loss.
  * The provision lease is not the daemon/worker lease or a permission grant. */
 export async function ensureCloudMachine(pool:Pool,actor:Actor,runtime:Runtime=provider) {
-  const client=await pool.connect(),leaseId=randomUUID()
+  const client=await connectForCommitEffects(pool),leaseId=randomUUID()
   let machine:{sandboxId:string|null;operationId:string;runtimeReady:boolean;state:string}|undefined
   try {
     await client.query('BEGIN')
