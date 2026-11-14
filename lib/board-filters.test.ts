@@ -1,6 +1,7 @@
+import { taskWorkOwner } from './issue-metadata'
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { boardProjectFilters, boardTaskOwner, migrateBoardFilters, personFilters } from './board-filters'
+import { boardProjectFilters, migrateBoardFilters, personFilters } from './board-filters'
 
 const me = 'user-me'
 const myAgent = 'agent-mine'
@@ -58,8 +59,8 @@ test('the retired default 负责人：我 is dropped from saved Board filters; a
 test('a Board card and actor filter name an admitted Agent without treating its owner as the assignee', () => {
   const agent = { kind: 'agent' as const, id: myAgent, name: 'Builder', image: null }
   const member = { kind: 'member' as const, id: me, name: 'Owner', image: null }
-  assert.equal(boardTaskOwner({ assignee: null, delegate: agent }), agent)
-  assert.equal(boardTaskOwner({ assignee: member, delegate: agent }), member)
-  assert.equal(boardTaskOwner({ assignee: null, delegate: null }), null)
+  assert.equal(taskWorkOwner({ assignee: null, delegate: agent }), agent)
+  assert.equal(taskWorkOwner({ assignee: member, delegate: agent }), member)
+  assert.equal(taskWorkOwner({ assignee: null, delegate: null }), null)
   assert.equal(personFilters(task('other', null), me, mine(true)).assignee, false)
 })

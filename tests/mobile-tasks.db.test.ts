@@ -128,6 +128,25 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     (select coalesce(jsonb_agg(jsonb_build_array(id,"workspaceId","issueId","runId") order by id),'[]') from artifacts where "userId"=$1) as artifacts,
     (select coalesce(jsonb_agg(jsonb_build_array(id,workspace_id,status,next_at) order by id),'[]') from user_schedules where owner_id=$1) as schedules`, [owner])).rows[0]
 
+  await t.test('an authorized task owner label follows its member or admitted Agent, with no private run access for the teammate', async () => {
+    const task = await workspaceTask()
+    const delegate = { kind: 'agent', id: randomUUID(), name: 'Builder', image: null }
+    const member = { kind: 'member', id: owner, name: 'Task owner', image: null }
+    async function setOwner(assignee: typeof member | null) {
+      const content = { type: 'doc', attrs: { mikka: { delegate, assignee } } }
+      await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [task, JSON.stringify(content)])
+    }
+    try {
+      await setOwner(null)
+      assert.deepEqual((await (await request(task)).json()).task.workOwner, { kind: 'agent', name: 'Builder' })
+      assert.deepEqual((await (await request(task, { bearer: peer.token, workspaceId: teamWorkspace.id })).json()).task.workOwner, { kind: 'agent', name: 'Builder' })
+      assert.equal((await request(task, { bearer: peer.token, workspaceId: secondWorkspace.id })).status, 404)
+      await setOwner(member)
+      assert.deepEqual((await (await request(task)).json()).task.workOwner, { kind: 'member', name: 'Task owner' })
+    } finally {
+      await pool.query('DELETE FROM issues WHERE id=$1', [task])
+    }
+  })
   await t.test('the versioned work request returns task state, readable PRs and conversation metadata in one owner-authorized detail', async () => {
     const load = (options?: ReadOptions) => run('/api/mobile/tasks/' + issueId + '?work=1', req => GET(req, { params: Promise.resolve({ id: issueId }) }), options)
     const child = await workspaceTask()

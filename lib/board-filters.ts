@@ -1,10 +1,3 @@
-import type { IssueMetadata } from './issue-metadata'
-
-/** The visible work owner is the named member, or the task’s execution delegate when it has no member. */
-export function boardTaskOwner(metadata: Pick<IssueMetadata, 'assignee' | 'delegate'>) {
-  return metadata.assignee ?? metadata.delegate
-}
-
 /**
  * Responsibility and delegation are separate (#1687). A bot holding a task
  * never makes its owner the human assignee. Following is an explicit relation.

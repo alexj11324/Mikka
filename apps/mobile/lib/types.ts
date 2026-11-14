@@ -233,6 +233,8 @@ export interface TaskDetail {
       state: 'running' | 'paused' | 'done' | 'failed' | 'blocked' | 'replaced'; stopping: boolean }[]
     pullRequests: { url: string; title?: string; state: 'open' | 'draft' | 'merged' | 'closed'; additions?: number; deletions?: number; sourceConversationId?: string }[] }
   task: Pick<Task, 'id' | 'identifier' | 'title' | 'status' | 'priority' | 'group' | 'state' | 'reason' | 'blockedBy'> & {
+    /** Human-facing owner on servers that project the task’s canonical assignment. */
+    workOwner?: { kind: 'member' | 'agent' | 'bot' | 'profile'; name: string } | null
     /** Authorized conversation head, null for read-only evidence. Absent on older servers. */
     replyRunId?: string | null
     factoryTaskId?: string
