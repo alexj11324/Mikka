@@ -1915,8 +1915,8 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Projects authorized work outputs to GitHub pull requests without fetching remote repositories.",
-    "test": "components/workspace/task-work-section.test.tsx",
-    "suite": "test:issue-readonly-dom"
+    "test": "lib/task-work-pulls.test.ts",
+    "suite": "test:lib-units"
   },
   "lib/task-work-read.ts": {
     "mode": "built-in",

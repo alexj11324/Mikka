@@ -48,6 +48,8 @@ export type TaskChip = {
   title?: string
   /** Opens in a new tab. */
   href?: string
+  /** A quiet word after the text, as Capy's property lines: a conversation's Factory stage or run result, a PR's state. */
+  detail?: string
   /** A PR's live GitHub state: `draw` gets the words to show while GitHub answers. */
   live?: (draw: (view: { text: string; title: string; state: string; confirmed: boolean }) => ReactNode) => ReactNode
   /** The chip opens these choices. */
@@ -66,6 +68,8 @@ export type TaskDetailRow = {
   /** The value opens one of Mikka's dialogs instead. */
   onClick?: () => void
   chips?: TaskChip[]
+  /** One chip per line under the label, as Capy lists a task's threads and pull requests. */
+  stacked?: boolean
   /** The + after the chips. */
   add?: { label: string; menu?: TaskMenuItem[]; onClick?: () => void }
   /** A quiet word after the value (自动判断). */
@@ -116,8 +120,6 @@ export type TaskDetailFrameProps = {
   workspaceId?: string | null
   /** The same authorized presentation that supplies the status row also identifies its Factory receipts. */
   factoryTaskId?: string
-  /** The work section and evidence viewer share the same authorized detail snapshot. */
-  work?: ReactNode
   factorySnapshot?: import('@/lib/factory/activity').FactoryActivityView | null
   rootRef: RefObject<HTMLDivElement | null>
   onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void

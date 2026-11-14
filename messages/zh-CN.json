@@ -457,7 +457,8 @@
       "accessChangeConfirm": "仍然移动",
       "saveFailed": "保存失败，请重试。",
       "saveFailedRetry": "保存失败，请稍后重试。",
-      "estimatePoints": "{count} 点估算"
+      "estimatePoints": "{count} 点估算",
+      "linkPullRequest": "关联 PR"
     },
     "colors": {
       "violet": "紫色",

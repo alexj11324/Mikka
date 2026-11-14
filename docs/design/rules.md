@@ -224,10 +224,15 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   A group heading that names the
   workspace its settings apply to (设置's workspace group) is not a crumb and
   stays.
-- **R-62** A task’s 工作 section follows its description. It lists authorized
-  conversations and PRs with their available Agent, observed model, status
-  and result. Each run has one expandable progress row. 活动 contains task
-  changes, links and comments with the author or system actor visible.
+- **R-62** A task page says where the work is and whether you are needed;
+  the work itself is elsewhere (as Capy,
+  [2026-11-14-2330](decisions/2026-11-14-2330-capy-activity-and-conversation-titles.md)).
+  Its properties list each authorized conversation and PR on its own line: a
+  conversation with its Factory stage (实现中, 交给你…) or run result, a PR with
+  its title and live state, and + to link one. Stage changes and the Bot's one
+  comment per stage are in 活动. A Factory run's steps are in its conversation,
+  and its acceptance report is an Artifact; there is no 工作 section.
+  活动 contains task changes, links and comments with the author or system actor visible.
   The conversation opens directly at its authorized root. Its composer follows
   the current run (R-10, R-81). The task properties
   show its dispatching bot, Agent/model and execution location. A reader who

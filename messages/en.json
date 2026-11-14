@@ -457,7 +457,8 @@
       "accessChangeConfirm": "Move anyway",
       "saveFailed": "The save failed. Please try again.",
       "saveFailedRetry": "The save failed. Please try again shortly.",
-      "estimatePoints": "{count} point estimate"
+      "estimatePoints": "{count} point estimate",
+      "linkPullRequest": "Link pull request"
     },
     "colors": {
       "violet": "Violet",

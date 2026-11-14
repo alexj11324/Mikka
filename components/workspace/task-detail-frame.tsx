@@ -4,7 +4,7 @@ import { taskWorkOwner } from '@/lib/issue-metadata'
 
 import { useRef, useState, type ComponentType, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import useSWR from 'swr'
-import { useFormatter, useNow, useTranslations } from 'next-intl'
+import { useFormatter, useMessages, useNow, useTranslations } from 'next-intl'
 import { getIssuePropertyOptions } from '@/app/actions/issue-metadata'
 import type { IssueView } from '@/app/actions/issues'
 import { TaskAttachments } from './task-attachments'
@@ -23,9 +23,14 @@ import { useTaskOwnershipRows } from './issue-scope-control'
 import { AgentSphere } from './issue-assignee-menu'
 import type { useTaskWork } from './issue-threads'
 import { openGroupConversation } from './workspace-navigation'
-import { TaskWorkSection } from './task-work-section'
 import { useActivityEvents, type ActivityEventItem } from './issue-activity-feed'
 import { useActivityDrafts, type DiscussionSave } from './issue-activity'
+import { threadQuestionView } from '@/lib/issue-threads'
+import { presentedFactoryEvents, taskFactoryProgress } from '@/lib/task-factory-events'
+import { runResult, useRunResultLabel } from '@/hooks/use-run-result'
+import { pullLabel } from '@/lib/issue-activity'
+import { TaskRunMark } from './task-state-icon'
+import { conversationIndicatorOf } from '@/lib/task-state'
 import type { IssueDiscussions } from './issue-editor'
 import { chronologicalActivity, taskDiscussionEvents } from '@/lib/task-activity-timeline'
 import type { ActivityVersion } from '@/lib/issue-activity'
@@ -92,6 +97,11 @@ export function FramedTask(props: FramedTaskProps) {
   const tFrame = useTranslations('IssueDetail.frame')
   const tDetail = useTranslations('Workspace.detail')
   const tDirectory = useTranslations('ConversationDirectory')
+  const tThreads = useTranslations('IssueThreads')
+  const resultLabel = useRunResultLabel()
+  const messages = useMessages()
+  const labelStage = (stage: string) => (messages.GroupTask.stage as Record<string, string>)[stage] ?? stage
+  const labelGate = (status: string) => (messages.GroupTask.status as Record<string, string>)[status] ?? status
   const tArtifact = useTranslations('ArtifactReview')
   const tActivity = useTranslations('Workspace.activity')
   const tIssue = useTranslations('Issue')
@@ -134,13 +144,24 @@ export function FramedTask(props: FramedTaskProps) {
     ...options?.isOwner ? [{ id: 'invite', label: tAssignee('invite'), mark: { kind: 'icon', icon: 'mail' }, divider: true, onSelect: () => props.requestProperty('invite') } satisfies TaskMenuItem] : [],
   ]
   const delegate = meta.delegate?.name
+  // Capy's Thread lines: each conversation with where it is. A Factory conversation says its stage (实现中, 交给你…);
+  // any other its run result. The steps themselves are in the conversation, not on the task page.
+  const factoryEvents = props.agentActivity.work?.factory
+  const stageOf = new Map(taskFactoryProgress(presentedFactoryEvents(factoryEvents?.events, factoryEvents?.task.id))
+    .flatMap(group => group.runId ? [[group.runId, group.current] as const] : []))
   const conversations = [
     ...(presentation.data?.linkedChats ?? []).map(chat => ({
-      id: 'chat:' + chat.id, text: chat.title || tDirectory('untitled'), open: () => openGroupConversation(chat.id),
+      id: 'chat:' + chat.id, text: chat.title || tDirectory('untitled'), detail: undefined as string | undefined, mark: undefined as ReactNode, open: () => openGroupConversation(chat.id),
     })),
-    ...(props.agentActivity.threads ?? []).flatMap(thread => thread.detail ? [{
-      id: 'run:' + thread.id, text: thread.detail.name || tDirectory('untitled'), open: () => props.agentActivity.openThread(thread.id),
-    }] : []),
+    ...(props.agentActivity.threads ?? []).flatMap(thread => {
+      if (!thread.detail) return []
+      const view = threadQuestionView(thread)
+      const run = { status: view.waiting ? 'waiting_input' : view.status, outcome: view.outcome }
+      const { result, reason } = runResult(run, true)
+      const gate = [thread.id, ...thread.attempts.map(attempt => attempt.runId)].map(id => stageOf.get(id)).find(Boolean)
+      const detail = gate ? [labelStage(gate.stage), labelGate(gate.status)].filter(Boolean).join(' · ') : view.stopping ? tThreads('stopping') : resultLabel(result, reason)
+      return [{ id: 'run:' + thread.id, text: thread.detail.name || tDirectory('untitled'), detail, mark: <TaskRunMark indicator={conversationIndicatorOf(run)} /> as ReactNode, open: () => props.agentActivity.openThread(thread.id) }]
+    }),
   ]
   const reviewBranch = props.agentActivity.work?.factory?.task.review?.summary?.branch
 
@@ -187,11 +208,12 @@ export function FramedTask(props: FramedTaskProps) {
     } })) },
     ...meta.dueDate ? [{ id: 'dueDate', label: tProperty('dueDate'), disabled: locked, onClick: () => props.requestAction('dueDate'), value: { text: formatDateOnly(format, meta.dueDate, { month: 'short', day: 'numeric' }), mark: { kind: 'icon', icon: 'calendar' }, danger: overdue(meta.dueDate, props.status, now) } } satisfies TaskDetailRow] : [],
     ...meta.estimate !== null ? [{ id: 'estimate', label: tProperty('estimate'), disabled: locked, onClick: () => props.requestAction('estimate'), value: { text: tProperty('estimatePoints', { count: meta.estimate }), mark: { kind: 'icon', icon: 'estimate' } } } satisfies TaskDetailRow] : [],
-    ...conversations.length ? [{ id: 'conversations', label: tDirectory('title'),
-      chips: conversations.map(({ id, text, open }) => ({ id, text, menu: [{ id: 'open', label: tFrame('open'), onSelect: open }] })),
+    ...conversations.length ? [{ id: 'conversations', label: tDirectory('title'), stacked: true,
+      chips: conversations.map(({ id, text, detail, mark, open }) => ({ id, text, ...detail ? { detail } : {}, ...mark ? { mark: { kind: 'node' as const, node: mark } } : {}, menu: [{ id: 'open', label: tFrame('open'), onSelect: open }] })),
     } satisfies TaskDetailRow] : [],
     ...reviewBranch ? [{ id: 'branch', label: tArtifact('branch'), value: { text: reviewBranch } } satisfies TaskDetailRow] : [],
-    ...pullRequests.length ? [{ id: 'pullRequests', label: tProperty('pullRequests'), disabled: locked, chips: pullRequests.map(pr => ({ id: pr.url, text: `#${pr.url.split('/').filter(Boolean).at(-1)}`, href: pr.url, mark: { kind: 'icon', icon: 'pullRequest' }, live: draw => <PullRequestStatus issueId={task.id} pr={pr}>{view => draw({ text: view.text ? `#${view.number} ${view.text}` : `#${view.number}`, title: view.title, state: view.state, confirmed: view.confirmed })}</PullRequestStatus> })), add: { label: tProperty('managePullRequestsAria'), onClick: () => props.requestProperty('pullRequests') } } satisfies TaskDetailRow] : [],
+    // Capy's Pull requests lines: repo#n and its title, its live state, and + to link one, shown even before there is one.
+    ...preview ? [] : [{ id: 'pullRequests', label: tProperty('pullRequests'), disabled: locked, stacked: true, chips: pullRequests.map(pr => ({ id: pr.url, text: [pullLabel(pr.url), pr.title].filter(Boolean).join(' '), href: pr.url, mark: { kind: 'icon', icon: 'pullRequest' }, live: draw => <PullRequestStatus issueId={task.id} pr={pr}>{view => draw({ text: [pullLabel(pr.url), view.text || pr.title].filter(Boolean).join(' '), title: view.title, state: view.state, confirmed: view.confirmed })}</PullRequestStatus> })), add: { label: tProperty('linkPullRequest'), onClick: () => props.requestProperty('pullRequests') } } satisfies TaskDetailRow],
     ...preview ? [] : connections.groups.filter(group => group.items.length).map((group): TaskDetailRow => ({
       id: `relation-${group.kind}`, label: group.label, disabled: locked || connections.pending,
       chips: group.items.map(row => ({
@@ -271,8 +293,6 @@ export function FramedTask(props: FramedTaskProps) {
     workspaceId={preview ? undefined : task.workspaceId}
     factoryTaskId={presentation.data?.factoryTaskId}
     factorySnapshot={props.agentActivity.work?.factory ?? null}
-    work={!preview && <TaskWorkSection threads={props.agentActivity.threads ?? []} pulls={pullRequests} linkedChats={presentation.data?.linkedChats}
-      factory={props.agentActivity.work?.factory} open={props.agentActivity.openThread} />}
     rootRef={props.rootRef} onKeyDown={props.onKeyDown} label={props.label} busy={preview}
     origin={props.origin} identifier={task.identifier} title={props.title} saveLabel={props.saveLabel} saved={props.saved} saveHint={t('autosaveHint')}
     navigation={props.navigation} onClose={props.onClose}
