@@ -694,14 +694,22 @@ test('mobile task endpoints with real task ACL, current workspace membership and
       view: 'botChildren', workspaceId: teamWorkspace.id, botId: id,
     }), directory, { workspaceId: teamWorkspace.id, ...options })
     try {
+      const { changeThreadRead } = await import('../lib/thread-reads')
+      // Eleven marked roots include one archived row and several outside the visible eight.
+      for (const runId of ids.slice(0, 11)) {
+        assert.equal(await changeThreadRead(owner, teamWorkspace.id, { action: 'unread', runId }), true)
+      }
       const response = await read()
       assert.equal(response.status, 200)
       const group = await response.json()
+      assert.equal(group.unreadCount, 10)
       assert.equal(group.workspaceId, teamWorkspace.id)
       assert.equal(group.botId, childBot)
       assert.equal(group.more, true)
       assert.deepEqual(group.items.map((row: { id: string }) => row.id), [47, 6, 2, 1, 3, 4, 5, 7].map(index => ids[index]))
-      assert.deepEqual((await (await read({ bearer: peer.token })).json()).items, [])
+      const memberGroup = await (await read({ bearer: peer.token })).json()
+      assert.deepEqual(memberGroup.items, [])
+      assert.equal(memberGroup.unreadCount, 0)
       assert.deepEqual((await (await read({}, secondBot)).json()).items, [])
       assert.equal((await read({ workspaceId: secondWorkspace.id })).status, 403)
       assert.equal((await read({ bearer: null })).status, 401)
@@ -709,6 +717,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
       await pool.query('UPDATE agent_runs SET "conversationArchivedAt"=now() WHERE id=ANY($1::uuid[])', [ids.slice(3)])
       const remainder = await (await read()).json()
       assert.equal(remainder.more, false)
+      assert.equal(remainder.unreadCount, 2)
       assert.deepEqual(remainder.items.map((row: { id: string }) => row.id), [ids[2], ids[1]])
     } finally {
       await pool.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[])', [ids])

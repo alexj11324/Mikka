@@ -146,15 +146,16 @@ async function sidebarRows(database: RunChainQueryable, userId: string, workspac
     SELECT n.*,b.id AS "botId" FROM named_chats n JOIN conversation_members cm ON cm."conversationId"=n.id AND cm."memberType"='bot' AND cm."leftAt" IS NULL
       JOIN bots b ON b.id::text=cm."memberId" AND b."workspaceId"=$${facts.params.length+2} AND b."ownerId"=$${facts.params.length+1}
   ), ranked AS (
-    SELECT *,row_number() OVER (PARTITION BY "botId" ORDER BY pinned DESC,
+    SELECT *,count(*) FILTER (WHERE unread) OVER (PARTITION BY "botId")::integer AS "unreadCount",
+      row_number() OVER (PARTITION BY "botId" ORDER BY pinned DESC,
       CASE WHEN state IN ('waiting','failed') THEN 0 WHEN state='working' THEN 1 WHEN status IN ('done','canceled','duplicate') OR "runStatus" IN ('succeeded','failed','stopped','cancelled','canceled') THEN 3 ELSE 2 END,
       touched DESC,id DESC)::integer AS position
     FROM bot_rows WHERE NOT archived AND "botId" IS NOT NULL AND source IS DISTINCT FROM 'mcp' ${botFilter}
   ) SELECT * FROM ranked WHERE position<=9 ORDER BY "botId",position`
-  const rows = (await database.query(statement, values)).rows as Row[]
-  const bots: Record<string,{ items: (ReturnType<typeof item> & {harness:string | null; status:string | null})[]; more:boolean }> = {}
+  const rows = (await database.query(statement, values)).rows as (Row & { unreadCount: number })[]
+  const bots: Record<string,{ items: (ReturnType<typeof item> & {harness:string | null; status:string | null})[]; more:boolean; unreadCount:number }> = {}
   for (const row of rows) {
-    const group = bots[row.botId!] ??= {items:[],more:false}
+    const group = bots[row.botId!] ??= {items:[],more:false,unreadCount:row.unreadCount}
     if (row.position===9) group.more=true
     else group.items.push({...item(row),harness:row.harness,status:row.status})
   }

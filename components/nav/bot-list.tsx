@@ -55,12 +55,20 @@ export function useChatNav({ bots, workspaceId, active, userId, presentations }:
     return { moreBotId: group?.more ? botId : undefined, work: group?.items.map(row => {
       const task = row.issueId ? presentations[row.issueId] : undefined
       return { id:row.id, issueId:row.issueId, name:row.title, fullName:row.title,
+        ...(row.kind === 'chat' && workspaceId ? {
+          conversationTarget: { kind: 'group' as const, id: row.id, title: row.title, workspaceId },
+        } : {}),
         status:row.status, state:task?.state ?? null, reason:task?.reason ?? null,
         unread:row.unread,unreadCount:Number(row.unread), activity: row.state === 'waiting' ? 'waiting' as const : row.state === 'working' ? 'working' as const : row.state === 'failed' ? 'error' as const : null,
-        runs:[{id:row.id,name:row.title,harness:row.harness}] }
+        runs:row.kind === 'chat' ? [] : [{id:row.id,name:row.title,harness:row.harness}] }
     }) ?? [] }
   }
-  const botUnread = (id:string) => { const count=unreadCount(id)+(sidebar?.[id]?.items ?? []).reduce((sum,row)=>sum+Number(row.unread),0); return {unread:count>0,unreadCount:count} }
+  const botUnread = (id: string) => {
+    const group = sidebar?.[id]
+    const childCount = group?.unreadCount ?? group?.items.filter(row => row.unread).length ?? 0
+    const count = unreadCount(id) + childCount
+    return { unread: count > 0, unreadCount: count }
+  }
   const coordinator: ChatNavEntry = { id: 'coordinator', kind: 'coordinator', name: i18nText('Nav.coordinator'), ...botUnread(coordinatorId ?? ''), current: active?.kind === 'coordinator', target: { kind: 'coordinator' }, avatar: <CoordinatorAvatar size="row" />, ...workFor(coordinatorId) }
   const entries = [coordinator, ...rows.map((row): ChatNavEntry => row.kind === 'group'
     ? { id: row.group.id, kind: 'group', name: row.group.title || i18nText('Nav.untitledConversation'), unread: Boolean(Number(row.group.unreadCount) || row.group.markedUnread), unreadCount: Number(row.group.unreadCount) || Number(Boolean(row.group.markedUnread)), current: active?.kind === 'group' && active.id === row.group.id, target: { kind: 'group', id: row.group.id, title: row.group.title, workspaceId: row.group.workspaceId }, avatar: <CachedGroupAvatar id={row.group.id} title={row.group.title || i18nText('Nav.untitledConversation')} /> }
