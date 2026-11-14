@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import { test } from 'node:test'
-import { handleRequest, runScheduled, type Env } from './index'
+import worker, { handleRequest, type Env } from './index'
 
 const webhookSecret = 'worker-test-webhook-secret'
 const ctx = { waitUntil: (_promise: Promise<unknown>) => {} }
@@ -84,7 +84,7 @@ test('disabled Worker webhook, protected cron and scheduler never read Hyperdriv
   assert.equal(revoked.headers.get('retry-after'), '60')
   const cron = await handleRequest(new Request('https://sync.example.test/mikka/api/cron/linear-sync', { headers: { authorization: 'Bearer test-worker-cron' } }), env, ctx)
   assert.deepEqual(await cron.json(), { inbox: 0, outbox: 0, disabled: true })
-  await runScheduled(env)
+  await worker.scheduled({ cron: '0 4 * * *' }, env)
   assert.equal(background, 0)
 })
 
@@ -108,4 +108,12 @@ test('Worker requires an explicit true from its own configured PostHog project b
   // No project token stays off even when another project's flag was true.
   const unconfigured = await handleRequest(request(), { CRON_SECRET: env.CRON_SECRET }, ctx)
   assert.deepEqual(await unconfigured.json(), { inbox: 0, outbox: 0, disabled: true })
+})
+
+test('a native scheduled delivery reports failures even when the manual HTTP cron is unconfigured', async t => {
+  t.mock.method(globalThis, 'fetch', async () => Response.json({ errorsWhileComputingFlags: false, flags: { 'mikka-linear-sync': { enabled: true } } }))
+  const env: Env = { NEXT_PUBLIC_POSTHOG_KEY: 'test-native-cron-enabled' }
+  const http = await handleRequest(new Request('https://sync.example.test/mikka/api/cron/linear-sync'), env, ctx)
+  assert.equal(http.status, 503)
+  await assert.rejects(worker.scheduled({ cron: '0 4 * * *' }, env), /Linear sync is not configured/)
 })

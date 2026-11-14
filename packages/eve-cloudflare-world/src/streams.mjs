@@ -139,20 +139,19 @@ async function liveChunks(stub, start, signal, subscriptionId) {
   })
 }
 
-function getStreamStub(binding, runId, name) {
-  return binding.get(binding.idFromName(JSON.stringify(['stream', runId, name])))
-}
-
-function getRunRegistry(binding, runId) {
-  return binding.get(binding.idFromName(JSON.stringify(['run-streams', runId])))
+function streamObject(binding, workload, key) {
+  // Existing business objects are named with the serialized stream key nested
+  // inside the workload key. Both serializations are part of persisted identity.
+  const name = JSON.stringify(key)
+  return binding.getByName(workload === 'eve' ? name : JSON.stringify([workload, name]))
 }
 
 /** Official v5 Streamer methods carry a run id on every operation. Scope the
  * stream object itself to that run, even if another run uses the same name. */
-export function createStreamStorage(binding, { signal, subscriptionId } = {}) {
+export function createStreamStorage(binding, { signal, subscriptionId, workload = 'eve' } = {}) {
   async function writable(runId, name) {
-    await getRunRegistry(binding, runId).registerStream(name)
-    return getStreamStub(binding, runId, name)
+    await streamObject(binding, workload, ['run-streams', runId]).registerStream(name)
+    return streamObject(binding, workload, ['stream', runId, name])
   }
   return {
     async write(runId, name, chunk) {
@@ -164,13 +163,13 @@ export function createStreamStorage(binding, { signal, subscriptionId } = {}) {
       await stub.closeStream()
     },
     get(runId, name, startIndex = 0) {
-      return liveChunks(getStreamStub(binding, runId, name), startIndex, signal, subscriptionId ?? crypto.randomUUID())
+      return liveChunks(streamObject(binding, workload, ['stream', runId, name]), startIndex, signal, subscriptionId ?? crypto.randomUUID())
     },
     list(runId) {
-      return getRunRegistry(binding, runId).listStreams()
+      return streamObject(binding, workload, ['run-streams', runId]).listStreams()
     },
     getInfo(runId, name) {
-      return getStreamStub(binding, runId, name).getInfo()
+      return streamObject(binding, workload, ['stream', runId, name]).getInfo()
     },
     async getChunks(runId, name, { cursor, limit = 100 } = {}) {
       if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new RangeError('Invalid stream page size')
@@ -178,7 +177,7 @@ export function createStreamStorage(binding, { signal, subscriptionId } = {}) {
       if (!Number.isSafeInteger(start) || start < 0 || (cursor != null && String(start) !== cursor)) {
         throw new RangeError('Invalid stream cursor')
       }
-      const { chunks, done, tailIndex } = await getStreamStub(binding, runId, name).getChunks({ startIndex: start, limit })
+      const { chunks, done, tailIndex } = await streamObject(binding, workload, ['stream', runId, name]).getChunks({ startIndex: start, limit })
       const next = start + chunks.length
       const hasMore = next <= tailIndex
       return { data: chunks.map((data, offset) => ({ index: start + offset, data })), done, hasMore,
@@ -190,7 +189,7 @@ export function createStreamStorage(binding, { signal, subscriptionId } = {}) {
 /** Node's World transport explicitly releases a tagged subscription through
  * the same private service binding as its read. A TCP disconnect may otherwise
  * be invisible at an idle Worker while no application bytes are being sent. */
-export async function serveStreamRequest(request, binding) {
+export async function serveStreamRequest(request, binding, workload = 'eve') {
   const { pathname, searchParams } = new URL(request.url)
   const runId = searchParams.get('runId')
   const name = searchParams.get('name')
@@ -198,14 +197,14 @@ export async function serveStreamRequest(request, binding) {
   const id = searchParams.get('subscriber')
   if (pathname !== '/world/stream' || !validSubscriber(id)) return new Response(null, { status: 400 })
   if (request.method === 'DELETE') {
-    await getStreamStub(binding, runId, name).release(id)
+    await streamObject(binding, workload, ['stream', runId, name]).release(id)
     return new Response(null, { status: 204 })
   }
   if (request.method !== 'GET') return new Response(null, { status: 405 })
   const value = searchParams.get('start') ?? '0'
   const start = Number(value)
   if (!Number.isSafeInteger(start) || String(start) !== value) return new Response(null, { status: 400 })
-  const streams = createStreamStorage(binding, { signal: request.signal, subscriptionId: id })
+  const streams = createStreamStorage(binding, { signal: request.signal, subscriptionId: id, workload })
   const body = await streams.get(runId, name, start)
   return new Response(body, { headers: { 'content-type': 'application/octet-stream', 'cache-control': 'no-store, no-transform' } })
 }
