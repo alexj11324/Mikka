@@ -2,12 +2,12 @@
 
 import { useEffect, useRef } from 'react'
 import useSWR from 'swr'
-import { getThreadMachine } from '@/app/actions/agents'
+import { getThreadMachine, getThreadChanges } from '@/app/actions/agents'
 import { listRunArtifacts } from '@/app/actions/artifacts'
 
 // SWR reads on mount and when the key changes. Only a state change within
 // the same mounted run needs an explicit refresh of that run's existing row.
-function useStatusRefresh(runId: string, issueId: string | null, status: string | undefined, refresh: () => Promise<unknown>) {
+function useStatusRefresh(runId: string | null, issueId: string | null, status: string | undefined, refresh: () => Promise<unknown>) {
   const previous = useRef({ runId, issueId, status })
   useEffect(() => {
     const changed = previous.current.runId === runId && previous.current.issueId === issueId && previous.current.status !== status
@@ -28,6 +28,13 @@ export function useThreadMachine(issueId: string | null, runId: string, status: 
   const read = useSWR(['thread-machine', issueId, runId], () => getThreadMachine(issueId, runId), {
     revalidateOnFocus: false, dedupingInterval: 0,
   })
+  useStatusRefresh(runId, issueId, status, read.mutate)
+  return read
+}
+
+export function useThreadChanges(issueId: string | null, runId: string | null, status?: string) {
+  const read = useSWR(runId ? ['thread-changes', issueId, runId] as const : null,
+    ([, issue, run]) => getThreadChanges(issue, run), { dedupingInterval: 0 })
   useStatusRefresh(runId, issueId, status, read.mutate)
   return read
 }
