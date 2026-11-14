@@ -64,6 +64,7 @@ export const ACTION_ERROR_CODES = [
   'messageRequired',
   'messageTooLong',
   'submissionConflict',
+  'threadSubmissionOutcomeUnconfirmed',
   'pendingActionUnavailable',
   'deviceSaveFailed',
   'tokenCreateFailed',

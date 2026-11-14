@@ -1234,6 +1234,7 @@
     "artifactNotFound": "找不到这个成果。",
     "messageRequired": "消息不能为空。",
     "submissionConflict": "此提交标识已用于另一条消息。",
+    "threadSubmissionOutcomeUnconfirmed": "暂时无法确认这条消息的处理结果。请刷新对话查看状态。",
     "pendingActionUnavailable": "这项操作已处理或已过期。",
     "deviceSaveFailed": "保存失败，请重试。",
     "tokenCreateFailed": "生成 token 失败，请重试。",
