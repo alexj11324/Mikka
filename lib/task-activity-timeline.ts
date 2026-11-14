@@ -69,7 +69,7 @@ type HistoryLabels = Pick<typeof import('../messages/en.json')['Workspace']['act
 
 /** A clause is words plus the task, thread or pull a word opens. The row paints them; the name is one part at the front. */
 export type ActivityPiece =
-  | { kind: 'text'; text: string }
+  | { kind: 'text'; text: string; name?: boolean }
   | { kind: 'task'; text: string; taskId: string }
   | { kind: 'thread'; text: string; runId: string }
   | { kind: 'pull'; text: string; href: string }
@@ -170,6 +170,6 @@ export function activityLineParts(
   const name = actor?.name || null
   if (!name) return clause
   const runId = activityRunId(events[0]?.at ?? '', actor, stretches)
-  const lead: ActivityPiece = runId ? { kind: 'thread', text: name, runId } : { kind: 'text', text: name }
+  const lead: ActivityPiece = runId ? { kind: 'thread', text: name, runId } : { kind: 'text', text: name, name: true }
   return [lead, { kind: 'text', text: ' ' }, ...clause]
 }

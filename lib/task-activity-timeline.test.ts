@@ -50,7 +50,7 @@ test('a person stays text, and the same minute keeps one name with every code', 
     event({ id: 'a', at: '2026-11-14T14:02:40.000Z', kind: 'assigned', assigneeName: 'Bob' }),
   ], labels(en), subject, en.Workspace.activity.separator, person, stretches)
   assert.equal(line.filter(part => part.kind === 'thread').length, 0)
-  assert.deepEqual(line[0], { kind: 'text', text: 'Ada' })
+  assert.deepEqual(line[0], { kind: 'text', text: 'Ada', name: true })
   assert.equal(line.map(part => part.text).join(''), 'Ada created MIK-12, set priority to high, assigned Bob')
   assert.deepEqual(line.filter(part => part.kind === 'task'), [{ kind: 'task', text: 'MIK-12', taskId: 'task-1' }])
 })

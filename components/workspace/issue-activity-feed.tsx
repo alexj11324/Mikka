@@ -84,6 +84,6 @@ function ActivitySentence({ parts }: { parts: ActivityPiece[] }) {
     if (part.kind === 'thread') return <button key={`${part.runId}:${index}`} type="button" className="border-0 bg-transparent p-0 font-medium text-foreground hover:underline" aria-label={t('openThread', { name: part.text })} onClick={() => openThread(part.runId)}>{part.text}</button>
     if (part.kind === 'task') return <button key={`${part.taskId}:${index}`} type="button" className="border-0 bg-transparent p-0 font-medium text-foreground hover:underline" onClick={() => openTask(part.taskId)}>{part.text}</button>
     if (part.kind === 'pull') return <a key={`${part.href}:${index}`} className="font-medium text-foreground underline-offset-2 hover:underline" href={part.href} target="_blank" rel="noreferrer">{part.text}</a>
-    return <span key={index} className="text-muted-foreground">{part.text}</span>
+    return <span key={index} className={part.name ? 'font-medium text-foreground' : 'text-muted-foreground'}>{part.text}</span>
   })}</span>
 }
