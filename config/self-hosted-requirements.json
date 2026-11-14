@@ -615,6 +615,13 @@
     "test": "tests/task-presentation.db.test.ts",
     "suite": "test:task-presentation-db"
   },
+  "lib/factory/questions/schema.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The selected server uses its existing PostgreSQL database and Factory question contract to return pending items before the newest-50 limit, while retaining complete task-history reads.",
+    "test": "lib/factory/questions/ask-user.db.test.ts",
+    "suite": "test:factory-routing-db"
+  },
   "lib/factory/review-change.ts": {
     "mode": "built-in",
     "environment": [],
