@@ -6,6 +6,7 @@ import { looksLikeSecretValue } from '@/lib/audit/events'
 export const organizationAuditActionSchema = z.enum([
   'organization.created', 'organization.renamed', 'organization.archived', 'organization.member_changed', 'organization.member_removed',
   'organization.member_invited', 'organization.invitation_revoked', 'organization.invitation_accepted', 'organization.workspace_attached', 'organization.workspace_detached',
+  'organization.join_domain_added', 'organization.join_domain_removed', 'organization.member_joined_by_domain',
   'entitlement.changed', 'scim.user_created', 'scim.user_updated', 'scim.user_suspended', 'scim.user_deleted', 'scim.group_changed',
   'sso.configured', 'sso.domain_verified', 'sso.policy_changed', 'sso.signed_in', 'sso.sign_in_failed', 'sso.signed_out', 'sso.logout_failed',
   'organization.policy_changed', 'organization.resource_requested', 'organization.resource_decided', 'organization.audit_exported', 'organization.retention_applied', 'organization.billing_account_changed', 'organization.api_key_renamed',
