@@ -155,8 +155,12 @@ export default function GroupChat() {
   }
 
   // What the person has seen: the newest message, once it is on screen.
-  const newest = accessDenied ? undefined : page.data?.messages[0]?.id
-  useEffect(() => { if (newest && atLatest) void api(`/api/conversations/${id}/read`, { method: 'POST', body: { messageId: newest } }).catch(() => undefined) }, [id, newest, atLatest])
+  const newest = page.data?.messages[0]?.id ?? null
+  const readRevision = page.data?.readRevision
+  useEffect(() => {
+    if (accessDenied || !atLatest || (!newest && readRevision === undefined)) return
+    void api(`/api/conversations/${id}/read`, { method: 'POST', body: { messageId: newest, readRevision } }).catch(() => undefined)
+  }, [id, newest, atLatest, readRevision, accessDenied])
 
   const member = (type: string, memberId: string) => members.data?.members.find(item => item.memberType === type && item.id === memberId)
   const bots = accessDenied ? [] : (members.data?.members ?? []).filter(item => item.memberType !== 'user')

@@ -1,4 +1,4 @@
-import { directoryInput } from '@/lib/conversation-directory-input'
+import { archiveIdleDays, directoryInput } from '@/lib/conversation-directory-input'
 import { saveEnvironmentInput, projectDefaultEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
 import { createOnlyCommand, dispatchReceiptInput } from '@/lib/task-create-command'
 import { taskListPageInput } from '@/lib/task-list-page'
@@ -69,6 +69,7 @@ const apiKey = z.discriminatedUnion('provider', [
   object({ provider: z.literal('custom'), name: text(60).trim().min(1), baseUrl: text(500).trim().min(1), protocol: z.enum(['anthropic', 'openai']), apiKey: text(512).trim().min(8), models: z.array(text(128).trim().min(1)).max(200).optional() }),
 ])
 const preferences = object({
+  archiveIdleAfterDays: z.literal(archiveIdleDays).optional(),
   proactive: bool, pushDecide: bool, pushReview: bool, pushFinished: bool, pushBriefing: bool,
   pushWhen: z.enum(['always', 'away']), memoryEnabled: bool, sendKey: z.enum(['enter', 'modEnter']),
   personalInstructions: text(8000).transform(value => value.trim()).refine(value => [...value].length <= 2000), dailySuggestions: bool,
@@ -283,6 +284,7 @@ export const desktopActionSchemas = {
   'task-runs.pollThreads': tuple(version.optional(), listPositions(200).optional()),
   'task-runs.syncThreadList': tuple(version.optional(), listPositions(200).optional()),
   'task-runs.listConversations': tuple(directoryInput),
+  'task-runs.listConversationSidebar': none,
   'task-runs.readConversationOrganization': tuple(uuid),
   'task-runs.setConversationOrganization': tuple(uuid, object({ field: z.enum(['archived', 'pinned']), value: bool })),
   'task-runs.renameConversation': tuple(uuid, text(400)),

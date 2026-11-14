@@ -44,7 +44,7 @@ test('a pin or mute change pushes its bot chat keys to the owner in the bot work
   const globalDb = globalThis as unknown as { workspacePool?: Pool }
   const previousWorkspace = globalDb.workspacePool
   globalDb.workspacePool = database
-  const { createRequestDatabaseScope } = await import('../db/request-scope')
+  const { db, createRequestDatabaseScope, withDatabaseTransaction } = await import('../db/request-scope')
   const scope = createRequestDatabaseScope(target.toString())
   const drain = async () => { while (pending.length) await Promise.all(pending.splice(0).map(work => work())) }
   try {
@@ -105,6 +105,43 @@ test('a pin or mute change pushes its bot chat keys to the owner in the bot work
       assert.equal(await scope.run(() => setGroupPreference('owner', group, { pinned: true })), 'pinLimit')
       assert.equal(await scope.run(() => setChatPreference('owner', extra[0]!, { pinned: true })), 'ok', 'a chat already pinned can be set again')
       await drain()
+    })
+
+    await t.test('an archive preference wakes only the owner’s active workspace lists after commit and stays quiet on replay or rollback', async () => {
+      const { readPreferences, savePreferences } = await import('../preferences')
+      const suspended = randomUUID()
+      await database.query(`INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES ($1,'peer','Suspended','team')`, [suspended])
+      await database.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status)
+        VALUES ($1,'owner','owner','owner','member','suspended')`, [suspended])
+      await drain()
+      sent.length = 0
+      const change = (archiveIdleAfterDays: 0 | 7) => savePreferences('owner', { archiveIdleAfterDays })
+      const visibleDays = async () => (await database.query<{ days: number }>(
+        `SELECT coalesce((SELECT "archiveIdleAfterDays" FROM user_preferences WHERE "userId"='owner'),30) AS days`,
+      )).rows[0]!.days
+      await scope.run(() => db.transaction(outer => withDatabaseTransaction(outer, async () => {
+        assert.equal((await change(7)).archiveIdleAfterDays, 7)
+        assert.equal(await visibleDays(), 30)
+        await drain()
+        assert.deepEqual(sent, [])
+      })))
+      assert.equal(await visibleDays(), 7)
+      await drain()
+      assert.deepEqual(sent.map(({ scope: recipient, events }) => ({ recipient, kinds: events.map(event => [event.kind, event.id]).sort() }))
+        .sort((a, b) => a.recipient.workspaceId.localeCompare(b.recipient.workspaceId)), [home, team].sort().map(workspaceId => ({
+          recipient: { ownerId: 'owner', workspaceId }, kinds: [['group_list', workspaceId], ['thread_list', workspaceId]],
+        })))
+      sent.length = 0
+      await scope.run(() => change(7))
+      await assert.rejects(scope.run(() => db.transaction(outer => withDatabaseTransaction(outer, async () => {
+        await change(0)
+        throw new Error('archive preference rollback')
+      }))), /archive preference rollback/)
+      await drain()
+      assert.equal(await visibleDays(), 7)
+      assert.equal((await scope.run(() => readPreferences('peer'))).archiveIdleAfterDays, 30)
+      assert.deepEqual(sent, [])
+      assert.deepEqual(unexpected, [])
     })
 
     await t.test('a bot that is not the caller’s writes and pushes nothing', async () => {

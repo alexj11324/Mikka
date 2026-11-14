@@ -436,6 +436,7 @@ export const agentRuns = pgTable('agent_runs', {
   title: varchar('title', { length: 60 }), titleSource: text('titleSource').$type<'generated' | 'manual'>(),
   /** On the canonical chain root, shared by all attempts. */
   conversationArchivedAt: timestamp('conversationArchivedAt', { withTimezone: true }),
+  conversationRestoredAt: timestamp('conversationRestoredAt', { withTimezone: true }),
   conversationPinnedAt: timestamp('conversationPinnedAt', { withTimezone: true }),
   /** On a thread's root run: the root of the thread that replaced it, when the person explicitly asked for a new one. */
   threadReplacedBy: uuid('threadReplacedBy').references((): AnyPgColumn => agentRuns.id, { onDelete: 'set null' }),
@@ -963,6 +964,10 @@ export const conversations = pgTable('conversations', {
   id: uuid('id').primaryKey(), workspaceId: uuid('workspaceId').notNull(),
   kind: text('kind').$type<'group' | 'agent_dm'>().notNull(), title: text('title').notNull(),
   createdBy: text('createdBy').notNull(), lastPosition: bigint('lastPosition', { mode: 'bigint' }).notNull().default(sql`0`),
+  creationPurpose: text('creationPurpose').notNull().default('group'),
+  conversationArchivedAt: timestamp('conversationArchivedAt', { withTimezone: true }),
+  conversationPinnedAt: timestamp('conversationPinnedAt', { withTimezone: true }),
+  conversationRestoredAt: timestamp('conversationRestoredAt', { withTimezone: true }),
   // Optional owner-designated current group agent; never inferred or backfilled.
   leadAgentId: uuid('leadAgentId'),
   leadBotId: uuid('leadBotId'),
@@ -1000,6 +1005,8 @@ export const messageReactions = pgTable('message_reactions', {
 export const conversationReads = pgTable('conversation_reads', {
   userId: text('userId').notNull(), conversationId: text('conversationId').notNull(),
   lastReadPosition: integer('lastReadPosition').notNull().default(0), lastReadMessageId: text('lastReadMessageId'),
+  runReadAt: timestamp('runReadAt', { withTimezone: true }), manuallyUnread: boolean('manuallyUnread').notNull().default(false),
+  unreadRevision: integer('unreadRevision').notNull().default(0),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, t => [primaryKey({ columns: [t.userId, t.conversationId] })])
 export const conversationLinks = pgTable('conversation_links', {
@@ -1282,6 +1289,7 @@ export const userPreferences = pgTable('user_preferences', {
   /** The chat composer's send key: Enter (Shift+Enter breaks the line) or ⌘/Ctrl+Enter (Enter breaks the line). */
   sendKey: text('sendKey').$type<SendKey>().notNull().default('enter'),
   /** The person's own instructions for the Coordinator and their Bots, at most 2000 characters. */
+  archiveIdleAfterDays: integer('archiveIdleAfterDays').notNull().default(30),
   personalInstructions: text('personalInstructions').notNull().default(''),
   /** 每日建议: the 08:00 briefing. Needs memoryEnabled. */
   dailySuggestions: boolean('dailySuggestions').notNull().default(true),

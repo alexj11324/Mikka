@@ -139,6 +139,17 @@ export const issueListChanged = async (executor: object, issueId: string, titleC
 export const botListChanged = (executor: object, botId: string) => changed(executor, `bot:${botId}`, (db, workspace) => botListTargets(db, workspace, botId))
 export const groupListChanged = (executor: object, conversationId: string, removedUserId: string | null = null) => changed(executor, `group:${conversationId}:${removedUserId ?? ''}`, (db, workspace) => groupListTargets(db, workspace, conversationId, removedUserId))
 export const groupListReadChanged = (executor: object, conversationId: string, ownerId: string) => changed(executor, `group-read:${conversationId}:${ownerId}`, async (db, workspace) => (await groupListTargets(db, workspace, conversationId)).filter(value => value.scope.ownerId === ownerId))
+/** A personal archive interval affects this reader's directories in each active workspace. */
+export const archivePreferenceChanged = (executor: object, ownerId: string) => changed(executor, `archive-preference:${ownerId}`, async (_db, workspace) => {
+  const { rows } = await workspace.query<LiveScope>(`SELECT m."userId" AS "ownerId", w.id AS "workspaceId"
+    FROM mikka_workspace_members m JOIN mikka_workspaces w ON w.id=m."workspaceId"
+    WHERE m."userId"=$1 AND m.status='active' AND (w.kind='team' OR w."userId"=$1)`, [ownerId])
+  return rows.map(scope => target(scope, ['thread_list', 'group_list']))
+})
+/** Only the reader's channel in the selected workspace consumes this receipt. */
+export const threadReadChanged = (executor: object, ownerId: string, workspaceId: string, kind: 'thread_list' | 'group_list' = 'thread_list') =>
+  changed(executor, `thread-read:${workspaceId}:${ownerId}:${kind}`, async (_db, workspace) =>
+    (await workspaceScopes(workspace, workspaceId, [ownerId])).map(scope => target(scope, [kind])))
 export const ownerListChanged = (executor: object, ownerId: string, kinds: readonly OwnerListKind[]) => changed(executor, `owner:${ownerId}:${[...kinds].sort().join(',')}`, (_db, workspace) => ownerListTargets(workspace, ownerId, kinds))
 export const workspaceListChanged = (executor: object, workspaceId: string, kinds: readonly WorkspaceListKind[]) => changed(executor, `workspace:${workspaceId}:${[...kinds].sort().join(',')}`, (_db, workspace) => workspaceListTargets(workspace, workspaceId, kinds))
 

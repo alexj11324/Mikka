@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+export const archiveIdleDays = [0, 3, 7, 14, 30, 90] as const
+
 export const directoryInput = z.strictObject({
   search: z.string().trim().max(120).default(''),
   state: z.enum(['all', 'working', 'waiting', 'idle', 'failed']).default('all'),
@@ -9,3 +11,11 @@ export const directoryInput = z.strictObject({
 })
 export type DirectoryInput = z.input<typeof directoryInput>
 export type DirectoryState = Exclude<z.output<typeof directoryInput>['state'], 'all'>
+
+export interface ConversationDirectoryPage {
+  items: {
+    kind?: 'run' | 'chat'; id: string; issueId: string | null; identifier: string | null; title: string
+    state: DirectoryState; at: string; pinned: boolean; unread: boolean
+  }[]
+  cursor: NonNullable<DirectoryInput['cursor']> | null
+}
