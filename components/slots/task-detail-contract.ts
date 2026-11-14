@@ -104,6 +104,9 @@ export type TaskDetailFrameProps = {
   workspaceId?: string | null
   /** The same authorized presentation that supplies the status row also identifies its Factory receipts. */
   factoryTaskId?: string
+  /** The work section and evidence viewer share the same authorized detail snapshot. */
+  work?: ReactNode
+  factorySnapshot?: import('@/lib/factory/activity').FactoryActivityView | null
   rootRef: RefObject<HTMLDivElement | null>
   onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void
   /** The page's accessible name: the title, or the title field's label while it is empty. */

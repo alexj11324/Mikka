@@ -4,11 +4,11 @@ Three schedules keep the 建议 page and each person's profile current (R-21, R-
 Hono/Nitro API. Community deployments can run the same schedule through the
 [built-in scheduler](self-hosting-realtime.md#scheduled-work).
 
-The Worker has one trigger, `* * * * *` (`wrangler.jsonc`). On each run it reads Cloudflare's `scheduledTime` and calls, in parallel (`src/index.mjs`):
+Wrangler configures one native Cloudflare Cron Trigger, `0,15,30,45 * * * *`, so the Worker wakes four times per hour. On each run it reads Cloudflare's `scheduledTime` and calls, in parallel (`src/index.mjs`):
 
 | When (UTC) | Endpoints |
 | --- | --- |
-| Minutes 0, 15, 30 and 45 | `/api/cron/reconcile` (`SWEEP_MINUTES`), `/api/cron/ops-monitor`, `/api/cron/briefings` |
+| Minutes 0, 15, 30 and 45 | `/api/cron/reconcile`, `/api/cron/ops-monitor`, `/api/cron/briefings` |
 | Minute 0 | `/api/cron/subscriptions`, `/api/cron/suggestions-reconcile` |
 | Minute 30 | `/api/cron/user-facts` |
 
@@ -17,7 +17,7 @@ safety sweep. The Worker does not call their individual cron routes hourly.
 
 Coordinator wakes, schedules and run recovery are event-driven (#1212, #1371): each starts from the write that makes it due, and work due later runs on a durable Workflow timer (`workflows/due-timer`, the Coordinator wake deadline) at its persisted time. `/api/cron/reconcile` is the one safety net: one statement (`lib/reconcile-due.ts`) says which of the three has work already due that no wake or timer picked up, and only that work runs and its timer is re-armed. Worst case, work whose start was lost runs 15 minutes after its due time. The old `/api/cron/coordinator-wakes`, `/api/cron/schedules` and `/api/cron/run-recovery` routes still work when called by hand.
 
-Because it uses `scheduledTime`, a late run still does the work of the minute it was scheduled for. Each endpoint gets its call even when another fails (`Promise.allSettled`); any failure then fails the run. `runSchedule` still accepts the older single cron strings (`*/15 * * * *`, `0 * * * *`, `30 * * * *`) and then calls only that endpoint. Deployment steps: [`operations/minute-worker-deployment.md`](operations/minute-worker-deployment.md).
+Because it uses `scheduledTime`, a late run still does the work of the minute it was scheduled for. Each endpoint gets its call even when another fails (`Promise.allSettled`); any failure then fails the run. `runSchedule` still accepts the older single cron strings (`*/15 * * * *`, `0 * * * *`, `30 * * * *`) and then calls only that endpoint. During Cloudflare propagation, an event from the previous minute trigger uses its scheduled time and skips minutes without due work. Deployment steps: [`operations/minute-worker-deployment.md`](operations/minute-worker-deployment.md).
 
 The three suggestions endpoints:
 
@@ -121,12 +121,7 @@ usage.
 
 The Worker logs each endpoint path, HTTP status, and whitelisted numeric summary counts; request failures reject the scheduled run. Public Worker and version preview URLs are disabled.
 
-Upload `cloudflare/suggestions-cron/src/index.mjs` as an ES module from the
-reviewed commit using the authorized Cloudflare API credential. It has no
-imports and needs no build. Apply the single `* * * * *` trigger, `MIKKA_URL`
-and the observability settings from `wrangler.jsonc` separately when uploading
-through the API. Deploy only after the matching app deployment is READY and
-its migrations have run ([`operations/minute-worker-deployment.md`](operations/minute-worker-deployment.md)).
+Deploy the reviewed Worker and its trigger through the existing Wrangler publisher after the matching application is READY and its migrations have run. Wrangler manages the trigger from `cloudflare/suggestions-cron/wrangler.jsonc`. The release verifies the previous or current cadence before its single write and checks the new cadence afterwards. See [Cloudflare Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/) and the [deployment runbook](operations/minute-worker-deployment.md).
 
 The Worker needs only `MIKKA_URL` and the secret binding `CRON_SECRET`. Its
 secret must match the production app's value in Infisical `prod:/vercel`.

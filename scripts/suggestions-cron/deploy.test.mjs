@@ -77,6 +77,7 @@ function fixture() {
       assert.equal(sha, SOURCE)
       assert.deepEqual(authority, { accountId: ACCOUNT, cloudflareToken: 'fixture-cf' })
       state.writes++
+      state.schedules = ['0,15,30,45 * * * *']
       return VERSION
     },
   }
@@ -90,13 +91,23 @@ test('deploys the existing Worker once after exact Web deploy, READY alias and p
   assert.equal(state.waits, 0)
   assert.equal(state.calls.filter(url => url === MIKKA_URL + '/api/version').length, 5)
   assert.deepEqual(report, { skipped: false, sourceCommit: SOURCE, production: { id: 'dpl_fixture', sha: SOURCE },
-    webDeployRunId: 42, versionId: VERSION, cron: '* * * * *', publicUrls: false, secretBinding: 'CRON_SECRET', observability: true })
+    webDeployRunId: 42, versionId: VERSION, cron: '0,15,30,45 * * * *', publicUrls: false, secretBinding: 'CRON_SECRET', observability: true })
   assert.equal(state.calls.some(url => /\/secrets(?:\/|$)/.test(url)), false)
 })
 
 const promotion = { schema: 'mikka.cloudflare-promotion.v1', approvalComment: '1954', approvalSha256: '2'.repeat(64),
   product: SOURCE, overlay: OLD, releasePin: 'aaaaaaaa-1953-1', gatewayVersionSha256: '3'.repeat(64),
   inventorySha256: '4'.repeat(64), verifiedAt: '2026-11-12T07:00:00.000Z', outcome: 'promoted' }
+
+test('accepts an already migrated trigger and refuses to confirm a writer that left the old trigger active', async () => {
+  const migrated = fixture()
+  migrated.state.schedules = ['0,15,30,45 * * * *']
+  assert.equal((await deployCron(migrated.options)).cron, '0,15,30,45 * * * *')
+  const stale = fixture()
+  stale.options.deployWorker = async () => { stale.state.writes++; return VERSION }
+  await assert.rejects(deployCron(stale.options), /cron_schedule_mismatch/)
+  assert.equal(stale.state.writes, 1)
+})
 
 test('the protected Cloudflare promotion is re-read before the single existing minute Worker write', async () => {
   const { options, state } = fixture()
