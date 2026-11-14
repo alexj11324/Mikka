@@ -9,7 +9,7 @@ import { listProjectTeams, setProjectTeams } from '@/app/actions/team-relations'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -18,13 +18,22 @@ import { usePresence, type PresenceProps } from '@/lib/use-presence'
 
 export function ProjectTeamControl({ project, onUpdated, disabled }: { project: Project; onUpdated: () => void; disabled: boolean }) {
   const i18nText = useTranslations();
-  const { data: teams = [], error: teamsError } = useSWR('teams', listTeams)
-  const { data: links, error: linksError, mutate } = useSWR('project-teams', listProjectTeams)
+  const { data: teams, error: teamsError, mutate: refreshTeams, isValidating: teamsLoading } = useSWR('teams', listTeams)
+  const { data: links, error: linksError, mutate, isValidating: linksLoading } = useSWR('project-teams', listProjectTeams)
   const [open, setOpen] = useState(false)
   const teamDialog = usePresence(open)
   const current = links?.filter(link => link.projectId === project.id) ?? []
-  return <section className="flex flex-col gap-3"><h2 className="text-sm font-medium">{i18nText("FeatureCopy.c_8663016b")}</h2><div className="flex flex-wrap gap-2">{current.map(link => { const team = teams.find(team => team.id === link.teamId); return <Badge key={link.teamId} variant={link.isPrimary ? 'secondary' : 'outline'}>{team?.name ?? i18nText("Settings.sections.teams.title")}{link.isPrimary ? <> {i18nText("FeatureCopy.c_e99105b9")}</> : ''}</Badge> })}{links && !current.length && <p className="text-xs text-muted-foreground">{i18nText("FeatureCopy.c_46147716")}</p>}</div><Button size="sm" variant="outline" disabled={disabled || !links || !!teamsError || !!linksError} onClick={() => setOpen(true)}>{i18nText("FeatureCopy.c_1ddf3032")}</Button>{(teamsError || linksError) && <FieldError className="text-xs">{i18nText("FeatureCopy.c_d50b2473")}</FieldError>}
-    {project.canEditProperties !== false && teamDialog.value && <ProjectTeamForm open={teamDialog.open} onOpenChangeComplete={teamDialog.onOpenChangeComplete} project={project} teams={teams} initialIds={current.map(link => link.teamId)} initialPrimary={current.find(link => link.isPrimary)?.teamId ?? ''} onClose={() => setOpen(false)} onSaved={() => { setOpen(false); void mutate(); onUpdated() }} />}
+  if (teamsError || linksError) {
+    if (open) setOpen(false)
+    return <section className="flex flex-col gap-3">
+      <h2 className="text-sm font-medium">{i18nText("FeatureCopy.c_8663016b")}</h2>
+      <Alert variant="destructive"><AlertDescription>{i18nText("FeatureCopy.c_d50b2473")}</AlertDescription></Alert>
+      <Button type="button" size="sm" variant="outline" disabled={teamsLoading || linksLoading}
+        onClick={() => { if (teamsError) void refreshTeams(); if (linksError) void mutate() }}>{i18nText("Common.retry")}</Button>
+    </section>
+  }
+  return <section className="flex flex-col gap-3"><h2 className="text-sm font-medium">{i18nText("FeatureCopy.c_8663016b")}</h2><div className="flex flex-wrap gap-2">{current.map(link => { const team = teams?.find(team => team.id === link.teamId); return <Badge key={link.teamId} variant={link.isPrimary ? 'secondary' : 'outline'}>{team?.name ?? i18nText("Settings.sections.teams.title")}{link.isPrimary ? <> {i18nText("FeatureCopy.c_e99105b9")}</> : ''}</Badge> })}{links && !current.length && <p className="text-xs text-muted-foreground">{i18nText("FeatureCopy.c_46147716")}</p>}</div><Button size="sm" variant="outline" disabled={disabled || !teams || !links} onClick={() => setOpen(true)}>{i18nText("FeatureCopy.c_1ddf3032")}</Button>
+    {project.canEditProperties !== false && teams && teamDialog.value && <ProjectTeamForm open={teamDialog.open} onOpenChangeComplete={teamDialog.onOpenChangeComplete} project={project} teams={teams} initialIds={current.map(link => link.teamId)} initialPrimary={current.find(link => link.isPrimary)?.teamId ?? ''} onClose={() => setOpen(false)} onSaved={() => { setOpen(false); void mutate(); onUpdated() }} />}
   </section>
 }
 function ProjectTeamForm({ project, teams, initialIds, initialPrimary, onClose, onSaved, open = true, onOpenChangeComplete }: { project: Project; teams: Awaited<ReturnType<typeof listTeams>>; initialIds: string[]; initialPrimary: string; onClose: () => void; onSaved: () => void } & PresenceProps) {
