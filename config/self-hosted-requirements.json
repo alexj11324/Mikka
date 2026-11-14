@@ -1841,5 +1841,11 @@
     "behavior": "Claim a Factory check run from the installation database under the canonical task, owner, Bot and cancellation fences, then update the run and its live task views in the same transaction.",
     "test": "lib/factory/checks.test.ts",
     "suite": "test:factory"
+  },
+  "lib/workspace-defaults.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the same default workspace identity in project validation and presentation without loading browser components into server workflows.",
+    "test": "apps/api/scripts/workflow-source-boundary.test.mjs"
   }
 }

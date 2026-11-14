@@ -91,13 +91,25 @@ async function mount({ showDialogs = false, ...props } = {}) {
   const Capture = props => { frame = props; return showDialogs ? props.dialogs : null }
   function Task() {
     const [task, setTask] = useState(issue)
-    return createElement(FramedTask, { Frame: Capture, task, userId: 'owner', title: task.title, status: task.status, priority: 'normal', locked: false, ...props,
-      agentActivity: { items: [] }, versions: [], getCurrent: async () => issue, adopt: saved => { issue = saved; setTask(saved) } })
+    return createElement(FramedTask, { Frame: Capture, task, userId: 'owner', title: task.title, status: task.status, priority: 'normal', locked: false, agentActivity: { items: [] }, ...props,
+      versions: [], getCurrent: async () => issue, adopt: saved => { issue = saved; setTask(saved) } })
   }
   await act(async () => root.render(createElement(Task)))
   return () => act(async () => { root.unmount(); host.remove() })
 }
 const row = id => frame.rows.find(item => item.id === id)
+test('properties and Work use the same authorized pull receipts, including an empty set', async () => {
+  issue.metadata.pullRequests = [{ url: 'https://github.com/example/legacy/pull/1', state: 'open' }]
+  const current = { url: 'https://github.com/example/review/pull/2', state: 'merged' }
+  for (const receipts of [[current], []]) {
+    const done = await mount({ agentActivity: { items: [], work: { presentation: { pullRequests: receipts } } } })
+    try {
+      assert.deepEqual(frame.work.props.pulls, receipts)
+      assert.deepEqual(row('pullRequests')?.chips.map(chip => chip.href) ?? [], receipts.map(pull => pull.url))
+    } finally { await done() }
+  }
+})
+
 const pickTeam = id => act(async () => row('team').menu.find(item => item.id === id).onSelect())
 
 test('confirmed deletion refreshes the viewer list without reading connections for the deleted task', async () => {
