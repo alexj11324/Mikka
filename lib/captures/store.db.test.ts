@@ -1,3 +1,4 @@
+import { measured } from '../../tests/helpers/read-metrics'
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
@@ -252,6 +253,9 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     assert.ok('error' in await store.resumeUpload({ ...local, runId: bobRun, userId: bob }, begun.captureId), 'another owner cannot resume it')
     assert.deepEqual(await store.resumeUpload(local, begun.captureId), begun)
     assert.deepEqual(await store.receiveUpload(local, begun.captureId, PNG), { ok: true })
+    const missing = await measured(() => store.completeUpload(local, randomUUID()))
+    assert.equal('error' in missing.value && missing.value.error, 'not_found')
+    assert.equal(missing.statements, 4, 'begin, account guard, one capture read, commit')
     const completed = await store.completeUpload(local, begun.captureId)
     assert.ok(!('error' in completed))
     assert.equal(completed.title, 'Checkout')
