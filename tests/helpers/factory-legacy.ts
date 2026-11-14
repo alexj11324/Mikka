@@ -1,4 +1,4 @@
-import type { Pool } from 'pg'
+import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { runPolicySchema } from '@mikka/protocol/agent-policy'
 import { createFactoryClaim } from '../../lib/factory/claim'
@@ -38,11 +38,12 @@ export function claimFixtureFactoryCheck(pool: Pool, store: ReturnType<typeof cr
     ? factoryMonitorDispatchAssignment(tx, task.userId, runId)
     : factoryCheckAssignment(tx, task.userId, runId))
 
-  return async (userId: string, deviceId: string, runId: string, leaseExpiresAt: string) => {
+  return async (userId: string, deviceId: string, runId: string, leaseExpiresAt: string, onClaim?: (tx: PoolClient) => Promise<void>) => {
     const tx = await pool.connect()
     try {
       await tx.query('BEGIN')
       const assignment = await guard(tx, userId, deviceId, runId, leaseExpiresAt)
+      await onClaim?.(tx)
       const policy = runPolicySchema.parse(assignment.policy)
       const baseBranch = z.string().parse(assignment.baseBranch)
       const updated = await tx.query(

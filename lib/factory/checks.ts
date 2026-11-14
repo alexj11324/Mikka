@@ -4,7 +4,6 @@ import { cloudTaskTarget, ownedCloudTaskTarget } from '../computer/cloud-task-ta
 import type { PoolClient } from "pg";
 import { isDeepStrictEqual } from 'node:util';
 import { orchestratorSettings } from '@mikka/protocol/orchestrator';
-import { z } from "zod";
 import { deviceIsOnline } from "../device-presence";
 import {
   applyApprovalMode,
