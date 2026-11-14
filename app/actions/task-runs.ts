@@ -1,5 +1,8 @@
 'use server'
 
+import type { IssuePullRequest } from '@/lib/issue-metadata'
+import type { DirectoryInput } from '@/lib/conversation-directory-input'
+import type { ConversationOrganizationChange } from '@/lib/conversation-organization'
 import { runAwaitingApproval, runHistoryWindow } from '@/lib/task-state-query'
 import { singleFlight } from '@/lib/single-flight'
 import { readCompactRunFailure, runFailureBrief, type CompactRunFailure } from '@/lib/run-failure-projection'
@@ -11,9 +14,10 @@ import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
 import { deviceOnlineStates } from '@/lib/device-presence'
 import { gatewayConfig } from '@/lib/builtin-gateway/config'
 import { ActionFailureError } from '@/lib/action-error'
+import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { agents, agentRuns, bots, devices, issues, type RunOutcome, type RunStatus } from '@/lib/db/schema'
+import { agents, agentRuns, bots, conversationReads, devices, issues, type RunOutcome, type RunStatus } from '@/lib/db/schema'
 import { runAgentName, runBotId, runBotName, runTaskPrompt } from '@/lib/run-bot-name'
 import { replyLine } from '@/lib/thread-groups'
 import { queryVersionWithExpiry } from '@/lib/db/query-version'
@@ -25,7 +29,10 @@ import { changedListIds, listPositionKey, readListPositions, unchangedList, type
 import { cacheReadAction } from '@/lib/cache-read-action'
 import { beginWorkspaceListRead } from '@/lib/live/revision-read'
 import { issueShortTitle } from '@/lib/short-title-sql'
+import { conversationTitle } from '@/lib/short-title'
+import { threadName } from '@/lib/issue-threads'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
+import { joinThreadRead, threadUnread } from '@/lib/thread-reads'
 import { issueVisibility } from '@/lib/issue-visibility'
 
 /** The newest run on each issue, for the right column's 我的任务 groups (MIK-38). */
@@ -66,7 +73,9 @@ async function readTaskRuns() {
   // run-recovery cron (sweepExpiredRunLeases), not by this poll.
   const latest = db.selectDistinctOn([agentRuns.issueId], {
     // A thread's name: its task's short title while the task keeps the title it was written from (lib/short-title.ts).
-    issueId: agentRuns.issueId, runId: agentRuns.id, issueTitle: sql<string>`coalesce(${issueShortTitle}, ${issues.title})`.as('issueTitle'), agentName: runAgentName.as('agentName'),
+    issueId: agentRuns.issueId, runId: agentRuns.id, issueTitle: sql<string>`coalesce(${issueShortTitle}, ${issues.title})`.as('issueTitle'),
+    // The conversation's own stored title and the opening of what it was asked: the run is named by conversationTitle below.
+    conversationTitle: agentRuns.title, asked: sql<string>`left(${runTaskPrompt}, 200)`.as('asked'), agentName: runAgentName.as('agentName'),
     status: agentRuns.status, outcome: agentRuns.outcome, failureDetails: runFailureBrief.as('failureDetails'),
     botId: runBotId.as('botId'),
     expiresAt: sql<Date | null>`(select min(r."createdAt")+${runHistoryWindow} from agent_runs r where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."workspaceId"=${agentRuns.workspaceId} and r."createdAt">now()-${runHistoryWindow})`.as('expiresAt'),
@@ -77,17 +86,22 @@ async function readTaskRuns() {
   // Select the same 200 issues first. Bot decoration is a one-to-one join in
   // this database; a missing or foreign bot cannot remove or duplicate a task.
   const rows = await db.select({
-    issueId: latest.issueId, runId: latest.runId, issueTitle: latest.issueTitle, agentName: latest.agentName,
+    issueId: latest.issueId, runId: latest.runId, issueTitle: latest.issueTitle, conversationTitle: latest.conversationTitle, asked: latest.asked, agentName: latest.agentName,
     status: latest.status, outcome: latest.outcome, failureDetails: latest.failureDetails, expiresAt: latest.expiresAt, harnesses: latest.harnesses,
     bot: { id: bots.id, name: bots.name, color: bots.color, shape: bots.shape },
   }).from(latest).leftJoin(bots, and(eq(bots.id, latest.botId), eq(bots.ownerId, session.user.id), eq(bots.workspaceId, context.workspace.id))).orderBy(latest.issueId)
   const live = await ownerListRead(session.user.id, rows.map(row => row.expiresAt), observedAt, begun)
-  const items: TaskRun[] = rows.map(({ expiresAt: _expiresAt, ...row }) => ({ ...row, failureDetails: readCompactRunFailure(row.failureDetails), issueId: row.issueId! }))
+  // `issueTitle` names the run where a list or a notification names it: the conversation's one short title (decision
+  // 2026-11-13-1405), its stored one first, never the task's full title. The field keeps its name for released clients.
+  const items: TaskRun[] = rows.map(({ expiresAt: _expiresAt, conversationTitle: stored, asked, ...row }) => ({ ...row,
+    issueTitle: conversationTitle({ title: stored, name: threadName(asked ?? '', ''), issue: { title: row.issueTitle } }),
+    failureDetails: readCompactRunFailure(row.failureDetails), issueId: row.issueId! }))
   return { items, live }
 }
 
 /** A thread: one run, newest first. Its name comes from its task, else its prompt. */
 export interface Thread {
+  unread?: boolean
   pauseReason?: 'human_control' | 'quota_exhausted' | null
   stopReason?: string | null
   awaitingApproval?: boolean
@@ -101,6 +115,8 @@ export interface Thread {
   agentName: string
   issueId: string | null
   prompt: string
+  /** The conversation's own stored short title, once it has one (conversationTitle reads it first). */
+  title?: string | null
   status: RunStatus
   createdAt: string
   updatedAt: string
@@ -111,6 +127,7 @@ export interface Thread {
   /** How it came out once it ended, as the decision model judged it; null while running or not judged yet (R-52). */
   outcome: RunOutcome | null
   failureDetails?: CompactRunFailure | null
+  pullState?: IssuePullRequest['state'] | null
   /** The coding agent running it (claude_code, codex…); its mark is the thread's icon (R-78). */
   harness: string | null
   waitingFor?: { deviceId: string; deviceName: string; deviceType: 'laptop' | 'server'; harness: string }
@@ -159,17 +176,25 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
       (${devices.enabled} is false or (${gatewayOffline} and (${devices.lastSeenAt} is null or
        ${devices.lastSeenAt}>statement_timestamp() OR ${devices.lastSeenAt}<statement_timestamp()-(${DEVICE_ONLINE_WINDOW_MS} * interval '1 millisecond'))))`
     const snapshot = db.select({
-      id: agentRuns.id, botId: agentRuns.botId, agentName: runBotName.as('agentName'), issueId: agentRuns.issueId, prompt: sql<string>`left(${runTaskPrompt}, 200)`.as('prompt'),
+      unread: threadUnread.as('unread'),
+      id: agentRuns.id, botId: agentRuns.botId, agentName: runBotName.as('agentName'), issueId: agentRuns.issueId, prompt: sql<string>`left(${runTaskPrompt}, 200)`.as('prompt'), title: agentRuns.title,
       status: agentRuns.status, createdAt: agentRuns.createdAt, updatedAt: agentRuns.updatedAt,
       lastReply: agentRuns.lastReply, lastReplyAt: agentRuns.lastReplyAt, source: agentRuns.source,
       deviceId: sql<string | null>`case when ${waitingForDevice} then ${devices.id} end`.as('deviceId'),
       deviceName: sql<string | null>`case when ${waitingForDevice} then ${devices.name} end`.as('deviceName'),
       deviceType: sql<'laptop' | 'server' | null>`case when ${waitingForDevice} then ${devices.deviceType} end`.as('deviceType'),
       waitingForDevice: waitingForDevice.as('waitingForDevice'),
+      pullState: sql<IssuePullRequest['state'] | null>`(select p."pullRequest"->>'state' from run_publications p
+        join issues i on i.id=p."issueId" and i."workspaceId"=${agentRuns.workspaceId} and i."ownershipState"='bound'
+        where p."runId"=${agentRuns.id} and p."userId"=${agentRuns.userId} and p."issueId"=${agentRuns.issueId}
+          and p.status='published' and p."pullRequest"->>'state' in ('open','draft','merged','closed')
+          and coalesce(i.content->'attrs'->'mikka',i.content->'attrs'->'orvilo')->>'deletedAt' is null
+          and mikka_resource_acl_allowed('account',${session.user.id},i."workspaceId",'task',i.id,'canReadContent'))`.as('pullState'),
       harness: sql<string>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`.as('harness'),
       outcome: agentRuns.outcome, failureDetails: runFailureBrief.as('failureDetails'),
       pauseReason: agentRuns.pauseReason, stopReason: agentRuns.stopReason, awaitingApproval: runAwaitingApproval.as('awaitingApproval'), threadReplacedBy: agentRuns.threadReplacedBy,
     }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(devices, eq(devices.id, agentRuns.deviceId))
+      .leftJoin(conversationReads, joinThreadRead(session.user.id))
       .where(and(eq(agentRuns.userId, session.user.id), eq(agentRuns.workspaceId, context.workspace.id), sql`${agentRuns.createdAt} > now() - ${runHistoryWindow}`))
       .orderBy(desc(sql`greatest(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt})`), desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200)
     const signature = await queryVersionWithExpiry(snapshot, sql`min(snapshot."createdAt")+${runHistoryWindow}`)
@@ -200,4 +225,128 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
       return { version, items, positions, ...(previous ? { delta: true as const } : {}), live, presenceFallback }
     })
   })
+}
+
+async function conversationActor() {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) throw new ActionFailureError('authRequired')
+  const context = await loadWorkspaceContext(undefined, session.user)
+  return { ownerId: session.user.id, reader: session.user, workspaceId: context.workspace.id }
+}
+
+/**
+ * Renames a conversation (a thread and the runs that continue it): the person's title is held to the short-title
+ * bound, written on every run of the conversation, and never replaced by a generated one (decision 2026-11-13-1405).
+ * Only the conversation's owner renames it.
+ */
+export async function renameConversation(runId: string, title: string): Promise<ActionResult<{ title: string }, 'issueTitleInvalid' | 'runNotFound'>> {
+  const { ownerId, workspaceId } = await conversationActor()
+  const { manualConversationTitle } = await import('@/lib/conversation-title')
+  const normalized = typeof title === 'string' && title.length <= 400 ? manualConversationTitle(title) : null
+  if (!normalized) return { error: 'issueTitleInvalid' }
+  const { renameConversationTitle } = await import('@/lib/conversation-title-server')
+  const { pool } = await import('@/lib/db')
+  const saved = await renameConversationTitle(pool, String(runId), ownerId, title, workspaceId)
+  if (!saved) {
+    const { renameStandalone } = await import('@/lib/standalone-chat-controls')
+    const renamed = await renameStandalone(pool, runId, ownerId, workspaceId, normalized)
+    if (!renamed) return { error: 'runNotFound' }
+    await (await import('@/lib/live/lists')).groupListChanged(pool, runId)
+    return { title: renamed }
+  }
+  await (await import('@/lib/live/lists')).runListChanged(pool, String(runId))
+  return { title: saved }
+}
+
+/**
+ * Asks the small model for a new title now, replacing even a manual one, because the person asked. `regenerated` is
+ * false when the model was unavailable or gave nothing usable: the conversation keeps the title it had.
+ */
+export async function regenerateConversationTitle(runId: string): Promise<ActionResult<{ title: string | null; regenerated: boolean }, 'runNotFound'>> {
+  const { reader, ownerId, workspaceId } = await conversationActor()
+  const { pool } = await import('@/lib/db')
+  const { withConversationWorkspace } = await import('@/lib/conversation-workspace')
+  const read = () => withConversationWorkspace(reader, workspaceId, async () => {
+    const result = await pool.query('SELECT title FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "workspaceId"=$3', [String(runId), ownerId, workspaceId])
+    return result.rows[0] as { title: string | null } | undefined
+  })
+  const owned = await read()
+  if (!owned) {
+    const { regenerateStandalone } = await import('@/lib/standalone-chat-controls')
+    const response = await regenerateStandalone(pool, runId, ownerId, workspaceId, async (owner, content, workspace) => {
+      const { defaultModelAvailable } = await import('@/lib/default-model')
+      if (!await defaultModelAvailable(owner)) return null
+      const { generateShortTitle } = await import('@/lib/short-title-server')
+      try { return await generateShortTitle(owner, content, workspace) } catch { return null }
+    })
+    if (!response) return { error: 'runNotFound' }
+    if (response.regenerated) await (await import('@/lib/live/lists')).groupListChanged(pool, runId)
+    return response
+  }
+  const { defaultModelAvailable } = await import('@/lib/default-model')
+  if (!await defaultModelAvailable(ownerId)) {
+    const current = await read()
+    return current ? { title: current.title, regenerated: false } : { error: 'runNotFound' }
+  }
+  const { nameConversation } = await import('@/lib/conversation-title-server')
+  const { generateShortTitle } = await import('@/lib/short-title-server')
+  let title: string | null = null
+  try { title = await nameConversation(pool, String(runId), ownerId, 'regenerate', generateShortTitle) } catch (error) {
+    console.error('Conversation title regenerate failed', error instanceof Error ? error.name : 'unknown')
+  }
+  if (title) await (await import('@/lib/live/lists')).runListChanged(pool, String(runId))
+  const current = await read()
+  if (!current) return { error: 'runNotFound' }
+  return { title: current.title, regenerated: !!title }
+}
+
+export async function readConversationOrganization(runId: string) {
+  const { ownerId, workspaceId } = await conversationActor()
+  const { pool } = await import('@/lib/db')
+  const { conversationOrganization } = await import('@/lib/conversation-organization')
+  const state = await conversationOrganization(pool, ownerId, workspaceId, runId)
+  if (state) return state
+  const { standaloneOrganization } = await import('@/lib/standalone-chat-controls')
+  return standaloneOrganization(pool, runId, ownerId, workspaceId)
+}
+
+export async function setConversationOrganization(runId: string, change: ConversationOrganizationChange) {
+  const { ownerId, workspaceId } = await conversationActor()
+  if (!change || !['archived', 'pinned'].includes(change.field) || typeof change.value !== 'boolean') {
+    throw new ActionFailureError('validationGeneric')
+  }
+  const { pool } = await import('@/lib/db')
+  const { conversationOrganization } = await import('@/lib/conversation-organization')
+  const state = await conversationOrganization(pool, ownerId, workspaceId, runId, change)
+  if (state) {
+    await (await import('@/lib/live/lists')).runListChanged(pool, runId)
+    return state
+  }
+  const { standaloneOrganization } = await import('@/lib/standalone-chat-controls')
+  const chat = await standaloneOrganization(pool, runId, ownerId, workspaceId, change)
+  if (chat) await (await import('@/lib/live/lists')).groupListChanged(pool, runId)
+  return chat
+}
+
+export async function listConversations(input: DirectoryInput) {
+  const { reader, workspaceId } = await conversationActor()
+  const { conversationDirectory } = await import('@/lib/conversation-directory')
+  const { pool } = await import('@/lib/db')
+  return conversationDirectory(pool, reader, workspaceId, input)
+}
+
+export async function listConversationSidebar() {
+  const { reader, workspaceId } = await conversationActor()
+  const { conversationSidebar } = await import('@/lib/conversation-directory')
+  const { pool } = await import('@/lib/db')
+  return conversationSidebar(pool, reader, workspaceId)
+}
+
+/** A workspace switch between composing and searching invalidates the old picker. */
+export async function findThreadReferences(expectedWorkspaceId: string, query: string, kind?: 'task' | 'thread' | 'pr') {
+  const { ownerId, workspaceId } = await conversationActor()
+  if (expectedWorkspaceId !== workspaceId || typeof query !== 'string' || query.length > 120 ||
+    (kind !== undefined && !['task', 'thread', 'pr'].includes(kind))) throw new ActionFailureError('validationGeneric')
+  const { searchThreadReferences } = await import('@/lib/thread-reference-search')
+  return searchThreadReferences(ownerId, workspaceId, query.trim(), kind)
 }

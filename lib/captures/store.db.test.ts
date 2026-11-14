@@ -1,3 +1,4 @@
+import { measured } from '../../tests/helpers/read-metrics'
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
@@ -5,6 +6,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
+import { measured } from '../../tests/helpers/read-metrics'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 
 // Run captures belong to one run and its owner: teammates, other devices and
@@ -24,6 +26,41 @@ const dbTest = databaseUrl ? test : test.skip
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...Buffer.from('IHDR-test-image')])
 const MP4 = new Uint8Array([0, 0, 0, 0x18, ...Buffer.from('ftypisom-test-video')])
 const sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
+
+dbTest('capture metadata reads do not transfer the inline file', async t => {
+  const [{ createRequestDatabaseScope, pool }, { runEvidence, readCapture }] = await Promise.all([import('../db'), import('./store')])
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const owner = 'capture-summary-' + randomUUID(), run = randomUUID(), agent = randomUUID(), id = randomUUID()
+  const at = new Date('2026-01-02T12:00:00.000Z')
+  try {
+    await scope.run(async () => {
+      await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [owner, owner + '@example.invalid'])
+      await pool.query(`INSERT INTO agents(id,"userId",name,harness) VALUES($1,$2,'Capture','codex')`, [agent, owner])
+      await pool.query(`INSERT INTO agent_runs(id,"userId","agentId",status) VALUES($1,$2,$3,'succeeded')`, [run, owner, agent])
+      await pool.query(`INSERT INTO run_captures(id,"userId","runId",kind,"contentType",source,status,title,size,"inlineContent","createdAt","storageKey",sha256)
+        VALUES($1,$2,$3,'image','image/png','local','ready','Preview',$4,$5,$6,$7,$8)`, [id, owner, run, PNG.length, PNG, at, 'fixture/' + id, sha(PNG)])
+      const small = await measured(() => runEvidence(owner, run))
+      const expected = { id, kind: 'image', contentType: 'image/png', source: 'local', title: 'Preview', size: PNG.length, durationMs: null, createdAt: at.toISOString() }
+      assert.deepEqual(small.value?.captures, [expected])
+      const payload = Buffer.concat([PNG, Buffer.alloc(256 * 1024)])
+      await pool.query('UPDATE run_captures SET "inlineContent"=$2,size=$3,sha256=$4 WHERE id=$1', [id, payload, payload.length, sha(payload)])
+      const large = await measured(() => runEvidence(owner, run))
+      assert.deepEqual(large.value?.captures, [{ ...expected, size: payload.length }])
+      assert.equal(await runEvidence('foreign-' + owner, run), null)
+      assert.deepEqual((await readCapture(owner, id))?.bytes, new Uint8Array(payload))
+      t.diagnostic(JSON.stringify({ inlineBytes: payload.length, smallResultBytes: small.resultBytes, largeResultBytes: large.resultBytes,
+        smallSocketBytes: small.bytes, largeSocketBytes: large.bytes }))
+      assert.ok(large.resultBytes < small.resultBytes + 256, 'metadata reads must not transfer the inline file')
+    })
+  } finally {
+    try { await scope.run(async () => {
+      await pool.query('DELETE FROM run_captures WHERE id=$1', [id])
+      await pool.query('DELETE FROM agent_runs WHERE id=$1', [run])
+      await pool.query('DELETE FROM agents WHERE id=$1', [agent])
+      await pool.query('DELETE FROM "user" WHERE id=$1', [owner])
+    }) } finally { await scope.close() }
+  }
+})
 
 dbTest('artifact evidence follows each real submission version, not the artifact creator or mutable latest version', async t => {
   const [{ createRequestDatabaseScope, pool }, { submitArtifact, readArtifactContent }, { runEvidence }, { artifactStorage }, { workAsyncStorage }, { workUnitAsyncStorage }] = await Promise.all([
@@ -252,6 +289,9 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     assert.ok('error' in await store.resumeUpload({ ...local, runId: bobRun, userId: bob }, begun.captureId), 'another owner cannot resume it')
     assert.deepEqual(await store.resumeUpload(local, begun.captureId), begun)
     assert.deepEqual(await store.receiveUpload(local, begun.captureId, PNG), { ok: true })
+    const missing = await measured(() => store.completeUpload(local, randomUUID()))
+    assert.equal('error' in missing.value && missing.value.error, 'not_found')
+    assert.equal(missing.statements, 4, 'begin, account guard, one capture read, commit')
     const completed = await store.completeUpload(local, begun.captureId)
     assert.ok(!('error' in completed))
     assert.equal(completed.title, 'Checkout')
@@ -356,6 +396,13 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
       assert.ok(!('error' in verified))
       await fetch(r2.upload.url, { method: 'PUT', headers: r2.upload.headers, body: swapped })
       assert.deepEqual((await store.readCapture(alice, r2.captureId))?.bytes, PNG, 'replayed signed PUT cannot replace verified evidence')
+      const objectShare = await store.createCaptureShare(alice, r2.captureId)
+      assert.ok(objectShare)
+      const sharedObject = await measured(() => store.sharedCapture(objectShare.token))
+      assert.deepEqual(sharedObject.value?.bytes, PNG, 'the authorized shared object still uses its normal storage reader')
+      assert.equal(sharedObject.statements, 1)
+      assert.equal(await store.revokeCaptureShares(alice, r2.captureId), 1)
+      assert.equal(await store.sharedCapture(objectShare.token), null)
     } finally {
       globalThis.fetch = originalFetch
       for (const name of names) if (previous[name] === undefined) delete process.env[name]; else process.env[name] = previous[name]
@@ -381,7 +428,12 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     assert.equal(await store.createCaptureShare(bob, saved.id), null)
     const share = await store.createCaptureShare(alice, saved.id)
     assert.ok(share?.token.startsWith('mkc_'))
-    assert.deepEqual((await store.sharedCapture(share!.token))?.bytes, PNG)
+    const linked = await measured(() => store.sharedCapture(share!.token))
+    assert.deepEqual(linked.value?.bytes, PNG)
+    assert.equal(linked.statements, 1, 'share authority and ready media must be read in one statement')
+    await pool.query("UPDATE run_captures SET status='failed' WHERE id=$1", [saved.id])
+    try { assert.equal(await store.sharedCapture(share!.token), null, 'a live link cannot reveal an unready capture') }
+    finally { await pool.query("UPDATE run_captures SET status='ready' WHERE id=$1", [saved.id]) }
     assert.equal(await store.revokeCaptureShares(bob, saved.id), 0)
     assert.equal(await store.revokeCaptureShares(alice, saved.id), 1)
     assert.equal(await store.sharedCapture(share!.token), null)

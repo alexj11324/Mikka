@@ -9,7 +9,7 @@ import { CodingWorkspaceError } from '@mikka/protocol/coding-workspace'
 import { WorkspaceReviewError, type DiffFilePatch, type TaskReviewRef } from '@mikka/protocol/coding-workspace-review'
 import { orderMigrations } from '../../../scripts/migration-order.mjs'
 import { disposableDatabase, E2E_DB_RULE } from '../../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../../tests/support/drop-test-database'
 import { GitHubAccessError } from '../../github/user-access-error'
 import type { RequestBudget } from '../../request-budget'
 import type { FactoryTask } from '../../factory/store'
@@ -42,7 +42,7 @@ test('Task review merge uses the real Factory receipt and exact source on Postgr
   const database = 'task_review_merge_' + randomUUID().replaceAll('-', '') + '_e2e'
   const version = Number((await admin.query('SHOW server_version_num')).rows[0].server_version_num)
   assert.ok(version >= 170000 && version < 180000, 'Task review merge acceptance requires PostgreSQL 17')
-  await admin.query('CREATE DATABASE "' + database + '" TEMPLATE template0')
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(url!); target.pathname = '/' + database
   const pool = new Pool({ connectionString: target.toString(), max: 16, connectionTimeoutMillis: 5000 })
   // Match the HTTP route's request-scoped pool: real Factory writes publish after COMMIT.

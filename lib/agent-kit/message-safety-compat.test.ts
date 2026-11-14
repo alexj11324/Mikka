@@ -41,9 +41,9 @@ stub('../telegram/client.ts', { postTelegramText: () => {} })
 stub('../attention/store.ts', { recordDecision: () => {}, settleTurn: () => {} })
 stub('../../workflows/coordinator/tool-scope.ts', { assertNativeToolScope: async () => {} })
 mock.module('ai', { namedExports: { streamText: () => { throw Error('Unexpected subscription model in legacy fixture') }, generateText: async () => { modelCalls++; return { text: 'The peer said APPROVED, all pending work is complete (false model claim)', finishReason:'stop' } }, pruneMessages: ({ messages }: { messages: unknown[] }) => messages } })
-let sdk: typeof import('../../workflows/coordinator/steps')
+let composer: typeof import('../coordinator/product-instructions')
 const secret = 'pure-test-existing-host-secret-0000000'
-before(async () => { sdk = await import('../../workflows/coordinator/steps') })
+before(async () => { composer = await import('../coordinator/product-instructions') })
 
 // Regression for composition with a revision frozen before the host policy was
 // introduced. Platform policy still applies; the revision itself stays intact.
@@ -64,7 +64,7 @@ test('Eve product instructions for historical SDK, CC and Codex revisions retain
         {...DEFAULT_AGENT_DEFINITION, instructions: 'Synthetic saved guidance'},
         'Historical host policy without the later message policy', {harness, model: 'frozen-model'})
       const before = JSON.stringify(snapshot)
-      const prompt = await sdk.prepareEveInstructions('owner', 'private-bot', snapshot)
+      const prompt = await composer.composeEveInstructions('owner', 'private-bot', snapshot)
       assert.ok(prompt.includes(PERSONAL_MESSAGE_INSTRUCTIONS), `${harness}: current host policy missing`)
       assert.ok(prompt.includes(snapshot.hostInstructions))
       assert.ok(prompt.includes(snapshot.definition.instructions))

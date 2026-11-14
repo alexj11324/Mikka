@@ -47,7 +47,7 @@ test('cloud hosted choices identify Mikka Cloud credits while self-hosted and ol
   const hosted: ModelMenu['current'] = { id: HOSTED_CHOICE, modelId: '', provider: 'mikka', kind: 'hosted', available: true, chosen: true, hostedSource: 'cloud' }
   assert.equal(groupTag({ kind: 'hosted', hostedSource: 'cloud', options: [hosted] }), mobileMessages.Coordinator.modelPicker.cloudCredits)
   assert.equal(groupTag({ kind: 'hosted', hostedSource: 'self-hosted', options: [] }), mobileMessages.Coordinator.modelPicker.ownProvider)
-  assert.equal(groupTag({ kind: 'hosted', options: [] }), '点数')
+  assert.equal(groupTag({ kind: 'hosted', options: [] }), mobileMessages.Coordinator.modelPicker.credits)
   assert.equal(modelMenuLabel(hosted), mobileMessages.Coordinator.modelPicker.hosted, 'the composer chip stays compact')
   assert.equal(modelSourceLabel(hosted), `${mobileMessages.Coordinator.modelPicker.hosted} · ${mobileMessages.Coordinator.modelPicker.cloudCredits}`)
 })

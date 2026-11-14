@@ -1,7 +1,7 @@
 /** Pure JSON codec shared with the bundled renderer. No server dependencies. */
-export const DESKTOP_RPC_VERSION = 1 as const
-export const DESKTOP_RPC_PREVIOUS_VERSION = 0 as const
-export const UPDATE_REQUIRED = 'desktop_client_update_required' as const
+import { AVATAR_MAX_BYTES } from '../account/avatar-file.ts'
+
+export { DESKTOP_RPC_VERSION, DESKTOP_RPC_PREVIOUS_VERSION, UPDATE_REQUIRED } from './version.ts'
 
 export type Wire =
   | null | boolean | number | string
@@ -74,7 +74,7 @@ export async function encodeArgs(args: unknown[]): Promise<Wire> {
     for (const [key, item] of value.entries()) {
       if (typeof item === 'string') entries.push([key, item])
       else {
-        if (item.size > 200 * 1024) throw new TypeError('desktop_rpc_value_invalid')
+        if (item.size > AVATAR_MAX_BYTES) throw new TypeError('desktop_rpc_value_invalid')
         const bytes = new Uint8Array(await item.arrayBuffer())
         let binary = ''
         for (const byte of bytes) binary += String.fromCharCode(byte)

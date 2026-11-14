@@ -112,7 +112,7 @@ export async function advanceFactoryRequest(tx: PoolClient, task: FactoryTask, s
 
 /** Owner messages to an active thread use the same epoch path as terminal
  * continuations. Peer/model messages never call this entry point. */
-export async function continueActiveFactoryRequest(pool: Pool, userId: string, runId: string, text: string, sourceEventId?: string, submission?: { recordOwnerMessage: true }) {
+export async function continueActiveFactoryRequest(pool: Pool, userId: string, runId: string, text: string, sourceEventId?: string, submission?: { recordOwnerMessage: true; interrupt?: boolean }) {
   const { rows: [identity] } = await pool.query(`SELECT t.id,t."botId",t."issueId" FROM factory_attempts a
     JOIN factory_tasks t ON t.id=a."taskId" WHERE a."runId"=$1 AND t."userId"=$2`, [runId, userId])
   if (!identity) return false
@@ -131,6 +131,16 @@ export async function continueActiveFactoryRequest(pool: Pool, userId: string, r
     // event. It adds no new request and must not stop its current executor.
     if (sourceEventId === task.sourceEventId && !['cancelled', 'revoked'].includes(task.status)) {
       await tx.query('COMMIT'); return 'replayed' as const
+    }
+    // A second window may still show the previous turn while its device
+    // acknowledges a stop. Only this exact active attempt can be interrupted.
+    if (submission?.interrupt) {
+      const current = await tx.query(`SELECT 1 FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId"
+        WHERE a.id=$1 AND a."taskId"=$2 AND a.status='running' AND r.id=$3
+          AND r."userId"=$4 AND r."workspaceId"=$5 AND r."issueId"=$6
+          AND r.status IN ('preparing','running','finishing','queued') AND r."stopRequestedAt" IS NULL FOR UPDATE OF r`,
+      [task.attemptId, task.id, runId, userId, task.workspaceId, task.issueId])
+      if (task.status !== 'running' || !current.rowCount) throw new ActionFailureError('threadDeliveryUnavailable')
     }
     const id = sourceEventId ? await factoryContinuationSource(tx, task, sourceEventId, runId) : randomUUID()
     if (!sourceEventId) await tx.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload,tier,"deliveredAt")

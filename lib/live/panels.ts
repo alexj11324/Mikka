@@ -47,24 +47,38 @@ export async function threadLiveReferences(database: Database, workspaceDatabase
   return runIds.map(id => ({ id, workspaceId: scopes.get(id)?.workspaceId ?? null }))
 }
 
-/** Body visibility follows issueVisibilityPredicate: a personal body's owner,
- * or active members of the linked workspace. Legacy invitations grant nothing. */
-export async function documentLiveTargets(database: Database, workspaceDatabase: Database, issueId: string, viewerId: string | null = null) {
-  const { rows: [issue] } = await database.query<{ userId: string; scope: string; workspaceId: string | null }>(
-    `SELECT "userId",scope,"workspaceId" FROM issues WHERE id=$1 AND "ownershipState"='bound'
-       AND coalesce(content->'attrs'->'mikka',content->'attrs'->'orvilo')->>'deletedAt' IS NULL`, [issueId],
+/** Resolve issue ownership in the application DB and its active audience in the workspace DB. */
+export async function issueAudienceTargets(database: Database, workspaceDatabase: Database, issueIds: readonly string[],
+  kind: 'issue_document' | 'issue_relations' | 'pull_request_status', viewerId: string | null = null) {
+  if (!issueIds.length) return []
+  const { rows: issues } = await database.query<{ id: string; workspaceId: string }>(
+    `SELECT id,"workspaceId" FROM issues WHERE id=ANY($1::uuid[]) AND "ownershipState"='bound' AND "workspaceId" IS NOT NULL
+       AND coalesce(content->'attrs'->'mikka',content->'attrs'->'orvilo')->>'deletedAt' IS NULL`, [issueIds],
   )
-  if (!issue) return []
-  const scopes = await documentScopes(workspaceDatabase, issueId, issue, viewerId)
-  return scopes.map(scope => ({ scope, events: [{ kind: 'issue_document', id: issueId }] as LiveInvalidation[] }))
+  const byId = new Map(issues.map(issue => [issue.id, issue.workspaceId]))
+  const workspaceEvents = new Map<string, LiveInvalidation[]>()
+  for (const id of issueIds) {
+    const workspaceId = byId.get(id.toLowerCase())
+    if (!workspaceId) continue
+    const events = workspaceEvents.get(workspaceId)
+    if (events) events.push({ kind, id })
+    else workspaceEvents.set(workspaceId, [{ kind, id }])
+  }
+  const scopes = await documentScopes(workspaceDatabase, [...workspaceEvents.keys()], viewerId)
+  return scopes.map(scope => ({ scope, events: [...workspaceEvents.get(scope.workspaceId)!] }))
 }
 
-async function documentScopes(workspaceDatabase: Database, issueId: string, issue: { userId: string; scope: string; workspaceId: string | null }, viewerId: string | null = null) {
+export function documentLiveTargets(database: Database, workspaceDatabase: Database, issueId: string, viewerId: string | null = null) {
+  return issueAudienceTargets(database, workspaceDatabase, [issueId], 'issue_document', viewerId)
+}
+
+async function documentScopes(workspaceDatabase: Database, workspaceIds: string[], viewerId: string | null = null) {
+  if (!workspaceIds.length) return []
   const { rows } = await workspaceDatabase.query<LiveScope>(
     `SELECT m."userId" AS "ownerId",w.id AS "workspaceId" FROM mikka_workspaces w
      JOIN mikka_workspace_members m ON m."workspaceId"=w.id AND m.status='active'
-     WHERE w.id=$1 AND (w.kind='team' OR w."userId"=m."userId")
-       AND ($2::text IS NULL OR m."userId"=$2)`, [issue.workspaceId, viewerId],
+     WHERE w.id=ANY($1::uuid[]) AND (w.kind='team' OR w."userId"=m."userId")
+       AND ($2::text IS NULL OR m."userId"=$2)`, [workspaceIds, viewerId],
   )
   return rows
 }
@@ -163,7 +177,7 @@ export async function documentScopesBeforeChange(issue: { id: string; userId: st
   if (!liveGatewayConfig(process.env)) return []
   try {
     const { workspacePool } = await import('../workspace-db')
-    return await documentScopes(workspacePool, issue.id, issue)
+    return await documentScopes(workspacePool, issue.workspaceId ? [issue.workspaceId] : [])
   } catch {
     console.warn('[live] document scope capture unavailable')
     return []

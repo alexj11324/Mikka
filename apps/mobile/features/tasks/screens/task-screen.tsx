@@ -1,12 +1,12 @@
-import { presentedFactoryEvents, taskEvidenceHref } from '../../../../../lib/task-factory-events'
+import { presentedFactoryEvents, taskEvidenceHref, taskFactoryProgress, type TaskFactoryProgress } from '../../../../../lib/task-factory-events'
 import { mobileMessages } from '@/lib/messages'
-import { useEffect, useRef, type ReactNode } from 'react'
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { CalendarClock, ChevronRight, Sparkles } from 'lucide-react-native'
 import { BotAvatar, MachineIcon, Spinner } from '@/components/icons'
-import { Markdown } from '@/components/Markdown'
+import { TaskDescription } from '../components/task-description'
 import { NavBar, underBar } from '@/components/NavBar'
 import { useScrolledUnderBar } from '@/components/BarBackdrop'
 import { ReadNotice } from '@/components/ReadNotice'
@@ -47,14 +47,19 @@ export function TaskScreen() {
   const bar = useScrolledUnderBar()
   const home = useHome().data
   const { data, error, loading, reload } = useLiveApi<TaskDetail>(`/api/mobile/tasks/${id}`,
-    detail => taskDetailLive(id, detail?.live?.workspaceId, home?.live?.workspaceId, home?.workspace.id, detail?.task.factoryTaskId, detail?.live?.factoryActivityVersion), readPresentedTask)
+    detail => taskDetailLive(id, detail?.live?.workspaceId, home?.live?.workspaceId, home?.workspace.id, detail?.task.factoryTaskId, detail?.live?.factoryActivityVersion, Array.isArray(detail?.work?.connections)), readPresentedTask)
   const task = data?.task
   const openTaskOnWeb = () => { if (task) void openOnWeb(`/?issue=${encodeURIComponent(task.id)}`) }
   // The task's own state: its current attempt's in 等待你 and 进行中, else its board status (2026-11-07-2230).
   const shown = task ? rowState(task) : null
   // 活动 runs oldest first, from the task's creation down (Alex 2026-11-07); the server sends it newest first.
   const receipts = presentedFactoryEvents(data?.factoryEvents, task?.factoryTaskId)
-  const activity = data ? activityEntries(data.activity, [...data.timeline ?? [], ...receipts]) : []
+  const conversations = data?.work?.conversations
+  const progress = conversations ? taskFactoryProgress(receipts) : []
+  const activity = data ? activityEntries(
+    conversations ? data.activity.filter(item => item.kind === 'created') : data.activity,
+    [...data.timeline ?? [], ...(conversations ? receipts.filter(item => item.kind === 'evidence') : receipts)],
+  ) : []
 
   // Only the authorized Task detail can match a link to one of its runs.
   const target = !loading && !error ? taskLinkAttempt(id, attempt, data) : undefined
@@ -89,7 +94,34 @@ export function TaskScreen() {
               {task.schedule ? <Chip icon={<CalendarClock size={14} color={colors.secondary} strokeWidth={2} />} label={task.schedule.label} /> : null}
             </View>
             <Row label={mobileMessages.MobileCore.taskPropertiesOnWeb} onPress={openTaskOnWeb} />
-            {task.description ? <View style={styles.description}><Markdown text={task.description} /></View> : null}
+            {task.description ? <View style={styles.description}><TaskDescription key={task.id} body={task.description} /></View> : null}
+            {data?.work && (data.work.linkedChats.length > 0 || data.work.pullRequests.length > 0 || Boolean(conversations?.length) || progress.length > 0) ? <View>
+              <Text accessibilityRole="header" style={styles.section}>{mobileMessages.IssueDetail.work.heading}</Text>
+              {data.work.linkedChats.map(chat => <Row key={chat.id} label={chat.title || mobileMessages.ConversationDirectory.untitled}
+                onPress={() => router.push(`/groups/${chat.id}`)} />)}
+              {conversations?.map(thread => {
+                const label = thread.detail?.name || (thread.ownerName ? mobileMessages.IssueThreads.ownerThread.replace('{name}', thread.ownerName) : mobileMessages.IssueThreads.hidden)
+                const status = thread.stopping ? mobileMessages.IssueThreads.stopping : thread.state === 'replaced' ? mobileMessages.MobileCore.threadReplaced : ATTEMPT_WORD[thread.state]
+                const detail = [thread.detail?.agent, thread.detail?.observedModel, status, thread.detail?.summary].filter(Boolean).join(' · ')
+                return <Row key={thread.id} label={label} detail={detail} onPress={thread.detail ? () => router.push(`/thread/${thread.id}`) : undefined} />
+              })}
+              {data.work.pullRequests.map(pull => {
+                const source = pull.sourceConversationId ? conversations?.find(thread => thread.id === pull.sourceConversationId)?.detail : null
+                const detail = [source?.name, source?.agent, source?.observedModel, mobileMessages.IssueDetail.work.states[pull.state], source?.summary].filter(Boolean).join(' · ')
+                return <Row key={pull.url} label={pull.title || pull.url} detail={detail} onPress={() => { void Linking.openURL(pull.url) }} />
+              })}
+              {progress.map(group => <FactoryProgressRow key={group.id} group={group} />)}
+            </View> : null}
+            {(['child', 'parent', 'blockedBy', 'blocks', 'duplicate', 'related'] as const).map(kind => {
+              const rows = data?.work?.connections?.filter(row => row.kinds.includes(kind)) ?? []
+              if (!rows.length) return null
+              const labels = mobileMessages.Metadata.relations
+              return <View key={kind}>
+                <Text accessibilityRole="header" style={styles.section}>{kind === 'child' ? labels.subissuesAria : labels.groupLabel[kind]}</Text>
+                {rows.map(row => <Row key={row.id} label={[row.identifier, row.title].filter(Boolean).join(' · ')}
+                  onPress={() => router.push(`/task/${row.id}`)} />)}
+              </View>
+            })}
             {activity.length ? <Text accessibilityRole="header" style={styles.section}>{mobileMessages.MobileCore.activity}</Text> : null}
             {activity.map((item, index) => <ActivityRow key={activityEntryId(item)} item={item} first={index === 0} last={index === activity.length - 1}
 
@@ -106,6 +138,14 @@ export function TaskScreen() {
       ) : null}
     </View>
   )
+}
+
+function FactoryProgressRow({ group }: { group: TaskFactoryProgress }) {
+  const [expanded, setExpanded] = useState(false)
+  return <View>
+    <Row label={nativeActivityLabel(group.current)} expanded={expanded} onPress={() => setExpanded(value => !value)} />
+    {expanded && group.steps.map(step => <Row key={step.id} label={nativeActivityLabel(step)} detail={shortWhen(step.at)} />)}
+  </View>
 }
 
 function Chip({ icon, label }: { icon: ReactNode; label: string }) {

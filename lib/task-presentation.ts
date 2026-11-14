@@ -1,3 +1,4 @@
+import type { IssuePullRequest } from './issue-metadata'
 import type { ReviewLineSummary } from './code-review/summary-text'
 import type { InboxSource } from './inbox/contract'
 import type { IssueStatus } from './issue-meta'
@@ -6,6 +7,8 @@ import type { FactoryFlowView } from './factory/public-flow'
 import { taskStateOf, type TaskStateContext, type TaskStateRun, type TaskStateView } from './task-state'
 
 export type TaskPresentation = TaskStateView & {
+  linkedChats?: { id: string; title: string }[]
+  pullRequests?: IssuePullRequest[]
   version: 1
   /** Missing on cached snapshots from before the Inbox attention projection. */
   inboxReason?: InboxSource['reason']

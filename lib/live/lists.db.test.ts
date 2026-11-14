@@ -8,7 +8,7 @@ import { after, before, mock, test } from 'node:test'
 import { Pool } from 'pg'
 import { sql } from 'drizzle-orm'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { seedTeam } from '../../tests/support/workspace-admin-db'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { captureDatabaseQuery, observePoolCommits } from '../db/commit-effects'
@@ -41,7 +41,7 @@ test('real PG: lists retain their reader scope and publish only the originating 
   const coordinator = await isolateCoordinatorWakes(t)
   const admin = new Pool({ connectionString: url, max: 1 })
   const names = [0, 1].map(() => `list_live_${randomUUID().replaceAll('-', '')}_e2e`)
-  for (const name of names) await admin.query(`CREATE DATABASE "${name}" TEMPLATE template0`)
+  for (const name of names) await createTestDatabase(admin, name, 'template0')
   const urls = names.map(name => { const value = new URL(url!); value.pathname = `/${name}`; return value.toString() })
   const database = new Pool({ connectionString: urls[0], max: 6 })
   const foreign = new Pool({ connectionString: urls[1], max: 4 })

@@ -90,8 +90,14 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     return deviceId
   }
   type Dispatched = { runId: string; thread: string; threadId: string; status?: string; continuesRunId?: string; replacedThreadId?: string; error?: string; placement?: unknown; card?: { title: string; description?: string } }
-  const dispatch = async (who: { id: string; issueId: string; botId: string }, extra: { note?: string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string; target?: 'cloud' | { deviceId: string }; model?: { harness: 'claude_code' | 'codex'; model: string } } = {}) =>
-    await steps.dispatchRun(who.id, { issueId: who.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}`, ...extra }, undefined, who.botId) as unknown as Dispatched
+  const dispatch = async (who: { id: string; issueId: string; botId: string }, extra: { note?: string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string; target?: 'cloud' | { deviceId: string }; model?: { harness: 'claude_code' | 'codex'; model: string } } = {}) => {
+    // This fixture represents a connected subscription with a reporting meter.
+    // Refresh its observation before each dispatch, including follow-ups in
+    // the same case; the real admission still rejects a stale provider read.
+    await pool.query(`UPDATE byos_connections SET quota=jsonb_set(quota,'{observedAt}',to_jsonb(clock_timestamp()::text))
+      WHERE "ownerId"=$1`, [who.id])
+    return await steps.dispatchRun(who.id, { issueId: who.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}`, ...extra }, undefined, who.botId) as unknown as Dispatched
+  }
   const runs = async (userId: string) => (await pool.query('SELECT id,status,"continuesRunId","threadReplacedBy" FROM agent_runs WHERE "userId"=$1 ORDER BY "createdAt"', [userId])).rows
   const said = async (who: { id: string; botId: string }, text: string) => {
     const id = randomUUID()

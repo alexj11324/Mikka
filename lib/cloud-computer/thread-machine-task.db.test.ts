@@ -16,7 +16,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Pool } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
-import { dropTestDatabase } from '../../tests/support/drop-test-database';
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database';
 
 type UploadedFile = { path: string; data: string };
 function uploadedFiles(path: string | UploadedFile[], body?: unknown): UploadedFile[] {
@@ -37,7 +37,7 @@ if (url) {
 test("a task's sandbox serves only that task's runs, parks between them and ends with the task", { skip: !url, timeout: 180000 }, async (t) => {
   const admin = new Pool({ connectionString: url, max: 1 });
   const database = `thr_task_${randomUUID().replaceAll("-", "")}_e2e`;
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`);
+  await createTestDatabase(admin, database, 'template0');
   const target = new URL(url!);
   target.pathname = `/${database}`;
   const saved = { m: process.env.MIKKA_DATABASE_URL, d: process.env.DATABASE_URL, template: process.env.E2B_CODEX_TEMPLATE };

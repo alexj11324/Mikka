@@ -1,12 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import useSWR from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
 import { toast } from 'sonner'
 import { useTranslations } from 'next-intl'
 import { chooseBotModel, getBotModelMenu, refreshBotModelMenuAction } from '@/app/actions/execution-settings'
 import { previewBotModelChoice } from '@/lib/bot-model-optimistic'
-import { HOSTED_CHOICE, type BotModelMenu, type BotModelMenuGroup, type BotModelMenuOption } from '@/lib/bot-model-menu-view'
+import { HOSTED_CHOICE, withChosenModel, type BotModelMenu, type BotModelMenuGroup, type BotModelMenuOption } from '@/lib/bot-model-menu-view'
 
 export type ModelPickerT = ReturnType<typeof useTranslations<'Coordinator.modelPicker'>>
 
@@ -49,14 +49,19 @@ export function modelGroupTag(t: ModelPickerT, group: BotModelMenuGroup) {
 
 export type ChipModel = Pick<BotModelMenuOption, 'id' | 'modelId' | 'provider'>
 
-/** Where this browser keeps the model a chat's chip showed last; someone else's bot or a failed menu clears it. */
-const lastChipKey = (botId: string | null) => `mikka:model-chip:${botId ?? 'coordinator'}`
+/** A scope is available only on the active authenticated cache. The ordinary memory cache has none. */
+function chipNamespace(cache: object): string | null {
+  return 'namespace' in cache && typeof cache.namespace === 'string' && 'isEnabled' in cache && cache.isEnabled
+    ? cache.namespace : null
+}
 
-function readChip(value: string | null): ChipModel | null {
+function readChip(value: string | null, namespace: string): ChipModel | null {
   try {
     const chip: unknown = value ? JSON.parse(value) : null
     if (!chip || typeof chip !== 'object') return null
-    const { id, modelId, provider } = chip as Record<string, unknown>
+    const stored = chip as Record<string, unknown>
+    if (stored.namespace !== namespace) return null
+    const { id, modelId, provider } = stored
     return typeof id === 'string' && typeof modelId === 'string' && typeof provider === 'string' ? { id, modelId, provider } : null
   } catch { return null }
 }
@@ -67,14 +72,19 @@ function readChip(value: string | null): ChipModel | null {
  * can use here, the saved choice per bot, explicit refresh, and the chip it
  * showed last while the menu loads. A run already going keeps its model.
  */
-export function useBotModelPicker(botId: string | null) {
+export function useBotModelPicker(botId: string | null, thread?: import('@/components/slots/model-picker-contract').BotModelPickerProps['thread']) {
   const t = useTranslations('Coordinator.modelPicker')
-  const menu = useSWR<BotModelMenu>(botModelMenuKey(botId), () => getBotModelMenu(botId))
+  const scope = thread?.scope ?? botId
+  const menu = useSWR<BotModelMenu | null>(thread ? ['thread-continuation-models', thread.scope] : botModelMenuKey(botId),
+    () => thread ? thread.load() : getBotModelMenu(botId), { shouldRetryOnError: false })
   const [failed, setFailed] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshFailed, setRefreshFailed] = useState(false)
   const [open, setOpenState] = useState(false)
-  const [last, setLast] = useState<ChipModel | null>(null)
+  const { cache } = useSWRConfig()
+  const namespace = chipNamespace(cache)
+  const chipKey = `mikka:model-chip:${botId ?? 'coordinator'}`
+  const [last, setLast] = useState<{ key: string; namespace: string; chip: ChipModel } | null>(null)
   const [saving, setSaving] = useState(false)
   const pendingSave = useRef<Promise<boolean> | null>(null)
   const latestMenu = useRef(menu.data)
@@ -88,27 +98,42 @@ export function useBotModelPicker(botId: string | null) {
     try {
       // A manual catalogue refresh must not race an in-flight model save.
       if (pendingSave.current) await pendingSave.current
-      await menu.mutate(() => refreshBotModelMenuAction(botId), { populateCache: true, revalidate: false })
+      await menu.mutate(() => thread ? thread.load() : refreshBotModelMenuAction(botId), { populateCache: true, revalidate: false })
     } catch { setRefreshFailed(true) } finally { setRefreshing(false) }
   }
 
   useEffect(() => {
+    if (thread) return
     const listener = (event: Event) => { if ((event as CustomEvent<string>).detail === (botId ?? 'coordinator')) setOpenState(true) }
     window.addEventListener(OPEN_EVENT, listener)
     return () => window.removeEventListener(OPEN_EVENT, listener)
   })
 
-  const shown = menu.data?.current
+  // The menu this bot showed last stays on screen while a read is under way, so the chip never drops out and comes
+  // back. Another bot's menu is never held over: its chip waits for its own.
+  const held = useRef<{ botId: string | null; namespace: string | null; menu: BotModelMenu } | null>(null)
+  if (menu.data) held.current = { botId: scope, namespace, menu: menu.data }
+  const loaded = thread ? menu.data : menu.data ?? (!menu.error && held.current?.botId === scope && held.current.namespace === namespace ? held.current.menu : undefined)
+  const data = loaded && thread?.selected ? withChosenModel(loaded, thread.selected) ?? loaded : loaded
+  const shown = data?.current
   useEffect(() => {
-    const key = lastChipKey(botId)
+    if (thread || !namespace) return
     try {
-      if (shown && !(saving && shown.availability === 'checking')) window.localStorage.setItem(key, JSON.stringify({ id: shown.id, modelId: shown.modelId, provider: shown.provider }))
-      else if (menu.error) window.localStorage.removeItem(key)
-      else setLast(readChip(window.localStorage.getItem(key)))
+      if (shown && !(saving && shown.availability === 'checking')) window.localStorage.setItem(chipKey, JSON.stringify({ namespace, id: shown.id, modelId: shown.modelId, provider: shown.provider }))
+      else if (menu.error) window.localStorage.removeItem(chipKey)
+      else {
+        const chip = readChip(window.localStorage.getItem(chipKey), namespace)
+        setLast(chip ? { key: chipKey, namespace, chip } : null)
+      }
     } catch { /* storage unavailable: the chip waits for the menu */ }
-  }, [botId, shown, menu.error, saving])
+  }, [chipKey, namespace, shown, menu.error, saving, thread])
 
   function choose(id: string): Promise<boolean> {
+    if (thread) {
+      if (!data || !withChosenModel(data, id)) return Promise.resolve(false)
+      thread.choose(id)
+      return Promise.resolve(true)
+    }
     // A previous save must settle before another write; otherwise late server
     // responses can overwrite the model the user picked most recently.
     const previous = pendingSave.current
@@ -162,17 +187,17 @@ export function useBotModelPicker(botId: string | null) {
   /** What a person reads for an option: the hosted model's name, or the provider's id (callers format it). */
   const optionName = (option: ChipModel) => option.id === HOSTED_CHOICE ? t('hosted') : option.modelId || t('unknownModel')
 
-  const current = menu.data?.current
+  const current = data?.current
   const checking = current?.availability === 'checking'
   const chipLabel = current ? [optionName(current), current.fallback ? t('fallback') : null, checking ? t('checking') : null].filter(Boolean).join(' · ') : null
 
   return {
     t,
     /** The menu, once it has arrived; until then `last` is the chip's look only, not a control. */
-    menu: menu.data,
+    menu: data,
     /** Someone else's bot, or the menu failed: no chip at all. */
     error: !!menu.error,
-    last: menu.data || menu.error ? null : last,
+    last: !thread && !data && !menu.error && last?.key === chipKey && last.namespace === namespace ? last.chip : null,
     open,
     /** Opening uses the cached menu; catalogue refresh is explicit. */
     // Model catalogue refresh is explicit; opening a cached menu must not

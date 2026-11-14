@@ -13,7 +13,7 @@ import { handleFactoryDispatch } from "./dispatch-http";
 import { runPrompt } from "../run-prompt";
 import { factoryEventId } from "./event-id";
 import { isE2eTarget, E2E_DB_RULE } from "../../tests/helpers/e2e-target.mjs";
-import { dropTestDatabase } from "../../tests/support/drop-test-database";
+import { createTestDatabase, dropTestDatabase } from "../../tests/support/drop-test-database";
 
 const url = process.env.E2E_DATABASE_URL;
 if (url) assert.ok(isE2eTarget(url), E2E_DB_RULE);
@@ -22,7 +22,7 @@ else if (process.env.REQUIRE_DB === "1") assert.fail("REQUIRE_DB=1 needs E2E_DAT
 test("POST /api/factory/tasks dispatches once, replays idempotently and is owner-only", { skip: !url, timeout: 180000 }, async () => {
   const admin = new Pool({ connectionString: url, max: 1 });
   const database = `fac_tasks_${randomUUID().replaceAll("-", "")}_e2e`;
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`);
+  await createTestDatabase(admin, database, 'template0');
   const target = new URL(url!);
   target.pathname = `/${database}`;
   const pool = new Pool({ connectionString: target.toString(), max: 8 });

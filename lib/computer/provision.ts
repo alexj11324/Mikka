@@ -39,11 +39,15 @@ export async function ensureCloudMachine(pool:Pool,actor:Actor,runtime:Runtime=p
       sandbox=null
     }
     sandbox??=await runtime.createComputer(actor.workspaceId,machine.operationId)
-    // Record even an older attempt's idempotent allocation, but never replace a
-    // different machine. A failed later step cannot erase an allocated resource.
-    const recorded=await pool.query(`UPDATE cloud_machines SET "sandboxId"=$3 WHERE "workspaceId"=$1 AND "ownerId"=$2 AND "operationId"=$4 AND ("sandboxId" IS NULL OR "sandboxId"=$3) RETURNING "provisionLeaseId"`,[actor.workspaceId,actor.userId,sandbox.sandboxId,machine.operationId])
-    if(recorded.rows[0]?.provisionLeaseId!==leaseId) return null
-    if(!machine.runtimeReady) await runtime.installComputerRuntime(sandbox)
+    if (!machine.runtimeReady || machine.sandboxId !== sandbox.sandboxId) {
+      // Persist a new allocation across installation failure. Before installing,
+      // confirm the reservation still belongs to this attempt.
+      const recorded = await pool.query(`UPDATE cloud_machines SET "sandboxId"=$3
+        WHERE "workspaceId"=$1 AND "ownerId"=$2 AND "operationId"=$4 AND ("sandboxId" IS NULL OR "sandboxId"=$3)
+        RETURNING "provisionLeaseId"`, [actor.workspaceId, actor.userId, sandbox.sandboxId, machine.operationId])
+      if (recorded.rows[0]?.provisionLeaseId !== leaseId) return null
+      if (!machine.runtimeReady) await runtime.installComputerRuntime(sandbox)
+    }
     const completed=await pool.query(`UPDATE cloud_machines SET state='running',"runtimeReady"=true,"lastActiveAt"=now(),"provisionLeaseId"=NULL,"provisionLeaseUntil"=NULL WHERE "workspaceId"=$1 AND "ownerId"=$2 AND "provisionLeaseId"=$3 AND "sandboxId"=$4 RETURNING "sandboxId"`,[actor.workspaceId,actor.userId,leaseId,sandbox.sandboxId])
     if (completed.rowCount) await machineCommitted(pool, actor.userId, actor.workspaceId)
     // A running machine is checked with E2B once idle for an hour (#1212).

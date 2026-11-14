@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { canonicalOrigin, CredentialError, secretText, submitSchema, otpSchema } from './contracts'
+import { canonicalOrigin, CredentialError, secretText, submitSchema, otpSchema, type Actor } from './contracts'
 import { checkCredentialRequest, credentialBody, credentialFailure, privateHeaders } from './http'
 import { credentialActor, credentialStore, login, executeCredentialLease, resolveCredentialBrowser } from './runtime'
 import { pool } from '@/lib/db'
@@ -14,15 +14,16 @@ export async function threadCredentialRoute(request: Request, runId: string, act
     if (!z.uuid().safeParse(runId).success) throw new CredentialError('credential_denied', 404)
     const row = (await pool.query('SELECT "botId" FROM agent_runs WHERE id=$1 AND "userId"=$2', [runId, actor.userId])).rows[0]
     if (!row?.botId) throw new CredentialError('credential_denied', 404)
-    return browserCredentialRoute(request, { botId: row.botId, runId }, action)
+    return browserCredentialRoute(request, { botId: row.botId, runId }, action, actor)
   } catch (error) { return credentialFailure(error) }
 }
 
-async function browserCredentialRoute(request: Request, identity: { botId: string; subagentId?: string; runId?: string }, action: 'challenge' | 'submit' | 'login') {
+async function browserCredentialRoute(request: Request, identity: { botId: string; subagentId?: string; runId?: string }, action: 'challenge' | 'submit' | 'login', resolvedActor?: Actor) {
   try {
     checkCredentialRequest(request)
     if (!z.uuid().safeParse(identity.botId).success || !z.uuid().safeParse(identity.subagentId ?? identity.runId).success) throw new CredentialError('credential_denied', 404)
-    const caller = { ...await credentialActor(request), ...identity }
+    const actor = resolvedActor ?? await credentialActor(request)
+    const caller = { ...actor, ...identity }
     await credentialStore.authorize(caller)
     if (action === 'submit') {
       const parsed = z.union([submitSchema, otpSchema]).safeParse(await credentialBody(request))

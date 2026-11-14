@@ -5,7 +5,7 @@ import test from 'node:test'
 import { Pool } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { assertE2eTarget, disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { seedUser, seedWorkspace, seedBot, seedAgent, seedIssue } from '../../tests/support/workspace-admin-db'
 import { createFactoryStore } from './store'
 import { readFactoryActivity } from './activity'
@@ -20,7 +20,7 @@ test('Factory activity: one owner-scoped SQL read model for every run, computer 
   assert.ok(disposableDatabase())
   const adminUrl = assertE2eTarget(base!), name = `activity_${randomUUID().replaceAll('-', '')}_e2e`
   const admin = new Pool({ connectionString: adminUrl.toString(), max: 1 })
-  await admin.query(`CREATE DATABASE ${name} TEMPLATE template0`)
+  await createTestDatabase(admin, name, 'template0')
   const target = new URL(adminUrl); target.pathname = `/${name}`
   const pool = new Pool({ connectionString: target.toString(), max: 4 })
   observePoolCommits(pool)

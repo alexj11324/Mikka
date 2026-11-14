@@ -15,6 +15,7 @@ import type { MetadataRequest } from './issue-metadata-controls'
 import { toast } from 'sonner'
 import { getDeletedIssue, setIssueDeleted } from '@/app/actions/issue-operations'
 import { pollIssue, pollIssueVersionSummaries, saveIssue, listIssueVersions, type IssueView } from '@/app/actions/issues'
+import { descriptionKey } from '@/lib/issue-relations'
 import { CacheReadError } from '@/lib/cache-read-error'
 import { readAccessFailure, waitForCacheHydration } from '@/lib/swr/persistent-cache'
 import { isTaskPresentationKey, issueKeys } from '@/lib/swr/keys'
@@ -24,7 +25,7 @@ import { IssueEditor, createDocumentSeed, type IssueDiscussions } from './issue-
 import { DocumentSync } from '@/lib/document-sync'
 import { useActionError } from '@/lib/use-action-error'
 import { IssueMembers } from './issue-members'
-import { useAgentActivity } from './issue-threads'
+import { useTaskWork } from './issue-threads'
 import { FramedTask } from './task-detail-frame'
 import { TaskThreadPane } from './task-thread-pane'
 import { navigate } from './workspace-navigation'
@@ -43,6 +44,14 @@ import { TaskDetailFrame } from '@ui-slot/task-detail'
 type Issue = IssueView
 type IssueRead = IssueView & { readVersion?: string }
 type ActivityRead = ListSnapshot<Awaited<ReturnType<typeof listIssueVersions>>[number]>
+
+function savedChangesMatch(previous: Issue, submitted: Pick<Issue, 'title' | 'status' | 'priority' | 'content'>, latest: Issue) {
+  return latest.id === previous.id && latest.workspaceId === previous.workspaceId && latest.canSteer !== false && latest.revision > previous.revision &&
+    (submitted.title === previous.title || latest.title === submitted.title.trim()) &&
+    (submitted.status === previous.status || latest.status === submitted.status) &&
+    (submitted.priority === previous.priority || latest.priority === submitted.priority) &&
+    (descriptionKey(submitted.content) === descriptionKey(previous.content) || descriptionKey(latest.content) === descriptionKey(submitted.content))
+}
 
 // No access and deleted come back as an action error; SWR's error state renders UnavailableIssue.
 async function loadIssue(id: string, viewerId: string, previous?: IssueRead): Promise<IssueRead> {
@@ -200,7 +209,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   const { mutate: retrySync } = useSWR(syncKey, () => sync?.exchange(saved.id), { refreshInterval: 0, revalidateOnFocus: false, revalidateOnReconnect: false, shouldRetryOnError: false })
   // A committed acceptance changes the issue and its history without editing
   // the Yjs body. All three reads follow the same authorized document event.
-  useLiveKey('issue_document', sync || reader ? saved.id : null, [...(syncKey ? [unstable_serialize(syncKey)] : []), unstable_serialize(issueKeys.detail(saved.id)), unstable_serialize(issueKeys.versions(saved.id)), unstable_serialize(issueKeys.activityVersions(saved.id))], liveWorkspaceId, { minIntervalMs: 1500 })
+  useLiveKey('issue_document', sync || reader ? saved.id : null, [...(syncKey ? [unstable_serialize(syncKey)] : []), unstable_serialize(issueKeys.detail(saved.id)), unstable_serialize(issueKeys.versions(saved.id)), unstable_serialize(issueKeys.activityVersions(saved.id)), unstable_serialize(['issue-threads', saved.id])], liveWorkspaceId, { minIntervalMs: 1500 })
   useEffect(() => {
     // Delay disposal so React Strict Mode's immediate effect replay retains this document.
     if (!sync) return
@@ -218,6 +227,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   const draft = useRef({ title: initial.title, content: initial.content, status: initial.status, priority: initial.priority, generation: 0 })
   const savedRef = useRef(initial)
   const acknowledged = useRef(0)
+  const conflictingRead = useRef<Issue | null>(null)
   const composing = useRef(false)
   const [editSequence, setEditSequence] = useState(0)
   const [metadataSaving, setMetadataSaving] = useState(false)
@@ -226,7 +236,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   const [openAcceptance, setOpenAcceptance] = useState<FactoryTask | null>(null)
   // The open thread is the address's (?thread=), so back closes it and a link reopens it beside this task (R-82).
   const showThread = useCallback((runId: string | null) => { setOpenAcceptance(null); setThreadTab('chat'); navigate({ thread: runId }) }, [])
-  const agentActivity = useAgentActivity(saved.id, openThread ?? null, showThread, !preview)
+  const agentActivity = useTaskWork(saved.id, showThread, !preview, user.id)
   const showAcceptance = useCallback((task: FactoryTask) => {
     if (task.candidateRunId) { setOpenAcceptance(null); setThreadTab('acceptance'); navigate({ thread: task.candidateRunId }) }
     else { navigate({ thread: null }); setOpenAcceptance(task) }
@@ -246,7 +256,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   const restoration = useRef<{ resolve: (success: boolean) => void } | null>(null)
   const [replacement, setReplacement] = useState<{ content: JSONContent; version: number }>()
   const activityKey = issueKeys.activityVersions(saved.id)
-  const { data: activityRead, error: historyError, mutate: refreshVersions } = useSWR<ActivityRead>(preview ? null : activityKey, async () => {
+  const localActivity = useSWR<ActivityRead>(preview || agentActivity.history ? null : activityKey, async () => {
     await waitForCacheHydration(cache)
     const previous = cache.get(unstable_serialize(activityKey))?.data as ActivityRead | undefined
     const held = heldListPositions(previous)
@@ -257,24 +267,28 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     const next = result.snapshot
     return { version: next.version, items: mergeList(previous?.items ?? [], next), positions: 'positions' in next ? next.positions : previous?.positions }
   })
-  const versions = activityRead?.items
+  const versions = agentActivity.history ? agentActivity.history.rows : localActivity.data?.items
+  const historyError = agentActivity.history ? agentActivity.history.error : localActivity.error
+  const refreshVersions = agentActivity.history?.refresh ?? localActivity.mutate
   const { data: historyVersions, error: historyBodyError, mutate: refreshHistoryVersions } = useSWR(history && !preview ? issueKeys.versions(saved.id) : null, () => listIssueVersions(saved.id))
-  useEffect(() => {
+  const applyRead = useCallback((fresh: Issue) => {
     const previous = savedRef.current
-    if (initial.id !== previous.id || initial.revision <= previous.revision) return
+    if (fresh.id !== previous.id || fresh.revision <= previous.revision) return
+    if (conflictingRead.current && fresh.revision > conflictingRead.current.revision) conflictingRead.current = fresh
     const current = draft.current
     const next = { ...current }
     // Only fields unchanged since the last server snapshot adopt its newer
     // value. Updating the draft too keeps a later text save from reopening Done.
-    if (current.title === previous.title && !composing.current) { next.title = initial.title; setTitle(initial.title) }
-    if (current.status === previous.status) { next.status = initial.status; setStatus(initial.status) }
-    if (current.priority === previous.priority) { next.priority = initial.priority; setPriority(initial.priority) }
-    if (JSON.stringify(current.content) === JSON.stringify(previous.content)) { next.content = initial.content; setContent(initial.content) }
+    if (current.title === previous.title && !composing.current) { next.title = fresh.title; setTitle(fresh.title) }
+    if (current.status === previous.status) { next.status = fresh.status; setStatus(fresh.status) }
+    if (current.priority === previous.priority) { next.priority = fresh.priority; setPriority(fresh.priority) }
+    if (JSON.stringify(current.content) === JSON.stringify(previous.content)) { next.content = fresh.content; setContent(fresh.content) }
     draft.current = next
-    savedRef.current = initial
-    setSaved(initial)
+    savedRef.current = fresh
+    setSaved(fresh)
     // This is a read, not an edit: keep generation, selection and the Y.Doc.
-  }, [initial])
+  }, [])
+  useEffect(() => { applyRead(initial) }, [initial, applyRead])
   const hasUnsavedChanges = dirty || syncState.pending
   useEffect(() => { onDirty(hasUnsavedChanges || pending) }, [hasUnsavedChanges, pending, onDirty])
   useEffect(() => {
@@ -297,7 +311,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   const save = useCallback((): Promise<boolean> => {
     if (locked) return Promise.resolve(false)
     if (flight.current) return flight.current
-    if (composing.current) return Promise.resolve(false)
+    if (composing.current || conflictingRead.current) return Promise.resolve(false)
     const operation = (async () => {
       const mustPersist = () => draft.current.generation !== acknowledged.current
       if (!mustPersist() && !sync?.getSnapshot().pending) return true
@@ -317,16 +331,40 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
           // snapshot, never paired with fields captured at an older revision.
           if (savedRef.current.revision !== revision) continue
           if (snapshot.generation !== acknowledged.current) {
-            const result = await saveIssue({ id: initial.id, revision, title: snapshot.title, content: snapshot.content, status: snapshot.status, priority: snapshot.priority })
-            if (!('issue' in result) || !result.issue) { setError(saveMessages.current.actionError(result.error ?? 'issueSaveFailed')); return false }
-            if (result.issue.revision >= savedRef.current.revision) {
-              savedRef.current = result.issue
-              setSaved(result.issue)
+            let result: Awaited<ReturnType<typeof saveIssue>> | undefined
+            try {
+              result = await saveIssue({ id: initial.id, revision, title: snapshot.title, content: snapshot.content, status: snapshot.status, priority: snapshot.priority })
+            } catch (error) {
+              if (error && typeof error === 'object') {
+                if ('code' in error && error.code === 'desktop_session_changed') throw error
+                if ('status' in error && typeof error.status === 'number' && error.status >= 400 && error.status < 500) throw error
+              }
+              // The server may have committed before the connection broke.
             }
+            if (result?.error && result.error !== 'issueStale') { setError(saveMessages.current.actionError(result.error)); return false }
+            let confirmed = result && 'issue' in result ? result.issue : undefined
+            if (!confirmed) {
+              const latest = await loadIssue(initial.id, user.id)
+              if (!savedChangesMatch(previous, snapshot, latest)) {
+                if (latest.id === previous.id && latest.workspaceId === previous.workspaceId && latest.canSteer !== false && latest.revision > revision) {
+                  conflictingRead.current = latest
+                }
+                setError(latest.revision > revision ? saveMessages.current.actionError('issueOutdated') : saveMessages.current.t('autosaveFailed'))
+                return false
+              }
+              // Preserve edits typed while the read was in flight and adopt the server's untouched fields.
+              applyRead(latest)
+              confirmed = latest
+            }
+            if (confirmed.revision >= savedRef.current.revision) {
+              savedRef.current = confirmed
+              setSaved(confirmed)
+            }
+            conflictingRead.current = null
             acknowledged.current = snapshot.generation
             setDirty(draft.current.generation !== acknowledged.current)
             void refreshVersions().catch(() => {})
-            publishSaved(result.issue, previous.status)
+            publishSaved(confirmed, previous.status)
           }
         } while (draft.current.generation !== acknowledged.current)
         return true
@@ -336,7 +374,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     flight.current = operation
     void operation.finally(() => { flight.current = null })
     return operation
-  }, [initial.id, locked, sync, publishSaved, refreshVersions])
+  }, [initial.id, user.id, locked, sync, applyRead, publishSaved, refreshVersions])
   useEffect(() => {
     // A preview cannot acquire an editable draft, so leaving it needs no save.
     // Keep save() itself refused until the normal read verifies access.
@@ -349,6 +387,14 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     const timer = setTimeout(() => { void save() }, 700)
     return () => clearTimeout(timer)
   }, [editSequence, syncState.ready, syncState.pending, syncState.error, save])
+  function retryAutosave() {
+    // Only a person's explicit retry may base their edited fields on a competing write.
+    if (conflictingRead.current) {
+      applyRead(conflictingRead.current)
+      conflictingRead.current = null
+    }
+    void save()
+  }
   function adopt(issue: Issue) {
     if (issue.revision < savedRef.current.revision) return
     const previousStatus = savedRef.current.status
@@ -357,6 +403,9 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     void refreshVersions().catch(() => {}); publishSaved(issue, previousStatus)
   }
   async function getCurrent() { return await save() ? savedRef.current : null }
+  async function openHistory() {
+    if (!preview && (reader || await save())) setHistory(true)
+  }
   async function restore(version: NonNullable<typeof historyVersions>[number]) {
     if (!await save()) return false
     return new Promise<boolean>(resolve => {
@@ -390,7 +439,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   </>
   const dialogs = <>
     <Dialog open={members} onOpenChange={setMembers}><DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>{t('membersTitle')}</DialogTitle><DialogDescription>{tDetail('membersDialogDescription')}</DialogDescription></DialogHeader><IssueMembers id={saved.id} onChanged={async () => { adopt(await loadIssue(saved.id, user.id)) }} /></DialogContent></Dialog>
-    <IssueDescriptionHistory open={history} onOpenChange={setHistory} identifier={saved.identifier} title={title} currentContent={content} versions={historyVersions} loadingError={!!historyBodyError} onRetry={() => { void refreshHistoryVersions() }} onRestore={restore} />
+    <IssueDescriptionHistory open={history} onOpenChange={setHistory} identifier={saved.identifier} title={title} currentContent={content} versions={historyVersions} loadingError={!!historyBodyError} onRetry={() => { void refreshHistoryVersions() }} onRestore={locked ? undefined : restore} />
   </>
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => closeOnEscape(event, rootRef.current, onClose)
   const titleChange = (value: string) => changed({ title: value })
@@ -399,12 +448,12 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     task={saved} title={title} status={status} priority={priority} liveWorkspaceId={liveWorkspaceId} saveLabel={saveLabel} saved={!error && !syncState.error && !pending && !metadataSaving}
     discussionSave={sync ? { afterAcknowledged: sync.afterAcknowledged, retry: () => { void save() } } : undefined}
     titleField={{ value: title, label: t('titleLabel'), readOnly: locked, maxLength: 200, onChange: titleChange, onCompositionStart: () => { composing.current = true }, onCompositionEnd: () => { composing.current = false; setEditSequence(value => value + 1) }, onBlur: () => { if (title.trim() && title !== saved.title) void save() }, onKeyDown: titleKeyDown }}
-    saveError={error ? { text: error, retry: t('retryAutosave'), onRetry: () => { void save() }, busy: pending } : null} syncNotice={syncState.error ? t('syncRetryNotice') : null}
+    saveError={error ? { text: error, retry: t('retryAutosave'), onRetry: retryAutosave, busy: pending } : null} syncNotice={syncState.error ? t('syncRetryNotice') : null}
     editor={(afterDescription, renderActivity) => editorWith(afterDescription, renderActivity)} acceptance={acceptance}
     versions={versions ?? []} historyFailed={historyError ? () => { void refreshVersions() } : null} agentActivity={agentActivity}
     documentTools={documentTools} actionRequest={actionRequest} propertyRequest={propertyRequest} requestAction={requestAction} requestProperty={requestProperty} getCurrent={getCurrent} adopt={adopt} onMetadataBusy={setMetadataSaving}
     onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }}
-    onHistory={() => { void save().then(success => { if (success) setHistory(true) }) }} onMembers={() => setMembers(true)} onDocumentTools={() => setDocumentTools(value => !value)}
+    onHistory={() => { void openHistory() }} onMembers={() => setMembers(true)} onDocumentTools={() => setDocumentTools(value => !value)}
     panel={threadPanel || null} wide={wide} resize={{ handle: wide && threadPanel ? <ResizeHandle resize={threadWidth} label={tCommon('resize.taskPanel')} edge="start" /> : null, width: threadWidth.width, dragging: threadWidth.dragging }} dialogs={dialogs} />
 
 }

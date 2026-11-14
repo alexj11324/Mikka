@@ -768,10 +768,11 @@ export class RunSupervisor {
     await this.send(runId, mailboxNoticeText(runId, messageIds))
   }
 
-  async send(runId: string, text: string) {
+  async send(runId: string, text: string, mode?: "steer") {
     const run = this.active.get(runId)
     const adapter = this.adapterFor(runId)
     if (!run?.session) throw new RunNotFoundError(runId)
+    if (mode === "steer" && adapter.harness !== "codex") throw new Error("Active turn steering unavailable")
     if (!adapter.capabilities.supportsInterject) {
       throw new Error(
         `Harness "${adapter.harness}" cannot take messages mid-run`,
@@ -784,7 +785,7 @@ export class RunSupervisor {
       if (!entry || !this.deps.downloadChatFile || !this.deps.adapterStateDir) throw Error('Run attachments unavailable')
       text = await materializeChatFiles(text, join(this.deps.adapterStateDir, 'inputs', runId), id => this.deps.downloadChatFile!(entry.assignment, id, run.abort.signal))
     }
-    await run.session.send(text)
+    await run.session.send(text, mode)
   }
 
   async cancel(runId: string): Promise<RunSummary> {

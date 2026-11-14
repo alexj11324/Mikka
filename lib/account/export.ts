@@ -44,6 +44,17 @@ export async function releaseExport(userId: string, id: string): Promise<void> {
   await db.delete(accountDataExports).where(and(eq(accountDataExports.id, id), eq(accountDataExports.userId, userId)))
 }
 
+function liveExport(userId: string, token: string, now: Date) {
+  return and(eq(accountDataExports.tokenHash, sha256(token)), eq(accountDataExports.userId, userId), gt(accountDataExports.expiresAt, now))
+}
+
+/** Recheck the grant while streaming without recording another download. */
+export async function isExportCurrent(userId: string, token: string, now = new Date()): Promise<boolean> {
+  if (!TOKEN_SHAPE.test(token)) return false
+  const [row] = await db.select({ id: accountDataExports.id }).from(accountDataExports).where(liveExport(userId, token, now))
+  return Boolean(row)
+}
+
 /**
  * Whether `token` is a live export link of this person's. A link only ever
  * opens for the account that asked for it, and not after it expires; the file
@@ -52,7 +63,7 @@ export async function releaseExport(userId: string, id: string): Promise<void> {
 export async function claimExport(userId: string, token: string, now = new Date()): Promise<boolean> {
   if (!TOKEN_SHAPE.test(token)) return false
   const [row] = await db.update(accountDataExports).set({ downloadedAt: now })
-    .where(and(eq(accountDataExports.tokenHash, sha256(token)), eq(accountDataExports.userId, userId), gt(accountDataExports.expiresAt, now)))
+    .where(liveExport(userId, token, now))
     .returning({ id: accountDataExports.id })
   return Boolean(row)
 }
@@ -95,13 +106,20 @@ export async function buildAccountExport(userId: string, now = new Date()) {
     .from(workspaceMembers).innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))
     .where(eq(workspaceMembers.userId, userId))
   const messagesByRun = new Map<unknown, Row[]>()
-  for (const message of threadMessages) messagesByRun.set(message.runId, [...messagesByRun.get(message.runId) ?? [], { text: message.text, createdAt: message.createdAt }])
+  const exportedThreads = threads.map(thread => {
+    const messages: Row[] = []
+    messagesByRun.set(thread.id, messages)
+    return { ...thread, messages }
+  })
+  for (const message of threadMessages) {
+    messagesByRun.get(message.runId)?.push({ text: message.text, createdAt: message.createdAt })
+  }
   return {
     format: 'mikka-account-export', version: 1, exportedAt: now.toISOString(),
     profile: profile ?? null,
     signInMethods, preferences: preferences[0] ?? null, timeZone: timeZone[0] ?? null,
     workspaces: memberships, bots, agents,
-    threads: threads.map(thread => ({ ...thread, messages: messagesByRun.get(thread.id) ?? [] })),
+    threads: exportedThreads,
     botMessages, tasks, memory, artifacts, savedLogins,
     connections: { integrations, linear, telegram, repositories, devices, subscriptions },
   }

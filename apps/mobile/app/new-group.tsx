@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import { z } from 'zod'
+import { GlassButton } from '@/components/GlassButton'
 import { Check, X } from 'lucide-react-native'
 import { BotAvatar, Spinner } from '@/components/icons'
 import { NavBar } from '@/components/NavBar'
@@ -8,8 +10,10 @@ import { ReadNotice } from '@/components/ReadNotice'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { Field, Group } from '@/components/ui'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
+import { apiCache } from '@/lib/api-cache'
 import { tap } from '@/lib/haptics'
+import { mobileMessages } from '@/lib/messages'
 import { useHome } from '@/lib/home'
 import { openChat } from '@/lib/navigate'
 import { colors, font } from '@/lib/theme'
@@ -22,48 +26,70 @@ import { colors, font } from '@/lib/theme'
 export default function NewGroup() {
   const router = useRouter()
   const home = useHome()
-  // A group is made of the person's own bots, as before the Coordinator had a bot row.
-  const bots = (home.data?.bots ?? []).filter(bot => !bot.coordinator)
+  const { purpose } = useLocalSearchParams<{ purpose?: string }>()
+  const standalone = purpose === 'conversation'
+  const words = standalone ? mobileMessages.Shell.createConversation : mobileMessages.Shell.newGroup
+  const bots = (home.data?.bots ?? []).filter(bot => standalone || !bot.coordinator)
+  const pending = useRef(false)
   const [title, setTitle] = useState('')
   const [picked, setPicked] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
-  const [failed, setFailed] = useState(false)
-  const ready = Boolean(title.trim() && picked.length && home.data)
+  const [problem, setProblem] = useState<'failed' | 'unconfirmed' | null>(null)
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
+  const selected = picked.filter(id => bots.some(bot => bot.id === id))
+  const ready = problem !== 'unconfirmed' && Boolean(title.trim() && selected.length && selected.length <= 100 && home.data)
   const create = async () => {
-    if (!ready || busy || !home.data) return
+    if (!ready || pending.current || !home.data) return
+    const context = apiCache.context()
+    const current = () => mounted.current && context === apiCache.context()
+    pending.current = true
     setBusy(true)
-    setFailed(false)
+    setProblem(null)
     try {
-      const group = await api<{ id: string }>('/api/conversations', { method: 'POST', body: {
-        workspaceId: home.data.workspace.id, title: title.trim(), members: picked.map(id => ({ memberType: 'bot', memberId: id })),
+      const group = await api<{ id: string; title: string }>('/api/conversations', { method: 'POST', body: {
+        workspaceId: home.data.workspace.id, title: title.trim(),
+        ...(standalone ? { purpose: 'conversation', leadBotId: selected[0] } : {}),
+        members: selected.map(id => ({ memberType: 'bot', memberId: id })),
       } })
+      if (!current()) return
+      if (!z.uuid().safeParse(group?.id).success || typeof group?.title !== 'string') {
+        setProblem('unconfirmed')
+        return
+      }
       tap()
       openChat(`/groups/${group.id}`)
-    } catch {
-      setFailed(true)
+    } catch (error) {
+      if (current()) setProblem(error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 408 ? 'failed' : 'unconfirmed')
     } finally {
-      setBusy(false)
+      pending.current = false
+      if (mounted.current) setBusy(false)
     }
   }
   const toggle = (id: string) => { tap(); setPicked(list => list.includes(id) ? list.filter(item => item !== id) : [...list, id]) }
   return (
     <>
-      <NavBar fade={false} title="新建群聊"
-        left={{ icon: 'xmark', label: '取消', disabled: busy, web: <X size={20} color={colors.ink} />, onPress: () => router.back() }}
-        right={{ icon: 'checkmark', label: busy ? '创建中' : '创建', disabled: !ready || busy, busy, prominent: true, web: <Check size={20} color={colors.accent} strokeWidth={2.4} />, onPress: () => void create() }} />
+      <NavBar fade={false} title={words.title}
+        left={{ icon: 'xmark', label: mobileMessages.Common.cancel, disabled: busy, web: <X size={20} color={colors.ink} />, onPress: () => router.back() }}
+        right={{ icon: 'checkmark', label: busy ? mobileMessages.Common.loading : words.create, disabled: !ready || busy, busy, prominent: true, web: <Check size={20} color={colors.accent} strokeWidth={2.4} />, onPress: () => void create() }} />
       <ScrollView style={styles.screen} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
         <Field style={styles.field}>
-          <TextInput editable={!busy} value={title} onChangeText={setTitle} placeholder="群聊名称" placeholderTextColor={colors.secondary} maxLength={200} autoFocus
-            style={styles.input} accessibilityLabel="群聊名称" />
+          <TextInput editable={!busy && problem !== 'unconfirmed'} value={title} onChangeText={setTitle} placeholder={words.name} placeholderTextColor={colors.secondary} maxLength={200} autoFocus
+            style={styles.input} accessibilityLabel={words.name} />
         </Field>
-        {failed ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.problem}>没能创建</Text> : null}
-        <ReadNotice error={home.error} hasData={Boolean(home.data)} label="Bot 列表" onRetry={home.reload} />
+        {problem ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.problem}>{words[problem]}</Text> : null}
+        {problem === 'unconfirmed' && <GlassButton label={words.reviewGroups} onPress={() => router.replace(standalone ? '/conversations' : '/')} />}
+        <ReadNotice error={home.error} hasData={Boolean(home.data)} label={mobileMessages.Nav.bots} onRetry={home.reload} />
         {home.loading && !home.data ? <View style={{ alignItems: 'center', paddingVertical: 16 }}><Spinner /></View> : null}
-        <Group label="Bot" backgroundColor={colors.bubble}>
+        <Group label={words.bots} backgroundColor={colors.bubble}>
           {bots.map(bot => {
             const on = picked.includes(bot.id)
+            const disabled = busy || problem === 'unconfirmed'
             return (
-              <Pressable key={bot.id} accessibilityRole="checkbox" accessibilityLabel={bot.name} accessibilityState={{ checked: on, disabled: busy }} aria-checked={Platform.OS === 'web' ? on : undefined} aria-disabled={Platform.OS === 'web' ? busy : undefined} disabled={busy} onPress={() => toggle(bot.id)}
+              <Pressable key={bot.id} accessibilityRole="checkbox" accessibilityLabel={bot.name} accessibilityState={{ checked: on, disabled }} aria-checked={Platform.OS === 'web' ? on : undefined} aria-disabled={Platform.OS === 'web' ? disabled : undefined} disabled={disabled} onPress={() => toggle(bot.id)}
                 style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
                 <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size={30} />
                 <Text style={styles.name} numberOfLines={1}>{bot.name}</Text>
@@ -72,7 +98,7 @@ export default function NewGroup() {
             )
           })}
         </Group>
-        {home.data && !bots.length ? <Text style={styles.note}>先新建一个 Bot</Text> : null}
+        {home.data && !bots.length ? <Text style={styles.note}>{words.noBots}</Text> : null}
       </ScrollView>
     </>
   )

@@ -5,7 +5,7 @@ import test from 'node:test';
 import { Pool, type PoolClient } from 'pg';
 import { orderMigrations } from '../../scripts/migration-order.mjs';
 import { assertE2eTarget, disposableDatabase } from '../../tests/helpers/e2e-target.mjs';
-import { dropTestDatabase } from '../../tests/support/drop-test-database';
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database';
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { bindFixtureWorkspaceDatabase } from '../../tests/helpers/workspace-database';
 import { freezeWorkerDefinition } from '../agent-kit/worker';
@@ -26,7 +26,7 @@ test('spec Artifact: real PG completion, immutable replay, concurrent writes and
   const adminUrl = assertE2eTarget(base!);
   const admin = new Pool({ connectionString: adminUrl.toString(), max: 1 });
   const name = `spec_${randomUUID().replaceAll('-', '')}_e2e`;
-  await admin.query(`CREATE DATABASE ${name} TEMPLATE template0`);
+  await createTestDatabase(admin, name, 'template0');
   const target = new URL(adminUrl); target.pathname = `/${name}`; assertE2eTarget(target.toString());
   const pool = new Pool({ connectionString: target.toString(), max: 5 });
   const closeWorkspace = await bindFixtureWorkspaceDatabase(pool);

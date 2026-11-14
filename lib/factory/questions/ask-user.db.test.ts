@@ -15,7 +15,7 @@ import { handleFactoryQuestionList } from "./ask-user";
 import { builtinGateway } from "../../builtin-gateway/runtime";
 import { isolateCoordinatorWakes } from "../../../tests/support/coordinator-wake";
 import { bindFixtureWorkspaceDatabase } from "../../../tests/helpers/workspace-database";
-import { dropTestDatabase } from "../../../tests/support/drop-test-database";
+import { createTestDatabase, dropTestDatabase } from "../../../tests/support/drop-test-database";
 
 const url = process.env.E2E_DATABASE_URL;
 if (url) {
@@ -28,7 +28,7 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
   await isolateCoordinatorWakes(t);
   const admin = new Pool({ connectionString: url, max: 1 });
   const database = `fac_askq_${randomUUID().replaceAll("-", "")}_e2e`;
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`);
+  await createTestDatabase(admin, database, 'template0');
   const target = new URL(url!);
   target.pathname = `/${database}`;
   const pool = new Pool({ connectionString: target.toString(), max: 6 });

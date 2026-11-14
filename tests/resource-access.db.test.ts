@@ -5,7 +5,7 @@ import test from 'node:test'
 import { Pool } from 'pg'
 import { sql } from 'drizzle-orm'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 import { orderMigrations } from '../scripts/migration-order.mjs'
 import { applyMigration, planMigration } from '../scripts/migration-steps.mjs'
 import { scopeMigrationBeforeCommit } from '../scripts/scope-migration-history.mjs'
@@ -22,8 +22,8 @@ test('resource ACL: real split PostgreSQL migrations, fresh grants and concurren
   const admin = new Pool({ connectionString: url, max: 1 })
   const appUrl = new URL(url!), wsUrl = new URL(url!)
   appUrl.pathname = `/${appName}`; wsUrl.pathname = `/${wsName}`
-  await admin.query(`create database "${appName}" template template0`)
-  await admin.query(`create database "${wsName}" template template0`)
+  await createTestDatabase(admin, appName, 'template0')
+  await createTestDatabase(admin, wsName, 'template0')
   const app = new Pool({ connectionString: appUrl.toString(), max: 6 })
   const ws = new Pool({ connectionString: wsUrl.toString(), max: 5 })
   const previous = { app: process.env.MIKKA_DATABASE_URL, ws: process.env.DATABASE_URL }

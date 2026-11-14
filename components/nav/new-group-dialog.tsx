@@ -15,6 +15,7 @@ import { BotAvatar } from './bot-avatar'
 
 type CreatedGroup = { id: string; title: string; workspaceId: string }
 type Props = {
+  purpose?: 'conversation'
   open: boolean
   onOpenChange: (open: boolean) => void
   workspaceId: string
@@ -24,9 +25,9 @@ type Props = {
   onReviewGroups: () => void
 }
 
-/** The web entry for the same owner-Bot group creation flow as mobile. */
-export function NewGroupDialog({ open, onOpenChange, workspaceId, bots, onCreated, onNewBot, onReviewGroups }: Props) {
-  const t = useTranslations('Shell.newGroup')
+/** Both entry points use the workspace's owned Bots and the same persistent message transport. */
+export function NewGroupDialog({ purpose, open, onOpenChange, workspaceId, bots, onCreated, onNewBot, onReviewGroups }: Props) {
+  const t = useTranslations(purpose ? 'Shell.createConversation' : 'Shell.newGroup')
   const common = useTranslations('Common')
   const [title, setTitle] = useState('')
   const [picked, setPicked] = useState<string[]>([])
@@ -37,7 +38,7 @@ export function NewGroupDialog({ open, onOpenChange, workspaceId, bots, onCreate
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   const created = useRef(false)
   const openerFocus = useOpenerFocus(open)
-  const choices = bots.filter(bot => !bot.coordinator)
+  const choices = purpose ? bots : bots.filter(bot => !bot.coordinator)
   const selected = picked.filter(id => choices.some(bot => bot.id === id))
   const ready = Boolean(title.trim() && selected.length && selected.length <= 100 && workspaceId)
 
@@ -49,7 +50,7 @@ export function NewGroupDialog({ open, onOpenChange, workspaceId, bots, onCreate
     try {
       const response = await fetch(withBasePath('/api/conversations'), {
         method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ workspaceId, title: title.trim(), members: selected.map(memberId => ({ memberType: 'bot', memberId })) }),
+        body: JSON.stringify({ workspaceId, ...(purpose ? { purpose, leadBotId: selected[0] } : {}), title: title.trim(), members: selected.map(memberId => ({ memberType: 'bot', memberId })) }),
         signal: AbortSignal.timeout(30000),
       })
       const group = await response.json().catch(() => null) as { id?: unknown; title?: unknown } | null

@@ -4,6 +4,7 @@
 // its suite even if the test or package script was accidentally removed. All other
 // present pg/DB test files must map to a package script or inventory fails closed.
 import { spawn } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { availableParallelism } from 'node:os'
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { posix, resolve } from 'node:path'
@@ -126,6 +127,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/computer/event-page.ts', file: 'lib/computer/event-session.db.test.ts', script: 'test:live-db' },
   { marker: 'lib/credentials/broker.ts', file: 'lib/computer/event-broker.db.test.ts', script: 'test:live-db' },
   { marker: 'lib/captures/store.ts', file: 'lib/captures/store.db.test.ts', script: 'test:captures-db' },
+  { marker: 'lib/thread-reads.ts', file: 'lib/thread-reads.db.test.ts', script: 'test:conversation-reads' },
   { marker: 'lib/group-conversations-store.ts', file: 'lib/group-conversations.test.ts', script: 'test:groups' },
   { marker: 'lib/group-conversations-store.ts', file: 'lib/group-reads.db.test.ts', script: 'test:conversation-reads' },
   { marker: 'lib/active-agents.ts', file: 'lib/active-agents.test.ts', script: 'test:active-agents' },
@@ -340,11 +342,16 @@ export const TEMPLATE_BOUND = [
 ]
 
 /** The per-suite clone of `template` (a loopback *_e2e URL); <= 63 bytes and *_e2e itself. */
-export function cloneDatabaseName(template, index, script) {
-  const base = decodeURIComponent(new URL(template).pathname.slice(1)).replace(/_e2e$/, '')
-  const prefix = `${base}_s${String(index).padStart(2, '0')}_`
-  const slug = script.replace(/^test:/, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/_db$/, '')
-  return `${prefix}${slug.slice(0, Math.max(0, 63 - prefix.length - 4))}_e2e`
+export function cloneDatabaseName(template, index, script, runId = randomUUID().replaceAll('-', '').slice(0, 12)) {
+  const base = decodeURIComponent(new URL(template).pathname.slice(1)).replace(/_e2e$/, '').replace(/[^A-Za-z0-9_]+/g, '_')
+  const run = String(runId).replaceAll('-', '').toLowerCase()
+  if (!/^[a-f0-9]{8,32}$/.test(run)) throw new Error('runId must be 8–32 hexadecimal characters')
+  const slug = script.replace(/^test:/, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/_db$/, '') || 'suite'
+  const suffix = `_r${run}_s${String(index).padStart(2, '0')}_e2e`
+  const available = 63 - suffix.length - 1
+  const basePart = base.slice(0, Math.max(1, Math.floor(available / 2)))
+  const slugPart = slug.slice(0, Math.max(1, available - basePart.length))
+  return `${basePart}_${slugPart}${suffix}`
 }
 
 export function databaseUrl(template, name) {
@@ -367,31 +374,93 @@ export function suiteEnv(env, database) {
   return { ...next, REQUIRE_DB: '1', CONVERSATION_READS_REQUIRE_DB: '1', MIKKA_TEST_DB_PORT: new URL(template).port || '5432' }
 }
 
-/** CREATE DATABASE <clone> TEMPLATE <bootstrapped>, from a separate *_e2e
- * control database so that nothing is connected to the template. `ready` is
- * called as each clone exists, so its suite can start while the rest are made. */
-export async function createClones(template, names, ready = () => {}) {
-  if (!names.length) return
-  const { default: pg } = await import('pg')
+/** Create unique, positively tagged per-run clones. Cleanup drops only databases
+ * whose marker still matches this invocation; pre-existing names are never removed. */
+export async function createClones(template, names, ready = () => {}, { ClientClass, runId = randomUUID().replaceAll('-', '') } = {}) {
+  if (!names.length) return { cleanup: async () => {} }
+  if (!isE2eTarget(template)) throw new Error(E2E_DB_RULE)
+  const { default: pg } = ClientClass ? { default: { Client: ClientClass } } : await import('pg')
+  const Client = pg.Client
   const source = decodeURIComponent(new URL(template).pathname.slice(1))
-  const control = databaseUrl(template, `${source.replace(/_e2e$/, '')}_runner_e2e`)
+  const token = String(runId).replaceAll('-', '').toLowerCase()
+  if (!/^[a-f0-9]{8,32}$/.test(token)) throw new Error('runId must be 8–32 hexadecimal characters')
+  const controlName = `${source.replace(/_e2e$/, '').slice(0, 24)}_runner_${token.slice(0, 16)}_e2e`
+  const control = databaseUrl(template, controlName)
+  const marker = `mikka-test-run:${token}`
   const quote = name => `"${name.replaceAll('"', '""')}"`
-  const once = async (url, statements) => {
-    const client = new pg.Client({ connectionString: url })
+  const literal = value => `'${value.replaceAll("'", "''")}'`
+  const created = new Set()
+  let controlCreated = false
+  const connect = async url => {
+    const client = new Client({ connectionString: url })
     await client.connect()
-    try { for (const statement of statements) await client.query(statement) } finally { await client.end() }
+    return client
   }
-  const controlName = decodeURIComponent(new URL(control).pathname.slice(1))
-  await once(template, [`DROP DATABASE IF EXISTS ${quote(controlName)} WITH (FORCE)`, `CREATE DATABASE ${quote(controlName)} TEMPLATE template0`])
-  const client = new pg.Client({ connectionString: control })
-  await client.connect()
-  try {
-    for (const name of names) {
-      await client.query(`DROP DATABASE IF EXISTS ${quote(name)} WITH (FORCE)`)
-      await client.query(`CREATE DATABASE ${quote(name)} TEMPLATE ${quote(source)}`)
-      ready(name)
+  const createAndMark = async (client, name, templateName, { trackForCleanup = true, onCreated = () => {} } = {}) => {
+    await client.query(`CREATE DATABASE ${quote(name)} TEMPLATE ${quote(templateName)}`)
+    // Record the successful CREATE immediately. Cleanup still requires the
+    // persisted marker, so a failed marker write can never authorize a drop.
+    if (trackForCleanup) created.add(name)
+    onCreated()
+    await client.query(`COMMENT ON DATABASE ${quote(name)} IS ${literal(marker)}`)
+  }
+  const hasMarker = async (client, name) => {
+    const result = await client.query("SELECT shobj_description(oid, 'pg_database') AS ownership FROM pg_database WHERE datname=$1", [name])
+    return result.rows?.[0]?.ownership === marker
+  }
+  const cleanup = async () => {
+    const failures = []
+    let controlClient
+    if (controlCreated) {
+      try {
+        controlClient = await connect(control)
+        if (!await hasMarker(controlClient, controlName)) throw new Error(`refusing cleanup: ${controlName} per-run marker is absent or mismatched`)
+        for (const name of created) {
+          try {
+            if (!await hasMarker(controlClient, name)) throw new Error(`refusing to drop ${name}: per-run marker is absent or mismatched`)
+            await controlClient.query(`DROP DATABASE ${quote(name)} WITH (FORCE)`)
+            created.delete(name)
+          } catch (error) { failures.push(error) }
+        }
+      } catch (error) { failures.push(error) }
+      finally { await controlClient?.end().catch(error => failures.push(error)) }
+      // The control database is independently proven by its own marker; a
+      // retained/mismatched clone does not justify leaking this run's control DB.
+      try {
+        const admin = await connect(template)
+        try {
+          if (!await hasMarker(admin, controlName)) throw new Error(`refusing to drop ${controlName}: per-run marker is absent or mismatched`)
+          await admin.query(`DROP DATABASE ${quote(controlName)} WITH (FORCE)`)
+          controlCreated = false
+        } finally { await admin.end() }
+      } catch (error) { failures.push(error) }
     }
-  } finally { await client.end() }
+    if (failures.length) throw new AggregateError(failures, 'one or more per-run database clones could not be safely cleaned up')
+  }
+
+  try {
+    const admin = await connect(template)
+    try {
+      await createAndMark(admin, controlName, 'template0', {
+        trackForCleanup: false,
+        onCreated: () => { controlCreated = true },
+      })
+    } finally { await admin.end() }
+    const client = await connect(control)
+    try {
+      for (const name of names) {
+        if (!/^[a-z0-9_]+_e2e$/.test(name) || name === controlName || !name.includes(token.slice(0, 8))) {
+          throw new Error(`clone name ${name} must be a unique safe name containing this run token`)
+        }
+        await createAndMark(client, name, source)
+        ready(name)
+      }
+    } finally { await client.end() }
+    return { cleanup }
+  } catch (error) {
+    try { await cleanup() } catch (cleanupError) { throw new AggregateError([error, cleanupError], 'clone creation failed and safe cleanup was incomplete') }
+    throw error
+  }
 }
 
 // Progress is a bounded preview, never a second TAP summary or Actions command.
@@ -457,15 +526,18 @@ export async function main({ root = '.', env = process.env, run = runScript, clo
     const bound = new Set(TEMPLATE_BOUND.map(entry => entry.script))
     const onTemplate = selected.filter(script => bound.has(script))
     const byWeight = (a, b) => b.weight - a.weight || (a.script < b.script ? -1 : 1)
+    const runId = randomUUID().replaceAll('-', '').slice(0, 12)
     const isolated = selected.filter(script => !bound.has(script)).map(script => {
       let ready, failed
       const cloned = new Promise((resolvePromise, rejectPromise) => { ready = resolvePromise; failed = rejectPromise })
       cloned.catch(() => {})
-      return { script, weight: suiteWeight(scripts[script]), database: cloneDatabaseName(env.E2E_DATABASE_URL, plan.scripts.indexOf(script), script), cloned, ready, failed }
+      return { script, weight: suiteWeight(scripts[script]), database: cloneDatabaseName(env.E2E_DATABASE_URL, plan.scripts.indexOf(script), script, runId), cloned, ready, failed }
     }).sort(byWeight)
     const cloning = now()
-    const clones = Promise.resolve().then(() => clone(env.E2E_DATABASE_URL, isolated.map(suite => suite.database), name => isolated.find(suite => suite.database === name)?.ready()))
-      .then(() => {
+    let cleanupClones
+    const clones = Promise.resolve().then(() => clone(env.E2E_DATABASE_URL, isolated.map(suite => suite.database), name => isolated.find(suite => suite.database === name)?.ready(), { runId }))
+      .then(result => {
+        if (typeof result?.cleanup === 'function') cleanupClones = result.cleanup
         for (const suite of isolated) suite.failed(new Error(`clone ${suite.database} was not created`))
         console.log(`Required DB clones: ${JSON.stringify({ template: new URL(env.E2E_DATABASE_URL).pathname.slice(1), clones: isolated.length, onTemplate, seconds: Math.round((now() - cloning) / 100) / 10 })}`)
       }, error => { for (const suite of isolated) suite.failed(error); throw error })
@@ -495,6 +567,11 @@ export async function main({ root = '.', env = process.env, run = runScript, clo
     ].sort(byWeight)
     const workers = Array.from({ length: Math.min(limit, lanes.length) }, async () => { while (lanes.length) await lanes.shift().start() })
     await Promise.all(workers)
+    try { await clones } catch { /* the clone error is already reported through the guarded suites */ }
+    if (cleanupClones) {
+      try { await cleanupClones() }
+      catch (error) { console.error(`::error::safe clone cleanup failed: ${error.message}`); failed = true }
+    }
     console.log(`Required DB timings: ${JSON.stringify({ shard: env.DB_TEST_SHARD ?? 'all', concurrency: limit, cpus: availableParallelism(), suites: timings.sort((a, b) => b.seconds - a.seconds) })}`)
     return failed ? 1 : 0
   } catch (error) { console.error(`::error::${error.message}`); return 1 }

@@ -36,9 +36,20 @@ export function shortTitlePrompt(task: { title: string; body: string }): { instr
 const LEADING_KEY = /^\s*(?:\[\s*)?(?:[A-Za-z][A-Za-z0-9]*-\d+|#\d+)(?:\s*\])?\s*[:：\-–—·|]?\s*/
 const TRAILING_DATE = /\s*[-–—·|,，(（[]?\s*(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}(?:[ T]\d{1,2}:\d{2}(?::\d{2})?)?|\d{1,2}:\d{2})\s*[)）\]]?\s*$/
 
+const WORD_CHAR = /[A-Za-z0-9]/
+
+/** Where to cut `chars` at `max` without ending inside a Latin word or a number: back to that word's start, unless it is the whole text. */
+function cutBeforeWord(chars: string[], max: number): number {
+  if (chars.length <= max) return chars.length
+  if (!WORD_CHAR.test(chars[max - 1]!) || !WORD_CHAR.test(chars[max]!)) return max
+  let start = max
+  while (start > 0 && WORD_CHAR.test(chars[start - 1]!)) start--
+  return start > 0 ? start : max
+}
+
 function limitShortTitle(title: string, cjk: boolean): string {
-  const limited = cjk ? [...title].slice(0, SHORT_TITLE_CJK_MAX).join('') : title.split(' ').slice(0, SHORT_TITLE_WORDS_MAX).join(' ')
-  return [...limited].slice(0, SHORT_TITLE_CHARS_MAX).join('').trim()
+  const chars = [...(cjk ? title : title.split(' ').slice(0, SHORT_TITLE_WORDS_MAX).join(' '))]
+  return chars.slice(0, cutBeforeWord(chars, cjk ? SHORT_TITLE_CJK_MAX : SHORT_TITLE_CHARS_MAX)).join('').trim()
 }
 
 /** Cleans what the model wrote and holds it to the limit; null when nothing usable is left. */
@@ -64,6 +75,19 @@ export function parseShortTitle(text: string, cjk: boolean): string | null {
 /** What a list shows for a task: its short title, else its title. */
 export function displayTaskTitle(task: { title: string; shortTitle?: string | null }): string {
   return task.shortTitle || task.title
+}
+
+/**
+ * A conversation's one name (a thread: a run and the runs that continue it), the same bounded short title wherever it
+ * is named (decision 2026-11-13-1405): its own stored title; until it has one, the bounded first line of what it was
+ * asked; and only when that is empty, its task's short title. A task's own title is not touched by this.
+ */
+export function conversationTitle(run: { title?: string | null; name?: string | null; issue?: { title: string; shortTitle?: string | null } | null }): string {
+  for (const own of [run.title, run.name]) {
+    const text = own?.replace(/…$/, '').trim()
+    if (text) return compactTaskTitle({ title: text })
+  }
+  return run.issue ? compactTaskTitle(run.issue) : ''
 }
 
 /** Compact navigation uses the existing generated title, with a bounded fallback while it is unavailable. */

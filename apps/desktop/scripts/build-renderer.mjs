@@ -1,7 +1,7 @@
 import { resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-export { actionExports, actionSignatures, actionReferences, applicationBoundary, usedActionImports, nativeOfflineView } from './renderer-transforms.mjs'
+export { nativeOfflineView } from './renderer-transforms.mjs'
 
 /** The installed renderer and browser use the same Vite module graph. */
 export async function buildRenderer(options = {}) {

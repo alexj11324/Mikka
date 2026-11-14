@@ -3,6 +3,7 @@ import { remoteKey } from "@mikka/protocol/repository";
 import { factoryChanged } from "../../live/factory";
 import { runChanged } from "../../live/panels";
 import { runListChanged } from '../../live/lists';
+import { advanceTaskAfterRunStart } from '../../task-status-run-start';
 import { wakeCoordinatorAfterCommit } from '../../coordinator/wake-after-commit';
 import { notifyQueuedLocalRun } from '../../device-gateway-notify';
 import { appendFactoryCheckContinuationContext, factoryCheckAssignment, factoryReportQuestionAssignment } from "../checks";
@@ -961,6 +962,7 @@ export function createFactoryQuestions(
             : {};
         if (!existing) {
           await tx.query('UPDATE agent_runs SET status=\'preparing\',"startedAt"=now(),"leaseExpiresAt"=$2,"updatedAt"=now() WHERE id=$1',[runId,leaseExpiresAt]);
+          advanceTaskAfterRunStart(tx,runId);
           await runListChanged(tx,runId);
           await runChanged(tx,runId);
           if (typeof existingOrClaim === "function") await existingOrClaim(tx);

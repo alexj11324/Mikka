@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { Pool, type PoolClient } from 'pg'
 import { orderMigrations } from '../../../scripts/migration-order.mjs'
-import { dropTestDatabase } from '../../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../../tests/support/drop-test-database'
 import { createFactoryStore } from '../store'
 import { createFactoryDispatch, factoryBinding } from '../dispatch'
 import { factoryEventId } from '../event-id'
@@ -29,7 +29,7 @@ if (url) {
 test('real PG: question receipts preserve one execution without opening a repair-cap bypass', { skip: !url, timeout: 120_000 }, async t => {
   const admin = new Pool({ connectionString: url, max: 1 })
   const database = `question_cap_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(url!); target.pathname = '/' + database
   const pool = new Pool({ connectionString: target.toString(), max: 8 })
   let closeWorkspaceDatabase: (() => Promise<void>) | undefined

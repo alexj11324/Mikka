@@ -3,6 +3,7 @@ import { before, mock, test } from 'node:test'
 import { act, useState } from 'react'
 import { Window } from 'happy-dom'
 import type { BotModelMenu } from '../lib/bot-model-menu-view'
+import { PersistentReadCache } from '../lib/swr/persistent-cache'
 
 const initial: BotModelMenu = {
   current: { id: 'old', modelId: 'gpt-6-luna', provider: 'codex',
@@ -16,10 +17,13 @@ let chooseResult: Promise<BotModelMenu | { error: string }> = Promise.resolve(in
 let refreshes = 0
 let failures = 0
 let choices: string[] = []
+let fixtureMenu: BotModelMenu | undefined = initial
+const fixtureScope = (userId: string, workspaceId: string) => new PersistentReadCache({ userId, workspaceId, role: 'admin', build: 'fixture' })
+let fixtureCache: Map<string, unknown> = new Map()
 mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) => key } })
 mock.module('sonner', { namedExports: { toast: { error: () => { failures++ } } } })
-mock.module('swr', { defaultExport: function useFixtureSWR() {
-  const [data, setData] = useState(initial)
+mock.module('swr', { namedExports: { useSWRConfig: () => ({ cache: fixtureCache }) }, defaultExport: function useFixtureSWR() {
+  const [data, setData] = useState(fixtureMenu)
   return { data, error: undefined, mutate: async (update: () => Promise<BotModelMenu>, options: {
     optimisticData?: BotModelMenu; rollbackOnError?: boolean
   } = {}) => {
@@ -107,4 +111,32 @@ test('opening a cached picker does not refresh subscriptions, and an unsaved cho
     assert.equal(picker.menu?.current.id, 'old', 'a failed save restores the confirmed model')
     assert.equal(failures, 1)
   } finally { await act(async () => root.unmount()) }
+})
+
+test('the pending Coordinator chip follows the authenticated read cache across account and workspace switches', async () => {
+  const root = createRoot(browser.document.createElement('div') as unknown as HTMLDivElement)
+  const alice = fixtureScope('alice', 'home')
+  let chip: ReturnType<typeof useBotModelPicker>['last'] = null
+  function Probe() { chip = useBotModelPicker(null).last; return null }
+  async function mount(key: string, cache: Map<string, unknown>, menu?: BotModelMenu) {
+    fixtureCache = cache
+    fixtureMenu = menu
+    await act(async () => { root.render(<Probe key={key} />) })
+    return chip
+  }
+  try {
+    browser.localStorage.setItem('mikka:model-chip:coordinator', JSON.stringify({ id: 'legacy', modelId: 'fixture', provider: 'codex' }))
+    assert.equal(await mount('legacy chip', alice), null)
+    await mount('first', alice, initial)
+    assert.deepEqual(await mount('reload', fixtureScope('alice', 'home')), {
+      id: 'old', modelId: 'gpt-6-luna', provider: 'codex',
+    })
+    assert.equal(await mount('switch workspace', fixtureScope('alice', 'other')), null)
+    assert.equal(await mount('switch account', fixtureScope('bob', 'home')), null)
+    assert.equal(await mount('unresolved workspace', new Map()), null)
+  } finally {
+    fixtureCache = new Map()
+    fixtureMenu = initial
+    await act(async () => root.unmount())
+  }
 })

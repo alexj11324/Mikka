@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
-import { CircleArrowDown } from 'lucide-react'
+import { CircleArrowDown, SquarePen } from 'lucide-react'
 import { RAIL_ITEMS, type RailProps } from '@/components/nav/rail-items'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -26,6 +26,7 @@ export function IconRailView({ active, onNavigate, ...menu }: RailProps) {
   const i18nText = useTranslations()
   // A non-collapsing Sidebar, as in shadcn's nested icon-rail pattern; phones get these items in the list footer.
   return <Sidebar collapsible="none" role="navigation" aria-label={i18nText('Nav.rail')} className="hidden h-full w-17 shrink-0 items-center gap-1 bg-transparent pt-1 pb-1 md:flex">
+    {menu.chats?.onNewConversation && <Button size="icon" variant="ghost" aria-label={i18nText('Nav.startConversation')} title={i18nText('Nav.startConversation')} onClick={menu.chats.onNewConversation}><SquarePen /></Button>}
     {RAIL_ITEMS.map(item => {
       const selected = active === item.id
       const Icon = selected ? item.selectedIcon : item.icon

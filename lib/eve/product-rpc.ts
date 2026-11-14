@@ -5,7 +5,7 @@ import type { TurnOutcome } from 'eve/events'
 import type { asSchema } from 'ai'
 
 export interface ProductCatalogueEntry { name:string; description:string; inputSchema:Awaited<ReturnType<typeof asSchema>['jsonSchema']>; needsApprovalReview?:boolean }
-export type ProductOperation = {operation:'prepare'|'instructions'|'catalogue'|'approval'|'execute'|'finish';sessionId:string;turnId:string;executionId?:string;name?:string;input?:unknown;callId?:string;approvalResponder?:ApprovalPrincipal;outcome?:TurnOutcome;messages?:unknown[]}
+export type ProductOperation = {operation:'approval'|'execute'|'finish';sessionId:string;turnId:string;executionId?:string;name?:string;input?:unknown;callId?:string;approvalResponder?:ApprovalPrincipal;outcome?:TurnOutcome;messages?:unknown[]}
 
 /** Business actions execute on the app host, whose Workflow World owns task jobs. */
 export async function productRpc<T>(scope:EveScope,operation:ProductOperation,signal?:AbortSignal):Promise<T> {

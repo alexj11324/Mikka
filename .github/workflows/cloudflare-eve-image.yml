@@ -58,7 +58,7 @@ jobs:
     timeout-minutes: 60
     env:
       NITRO_PRESET: node-server
-      MIKKA_EVE_WORKFLOW_WORLD: cloudflare
+      WORKFLOW_TARGET_WORLD: '@workflow/world-postgres'
       NODE_OPTIONS: --max-old-space-size=6144
       MIKKA_BUILD_REVISION: ${{ github.sha }}
       # Ordinary qualification builds the public server resources.
@@ -72,38 +72,10 @@ jobs:
           skip-electron: 'true'
       - name: Bind the existing release format
         run: echo "MIKKA_DEPLOYMENT_ID=$(node lib/deployment-id.mjs)" >> "$GITHUB_ENV"
-      - name: Bundle the private World authority from the locked public source
-        env:
-          WRANGLER_SEND_METRICS: 'false'
-        run: |
-          set -euo pipefail
-          world="$RUNNER_TEMP/eve-world"
-          pnpm exec wrangler deploy --dry-run --config packages/eve-cloudflare-world/wrangler.jsonc --outdir "$world"
-          artifact="$RUNNER_TEMP/eve-world-artifact"
-          mkdir -p "$artifact/modules"
-          cp -a "$world/." "$artifact/modules/"
-          rm -f "$artifact/modules/README.md"
-          cd "$artifact"
-          find modules -type f -print -quit | grep -q .
-          git -C "$GITHUB_WORKSPACE" rev-parse HEAD > source.txt
-          find modules -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS
-          sha256sum source.txt >> SHA256SUMS
-          sha256sum --check --status SHA256SUMS
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: eve-world-authority-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/eve-world-artifact/
-          if-no-files-found: error
-          retention-days: 1
       - name: Compile the official Eve runtime and shared product resources offline
         run: bash scripts/build-cloudflare-eve-image.sh
       - name: Build the portable Node 24 image
         run: docker build -f cloudflare/eve-runtime/Dockerfile -t mikka-eve-qualification .
-      - name: Start the compiled host and require the native World
-        run: |
-          docker run --rm --network none \
-            --mount "type=bind,src=$PWD/cloudflare/eve-runtime/test/compiled-host.mjs,dst=/acceptance.mjs,readonly" \
-            mikka-eve-qualification node /acceptance.mjs
   publish:
     permissions:
       contents: read
@@ -115,7 +87,7 @@ jobs:
     timeout-minutes: 60
     env:
       NITRO_PRESET: node-server
-      MIKKA_EVE_WORKFLOW_WORLD: cloudflare
+      WORKFLOW_TARGET_WORLD: '@workflow/world-postgres'
       NODE_OPTIONS: --max-old-space-size=6144
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -165,29 +137,6 @@ jobs:
         run: |
           test "$MIKKA_RUNTIME_RELEASE" = "$MAINTENANCE_OWNER_RELEASE"
           test "$RUNTIME_IMAGE_TAG" = "$MIKKA_DEPLOYMENT_ID-maintenance-$MAINTENANCE_OWNER_RELEASE"
-      - name: Bundle the private World authority from the locked public source
-        env:
-          WRANGLER_SEND_METRICS: 'false'
-        run: |
-          set -euo pipefail
-          world="$RUNNER_TEMP/eve-world"
-          pnpm exec wrangler deploy --dry-run --config packages/eve-cloudflare-world/wrangler.jsonc --outdir "$world"
-          artifact="$RUNNER_TEMP/eve-world-artifact"
-          mkdir -p "$artifact/modules"
-          cp -a "$world/." "$artifact/modules/"
-          rm -f "$artifact/modules/README.md"
-          cd "$artifact"
-          find modules -type f -print -quit | grep -q .
-          git -C "$GITHUB_WORKSPACE" rev-parse HEAD > source.txt
-          find modules -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS
-          sha256sum source.txt >> SHA256SUMS
-          sha256sum --check --status SHA256SUMS
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: eve-world-authority-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/eve-world-artifact/
-          if-no-files-found: error
-          retention-days: 1
       - name: Compile the official Eve runtime and shared product resources offline
         run: bash scripts/build-cloudflare-eve-image.sh --prebuilt-api
       - name: Build the portable Node 24 image
@@ -200,11 +149,6 @@ jobs:
           docker build -f cloudflare/eve-runtime/Dockerfile --label "org.opencontainers.image.revision=$MIKKA_BUILD_REVISION" --label "com.mikka.overlay=$MIKKA_UI_OVERLAY_SHA" --label "com.mikka.release=$MIKKA_DEPLOYMENT_ID" "${labels[@]}" -t "mikka-eve:$image_tag" .
           image_id=$(docker image inspect --format '{{.Id}}' "mikka-eve:$image_tag")
           echo "RUNTIME_TESTED_IMAGE_ID=$image_id" >> "$GITHUB_ENV"
-      - name: Start the compiled host and require the native World
-        run: |
-          docker run --rm --network none \
-            --mount "type=bind,src=$PWD/cloudflare/eve-runtime/test/compiled-host.mjs,dst=/acceptance.mjs,readonly" \
-            "$RUNTIME_TESTED_IMAGE_ID" node /acceptance.mjs
       - name: Issue a short-lived Registry publication credential
         id: registry
         uses: ./.github/actions/cloudflare-registry-credentials

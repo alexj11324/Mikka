@@ -5,7 +5,7 @@ import { ActionFailureError } from '@/lib/action-error'
 import { WorkspaceError } from '@/lib/workspace-error'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { enterprisePrincipal, type EnterprisePrincipal } from '@/lib/enterprise/principal'
-import { enterpriseWorkspaceAllowed } from '@/lib/enterprise/access'
+import { filterEnterpriseWorkspaceLinks } from '@/lib/enterprise/access'
 import { lockLiveRegistration } from '@/lib/enterprise/live-store'
 import { organizationWorkspaces } from '@/lib/db/governance-schema'
 import { db, pool, withDatabaseClient } from '@/lib/db'
@@ -97,7 +97,9 @@ export async function pushReply(userId: string, botId: string, text: string | nu
                   'SELECT id FROM "session" WHERE id=$1 AND "userId"=$2 AND "expiresAt">clock_timestamp()' + (organizationId ? '' : ' FOR SHARE'),
                   [sessionId, userId])
                 if (!session.rowCount) return
-                if (!await enterpriseWorkspaceAllowed(userId, origin.workspaceId, principal, workspaceTx, client)) return
+                // The Workspace transaction still holds its attachment lock. Recheck the live policy under the APP barrier.
+                const allowed = await filterEnterpriseWorkspaceLinks(reader, [{ id: origin.workspaceId, organizationId }], client)
+                if (!allowed.length) return
                 if (!pushAllowed(await readPreferences(userId), reasons)) return
                 if (await chatMuted(userId, botId)) return
                 const [bot] = await db.select({ name: bots.name, coordinator: sql<boolean>`exists (select 1 from coordinator_bots cb where cb."botId" = ${bots.id})` }).from(bots)
