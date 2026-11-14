@@ -162,7 +162,7 @@ export function FactoryFlowCard({ task, detail, onOpenThread }: { task: FactoryT
             {shownError?.kind === 'unknown' ? t('card.retryApprove') : t('card.approveSpec')}
           </Button>
         </>}
-        {kind === 'question' && flow.botId && <Button size="sm" onClick={() => navigate({ section: 'coordinator', bot: flow.botId, issue: null })}><MessageCircleQuestion data-icon="inline-start" aria-hidden="true" />{t('card.answer')}</Button>}
+        {kind === 'question' && <Button size="sm" onClick={() => navigate({ section: 'coordinator', bot: flow.botId, issue: null })}><MessageCircleQuestion data-icon="inline-start" aria-hidden="true" />{t('card.answer')}</Button>}
         {flow.acceptance
           // E2 (decision 2026-11-06-1615): a PR's report opens as the PR it reviews, 「查看 PR #1288」.
           ? <Button size="sm" onClick={() => openArtifact(flow.acceptance!.artifactId)}>{prNumber ? t('card.viewPullRequest', { number: prNumber }) : <><FileCheck data-icon="inline-start" aria-hidden="true" />{t('card.openAcceptance')}</>}</Button>
