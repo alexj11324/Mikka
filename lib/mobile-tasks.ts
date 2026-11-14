@@ -1,17 +1,18 @@
 import 'server-only'
 import { withTaskDevicePresence } from './task-state-presence'
-import { taskStateOf } from './task-state'
+import { attemptStateOf, taskStateOf } from './task-state'
 import { taskStateRunColumns } from './task-state-query'
 import { readCompactRunFailure } from './run-failure-projection'
 import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { agents, agentRuns, bots, devices, issues, issueDocuments, users, runPublications } from '@/lib/db/schema'
+import { agents, agentRuns, bots, devices, issues, issueDocuments, users, runPublications, RUN_OUTCOMES } from '@/lib/db/schema'
 import { issueForUser } from '@/lib/issue-access'
 import { withIssueWorkspace } from '@/lib/issue-scope-authorization'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { enterprisePrincipal } from '@/lib/enterprise/principal'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { readIssueMetadata } from '@/lib/issue-metadata'
+import { taskRelationKinds } from './issue-relations'
 import { displayTaskTitle } from '@/lib/short-title'
 import { issueContentToMarkdown } from '@/lib/linear-sync/markdown'
 import { runBotId } from '@/lib/run-bot-name'
@@ -20,7 +21,8 @@ import { enrichActivityActors } from '@/lib/activity-actor-server'
 import { taskActivityVersions } from './task-activity-versions'
 import { taskActivityFacts } from './task-activity-timeline'
 import { deriveIssueActivity } from './issue-activity'
-import { latestConversationRun } from '@/lib/issue-threads'
+import { actAs } from './acting-user'
+import { threadQuestionView, latestConversationRun } from '@/lib/issue-threads'
 import { mobileTaskActivity } from '@/lib/mobile-task-view'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import { taskBlock } from '@/lib/task-blocked'
@@ -44,12 +46,29 @@ export async function mobileTask(user: Exclude<IssueReader, string>, id: string,
   return withTaskWorkspace(reader, workspaceId, async () => {
     const { presentation, factory } = await readTaskWork(reader, workspaceId, id)
     if (!presentation) return null
+    const { listIssueConnections } = await import('@/app/actions/issue-operations')
+    const connected = await actAs(reader, () => listIssueConnections(id))
+    const current = connected.find(row => row.id === id)
+    const connections = connected.flatMap(row => {
+      const kinds = current ? taskRelationKinds(current, row) : []
+      return kinds.length ? [{ id: row.id, identifier: row.identifier, title: row.title, kinds }] : []
+    })
+    const { listIssueThreads } = await import('@/app/actions/agents')
+    const threads = await actAs(reader, () => listIssueThreads(id))
+    const conversations = threads.map(thread => {
+      const view = threadQuestionView(thread)
+      const outcome = RUN_OUTCOMES.find(outcome => outcome === view.outcome) ?? null
+      const state = attemptStateOf({ runId: view.runId, status: view.waiting ? 'waiting_input' : view.status, outcome, pauseReason: view.pauseReason })
+      const source = thread.detail
+      return { id: thread.id, ownerName: thread.ownerName, state, stopping: view.stopping,
+        detail: source ? { name: source.name, agent: source.profile?.name || source.agentName, observedModel: source.observedModel ?? null, summary: source.summary } : null }
+    })
     const detail = await read()
     if (!detail) return null
     return { ...detail, task: { ...detail.task, status: presentation.primaryStatus, group: presentation.group,
       state: presentation.state, reason: presentation.reason, blockedBy: presentation.blockedBy,
       ...(factory ? { factoryTaskId: factory.task.id } : {}) },
-      work: { version: 1 as const, linkedChats: presentation.linkedChats ?? [], pullRequests: presentation.pullRequests ?? [] },
+      work: { version: 1 as const, connections, conversations, linkedChats: presentation.linkedChats ?? [], pullRequests: presentation.pullRequests ?? [] },
       ...(factory ? { factoryEvents: factory.events } : {}) }
   })
 }

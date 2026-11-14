@@ -130,16 +130,30 @@ test('mobile task endpoints with real task ACL, current workspace membership and
 
   await t.test('the versioned work request returns task state, readable PRs and chat links in one owner-authorized detail', async () => {
     const load = (options?: ReadOptions) => run('/api/mobile/tasks/' + issueId + '?work=1', req => GET(req, { params: Promise.resolve({ id: issueId }) }), options)
+    const child = await workspaceTask()
+    const foreign = await workspaceTask(secondWorkspace.id, false)
+    const childContent = { type: 'doc', attrs: { mikka: { parentId: issueId } } }
+    await pool.query('update issues set content=$1 where id=any($2::uuid[])', [childContent, [child, foreign]])
     const response = await load()
     assert.equal(response.status, 200)
     const detail = await response.json()
     assert.equal(detail.work.version, 1)
     assert.deepEqual(detail.work.pullRequests, [{ url: 'https://github.com/acme/app/pull/1', state: 'open' }])
     assert.deepEqual(detail.work.linkedChats, [])
+    assert.deepEqual(detail.work.connections.map((row: { id: string; kinds: string[] }) => [row.id, row.kinds]), [[child, ['child']]])
+    const ownedThread = detail.work.conversations.find((row: { id: string }) => row.id === latest)
+    assert.ok(ownedThread?.detail?.name)
+    assert.equal(ownedThread.detail.observedModel, null, 'a requested model must not stand in for the observed model')
+    const teammate = await load({ bearer: peer.token, workspaceId: teamWorkspace.id })
+    assert.equal(teammate.status, 200)
+    const peerWork = (await teammate.json()).work
+    assert.ok(peerWork.conversations.some((row: { id: string }) => row.id === latest))
+    assert.ok(peerWork.conversations.every((row: { detail: unknown }) => row.detail === null), 'teammates see only the shared status')
     assert.equal(detail.task.id, issueId)
     assert.ok(Array.isArray(detail.timeline))
     assert.equal((await load({ bearer: null })).status, 401)
     assert.equal((await load({ bearer: peer.token, workspaceId: secondWorkspace.id })).status, 404)
+    await pool.query('delete from issues where id=any($1::uuid[])', [[child, foreign]])
   })
   await t.test('detail includes contract fields, every attempt, replacement time and creation; excludes raw errors', async () => {
     const response = await request(issueId)

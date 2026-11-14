@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { listIssueConnections, updateIssueRelation } from '@/app/actions/issue-operations'
 import { moveIssue, type IssueView } from '@/app/actions/issues'
 import { useActionError } from '@/lib/use-action-error'
+import { closedRelationStatus as closed, taskRelationKinds, type TaskRelationKind } from '@/lib/issue-relations'
 import { useRelationSearch } from '@/lib/hooks/use-relation-search'
 import { isIssueListKey, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
 import { useLiveKey } from '@/hooks/use-live-key'
@@ -22,8 +23,7 @@ import { cn } from '@/lib/utils'
 import { FieldError } from '@/components/ui/field'
 
 type Issue = IssueView
-export type RelationKind = 'parent' | 'child' | 'related' | 'blockedBy' | 'blocks' | 'duplicate'
-const closed = (status: string) => ['done', 'canceled', 'duplicate'].includes(status)
+export type RelationKind = TaskRelationKind
 
 export function IssueRelationPicker({ kind, task, open, onOpenChange, pending, onSelect, validationError }: { kind: RelationKind; task: Issue; open: boolean; onOpenChange: (open: boolean) => void; pending: boolean; onSelect: (id: string) => void; validationError?: string }) {
   const t = useTranslations('Metadata.relations')
@@ -86,7 +86,15 @@ export function useIssueConnections({ liveWorkspaceId = null, viewerId, task, ge
   const [pending, setPending] = useState(false)
   const busy = useRef(false)
   const current = rows?.find(row => row.id === task.id)?.metadata ?? task.metadata
-  const children = rows?.filter(row => row.metadata.parentId === task.id) ?? []
+  const byKind = new Map<RelationKind, ConnectionRows>()
+  for (const row of rows ?? []) {
+    for (const kind of taskRelationKinds({ id: task.id, status: task.status, metadata: current }, row)) {
+      const group = byKind.get(kind)
+      if (group) group.push(row)
+      else byKind.set(kind, [row])
+    }
+  }
+  const children = byKind.get('child') ?? []
   async function remove(kind: RelationKind, targetId: string) {
     if (busy.current || disabled || error) return
     busy.current = true; setPending(true)
@@ -127,11 +135,11 @@ export function useIssueConnections({ liveWorkspaceId = null, viewerId, task, ge
     finally { busy.current = false; setPending(false) }
   }
   const groups: { kind: RelationKind; label: string; items: NonNullable<typeof rows>; icon: typeof Flag; warning?: boolean }[] = [
-    { kind: 'parent', label: groupLabel('parent'), items: rows?.filter(row => row.id === current.parentId) ?? [], icon: GitBranch },
-    { kind: 'blockedBy', label: groupLabel('blockedBy'), items: rows?.filter(row => current.blockedByIds.includes(row.id) && !closed(row.status)) ?? [], icon: Flag, warning: true },
-    { kind: 'blocks', label: groupLabel('blocks'), items: rows?.filter(row => row.metadata.blockedByIds.includes(task.id) && !closed(task.status)) ?? [], icon: Flag, warning: true },
-    { kind: 'duplicate', label: groupLabel('duplicate'), items: rows?.filter(row => row.id === current.duplicateOfId) ?? [], icon: Link2 },
-    { kind: 'related', label: groupLabel('related'), items: rows?.filter(row => current.relatedIds.includes(row.id) || row.metadata.relatedIds.includes(task.id) || (current.blockedByIds.includes(row.id) && closed(row.status)) || (row.metadata.blockedByIds.includes(task.id) && closed(task.status))) ?? [], icon: Link2 },
+    { kind: 'parent', label: groupLabel('parent'), items: byKind.get('parent') ?? [], icon: GitBranch },
+    { kind: 'blockedBy', label: groupLabel('blockedBy'), items: byKind.get('blockedBy') ?? [], icon: Flag, warning: true },
+    { kind: 'blocks', label: groupLabel('blocks'), items: byKind.get('blocks') ?? [], icon: Flag, warning: true },
+    { kind: 'duplicate', label: groupLabel('duplicate'), items: byKind.get('duplicate') ?? [], icon: Link2 },
+    { kind: 'related', label: groupLabel('related'), items: byKind.get('related') ?? [], icon: Link2 },
   ]
   return { rows, error, mutate, expanded, setExpanded, pending, current, children, remove, status, statusOptions, groups, done: children.filter(row => closed(row.status)).length, closed }
 }
