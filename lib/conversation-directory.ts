@@ -167,7 +167,7 @@ async function sidebarRows(database: RunChainQueryable, userId: string, workspac
     SELECT kind,pulls,unread,id,title,"agentName",harness,"issueId",identifier,"taskTitle",status,"runStatus",pinned,touched,source,asked,state,at,archived,"botId" FROM visible
     UNION ALL
     SELECT n.*,b.id AS "botId" FROM named_chats n JOIN conversation_members cm ON cm."conversationId"=n.id AND cm."memberType"='bot' AND cm."leftAt" IS NULL
-      JOIN bots b ON b.id::text=cm."memberId" AND b."workspaceId"=${facts.params.length+2} AND b."ownerId"=${facts.params.length+1}
+      JOIN bots b ON b.id::text=cm."memberId" AND b."workspaceId"=$${facts.params.length+2} AND b."ownerId"=$${facts.params.length+1}
   ), ranked AS (
     SELECT *,count(*) FILTER (WHERE unread) OVER (PARTITION BY "botId")::integer AS "unreadCount",
       row_number() OVER (PARTITION BY "botId" ORDER BY pinned DESC,
