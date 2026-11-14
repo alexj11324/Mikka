@@ -1,8 +1,8 @@
 import 'server-only'
 import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { db } from '@/lib/db'
-import { attentionSettings, PUSH_WHEN, userPreferences } from '@/lib/db/schema'
+import { db, withDatabaseTransaction } from '@/lib/db'
+import { attentionSettings, PUSH_WHEN, userPreferences, users } from '@/lib/db/schema'
 import { SEND_KEYS } from '@/lib/send-key'
 import { ActionFailureError } from '@/lib/action-error'
 import { setAttentionEnabled } from '@/lib/attention/store'
@@ -93,14 +93,19 @@ export async function readPreferences(userId: string): Promise<Preferences> {
  * dailySuggestionsNeedMemory.
  */
 export async function savePreferences(userId: string, patch: PreferencesPatch): Promise<Preferences> {
-  const { proactive, ...rest } = patch
-  const current = await readPreferences(userId)
-  const memoryEnabled = rest.memoryEnabled ?? current.memoryEnabled
-  if (rest.dailySuggestions && !memoryEnabled) throw new ActionFailureError('dailySuggestionsNeedMemory')
-  if (proactive !== undefined) await setAttentionEnabled(userId, proactive)
-  const { proactive: _proactive, ...merged } = { ...current, ...rest }
-  const stored = { ...merged, dailySuggestions: merged.dailySuggestions && memoryEnabled }
-  await db.insert(userPreferences).values({ userId, ...stored, updatedAt: new Date() })
-    .onConflictDoUpdate({ target: userPreferences.userId, set: { ...stored, updatedAt: new Date() } })
-  return readPreferences(userId)
+  return db.transaction(tx => withDatabaseTransaction(tx, async () => {
+    // An owner exists even before their first preference row. Serialize read/merge/write
+    // for that owner so simultaneous patches cannot replace each other's fields.
+    await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for('no key update')
+    const { proactive, ...rest } = patch
+    const current = await readPreferences(userId)
+    const memoryEnabled = rest.memoryEnabled ?? current.memoryEnabled
+    if (rest.dailySuggestions && !memoryEnabled) throw new ActionFailureError('dailySuggestionsNeedMemory')
+    if (proactive !== undefined) await setAttentionEnabled(userId, proactive)
+    const { proactive: _proactive, ...merged } = { ...current, ...rest }
+    const stored = { ...merged, dailySuggestions: merged.dailySuggestions && memoryEnabled }
+    await tx.insert(userPreferences).values({ userId, ...stored, updatedAt: new Date() })
+      .onConflictDoUpdate({ target: userPreferences.userId, set: { ...stored, updatedAt: new Date() } })
+    return readPreferences(userId)
+  }))
 }
