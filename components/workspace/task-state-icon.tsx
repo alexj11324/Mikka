@@ -6,7 +6,8 @@
 // The state comes from localTaskState; this file only draws it. Colour follows what the state asks of the person.
 import type { ComponentType } from 'react'
 import { useTranslations } from 'next-intl'
-import { Ban, Circle, CircleCheck, CircleDashed, CircleDot, CircleX, Clock, Hand, OctagonAlert, TriangleAlert, type LucideProps } from 'lucide-react'
+import { Ban, Circle, CircleCheck, CircleDashed, CircleDot, CircleX, Clock, Hand, OctagonAlert, TriangleAlert, type LucideIcon, type LucideProps } from 'lucide-react'
+import { ISSUE_STATUSES } from '@/components/workspace/issue-properties'
 import { cn } from 'cn'
 import type { TaskReason, TaskState } from '@/hooks/use-bot-tasks'
 import { statusIconTints, type StatusTone } from '@/lib/status-appearance'
@@ -46,4 +47,38 @@ export function newestThreadRun(threads: readonly ThreadRun[] | undefined): { st
   if (!newest) return null
   const live = newest.continuation ?? newest
   return { status: live.status, outcome: live.outcome ?? null }
+}
+
+const STATUS_SIZE = { sm: 'size-3.5', md: 'size-4', lg: 'size-5' } as const
+
+/** The board status glyph the official layer still draws (one status, one icon). */
+export function TaskStatusIcon({ status, size = 'md', plain = false }: { status: string; size?: keyof typeof STATUS_SIZE; plain?: boolean }) {
+  const option = ISSUE_STATUSES.find(item => item.value === status)
+  const Icon: LucideIcon = option?.icon ?? Circle
+  return <Icon aria-hidden="true" data-task-status={status} className={cn(STATUS_SIZE[size], 'shrink-0', plain ? undefined : option?.indicatorClassName)} />
+}
+
+/** A run's activity mark. The official rows use it when a task has no board status of its own. */
+export function TaskRunMark({ indicator, plain = false }: { indicator: string; plain?: boolean }) {
+  const state = indicator in STATE_ICONS ? indicator as TaskState : 'running'
+  const Icon = STATE_ICONS[state]
+  return <Icon aria-hidden="true" data-run-indicator={indicator} className={cn('size-3.5 shrink-0', plain ? undefined : statusIconTints[STATE_TONES[state]])} />
+}
+
+/** Status when the task has one, otherwise what the run is doing. */
+export function TaskStatusMark({ status, indicator, size = 'md' }: { status: string; indicator?: string | null; size?: keyof typeof STATUS_SIZE }) {
+  if (indicator) return <TaskRunMark indicator={indicator} />
+  return <TaskStatusIcon status={status} size={size} />
+}
+
+/** The status word on a board column, list section and task row. */
+export function useTaskStatusLabel() {
+  const t = useTranslations('Issue')
+  return (status: string) => t.has(`status.${status}` as 'status.todo') ? t(`status.${status}` as 'status.todo') : status
+}
+
+/** Words for what an Agent is doing, beside the task's own status. */
+export function useRunIndicatorLabel() {
+  const label = useTaskStateLabel()
+  return (indicator: string) => indicator in STATE_ICONS ? label(indicator as TaskState, null) : indicator
 }

@@ -46,6 +46,28 @@ export interface TaskRun {
   harnesses: string[]
 }
 
+export type ConversationOrganization = { archived: boolean; pinned: boolean }
+
+/** The conversation's archive and pin flags. Absent when this server has no row for the run. */
+export async function readConversationOrganization(_runId: string): Promise<ConversationOrganization | null> {
+  return null
+}
+
+/** Sets one organization flag and returns the stored pair. */
+export async function setConversationOrganization(_runId: string, _change: { field: 'archived' | 'pinned'; value: boolean }): Promise<ConversationOrganization | null> {
+  return null
+}
+
+/** Asks for a new conversation title. This server keeps the current title. */
+export async function regenerateConversationTitle(_runId: string): Promise<{ error?: string; regenerated: boolean }> {
+  return { regenerated: false }
+}
+
+/** Saves a person's conversation title. */
+export async function renameConversation(_runId: string, _title: string): Promise<{ error?: string }> {
+  return { error: 'unavailable' }
+}
+
 export async function listTaskRuns(): Promise<TaskRun[]> {
   return (await pollTaskRuns()).items
 }

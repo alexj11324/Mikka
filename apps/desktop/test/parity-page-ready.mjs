@@ -157,7 +157,12 @@ export async function pageReady(page, name, fixture, messages, observed = {}) {
     // Activity versions are a separate read from the task's editable fields.
     // The fixture's creation event must finish rendering before comparison.
     const activity = task.getByRole('region', { name: messages.Workspace.activity.title, exact: true })
-    await activity.getByRole('listitem').filter({ hasText: messages.Workspace.detail.createdTask }).waitFor()
+    // A task with an identifier reads 「created APP-1」. The no-code fallback stays the older sentence.
+    const createdTemplate = messages.Workspace.activity?.created
+    const created = typeof createdTemplate === 'string' && fixture.issueIdentifier
+      ? createdTemplate.replaceAll('{code}', fixture.issueIdentifier)
+      : messages.Workspace.detail.createdTask
+    await activity.getByRole('listitem').filter({ hasText: created }).waitFor()
     if (name === 'task-thread') {
       // 活动's Agent rows have no loading placeholder. The selected row, named
       // after its Agent (one row per Agent stretch), proves that read is
