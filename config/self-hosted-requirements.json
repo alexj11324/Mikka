@@ -1746,6 +1746,13 @@
     "test": "lib/thread-reads.db.test.ts",
     "suite": "test:conversation-reads"
   },
+  "lib/group-read-receipts.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Advance a participant's durable group message position and clear their manual mark inside the authorized conversation transaction.",
+    "test": "lib/thread-reads.db.test.ts",
+    "suite": "test:conversation-reads"
+  },
   "lib/thread-reads.ts": {
     "mode": "built-in",
     "environment": [],

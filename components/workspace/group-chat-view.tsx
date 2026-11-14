@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import useSWRInfinite, { unstable_serialize as infiniteKey } from 'swr/infinite'
 import useSWR, { unstable_serialize } from 'swr'
 import { useTranslations } from 'next-intl'
@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/button'
 import { GroupLeaveAction } from './group-leave-action'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
+import { withBasePath } from '@/lib/base-path'
+import { VisibleReadEnd } from './visible-read-end'
 import { ThreadHeader } from './thread-header'
 import { ConversationPill } from '@/components/nav/conversation-pill'
 import { GroupAvatar, groupMembersKey, memberAvatar, useGroupMembers } from '@/components/nav/group-avatar'
@@ -148,6 +150,21 @@ export function GroupChatView({ group, userId, people, onLeft }: {
     })
   }
   const first = pages?.[0]
+  const readRevision = first?.readRevision
+  const lastMessageId = messages.at(-1)?.id ?? null
+  const sentRead = useRef<string | null>(null)
+  const acknowledge = useCallback(() => {
+    if (readRevision === undefined) return
+    const key = JSON.stringify([group.id, lastMessageId, readRevision])
+    if (sentRead.current === key) return
+    sentRead.current = key
+    void fetch(withBasePath(`/api/conversations/${group.id}/read`), {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ messageId: lastMessageId, readRevision }),
+    }).then(response => {
+      if (!response.ok && sentRead.current === key) sentRead.current = null
+    }).catch(() => { if (sentRead.current === key) sentRead.current = null })
+  }, [group.id, lastMessageId, readRevision])
   // 停止: the reply ends on the server; the button waits until the group stops answering.
   const actionError = useActionError()
   const [stopping, setStopping] = useState(false)
@@ -225,6 +242,7 @@ export function GroupChatView({ group, userId, people, onLeft }: {
                   {first?.routingError && !first.agentStatus && <p className="text-center text-xs text-muted-foreground">{t('noTaker')}</p>}
                   {first?.stopped && !first.agentStatus && <p role="status" className="text-center text-xs text-muted-foreground">{t('stopped')}</p>}
                 </>}
+        {namedChat && readRevision !== undefined && !blockingCode && !accessRejected && <VisibleReadEnd onSeen={acknowledge} />}
       </div>
     </div>
     <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">

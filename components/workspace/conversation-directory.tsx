@@ -1,6 +1,7 @@
 'use client'
 
 import { useDeferredValue, useState } from 'react'
+import type { ThreadReadChange } from '@/lib/thread-reads'
 import { setThreadRead } from '@/lib/thread-read-client'
 import { threadKeys } from '@/lib/swr/keys'
 import useSWRInfinite from 'swr/infinite'
@@ -49,12 +50,12 @@ export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 
   useLiveKey('group_list', workspaceId, workspaceId ? [unstable_serialize(getKey)] : [], workspaceId)
   const rows = [...new Map(data?.flatMap(page => page.items).map(item => [item.id, item])).values()]
   const more = Boolean(data?.at(-1)?.cursor)
-  async function mark(runId?: string) {
+  async function mark(change: ThreadReadChange) {
     if (writing) return
     setWriting(true)
     setWriteError(false)
     try {
-      await setThreadRead(runId ? { action: 'unread', runId } : { action: 'readAll' })
+      await setThreadRead(change)
       await Promise.all([mutate(), refresh(threadKeys.list(ownerId))])
     } catch { setWriteError(true) }
     finally { setWriting(false) }
@@ -85,7 +86,7 @@ export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 
         {pullStates.map(value => <NativeSelectOption value={value} key={value}>{value === 'all' ? categories('pullRequests') : prLabel(value)}</NativeSelectOption>)}
       </NativeSelect>
       {!pullsOnly && <Button size="sm" variant="outline" aria-pressed={archived} onClick={() => setArchived(!archived)}>{t('archived')}</Button>}
-      <Button size="sm" variant="ghost" disabled={writing || !workspaceId} onClick={() => void mark()}>{t('readAll')}</Button>
+      <Button size="sm" variant="ghost" disabled={writing || !workspaceId} onClick={() => void mark({ action: 'readAll' })}>{t('readAll')}</Button>
     </div>
     {writeError && <p role="alert">{t('writeError')}</p>}
     {error && <div role="alert">{t('loadError')} <Button size="sm" variant="ghost" onClick={() => void mutate()}>{t('retry')}</Button></div>}
@@ -114,7 +115,7 @@ export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 
         <PullRequestsBadge pullRequests={row.pulls} />
         <span>{t(row.state)}</span><time dateTime={row.at}>{format.dateTime(new Date(row.at), { dateStyle: 'medium', timeStyle: 'short' })}</time>
       </Button>
-        {row.kind === 'run' && !row.unread && <Button size="sm" variant="ghost" disabled={writing} onClick={() => void mark(row.id)}>{t('markUnread')}</Button>}
+        {!row.unread && <Button size="sm" variant="ghost" disabled={writing} onClick={() => void mark(row.kind === 'chat' ? { action: 'unread', chatId: row.id } : { action: 'unread', runId: row.id })}>{t('markUnread')}</Button>}
       </li>)}
     </ul>
     {more && <Button variant="outline" disabled={isValidating} onClick={() => void setSize(size + 1)}>{t('more')}</Button>}
