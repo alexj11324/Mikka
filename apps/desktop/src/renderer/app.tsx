@@ -30,6 +30,7 @@ import { platform, AuthForm, BrowserRoute, setSession, onSessionChanged, authent
 import { loadWorkspace, preloadWorkspace } from './workspace-loader'
 import { InstalledWorkspace } from './installed-workspace'
 import { mobileTaskLaunch } from '@/lib/mobile-task-handoff'
+import { DesktopTabs } from './desktop-tabs'
 import { serverDocumentKind, serverPageKind } from '@/lib/server-pages'
 
 const MobileTaskHandoff = lazy(() => import('@/components/mobile-task-handoff'))
@@ -52,11 +53,16 @@ export function App() {
   const status = platform === 'web' && serverDocumentKind() === 'status'
   const mobileTask = platform === 'web' && !serverDocumentKind() ? mobileTaskLaunch(location) : null
   return <NextIntlClientProvider locale={locale} messages={locale === 'en' ? en : zh} timeZone={Intl.DateTimeFormat().resolvedOptions().timeZone}>
-    <ThemeProvider>{mobileTask
-      ? <RendererBoundary><Suspense fallback={<WorkspaceLoading />}><MobileTaskHandoff key={location.href} launch={mobileTask} /></Suspense></RendererBoundary>
-      : status
-      ? <RendererBoundary><Suspense fallback={<WorkspaceLoading />}><ServerStatus /></Suspense></RendererBoundary>
-      : <><PlatformExtras /><SWRDefaults><RendererBoundary><SessionApplication /></RendererBoundary></SWRDefaults><Toaster /></>}</ThemeProvider>
+    <ThemeProvider>
+      <>
+        <DesktopTabs />
+        {mobileTask
+          ? <RendererBoundary><Suspense fallback={<WorkspaceLoading />}><MobileTaskHandoff key={location.href} launch={mobileTask} /></Suspense></RendererBoundary>
+          : status
+            ? <RendererBoundary><Suspense fallback={<WorkspaceLoading />}><ServerStatus /></Suspense></RendererBoundary>
+            : <><PlatformExtras /><SWRDefaults><RendererBoundary><SessionApplication /></RendererBoundary></SWRDefaults><Toaster /></>}
+      </>
+    </ThemeProvider>
   </NextIntlClientProvider>
 }
 

@@ -9,12 +9,12 @@ import { actionReferences, actionSignatures, applicationBoundary, usedActionImpo
 const repository = fileURLToPath(new URL('../../..', import.meta.url))
 const renderer = join(repository, 'apps/desktop/src/renderer')
 let imports = 0
-async function moduleFrom({ entry, source, plugins = [] }) {
+async function moduleFrom({ entry, source, plugins = [], defines = {} }) {
   const result = await build({
     absWorkingDir: repository, ...(entry ? { entryPoints: [join(renderer, entry)] } : { stdin: { contents: source, sourcefile: 'renderer-contract-test.ts', resolveDir: repository, loader: 'ts' } }),
     write: false, bundle: true, format: 'esm', platform: 'browser', target: 'es2023',
     tsconfig: join(repository, 'apps/desktop/tsconfig.renderer.json'),
-    define: { 'process.env.NODE_ENV': '"production"', 'process.env.MIKKA_BASE_PATH': '"/mikka"', 'process.env': '{}' }, plugins,
+    define: { 'process.env.NODE_ENV': '"production"', 'process.env.MIKKA_BASE_PATH': '"/mikka"', 'process.env': '{}', ...defines }, plugins,
   })
   return import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}#${++imports}`)
 }
@@ -346,4 +346,66 @@ test('viewer HTTP seam retains shared response errors and routes ordinary reques
   assert.equal(calls.length, 1, 'malformed bot IDs cannot reach the viewer IPC')
   assert.deepEqual(await computerRequest('/api/bots/bot-id/computer'), { machine: 'sleeping' })
   assert.equal(calls[1].path, '/mikka/api/bots/bot-id/computer')
+}))
+
+test('desktop tabs restore once at launch without overwriting later Settings navigation', () => browser(async window => {
+  const saved = { items: [{ entries: ['/mikka/en/dashboard'], index: 0 }], active: 0 }
+  window.localStorage.setItem('mikka:desktop:saved-tabs:v1', JSON.stringify(saved))
+  window.document.documentElement.dataset.desktopWindow = 'main'
+  globalThis.__mikkaDesktopTabsWindow = window
+  const fixture = await moduleFrom({
+    defines: { window: 'globalThis.__mikkaDesktopTabsWindow', document: 'globalThis.__mikkaDesktopTabsWindow.document' },
+    source: `
+      import React from 'react'
+      import { createRoot } from 'react-dom/client'
+      import { DesktopTabs } from ${JSON.stringify(join(renderer, 'desktop-tabs.tsx'))}
+      let testWindow
+      export function setWindow(value) { globalThis.__mikkaDesktopTabsWindow = value }
+      export async function mount(container) {
+        const root = createRoot(container)
+        root.render(React.createElement(DesktopTabs))
+        await new Promise(resolve => setTimeout(resolve, 30))
+        return root
+      }
+      export async function unmount(root) { root.unmount(); await new Promise(resolve => setTimeout(resolve, 0)) }
+      export async function navigateForTest(href) {
+        globalThis.__mikkaDesktopTabsWindow.history.pushState(globalThis.__mikkaDesktopTabsWindow.history.state, '', href)
+        globalThis.__mikkaDesktopTabsWindow.dispatchEvent(new globalThis.__mikkaDesktopTabsWindow.CustomEvent('mikka:desktop-history', { detail: { method: 'pushState', href } }))
+        globalThis.__mikkaDesktopTabsWindow.dispatchEvent(new globalThis.__mikkaDesktopTabsWindow.Event('mikka:test-location'))
+        await new Promise(resolve => setTimeout(resolve, 30))
+      }
+    `,
+    plugins: [{
+      name: 'desktop-tabs-renderer-fixtures',
+      setup(build) {
+        build.onResolve({ filter: /^mikka:platform$/ }, () => ({ path: 'platform', namespace: 'desktop-tabs-fixture' }))
+        build.onResolve({ filter: /^next-intl$/ }, () => ({ path: 'next-intl', namespace: 'desktop-tabs-fixture' }))
+        build.onResolve({ filter: /^\.\/location$/ }, args => args.importer.endsWith('/desktop-tabs.tsx') ? ({ path: 'location', namespace: 'desktop-tabs-fixture' }) : undefined)
+        build.onLoad({ filter: /.*/, namespace: 'desktop-tabs-fixture' }, args => ({
+          loader: 'js',
+          resolveDir: repository,
+          contents: args.path === 'platform'
+            ? 'export const platform = "desktop"'
+            : args.path === 'next-intl'
+              ? 'export function useTranslations() { return (key, values) => key === "closeTab" ? `Close ${values?.title ?? ""}` : key }'
+              : `import { useSyncExternalStore } from 'react'
+                 const subscribe = callback => { globalThis.__mikkaDesktopTabsWindow.addEventListener('mikka:test-location', callback); return () => globalThis.__mikkaDesktopTabsWindow.removeEventListener('mikka:test-location', callback) }
+                 const snapshot = () => globalThis.__mikkaDesktopTabsWindow.location.href
+                 export function useLocation() { return new URL(useSyncExternalStore(subscribe, snapshot, snapshot)) }
+                 export function navigate(href, replace = false) { globalThis.__mikkaDesktopTabsWindow.history[replace ? 'replaceState' : 'pushState'](globalThis.__mikkaDesktopTabsWindow.history.state, '', href); globalThis.__mikkaDesktopTabsWindow.dispatchEvent(new globalThis.__mikkaDesktopTabsWindow.Event('mikka:test-location')) }`,
+        }))
+      },
+    }],
+  })
+  try {
+    fixture.setWindow(window)
+    const container = window.document.createElement('div')
+    window.document.body.append(container)
+    const root = await fixture.mount(container)
+    assert.equal(window.location.pathname, '/mikka/en/dashboard', 'startup restores the saved active route')
+    await fixture.navigateForTest('/mikka/en/settings')
+    assert.equal(window.location.pathname, '/mikka/en/settings', 'later Settings navigation is not reset to the launch route')
+    await fixture.unmount(root)
+  } finally {
+  }
 }))

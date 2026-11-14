@@ -6382,6 +6382,13 @@
     }
   },
   "DesktopRenderer": {
+    "back": "Back",
+    "forward": "Forward",
+    "tabsLabel": "Saved tabs",
+    "newTab": "New tab",
+    "closeTab": "Close {title}",
+    "tabHome": "Home",
+    "tabSettings": "Settings",
     "serverUnavailable": "Can't reach Mikka",
     "networkUnavailable": "No network",
     "reconnecting": "Reconnecting…",

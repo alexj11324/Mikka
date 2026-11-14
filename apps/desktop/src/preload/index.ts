@@ -27,6 +27,8 @@ if (appOrigin && window.top === window && (bundled ? localOrigin === appOrigin &
   const translucent = process.argv.includes('--mikka-translucent')
   const markPlatform = () => {
     document.documentElement.dataset.desktopPlatform = process.platform
+    const windowKind = process.argv.find(argument => argument.startsWith('--mikka-window-kind='))?.slice('--mikka-window-kind='.length)
+    if (windowKind === 'main' || windowKind === 'child') document.documentElement.dataset.desktopWindow = windowKind
     if (translucent) document.documentElement.dataset.desktopTranslucent = ''
   }
   if (document.documentElement) markPlatform()

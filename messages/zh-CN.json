@@ -6382,6 +6382,13 @@
     }
   },
   "DesktopRenderer": {
+    "back": "后退",
+    "forward": "前进",
+    "tabsLabel": "已保存的标签页",
+    "newTab": "新建标签页",
+    "closeTab": "关闭{title}",
+    "tabHome": "首页",
+    "tabSettings": "设置",
     "serverUnavailable": "无法连接 Mikka",
     "networkUnavailable": "没有网络",
     "reconnecting": "正在重新连接…",
