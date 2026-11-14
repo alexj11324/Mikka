@@ -24,30 +24,33 @@ export async function readContainerWindow({ application, environment, now, read,
   const app = containerApplicationId(application)
   if (!['production', 'staging'].includes(environment) || !Number.isSafeInteger(now)) fail('container_window_invalid')
   const start = now - WINDOW_MS, through = now + (completionGrace ? REQUEST_DEADLINE_MS : 0), found = new Map()
-  let pages = 0, records = 0
-  async function visit(from, to) {
+  const seen = new Set(), cursors = new Set()
+  let pages = 0, records = 0, expected = 0
+  /** @type {string | undefined} */
+  let offset
+  for (;;) {
     if (++pages > maxQueries) fail('container_log_query_budget_exceeded')
     const result = await read({
-      queryId: 'mikka-container-runtime-window', view: 'events', limit, timeframe: { from, to },
+      queryId: 'mikka-container-runtime-window', view: 'events', limit, timeframe: { from: start, to: through },
+      ...(offset ? { offset } : {}),
       parameters: { datasets: ['containers'], filters: [{ key: '$metadata.service', type: 'string', operation: 'eq', value: app }] },
     })
     const section = result?.events, rows = section?.events
     if (!Array.isArray(rows) || rows.length > limit || !Number.isSafeInteger(section.count) ||
-      section.count < rows.length || result.statistics?.abr_level !== 1) fail('container_log_response_incomplete')
-    // Cloudflare can return count == limit on a truncated window. Never use
-    // the count as a complete denominator or advance past equal timestamps.
-    if (rows.length === limit || section.count !== rows.length) {
-      if (to - from <= 1 || pages >= maxQueries) fail('container_log_window_saturated')
-      const mid = from + Math.floor((to - from) / 2)
-      await visit(from, mid)
-      await visit(mid, to)
-      return
-    }
+      section.count < rows.length || !result.statistics || typeof result.statistics !== 'object' ||
+      (result.statistics.abr_level ?? 1) !== 1) fail('container_log_response_incomplete')
+    expected = Math.max(expected, section.count)
+    const previousSize = seen.size
     for (const row of rows) {
       if (row.dataset !== 'containers' || row.$metadata?.type !== 'cf-container' ||
         row.$metadata?.service !== app || row.$containers?.applicationId !== app ||
         !row.$metadata?.id || typeof row.$metadata.id !== 'string' ||
-        !Number.isSafeInteger(row.timestamp) || row.timestamp < from || row.timestamp > to) fail('container_log_scope_mismatch')
+        !Number.isSafeInteger(row.timestamp) || row.timestamp < start || row.timestamp > through) fail('container_log_scope_mismatch')
+      const id = row.$metadata.id
+      if (!seen.has(id)) {
+        seen.add(id)
+        if (row.timestamp < now) records++
+      }
       if (row.timestamp === through) continue
       if (row.$metadata.truncated || row.$containers.truncated) fail('container_log_records_truncated')
       const value = row.source
@@ -59,13 +62,18 @@ export async function readContainerWindow({ application, environment, now, read,
       const message = JSON.stringify(Object.fromEntries(fields.filter(key => Object.hasOwn(value, key))
         .map(key => [key, key === 'error' ? Boolean(value.error) : value[key]])))
       const record = { deploymentId: app, environment, message, truncated: row.$metadata.truncated === true }
-      const previous = found.get(row.$metadata.id)
+      const previous = found.get(id)
       if (previous && (previous.at !== row.timestamp || previous.event.message !== message)) fail('container_log_id_conflict')
-      found.set(row.$metadata.id, { at: row.timestamp, event: record })
+      found.set(id, { at: row.timestamp, event: record })
     }
-    records += completionGrace ? rows.filter(row => row.timestamp < now).length : rows.length
+    if (rows.length < limit && seen.size >= expected) break
+    if (seen.size === previousSize) fail('container_log_response_incomplete')
+    // Workers Observability takes the last event ID as its top-level offset.
+    const next = rows.at(-1).$metadata.id
+    if (cursors.has(next)) fail('container_log_response_incomplete')
+    cursors.add(next)
+    offset = next
   }
-  await visit(start, through)
   const rows = [...found.values()]
   return { applicationId: app, environment, start, end: now, pages, records,
     events: rows.filter(row => row.at < now).map(row => row.event),
