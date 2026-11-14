@@ -1551,7 +1551,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "e32ba9f64483ff8bdbf5303b07229ee6bc4624e6967d34d4f05c1c72d5ac1540"
+      "sourceHash": "348bbb3da379ade57ee323e925e046ed4849051bc969f8611ceb133198e95379"
     },
     {
       "path": "/mikka/api/mobile/groups/[id]",
@@ -1569,7 +1569,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "05d1352299fb3b0e191049a97c5bc7c6e5784cac4808421b8f2dd1d520d0970c"
+      "sourceHash": "c8f4e82f9aa2fd8335f8bd4846348475e69315a84b993bfbdeed788c04c6a838"
     },
     {
       "path": "/mikka/api/mobile/model",
