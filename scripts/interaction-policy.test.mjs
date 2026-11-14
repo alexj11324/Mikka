@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { auditInteractions } from './interaction-policy.mjs'
+import { auditActionBindings, auditInteractions } from './interaction-policy.mjs'
 
 const rules = source => auditInteractions('components/example.tsx', source).map(d => d.rule)
 
@@ -103,3 +103,26 @@ for (const [name, source] of [
   ['menu selection', '<CommandItem onSelect={() => navigate(id)}>打开</CommandItem>'],
   ['noninteractive layout', '<div onClick={event => event.stopPropagation()}><span>任务</span></div>'],
 ]) test(`allows ${name}`, () => assert.deepEqual(rules(source), []))
+
+const adapterRules = source => auditActionBindings('screen.tsx', source).map(diagnostic => diagnostic.rule)
+const press = 'import { Pressable as Tap } from "react-native"; '
+
+for (const [name, source, rule] of [
+  ['native button without a press action', press + '<Tap accessibilityRole="button" />', 'interaction/no-dead-control'],
+  ['a web click does not activate a native button', press + '<Tap accessibilityRole="button" onClick={save} />', 'interaction/no-dead-control'],
+  ['named native no-op', press + 'const save = () => {}; const ui = <Tap onPress={save} />', 'interaction/no-placeholder-action'],
+  ['toast-only adapter onPress', '<ActionRow onPress={() => toast.success("Saved")} />', 'interaction/no-placeholder-action'],
+  ['native feedback alone', 'import { Alert as Dialog } from "react-native"; const ui = <ActionRow onPress={() => Dialog.alert("Saved")} />', 'interaction/no-placeholder-action'],
+  ['official menu empty selection', '<ActionMenu onSelect={() => {}} />', 'interaction/no-placeholder-action'],
+]) test(name, () => assert.ok(adapterRules(source).includes(rule)))
+
+for (const [name, source] of [
+  ['press delegates to command', press + '<Tap accessibilityRole="button" onPress={() => save(id)} />'],
+  ['Expo link supplies press', press + 'import { Link } from "expo-router"; const ui = <Link asChild href="/edit"><Link.Trigger><Tap accessibilityRole="button" /></Link.Trigger></Link>'],
+  ['forwarded native press props', press + '<Tap accessibilityRole="button" {...buttonProps} />'],
+  ['pressable used for gesture input', press + '<Tap onPressIn={start} onPressOut={stop} />'],
+  ['portal container absorbs clicks', '<div onClick={event => event.stopPropagation()} />'],
+  ['paid button handled by the owning trigger', '<DialogTrigger asChild><button /></DialogTrigger>'],
+  ['native confirmation with a button action', 'import { Alert } from "react-native"; const ui = <ActionRow onPress={() => Alert.alert("Delete?", "", [{ text: "Delete", onPress: remove }])} />'],
+  ['read-only native summary', '<View><Text>Priority</Text></View>'],
+]) test(name, () => assert.deepEqual(adapterRules(source), []))

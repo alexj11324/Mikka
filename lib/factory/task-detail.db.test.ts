@@ -4,6 +4,7 @@ import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { Pool } from 'pg';
+import { observePoolCommits } from '../db/commit-effects';
 import { orderMigrations } from '../../scripts/migration-order.mjs';
 import { createFactoryStore } from './store';
 import { readFactoryTaskView } from './public-task';
@@ -31,6 +32,7 @@ test('task detail GET exposes criteria and delivery without unused fields or wri
   await adminPool.query(`CREATE DATABASE ${name} TEMPLATE template0`);
   const target = new URL(admin.toString()); target.pathname = `/${name}`; guarded(target.toString());
   const pool = new Pool({ connectionString: target.toString(), max: 4 });
+  observePoolCommits(pool);
   try {
     const dir = new URL('../../drizzle/', import.meta.url);
     for (const f of orderMigrations((await readdir(dir)).filter(f => f.endsWith('.sql')))) await pool.query(await readFile(new URL(f, dir), 'utf8'));
