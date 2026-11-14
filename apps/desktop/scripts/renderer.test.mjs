@@ -339,7 +339,7 @@ test('viewer HTTP seam retains shared response errors and routes ordinary reques
     for (const endpoint of ['viewer', 'takeover']) {
       await assert.rejects(
         computerRequest(`/api/bots/${malformed}/computer/${endpoint}`, { method: 'POST', json: { mode: 'view' } }),
-        error => error.status === 400 && error.body?.error === 'invalid_request',
+        error => error.status === 400 && error.body?.error === 'invalid_request' && error.cause instanceof URIError,
       )
     }
   }

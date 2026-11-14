@@ -13,7 +13,7 @@ export async function computerRequest<T>(path: string, init?: RequestInit & { js
   // A malformed URL must use the shared request error contract, not throw URIError.
   let botId: string
   try { botId = decodeURIComponent(viewer[1]) }
-  catch { throw new ComputerRequestError(400, { error: 'invalid_request' }) }
+  catch (cause) { throw new ComputerRequestError(400, { error: 'invalid_request' }, { cause }) }
   const response = await rendererHost().viewer.prepare({ botId, mode, ...(viewer[2] === 'takeover' ? { takeover: true } : {}) })
   if (response.status < 200 || response.status >= 300) throw new ComputerRequestError(response.status, response.body)
   return response.body as T
