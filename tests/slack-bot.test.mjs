@@ -2,14 +2,10 @@ import assert from 'node:assert/strict'
 import { mock, test } from 'node:test'
 import { createHmac } from 'node:crypto'
 import { createMikkaSlackChannel } from '../lib/slack/eve-channel.ts'
-import { slackInboundIdentity, slackRouting } from '../lib/slack/eve-routing.ts'
-import { slackConfig } from '../lib/slack/config.ts'
 
 const env = {
-  SLACK_BOT_TOKEN: 'test-only-bot-token', SLACK_SIGNING_SECRET: 'test-only-signing-secret',
-  SLACK_APP_ID: 'A123', SLACK_TEAM_ID: 'T123', SLACK_BOT_USER_ID: 'U123',
-  SLACK_USER_BINDINGS: '{"U456":"owner-a","U789":"owner-b"}',
-  SLACK_WATCHED_CHANNELS: '["C123"]',
+  SLACK_SIGNING_SECRET: 'test-only-signing-secret',
+  SLACK_APP_ID: 'A123',
 }
 const workspaceId = '00000000-0000-4000-8000-000000000001'
 const linkId = '00000000-0000-4000-8000-000000000007'
@@ -150,20 +146,19 @@ test('relevant ambient input joins only its thread and each bound owner has a di
   assert.equal(h.sends[1].options.auth.principalId, 'owner-b')
 })
 
-test('channel workspace selection is operator configuration and malformed selection fails closed', () => {
-  assert.deepEqual(slackRouting({ SLACK_WATCHED_CHANNELS: '["C123"]', SLACK_CHANNEL_WORKSPACES: JSON.stringify({ C123: workspaceId }) }), { watched: ['C123'], workspaces: { C123: workspaceId } })
-  for (const invalid of ['not-json', '["C123"]', '{"C123":"other-tenant"}']) assert.equal(slackRouting({ SLACK_CHANNEL_WORKSPACES: invalid }), null)
-  assert.equal(slackRouting({ SLACK_WATCHED_CHANNELS: '["not-a-channel"]' }), null)
-})
-
-test('signed interaction callbacks still require bound owner and installed workspace', () => {
-  const config = slackConfig(env)
-  const callback = { type: 'block_actions', api_app_id: 'A123', team: { id: 'T123' }, user: { id: 'U456' }, channel: { id: 'C123' } }
-  assert.deepEqual(slackInboundIdentity(config, callback), { ownerId: 'owner-a', channelId: 'C123' })
-  assert.equal(slackInboundIdentity(config, { ...callback, user: { id: 'U999' } }), null)
-  assert.equal(slackInboundIdentity(config, { ...callback, team: { id: 'T999' } }), null)
-  const modal = { ...callback, type: 'view_submission', channel: undefined, view: { private_metadata: JSON.stringify({ channelId: 'C123', requestId: 'request-test' }) } }
-  assert.deepEqual(slackInboundIdentity(config, modal), { ownerId: 'owner-a', channelId: 'C123' })
+test('signed interactions require the current installation and workspace member', async () => {
+  const callback = { type: 'block_actions', api_app_id: 'A123', team: { id: 'T123' }, user: { id: 'U456' }, channel: { id: 'C123' }, actions: [] }
+  const modal = { ...callback, type: 'view_submission', channel: undefined, view: { private_metadata: JSON.stringify({ channelId: 'C123' }) } }
+  for (const payload of [callback, modal]) {
+    const allowed = harness()
+    await allowed.post(payload)
+    assert.deepEqual(allowed.scopes, [['owner-a', workspaceId]])
+    for (const patch of [{ user: { id: 'U999' } }, { team: { id: 'T999' } }]) {
+      const denied = harness()
+      assert.equal((await denied.post({ ...payload, ...patch })).status, 204)
+      assert.deepEqual([denied.scopes, denied.sends, denied.api], [[], [], []])
+    }
+  }
 })
 
 let decisionAnswer = 'respond'
