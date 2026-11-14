@@ -1163,7 +1163,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "68ba42e52386acbde9ac9d3500067dd094a9de36fb48e6c7e615e3202c7fccfc"
+      "sourceHash": "515ac417832be58b303d90de866971e221ba106f322c7b9714d35fcd435713fb"
     },
     {
       "path": "/mikka/api/health",
