@@ -107,7 +107,9 @@ test('a refused copy of selected words preserves the action and can be retried',
   await act(async () => { copy.click(); await frame() })
   assert.deepEqual(written, ['Selected words'])
   assert.equal(copySuccess.mock.calls.at(-1)?.arguments[0], 'Artifact.copied')
-  assert.deepEqual(copySuccess.mock.calls.at(-1)?.arguments[1], copyError.mock.calls.at(-1)?.arguments[1])
+  const failureToast = copyError.mock.calls.at(-1)?.arguments[1]
+  assert.ok(failureToast?.id)
+  assert.deepEqual(copySuccess.mock.calls.at(-1)?.arguments[1], failureToast)
   assert.equal(document.querySelector('[data-slot="selection-actions"]'), null)
 })
 
