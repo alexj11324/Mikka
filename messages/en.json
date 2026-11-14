@@ -6507,6 +6507,19 @@
     "renderHint": "Retry to reopen the view."
   },
   "Organization": {
+    "domains": {
+      "discover": "Organizations you can join",
+      "join": "Join",
+      "manage": "Join by email domain",
+      "hint": "Allow the domain of your verified work email so people with that domain can join as members.",
+      "domain": "Email domain",
+      "add": "Allow domain",
+      "remove": "Remove {domain}",
+      "empty": "No domains allowed",
+      "joined": "Joined {name}",
+      "added": "Allowed {domain}",
+      "removed": "Removed {domain}. Existing members keep their membership."
+    },
     "serviceKeys": {
       "title": "Organization service keys",
       "empty": "No organization-bound service keys in the workspaces you administer.",

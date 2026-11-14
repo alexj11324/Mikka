@@ -6507,6 +6507,19 @@
     "renderHint": "请重试打开页面。"
   },
   "Organization": {
+    "domains": {
+      "discover": "可加入的组织",
+      "join": "加入",
+      "manage": "通过邮箱域名加入",
+      "hint": "允许已验证工作邮箱的域名后，使用同一域名的人可以加入组织，成为普通成员。",
+      "domain": "邮箱域名",
+      "add": "允许域名",
+      "remove": "移除 {domain}",
+      "empty": "暂未允许任何域名",
+      "joined": "已加入{name}",
+      "added": "已允许 {domain}",
+      "removed": "已移除 {domain}。现有成员保留组织成员身份。"
+    },
     "serviceKeys": {
       "title": "组织服务密钥",
       "empty": "你管理的工作区中暂无绑定此组织的服务密钥。",

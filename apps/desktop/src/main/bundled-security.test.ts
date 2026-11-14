@@ -144,6 +144,22 @@ test('organization overview and service key directory use their exact session ro
   }
 })
 
+test('Organization domain discovery and admission forward only the declared routes and methods', () => {
+  const org = 'ab81a708-013c-4e44-9ab2-a500bd59f381'
+  const domain = 'ebb7878e-6918-4b68-9300-d956761b5011'
+  const base = `/api/organizations/${org}`
+  const collection = `${base}/allowed-domains`
+  for (const method of ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) {
+    assert.equal(allowedApiPath('/api/me/joinable-organizations', method), method === 'GET')
+    assert.equal(allowedApiPath(collection, method), method === 'GET' || method === 'POST')
+    assert.equal(allowedApiPath(`${collection}/${domain}`, method), method === 'DELETE')
+    assert.equal(allowedApiPath(`${base}/join-by-domain`, method), method === 'POST')
+    for (const path of [collection.replace(org, 'unknown'), `${collection}/unknown`, `${collection}/${domain}/unknown`, `${base}/join-by-domain/extra`]) {
+      assert.equal(allowedApiPath(path, method), false, `${method} ${path}`)
+    }
+  }
+})
+
 test('billing metadata and commands have exact scoped routes and methods', () => {
   assert.equal(allowedApiPath('/api/organizations', 'GET'), true)
   for (const method of ['HEAD', 'POST', 'PATCH', 'DELETE', 'PUT', 'OPTIONS']) assert.equal(allowedApiPath('/api/organizations', method), false)
