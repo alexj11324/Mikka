@@ -172,7 +172,10 @@ test('workflow uses public manual main qualification and uploads the single rece
   assert.match(workflow, /node-version: 24\.22\.1/)
   assert.match(workflow, /corepack prepare pnpm@10\.34\.3 --activate/)
   assert.match(workflow, /MIKKA_CLOUD_SOURCE_SHA: \$\{\{ inputs.cloud_source_sha }}/)
-  assert.match(workflow, /MIKKA_CLOUD_READ_TOKEN: \$\{\{ secrets.MIKKA_CLOUD_READ_TOKEN }}/)
+  assert.match(workflow, /MIKKA_CLOUD_READ_TOKEN: \$\{\{ steps\.source-token\.outputs\.token }}/)
+  assert.match(workflow, /uses: actions\/create-github-app-token@[a-f0-9]{40}/)
+  assert.match(workflow, /repositories: mikka-cloud\n          permission-contents: read/)
+  assert.match(workflow, /id-token: write/)
   assert.match(workflow, /name: Qualify the pinned Cloud Services source[\s\S]*run: node scripts\/cloudflare-cloud-ci.mjs build/)
   assert.match(workflow, /name: Verify the Cloud Services qualification\n        run: node scripts\/cloudflare-cloud-ci.mjs verify/)
   assert.match(workflow, /name: Upload the qualification receipt/)
@@ -180,10 +183,12 @@ test('workflow uses public manual main qualification and uploads the single rece
   assert.match(workflow, /path: \$\{\{ runner.temp }}\/cloud-services-ci-receipt\/receipt.json\n          if-no-files-found: error/)
   assert.equal((workflow.match(/actions\/upload-artifact@/g) ?? []).length, 1)
   assert.match(workflow, /environment: cloudflare-runtime-release/)
-  assert.match(workflow, /CF_RUNTIME_REGISTRY_USERNAME: \$\{\{ vars\.CF_RUNTIME_REGISTRY_USERNAME }}/)
+  assert.match(workflow, /CF_RUNTIME_REGISTRY_USERNAME: \$\{\{ steps\.registry\.outputs\.username }}/)
+  assert.match(workflow, /uses: \.\/\.github\/actions\/cloudflare-registry-credentials/)
+  assert.doesNotMatch(workflow, /secrets\.CF_RUNTIME_REGISTRY_PASSWORD/)
   assert.match(workflow, /name: Publish the qualified Cloud Services artifact[\s\S]*CF_RUNTIME_REGISTRY_USERNAME:[\s\S]*CF_RUNTIME_REGISTRY_PASSWORD:[\s\S]*run: node scripts\/cloudflare-cloud-ci.mjs publish/)
   assert.ok(workflow.indexOf('name: Verify the Cloud Services qualification') < workflow.indexOf('name: Publish the qualified Cloud Services artifact'))
-  assert.doesNotMatch(workflow, /pull_request:|push:|WORKERS_CI|create-github-app-token|CLOUDFLARE_API_TOKEN/)
+  assert.doesNotMatch(workflow, /pull_request:|push:|WORKERS_CI|secrets\.MIKKA_CLOUD_READ_TOKEN|CLOUDFLARE_API_TOKEN|permission-contents: write/)
 })
 
 test('CLI reports fixed errors without raw failure values', () => {
@@ -194,6 +199,40 @@ test('CLI reports fixed errors without raw failure values', () => {
   assert.equal(result.stdout, '')
 })
 
+
+test('CLI preserves public qualification stages from a pinned private runner and suppresses unknown diagnostics', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'mikka-cloud-stage-error-'))
+  try {
+    const publicRoot = join(directory, 'public')
+    const script = 'scripts/cloudflare-cloud-ci.mjs'
+    const publicSource = await repository(publicRoot, 'alexj11324/Mikka', {
+      '.gitignore': '/.mikka-cloud/\n',
+      [script]: await readFile(new URL('./cloudflare-cloud-ci.mjs', import.meta.url), 'utf8'),
+      'scripts/cloudflare-source.mjs': await readFile(new URL('./cloudflare-source.mjs', import.meta.url), 'utf8'),
+    })
+    const privateSource = await repository(join(publicRoot, '.mikka-cloud'), 'alexj11324/mikka-cloud', {
+      'scripts/cloudflare-ci.mjs': 'export function runCi({env}) { throw new Error(env.TEST_DIAGNOSTIC) }',
+    })
+    for (const [diagnostic, expected] of [
+      ['CLOUD_CI_STAGE_FAILED_OPS_CONTRACTS', 'CLOUD_CI_STAGE_FAILED_OPS_CONTRACTS'],
+      ['CLOUD_CI_STAGE_FAILED_POSTGRES17_CORE_MODELS_AND_EVE', 'CLOUD_CI_STAGE_FAILED_POSTGRES17_CORE_MODELS_AND_EVE'],
+      ['CLOUD_CI_STAGE_FAILED_PRIVATE_SENTINEL', 'CLOUD_PUBLIC_CI_FAILED'],
+      ['CLOUD_CI_STAGE_FAILED_TYPECHECK_CORE\nprivate-sentinel', 'CLOUD_PUBLIC_CI_FAILED'],
+      ['provider failure: private-sentinel', 'CLOUD_PUBLIC_CI_FAILED'],
+    ]) {
+      const result = spawnSync(process.execPath, [join(publicRoot, script), 'verify'], {
+        cwd: publicRoot, encoding: 'utf8',
+        env: { PATH: process.env.PATH, ...env, GITHUB_SHA: publicSource, GITHUB_WORKFLOW_SHA: publicSource,
+          MIKKA_CLOUD_SOURCE_SHA: privateSource, TEST_DIAGNOSTIC: diagnostic },
+      })
+      assert.equal(result.status, 1)
+      assert.equal(result.stdout, '')
+      assert.equal(result.stderr.trim(), expected)
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
 
 test('published metadata contains exactly the qualified sources, hashes and immutable Registry reference', () => {
   const context = sourceContext(env, env.GITHUB_SHA)

@@ -4,6 +4,9 @@ import { agentRuns } from './db/schema'
 import { correlatedColumn } from './db/correlated-column'
 import { runFailureBrief } from './run-failure-projection'
 
+/** The 30-day run list is a rolling duration, including across daylight-saving changes. */
+export const runHistoryWindow = sql`interval '720 hours'`
+
 const run = {
   id: correlatedColumn(agentRuns.id), userId: correlatedColumn(agentRuns.userId),
   status: correlatedColumn(agentRuns.status), stopRequestedAt: correlatedColumn(agentRuns.stopRequestedAt),

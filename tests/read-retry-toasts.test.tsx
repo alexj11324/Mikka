@@ -184,6 +184,10 @@ for (const item of cases) test(`${item.name}: a failed Retry stays available, th
   const notice = () => [...container.querySelectorAll('[data-sonner-toast]')].find(element => element.textContent?.includes(item.title))
   const retry = () => notice()?.querySelector<HTMLButtonElement>('button[data-action]')
   await until(() => !!retry(), 'The actual Sonner Retry button must appear')
+  if (isApp) {
+    assert.equal(notice()?.getAttribute('data-y-position'), 'top', 'The persistent connection alert stays clear of the composer')
+    assert.ok(notice()?.querySelector('button[data-close-button]'), 'Other controls under a persistent alert can be uncovered')
+  }
   const before = reads.get(item.read)!
   await act(async () => retry()!.click())
   await until(() => reads.get(item.read) === before + 1, 'Retry must perform the next read')

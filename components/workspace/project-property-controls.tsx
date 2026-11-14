@@ -75,7 +75,7 @@ export function projectDirectory(workspace: { workspace: { id: string }; members
 export type ProjectDirectory = ReturnType<typeof projectDirectory>
 
 type ControlValue = Pick<ProjectDraft, 'lead' | 'startDate' | 'targetDate' | 'properties' | 'leadUserId' | 'memberIds'> & {
-  status: string; priority: string; userId?: string; workspaceId?: string; canEditProperties?: boolean
+  status: string; priority: string; userId?: string; workspaceId?: string; canEditProperties?: boolean; archivedAt?: Project['archivedAt']
 }
 
 export function ProjectPropertyControl({ field, value, onChange, directory, projects = [], projectId, disabled, plain }: {
@@ -84,7 +84,7 @@ export function ProjectPropertyControl({ field, value, onChange, directory, proj
 }) {
   const t = useTranslations('Projects')
   const format = useFormatter()
-  const shared = { disabled: disabled || value.canEditProperties === false, plain }
+  const shared = { disabled: disabled || value.canEditProperties === false || Boolean(value.archivedAt), plain }
   const label = (group: string, item: string) => t.has(`${group}.${item}` as never) ? t(`${group}.${item}` as never) : item
   const properties = value.properties
   const updateProperties = (changes: Partial<ProjectDraft['properties']>) => onChange({ properties: { ...properties, ...changes } })

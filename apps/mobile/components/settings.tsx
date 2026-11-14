@@ -1,3 +1,4 @@
+import { mobileMessages as messages } from '@/lib/messages'
 import { ReadNotice } from '@/components/ReadNotice'
 import { useSettings } from '@/lib/settings'
 import { useEffect, useState, type ReactNode } from 'react'
@@ -40,7 +41,7 @@ export function SettingsPage({ title, children, footer }: { title: string; child
     <View style={{ flex: 1, backgroundColor: colors.grouped }}>
       <NavBar back={() => router.canGoBack() ? router.back() : router.replace('/settings')} title={title} />
       <ScrollView {...underBar} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: footer ? 16 : insets.bottom + 24 }}>
-        <ReadNotice error={error} hasData={Boolean(data)} label="设置" onRetry={reload} />
+        <ReadNotice error={error} hasData={Boolean(data)} label={messages.Settings.title} onRetry={reload} />
         {!data && loading ? <View style={{ padding: 24, alignItems: 'center' }}><Spinner /></View> : null}
         {data ? children : null}
       </ScrollView>

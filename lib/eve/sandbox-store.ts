@@ -1,11 +1,11 @@
 import type { Pool, PoolClient } from 'pg'
 import { SandboxSessionGoneError } from 'eve/sandbox/provider'
 import type { EveScope } from './scope'
-import type { ScratchSnapshot } from './sandbox-filesystem'
+import type { ScratchSnapshot, ScratchMutationResult } from './sandbox-filesystem'
 
 export type ScratchIdentity={sessionId:string;scope:EveScope}
 export interface ScratchStore {
-  mutate<T>(identity:ScratchIdentity,initial:ScratchSnapshot|undefined,work:(snapshot:ScratchSnapshot)=>Promise<{snapshot:ScratchSnapshot;value:T}>):Promise<T>
+  mutate<T>(identity:ScratchIdentity,initial:ScratchSnapshot|undefined,work:(snapshot:ScratchSnapshot)=>Promise<ScratchMutationResult<T>>):Promise<T>
   remove(identity:ScratchIdentity):Promise<void>
 }
 /** A transaction spans one bounded file/exec operation, never the connection,
@@ -23,10 +23,14 @@ export function scratchStore(pool:Pick<Pool,'connect'|'query'>,authorize:(scope:
         if(row&&(row.owner_id!==scope.ownerId||row.bot_id!==scope.botId||row.workspace_id!==scope.workspaceId||row.surface!==scope.surface))throw new Error('workspaceAccessDenied')
         if(!row&&!initial)throw new SandboxSessionGoneError('The session scratch files no longer exist.')
         await authorize(scope,client)
-        const result=await work(row?.snapshot??initial!)
+        const snapshot = row?.snapshot ?? initial!
+        const result = await work(snapshot)
         await authorize(scope,client)
-        if(row)await client.query('UPDATE eve_sandbox_sessions SET snapshot=$2,updated_at=clock_timestamp() WHERE session_id=$1',[sessionId,result.snapshot])
-        else await client.query('INSERT INTO eve_sandbox_sessions(session_id,owner_id,bot_id,workspace_id,surface,snapshot) VALUES($1,$2,$3,$4,$5,$6)',[sessionId,scope.ownerId,scope.botId,scope.workspaceId,scope.surface,result.snapshot])
+        if (!row) {
+          await client.query('INSERT INTO eve_sandbox_sessions(session_id,owner_id,bot_id,workspace_id,surface,snapshot) VALUES($1,$2,$3,$4,$5,$6)',[sessionId,scope.ownerId,scope.botId,scope.workspaceId,scope.surface,result.snapshot ?? snapshot])
+        } else if (result.snapshot) {
+          await client.query('UPDATE eve_sandbox_sessions SET snapshot=$2,updated_at=clock_timestamp() WHERE session_id=$1',[sessionId,result.snapshot])
+        }
         await client.query('COMMIT')
         return result.value
       } catch(error) {await client.query('ROLLBACK').catch(()=>{});throw error}

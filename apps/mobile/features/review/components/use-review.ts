@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { Alert } from 'react-native'
+import { confirmDestructiveAction, showSystemAlert } from '@/lib/system-alert'
 import { useHome } from '@/lib/home'
 import { tasksLive } from '@/lib/live-keys'
 import { useLiveApi } from '@/lib/useApi'
@@ -12,7 +12,7 @@ import { checksPath, merge, readChecksPath, readReviewPath, reviewPath, sendToAg
 function refused(result: ActionResult, fallback: string) {
   if (result.kind !== 'denied') return false
   warn()
-  Alert.alert(denial(result.reason, fallback))
+  showSystemAlert(denial(result.reason, fallback))
   return true
 }
 
@@ -54,7 +54,7 @@ export function useReview(taskId: string) {
       void reloadAll()
     } catch {
       warn()
-      Alert.alert('没能发给 Agent')
+      showSystemAlert('没能发给 Agent')
     } finally {
       setSending(false)
     }
@@ -63,10 +63,9 @@ export function useReview(taskId: string) {
   const approve = useCallback(async () => {
     if (!review || versioned || !permissions?.canMerge || merging) return
     const failed = review.summary.checks?.failed
-    const confirm = (run: () => void) => Alert.alert(failed ? `还有 ${failed} 项检查失败，确定合并？` : '检查未通过，确定合并？', undefined, [
-      { text: '取消', style: 'cancel' },
-      { text: '仍然合并', style: 'destructive', onPress: run },
-    ])
+    const confirm = (run: () => void) => confirmDestructiveAction(
+      failed ? `还有 ${failed} 项检查失败，确定合并？` : '检查未通过，确定合并？', '仍然合并', run,
+    )
     const run = async (confirmed: boolean) => {
       setMerging(true)
       try {
@@ -77,7 +76,7 @@ export function useReview(taskId: string) {
         void reloadAll()
       } catch {
         warn()
-        Alert.alert('没能合并')
+        showSystemAlert('没能合并')
       } finally {
         setMerging(false)
       }

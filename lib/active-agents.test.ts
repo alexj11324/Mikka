@@ -157,6 +157,12 @@ dbTest('active agents on the database', async t => {
   assert.deepEqual((await listActiveAgents(db, other, now)).map(x => x.name), ['Other'], 'other users only see their own')
   assert.deepEqual(await listActiveAgents(db, me, now), list, 'stable order across polls')
 
+  const alternateWorkspace = await seedFixtureWorkspace(pool, me, 'team')
+  assert.deepEqual(await listActiveAgents(db, me, now, alternateWorkspace), [],
+    'workspace-scoped token does not return active runs belonging to another workspace')
+  assert.deepEqual((await listActiveAgents(db, me, now, workspaceId)).map(row => row.name), ['B', 'A', 'C'],
+    'the matching workspace still displays its active runs')
+
   await t.test('ties order by id', async () => {
     const tie = ago(200_000)
     const [x, y] = [agent('X'), agent('Y')]
@@ -270,11 +276,11 @@ dbTest('active agents on the database', async t => {
 
   await t.test('coordinator listed while it holds an unexpired lease', async () => {
     // The Coordinator's chat is its bot row's (coordinator_bots); its entry carries that bot's id.
-    const coordinatorBot = randomUUID(), workspaceId = randomUUID()
+    const coordinatorBot = randomUUID(), coordinatorWorkspace = alternateWorkspace
     const { sql } = await import('drizzle-orm')
     await db.execute(sql`insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values (${me},'Active agents fixture',${`${me}@example.invalid`},false,now(),now()) on conflict do nothing`)
-    await db.insert(schema.bots).values({ id: coordinatorBot, ownerId: me, workspaceId, name: 'Coordinator' })
-    await db.insert(schema.coordinatorBots).values({ ownerId: me, workspaceId, botId: coordinatorBot })
+    await db.insert(schema.bots).values({ id: coordinatorBot, ownerId: me, workspaceId: coordinatorWorkspace, name: 'Coordinator' })
+    await db.insert(schema.coordinatorBots).values({ ownerId: me, workspaceId: coordinatorWorkspace, botId: coordinatorBot })
     await db.insert(coordinatorSessions).values({ userId: me, botId: coordinatorBot, leaseHolder: null, leaseUntil: ahead, updatedAt: ago(1_000) })
     assert.ok(!(await listActiveAgents(db, me, now)).some(x => x.kind === 'coordinator'), 'no holder')
     await db.update(coordinatorSessions).set({ leaseHolder: 'turn-1', leaseUntil: ago(1) }).where(eq(coordinatorSessions.userId, me))
@@ -284,6 +290,10 @@ dbTest('active agents on the database', async t => {
     const coordinator = result.find(x => x.kind === 'coordinator')
     assert.deepEqual(coordinator, { id: coordinatorBot, kind: 'coordinator', name: 'Coordinator', avatarUrl: null, startedAt: ago(1_000).toISOString(), state: 'working', runId: null, issueId: null })
     assert.equal(result.at(-1)?.id, coordinatorBot, 'sorted by start like the rest')
+    assert.deepEqual((await listActiveAgents(db, me, now, coordinatorWorkspace)).map(row => row.id), [coordinatorBot],
+      'a team-scoped token sees only its active Coordinator, not personal workspace runs')
+    assert.ok(!(await listActiveAgents(db, me, now, workspaceId)).some(row => row.kind === 'coordinator'),
+      'a personal workspace token cannot see the active Coordinator of another workspace')
     assert.ok(!(await listActiveAgents(db, other, now)).some(x => x.kind === 'coordinator'), 'not shown to others')
   })
 })

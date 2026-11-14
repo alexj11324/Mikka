@@ -232,6 +232,30 @@ test('the official app without a server document marker keeps its normal workspa
   assert.equal(f.state.githubMounts, 0)
 })
 
+test('Back to a different workspace waits for the authorized switch and never mounts a refused workspace', async t => {
+  const workspace = 'bf0f49e9-60ef-42a2-9e46-519b6010d7ef'
+  for (const accepted of [true, false]) await t.test(accepted ? 'active membership' : 'suspended membership', async t => {
+    let selected = false
+    const switching = deferred()
+    const f = await fixture(t, { path: '/mikka/en?workspace=' + workspace, fetch: (request, state) => {
+      if (request.action === 'desktop.bootstrap') return packet({ ...fullBootstrap(state.identity), requestedWorkspaceSelected: selected })
+      assert.equal(request.action, 'workspace.switchWorkspace')
+      assert.deepEqual(request.args, [workspace])
+      return switching.promise
+    } })
+    assert.equal(f.state.workspaceMounts, 0, 'the old workspace stays unmounted while selection is pending')
+    await act(async () => {
+      selected = accepted
+      switching.resolve(packet(accepted ? { ok: true } : { ok: false, error: 'Membership suspended' }))
+    })
+    assert.equal(f.state.workspaceMounts, accepted ? 1 : 0)
+    assert.deepEqual(f.state.requests.filter(item => item.action).map(item => item.action), accepted
+      ? ['desktop.bootstrap', 'workspace.switchWorkspace', 'desktop.bootstrap']
+      : ['desktop.bootstrap', 'workspace.switchWorkspace'])
+    if (!accepted) assert.match(f.container.textContent, /Common.retry/)
+  })
+})
+
 test('leaving PKCE with the same null workspace selector requires fresh bootstrap before any workspace mounts', async t => {
   const ready = deferred()
   const f = await fixture(t, { fetch: request => request.action === 'desktop.bootstrap' && request.location === '/mikka/en/' ? ready.promise : undefined })

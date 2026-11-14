@@ -200,7 +200,7 @@ export async function applyDriveWrite(
     const manifestProblem = driveManifestProblem(applied.manifest)
     if (manifestProblem) throw new DriveError(manifestProblem === 'too_many_entries' ? 'drive_limit_exceeded' : 'drive_manifest_invalid', manifestProblem === 'too_many_entries' ? 413 : 422)
 
-    return commitVersion(client, volume, applied.manifest, actor, 'autosave', null, write.mutationId, requestDigest, write.expectedDigest)
+    return commitVersion(client, volume, current, applied.manifest, actor, 'autosave', null, write.mutationId, requestDigest, write.expectedDigest)
   })
 }
 
@@ -215,6 +215,7 @@ export async function applyDriveWrite(
 async function commitVersion(
   client: PoolClient,
   volume: { id: string; ownerId: string },
+  current: readonly DriveManifestEntry[],
   manifest: readonly DriveManifestEntry[],
   actor: DriveActor,
   kind: 'autosave' | 'checkpoint' | 'restore',
@@ -231,12 +232,9 @@ async function commitVersion(
   // The entry rows and the version are written in the caller's transaction, so a
   // failure anywhere leaves the volume exactly as it was: this is what "a
   // refused write has no effect" means in practice.
-  const { rows: held } = await client.query<{ path: string; mode: number; sizeBytes: number; sha256: string }>(
-    'SELECT path,mode,"sizeBytes",sha256 FROM drive_volume_entries WHERE "volumeId"=$1 ORDER BY path', [volume.id])
-  const currentPaths = new Set(held.map(row => row.path))
-  const kept = new Map(held.map(row => [row.path, row]))
+  const kept = new Map(current.map(entry => [entry.path, entry]))
   const nextPaths = new Set(manifest.map(entry => entry.path))
-  const removed = [...currentPaths].filter(path => !nextPaths.has(path))
+  const removed = [...kept.keys()].filter(path => !nextPaths.has(path))
   if (removed.length) await client.query('DELETE FROM drive_volume_entries WHERE "volumeId"=$1 AND path = ANY($2::text[])', [volume.id, removed])
   const changed = manifest.filter(entry => {
     const before = kept.get(entry.path)
@@ -380,17 +378,21 @@ export async function restoreDriveVersion(
     if (!source) throw new DriveError('drive_not_found', 404)
 
     // The same CAS as a write: the caller's view must still be current.
+    const current = await readEntries(client, volume.id)
     if (input.expectedDigest !== volume.headDigest) {
-      const current = await readEntries(client, volume.id)
       const wanted = new Map(source.manifest.map(entry => [entry.path, entry]))
-      const paths = [...new Set([...current.map(entry => entry.path), ...wanted.keys()])].filter(path => {
-        const held = current.find(entry => entry.path === path), target = wanted.get(path)
-        return target ? !held || held.sha256 !== target.sha256 || held.mode !== target.mode : Boolean(held)
-      }).sort()
+      const paths: string[] = []
+      for (const entry of current) {
+        const target = wanted.get(entry.path)
+        if (!target || entry.sha256 !== target.sha256 || entry.mode !== target.mode) paths.push(entry.path)
+        wanted.delete(entry.path)
+      }
+      for (const path of wanted.keys()) paths.push(path)
+      paths.sort()
       throw new DriveError('drive_version_conflict', 409, { headDigest: volume.headDigest, headVersionId: volume.headVersionId, paths })
     }
     // The restored version is written forward as a new one that names its source.
-    return commitVersion(client, volume, source.manifest, actor, 'restore', input.versionId,
+    return commitVersion(client, volume, current, source.manifest, actor, 'restore', input.versionId,
       input.mutationId, requestDigest, input.expectedDigest)
   })
 }

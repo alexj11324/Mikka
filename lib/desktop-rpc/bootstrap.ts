@@ -1,5 +1,6 @@
 import 'server-only'
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
+import { workspaceSelection } from '@/lib/workspace-selection'
 import { withFreshSession } from '@/lib/fresh-session'
 import { auth, googleEnabled, githubSignInEnabled } from '@/lib/auth'
 import { emailSignInEnabled } from '@/lib/email-sign-in'
@@ -36,7 +37,12 @@ export async function desktopBootstrap(workspaceId?: string): Promise<DesktopBoo
   if (onboarding && byoE2BKeyEnabled()) {
     computer = await currentWorkspaceActor().then(async actor => (await getE2BKeyStatus(actor.userId, actor.workspaceId)).configured ? 'none' as const : 'ask' as const).catch(() => 'none' as const)
   }
-  return { ...session, ...config, onboarding, computer, cacheWorkspace }
+  const value = { ...session, ...config, onboarding, computer, cacheWorkspace }
+  if (!workspaceId) return value
+  // A requested cache namespace alone does not select the workspace used by ordinary task reads.
+  const selection = workspaceSelection(await headers())
+  const selected = selection.present ? selection.workspaceId : (await cookies()).get('mikka-workspace')?.value
+  return { ...value, requestedWorkspaceSelected: selected === workspaceId }
 }
 
 export async function desktopAccounts() {

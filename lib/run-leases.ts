@@ -8,7 +8,7 @@ import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/repository'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { retryWorkerDefinition } from '@/lib/agent-kit/worker'
-import { afterJob } from '@/lib/background'
+import { wakeCoordinatorAfterCommit } from '@/lib/coordinator/wake-after-commit'
 import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import { DEVICE_ONLINE_WINDOW_MS, RUN_LEASE_MS, type RunCheckpoint } from '@mikka/protocol/device'
 import { db, pool } from '@/lib/db'
@@ -510,7 +510,7 @@ export async function failUnclaimedCloudStart(actor: { userId: string; workspace
       stopReason: 'device_lost', failureDetails: serverRunFailure(runId, now), error: run.error ?? DEVICE_STAYED_OFFLINE, finishedAt: now, updatedAt: now })
       .where(eq(agentRuns.id, runId)).returning()
     const event = runFinishedEvent({ ...ended, stopReason: 'device_lost', report: null })
-    await recordCoordinatorEvent(tx, { ...event, payload: { ...event.payload, noMachine } })
+    await recordTerminalEvent(tx, { ...event, payload: { ...event.payload, noMachine } })
     // The terminal row changed even when its durable completion event already exists.
     await runListChanged(tx, ended.id)
     await runChanged(tx, ended.id)
@@ -523,13 +523,20 @@ export async function failUnclaimedCloudStart(actor: { userId: string; workspace
   // Admission may have failed before any machine row existed, so do not rely
   // on cleanup to reconcile the committed failure. This hook is idempotent.
   await afterRunEnded(actor.userId, runId)
-  await wakeCoordinator(actor.userId).catch(() => undefined)
   return true
 }
 
 /** The card of what the person can do when no machine can continue a run. */
 async function noMachineCard() {
   return (await import('@/lib/rule-dispatch')).machineUnavailableCard()
+}
+
+/** A terminal state change can find its old completion event already stored.
+ * Register its owner wake on the same transaction: a new event uses the same
+ * commit key, and a real rollback discards both registrations. */
+async function recordTerminalEvent(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], event: ReturnType<typeof runFinishedEvent>) {
+  await recordCoordinatorEvent(tx, event)
+  wakeCoordinatorAfterCommit(tx, event.userId)
 }
 
 /** Ends a run that is still in one of `from`; false when something else ended it first. */
@@ -544,7 +551,7 @@ async function endRun(runId: string, from: readonly Run['status'][], end: { stat
     if (!ended) return false
     // A worker ending after this commit cannot lose the failure notification.
     const event = runFinishedEvent({ ...ended, stopReason: 'device_lost', report: null })
-    await recordCoordinatorEvent(tx, noMachine ? { ...event, payload: { ...event.payload, noMachine } } : event)
+    await recordTerminalEvent(tx, noMachine ? { ...event, payload: { ...event.payload, noMachine } } : event)
     return true
   })
 }
@@ -561,7 +568,7 @@ export async function failRunForDaemonUpgrade(runId: string, deviceId: string, u
       .returning()
     if (!run) return null
     const event = runFinishedEvent({ ...run, stopReason: 'error', report: null })
-    await recordCoordinatorEvent(tx, { ...event, payload: { ...event.payload, daemonUpgradeRequired: true } })
+    await recordTerminalEvent(tx, { ...event, payload: { ...event.payload, daemonUpgradeRequired: true } })
     return run
   })
   if (!ended) return false
@@ -595,7 +602,7 @@ export async function failQueuedSubscriptionRuntime(runId: string, deviceId: str
           AND ${agentRuns.agentDefinition}->'subscription'->>'bindingId'=${expected.bindingId}))`))
       .returning()
     if (!run) return null
-    await recordCoordinatorEvent(tx, runFinishedEvent({ ...run, stopReason: 'error', report }))
+    await recordTerminalEvent(tx, runFinishedEvent({ ...run, stopReason: 'error', report }))
     await runListChanged(tx, run.id)
     await runChanged(tx, run.id)
     return { run, error }
@@ -614,5 +621,4 @@ async function announceEnd(run: Run & { status: 'failed' | 'stopped' }) {
   await revokeRunTokens(run.id)
   stopRecordingsAfter([run.id])
   await afterRunEnded(run.userId, run.id)
-  afterJob('after:coordinator-wake', () => wakeCoordinator(run.userId))
 }

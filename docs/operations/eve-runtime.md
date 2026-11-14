@@ -39,6 +39,10 @@ For a separately supervised eve process, set `MIKKA_EVE_ORIGIN` to its HTTP
 origin. Mikka then proxies to that service and starts no additional process.
 The value must be an origin without credentials, a path or query parameters.
 Keep that service's model and database configuration consistent with Mikka.
+Keep the two hosts' clocks synchronized. Mikka signs self-hosted Eve requests
+for 59 seconds. A verifier up to one second behind the issuer can accept a
+new request within its existing 60-second upper bound. It rejects the
+credential at the signed expiry.
 
 `pnpm dev` starts `eve dev` before the API workers. Eve owns its authored-file
 watcher; API hot replacements reuse the existing service.

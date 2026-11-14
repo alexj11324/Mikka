@@ -5,6 +5,7 @@ import { once } from 'node:events'
 import { readFile } from 'node:fs/promises'
 import { mock, test } from 'node:test'
 import { Pool } from 'pg'
+import { measured } from '../../tests/helpers/read-metrics'
 import { dbUrl, seedPersonalWorkspace, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 
 test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and versioned bytes', { skip: !dbUrl, timeout: 60_000 }, async t => {
@@ -72,6 +73,21 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
   const volume = (await created.json()).volume
   const duplicate = await call('', { method: 'POST', body: { name: volume.name } })
   assert.equal(duplicate.status, 409)
+  // Measure the point lookups used to open a single folder. Match only SELECTs
+  // of the volume row; membership, immutable versions and session reads remain independent.
+  const selectRows = pool.query.bind(pool)
+  let volumeLookups = 0
+  const lookup = t.mock.method(pool, 'query', (...args: Parameters<typeof pool.query>) => {
+    const [sql] = args
+    if (typeof sql === 'string' && /FROM\s+drive_volumes\b/i.test(sql)) volumeLookups++
+    return selectRows(...args)
+  })
+  try {
+    const open = await call(`/${volume.id}`)
+    assert.equal(open.status, 200)
+    assert.equal((await open.json()).volume.id, volume.id)
+    assert.equal(volumeLookups, 1, 'open one folder with one authorized volume row lookup')
+  } finally { lookup.mock.restore() }
   assert.deepEqual(await duplicate.json(), { error: 'drive_volume_exists' })
   assert.equal(created.headers.get('cache-control'), 'private, no-store')
   assert.equal((await call('', { token: null })).status, 401)
@@ -82,7 +98,10 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
   assert.deepEqual(fresh.head.entries, [])
   const blobA = await (await call(`/${volume.id}/blobs`, { method: 'POST', raw: 'first file bytes' })).json()
   assert.equal(blobA.sha256, createHash('sha256').update('first file bytes').digest('hex'))
-  const writeA = { expectedDigest: fresh.head.headDigest, mutationId: randomUUID(), changes: [{ op: 'put', path: 'notes/result.txt', mode: 0o644, ...blobA }] }
+  const writeA = { expectedDigest: fresh.head.headDigest, mutationId: randomUUID(), changes: [
+    { op: 'put', path: 'notes/result.txt', mode: 0o644, ...blobA },
+    ...Array.from({ length: 192 }, (_, index) => ({ op: 'put', path: 'other/file-' + index, mode: 0o644, ...blobA })),
+  ] }
   const written = await call(`/${volume.id}/entries`, { method: 'PATCH', body: writeA })
   assert.equal(written.status, 200)
   const first = await written.json()
@@ -90,6 +109,12 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
   const conflict = await call(`/${volume.id}/entries`, { method: 'PATCH', body: { ...writeA, mutationId: randomUUID() } })
   assert.equal(conflict.status, 409)
   assert.equal((await conflict.json()).headDigest, first.headDigest)
+  const readSingle = await measured(() => file.GET(
+    new Request(`${origin}/api/drive/volumes/${volume.id}/files?workspaceId=${personal}&path=notes%2Fresult.txt`, { headers: { authorization: `Bearer ${ownerToken}` } }),
+    { params: Promise.resolve({ volumeId: volume.id }) },
+  ))
+  assert.equal(await readSingle.value.text(), 'first file bytes')
+  assert.ok(readSingle.resultBytes < 12_000, 'one download must not transfer unrelated manifest entries')
   const download = await fetch(`${origin}/api/drive/volumes/${volume.id}/files?workspaceId=${personal}&path=notes%2Fresult.txt`, { headers: { authorization: `Bearer ${ownerToken}` } })
   assert.equal(download.status, 200)
   assert.equal(await download.text(), 'first file bytes')
@@ -113,6 +138,14 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
   const mismatch = await call(`/${volume.id}/entries`, { method: 'PATCH', body: { ...writeA, changes: [{ ...writeA.changes[0], path: 'another.txt' }] } })
   assert.equal(mismatch.status, 409)
   assert.equal((await mismatch.json()).error, 'drive_replay_mismatch')
+  const duplicatePath = await call(`/${volume.id}/entries`, { method: 'PATCH', body: {
+    expectedDigest: restoredBody.headDigest, mutationId: randomUUID(),
+    changes: [{ op: 'delete', path: 'same.txt' }, { op: 'delete', path: 'same.txt' }],
+  } })
+  assert.equal(duplicatePath.status, 422)
+  assert.equal(duplicatePath.headers.get('cache-control'), 'private, no-store')
+  assert.equal(duplicatePath.headers.get('x-content-type-options'), 'nosniff')
+  assert.deepEqual(await duplicatePath.json(), { error: 'drive_write_invalid' })
   for (const path of ['../escape', '/absolute', 'bad\\path', 'a//b']) {
     const invalid = await call(`/${volume.id}/entries`, { method: 'PATCH', body: { expectedDigest: restoredBody.headDigest, mutationId: randomUUID(), changes: [{ ...writeA.changes[0], path }] } })
     assert.equal(invalid.status, 400)

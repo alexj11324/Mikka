@@ -13,16 +13,15 @@ import { GITHUB_MANIFEST_CALLBACK, GITHUB_MANIFEST_COOKIE } from '../lib/github/
 test('GitHub App registration enforces server authority, session binding and single-use encrypted storage on PostgreSQL', { skip: !dbUrl }, async t => {
   const schema = `github_app_${randomUUID().replaceAll('-', '')}`
   const pool = new Pool({ connectionString: dbUrl, max: 4, options: `-c search_path=${schema},public` })
-  const users: string[] = []
   t.after(async () => {
     await pool.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`)
-    if (users.length) await pool.query('DELETE FROM public."user" WHERE id=any($1)', [users])
     await pool.end()
   })
   await pool.query(`CREATE SCHEMA ${schema}`)
+  // Keep both foreign keys and their cleanup locks inside the disposable schema.
+  await pool.query('CREATE TABLE "user" (LIKE public."user" INCLUDING DEFAULTS INCLUDING INDEXES)')
   await pool.query(readFileSync(new URL('../drizzle/20261107171000_server_github_app.sql', import.meta.url), 'utf8'))
   const admin = await seedUser(pool, 'github-app-admin'), other = await seedUser(pool, 'github-app-other')
-  users.push(admin, other)
   const origin = 'https://selfhost.example'
   const env = { MIKKA_SERVER_ADMIN_USER_IDS: `${admin},${other}`, WORKSPACE_SECRETS_KEY: randomBytes(32).toString('hex'), BETTER_AUTH_URL: origin }
   let current: { user: { id: string }; session: { id: string } } | null = { user: { id: admin }, session: { id: randomUUID() } }

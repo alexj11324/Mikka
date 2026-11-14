@@ -279,7 +279,6 @@ export function createFactoryReconciler(
           if (questions) {
             await tx.query("SAVEPOINT question_recovery");
             try {
-              await questions.settle(userId, run.id, tx);
               await questions.record(userId, run.id, tx);
             } catch (error) {
               await tx.query("ROLLBACK TO SAVEPOINT question_recovery");

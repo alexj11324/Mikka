@@ -134,7 +134,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "0158c37f4e2c841b7302edec6c8632f4867b20bc5384c876a262db017ea4941f"
+      "sourceHash": "55fc3555acca7e5fd7e043e83febb8264eb1da947118ff21457844e57d21ceb2"
     },
     {
       "path": "/mikka/api/artifacts/[artifactId]/versions/[version]/download",
@@ -390,7 +390,7 @@
         "POST"
       ],
       "maxDuration": 120,
-      "sourceHash": "2885d169e6fa4b72b4b28ea8d15a7f69f56910a344de754093d0d45e69e9c5f8"
+      "sourceHash": "5a4e2845a21067c99d61e54c7ee26729f49366f52232290a3768ab89d2cb9e2f"
     },
     {
       "path": "/mikka/api/chat/attachments/[id]",
@@ -400,7 +400,7 @@
         "DELETE",
         "GET"
       ],
-      "sourceHash": "e3c8d68148a951501ab4b0beef0ba49410c8123dc07f877d875cebcff0d53a90"
+      "sourceHash": "5ec6bb6135692efbb0166d8bddea60d39bbb684a0ffc322d40a560ba67624d20"
     },
     {
       "path": "/mikka/api/cloud/callback",
@@ -641,7 +641,7 @@
         "GET"
       ],
       "maxDuration": 60,
-      "sourceHash": "d67ce6ee4b39770322e64eb83775b62757ebb8d23b05460d13fc3ae49efa2b61"
+      "sourceHash": "82418e59012a94d1cde8decc4be04d207696998aba74615577e5bb2fc08c00b8"
     },
     {
       "path": "/mikka/api/cron/coordinator-wakes",
@@ -1372,7 +1372,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "8b8b1fbf13cdfb81ea272a37e8158cd0eddbe97522f14621b4b48371440929c8"
+      "sourceHash": "b8e6836b0d64097f5e7a22de15ecb864d712994b0ba5c8f0ab1693d213c536d8"
     },
     {
       "path": "/mikka/api/internal/eve/tools",
@@ -1449,7 +1449,7 @@
         "GET",
         "PATCH"
       ],
-      "sourceHash": "c53c7cd44ff37cc47e024b7bae32ba446acf09a295bd645b9ae671f9c488b2be"
+      "sourceHash": "f11fa6662a2614f5a01393bf378c0bf45e4c515569e3903f3a5dd64f8c370d91"
     },
     {
       "path": "/mikka/api/mobile/chat",
@@ -1513,7 +1513,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "f8df6890ded9a816153473159cf510191893256b0b4bf05bd5ec72ea40a57846"
+      "sourceHash": "6202ba06a2a0659533d0ee7cabf5abaa6cf4d7b222ca7bf095dff4a9201aefba"
     },
     {
       "path": "/mikka/api/mobile/model",
@@ -1582,7 +1582,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "85f484470a727839834803968d6adc74c5990f53559372c418d8902e9db8bcd9"
+      "sourceHash": "5c0f20bdf605f156b97b1963c7e7cb8193ed6034babbfef0675705a9e21183b5"
     },
     {
       "path": "/mikka/api/mobile/task-presentations",
@@ -2260,7 +2260,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "a73ac42d81c8f719c0d9ca6191e134003408aad921aad3dd24740399b9612076"
+      "sourceHash": "8dd6775734d33f4610596bf64742753287ebe51278624b360f9e4020ffe4ac91"
     },
     {
       "path": "/mikka/api/suggestions/[id]",

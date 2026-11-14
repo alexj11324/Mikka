@@ -35,6 +35,10 @@ test('desktop links preserve real workspace membership and public share permissi
     mocks.push(mock.module(new URL('../lib/workspace-db.ts', import.meta.url).href, { namedExports: { workspacePool: database, workspaceDb: drizzle(measuredClient, { schema: workspaceSchema }) } }))
     const { readWorkspaceLink, readWorkspaceSlug } = await import('../lib/workspace-admin/links')
     const { resolveSlugRedirect } = await import('../lib/workspace-admin/general')
+    const storage = await import('../lib/artifacts/storage')
+    const objectBody = '<main>Shared HTML object fixture</main>'
+    const fetchObject = mock.fn(async (_key: string) => objectBody)
+    mocks.push(mock.module(new URL('../lib/artifacts/storage.ts', import.meta.url).href, { namedExports: { ...storage, getArtifactObject: fetchObject } }))
     const { sharedArtifact } = await import('../lib/artifacts/store')
     const readShared = (token: string) => withDatabaseClient(measuredClient, () => sharedArtifact(token))
     const { GET } = await import('../app/api/artifacts/shared/[token]/route')
@@ -56,6 +60,20 @@ test('desktop links preserve real workspace membership and public share permissi
     const markdown = await artifact('markdown'), html = await artifact('html')
     const get = (token: string) => withDatabaseClient(measuredClient, () => GET(new Request(`http://127.0.0.1/mikka/api/artifacts/shared/${encodeURIComponent(token)}`), { params: Promise.resolve({ token }) }))
 
+    await t.test('signed reads select an authorized artifact and its requested version together', async () => {
+      const { readArtifactContent } = await import('../lib/artifacts/store')
+      const { tokenWorkspace } = await import('../lib/tokens/principal')
+      const read = (userId: string, tenant: string, version: number) => withDatabaseClient(measuredClient, () =>
+        readArtifactContent({ id: userId, [tokenWorkspace]: tenant }, markdown.id, version))
+      queries.length = 0
+      assert.deepEqual(await read(owner, workspaceId, 1), { kind: 'markdown', title: 'Shared fixture', content: markdown.content })
+      const versionReads = queries.filter(query => /from "(?:artifacts|artifact_versions)"/i.test(query))
+      assert.equal(versionReads.length, 1, 'one statement retrieves metadata and bytes after the workspace gate')
+      assert.match(versionReads[0], /join "artifact_versions"/i)
+      assert.equal(await read(owner, workspaceId, 2), null)
+      assert.equal(await read(peer, foreignWorkspaceId, 1), null)
+      assert.equal(await read(owner, foreignWorkspaceId, 1), null)
+    })
     await t.test('current and historical workspace links keep the original member reads and byte budget', async () => {
       const before = stream.bytesRead
       assert.equal(await readWorkspaceSlug(owner, oldSlug), null)
@@ -116,6 +134,25 @@ test('desktop links preserve real workspace membership and public share permissi
       assert.equal(value.markdown, null)
       const serialized = JSON.stringify(value)
       for (const hidden of [owner, html.content, 'private/', 'tokenHash', 'storageKey', 'createdBy']) assert.equal(serialized.includes(hidden), false)
+    })
+    await t.test('shared HTML fetches object bytes only for its sandboxed frame', async () => {
+      const { GET: frame } = await import('../app/api/artifacts/shared/[token]/frame/route')
+      const openFrame = (token: string) => withDatabaseClient(measuredClient, () => frame(new Request('http://localhost/frame'), { params: Promise.resolve({ token }) }))
+      await database.query('UPDATE artifact_versions SET "inlineContent"=NULL WHERE "artifactId"=$1', [html.id])
+      const meta = await get(html.token)
+      assert.equal(meta.status, 200)
+      assert.equal((await meta.json()).markdown, null)
+      const metadataReads = fetchObject.mock.callCount()
+      queries.length = 0
+      const page = await openFrame(html.token)
+      assert.equal(page.status, 200)
+      assert.ok(page.headers.has('content-security-policy'))
+      assert.ok((await page.text()).includes(objectBody))
+      assert.equal((await openFrame(markdown.token)).status, 404)
+      t.diagnostic(JSON.stringify({ metadataReads, totalObjectReads: fetchObject.mock.callCount() }))
+      assert.equal(metadataReads, 0)
+      assert.equal(fetchObject.mock.callCount(), 1)
+      assert.ok(!queries.some(query => query.includes('"authorName"')), 'frame needs no historical author metadata')
     })
     await t.test('revoked, unknown, deleted and malformed share tokens are indistinguishable', async () => {
       await database.query('UPDATE artifact_shares SET "revokedAt"=now() WHERE "artifactId"=$1', [markdown.id])

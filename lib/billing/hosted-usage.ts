@@ -57,7 +57,7 @@ export interface CreditBillingView {
 }
 
 /** #559 `startPointsPurchase` accepts only these USD amounts. */
-export const POINTS_PURCHASE_AMOUNTS = [10, 25, 50] as const
+export { POINTS_PURCHASE_AMOUNTS } from './points'
 export const POINTS_PER_USD = 100
 const MICRO_USD_PER_POINT = 10_000
 
