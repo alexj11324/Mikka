@@ -58,13 +58,16 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
       ? { status: 'error', details: { error: 'MessageRateExceeded' } }
       : { status: 'ok', id: randomUUID() }) })
   })
-  const wake = mock.module('workflow/api', { namedExports: { start: async (_workflow: unknown, args: unknown[]) => {
+  const phonePushReceipts = async () => {}
+  const workflow = mock.module(new URL('../workflows/phone-push-receipts/workflow.ts', import.meta.url).href,
+    { namedExports: { phonePushReceipts } })
+  const wake = mock.module('workflow/api', { namedExports: { start: async (started: unknown, args: unknown[]) => {
+    // Other after-commit workflows (including audit retention) have their own arguments.
+    if (started !== phonePushReceipts) return
     const id = String(args[0]); starts.push(id)
     const { pool } = await import('../lib/db')
     assert.equal((await pool.query('SELECT id FROM mobile_push_receipts WHERE id=$1', [id])).rowCount, 1)
   } } })
-  const workflow = mock.module(new URL('../workflows/phone-push-receipts/workflow.ts', import.meta.url).href,
-    { namedExports: { phonePushReceipts: async () => {} } })
   t.after(async () => {
     provider.mock.restore(); wake.restore(); workflow.restore()
     globals.mikkaPool = previous.app; globals.workspacePool = previous.workspace
@@ -134,8 +137,18 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
     assert.equal((await admin.query('SELECT "sessionId" FROM mobile_push_tokens WHERE token=$1', [token])).rows[0].sessionId, ownerSession.id)
   }
 
-  await t.test('personal and both shared origins reach only the current owner tokens', async () => {
+  await t.test('personal and both shared origins reach only the current owner tokens', async t => {
+    const raw = await workspace.connect()
+    const reads = t.mock.method(raw, 'query')
+    raw.release()
     for (const bot of [personalBot, alphaBot, betaBot]) await push(bot)
+    const linkReads = reads.mock.calls.filter(call => {
+      // pg accepts a query config object as well as SQL text.
+      const query: unknown = call.arguments[0]
+      const sql = typeof query === 'object' && query !== null && 'text' in query ? query.text : query
+      return typeof sql === 'string' && sql.startsWith('select "organizationId" from "mikka_organization_workspaces" ')
+    })
+    assert.equal(linkReads.length, 3, 'each admitted phone reads its locked organization link once')
     assert.equal(sent.length, 3)
     assert.ok(sent.every(row => row.userId === owner && row.message.to.length === 1 && row.message.to[0] === token))
     assert.deepEqual(sent.map(row => row.message.data.botId), [personalBot, alphaBot, betaBot])
