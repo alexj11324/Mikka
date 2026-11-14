@@ -3,7 +3,7 @@
 import type { IssuePullRequest } from '@/lib/issue-metadata'
 import type { DirectoryInput } from '@/lib/conversation-directory-input'
 import { conversationOrganization, type ConversationOrganizationChange } from '@/lib/conversation-organization'
-import { runAwaitingApproval } from '@/lib/task-state-query'
+import { runAwaitingApproval, runHistoryWindow } from '@/lib/task-state-query'
 import { singleFlight } from '@/lib/single-flight'
 import { readCompactRunFailure, runFailureBrief, type CompactRunFailure } from '@/lib/run-failure-projection'
 
@@ -78,10 +78,10 @@ async function readTaskRuns() {
     conversationTitle: agentRuns.title, asked: sql<string>`left(${runTaskPrompt}, 200)`.as('asked'), agentName: runAgentName.as('agentName'),
     status: agentRuns.status, outcome: agentRuns.outcome, failureDetails: runFailureBrief.as('failureDetails'),
     botId: runBotId.as('botId'),
-    expiresAt: sql<Date | null>`(select min(r."createdAt")+interval '30 days' from agent_runs r where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."workspaceId"=${agentRuns.workspaceId} and r."createdAt">now()-interval '30 days')`.as('expiresAt'),
-    harnesses: sql<string[]>`array(select a.harness from agent_runs r join agents a on a.id=r."agentId" where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."workspaceId"=${agentRuns.workspaceId} and r."createdAt" > now() - interval '30 days' group by a.harness order by max(r."createdAt") desc)`.as('harnesses'),
+    expiresAt: sql<Date | null>`(select min(r."createdAt")+${runHistoryWindow} from agent_runs r where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."workspaceId"=${agentRuns.workspaceId} and r."createdAt">now()-${runHistoryWindow})`.as('expiresAt'),
+    harnesses: sql<string[]>`array(select a.harness from agent_runs r join agents a on a.id=r."agentId" where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."workspaceId"=${agentRuns.workspaceId} and r."createdAt" > now() - ${runHistoryWindow} group by a.harness order by max(r."createdAt") desc)`.as('harnesses'),
   }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).innerJoin(issues, eq(issues.id, agentRuns.issueId))
-    .where(and(eq(agentRuns.userId, session.user.id), eq(agentRuns.workspaceId, context.workspace.id), visibility.predicate, isNotNull(agentRuns.issueId), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
+    .where(and(eq(agentRuns.userId, session.user.id), eq(agentRuns.workspaceId, context.workspace.id), visibility.predicate, isNotNull(agentRuns.issueId), sql`${agentRuns.createdAt} > now() - ${runHistoryWindow}`))
     .orderBy(agentRuns.issueId, desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200).as('latest_task_runs')
   // Select the same 200 issues first. Bot decoration is a one-to-one join in
   // this database; a missing or foreign bot cannot remove or duplicate a task.
@@ -163,7 +163,7 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
         .innerJoin(agentRuns, eq(agentRuns.deviceId, devices.id))
         .where(and(eq(agentRuns.userId, session.user.id), eq(agentRuns.workspaceId, context.workspace.id), eq(devices.ownerId, session.user.id),
           eq(devices.kind, 'local'), eq(devices.enabled, true), eq(agentRuns.status, 'queued'),
-          sql`${agentRuns.createdAt} > now() - interval '30 days'`))
+          sql`${agentRuns.createdAt} > now() - ${runHistoryWindow}`))
       : []
     const presence = await deviceOnlineStates(queuedDevices, observedAt)
     const presenceDevices = queuedDevices.map((device): PresenceDevice => [device.id, presence.get(device.id) ?? false,
@@ -195,9 +195,9 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
       pauseReason: agentRuns.pauseReason, stopReason: agentRuns.stopReason, awaitingApproval: runAwaitingApproval.as('awaitingApproval'), threadReplacedBy: agentRuns.threadReplacedBy,
     }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(devices, eq(devices.id, agentRuns.deviceId))
       .leftJoin(conversationReads, joinThreadRead(session.user.id))
-      .where(and(eq(agentRuns.userId, session.user.id), eq(agentRuns.workspaceId, context.workspace.id), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
+      .where(and(eq(agentRuns.userId, session.user.id), eq(agentRuns.workspaceId, context.workspace.id), sql`${agentRuns.createdAt} > now() - ${runHistoryWindow}`))
       .orderBy(desc(sql`greatest(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt})`), desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200)
-    const signature = await queryVersionWithExpiry(snapshot, sql`min(snapshot."createdAt")+interval '30 days'`)
+    const signature = await queryVersionWithExpiry(snapshot, sql`min(snapshot."createdAt")+${runHistoryWindow}`)
     const version = createHash('sha256').update(JSON.stringify([session.user.id, context.workspace.id, signature.version])).digest('hex').slice(0, 32)
     const visible = snapshot.as('thread_list_expiry')
     const live = withDevicePresence(await ownerListRead(session.user.id, [signature.expiresAt], observedAt, begun), presenceDevices, process.env, observedAt)

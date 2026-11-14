@@ -1531,7 +1531,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "bd15167a06c8bd87a521ade37b3c4108c05fda04e012fa66c89f17fac5565785"
+      "sourceHash": "05d1352299fb3b0e191049a97c5bc7c6e5784cac4808421b8f2dd1d520d0970c"
     },
     {
       "path": "/mikka/api/mobile/model",
