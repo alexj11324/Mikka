@@ -44,7 +44,8 @@ export function createEveOutcomeDelivery(app:Query,workspace:Query,overrides:Par
     if(scope.surface!=='web')return null
     const {rows:[row]}=await app.query<StoredOutcome>(`SELECT e.id AS "sourceId",e.kind,e.tier,e."runId",e."issueId",
       jsonb_build_object('telegram', e.payload->'telegram', 'verificationCode', e.payload#>'{assessment,verificationCode}') AS payload,m.message,
-      i."userId" AS "issueOwner",i."workspaceId" AS "issueWorkspace",i."ownershipState",i.content AS "issueContent",
+      i."userId" AS "issueOwner",i."workspaceId" AS "issueWorkspace",i."ownershipState",
+      jsonb_build_object('type', 'doc', 'attrs', i.content->'attrs') AS "issueContent",
       EXISTS(SELECT 1 FROM coordinator_bots cb WHERE cb."ownerId"=$2 AND cb."botId"=$3 AND cb."workspaceId"=$4) AS "personalCoordinator"
       FROM eve_sessions s JOIN bots b ON b.id=s.bot_id AND b."ownerId"=s.owner_id AND b."workspaceId"=s.workspace_id
       JOIN eve_turn_sources t ON t.session_id=s.session_id AND t.turn_id=$5
