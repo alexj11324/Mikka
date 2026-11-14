@@ -142,7 +142,8 @@ export function useOrganizations(enabled = true) {
 
 export function useJoinableOrganizations() {
   const { data, isPending } = authClient.useSession()
-  return useSWR(isPending || !data?.user.emailVerified ? null : ['joinable-organizations', data.user.id, data.user.email],
+  // Desktop projects the public identity without emailVerified. The API checks the current verified email.
+  return useSWR(isPending || !data || data.user.emailVerified === false ? null : ['joinable-organizations', data.user.id, data.user.email],
     () => request<{ organizations: JoinableOrganization[] }>('/api/me/joinable-organizations').then(value => value.organizations))
 }
 
