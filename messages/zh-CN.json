@@ -143,9 +143,15 @@
       "emptyTitle": "这里还没有任务",
       "newTask": "新建任务"
     },
-    "createdAtDate": "创建于 {date}"
+    "createdAtDate": "创建于 {date}",
+    "agentMark": {
+      "working": "Agent 运行中",
+      "waiting": "等你处理",
+      "error": "Agent 出错"
+    }
   },
   "Nav": {
+    "startConversation": "新建对话",
     "switchLanguage": "切换语言",
     "workspaceAll": "{name} 全部任务",
     "tagline": "任务与文档",
@@ -585,6 +591,7 @@
     "openableDraggableTask": "可打开、可拖动任务"
   },
   "Editor": {
+    "executionInstructions": "执行指令",
     "draftAuthor": "草稿作者",
     "unsavedDraft": "未保存草稿",
     "editorLabel": "任务描述编辑器",
@@ -1229,6 +1236,7 @@
     "artifactNotFound": "找不到这个成果。",
     "messageRequired": "消息不能为空。",
     "submissionConflict": "此提交标识已用于另一条消息。",
+    "threadSubmissionOutcomeUnconfirmed": "暂时无法确认这条消息的处理结果。请刷新对话查看状态。",
     "pendingActionUnavailable": "这项操作已处理或已过期。",
     "deviceSaveFailed": "保存失败，请重试。",
     "tokenCreateFailed": "生成 token 失败，请重试。",
@@ -1367,6 +1375,7 @@
     "accountSoleAdmin": "你是工作区「{workspaces}」唯一的管理员。先把管理员身份转给其他成员，再删除账户。",
     "accountLastOrganizationOwner": "组织至少需要保留一位活跃所有者。",
     "runChainEnded": "这个任务已经停了，没有可停止的运行。",
+    "threadDeliveryUnavailable": "当前对话无法按这种方式投递消息。",
     "threadStopping": "线程正在停止",
     "secretNotFound": "该密钥或环境变量已不存在。",
     "secretNameReserved": "该名称为运行环境保留（例如 PATH、HOME、代理、TLS、加载器、git、E2B 或 MIKKA 相关变量），请换一个名称。",
@@ -1415,6 +1424,17 @@
     "viewProjects": "查看项目"
   },
   "IssueDetail": {
+    "work": {
+      "heading": "工作",
+      "system": "系统",
+      "agent": "Agent",
+      "states": {
+        "open": "开放",
+        "closed": "已关闭",
+        "draft": "草稿",
+        "merged": "已合并"
+      }
+    },
     "frame": {
       "delegate": "交给",
       "open": "打开",
@@ -3877,6 +3897,7 @@
     "contextEstimated": "按存储文本估算，非模型实际 token 计数",
     "contextNoWindow": "Mikka 不存储模型上下文窗口，因此不显示占窗口比例",
     "modelPicker": {
+      "retryLoad": "模型加载失败，重试",
       "label": "模型：{name}",
       "labelUnavailable": "模型：{name}，不可用",
       "hosted": "Mikka 默认",
@@ -4413,7 +4434,75 @@
     "copied": "ID 已复制",
     "copyFailed": "复制失败"
   },
+  "ConversationDirectory": {
+    "unread": "未读",
+    "readAll": "全部标为已读",
+    "markUnread": "标为未读",
+    "writeError": "未能保存已读状态，请重试。",
+    "archiveIdle": "闲置对话自动归档",
+    "archiveDays": "{days} 天",
+    "archiveOff": "关闭",
+    "archiveUnavailable": "此服务器不支持闲置对话自动归档。",
+    "archiveSaveError": "未能保存自动归档偏好。",
+    "viewAll": "查看全部",
+    "title": "对话",
+    "search": "搜索对话",
+    "all": "全部",
+    "working": "进行中",
+    "waiting": "待处理",
+    "idle": "空闲",
+    "failed": "失败",
+    "archived": "已归档",
+    "loadError": "未能加载对话。",
+    "retry": "重试",
+    "loading": "正在加载对话…",
+    "empty": "没有匹配的对话。",
+    "untitled": "未命名对话",
+    "more": "加载更多"
+  },
+  "ThreadReferences": {
+    "sourceUnavailable": "此对话暂时无法引用源码文件或目录。",
+    "references": "引用",
+    "task": "任务",
+    "thread": "对话",
+    "pr": "拉取请求",
+    "searching": "正在搜索…",
+    "error": "引用加载失败",
+    "empty": "没有匹配的引用"
+  },
   "IssueThreads": {
+    "composerModelUnknown": "模型未上报",
+    "composerModelRequested": "所选模型：{model}",
+    "organization": {
+      "archive": "归档对话",
+      "unarchive": "取消归档",
+      "pin": "置顶对话",
+      "unpin": "取消置顶",
+      "unavailable": "此对话已不可用。",
+      "failed": "未能保存对话更改。"
+    },
+    "deliveryMode": "运行时的发送方式",
+    "deliveryModes": {
+      "queue": "排到下一轮",
+      "steer": "插话到当前轮",
+      "interrupt": "打断并发送"
+    },
+    "deliveryQueued": "排队中",
+    "deliverySending": "正在发送",
+    "deliveryFailed": "投递失败",
+    "deliverySendNow": "立即发送",
+    "deliveryCancel": "取消",
+    "versionEdit": "编辑消息",
+    "versionRerun": "重跑回复",
+    "versionEffects": "将从这条消息开始一次新的运行。已有的提交、拉取请求和先前的回复都会保留。",
+    "versionHistory": "消息版本",
+    "versionOriginal": "原始版本",
+    "versionNumber": "版本 {number}",
+    "versionRun": "运行新版本",
+    "versionPullRequest": "打开拉取请求",
+    "versionClose": "关闭",
+    "versionPending": "等待回复",
+    "deliveryTooLate": "这条消息已经开始投递。",
     "title": "线程",
     "modelSwitched": "已改用",
     "agent": "Bot",
@@ -4613,7 +4702,14 @@
     },
     "errorDetails": "详情",
     "fullInstructions": "查看完整指令",
-    "hideInstructions": "隐藏完整指令"
+    "hideInstructions": "隐藏完整指令",
+    "conversationTitle": {
+      "rename": "重命名",
+      "regenerate": "重新生成标题",
+      "label": "标题",
+      "renameFailed": "标题未保存",
+      "regenerateFailed": "未能生成新标题"
+    }
   },
   "Computer": {
     "status": {
@@ -4736,6 +4832,17 @@
       "create": "创建",
       "creating": "正在创建…"
     },
+    "createConversation": {
+      "title": "新建对话",
+      "name": "对话名称",
+      "bots": "选择 Bot（首选 Bot 负责回复）",
+      "noBots": "暂无可用 Bot",
+      "newBot": "新建 Bot",
+      "create": "开始对话",
+      "failed": "创建对话失败",
+      "unconfirmed": "尚未确认是否已创建",
+      "reviewGroups": "查看对话"
+    },
     "newGroup": {
       "title": "新建群聊",
       "name": "群名",
@@ -4803,11 +4910,22 @@
         "label": "公开职责",
         "hint": "群聊按此公开职责选择 Bot；工具仍需授权。",
         "placeholder": "在群聊中负责的工作；留空可清除",
-        "count": "{count} / {max}",
         "tooLong": "公开职责最多 {max} 个字",
         "loadError": "公开职责加载失败",
         "saveError": "保存未确认，修改已保留。",
-        "saved": "已保存"
+        "saved": "已保存",
+        "add": "添加公开职责",
+        "edit": "编辑公开职责"
+      },
+      "glance": {
+        "running": "{count} 个进行中",
+        "waiting": "{count} 个等你处理",
+        "idle": "没有进行中的任务",
+        "prReview": "{count} 个等待审查",
+        "prRunning": "{count} 个进行中",
+        "prNone": "没有打开的 PR",
+        "computerScreen": "查看屏幕",
+        "computerMissing": "需要 E2B API Key"
       },
       "threads": "线程",
       "tasks": "任务",
@@ -4993,11 +5111,6 @@
     "board": {
       "toolbar": "看板工具栏",
       "scopeLabel": "任务范围",
-      "scope": {
-        "all": "全部",
-        "workspace": "工作区",
-        "personal": "个人"
-      },
       "filter": "筛选",
       "filterField": {
         "status": "状态",
@@ -5006,7 +5119,7 @@
         "creator": "我创建的",
         "labels": "标签",
         "project": "项目",
-        "agentState": "线程状态"
+        "agentState": "Agent 活动"
       },
       "removeFilter": "移除{field}筛选",
       "me": "我",
@@ -5037,7 +5150,7 @@
         "labels": "标签",
         "pullRequests": "PR",
         "subtasks": "子任务",
-        "agentState": "线程状态",
+        "agentState": "Agent 活动",
         "project": "项目",
         "dueDate": "截止日期",
         "createdAt": "创建时间"
@@ -5051,8 +5164,6 @@
       "inlineTitle": "任务标题",
       "discussPrefill": "我们聊聊 {id} {title}：",
       "card": {
-        "personal": "个人任务",
-        "personalHint": "个人任务 · 只有你能看到",
         "status": "状态",
         "priority": "优先级",
         "subtasks": "子任务",
@@ -5063,9 +5174,9 @@
         "discuss": "讨论",
         "delete": "删除",
         "agent": {
-          "running": "进行中",
-          "waiting": "等待你",
-          "blocked": "受阻"
+          "running": "Agent 运行中",
+          "waiting": "等你处理",
+          "blocked": "Agent 出错"
         },
         "block": {
           "question": "等你回答",
@@ -7021,6 +7132,7 @@
     "noTasks": "没有任务"
   },
   "HostedInbox": {
+    "writeError": "未能确认收件箱更改。请刷新后重试。",
     "dismiss": "忽略",
     "dismissed": "已忽略",
     "reason": {

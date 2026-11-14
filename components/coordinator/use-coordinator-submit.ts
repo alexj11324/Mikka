@@ -34,7 +34,7 @@ export function useCoordinatorSubmit(agent?: Pick<UseEveAgentReturn, 'send'>) {
   const t = useTranslations('Coordinator')
   const tErrors = useTranslations('Errors')
   const operations = useRef(new Map<string, { id: string; conflict?: true; delivered?: true }>())
-  const submit = useCallback(async (text: string, context?: CoordinatorMessageContext, requestId?: string): Promise<SubmitOutcome> => {
+  const submit = useCallback(async (text: string, context?: CoordinatorMessageContext, requestId?: string, turnPolicy?: 'queue' | 'steer'): Promise<SubmitOutcome> => {
     const trimmed = text.trim()
     if (!trimmed || trimmed.length > 10_000) return { kind: 'rejected', error: 'messageRequired' }
     // Mounted chat sends its captured owner with the message. Eve checks that owner
@@ -50,13 +50,13 @@ export function useCoordinatorSubmit(agent?: Pick<UseEveAgentReturn, 'send'>) {
     }
     // The confirmation replays one refused command. It is not a new message.
     const { confirmTaskAccess: _confirmation, ...immutable } = context ?? {}
-    const body = JSON.stringify([ownerId, requestId ?? null, trimmed, context ? immutable : null])
+    const body = JSON.stringify([ownerId, requestId ?? null, trimmed, context ? immutable : null, turnPolicy ?? 'queue'])
     // Another message may be sent before this one's uncertain result is retried.
     // Retain each unresolved key; the native server remains the dedupe authority.
     let operation = operations.current.get(body)
     if (operation?.conflict) return { kind: 'conflict' }
     if (!operation) { operation = { id: requestId ?? crypto.randomUUID() }; operations.current.set(body, operation) }
-    const options: SendTurnOptions = { headers: { 'x-mikka-submission-id': operation.id },
+    const options: SendTurnOptions = { ...(turnPolicy ? { turnPolicy } : {}), headers: { 'x-mikka-submission-id': operation.id },
       clientContext: JSON.parse(JSON.stringify(context ?? {})) as NonNullable<SendTurnOptions['clientContext']> }
     try {
       await acceptTaskDelivery(operation, async () => {

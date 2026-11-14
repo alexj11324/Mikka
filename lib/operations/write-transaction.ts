@@ -1,3 +1,4 @@
+import { connectForCommitEffects } from '../db/commit-effects'
 import type { Pool, PoolClient } from 'pg'
 import { MailboxError } from '@/lib/mailbox-error'
 import { cancelMailboxBackend } from '@/lib/mailbox-pg-cancel'
@@ -46,7 +47,7 @@ export async function writeTransaction<T>(pool: Pick<Pool, 'connect'>, work: (cl
   const closeLease = () => lease ? closingLease ??= Promise.resolve().then(() => lease!.close()) : Promise.resolve()
   try {
     check()
-    const connection = pool.connect().then(client => {
+    const connection = connectForCommitEffects(pool).then(client => {
       raw = client // Register ownership before the abortable waiter can reject.
       if (controller.signal.aborted) { release(client, cancelled()); throw cancelled() }
       return client

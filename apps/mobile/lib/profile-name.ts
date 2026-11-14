@@ -1,4 +1,4 @@
-import { DESKTOP_RPC_VERSION } from '../../../lib/desktop-rpc/wire'
+import { DESKTOP_RPC_VERSION } from '../../../lib/desktop-rpc/version'
 
 type Receipt = { version?: number; ok?: boolean; result?: { name?: string; error?: string } }
 type Request = (path: string, init: { method: 'POST'; body: unknown }) => Promise<Receipt | null>

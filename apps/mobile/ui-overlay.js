@@ -71,6 +71,10 @@ function overlayResolver(app, env = process.env, next) {
   const fromApp = join(app, 'package.json')
   return (context, moduleName, platform) => {
     const resolveNext = (ctx, name) => (next ?? ctx.resolveRequest)(ctx, name, platform)
+    // Shared workspace hooks must use the React instance owned by the Expo renderer.
+    if (moduleName === 'react' || moduleName.startsWith('react/')) {
+      return resolveNext({ ...context, originModulePath: fromApp }, moduleName)
+    }
     if (moduleName.startsWith(SLOT_PREFIX)) {
       const file = slots[moduleName.slice(SLOT_PREFIX.length)]
       if (!file) throw new Error(`MOBILE_SLOT_UNKNOWN: ${moduleName}`)

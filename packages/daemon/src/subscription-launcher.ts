@@ -81,7 +81,7 @@ export async function launchHostedSubscription(use: SubscriptionUse, options: St
   return {
     sessionId: session.sessionId,
     async *events() { try { yield* session.events() } finally { cleanup() } },
-    send: text => { if (gate.revoked) throw new Error('Run tool approval unavailable'); return session.send(text) },
+    send: (text, mode) => { if (gate.revoked) throw new Error('Run tool approval unavailable'); return session.send(text, mode) },
     async cancel() { cleanup(); await session.cancel() },
     async detach() { cleanup(); if (session.detach) await session.detach() }
   }

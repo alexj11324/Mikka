@@ -9,9 +9,11 @@ import { pushSettingsHistory } from '@/lib/settings-navigation'
  * Nothing outside this file and lib/settings-navigation.ts writes the
  * browser history; scripts/navigation-policy.mjs enforces that.
  */
-export type WorkspaceSection = 'inbox' | 'my-issues' | 'agent' | 'coordinator' | 'group' | 'projects' | 'views' | 'team-home' | 'team-issues' | 'team-projects' | 'all-issues' | 'plugins' | 'suggestions' | 'artifacts' | 'memory' | 'tasks'
+export type WorkspaceSection = 'pulls' | 'conversations' | 'inbox' | 'my-issues' | 'agent' | 'coordinator' | 'group' | 'projects' | 'views' | 'team-home' | 'team-issues' | 'team-projects' | 'all-issues' | 'plugins' | 'suggestions' | 'artifacts' | 'memory'
 
 export const SECTION_TITLE_KEYS: Record<WorkspaceSection, string> = {
+  conversations: 'Nav.conversations',
+  pulls: 'ArtifactsPage.category.pullRequests',
   inbox: 'Nav.inbox',
   'my-issues': 'Nav.myTasks',
   agent: 'Nav.agent',
@@ -27,17 +29,20 @@ export const SECTION_TITLE_KEYS: Record<WorkspaceSection, string> = {
   suggestions: 'Nav.suggestions',
   artifacts: 'Nav.artifacts',
   memory: 'HostedSettings.memory.title',
-  tasks: 'Nav.tasks',
 }
 
 /** Sections a reload or a shared link reopens; the others start from their parent page. The Coordinator's chat is the default and needs none. */
-const URL_SECTIONS = ['agent', 'plugins', 'suggestions', 'artifacts', 'memory', 'tasks', 'all-issues', 'projects'] as const satisfies readonly WorkspaceSection[]
+const URL_SECTIONS = ['pulls', 'conversations', 'agent', 'plugins', 'suggestions', 'artifacts', 'memory', 'all-issues', 'projects'] as const satisfies readonly WorkspaceSection[]
 const READ_SECTIONS: readonly string[] = [...URL_SECTIONS, 'coordinator']
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 /** Query keys that belong to a page inside a section (the plugins page's app and category); a new place drops them. */
 const PAGE_KEYS = ['app', 'category'] as const
 
+/** The retired 任务 page's address. Tasks have one entry, the board (2026-11-13-1405): an old link opens it in its list view. */
+export const LEGACY_TASKS_SECTION = 'tasks'
+
 export function sectionFromQuery(section: string | undefined): WorkspaceSection {
+  if (section === LEGACY_TASKS_SECTION) return 'all-issues'
   return READ_SECTIONS.includes(section ?? '') ? section as WorkspaceSection : 'coordinator'
 }
 
@@ -51,6 +56,8 @@ export type WorkspaceLocation = {
   section: WorkspaceSection
   /** The bot whose chat is in the centre; null for the Coordinator. */
   bot: string | null
+  /** Optional Bot filter for the conversation directory. */
+  directoryBot?: string | null
   /** The group chat in the centre (`group=<id>`; its section is implied). */
   group: string | null
   /** The saved chat in the centre (`section=agent&session=<id>`); null opens the latest. */
@@ -76,9 +83,9 @@ const TEAM_SECTIONS: readonly string[] = ['team-home', 'team-issues', 'team-proj
 /** Pages that can show one project. */
 const PROJECT_SECTIONS: readonly string[] = ['projects', 'team-projects'] satisfies readonly WorkspaceSection[]
 /** Keys this file owns besides `section`, in the order a new address writes them. */
-const PLACE_KEYS = ['bot', 'group', 'session', 'team', 'project', 'issue', 'task', 'thread', 'artifact', 'threads'] as const satisfies readonly (keyof WorkspaceLocation)[]
+const PLACE_KEYS = ['bot','directoryBot', 'group', 'session', 'team', 'project', 'issue', 'task', 'thread', 'artifact', 'threads'] as const satisfies readonly (keyof WorkspaceLocation)[]
 /** What is in the centre; the thread sits beside it and the Artifact window over it. */
-const CENTRE_KEYS = ['section', 'bot', 'group', 'session', 'team', 'project', 'issue'] as const satisfies readonly (keyof WorkspaceLocation)[]
+const CENTRE_KEYS = ['section', 'bot','directoryBot', 'group', 'session', 'team', 'project', 'issue'] as const satisfies readonly (keyof WorkspaceLocation)[]
 
 /** A team page without a team is the workspace-wide page it would scope. */
 export function sectionFor(section: WorkspaceSection, team: string | null): WorkspaceSection {
@@ -95,6 +102,7 @@ export function readLocation(params: URLSearchParams): WorkspaceLocation {
   else if (section === 'coordinator' && id('group')) section = 'group'
   return {
     section,
+    ...(section === 'conversations' && id('directoryBot') ? {directoryBot:id('directoryBot')} : {}),
     bot: section === 'coordinator' ? id('bot') : null,
     group: section === 'group' ? id('group') : null,
     session: section === 'agent' ? id('session') : null,
@@ -132,6 +140,7 @@ function buildHref(current: URL, change: Partial<WorkspaceLocation>, nameCoordin
   const named = params.get('section') === 'coordinator'
   const next = { ...before, ...change }
   next.section = sectionFor(next.section, next.team)
+  if (next.section !== 'conversations') delete next.directoryBot
   if (next.section !== 'coordinator') next.bot = null
   if (next.section !== 'group') next.group = null
   if (next.section !== 'agent') next.session = null
@@ -167,6 +176,10 @@ export function workspaceHref(current: URL, change: Partial<WorkspaceLocation>):
 export function workspaceSearch(place: Partial<WorkspaceLocation>): string {
   const href = buildHref(new URL('https://mikka.invalid/'), place, place.section === 'coordinator')
   return href.slice(1)
+}
+
+export function openGroupConversation(id: string) {
+  navigate({ section: 'group', group: id, issue: null, thread: null, task: null })
 }
 
 /** An app-root link to a place, e.g. `/?issue=<id>`; prefix the base path and locale where the caller needs them. */

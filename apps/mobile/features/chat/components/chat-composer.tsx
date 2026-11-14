@@ -25,7 +25,7 @@ import { cardAnchor } from '@/features/chat/model/chat-attachment-card'
  * them), so a failed send loses nothing. Controlled when `value` and
  * `onChangeText` are passed.
  */
-export function Composer({ placeholder, onSend, initial = '', disabled = false, sendDisabled = false, value, onChangeText, attach = false, overlay = false, onHeight, autoFocus = false, quote, onClearQuote, accessory, notice, onStop, attachmentScope }: {
+export function Composer({ placeholder, onSend, initial = '', disabled = false, sendDisabled = false, value, onChangeText, attach = false, overlay = false, onHeight, autoFocus = false, quote, onClearQuote, accessory, notice, onStop, attachmentScope, onCaretChange }: {
   placeholder: string
   onSend?: (text: string, attachments: Attachment[]) => boolean | void | Promise<boolean | void>
   initial?: string
@@ -34,6 +34,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
   sendDisabled?: boolean
   value?: string
   onChangeText?: (text: string) => void
+  onCaretChange?: (position: number) => void
   attach?: boolean
   attachmentScope?: ChatFileScope
   /** Float over the end of the list, the content fading out beneath it; `onHeight` reports its height so the list leaves room. */
@@ -165,7 +166,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
               </Pressable>
             </View>
           ) : null}
-          <TextInput ref={input} accessibilityLabel={placeholder} value={text} onChangeText={setText} placeholder={placeholder} editable={!blocked} multiline autoFocus={autoFocus}
+          <TextInput ref={input} accessibilityLabel={placeholder} value={text} onSelectionChange={onCaretChange ? event => onCaretChange(event.nativeEvent.selection.end) : undefined} onChangeText={setText} placeholder={placeholder} editable={!blocked} multiline autoFocus={autoFocus}
             placeholderTextColor={colors.secondary} style={[styles.input, sending && { color: colors.secondary }]} />
           <View style={styles.fieldRow}>
             {attach ? <ChatAttachmentPlus ref={card.plus} progress={card.progress} disabled={blocked} onPress={openCard} /> : null}

@@ -13,7 +13,7 @@ const translate = Object.assign(key => key, { has: () => true })
 const stub = (path, namedExports) => mock.module(new URL('../' + path, import.meta.url).href, { namedExports })
 let teamId, response, issue, child, frame, teamWrites, favoriteDenied, saveMetadata, createChild, connectionsError, moves, reads, optionsRead
 const teams = ['existing', 'another'].map(id => ({ id, identifier: id, name: id }))
-mock.module('next-intl', { namedExports: { useTranslations: () => translate, useFormatter: () => ({ relativeTime: noop, dateTime: date => date.toISOString().slice(0, 10) }), useNow: () => new Date() } })
+mock.module('next-intl', { namedExports: { useTranslations: () => translate, useMessages: () => ({ IssueDetail: { work: { states: {} } }, GroupTask: { stage: {}, status: {} } }), useFormatter: () => ({ relativeTime: noop, dateTime: date => date.toISOString().slice(0, 10) }), useNow: () => new Date() } })
 mock.module('sonner', { namedExports: { toast: { error: noop, success: noop } } })
 mock.module('swr', { defaultExport: key => {
   if (key?.[0] === 'issue-property-options') return optionsRead
@@ -91,13 +91,43 @@ async function mount({ showDialogs = false, ...props } = {}) {
   const Capture = props => { frame = props; return showDialogs ? props.dialogs : null }
   function Task() {
     const [task, setTask] = useState(issue)
-    return createElement(FramedTask, { Frame: Capture, task, userId: 'owner', title: task.title, status: task.status, priority: 'normal', locked: false, ...props,
-      agentActivity: { items: [] }, versions: [], getCurrent: async () => issue, adopt: saved => { issue = saved; setTask(saved) } })
+    return createElement(FramedTask, { Frame: Capture, task, userId: 'owner', title: task.title, status: task.status, priority: 'normal', locked: false, agentActivity: { items: [] }, ...props,
+      versions: [], getCurrent: async () => issue, adopt: saved => { issue = saved; setTask(saved) } })
   }
   await act(async () => root.render(createElement(Task)))
   return () => act(async () => { root.unmount(); host.remove() })
 }
 const row = id => frame.rows.find(item => item.id === id)
+test('properties and Work use the same authorized pull receipts, including an empty set', async () => {
+  issue.metadata.pullRequests = [{ url: 'https://github.com/example/legacy/pull/1', state: 'open' }]
+  const current = { url: 'https://github.com/example/review/pull/2', state: 'merged' }
+  for (const receipts of [[current], []]) {
+    const done = await mount({ agentActivity: { items: [], work: { presentation: { pullRequests: receipts } } } })
+    try {
+      assert.deepEqual(frame.work.props.pulls, receipts)
+      assert.deepEqual(row('pullRequests')?.chips.map(chip => chip.href) ?? [], receipts.map(pull => pull.url))
+    } finally { await done() }
+  }
+})
+
+test('properties link only admitted conversations and show the recorded Factory branch', async () => {
+  const opened = []
+  const done = await mount({ agentActivity: {
+    items: [], threads: [{ id: 'run', detail: { name: 'Worker review' } }, { id: 'hidden', detail: null }],
+    openThread: id => opened.push(id), work: {
+      presentation: { linkedChats: [{ id: 'chat', title: 'Planning' }] },
+      factory: { task: { review: { summary: { branch: 'feature/review' } } } },
+    },
+  } })
+  try {
+    assert.equal(row('branch').value.text, 'feature/review')
+    const { chips } = row('conversations')
+    assert.deepEqual(chips.map(chip => [chip.id, chip.text]), [['chat:chat', 'Planning'], ['run:run', 'Worker review']])
+    await act(async () => chips[1].menu[0].onSelect())
+    assert.deepEqual(opened, ['run'])
+  } finally { await done() }
+})
+
 const pickTeam = id => act(async () => row('team').menu.find(item => item.id === id).onSelect())
 
 test('confirmed deletion refreshes the viewer list without reading connections for the deleted task', async () => {
@@ -197,9 +227,19 @@ test('clearing current delegation leaves historical Bot runs out of the Task del
   } finally { await dispose() }
 })
 
-test('the saved delegate is visible before its first run and favorites immediately adopt the server revision', async () => {
+test('a saved Bot is the only displayed assignee before its first run when no member owns the Task', async () => {
   const dispose = await mount()
   try {
+    assert.equal(row('assignee').value.text, 'Assigned bot')
+    assert.equal(row('delegate'), undefined)
+  } finally { await dispose() }
+})
+
+test('the saved delegate is visible before its first run and favorites immediately adopt the server revision', async () => {
+  issue.metadata = { ...issue.metadata, assignee: { kind: 'member', id: 'member', name: 'Assigned member', image: null } }
+  const dispose = await mount()
+  try {
+    assert.equal(row('assignee').value.text, 'Assigned member')
     assert.equal(row('delegate').value.text, 'Assigned bot')
     await act(async () => frame.favorite.toggle())
     assert.equal(issue.revision, 4)

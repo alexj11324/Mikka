@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { useTranslations } from 'next-intl'
 import { chooseBotModel, getBotModelMenu, refreshBotModelMenuAction } from '@/app/actions/execution-settings'
 import { previewBotModelChoice } from '@/lib/bot-model-optimistic'
-import { HOSTED_CHOICE, type BotModelMenu, type BotModelMenuGroup, type BotModelMenuOption } from '@/lib/bot-model-menu-view'
+import { HOSTED_CHOICE, withChosenModel, type BotModelMenu, type BotModelMenuGroup, type BotModelMenuOption } from '@/lib/bot-model-menu-view'
 
 export type ModelPickerT = ReturnType<typeof useTranslations<'Coordinator.modelPicker'>>
 
@@ -67,9 +67,11 @@ function readChip(value: string | null): ChipModel | null {
  * can use here, the saved choice per bot, explicit refresh, and the chip it
  * showed last while the menu loads. A run already going keeps its model.
  */
-export function useBotModelPicker(botId: string | null) {
+export function useBotModelPicker(botId: string | null, thread?: import('@/components/slots/model-picker-contract').BotModelPickerProps['thread']) {
   const t = useTranslations('Coordinator.modelPicker')
-  const menu = useSWR<BotModelMenu>(botModelMenuKey(botId), () => getBotModelMenu(botId))
+  const scope = thread?.scope ?? botId
+  const menu = useSWR<BotModelMenu | null>(thread ? ['thread-continuation-models', thread.scope] : botModelMenuKey(botId),
+    () => thread ? thread.load() : getBotModelMenu(botId), { shouldRetryOnError: false })
   const [failed, setFailed] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshFailed, setRefreshFailed] = useState(false)
@@ -88,18 +90,26 @@ export function useBotModelPicker(botId: string | null) {
     try {
       // A manual catalogue refresh must not race an in-flight model save.
       if (pendingSave.current) await pendingSave.current
-      await menu.mutate(() => refreshBotModelMenuAction(botId), { populateCache: true, revalidate: false })
+      await menu.mutate(() => thread ? thread.load() : refreshBotModelMenuAction(botId), { populateCache: true, revalidate: false })
     } catch { setRefreshFailed(true) } finally { setRefreshing(false) }
   }
 
   useEffect(() => {
+    if (thread) return
     const listener = (event: Event) => { if ((event as CustomEvent<string>).detail === (botId ?? 'coordinator')) setOpenState(true) }
     window.addEventListener(OPEN_EVENT, listener)
     return () => window.removeEventListener(OPEN_EVENT, listener)
   })
 
-  const shown = menu.data?.current
+  // The menu this bot showed last stays on screen while a read is under way, so the chip never drops out and comes
+  // back. Another bot's menu is never held over: its chip waits for its own.
+  const held = useRef<{ botId: string | null; menu: BotModelMenu } | null>(null)
+  if (menu.data) held.current = { botId: scope, menu: menu.data }
+  const loaded = thread ? menu.data : menu.data ?? (!menu.error && held.current?.botId === scope ? held.current.menu : undefined)
+  const data = loaded && thread?.selected ? withChosenModel(loaded, thread.selected) ?? loaded : loaded
+  const shown = data?.current
   useEffect(() => {
+    if (thread) return
     const key = lastChipKey(botId)
     try {
       if (shown && !(saving && shown.availability === 'checking')) window.localStorage.setItem(key, JSON.stringify({ id: shown.id, modelId: shown.modelId, provider: shown.provider }))
@@ -109,6 +119,11 @@ export function useBotModelPicker(botId: string | null) {
   }, [botId, shown, menu.error, saving])
 
   function choose(id: string): Promise<boolean> {
+    if (thread) {
+      if (!data || !withChosenModel(data, id)) return Promise.resolve(false)
+      thread.choose(id)
+      return Promise.resolve(true)
+    }
     // A previous save must settle before another write; otherwise late server
     // responses can overwrite the model the user picked most recently.
     const previous = pendingSave.current
@@ -162,17 +177,17 @@ export function useBotModelPicker(botId: string | null) {
   /** What a person reads for an option: the hosted model's name, or the provider's id (callers format it). */
   const optionName = (option: ChipModel) => option.id === HOSTED_CHOICE ? t('hosted') : option.modelId || t('unknownModel')
 
-  const current = menu.data?.current
+  const current = data?.current
   const checking = current?.availability === 'checking'
   const chipLabel = current ? [optionName(current), current.fallback ? t('fallback') : null, checking ? t('checking') : null].filter(Boolean).join(' · ') : null
 
   return {
     t,
     /** The menu, once it has arrived; until then `last` is the chip's look only, not a control. */
-    menu: menu.data,
+    menu: data,
     /** Someone else's bot, or the menu failed: no chip at all. */
     error: !!menu.error,
-    last: menu.data || menu.error ? null : last,
+    last: thread || data || menu.error ? null : last,
     open,
     /** Opening uses the cached menu; catalogue refresh is explicit. */
     // Model catalogue refresh is explicit; opening a cached menu must not

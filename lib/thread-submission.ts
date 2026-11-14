@@ -1,4 +1,5 @@
 import 'server-only'
+import { threadModelKey, type ThreadModelChoice } from './thread-model-choice'
 import type { Pool } from 'pg'
 import { z } from 'zod'
 import { ActionFailureError } from './action-error'
@@ -8,7 +9,8 @@ import { runChanged } from './live/panels'
 export type ThreadSubmissionResult = { runId: string; continued: boolean }
 type Input = {
   userId: string; requestId: string; rootRunId: string; requestedRunId: string
-  previousRunId: string; issueId: string | null; botId: string | null; text: string
+  previousRunId: string; issueId: string | null; botId: string | null; text: string; modelChoice?: ThreadModelChoice
+  delivery?: 'queue' | 'steer' | 'interrupt' | 'afterRun' | 'version'
   mode: 'message' | 'continuation'
 }
 const resultSchema = z.object({ runId: z.uuid(), continued: z.boolean() }).strict()
@@ -23,19 +25,36 @@ export async function submitThreadOnce(pool: Pool, input: Input,
 ): Promise<ThreadSubmissionResult> {
   const requestId = z.uuid().parse(input.requestId).toLowerCase()
   const id = factoryEventId('thread-submission', JSON.stringify([input.userId, requestId]))
-  const binding = { requestId, rootRunId: input.rootRunId, requestedRunId: input.requestedRunId, mode: input.mode }
-  const { rows: inserted } = await pool.query(`INSERT INTO coordinator_events
+  const binding = { requestId, rootRunId: input.rootRunId, requestedRunId: input.requestedRunId, mode: input.mode, ...(input.modelChoice ? { modelKey: threadModelKey(input.modelChoice) } : {}), ...(input.delivery ? { delivery: input.delivery } : {}) }
+  // Queue and immediate delivery share one client request namespace. Acquire
+  // the lock before the receipt read so concurrent intents see the winner.
+  const client = await pool.connect()
+  let inserted: boolean
+  try {
+    await client.query('BEGIN')
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))', [id])
+    const queued = await client.query('SELECT 1 FROM thread_queued_messages WHERE "userId"=$1 AND "requestId"=$2', [input.userId, requestId])
+    if (queued.rowCount) throw new ActionFailureError('submissionConflict')
+    const receipt = await client.query(`INSERT INTO coordinator_events
     (id,"userId","botId","issueId",kind,"dedupeKey",payload,tier,"deliveredAt")
     VALUES($1,$2,$3,$4,'user_message',$5,$6,'background',now()) ON CONFLICT DO NOTHING RETURNING id`,
   [id, input.userId, input.botId, input.issueId, `thread-submission:${id}`,
     JSON.stringify({ text: input.text, source: 'thread_continuation', previousRunId: input.previousRunId,
       postedToChat: true, threadSubmission: binding })])
+    inserted = Boolean(receipt.rowCount)
+    await client.query('COMMIT')
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally { client.release() }
   const { rows: [event] } = await pool.query(`SELECT "userId","botId","issueId",kind,payload
     FROM coordinator_events WHERE id=$1`, [id])
   const recorded = event?.payload?.threadSubmission
   if (!event || event.userId !== input.userId || event.botId !== input.botId || event.issueId !== input.issueId
     || event.kind !== 'user_message' || event.payload?.source !== 'thread_continuation'
     || event.payload?.text !== input.text || recorded?.requestId !== binding.requestId
+    || recorded?.delivery !== binding.delivery
+    || recorded?.modelKey !== binding.modelKey
     || recorded?.rootRunId !== binding.rootRunId || recorded?.requestedRunId !== binding.requestedRunId
     || !['message','continuation'].includes(recorded?.mode)
     || !z.uuid().safeParse(event.payload?.previousRunId).success) throw new ActionFailureError('submissionConflict')
@@ -98,7 +117,7 @@ export async function submitThreadOnce(pool: Pool, input: Input,
     [id, input.userId, input.issueId, input.text])
     return message ? saveResult({ runId: message.runId, continued: message.runId !== previousRunId }) : null
   }
-  if (!inserted.length) {
+  if (!inserted) {
     const outcome = await readOutcome()
     if (outcome) {
       // An answered question can be durable before its VM wake succeeds. A
@@ -110,7 +129,7 @@ export async function submitThreadOnce(pool: Pool, input: Input,
     }
     const answer = recorded.mode === 'continuation' ? await recoverQuestion?.(id, previousRunId, false) : null
     if (answer) return saveResult(answer)
-    throw new Error('threadSubmissionOutcomeUnconfirmed')
+    throw new ActionFailureError('threadSubmissionOutcomeUnconfirmed')
   }
   try { return await saveResult(await deliver(id)) }
   catch (error) {

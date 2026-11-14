@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { promisify } from 'node:util'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 import test from 'node:test'
 import { dbUrl, seedAgent, seedIssue, seedRun, seedUser } from './support/workspace-admin-db'
 
@@ -27,7 +27,7 @@ test('ended runs get a judged outcome', { skip: !dbUrl }, async t => {
       await admin.end()
     }
   })
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   for (const name of settings) process.env[name] = target.href
   await promisify(execFile)(process.execPath, ['scripts/migrate.mjs'], {
     env: { ...process.env, MIGRATE: '1' }, maxBuffer: 4 * 1024 * 1024,

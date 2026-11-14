@@ -6,7 +6,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { orderMigrations } from '../scripts/migration-order.mjs'
 import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../tests/support/drop-test-database'
 import { freezeWorkerDefinition } from './agent-kit/worker'
 import { freezeExecutionIdentity, ExecutionIdentityError } from './execution-identity'
 import { createExecutionClaim } from '../tests/helpers/factory-execution-claim'
@@ -19,7 +19,7 @@ else if (process.env.REQUIRE_DB === '1') assert.fail('REQUIRE_DB=1 needs an isol
 test('real claim, MCP tools, key disclosure and artifacts enforce the frozen execution identity', { skip: !url, timeout: 180_000 }, async t => {
   const admin = new Pool({ connectionString: url, max: 1 })
   const database = `execution_identity_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(url!); target.pathname = `/${database}`
   const databaseUrl = target.toString()
   const pool = new Pool({ connectionString: databaseUrl, max: 5 })

@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { listIssueConnections, updateIssueRelation } from '@/app/actions/issue-operations'
 import { moveIssue, type IssueView } from '@/app/actions/issues'
 import { useActionError } from '@/lib/use-action-error'
+import { closedRelationStatus as closed, taskRelationKinds, type TaskRelationKind } from '@/lib/issue-relations'
 import { useRelationSearch } from '@/lib/hooks/use-relation-search'
 import { isIssueListKey, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
 import { useLiveKey } from '@/hooks/use-live-key'
@@ -22,8 +23,7 @@ import { cn } from '@/lib/utils'
 import { FieldError } from '@/components/ui/field'
 
 type Issue = IssueView
-export type RelationKind = 'parent' | 'child' | 'related' | 'blockedBy' | 'blocks' | 'duplicate'
-const closed = (status: string) => ['done', 'canceled', 'duplicate'].includes(status)
+export type RelationKind = TaskRelationKind
 
 export function IssueRelationPicker({ kind, task, open, onOpenChange, pending, onSelect, validationError }: { kind: RelationKind; task: Issue; open: boolean; onOpenChange: (open: boolean) => void; pending: boolean; onSelect: (id: string) => void; validationError?: string }) {
   const t = useTranslations('Metadata.relations')
@@ -38,7 +38,9 @@ export function IssueRelationPicker({ kind, task, open, onOpenChange, pending, o
   return <Dialog open={open} onOpenChange={value => { if (!pending) onOpenChange(value) }}><DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg">{/* Our own container caps the height to the viewport so the header and close button stay visible on short screens; the list scrolls inside. */}<div className="flex max-h-[calc(100svh-2rem)] min-h-0 flex-col"><DialogHeader className="shrink-0 p-4 pr-10"><DialogTitle>{relationTitle(kind)}</DialogTitle></DialogHeader>{validationError && <FieldError className="shrink-0 px-4 pb-3">{validationError}</FieldError>}{loadFailed && <FieldError className="shrink-0 px-4 pb-3">{t('loadFailed')}</FieldError>}<Command shouldFilter={false} className="min-h-0 flex-1 [&_[cmdk-item]]:min-h-11 lg:[&_[cmdk-item]]:min-h-0"><CommandInput value={query} onValueChange={setQuery} placeholder={t('searchPlaceholder')} aria-label={t('searchAria')} disabled={pending} />{/* min-h keeps loading / empty / list states the same height so the dialog does not jump. */}<CommandList className="min-h-36">{empty ? <CommandEmpty>{!items ? <span className="text-muted-foreground">{empty}</span> : empty}</CommandEmpty> : null}{rows.length > 0 && <CommandGroup heading={t('group')}>{rows.map(row => { const Icon = ISSUE_STATUSES.find(status => status.value === row.status)?.icon ?? Circle; return <CommandItem key={row.id} value={`${row.id} ${issueIdentifier(row)} ${row.title}`} disabled={pending} onSelect={() => onSelect(row.id)}><Icon /><span className="shrink-0 text-xs text-muted-foreground">{issueIdentifier(row)}</span><span className="truncate">{row.title}</span></CommandItem> })}</CommandGroup>}{failed && <CommandGroup><CommandItem value="reload" onSelect={reload}>{t('reload')}</CommandItem></CommandGroup>}</CommandList></Command></div></DialogContent></Dialog>
 }
 
-type ConnectionsProps = { liveWorkspaceId?: string | null; viewerId: string; task: Issue; getCurrent: () => Promise<Issue | null>; onSaved: (issue: Issue) => void; disabled: boolean; /** False: nothing is read (a task not yet verified). */ enabled?: boolean }
+type ConnectionRows = Awaited<ReturnType<typeof listIssueConnections>>
+type ConnectionSnapshot = { rows?: ConnectionRows; error?: unknown; refresh: () => Promise<ConnectionRows | undefined> }
+type ConnectionsProps = { snapshot?: ConnectionSnapshot; liveWorkspaceId?: string | null; viewerId: string; task: Issue; getCurrent: () => Promise<Issue | null>; onSaved: (issue: Issue) => void; disabled: boolean; /** False: nothing is read (a task not yet verified). */ enabled?: boolean }
 
 export function IssueRelations({ mode, onOpen, onCreate, onPick, ...props }: ConnectionsProps & { mode: 'subissues' | 'sidebar'; onOpen: (id: string) => void; onCreate: () => void; onPick: (kind: RelationKind) => void }) {
   const { task, disabled } = props
@@ -62,7 +64,7 @@ export function IssueRelations({ mode, onOpen, onCreate, onPick, ...props }: Con
 }
 
 /** A task's connections (sub-tasks and relations) and what can be done to them, for IssueRelations and a layer that draws them. */
-export function useIssueConnections({ liveWorkspaceId = null, viewerId, task, getCurrent, onSaved, disabled, enabled = true }: ConnectionsProps) {
+export function useIssueConnections({ liveWorkspaceId = null, viewerId, task, getCurrent, onSaved, disabled, enabled = true, snapshot }: ConnectionsProps) {
   const t = useTranslations('Metadata.relations')
   const tIssue = useTranslations('Issue')
   const actionError = useActionError()
@@ -71,16 +73,28 @@ export function useIssueConnections({ liveWorkspaceId = null, viewerId, task, ge
   const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
   const { mutate: refresh } = useSWRConfig()
   const connectionsKey = issueKeys.connections(task.id)
-  const { data, error, mutate } = useSWR(enabled ? connectionsKey : null, () => listIssueConnections(task.id))
-  const rows = error ? undefined : data
+  const standalone = enabled && !snapshot
+  const local = useSWR(standalone ? connectionsKey : null, () => listIssueConnections(task.id))
+  const error = snapshot ? snapshot.error : local.error
+  const mutate = snapshot ? snapshot.refresh : () => local.mutate()
+  const rows = enabled && !error ? (snapshot ? snapshot.rows : local.data) : undefined
+  const relationScope = liveWorkspaceId ? task.id : UNRESOLVED_LIST_SCOPE
   // No timer (#1212): a change to this task or one connected to it pushes `issue_relations` on the
   // task's own channel, the one its document syncs on. Without one it is read once a minute.
-  useLiveKey('issue_relations', liveWorkspaceId ? task.id : UNRESOLVED_LIST_SCOPE, [unstable_serialize(connectionsKey)], liveWorkspaceId, { minIntervalMs: 2_000 })
+  useLiveKey('issue_relations', standalone ? relationScope : null, [unstable_serialize(connectionsKey)], liveWorkspaceId, { minIntervalMs: 2_000 })
   const [expanded, setExpanded] = useState(true)
   const [pending, setPending] = useState(false)
   const busy = useRef(false)
   const current = rows?.find(row => row.id === task.id)?.metadata ?? task.metadata
-  const children = rows?.filter(row => row.metadata.parentId === task.id) ?? []
+  const byKind = new Map<RelationKind, ConnectionRows>()
+  for (const row of rows ?? []) {
+    for (const kind of taskRelationKinds({ id: task.id, status: task.status, metadata: current }, row)) {
+      const group = byKind.get(kind)
+      if (group) group.push(row)
+      else byKind.set(kind, [row])
+    }
+  }
+  const children = byKind.get('child') ?? []
   async function remove(kind: RelationKind, targetId: string) {
     if (busy.current || disabled || error) return
     busy.current = true; setPending(true)
@@ -121,11 +135,11 @@ export function useIssueConnections({ liveWorkspaceId = null, viewerId, task, ge
     finally { busy.current = false; setPending(false) }
   }
   const groups: { kind: RelationKind; label: string; items: NonNullable<typeof rows>; icon: typeof Flag; warning?: boolean }[] = [
-    { kind: 'parent', label: groupLabel('parent'), items: rows?.filter(row => row.id === current.parentId) ?? [], icon: GitBranch },
-    { kind: 'blockedBy', label: groupLabel('blockedBy'), items: rows?.filter(row => current.blockedByIds.includes(row.id) && !closed(row.status)) ?? [], icon: Flag, warning: true },
-    { kind: 'blocks', label: groupLabel('blocks'), items: rows?.filter(row => row.metadata.blockedByIds.includes(task.id) && !closed(task.status)) ?? [], icon: Flag, warning: true },
-    { kind: 'duplicate', label: groupLabel('duplicate'), items: rows?.filter(row => row.id === current.duplicateOfId) ?? [], icon: Link2 },
-    { kind: 'related', label: groupLabel('related'), items: rows?.filter(row => current.relatedIds.includes(row.id) || row.metadata.relatedIds.includes(task.id) || (current.blockedByIds.includes(row.id) && closed(row.status)) || (row.metadata.blockedByIds.includes(task.id) && closed(task.status))) ?? [], icon: Link2 },
+    { kind: 'parent', label: groupLabel('parent'), items: byKind.get('parent') ?? [], icon: GitBranch },
+    { kind: 'blockedBy', label: groupLabel('blockedBy'), items: byKind.get('blockedBy') ?? [], icon: Flag, warning: true },
+    { kind: 'blocks', label: groupLabel('blocks'), items: byKind.get('blocks') ?? [], icon: Flag, warning: true },
+    { kind: 'duplicate', label: groupLabel('duplicate'), items: byKind.get('duplicate') ?? [], icon: Link2 },
+    { kind: 'related', label: groupLabel('related'), items: byKind.get('related') ?? [], icon: Link2 },
   ]
   return { rows, error, mutate, expanded, setExpanded, pending, current, children, remove, status, statusOptions, groups, done: children.filter(row => closed(row.status)).length, closed }
 }

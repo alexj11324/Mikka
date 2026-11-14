@@ -19,7 +19,7 @@ import { readWorkspaceDiffReceipt } from '../../../packages/daemon/src/coding-wo
 import type { JournalEntry } from '../../../packages/daemon/src/runs/journal'
 import { orderMigrations } from '../../../scripts/migration-order.mjs'
 import { disposableDatabase, E2E_DB_RULE } from '../../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../../tests/support/drop-test-database'
 import { GitHubAccessError } from '../../github/user-access-error'
 import { admitRepositoryTask } from '../../repository-admission'
 import type { RequestBudget } from '../../request-budget'
@@ -56,7 +56,7 @@ test('Task review send composes real transactional deliveries on PostgreSQL 17',
   const database = 'task_review_send_' + randomUUID().replaceAll('-', '') + '_e2e'
   const version = Number((await admin.query('SHOW server_version_num')).rows[0].server_version_num)
   assert.ok(version >= 170000 && version < 180000, 'Task review send acceptance requires PostgreSQL 17')
-  await admin.query('CREATE DATABASE "' + database + '" TEMPLATE template0')
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(url!); target.pathname = '/' + database
   const pool = new Pool({ connectionString: target.toString(), max: 16, connectionTimeoutMillis: 5000 })
   observePoolCommits(pool)

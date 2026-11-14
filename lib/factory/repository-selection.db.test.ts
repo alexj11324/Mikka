@@ -5,7 +5,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { Pool, type PoolClient } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { createFactoryStore } from './store'
 import { createFactoryDispatch as rawDispatch, factoryBinding } from './dispatch'
 import { createFactoryReconciler as rawReconciler } from './reconcile'
@@ -25,7 +25,7 @@ if (url) {
 test('Agent repository selection creates an authorized new execution, retaining history, model and Factory fences', { skip: !url, timeout: 180000 }, async t => {
   const admin = new Pool({ connectionString: url, max: 1 })
   const database = `repository_selection_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(url!); target.pathname = `/${database}`
   const pool = new Pool({ connectionString: target.toString(), max: 5 })
   const { workspacePool } = await import('../workspace-db')

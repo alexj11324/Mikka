@@ -56,3 +56,9 @@ export function useModelMenu(botId: string | null) {
 }
 
 export type ModelMenuState = ReturnType<typeof useModelMenu>
+
+export type ModelMenuControls = Pick<ModelMenuState, 'menu' | 'loading' | 'busy' | 'choosing' | 'refreshing' | 'refreshFailed'> & {
+  choose: (id: string) => unknown
+  refresh: () => unknown
+  retryRead: () => Promise<unknown>
+}

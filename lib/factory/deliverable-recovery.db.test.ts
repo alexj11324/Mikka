@@ -11,7 +11,7 @@ import { gzipSync } from 'node:zlib'
 import { readFile, readdir } from 'node:fs/promises'
 import { Pool, type PoolClient } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { applyApprovalMode, defaultRunPolicy } from '@mikka/protocol/agent-policy'
 
 import { createFactoryDispatch, defaultFactoryDispatchAdapters, factoryBinding, type FactoryQueue } from './dispatch'
@@ -43,7 +43,7 @@ const patch = Buffer.from(`diff --git a/DELIVERY.txt b/DELIVERY.txt\nnew file mo
 test('legacy delivery snapshot recovery binds a fresh live observation without rewriting the successful producer or failed review', { skip: !url, timeout: 180_000 }, async t => {
   const admin = new Pool({ connectionString: url, max: 1 })
   const database = `factory_snapshot_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(url!)
   target.pathname = '/' + database
   const pool = new Pool({ connectionString: target.toString(), max: 8 })

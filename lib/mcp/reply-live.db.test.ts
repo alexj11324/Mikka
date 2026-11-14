@@ -12,7 +12,7 @@ import { Pool } from 'pg'
 import { build } from 'esbuild'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { seedCoordinator } from '../../tests/support/coordinator-bot'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { observePoolCommits } from '../db/commit-effects'
 import { coordinatorSessionScope } from '../live/coordinator-session'
@@ -138,6 +138,9 @@ test('MCP waits use committed PG notifications; independent web observers still 
       await app.pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$2,$3,true,now(),now())', [owner, 'MCP reply fixture', `${owner}@example.invalid`])
       const identity = { owner, ...await seedCoordinator(owner) }
       await app.pool.query('INSERT INTO coordinator_sessions("userId","botId","leaseHolder","leaseUntil") VALUES ($1,$2,\'mcp-fixture-holder\',now()+interval \'10 minutes\') ON CONFLICT ("userId","botId") DO UPDATE SET "leaseHolder"=EXCLUDED."leaseHolder","leaseUntil"=EXCLUDED."leaseUntil"', [owner, identity.botId])
+      // Coordinator creation publishes its own list update. Complete that transaction's
+      // delivery before a test measures the effects of appending a reply.
+      await flush()
       chats.push(identity)
       return identity
     })
@@ -357,7 +360,7 @@ test('MCP waits use committed PG notifications; independent web observers still 
       const database = `mcp_context_${randomUUID().replaceAll('-', '')}_e2e`
       const targetUrl = new URL(target!); targetUrl.pathname = `/${database}`
       const admin = new Pool({ connectionString: target, max: 1 })
-      await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+      await createTestDatabase(admin, database, 'template0')
       const isolated = new Pool({ connectionString: targetUrl.toString(), max: 2 })
       const isolatedRequest = app.createRequestDatabaseScope(targetUrl.toString())
       const deferred: (() => Promise<void>)[] = []

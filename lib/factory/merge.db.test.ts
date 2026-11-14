@@ -68,7 +68,7 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       ALTER TABLE factory_tasks ADD COLUMN "createdAt" timestamptz NOT NULL DEFAULT now(), ADD COLUMN route jsonb;
       ALTER TABLE factory_attempts ADD COLUMN reason text;
       CREATE TABLE issue_versions (id uuid PRIMARY KEY,"issueId" uuid NOT NULL,"userId" text NOT NULL,
-        revision integer NOT NULL,title text,content jsonb,status text,priority text,actor_type text,actor_id text);
+        revision integer NOT NULL,title text,content jsonb,status text,priority text,actor_type text,actor_id text,"createdAt" timestamptz NOT NULL DEFAULT now());
     `);
 
     let nextPull = 418;
@@ -125,6 +125,23 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       assert.equal((await x.receipts()).length, 1);
       assert.equal((await x.history()).length, 1);
       assert.equal((await x.issue()).revision, before.revision + 1);
+    });
+
+    await t.test('acceptance advances a lagging task while preserving a later human status change', async () => {
+      const lagging = await preparedDeliverable();
+      await pool.query(`UPDATE issues SET status='doing' WHERE id=$1`, [lagging.task.issueId]);
+      assert.equal((await lagging.accept(randomUUID(), null)).status, 'accepted');
+      assert.equal((await lagging.issue()).status, 'done');
+      assert.equal((await lagging.history())[0].actor_id, actor.userId);
+
+      const held = await preparedDeliverable();
+      await pool.query(`INSERT INTO issue_versions (id,"issueId","userId",revision,status,actor_type,actor_id)
+        VALUES (gen_random_uuid(),$1,$2,1,'review','system','fixture'), (gen_random_uuid(),$1,$2,2,'todo','user',$2)`,
+        [held.task.issueId, actor.userId]);
+      await pool.query(`UPDATE issues SET status='todo',revision=2 WHERE id=$1`, [held.task.issueId]);
+      assert.equal((await held.accept(randomUUID(), null)).status, 'accepted');
+      assert.equal((await held.issue()).status, 'todo');
+      assert.equal((await held.history()).length, 2);
     });
 
     await t.test('a failure writing issue history rolls back acceptance, Factory state and issue completion together', async () => {
@@ -649,7 +666,8 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       // transport are fixtures. Signature admission has its own route tests.
       await pool.query(`
         ALTER TABLE agent_runs ADD COLUMN "pauseReason" text, ADD COLUMN "deviceTokenId" uuid,
-          ADD COLUMN "retryOf" uuid, ADD COLUMN "continuesRunId" uuid, ADD COLUMN "agentId" uuid;
+          ADD COLUMN "retryOf" uuid, ADD COLUMN "continuesRunId" uuid, ADD COLUMN "agentId" uuid,
+          ADD COLUMN "createdAt" timestamptz NOT NULL DEFAULT now();
         ALTER TABLE run_publications ADD COLUMN "issueId" uuid, ADD COLUMN "updatedAt" timestamptz DEFAULT now();
         CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
         CREATE TABLE computer_run_bindings ("runId" uuid PRIMARY KEY,"botId" uuid,"ownerId" text);

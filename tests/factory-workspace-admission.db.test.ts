@@ -10,7 +10,7 @@ import { enterprisePrincipal } from '../lib/enterprise/principal'
 import { tokenWorkspace } from '../lib/tokens/principal'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { orderMigrations } from '../scripts/migration-order.mjs'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 import { connectGitHub, githubAppStub } from './support/github-app-stub'
 
 const target = process.env.E2E_DATABASE_URL
@@ -22,7 +22,7 @@ const code = (error: unknown): string | undefined => error && typeof error === '
 test('human Factory admission holds Workspace before APP and reuses Profile membership with both pools at one', { skip: !allowed, timeout: 180_000 }, async t => {
   const admin = new Pool({ connectionString: target, max: 1 })
   const database = 'factory_workspace_' + randomUUID().replaceAll('-', '') + '_e2e'
-  await admin.query('CREATE DATABASE "' + database + '" TEMPLATE template0')
+  await createTestDatabase(admin, database, 'template0')
   const isolated = new URL(target!); isolated.pathname = '/' + database
   const url = isolated.toString()
   const controls = new Pool({ connectionString: url, max: 1 })

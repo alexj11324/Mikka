@@ -1,7 +1,5 @@
 /** Pure JSON codec shared with the bundled renderer. No server dependencies. */
-export const DESKTOP_RPC_VERSION = 1 as const
-export const DESKTOP_RPC_PREVIOUS_VERSION = 0 as const
-export const UPDATE_REQUIRED = 'desktop_client_update_required' as const
+export { DESKTOP_RPC_VERSION, DESKTOP_RPC_PREVIOUS_VERSION, UPDATE_REQUIRED } from './version.ts'
 
 export type Wire =
   | null | boolean | number | string

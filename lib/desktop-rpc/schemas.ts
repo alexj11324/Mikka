@@ -1,3 +1,5 @@
+import { threadModelChoice } from '@/lib/thread-model-choice'
+import { archiveIdleDays, directoryInput } from '@/lib/conversation-directory-input'
 import { saveEnvironmentInput, projectDefaultEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
 import { createOnlyCommand, dispatchReceiptInput } from '@/lib/task-create-command'
 import { taskListPageInput } from '@/lib/task-list-page'
@@ -68,6 +70,7 @@ const apiKey = z.discriminatedUnion('provider', [
   object({ provider: z.literal('custom'), name: text(60).trim().min(1), baseUrl: text(500).trim().min(1), protocol: z.enum(['anthropic', 'openai']), apiKey: text(512).trim().min(8), models: z.array(text(128).trim().min(1)).max(200).optional() }),
 ])
 const preferences = object({
+  archiveIdleAfterDays: z.literal(archiveIdleDays).optional(),
   proactive: bool, pushDecide: bool, pushReview: bool, pushFinished: bool, pushBriefing: bool,
   pushWhen: z.enum(['always', 'away']), memoryEnabled: bool, sendKey: z.enum(['enter', 'modEnter']),
   personalInstructions: text(8000).transform(value => value.trim()).refine(value => [...value].length <= 2000), dailySuggestions: bool,
@@ -131,13 +134,19 @@ export const desktopActionSchemas = {
   'agents.renameDevice': tuple(uuid, text(100).trim().min(1)),
   'agents.removeDevice': oneId,
   'agents.listAgents': none,
-  'agents.pollIssueThreads': oneId,
+  'agents.pollIssueThreads': tuple(uuid, bool.optional(), object({ version: version.optional(), positions: listPositions(51).optional() }).optional()),
   'agents.findThreadIssue': oneId,
   'agents.getIssueThread': tuple(uuid.nullable(), uuid, object({ chain: text(4000), runId: uuid.nullable(), seq: count, runs: count, count }).nullish()),
   'agents.getThreadChanges': tuple(uuid.nullable(), uuid),
   'agents.getThreadMachine': tuple(uuid.nullable(), uuid),
   'agents.getThreadInstructions': tuple(uuid.nullable(), uuid),
-  'agents.sendIssueThreadReply': tuple(object({ expectedOwnerId: text(256).optional(), expectedWorkspaceId: uuid.optional(), issueId: uuid.nullable(), runId: uuid, text: text(10_000).min(1), requestId: uuid.optional(), retryOriginalSession: z.literal(true).optional(), questionWakeGeneration: uuid.optional() })),
+  'agents.sendIssueThreadReply': tuple(object({ expectedOwnerId: text(256).optional(), expectedWorkspaceId: uuid.optional(), issueId: uuid.nullable(), runId: uuid, text: text(10_000).min(1), requestId: uuid.optional(), retryOriginalSession: z.literal(true).optional(), questionWakeGeneration: uuid.optional(), modelChoice: threadModelChoice.optional(), delivery: z.enum(['queue','steer','interrupt']).optional() })),
+  'agents.createThreadReplyVersion': tuple(object({issueId:uuid.nullable(),runId:uuid,change:z.discriminatedUnion('operation',[
+    object({operation:z.literal('edit'),anchorRunId:uuid,anchorKey:uuid,requestId:uuid,text:text(10_000).min(1)}),
+    object({operation:z.literal('rerun'),anchorRunId:uuid,anchorKey:text(320).min(1),requestId:uuid})])})),
+  'agents.getThreadReplyVersions': tuple(uuid.nullable(),uuid),
+  'agents.changeQueuedThreadReply': tuple(object({issueId: uuid.nullable(), runId: uuid, messageId: uuid, action: z.enum(['cancel','sendNow'])})),
+  'agents.getThreadContinuationModels': tuple(uuid, uuid),
   'agents.getThreadName': oneId,
   'agents.stopRun': oneId,
   'agents.resumeQuotaPausedRunOnApiKey': oneId,
@@ -281,6 +290,13 @@ export const desktopActionSchemas = {
   'task-runs.pollTaskRuns': none,
   'task-runs.pollThreads': tuple(version.optional(), listPositions(200).optional()),
   'task-runs.syncThreadList': tuple(version.optional(), listPositions(200).optional()),
+  'task-runs.findThreadReferences': z.union([tuple(uuid, text(120)), tuple(uuid, text(120), z.enum(['task', 'thread', 'pr']))]),
+  'task-runs.listConversations': tuple(directoryInput),
+  'task-runs.listConversationSidebar': none,
+  'task-runs.readConversationOrganization': tuple(uuid),
+  'task-runs.setConversationOrganization': tuple(uuid, object({ field: z.enum(['archived', 'pinned']), value: bool })),
+  'task-runs.renameConversation': tuple(uuid, text(400)),
+  'task-runs.regenerateConversationTitle': tuple(uuid),
   'team-relations.getIssueTeam': oneId,
   'team-relations.setIssueTeam': tuple(object({ issueId: uuid, teamId: uuid.nullable(), expectedTeamId: uuid.nullable() })),
   'team-relations.listProjectTeams': none,

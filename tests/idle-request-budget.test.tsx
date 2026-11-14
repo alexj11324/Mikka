@@ -256,6 +256,11 @@ Object.assign(fixtures, {
   'agents.getThreadMachine': () => ({ kind: 'laptop', state: 'online', name: 'Ada’s MacBook', platform: 'darwin', arch: 'arm64', hostname: null, lastSeenAt: new Date(AT).toISOString(), cloud: null }),
   'agents.listAgents': () => [{ id: AGENT, name: 'Claude Code', description: '', instructions: '', harness: 'claude_code', deviceId: DEVICE, deviceName: 'Ada’s MacBook' }],
   'linear-sync.getLinearBoardSync': () => ({ synced: false }),
+  'task-runs.listConversationSidebar': () => ({ [BOT]: { more: false, items: [{
+    id: RUN, issueId: ISSUE, identifier: null, title: 'Fix sign-in redirect', at: AT,
+    pulls: [{ url: PULL_REQUEST, state: 'merged' }],
+    pinned: false, state: 'working', status: 'doing', harness: 'claude_code',
+  }] } }),
   'task-runs.pollTaskRuns': () => ({ items: [{ issueId: ISSUE, runId: RUN, issueTitle: 'Fix sign-in redirect', agentId: AGENT, agentName: 'Claude Code', status: 'running', outcome: null, error: null, finishedAt: null, bot: null, harnesses: ['claude_code'] }], live }),
   'execution-settings.getBotModelMenu': () => ({ groups: [{ kind: 'subscription', provider: 'claude', plan: 'Max', credentialLabel: 'ada@example.invalid', options: [{ id: 'binding-1', modelId: 'claude-sonnet-4-6', provider: 'claude' }] }],
     current: { id: 'binding-1', modelId: 'claude-sonnet-4-6', provider: 'claude', kind: 'subscription', chosen: false, available: true } }),
@@ -309,7 +314,7 @@ const shows: Record<string, string[]> = {
   'bot-chat': ['Can you fix the sign-in redirect?', 'Done: the redirect is fixed.'],
   devices: ['Ada’s MacBook'],
   'artifact-viewer': ['Release notes', 'Sign-in redirect fixed.'],
-  'nav-bot-list': ['Scout', 'Fix sign-in redirect', 'blocked'],
+  'nav-bot-list': ['Scout', 'Fix sign-in redirect', 'blocked', 'merged'],
   'group-chat': ['Who can fix the sign-in redirect?', 'Looking into the redirect now.'],
   'subscription-settings': ['ada@example.invalid'],
   'pull-request-badge': ['#81'],
@@ -349,7 +354,7 @@ const pages: Record<string, () => Promise<ReactNode>> = {
     const { useChatNav } = await import('../components/nav/bot-list')
     function ChatNavigation() {
       const { entries } = useChatNav({ bots, workspaceId: WORKSPACE, threads: [listedThread], issues: boardIssues.map(issue => ({ ...issue, workspaceId: WORKSPACE })) as never, presentations, active: { kind: 'coordinator' }, userId: user.id })
-      return <>{entries.map(entry => <span key={entry.id}>{entry.avatar}{entry.name}{entry.work?.map(row => <span key={row.id}>{row.fullName} {row.state}</span>)}</span>)}</>
+      return <>{entries.map(entry => <span key={entry.id}>{entry.avatar}{entry.name}{entry.work?.map(row => <span key={row.id}>{row.fullName} {row.state} {row.pullState}</span>)}</span>)}</>
     }
     return <ChatNavigation />
   },

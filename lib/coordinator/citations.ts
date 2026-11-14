@@ -3,14 +3,10 @@
 // URLs. The chat shows all of them as source chips: issues and runs looked up
 // for the person when the chat loads, web pages by their link preview.
 
-export type CitationKind = 'issue' | 'run'
+import { conversationTitle } from '../short-title'
 
-export type CitationPart =
-  | { type: 'text'; text: string }
-  /** `kind` is null for a bare id, which may be either. */
-  | { type: 'citation'; kind: CitationKind | null; id: string; raw: string }
-  /** A web page; `label` is the Markdown link text, if any. */
-  | { type: 'link'; url: string; label: string | null; raw: string }
+import { splitCitations, type CitationPart } from './citation-parts'
+export { splitCitations, type CitationPart, type CitationKind } from './citation-parts'
 
 export interface IssueSource {
   kind: 'issue'
@@ -40,6 +36,8 @@ export interface RunSource {
   /** Its group in the thread list (R-52), decided on the server: the phone draws it as is. */
   group?: import('@/lib/thread-groups').ThreadGroup
   issue: { id: string; number: number | null; identifier: string | null; title: string; shortTitle?: string | null; status?: string; run?: { status: string; outcome: string | null; stopReason?: string | null } | null; review?: import('@/lib/coding-workspace/task-review/read').TaskReviewSummary | null } | null
+  /** The conversation's own stored short title, once it has one (agent_runs.title of the chain's first run). */
+  title?: string | null
   /** The first line of what it was asked to do; its shown name is runThreadName. */
   name: string
   /** How it ended, once it has. */
@@ -56,42 +54,35 @@ export interface RunSource {
 
 export type CitationSource = IssueSource | RunSource
 
-/** A thread's own name, as its thread-list row shows it (glossary): its task, as 「MIK-12 标题」, else what it was asked. */
-export function runThreadName(run: Pick<RunSource, 'issue' | 'name'>) {
-  return run.issue ? [run.issue.identifier, run.issue.title].filter(Boolean).join(' ') : run.name
+/** A thread's name where a row or a card names it: its task's code, when it has one, and the conversation's short title. */
+export function runThreadName(run: Pick<RunSource, 'issue' | 'name' | 'title'>) {
+  return [run.issue?.identifier, runTitle(run)].filter(Boolean).join(' ')
 }
 
 /**
- * A thread's title where it is named in a sentence (decision 2026-11-10): its task's title without the code, since the
- * task is cited as its own chip that carries the code, else what it was asked.
+ * A thread's title wherever it is named: the conversation's one bounded short title (lib/short-title.ts
+ * conversationTitle, decision 2026-11-13-1405), never its task's full title and never with the code, which the task's
+ * own chip carries.
  */
-export function runTitle(run: Pick<RunSource, 'issue' | 'name'>) {
-  return run.issue?.title || run.name
+export function runTitle(run: Pick<RunSource, 'issue' | 'name' | 'title'>) {
+  return conversationTitle(run)
 }
 
-const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
-/** ASCII only, so a URL followed by Chinese text with no space still ends at the URL. */
-const URL_CHARS = '[^\\s<>()\\[\\]"\'`\\u0080-\\uffff]+'
-const CITATION = new RegExp(`\\[([^\\]\\n]{1,200})\\]\\((https?://${URL_CHARS})\\)|(https?://${URL_CHARS})|\\[\\[(issue|run):(${UUID})\\]\\]|\\b(${UUID})\\b`, 'gi')
-/** Punctuation that ends a sentence rather than a bare URL. */
-const TRAILING = /[.,;:!?。，；：！？、）]+$/
-
-/** Splits reply text into plain text and citations, in order. */
-export function splitCitations(text: string): CitationPart[] {
-  const parts: CitationPart[] = []
-  let last = 0
-  for (const match of text.matchAll(CITATION)) {
-    if (match.index > last) parts.push({ type: 'text', text: text.slice(last, match.index) })
-    let raw = match[0]
-    if (match[2]) parts.push({ type: 'link', url: match[2], label: match[1].trim() || null, raw })
-    else if (match[3]) {
-      raw = match[3].replace(TRAILING, '')
-      parts.push({ type: 'link', url: raw, label: null, raw })
-    } else parts.push({ type: 'citation', kind: match[4] ? match[4].toLowerCase() as CitationKind : null, id: (match[5] ?? match[6]).toLowerCase(), raw })
-    last = match.index + raw.length
+/**
+ * Marks a `[[run:…]]` that directly follows an `[[issue:…]]` (nothing but spaces between): when that thread belongs to
+ * that task, the two read as one reference, the task's chip and then the thread's title. The gap between them is dropped here: the
+ * thread draws one word gap itself, so nothing is left behind when its title is left out beside its card.
+ */
+export function pairCitations(parts: readonly CitationPart[]): (CitationPart & { after?: string })[] {
+  const out: (CitationPart & { after?: string })[] = []
+  for (const part of parts) {
+    const gap = out.at(-1), before = gap?.type === 'text' && !gap.text.trim() && !gap.text.includes('\n') ? out.at(-2) : gap
+    if (part.type === 'citation' && part.kind === 'run' && before?.type === 'citation' && before.kind === 'issue') {
+      if (gap !== before) out.pop()
+      out.push({ ...part, after: before.id })
+    } else out.push(part)
   }
-  if (last < text.length) parts.push({ type: 'text', text: text.slice(last) })
-  return parts
+  return out
 }
 
 /** The start of a `[[issue:<id>]]` or `[[run:<id>]]` at the very end of the text, up to its last `]`. */
@@ -160,8 +151,8 @@ export function remarkCitations() {
       node.children = node.children.flatMap(child => {
         if (child.type === 'link' && child.children?.length === 1 && child.children[0].value === child.url) return autolink(child)
         if (child.type !== 'text' || !child.value) { walk(child); return [child] }
-        return splitCitations(child.value).flatMap<MdastNode>(part => {
-          if (part.type === 'citation') return [{ type: 'link', url: `${CITATION_HREF}${part.kind ?? 'any'}/${part.id}`, children: [{ type: 'text', value: part.raw }] }]
+        return pairCitations(splitCitations(child.value)).flatMap<MdastNode>(part => {
+          if (part.type === 'citation') return [{ type: 'link', url: `${CITATION_HREF}${part.kind ?? 'any'}/${part.id}${part.after ? `/after/${part.after}` : ''}`, children: [{ type: 'text', value: part.raw }] }]
           if (part.type === 'link') return [{ type: 'link', url: part.url, children: [{ type: 'text', value: part.label ?? part.url }] }]
           return part.text.split('\n').flatMap((line, index) => [...(index ? [{ type: 'break' }] : []), ...(line ? [{ type: 'text', value: line }] : [])])
         })

@@ -1,7 +1,8 @@
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import { listOwnerBots } from '@/lib/coordinator/coordinator-bot'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
+import { conversationSidebar } from '@/lib/conversation-directory'
 import { runHistoryWindow } from '@/lib/task-state-query'
 import { agentRuns } from '@/lib/db/schema'
 import { botChats } from '@/lib/coordinator/store'
@@ -34,7 +35,7 @@ async function handleGET(request: Request) {
   const context = await loadWorkspaceContext(undefined, user)
   const recent = and(eq(agentRuns.userId, user.id), eq(agentRuns.workspaceId, context.workspace.id),
     sql`${agentRuns.createdAt} > now() - ${runHistoryWindow}`)
-  const [botRows, chats, suggestions, perBot, preferences, live] = await Promise.all([
+  const [botRows, chats, suggestions, perBot, sidebar, preferences, live] = await Promise.all([
     // The Coordinator first, marked `coordinator` (lib/coordinator/coordinator-bot.ts listOwnerBots).
     listOwnerBots(user.id, context.workspace.id),
     botChats(user.id),
@@ -45,6 +46,7 @@ async function handleGET(request: Request) {
       running: sql<number>`count(*) filter (where ${inArray(agentRuns.status, [...RUNNING])})`,
       waiting: sql<number>`count(*) filter (where ${eq(agentRuns.status, 'waiting_input')})`,
     }).from(agentRuns).where(recent).groupBy(agentRuns.botId),
+    conversationSidebar(pool, user, context.workspace.id),
     chatPreferences(user.id),
     ownerListRead(user.id),
   ])
@@ -61,6 +63,7 @@ async function handleGET(request: Request) {
     workspace: context.workspace,
     workspaces: context.choices,
     bots: botRows.map(bot => ({ ...bot, line: homeLine(chats[bot.id]?.line), at: chats[bot.id]?.at ?? null, working: chats[bot.id]?.working ?? false,
+      unreadCount: (chats[bot.id]?.unreadCount ?? 0) + (sidebar[bot.id]?.unreadCount ?? 0),
       pinned: preferences[bot.id]?.pinned ?? bot.coordinator, waiting: waiting.get(bot.id) ?? 0, ...own(bot.id) })),
     // The person's own state for each group chat they changed on the home list, by conversation id.
     groupPreferences: Object.fromEntries(Object.entries(preferences).filter(([key]) => !botIds.has(key) && /^[0-9a-f-]{36}$/i.test(key))

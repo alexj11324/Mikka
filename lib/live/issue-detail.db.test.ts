@@ -5,7 +5,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import test, { mock } from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { seedTeam } from '../../tests/support/workspace-admin-db'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { observePoolCommits } from '../db/commit-effects'
@@ -45,7 +45,7 @@ test('issue members and relations keys reach only the task audience, after the a
   })
   const admin = new Pool({ connectionString: url, max: 1 })
   const name = `issue_detail_live_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${name}" TEMPLATE template0`)
+  await createTestDatabase(admin, name, 'template0')
   const target = new URL(url!); target.pathname = `/${name}`
   const database = new Pool({ connectionString: target.toString(), max: 6 })
   observePoolCommits(database)

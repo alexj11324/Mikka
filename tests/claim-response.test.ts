@@ -43,6 +43,7 @@ function fixture() {
     checkpoint: null as RunCheckpoint | null,
     strictRecovery: false,
     lost: undefined as {deviceId:string;sessionId:string;agentId:string;agentDefinition?:{harness?:'codex'|'claude_code'}|null}|undefined,
+    historicalReplyVersion:false,
     preparation:[] as string[],
     modelAdmissionCalls:[] as {scope:{workspaceId:string;ownerId:string};model:string}[],
     subscriptionAdmissionCalls:[] as {scope:{workspaceId:string;ownerId:string};model:string;route:string}[],
@@ -679,6 +680,18 @@ test('capable workers receive the signed final composed policy, not the earlier 
   } finally {if(before===undefined)delete process.env.BETTER_AUTH_SECRET;else process.env.BETTER_AUTH_SECRET=before}
 })
 
+
+test('a historical reply version leaves prior worktrees and native sessions out of its daemon claim', async () => {
+  const probe = fixture()
+  probe.historicalReplyVersion = true
+  Object.assign(probe.run,{ continuesRunId: 'version-anchor' })
+  const response = await claim(probe)
+  assert.equal(response.status,200)
+  const body = await response.json()
+  assert.equal(body.continuesRunId,undefined)
+  assert.equal(body.resumeSessionId,undefined)
+  assert.equal(body.followUp,undefined)
+})
 
 test('Profile model, source or version changes keep ancestry but start a fresh native session', async () => {
   const profile = { profileId: 'default', version: 1, digest: 'frozen-role', targetEntry: { id: 'first', harness: 'codex', model: 'gpt-6-luna', source: { kind: 'subscription', connectionId: 'source-a' } } }

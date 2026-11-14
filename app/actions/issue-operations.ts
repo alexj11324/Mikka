@@ -4,7 +4,7 @@ import { and, desc, eq, inArray, or, sql, type SQL } from 'drizzle-orm'
 import { getTranslations } from 'next-intl/server'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
-import { db } from '@/lib/db'
+import { db, withDatabaseTransaction } from '@/lib/db'
 import { issueListChanged } from '@/lib/live/lists'
 import { reviewTaskChanged } from '@/lib/coding-workspace/review-sessions'
 import { issueRelationsChanged, relationIds } from '@/lib/live/issue-detail'
@@ -46,7 +46,7 @@ type ConnectionAccess = { issue: Pick<typeof issues.$inferSelect, 'id' | 'userId
   user: Awaited<ReturnType<typeof requireIssueAccess>>['user']; teamId: string | null }
 async function issueConnections(id: string, reach: 'linked' | 'all', known?: ConnectionAccess) {
   const { issue, user, teamId } = known ?? await requireIssueAccessWithoutBody(id, { projection: 'lock' })
-  return db.transaction(async tx => {
+  return db.transaction(tx => withDatabaseTransaction(tx, async () => {
   const [locked] = await tx.select({ workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, content: issueAttrsContent }).from(issues).where(eq(issues.id, id)).for('share')
   requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
   await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
@@ -76,7 +76,7 @@ async function issueConnections(id: string, reach: 'linked' | 'all', known?: Con
       number: readIssueMetadata(row.content).number, issuedIdentifier: row.issuedIdentifier })), tx, knownTeams)
     : new Map<string, string | null>()
   return live.map(({ content, issuedIdentifier: _issuedIdentifier, ...row }) => ({ ...row, identifier: identifiers.get(row.id) ?? null, metadata: readIssueMetadata(content) }))
-  })
+  }))
 }
 
 export async function updateIssueRelation(input: z.input<typeof relationSchema>) {

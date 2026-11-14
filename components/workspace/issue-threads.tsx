@@ -1,13 +1,16 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import useSWR, { unstable_serialize } from 'swr'
+import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
+import { heldListPositions, mergeList, type ListSnapshot } from '@/lib/list-poll'
+import { waitForCacheHydration } from '@/lib/swr/persistent-cache'
+import type { listIssueVersions } from '@/app/actions/issues'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { ChevronRight } from 'lucide-react'
 import { pollIssueThreads } from '@/app/actions/agents'
 import { acceptedProducerOutcome, agentStretches, threadQuestionView, threadTime, type IssueThread } from '@/lib/issue-threads'
 import { useLiveKey } from '@/hooks/use-live-key'
-import { UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
+import { ListReadScopeError, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
 import { BotAvatar, COORDINATOR_AVATAR, colorFor } from '@/components/nav/bot-avatar'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/reui/badge'
@@ -20,18 +23,57 @@ import { cn } from '@/lib/utils'
 import { InlineLoadError } from '@/components/load-error'
 import { useAcceptanceTasks } from './factory-acceptance'
 
-/** The SWR key of an issue's thread list; it holds `{ threads, live }`. */
+/** Shared by the Task's workspace reads and its thread actions. */
 export const issueThreadsKey = (issueId: string) => ['issue-threads', issueId] as const
 export type IssueThreadsRead = Awaited<ReturnType<typeof pollIssueThreads>>
 
 /** No timer reads the list (#1212): a run change on this issue, a teammate's included, pushes
  * `issue_threads` to every member who can see it. While the channel is down it is read once a minute. */
-export function useIssueThreads(issueId: string, enabled = true) {
+export function useIssueThreads(issueId: string, enabled = true, viewerId?: string) {
   const key = issueThreadsKey(issueId)
-  const result = useSWR(enabled ? key : null, () => pollIssueThreads(issueId), { revalidateOnReconnect: true })
+  const { cache } = useSWRConfig()
+  type History = ListSnapshot<Awaited<ReturnType<typeof listIssueVersions>>[number]>
+  const result = useSWR(enabled ? key : null, async () => {
+    await waitForCacheHydration(cache)
+    const cached = cache.get(unstable_serialize(key))?.data as { viewerId?: string; history?: History } | undefined
+    const previous = viewerId && cached?.viewerId === viewerId ? cached.history : undefined
+    const positions = heldListPositions(previous)
+    const version = positions && positions.length === previous?.positions?.length ? previous.version : undefined
+    const incoming = await pollIssueThreads(issueId, true, { version, positions })
+    if (!('activity' in incoming)) return { ...incoming, history: undefined }
+    if (viewerId && incoming.viewerId !== viewerId) throw new ListReadScopeError('owner')
+    const next = incoming.activity
+    const history: History = { version: next.version, items: mergeList(previous?.items ?? [], next),
+      positions: 'positions' in next ? next.positions : previous?.positions }
+    return { ...incoming, history }
+  }, { revalidateOnReconnect: true })
   const scope = enabled ? result.data?.live.workspaceId ?? null : null
   useLiveKey('issue_threads', scope ? issueId : UNRESOLVED_LIST_SCOPE, [unstable_serialize(key)], scope, { minIntervalMs: 2_000 })
-  return { ...result, data: result.data?.threads }
+  useLiveKey('factory_issue', enabled && scope ? issueId : null, [unstable_serialize(key)], scope, { minIntervalMs: 2_000 })
+  useLiveKey('issue_list', enabled && scope ? scope : null, [unstable_serialize(key)], scope, { minIntervalMs: 2_000 })
+  const hasConnections = result.data && 'connections' in result.data
+  useLiveKey('issue_relations', hasConnections && scope ? issueId : null, [unstable_serialize(key)], scope, { minIntervalMs: 2_000 })
+  // A cached client can still meet an earlier server during a rolling upgrade.
+  const connections = !result.error && result.data && !hasConnections ? undefined : {
+    rows: !result.error && result.data && 'connections' in result.data ? result.data.connections : undefined,
+    error: result.error,
+    refresh: async () => {
+      const updated = await result.mutate()
+      return updated && 'connections' in updated ? updated.connections : undefined
+    },
+  }
+  const history = !result.error && result.data && !('activity' in result.data) ? undefined : {
+    rows: result.error ? undefined : result.data?.history?.items, error: result.error, refresh: result.mutate,
+  }
+  return { ...result, history, connections, data: result.data?.threads, work: result.error ? undefined : result.data?.work }
+}
+
+export function useTaskWork(issueId: string, onOpen: (id: string) => void, enabled: boolean, viewerId: string) {
+  const t = useTranslations('IssueThreads')
+  const { data, error, mutate, work, connections, history } = useIssueThreads(issueId, enabled, viewerId)
+  const retry = () => { void mutate() }
+  return { work, connections, history, threads: error ? [] : data ?? [], openThread: onOpen, retry,
+    failed: error ? { label: t('loadFailed'), retry } : null }
 }
 
 export function harnessLabel(harness: string) {
@@ -53,15 +95,16 @@ export type AgentActivityRow = { id: string; at: string; node: ReactNode }
 /** An Agent row as data, for a layer that draws the log: its mark (the Agent's, or the result's), name, run result and time. */
 export type AgentActivityItem = { id: string; at: string; name: string; mark: ReactNode; result: string; group: ThreadGroup; time: string; open: boolean; onOpen: (() => void) | null }
 
-export function useAgentActivity(issueId: string, openId: string | null, onOpen: (id: string) => void, enabled = true): { rows: AgentActivityRow[]; items: AgentActivityItem[]; error: ReactNode; failed: { label: string; retry: () => void } | null } {
+export function useAgentActivity(issueId: string, openId: string | null, onOpen: (id: string) => void, enabled = true, viewerId?: string) {
   const t = useTranslations('IssueThreads')
   const resultLabel = useRunResultLabel()
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
-  const { data, error, mutate } = useIssueThreads(issueId, enabled)
+  const { data, error, mutate, work, connections, history } = useIssueThreads(issueId, enabled, viewerId)
+  const snapshot = { work, connections, history, threads: error ? [] : data ?? [], openThread: onOpen, retry: () => { void mutate() } }
   const { allTasks } = useAcceptanceTasks(enabled ? issueId : null)
-  if (!enabled) return { rows: [], items: [], error: null, failed: null }
-  if (error) return { rows: [], items: [], error: <InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />, failed: { label: t('loadFailed'), retry: () => { void mutate() } } }
+  if (!enabled) return { ...snapshot, rows: [], items: [], error: null, failed: null }
+  if (error) return { ...snapshot, rows: [], items: [], error: <InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />, failed: { label: t('loadFailed'), retry: () => { void mutate() } } }
   const stretches = agentStretches(data ?? [])
   const items: AgentActivityItem[] = []
   const rows = stretches.map(({ first, last, ids }, index): AgentActivityRow => {
@@ -89,7 +132,7 @@ export function useAgentActivity(issueId: string, openId: string | null, onOpen:
     items.push({ id: `agent:${first.id}`, at, name, mark: profile ? <ProfileMark icon={profile.icon} color={profile.color} /> : harness ? <HarnessMark harness={harness} /> : <ThreadStatusIcon group={group} />, result: view.stopping ? t('stopping') : resultLabel(result, reason), group, time: format.relativeTime(threadTime(last, now), now), open, onOpen: first.detail ? () => onOpen(first.id) : null })
     return { id: `agent:${first.id}`, at, node }
   })
-  return { rows, items, error: null, failed: null }
+  return { ...snapshot, rows, items, error: null, failed: null }
 }
 
 /** The dispatching Bot in its own look (R-36): the same bloub as its bot-list row; the Coordinator's own runs use its mark. */

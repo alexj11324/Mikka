@@ -441,7 +441,13 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     : {}
   // The next run of a thread after a new dispatch (lib/thread-dispatch.ts) goes on in the thread's last worktree and,
   // on the same device, its session, sent only the new note; elsewhere it starts fresh with the full brief.
-  const [earlier] = !run.retryOf && run.continuesRunId
+  // A historical version keeps its conversation lineage but starts a fresh
+  // native session and worktree. Resuming the latest session would leak later
+  // turns back into the historical prefix or overwrite its working files.
+  const version = !run.retryOf && run.continuesRunId && (await pool.query(
+    'SELECT 1 FROM thread_reply_versions WHERE "resultRunId"=$1 AND "userId"=$2 AND "workspaceId"=$3',
+    [run.id,caller.userId,run.workspaceId])).rowCount
+  const [earlier] = !version && !run.retryOf && run.continuesRunId
     ? await db.select({ sessionId: agentRuns.sessionId, deviceId: agentRuns.deviceId, agentId: agentRuns.agentId, agentDefinition: agentRuns.agentDefinition }).from(agentRuns).where(and(eq(agentRuns.id, run.continuesRunId), eq(agentRuns.userId, caller.userId), eq(agentRuns.issueId, issueId))).limit(1)
     : []
   const earlierHarness = earlier?.agentDefinition?.harness ?? (earlier?.agentDefinition == null && earlier?.agentId === run.agentId ? agent.harness : undefined)

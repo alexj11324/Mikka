@@ -14,7 +14,7 @@ import { Pool } from 'pg'
 import { observePoolCommits } from '../db/commit-effects'
 import { isolateCoordinatorWakes } from '../../tests/support/coordinator-wake'
 import { dbUrl, seedUser, seedPersonalWorkspace, seedBot, seedIssue } from '../../tests/support/workspace-admin-db'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { templateModelsFixture } from '../../tests/support/template-models'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import type { DecisionAnswer } from '../coordinator/decision'
@@ -35,7 +35,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
   await isolateCoordinatorWakes(t)
   const admin = new Pool({ connectionString: dbUrl })
   const database = `factory_profile_dispatch_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${database}"`)
+  await createTestDatabase(admin, database)
   const isolated = new URL(dbUrl); isolated.pathname = `/${database}`
   const url = isolated.toString()
   const old = { E2E_DATABASE_URL: process.env.E2E_DATABASE_URL, MIKKA_DATABASE_URL: process.env.MIKKA_DATABASE_URL, DATABASE_URL: process.env.DATABASE_URL }
