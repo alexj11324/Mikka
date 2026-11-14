@@ -13,9 +13,10 @@ export async function GET(request: Request) {
   const pinned = params.get('pinned')
   const archived = params.get('archived')
   if ((pinned !== null && pinned !== 'true' && pinned !== 'false') ||
-      (archived !== null && archived !== 'true' && archived !== 'false')) return json({ error: 'invalidInput' }, 422)
+      (archived !== null && archived !== 'true' && archived !== 'false' && archived !== 'any')) return json({ error: 'invalidInput' }, 422)
   const raw = {
-    search: params.get('search') ?? '', state: params.get('state') ?? 'all', archived: archived === 'true',
+    search: params.get('search') ?? '', state: params.get('state') ?? 'all', archived: archived === 'any' ? 'any' : archived === 'true',
+    pullState: params.get('pullState') ?? 'all',
     botId: params.get('botId') ?? undefined,
     cursor: params.has('after') || params.has('at') || pinned !== null
       ? { id: params.get('after'), at: params.get('at'), pinned: pinned === null ? null : pinned === 'true' } : undefined,

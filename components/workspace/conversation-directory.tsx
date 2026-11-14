@@ -17,7 +17,7 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { useLiveKey } from '@/hooks/use-live-key'
 import type { DirectoryState } from '@/lib/conversation-directory-input'
 import { PullRequestsBadge, pullRequestRef } from './pull-requests-badge'
-import { directoryPullRequests } from '@/lib/pull-request-appearance'
+import { directoryPullRequests, directoryPullStates as pullStates } from '@/lib/directory-pulls'
 import { openGroupConversation, openTask, openThread } from './workspace-navigation'
 
 type Page = Awaited<ReturnType<typeof listConversations>>
@@ -27,7 +27,6 @@ export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 
   const t = useTranslations('ConversationDirectory')
   const prLabel = useTranslations('Metadata.prState')
   const categories = useTranslations('ArtifactsPage.category')
-  const pullStates = ['all','open','draft','merged','closed'] as const
   const [pullState,setPullState] = useState<typeof pullStates[number]>('all')
   const format = useFormatter()
   const { mutate: refresh } = useSWRConfig()
@@ -103,7 +102,7 @@ export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 
           <span>{prLabel(pull.state)}</span>
           {pull.additions !== undefined && pull.deletions !== undefined && <bdi>+{pull.additions} −{pull.deletions}</bdi>}
           <div className="flex basis-full flex-wrap items-center gap-2">
-            {conversations.map(row => <Button key={row.id} variant="ghost" onClick={() => openThread(row.id)}>{row.title || t('untitled')}</Button>)}
+            {conversations.map(row => <Button key={row.id} variant="ghost" onClick={() => row.kind === 'chat' ? openGroupConversation(row.id) : openThread(row.id)}>{row.title || t('untitled')}</Button>)}
             {[...tasks].map(([id, label]) => <Button key={id} size="sm" variant="link" onClick={() => openTask(id)}>{label}</Button>)}
           </div>
         </li>

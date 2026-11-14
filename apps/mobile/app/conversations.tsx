@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { FlatList, RefreshControl, StyleSheet, View } from 'react-native'
+import { FlatList, Linking, RefreshControl, StyleSheet, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { GlassButton } from '@/components/GlassButton'
 import { NavBar, underBar } from '@/components/NavBar'
@@ -16,6 +16,7 @@ import { mobileLocale, mobileMessages } from '@/lib/messages'
 import { colors, LIST_INSET } from '@/lib/theme'
 import { useLiveApi, useRefresh } from '@/lib/useApi'
 import { useTaskContinuation } from '../../../lib/hooks/use-task-continuation'
+import { directoryPullRequests, directoryPullStates, pullRequestsState } from '../../../lib/directory-pulls'
 import type { ConversationDirectoryPage, DirectoryInput } from '../../../lib/conversation-directory-input'
 
 type Page = ConversationDirectoryPage & { workspaceId: string }
@@ -24,7 +25,10 @@ const states = ['all', 'working', 'waiting', 'idle', 'failed'] as const
 
 export default function Conversations() {
   const router = useRouter()
-  const { botId } = useLocalSearchParams<{ botId?: string }>()
+  const { botId, view } = useLocalSearchParams<{ botId?: string; view?: string }>()
+  const pullsOnly = view === 'pulls'
+  const title = pullsOnly ? mobileMessages.ArtifactsPage.category.pullRequests : labels.title
+  const [pullState, setPullState] = useState<typeof directoryPullStates[number]>('all')
   const workspaceId = useHome().data?.workspace.id
   const [search, setSearch] = useState('')
   const [state, setState] = useState<NonNullable<DirectoryInput['state']>>('all')
@@ -32,7 +36,8 @@ export default function Conversations() {
   const [writing, setWriting] = useState(false)
   const [writeError, setWriteError] = useState(false)
   const pending = useRef(false)
-  const params = new URLSearchParams({ workspaceId: workspaceId ?? '', search, state, archived: String(archived) })
+  const params = new URLSearchParams({ workspaceId: workspaceId ?? '', search, state: pullsOnly ? 'all' : state, archived: pullsOnly ? 'any' : String(archived),
+    pullState: pullsOnly && pullState === 'all' ? 'linked' : pullState })
   if (botId) params.set('botId', botId)
   const path = workspaceId ? '/api/mobile/conversations?' + params : null
   const list = useLiveApi<Page>(path, () => ({ refs: [listRef('thread_list', workspaceId), listRef('group_list', workspaceId)], minIntervalMs: 2_000 }))
@@ -65,22 +70,43 @@ export default function Conversations() {
     } catch { setWriteError(true) }
     finally { pending.current = false; setWriting(false) }
   }
+  type Conversation = Page['items'][number]
+  const open = (row: Conversation) => router.push(row.kind === 'chat' ? `/groups/${row.id}` : `/thread/${row.id}`)
+  const rows = pullsOnly
+    ? directoryPullRequests(pages.items, pullState).map(entry => ({ kind: 'pull' as const, key: entry.pull.url, ...entry }))
+    : pages.items.map(conversation => ({ kind: 'conversation' as const, key: conversation.id, conversation }))
   return <View style={styles.screen}>
-    <NavBar title={labels.title} back={() => router.back()} search={{ placeholder: labels.search, onChange: value => setSearch(value.slice(0, 120)) }} />
-    <FlatList {...underBar} data={pages.items} keyExtractor={item => item.id} refreshControl={<RefreshControl {...refresh} />}
+    <NavBar title={title} back={() => router.back()} search={{ placeholder: labels.search, onChange: value => setSearch(value.slice(0, 120)) }} />
+    <FlatList<(typeof rows)[number]> {...underBar} data={rows} keyExtractor={item => item.key} refreshControl={<RefreshControl {...refresh} />}
       ListHeaderComponent={<View style={styles.controls}>
-        <Segmented options={states.map(value => ({ value, label: labels[value] }))} value={state} onChange={setState} />
-        <Row label={labels.archived} value={archived ? '✓' : undefined} onPress={() => setArchived(!archived)} />
-        <GlassButton label={labels.readAll} busy={writing} disabled={!page} onPress={() => void mark({ action: 'readAll' })} />
+        {!pullsOnly && <Segmented options={states.map(value => ({ value, label: labels[value] }))} value={state} onChange={setState} />}
+        <Segmented options={directoryPullStates.map(value => ({ value, label: value === 'all' ? mobileMessages.ArtifactsPage.category.pullRequests : mobileMessages.Metadata.prState[value] }))} value={pullState} onChange={setPullState} />
+        {!pullsOnly && <Row label={labels.archived} value={archived ? '✓' : undefined} onPress={() => setArchived(!archived)} />}
+        {!pullsOnly && <GlassButton label={labels.readAll} busy={writing} disabled={!page} onPress={() => void mark({ action: 'readAll' })} />}
         {writeError && <Text accessibilityRole="alert">{labels.writeError}</Text>}
-        <ReadNotice error={list.error} label={labels.title} hasData={Boolean(page)} onRetry={list.reload} />
+        <ReadNotice error={list.error} label={title} hasData={Boolean(page)} onRetry={list.reload} />
       </View>}
-      renderItem={({ item }) => <View>
-        <Row label={item.title || labels.untitled} value={item.unread ? labels.unread : undefined}
-          detail={[labels[item.state], item.identifier, new Date(item.at).toLocaleString(mobileLocale)].filter(Boolean).join(' · ')}
-          onPress={() => router.push(item.kind === 'chat' ? `/groups/${item.id}` : `/thread/${item.id}`)} />
-        {!item.unread && <View style={styles.action}><GlassButton label={labels.markUnread} disabled={writing} onPress={() => void mark(item.kind === 'chat' ? { action: 'unread', chatId: item.id } : { action: 'unread', runId: item.id })} /></View>}
-      </View>}
+      renderItem={({ item: row }) => {
+        if (row.kind === 'pull') {
+          const { pull, conversations } = row
+          const tasks = new Map(conversations.flatMap(item => item.issueId ? [[item.issueId, item.identifier || item.taskTitle || item.issueId] as const] : []))
+          const counts = pull.additions !== undefined && pull.deletions !== undefined ? `+${pull.additions} −${pull.deletions}` : null
+          return <View>
+            <Row label={pull.title || pull.url} detail={[mobileMessages.Metadata.prState[pull.state], counts].filter(Boolean).join(' · ')}
+              onPress={() => { void Linking.openURL(pull.url) }} />
+            {conversations.map(item => <Row key={item.id} label={item.title || labels.untitled} onPress={() => open(item)} />)}
+            {[...tasks].map(([id, label]) => <Row key={id} label={label} onPress={() => router.push(`/task/${id}`)} />)}
+          </View>
+        }
+        const item = row.conversation
+        const prStatus = item.pulls?.length ? mobileMessages.Metadata.prState[pullRequestsState(item.pulls)] : null
+        return <View>
+          <Row label={item.title || labels.untitled} value={item.unread ? labels.unread : undefined}
+            detail={[labels[item.state], prStatus, item.identifier, new Date(item.at).toLocaleString(mobileLocale)].filter(Boolean).join(' · ')}
+            onPress={() => open(item)} />
+          {!item.unread && <View style={styles.action}><GlassButton label={labels.markUnread} disabled={writing} onPress={() => void mark(item.kind === 'chat' ? { action: 'unread', chatId: item.id } : { action: 'unread', runId: item.id })} /></View>}
+        </View>
+      }}
       ListEmptyComponent={!list.error ? <Text style={styles.action}>{list.loading || !workspaceId ? labels.loading : labels.empty}</Text> : undefined}
       ListFooterComponent={pages.hasMore ? <View style={styles.action}><GlassButton label={pages.failed ? labels.retry : labels.more}
         busy={pages.loading} onPress={() => void pages.loadMore()} /></View> : undefined} />

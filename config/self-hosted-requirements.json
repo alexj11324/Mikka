@@ -1085,6 +1085,13 @@
     "test": "lib/device-enrollment.db.test.ts",
     "suite": "test:device-enrollment-db"
   },
+  "lib/directory-pulls.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Groups visible conversation publications by canonical GitHub pull request and filters locally by published state.",
+    "test": "apps/mobile/tests/conversation-directory-read.test.mts",
+    "suite": "test:mobile"
+  },
   "lib/dispatch-delegate.ts": {
     "mode": "built-in",
     "environment": [],
@@ -1390,6 +1397,13 @@
     "test": "scripts/task-detail-live.test.tsx",
     "suite": "test:issue-readonly-dom"
   },
+  "lib/issue-relations.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Uses stored task relations to display the current blocking and dependency state without an external service.",
+    "test": "components/workspace/issue-relations.test.tsx",
+    "suite": "test:view-state"
+  },
   "lib/issue-threads.ts": {
     "mode": "built-in",
     "environment": [],
@@ -1693,6 +1707,13 @@
     "test": "tests/task-create-only.db.test.ts",
     "suite": "test:coordinator-issue-create-db"
   },
+  "lib/task-description.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Classifies existing task content locally for display on supported clients.",
+    "test": "apps/mobile/tests/task-description.test.mts",
+    "suite": "test:mobile"
+  },
   "lib/task-discussion.ts": {
     "mode": "built-in",
     "environment": [],
@@ -1803,6 +1824,13 @@
     "behavior": "Select the Task run using the installation’s PostgreSQL relations, excluding group chat and late-bound Factory checker runs.",
     "test": "lib/coding-workspace/review-authority.db.test.ts",
     "suite": "test:coding-workspace-db"
+  },
+  "lib/task-work-pulls.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Projects authorized work outputs to GitHub pull requests without fetching remote repositories.",
+    "test": "components/workspace/task-work-section.test.tsx",
+    "suite": "test:issue-readonly-dom"
   },
   "lib/task-work-read.ts": {
     "mode": "built-in",

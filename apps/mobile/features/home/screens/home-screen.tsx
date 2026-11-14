@@ -73,6 +73,7 @@ export function HomeScreen() {
               </Pressable>
             ) : null}
             <Row label={mobileMessages.ConversationDirectory.title} onPress={() => router.push('/conversations')} />
+            <Row label={mobileMessages.ArtifactsPage.category.pullRequests} onPress={() => router.push({ pathname: '/conversations', params: { view: 'pulls' } })} />
             <PinnedGrid pinned={pinned} actions={actions} />
           </View>
         }

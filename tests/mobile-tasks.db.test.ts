@@ -155,6 +155,54 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.equal((await load({ bearer: peer.token, workspaceId: secondWorkspace.id })).status, 404)
     await pool.query('delete from issues where id=any($1::uuid[])', [[child, foreign]])
   })
+  await t.test('the native PR directory filters canonical publications with the requested workspace and authenticated reader', async () => {
+    const { GET: directory } = await import('../app/api/mobile/conversations/route')
+    const read = (space: string, filter: string, options?: ReadOptions) =>
+      run(`/api/mobile/conversations?workspaceId=${space}&archived=any&pullState=${filter}`, directory, { workspaceId: space, ...options })
+    const allowed = await read(teamWorkspace.id, 'open')
+    assert.equal(allowed.status, 200)
+    const page = await allowed.json()
+    assert.ok(page.items.some((row: { id: string; pulls: { url: string }[] }) =>
+      row.id === latest && row.pulls.some(pull => pull.url === 'https://github.com/acme/app/pull/42')))
+    const closed = await read(teamWorkspace.id, 'closed')
+    assert.equal(closed.status, 200)
+    assert.deepEqual((await closed.json()).items, [])
+    const member = await read(teamWorkspace.id, 'linked', { bearer: peer.token })
+    assert.equal(member.status, 200)
+    assert.deepEqual((await member.json()).items, [])
+    assert.equal((await read(teamWorkspace.id, 'invented')).status, 422)
+    assert.equal((await read(teamWorkspace.id, 'linked', { bearer: null })).status, 401)
+    assert.equal((await read(teamWorkspace.id, 'linked', { workspaceId: secondWorkspace.id })).status, 403)
+  })
+  await t.test('a verified Factory PR identifies its conversation for the owner while a teammate sees only the shared work', async () => {
+    const factoryId = randomUUID(), attempt = randomUUID(), source = randomUUID()
+    const tx = await pool.connect()
+    try {
+      await tx.query('BEGIN')
+      await tx.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload)
+        VALUES($1::uuid,$2,$3,$4,'user_message',$1::text,'{"text":"Native pull request fixture"}')`, [source, owner, bot, issueId])
+      await tx.query(`INSERT INTO factory_tasks(id,"userId","botId","issueId","sourceEventId","scopeVersion",route,stage,status,"attemptId",reason)
+        SELECT $1,$2,$3,$4,$5,"scopeVersion",'{}','execute','passed',$6,'Native work fixture' FROM issues WHERE id=$4`, [factoryId, owner, bot, issueId, source, attempt])
+      await tx.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,"runId",reason)
+        VALUES($1,$2,'execute',1,1,'passed',$3,'Native work fixture')`, [attempt, factoryId, latest])
+      await tx.query('COMMIT')
+    } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+    try {
+      const load = (options?: ReadOptions) => run('/api/mobile/tasks/' + issueId + '?work=1', req => GET(req, { params: Promise.resolve({ id: issueId }) }), options)
+      const response = await load()
+      assert.equal(response.status, 200)
+      const ownerWork = (await response.json()).work
+      assert.equal(ownerWork.pullRequests.find((pull: { url: string }) => pull.url.endsWith('/42'))?.sourceConversationId, latest)
+      assert.ok(!('sourceConversationId' in ownerWork.pullRequests.find((pull: { url: string }) => pull.url.endsWith('/1'))))
+      const peerResponse = await load({ bearer: peer.token, workspaceId: teamWorkspace.id })
+      assert.equal(peerResponse.status, 200)
+      const peerWork = (await peerResponse.json()).work
+      assert.ok(peerWork.pullRequests.every((pull: { sourceConversationId?: string }) => !pull.sourceConversationId))
+    } finally {
+      await pool.query('DELETE FROM factory_tasks WHERE id=$1 AND "userId"=$2', [factoryId, owner])
+      await pool.query('DELETE FROM coordinator_events WHERE id=$1 AND "userId"=$2', [source, owner])
+    }
+  })
   await t.test('detail includes contract fields, every attempt, replacement time and creation; excludes raw errors', async () => {
     const response = await request(issueId)
     assert.equal(response.status, 200)
