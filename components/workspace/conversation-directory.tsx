@@ -1,6 +1,6 @@
 'use client'
 
-import { useDeferredValue, useState } from 'react'
+import { useState } from 'react'
 import useSWRInfinite from 'swr/infinite'
 import { unstable_serialize } from 'swr/infinite'
 import { useFormatter, useTranslations } from 'next-intl'
@@ -27,7 +27,7 @@ export function ConversationDirectory({ ownerId, workspaceId, pullsOnly = false 
   const [search, setSearch] = useState('')
   const [state, setState] = useState<DirectoryState | 'all'>('all')
   const [archived, setArchived] = useState(false)
-  const query = useDeferredValue(search.trim())
+  const query = search.trim()
   const getKey = (index: number, previous: Page | null) => !workspaceId || (index > 0 && !previous?.cursor)
     ? null : ['conversation-directory', ownerId, workspaceId, query, state, pullsOnly ? 'any' : archived, pullsOnly && pullState === 'all' ? 'linked' : pullState, previous?.cursor ?? null] as const
   const { data, error, mutate, size, setSize, isValidating } = useSWRInfinite<Page, Error, typeof getKey>(getKey,
