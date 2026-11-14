@@ -199,8 +199,11 @@ export function FramedTask(props: FramedTaskProps) {
   })
 
   // 活动: the task's events, its Agent rows and its discussions in one log, oldest first.
-  const subtaskRows = (connections.rows ?? []).filter(row => row.metadata.parentId === task.id).map(row => ({ id: row.id, title: row.title, createdAt: row.createdAt }))
-  const eventsFor = useActivityEvents(props.historyFailed ? [] : props.versions, props.historyFailed ? [] : subtaskRows)
+  const subtaskRows = (connections.rows ?? []).filter(row => row.metadata.parentId === task.id).map(row => ({ id: row.id, title: row.title, identifier: row.identifier, createdAt: row.createdAt }))
+  const eventsFor = useActivityEvents(props.historyFailed ? [] : props.versions, props.historyFailed ? [] : subtaskRows, {
+    task: { taskId: task.id, code: task.identifier },
+    stretches: (props.agentActivity.items ?? []).map(item => ({ at: item.at, runId: item.runId, linked: item.onOpen !== null })),
+  })
   const discussions = useRef<IssueDiscussions | null>(null)
   const drafts = useActivityDrafts(task.id,
     (body, operationId) => discussions.current ? discussions.current.onComment(body, operationId) : false,
@@ -220,7 +223,7 @@ export function FramedTask(props: FramedTaskProps) {
       : current.threads.map(thread => ({ kind: 'comment', id: thread.id, at: thread.createdAt, thread, time, excerpt: excerpt(thread.id) }))
     const history = eventsFor([...props.agentActivity.items, ...comments, ...additional])
     return chronologicalActivity<TaskActivityItem>([
-      ...history.map((item): TaskActivityItem => ({ kind: 'event', id: `history:${item.id}`, at: item.at, who: item.actor?.name ?? null, mark: item.actor?.name ? (item.actor.type === 'agent' ? { kind: 'node', node: <AgentSphere name={item.actor.name} compact /> } : { kind: 'person', name: item.actor.name }) : undefined, text: item.text, time: item.time })),
+      ...history.map((item): TaskActivityItem => ({ kind: 'event', id: `history:${item.id}`, at: item.at, who: item.actor?.name ?? null, mark: item.actor?.name ? (item.actor.type === 'agent' ? { kind: 'node', node: <AgentSphere name={item.actor.name} compact /> } : { kind: 'person', name: item.actor.name }) : undefined, text: item.text, parts: item.parts, time: item.time })),
       ...props.agentActivity.items.map((item): TaskActivityItem => ({ kind: 'agent', id: item.id, at: item.at, who: item.name, mark: { kind: 'node', node: item.mark }, text: item.result, time: item.time, open: item.open, onOpen: item.onOpen, openLabel: tFrame('openThread', { name: item.name }) })),
       ...comments, ...additional,
     ])

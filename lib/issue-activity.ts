@@ -21,6 +21,7 @@ export type ActivityVersion = {
 export type ActivityChild = {
   id: string
   title: string
+  identifier?: string | null
   createdAt: Date | string
 }
 
@@ -75,7 +76,7 @@ export function deriveIssueActivity(versions: ActivityVersion[], children: Activ
     const after = afterMetadata.assignee
     if ((before?.id ?? null) !== (after?.id ?? null)) {
       if (after) add({ id: `assign-${current.id}`, at, actorKey, actor, kind: 'assigned', assigneeName: after.name })
-      else add({ id: `unassign-${current.id}`, at, actorKey, actor, kind: 'unassigned' })
+      else add({ id: `unassign-${current.id}`, at, actorKey, actor, kind: 'unassigned', assigneeName: before?.name })
     }
     if (!sameDelegate(beforeMetadata.delegate, afterMetadata.delegate, previous.content, current.content)) {
       if (afterMetadata.delegate) add({ id: `delegate-assign-${current.id}`, at, actorKey, actor, kind: 'assigned', assignmentTarget: 'delegate', assigneeName: afterMetadata.delegate.name })
@@ -94,7 +95,7 @@ export function deriveIssueActivity(versions: ActivityVersion[], children: Activ
   for (const child of children) {
     const at = timestamp(child.createdAt)
     if (Date.parse(at) + 2000 < createdAt) continue
-    events.push({ source: { kind: 'subtask', id: child.id }, id: `subtask-${child.id}`, at, kind: 'subtask', title: child.title })
+    events.push({ source: { kind: 'subtask', id: child.id }, id: `subtask-${child.id}`, at, kind: 'subtask', title: child.title, targetId: child.id, ...(child.identifier ? { code: child.identifier } : {}) })
   }
   const createdEvent = events.find(event => event.kind === 'created')
   const rest = events.filter(event => event.kind !== 'created').sort((a, b) => b.at.localeCompare(a.at) || a.id.localeCompare(b.id)).slice(0, limit)
@@ -103,7 +104,7 @@ export function deriveIssueActivity(versions: ActivityVersion[], children: Activ
 
 /**
  * R-63: one person's events in the same minute read as one row
- * (「创建了任务，指派给 Ada」). Rows from before MIK-17 have no actor and
+ * (「Ada 创建了 MIK-12，指派给了 Bob」). Rows from before MIK-17 have no actor and
  * group by minute alone; events must already be in time order.
  */
 export function groupActivityByMinute(events: IssueActivityEvent[]): IssueActivityEvent[][] {

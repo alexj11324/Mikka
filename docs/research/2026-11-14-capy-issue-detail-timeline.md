@@ -28,7 +28,7 @@
 
 `linked` / `unlinked` 一句里的 thread、PR、issue 同样来自 `refs`，再被同一套扫描收成芯片。认不出的事件整句是 `This update needs a newer version of Capy`，没有链接。
 
-## 我们现在点不进去
+## 改之前点不进去
 
 官方 `LogEntry` 把字段变更画成一行纯文本：名字用 `<b>`，后面接「状态改为进行中 · 时间」。这一行没有 `onOpen`。名字、任务编号、PR 都不是链接。Agent 改了状态，点那一句没有任何去处。
 
@@ -81,6 +81,8 @@ Agent 那一行继续用运行结果词（完成、运行中、等你回复）�
 标题保持可编辑。他们这个包的标题是静态 `h1`。
 
 ## 实现
+
+第 1 节已经写进公开仓库和 `mikka-hosted-ui` 的 `slots/task-detail.tsx`。第 2 到第 4 节还没做。
 
 点击和文案先做。筛选、窗口、补事件种类留在后面，沿现有修订和 `timeline` 契约，不新开活动表。
 

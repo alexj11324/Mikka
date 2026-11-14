@@ -92,7 +92,7 @@ export function TaskScreen() {
             {task.description ? <View style={styles.description}><Markdown text={task.description} /></View> : null}
             {activity.length ? <Text accessibilityRole="header" style={styles.section}>{mobileMessages.MobileCore.activity}</Text> : null}
             {activity.map((item, index) => <ActivityRow key={activityEntryId(item)} item={item} first={index === 0} last={index === activity.length - 1}
-
+              taskId={task.id} code={task.identifier}
               onOpen={item.kind === 'agent' ? () => router.push(conversationHref(task.id, item.run.attempts[0]!.runId))
                 : item.kind === 'evidence' ? () => { const href = taskEvidenceHref(task.id, item.factoryTaskId, item.sourceId); if (href) void openOnWeb(href) } : undefined} />)}
           </>
@@ -122,7 +122,7 @@ function Chip({ icon, label }: { icon: ReactNode; label: string }) {
  * row: the Agent's glyph and name, 「Codex」, with its latest run's result (2026-11-07-2230) and date; another Agent starts
  * its own row, with no 「换」 (2026-11-09, as Warp). A row opens the task's conversation at its first run; a replaced thread and the creation are lines.
  */
-function ActivityRow({ item, first, last, onOpen }: { item: ActivityEntry; first: boolean; last: boolean; onOpen?: () => void }) {
+function ActivityRow({ item, first, last, onOpen, taskId, code }: { item: ActivityEntry; first: boolean; last: boolean; onOpen?: () => void; taskId: string; code: string | null }) {
   const latest = item.kind === 'agent' ? item.run.attempts.at(-1)! : null
   // Its own run's result, never the task's reason: a run that finished and opened a PR is 完成; only the task waits.
   const result = latest ? attemptState(latest) : null
@@ -139,7 +139,7 @@ function ActivityRow({ item, first, last, onOpen }: { item: ActivityEntry; first
       </View>
       <View style={styles.activityText}>
         {item.kind === 'agent' ? <AgentName harness={item.run.harness} style={styles.activityTitle} /> : <Text style={styles.activityTitle} numberOfLines={1}>
-          {'at' in item ? nativeActivityLabel(item) : item.kind === 'replaced' ? mobileMessages.MobileCore.threadReplaced : item.by ? mobileMessages.MobileCore.taskCreatedBy.replace('{name}', item.by) : mobileMessages.MobileCore.taskCreated}
+          {'at' in item ? nativeActivityLabel(item, { taskId, code }) : item.kind === 'replaced' ? mobileMessages.MobileCore.threadReplaced : item.by ? mobileMessages.MobileCore.taskCreatedBy.replace('{name}', item.by) : mobileMessages.MobileCore.taskCreated}
         </Text>}
         <Text style={styles.activityMeta} numberOfLines={2}>
           {result && latest ? [ATTEMPT_WORD[result], result === 'done' && pullRequest ? mobileMessages.MobileCore.openedPullRequest.replace('{number}', String(pullRequest.number)) : null, shortWhen(latest.createdAt)].filter(Boolean).join(' · ') : item.kind === 'agent' ? null : shortWhen('at' in item ? item.at : item.createdAt)}
