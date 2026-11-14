@@ -1,3 +1,4 @@
+import { AVATAR_MAX_BYTES, isAvatarContentType } from '../account/avatar-file'
 import { saveEnvironmentInput, projectDefaultEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
 import { createOnlyCommand, dispatchReceiptInput } from '@/lib/task-create-command'
 import { taskListPageInput } from '@/lib/task-list-page'
@@ -82,7 +83,7 @@ const avatar = z.instanceof(FormData).superRefine((form, context) => {
   const entries = [...form.entries()]
   const file = entries[0]?.[1]
   if (entries.length !== 1 || entries[0]?.[0] !== 'avatar' || !(file instanceof Blob)
-    || file.size > 200 * 1024 || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) context.addIssue({ code: 'custom' })
+    || file.size > AVATAR_MAX_BYTES || !isAvatarContentType(file.type)) context.addIssue({ code: 'custom' })
 })
 const readBatch: z.ZodType = tuple(z.array(object({ action: z.enum(READ_BATCH_ACTIONS), args: z.array(z.unknown()) }))
   .min(1).max(MAX_READ_BATCH)).superRefine((value, context) => {
