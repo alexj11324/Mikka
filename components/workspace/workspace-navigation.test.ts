@@ -130,6 +130,13 @@ test('a group chat is `group=<id>`; another chat drops it', () => {
   assert.equal(readLocation(new URLSearchParams(`section=all-issues&group=${GROUP}`)).group, null)
 })
 
+test('the conversation directory has its own route alongside the default coordinator chat', () => {
+  const directory = workspaceLink({ section: 'conversations' })
+  assert.equal(directory, '/?section=conversations')
+  assert.equal(readLocation(new URL(directory, 'https://example.invalid').searchParams).section, 'conversations')
+  assert.equal(readLocation(new URLSearchParams()).section, 'coordinator')
+})
+
 test('a saved chat is `section=agent&session=<id>`', () => {
   assert.equal(workspaceLink({ section: 'agent', session: SESSION }), `/?section=agent&session=${SESSION}`)
   assert.equal(workspaceHref(at(`/mikka?section=agent&session=${SESSION}`), { section: 'coordinator' }), '/mikka')

@@ -34,6 +34,9 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     workspacePool = (await import('../lib/workspace-db')).workspacePool
     const { nameConversation, renameConversationTitle } = await import('../lib/conversation-title-server')
     const { conversationOrganization } = await import('../lib/conversation-organization')
+    const { groupDirectory } = await import('../lib/group-conversations-directory')
+    const { handleGroup } = await import('../lib/group-conversations-store')
+    type GroupRequest = import('../lib/group-conversations-store').GroupRequest
     const { conversationDirectory } = await import('../lib/conversation-directory')
     const dir = new URL('../drizzle/', import.meta.url)
     for (const f of orderMigrations((await readdir(dir)).filter(f => f.endsWith('.sql')))) await pool.query(await readFile(new URL(f, dir), 'utf8'))
@@ -153,6 +156,73 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     assert.deepEqual((await conversationDirectory(pool, 'owner', workspaceId, search)).items, [])
     assert.equal((await conversationDirectory(pool, 'owner', workspaceId, { ...search, archived: true })).items[0].id, unlinked)
 
+    const bot = randomUUID(), secondBot = randomUUID(), otherBot = randomUUID()
+    await pool.query(`INSERT INTO bots (id,"ownerId","workspaceId",name)
+      VALUES ($1,'owner',$4,'Coordinator'), ($2,'owner',$4,'Writer'), ($3,'other',$4,'Private')`, [bot, secondBot, otherBot, workspaceId])
+    await pool.query(`INSERT INTO coordinator_bots ("ownerId","workspaceId","botId") VALUES ('owner',$1,$2)`, [workspaceId, bot])
+    const authorized = groupDirectory({
+      async activeUsers(space, ids) {
+        return (await pool.query(`SELECT "userId" AS id FROM mikka_workspace_members WHERE "workspaceId"=$1 AND status='active' AND "userId"=ANY($2)`, [space, ids])).rows.map(row => row.id)
+      },
+      async ownedAgents() { return [] },
+      async ownedBots(space, owner, ids) {
+        return (await pool.query('SELECT id FROM bots WHERE "workspaceId"=$1 AND "ownerId"=$2 AND id=ANY($3)', [space, owner, ids])).rows.map(row => row.id)
+      },
+    })
+    const groupApi = (request: Partial<GroupRequest>) => handleGroup(pool, authorized, {
+      userId: 'owner', workspaceId, method: 'POST', resource: 'conversations', host: 'fixture.local', origin: null, ...request,
+    }, true)
+    const createChat = (ids: string[], space = workspaceId) => groupApi({ body: JSON.stringify({
+      purpose: 'conversation', workspaceId: space, title: 'Named independent chat', leadBotId: ids[0],
+      members: ids.map(memberId => ({ memberType: 'bot', memberId })),
+    }) })
+    for (const bad of [await createChat([otherBot]), await createChat([bot], foreignWorkspace)]) assert.equal(bad.status, 404)
+    const simple = await createChat([bot]), multi = await createChat([bot, secondBot])
+    assert.equal(simple.status, 201)
+    assert.equal(multi.status, 201)
+    const id = (simple.body as { id: string }).id, multiId = (multi.body as { id: string }).id
+    assert.notEqual(id, multiId)
+    assert.equal((await groupApi({ id, method: 'POST', resource: 'members', body: JSON.stringify({ memberType: 'user', memberId: 'other' }) })).status, 422)
+    assert.equal((await groupApi({ id, resource: 'messages', body: JSON.stringify({ body: 'Keep this first message', requestId: randomUUID(), expectedOwnerId: 'owner', expectedWorkspaceId: workspaceId }) })).status, 201)
+    const history = await groupApi({ id, method: 'GET', resource: 'messages' })
+    assert.equal(history.status, 200)
+    assert.deepEqual((history.body as { messages: { body: string }[] }).messages.map(row => row.body), ['Keep this first message'])
+    assert.equal((await groupApi({ id, method: 'GET', resource: 'messages', userId: 'other' })).status, 404)
+    assert.equal((await pool.query(`SELECT count(*)::int AS count FROM group_turns WHERE "conversationId"=$1 AND status='queued'`, [id])).rows[0].count, 1)
+    const named = { search: 'independent chat' }
+    const namedPage = await conversationDirectory(pool, 'owner', workspaceId, named)
+    assert.deepEqual(new Set(namedPage.items.map(row => row.id)), new Set([id, multiId]))
+    assert.ok(namedPage.items.every(row => row.kind === 'chat' && row.issueId === null))
+    assert.deepEqual((await conversationDirectory(pool, 'owner', workspaceId, { ...named, botId: secondBot })).items.map(row => row.id), [multiId])
+    assert.deepEqual((await conversationDirectory(pool, 'other', workspaceId, named)).items, [])
+    assert.deepEqual((await conversationDirectory(pool, 'owner', foreignWorkspace, named)).items, [])
+    const { standaloneOrganization, renameStandalone, regenerateStandalone } = await import('@/lib/standalone-chat-controls')
+    const change = (field: 'pinned' | 'archived', value: boolean) => standaloneOrganization(pool, id, 'owner', workspaceId, { field, value })
+    assert.deepEqual(await change('pinned', true), { pinned: true, archived: false })
+    assert.equal((await conversationDirectory(pool, 'owner', workspaceId, named)).items[0].id, id)
+    assert.deepEqual(await change('archived', true), { pinned: true, archived: true })
+    assert.deepEqual((await conversationDirectory(pool, 'owner', workspaceId, named)).items.map(row => row.id), [multiId])
+    assert.deepEqual((await conversationDirectory(pool, 'owner', workspaceId, { ...named, archived: true })).items.map(row => row.id), [id])
+    assert.deepEqual(await change('archived', false), { pinned: true, archived: false })
+    assert.deepEqual(await change('pinned', false), { pinned: false, archived: false })
+    assert.equal(await renameStandalone(pool, id, 'other', workspaceId, 'unowned'), undefined)
+    assert.equal(await standaloneOrganization(pool, id, 'owner', foreignWorkspace), null)
+    const revised = await regenerateStandalone(pool, id, 'owner', workspaceId, async (actor, body, scope) => {
+      assert.equal(actor, 'owner')
+      assert.equal(scope, workspaceId)
+      assert.equal(body.body, 'Keep this first message')
+      return 'Generated chat'
+    })
+    assert.deepEqual(revised, { title: 'Generated chat', regenerated: true })
+    await regenerateStandalone(pool, id, 'owner', workspaceId, async () => {
+      await renameStandalone(pool, id, 'owner', workspaceId, 'Manual chat')
+      return 'Stale answer'
+    })
+    assert.deepEqual(await regenerateStandalone(pool, id, 'owner', workspaceId, async () => null), { title: 'Manual chat', regenerated: false })
+    assert.equal(await regenerateStandalone(pool, id, 'other', workspaceId, async () => { throw Error('unauthorized model call') }), null)
+
+    assert.deepEqual((await pool.query(`SELECT "botId" FROM coordinator_bots WHERE "ownerId"='owner' AND "workspaceId"=$1`, [workspaceId])).rows, [{ botId: bot }])
+
     // Regenerate is the person asking for a generated title again.
     assert.equal(await nameConversation(pool, first, 'owner', 'regenerate', model('登录回调与前缀')), '登录回调与前缀')
     assert.deepEqual([await stored(first), await stored(second), await stored(third)], Array(3).fill({ title: '登录回调与前缀', titleSource: 'generated' }))
@@ -169,6 +239,11 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     assert.deepEqual(await stored(revoked), { title: null, titleSource: null })
     assert.equal(await conversationOrganization(pool, 'owner', workspaceId, first), null)
     assert.equal(await organize(first, 'pinned', true), null, 'a suspended owner cannot organize a conversation')
+    assert.equal(await standaloneOrganization(pool, id, 'owner', workspaceId), null)
+    assert.equal(await renameStandalone(pool, id, 'owner', workspaceId, 'Revoked rename'), undefined)
+    assert.equal(await regenerateStandalone(pool, id, 'owner', workspaceId, async () => {
+      assert.fail('revoked standalone ownership must not call the title provider')
+    }), null)
     assert.equal((await pool.query('SELECT "conversationPinnedAt" FROM agent_runs WHERE id=$1', [first])).rows[0].conversationPinnedAt, null)
   } finally {
     for (const [key, value] of [['MIKKA_DATABASE_URL',before.app], ['DATABASE_URL',before.workspace]] as const) {

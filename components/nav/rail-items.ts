@@ -10,8 +10,8 @@ export type RailDestination = 'chats' | 'suggestions' | 'board' | 'plugins' | 'a
 type RailIcon = ComponentType<{ className?: string; 'data-icon'?: string }>
 
 // 主页 (the bot chats), 建议, the board, plugins, Artifact. `selectedIcon` is the solid twin shown on the current item.
-export const RAIL_ITEMS: { id: RailDestination; icon: RailIcon; selectedIcon: RailIcon; label: 'Nav.home' | 'Nav.suggestions' | 'Nav.board' | 'Nav.plugins' | 'Nav.artifacts' }[] = [
-  { id: 'chats', icon: House, selectedIcon: HouseFilled, label: 'Nav.home' },
+export const RAIL_ITEMS: { id: RailDestination; icon: RailIcon; selectedIcon: RailIcon; label: 'Nav.conversations' | 'Nav.suggestions' | 'Nav.board' | 'Nav.plugins' | 'Nav.artifacts' }[] = [
+  { id: 'chats', icon: House, selectedIcon: HouseFilled, label: 'Nav.conversations' },
   { id: 'suggestions', icon: Lightbulb, selectedIcon: LightbulbFilled, label: 'Nav.suggestions' },
   { id: 'board', icon: Columns3, selectedIcon: Columns3Filled, label: 'Nav.board' },
   { id: 'plugins', icon: PlugCircle, selectedIcon: PlugCircleFilled, label: 'Nav.plugins' },
@@ -27,7 +27,7 @@ export type RailProps = {
   signingOut: boolean
   onBeforeChange?: (action: () => Promise<void>) => void
   /** The bot list's rows as data, for a frame that lists them itself (the hosted App Shell); the open-source rail ignores it. */
-  chats?: { workspaceId: string | null; entries: ChatNavEntry[]; onOpen: (target: ChatTarget) => void; onNewBot: () => void; onNewGroup: () => void }
+  chats?: { workspaceId: string | null; entries: ChatNavEntry[]; onOpen: (target: ChatTarget) => void; onNewBot: () => void; onNewGroup: () => void; onNewConversation?: () => void }
   /** Opens the ⌘K search, for a frame with its own search field. */
   onSearch?: () => void
   /** How many items 收件箱 lists (hooks/use-inbox-count.ts), for a frame that shows the count on it. */

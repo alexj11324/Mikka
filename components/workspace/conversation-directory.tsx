@@ -9,12 +9,12 @@ import { Button } from '@/components/ui/button'
 import { SearchInput } from '@/components/ui/search-input'
 import { useLiveKey } from '@/hooks/use-live-key'
 import type { DirectoryState } from '@/lib/conversation-directory-input'
-import { openThread } from './workspace-navigation'
+import { navigate, openThread } from './workspace-navigation'
 
 type Page = Awaited<ReturnType<typeof listConversations>>
 const states = ['all', 'working', 'waiting', 'idle', 'failed'] as const
 
-export function ConversationDirectory({ ownerId, workspaceId }: { ownerId: string; workspaceId: string | null }) {
+export function ConversationDirectory({ ownerId, workspaceId, revision = 0 }: { ownerId: string; workspaceId: string | null; revision?: number }) {
   const t = useTranslations('ConversationDirectory')
   const format = useFormatter()
   const [search, setSearch] = useState('')
@@ -22,11 +22,12 @@ export function ConversationDirectory({ ownerId, workspaceId }: { ownerId: strin
   const [archived, setArchived] = useState(false)
   const query = search.trim()
   const getKey = (index: number, previous: Page | null) => !workspaceId || (index > 0 && !previous?.cursor)
-    ? null : ['conversation-directory', ownerId, workspaceId, query, state, archived, previous?.cursor ?? null] as const
+    ? null : ['conversation-directory', ownerId, workspaceId, query, state, archived, previous?.cursor ?? null, revision] as const
   const { data, error, mutate, size, setSize, isValidating } = useSWRInfinite<Page, Error, typeof getKey>(getKey,
     ([, , , text, selected, showArchive, cursor]) => listConversations({ search: text, state: selected, archived: showArchive, cursor: cursor ?? undefined }),
     { revalidateOnFocus: false, shouldRetryOnError: false })
   useLiveKey('thread_list', workspaceId, workspaceId ? [unstable_serialize(getKey)] : [], workspaceId)
+  useLiveKey('group_list', workspaceId, workspaceId ? [unstable_serialize(getKey)] : [], workspaceId)
   const rows = [...new Map(data?.flatMap(page => page.items).map(item => [item.id, item])).values()]
   const more = Boolean(data?.at(-1)?.cursor)
   return <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4" aria-label={t('title')}>
@@ -41,7 +42,7 @@ export function ConversationDirectory({ ownerId, workspaceId }: { ownerId: strin
     {!error && !data && <p role="status">{t('loading')}</p>}
     {data && !rows.length && !more && !error && <p role="status">{t('empty')}</p>}
     <ul className="flex flex-col gap-1">
-      {rows.map(row => <li key={row.id} className="flex items-center gap-2"><Button type="button" variant="ghost" onClick={() => openThread(row.id)}
+      {rows.map(row => <li key={row.id} className="flex items-center gap-2"><Button variant="ghost" type="button" onClick={() => row.kind === 'chat' ? navigate({ section: 'group', group: row.id, issue: null, thread: null, task: null }) : openThread(row.id)}
         className="h-auto min-w-0 flex-1 flex-wrap justify-start gap-x-3 gap-y-1 py-3 text-start">
         <span className="min-w-0 flex-1 break-words font-medium">{row.title || t('untitled')}</span>
         {row.identifier && <bdi>{row.identifier}</bdi>}

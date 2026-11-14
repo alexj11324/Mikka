@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { GroupLeaveAction } from './group-leave-action'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
+import { ThreadHeader } from './thread-header'
 import { ConversationPill } from '@/components/nav/conversation-pill'
 import { GroupAvatar, groupMembersKey, memberAvatar, useGroupMembers } from '@/components/nav/group-avatar'
 import { useLiveKey } from '@/hooks/use-live-key'
@@ -41,7 +42,7 @@ const GROUP_MERGE_MS = 500
 /** The newest page's key, then each older page before the last one shown. */
 const pageKey = (groupId: string) => (index: number, previous: GroupMessagePage | null) => index === 0 ? ['group-messages', groupId, null] : previous?.nextBefore ? ['group-messages', groupId, previous.nextBefore] : null
 
-export type GroupChatRequest = { id: string; title: string; workspaceId: string }
+export type GroupChatRequest = { id: string; title: string; workspaceId: string; creationPurpose?: 'group' | 'conversation' }
 
 /**
  * A group chat. It reads and sends through the group API (the phone's path),
@@ -60,6 +61,8 @@ export function GroupChatView({ group, userId, people, onLeft }: {
   people: Map<string, string>
 }) {
   const t = useTranslations('GroupChat')
+  const titleHeading = useRef<HTMLHeadingElement>(null)
+  const namedChat = group.creationPurpose === 'conversation'
   const feedback = useTranslations('Coordinator')
   const { data: agents = [] } = useSWR('agents', listAgents)
   // The pill's avatar is the members' bloubs (R-36); the right column's 详情 reads the same request.
@@ -169,7 +172,10 @@ export function GroupChatView({ group, userId, people, onLeft }: {
   const speaker = { id: group.id, name: group.title || t('untitled') }
 
   return <section aria-label={group.title || t('untitled')} data-testid="group-chat" className={cn('relative flex min-h-0 w-full flex-1 flex-col', CHAT_SURFACE)}>
-    <ConversationPill name={group.title || t('untitled')} avatar={<GroupAvatar title={group.title || t('untitled')} members={members} />} />
+    {namedChat
+      ? <ThreadHeader standalone issueId={null} runId={group.id} title={group.title || t('untitled')} headingRef={titleHeading}
+          onStop={null} place={null} acceptanceBadge={null} identity={null} artifact={null} tabs={null} wraps={false} />
+      : <ConversationPill name={group.title || t('untitled')} avatar={<GroupAvatar title={group.title || t('untitled')} members={members} />} />}
     {onLeft && !refused && !accessRejected && mayLeaveGroup(members, userId)
       ? <div className="flex h-14 shrink-0 items-center justify-end px-4">
           <GroupLeaveAction group={group} userId={userId} onLeft={() => {
@@ -180,7 +186,7 @@ export function GroupChatView({ group, userId, people, onLeft }: {
             onLeft(group.id)
           }} />
         </div>
-      : <div aria-hidden="true" className="hidden h-14 shrink-0 md:block" />}
+      : namedChat ? null : <div aria-hidden="true" className="hidden h-14 shrink-0 md:block" />}
     <div ref={scroller} onScroll={event => { const node = event.currentTarget; const next = node.scrollHeight - node.scrollTop - node.clientHeight < 56; if (next !== following) setFollowing(next) }} className="min-h-0 flex-1 overflow-y-auto scroll-fade-y">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pb-6">
         {blockingCode === 'not_found' ? <p role="alert" className="py-6 text-sm">{t('notFound')}</p>

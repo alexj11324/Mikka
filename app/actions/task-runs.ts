@@ -230,11 +230,18 @@ async function conversationActor() {
 export async function renameConversation(runId: string, title: string): Promise<ActionResult<{ title: string }, 'issueTitleInvalid' | 'runNotFound'>> {
   const { ownerId, workspaceId } = await conversationActor()
   const { manualConversationTitle } = await import('@/lib/conversation-title')
-  if (typeof title !== 'string' || title.length > 400 || !manualConversationTitle(title)) return { error: 'issueTitleInvalid' }
+  const normalized = typeof title === 'string' && title.length <= 400 ? manualConversationTitle(title) : null
+  if (!normalized) return { error: 'issueTitleInvalid' }
   const { renameConversationTitle } = await import('@/lib/conversation-title-server')
   const { pool } = await import('@/lib/db')
   const saved = await renameConversationTitle(pool, String(runId), ownerId, title, workspaceId)
-  if (!saved) return { error: 'runNotFound' }
+  if (!saved) {
+    const { renameStandalone } = await import('@/lib/standalone-chat-controls')
+    const renamed = await renameStandalone(pool, runId, ownerId, workspaceId, normalized)
+    if (!renamed) return { error: 'runNotFound' }
+    await (await import('@/lib/live/lists')).groupListChanged(pool, runId)
+    return { title: renamed }
+  }
   await (await import('@/lib/live/lists')).runListChanged(pool, String(runId))
   return { title: saved }
 }
@@ -252,7 +259,18 @@ export async function regenerateConversationTitle(runId: string): Promise<Action
     return result.rows[0] as { title: string | null } | undefined
   })
   const owned = await read()
-  if (!owned) return { error: 'runNotFound' }
+  if (!owned) {
+    const { regenerateStandalone } = await import('@/lib/standalone-chat-controls')
+    const response = await regenerateStandalone(pool, runId, ownerId, workspaceId, async (owner, content, workspace) => {
+      const { defaultModelAvailable } = await import('@/lib/default-model')
+      if (!await defaultModelAvailable(owner)) return null
+      const { generateShortTitle } = await import('@/lib/short-title-server')
+      try { return await generateShortTitle(owner, content, workspace) } catch { return null }
+    })
+    if (!response) return { error: 'runNotFound' }
+    if (response.regenerated) await (await import('@/lib/live/lists')).groupListChanged(pool, runId)
+    return response
+  }
   const { defaultModelAvailable } = await import('@/lib/default-model')
   if (!await defaultModelAvailable(ownerId)) return { title: owned.title ?? null, regenerated: false }
   const { nameConversation } = await import('@/lib/conversation-title-server')
@@ -271,7 +289,10 @@ export async function readConversationOrganization(runId: string) {
   const { ownerId, workspaceId } = await conversationActor()
   const { pool } = await import('@/lib/db')
   const { conversationOrganization } = await import('@/lib/conversation-organization')
-  return conversationOrganization(pool, ownerId, workspaceId, runId)
+  const state = await conversationOrganization(pool, ownerId, workspaceId, runId)
+  if (state) return state
+  const { standaloneOrganization } = await import('@/lib/standalone-chat-controls')
+  return standaloneOrganization(pool, runId, ownerId, workspaceId)
 }
 
 export async function setConversationOrganization(runId: string, change: ConversationOrganizationChange) {
@@ -282,8 +303,14 @@ export async function setConversationOrganization(runId: string, change: Convers
   const { pool } = await import('@/lib/db')
   const { conversationOrganization } = await import('@/lib/conversation-organization')
   const state = await conversationOrganization(pool, ownerId, workspaceId, runId, change)
-  if (state) await (await import('@/lib/live/lists')).runListChanged(pool, runId)
-  return state
+  if (state) {
+    await (await import('@/lib/live/lists')).runListChanged(pool, runId)
+    return state
+  }
+  const { standaloneOrganization } = await import('@/lib/standalone-chat-controls')
+  const chat = await standaloneOrganization(pool, runId, ownerId, workspaceId, change)
+  if (chat) await (await import('@/lib/live/lists')).groupListChanged(pool, runId)
+  return chat
 }
 
 export async function listConversations(input: DirectoryInput) {

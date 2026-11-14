@@ -80,6 +80,31 @@ test('Task presentation batches keep current tenant authority and one Factory pr
       await workspace.query('INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES($1,$2,\'Presentation fixture\',$3)', [id, owner, kind])
       for (const userId of kind === 'personal' ? [owner] : [owner, peer]) await workspace.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,\'admin\',\'active\')', [id, userId, `${userId}@example.invalid`])
     }
+    await t.test('standalone conversation controls use workspace membership from its authoritative database', async () => {
+      const { standaloneOrganization, renameStandalone, regenerateStandalone } = await import('../lib/standalone-chat-controls')
+      const { conversationDirectory } = await import('../lib/conversation-directory')
+      const id = randomUUID()
+      const chats = async (reader: string) => (await conversationDirectory(application, reader, shared, { search: 'Renamed' })).items.map(row => row.id)
+      await application.query(`INSERT INTO conversations(id,"workspaceId",kind,title,"createdBy","creationPurpose")
+        VALUES ($1,$2,'group','Original',$3,'conversation')`, [id, shared, owner])
+      await application.query(`INSERT INTO conversation_members("conversationId","memberType","memberId",role) VALUES ($1,'user',$2,'owner')`, [id, owner])
+      assert.equal(await renameStandalone(application, id, owner, shared, 'Renamed'), 'Renamed')
+      assert.deepEqual(await standaloneOrganization(application, id, owner, shared, {field:'pinned',value:true}), {archived:false,pinned:true})
+      assert.deepEqual(await chats(owner), [id])
+      assert.deepEqual(await chats(peer), [])
+      assert.equal(await renameStandalone(application, id, peer, shared, 'Other owner'), undefined)
+      assert.equal(await standaloneOrganization(application, id, owner, other), null)
+      await workspace.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [shared, owner])
+      try {
+        assert.deepEqual(await chats(owner), [])
+        assert.equal(await standaloneOrganization(application, id, owner, shared), null)
+        assert.equal(await renameStandalone(application, id, owner, shared, 'Denied'), undefined)
+        assert.equal(await regenerateStandalone(application, id, owner, shared, async () => { assert.fail('revoked writer reached provider') }), null)
+        assert.equal((await application.query('SELECT title FROM conversations WHERE id=$1',[id])).rows[0].title, 'Renamed')
+      } finally {
+        await workspace.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`, [shared, owner])
+      }
+    })
     const as = <T>(userId: string, workspaceId: string, work: () => Promise<T>, header?: string) =>
       withActivitySession(userId, () => runRequestScope(createRequestScope(new Request('http://localhost/mikka/api/rpc', {
         headers: header === undefined ? {} : { 'x-mikka-workspace-id': header },

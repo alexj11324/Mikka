@@ -151,6 +151,7 @@
     }
   },
   "Nav": {
+    "startConversation": "New conversation",
     "switchLanguage": "Switch language",
     "workspaceAll": "{name} — all tasks",
     "tagline": "Tasks and documents",
@@ -4771,6 +4772,17 @@
       },
       "create": "Create",
       "creating": "Creating…"
+    },
+    "createConversation": {
+      "title": "New conversation",
+      "name": "Conversation name",
+      "bots": "Choose Bots (first selected leads)",
+      "noBots": "No bots available",
+      "newBot": "New bot",
+      "create": "Start conversation",
+      "failed": "Couldn’t create the conversation",
+      "unconfirmed": "Creation not confirmed",
+      "reviewGroups": "View conversations"
     },
     "newGroup": {
       "title": "New group chat",
