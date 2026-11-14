@@ -1,5 +1,5 @@
 import { conversationAccessDenied, useConversationDelivery } from '@/features/chat/components/conversation-delivery'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { ChatMessageList, type ChatListHandle } from '@/features/chat/components/chat-message-list'
 import { groupPagePath, mergeGroupHistory, mergeGroupRead, type GroupRead } from '@/features/chat/model/chat-pages'
@@ -25,7 +25,7 @@ import { api } from '@/lib/api'
 import { separatorLabel, startsGroup } from '@/lib/chat-time'
 import { mentionsIn } from '@/lib/group'
 import { useHome } from '@/lib/home'
-import { holdMessage, type HeldMessage } from '@/lib/message-actions'
+import { clearHeldMessage, holdMessage, type HeldMessage } from '@/lib/message-actions'
 import { plainText, quotable } from '@/lib/quote'
 import { myReaction, toggled, withMine } from '@/lib/reactions'
 import type { GroupMember, GroupMessage, GroupPage, GroupSummary, Reaction } from '@/lib/types'
@@ -65,6 +65,10 @@ export default function GroupChat() {
   // A network failure or 5xx is not a membership decision and keeps the recoverable offline view.
   const accessDenied = conversationAccessDenied(page.error) || conversationAccessDenied(members.error)
   const identity = `${id}:${apiContext}`
+  useLayoutEffect(() => {
+    if (accessDenied) clearHeldMessage(identity)
+    return () => clearHeldMessage(identity)
+  }, [identity, accessDenied])
   // A screen can be reused for a different group or signed-in workspace without remounting.
   // Keep drafts attached to their original identity so an old group's text/quote is never shown in the new group.
   const [composerDraft, setComposerDraft] = useState<{ identity: string; text: string; quote: string | null }>(
@@ -185,7 +189,7 @@ export default function GroupChat() {
     }
   }
 
-  const held = (words: string, messageId: string): HeldMessage => ({ text: plainText(words), onQuote: () => setQuote(quotable(words)), react: { current: myReaction(reactions[messageId]), set: emoji => void react(messageId, emoji) } })
+  const held = (words: string, messageId: string): HeldMessage => ({ scope: identity, text: plainText(words), onQuote: () => setQuote(quotable(words)), react: { current: myReaction(reactions[messageId]), set: emoji => void react(messageId, emoji) } })
   // A long press selects the words: a group has no in-place selection, so they open selectable (app/message-text.tsx).
   const select = (words: string, messageId: string) => {
     holdMessage(held(words, messageId))

@@ -2,10 +2,32 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { withholdsCachedRead } from '../lib/api-read-state.ts'
+import { clearHeldMessage, heldMessage, holdMessage, subscribeHeldMessage } from '../lib/message-actions.ts'
 
 // The mounted-cache behavior is exercised in api-context.test.mts. This guards the
 // native GroupChat wiring that must also retire screen-local drafts and actions.
 const source = readFileSync(new URL('../app/groups/[id].tsx', import.meta.url), 'utf8')
+
+test('the open selection loses the denied group’s text and actions without clearing another group', () => {
+  const first = { scope: 'group-a:1', text: 'A', onQuote() {} }
+  const second = { scope: 'group-b:1', text: 'B', onQuote() {} }
+  const seen: Array<string | null> = []
+  const unsubscribe = subscribeHeldMessage(() => seen.push(heldMessage()?.text ?? null))
+  try {
+    holdMessage(first)
+    clearHeldMessage(second.scope)
+    assert.equal(heldMessage(), first)
+    clearHeldMessage(first.scope)
+    assert.equal(heldMessage(), null)
+    holdMessage(second)
+    clearHeldMessage(first.scope)
+    assert.equal(heldMessage(), second)
+    assert.deepEqual(seen, ['A', null, 'B'])
+  } finally {
+    unsubscribe()
+    clearHeldMessage(second.scope)
+  }
+})
 
 test('only a confirmed member denial hides the group; ordinary outages retain offline state', () => {
   for (const code of [403, 404]) assert.equal(withholdsCachedRead(code), true)
