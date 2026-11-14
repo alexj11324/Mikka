@@ -108,6 +108,22 @@ test('task run rows keep the newest owner run and the 200-row limit without unus
   }
 })
 
+test('the run list deadline and lookback each span exactly 720 hours across daylight-saving changes', { skip: !enabled }, async () => {
+  const { sql } = await import('drizzle-orm')
+  const { db } = await import('../lib/db')
+  const { runHistoryWindow } = await import('../lib/task-state-query')
+  await db.transaction(async tx => {
+    await tx.execute(sql`set local time zone 'America/New_York'`)
+    const { rows } = await tx.execute<{ forward: number; backward: number }>(sql`
+      select extract(epoch from (started + ${runHistoryWindow} - started))::int as forward,
+             extract(epoch from (ended - (ended - ${runHistoryWindow})))::int as backward
+      from (values ('2026-02-20T12:00:00Z'::timestamptz, '2026-03-22T12:00:00Z'::timestamptz),
+                   ('2026-10-20T12:00:00Z'::timestamptz, '2026-11-19T12:00:00Z'::timestamptz)) as windows(started, ended)
+    `)
+    for (const row of rows) assert.deepEqual(row, { forward: 30 * 86400, backward: 30 * 86400 })
+  })
+})
+
 test('one bounded snapshot aggregate preserves the old fingerprint and exact expiry, including empty rows', { skip: !enabled }, async () => {
   const { sql } = await import('drizzle-orm')
   const { queryVersion, queryVersionWithExpiry } = await import('../lib/db/query-version')

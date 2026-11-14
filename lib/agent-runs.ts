@@ -380,11 +380,34 @@ export async function visibleRunNames(reader: IssueReader, runIds: string[], _te
   return rows.map(({ ownerId, ...row }) => ({ ...row, own: ownerId === userId }))
 }
 
+type RunListFilter = { issueId?: string; activeOnly?: boolean; limit?: number }
+
+function runListFilter(input: RunListFilter) {
+  return and(
+    input.issueId ? eq(agentRuns.issueId, input.issueId) : undefined,
+    input.activeOnly ? inArray(agentRuns.status, [...UNFINISHED_RUN_STATUSES]) : undefined,
+  )
+}
+
+/** The run states returned by MCP lists, including the list nested in a Task.
+ * As in workspaceRunView, teammates see the harness label and no private stop reason. */
+export async function visibleRunStates(userId: string, input: RunListFilter) {
+  if (input.issueId && !z.uuid().safeParse(input.issueId).success) return []
+  const visible = await runVisibilityPredicate(userId)
+  return db.select({
+    id: agentRuns.id, issueId: agentRuns.issueId, status: agentRuns.status, createdAt: agentRuns.createdAt,
+    agentName: sql<string>`case when ${agentRuns.userId}=${userId} then ${runBotName} else ${runViewColumns.harness} end`,
+    stopReason: sql<RunView['stopReason']>`case when ${agentRuns.userId}=${userId} then ${agentRuns.stopReason} end`,
+  }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId))
+    .where(and(visible, runListFilter(input))).orderBy(desc(agentRuns.createdAt), desc(agentRuns.id))
+    .limit(Math.max(1, Math.min(input.limit ?? 20, 100)))
+}
+
 /** Every surface uses this gate. Workspace membership never grants run control,
  * personal agent/session access, or raw transcript access.
  * `teams` remains a legacy compatibility hint with no authorization role.
  * `brief`: the list projection (`runBriefViewColumns`), for callers that show a run's name, state and summary only. */
-export async function visibleRuns(reader: IssueReader, input: { issueId?: string; runIds?: string[]; activeOnly?: boolean; limit?: number; brief?: boolean; teams?: readonly TeamScope[] } = {}): Promise<RunView[]> {
+export async function visibleRuns(reader: IssueReader, input: RunListFilter & { runIds?: string[]; brief?: boolean; teams?: readonly TeamScope[] } = {}): Promise<RunView[]> {
   const userId = typeof reader === 'string' ? reader : reader.id
   if (input.issueId && !z.uuid().safeParse(input.issueId).success) return []
   if (input.runIds && (!input.runIds.length || input.runIds.some(id => !z.uuid().safeParse(id).success))) return []
@@ -394,9 +417,8 @@ export async function visibleRuns(reader: IssueReader, input: { issueId?: string
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId)).leftJoin(devices,eq(devices.id,agentRuns.deviceId))
     .where(and(
       visible,
-      input.issueId ? eq(agentRuns.issueId, input.issueId) : undefined,
+      runListFilter(input),
       input.runIds ? inArray(agentRuns.id, input.runIds) : undefined,
-      input.activeOnly ? inArray(agentRuns.status, [...UNFINISHED_RUN_STATUSES]) : undefined,
     )).orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)).limit(Math.max(1, Math.min(input.limit ?? 20, 100)))
   const presence = await deviceOnlineStates(rows.flatMap(row => row.ownerId === userId && row.status === 'queued' && row.waitDeviceId
     ? [{ id: row.waitDeviceId, lastSeenAt: row.lastSeenAt }] : []))
@@ -415,14 +437,16 @@ export function readRunMessages(userId: string, runIds: string[]) {
     .where(inArray(runMessages.runId, runIds)).orderBy(asc(runMessages.createdAt))
 }
 
-export async function readRun(userId: string, runId: string): Promise<RunDetail | null> {
+export async function readRun(userId: string, runId: string, history: 'full' | 'latest-events' = 'full'): Promise<RunDetail | null> {
   const [run] = await visibleRuns(userId, { runIds: [runId], limit: 1 })
   if (!run) return null
   // Empty agentId is the deliberately restricted teammate projection.
   if (!run.agentId) return { run, chunks: [], messages: [] }
-  const chunks = await db.select({ chunk: runChunks.chunk }).from(runChunks)
-    .where(eq(runChunks.runId, run.id)).orderBy(asc(runChunks.seq))
-  const messages = await readRunMessages(userId, [run.id])
+  const chunksForRun = db.select({ chunk: runChunks.chunk }).from(runChunks).where(eq(runChunks.runId, run.id))
+  const chunks = history === 'full'
+    ? await chunksForRun.orderBy(asc(runChunks.seq))
+    : (await chunksForRun.orderBy(desc(runChunks.seq)).limit(5)).reverse()
+  const messages = history === 'full' ? await readRunMessages(userId, [run.id]) : []
   const decisionWarnings = await runDecisionWarnings(pool, userId, run.id)
   return { run, chunks: chunks.map(row => row.chunk), messages, decisionWarnings }
 }

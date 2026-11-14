@@ -4,6 +4,7 @@ import test, { mock } from 'node:test'
 import type { RunFailure } from '@mikka/protocol/run-failure'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { nextTaskListCursor } from '../lib/task-list-page'
+import { measured, readMetrics } from './helpers/read-metrics'
 
 // No business/local database fallback, including when REQUIRE_DB is unset.
 const url = process.env.E2E_DATABASE_URL
@@ -107,6 +108,18 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
       assert.equal(await readRun(user,privateRun),null)
       assert.equal(await readRun(user,orphanRun),null)
     }
+    await t.test('MCP stop uses the same owner and workspace checks as the stop operation', async subtest => {
+      const deniedAtAction = await measured(() => scoped(owner, personalWorkspace,
+        () => actions.stopRun(owner, sharedRun)))
+      const deniedAtRuntime = await measured(() => scoped(owner, personalWorkspace,
+        () => assert.rejects(requestRunStop(owner, sharedRun), /workspaceAccessDenied/)))
+      assert.deepEqual(deniedAtAction.value, { error: 'workspaceAccessDenied' })
+      assert.deepEqual(await scoped(foreign, otherWorkspace, () => actions.stopRun(foreign, sharedRun)), { error: 'runNotFound' })
+      assert.equal((await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [sharedRun])).rows[0].stopRequestedAt, null)
+      subtest.diagnostic(JSON.stringify({ mcpStatements: deniedAtAction.statements, runtimeStatements: deniedAtRuntime.statements }))
+      assert.ok(deniedAtRuntime.statements > 0)
+      assert.equal(deniedAtAction.statements, deniedAtRuntime.statements, 'the transport adds no second owner lookup')
+    })
     await assert.rejects(tools.getIssue(owner, shared), /workspaceAccessDenied/, 'an unscoped MCP call cannot aggregate memberships')
     assert.equal(await scoped(owner, personalWorkspace, () => tools.getIssue(owner, shared)), null, 'the same account cannot read a task outside its selected tenant')
     assert.equal((await scoped(owner, personalWorkspace, () => tools.listIssues(owner, {}))).some(row => row.id === shared), false)
@@ -117,6 +130,53 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
     assert.equal((await readRun(owner,sharedRun))?.messages.length,1)
     assert.equal((await readRun(owner,sharedRun))?.run.report?.summary,'secret-report')
     assert.deepEqual((await readRun(owner,sharedRun))?.run.failureDetails, failureDetails)
+    await t.test('MCP reads its latest five events independently of transcript history', async subtest => {
+      const latest = Array.from({ length: 5 }, (_, i) => ({ index: i + 1, text: 'Latest event' }))
+      await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk)
+        SELECT gen_random_uuid(),$1,100+i,chunk FROM jsonb_array_elements($2::jsonb) WITH ORDINALITY AS e(chunk,i)`, [sharedRun, JSON.stringify(latest)])
+      const recent = () => scoped(owner, workspace, () => tools.getRun(owner, sharedRun))
+      await recent()
+      const small = await measured(recent)
+      assert.deepEqual(small.value?.recentEvents.map(line => JSON.parse(line)), latest)
+      await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk)
+        SELECT gen_random_uuid(),$1,i,jsonb_build_object('text',repeat('x',8192)) FROM generate_series(2,33) AS i`, [sharedRun])
+      await pool.query(`INSERT INTO run_messages(id,"runId","userId",text) VALUES(gen_random_uuid(),$1,$2,repeat('y',8192))`, [sharedRun, owner])
+      const large = await measured(recent)
+      subtest.diagnostic(JSON.stringify({ shortHistory: readMetrics(small), longHistory: readMetrics(large) }))
+      assert.deepEqual(large.value, small.value)
+      assert.equal(large.resultBytes, small.resultBytes, 'older events and unrequested human messages never leave Postgres')
+      assert.deepEqual((await scoped(member, workspace, () => tools.getRun(member, sharedRun)))?.recentEvents, [])
+      const full = await readRun(owner, sharedRun)
+      assert.equal(full?.chunks.length, 38)
+      assert.equal(full?.messages.length, 2)
+      await pool.query('DELETE FROM run_chunks WHERE "runId"=$1 AND seq>1', [sharedRun])
+      await pool.query('DELETE FROM run_messages WHERE "runId"=$1 AND length(text)=8192', [sharedRun])
+    })
+    await t.test('MCP run lists and nested issue run summaries do not transfer report bodies', async subtest => {
+      const read = () => scoped(owner, workspace, async () => ({
+        list: await tools.listRuns(owner, { issueId: shared }),
+        nested: (await tools.getIssue(owner, shared))?.runs,
+      }))
+      await read()
+      const before = await measured(read)
+      await pool.query(`UPDATE agent_runs SET report = report || jsonb_build_object('opaqueReport', repeat('r',32768))
+        WHERE id=$1`, [sharedRun])
+      try {
+        const after = await measured(read)
+        subtest.diagnostic(JSON.stringify({ normal: readMetrics(before), largeReport: readMetrics(after) }))
+        assert.deepEqual(after.value, before.value)
+        assert.equal(after.value.list[0]?.id, sharedRun)
+        assert.equal(after.value.nested?.[0]?.id, sharedRun)
+        assert.equal(after.value.list[0]?.stopReason, 'secret-stop')
+        const peer = await scoped(member, workspace, () => tools.listRuns(member, { issueId: shared, activeOnly: true }))
+        assert.equal(peer[0]?.id, sharedRun)
+        assert.equal(peer[0]?.agent, 'codex')
+        assert.equal(peer[0]?.stopReason, null)
+        assert.equal(after.resultBytes, before.resultBytes, 'status-only projections never read a full report')
+      } finally {
+        await pool.query(`UPDATE agent_runs SET report = report - 'opaqueReport' WHERE id=$1`, [sharedRun])
+      }
+    })
     const ownBrief = await visibleRuns(owner, { issueId: shared, brief: true })
     assert.equal(ownBrief[0].failureDetails?.code, 'run_api_key_invalid')
     assert.doesNotMatch(JSON.stringify(ownBrief[0].failureDetails), /secret-provider-message|APIError/)

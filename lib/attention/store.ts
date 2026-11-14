@@ -40,8 +40,8 @@ export async function attentionEnabled(userId: string, executor: Pick<typeof db,
 }
 
 /** Turns matters from connected apps on or off. Off settles what waits as quiet; 建议 keeps filling either way. */
-export async function setAttentionEnabled(userId: string, enabled: boolean): Promise<void> {
-  await db.transaction(async tx => {
+export async function setAttentionEnabled(userId: string, enabled: boolean, executor: Pick<typeof db, 'transaction'> = db): Promise<void> {
+  await executor.transaction(async tx => {
     await lock(tx, userId)
     await tx.insert(attentionSettings).values({ userId, enabled }).onConflictDoUpdate({ target: attentionSettings.userId, set: { enabled, updatedAt: new Date() } })
     if (enabled) return

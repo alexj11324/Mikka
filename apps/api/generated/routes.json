@@ -134,7 +134,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "0158c37f4e2c841b7302edec6c8632f4867b20bc5384c876a262db017ea4941f"
+      "sourceHash": "55fc3555acca7e5fd7e043e83febb8264eb1da947118ff21457844e57d21ceb2"
     },
     {
       "path": "/mikka/api/artifacts/[artifactId]/versions/[version]/download",
@@ -1513,7 +1513,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "f8df6890ded9a816153473159cf510191893256b0b4bf05bd5ec72ea40a57846"
+      "sourceHash": "6202ba06a2a0659533d0ee7cabf5abaa6cf4d7b222ca7bf095dff4a9201aefba"
     },
     {
       "path": "/mikka/api/mobile/model",

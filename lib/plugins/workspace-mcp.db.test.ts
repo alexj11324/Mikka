@@ -1,3 +1,4 @@
+import { observePoolCommits } from '../db/commit-effects'
 import assert from 'node:assert/strict'
 import test, { mock } from 'node:test'
 import { randomBytes, randomUUID } from 'node:crypto'
@@ -16,7 +17,7 @@ import { AgentKitStore } from '@/lib/agent-kit/store'
 import { DEFAULT_AGENT_DEFINITION } from '@/lib/agent-kit/builtin'
 import { freezeWorkerDefinition, retryWorkerDefinition } from '@/lib/agent-kit/worker'
 import { freezeExecutionIdentity, ExecutionIdentityError } from '@/lib/execution-identity'
-import { createExecutionClaim } from '@/lib/factory/execution-claim'
+import { createExecutionClaim } from '../../tests/helpers/factory-execution-claim'
 
 const url = process.env.E2E_DATABASE_URL
 if (url) assert.ok(isE2eTarget(url), E2E_DB_RULE)
@@ -28,6 +29,7 @@ test('explicit workspace MCP sharing keeps requester, resource grants, tokens an
   await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
   const target = new URL(url!); target.pathname = `/${database}`
   const pool = new Pool({ connectionString: target.toString(), max: 5 })
+  observePoolCommits(pool)
   let appPool: Pool | undefined, workspacePool: Pool | undefined
   const saved = { MIKKA_DATABASE_URL: process.env.MIKKA_DATABASE_URL, DATABASE_URL: process.env.DATABASE_URL, WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY }
   Object.assign(process.env, { MIKKA_DATABASE_URL: target.toString(), DATABASE_URL: target.toString(), WORKSPACE_SECRETS_KEY: randomBytes(32).toString('hex') })
@@ -119,7 +121,7 @@ test('explicit workspace MCP sharing keeps requester, resource grants, tokens an
     const definition = freezeWorkerDefinition({ harness: 'codex', instructions: 'Requester task', prompt: 'Read the authorized team resource', parent: execution.snapshot, executionId: execution.id, allowLocalRecovery: true })
     definition.executionIdentity = await freezeExecutionIdentity(pool, { userId: requester, botId: bot, deviceId: device, agentDefinition: definition }, pool)
     const runId = randomUUID(), legacyId = randomUUID(), request = new Request('http://127.0.0.1/mikka/api/runs/mcp/custom_mcp')
-    for (const [id, value] of [[runId, definition], [legacyId, null]]) await pool.query('INSERT INTO agent_runs(id,"userId","botId","deviceId","agentId","issueId",status,"agentDefinition") VALUES($1,$2,$3,$4,$5,$6,\'queued\',$7)', [id, requester, bot, device, agent, issue, value ? JSON.stringify(value) : null])
+    for (const [id, value] of [[runId, definition], [legacyId, null]]) await pool.query('INSERT INTO agent_runs(id,"userId","botId","deviceId","agentId","issueId",status,"agentDefinition","workspaceId") VALUES($1,$2,$3,$4,$5,$6,\'queued\',$7,$8)', [id, requester, bot, device, agent, issue, value ? JSON.stringify(value) : null, workspace])
     const { token } = await issueRunToken({ id: runId, userId: requester }), legacy = await issueRunToken({ id: legacyId, userId: requester })
     const verified = await verifyRunToken(request, token); assert.ok(verified)
     const claim = createExecutionClaim(pool, async () => true)
@@ -187,6 +189,7 @@ test('explicit workspace MCP sharing keeps requester, resource grants, tokens an
   } finally {
     server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve()))
     for (const [name, value] of Object.entries(saved)) { if (value === undefined) delete process.env[name]; else process.env[name] = value }
+    await (await import('../builtin-gateway/runtime')).builtinGateway()?.stop()
     await dropTestDatabase(admin, database, pool, appPool, workspacePool)
   }
 })

@@ -126,6 +126,75 @@ dbTest('preferences read both optional owner rows in one statement without losin
   }
 })
 
+dbTest('a rejected preference save restores the proactive switch, waiting matter and quiet history', async () => {
+  const { db, schema, drizzle: { eq, sql } } = m
+  const { readPreferences, savePreferences } = await import('@/lib/preferences')
+  const owner = people.dana
+  const matterId = randomUUID()
+  const constraint = sql.identifier('test_pref_' + randomUUID().replaceAll('-', ''))
+  await db.insert(schema.attentionMatters).values({
+    id: matterId, userId: owner, matterKey: matterId, source: 'gmail', title: 'Waiting', level: 'high', assessment: {}, evidence: {}, state: 'waiting',
+  })
+  const readState = async () => {
+    const { proactive, personalInstructions } = await readPreferences(owner)
+    const [matter] = await db.select({ state: schema.attentionMatters.state }).from(schema.attentionMatters).where(eq(schema.attentionMatters.id, matterId))
+    const logs = await db.select({ action: schema.attentionLog.action }).from(schema.attentionLog).where(eq(schema.attentionLog.matterId, matterId))
+    return { proactive, personalInstructions, state: matter.state, log: logs.map(entry => entry.action) }
+  }
+  const initial = await readState()
+  assert.deepEqual(initial, { proactive: true, personalInstructions: '', state: 'waiting', log: [] })
+  const patch = { proactive: false, personalInstructions: 'Reject this test preference' }
+  await db.execute(sql`ALTER TABLE user_preferences ADD CONSTRAINT ${constraint} CHECK ("personalInstructions" <> 'Reject this test preference') NOT VALID`)
+  try {
+    await assert.rejects(savePreferences(owner, patch), (error: { cause?: { code?: string } }) => error.cause?.code === '23514')
+    assert.deepEqual(await readState(), initial, 'a failed save must leave all three tables unchanged')
+  } finally {
+    await db.execute(sql`ALTER TABLE user_preferences DROP CONSTRAINT ${constraint}`)
+  }
+  await savePreferences(owner, patch)
+  await savePreferences(owner, patch)
+  assert.deepEqual(await readState(), { proactive: false, personalInstructions: patch.personalInstructions, state: 'quiet', log: ['quiet'] })
+  assert.equal((await readPreferences(people.alex)).proactive, true)
+  await savePreferences(owner, { proactive: true, personalInstructions: '' })
+})
+
+dbTest('independent preference patches submitted together both survive', async () => {
+  const { readPreferences, savePreferences } = await import('@/lib/preferences')
+  const owner = people.dana
+  await savePreferences(owner, { pushReview: true, pushBriefing: true })
+  const { withDatabaseClient } = await import('@/lib/db')
+  const [gate, first, second] = await Promise.all([m.pool.connect(), m.pool.connect(), m.pool.connect()])
+  try {
+    // Hold the eventual upsert so both requests are in flight before either can commit.
+    const pids = await Promise.all([first, second].map(async client => (await client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid as number))
+    await gate.query('BEGIN')
+    await gate.query('SELECT 1 FROM user_preferences WHERE "userId" = $1 FOR UPDATE', [owner])
+    const writes = Promise.allSettled([
+      withDatabaseClient(first, () => savePreferences(owner, { pushReview: false })),
+      withDatabaseClient(second, () => savePreferences(owner, { pushBriefing: false })),
+    ])
+    try {
+      const deadline = Date.now() + 10000
+      while (true) {
+        const { rows } = await gate.query('SELECT DISTINCT pid FROM pg_locks WHERE pid = ANY ($1::int[]) AND NOT granted', [pids])
+        if (rows.length === 2) break
+        assert.ok(Date.now() < deadline, 'both writers acquired a connection and waited for a lock')
+        await new Promise(resolve => setTimeout(resolve, 10))
+      }
+    } finally {
+      await gate.query('ROLLBACK')
+      await writes
+    }
+    for (const write of await writes) if (write.status === 'rejected') throw write.reason
+  } finally {
+    gate.release()
+    first.release()
+    second.release()
+  }
+  const saved = await readPreferences(owner)
+  assert.deepEqual([saved.pushReview, saved.pushBriefing], [false, false])
+})
+
 dbTest('preferences: send key, personal instructions and daily suggestions save with their rules', async () => {
   as(people.alex)
   const { preferences } = m

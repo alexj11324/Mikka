@@ -175,6 +175,12 @@
     "behavior": "The Vercel packaging step deduplicates byte-identical function trees only when deployment configuration and resolved dependencies agree. Compose uses the Node server target.",
     "test": "apps/api/scripts/dedupe-functions.test.mjs"
   },
+  "apps/api/scripts/dev.mjs": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The development server uses Nitro's native drain during worker replacement so admitted requests can finish with their original worker.",
+    "test": "apps/api/runtime/dev-tracing.test.mjs"
+  },
   "apps/api/scripts/finalize-build.mjs": {
     "mode": "built-in",
     "environment": [
@@ -205,6 +211,13 @@
     "behavior": "Allow an existing owner-bound custody worker to revoke a frozen subscription only while its coordinator retains the exclusive deletion session. Preserve unsettled custody and ordinary write refusals.",
     "test": "lib/account/deletion-lock.db.test.ts",
     "suite": "test:account-db"
+  },
+  "drizzle/20261114061842_allow_exact_skill_sharing_approval.sql": {
+    "mode": "built-in",
+    "environment": ["DATABASE_URL"],
+    "behavior": "Store installed Skill sharing requests and their administrator decisions in the existing Workspace PostgreSQL approvals table.",
+    "test": "lib/enterprise/governance.db.test.ts",
+    "suite": "test:enterprise-db"
   },
   "drizzle/20261113165037_inbox_conversations.sql": {
     "mode": "built-in",
@@ -348,6 +361,13 @@
     "test": "lib/activity-actor-view.test.ts",
     "suite": "test:issues"
   },
+  "lib/artifacts/store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Authorize each request to a shared artifact against the installation's PostgreSQL share and workspace records. Markdown is delivered with metadata and HTML through its sandbox frame. Both use the configured artifact storage, including inline PostgreSQL on community installations.",
+    "test": "tests/desktop-links.db.test.ts",
+    "suite": "test:desktop-auth"
+  },
   "lib/artifacts/storage.ts": {
     "mode": "operator-configured",
     "environment": [
@@ -395,6 +415,13 @@
     "behavior": "Resolve saved board project names to the installation's visible project IDs and retain UUID filters across renames.",
     "test": "lib/board-filters.test.ts",
     "suite": "test:issues"
+  },
+  "lib/bot-model-optimistic.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Preview only an existing authorized chat-model option while its write is pending; the server still owns validation, persistence, and rollback in both cloud and self-hosted editions.",
+    "test": "lib/bot-model-optimistic.test.ts",
+    "suite": "test:execution-rules"
   },
   "lib/cloud-computer/sponsored-lifecycle.ts": {
     "mode": "optional-cloud",
@@ -615,6 +642,13 @@
     "test": "tests/task-presentation.db.test.ts",
     "suite": "test:task-presentation-db"
   },
+  "lib/factory/questions/schema.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The selected server uses its existing PostgreSQL database and Factory question contract to return pending items before the newest-50 limit, while retaining complete task-history reads.",
+    "test": "lib/factory/questions/ask-user.db.test.ts",
+    "suite": "test:factory-routing-db"
+  },
   "lib/factory/review-change.ts": {
     "mode": "built-in",
     "environment": [],
@@ -753,6 +787,13 @@
     "test": "lib/hooks/view-state.test.tsx",
     "suite": "test:view-state"
   },
+  "lib/issue-metadata.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Deleted Task metadata supplies the same 30-day recovery deadline to the owner-facing detail and the server restore command. No external service or configuration is required.",
+    "test": "scripts/task-detail-live.test.tsx",
+    "suite": "test:issue-readonly-dom"
+  },
   "lib/issue-threads.ts": {
     "mode": "built-in",
     "environment": [],
@@ -820,6 +861,13 @@
     "environment": [],
     "behavior": "Recognize local authentication documents and valid Workspace and Organization invitations so invitees can sign in even when Workspace bootstrap is unavailable.",
     "test": "apps/frontend/scripts/auth-only-bootstrap.test.mjs"
+  },
+  "lib/swr/keys.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A confirmed Task status change revalidates the current viewer’s mounted Task presentation reads in its workspace.",
+    "test": "scripts/task-detail-live.test.tsx",
+    "suite": "test:issue-readonly-dom"
   },
   "lib/task-activity-timeline.ts": {
     "mode": "built-in",
@@ -1381,6 +1429,13 @@
     "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
     "test": "lib/coding-workspace/terminal/http.test.ts",
     "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/task-state-query.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the same elapsed-time run history and deadline from the installation's PostgreSQL database in every server time zone, including across daylight-saving changes.",
+    "test": "tests/action-read-egress.db.test.ts",
+    "suite": "test:activity-actor-db"
   },
   "lib/agent-runs.ts": {
     "mode": "built-in",

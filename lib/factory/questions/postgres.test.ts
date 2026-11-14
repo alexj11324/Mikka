@@ -936,6 +936,36 @@ test(
           assert.equal(await queued(changedTask.issueId), 0);
         },
       );
+      await t.test("a superseded continuation cannot claim or settle its replacement", async (st) => {
+        const f = await fixture();
+        const first = await questions.answer(orchestrator, facts(f));
+        const replacementRunId = randomUUID();
+        const lockTask = store.lockTask.bind(store);
+        st.mock.method(store, "lockTask", async (...args: Parameters<typeof lockTask>) => {
+          const task = await lockTask(...args);
+          await args[0].query(
+            'UPDATE factory_questions SET "continuationRunId"=$2 WHERE id=$1',
+            [f.questionId, replacementRunId],
+          );
+          return task;
+        });
+
+        await rejects(
+          () => questions.claimContinuation(userId, deviceId, first.continuationRunId, new Date(Date.now() + 60000).toISOString()),
+          "factoryQuestionContinuationUnavailable",
+        );
+        await pool.query(
+          `UPDATE agent_runs SET status='succeeded', "stopReason"='submitted', "sessionId"=$2 WHERE id=$1`,
+          [first.continuationRunId, f.q.originSessionId],
+        );
+        assert.equal(await questions.settle(userId, first.continuationRunId), null);
+        const { rows: [current] } = await pool.query(
+          'SELECT status, "continuationRunId" FROM factory_questions WHERE id=$1',
+          [f.questionId],
+        );
+        assert.deepEqual(current, { status: "resuming", continuationRunId: replacementRunId });
+      });
+
       await t.test(
         "known context facts answer ten times creates one strict original-session continuation",
         async () => {

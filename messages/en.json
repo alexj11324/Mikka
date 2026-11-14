@@ -6700,7 +6700,8 @@
         "kinds": {
           "subscription": "Model subscription",
           "api_key": "API key",
-          "mcp": "MCP server"
+          "mcp": "MCP server",
+          "skill": "Skill"
         },
         "status": {
           "pending": "Pending",
@@ -7359,6 +7360,19 @@
     }
   },
   "MobileCore": {
+    "notifications": {
+      "on": "On",
+      "off": "Off",
+      "pushTypes": "Send notifications for",
+      "unavailable": "Push notifications are unavailable",
+      "openSettings": "Open settings",
+      "allow": "Allow notifications",
+      "savingOn": "Turning on",
+      "savingOff": "Turning off",
+      "unconfirmedOn": "Not confirmed on",
+      "unconfirmedOff": "Not confirmed off",
+      "retrySave": "Retry save"
+    },
     "pin": "Pin",
     "unpin": "Unpin",
     "hide": "Hide",
