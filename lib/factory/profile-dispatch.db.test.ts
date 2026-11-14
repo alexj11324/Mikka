@@ -12,6 +12,7 @@ import { promisify } from 'node:util'
 import { gzipSync } from 'node:zlib'
 import { Pool } from 'pg'
 import { observePoolCommits } from '../db/commit-effects'
+import { isolateCoordinatorWakes } from '../../tests/support/coordinator-wake'
 import { dbUrl, seedUser, seedPersonalWorkspace, seedBot, seedIssue } from '../../tests/support/workspace-admin-db'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
 import { templateModelsFixture } from '../../tests/support/template-models'
@@ -31,6 +32,7 @@ process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
 // teardown while the current child is still unwinding, obscuring that failure.
 test('real PG: independent cross-Harness Profile stages and recorded cloud runtimes', { skip: !dbUrl, timeout: 240_000 }, async t => {
   assert.ok(dbUrl)
+  await isolateCoordinatorWakes(t)
   const admin = new Pool({ connectionString: dbUrl })
   const database = `factory_profile_dispatch_${randomUUID().replaceAll('-', '')}_e2e`
   await admin.query(`CREATE DATABASE "${database}"`)
