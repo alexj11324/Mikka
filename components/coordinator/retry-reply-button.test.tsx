@@ -286,6 +286,23 @@ for (const valid of [true, false]) test(`parallel sends during a pending version
   assert.equal(submissions, valid ? 2 : 1)
 })
 
+test('two independent drafts are journaled before acknowledgement and reach Eve in order', async () => {
+  let release!: (valid: boolean) => void
+  const first = new Promise<boolean>(resolve => { release = resolve })
+  let probes = 0
+  buildCheck = () => ++probes === 1 ? first : Promise.resolve(true)
+  await act(async () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />))
+  await act(async () => composer.onChange('First draft'))
+  await act(async () => { composer.onSubmit() })
+  await act(async () => composer.onChange('Second independent draft'))
+  await act(async () => composer.onSubmit())
+  assert.equal(composer.value, '')
+  assert.equal(container.querySelectorAll('[data-testid="local-message"]').length, 2)
+  assert.equal(submissions, 0)
+  await act(async () => release(true))
+  assert.deepEqual(submitted.map(command => command.text), ['First draft','Second independent draft'])
+})
+
 test('a stale send moves its original text and attachments to the retry bubble and preserves browser notes', async () => {
   currentBuild = false
   await act(async () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />))

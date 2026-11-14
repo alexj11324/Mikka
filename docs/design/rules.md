@@ -278,6 +278,8 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   stopped and marked replaced. The task keeps links to its distinct
   conversation roots. Within a chain, the transcript orders runs by time and
   sends replies to the latest eligible run.
+  Replies typed during an active run default to the queue where a continuation is supported.
+  The owner may select a supported native steer or interrupt instead. See [#2257](https://github.com/alexj11324/Mikka/issues/2257).
   The server enforces this at every dispatch
   entry, not the prompt ([decision](decisions/2026-11-01-1330-one-thread-per-task.md)).
   The person may name where it runs (one of their computers, or the cloud);

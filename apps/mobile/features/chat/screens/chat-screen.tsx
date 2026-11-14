@@ -41,6 +41,7 @@ import { reviewHref } from '@/features/review/model/routes'
 import { ATTEMPT_WORD, attemptState } from '@/features/tasks/model/task-groups'
 import { ChatSelectableText } from '@/features/chat/components/chat-selectable-text'
 import { ChatSelectionBar } from '@/features/chat/components/chat-selection-bar'
+import { Segmented } from '@/components/Segmented'
 import { ChatQueueCard } from '@/features/chat/components/chat-queue-card'
 import { ADD_TO_CHAT, endsSelection, quotedMessage, selectionQuote, type Rect, type SelectionAction } from '@/features/chat/model/chat-selection'
 import { nextQueueCheck, queuedItems } from '@/features/chat/model/chat-queue'
@@ -120,6 +121,7 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
   const personal = usePersonalDelivery(scope, canSend, received, agent.sendMessage, reloadAfterWrite)
   const outbox = personal.rows
   const [text, setText] = useState(draft ?? '')
+  const [turnPolicy, setTurnPolicy] = useState<'queue' | 'steer'>('queue')
   const working = agent.status === 'busy' || outbox.some(item => item.phase === 'sending')
   const push = usePushState()
   const reduceMotion = useReducedMotionPreference()
@@ -231,7 +233,7 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
     const previous = sourceCardId ? pendingSends.find(item => item.sourceCardId === sourceCardId) : undefined
     // A lost acknowledgement may have committed. Only its original body and ID can be sent again.
     if (previous && !held && (previous.phase !== 'failed' || previous.error === mobileMessages.Coordinator.sendUncertain)) return false
-    const item = held ?? personalMessage(outgoingKey(uuid.v4), message, images, { botId: targetBotId, chatKey: self, context, sourceCardId })
+    const item = held ?? personalMessage(outgoingKey(uuid.v4), message, images, { botId: targetBotId, chatKey: self, context, sourceCardId, ...(agent.status === 'busy' ? { turnPolicy } : {}) })
     const acknowledgement = personal.start(item)
     if (!acknowledgement) return false
     if (previous && previous.id !== item.id) personal.discard(previous.id)
@@ -370,6 +372,10 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
       <OfflineBanner top={insets.top + 66} />
       <Composer value={text} sendDisabled={!canSend} onChangeText={setText} placeholder={selection ? mobileMessages.MobileCore.replySelection : name ? mobileMessages.Nav.messageBot.replace('{name}', name) : mobileMessages.MobileCore.message} onSend={send} attach attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : botId ? { kind: 'bot', id: botId } : undefined} overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
         quote={quote} onClearQuote={() => setQuote(null)} accessory={typeof composerAccessory === 'function' ? composerAccessory(working) : composerAccessory} notice={<>{serviceUnavailable ? <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.serviceNotice}><Text style={styles.serviceMessage}>对话服务尚未启用，暂时无法回复。</Text><GlassButton label="重试" busy={serviceRefresh.refreshing} onPress={() => void serviceRefresh.onRefresh()} /></View> : null}{composerNotice}<EveInteractions agent={agent} />{reactionFailure ? <View accessibilityRole="alert" style={styles.reactionNotice}><Text style={styles.error}>回应没保存。</Text><GlassButton label="重试" onPress={() => void react(reactionFailure.id, reactionFailure.emoji)} /></View> : null}
+          {agent.status === 'busy' && <Segmented value={turnPolicy} onChange={setTurnPolicy} options={[
+            { value: 'queue', label: mobileMessages.IssueThreads.deliveryModes.queue },
+            { value: 'steer', label: mobileMessages.IssueThreads.deliveryModes.steer },
+          ]} />}
           <ChatQueueCard items={queue} busy={stopper.sending} onSendNow={agent.status === 'busy' ? () => void stopper.stop() : undefined} />
           <ChatSelectionBar visible={Boolean(selection)} disabled={serviceUnavailable} onAction={selectionAction} /></>} onStop={(agent.status === 'busy' || activeTurn(agent.view) !== undefined) && agent.status !== 'resuming' && !stopper.sending ? () => void stopper.stop() : undefined} />
     </View>
