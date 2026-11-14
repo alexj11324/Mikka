@@ -79,8 +79,8 @@ const defaultServices: EveProductGatewayServices = {
     const { actAs } = await import('../acting-user')
     const { tokenWorkspace } = await import('../tokens/principal')
     return actAs({ id: scope.ownerId, [tokenWorkspace]: scope.workspaceId }, async () => {
-      const kit = await import('../../workflows/coordinator/agent-kit-steps')
       if (input.operation === 'prepare') {
+        const kit = await import('../../workflows/coordinator/agent-kit-steps')
         const execution = await kit.beginAgentExecution(scope.ownerId, scope.botId, `${input.sessionId}:${input.turnId}`, 0, { harness: 'ai_sdk' })
         return { execution, runtime: execution?.snapshot.runtime ?? await kit.botRuntime(scope.ownerId, scope.botId) }
       }
