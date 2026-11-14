@@ -1065,6 +1065,16 @@
       "newTask": "New task"
     },
     "activity": {
+      "timelineAll": "All",
+      "timelineUpdates": "Updates",
+      "timelineWork": "Agent work",
+      "timelineComments": "Comments",
+      "timelineFilter": "Filter activity",
+      "timelineEntryCount": "{count, plural, =0 {No events} =1 {1 event} other {# events}}",
+      "timelineCount": "{count} events",
+      "timelineEmpty": "No activity yet",
+      "timelineFilteredEmpty": "No {category} yet",
+      "timelineUnknownDate": "Date unavailable",
       "comment": "Comment by {author}",
       "label": "Task activity",
       "title": "Activity",

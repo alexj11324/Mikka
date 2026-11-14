@@ -1065,6 +1065,16 @@
       "newTask": "新建任务"
     },
     "activity": {
+      "timelineAll": "全部",
+      "timelineUpdates": "更新",
+      "timelineWork": "Agent 工作",
+      "timelineComments": "评论",
+      "timelineFilter": "筛选活动",
+      "timelineEntryCount": "{count, plural, =0 {暂无活动} other {# 条活动}}",
+      "timelineCount": "{count} 条活动",
+      "timelineEmpty": "暂无活动",
+      "timelineFilteredEmpty": "暂无{category}",
+      "timelineUnknownDate": "日期未知",
       "comment": "{author} 的评论",
       "label": "任务活动",
       "title": "活动",
