@@ -105,8 +105,11 @@ export function TaskScreen() {
                 const detail = [thread.detail?.agent, thread.detail?.observedModel, status, thread.detail?.summary].filter(Boolean).join(' · ')
                 return <Row key={thread.id} label={label} detail={detail} onPress={thread.detail ? () => router.push(`/thread/${thread.id}`) : undefined} />
               })}
-              {data.work.pullRequests.map(pull => <Row key={pull.url} label={pull.title || pull.url} detail={mobileMessages.IssueDetail.work.states[pull.state]}
-                onPress={() => { void Linking.openURL(pull.url) }} />)}
+              {data.work.pullRequests.map(pull => {
+                const source = pull.sourceConversationId ? conversations?.find(thread => thread.id === pull.sourceConversationId)?.detail : null
+                const detail = [source?.name, source?.agent, source?.observedModel, mobileMessages.IssueDetail.work.states[pull.state], source?.summary].filter(Boolean).join(' · ')
+                return <Row key={pull.url} label={pull.title || pull.url} detail={detail} onPress={() => { void Linking.openURL(pull.url) }} />
+              })}
               {progress.map(group => <FactoryProgressRow key={group.id} group={group} />)}
             </View> : null}
             {(['child', 'parent', 'blockedBy', 'blocks', 'duplicate', 'related'] as const).map(kind => {

@@ -5,6 +5,7 @@ import { ChevronRight, GitPullRequest, MessagesSquare } from 'lucide-react'
 import type { FactoryActivityView } from '@/lib/factory/activity'
 import { type IssueThread, threadQuestionView } from '@/lib/issue-threads'
 import { githubPullRequestKey, type IssuePullRequest } from '@/lib/issue-metadata'
+import { taskPullConversations } from '@/lib/task-work-pulls'
 import { runResult, useRunResultLabel } from '@/hooks/use-run-result'
 import { presentedFactoryEvents, taskFactoryProgress } from '@/lib/task-factory-events'
 import { openGroupConversation } from './workspace-navigation'
@@ -27,8 +28,7 @@ export function TaskWorkSection({ threads, pulls, linkedChats = [], factory, ope
   const states: Record<string, string> = messages.IssueDetail.work.states
   const resultLabel = useRunResultLabel()
   const conversations = threads
-  const runByPull = new Map((factory?.artifacts ?? []).filter(artifact => artifact.kind === 'pull_request')
-    .map(artifact => [githubPullRequestKey(artifact.url), artifact.runId]))
+  const sourceByPull = taskPullConversations(threads, factory)
   const progress = taskFactoryProgress(presentedFactoryEvents(factory?.events, factory?.task.id))
   if (!conversations.length && !linkedChats.length && !pulls.length && !progress.length) return null
   const byRun = new Map(conversations.flatMap(thread => [thread.id, ...thread.attempts.map(attempt => attempt.runId)].map(id => [id, thread] as const)))
@@ -61,8 +61,7 @@ export function TaskWorkSection({ threads, pulls, linkedChats = [], factory, ope
       </Button>
     })}
     {pulls.map(pull => {
-      const runId = runByPull.get(githubPullRequestKey(pull.url))
-      const detail = runId ? byRun.get(runId)?.detail : null
+      const detail = sourceByPull.get(githubPullRequestKey(pull.url))?.detail
       const number = pull.url.split('/').filter(Boolean).at(-1)
       const state = pull.state?.toLowerCase()
       const status = state ? states[state] : null

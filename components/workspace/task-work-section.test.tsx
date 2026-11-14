@@ -7,6 +7,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import type { FactoryActivityView } from '../../lib/factory/activity'
 import type { IssueThread } from '../../lib/issue-threads'
 import { TaskWorkSection } from './task-work-section'
+import { taskPullConversations } from '../../lib/task-work-pulls'
+import { githubPullRequestKey } from '../../lib/issue-metadata'
 
 const messages = JSON.parse(readFileSync(new URL('../../messages/en.json',import.meta.url),'utf8'))
 test('work shows the admitted conversation, one PR and the current progress; other owners have no navigation or model', () => {
@@ -40,4 +42,17 @@ test('work shows the admitted conversation, one PR and the current progress; oth
   assert.equal(progress.length, 1)
   assert.equal(progress[0].getAttribute('aria-expanded'), 'false')
   assert.match(progress[0].textContent ?? '', /Verification/)
+})
+
+test('published PR sources use the authorized conversation root for continuations and omit inaccessible runs', () => {
+  const visible = { id: 'root', detail: { name: 'Visible' }, attempts: [{ runId: 'continued' }] }
+  const restricted = { id: 'restricted', detail: null, attempts: [{ runId: 'private' }] }
+  const pull = 'https://github.com/Example/Repo/pull/5'
+  const other = 'https://github.com/example/repo/pull/6'
+  const publication = (url: string, runId: string) => ({ kind: 'pull_request', url, runId })
+  const factory = { artifacts: [publication(pull, 'continued'), publication(pull.toLowerCase(), 'private'),
+    publication(other, 'restricted'), publication(other, 'missing')] } as unknown as FactoryActivityView
+  const sources = taskPullConversations([visible, restricted] as unknown as IssueThread[], factory)
+  assert.equal(sources.get(githubPullRequestKey(pull.toLowerCase()))?.id, 'root')
+  assert.equal(sources.has(githubPullRequestKey(other)), false)
 })

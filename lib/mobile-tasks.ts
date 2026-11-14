@@ -11,8 +11,9 @@ import { withIssueWorkspace } from '@/lib/issue-scope-authorization'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { enterprisePrincipal } from '@/lib/enterprise/principal'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
-import { readIssueMetadata } from '@/lib/issue-metadata'
+import { githubPullRequestKey, readIssueMetadata } from '@/lib/issue-metadata'
 import { taskRelationKinds } from './issue-relations'
+import { taskPullConversations } from './task-work-pulls'
 import { displayTaskTitle } from '@/lib/short-title'
 import { issueContentToMarkdown } from '@/lib/linear-sync/markdown'
 import { runBotId } from '@/lib/run-bot-name'
@@ -63,12 +64,17 @@ export async function mobileTask(user: Exclude<IssueReader, string>, id: string,
       return { id: thread.id, ownerName: thread.ownerName, state, stopping: view.stopping,
         detail: source ? { name: source.name, agent: source.profile?.name || source.agentName, observedModel: source.observedModel ?? null, summary: source.summary } : null }
     })
+    const sources = taskPullConversations(threads, factory)
+    const pullRequests = (presentation.pullRequests ?? []).map(pull => {
+      const source = sources.get(githubPullRequestKey(pull.url))
+      return source ? { ...pull, sourceConversationId: source.id } : pull
+    })
     const detail = await read()
     if (!detail) return null
     return { ...detail, task: { ...detail.task, status: presentation.primaryStatus, group: presentation.group,
       state: presentation.state, reason: presentation.reason, blockedBy: presentation.blockedBy,
       ...(factory ? { factoryTaskId: factory.task.id } : {}) },
-      work: { version: 1 as const, connections, conversations, linkedChats: presentation.linkedChats ?? [], pullRequests: presentation.pullRequests ?? [] },
+      work: { version: 1 as const, connections, conversations, linkedChats: presentation.linkedChats ?? [], pullRequests },
       ...(factory ? { factoryEvents: factory.events } : {}) }
   })
 }

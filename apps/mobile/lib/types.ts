@@ -233,7 +233,7 @@ export interface TaskDetail {
     connections?: { id: string; identifier: string | null; title: string; kinds: ('child' | 'parent' | 'duplicate' | 'blockedBy' | 'blocks' | 'related')[] }[]
     conversations?: { id: string; ownerName: string | null; detail: { name: string; agent: string; observedModel: string | null; summary: string | null } | null
       state: 'running' | 'paused' | 'done' | 'failed' | 'blocked' | 'replaced'; stopping: boolean }[]
-    linkedChats: { id: string; title: string }[]; pullRequests: { url: string; title?: string; state: 'open' | 'draft' | 'merged' | 'closed'; additions?: number; deletions?: number }[] }
+    linkedChats: { id: string; title: string }[]; pullRequests: { url: string; title?: string; state: 'open' | 'draft' | 'merged' | 'closed'; additions?: number; deletions?: number; sourceConversationId?: string }[] }
   task: Pick<Task, 'id' | 'identifier' | 'title' | 'status' | 'priority' | 'group' | 'state' | 'reason' | 'blockedBy'> & {
     /** Authorized conversation head, null for read-only evidence. Absent on older servers. */
     replyRunId?: string | null
