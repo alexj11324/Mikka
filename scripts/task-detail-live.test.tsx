@@ -122,7 +122,7 @@ mock.module(at('components/workspace/task-detail-frame.tsx'), { namedExports: {
       <button data-priority="" onClick={() => props.onPriority('high')}>High</button>
       <output data-properties="" data-revision={task.revision}>{status}:{priority}</output>
       {props.editor(null, () => null)}
-      <section data-activity="">{!preview && <IssueActivityFeed versions={props.versions} children={[]} agents={props.agentActivity.rows} />}</section>
+      <section data-activity="">{!preview && <IssueActivityFeed versions={props.versions} children={[]} />}</section>
       {props.panel}{props.dialogs}
     </div>
   },
