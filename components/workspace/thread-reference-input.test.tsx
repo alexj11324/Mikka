@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { mock, test } from 'node:test'
 import { act, useRef, useState } from 'react'
 import { Window } from 'happy-dom'
+import { Textarea } from '../ui/textarea'
 
 const sharedId = '20000000-0000-4000-8000-000000000002'
 const browser = new Window()
@@ -23,10 +24,10 @@ test('the thread picker observes the caret after the composer accepts each edit,
   function Composer() {
     const [draft, setDraft] = useState(accepted)
     const input = useRef<HTMLTextAreaElement>(null)
-    return <><textarea aria-label="Thread" ref={input} value={draft} onChange={event => {
+    return <><Textarea aria-label="Thread" ref={input} value={draft} onChange={event => {
       accepted = event.currentTarget.value
       setDraft(accepted)
-    }} /><ThreadReferencePicker input={input} draft={draft} onChange={setDraft} workspaceId="workspace" /><textarea aria-label="Other" /></>
+    }} /><ThreadReferencePicker input={input} draft={draft} onChange={setDraft} workspaceId="workspace" /><Textarea aria-label="Other" /></>
   }
   try {
     await act(async () => root.render(<Composer />))
@@ -61,7 +62,7 @@ test('authorized Chat and Run results sharing a UUID keep their own buttons and 
   function Composer() {
     const [draft, setDraft] = useState('@thread:shared')
     const input = useRef<HTMLTextAreaElement>(null)
-    return <><textarea ref={input} value={draft} onChange={event => setDraft(event.currentTarget.value)} />
+    return <><Textarea ref={input} value={draft} onChange={event => setDraft(event.currentTarget.value)} />
       <ThreadReferencePicker input={input} draft={draft} onChange={setDraft} workspaceId="workspace" /></>
   }
   try {
