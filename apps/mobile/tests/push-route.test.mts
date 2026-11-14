@@ -35,14 +35,15 @@ test('a tapped bot notification binds its source workspace, refuses lost access 
   const active = '99e6cc12-d49b-43ea-8c41-798b54addad1'
   let actor: { id: string; user: { id: string } | null } = { id: 'account', user: { id: 'viewer' } }
   let currentWorkspace = active
-  let read = async () => ({ botId: bot, workspaceId: source })
+  let read: (path: string) => Promise<unknown> = async () => ({ botId: bot, workspaceId: source })
+  let save = async (id: string) => { currentWorkspace = id }
   const routes: string[] = [], alerts: string[] = [], reads: string[] = []
   class ApiError extends Error { constructor(readonly status: number, message: string) { super(message) } }
   mock.module('expo-router', { namedExports: { router: { canDismiss: () => false, navigate: () => {}, push: (href: string) => routes.push(href) } } })
   const stub = (file: string, namedExports: Record<string, unknown>) =>
     mock.module(new URL('../lib/' + file + '.ts', import.meta.url).href, { namedExports })
-  stub('api', { ApiError, apiConnection: () => ({ account: actor }), api: async (path: string) => { reads.push(path); return read() },
-    savedWorkspace: async () => currentWorkspace, saveWorkspace: async (id: string) => { currentWorkspace = id } })
+  stub('api', { ApiError, apiConnection: () => ({ account: actor }), api: async (path: string) => { reads.push(path); return read(path) },
+    savedWorkspace: async () => currentWorkspace, saveWorkspace: (id: string) => save(id) })
   stub('config', { currentAccount: () => actor })
   stub('system-alert', { showSystemAlert: (message: string) => alerts.push(message) })
   const { openPush } = await import('../lib/navigate.ts')
@@ -62,4 +63,36 @@ test('a tapped bot notification binds its source workspace, refuses lost access 
   assert.equal(routes.length, 1)
   await openPush(pushTarget({ botId: bot }))
   assert.equal(reads.length, 3)
+
+  actor = { id: 'account', user: { id: 'viewer' } }
+  read = async () => ({ threads: [], schedules: [], pullRequests: [] })
+  await openPush(pushTarget({ botId: bot }))
+  assert.equal(currentWorkspace, active)
+  assert.equal(routes.at(-1), `/bots/${bot}`)
+
+  const lookedUp = Promise.withResolvers<void>(), finishRead = Promise.withResolvers<void>()
+  read = async (path: string) => {
+    if (path.includes(bot)) { lookedUp.resolve(); await finishRead.promise; return { botId: bot, workspaceId: source } }
+    return { botId: run, workspaceId: active }
+  }
+  const earlier = openPush(pushTarget({ botId: bot }))
+  await lookedUp.promise
+  await openPush(pushTarget({ botId: run }))
+  finishRead.resolve()
+  await earlier
+  assert.equal(currentWorkspace, active)
+  assert.equal(routes.at(-1), `/bots/${run}`)
+
+  const writing = Promise.withResolvers<void>(), finishWrite = Promise.withResolvers<void>()
+  save = async (id: string) => {
+    if (id === source) { writing.resolve(); await finishWrite.promise }
+    currentWorkspace = id
+  }
+  const first = openPush(pushTarget({ botId: bot }))
+  await writing.promise
+  const last = openPush(pushTarget({ botId: run }))
+  finishWrite.resolve()
+  await Promise.all([first, last])
+  assert.equal(currentWorkspace, active)
+  assert.equal(routes.at(-1), `/bots/${run}`)
 })
