@@ -3,12 +3,17 @@ import { mock, test } from 'node:test'
 import { act, useRef, useState } from 'react'
 import { Window } from 'happy-dom'
 
+const sharedId = '20000000-0000-4000-8000-000000000002'
 const browser = new Window()
 Object.assign(globalThis, { window: browser, document: browser.document, HTMLElement: browser.HTMLElement, Element: browser.Element, Node: browser.Node, IS_REACT_ACT_ENVIRONMENT: true })
 const { createRoot } = await import('react-dom/client')
+Object.assign(globalThis, { requestAnimationFrame: browser.requestAnimationFrame.bind(browser) })
 
 mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) => key } })
-mock.module(new URL('../../app/actions/task-runs.ts', import.meta.url).href, { namedExports: { findThreadReferences: async () => [] } })
+mock.module(new URL('../../app/actions/task-runs.ts', import.meta.url).href, { namedExports: { findThreadReferences: async () => [
+  { kind: 'thread', conversationKind: 'chat', id: sharedId, title: 'Standalone conversation' },
+  { kind: 'thread', id: sharedId, title: 'Execution run' },
+] } })
 const { ThreadReferencePicker } = await import('./thread-references')
 
 test('the thread picker observes the caret after the composer accepts each edit, including replacement of a restored draft', async () => {
@@ -48,4 +53,31 @@ test('the thread picker observes the caret after the composer accepts each edit,
     await act(async () => root.unmount())
     await browser.happyDOM.abort()
   }
+})
+
+test('authorized Chat and Run results sharing a UUID keep their own buttons and insert their distinct references', async t => {
+  const errors = t.mock.method(console, 'error', () => {})
+  const root = createRoot(document.body)
+  function Composer() {
+    const [draft, setDraft] = useState('@thread:shared')
+    const input = useRef<HTMLTextAreaElement>(null)
+    return <><textarea ref={input} value={draft} onChange={event => setDraft(event.currentTarget.value)} />
+      <ThreadReferencePicker input={input} draft={draft} onChange={setDraft} workspaceId="workspace" /></>
+  }
+  try {
+    for (const [index, [title, kind]] of [['Standalone conversation', 'chat'], ['Execution run', 'run']].entries()) {
+      await act(async () => root.render(<Composer key={index} />))
+      const input = browser.document.querySelector('textarea')!
+      input.setSelectionRange(input.value.length, input.value.length)
+      await act(async () => { input.dispatchEvent(new browser.Event('click', { bubbles: true })) })
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 230)) })
+      const buttons = Array.from(browser.document.querySelectorAll('button'))
+      assert.equal(buttons.length, 2)
+      const button = buttons.find(node => node.textContent?.includes(title))
+      assert.ok(button)
+      await act(async () => button.click())
+      assert.equal(input.value, `[[${kind}:${sharedId}]] `)
+    }
+    assert.equal(errors.mock.calls.filter(call => String(call.arguments[0]).includes('same key')).length, 0)
+  } finally { await act(async () => root.unmount()) }
 })

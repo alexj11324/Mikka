@@ -76,7 +76,7 @@ function ThreadInput({ detail, runId, workspaceId, onSend, ...props }: Props & {
     {scopeFile && <Text>{references.sourceUnavailable}</Text>}
     {searching && mention && <View accessibilityLabel={references.references}>
       {!found ? <Text>{references.searching}</Text> : !found.items ? <Pressable accessibilityRole="button" onPress={() => { setLookup(null); setRetry(n => n + 1) }}><Text>{references.error} · {mobileMessages.Common.retry}</Text></Pressable>
-        : found.items.length ? found.items.map(item => <Pressable key={item.kind + item.id} accessibilityRole="button" onPress={() => {
+        : found.items.length ? found.items.map(item => <Pressable key={referenceMarker(item)} accessibilityRole="button" onPress={() => {
           const insert = referenceMarker(item) + ' '
           setText(text.slice(0, mention.from) + insert + text.slice(mention.end))
           setCaret(mention.from + insert.length)
