@@ -10,6 +10,6 @@ export default defineDynamic(async ctx => {
   if(evaluation)return evaluationNativeTools(evaluation)
   const { scope, execution } = await executionForSession(ctx)
   const binding = {sessionId:ctx.session.id,turnId:ctx.turn!.id,executionId:execution?.id}
-  const catalogue = await productCatalogue(scope,binding)
+  const catalogue = await productCatalogue(scope,binding,execution)
   return Object.fromEntries(catalogue.map(definition => [definition.name,createProductTool(scope,binding,definition)]))
 })

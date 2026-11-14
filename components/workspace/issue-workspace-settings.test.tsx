@@ -35,6 +35,8 @@ let teamDirectoryPending = false
 let teamDirectoryRetries = 0
 let scopedTeamFixture = false
 let workspaceTasksPending = false
+let workspaceTasksFailed = false
+let workspaceTasksCached = true
 let refreshGlobalTasks = refreshed
 let scopedTasksPending = false
 let scopedTeamPageMutations = 0
@@ -78,7 +80,7 @@ mock.module('@/hooks/use-agent-history', { namedExports: { useAgentHistory: () =
 mock.module('@/hooks/use-focus-return', { namedExports: { focusChatComposer: nothing, useOpenerFocus: () => () => true } })
 mock.module('@/hooks/use-live-key', { namedExports: { LiveProvider: plain, useLiveKey: nothing, useLiveKeys: nothing, useLiveScope: () => null } })
 mock.module('@/hooks/use-live-lists', { namedExports: {
-  useLiveIssueList: () => ({ ...emptyList, isLoading: workspaceTasksPending, mutate: refreshGlobalTasks }), useLiveThreadList: () => emptyList,
+  useLiveIssueList: () => ({ data: workspaceTasksCached ? emptyList.data : undefined, error: workspaceTasksFailed ? new Error('unavailable') : undefined, isLoading: workspaceTasksPending, mutate: refreshGlobalTasks }), useLiveThreadList: () => emptyList,
   useLiveBotRoster: () => botList, useLiveBotChatList: () => ({ data: { items: {} } }), useLiveGroupList: () => ({
     data: groupList,
     error: groupListError,
@@ -230,6 +232,8 @@ beforeEach(() => {
   workspaceReady = true
   workspaceError = undefined
   refreshGlobalTasks = refreshed
+  workspaceTasksFailed = false
+  workspaceTasksCached = true
   groupList = []
   groupListError = undefined
   groupListRetries = 0
@@ -396,6 +400,29 @@ for (const section of ['team-home', 'team-projects', 'team-issues'] as const) {
     await show()
     assert.equal(alert(), null)
     assert.ok(container.querySelector(pageSelector))
+  })
+}
+
+for (const cached of [false, true]) {
+  test(`the workspace Board withdraws a ${cached ? 'cached' : 'never loaded'} list on read failure and retries its own reader`, async () => {
+    workspaceTasksCached = cached
+    workspaceTasksFailed = true
+    let retries = 0
+    refreshGlobalTasks = async () => { retries++; workspaceTasksFailed = false; workspaceTasksCached = true }
+    const show = () => render({ initialSection: 'all-issues' })
+    await show()
+    const alert = container.querySelector('[role="alert"]')
+    assert.ok(alert)
+    assert.ok(alert.textContent?.includes('Workspace.listError'))
+    assert.equal(container.querySelector('[data-team-board-visible]'), null)
+    const retry = alert.querySelector('button')
+    assert.ok(retry)
+    await act(async () => retry.click())
+    await show()
+    assert.equal(retries, 1)
+    assert.equal(scopedTeamPageMutations, 0)
+    assert.equal(container.querySelector('[role="alert"]'), null)
+    assert.ok(container.querySelector('[data-team-board-visible]'))
   })
 }
 
