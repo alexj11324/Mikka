@@ -6,6 +6,7 @@ import { wakeTransport } from './workflow-wake'
 const deployment = process.env.VERCEL_DEPLOYMENT_ID, vercelEnv = process.env.VERCEL_ENV
 afterEach(() => {
   delete wakeTransport.resume; delete dueTimerTransport.start; delete dueTimerTransport.holder; delete dueTimerTransport.cancel
+  delete dueTimerTransport.latestDeployment
   forgetCheckedDueTimers()
   if (deployment === undefined) delete process.env.VERCEL_DEPLOYMENT_ID; else process.env.VERCEL_DEPLOYMENT_ID = deployment
   if (vercelEnv === undefined) delete process.env.VERCEL_ENV; else process.env.VERCEL_ENV = vercelEnv
@@ -42,6 +43,7 @@ function world(holder: DueTimerHolder | null) {
   const calls: string[] = []
   let live = holder
   dueTimerTransport.holder = async () => live
+  dueTimerTransport.latestDeployment = async () => process.env.VERCEL_DEPLOYMENT_ID
   dueTimerTransport.cancel = async runId => { calls.push(`cancel:${runId}`); if (live?.runId === runId) live = null }
   dueTimerTransport.start = async kind => {
     calls.push(`start:${kind}`)
@@ -81,6 +83,7 @@ test('outside Vercel no holder is looked up', async () => {
 test('a failed replacement never fails the arm: the running timer is still woken', async () => {
   process.env.VERCEL_DEPLOYMENT_ID = 'dpl_new'
   const timer = world({ runId: 'run-old', deploymentId: 'dpl_old' })
+  const cancel = dueTimerTransport.cancel!
   dueTimerTransport.cancel = async () => { throw new Error('private transport text') }
   const logged: unknown[][] = []
   const original = console.error
@@ -88,6 +91,19 @@ test('a failed replacement never fails the arm: the running timer is still woken
   try { await armDueTimer('schedules') } finally { console.error = original }
   assert.deepEqual(timer.calls, ['resume:due-timer:schedules'])
   assert.equal(JSON.stringify(logged).includes('private'), false)
+  dueTimerTransport.cancel = cancel
+  await armDueTimer('schedules')
+  assert.deepEqual(timer.calls, ['resume:due-timer:schedules', 'cancel:run-old', 'start:schedules'])
+  assert.equal(timer.live()?.deploymentId, 'dpl_new')
+})
+
+test('an older caller leaves the latest holder in place and wakes it', async () => {
+  process.env.VERCEL_DEPLOYMENT_ID = 'dpl_old'
+  const timer = world({ runId: 'run-new', deploymentId: 'dpl_new' })
+  dueTimerTransport.latestDeployment = async () => 'dpl_new'
+  await armDueTimer('schedules')
+  assert.deepEqual(timer.calls, ['resume:due-timer:schedules'])
+  assert.equal(timer.live()?.runId, 'run-new')
 })
 
 test('production run recovery is left to its own owner handover (#1403): never cancelled here', async () => {
