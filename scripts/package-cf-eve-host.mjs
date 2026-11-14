@@ -1,7 +1,6 @@
-import { cp, lstat, mkdir, readFile, readdir, readlink, writeFile } from 'node:fs/promises'
+import { cp, lstat, mkdir, readdir, readlink, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { validateHostBuild } from '../cloudflare/eve-runtime/runtime/config.mjs'
 
 async function assertPortableLinks(root, directory = root) {
   for (const item of await readdir(directory, { withFileTypes: true })) {
@@ -22,15 +21,10 @@ export async function packageCloudflareEveHost({
   root = process.cwd(), sourceSha, uiSha, releaseId, uiSource = 'official',
 } = {}) {
   const source = join(root, '.output', 'eve')
-  const build = JSON.parse(await readFile(join(source, 'mikka-eve-build.json'), 'utf8'))
   if (!['official', 'public-server'].includes(uiSource) || (uiSource === 'public-server' && uiSha !== sourceSha)) {
     throw new Error('CF_EVE_UI_SOURCE_MISMATCH')
   }
   const host = { version: 1, sourceSha, uiSha, releaseId, uiSource }
-  validateHostBuild(build, host, {
-    MIKKA_EVE_HOST: 'cloudflare', MIKKA_EVE_WORKFLOW_WORLD: 'cloudflare',
-    MIKKA_BUILD_REVISION: sourceSha, MIKKA_UI_OVERLAY_SHA: uiSha, MIKKA_EVE_RELEASE_ID: releaseId,
-  })
   try {
     await lstat(join(source, '.eve', '.workflow-data'))
     throw new Error('CF_EVE_IMAGE_LOCAL_STATE_REFUSED')
@@ -42,10 +36,6 @@ export async function packageCloudflareEveHost({
   await mkdir(output, { recursive: true })
   if ((await readdir(output)).length) throw new Error('CF_EVE_IMAGE_OUTPUT_NOT_EMPTY')
   await cp(source, join(output, 'eve'), { recursive: true, verbatimSymlinks: true })
-  await mkdir(join(output, 'runtime'), { recursive: true })
-  for (const file of ['config.mjs', 'start.mjs']) {
-    await cp(join(root, 'cloudflare', 'eve-runtime', 'runtime', file), join(output, 'runtime', file))
-  }
   await writeFile(join(output, 'eve-host.json'), JSON.stringify(host, null, 2) + '\n')
   return { output, host }
 }

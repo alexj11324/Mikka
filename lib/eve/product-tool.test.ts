@@ -59,7 +59,7 @@ test('self-hosted product RPC uses the configured server and reserves the privat
     calls.push(new Request(url, options))
     return Response.json({ accepted: true })
   })
-  const operation: ProductOperation = { ...binding, operation: 'prepare' }
+  const operation: ProductOperation = { ...binding, operation: 'finish', outcome: 'completed' }
   assert.deepEqual(await productRpc(scope, operation), { accepted: true })
   assert.equal(calls.length, 1)
   const [request] = calls
@@ -89,6 +89,6 @@ test('Cloudflare product RPC carries the native Eve scope without a second signe
     assert.equal(request.headers.get('x-mikka-product-capability'), 'private-runtime-capability')
     return Response.json({ accepted: true })
   })
-  assert.deepEqual(await productRpc(scope, { ...binding, operation: 'prepare' }), { accepted: true })
+  assert.deepEqual(await productRpc(scope, { ...binding, operation: 'finish', outcome: 'completed' }), { accepted: true })
   assert.equal(calls, 1)
 })

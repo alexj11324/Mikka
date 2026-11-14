@@ -5,6 +5,8 @@ import { createComposioAITools, createGoogleAITools, type ComposioActionName } f
 import { createAppTools } from '@/lib/app-tools'
 import { instrumentTools } from '@/lib/agent-kit/instrument'
 import type { AgentExecution } from '@/lib/agent-kit/store'
+import type { DefinitionSnapshot } from '@/lib/agent-kit/definition'
+import type { HostedRuntimeSnapshot } from '@/lib/subscription-model-snapshot'
 import * as steps from './steps'
 import * as kit from './agent-kit-steps'
 import type { NativeToolScope } from './tool-scope'
@@ -19,7 +21,7 @@ import { deploymentSwitch } from '@/lib/deployment-switches'
 import { personalMailboxTools } from '@/lib/mailbox-tools'
 import { mailboxInputs, type MailboxToolName } from '@mikka/protocol/mailbox'
 import { modelWriteTools, type ModelWriteCall, type ModelWriteTool } from '@/lib/operations/model-write-tools'
-import { FACTORY_TOOL_IDS, PERSONAL_WRITE_TOOL_IDS } from '@/lib/agent-kit/registry'
+import { FACTORY_TOOL_IDS, PERSONAL_WRITE_TOOL_IDS, selectRegisteredTools } from '@/lib/agent-kit/registry'
 import { writeSchemas } from '@/lib/operations/write-schema'
 import { supportsWritePlanning } from '@/lib/operations/write-planning-model'
 import { scheduledReadTools } from '@/lib/coordinator/scheduled-read-tools'
@@ -37,13 +39,19 @@ export function readCoordinatorSwitches(): CoordinatorSwitches {
   return { issueTools: issueMutationsEnabled(), factoryRouting: deploymentSwitch('factoryRouting'), factoryLifecycle: deploymentSwitch('factoryLifecycle') }
 }
 
-export interface CoordinatorToolOptions { /** The hosted prompt omitted repository facts; discover its workspace context on demand. */ lazyGitHubContext?: boolean; /** Started tool finish records; the round awaits them before storing its reply. Without it each record is awaited in place. */ audits?: Promise<unknown>[]; switches?: CoordinatorSwitches; coordinator?: boolean; execution?: AgentExecution | null; readOnly?: boolean; readToolIds?: readonly string[]; sourceEventId?: string; /** Evidence-only entry provenance for dispatched runs; the app's chats are 'web', Slack names itself. */ origin?: RunOrigin; originRef?: RunOriginRef | null; writeEnabled?: boolean; taskEventId?: string; computerEnabled?: boolean; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[]; writeTools?: { catalog: readonly ModelWriteTool[]; submit: (call: ModelWriteCall) => Promise<unknown> } }
+export interface CoordinatorToolOptions { /** The hosted prompt omitted repository facts; discover its workspace context on demand. */ lazyGitHubContext?: boolean; /** Started tool finish records; the round awaits them before storing its reply. Without it each record is awaited in place. */ audits?: Promise<unknown>[]; switches?: CoordinatorSwitches; coordinator?: boolean; execution?: AgentExecution | null; policy?: Pick<DefinitionSnapshot, 'definition' | 'effectiveTools'>; runtime?: HostedRuntimeSnapshot; readOnly?: boolean; readToolIds?: readonly string[]; sourceEventId?: string; /** Evidence-only entry provenance for dispatched runs; the app's chats are 'web', Slack names itself. */ origin?: RunOrigin; originRef?: RunOriginRef | null; writeEnabled?: boolean; taskEventId?: string; computerEnabled?: boolean; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[]; writeTools?: { catalog: readonly ModelWriteTool[]; submit: (call: ModelWriteCall) => Promise<unknown> } }
 /** One task, one thread (decision 2026-11-01-1330-one-thread-per-task): how both dispatch tools say it. */
 const ONE_THREAD = 'A task has one thread at a time. When the task already has one, this goes to that thread: a thread still working gets `note` as a message; a thread that ended (done, failed or stopped) runs again in the same thread with `note`. Use it to retry or to add information; never to start over. Set newThread only when the person, in their own words, explicitly asked for a new session or thread, or a different agent; the host checks their message and otherwise keeps the existing thread.'
 const newThreadInput = z.boolean().optional().describe('Only when the person explicitly asked for a new session or thread, or a different agent, in their own words. Retries and added information never set it.')
 const needsSpecInput = z.boolean().optional().describe('true when the person asks for a specification or plan before implementation. Starts a read-only planner and waits for the person to approve its completed specification before a new executor implements it. Omit for direct implementation; this never approves an existing specification.')
 
 const factoryCapabilities = new Set<string>([...FACTORY_TOOL_IDS, 'dispatch_factory_task', 'recover_factory_check', 'intake_factory_request'])
+
+export const coordinatorWriteCatalogue: readonly ModelWriteTool[] = [
+  { name:'append_notion_paragraph', description:'Append text to a Notion page.', inputSchema:writeSchemas.append_notion_paragraph },
+  { name:'send_slack_message', description:'Send a Slack message.', inputSchema:writeSchemas.send_slack_message },
+  { name:'cancel_calendar_event', description:'Cancel a calendar event.', inputSchema:writeSchemas.cancel_calendar_event },
+]
 
 export function createCoordinatorRegistry(userId: string, botId: string, scope?: NativeToolScope, options: CoordinatorToolOptions = {}): ToolSet {
   if (!options || typeof options !== 'object') throw new Error('agentToolOptionsInvalid')
@@ -55,11 +63,9 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
   // may select any authorized Bot on the person's explicit instruction.
   const botInput = coordinator ? id : id.optional()
   const targetBot = (requested?: string) => coordinator ? requested ?? null : (!requested || requested === botId ? botId : null)
-  const writeTools = options.writeTools ?? (execution ? { catalog: [
-    { name:'append_notion_paragraph', description:'Append text to a Notion page.', inputSchema:writeSchemas.append_notion_paragraph },
-    { name:'send_slack_message', description:'Send a Slack message.', inputSchema:writeSchemas.send_slack_message },
-    { name:'cancel_calendar_event', description:'Cancel a calendar event.', inputSchema:writeSchemas.cancel_calendar_event },
-  ], submit:(call:ModelWriteCall) => steps.personalWrite(userId,botId,execution.id,call,scope) } : undefined)
+  const writeTools = options.writeTools ?? (execution ? { catalog: coordinatorWriteCatalogue,
+    submit:(call:ModelWriteCall) => steps.personalWrite(userId,botId,execution.id,call,scope) } : undefined)
+  const runtime = execution?.snapshot.runtime ?? options.runtime
   if (writeTools && writeTools.catalog.some(entry => !(PERSONAL_WRITE_TOOL_IDS as readonly string[]).includes(entry.name))) throw new Error('invalidWriteToolCatalog')
   const read = (action: ComposioActionName, input: unknown, accountId?: string) => steps.composioAction(userId, action, input, scope, accountId, botId)
   const registry = {
@@ -74,9 +80,9 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       execute: input => steps.personalMcp(userId, botId, execution?.id, input, scope),
     }),
     ...scheduleTools(command => steps.scheduleCommand(userId, botId, options.sourceEventId, command, scope)),
-    ...modelWriteTools((options.writeEnabled === true) && Boolean(execution && supportsWritePlanning(execution.snapshot.runtime)) && Boolean(writeTools), writeTools?.catalog ?? [], call => writeTools!.submit(call)),
+    ...modelWriteTools((options.writeEnabled === true) && Boolean(runtime && supportsWritePlanning(runtime)) && Boolean(writeTools), writeTools?.catalog ?? [], call => writeTools!.submit(call)),
     ...(coordinator && factoryOn ? factoryCoordinatorTools(userId,scope) : {}),
-    ...personalMailboxTools(mailboxEnabled && Boolean(execution), request => steps.personalMailbox(userId, botId, request, scope, execution?.id)),
+    ...personalMailboxTools(mailboxEnabled && Boolean(execution || options.policy), request => steps.personalMailbox(userId, botId, request, scope, execution?.id)),
     // A named Bot carries its id so the workspace's 团队权限 › 允许使用的应用 applies (lib/app-policy).
     ...createComposioAITools(read),
     ...createAppTools({ list: input => steps.appTools(userId, botId, 'list', input, scope), call: input => steps.appTools(userId, botId, 'call', input, scope) }),
@@ -274,17 +280,20 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
 export function coordinatorTools(userId: string, botId: string, scope?: NativeToolScope, options: CoordinatorToolOptions = {}): ToolSet {
   const registry = createCoordinatorRegistry(userId,botId,scope,options)
   const { execution } = options
-  if (!execution) return Object.fromEntries(Object.entries(registry).filter(([name]) => name !== 'load_skill' && name !== 'read_personal_skill'))
+  const policy = execution?.snapshot ?? options.policy
+  const runtime = execution?.snapshot.runtime ?? options.runtime
+  if (!policy) return Object.fromEntries(Object.entries(registry).filter(([name]) => name !== 'load_skill' && name !== 'read_personal_skill'))
   // A rollout gate can narrow a frozen grant; enabling it never adds tool IDs
   // absent from this execution's immutable effectiveTools.
-  const requested = execution.snapshot.effectiveTools.filter(name =>
+  const requested = policy.effectiveTools.filter(name =>
     (!options.readOnly || Object.hasOwn(registry, name)) &&
     // Frozen grants are narrowed by the current Factory rollout and Bot scope.
     // Unknown tool IDs still reach instrumentTools and fail closed there.
     (!factoryCapabilities.has(name) || Object.hasOwn(registry, name)) &&
     ((options.switches ?? readCoordinatorSwitches()).issueTools || (name !== 'create_issue' && name !== 'update_issue')) &&
     (!Object.hasOwn(mailboxInputs, name) || (options.mailboxEnabled && options.mailboxTools?.includes(name as MailboxToolName))) &&
-    (!(PERSONAL_WRITE_TOOL_IDS as readonly string[]).includes(name) || ((options.writeEnabled === true) && Boolean(execution && supportsWritePlanning(execution.snapshot.runtime)) && (!options.writeTools || options.writeTools.catalog.some(entry => entry.name === name)))))
+    (!(PERSONAL_WRITE_TOOL_IDS as readonly string[]).includes(name) || ((options.writeEnabled === true) && Boolean(runtime && supportsWritePlanning(runtime)) && (!options.writeTools || options.writeTools.catalog.some(entry => entry.name === name)))))
+  if (!execution) return selectRegisteredTools(registry, requested)
   return instrumentTools(registry,requested,{
     before:(callId,name) => kit.beforeAgentTool(userId,botId,execution.id,callId,name,scope),
     after:(callId,name,outcome) => {

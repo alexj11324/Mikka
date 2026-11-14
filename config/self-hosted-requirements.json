@@ -632,9 +632,23 @@
   "lib/eve/product-definitions.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Native Eve definitions prepare the current session's execution and tool catalogue through the installation's existing scoped stores. Product actions retain their authenticated application-host boundary.",
+    "behavior": "Native Eve definitions read the configured Bot capabilities. Actual product actions resolve their existing execution audit and authorization on the application host.",
     "test": "lib/eve/product-definitions.test.ts",
     "suite": "test:eve-product-tool"
+  },
+  "lib/eve/runtime.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The official Eve turn lifecycle persists the installation's selected model, Bot policy and original request. Definitions consume that business data while Eve owns turn execution.",
+    "test": "lib/eve/runtime.test.ts",
+    "suite": "test:eve"
+  },
+  "workflows/coordinator/tools.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The installation's existing tool definitions supply both native Eve discovery and application action execution, preserving the configured Bot capability selection.",
+    "test": "lib/agent-kit/tool-defaults-compat.test.ts",
+    "suite": "test:agent-kit-model"
   },
   "lib/eve/product-rpc.ts": {
     "mode": "operator-configured",
