@@ -11,6 +11,8 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { gzipSync } from 'node:zlib'
 import { Pool } from 'pg'
+import { observePoolCommits } from '../db/commit-effects'
+import { isolateCoordinatorWakes } from '../../tests/support/coordinator-wake'
 import { dbUrl, seedUser, seedPersonalWorkspace, seedBot, seedIssue } from '../../tests/support/workspace-admin-db'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
 import { templateModelsFixture } from '../../tests/support/template-models'
@@ -30,6 +32,7 @@ process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
 // teardown while the current child is still unwinding, obscuring that failure.
 test('real PG: independent cross-Harness Profile stages and recorded cloud runtimes', { skip: !dbUrl, timeout: 240_000 }, async t => {
   assert.ok(dbUrl)
+  await isolateCoordinatorWakes(t)
   const admin = new Pool({ connectionString: dbUrl })
   const database = `factory_profile_dispatch_${randomUUID().replaceAll('-', '')}_e2e`
   await admin.query(`CREATE DATABASE "${database}"`)
@@ -38,6 +41,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
   const old = { E2E_DATABASE_URL: process.env.E2E_DATABASE_URL, MIKKA_DATABASE_URL: process.env.MIKKA_DATABASE_URL, DATABASE_URL: process.env.DATABASE_URL }
   Object.assign(process.env, { E2E_DATABASE_URL: url, MIKKA_DATABASE_URL: url, DATABASE_URL: url })
   const pool = new Pool({ connectionString: url, max: 12, options: '-c statement_timeout=15000 -c lock_timeout=5000' })
+  observePoolCommits(pool)
   let appPool: Pool | undefined, workspacePool: Pool | undefined
   t.after(async () => {
     await dropTestDatabase(admin, database, pool, appPool, workspacePool)
@@ -1388,8 +1392,18 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
   const claim = async (f: Awaited<ReturnType<typeof claimFixture>>) => {
     const lease = new Date(Date.now() + 30_000)
     const beforeClaim = f.inherit ? async (tx: import('pg').PoolClient) => {
-      const result = await (await import('./runtime')).guardFactoryClaim(tx, f.ownerId, f.threadDevice, f.runId, lease.toISOString())
-      assert.equal(result.preserveQuestionWorktree, true)
+      const queries = t.mock.method(tx, 'query')
+      try {
+        const result = await (await import('./runtime')).guardFactoryClaim(tx, f.ownerId, f.threadDevice, f.runId, lease.toISOString())
+        assert.equal(result.preserveQuestionWorktree, true)
+        const lineageReads = queries.mock.calls.filter(call => {
+          const query = call.arguments[0]
+          return typeof query === 'string' && query.includes('WITH RECURSIVE lineage AS') && query.includes('FROM lineage l')
+        })
+        assert.equal(lineageReads.length, 1, 'the lease claim resolves its Factory task lineage once')
+      } finally {
+        queries.mock.restore()
+      }
     } : undefined
     return factoryResourceWorkspace(pool)(f.ownerId, f.task.id, () =>
       claimCloudRun(pool, f.actor, f.runId, f.threadDevice, lease, f.subscriptionBindingId, beforeClaim, undefined, false))
