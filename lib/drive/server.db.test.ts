@@ -262,6 +262,46 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
   assert.equal((await call(fileHistory, { token: null })).status, 401)
   assert.equal((await call(fileHistory, { token: sharedToken, workspaceId: team.id })).status, 404)
   assert.equal((await call(fileHistory, { token: peerToken, workspaceId: team.id })).status, 404)
+  await t.test('volume history follows commit sequence across independent version-ID generators', async () => {
+    const create = await call('', { method: 'POST', body: { name: 'Version order fixture' } })
+    assert.equal(create.status, 201)
+    const { volume: volumeWithHistory } = await create.json()
+    // Two committed checkpoints have IDs from the same millisecond on different workers.
+    // Their random suffixes sort in the opposite order to their commits.
+    const prefix = 'vver_0000000001' + randomUUID().replaceAll('-', '').slice(0, 15).toUpperCase()
+    const secondId = prefix + 'Z', thirdId = prefix + '0'
+    await fixture.query(`
+      WITH checkpoints AS (
+        INSERT INTO drive_volume_versions (id, "volumeId", "ownerId", seq, kind, "fileCount", "totalBytes", digest, manifest, "authorName")
+        SELECT point.id, seed."volumeId", seed."ownerId", point.seq, 'checkpoint', seed."fileCount", seed."totalBytes",
+               seed.digest, seed.manifest, seed."authorName"
+          FROM drive_volume_versions seed
+          CROSS JOIN (VALUES ($2::text, 2), ($3::text, 3)) AS point(id, seq)
+         WHERE seed.id=$1
+        RETURNING id, "volumeId", seq
+      )
+      UPDATE drive_volumes volume SET "headVersionId"=checkpoints.id
+        FROM checkpoints WHERE volume.id=checkpoints."volumeId" AND checkpoints.seq=3`,
+    [volumeWithHistory.headVersionId, secondId, thirdId])
+
+    const historyPath = `/${volumeWithHistory.id}/versions?limit=2`
+    const firstPage = await call(historyPath)
+    assert.equal(firstPage.status, 200)
+    const page = await firstPage.json()
+    assert.deepEqual(page.versions.map((version: { id: string }) => version.id), [thirdId, secondId])
+    assert.equal(page.nextCursor, secondId)
+
+    const nextPage = await call(historyPath + '&before=' + page.nextCursor)
+    assert.equal(nextPage.status, 200)
+    const rest = await nextPage.json()
+    assert.deepEqual(rest.versions.map((version: { id: string }) => version.id), [volumeWithHistory.headVersionId])
+    assert.equal(rest.nextCursor, null)
+
+    const foreignCursor = await call(historyPath + '&before=' + volume.headVersionId)
+    assert.equal(foreignCursor.status, 200)
+    assert.deepEqual(await foreignCursor.json(), { versions: [], nextCursor: null })
+  })
+
   await fixture.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [team.id, owner])
   assert.equal((await call(`/${otherVolume.id}`, { token: sharedToken, workspaceId: team.id })).status, 401)
   await fixture.query(`UPDATE personal_access_tokens SET "revokedAt"=now() WHERE "userId"=$1`, [owner])

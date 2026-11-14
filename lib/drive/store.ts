@@ -306,15 +306,17 @@ export async function readDriveHistory(
   const limit = Math.min(Math.max(options.limit ?? 50, 1), 200)
   const { rows: [volume] } = await database.query<{ ownerId: string }>('SELECT "ownerId" FROM drive_volumes WHERE id=$1 AND "archivedAt" IS NULL', [volumeId])
   if (!volume || volume.ownerId !== actor.ownerId) throw new DriveError('drive_not_found', 404)
-  // A cursor is the last id already seen; ULIDs sort by time, so it doubles as
-  // a stable page boundary without an offset that shifts under new writes.
+  // The volume lock serializes sequence numbers. Independent writers can generate
+  // ULIDs in a different order within the same millisecond.
   const { rows } = await database.query<{
     id: string; seq: number; kind: DriveVersionSummary['kind']; fileCount: number; totalBytes: string; digest: string
     threadId: string | null; threadTitle: string | null; authorName: string; restoredFromVersionId: string | null; createdAt: Date
   }>(`SELECT id,seq,kind,"fileCount","totalBytes",digest,"threadId","threadTitle","authorName","restoredFromVersionId","createdAt"
       FROM drive_volume_versions
-      WHERE "volumeId"=$1 AND ($2::text IS NULL OR id < $2)
-      ORDER BY id DESC LIMIT $3`, [volumeId, options.beforeId ?? null, limit])
+      WHERE "volumeId"=$1 AND ($2::text IS NULL OR seq < (
+        SELECT seq FROM drive_volume_versions WHERE "volumeId"=$1 AND id=$2
+      ))
+      ORDER BY seq DESC LIMIT $3`, [volumeId, options.beforeId ?? null, limit])
   return rows.map(row => ({ ...row, totalBytes: Number(row.totalBytes) }))
 }
 
