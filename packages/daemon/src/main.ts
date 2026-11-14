@@ -111,7 +111,8 @@ import { daemonTestMode, normalizeRepository } from "@mikka/protocol/repository"
 import type { RunAssignment } from "./server-link"
 import { createHostedBotRunner } from "./subscription-hosted-runner"
 import { ComputerBroker } from "./computer/broker.mjs"
-import { detectComputerDriver, executeDriver, type ComputerDriver } from "./computer/driver.mjs"
+import { detectComputerDriver, executeDriver, inspectComputerDriver, type ComputerDriver, type ComputerDriverInspection } from "./computer/driver.mjs"
+import { doctorComputerDriver, grantComputerAccess } from "./computer/doctor.mjs"
 import { createHostedComputerExecutor, type CredentialExecutorAuthority } from "./computer/credential-executor"
 import { pollWebComputerReviews } from "./computer/web-review"
 import { DeviceWorkSignal, type PushedWait } from "./device-work-signal"
@@ -242,6 +243,11 @@ function cloudComputerGrantMatches(assignment: RunAssignment | undefined, runId:
   return !snapshot || (snapshot.runId === runId && snapshot.deviceId === deviceId && snapshot.ownerId === assignment.computer.ownerId)
 }
 
+/** The exact driver an already-wired broker is bound to; a reinstall changes the fingerprint. */
+function sameLocalComputerDriver(wired: ComputerDriver, current: ComputerDriver | null): boolean {
+  return Boolean(current && current.path === wired.path && current.version === wired.version && current.fingerprint === wired.fingerprint)
+}
+
 export class Daemon {
   readonly paths: DaemonPaths
   readonly log: Logger
@@ -303,6 +309,12 @@ export class Daemon {
   private cloudComputerBroker: ComputerBroker | null = null
   private localComputerDriver: ComputerDriver | null = null
   private localComputerBroker: ComputerBroker | null = null
+  /** One in-flight detection/setup pass; cleared so a later install is retried. */
+  private localComputerSetup: Promise<void> | null = null
+  /** One in-flight revalidation shared by concurrent status calls. */
+  private localComputerRefresh: Promise<ComputerDriverInspection> | null = null
+  /** Which broker the web review loop currently polls; a replaced broker gets a new loop. */
+  private reviewLoopBroker: ComputerBroker | null = null
   /** Messages handed to an agent whose delivery the server has not taken yet. */
   private unacked = new Set<string>()
   /** Runs this daemon already started cancelling for a stop request. */
@@ -377,39 +389,9 @@ export class Daemon {
     // Before its first gateway session, too (runControlPush in the constructor).
     if (this.runControlPush) this.options.link.setRunControlMode?.('fallback')
     if (this.stopped) throw new Error("daemon stopped during startup")
-    if (!this.options.hostedSubscriptions && this.sandbox) this.localComputerDriver = await detectComputerDriver()
-    if (this.localComputerDriver && this.options.link.syncComputerReviews) {
-      this.localComputerBroker = new ComputerBroker({
-        driver: this.localComputerDriver,
-        socketPath: join(paths.dataDir, 'local-computer.sock'),
-        transport: 'tcp',
-        needsPerson: this.computerNeedsPerson(),
-        permitted: runId => {
-          const assignment = this.journal.get(runId)?.assignment
-          return Boolean(!this.stopped && this.registered && assignment?.localComputer && !assignment.computer &&
-            assignment.deviceId === this.device.deviceId && assignment.policy?.permissions.computer_use &&
-            decide('computer_use', { policy: assignment.policy }) !== 'deny' && this.supervisor?.computerRunAllowed(runId))
-        },
-        execute: async (driver, call, display, runId, context) => {
-          const initial = this.journal.get(runId)?.assignment.localComputer
-          if (!initial || display !== undefined) throw new Error('Local computer unavailable')
-          const recheck = async () => {
-            const current = this.journal.get(runId)?.assignment.localComputer
-            context.assertLive()
-            if (!this.supervisor.computerRunAllowed(runId) || !current || current.botId !== initial.botId || current.ownerId !== initial.ownerId || current.workspaceId !== initial.workspaceId || current.policyVersion !== initial.policyVersion || current.permission !== initial.permission)
-              throw new Error('Local computer authority changed')
-          }
-          try {
-            await recheck()
-            return await executeDriver(driver, call, undefined, undefined, context.assertLive, recheck)
-          } catch (error) {
-            this.localComputerBroker?.spec(runId, 'deny')
-            throw error
-          }
-        },
-      })
-      await this.localComputerBroker.listen()
-    }
+    // The local driver may be installed or upgraded while the daemon runs;
+    // this first look is also the path each doctor/grant call retries.
+    await this.ensureLocalComputer()
     if (this.options.cloudComputer) {
       if (!this.options.hostedSubscriptions || !this.options.e2bContainerRuntime || this.options.computerBroker) throw new Error("Cloud computer runtime unavailable")
       const driver = await detectComputerDriver('/opt/mikka/computer/cua-driver')
@@ -1285,6 +1267,162 @@ export class Daemon {
       judgeComputerAction(this.serverDecide(), runId, { ...evidence, task: this.journal.get(runId)?.assignment.prompt }, signal)
   }
 
+  /**
+   * Re-look at the local driver before every doctor/grant call. A replaced,
+   * upgraded or removed binary retires the broker, clears the capability and
+   * either wires the new pinned driver or announces installed=false. The
+   * whole look is single-flight, so two concurrent status calls inspect the
+   * binary once.
+   */
+  private refreshLocalComputer(): Promise<ComputerDriverInspection> {
+    if (this.stopped || this.options.hostedSubscriptions || !this.sandbox) return Promise.resolve({ driver: null, found: [] })
+    this.localComputerRefresh ??= this.reconcileLocalComputer().finally(() => { this.localComputerRefresh = null })
+    return this.localComputerRefresh
+  }
+
+  private async reconcileLocalComputer(): Promise<ComputerDriverInspection> {
+    const inspection = await inspectComputerDriver()
+    const current = inspection.driver
+    const wired = this.localComputerDriver
+    if (wired && !sameLocalComputerDriver(wired, current)) {
+      await this.retireLocalComputer()
+      if (!current) {
+        await this.announceComputerCapability()
+        return inspection
+      }
+    }
+    if (current && !this.localComputerBroker) {
+      try {
+        await this.ensureLocalComputer(current)
+      } catch (error) {
+        // The capability must not stay true when its broker could not bind.
+        await this.announceComputerCapability()
+        throw error
+      }
+    }
+    return inspection
+  }
+
+  /**
+   * Wire the local driver when one is available. Concurrent callers share the
+   * look; a missing or unusable driver is retried on the next call. The
+   * driver is published only together with a listening broker, so neither
+   * the heartbeat nor a run can claim a capability we cannot serve, and a
+   * daemon stopped mid-setup never leaves a listener behind.
+   */
+  private ensureLocalComputer(driver?: ComputerDriver | null): Promise<void> {
+    if (this.localComputerBroker || this.stopped || this.options.hostedSubscriptions || !this.sandbox) return Promise.resolve()
+    this.localComputerSetup ??= this.setupLocalComputer(driver).finally(() => { this.localComputerSetup = null })
+    return this.localComputerSetup
+  }
+
+  private async setupLocalComputer(driver?: ComputerDriver | null) {
+    const next = driver === undefined ? await detectComputerDriver() : driver
+    if (!next || this.stopped) return
+    // Without the review transport a run can never use the driver: no
+    // broker, no announced capability.
+    if (!this.options.link.syncComputerReviews) return
+    const broker = new ComputerBroker({
+      driver: next,
+      socketPath: join(this.paths.dataDir, 'local-computer.sock'),
+      transport: 'tcp',
+      needsPerson: this.computerNeedsPerson(),
+      permitted: runId => {
+        const assignment = this.journal.get(runId)?.assignment
+        return Boolean(!this.stopped && this.registered && assignment?.localComputer && !assignment.computer &&
+          assignment.deviceId === this.device.deviceId && assignment.policy?.permissions.computer_use &&
+          decide('computer_use', { policy: assignment.policy }) !== 'deny' && this.supervisor?.computerRunAllowed(runId))
+      },
+      execute: async (current, call, display, runId, context) => {
+        const initial = this.journal.get(runId)?.assignment.localComputer
+        if (!initial || display !== undefined) throw new Error('Local computer unavailable')
+        const recheck = async () => {
+          const latest = this.journal.get(runId)?.assignment.localComputer
+          context.assertLive()
+          if (!this.supervisor.computerRunAllowed(runId) || !latest || latest.botId !== initial.botId || latest.ownerId !== initial.ownerId || latest.workspaceId !== initial.workspaceId || latest.policyVersion !== initial.policyVersion || latest.permission !== initial.permission)
+            throw new Error('Local computer authority changed')
+        }
+        try {
+          await recheck()
+          return await executeDriver(current, call, undefined, undefined, context.assertLive, recheck)
+        } catch (error) {
+          broker.spec(runId, 'deny')
+          throw error
+        }
+      },
+    })
+    try {
+      await broker.listen()
+    } catch (error) {
+      await broker.close().catch(() => undefined)
+      throw error
+    }
+    // A stop that raced the listen must not leave this listener alive.
+    if (this.stopped) {
+      await broker.close().catch(() => undefined)
+      return
+    }
+    this.localComputerBroker = broker
+    this.localComputerDriver = next
+    this.startLateComputerReviewLoop()
+    await this.announceComputerCapability()
+  }
+
+  /** Close the broker and forget the driver before replacing or dropping it. */
+  private async retireLocalComputer() {
+    const broker = this.localComputerBroker
+    this.localComputerBroker = null
+    this.localComputerDriver = null
+    this.reviewAbort?.abort()
+    this.reviewAbort = null
+    this.reviewLoopBroker = null
+    if (broker) await broker.close().catch(() => undefined)
+  }
+
+  /**
+   * A broker created or replaced after this daemon registered needs its own
+   * web review loop; register() only starts one for the brokers it saw.
+   */
+  private startLateComputerReviewLoop() {
+    const broker = this.localComputerBroker
+    const deviceId = this.device.deviceId
+    if (!broker || !this.registered || !deviceId || this.stopped || !this.options.link.syncComputerReviews) return
+    if (this.reviewAbort && this.reviewLoopBroker === broker) return
+    this.reviewAbort?.abort()
+    const previous = this.reviewLoop
+    const abort = new AbortController()
+    this.reviewAbort = abort
+    this.reviewLoopBroker = broker
+    this.reviewLoop = pollWebComputerReviews(broker, deviceId, this.options.link, abort.signal, undefined, this.workSignal)
+    void previous.catch(() => undefined)
+  }
+
+  /**
+   * The server's claim route reads the device's computerUse from its row and
+   * only grants localComputer when it is installed. Send that heartbeat
+   * before waking queued claims, so a run claimed in this window already
+   * sees the new capability.
+   */
+  private async announceComputerCapability(): Promise<void> {
+    if (!this.registered) return
+    await this.syncWithServer().catch((error) => this.log.warn({ err: error }, 'computer capability refresh failed'))
+    if (this.stopped) return
+    this.wakeCommands?.()
+  }
+
+  /** One doctor/grant answer; the driver and broker are revalidated first. */
+  private async computerReport(grant: boolean) {
+    const inspection = await this.refreshLocalComputer()
+    const report = grant
+      ? await grantComputerAccess({ inspection })
+      : await doctorComputerDriver({ inspection })
+    if (report.installed && !this.localComputerBroker) {
+      if (inspection.driver) await this.ensureLocalComputer(inspection.driver)
+      if (!this.localComputerBroker) throw new Error("Local computer broker unavailable")
+    }
+    return report
+  }
+
   /** What every real adapter of this daemon is built with, subscription runs included. */
   private adapterOptions() {
     const sandbox = this.agentSandbox()
@@ -1410,6 +1548,7 @@ export class Daemon {
       this.reviewAbort?.abort()
       const abort = new AbortController()
       this.reviewAbort = abort
+      this.reviewLoopBroker = computerBroker
       this.reviewLoop = pollWebComputerReviews(computerBroker, deviceId, this.options.link, abort.signal, undefined, this.workSignal)
     }
     this.wakeCommands?.()
@@ -1588,6 +1727,7 @@ export class Daemon {
     this.registered = false
     this.reviewAbort?.abort()
     this.reviewAbort = null
+    this.reviewLoopBroker = null
     this.saveDevice({ credential: undefined })
     for (const runId of this.supervisor?.activeRunIds() ?? []) {
       void this.supervisor.cancel(runId).catch(() => this.log.warn({ run_id: runId }, 'could not stop revoked session'))
@@ -1843,6 +1983,7 @@ export class Daemon {
       "device.setCredential": (raw) => {
         this.reviewAbort?.abort()
         this.reviewAbort = null
+        this.reviewLoopBroker = null
         const { credential, workspaceId, traceContext } =
           daemonRpc["device.setCredential"].params.parse(raw)
         // The device id is kept, in every workspace (ADR ORV-284):
@@ -1861,6 +2002,7 @@ export class Daemon {
       "device.clearCredential": () => {
         this.reviewAbort?.abort()
         this.reviewAbort = null
+        this.reviewLoopBroker = null
         // Signed out in the app: stop talking to the server as that person.
         // The device id stays, so signing in again keeps the device.
         this.saveDevice({ credential: undefined })
@@ -1883,6 +2025,10 @@ export class Daemon {
         const { runId } = daemonRpc["runs.cancel"].params.parse(raw)
         return this.supervisor.cancel(runId)
       },
+      // Local computer use. Both calls revalidate the wired driver, rewire a
+      // replaced one and answer only when a listening broker can serve it.
+      "computer.permissions": () => this.computerReport(false),
+      "computer.permissions.grant": () => this.computerReport(true),
       "dev.mockRun": async (raw) => {
         const params = daemonRpc["dev.mockRun"].params.parse(raw)
         const memory = this.options.memoryServer
@@ -1983,6 +2129,10 @@ export class Daemon {
     const anonymousClosing = Promise.all([this.options.anonymousClaudeCandidate?.close(), this.options.anonymousCodexCandidate?.close()])
     this.localComputerBroker?.suspend()
     await this.starting?.catch(() => undefined)
+    // A doctor/grant RPC may be wiring a broker right now: its post-listen
+    // check sees `stopped` and closes the listener before this stop returns.
+    await this.localComputerRefresh?.catch(() => undefined)
+    await this.localComputerSetup?.catch(() => undefined)
     await this.maintenance
     if (this.timer) clearTimeout(this.timer)
     await this.quota?.stop()
