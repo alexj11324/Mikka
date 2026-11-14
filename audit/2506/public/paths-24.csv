@@ -291,7 +291,7 @@ scripts/e2b/validate-template-subscriptions.test.mjs,100644,e5a196078c93b5dec04c
 scripts/e2b/viewer-gateway.py,100644,c3d0d4586be6c934c8eb610ab85bfaad2e8d3d25,code,tool/action implementation,scripts/e2b,unreviewed,,,
 scripts/e2b/viewer-probe.py,100644,bb107f7cd9bab7af20e6c30f3d779de5a6cb1e28,code,tool/action implementation,scripts/e2b,unreviewed,,,
 scripts/e2b/worker-live.ts,100644,2d82b63c786169c29160d3ff5941fc14e878b240,code,tool/action implementation,scripts/e2b,unreviewed,,,
-scripts/engineering-sandbox.mjs,100644,840f2cabf77443130c966ab259ce30813d2e783b,code,tool/action implementation,scripts,unreviewed,,,
+scripts/engineering-sandbox.mjs,100644,840f2cabf77443130c966ab259ce30813d2e783b,code,tool/action implementation,scripts,complete,,- `scripts/engineering-sandbox.mjs` · 已审。公开 Actions 通过 audience OIDC 读短期 token，校验固定 HTTPS origin/路径；单 run 附固定 issue/SHA，cancel 和 receipt 共用 identity、workload，禁止 redirect；signal、15s token timeout 与 workload 截止；SIGINT/SIGTERM 只发一次定向取消。回执 0600 临时文件、只记录元数据，非 passed 退出1。原生容器到期和成本保留职责是 Worker；该脚本只负责 Actions 身份、信号和 artifact 输出。 https://github.com/alexj11324/Mikka/issues/2506#issuecomment-6883384188,see path-specific decision in source receipt
 scripts/entity-ui-policy.mjs,100644,2b9b690a521b2a5ab16c4c74ddf5d892f7aeaf28,code,tool/action implementation,scripts,unreviewed,,,
 scripts/entity-ui-policy.test.mjs,100644,c22a8e25489fcee950ebd962c72ccb16371ec95a,code,"test, test support or fixture",scripts,unreviewed,,,
 scripts/error-cause-policy.mjs,100644,780a61a582c59af3b46177f6fccb436d83bdd44a,code,tool/action implementation,scripts,unreviewed,,,
