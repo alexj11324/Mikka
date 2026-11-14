@@ -86,11 +86,13 @@ test('Agent Kit evaluations run through compiled public Eve sessions with inert 
   await writeFile(join(fixture,'bindings',id+'.json'),JSON.stringify({id,session_id:null,plan}))
   let endStreamPath: string | undefined
   let teardownReads = 0
+  let deliveryReads = 0
   const nativeFetch = globalThis.fetch
   const requests = t.mock.method(globalThis, 'fetch', (input: RequestInfo | URL, init?: RequestInit) => {
     const path = new URL(input instanceof Request ? input.url : input.toString()).pathname
     if (init?.method === 'POST' && path.endsWith('/end')) endStreamPath = path.slice(0, -4) + '/stream'
     if (path === endStreamPath) teardownReads++
+    else if (path.endsWith('/stream')) deliveryReads++
     return nativeFetch(input, init)
   })
   if(kind==='abort') {
@@ -99,6 +101,7 @@ test('Agent Kit evaluations run through compiled public Eve sessions with inert 
   } else if(kind==='provider-failure')await assert.rejects(runEveEvaluation(scope,id,plan,AbortSignal.timeout(20000)),/agentEvaluationGenerationFailed/)
   else{const trace=await runEveEvaluation(scope,id,plan,AbortSignal.timeout(20000));assert.equal(trace.tools.length,1);assert.equal(trace.tools[0].effectPerformed,false);assert.equal(trace.tools[0].name,kind==='native-blocked'?'agent':'web_search');assert.equal(trace.tools[0].outcome,kind==='native-blocked'?'error':'ok');assert.match(trace.text,kind==='candidate'?/^Candidate:/ : /^Baseline:/)}
   requests.mock.restore()
+  if (kind !== 'abort') assert.equal(deliveryReads, 1, 'one native stream supplies evidence and the delivery result')
   assert.equal(teardownReads, 1, 'one native stream observes the durable session end')
   const binding=JSON.parse(await readFile(join(fixture,'bindings',id+'.json'),'utf8'));assert.ok(binding.session_id);ids.push(binding.session_id)
   const client=new Client({baseUrl:origin+'/mikka/evaluations',headers:()=>({authorization:internalEveAuthorization(scope),'x-mikka-evaluation-id':id})})
