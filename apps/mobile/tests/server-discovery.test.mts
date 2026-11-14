@@ -30,7 +30,7 @@ test('discovery falls back from a bare origin and never sends session credential
   assert.equal(result.status, 'ok')
   if (result.status === 'ok') assert.deepEqual(result.server, { url: 'https://self.example.test/mikka', name: document.name,
     version: document.version, edition: 'community', signIn: { ...document.signIn, apple: false }, mobileReady: true })
-  assert.equal(calls.filter(url => url.endsWith('/api/desktop/discovery')).length, 2)
+  assert.deepEqual(calls, ['https://self.example.test/api/desktop/discovery', 'https://self.example.test/mikka/api/desktop/discovery'])
 })
 
 test('discovery reports mobile trust, server and app incompatibility using fixed outcomes', async () => {
@@ -85,4 +85,32 @@ test('a typed installation path cannot select another installation on the same o
   const correct = await check('/team-a')
   assert.equal(correct.status, 'ok')
   if (correct.status === 'ok') assert.equal(correct.server.url, base)
+})
+
+test('legacy discovery uses only reachable candidates after checking both modern paths', async () => {
+  const calls: string[] = []
+  const result = await probeMobileServer('self.example.test', options(async input => {
+    const path = new URL(String(input)).pathname
+    calls.push(path)
+    if (path === '/api/desktop/discovery') throw new TypeError('unreachable')
+    if (path === '/mikka/api/version') return reply({ build: 'legacy', minDesktopVersion: null })
+    return new Response(null, { status: 404 })
+  }))
+  assert.deepEqual(result, { status: 'server_update_required', version: null })
+  assert.deepEqual(calls, ['/api/desktop/discovery', '/mikka/api/desktop/discovery', '/mikka/api/version'])
+})
+
+test('a slow legacy root cannot exhaust the discovery deadline before a working installation', async () => {
+  const result = await probeMobileServer('self.example.test', {
+    ...options(async (input, init) => {
+      const path = new URL(String(input)).pathname
+      if (path === '/api/desktop/discovery') return new Response(null, { status: 404 })
+      if (path === '/mikka/api/desktop/discovery') return reply()
+      return new Promise<Response>((_, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new Error('deadline')), { once: true })
+      })
+    }),
+    timeoutMs: 100,
+  })
+  assert.equal(result.status, 'ok')
 })
