@@ -9,6 +9,7 @@ import { tokenWorkspace } from '@/lib/tokens/principal'
 import { borrowTaskWorkspaceMembership, withTaskWorkspace } from '@/lib/task-workspace'
 import { withProjectResourceLease } from '@/lib/project-resources/store'
 import { FactoryError } from './contract'
+import { PENDING_QUESTION_STATUSES } from './questions/schema'
 import type { createFactoryStore } from './store'
 import type { createFactoryQuestions } from './questions/store'
 
@@ -163,7 +164,7 @@ export function bindFactoryQuestionsWorkspace(pool: Pick<Pool, 'query'>, questio
         JOIN factory_questions q ON q."taskId"=t.id AND q."userId"=t."userId"
         JOIN issues i ON i.id=t."issueId" AND i."ownershipState"='bound' AND i."workspaceId"=t."workspaceId"
         WHERE t."userId"=$1 AND t."workspaceId" IS NOT NULL AND ($2::boolean OR t."botId" IS NOT DISTINCT FROM $3::uuid)
-          AND q.status IN ('open','waiting_user','resuming','blocked') ORDER BY t."workspaceId"`, [userId, readScope === 'user', botId])
+          AND q.status = ANY($4::text[]) ORDER BY t."workspaceId"`, [userId, readScope === 'user', botId, PENDING_QUESTION_STATUSES])
       const result: Awaited<ReturnType<Questions['pending']>> = []
       for (const row of rows) {
         try { result.push(...await inWorkspace(userId, row.workspaceId, () => questions.pending(userId, undefined, readScope))) }
