@@ -782,6 +782,13 @@
     "test": "tests/organization-invitations.db.test.ts",
     "suite": "test:organization-invitations-db"
   },
+  "lib/governance/organizations.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read retained archived organization names for currently active owners from the existing workspace database. The active directory remains separate and no additional service or credential is required.",
+    "test": "lib/enterprise/governance.db.test.ts",
+    "suite": "test:enterprise-db"
+  },
   "lib/governance/policy.ts": {
     "mode": "built-in",
     "environment": [],
