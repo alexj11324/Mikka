@@ -1,5 +1,6 @@
 'use server'
 
+import type { IssuePullRequest } from '@/lib/issue-metadata'
 import type { DirectoryInput } from '@/lib/conversation-directory-input'
 import type { ConversationOrganizationChange } from '@/lib/conversation-organization'
 import { runAwaitingApproval, runHistoryWindow } from '@/lib/task-state-query'
@@ -124,6 +125,7 @@ export interface Thread {
   /** How it came out once it ended, as the decision model judged it; null while running or not judged yet (R-52). */
   outcome: RunOutcome | null
   failureDetails?: CompactRunFailure | null
+  pullState?: IssuePullRequest['state'] | null
   /** The coding agent running it (claude_code, codex…); its mark is the thread's icon (R-78). */
   harness: string | null
   waitingFor?: { deviceId: string; deviceName: string; deviceType: 'laptop' | 'server'; harness: string }
@@ -179,6 +181,12 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
       deviceName: sql<string | null>`case when ${waitingForDevice} then ${devices.name} end`.as('deviceName'),
       deviceType: sql<'laptop' | 'server' | null>`case when ${waitingForDevice} then ${devices.deviceType} end`.as('deviceType'),
       waitingForDevice: waitingForDevice.as('waitingForDevice'),
+      pullState: sql<IssuePullRequest['state'] | null>`(select p."pullRequest"->>'state' from run_publications p
+        join issues i on i.id=p."issueId" and i."workspaceId"=${agentRuns.workspaceId} and i."ownershipState"='bound'
+        where p."runId"=${agentRuns.id} and p."userId"=${agentRuns.userId} and p."issueId"=${agentRuns.issueId}
+          and p.status='published' and p."pullRequest"->>'state' in ('open','draft','merged','closed')
+          and coalesce(i.content->'attrs'->'mikka',i.content->'attrs'->'orvilo')->>'deletedAt' is null
+          and mikka_resource_acl_allowed('account',${session.user.id},i."workspaceId",'task',i.id,'canReadContent'))`.as('pullState'),
       harness: sql<string>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`.as('harness'),
       outcome: agentRuns.outcome, failureDetails: runFailureBrief.as('failureDetails'),
       pauseReason: agentRuns.pauseReason, stopReason: agentRuns.stopReason, awaitingApproval: runAwaitingApproval.as('awaitingApproval'), threadReplacedBy: agentRuns.threadReplacedBy,
