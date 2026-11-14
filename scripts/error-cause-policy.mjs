@@ -131,7 +131,6 @@ export const droppedCauseAllowlist = {
   'lib/factory/merge.ts': 1,
   'lib/factory/monitor-issue-links.ts': 1,
   'lib/factory/publication-receipt.ts': 1,
-  'lib/factory/questions/queue-continuation.ts': 1,
   'lib/factory/server.ts': 3,
   'lib/factory/vercel-publication.ts': 3,
   'lib/federated-search/input.ts': 1,
