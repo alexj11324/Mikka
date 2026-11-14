@@ -77,7 +77,7 @@ function VersionPicker({ issueId, runId, anchor, text, reload, working }: Pick<P
       if (!isRecord(receipt) || !isId(receipt.versionId) || !isId(receipt.runId)) throw new Error('submissionUnconfirmed')
       const rows = await read()
       const saved = rows.find(row => row.id === receipt.versionId)
-      if (!saved || (saved.resultRunId !== null && saved.resultRunId !== receipt.runId)) throw new Error('submissionUnconfirmed')
+      if (saved?.resultRunId !== receipt.runId) throw new Error('submissionUnconfirmed')
       setVersions(rows); setSelected(saved.id); setDraft(saved.text)
       await reload()
       request.current = null
