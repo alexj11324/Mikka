@@ -19,6 +19,7 @@ import { projectDirectory, ProjectPropertyControl } from './project-property-con
 import { useProjectUpdate } from './use-project-update'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { usePresence } from '@/lib/use-presence'
+import { navigate } from './workspace-navigation'
 import { SearchInput } from '@/components/ui/search-input'
 
 const ProjectForm = dynamic(() => import('./project-form').then(module => module.ProjectForm), {
@@ -54,6 +55,14 @@ export function ProjectWorkspace({ readerId, paging, projects, loading, error, p
       const counts = projectTaskCounts(item, issues)
       return <TableRow key={item.id}><TableCell><Button variant="ghost" className="h-auto w-full justify-start py-3 text-left whitespace-normal" onClick={() => onSelect(item.id)}><Box data-icon="inline-start" className={PROJECT_ICON_TINTS[item.properties.color]} /><span className="line-clamp-2">{item.name}</span></Button></TableCell><TableCell><ProjectPropertyControl field="health" value={item} directory={directory} disabled={pending || Boolean(item.archivedAt)} plain onChange={changes => void update(item, changes)} /></TableCell>{(['priority', 'lead', 'targetDate'] as const).map(field => <TableCell key={field}><ProjectPropertyControl field={field} projectId={item.id} value={item} directory={directory} disabled={pending || Boolean(item.archivedAt)} plain onChange={changes => void update(item, changes)} /></TableCell>)}<TableCell className="text-right">{counts?.total ?? '—'}</TableCell><TableCell><div className="inline-flex items-center gap-2"><ProjectPropertyControl field="status" value={item} directory={directory} disabled={pending || Boolean(item.archivedAt)} plain onChange={changes => void update(item, changes)} /><span className="text-xs text-muted-foreground">{counts ? `${counts.total ? Math.round(counts.done / counts.total * 100) : 0}%` : '—'}</span></div></TableCell></TableRow>
     })}</TableBody></Table></div> : <Empty className="min-h-80"><EmptyHeader><EmptyMedia variant="icon"><Box /></EmptyMedia><EmptyTitle>{archived || query || status !== 'all' ? i18nText("Projects.noMatchTitle") : i18nText("Projects.emptyTitle")}</EmptyTitle></EmptyHeader>{!archived && <EmptyContent><Button size="sm" onClick={() => setCreating(true)}><Plus data-icon="inline-start" />{i18nText("Projects.form.createTitle")}</Button></EmptyContent>}</Empty>}
-    {createDialog.value && <ProjectForm open={createDialog.open} onOpenChangeComplete={createDialog.onOpenChangeComplete} initialTeamId={initialTeamId} projects={projects} directory={directory} onClose={() => setCreating(false)} onSaved={saved => { setCreating(false); onUpdated(); onSelect(saved.id) }} />}
+    {createDialog.value && <ProjectForm open={createDialog.open} onOpenChangeComplete={createDialog.onOpenChangeComplete} initialTeamId={initialTeamId} projects={projects} directory={directory} onClose={() => setCreating(false)} onSaved={(saved, attachedTeamId) => {
+      setCreating(false)
+      onUpdated()
+      if (initialTeamId && attachedTeamId !== initialTeamId) {
+        navigate({ section: 'projects', team: null, project: saved.id })
+      } else {
+        onSelect(saved.id)
+      }
+    }} />}
   </div>
 }
