@@ -12,7 +12,9 @@ import { createFactoryDispatch, factoryBinding } from "../dispatch";
 import { factoryCheckIndependent } from "../check-independence";
 import { createFactoryQuestions } from "./store";
 import { handleFactoryQuestionList } from "./ask-user";
-import { observePoolCommits } from "../../db/commit-effects";
+import { builtinGateway } from "../../builtin-gateway/runtime";
+import { isolateCoordinatorWakes } from "../../../tests/support/coordinator-wake";
+import { bindFixtureWorkspaceDatabase } from "../../../tests/helpers/workspace-database";
 import { dropTestDatabase } from "../../../tests/support/drop-test-database";
 
 const url = process.env.E2E_DATABASE_URL;
@@ -23,13 +25,14 @@ if (url) {
 } else if (process.env.REQUIRE_DB === "1") assert.fail("REQUIRE_DB=1 needs E2E_DATABASE_URL");
 
 test("pending Factory questions list by task and by run in AskUserQuestion shape", { skip: !url, timeout: 180000 }, async (t) => {
+  await isolateCoordinatorWakes(t);
   const admin = new Pool({ connectionString: url, max: 1 });
   const database = `fac_askq_${randomUUID().replaceAll("-", "")}_e2e`;
   await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`);
   const target = new URL(url!);
   target.pathname = `/${database}`;
   const pool = new Pool({ connectionString: target.toString(), max: 6 });
-  observePoolCommits(pool);
+  const closeWorkspace = await bindFixtureWorkspaceDatabase(pool);
   try {
     const dir = new URL("../../../drizzle/", import.meta.url);
     for (const f of orderMigrations((await readdir(dir)).filter((f) => f.endsWith(".sql"))))
@@ -370,7 +373,10 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
       assert.equal((await get("owner", `?taskId=${first.taskId}`)).status, 200, "restored authorized source reads normally");
     });
   } finally {
-    await dropTestDatabase(admin, database, pool);
+    await builtinGateway()?.stop();
+    await closeWorkspace();
+    const { pool: appPool } = await import("../../db/request-scope");
+    await dropTestDatabase(admin, database, pool, appPool);
     await admin.end();
   }
 });
