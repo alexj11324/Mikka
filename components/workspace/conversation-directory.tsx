@@ -1,6 +1,6 @@
 'use client'
 
-import { useDeferredValue, useState } from 'react'
+import { useState } from 'react'
 import useSWRInfinite from 'swr/infinite'
 import useSWR, {useSWRConfig} from 'swr'
 import { getPreferences, updatePreferences } from '@/app/actions/preferences'
@@ -28,7 +28,7 @@ export function ConversationDirectory({ ownerId, workspaceId, botId }: { ownerId
   const [search, setSearch] = useState('')
   const [state, setState] = useState<DirectoryState | 'all'>('all')
   const [archived, setArchived] = useState(false)
-  const query = useDeferredValue(search.trim())
+  const query = search.trim()
   const getKey = (index: number, previous: Page | null) => !workspaceId || (index > 0 && !previous?.cursor)
     ? null : ['conversation-directory', ownerId, workspaceId, botId, query, state, archived, previous?.cursor ?? null] as const
   const { data, error, mutate, size, setSize, isValidating } = useSWRInfinite<Page, Error, typeof getKey>(getKey,
