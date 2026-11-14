@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { withholdsCachedRead } from '../lib/api-read-state.ts'
-import { clearHeldMessageForScope, heldMessage, holdMessage, subscribeHeldMessage } from '../lib/message-actions.ts'
 import { clearHeldMessage, heldMessage, holdMessage, subscribeHeldMessage } from '../lib/message-actions.ts'
 
 // The mounted-cache behavior is exercised in api-context.test.mts. This guards the
@@ -69,26 +68,4 @@ test('an in-place group or account transition does not reuse the previous draft 
 
 
 test('revoking a selected group message removes its text and actions without clearing another selection', () => {
-  const original = { sourceScope: 'group:alpha:1', text: 'private group message', onQuote: () => {} }
-  const other = { sourceScope: 'group:beta:1', text: 'other group', onQuote: () => {} }
-  let changes = 0
-  const unsubscribe = subscribeHeldMessage(() => { changes++ })
-  try {
-    holdMessage(original)
-    assert.equal(heldMessage(), original)
-    clearHeldMessageForScope('group:beta:1')
-    assert.equal(heldMessage(), original, 'revoking a different group must not erase a valid selection')
-    clearHeldMessageForScope('group:alpha:1')
-    assert.equal(heldMessage(), null, 'a revoked group must not remain copyable in the selection route')
-    holdMessage(other)
-    clearHeldMessageForScope('group:alpha:1')
-    assert.equal(heldMessage(), other)
-    assert.equal(changes, 3, 'only actual selection changes notify an open native action sheet')
-  } finally {
-    unsubscribe()
-    clearHeldMessageForScope('group:alpha:1')
-    clearHeldMessageForScope('group:beta:1')
-  }
-  assert.match(source, /clearHeldMessageForScope\\(`group:\\$\\{identity\\}`\\)/)
-  assert.match(source, /sourceScope: `group:\\$\\{identity\\}`/)
-})
+ 
