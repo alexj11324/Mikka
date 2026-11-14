@@ -1,3 +1,4 @@
+import { connectForCommitEffects } from '../db/commit-effects'
 import { factoryEventId } from "./event-id";
 import { readIssueMetadata } from "../issue-metadata";
 import type { JSONContent } from "@tiptap/core";
@@ -237,7 +238,7 @@ export function createFactoryStore(
     // owns BEGIN/COMMIT/ROLLBACK; an error must roll back the entire dispatch.
     if (existing) return fn(existing);
     const { beginFactoryTransaction, commitFactoryTransaction, rollbackFactoryTransaction, forgetFactoryTransaction } = await import('./transaction');
-    const tx = await pool.connect();
+    const tx = await connectForCommitEffects(pool);
     try {
       await beginFactoryTransaction(tx);
       const result = await fn(tx);
