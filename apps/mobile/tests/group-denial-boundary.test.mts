@@ -25,7 +25,7 @@ test('a revoked group cannot expose a stale title, attachment composer, reaction
   for (const state of ['setText', 'setQuote', 'setSentHere', 'setReactionSnapshot', 'setReactionFailure',
     'setHistoryError', 'setLoadingHistory', 'setStopFailed', 'setStopping']) {
     const deniedEffect = source.split('if (!accessDenied) return')[1]?.split('}, [accessDenied, identity])')[0] ?? ''
-    assert.match(deniedEffect, new RegExp(state + '\\\\('), state + ' must be cleared when access is revoked')
+    assert.match(deniedEffect, new RegExp(state + '\\('), state + ' must be cleared when access is revoked')
   }
   assert.match(source, /opened\.current = null/)
   assert.match(source, /historyRequest\.current = null/)
