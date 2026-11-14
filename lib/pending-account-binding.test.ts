@@ -17,6 +17,7 @@ const liveEffects: Array<() => Promise<unknown>> = []
 let workspacePolicy: Record<string, unknown> | null = null
 const db = {
   session: { client },
+  transaction: async <T>(operation: (executor: unknown) => Promise<T>): Promise<T> => operation(db),
   $count: async () => 0,
   execute: async () => ({ rows: workspacePolicy === null ? [] : [{ workspace: workspacePolicy }] }),
   select: () => ({ from: () => ({ where: () => ({ limit: async () => [row] }) }) }),
