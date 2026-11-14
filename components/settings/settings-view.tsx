@@ -38,6 +38,8 @@ import { pushSettingsHistory } from '@/lib/settings-navigation'
 import type { RailDestination } from '@/components/nav/icon-rail'
 import { prefetchSettingsSection } from '@/lib/settings-prefetch'
 import { FieldError } from '@/components/ui/field'
+import { InlineLoadError } from '@/components/load-error'
+import { isSettingsAccessError } from '@/lib/settings-data'
 import { GovernancePlan, GovernanceTemplates, GovernanceUsage } from '@ui-slot/settings-governance'
 import { ORGANIZATION_SETTINGS, OrganizationSettings } from '@ui-slot/settings-organization'
 import { toast } from 'sonner'
@@ -64,8 +66,10 @@ interface SettingsViewProps {
 
 export function SettingsView({ user, userKey, googleEnabled = false, onRail, onSignOut, signingOut, accountError, activeSection, initialSection, inviteInitially = false, workspaceId, selectedTeamId, linearNotice = null, preview = false }: SettingsViewProps) {
   const t = useTranslations('Settings')
+  const common = useTranslations('Common')
+  const members = useTranslations('Members')
   const [localSection, setSection] = useState<SettingsSectionId>(activeSection ?? initialSection ?? 'preferences')
-  const { data: workspace, error: workspaceError } = useWorkspace(userKey ?? user.email, workspaceId)
+  const { data: workspace, error: workspaceError, mutate: refreshWorkspace } = useWorkspace(userKey ?? user.email, workspaceId)
   const requestedSection = activeSection ?? localSection
   const billing = workspace !== undefined && workspace.edition !== 'community'
   const community = workspace?.edition === 'community'
@@ -116,7 +120,10 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
 
       {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
       {routedBody ? <SettingsContent className="gap-6 max-md:pt-1">
-        {preview || workspaceError || mismatchedWorkspace ? <FieldError>{t('workspaceUnavailable')}</FieldError> : team && resolvedWorkspaceId ? <>
+        {preview ? <FieldError>{t('workspaceUnavailable')}</FieldError> : workspaceError || mismatchedWorkspace
+          ? <InlineLoadError message={isSettingsAccessError(workspaceError) ? members('noAccessDescription') : t('workspaceUnavailable')}
+              retryLabel={common('retry')} onRetry={() => { void refreshWorkspace() }} />
+          : team && resolvedWorkspaceId ? <>
           {section === 'members' && <GovernancePlan workspaceId={resolvedWorkspaceId} />}
           <MembersScreen key={resolvedWorkspaceId} section={section} workspaceId={resolvedWorkspaceId} inviteInitially={inviteInitially} onSection={openSection} />
         </> : <p role="status" className="text-sm text-muted-foreground">{t('workspaceLoading')}</p>}
