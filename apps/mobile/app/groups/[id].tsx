@@ -60,7 +60,8 @@ export default function GroupChat() {
   const pagePath = `/api/conversations/${id}/messages?limit=50`
   const readPage = useCallback(async (at: string) => mergeGroupRead(apiCache.get<GroupRead>(at), await api<GroupRead>(groupPagePath(id, apiCache.get<GroupRead>(at)))), [id])
   const page = useLiveApi<GroupRead>(pagePath, () => live, readPage)
-  const members = useLiveApi<{ members: GroupMember[] }>(`/api/conversations/${id}/members`, () => live)
+  const membersPath = `/api/conversations/${id}/members`
+  const members = useLiveApi<{ members: GroupMember[] }>(membersPath, () => live)
   // A server-confirmed loss of membership must hide this group's cached history and actions immediately.
   // A network failure or 5xx is not a membership decision and keeps the recoverable offline view.
   const accessDenied = conversationAccessDenied(page.error) || conversationAccessDenied(members.error)
@@ -161,7 +162,8 @@ export default function GroupChat() {
   const bots = accessDenied ? [] : (members.data?.members ?? []).filter(item => item.memberType !== 'user')
 
   const canSend = Boolean(page.data && members.data && !accessDenied)
-  const delivery = useConversationDelivery(canSend ? { kind: 'group', id } : null, messages.map(message => message.id), page.reload)
+  const revoked = apiCache.denial(pagePath) || apiCache.denial(membersPath)
+  const delivery = useConversationDelivery(canSend ? { kind: 'group', id } : null, messages.map(message => message.id), page.reload, revoked ? id : undefined)
   const send = (body: string) => {
     const queued = delivery.send(body, mentionsIn(body, bots))
     if (queued) {
