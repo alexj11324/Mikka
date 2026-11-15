@@ -55,9 +55,10 @@ export const automationSeams:AutomationSeams={
     // An event-started run carries the event after the creator's request, marked as GitHub's data.
     const text=event?`${task.prompt}\n\n${event}`:task.prompt
     // 追加到同一个任务: after the first run made the task, a run is a follow-up in that task's thread, as the creator
-    // would type it there. The occurrence ID is the request ID, so a retried run sends it once.
+    // would type it there. The occurrence ID is the request ID, so a retried run sends it once. The task is the one the
+    // current creator's first run made: after 接手 the new creator's next run makes theirs.
     if(single){
-      const standing=(await pool.query<{id:string}>(`SELECT result->>'id' id FROM schedule_occurrences WHERE schedule_id=$1 AND id<>$2 AND status='succeeded' AND result ? 'eventId' ORDER BY created_at LIMIT 1`,[scheduleId,occurrenceId])).rows[0]
+      const standing=(await pool.query<{id:string}>(`SELECT result->>'id' id FROM schedule_occurrences WHERE schedule_id=$1 AND id<>$2 AND status='succeeded' AND result ? 'eventId' AND result->>'requestedBy'=$3 ORDER BY created_at LIMIT 1`,[scheduleId,occurrenceId,ownerId])).rows[0]
       if(standing){
         const issue=(await pool.query<{title:string;status:string;identifier:string|null}>(`SELECT i.title,i.status,r.identifier FROM issues i LEFT JOIN task_creation_receipts r ON r."taskId"=i.id AND r."userId"=$2
           WHERE i.id=$1 AND i."workspaceId"=$3`,[standing.id,ownerId,workspaceId])).rows[0]
@@ -77,7 +78,7 @@ export const automationSeams:AutomationSeams={
     const row=(await pool.query<{title:string;status:string;identifier:string|null}>(`SELECT i.title,i.status,r.identifier FROM issues i
       LEFT JOIN task_creation_receipts r ON r."taskId"=i.id AND r."userId"=$2 WHERE i.id=$1`,[created.issueId,ownerId])).rows[0]
     if(!row)throw new ScheduleError('scheduleDispatchUnavailable',503)
-    return {id:created.issueId,title:row.title,status:row.status,identifier:row.identifier,eventId}
+    return {id:created.issueId,title:row.title,status:row.status,identifier:row.identifier,eventId,requestedBy:ownerId}
   },
   async changed(tx,workspaceId){await (await import('@/lib/live/lists')).scheduleListChanged(tx,workspaceId)},
   async repository(workspaceId,repository){

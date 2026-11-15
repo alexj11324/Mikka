@@ -17,6 +17,8 @@ export type AutomationView = {
   owner_name?: string | null
   /** Why the host paused it (the creator lost the authority it runs on); null when a person paused it or it runs. */
   disabled_reason?: string | null
+  /** 接手 is offered: the reader is an owner or admin and someone else created it. */
+  can_take_over?: boolean
 }
 export type AutomationList = { schedules: AutomationView[]; nextCursor: string | null }
 

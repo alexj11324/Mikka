@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { ArrowLeft, Play } from 'lucide-react'
 import { listDevices } from '@/app/actions/agents'
 import { getWorkspaceBotDefaults, listBots } from '@/app/actions/bots'
-import { cancelAutomation, createAutomation, pauseAutomation, resumeAutomation, runAutomationNow, updateAutomation } from '@/app/actions/automations'
+import { cancelAutomation, createAutomation, pauseAutomation, resumeAutomation, runAutomationNow, takeOverAutomation, updateAutomation } from '@/app/actions/automations'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -65,8 +65,9 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
     setDraft(draftFrom(current.definition))
   }, [current])
   const requestId = useRef(crypto.randomUUID())
-  const [busy, setBusy] = useState<null | 'save' | 'toggle' | 'run' | 'delete'>(null)
+  const [busy, setBusy] = useState<null | 'save' | 'toggle' | 'run' | 'delete' | 'takeOver'>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmTakeOver, setConfirmTakeOver] = useState(false)
   const set = (patch: Partial<AutomationDraft>) => setDraft(value => value ? { ...value, ...patch } : value)
 
   const { data: bots = [] } = useSWR('bots', listBots, { revalidateOnFocus: false })
@@ -124,6 +125,18 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
       await history.mutate()
     } finally { setBusy(null) }
   }
+  async function takeOver() {
+    if (!current || busy) return
+    setBusy('takeOver')
+    try {
+      const result = await takeOverAutomation({ scheduleId: current.id, version: current.version })
+      if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
+      setConfirmTakeOver(false)
+      toast.success(t('tookOver'))
+      loaded.current = null
+      await automation.mutate({ ...(result as { schedule: AutomationView }).schedule, owner_name: null, can_take_over: false }, { revalidate: false })
+    } finally { setBusy(null) }
+  }
   async function remove() {
     if (!current || busy) return
     setBusy('delete')
@@ -155,6 +168,7 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
       </div>
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         <span>{t('creator')} · {creator}</span>
+        {current?.can_take_over && <Button size="xs" variant="outline" disabled={busy !== null} onClick={() => setConfirmTakeOver(true)}>{t('takeOver')}</Button>}
         {current && <Badge variant={current.status === 'active' ? 'secondary' : 'outline'}>{tAll(`status.${current.status}`)}</Badge>}
         {current?.status === 'paused' && current.disabled_reason && <span role="status" className="text-destructive-foreground">{t('autoPaused', { reason: errorText(current.disabled_reason) })}</span>}
       </div>
@@ -275,6 +289,12 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
       <AlertDialogContent>
         <AlertDialogHeader><AlertDialogTitle>{t('deleteTitle')}</AlertDialogTitle><AlertDialogDescription>{t('deleteBody')}</AlertDialogDescription></AlertDialogHeader>
         <AlertDialogFooter><AlertDialogCancel disabled={busy === 'delete'}>{t('cancel')}</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={busy === 'delete'} onClick={() => { void remove() }}>{t('delete')}</AlertDialogAction></AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    <AlertDialog open={confirmTakeOver} onOpenChange={open => { if (!busy) setConfirmTakeOver(open) }}>
+      <AlertDialogContent>
+        <AlertDialogHeader><AlertDialogTitle>{t('takeOverTitle')}</AlertDialogTitle><AlertDialogDescription>{t('takeOverBody', { name: creator })}</AlertDialogDescription></AlertDialogHeader>
+        <AlertDialogFooter><AlertDialogCancel disabled={busy === 'takeOver'}>{t('cancel')}</AlertDialogCancel><AlertDialogAction disabled={busy === 'takeOver'} onClick={() => { void takeOver() }}>{t('takeOver')}</AlertDialogAction></AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
   </EditorFrame>

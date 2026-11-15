@@ -6,7 +6,7 @@ import { Pool } from 'pg'
 import { dbUrl, seedBot, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import type { Command, Definition } from './contract'
 
-type Schedule = { id: string; version: number; status: string; source_event_id: string | null; next_at: Date | null }
+type Schedule = { id: string; version: number; status: string; owner_id?: string; bot_id?: string | null; source_event_id: string | null; next_at: Date | null }
 type Occurrence = { id: string; status: string; error: string | null; result: { id: string; title: string; identifier: string | null; eventId: string } | null }
 
 test('dispatch_task automations run as their creator through the existing create-and-dispatch path', { skip: !dbUrl, timeout: 120_000 }, async t => {
@@ -272,6 +272,46 @@ test('dispatch_task automations run as their creator through the existing create
     const seen = await page<{ days: { costMicroUsd: number | null }[] }>(member, memberChat, { action: 'usage', scheduleId: capped.id })
     assert.equal(seen.days[0]!.costMicroUsd, null, 'another member sees runs, not spend')
   })
+  await t.test('接手: an admin makes a member’s automation theirs; it runs as them, or waits paused when it uses what is not theirs', async () => {
+    const memberBuilder = await seedBot(fixture, workspace.id, member, 'Member builder')
+    const asMember = (def: Definition) => page<{ schedule: Schedule }>(member, memberChat, { action: 'create', requestId: randomUUID(), definition: def })
+    const plain = (await asMember(definition(null))).schedule
+    const own = (await asMember(definition(memberBuilder))).schedule
+    const listed = (id: string, who: string, bot: string) => page<{ schedules: (Schedule & { can_take_over: boolean })[] }>(who, bot, { action: 'list', scheduleId: id }).then(list => list.schedules[0]!.can_take_over)
+    assert.deepEqual([await listed(plain.id, owner, chat), await listed(plain.id, member, memberChat)], [true, false], 'offered to the admin, not to its creator')
+    const mine = (await create()).schedule
+    assert.equal(await listed(mine.id, member, memberChat), false, 'never offered to a member')
+    await assert.rejects(page(member, memberChat, { action: 'take_over', scheduleId: mine.id, version: mine.version }), /scheduleAdminRequired/)
+
+    const { occurrence: waiting } = await runNow(plain, randomUUID(), member, memberChat)
+    const taken = (await page<{ schedule: Schedule & { disabled_reason: string | null } }>(owner, chat, { action: 'take_over', scheduleId: plain.id, version: plain.version })).schedule
+    assert.deepEqual([taken.owner_id, taken.bot_id, taken.status, taken.disabled_reason, taken.version], [owner, chat, 'active', null, plain.version + 1])
+    assert.deepEqual(await occurrence(waiting.id).then(run => [run.status, run.error]), ['cancelled', 'scheduleChanged'], 'a run the member started does not run as the admin')
+    await assert.rejects(page(member, memberChat, { action: 'update', scheduleId: plain.id, version: taken.version, definition: definition(null) }), /scheduleAdminRequired/, 'the member no longer changes it')
+    const { occurrence: next } = await runNow(taken)
+    await tick()
+    const ran = await occurrence(next.id)
+    assert.equal(ran.status, 'succeeded')
+    assert.equal((await fixture.query('SELECT "userId" FROM coordinator_events WHERE id=$1', [ran.result!.eventId])).rows[0].userId, owner, 'the task is the admin’s request')
+    assert.deepEqual((await page<{ schedule: Schedule }>(owner, chat, { action: 'take_over', scheduleId: plain.id, version: taken.version })).schedule.version, taken.version, 'taking over one’s own is a no-op')
+
+    const held = (await page<{ schedule: Schedule & { disabled_reason: string | null } }>(owner, chat, { action: 'take_over', scheduleId: own.id, version: own.version })).schedule
+    assert.deepEqual([held.owner_id, held.status, held.disabled_reason], [owner, 'paused', 'scheduleBotUnavailable'], 'the member’s own Bot is not the admin’s to use')
+    const fixed = (await page<{ schedule: Schedule }>(owner, chat, { action: 'update', scheduleId: own.id, version: held.version, definition: definition(builder) })).schedule
+    assert.equal((await page<{ schedule: Schedule }>(owner, chat, { action: 'resume', scheduleId: own.id, version: fixed.version })).schedule.status, 'active')
+
+    const standing = (await asMember({ ...definition(null), eachRun: 'same_task' })).schedule
+    const { occurrence: theirs } = await runNow(standing, randomUUID(), member, memberChat)
+    await tick()
+    const before = (await occurrence(theirs.id)).result!.id
+    const inherited = (await page<{ schedule: Schedule }>(owner, chat, { action: 'take_over', scheduleId: standing.id, version: standing.version })).schedule
+    const { occurrence: after } = await runNow(inherited)
+    await tick()
+    const made = await occurrence(after.id)
+    assert.equal(made.status, 'succeeded')
+    assert.notEqual(made.result!.id, before, '追加到同一个任务 starts a task of the admin’s own, not the member’s')
+  })
+
   await t.test('追加到同一个任务: later runs add to the first run’s task; a deleted task pauses the automation', async () => {
     const standing = (await create({ ...definition(builder), maxConcurrent: 3, eachRun: 'same_task' })).schedule
     const first = await runNow(standing)

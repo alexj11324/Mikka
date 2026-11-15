@@ -71,6 +71,8 @@ export const commandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('history'), scheduleId: z.uuid() }).strict(),
   z.object({ action: z.literal('update'), scheduleId: z.uuid(), version: z.number().int().positive(), definition: definitionSchema }).strict(),
   z.object({ action: z.enum(['pause', 'resume', 'cancel']), scheduleId: z.uuid(), version: z.number().int().positive() }).strict(),
+  // 接手: an owner or admin makes a workspace automation theirs; from then on it runs as them (decision 2026-11-15-1840).
+  z.object({ action: z.literal('take_over'), scheduleId: z.uuid(), version: z.number().int().positive() }).strict(),
   // 立即运行: one occurrence due now. The same requestId never adds a second one.
   z.object({ action: z.literal('run_now'), scheduleId: z.uuid(), version: z.number().int().positive(), requestId: z.uuid() }).strict(),
   // 用量: runs and cost per day in the automation's time zone, newest first.

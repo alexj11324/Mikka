@@ -15,7 +15,7 @@ export type WorkspaceGuard = <T>(ownerId: string, workspaceId: string | null, wo
 export type MessageGuard = (tx: PoolClient, ownerId: string, value: unknown) => Promise<void>
 export type IssueReader = (tx: PoolClient, ownerId: string, issueId: string) => Promise<{ id: string; title: string; status: string } | null>
 /** What one dispatch_task run made: the task (as the chat's task line shows it) and the request event behind it. */
-export type DispatchResult = { id: string; title: string; status: string; identifier: string | null; eventId?: string; runId?: string; continued?: true }
+export type DispatchResult = { id: string; title: string; status: string; identifier: string | null; eventId?: string; requestedBy?: string; runId?: string; continued?: true }
 export type DispatchInput = { ownerId: string; workspaceId: string; scheduleId: string; occurrenceId: string; task: DispatchTask; event?: string; single?: true }
 /** The event a run started on and the indexes of the triggers that took it. */
 export type OccurrenceTrigger = { event: GitHubAutomationEvent; triggers: number[] }
@@ -123,7 +123,8 @@ export class ScheduleStore {
           LIMIT $6`, [actor.workspaceId, actor.ownerId, actor.botId, at ?? null, id ?? null, limit + 1, cmd.scheduleId ?? null])
         const page = rows.slice(0, limit)
         return {
-          schedules: page.map(({ page_cursor: _cursor, ...schedule }) => schedule),
+          // 接手 is offered to an owner or admin on another person's workspace automation.
+          schedules: page.map(({ page_cursor: _cursor, ...schedule }) => ({ ...schedule, can_take_over: schedule.visibility === 'workspace' && schedule.owner_id !== actor.ownerId && access.role !== 'member' })),
           nextCursor: rows.length > limit ? page[limit - 1]!.page_cursor : null,
         }
       }
@@ -178,6 +179,7 @@ export class ScheduleStore {
       if(row.version!==cmd.version) throw new ScheduleError('scheduleVersionConflict')
       if(row.status==='cancelled') throw new ScheduleError('scheduleCancelled')
       if(cmd.action==='run_now') return this.runNow(tx,row,cmd.requestId)
+      if(cmd.action==='take_over') return this.takeOver(tx,actor,access,row)
       let def=row.definition, status=row.status, next=row.next_at
       if(cmd.action==='update'){def=cmd.definition;def.timezone=timezone(def.timezone);await this.permission(tx,row.owner_id,row.bot_id,row.workspace_id,def);next=nextTime(def,this.clock(),true);if(status==='completed')status='active'}
       else if(cmd.action==='pause'){status='paused';next=null}
@@ -195,6 +197,33 @@ export class ScheduleStore {
       await this.listChanged(tx,row.workspace_id)
       return {schedule:updated}
     }))
+  }
+  /**
+   * 接手: the automation becomes the actor's. It runs as them from now on, reports to their chat, and its authority is
+   * theirs, checked now. When something it uses is not theirs to use (another person's Bot, a repository outside the
+   * workspace), it is taken over paused with that reason, so they can change it and turn it back on. Runs that had not
+   * started are cancelled; a 追加到同一个任务 automation starts a new task of theirs on its next run.
+   */
+  private async takeOver(tx:PoolClient,actor:Actor,access:WorkspaceAccess,row:Schedule){
+    if(row.visibility!=='workspace'||!row.workspace_id) throw new ScheduleError('scheduleNotFound',404)
+    if(row.owner_id===actor.ownerId) return {schedule:row}
+    if(access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
+    let status=row.status, next=row.next_at, reason:string|null=null
+    if(status==='active'||(status==='paused'&&row.disabled_reason)){
+      try{await this.permission(tx,actor.ownerId,actor.botId,row.workspace_id,row.definition);if(status==='paused'){next=nextTime(row.definition,this.clock());status=next||!runsOnSchedule(row.definition)?'active':'completed'}}
+      catch(error){if(!(error instanceof ScheduleError)||!AUTHORITY_LOST.has(error.code))throw error;status='paused';next=null;reason=error.code}
+    }
+    const stale=await tx.query<Occurrence>(`UPDATE schedule_occurrences SET status='cancelled',error='scheduleChanged',lease_token=NULL,lease_until=NULL,finished_at=$2 WHERE schedule_id=$1 AND status IN ('pending','running') RETURNING *`,[row.id,this.clock()])
+    if (stale.rows.length) {
+      await this.lockChat(tx,row)
+      for (const item of stale.rows) {
+        await this.retireEvent(tx,item.event_id)
+        await this.report(tx,row,item,'cancelled',null,'scheduleChanged')
+      }
+    }
+    const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET owner_id=$2,bot_id=$3,source_event_id=NULL,status=$4,next_at=$5,disabled_reason=$6,version=version+1,updated_at=$7 WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,actor.ownerId,actor.botId,status,next,reason,this.clock()])).rows[0]
+    await this.listChanged(tx,row.workspace_id)
+    return {schedule:updated}
   }
   /**
    * 立即运行: one occurrence due now, run by the same claim and execute path as a timed one (so maxConcurrent, the
