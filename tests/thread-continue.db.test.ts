@@ -117,12 +117,18 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     const { deviceWork } = await import('../lib/device-link')
     const taskState = async () => (await pool.query(`SELECT t.id,t."attemptId",t."sourceEventId",t.revision,t.status FROM factory_tasks t
       JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1 AND t."userId"=$2`, [run, owner.id])).rows[0]
+    const queuedRequest = randomUUID()
+    await sendThreadMessage(owner.id, run, 'Retain this pending input for the old request only.', 'user', queuedRequest, 'queue')
+    const pending = async () => (await pool.query('SELECT status,"failureCode","sentRunId",text FROM thread_queued_messages WHERE "userId"=$1 AND "requestId"=$2', [owner.id, queuedRequest])).rows[0]
     const previous = await taskState()
     assert.ok((await threadDeliveryView(appPool, owner.id, run, run)).modes.includes('interrupt'))
     await assert.rejects(sendThreadMessage(a.id, run, text, 'user', requestId, 'interrupt'), { code: 'runNotFound' })
     assert.deepEqual(await taskState(), previous)
+    assert.equal((await pending()).status, 'queued', 'a refused interrupt cannot change pending input')
     const accepted = await sendThreadMessage(owner.id, run, text, 'user', requestId, 'interrupt')
     assert.deepEqual(accepted, { runId: run, continued: false })
+    const heldInput = { status: 'failed', failureCode: 'threadDeliveryUnavailable', sentRunId: null, text: 'Retain this pending input for the old request only.' }
+    assert.deepEqual(await pending(), heldInput, 'an admitted replacement closes only the old waiting input before another worker starts')
     const replacement = await taskState()
     assert.notEqual(replacement.sourceEventId, previous.sourceEventId)
     assert.notEqual(replacement.attemptId, previous.attemptId)
@@ -140,6 +146,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     assert.ok(!(await threadDeliveryView(appPool, owner.id, run, run)).modes.includes('interrupt'))
     await pool.query(`UPDATE coordinator_events SET payload=payload #- '{threadSubmission,result}' WHERE id=$1`, [replacement.sourceEventId])
     assert.deepEqual(await sendThreadMessage(owner.id, run, text, 'user', requestId, 'interrupt'), accepted)
+    assert.deepEqual(await pending(), heldInput)
     await assert.rejects(sendThreadMessage(owner.id, run, 'Late second window.', 'user', randomUUID(), 'interrupt'), { code: 'threadDeliveryUnavailable' })
     assert.deepEqual(await taskState(), replacement)
     const messages = (await pool.query('SELECT text,"deliveredAt" FROM run_messages WHERE "runId"=$1', [run])).rows
