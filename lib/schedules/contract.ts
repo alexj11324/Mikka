@@ -24,6 +24,7 @@ export const definitionSchema = z.object({
 export const SCHEDULE_PAGE_MAX = 100
 const scheduleCursor = z.templateLiteral([z.iso.datetime({ precision: 6 }), '/', z.uuid()])
 export const scheduleListInput = z.object({
+  scheduleId: z.uuid().optional(),
   limit: z.number().int().min(1).max(SCHEDULE_PAGE_MAX).optional(),
   cursor: scheduleCursor.optional(),
 }).strict()

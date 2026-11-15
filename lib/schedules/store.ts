@@ -81,9 +81,10 @@ export class ScheduleStore {
           WHERE workspace_id IS NOT DISTINCT FROM $1::uuid
             AND ((visibility = 'workspace' AND $1::uuid IS NOT NULL)
               OR (visibility = 'owner' AND owner_id = $2 AND bot_id IS NOT DISTINCT FROM $3::uuid))
+            AND ($7::uuid IS NULL OR id = $7::uuid)
             AND ($4::timestamptz IS NULL OR (created_at, id) < ($4::timestamptz, $5::uuid))
           ORDER BY created_at DESC, id DESC
-          LIMIT $6`, [actor.workspaceId, actor.ownerId, actor.botId, at ?? null, id ?? null, limit + 1])
+          LIMIT $6`, [actor.workspaceId, actor.ownerId, actor.botId, at ?? null, id ?? null, limit + 1, cmd.scheduleId ?? null])
         const page = rows.slice(0, limit)
         return {
           schedules: page.map(({ page_cursor: _cursor, ...schedule }) => schedule),
