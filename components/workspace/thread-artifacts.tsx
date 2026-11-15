@@ -5,7 +5,6 @@ import useSWR from 'swr'
 import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { ChevronRight, ClipboardList, FileText, Play } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { listRunArtifacts } from '@/app/actions/artifacts'
 import { withBasePath } from '@/lib/base-path'
@@ -130,18 +129,14 @@ export function ThreadArtifactsPane({ groups, focusId, mediaTaskId }: { groups: 
   </div>
 }
 
+/** As Capy's PR line (issue-view PullValueRow): the state's coloured mark, repo#n quiet, then the title — no state word. */
 function PullRow({ item, focused, stateLabel }: { item: Extract<ThreadArtifactItem, { group: 'pullRequests' }>; focused: boolean; stateLabel: string | null }) {
   const { repo, number } = pullRequestRef(item.url)
   const Icon = PULL_REQUEST_ICONS[item.state ?? 'open']
-  return <Button variant="ghost" nativeButton={false} data-artifact-item={item.id} data-focused={focused} className={cn(ROW, 'items-start')}
-    render={<a href={item.url} target="_blank" rel="noopener noreferrer" />}>
-    <Icon data-icon="inline-start" aria-hidden="true" className={cn('mt-0.5 text-muted-foreground', item.state && PULL_REQUEST_COLORS[item.state])} />
-    <span className="flex min-w-0 flex-1 flex-col gap-1">
-      <span className="truncate text-sm">{item.title ?? `${repo}#${number}`}</span>
-      <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-        {stateLabel && <Badge variant="secondary" className={cn(item.state && PULL_REQUEST_COLORS[item.state])}>{stateLabel}</Badge>}
-        <span className="min-w-0 truncate tabular-nums">{repo}#{number}</span>
-      </span>
-    </span>
+  return <Button variant="ghost" nativeButton={false} data-artifact-item={item.id} data-focused={focused} className={ROW}
+    render={<a href={item.url} target="_blank" rel="noopener noreferrer" aria-label={[stateLabel, `${repo}#${number}`, item.title].filter(Boolean).join(' ')} />}>
+    <Icon data-icon="inline-start" aria-hidden="true" className={PULL_REQUEST_COLORS[item.state ?? 'open']} />
+    <span className="shrink-0 text-sm text-muted-foreground tabular-nums">{repo}#{number}</span>
+    {item.title && <span className="min-w-0 flex-1 truncate text-sm">{item.title}</span>}
   </Button>
 }
