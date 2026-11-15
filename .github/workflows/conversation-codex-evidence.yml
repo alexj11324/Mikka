@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 24
     env:
-      SOURCE: ea4e52896e0f81ffca9b98fcfc2418a06f5e9da4
+      SOURCE: da2df5fd22f0d41182e629006275b00baba85d29
     steps:
       - name: Check out the public harness only
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           path: product
-          ref: ea4e52896e0f81ffca9b98fcfc2418a06f5e9da4
+          ref: da2df5fd22f0d41182e629006275b00baba85d29
           persist-credentials: false
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
         with:
@@ -37,7 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git -C product rev-parse HEAD)" = "$SOURCE"
-          test "$(git -C product rev-parse 'HEAD^{tree}')" = 5710ae77ac64885d43ab444a85d9bcc6c4935f31
+          test "$(git -C product rev-parse 'HEAD^{tree}')" = 720517a532677cba6c043998c6bc13c2fe463473
           cd product
           pnpm install --frozen-lockfile
           cd ../harness/evidence/2257/local-provider
@@ -73,7 +73,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: codex-pg-delivery-ea4e5289
+          name: codex-pg-delivery-da2df5fd
           path: |
             ${{ runner.temp }}/receipt/delivery.json
             ${{ runner.temp }}/receipt/steer-result.json
