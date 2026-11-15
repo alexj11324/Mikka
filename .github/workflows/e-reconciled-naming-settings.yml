@@ -1,0 +1,210 @@
+name: E authorized per-person and per-Workspace thread naming settings in original paired source
+on:
+  push:
+    branches: [evidence/2254-sidebar-85dfc396]
+    paths: [.github/workflows/e-reconciled-naming-settings.yml]
+permissions:
+  contents: read
+env:
+  # Existing accounting/admission suites exercise the hosted deployment.
+  # The self-hosted image workflow separately runs the default community mode.
+  MIKKA_EDITION: cloud
+  # A cache restore that fails (e.g. the account's cache egress limit) would
+  # otherwise hang for actions/cache's 10-minute default before falling back
+  # to a normal install, which outlasts the short jobs' own timeouts.
+  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+  # Ephemeral CI registration fixtures share one loopback IP. Keep finite
+  # limits while leaving the production defaults at 5 signups/IP/hour.
+  MIKKA_SIGNUP_IP_HOURLY: '1000'
+  MIKKA_SIGNUP_GLOBAL_HOURLY: '10000'
+  MIKKA_VERIFICATION_IP_HOURLY: '1000'
+  MIKKA_VERIFICATION_GLOBAL_HOURLY: '10000'
+
+jobs:
+  governance:
+    name: Exact source, two sessions and PostgreSQL 17
+    if: github.repository == 'alexj11324/Mikka'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-local-only
+          POSTGRES_DB: mikka_e2e
+          # Parallel full-schema DROP CASCADE needs more than PG17's default
+          # cluster-wide lock table. This applies only to the disposable service.
+          POSTGRES_INITDB_ARGS: --set=max_locks_per_transaction=512
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d mikka_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: 'true'
+      REQUIRE_DB: '1'
+      MIKKA_TEST_DB_PORT: '5432'
+      E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      BETTER_AUTH_URL: http://127.0.0.1:3100
+      MIKKA_TEST_DEPLOYMENT_SHA: bfee6b083e83e22b792decc1e686c12d39cf4f51
+      MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 2
+          ref: bfee6b083e83e22b792decc1e686c12d39cf4f51
+          persist-credentials: false
+      - name: Verify the immutable E integration candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MIKKA_TEST_DEPLOYMENT_SHA"
+          test "$(git rev-parse 'HEAD^{tree}')" = e5354fa4cf071a41d774b71b1b98ea846d0f9fdf
+          mkdir -m 700 "$RUNNER_TEMP/compat-qa-receipt"
+      - name: Load isolated public permission checks
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: qa-harness
+          persist-credentials: false
+          ref: 675f1adde1fe6406799d6f27c8d254be9c357cfd
+          sparse-checkout: evidence/2254/unread-1381
+
+      - uses: ./.github/actions/pnpm-install
+      - name: Generate ephemeral test-only auth secret
+        run: |
+          node --input-type=commonjs - <<'NODE'
+          const { appendFileSync, writeSync } = require('node:fs')
+          const secret = require('node:crypto').randomBytes(32).toString('hex')
+          writeSync(1, `::add-mask::${secret}\n`)
+          appendFileSync(process.env.GITHUB_ENV, `BETTER_AUTH_SECRET=${secret}\n`)
+          NODE
+      - name: Bootstrap empty database using tracked migrations only
+        run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
+        env:
+          MIGRATION_BOOTSTRAP_CI: '1'
+      - run: pnpm test:e2e:setup
+      - name: Bind the disposable test environment to the exact checkout
+        run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
+      - name: Run two independently authenticated users against the source server and read persisted state
+        shell: bash
+        env:
+          MIKKA_EDITION: cloud
+          MIKKA_BASE_PATH: /mikka
+          AUTH_TRUSTED_ORIGINS: http://127.0.0.1:3100
+          WORKFLOW_TARGET_WORLD: local
+          MIKKA_DEV_SKIP_ENV_FILES: '1'
+          MIKKA_TRACE_SAMPLE_RATE: '0'
+          FACTORY_ACTIVITY_HTTP_NETWORK_RECEIPT: ${{ runner.temp }}/loopback-receipt.log
+        run: |
+          set -euo pipefail
+          node --import ./tests/fixtures/factory-activity-http-network.mjs --import ./scripts/server-test.mjs --import tsx --import ./qa-harness/evidence/2254/unread-1381/aliases.mjs ./qa-harness/evidence/2254/unread-1381/api.mjs > "$RUNNER_TEMP/product-api.log" 2>&1 & server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for x in $(seq 1 120); do
+            if curl -fsS --max-time 1 "$BETTER_AUTH_URL/mikka/api/version" > /dev/null 2>&1; then break; fi
+            if ! kill -0 "$server" 2>/dev/null; then echo 'Product source API process exited before readiness'; exit 2; fi
+            sleep 1
+          done
+          curl -fsS --max-time 2 "$BETTER_AUTH_URL/mikka/api/version" >/dev/null
+          cat > "$RUNNER_TEMP/thread-naming-settings.cjs" <<'NAMING_TEST'
+          const { createRequire } = require('node:module')
+          const { resolve } = require('node:path')
+          const { randomUUID, randomBytes } = require('node:crypto')
+          const { writeFileSync } = require('node:fs')
+          const assert = require('node:assert/strict')
+          const app=createRequire(resolve('package.json'))
+          const {Pool}=app('pg')
+          const {request}=app('@playwright/test')
+          const origin='http://127.0.0.1:3100',base=origin+'/mikka',source='bfee6b083e83e22b792decc1e686c12d39cf4f51'
+          const report={source,tree:'e5354fa4cf071a41d774b71b1b98ea846d0f9fdf',started:new Date().toISOString(),passed:[],backend:'Original apps/api/src/index.ts, generated application routes, real Better Auth and PostgreSQL; loopback HTTP adapter. No renderer or native device is included.'}
+          const times=(name)=>{report.passed.push({at:new Date().toISOString(),name});console.log(name)}
+          async function main(){
+           assert.equal(process.env.MIKKA_TEST_DEPLOYMENT_SHA,source)
+           const db=new Pool({connectionString:process.env.E2E_DATABASE_URL})
+           const contexts=[]
+           try {
+             report.pgVersion=(await db.query("select current_setting('server_version_num') as v")).rows[0].v;assert.equal(Math.floor(Number(report.pgVersion)/10000),17)
+             async function sign(role){
+               const ctx=await request.newContext({extraHTTPHeaders:{origin,'sec-fetch-site':'same-origin','x-mikka-rpc':'1'}});contexts.push(ctx)
+               const email='naming-'+role+'-'+randomUUID()+'@example.invalid'
+               const login=await ctx.post(base+'/api/auth/sign-up/email',{data:{name:'Naming '+role,email,password:randomBytes(32).toString('base64url')}})
+               assert.equal(login.status(),200,role+' sign-up')
+               const sess=await (await ctx.get(base+'/api/auth/get-session?disableCookieCache=true')).json()
+               assert.ok(sess.user?.id&&sess.session?.id,role+' verified session')
+               assert.equal((await ctx.get(base+'/api/workspace')).status(),200)
+               return {ctx,email,id:sess.user.id,rpc:async(action,...args)=>{
+                 const p=await ctx.post(base+'/api/rpc',{data:{version:1,action,args}})
+                 const body=await p.json();assert.equal(p.status(),200,action+' '+String(body.error?.code??''));assert.equal(body.ok,true,action);return body.result
+               }}
+             }
+             const owner=await sign('owner'),member=await sign('member');assert.notEqual(owner.id,member.id)
+             const team=await owner.rpc('workspace.createWorkspace',{name:'Thread title settings QA',slug:'read-'+randomUUID().slice(0,8)});assert.ok(team.ok)
+             const ws=team.data.workspaceId
+             const invited=await owner.rpc('workspace.createWorkspaceInvitation',{workspaceId:ws,emails:[member.email],role:'member'})
+             assert.ok(invited.ok);const invite=/^\/invite\/([a-f0-9]{64})$/.exec(invited.data[0].path)?.[1];assert.ok(invite)
+             const joined=await member.rpc('workspace.acceptWorkspaceInvitation',invite);assert.ok(joined.ok)
+             for(const a of [owner,member]){assert.ok((await a.rpc('workspace.switchWorkspace',ws)).ok);assert.equal((await (await a.ctx.get(base+'/api/workspace')).json()).workspace.id,ws)}
+             times('Two signed-in identities joined and selected the same existing Workspace via product routes')
+             const read=(person,space=ws)=>person.rpc('thread-title-settings.getThreadTitleSettings',space)
+             const write=(person,scope,values,space=ws)=>person.rpc('thread-title-settings.saveThreadTitleSettings',{workspaceId:space,scope,...values})
+             const stored=async(space=ws)=>(await db.query('select "userId",instructions,triggers from thread_title_settings where "workspaceId"=$1 order by "userId"',[space])).rows
+             assert.deepEqual((await read(owner)).workspace,{instructions:'',triggers:'either'})
+             assert.equal((await read(owner)).admin,true)
+             assert.equal((await read(member)).admin,false)
+             assert.deepEqual(await stored(),[])
+             times('Existing Workspace with no settings reads the original defaults without a database write')
+             const defaults={instructions:'Name the result in English',triggers:'first_run_ended'}
+             assert.deepEqual((await write(owner,'workspace',defaults)).workspace,defaults)
+             const personal={instructions:'Keep the title short',triggers:'pull_opened'}
+             const changed=await write(member,'mine',personal)
+             assert.deepEqual(changed.mine,personal)
+             assert.deepEqual(changed.workspace,defaults)
+             assert.deepEqual((await read(owner)).mine,{instructions:'',triggers:null})
+             assert.deepEqual((await read(member)).mine,personal)
+             assert.deepEqual(await stored(),[{userId:'',...defaults},{userId:member.id,...personal}])
+             times('Owner defaults and Member-specific instructions and trigger persisted independently in real PostgreSQL')
+             assert.equal((await write(member,'workspace',{instructions:'forbidden'})).error,'workspaceAccessDenied')
+             assert.equal((await write(owner,'workspace',{triggers:null})).error,'validationGeneric')
+             const other=await owner.rpc('workspace.createWorkspace',{name:'Private title setting QA',slug:'name-'+randomUUID().slice(0,8)})
+             assert.ok(other.ok)
+             const second=other.data.workspaceId
+             assert.notEqual(second,ws)
+             assert.equal((await read(member,second)).error,'workspaceAccessDenied')
+             assert.equal((await write(member,'mine',personal,second)).error,'workspaceAccessDenied')
+             assert.equal((await write(member,'workspace',defaults,second)).error,'workspaceAccessDenied')
+             assert.deepEqual(await stored(second),[])
+             assert.deepEqual(await stored(),[{userId:'',...defaults},{userId:member.id,...personal}])
+             times('Member cannot change the workspace default or read or write another actual workspace, with no foreign rows')
+             const inherited=await write(member,'mine',{triggers:null})
+             assert.deepEqual(inherited.mine,{...personal,triggers:null})
+             assert.deepEqual(inherited.workspace,defaults)
+             assert.deepEqual((await read(member)).mine,inherited.mine)
+             assert.deepEqual(await stored(),[{userId:'',...defaults},{userId:member.id,...personal,triggers:null}])
+             times('Resetting only the personal trigger retained stored instructions and restored inheritance in a fresh HTTP read')
+           } finally {report.ended=new Date().toISOString();writeFileSync(resolve(process.env.RUNNER_TEMP,'compat-qa-receipt','settings-http.json'),JSON.stringify(report,null,2)+'\n');for(const c of contexts)await c.dispose();await db.end()}
+          }
+          main().catch(e=>{console.error('HTTP verification failed:',String(e.message).slice(0,330).replace(/(?:https?|postgres(?:ql)?)\S*:\/\/\S+/ig,'[endpoint]'));process.exitCode=1})
+          NAMING_TEST
+          node "$RUNNER_TEMP/thread-naming-settings.cjs"
+      - name: Record original complete DB files
+        if: success() || failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test-force-exit --test --test-reporter=tap tests/thread-title.db.test.ts lib/thread-title.test.ts > "$RUNNER_TEMP/read-db.tap" 2>&1
+          grep -E '^[[:space:]]*ok [0-9]+ - |^# (tests|pass|fail|cancelled|skipped|todo) ' "$RUNNER_TEMP/read-db.tap" > "$RUNNER_TEMP/compat-qa-receipt/original-tests.txt"
+          grep -qx '# skipped 0' "$RUNNER_TEMP/compat-qa-receipt/original-tests.txt"
+          cat "$RUNNER_TEMP/compat-qa-receipt/original-tests.txt"
+      - name: Preserve public test names, times and statuses
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: thread-naming-settings-bfee6b08
+          path: ${{ runner.temp }}/compat-qa-receipt
+          retention-days: 7
+          if-no-files-found: error
