@@ -82,9 +82,12 @@ export const definitionSchema = z.object({
   events: z.array(eventTriggerSchema).min(1).max(20).optional(),
   /** Webhook: the automation's own URL starts a run; requests within `batchMinutes` of the first go to one run. */
   webhook: z.object({ batchMinutes: z.number().int().min(0).max(60) }).strict().optional(),
+  /** 运行后发到 Slack: each finished run is posted to this channel of the workspace's Slack, in the locale saved here. */
+  notify: z.object({ slack: z.object({ channel: z.string().regex(/^[CG][A-Z0-9]{2,30}$/), locale: z.enum(['zh-CN', 'en']) }).strict() }).strict().optional(),
 }).strict()
   .refine(value => !value.events || value.task.kind === 'dispatch_task', { message: 'eventTriggersNeedDispatchTask', path: ['events'] })
   .refine(value => !value.webhook || value.task.kind === 'dispatch_task', { message: 'eventTriggersNeedDispatchTask', path: ['webhook'] })
+  .refine(value => !value.notify || value.task.kind === 'dispatch_task', { message: 'eventTriggersNeedDispatchTask', path: ['notify'] })
 export const SCHEDULE_PAGE_MAX = 100
 const scheduleCursor = z.templateLiteral([z.iso.datetime({ precision: 6 }), '/', z.uuid()])
 export const scheduleListInput = z.object({

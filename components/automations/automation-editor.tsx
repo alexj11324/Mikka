@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { ArrowLeft, Play } from 'lucide-react'
 import { listDevices } from '@/app/actions/agents'
@@ -49,6 +49,7 @@ const runVariant = { pending: 'outline', running: 'secondary', succeeded: 'secon
  */
 export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { workspaceId: string | null; userId: string; id: string | 'new'; onOpen: (id: string) => void; onBack: () => void }) {
   const t = useTranslations('Automations.editor')
+  const locale = useLocale()
   const tAll = useTranslations('Automations')
   const tCommon = useTranslations('Common')
   const actionError = useActionError()
@@ -90,7 +91,7 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
   }, { revalidateOnFocus: false })
   // Slack triggers' channels, read only once the person adds a Slack event or the automation has one.
   const [slackWanted, setSlackWanted] = useState(false)
-  const slackChannels = useSWR(slackWanted || Boolean(draft?.slack.length) ? ['automation-slack-channels', workspaceId] : null, async () => {
+  const slackChannels = useSWR(slackWanted || Boolean(draft?.slack.length) || Boolean(draft?.notify) ? ['automation-slack-channels', workspaceId] : null, async () => {
     const result = await automationSlackChannels()
     if ('error' in result && result.error) throw new Error(result.error)
     return result as { installed: boolean; channels: { id: string; name: string; private: boolean }[] }
@@ -210,6 +211,14 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
         <NativeSelectOption value="new_task">{t('eachRunNew')}</NativeSelectOption>
         <NativeSelectOption value="same_task">{t('eachRunSame')}</NativeSelectOption>
       </NativeSelect>)}
+      {field(t('notify'), slackWanted || draft.notify
+        ? <NativeSelect aria-label={t('notify')} value={draft.notify?.channel ?? ''} disabled={!slackChannels.data && !draft.notify}
+          onChange={event => set({ notify: event.target.value ? { channel: event.target.value, locale: locale === 'en' ? 'en' : 'zh-CN' } : null })}>
+          <NativeSelectOption value="">{t('notifyOff')}</NativeSelectOption>
+          {draft.notify && !slackChannels.data?.channels.some(channel => channel.id === draft.notify!.channel) && <NativeSelectOption value={draft.notify.channel}>{draft.notify.channel}</NativeSelectOption>}
+          {(slackChannels.data?.channels ?? []).map(channel => <NativeSelectOption key={channel.id} value={channel.id}>#{channel.name}</NativeSelectOption>)}
+        </NativeSelect>
+        : <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => setSlackWanted(true)}>{t('notifyChoose')}</Button>)}
       {field(t('timezone'), <NativeSelect aria-label={t('timezone')} value={draft.timezone} onChange={event => set({ timezone: event.target.value, fold: null })}>
         {(zones.includes(draft.timezone) ? zones : [draft.timezone, ...zones]).map(zone => <NativeSelectOption key={zone} value={zone}>{zone}</NativeSelectOption>)}
       </NativeSelect>)}

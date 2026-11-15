@@ -7827,6 +7827,12 @@
     "saveUnconfirmed": "无法确认修改结果，请刷新文件夹后再试。",
     "loadError": "无法加载个人文件。"
   },
+  "AutomationSlack": {
+    "succeeded": "自动化「{title}」运行完成：{task}",
+    "succeededNoTask": "自动化「{title}」运行完成",
+    "failed": "自动化「{title}」没运行成功：{reason}",
+    "failedUnknown": "出了点问题，详情在 Mikka 的运行记录里"
+  },
   "Automations": {
     "usage": {
       "title": "用量",
@@ -7903,6 +7909,9 @@
       "eachRun": "每次运行",
       "eachRunNew": "新建任务",
       "eachRunSame": "追加到同一个任务",
+      "notify": "运行后发到 Slack",
+      "notifyOff": "不发送",
+      "notifyChoose": "选择频道",
       "perDay": "每天最多运行",
       "unlimited": "不限",
       "autoPaused": "已自动暂停：{reason}",

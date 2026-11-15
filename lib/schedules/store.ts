@@ -22,6 +22,8 @@ export type DispatchResult = { id: string; title: string; status: string; identi
 export type DispatchInput = { ownerId: string; workspaceId: string; scheduleId: string; occurrenceId: string; task: DispatchTask; event?: string; source?: 'github' | 'linear' | 'slack' | 'webhook'; single?: true }
 /** What started a run: a GitHub event and the indexes of the triggers that took it, or the webhook requests it batched. */
 export type OccurrenceTrigger = { event: GitHubAutomationEvent | LinearAutomationEvent | SlackAutomationEvent; triggers: number[] } | { webhook: { requests: WebhookRequest[] } }
+/** One finished run to post: the automation, how it ended, and the task it made or added to. */
+export type RunNotice = { ownerId: string; workspaceId: string; scheduleId: string; title: string; channel: string; locale: 'zh-CN' | 'en'; status: 'succeeded' | 'failed'; task: { id: string; identifier: string | null; title: string } | null; error: string | null }
 export type RunWhenInput = { ownerId: string; workspaceId: string; condition: string; event: string }
 /**
  * dispatch_task's two host seams. `check` re-authorizes the creator's request at create, update, resume and every run
@@ -34,6 +36,8 @@ export type AutomationSeams = {
   changed?: (tx: PoolClient, workspaceId: string) => Promise<void>
   /** The Linear team IDs the person's own Linear connection can see, or null without one. */
   linearTeams?: (ownerId: string) => Promise<Set<string> | null>
+  /** 运行后发到 Slack: post a finished run to the channel, as the workspace's Slack app. */
+  notify?: (input: RunNotice) => Promise<void>
   /** The channel IDs the workspace's Slack installation can see for the person, or null when they are not in it. */
   slackChannels?: (ownerId: string, workspaceId: string) => Promise<Set<string> | null>
   /** Whether the workspace can still use a repository an event trigger names. */
@@ -107,7 +111,7 @@ export class ScheduleStore {
         const visible=this.automation.linearTeams?await this.automation.linearTeams(owner):null
         if(!visible||[...teams].some(team=>!visible.has(team)))throw new ScheduleError('scheduleLinearUnavailable',403)
       }
-      const channels=new Set((def.events??[]).flatMap(trigger=>trigger.source==='slack'?trigger.channels:[]))
+      const channels=new Set([...(def.events??[]).flatMap(trigger=>trigger.source==='slack'?trigger.channels:[]),...(def.notify?.slack?[def.notify.slack.channel]:[])])
       if(channels.size){
         // A Slack trigger names channels of the workspace's Slack installation, which the creator is a member of.
         const visible=this.automation.slackChannels?await this.automation.slackChannels(owner,workspaceId):null
@@ -367,6 +371,7 @@ export class ScheduleStore {
       await this.report(tx,row,done,'succeeded',result,null)
       return true
     }))
+    if(recorded)await this.notice(o.id,'succeeded')
     // The request event waits in the Bot's chat: waking the creator's chats delivers it.
     return recorded?row.owner_id:undefined
   }
@@ -509,6 +514,21 @@ export class ScheduleStore {
       return reason?{status:'skipped' as const,reason}:{status:'queued' as const,dueAt:due.toISOString()}
     })
   }
+  /**
+   * 运行后发到 Slack: a finished run is claimed once (notified_at) and posted; a post that fails is logged, never retried
+   * into a second post, and never changes the run.
+   */
+  private async notice(occurrenceId:string,status:'succeeded'|'failed'){
+    if(!this.automation.notify)return
+    try{
+      const o=(await this.pool.query<Occurrence&{result:DispatchResult|null;owner_id:string;workspace_id:string|null}>(`UPDATE schedule_occurrences o SET notified_at=clock_timestamp() FROM user_schedules s
+        WHERE o.id=$1 AND s.id=o.schedule_id AND o.notified_at IS NULL AND o.definition ? 'notify' RETURNING o.*,s.owner_id,s.workspace_id`,[occurrenceId])).rows[0]
+      const slack=o?.definition.notify?.slack
+      if(!o||!slack||!o.workspace_id)return
+      await this.automation.notify({ownerId:o.owner_id,workspaceId:o.workspace_id,scheduleId:o.schedule_id,title:o.definition.title,channel:slack.channel,locale:slack.locale,status,
+        task:o.result?.id?{id:o.result.id,identifier:o.result.identifier,title:o.result.title}:null,error:o.error})
+    }catch(error){console.error('schedule_notice_failed',error instanceof ScheduleError?error.code:error instanceof Error?error.name:'unknown')}
+  }
   /** Whether maxRunsPerDay runs already started (or wait) today in the automation's time zone, not counting `except`. */
   private async dailyFull(tx:PoolClient,row:Schedule,except?:string){
     const max=row.definition.maxRunsPerDay
@@ -534,6 +554,7 @@ export class ScheduleStore {
       return row?.status==='failed'?row:null
     })
     if(failed)await this.publishFailedReport(failed)
+    if(failed)await this.notice(failed.id,'failed')
   }
   private async publishFailedReport(o:Occurrence){
     const row=(await this.pool.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1',[o.schedule_id])).rows[0]

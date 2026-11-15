@@ -2491,5 +2491,21 @@
     "behavior": "List the channels the workspace's Slack installation can see, with its bot token, for a member of that installation.",
     "test": "lib/schedules/dispatch.db.test.ts",
     "suite": "test:schedules-db"
+  },
+  "drizzle/20261115203000_schedule_notified.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Record when a finished automation run was posted to Slack, so it is posted once.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
+  },
+  "lib/slack/automation-notice.ts": {
+    "mode": "built-in",
+    "environment": [
+      "SLACK_APP_ID"
+    ],
+    "behavior": "Post a finished automation run to its Slack channel with the workspace installation's bot token, in the saved locale.",
+    "test": "lib/slack/automation-notice.test.ts",
+    "suite": "test:schedules"
   }
 }

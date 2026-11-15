@@ -108,3 +108,12 @@ test('Webhook: off leaves the key out; 0 and a batch window round-trip', () => {
     assert.equal(draftFrom(on.definition, now).webhook, minutes)
   }
 })
+
+test('运行后发到 Slack: off leaves the key out; a channel round-trips with the locale it was saved in', () => {
+  const off = definitionFrom(filled({ scheduleOn: false }), now)
+  assert.ok('definition' in off && !('notify' in off.definition))
+  const on = definitionFrom(filled({ scheduleOn: false, notify: { channel: 'C0RUNS', locale: 'en' } }), now)
+  assert.ok('definition' in on)
+  assert.deepEqual(on.definition.notify, { slack: { channel: 'C0RUNS', locale: 'en' } })
+  assert.deepEqual(draftFrom(on.definition, now).notify, { channel: 'C0RUNS', locale: 'en' })
+})

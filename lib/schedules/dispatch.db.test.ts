@@ -414,6 +414,34 @@ test('dispatch_task automations run as their creator through the existing create
     }
   })
 
+  await t.test('运行后发到 Slack: each finished run is posted once to its channel; a failed post never changes the run', async () => {
+    const seenChannels = runtime.automationSeams.slackChannels, seenNotify = runtime.automationSeams.notify
+    const posted: Array<{ status: string; channel: string; locale: string; task: string | null }> = []
+    let refuse = false
+    runtime.automationSeams.slackChannels = async who => who === owner ? new Set(['C0RUNS']) : null
+    runtime.automationSeams.notify = async notice => { if (refuse) throw new Error('slackPostFailed:not_in_channel'); posted.push({ status: notice.status, channel: notice.channel, locale: notice.locale, task: notice.task?.identifier ?? notice.task?.id ?? null }) }
+    try {
+      await assert.rejects(create({ ...definition(builder), notify: { slack: { channel: 'C0ELSEWHERE', locale: 'zh-CN' } } }), /scheduleSlackUnavailable/)
+      const { schedule } = await create({ ...definition(builder), maxConcurrent: 3, notify: { slack: { channel: 'C0RUNS', locale: 'en' } } })
+      const { occurrence: first } = await runNow(schedule)
+      await tick()
+      assert.equal((await occurrence(first.id)).status, 'succeeded')
+      assert.equal(posted.length, 1)
+      assert.deepEqual({ ...posted[0], task: undefined }, { status: 'succeeded', channel: 'C0RUNS', locale: 'en', task: undefined })
+      assert.ok(posted[0]!.task, 'the post names the task')
+      await tick()
+      assert.equal(posted.length, 1, 'a run is posted once')
+      refuse = true
+      const { occurrence: second } = await runNow(schedule)
+      await tick()
+      assert.equal((await occurrence(second.id)).status, 'succeeded', 'a refused post never changes the run')
+      assert.ok((await fixture.query('SELECT notified_at FROM schedule_occurrences WHERE id=$1', [second.id])).rows[0].notified_at, 'and is not tried into a second post')
+    } finally {
+      runtime.automationSeams.slackChannels = seenChannels
+      runtime.automationSeams.notify = seenNotify
+    }
+  })
+
   await t.test('追加到同一个任务: later runs add to the first run’s task; a deleted task pauses the automation', async () => {
     const standing = (await create({ ...definition(builder), maxConcurrent: 3, eachRun: 'same_task' })).schedule
     const first = await runNow(standing)

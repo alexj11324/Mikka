@@ -89,6 +89,7 @@ export const automationSeams:AutomationSeams={
     try{return new Set((await linearTeams(await linearAccessToken(ownerId))).map(team=>team.id))}
     catch(error){throw new ScheduleError('scheduleLinearUnreachable',503,{cause:error})}
   },
+  async notify(notice){await (await import('@/lib/slack/automation-notice')).postRunNotice(notice)},
   /** Channels the workspace's Slack installation can see, for a creator who is a member of it; null otherwise. */
   async slackChannels(ownerId,workspaceId){
     const app=process.env.SLACK_APP_ID
