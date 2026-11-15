@@ -13,6 +13,7 @@ import { threadModelChoice, type ThreadModelChoice } from '@/lib/thread-model-ch
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import type { SelectResult } from 'drizzle-orm/query-builders/select.types'
 import { z } from 'zod'
+import { cacheReadAction } from '@/lib/cache-read-action'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
@@ -272,6 +273,21 @@ export async function pollIssueThreads(issueId: string, includeTaskWork = false,
     if (activity.error) throw new ActionFailureError(activity.error)
     if (activity.viewerId !== user.id) throw new ActionFailureError('issueNotFound')
     return { ...snapshot, connections, activity: activity.snapshot, viewerId: user.id }
+  })
+}
+
+export type IssueWorkSnapshot = Extract<Awaited<ReturnType<typeof pollIssueThreads>>, { viewerId: string }>
+
+/** Reuse the authorized content read, then release its document lock before
+ * reading the Work view. The stable task and both viewer identities must agree. */
+export async function pollTaskDetail(issueId: string, known?: string, activityCursor?: { version?: string; positions?: import('@/lib/list-poll').ListPosition[] }) {
+  return cacheReadAction(async () => {
+    const { pollIssue } = await import('@/app/actions/issues')
+    const document = await pollIssue(issueId, known)
+    if (document.error) throw new ActionFailureError(document.error)
+    const work = await pollIssueThreads(issueId, true, activityCursor)
+    if (!('activity' in work) || work.viewerId !== document.viewerId) throw new ActionFailureError('issueNotFound')
+    return { ...document, taskWork: work }
   })
 }
 

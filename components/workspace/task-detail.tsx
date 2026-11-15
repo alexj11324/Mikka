@@ -14,7 +14,8 @@ import { IssueDescriptionHistory } from './issue-description-history'
 import type { MetadataRequest } from './issue-metadata-controls'
 import { toast } from 'sonner'
 import { getDeletedIssue, setIssueDeleted } from '@/app/actions/issue-operations'
-import { pollIssue, pollIssueVersionSummaries, saveIssue, listIssueVersions, type IssueView, type IssueWorkSnapshot } from '@/app/actions/issues'
+import { pollIssue, pollIssueVersionSummaries, saveIssue, listIssueVersions, type IssueView } from '@/app/actions/issues'
+import { pollTaskDetail, type IssueWorkSnapshot } from '@/app/actions/agents'
 import { descriptionKey } from '@/lib/issue-relations'
 import { CacheReadError } from '@/lib/cache-read-error'
 import { readAccessFailure, waitForCacheHydration } from '@/lib/swr/persistent-cache'
@@ -60,16 +61,16 @@ async function loadIssue(id: string, viewerId: string, previous?: IssueRead, inc
   const version = positions && positions.length === held?.positions?.length ? held.version : undefined
   let result
   try {
-    result = includeWork ? await pollIssue(id, previous?.readVersion, { version, positions }) : await pollIssue(id, previous?.readVersion)
+    result = includeWork ? await pollTaskDetail(id, previous?.readVersion, { version, positions }) : await pollIssue(id, previous?.readVersion)
   } catch (error) {
-    // The older RPC schema accepts only two arguments. A refused view never falls back.
-    if (!includeWork || !error || typeof error !== 'object' || !('code' in error) || error.code !== 'desktop_rpc_request_invalid' || !('status' in error) || error.status !== 400) throw error
+    // Earlier servers have no joined RPC. A refused task is still a refusal.
+    if (!includeWork || !error || typeof error !== 'object' || !('code' in error) || error.code !== 'desktop_rpc_action_unknown' || !('status' in error) || error.status !== 404) throw error
     result = await pollIssue(id, previous?.readVersion)
   }
   if (result.error) throw new CacheReadError(result.error)
   if (result.viewerId !== viewerId) throw new ListReadScopeError('owner')
   const document = result.unchanged ? previous! : result.issue
-  const work = result.taskWork
+  const work = 'taskWork' in result ? result.taskWork : undefined
   if (!work) return { ...document, readVersion: result.version, taskWork: undefined }
   if (work.viewerId !== viewerId) throw new ListReadScopeError('owner')
   const next = work.activity

@@ -63,8 +63,7 @@ mock.module(at('app/actions/task-domain.ts'), { namedExports: {
 } })
 let afterCommit: (() => void) | undefined
 let writes: Parameters<typeof import('../app/actions/issues')['saveIssue']>[0][]
-mock.module(at('app/actions/issues.ts'), { namedExports: {
-  pollIssue: async (id: string, known?: string, cursor?: object) => {
+async function readFixtureIssue(id: string, known?: string, cursor?: object) {
     assert.equal(id, issueId); issueReads++; knownVersions.push(known)
     const issue = readOverride ? await readOverride() : structuredClone(stored)
     if (readFailure) return { error: readFailure }
@@ -73,7 +72,10 @@ mock.module(at('app/actions/issues.ts'), { namedExports: {
     if (!serveJoined || !cursor) return document
     joinedReads++
     return { ...document, taskWork: { live: { workspaceId }, viewerId: readViewerId, work: null, connections: [], threads: [], activity: { version, items: structuredClone(versions) } } }
-  },
+  }
+mock.module(at('app/actions/agents.ts'), { namedExports: { pollTaskDetail: readFixtureIssue } })
+mock.module(at('app/actions/issues.ts'), { namedExports: {
+  pollIssue: readFixtureIssue,
   pollIssueVersionSummaries: async (id: string) => {
     assert.equal(id, issueId); versionReads++
     return { viewerId: readViewerId, snapshot: { version: String(versions.length).padStart(32, '0'), items: structuredClone(versions) } }

@@ -232,8 +232,8 @@ test('task thread lists retain exact titles, summaries and privacy while details
     await assert.rejects(withActivitySession(outsider, () => pollIssueThreads(issue, true), workspace), { code: 'issueNotFound' })
     assert.ok(selected.bytes < baseline.reads[0].bytes / 20, 'list projection excludes full prompts, reports and error stacks')
     assert.equal(selected.route, '/actions/threads/issue-list')
-    const { pollIssue } = await import('../app/actions/issues')
-    const readDetail = (viewer: string, known?: string) => withActivitySession(viewer, () => pollIssue(issue, known, {}), workspace)
+    const { pollTaskDetail } = await import('../app/actions/agents')
+    const readDetail = (viewer: string, known?: string) => withActivitySession(viewer, () => pollTaskDetail(issue, known, {}), workspace)
     const combined = await measured(() => readDetail(owner))
     assert.ok(!combined.value.error && combined.value.issue && combined.value.taskWork)
     const snapshot = combined.value.taskWork

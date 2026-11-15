@@ -253,24 +253,7 @@ const { content: _issueBody, ...issueSummaryColumns } = getTableColumns(issues)
 
 /** A cached detail still checks its current ACL. Its body hash is computed in
  * Postgres so a warm read returns no document unless the visible view changed. */
-export type IssueWorkSnapshot = Extract<Awaited<ReturnType<typeof import('./agents').pollIssueThreads>>, { viewerId: string }>
-type IssueDocumentRead = { viewerId: string; version: string; issue: IssueView; unchanged?: never } | { viewerId: string; version: string; unchanged: true; issue?: never }
-
-/** A mounted task asks for its document and work together. A caller confirming
- * a write can still request just the conditional document. Never hold its share
- * lock across a Factory or Workspace pool checkout. */
-export async function pollIssue(id: string, known?: string, activityCursor?: { version?: string; positions?: import('@/lib/list-poll').ListPosition[] }): Promise<ActionResult<IssueDocumentRead & { taskWork?: IssueWorkSnapshot }>> {
-  const document = await pollIssueDocument(id, known)
-  if (document.error || !activityCursor) return document
-  return cacheReadAction(async () => {
-    const { pollIssueThreads } = await import('./agents')
-    const work = await pollIssueThreads(id, true, activityCursor)
-    if (!('activity' in work) || work.viewerId !== document.viewerId) throw new ActionFailureError('issueNotFound')
-    return { ...document, taskWork: work }
-  })
-}
-
-async function pollIssueDocument(id: string, known?: string): Promise<ActionResult<IssueDocumentRead>> {
+export async function pollIssue(id: string, known?: string): Promise<ActionResult<{ viewerId: string; version: string; issue: IssueView; unchanged?: never } | { viewerId: string; version: string; unchanged: true; issue?: never }>> {
   return cacheReadAction(() => withDatabaseOperation('/actions/issues/detail', async () => {
     const { issue, user } = await requireIssueAccessWithoutBody(id)
     if (!issue.issuedIdentifier) await taskIdentifiers([{ id: issue.id, ownerId: issue.userId, scope: issue.scope }])
