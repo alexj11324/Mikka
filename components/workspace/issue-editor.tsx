@@ -71,7 +71,8 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
   const [instructionsOpen, setInstructionsOpen] = useState(false)
   const unreadable = !sharedDoc && initialContent === null
   // Read-only shows no typing hint, including on the empty document that stands in for unreadable content.
-  const placeholder = disabled || unreadable ? null : compact ? t('placeholderCompact') : t('placeholderFull')
+  // A task's description reads Capy's 「Describe this issue」; other documents keep the fuller hint.
+  const placeholder = disabled || unreadable ? null : compact ? t('placeholderCompact') : layout === 'issue' ? t('placeholderTask') : t('placeholderFull')
   const [localDoc] = useState(() => new Y.Doc())
   const threadDoc = sharedDoc ?? localDoc
   const threadStore = useMemo(() => createThreadStore(threadDoc), [threadDoc])

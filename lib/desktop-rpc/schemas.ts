@@ -208,6 +208,8 @@ export const desktopActionSchemas = {
   'issue-operations.setIssueDeleted': tuple(object({ id: uuid, revision: positive.optional(), restore: bool.optional() })),
   'issue-prefix.getIssuePrefixState': none,
   'issue-prefix.saveIssuePrefix': tuple(object({ prefix: text(20).min(1) })),
+  'thread-title-settings.getThreadTitleSettings': inWorkspace,
+  'thread-title-settings.saveThreadTitleSettings': tuple(object({ workspaceId: workspace, scope: z.enum(['workspace', 'mine']), instructions: text(1000).optional(), triggers: z.enum(['first_run_ended', 'pull_opened', 'either']).nullable().optional() })),
   'issues.listIssues': none,
   'issues.pollIssues': tuple(version.optional(), listPositions(100).optional()),
   'issues.syncIssueList': tuple(version.optional(), listPositions(100).optional()),

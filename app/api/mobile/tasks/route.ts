@@ -7,7 +7,6 @@ import { tokenWorkspace } from '@/lib/tokens/principal'
 import { nextTaskListCursor, taskListPageInput } from '@/lib/task-list-page'
 import { pollIssues, listWorkspaceIssues, listWorkspaceTaskPage } from '@/app/actions/issues'
 import { json, mobileUser, unauthorized } from '@/lib/mobile-api'
-import { displayTaskTitle } from '@/lib/short-title'
 import { boardBlocks } from '@/components/blocks/kanban-board-1/components/data'
 import { newestTaskRuns, taskScheduleLabels } from '@/lib/task-block-runs'
 import { taskStateOf } from '@/lib/task-state'
@@ -51,7 +50,7 @@ async function handleGET(request: Request) {
             const block = blocks.get(issue.id)
             return {
               // The short title the small model wrote, while the task keeps the title it was written from (lib/short-title.ts).
-              ...(dispatchedBy ? { dispatchedBy } : {}), id: issue.id, identifier: issue.identifier, title: displayTaskTitle(issue), status: issue.status, priority: issue.priority,
+              ...(dispatchedBy ? { dispatchedBy } : {}), id: issue.id, identifier: issue.identifier, title: issue.title, status: issue.status, priority: issue.priority,
               owner: issue.ownerName, updatedAt: issue.updatedAt,
               createdAt: issue.createdAt, ...taskStateOf(issue, runByIssue.get(issue.id), { block, schedule: byIssue.get(issue.id)?.schedule }),
               bot: byIssue.get(issue.id)?.bot ?? null, schedule: byIssue.get(issue.id)?.schedule ?? null,

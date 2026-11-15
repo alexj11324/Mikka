@@ -88,12 +88,11 @@ test('remarkCitations cuts a GFM autolink glued to Chinese text', () => {
 const LONG_CJK = '修复登录后的工作区前缀和查询参数丢失问题并补充回归测试覆盖所有入口'
 const LONG_LATIN = 'Fix the workspace prefix and query parameters that are lost after sign in and add regression tests'
 
-test('runTitle is the conversation\'s own bounded short title: stored title, else what it was asked, else its task\'s short title', () => {
-  const task = { id: ISSUE, number: 12, identifier: 'MIK-12', title: LONG_CJK, shortTitle: '登录前缀修复' }
+test('runTitle is the conversation\'s own bounded short title: stored title, else what it was asked, else its task\'s title', () => {
+  const task = { id: ISSUE, number: 12, identifier: 'MIK-12', title: LONG_CJK }
   assert.equal(runTitle({ title: '回调参数排查', name: 'Speed up the home page', issue: task }), '回调参数排查', 'its stored title wins')
   assert.equal(runTitle({ name: 'Speed up the home page', issue: task }), 'Speed up the home page', 'then what it was asked, never the task\'s title')
-  assert.equal(runTitle({ name: '', issue: task }), '登录前缀修复', 'an empty prompt falls back to the task\'s short title')
-  assert.equal(runTitle({ name: '', issue: { ...task, shortTitle: null } }), '修复登录后的工作区前缀和', 'a task without one is bounded the same way')
+  assert.equal(runTitle({ name: '', issue: task }), '修复登录后的工作区前缀和', 'an empty prompt falls back to the task\'s title, bounded')
   assert.equal(runTitle({ name: 'Check the logs', issue: null }), 'Check the logs', 'a standalone run')
   assert.equal(runTitle({ name: LONG_CJK, issue: null }), '修复登录后的工作区前缀和', 'long CJK: 12 characters')
   assert.equal([...runTitle({ name: LONG_CJK, issue: null })].length, 12)

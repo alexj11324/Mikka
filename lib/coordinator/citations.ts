@@ -3,7 +3,7 @@
 // URLs. The chat shows all of them as source chips: issues and runs looked up
 // for the person when the chat loads, web pages by their link preview.
 
-import { conversationTitle } from '../short-title'
+import { threadTitle } from '../short-title'
 
 import { splitCitations, type CitationPart } from './citation-parts'
 export { splitCitations, type CitationPart, type CitationKind } from './citation-parts'
@@ -35,7 +35,7 @@ export interface RunSource {
   stopReason?: string | null
   /** Its group in the thread list (R-52), decided on the server: the phone draws it as is. */
   group?: import('@/lib/thread-groups').ThreadGroup
-  issue: { id: string; number: number | null; identifier: string | null; title: string; shortTitle?: string | null; status?: string; run?: { status: string; outcome: string | null; stopReason?: string | null } | null; review?: import('@/lib/coding-workspace/task-review/read').TaskReviewSummary | null } | null
+  issue: { id: string; number: number | null; identifier: string | null; title: string; status?: string; run?: { status: string; outcome: string | null; stopReason?: string | null } | null; review?: import('@/lib/coding-workspace/task-review/read').TaskReviewSummary | null } | null
   /** The conversation's own stored short title, once it has one (agent_runs.title of the chain's first run). */
   title?: string | null
   /** The first line of what it was asked to do; its shown name is runThreadName. */
@@ -61,11 +61,11 @@ export function runThreadName(run: Pick<RunSource, 'issue' | 'name' | 'title'>) 
 
 /**
  * A thread's title wherever it is named: the conversation's one bounded short title (lib/short-title.ts
- * conversationTitle, decision 2026-11-13-1405), never its task's full title and never with the code, which the task's
+ * threadTitle, decision 2026-11-13-1405), never its task's full title and never with the code, which the task's
  * own chip carries.
  */
 export function runTitle(run: Pick<RunSource, 'issue' | 'name' | 'title'>) {
-  return conversationTitle(run)
+  return threadTitle(run)
 }
 
 /**

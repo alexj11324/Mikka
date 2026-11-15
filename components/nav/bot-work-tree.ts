@@ -1,10 +1,10 @@
 import { pullRequestsState } from '@/lib/pull-request-appearance'
 import type { Thread } from '@/app/actions/task-runs'
 import type { listIssues } from '@/app/actions/issues'
-import { conversationIndicatorOf, type RunIndicator, type TaskReason, type TaskState } from '@/lib/task-state'
+import { threadIndicatorOf, type RunIndicator, type TaskReason, type TaskState } from '@/lib/task-state'
 import type { TaskPresentation } from '@/lib/task-presentation'
 import { issueIdentifier } from '@/components/workspace/issue-properties'
-import { compactTaskTitle, conversationTitle } from '@/lib/short-title'
+import { compactTaskTitle, threadTitle } from '@/lib/short-title'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 export type BotWorkRun = { id: string; name: string; harness: string | null }
@@ -43,9 +43,9 @@ export function botWorkTree(workspaceId: string | null, botIds: readonly string[
     const child = { id: run.id, name: run.agentName, harness: run.harness }
     if (!run.issueId) {
       // A conversation with no task is named by its own short title: the stored one (a rename shows here), else what it was asked.
-      const title = conversationTitle({ title: run.title, name: run.prompt.split('\n').find(line => line.trim())?.trim() }) || run.agentName
+      const title = threadTitle({ title: run.title, name: run.prompt.split('\n').find(line => line.trim())?.trim() }) || run.agentName
       rowsFor(botId).set(run.id, { id: run.id, issueId: null, name: title, fullName: title,
-        status: null, state: null, reason: null, activity: conversationIndicatorOf(run), runs: [child] })
+        status: null, state: null, reason: null, activity: threadIndicatorOf(run), runs: [child] })
       continue
     }
     const issue = tasks.get(run.issueId), projected = presentations[run.issueId]

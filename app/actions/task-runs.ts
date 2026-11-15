@@ -28,8 +28,7 @@ import type { PresenceDevice } from '@/lib/live/presence'
 import { changedListIds, listPositionKey, readListPositions, unchangedList, type ListPosition } from '@/lib/list-poll'
 import { cacheReadAction } from '@/lib/cache-read-action'
 import { beginWorkspaceListRead } from '@/lib/live/revision-read'
-import { issueShortTitle } from '@/lib/short-title-sql'
-import { conversationTitle } from '@/lib/short-title'
+import { threadTitle } from '@/lib/short-title'
 import { threadName } from '@/lib/issue-threads'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { joinThreadRead, threadUnread } from '@/lib/thread-reads'
@@ -73,8 +72,8 @@ async function readTaskRuns() {
   // run-recovery cron (sweepExpiredRunLeases), not by this poll.
   const latest = db.selectDistinctOn([agentRuns.issueId], {
     // A thread's name: its task's short title while the task keeps the title it was written from (lib/short-title.ts).
-    issueId: agentRuns.issueId, runId: agentRuns.id, issueTitle: sql<string>`coalesce(${issueShortTitle}, ${issues.title})`.as('issueTitle'),
-    // The conversation's own stored title and the opening of what it was asked: the run is named by conversationTitle below.
+    issueId: agentRuns.issueId, runId: agentRuns.id, issueTitle: sql<string>`${issues.title}`.as('issueTitle'),
+    // The conversation's own stored title and the opening of what it was asked: the run is named by threadTitle below.
     conversationTitle: agentRuns.title, asked: sql<string>`left(${runTaskPrompt}, 200)`.as('asked'), agentName: runAgentName.as('agentName'),
     status: agentRuns.status, outcome: agentRuns.outcome, failureDetails: runFailureBrief.as('failureDetails'),
     botId: runBotId.as('botId'),
@@ -94,7 +93,7 @@ async function readTaskRuns() {
   // `issueTitle` names the run where a list or a notification names it: the conversation's one short title (decision
   // 2026-11-13-1405), its stored one first, never the task's full title. The field keeps its name for released clients.
   const items: TaskRun[] = rows.map(({ expiresAt: _expiresAt, conversationTitle: stored, asked, ...row }) => ({ ...row,
-    issueTitle: conversationTitle({ title: stored, name: threadName(asked ?? '', ''), issue: { title: row.issueTitle } }),
+    issueTitle: threadTitle({ title: stored, name: threadName(asked ?? '', ''), issue: { title: row.issueTitle } }),
     failureDetails: readCompactRunFailure(row.failureDetails), issueId: row.issueId! }))
   return { items, live }
 }
@@ -115,7 +114,7 @@ export interface Thread {
   agentName: string
   issueId: string | null
   prompt: string
-  /** The conversation's own stored short title, once it has one (conversationTitle reads it first). */
+  /** The conversation's own stored short title, once it has one (threadTitle reads it first). */
   title?: string | null
   status: RunStatus
   createdAt: string
@@ -241,8 +240,8 @@ async function conversationActor() {
  */
 export async function renameConversation(target: ConversationTarget, title: string): Promise<ActionResult<{ title: string }, 'issueTitleInvalid' | 'runNotFound'>> {
   const { ownerId, workspaceId } = await conversationActor()
-  const { manualConversationTitle } = await import('@/lib/conversation-title')
-  const normalized = typeof title === 'string' && title.length <= 400 ? manualConversationTitle(title) : null
+  const { manualThreadTitle } = await import('@/lib/thread-title')
+  const normalized = typeof title === 'string' && title.length <= 400 ? manualThreadTitle(title) : null
   if (!normalized) return { error: 'issueTitleInvalid' }
   const { pool } = await import('@/lib/db')
   const { resolveConversationTarget, renameStandalone } = await import('@/lib/standalone-chat-controls')
@@ -254,8 +253,8 @@ export async function renameConversation(target: ConversationTarget, title: stri
     await (await import('@/lib/live/lists')).groupListChanged(pool, resolved.id)
     return { title: renamed }
   }
-  const { renameConversationTitle } = await import('@/lib/conversation-title-server')
-  const saved = await renameConversationTitle(pool, resolved.id, ownerId, title, workspaceId)
+  const { renameThreadTitle } = await import('@/lib/thread-title-server')
+  const saved = await renameThreadTitle(pool, resolved.id, ownerId, title, workspaceId)
   if (!saved) return { error: 'runNotFound' }
   await (await import('@/lib/live/lists')).runListChanged(pool, resolved.id)
   return { title: saved }
@@ -293,10 +292,10 @@ export async function regenerateConversationTitle(target: ConversationTarget): P
     const current = await read()
     return current ? { title: current.title, regenerated: false } : { error: 'runNotFound' }
   }
-  const { nameConversation } = await import('@/lib/conversation-title-server')
+  const { nameThread } = await import('@/lib/thread-title-server')
   const { generateShortTitle } = await import('@/lib/short-title-server')
   let title: string | null = null
-  try { title = await nameConversation(pool, resolved.id, ownerId, 'regenerate', generateShortTitle) } catch (error) {
+  try { title = await nameThread(pool, resolved.id, ownerId, 'regenerate', generateShortTitle) } catch (error) {
     console.error('Conversation title regenerate failed', error instanceof Error ? error.name : 'unknown')
   }
   if (title) await (await import('@/lib/live/lists')).runListChanged(pool, resolved.id)

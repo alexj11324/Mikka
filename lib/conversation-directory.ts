@@ -11,7 +11,7 @@ import { runBotId } from './run-bot-name'
 import { runChainSql, RUN_CHAIN_MAX_DEPTH, type RunChainQueryable } from './run-chain'
 import { threadName } from './issue-threads'
 import { pullRequestSchema, type IssuePullRequest } from './issue-metadata'
-import { conversationTitle } from './short-title'
+import { threadTitle } from './short-title'
 
 type Row = {
   kind: 'run' | 'chat'; pulls: unknown[]
@@ -132,7 +132,7 @@ function item(row: Row, linkedTasks?: DirectoryTaskLink[]) {
     }),
     kind: row.kind, id: row.id, issueId: first?.id ?? row.issueId,
     identifier: first?.identifier ?? row.identifier, taskTitle: first?.title ?? row.taskTitle,
-    title: row.kind === 'chat' ? row.title ?? '' : conversationTitle({
+    title: row.kind === 'chat' ? row.title ?? '' : threadTitle({
       title: row.title, name: threadName(row.asked, ''), issue: { title: row.taskTitle || row.agentName },
     }),
     state: row.state, unread: row.unread, at: row.at, pinned: row.pinned,

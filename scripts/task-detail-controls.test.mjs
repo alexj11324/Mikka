@@ -98,13 +98,14 @@ async function mount({ showDialogs = false, ...props } = {}) {
   return () => act(async () => { root.unmount(); host.remove() })
 }
 const row = id => frame.rows.find(item => item.id === id)
-test('properties and Work use the same authorized pull receipts, including an empty set', async () => {
+// The task page has no Work section (R-62): the Pull requests property is where the authorized receipts show.
+test('the Pull requests property shows the authorized pull receipts, including an empty set', async () => {
   issue.metadata.pullRequests = [{ url: 'https://github.com/example/legacy/pull/1', state: 'open' }]
   const current = { url: 'https://github.com/example/review/pull/2', state: 'merged' }
   for (const receipts of [[current], []]) {
     const done = await mount({ agentActivity: { items: [], work: { presentation: { pullRequests: receipts } } } })
     try {
-      assert.deepEqual(frame.work.props.pulls, receipts)
+      assert.equal(frame.work, undefined)
       assert.deepEqual(row('pullRequests')?.chips.map(chip => chip.href) ?? [], receipts.map(pull => pull.url))
     } finally { await done() }
   }
@@ -126,7 +127,7 @@ test('both activity layouts preserve the genuine reply and its target in a mixed
 test('properties link only admitted conversations and show the recorded Factory branch', async () => {
   const opened = []
   const done = await mount({ agentActivity: {
-    items: [], threads: [{ id: 'run', detail: { name: 'Worker review' } }, { id: 'hidden', detail: null }],
+    items: [], threads: [{ id: 'run', createdAt: '2026-11-14T00:00:00.000Z', attempts: [], detail: { name: 'Worker review' } }, { id: 'hidden', createdAt: '2026-11-14T00:00:00.000Z', attempts: [], detail: null }],
     openThread: id => opened.push(id), work: {
       presentation: { linkedChats: [{ id: 'chat', title: 'Planning' }] },
       factory: { task: { review: { summary: { branch: 'feature/review' } } } },

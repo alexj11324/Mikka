@@ -81,6 +81,19 @@ export function findThreadOwnership(messages) {
   return problems
 }
 
+/**
+ * A thread is 线程 in Chinese (Alex, 2026-11-15; docs/design/glossary.md). 执行线程 and
+ * 运行链 have no other meaning in the UI, so they never appear. 会话 (sign-in sessions)
+ * and 对话 (Bot chats, group chats, the directory) are reviewed by hand.
+ */
+export function findBannedThreadWords(messages) {
+  const problems = []
+  for (const [key, value] of flattenMessages(messages['zh-CN'] ?? {})) {
+    if (typeof value === 'string' && /执行线程|运行链/.test(value)) problems.push(`zh-CN: "${key}" says 执行线程 or 运行链 ("${value}"); a thread is 线程`)
+  }
+  return problems
+}
+
 export function checkErrorCodes(codes, messages) {
   const problems = []
   for (const locale of LOCALES) {
@@ -285,6 +298,7 @@ export function checkRepository() {
   if (problems.length) return problems
   problems.push(...compareMessages(messages))
   problems.push(...findThreadOwnership(messages))
+  problems.push(...findBannedThreadWords(messages))
   const codeFile = path.join(ROOT, 'lib/action-result.ts')
   if (fs.existsSync(codeFile)) {
     const codes = extractActionErrorCodes(fs.readFileSync(codeFile, 'utf8'))

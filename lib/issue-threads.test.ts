@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { agentStretches, taskConversationRoots, canReadThread, projectIssueThreads, taskFreeThreadMembers, threadName, threadQuestionRunId, threadQuestionView, threadTime, withRunChain } from './issue-threads'
+import { agentStretches, taskThreadRoots, canReadThread, projectIssueThreads, taskFreeThreadMembers, threadName, threadQuestionRunId, threadQuestionView, threadTime, withRunChain } from './issue-threads'
 import type { RunChain } from './run-chain'
 import type { RunFailure } from '@mikka/protocol/run-failure'
 
@@ -249,11 +249,11 @@ test('the newest visible conversational continuation owns replies even after a p
   later.attempts[0].createdAt = later.createdAt
   const review = { ...later, id: 'review', kind: 'acceptance', createdAt: new Date('2026-01-04') }
   for (const list of [[redacted, later, review, first], [first, review, later, redacted]]) {
-    const { readable, reply } = taskConversationRoots(list)
+    const { readable, reply } = taskThreadRoots(list)
     assert.deepEqual(readable.map(run => run.id), ['first', 'second', 'review'])
     assert.equal(reply?.latestRunId, 'resumed')
   }
-  assert.equal(taskConversationRoots([review, redacted]).reply, null)
+  assert.equal(taskThreadRoots([review, redacted]).reply, null)
 })
 
 test('only an authorized thread owner sees the runtime-observed model in the task work list', () => {

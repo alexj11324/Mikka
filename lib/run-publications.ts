@@ -16,7 +16,7 @@ import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { workspaceDb } from '@/lib/workspace-db'
 import { systemActor } from '@/lib/activity-actor'
 import { advancesTo, personChangedStatusSince } from '@/lib/task-status-advance'
-import { scheduleConversationTitle } from '@/lib/conversation-title-schedule'
+import { scheduleThreadTitle } from '@/lib/thread-title-schedule'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runFinishedEvent } from '@/lib/coordinator-events'
 import { publicationBranch, publicationGate } from '@/lib/run-publication-policy'
@@ -119,7 +119,7 @@ async function finishResult(tx: Transaction, run: Run, publication?: { pullReque
       if (pr) {
         const found = metadata.pullRequests.some(existing => existing.url.replace(/\/$/, '') === pr.url)
         // A PR opened: the conversation is named again from what it delivered, while its title is a generated one.
-        if (!found) scheduleConversationTitle(tx, run.id, run.userId, 'pull_opened')
+        if (!found) scheduleThreadTitle(tx, run.id, run.userId, 'pull_opened')
         if (!found && metadata.pullRequests.length >= 10) throw new PublicationError('pull_request_limit')
         const pullRequests = found ? metadata.pullRequests.map(existing => existing.url.replace(/\/$/, '') === pr.url ? pr : existing) : [...metadata.pullRequests, pr]
         content = withIssueMetadata(task.content, { ...metadata, pullRequests })
@@ -237,7 +237,7 @@ async function completionTransaction(userId: string, runId: string, completion: 
         ...(quota ? { quotaResetsAt: resetsAt ? new Date(resetsAt) : null } : {}),
         ...(paused ? { leaseExpiresAt: null, finishedAt: null } : { finishedAt: sql`clock_timestamp()` }), updatedAt: new Date() }).where(eq(agentRuns.id, runId)).returning()
       // The daemon's first terminal completion has a report even when PR publication is still pending.
-      if (run.finishedAt) scheduleConversationTitle(tx, runId, userId, 'first_run_ended')
+      if (run.finishedAt) scheduleThreadTitle(tx, runId, userId, 'first_run_ended')
       await runListChanged(tx, runId)
       await runChanged(tx, runId)
       await tx.update(runTokens).set({ revokedAt: new Date() }).where(and(eq(runTokens.runId, runId), isNull(runTokens.revokedAt)))

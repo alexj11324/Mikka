@@ -4,7 +4,6 @@ import { ListTodo, Plus } from 'lucide-react'
 import { useFormatter, useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import type { listIssues } from '@/app/actions/issues'
-import { displayTaskTitle } from '@/lib/short-title'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { BLOCKED_COLUMN, BOARD_COLUMNS, boardColumnOf, type CardProperty, type RunOwner } from '@/components/blocks/kanban-board-1/components/data'
@@ -70,7 +69,7 @@ export function IssueList({ issues, blocks, properties = LIST_COLUMNS, owners, s
                 {showIdentifier && <span className="hidden w-20 shrink-0 text-xs text-muted-foreground tabular-nums sm:block">{issue.identifier}</span>}
                 {/* What blocks it stays at every width: under the title on a phone, beside it otherwise. */}
                 <span className="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-center sm:gap-3">
-                  <span className="min-w-0 flex-1 truncate font-medium" title={issue.title}>{displayTaskTitle(issue)}</span>
+                  <span className="min-w-0 flex-1 truncate font-medium" title={issue.title}>{issue.title}</span>
                   {column.value === BLOCKED_COLUMN && blocks?.get(issue.id) && <span className="truncate text-xs text-destructive-foreground sm:shrink-0">{blockLabel(tCard, blocks.get(issue.id)!)}</span>}
                 </span>
                 {/* The card's avatar group (R-25): the Bot on top, then the person; empty when nobody owns the task. The rings take the row's colour instead of the card's. */}

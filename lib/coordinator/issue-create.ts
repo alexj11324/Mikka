@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { systemActor } from '@/lib/activity-actor'
 import { db } from '@/lib/db'
-import { bots, coordinatorEvents, issues } from '@/lib/db/schema'
+import { bots, coordinatorEvents } from '@/lib/db/schema'
 import { FactoryError } from '@/lib/factory/contract'
 import { issueForUser } from '@/lib/issue-access'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
@@ -11,7 +11,6 @@ import { dispatchTaskIntent } from '@/lib/task-create-command'
 import { attachInitialProject, insertExplicitTask, reconcileInitialProject } from '../task-create-scope'
 import { withTaskCreationReceipt } from '@/lib/task-creation-receipt'
 import { taskTitleInputSchema } from '@/lib/task-title-input'
-import { compactTaskTitle } from '@/lib/short-title'
 import { backlogTaskDraft } from '@/lib/task-create-form'
 import { requestIssueInput } from './issue-input'
 import { withTaskWorkspace } from '@/lib/task-workspace'
@@ -64,7 +63,6 @@ export async function createIssueFromRequest(userId: string, input: z.input<type
         if (!issue?.identifier) throw new FactoryError('factoryInvalid')
         created = { taskId: issue.id, identifier: issue.identifier }
       }
-      if (typed.success || command) await tx.update(issues).set({ shortTitle: compactTaskTitle({ title }), shortTitleFrom: title }).where(eq(issues.id, created.taskId))
       return created
     }
     const receipt = command ? await withTaskCreationReceipt(tx, userId, source.workspaceId!,

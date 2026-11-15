@@ -6,6 +6,7 @@ import { createContext, type CompositionEvent, type KeyboardEvent, type ReactNod
 import type { IssueDetailNavigation } from '@/components/workspace/issue-detail-header'
 import type { IssueDiscussions } from '@/components/workspace/issue-editor'
 import type { TaskReason, TaskState } from '@/hooks/use-bot-tasks'
+import type { ActivityPiece } from '@/lib/task-activity-timeline'
 
 /** A glyph the layer draws from its own set. */
 export type TaskIcon =
@@ -47,6 +48,10 @@ export type TaskChip = {
   title?: string
   /** Opens in a new tab. */
   href?: string
+  /** A quiet word after the text, as Capy's property lines: a conversation's Factory stage or run result, a PR's state. */
+  detail?: string
+  /** The PR's stored state (open, draft, merged, closed), which colours its mark until GitHub answers. */
+  state?: string
   /** A PR's live GitHub state: `draw` gets the words to show while GitHub answers. */
   live?: (draw: (view: { text: string; title: string; state: string; confirmed: boolean }) => ReactNode) => ReactNode
   /** The chip opens these choices. */
@@ -65,6 +70,8 @@ export type TaskDetailRow = {
   /** The value opens one of Mikka's dialogs instead. */
   onClick?: () => void
   chips?: TaskChip[]
+  /** One chip per line under the label, as Capy lists a task's threads and pull requests. */
+  stacked?: boolean
   /** The + after the chips. */
   add?: { label: string; menu?: TaskMenuItem[]; onClick?: () => void }
   /** A quiet word after the value (自动判断). */
@@ -90,11 +97,22 @@ export type TaskSubtask = {
   menu: TaskMenuItem[]
 }
 
+/** What leads an event row: the status it moved to, the priority it set, or the kind of change. */
+export type TaskActivityGlyph =
+  | { kind: 'status'; value: string }
+  | { kind: 'priority'; value: string }
+  /** Capy's event icons: created, an edit (title, description), assignee, hierarchy (parent, sub-task), a relation, a pull request, an update this build cannot read. */
+  | { kind: 'event'; value: 'created' | 'edit' | 'assignee' | 'hierarchy' | 'blocked' | 'related' | 'pull' | 'pullMerged' | 'unsupported' }
+
+/**
+ * `time` is how long ago (「2 小时前」) on every row; `exact` is the date and time for its tooltip.
+ * `actor` says who made an event, so a layer can filter Agent rows; absent on rows from before MIK-17.
+ */
 export type TaskActivityItem =
-  | { kind: 'event'; id: string; at: string; who: string | null; mark?: TaskMark; text: string; time: string; onOpen?: () => void }
+  | { kind: 'event'; id: string; at: string; who: string | null; mark?: TaskMark; text: string; parts?: ActivityPiece[]; time: string; exact?: string; actor?: 'person' | 'agent' | null; glyph?: TaskActivityGlyph; onOpen?: () => void }
   /** An Agent's stretch of runs (R-62): opens the task's conversation at its first thread. */
-  | { kind: 'agent'; id: string; at: string; who: string; mark: TaskMark; text: string; time: string; open: boolean; onOpen: (() => void) | null; openLabel: string }
-  | { kind: 'comment'; id: string; at: string; thread: IssueDiscussions['threads'][number]; message?: { record: IssueDiscussions['threads'][number]['messages'][number]; first: boolean; last: boolean }; excerpt: string | null; time: (at: string) => string }
+  | { kind: 'agent'; id: string; at: string; who: string; mark: TaskMark; text: string; time: string; exact?: string; open: boolean; onOpen: (() => void) | null; openLabel: string }
+  | { kind: 'comment'; id: string; at: string; thread: IssueDiscussions['threads'][number]; message?: { record: IssueDiscussions['threads'][number]['messages'][number]; first: boolean; last: boolean }; excerpt: string | null; time: (at: string) => string; exact?: (at: string) => string }
 
 export type TaskDetailFrameProps = {
   /** The loaded task's identity, for task-specific navigation such as Review. Absent in older callers. */
@@ -104,8 +122,6 @@ export type TaskDetailFrameProps = {
   workspaceId?: string | null
   /** The same authorized presentation that supplies the status row also identifies its Factory receipts. */
   factoryTaskId?: string
-  /** The work section and evidence viewer share the same authorized detail snapshot. */
-  work?: ReactNode
   factorySnapshot?: import('@/lib/factory/activity').FactoryActivityView | null
   rootRef: RefObject<HTMLDivElement | null>
   onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void

@@ -24,7 +24,7 @@ export async function insertExplicitTask(tx: Transaction, userId: string, worksp
     if (!('issue' in result) || !result.issue?.identifier) throw new ActionFailureError('issueCreateFailed')
     return { taskId: result.issue.id, identifier: result.issue.identifier }
   }
-  const issue = await createIssueForUserInTransaction(tx, userId, fields, actor, { workspaceId, deriveShortTitle: false })
+  const issue = await createIssueForUserInTransaction(tx, userId, fields, actor, { workspaceId })
   if (!issue?.identifier) throw new ActionFailureError('issueCreateFailed')
   return { taskId: issue.id, identifier: issue.identifier }
 }

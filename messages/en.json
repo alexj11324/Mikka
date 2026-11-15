@@ -457,7 +457,13 @@
       "accessChangeConfirm": "Move anyway",
       "saveFailed": "The save failed. Please try again.",
       "saveFailedRetry": "The save failed. Please try again shortly.",
-      "estimatePoints": "{count} point estimate"
+      "estimatePoints": "{count} point estimate",
+      "linkPullRequest": "Link pull request",
+      "createdBy": "Created by",
+      "pullRequestOne": "Pull request",
+      "pullRequestMany": "Pull requests",
+      "threadOne": "Thread",
+      "threadMany": "Threads"
     },
     "colors": {
       "violet": "Violet",
@@ -524,7 +530,7 @@
       "aria": "Assignee: {name}",
       "ariaShortcut": "Assignee: {name} · A",
       "unassigned": "Unassigned",
-      "unassignedLabel": "Unassigned",
+      "unassignedLabel": "No assignee",
       "assignPlaceholder": "Assign to…",
       "searchAria": "Search assignees",
       "readFailed": "Could not load members. Please try again",
@@ -839,7 +845,8 @@
       }
     },
     "descriptionLabel": "Task description",
-    "editorAria": "{label} editor"
+    "editorAria": "{label} editor",
+    "placeholderTask": "Describe this task"
   },
   "Devices": {
     "scheduledOffline": "Scheduled · runs when back online",
@@ -1086,21 +1093,33 @@
       "replyPlaceholder": "Leave a reply…",
       "sendReply": "Send reply",
       "commentLabel": "Comment",
-      "commentPlaceholder": "Leave a comment…",
+      "commentPlaceholder": "Leave a comment",
       "shortcut": "⌘ / Ctrl + Enter to send",
       "sendComment": "Send comment",
-      "changedStatus": "Changed status to {status}",
-      "changedPriority": "Changed priority to {priority}",
-      "changedTitle": "Renamed the task to {title}",
-      "assigned": "Assigned to {name}",
-      "unassigned": "Cleared the assignee",
-      "delegated": "Delegated to {name}",
-      "undelegated": "Cleared the delegate",
-      "addedSubtask": "Added subtask {title}",
-      "addedLabel": "Added label {name}",
-      "removedLabel": "Removed label {name}",
-      "unknownAssignee": "someone",
-      "separator": ", "
+      "created": "created {code}",
+      "createdTask": "created the task",
+      "moved": "moved {code} to {status}",
+      "movedTask": "moved the task to {status}",
+      "setPriority": "set priority to {priority}",
+      "renamed": "renamed the task to {title}",
+      "editedDescription": "edited the description",
+      "assigned": "assigned {name}",
+      "unassigned": "unassigned {name}",
+      "unassignedTask": "unassigned the task",
+      "someone": "someone",
+      "setParent": "set the parent to {code}",
+      "removedParent": "removed the parent",
+      "aTask": "a task",
+      "addedSubtask": "added sub-issue {code}",
+      "markedBlockedBy": "marked {code} as blocked by {other}",
+      "markedRelated": "marked {code} as related to {other}",
+      "removedRelation": "removed the relation to {other}",
+      "linked": "linked {pull}",
+      "unlinked": "unlinked {pull}",
+      "merged": "Merged {pull} {title}",
+      "unsupported": "This update needs a newer version of Mikka",
+      "system": "Mikka",
+      "untitledThread": "Untitled thread"
     },
     "detail": {
       "readFailed": "Could not load this task. Please try again.",
@@ -1236,7 +1255,7 @@
     "artifactNotFound": "This artifact does not exist.",
     "messageRequired": "A message cannot be empty.",
     "submissionConflict": "This submission ID was already used for a different message.",
-    "threadSubmissionOutcomeUnconfirmed": "We couldn’t confirm what happened to this message. Refresh the conversation to check its status.",
+    "threadSubmissionOutcomeUnconfirmed": "We couldn’t confirm what happened to this message. Refresh the thread to check its status.",
     "pendingActionUnavailable": "This action was already handled or has expired.",
     "deviceSaveFailed": "The save failed. Please try again.",
     "tokenCreateFailed": "Could not create a token. Please try again.",
@@ -1375,7 +1394,7 @@
     "accountSoleAdmin": "You’re the only admin of {workspaces}. Make another member an admin before deleting your account.",
     "accountLastOrganizationOwner": "Keep at least one active organization owner.",
     "runChainEnded": "This task has already stopped; there is nothing left to stop.",
-    "threadDeliveryUnavailable": "This conversation cannot use that delivery mode right now.",
+    "threadDeliveryUnavailable": "This thread cannot use that delivery mode right now.",
     "threadStopping": "The thread is stopping",
     "secretNotFound": "That secret or variable no longer exists.",
     "secretNameReserved": "This name is reserved by the runtime (for example PATH, HOME, proxy, TLS, loader, git, E2B or MIKKA variables). Choose another name.",
@@ -1438,12 +1457,28 @@
     "frame": {
       "delegate": "Handed to",
       "open": "Open",
-      "openThread": "Open {name}'s conversation",
+      "openThread": "Open thread {name}",
       "subtaskPlaceholder": "Name the sub-task and press Enter",
       "subtaskMenu": "Actions for {title}",
       "subscribe": "Subscribe",
       "unsubscribe": "Unsubscribe",
-      "created": "created {when}"
+      "created": "created {when}",
+      "filters": "Filter activity",
+      "filterAll": "All",
+      "filterComments": "Comments",
+      "filterAgents": "Agents & bots",
+      "showEarlier": "Show {count} earlier",
+      "copy": "Copy",
+      "copied": "Copied",
+      "copyFailed": "Could not copy",
+      "reply": "Reply",
+      "description": "Description",
+      "collapseDescription": "Collapse description",
+      "expandDescription": "Expand description",
+      "editDescription": "Edit description",
+      "noDescription": "No description",
+      "untitledThread": "Untitled thread",
+      "replyTo": "Reply to {name}"
     },
     "breadcrumbBoard": "Board",
     "breadcrumbMore": "More locations",
@@ -3426,6 +3461,24 @@
       "restore": "Restore",
       "copyFiles": "Files to copy into the worktree, one per line",
       "approveSetup": "Run this setup when a new worktree starts"
+    },
+    "threadTitles": {
+      "title": "Thread titles",
+      "instructions": "Title instructions",
+      "instructionsMine": "How Mikka names the threads you start, on top of the workspace's instructions",
+      "instructionsWorkspace": "How Mikka names every thread started in this workspace",
+      "placeholder": "Prefix titles with the customer name when one is mentioned",
+      "saved": "Title instructions saved",
+      "cleared": "Title instructions cleared",
+      "saveError": "Could not save title instructions",
+      "triggers": "Regenerate the title when",
+      "triggersHint": "Titles you set by hand are kept",
+      "firstRunEnded": "Mikka finishes the first message",
+      "pullOpened": "A pull request opens",
+      "either": "Either happens",
+      "workspaceDefault": "Workspace default",
+      "triggersError": "Could not update the title triggers",
+      "loadError": "Could not load thread title settings"
     }
   },
   "TelegramBot": {
@@ -4461,10 +4514,10 @@
     "more": "Load more"
   },
   "ThreadReferences": {
-    "sourceUnavailable": "Source file and folder references are unavailable for this conversation.",
+    "sourceUnavailable": "Source file and folder references are unavailable for this thread.",
     "references": "References",
     "task": "Task",
-    "thread": "Conversation",
+    "thread": "Thread",
     "pr": "Pull request",
     "searching": "Searching…",
     "error": "Couldn’t load references",
@@ -4474,12 +4527,12 @@
     "composerModelUnknown": "Model not reported",
     "composerModelRequested": "Requested {model}",
     "organization": {
-      "archive": "Archive conversation",
-      "unarchive": "Unarchive conversation",
-      "pin": "Pin conversation",
-      "unpin": "Unpin conversation",
-      "unavailable": "This conversation is no longer available.",
-      "failed": "Could not save the conversation change."
+      "archive": "Archive thread",
+      "unarchive": "Unarchive thread",
+      "pin": "Pin thread",
+      "unpin": "Unpin thread",
+      "unavailable": "This thread is no longer available.",
+      "failed": "Could not save the thread change."
     },
     "deliveryMode": "While the agent is working",
     "deliveryModes": {
@@ -4513,7 +4566,7 @@
     "starting": "Getting ready",
     "close": "Close thread",
     "openTask": "Open task",
-    "conversation": "Thread conversation",
+    "conversation": "Thread messages",
     "outlineIndex": "Jump to a message, {count} in this thread",
     "outlineYou": "You",
     "outlineUnknownAuthor": "Unknown",
@@ -4703,12 +4756,23 @@
     "errorDetails": "Details",
     "fullInstructions": "View full instructions",
     "hideInstructions": "Hide full instructions",
-    "conversationTitle": {
+    "threadTitle": {
       "rename": "Rename",
       "regenerate": "Regenerate title",
       "label": "Title",
       "renameFailed": "Title not saved",
       "regenerateFailed": "Couldn't generate a new title"
+    },
+    "activityLine": {
+      "worked": "Worked for {duration}",
+      "working": "Working for {duration}",
+      "waiting": "Waiting on you",
+      "failed": "failed",
+      "stopped": "stopped",
+      "seconds": "{s}s",
+      "minutes": "{m}m {s}s",
+      "minutesOnly": "{m}m",
+      "hours": "{h}h {m}m"
     }
   },
   "Computer": {
@@ -4951,7 +5015,6 @@
         "activity": "Activity",
         "created": "Created the task",
         "createdBy": "{name} created the task",
-        "dispatchedTask": "{bot} dispatched this task · {time}",
         "openPage": "Open task page",
         "more": "More",
         "comment": "Comment",
@@ -5766,7 +5829,7 @@
       "budgetReadOnly": "A Workspace administrator can edit its resource budgets.",
       "resourceUnavailable": "Resource metadata is not available yet. Workspace and member budgets remain available.",
       "resourceId": "Resource ID",
-      "resourceIdHelp": "Choose a resource or enter its ID. Private titles and conversation content are not shown.",
+      "resourceIdHelp": "Choose a resource or enter its ID. Private titles and thread content are not shown.",
       "budgetSpent": "Spent",
       "budgetReserved": "Reserved",
       "budgetRemaining": "Remaining",
@@ -7137,8 +7200,8 @@
     "dismiss": "Dismiss",
     "dismissed": "Dismissed",
     "reason": {
-      "needsReply": "Open the conversation to answer.",
-      "confirm": "Open the conversation to review the request.",
+      "needsReply": "Open the thread to answer.",
+      "confirm": "Open the thread to review the request.",
       "review": "Open the task to review the changes.",
       "offline": "Reconnect the device, then resume the run.",
       "quota": "Check the model quota, then resume the run.",
@@ -7253,6 +7316,18 @@
       "useRecording": "Use recording",
       "sent": "Message sent.",
       "selected": "selected."
+    },
+    "toolKinds": {
+      "search": "{count, plural, one {Searched once} other {Searched # times}}",
+      "read": "{count, plural, one {Read a file} other {Read # files}}",
+      "edit": "{count, plural, one {Edited a file} other {Edited # files}}",
+      "command": "{count, plural, one {Ran a command} other {Ran # commands}}",
+      "web": "{count, plural, one {Searched the web} other {Searched the web # times}}",
+      "delegate": "{count, plural, one {Started a subagent} other {Started # subagents}}",
+      "todo": "Updated todos",
+      "other": "{count, plural, one {Used a tool} other {Used # tools}}",
+      "separator": ", ",
+      "failed": "{failed} failed"
     }
   },
   "HostedOnboarding": {

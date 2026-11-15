@@ -4,11 +4,11 @@ import { taskWorkOwner } from '@/lib/issue-metadata'
 
 import { useRef, useState, type ComponentType, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import useSWR from 'swr'
-import { useFormatter, useNow, useTranslations } from 'next-intl'
+import { useFormatter, useMessages, useNow, useTranslations } from 'next-intl'
 import { getIssuePropertyOptions } from '@/app/actions/issue-metadata'
 import type { IssueView } from '@/app/actions/issues'
 import { TaskAttachments } from './task-attachments'
-import type { TaskActivityItem, TaskDetailFrameProps, TaskDetailRow, TaskMenuItem, TaskSubtask } from '@/components/slots/task-detail-contract'
+import type { TaskActivityGlyph, TaskActivityItem, TaskDetailFrameProps, TaskDetailRow, TaskMenuItem, TaskSubtask } from '@/components/slots/task-detail-contract'
 import { useIssueTeam } from '@/components/teams/issue-team-control'
 import { formatDateOnly } from '@/lib/date-only'
 import { taskProjectOptions } from '@/lib/task-project-options'
@@ -23,9 +23,13 @@ import { useTaskOwnershipRows } from './issue-scope-control'
 import { AgentSphere } from './issue-assignee-menu'
 import type { useTaskWork } from './issue-threads'
 import { openGroupConversation } from './workspace-navigation'
-import { TaskWorkSection } from './task-work-section'
-import { useActivityEvents } from './issue-activity-feed'
+import { useActivityEvents, type ActivityEventItem } from './issue-activity-feed'
 import { useActivityDrafts, type DiscussionSave } from './issue-activity'
+import { isThreadRun, threadQuestionView } from '@/lib/issue-threads'
+import { presentedFactoryEvents, taskFactoryProgress } from '@/lib/task-factory-events'
+import { runResult, useRunResultLabel } from '@/hooks/use-run-result'
+import { pullLabel } from '@/lib/issue-activity'
+import { ThreadStatusIcon } from './thread-status-icon'
 import type { IssueDiscussions } from './issue-editor'
 import { chronologicalActivity, taskActivityThreads, taskDiscussionEvents } from '@/lib/task-activity-timeline'
 import type { ActivityVersion } from '@/lib/issue-activity'
@@ -92,6 +96,11 @@ export function FramedTask(props: FramedTaskProps) {
   const tFrame = useTranslations('IssueDetail.frame')
   const tDetail = useTranslations('Workspace.detail')
   const tDirectory = useTranslations('ConversationDirectory')
+  const tThreads = useTranslations('IssueThreads')
+  const resultLabel = useRunResultLabel()
+  const messages = useMessages()
+  const labelStage = (stage: string) => (messages.GroupTask.stage as Record<string, string>)[stage] ?? stage
+  const labelGate = (status: string) => (messages.GroupTask.status as Record<string, string>)[status] ?? status
   const tArtifact = useTranslations('ArtifactReview')
   const tActivity = useTranslations('Workspace.activity')
   const tIssue = useTranslations('Issue')
@@ -139,13 +148,32 @@ export function FramedTask(props: FramedTaskProps) {
     ...options?.isOwner ? [{ id: 'invite', label: tAssignee('invite'), mark: { kind: 'icon', icon: 'mail' }, divider: true, onSelect: () => props.requestProperty('invite') } satisfies TaskMenuItem] : [],
   ]
   const delegate = meta.delegate?.name
+  // Capy's Thread lines: each conversation with where it is. A Factory conversation says its stage (实现中, 交给你…);
+  // any other its run result. The steps themselves are in the conversation, not on the task page.
+  const factoryEvents = props.agentActivity.work?.factory
+  const stageOf = new Map(taskFactoryProgress(presentedFactoryEvents(factoryEvents?.events, factoryEvents?.task.id))
+    .flatMap(group => group.runId ? [[group.runId, group.current] as const] : []))
   const conversations = [
     ...(presentation.data?.linkedChats ?? []).map(chat => ({
-      id: 'chat:' + chat.id, text: chat.title || tDirectory('untitled'), open: () => openGroupConversation(chat.id),
+      id: 'chat:' + chat.id, text: chat.title || tDirectory('untitled'), detail: undefined as string | undefined, mark: undefined as ReactNode, open: () => openGroupConversation(chat.id),
     })),
-    ...(props.agentActivity.threads ?? []).flatMap(thread => thread.detail ? [{
-      id: 'run:' + thread.id, text: thread.detail.name || tDirectory('untitled'), open: () => props.agentActivity.openThread(thread.id),
-    }] : []),
+    // Only the task's own conversations: a review or verify runs on its own and is a child conversation inside the one it checks.
+    ...(props.agentActivity.threads ?? []).filter(isThreadRun).flatMap(thread => {
+      if (!thread.detail) return []
+      const view = threadQuestionView(thread)
+      const run = { status: view.waiting ? 'waiting_input' : view.status, outcome: view.outcome }
+      const { result, reason } = runResult(run, true)
+      // The Factory's own gate says the stage and how it stands; without one, the stage the run was dispatched for.
+      // A thread read without its chain (an older read) has no attempts: its own id still finds its gate.
+      const attempts = thread.attempts ?? []
+      const gate = [thread.id, ...attempts.map(attempt => attempt.runId)].map(id => stageOf.get(id)).find(Boolean)
+      const stage = attempts.at(-1)?.stage ?? attempts[0]?.stage
+      const detail = gate ? [labelStage(gate.stage), labelGate(gate.status)].filter(Boolean).join(' · ')
+        : stage ? [labelStage(stage), view.stopping ? tThreads('stopping') : resultLabel(result, reason)].join(' · ')
+        : view.stopping ? tThreads('stopping') : resultLabel(result, reason)
+      // Capy's thread line leads with the conversation's coloured status mark, done or not.
+      return [{ id: 'run:' + thread.id, text: thread.detail.name || tDirectory('untitled'), detail, mark: <ThreadStatusIcon status={view.status} outcome={view.outcome} waiting={view.waiting} small dot={false} /> as ReactNode, open: () => props.agentActivity.openThread(thread.id) }]
+    }),
   ]
   const reviewBranch = props.agentActivity.work?.factory?.task.review?.summary?.branch
 
@@ -166,6 +194,7 @@ export function FramedTask(props: FramedTaskProps) {
     })) : loading(),
   ]
 
+  const creator = props.versions.find(version => version.revision === 1)?.actor?.name ?? null
   const rows: TaskDetailRow[] = [
     {
       id: 'status', label: tIssue('statusLabel'), disabled: locked,
@@ -190,13 +219,16 @@ export function FramedTask(props: FramedTaskProps) {
       if (value === (team.data ?? '')) return
       void team.save(value)
     } })) },
+    // Capy's Created by: whoever made the task's first revision (the same actor 活动 starts with).
+    ...creator ? [{ id: 'createdBy', label: tProperty('createdBy'), value: { text: creator, mark: { kind: 'person', name: creator } } } satisfies TaskDetailRow] : [],
     ...meta.dueDate ? [{ id: 'dueDate', label: tProperty('dueDate'), disabled: locked, onClick: () => props.requestAction('dueDate'), value: { text: formatDateOnly(format, meta.dueDate, { month: 'short', day: 'numeric' }), mark: { kind: 'icon', icon: 'calendar' }, danger: overdue(meta.dueDate, props.status, now) } } satisfies TaskDetailRow] : [],
     ...meta.estimate !== null ? [{ id: 'estimate', label: tProperty('estimate'), disabled: locked, onClick: () => props.requestAction('estimate'), value: { text: tProperty('estimatePoints', { count: meta.estimate }), mark: { kind: 'icon', icon: 'estimate' } } } satisfies TaskDetailRow] : [],
-    ...conversations.length ? [{ id: 'conversations', label: tDirectory('title'),
-      chips: conversations.map(({ id, text, open }) => ({ id, text, menu: [{ id: 'open', label: tFrame('open'), onSelect: open }] })),
+    ...conversations.length ? [{ id: 'conversations', label: tProperty(conversations.length > 1 ? 'threadMany' : 'threadOne'), stacked: true,
+      chips: conversations.map(({ id, text, detail, mark, open }) => ({ id, text, ...detail ? { detail } : {}, ...mark ? { mark: { kind: 'node' as const, node: mark } } : {}, menu: [{ id: 'open', label: tFrame('open'), onSelect: open }] })),
     } satisfies TaskDetailRow] : [],
     ...reviewBranch ? [{ id: 'branch', label: tArtifact('branch'), value: { text: reviewBranch } } satisfies TaskDetailRow] : [],
-    ...pullRequests.length ? [{ id: 'pullRequests', label: tProperty('pullRequests'), disabled: locked, chips: pullRequests.map(pr => ({ id: pr.url, text: `#${pr.url.split('/').filter(Boolean).at(-1)}`, href: pr.url, mark: { kind: 'icon', icon: 'pullRequest' }, live: draw => <PullRequestStatus issueId={task.id} pr={pr}>{view => draw({ text: view.text ? `#${view.number} ${view.text}` : `#${view.number}`, title: view.title, state: view.state, confirmed: view.confirmed })}</PullRequestStatus> })), add: { label: tProperty('managePullRequestsAria'), onClick: () => props.requestProperty('pullRequests') } } satisfies TaskDetailRow] : [],
+    // Capy's Pull requests lines: repo#n and its title, its live state, and + to link one, shown even before there is one.
+    ...preview ? [] : [{ id: 'pullRequests', label: tProperty(pullRequests.length > 1 ? 'pullRequestMany' : 'pullRequestOne'), disabled: locked, stacked: true, chips: pullRequests.map(pr => ({ id: pr.url, text: [pullLabel(pr.url), pr.title].filter(Boolean).join(' '), href: pr.url, mark: { kind: 'icon', icon: 'pullRequest' }, ...pr.state ? { state: pr.state } : {}, live: draw => <PullRequestStatus issueId={task.id} pr={pr}>{view => draw({ text: [pullLabel(pr.url), view.text || pr.title].filter(Boolean).join(' '), title: view.title, state: view.state, confirmed: view.confirmed })}</PullRequestStatus> })), add: { label: tProperty('linkPullRequest'), onClick: () => props.requestProperty('pullRequests') } } satisfies TaskDetailRow],
     ...preview ? [] : connections.groups.filter(group => group.items.length).map((group): TaskDetailRow => ({
       id: `relation-${group.kind}`, label: group.label, disabled: locked || connections.pending,
       chips: group.items.map(row => ({
@@ -225,14 +257,28 @@ export function FramedTask(props: FramedTaskProps) {
   })
 
   // 活动: the task's events, its Agent rows and its discussions in one log, oldest first.
-  const subtaskRows = (connections.rows ?? []).filter(row => row.metadata.parentId === task.id).map(row => ({ id: row.id, title: row.title, createdAt: row.createdAt }))
-  const eventsFor = useActivityEvents(props.historyFailed ? [] : props.versions, props.historyFailed ? [] : subtaskRows)
+  const subtaskRows = (connections.rows ?? []).filter(row => row.metadata.parentId === task.id).map(row => ({ id: row.id, title: row.title, identifier: row.identifier, createdAt: row.createdAt }))
+  // An Agent's change is said by its conversation (Capy: the thread's code or title), matched to the conversation that had started by then.
+  const runConversations = (props.agentActivity.threads ?? []).map(thread => ({
+    at: new Date(thread.createdAt).toISOString(), runId: thread.id, linked: Boolean(thread.detail),
+    title: thread.detail?.name || tDirectory('untitled'), ...thread.detail?.harness ? { harness: thread.detail.harness } : {},
+  }))
+  const eventsFor = useActivityEvents(props.historyFailed ? [] : props.versions, props.historyFailed ? [] : subtaskRows, {
+    task: {
+      taskId: task.id, code: task.identifier, title: props.title, status: props.status, priority: props.priority, assignee: member?.name,
+      // Parent, sub-tasks and related tasks this page already reads, so a sentence names them by code, as Capy's does.
+      refs: Object.fromEntries((connections.rows ?? []).map(row => [row.id, { code: row.identifier ?? null, title: row.title, status: row.status, ...row.priority ? { priority: row.priority } : {} }])),
+    },
+    stretches: runConversations,
+  })
   const discussions = useRef<IssueDiscussions | null>(null)
   const drafts = useActivityDrafts(task.id,
     (body, operationId) => discussions.current ? discussions.current.onComment(body, operationId) : false,
     (id, body, operationId) => discussions.current ? discussions.current.onReply(id, body, operationId) : false,
     props.discussionSave)
-  const time = (at: string) => format.dateTime(new Date(at), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  // Every row says how long ago, as Capy's log does; the date and time is the tooltip. `now` ticks once a minute: a comment sent since reads 「现在」.
+  const time = (at: string) => format.relativeTime(new Date(Math.min(Date.parse(at), now.getTime())), now)
+  const exact = (at: string) => format.dateTime(new Date(at), { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   const activityItems = (current: IssueDiscussions, expandReplies = false, additional: readonly TaskActivityItem[] = []): TaskActivityItem[] => {
     const anchors = new Map(current.anchors.map(anchor => [anchor.id, anchor.excerpt]))
     const threads = taskActivityThreads(current.threads, presentation.data?.factoryStageComments ?? [])
@@ -241,13 +287,13 @@ export function FramedTask(props: FramedTaskProps) {
     const comments: TaskActivityItem[] = expandReplies
       ? taskDiscussionEvents(threads).map(fact => {
         const thread = byId.get(fact.threadId)!
-        return { kind: 'comment', id: fact.id, at: fact.at, thread, time, excerpt: excerpt(thread.id),
+        return { kind: 'comment', id: fact.id, at: fact.at, thread, time, exact, excerpt: excerpt(thread.id),
           message: { record: { id: fact.messageId, body: fact.body, author: fact.author, at: fact.at }, first: fact.kind === 'comment', last: fact.messageId === thread.messages.at(-1)?.id } }
       })
-      : threads.map(thread => ({ kind: 'comment', id: thread.id, at: thread.createdAt, thread, time, excerpt: excerpt(thread.id) }))
+      : threads.map(thread => ({ kind: 'comment', id: thread.id, at: thread.createdAt, thread, time, exact, excerpt: excerpt(thread.id) }))
     const history = eventsFor([...comments, ...additional])
     return chronologicalActivity<TaskActivityItem>([
-      ...history.map((item): TaskActivityItem => ({ kind: 'event', id: `history:${item.id}`, at: item.at, who: item.actor?.name || (item.actor?.type === 'system' ? t('work.system') : item.actor?.type === 'agent' ? t('work.agent') : null), mark: item.actor?.name ? (item.actor.type === 'agent' ? { kind: 'node', node: <AgentSphere name={item.actor.name} compact /> } : { kind: 'person', name: item.actor.name }) : undefined, text: item.text, time: item.time })),
+      ...history.map((item): TaskActivityItem => ({ kind: 'event', id: `history:${item.id}`, at: item.at, who: item.actor?.name || (item.actor?.type === 'system' ? t('work.system') : item.actor?.type === 'agent' ? t('work.agent') : null), mark: item.actor?.name ? (item.actor.type === 'agent' ? { kind: 'node', node: <AgentSphere name={item.actor.name} compact /> } : { kind: 'person', name: item.actor.name }) : undefined, text: item.text, parts: item.parts, time: item.time, exact: item.exact, actor: item.pullAction === 'merged' || !item.actor ? null : item.actor.type === 'agent' ? 'agent' : 'person', glyph: glyphOf(item) })),
       ...comments, ...additional,
     ])
   }
@@ -255,7 +301,9 @@ export function FramedTask(props: FramedTaskProps) {
   const readerMenu = locked && !preview
   const menuItems = readerMenu
     ? menu.items.filter(item => item.id === 'history')
-    : menu.items.map(item => item.id === 'assignee' ? { ...item, onSelect: undefined, submenu: assigneeItems } : item.id === 'project' ? { ...item, onSelect: undefined, submenu: projectItems } : item.id === 'labels' ? { ...item, onSelect: undefined, submenu: labelItems } : item)
+    : [...menu.items.map(item => item.id === 'assignee' ? { ...item, onSelect: undefined, submenu: assigneeItems } : item.id === 'project' ? { ...item, onSelect: undefined, submenu: projectItems } : item.id === 'labels' ? { ...item, onSelect: undefined, submenu: labelItems } : item),
+      // The task page shows the team only once it has one (as Capy shows only set properties): the ⋯ menu sets it.
+      ...team.unavailable || team.selected ? [] : [{ id: 'team', label: team.label, mark: { kind: 'icon', icon: 'team' } as const, submenu: rows.find(row => row.id === 'team')?.menu ?? [] } satisfies TaskMenuItem]]
   const created = new Date(task.createdAt)
   return <Frame
     taskId={preview ? undefined : task.id}
@@ -263,8 +311,6 @@ export function FramedTask(props: FramedTaskProps) {
     workspaceId={preview ? undefined : task.workspaceId}
     factoryTaskId={presentation.data?.factoryTaskId}
     factorySnapshot={props.agentActivity.work?.factory ?? null}
-    work={!preview && <TaskWorkSection threads={props.agentActivity.threads ?? []} pulls={pullRequests} linkedChats={presentation.data?.linkedChats}
-      factory={props.agentActivity.work?.factory} open={props.agentActivity.openThread} />}
     rootRef={props.rootRef} onKeyDown={props.onKeyDown} label={props.label} busy={preview}
     origin={props.origin} identifier={task.identifier} title={props.title} saveLabel={props.saveLabel} saved={props.saved} saveHint={t('autosaveHint')}
     navigation={props.navigation} onClose={props.onClose}
@@ -289,10 +335,26 @@ export function FramedTask(props: FramedTaskProps) {
     }}
     rows={rows}
     rowsError={metadata.error || team.failed || (presentation.error ? actionError() : '')}
-    meta={[task.identifier, tFrame('created', { when: format.relativeTime(created, now) })].filter(Boolean).join(' · ')}
+    // Capy's line under the title: the code and how long ago it was made.
+    meta={[task.identifier, format.relativeTime(created, now)].filter(Boolean).join(' · ')}
     panel={props.panel} wide={props.wide} resize={props.resize}
     dialogs={<>{props.dialogs}{menu.dialogs}<AccessChangeDialog change={metadata.accessChange} pending={metadata.pending} onConfirm={metadata.confirmAccess} onCancel={metadata.cancelAccessChange} /><IssueMetadataControls task={task} section="dialog" disabled={locked} onSaved={adopt} onBusyChange={props.onMetadataBusy} request={props.propertyRequest} /></>}
   />
+}
+
+/** The icon that leads an event row, as Capy's: the new status's own icon for a move, the priority's bars, else the kind of change. */
+function glyphOf(item: ActivityEventItem): TaskActivityGlyph {
+  switch (item.kind) {
+    case 'status': return item.status ? { kind: 'status', value: item.status } : { kind: 'event', value: 'edit' }
+    case 'priority': return item.priority ? { kind: 'priority', value: item.priority } : { kind: 'event', value: 'edit' }
+    case 'created': return { kind: 'event', value: 'created' }
+    case 'title': case 'description': return { kind: 'event', value: 'edit' }
+    case 'assigned': case 'unassigned': return { kind: 'event', value: 'assignee' }
+    case 'parent': case 'subtask': return { kind: 'event', value: 'hierarchy' }
+    case 'relation': return { kind: 'event', value: item.relation === 'related' ? 'related' : 'blocked' }
+    case 'pull': return { kind: 'event', value: item.pullAction === 'merged' ? 'pullMerged' : 'pull' }
+    case 'unsupported': return { kind: 'event', value: 'unsupported' }
+  }
 }
 
 /** Which relation a 相关 row really is: a closed block shows as related but is removed as the block it is. */

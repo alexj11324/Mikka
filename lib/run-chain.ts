@@ -1,3 +1,4 @@
+import { FACTORY_STAGES, type FactoryStage } from './factory/contract'
 import { readRunFailure, type RunFailure } from '@mikka/protocol/run-failure'
 import { readCompactRunFailure, type CompactRunFailure } from './run-failure-view'
 import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
@@ -32,6 +33,8 @@ export interface RunAttempt {
   status: string
   /** How it came out once it ended (R-52); null while running or not judged yet. */
   outcome?: string | null
+  /** The Factory stage this run works on (factory_attempts.stage), when the run is a Factory attempt. */
+  stage?: FactoryStage | null
   stopRequestedAt: Date | null
   createdAt: Date
   finishedAt: Date | null
@@ -87,7 +90,8 @@ const COMPACT_FAILURE = `CASE WHEN jsonb_typeof(x."failureDetails")='object' AND
   jsonb_strip_nulls(jsonb_build_object('detail',x."failureDetails"->'detail','provider',x."failureDetails"->'provider',
     'status',x."failureDetails"->'status','recovery',x."failureDetails"->'recovery')) END`
 const selectAttempts = (ownerDetail = false) => `a."depthExceeded", a.root::text AS "rootRunId", x.id::text AS "runId", x.status, x.outcome, x."pauseReason",
-  x."stopRequestedAt", x."createdAt", x."finishedAt", ${ownerDetail ? 'x."failureDetails"' : COMPACT_FAILURE} AS "failureDetails"`
+  x."stopRequestedAt", x."createdAt", x."finishedAt", ${ownerDetail ? 'x."failureDetails"' : COMPACT_FAILURE} AS "failureDetails",
+  (SELECT fa.stage FROM factory_attempts fa WHERE fa."runId" = x.id) AS "factoryStage"`
 
 /**
  * The newest `limit` chains on an issue among `userIds`' runs. Runs are folded by root
@@ -142,7 +146,8 @@ function foldChains(rows: Record<string, unknown>[]): RunChain[] {
     const entry = byRoot.get(root) ?? { rootCreatedAt: row.rootCreatedAt as Date, runs: [] }
     const failureDetails = readRunFailure(row.failureDetails) ?? readCompactRunFailure(row.failureDetails)
     const pauseReason = row.pauseReason === 'human_control' || row.pauseReason === 'quota_exhausted' ? row.pauseReason : null
-    entry.runs.push({ ...(pauseReason ? { pauseReason } : {}), ...(failureDetails ? { failureDetails } : {}), runId: String(row.runId), status: String(row.status), outcome: (row.outcome as string | null) ?? null, stopRequestedAt: (row.stopRequestedAt as Date | null) ?? null, createdAt: row.createdAt as Date, finishedAt: (row.finishedAt as Date | null) ?? null })
+    const stage = typeof row.factoryStage === 'string' && (FACTORY_STAGES as readonly string[]).includes(row.factoryStage) ? row.factoryStage as FactoryStage : null
+    entry.runs.push({ ...(pauseReason ? { pauseReason } : {}), ...(failureDetails ? { failureDetails } : {}), ...(stage ? { stage } : {}), runId: String(row.runId), status: String(row.status), outcome: (row.outcome as string | null) ?? null, stopRequestedAt: (row.stopRequestedAt as Date | null) ?? null, createdAt: row.createdAt as Date, finishedAt: (row.finishedAt as Date | null) ?? null })
     byRoot.set(root, entry)
   }
   const order = (a: { createdAt: Date; runId: string }, b: { createdAt: Date; runId: string }) => a.createdAt.getTime() - b.createdAt.getTime() || (a.runId < b.runId ? -1 : a.runId > b.runId ? 1 : 0)
