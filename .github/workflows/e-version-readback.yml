@@ -1,0 +1,48 @@
+name: E authenticated reply version UI recovery regression
+on:
+  push:
+    branches: [evidence/2254-sidebar-85dfc396]
+    paths: [.github/workflows/e-version-readback.yml]
+permissions:
+  contents: read
+jobs:
+  versions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 6d88ee3b24ff47862b34c89191b5a54a98aaf295
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.22.1
+      - name: Pin the source and install its lockfile
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 6d88ee3b24ff47862b34c89191b5a54a98aaf295
+          test "$(git rev-parse 'HEAD^{tree}')" = b17d0cbb8f48156395d19d969d022e58a3d168c9
+          pnpm install --frozen-lockfile
+      - name: Execute original complete group and conversation unit suites
+        run: |
+          set -uo pipefail
+          mkdir "$RUNNER_TEMP/version-receipt"
+          export R="$RUNNER_TEMP/version-receipt"
+          git rev-parse HEAD > "$R/public"
+          git rev-parse 'HEAD^{tree}' > "$R/tree"
+          date -u +%FT%TZ > "$R/start"
+          pnpm test:groups 2>&1 | tee "$R/named-checks.txt"
+          code=${PIPESTATUS[0]}
+          date -u +%FT%TZ > "$R/end"
+          printf '%s\n' "$code" > "$R/exit"
+          exit "$code"
+      - name: Archive the original test names and run status
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: version-readback-6d88ee3b
+          path: ${{ runner.temp }}/version-receipt/
+          if-no-files-found: error
