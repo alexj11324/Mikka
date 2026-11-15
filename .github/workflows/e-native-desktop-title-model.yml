@@ -17,15 +17,15 @@ jobs:
         ports: ['5432:5432']
         options: --health-cmd "pg_isready -U e2e -d mikka_e2e" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      MIKKA_EDITION: cloud
+      MIKKA_EDITION: community
       CI: 'true'
       MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       BETTER_AUTH_URL: http://localhost:3000
       AUTH_TRUSTED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
-      MIKKA_BUILD_REVISION: '4f4229b67ae025fd9c3a581656a6ddcdd7ecb4a8'
-      MIKKA_TEST_DEPLOYMENT_SHA: '4f4229b67ae025fd9c3a581656a6ddcdd7ecb4a8'
+      MIKKA_BUILD_REVISION: '30629ee1f18fa70b3713836017b437c22af915ee'
+      MIKKA_TEST_DEPLOYMENT_SHA: '30629ee1f18fa70b3713836017b437c22af915ee'
       NEXT_TELEMETRY_DISABLED: '1'
     defaults:
       run:
@@ -50,7 +50,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           path: product
-          ref: '4f4229b67ae025fd9c3a581656a6ddcdd7ecb4a8'
+          ref: '30629ee1f18fa70b3713836017b437c22af915ee'
           persist-credentials: false
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
         with:
@@ -64,7 +64,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$MIKKA_BUILD_REVISION"
-          test "$(git rev-parse 'HEAD^{tree}')" = 81e95f515d93a9a7a19bdb4faef68633a2aa90e9
+          test "$(git rev-parse 'HEAD^{tree}')" = e7c4c9fb3a72be9b06993a4ec244c5b25a1c3b26
           test ! -e .hosted-ui
           pnpm install --frozen-lockfile
       - name: Install pinned Linux Electron with OS keyring, display and setuid sandbox
@@ -125,7 +125,7 @@ jobs:
           import { closeElectron, stopLocalDaemons } from '../../apps/desktop/test/native-cleanup.mjs'
           import { waitForBundledSession } from '../../apps/desktop/test/bundled-session.mjs'
           
-          const sha = '4f4229b67ae025fd9c3a581656a6ddcdd7ecb4a8'
+          const sha = '30629ee1f18fa70b3713836017b437c22af915ee'
           const origin = 'http://localhost:3000'
           assert.equal(process.env.BETTER_AUTH_URL,origin)
           assert.equal(new URL(process.env.DATABASE_URL).hostname,'127.0.0.1')
@@ -241,7 +241,7 @@ jobs:
             const rejected=denied(await m.rpc('task-runs.regenerateConversationTitle',run))
             assert.equal((await records()).length,prior.length)
             const fresh=ok(await o.rpc('task-runs.regenerateConversationTitle',run))
-            assert.equal(fresh.regenerated,true);assert.ok(fresh.title)
+            assert.equal(fresh.regenerated,true,'self-hosted title provider must complete the native regenerate action');assert.ok(fresh.title)
             const recorded=await records()
             const inference=recorded.find((r,i)=>i>=prior.length&&r.syntheticTask.title===prompt)
             assert.ok(inference&&inference.outputTokens>0)
@@ -307,7 +307,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: 4f4229b6-public-native-model-title
+          name: 30629ee1-public-native-model-title
           path: ${{ runner.temp }}/native-controls.json
           if-no-files-found: warn
           retention-days: 14
