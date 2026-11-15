@@ -19,7 +19,7 @@ export function onAppForeground(entered: () => void) {
 export const FRESH_FOR_MS = 60_000
 onWorkspaceChange(() => cache.clear())
 
-/** Loads `path` ahead of its screen, once, so opening it draws at once (对话 warms the top chats). */
+/** Loads `path` ahead of its screen, once, so opening it draws at once (线程 warms the top chats). */
 export async function prefetch(path: string) {
   await cache.prefetch(path, api)
 }

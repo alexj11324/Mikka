@@ -33,7 +33,7 @@ export type ThreadHeaderProps = {
   standalone?: boolean
   /** The Artifact button (ThreadArtifactButton); null when the read was rejected. */
   artifact: ReactNode
-  /** 对话 / 验收 tabs when they share the header row; null otherwise. */
+  /** Unused since the 线程 | Artifact segmented control (2026-11-15): the panel draws its segments under the header; always null. */
   tabs: ReactNode
   /** The header wraps on a phone (a Factory candidate's tabs). */
   wraps: boolean

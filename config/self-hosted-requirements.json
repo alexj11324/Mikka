@@ -2363,6 +2363,20 @@
     "test": "lib/schedules/time.test.ts",
     "suite": "test:schedules"
   },
+  "app/api/mobile/threads/[id]/artifacts/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Serve an authenticated native client the Artifact list of one of its own threads in the selected installation workspace.",
+    "test": "tests/mobile-tasks.db.test.ts",
+    "suite": "test:workspace-admin-db"
+  },
+  "lib/mobile-thread-artifacts.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List a thread's plans, pull requests, reports and captures from the owner's task work read or run evidence, rechecking task content and Artifact access.",
+    "test": "tests/mobile-tasks.db.test.ts",
+    "suite": "test:workspace-admin-db"
+  },
   "lib/schedules/wall-time.ts": {
     "mode": "built-in",
     "environment": [],

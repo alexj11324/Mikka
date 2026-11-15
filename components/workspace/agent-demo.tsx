@@ -29,14 +29,14 @@ export function AgentDemo({ onClose }: { onClose: () => void }) {
       <Badge variant="secondary">不调用模型</Badge>
       <div className="ml-auto flex items-center gap-1">
         <Button variant="ghost" size="sm" onClick={() => { setRun(value => value + 1); setFeedback('演示已重置，可以重新体验所有交互。') }}><RotateCcw data-icon="inline-start" />重播演示</Button>
-        <Button variant="ghost" size="sm" onClick={onClose}><ArrowLeft data-icon="inline-start" />返回对话</Button>
+        <Button variant="ghost" size="sm" onClick={onClose}><ArrowLeft data-icon="inline-start" />返回线程</Button>
       </div>
     </header>
     <div className="min-h-0 flex-1 overflow-y-auto" data-agent-demo>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-4 py-8 sm:px-6" key={run}>
         <div className="flex flex-col gap-3">
           <h2 className="text-2xl font-semibold">一次看全回复与交互效果</h2>
-          <p className="text-sm leading-6 text-muted-foreground">全部内容自动渲染，数据均为虚构样例。演示不会请求模型、读取真实项目或保存任何修改；返回后原对话和草稿仍然保留。</p>
+          <p className="text-sm leading-6 text-muted-foreground">全部内容自动渲染，数据均为虚构样例。演示不会请求模型、读取真实项目或保存任何修改；返回后原线程和草稿仍然保留。</p>
           <div role="group" aria-label="演示内容" className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
             <a href="#demo-motion" className="underline underline-offset-4">加载与流式代码</a>
             {AGENT_DEMO_SECTIONS.map(section => <a key={section.id} href={`#demo-${section.id}`} className="underline underline-offset-4">{section.title}</a>)}

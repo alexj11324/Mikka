@@ -175,7 +175,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   useLiveKeys(liveRuns.map(reference => ({ ...reference, kind: 'thread' as const, revisions: { [liveKeys[0]]: heldRevision(data, 'thread', reference.id) } })), liveKeys, null, { minIntervalMs: 2000 })
   useLiveKeys(liveRuns.map(reference => ({ ...reference, kind: 'run' as const, revisions: { [liveKeys[0]]: heldRevision(data, 'run', reference.id) } })), liveKeys, null)
   useLiveKey('factory_issue', issueId, liveKeys, data?.live?.issueWorkspaceId ?? null, { deadline: data?.live?.questionDeadline })
-  // Frame 06: a thread whose candidate waits for acceptance has 对话 | 验收 in its header.
+  // Frame 06: a thread whose candidate waits for acceptance has 线程 | 验收 in its segmented control.
   const { tasks: acceptanceTasks, allTasks } = useAcceptanceTasks(issueId)
   // Keep the pane on the addressed producer; its status can follow an accepted continuation.
   const acceptance = readRejected ? undefined : acceptanceTasks.find(task => task.candidateRunId === runId)
@@ -607,35 +607,31 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive-foreground">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
     </div>}
     </>
-  // 对话 / 改动 / 验收 / Artifact: two share the header row; with 改动 or a third they take their own row.
+  // 线程 | 改动 | 验收 | Artifact (Alex, 2026-11-15, as ChatGPT's 聊天 | 工作): one glass segmented control at the top right
+  // of the thread, in its header row, shown when the thread has a second segment; with only the conversation the header stands alone.
   const tabCount = 1 + Number(hasChanges) + Number(Boolean(acceptance)) + Number(hasArtifacts)
-  const tabsInHeader = tabCount === 2 && !hasChanges
-  const tabList = (inHeader: boolean) => <TabsList className={cn(inHeader && 'max-sm:w-full')}>
-    <TabsTrigger value="chat">{t('chatTab')}</TabsTrigger>
-    {hasChanges && <TabsTrigger value="changes" className="gap-1.5"><ChangesTabLabel changes={changes.state === 'ready' ? changes.changes : null} /></TabsTrigger>}
-    {acceptance && <TabsTrigger value="acceptance">{t('acceptanceTab')}</TabsTrigger>}
-    {hasArtifacts && <TabsTrigger value="artifacts">{t('artifactsTab')}</TabsTrigger>}
-  </TabsList>
+  const segments = !bare && tabCount > 1 ? <div data-slot="thread-segments" className="flex shrink-0">
+    <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="max-w-full">
+      <TabsList variant="glass" className="max-w-full">
+        <TabsTrigger value="chat">{t('chatTab')}</TabsTrigger>
+        {hasChanges && <TabsTrigger value="changes" className="gap-1.5"><ChangesTabLabel changes={changes.state === 'ready' ? changes.changes : null} /></TabsTrigger>}
+        {acceptance && <TabsTrigger value="acceptance">{t('acceptanceTab')}</TabsTrigger>}
+        {hasArtifacts && <TabsTrigger value="artifacts">{t('artifactsTab')}</TabsTrigger>}
+      </TabsList>
+    </Tabs>
+  </div> : null
   // Esc inside the thread is ←; in its composer or another field it only leaves the field (decision 0301). A window opened from it keeps its own Esc.
   // data-own-scroll: the messages scroll inside and the composer stays at the bottom, so a frame whose one scroller
   // holds this panel (the official work area) gives it the scroller's height instead of growing with it.
   return <section ref={rootRef} aria-label={title} data-own-scroll="" className="flex h-full min-h-0 flex-col" onKeyDown={bare || !onBack ? undefined : event => closeOnEscape(event, headingRef.current, onBack)}>
     {!bare && <ThreadHeader issueId={issueId} runId={runId} title={title} headingRef={headingRef} onBack={onBack} onClose={onClose}
-      onStop={canStop ? () => { void stop() } : null} onOpenTask={onOpenTask} wraps={!!acceptance || tabsInHeader}
+      onStop={canStop ? () => { void stop() } : null} onOpenTask={onOpenTask} wraps={!!acceptance}
       widen={widen ?? undefined} liveRunId={liveRunId} status={data?.thread.status ?? ''} acceptanceTaskId={acceptance?.id ?? null}
       place={detail ? <ThreadRunPlace issueId={issueId} runId={runId} status={view?.status ?? data?.thread.status ?? ''} harness={detail.harness} botName={detail.agentName} /> : null}
       acceptanceBadge={acceptance ? <AcceptanceStateBadge task={acceptance} /> : null}
       identity={data?.thread.ownedByCurrentUser ? <ThreadExecutionIdentity runId={liveRunId} /> : null}
       artifact={!readRejected ? <ThreadArtifactButton runId={runId} status={data?.thread.status ?? ''} taskId={acceptance?.id} onOpen={hasArtifacts ? () => setTab('artifacts') : undefined} /> : null}
-      tabs={tabsInHeader ? <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="shrink-0 max-sm:order-last max-sm:w-full">
-        {tabList(true)}
-      </Tabs> : null} />}
-    {/* With 改动, or three tabs or more, the tabs get their own row: the side panel has no room for them beside the title. */}
-    {!bare && tabCount > 1 && !tabsInHeader && <div className="flex shrink-0 items-center px-3 pt-2">
-      <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)}>
-        {tabList(false)}
-      </Tabs>
-    </div>}
+      tabs={segments} />}
     {tabbed && data && !readRejected && <ThreadArtifactsReader issueId={issueId} runId={runId} runIds={[runId, ...(data.thread.attempts ?? []).map(attempt => attempt.runId)]}
       conversation={isThreadRun(data.thread)} status={view?.status ?? data.thread.status} onRead={setArtifacts} />}
     {viewingChanges ? (changes.state === 'ready'

@@ -50,7 +50,7 @@
   <text x="110" y="385" text-anchor="middle" font-size="14" fill="#ffffff">新 issue</text>
   <rect x="20" y="200" width="180" height="60" fill="#ffffff" stroke="#111111" stroke-width="2.5"/>
   <text x="110" y="216" text-anchor="middle" font-size="15" fill="#111111">新请求</text>
-  <text x="110" y="235" text-anchor="middle" font-size="15" fill="#111111">对话、Telegram、</text>
+  <text x="110" y="235" text-anchor="middle" font-size="15" fill="#111111">线程、Telegram、</text>
   <text x="110" y="254" text-anchor="middle" font-size="15" fill="#111111">Slack、MCP</text>
   <rect x="250" y="206" width="180" height="48" fill="#ffffff" stroke="#111111" stroke-width="2.5"/>
   <text x="340" y="235" text-anchor="middle" font-size="15" fill="#111111">Coordinator 分诊</text>

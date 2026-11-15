@@ -42,7 +42,7 @@ test('runtime events read as lines in the person\'s language, with the thread as
     }
   } finally { await pool.end() }
   await page.reload()
-  const chat = page.getByRole('region', { name: '与 Coordinator 的对话', exact: true })
+  const chat = page.getByRole('region', { name: 'Coordinator 线程', exact: true })
   // A question is a live state above the composer, not a stored event row (decision 2026-11-10); the thread stays an
   // inline link inside one sentence. The sentence lives in the composer column, outside the transcript region the
   // `chat` locator names, so it is read from the surface that holds both.
@@ -79,7 +79,7 @@ test('a failed reply says 回复失败 with 重试, never the step error; later 
   // 重新发送 retries in place (Alex, 2026-11-02): one message stays, the attempt that failed and its line go,
   // now and after a reload; a failure of the new attempt shows only under it.
   await past.getByRole('button', { name: '重新发送', exact: true }).click()
-  const chat = page.getByRole('region', { name: '与 Coordinator 的对话', exact: true })
+  const chat = page.getByRole('region', { name: 'Coordinator 线程', exact: true })
   await expect(chat.getByText('帮我看看 CI 为什么红了', { exact: true })).toHaveCount(1)
   await expect(chat.locator('[data-message-failure]')).toHaveCount(0)
   await attachLightDark(page, testInfo, 'chat-failed-resent')
@@ -100,7 +100,7 @@ test('a cold start shows the shapes of the chat and the thread list, never 还�
   })
   try {
     await page.reload()
-    const chat = page.getByRole('region', { name: '与 Coordinator 的对话', exact: true })
+    const chat = page.getByRole('region', { name: 'Coordinator 线程', exact: true })
     await expect(chat.getByRole('status', { name: '加载中…', exact: true })).toBeVisible()
     await expect(page.getByText('还没有线程', { exact: true })).toHaveCount(0)
     await attachLightDark(page, testInfo, 'chat-cold-start')

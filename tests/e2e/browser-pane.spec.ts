@@ -57,7 +57,7 @@ test('The globe opens the browser in place of the right panel; notes on a page g
   await page.mouse.move(box.x + 240, box.y + 160, { steps: 4 })
   await page.mouse.up()
   await browser.getByRole('textbox', { name: '给 example.com/pricing 写备注', exact: true }).fill('价格不对')
-  await browser.getByRole('button', { name: '放进对话', exact: true }).click()
+  await browser.getByRole('button', { name: '放进线程', exact: true }).click()
   await expect(chips).toHaveCount(2)
   await expect(chips.nth(1)).toHaveText('2 · example.com/pricing · 价格不对')
   await testInfo.attach('region-note', { body: await page.screenshot(), contentType: 'image/png' })
@@ -86,7 +86,7 @@ test('The globe opens the browser in place of the right panel; notes on a page g
     await page.mouse.move(currentBox.x + 245, currentBox.y + 165, { steps: 4 })
     await page.mouse.up()
     await browser.getByRole('textbox', { name: '给 example.com/pricing 写备注', exact: true }).fill('发送期间的新备注')
-    await browser.getByRole('button', { name: '放进对话', exact: true }).click()
+    await browser.getByRole('button', { name: '放进线程', exact: true }).click()
   } finally { releaseResponse.resolve() }
   await expect(composer).toBeEnabled()
   await expect(chips).toHaveCount(1)

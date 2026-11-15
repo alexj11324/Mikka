@@ -60,7 +60,7 @@ async function availableCoordinator(page: Page) {
   })
 }
 
-const conversation = (page: Page) => page.getByRole('region', { name: '与 Coordinator 的对话', exact: true })
+const conversation = (page: Page) => page.getByRole('region', { name: 'Coordinator 线程', exact: true })
 
 async function openChat(page: Page, testInfo: TestInfo, shot: string) {
   await page.reload()

@@ -83,13 +83,16 @@ export function findThreadOwnership(messages) {
 
 /**
  * A thread is 线程 in Chinese (Alex, 2026-11-15; docs/design/glossary.md). 执行线程 and
- * 运行链 have no other meaning in the UI, so they never appear. 会话 (sign-in sessions)
- * and 对话 (Bot chats, group chats, the directory) are reviewed by hand.
+ * 运行链 have no other meaning in the UI, so they never appear. Nor does 对话: a thread, a
+ * Bot chat and the directory are all 线程 (Alex, 2026-11-15); only 对话框 (a dialog box)
+ * keeps the characters. 会话 (sign-in sessions) is reviewed by hand.
  */
 export function findBannedThreadWords(messages) {
   const problems = []
   for (const [key, value] of flattenMessages(messages['zh-CN'] ?? {})) {
-    if (typeof value === 'string' && /执行线程|运行链/.test(value)) problems.push(`zh-CN: "${key}" says 执行线程 or 运行链 ("${value}"); a thread is 线程`)
+    if (typeof value !== 'string') continue
+    if (/执行线程|运行链/.test(value)) problems.push(`zh-CN: "${key}" says 执行线程 or 运行链 ("${value}"); a thread is 线程`)
+    if (/对话(?!框)/.test(value)) problems.push(`zh-CN: "${key}" says 对话 ("${value}"); a thread or chat is 线程 (对话框 only for a dialog box)`)
   }
   return problems
 }

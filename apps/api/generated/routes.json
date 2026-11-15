@@ -1569,7 +1569,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "c8f4e82f9aa2fd8335f8bd4846348475e69315a84b993bfbdeed788c04c6a838"
+      "sourceHash": "5556126276e8b0da6494fa04c07fc3bbc71562abe07cb9907c93c87f48308744"
     },
     {
       "path": "/mikka/api/mobile/model",
@@ -1685,6 +1685,15 @@
         "POST"
       ],
       "sourceHash": "749b5c5eff3445f1d3f3ae682541907b4d62b8c109b508639687124cd6560ac7"
+    },
+    {
+      "path": "/mikka/api/mobile/threads/[id]/artifacts",
+      "template": "/api/mobile/threads/[id]/artifacts",
+      "source": "app/api/mobile/threads/[id]/artifacts/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "54a8e09854ac4e1678b699cebe6706753313ef7727670ec6035caf958f68f176"
     },
     {
       "path": "/mikka/api/mobile/threads/[id]/continue",

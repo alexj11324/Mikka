@@ -43,7 +43,7 @@ async function mockChat(page: Page) {
   return state
 }
 
-const conversation = (page: Page) => page.getByRole('region', { name: '与 Coordinator 的对话', exact: true })
+const conversation = (page: Page) => page.getByRole('region', { name: 'Coordinator 线程', exact: true })
 const composer = (page: Page) => page.getByRole('textbox', { name: '给 Coordinator 发消息', exact: true })
 
 async function openWorkingChat(page: Page) {

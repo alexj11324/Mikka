@@ -102,7 +102,7 @@ export type ChatFailure = (
 /** Reactions on a message, by emoji (lib/reactions.ts on the server). */
 export interface Reaction { emoji: string; count: number; mine: boolean }
 
-/** A group chat in 对话 (GET /api/conversations). */
+/** A group chat in 线程 (GET /api/conversations). */
 export interface GroupSummary {
   creationPurpose?: 'group' | 'conversation'
   id: string

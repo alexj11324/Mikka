@@ -8,7 +8,7 @@ import { cn } from "cn"
 import { SegmentIndicator } from "@/components/ui/segment-indicator"
 
 // The list's variant and id, so the selected trigger draws the one indicator that glides between triggers.
-const TabsListContext = React.createContext<{ variant: "default" | "line"; id: string } | null>(null)
+const TabsListContext = React.createContext<{ variant: "default" | "line" | "glass"; id: string } | null>(null)
 
 function Tabs({
   className,
@@ -36,6 +36,8 @@ const tabsListVariants = cva(
       variant: {
         default: "rounded-md bg-control p-0.5",
         line: "gap-1 bg-transparent",
+        // glass is a frosted pill floating over content (ChatGPT's 聊天 | 工作): translucent surface, blur, hairline, round items.
+        glass: "rounded-full border border-border/60 bg-background/70 p-1 shadow-sm backdrop-blur-xl backdrop-saturate-150 group-data-horizontal/tabs:h-9",
       },
     },
     defaultVariants: {
@@ -76,12 +78,14 @@ function TabsTrigger({ className, render, indicator = true, ...props }: TabsPrim
       // a raised pill on the default track and an underline on the line list. It covers the trigger's
       // transparent 1px border, so it lines up with the trigger's edge.
       render={render ?? (list ? (tabProps, state) => <button {...tabProps}>
-        {state.active && <SegmentIndicator layoutId={`tabs-${list.id}`} variant={list.variant === "line" ? "line" : "pill"} className={list.variant === "line" ? "-inset-x-px" : "-inset-px"} />}
-        {tabProps.children}
+        {state.active && <SegmentIndicator layoutId={`tabs-${list.id}`} variant={list.variant === "default" ? "pill" : list.variant} className={list.variant === "line" ? "-inset-x-px" : "-inset-px"} />}
+        {/* The glass label carries its own colour: a host frame may make buttons inherit their list's muted colour. */}
+        {list.variant === "glass" ? <span className={cn("transition-colors", state.active ? "text-(--foreground)" : "text-(--muted-foreground) group-hover/tab:text-(--foreground)")}>{tabProps.children}</span> : tabProps.children}
       </button> : undefined)}
       className={cn(
         "relative isolate inline-flex h-full flex-1 items-center justify-center gap-1.5 rounded-sm border border-transparent px-2.5 py-0.5 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 has-data-[icon=inline-end]:pr-1 has-data-[icon=inline-start]:pl-1 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-active:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         "group-data-[variant=line]/tabs-list:px-1.5",
+        "group-data-[variant=glass]/tabs-list:rounded-full group-data-[variant=glass]/tabs-list:px-4 group/tab",
         className
       )}
       {...props}

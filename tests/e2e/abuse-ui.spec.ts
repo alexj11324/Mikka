@@ -131,7 +131,7 @@ test('对话：免费对话用完被拒时，并列绑定订阅和验证银行�
   await seedCoordinatorError(page, 'PaidResourceError: verification_required', undefined, '帮我整理本周的 PR')
   await page.reload()
   const notice = page.locator('[data-hosted-refusal="verification_required"]')
-  await expect(notice).toContainText('免费对话已用完')
+  await expect(notice).toContainText('免费线程已用完')
   await expect(notice.getByRole('button', { name: '绑定订阅', exact: true })).toBeVisible()
   await expect(notice.getByRole('link', { name: '验证银行卡', exact: true })).toBeVisible()
   await attachLightDark(page, testInfo, 'chat-trial-used')
