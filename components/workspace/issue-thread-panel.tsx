@@ -8,9 +8,9 @@ import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { PersonAvatar } from '@/components/person-avatar'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useMessages, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
-import { MessageSquareDiff } from 'lucide-react'
+import { ChevronDown, MessageSquareDiff } from 'lucide-react'
 import { getIssueThread, getThreadInstructions, stopRun, getThreadContinuationModels, type IssueThreadDetail } from '@/app/actions/agents'
 import { useThreadChanges } from '@/hooks/use-thread-run-reads'
 import { useActionError } from '@/lib/use-action-error'
@@ -23,7 +23,7 @@ import { ThreadReplyVersions } from './thread-reply-versions'
 import { ThreadSteps } from './thread-steps'
 import { ThreadExecutionIdentity } from './thread-execution-identity'
 import { ThreadRunPlace } from './thread-run-place'
-import { acceptedProducerOutcome, threadQuestionView } from '@/lib/issue-threads'
+import { acceptedProducerOutcome, isThreadRun, threadQuestionView } from '@/lib/issue-threads'
 import { threadComposerHarness } from '@/lib/run-model-fallback-view'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
 import { QuoteChip, QuoteLine } from '@/components/artifacts/artifact-quote'
@@ -43,7 +43,10 @@ import { BotModelPicker } from '@/components/coordinator/bot-model-picker'
 import { choiceFromMenu, threadModelKey, type ThreadModelChoice } from '@/lib/thread-model-choice'
 import { ThreadScreen } from '@ui-slot/thread'
 import type { ThreadEntry, ThreadEntryPart } from '@/components/slots/thread-contract'
+import { atTheirTime } from '@/lib/thread-child-entries'
 import { HarnessMark, harnessName, ModelLabel } from '@/components/labels/entity-labels'
+import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
+import { MikkaMark } from '@/components/brand/mikka-mark'
 import { navigate } from './workspace-navigation'
 import { ThreadHeader, ThreadStatusLine } from './thread-header'
 import { PersonReferences, ThreadReferencePicker } from './thread-references'
@@ -117,7 +120,7 @@ function ThreadInstructions({ issueId, runId, mine }: { issueId: string | null; 
  * the bot that dispatched it.
  */
 type ThreadTab = 'chat' | 'changes' | 'acceptance'
-type IssueThreadPanelProps = { /** The task it works on; null for a thread with no task. */ issueId: string | null; runId: string; /** ← and Esc: back to the list it was opened from. */ onBack?: () => void; /** ✕, only where it closes more than ← does (全部线程 under it). */ onClose?: () => void; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void; /** Beside a chat: the task it works on, as a header link. */ onOpenTask?: () => void; /** The name its thread-list row shows (glossary: its task, else what it was asked); defaults to what it was asked. */ name?: string; /** Inside the Artifact window (P2): 要求修改 waits in the composer as a chip; sending it starts the fix run on the same PR. */ changeRequest?: ThreadChangeRequest; /** A task's earlier attempts, drawn above this one's transcript in the same scroll (the task-conversation slot). */ before?: ReactNode; /** With `before`: scroll to this run's section, an earlier one or this panel's own, once the conversation has loaded. */ focusRunId?: string; /** Only the transcript, for an earlier attempt inside another panel's `before`: no header, scroll, composer or acceptance. */ transcriptOnly?: boolean; /** Its place in its task's one conversation: the status line names the attempt, and the dispatch is not a person's bubble. */ attempt?: { n: number; first: boolean; taskTitle?: string }; /** With a layer's thread screen: this run's rows as data, reported instead of drawn (an earlier attempt in a task's conversation). */ collect?: (runId: string, entries: ThreadEntry[]) => void; /** With a layer's thread screen: the earlier attempts' rows, above this run's own. */ beforeEntries?: ThreadEntry[]; /** Readable control-run evidence that follows the writable root, without acquiring its composer. */ afterEntries?: ThreadEntry[]; after?: ReactNode }
+type IssueThreadPanelProps = { /** The task it works on; null for a thread with no task. */ issueId: string | null; runId: string; /** ← and Esc: back to the list it was opened from. */ onBack?: () => void; /** ✕, only where it closes more than ← does (全部线程 under it). */ onClose?: () => void; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void; /** Beside a chat: the task it works on, as a header link. */ onOpenTask?: () => void; /** The name its thread-list row shows (glossary: its task, else what it was asked); defaults to what it was asked. */ name?: string; /** Inside the Artifact window (P2): 要求修改 waits in the composer as a chip; sending it starts the fix run on the same PR. */ changeRequest?: ThreadChangeRequest; /** A task's earlier attempts, drawn above this one's transcript in the same scroll (the task-conversation slot). */ before?: ReactNode; /** With `before`: scroll to this run's section, an earlier one or this panel's own, once the conversation has loaded. */ focusRunId?: string; /** Only the transcript, for an earlier attempt inside another panel's `before`: no header, scroll, composer or acceptance. */ transcriptOnly?: boolean; /** Its place in its task's one conversation: the status line names the attempt, and the dispatch is not a person's bubble. */ attempt?: { n: number; first: boolean; taskTitle?: string; /** The Factory stage this part of the conversation starts, when it differs from the part before (2026-11-04-2200, as Warp marks a stage). */ stage?: string }; /** With a layer's thread screen: this run's rows as data, reported instead of drawn (an earlier attempt in a task's conversation). */ collect?: (runId: string, entries: ThreadEntry[]) => void; /** With a layer's thread screen: the earlier attempts' rows, above this run's own. */ beforeEntries?: ThreadEntry[]; /** Readable control-run evidence that follows the writable root, without acquiring its composer. */ afterEntries?: ThreadEntry[]; /** Child conversations (an independent review or verify) as their own task cards, each placed at the time it started. */ childEntries?: ThreadEntry[]; /** A child thread: its sender's name opens the parent thread, as Capy's. */ openSender?: () => void; after?: ReactNode }
 
 export type ThreadChangeRequest = ReviewChangeTarget & { onCancel: () => void }
 
@@ -126,8 +129,9 @@ export function IssueThreadPanel(props: IssueThreadPanelProps) {
   return <ThreadPanel key={props.runId} {...props} />
 }
 
-function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab = 'chat', onOpenThread, onOpenTask, name: listedName, changeRequest, before, focusRunId, transcriptOnly = false, attempt, collect, beforeEntries, afterEntries, after }: IssueThreadPanelProps) {
+function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab = 'chat', onOpenThread, onOpenTask, name: listedName, changeRequest, before, focusRunId, transcriptOnly = false, attempt, collect, beforeEntries, afterEntries, childEntries, openSender, after }: IssueThreadPanelProps) {
   const t = useTranslations('IssueThreads')
+  const messages = useMessages()
   const runErrorText = useRunErrorText()
   const format = useFormatter()
   const { mutate: mutateCache, cache } = useSWRConfig()
@@ -189,6 +193,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const [replyQuote, setReplyQuote] = useViewState<string | null>(`thread:${runId}:quote`, null)
   const rootRef = useRef<HTMLElement>(null)
   const [sending, setSending] = useState(false)
+  // As Capy, a finished run's steps fold under its activity line; the line opens them.
+  const [stepsOpen, setStepsOpen] = useState(false)
   // false, or what to say: the refusal's reason when the server gave one (threadReplaced…), else 发送失败.
   const [sendFailed, setSendFailed] = useState<string | false>(false)
 
@@ -404,7 +410,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   </>
   // A layer's thread screen (slot `thread`) draws the conversation from these rows: each part as Mikka renders it, the
   // run's Agent as the author line, its steps as tool rows.
-  const author = detail?.harness ? { id: detail.harness, name: harnessName(detail.harness), mark: <HarnessMark harness={detail.harness} /> } : undefined
+  // As Capy, an Agent's reply is its words alone: the author stays for screen readers and the switch of Agent, unseen.
+  const author = detail?.harness ? { id: detail.harness, name: harnessName(detail.harness), mark: <HarnessMark harness={detail.harness} />, quiet: true } : undefined
   const at = (value: number | string | Date | undefined) => (value === undefined ? 0 : new Date(value).getTime()) || (data ? new Date(data.thread.createdAt).getTime() : Date.now())
   const entries: ThreadEntry[] = []
   if (data && (collect || (!bare && !transcriptOnly && detail))) {
@@ -419,12 +426,47 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       open = { id: `${runId}:${id}`, role: 'bot', at: at(extra?.at), parts: [...parts], ...(author ? { author } : {}), ...extra }
       entries.push(open)
     }
-    // A later attempt's status line says nothing unless it is stopping (the thread-header slot): no empty row for it.
-    if (!attempt || attempt.first || stopRequested) bot('status', [{ kind: 'text', text: '', node: <ThreadStatusLine pauseReason={view?.pauseReason} status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} startedAt={new Date(data.thread.createdAt).toISOString()} dispatchedBy={detail?.agentName || null}
-      issueId={issueId} runId={runId} harness={detail?.harness ?? null} {...(attempt ? { attempt: { ...attempt, harness: detail?.harness ?? null, prompt: data.thread.prompt.trim() || null } } : {})} /> }])
-    if (!attempt && data.thread.prompt.trim()) { open = null; entries.push({ id: `${runId}:prompt`, role: 'person', at: at(data.thread.createdAt), text: data.thread.prompt.trim() }) }
+    // Where the task's conversation reaches a new Factory stage, one quiet line names it, as Warp marks a stage; the
+    // steps of that stage follow as the run's own rows.
+    if (attempt?.stage) {
+      const stage = (messages.GroupTask.stage as Record<string, string>)[attempt.stage] ?? attempt.stage
+      entries.push({ id: `${runId}:stage`, role: 'bot', at: at(data.thread.createdAt), event: true, parts: [{ kind: 'text', text: stage, node:
+        <p role="separator" aria-label={stage} data-event-line="" data-factory-stage={attempt.stage} className="text-center text-xs text-muted-foreground">{stage}</p> }] })
+    }
+    // Who sent the run off: its Bot, or Mikka when no Bot did (a Factory review or verify; the read then falls back to the
+    // Agent's own name). What it was asked is that sender's first message, as a chat shows it, not a muted line.
+    const sender = detail?.agentName && detail.agentName !== harnessName(detail.harness) && detail.agentName !== detail.harness
+      ? { id: `bot:${detail.agentName}`, name: detail.agentName, mark: <BotAvatar {...(detail.bot ?? COORDINATOR_AVATAR)} size="message" still /> }
+      : { id: 'mikka', name: 'Mikka', mark: <MikkaMark />, ...(openSender ? { onOpen: openSender } : {}) }
+    const asked = data.thread.prompt.trim()
+    // Mikka's ask to a review or verify comes first too, before the run's own status line.
+    if ((attempt?.first || (!attempt && sender.id === 'mikka')) && asked) entries.push({ id: `${runId}:dispatch`, role: 'bot', at: at(data.thread.createdAt), author: sender,
+      parts: [{ kind: 'text', text: asked, node: <p className="whitespace-pre-wrap wrap-anywhere">{asked}</p> }] })
+    // As Capy, how the run went is one quiet centred line between rules where its work starts: 「工作了 2 分 3 秒」,
+    // 「正在工作 · 12 秒」, 「在等你回复」; it replaces the old 「完成 · 开始于 … · Agent」 status line (Alex, 2026-11-15).
+    {
+      const status = view?.status ?? data.thread.status
+      const started = new Date(data.thread.createdAt).getTime()
+      const ended = data.thread.finishedAt ? new Date(data.thread.finishedAt).getTime() : Date.now()
+      const seconds = Math.max(0, Math.round((ended - started) / 1000))
+      const duration = seconds < 60 ? t('activityLine.seconds', { s: seconds })
+        : seconds < 3600 ? (seconds % 60 ? t('activityLine.minutes', { m: Math.floor(seconds / 60), s: seconds % 60 }) : t('activityLine.minutesOnly', { m: seconds / 60 }))
+        : t('activityLine.hours', { h: Math.floor(seconds / 3600), m: Math.floor(seconds / 60) % 60 })
+      const line = stopRequested ? t('stopping') : question === 'waiting' ? t('activityLine.waiting')
+        : active ? t('activityLine.working', { duration })
+        : [t('activityLine.worked', { duration }), ...status === 'failed' ? [t('activityLine.failed')] : status === 'stopped' || status === 'cancelled' ? [t('activityLine.stopped')] : []].join(' · ')
+      const folds = !active && items.some(item => item.kind === 'steps')
+      entries.push({ id: `${runId}:activity`, role: 'bot', at: at(data.thread.createdAt), event: true, parts: [{ kind: 'text', text: line, node:
+        <div data-event-line="" data-activity-line="" className="flex justify-center text-xs text-muted-foreground">
+          {folds ? <Button type="button" variant="ghost" size="xs" aria-expanded={stepsOpen} onClick={() => setStepsOpen(value => !value)} className="text-muted-foreground">
+            {line}<ChevronDown data-icon="inline-end" aria-hidden className={cn('transition-transform', stepsOpen && 'rotate-180')} />
+          </Button> : <span role="status">{line}</span>}
+        </div> }] })
+    }
+    if (!attempt && asked && sender.id !== 'mikka') { open = null; entries.push({ id: `${runId}:prompt`, role: 'person', at: at(data.thread.createdAt), text: asked }) }
     if (!attempt && data.thread.hasInstructions) bot('instructions', [{ kind: 'text', text: '', node: <ThreadInstructions issueId={issueId} runId={runId} mine={data.thread.ownedByCurrentUser} /> }])
     for (const item of items) {
+      if (item.kind === 'steps' && !active && !stepsOpen) continue
       if (item.kind === 'person') { open = null; entries.push({ id: `${runId}:${item.id}`, role: 'person', at: at(item.at), text: item.text, actions: versionControl(item) }); continue }
       const part: ThreadEntryPart = item.kind === 'agent' ? { kind: 'text', text: item.text, node: <div {...{ [QUOTE_SOURCE_ATTR]: '' }}><AgentMarkdown text={item.text} isStreaming={active} /></div> }
         : item.kind === 'steps' ? { kind: 'tools', id: `${runId}:${item.id}`, tools: item.steps.map(step => ({ id: step.id, label: step.name, status: step.failed ? 'failed' as const : 'done' as const,
@@ -458,7 +500,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   }
   // Re-publish the admitted read itself. Identical message lengths or tool
   // counts do not prove the content, grant or attempt result is unchanged.
-  useEffect(() => { if (collect) collect(runId, entries) }, [collect, runId, data, active, canRetry, sending, view?.status, retryLabel, delivery.rows]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (collect) collect(runId, entries) }, [collect, runId, data, active, canRetry, sending, view?.status, retryLabel, delivery.rows, stepsOpen]) // eslint-disable-line react-hooks/exhaustive-deps
   if (collect) return null
   if (transcriptOnly) return <div data-attempt-section={runId} className="flex flex-col gap-3">{transcriptBody}</div>
   async function updateQueue(messageId: string, action: 'cancel' | 'sendNow') {
@@ -498,7 +540,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const referenceWorkspace = liveRuns.find(run => run.id === liveRunId)?.workspaceId
   const references = referenceWorkspace && data?.thread.ownedByCurrentUser ? <ThreadReferencePicker draft={draft}
     workspaceId={referenceWorkspace} input={inputRef} onChange={setDraft} /> : null
-  const conversation = !bare && detail ? <ThreadScreen botId={null} name={title} mark={author?.mark ?? null} entries={data ? [...beforeEntries ?? [], ...entries, ...afterEntries ?? []] : null}
+  const conversation = !bare && detail ? <ThreadScreen botId={null} name={title} mark={author?.mark ?? null} readOnly={Boolean(data?.thread.kind) && !isThreadRun(data!.thread)} entries={data ? atTheirTime([...beforeEntries ?? [], ...entries, ...afterEntries ?? []], childEntries) : null}
     working={working} onStop={working && canStop ? () => { void stop() } : undefined}
     composer={{ ref: inputRef, model: modelControl, label: replyBlocked ? t('checkEnded') : t('composer', { agent: harnessLabel(threadComposerHarness(detail.harness, liveRunId, modelFallback)) }), value: draft, onChange: setDraft, onSubmit: () => { void send() },
       attachmentScope: { kind: 'thread', id: liveRunId }, sending: sending || stopPending, editableWhileSending: true, submitDisabled: changeRequest ? false : replyBlocked || stopRequested || question === 'resuming',

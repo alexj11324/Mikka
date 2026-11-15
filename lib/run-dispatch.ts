@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { scheduleConversationTitle } from '@/lib/conversation-title-schedule'
+import { scheduleThreadTitle } from '@/lib/thread-title-schedule'
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { agentProfileReferenceSchema } from './factory/agent-profile-reference'
@@ -62,7 +62,7 @@ export async function insertRunOnce(database: Pick<typeof db, 'transaction'>, us
     if (active) throw new ActionFailureError('runAlreadyActive', { runId: active.id })
     const runId = crypto.randomUUID()
     // The conversation is named once this commits (decision 2026-11-13-1405); a run that continues one takes its title.
-    scheduleConversationTitle(tx, runId, userId, 'created')
+    scheduleThreadTitle(tx, runId, userId, 'created')
     await tx.insert(agentRuns).values({
       id: runId, userId, issueId: input.issueId, agentId: input.agentId, deviceId: brief.deviceId,
       deviceRepoId: input.deviceRepoId, status: 'queued', kind: 'implement', baseBranch: brief.baseBranch,

@@ -4,6 +4,7 @@
 - Source: Alex, relayed by the coordinator on 2026-11-06, after the research in
   [`docs/research/2026-11-06-agent-session-titles.md`](../../research/2026-11-06-agent-session-titles.md).
 - Rule: —
+- Superseded by: [2026-11-14-2330](2026-11-14-2330-capy-activity-and-thread-titles.md): Mikka names conversations, as Capy does, and no longer gives tasks a generated short title.
 - Superseded in part by: [2026-11-10-1341](2026-11-10-1341-sidebar-short-title-limits.md): compact Bot navigation and stored derived short titles have strict limits rather than an approximate model target; manual full titles stay unchanged.
 
 - Lists name a task, and the threads that work on it, by a short title, the way Claude Code and Codex name a session:

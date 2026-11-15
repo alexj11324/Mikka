@@ -10,7 +10,6 @@ import { runMarkKind, type BoardColumn, type BoardTask } from '@/components/bloc
 import { useRunIndicatorLabel } from '@/components/workspace/task-state-icon'
 import { runIndicatorOf } from '@/lib/task-state'
 import { blockLabel } from '@/components/workspace/block-label'
-import { displayTaskTitle } from '@/lib/short-title'
 import { formatDateOnly } from '@/lib/date-only'
 import type { TaskBlock } from '@/lib/task-blocked'
 import { useIssueBoardSaves } from './issue-board'
@@ -72,7 +71,7 @@ export function BoardScreenView({ issues, columns: visible, hidden, blocks, newe
       cards.push({
         id: task.id,
         column: hidden.includes(column) ? 'hidden' : column,
-        title: displayTaskTitle(task),
+        title: task.title,
         fullTitle: task.title,
         identifier: show('identifier') ? task.identifier ?? null : null,
         detail,

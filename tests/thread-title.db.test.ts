@@ -17,8 +17,8 @@ function guarded(url: string) {
   return u
 }
 
-// Decision 2026-11-13-1405: a conversation owns a bounded short title; a person's rename is never overwritten.
-test('a conversation\'s stored title: bounded by the schema, generated per trigger, shared by its chain, and a manual rename wins', { skip: !base, timeout: 120_000 }, async () => {
+// Decision 2026-11-13-1405: a thread owns a bounded short title; a person's rename is never overwritten.
+test('a thread\'s stored title: bounded by the schema, generated per trigger, shared by its chain, and a manual rename wins', { skip: !base, timeout: 120_000 }, async () => {
   const admin = guarded(base!)
   const name = `cvt_${randomUUID().replaceAll('-', '')}_e2e`
   const adminPool = new Pool({ connectionString: admin.toString(), max: 1 })
@@ -36,7 +36,7 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     const { handleGroup } = await import('../lib/group-conversations-store')
     const { conversationDirectory, conversationSidebar } = await import('../lib/conversation-directory')
     const { conversationOrganization } = await import('../lib/conversation-organization')
-    const { nameConversation, renameConversationTitle } = await import('../lib/conversation-title-server')
+    const { nameThread, renameThreadTitle } = await import('../lib/thread-title-server')
     type GroupRequest = import('../lib/group-conversations-store').GroupRequest
     const dir = new URL('../drizzle/', import.meta.url)
     for (const f of orderMigrations((await readdir(dir)).filter(f => f.endsWith('.sql')))) await pool.query(await readFile(new URL(f, dir), 'utf8'))
@@ -68,62 +68,76 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     await assert.rejects(pool.query(`UPDATE agent_runs SET title=$2,"titleSource"='generated' WHERE id=$1`, [first, 'one two three four five six seven']), /agent_runs_title_compact/)
     await assert.rejects(pool.query(`UPDATE agent_runs SET title='登录回调修复' WHERE id=$1`, [first]), /agent_runs_title_source/)
     await assert.rejects(pool.query(`UPDATE agent_runs SET title='登录回调修复',"titleSource"='model' WHERE id=$1`, [first]), /agent_runs_title_source/)
-    assert.deepEqual(await stored(first), { title: null, titleSource: null }, 'no backfill: an old conversation has no stored title')
+    assert.deepEqual(await stored(first), { title: null, titleSource: null }, 'no backfill: an old thread has no stored title')
 
     // Created: named from what it was asked, never from its task's title or the execution instructions.
-    assert.equal(await nameConversation(pool, first, 'owner', 'created', model('登录回调排查')), '登录回调排查')
+    assert.equal(await nameThread(pool, first, 'owner', 'created', model('登录回调排查')), '登录回调排查')
     assert.deepEqual(calls.at(-1), { title: '排查登录回调里丢失的 workspace 前缀', body: '补上回归测试' })
     assert.deepEqual(await stored(first), { title: '登录回调排查', titleSource: 'generated' })
-    assert.equal(await nameConversation(pool, first, 'owner', 'created', model('另一个名字')), null, 'created names it once')
-    // A model that gives nothing usable, or a conversation with no recorded request, keeps what it has.
+    assert.equal(await nameThread(pool, first, 'owner', 'created', model('另一个名字')), null, 'created names it once')
+    // A model that gives nothing usable, or a thread with no recorded request, keeps what it has.
     const silent = await run({ prompt: '' })
-    assert.equal(await nameConversation(pool, silent, 'owner', 'created', model('不该用到')), null)
+    assert.equal(await nameThread(pool, silent, 'owner', 'created', model('不该用到')), null)
     const unnamed = await run({ prompt: '整理设计备份' })
-    assert.equal(await nameConversation(pool, unnamed, 'owner', 'created', model(null)), null)
+    assert.equal(await nameThread(pool, unnamed, 'owner', 'created', model(null)), null)
     assert.deepEqual(await stored(unnamed), { title: null, titleSource: null })
     // Another person's run is never read or named.
-    assert.equal(await nameConversation(pool, first, 'other', 'regenerate', model('越权')), null)
+    assert.equal(await nameThread(pool, first, 'other', 'regenerate', model('越权')), null)
 
     // First run ended: named again from what it did, while the title is a generated one.
     await pool.query(`UPDATE agent_runs SET status='succeeded',"finishedAt"=now(),report=$2 WHERE id=$1`, [first, JSON.stringify({ summary: 'Restored the workspace prefix in the callback' })])
     const before = calls.length
-    assert.equal(await nameConversation(pool, first, 'owner', 'first_run_ended', model('回调前缀修复')), '回调前缀修复')
+    assert.equal(await nameThread(pool, first, 'owner', 'first_run_ended', model('回调前缀修复')), '回调前缀修复')
     assert.match(calls.at(-1)!.body, /Restored the workspace prefix/)
     assert.equal(calls.length, before + 1)
 
-    // A run that continues the conversation takes its title without asking the model, and its end does not rename it.
+    // A run that continues the thread takes its title without asking the model, and its end does not rename it.
     const second = await run({ continues: first })
-    assert.equal(await nameConversation(pool, second, 'owner', 'created', model('不该用到')), '回调前缀修复')
+    assert.equal(await nameThread(pool, second, 'owner', 'created', model('不该用到')), '回调前缀修复')
     assert.deepEqual(await stored(second), { title: '回调前缀修复', titleSource: 'generated' })
     assert.equal(calls.length, before + 1, 'no model call for a continuation')
-    assert.equal(await nameConversation(pool, second, 'owner', 'first_run_ended', model('不该用到')), null, 'only the first run\'s end')
+    assert.equal(await nameThread(pool, second, 'owner', 'first_run_ended', model('不该用到')), null, 'only the first run\'s end')
 
-    // PR opened: the whole conversation is named again, with the PR's title as evidence.
+    // PR opened: the whole thread is named again, with the PR's title as evidence.
     await pool.query(`INSERT INTO run_publications ("runId","userId","issueId","remoteUrl","remoteKey",status,"pullRequest") VALUES ($1,'owner',$2,'https://github.com/o/r','o/r','published',$3)`,
       [second, issueId, JSON.stringify({ url: 'https://github.com/o/r/pull/7', state: 'open', title: 'Keep the workspace prefix after sign-in' })])
-    assert.equal(await nameConversation(pool, second, 'owner', 'pull_opened', model('登录前缀保留')), '登录前缀保留')
+    assert.equal(await nameThread(pool, second, 'owner', 'pull_opened', model('登录前缀保留')), '登录前缀保留')
     assert.match(calls.at(-1)!.body, /Pull request: Keep the workspace prefix after sign-in/)
     assert.deepEqual([await stored(first), await stored(second)], [{ title: '登录前缀保留', titleSource: 'generated' }, { title: '登录前缀保留', titleSource: 'generated' }], 'every run of the chain carries it')
 
     // A manual rename is the title: bounded, on every run, and no trigger overwrites it.
-    assert.equal(await renameConversationTitle(pool, first, 'other', '越权改名', workspaceId), null)
-    assert.equal(await renameConversationTitle(pool, first, 'owner', '   ', workspaceId), null)
-    assert.equal(await renameConversationTitle(pool, first, 'owner', '  我自己起的名字，特别特别特别长  ', workspaceId), '我自己起的名字，特别特别')
+    assert.equal(await renameThreadTitle(pool, first, 'other', '越权改名', workspaceId), null)
+    assert.equal(await renameThreadTitle(pool, first, 'owner', '   ', workspaceId), null)
+    assert.equal(await renameThreadTitle(pool, first, 'owner', '  我自己起的名字，特别特别特别长  ', workspaceId), '我自己起的名字，特别特别')
     assert.deepEqual([await stored(first), await stored(second)], Array(2).fill({ title: '我自己起的名字，特别特别', titleSource: 'manual' }))
     const quiet = calls.length
-    for (const trigger of ['created', 'first_run_ended', 'pull_opened'] as const) assert.equal(await nameConversation(pool, second, 'owner', trigger, model('模型的名字')), null, trigger)
+    for (const trigger of ['created', 'first_run_ended', 'pull_opened'] as const) assert.equal(await nameThread(pool, second, 'owner', trigger, model('模型的名字')), null, trigger)
     assert.equal(calls.length, quiet, 'a manual title does not even ask the model')
-    // A third run of the renamed conversation takes the person's title.
+    // A third run of the renamed thread takes the person's title.
     const third = await run({ continues: second })
-    assert.equal(await nameConversation(pool, third, 'owner', 'created', model('不该用到')), '我自己起的名字，特别特别')
+    assert.equal(await nameThread(pool, third, 'owner', 'created', model('不该用到')), '我自己起的名字，特别特别')
     assert.deepEqual(await stored(third), { title: '我自己起的名字，特别特别', titleSource: 'manual' })
     // A rename that lands while the model is answering is kept: the write checks again.
     const racing = await run({ prompt: '导出账单 CSV' })
-    assert.equal(await nameConversation(pool, racing, 'owner', 'created', async () => { await renameConversationTitle(pool, racing, 'owner', '账单导出', workspaceId); return '模型晚到的名字' }), null)
+    assert.equal(await nameThread(pool, racing, 'owner', 'created', async () => { await renameThreadTitle(pool, racing, 'owner', '账单导出', workspaceId); return '模型晚到的名字' }), null)
     assert.deepEqual(await stored(racing), { title: '账单导出', titleSource: 'manual' })
 
+    // Thread title settings (Capy's): the workspace's then the person's instructions reach the model; a trigger the
+    // settings leave out names nothing; the person's choice wins over the workspace's; creation always names.
+    await pool.query(`INSERT INTO thread_title_settings ("workspaceId","userId",instructions,triggers) VALUES ($1,'','Use English','first_run_ended'),($1,'owner','Keep it short','pull_opened')`, [workspaceId])
+    await assert.rejects(pool.query(`INSERT INTO thread_title_settings ("workspaceId","userId",triggers) VALUES ($1,'other','sometimes')`, [workspaceId]), /thread_title_settings_triggers/)
+    let naming: readonly string[] | undefined
+    const capture = (answer: string) => async (_owner: string, _text: { title: string; body: string }, _scope: string, rules?: readonly string[]) => { naming = rules; return answer }
+    const settled = await run({ prompt: '导出订单 CSV', finished: true })
+    assert.equal(await nameThread(pool, settled, 'owner', 'created', capture('订单导出')), '订单导出')
+    assert.deepEqual(naming, ['Use English', 'Keep it short'])
+    assert.equal(await nameThread(pool, settled, 'owner', 'first_run_ended', capture('不该用到')), null, 'the person chose pull_opened only')
+    await pool.query(`UPDATE thread_title_settings SET triggers=NULL WHERE "userId"='owner'`)
+    assert.equal(await nameThread(pool, settled, 'owner', 'first_run_ended', capture('订单 CSV 导出')), '订单 CSV 导出', 'back to the workspace default')
+    await pool.query(`DELETE FROM thread_title_settings WHERE "workspaceId"=$1`, [workspaceId])
+
     const foreignWorkspace = randomUUID()
-    assert.equal(await renameConversationTitle(pool, first, 'owner', 'different workspace', foreignWorkspace), null)
+    assert.equal(await renameThreadTitle(pool, first, 'owner', 'different workspace', foreignWorkspace), null)
     const organize = (id: string, field: 'archived' | 'pinned', value: boolean) =>
       conversationOrganization(pool, 'owner', workspaceId, id, { field, value })
     assert.deepEqual(await organize(second, 'pinned', true), { archived: false, pinned: true })
@@ -327,25 +341,25 @@ test('a conversation\'s stored title: bounded by the schema, generated per trigg
     }
 
     // Regenerate is the person asking for a generated title again.
-    assert.equal(await nameConversation(pool, first, 'owner', 'regenerate', model('登录回调与前缀')), '登录回调与前缀')
+    assert.equal(await nameThread(pool, first, 'owner', 'regenerate', model('登录回调与前缀')), '登录回调与前缀')
     assert.deepEqual([await stored(first), await stored(second), await stored(third)], Array(3).fill({ title: '登录回调与前缀', titleSource: 'generated' }))
-    assert.equal(await renameConversationTitle(pool, first, 'owner', 'Initial manual', workspaceId), 'Initial manual')
-    assert.equal(await nameConversation(pool, first, 'owner', 'regenerate', async () => {
-      assert.equal(await renameConversationTitle(pool, first, 'owner', 'Later manual', workspaceId), 'Later manual')
+    assert.equal(await renameThreadTitle(pool, first, 'owner', 'Initial manual', workspaceId), 'Initial manual')
+    assert.equal(await nameThread(pool, first, 'owner', 'regenerate', async () => {
+      assert.equal(await renameThreadTitle(pool, first, 'owner', 'Later manual', workspaceId), 'Later manual')
       return 'Stale generated title'
     }), null)
     assert.deepEqual(await stored(first), { title: 'Later manual', titleSource: 'manual' })
-    assert.equal(await renameConversationTitle(pool, first, 'owner', 'Later manual', workspaceId), 'Later manual')
+    assert.equal(await renameThreadTitle(pool, first, 'owner', 'Later manual', workspaceId), 'Later manual')
     const revoked = await run({ prompt: 'A pending workspace title' })
     const suspend = () => pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"='owner'`, [workspaceId])
-    assert.equal(await nameConversation(pool, revoked, 'owner', 'created', async () => {
+    assert.equal(await nameThread(pool, revoked, 'owner', 'created', async () => {
       await suspend()
       return 'Late workspace reply'
     }), null, 'membership revoked while the model was answering')
-    assert.equal(await nameConversation(pool, revoked, 'owner', 'created', async () => {
+    assert.equal(await nameThread(pool, revoked, 'owner', 'created', async () => {
       assert.fail('revoked workspace must not invoke the model')
     }), null)
-    assert.equal(await renameConversationTitle(pool, revoked, 'owner', 'No access', workspaceId), null)
+    assert.equal(await renameThreadTitle(pool, revoked, 'owner', 'No access', workspaceId), null)
     assert.deepEqual(await stored(revoked), { title: null, titleSource: null })
     assert.equal(await conversationOrganization(pool, 'owner', workspaceId, first), null)
     assert.equal(await organize(first, 'pinned', true), null, 'a suspended owner cannot organize a conversation')

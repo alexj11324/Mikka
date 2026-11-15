@@ -64,7 +64,7 @@ export type ThreadEntry =
     streaming?: boolean
     stopped?: boolean
     /** Who wrote it, where the conversation has more than one Agent (a task's attempts): shown where it changes. */
-    author?: { id: string; name: string; mark: ReactNode }
+    author?: { id: string; name: string; mark: ReactNode; /** An Agent's reply, as Capy's: its words with no author line (Alex, 2026-11-15). */ quiet?: boolean; /** Its name opens where the message came from: a child thread's first message, its parent thread. */ onOpen?: () => void }
     /** A line about the chat (an event, a quota switch), not the Bot's words: it has no author line, and the reply after it shows its own. */
     event?: true
     /** Copy, the pages it cites, reactions. */
@@ -105,6 +105,8 @@ export type ThreadScreenProps = {
   onMarkRead?: () => void
   /** The composer, as the chat-composer slot gets it: `useChatComposer` (hooks/use-chat-composer.ts) does what it does. */
   composer: Omit<ChatComposerProps, 'quote'>
+  /** A thread nobody replies to (a child thread: a review or verify) shows no composer (Alex, 2026-11-15). */
+  readOnly?: boolean
   /** Chips that go out with the next message (a quote, a browser note), each with Remove. */
   pending: { id: string; name: string; meta?: string; onRemove: () => void }[]
   /** Notices that wait above the composer (quota, sign in again, actions to approve). */

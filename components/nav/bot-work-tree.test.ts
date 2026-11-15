@@ -8,7 +8,7 @@ import { botWorkTree } from './bot-work-tree'
 type Issue = Parameters<typeof botWorkTree>[3][number]
 type Thread = Parameters<typeof botWorkTree>[2][number]
 const issue = (id: string, status = 'doing'): Issue => ({
-  id, status, identifier: `MIK-${id}`, issuedIdentifier: `MIK-${id}`, title: `Task ${id}`, shortTitle: null,
+  id, status, identifier: `MIK-${id}`, issuedIdentifier: `MIK-${id}`, title: `Task ${id}`,
   ownerId: 'owner', ownerName: 'Owner', ownerImage: null, teamId: null,
   workspaceId: 'workspace', projectId: null,
   scope: 'personal', priority: 'normal', revision: 1,
@@ -73,12 +73,12 @@ test('a closed task stays closed while its run is active', () => {
   assert.equal(row.state, 'done')
 })
 
-test('sidebar task names use the existing short title and bound pending/manual titles; standalone runs are bounded too', () => {
-  const generated = { ...issue('a'), title: '完整的任务需求原文不应该出现在紧凑的导航里面', shortTitle: '登录回调修复' }
-  const pending = { ...issue('b'), title: '这是一个超过十二字限制的任务标题需要收短', shortTitle: null }
+test('sidebar task names bound the task title; standalone runs are bounded too', () => {
+  const generated = { ...issue('a'), title: '完整的任务需求原文不应该出现在紧凑的导航里面' }
+  const pending = { ...issue('b'), title: '这是一个超过十二字限制的任务标题需要收短' }
   const standalone = { ...run('c', null), prompt: 'one two three four five six seven eight' }
   const rows = botWorkTree('workspace', ['bot'], [run('a', 'a'), run('b', 'b'), standalone], [generated, pending], { a: present(generated, ['bot']), b: present(pending, ['bot']) }).get('bot')!
-  assert.equal(rows[0].name, 'MIK-a 登录回调修复')
+  assert.equal(rows[0].name, 'MIK-a 完整的任务需求原文不应该')
   assert.equal(rows[0].fullName, 'MIK-a 完整的任务需求原文不应该出现在紧凑的导航里面')
   assert.equal(rows[1].name, 'MIK-b 这是一个超过十二字限制的')
   assert.equal(rows[2].name, 'one two three four five six')

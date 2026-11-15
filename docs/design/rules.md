@@ -90,7 +90,7 @@ source wins in a conflict is in [`README.md`](README.md).
   use the faint accent fill (`--object-chip`), rounded corners and accent
   text at the surrounding text's size and line height. A thread mentioned in
   chat is the conversation's own bounded short title in the link colour
-  (`conversationTitle`, [2026-11-13-1405](decisions/2026-11-13-1405-one-task-status.md)), with no fill, accent or state badge, and
+  (`threadTitle`, [2026-11-13-1405](decisions/2026-11-13-1405-one-task-status.md)), with no fill, accent or state badge, and
   one small Agent mark after it only while the conversation is working,
   waiting or failed; it never repeats the task's code or borrows the task's
   title. A task's
@@ -214,9 +214,13 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   the bot on its own line under the assignee, joined by an elbow line, and
   the activity records 「<人> 把任务交给 <Bot>，自己负责」 (Linear's delegate).
 - **R-61** The page has a header line under the breadcrumb and one vertical
-  line before the properties column or an open thread. Nothing else gets a
-  line; sections are separated by space. The content column is centred in
-  the main area, up to 680px wide.
+  line before an open thread. Nothing else gets a line; sections are
+  separated by space. The content column is centred in the main area, up to
+  680px wide. As Capy's issue page
+  ([2026-11-14-2330](decisions/2026-11-14-2330-capy-activity-and-thread-titles.md)),
+  under the title come the code and how long ago, then the properties in one
+  column (an icon and label, then the value, ▾ where it opens choices) in
+  Capy's order; a property with nothing set is left out and the ⋯ menu sets it.
 - **R-79** No breadcrumb, title bar or page header shows the workspace's
   name. There is one workspace on screen, the name cannot be clicked there,
   and it is shown and switched only from the avatar menu at the bottom left.
@@ -224,10 +228,15 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   A group heading that names the
   workspace its settings apply to (设置's workspace group) is not a crumb and
   stays.
-- **R-62** A task’s 工作 section follows its description. It lists authorized
-  conversations and PRs with their available Agent, observed model, status
-  and result. Each run has one expandable progress row. 活动 contains task
-  changes, links and comments with the author or system actor visible.
+- **R-62** A task page says where the work is and whether you are needed;
+  the work itself is elsewhere (as Capy,
+  [2026-11-14-2330](decisions/2026-11-14-2330-capy-activity-and-thread-titles.md)).
+  Its properties list each authorized conversation and PR on its own line: a
+  conversation with its Factory stage (实现中, 交给你…) or run result, a PR with
+  its title and live state, and + to link one. Stage changes and the Bot's one
+  comment per stage are in 活动. A Factory run's steps are in its conversation,
+  and its acceptance report is an Artifact; there is no 工作 section.
+  活动 contains task changes, links and comments with the author or system actor visible.
   The conversation opens directly at its authorized root. Its composer follows
   the current run (R-10, R-81). The task properties
   show its dispatching bot, Agent/model and execution location. A reader who
@@ -241,10 +250,15 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   not permission to use the owner's private credential, device, Secret or memory.
   Administrators without a content grant see only the separate management and
   usage projection, never a private transcript or title.
-- **R-63** Activity: events (created, handed to, dispatched a thread,
-  status changes) are plain one-line rows; one person's events in the same
-  minute join into one row (「创建了任务，交给 Mikka Backend，自己负责」). A comment is a card with a 1px
-  border; its replies sit inside the same card above a 「留下回复…」 row. The
+- **R-63** Activity reads as Capy's issue log
+  ([2026-11-14-2330](decisions/2026-11-14-2330-capy-activity-and-thread-titles.md)):
+  each event is its own quiet line (its icon, one sentence, · how long ago),
+  never merged with others. The sentence starts with who: a person's name, the
+  conversation an Agent worked in (a chip with that conversation's title), or
+  Mikka. Task codes, conversations and PRs in it are chips that open them, with
+  Capy's hover card. 全部 / 评论 / Agent 和 Bot filter it; the latest 50 show,
+  with 「显示更早的 n 条」 above. A comment is a bordered card with its replies
+  inside, Copy and Reply on hover; a reply box opens only from Reply. The
   comment box at the bottom is the same bordered card.
 - **R-64** In a comment you can @ a person or a bot. @ a bot asks it to step
   in; it may dispatch a thread. You never @ a thread: open the thread and

@@ -16,7 +16,7 @@ import { workspaceDb } from '@/lib/workspace-db'
 // Its own module, beside lib/issue-access.ts: unit tests stub that module with only the names they use.
 const { content: _content, ...issueColumnsWithoutBody } = getTableColumns(issues)
 const citationColumns = { id: issues.id, userId: issues.userId, scope: issues.scope, issuedIdentifier: issues.issuedIdentifier, title: issues.title,
-  shortTitle: issues.shortTitle, shortTitleFrom: issues.shortTitleFrom, status: issues.status, content: issueAttrsContent, latestRun: issueLatestRun,
+  status: issues.status, content: issueAttrsContent, latestRun: issueLatestRun,
   codingReview: taskReviewSourceHint }
 type Issue = typeof issues.$inferSelect
 type CitationIssue = Pick<Issue, Exclude<keyof typeof citationColumns, 'latestRun' | 'codingReview'>> & { issuedIdentifier: string | null; latestRun: IssueLatestRun; codingReview: boolean }
