@@ -64,7 +64,7 @@ export type ThreadEntry =
     streaming?: boolean
     stopped?: boolean
     /** Who wrote it, where the conversation has more than one Agent (a task's attempts): shown where it changes. */
-    author?: { id: string; name: string; mark: ReactNode; /** An Agent's reply, as Capy's: its words with no author line (Alex, 2026-11-15). */ quiet?: boolean }
+    author?: { id: string; name: string; mark: ReactNode; /** An Agent's reply, as Capy's: its words with no author line (Alex, 2026-11-15). */ quiet?: boolean; /** Its name opens where the message came from: a child thread's first message, its parent thread. */ onOpen?: () => void }
     /** A line about the chat (an event, a quota switch), not the Bot's words: it has no author line, and the reply after it shows its own. */
     event?: true
     /** Copy, the pages it cites, reactions. */
