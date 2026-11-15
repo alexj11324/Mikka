@@ -1,5 +1,6 @@
 'use client'
 
+import { GATEWAY_FEATURES } from '@/lib/model-gateway/features'
 import { useState, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import { KeyRound, TriangleAlert } from 'lucide-react'
@@ -41,7 +42,7 @@ export function useApiKeyList(workspaceId: string) {
   const t = useTranslations('Settings.apiKeys')
   const shareT = useTranslations('Settings.subscriptionShare')
   const commonT = useTranslations('Common')
-  const { data, loadError, pending, failed, share: saveShare, refetch, remove: removeKey, add } = useApiKeys(workspaceId)
+  const { data, loadError, pending, failed, share: saveShare, setFeature, refetch, remove: removeKey, add } = useApiKeys(workspaceId)
   const [adding, setAdding] = useState(false)
   const [sharing, setSharing] = useState<Key | null>(null)
   const [removing, setRemoving] = useState<Key | null>(null)
@@ -56,9 +57,17 @@ export function useApiKeyList(workspaceId: string) {
     </span>
     return <span role="status" className="flex flex-wrap items-center gap-2 text-xs">{key.models.length ? t('modelCount', { count: key.models.length }) : t('noModels')}{refetchButton}</span>
   }
+  // A custom endpoint can turn off request features it rejects, as Capy's connections do (decision 2026-11-15-2000).
+  const featuresLine = (key: Key) => key.provider !== 'custom' ? null : <span className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+    {GATEWAY_FEATURES.map(feature => <Label key={feature} className="flex items-center gap-1.5 font-normal text-muted-foreground">
+      <Switch size="sm" aria-label={t(`features.${feature}`)} checked={key.features?.[feature] !== false} disabled={pending}
+        onCheckedChange={on => void setFeature(key, feature, on)} />
+      {t(`features.${feature}`)}
+    </Label>)}
+  </span>
   // An OpenAI-protocol provider without the Responses API serves bot chats only (Codex runs on it).
   const rows: ReactNode[] = (data?.keys ?? []).map(key => <div key={key.id} id={`api-key-${key.id}`} className="scroll-mt-20"><SettingRow icon={<ProviderIcon provider={key.provider} />} title={title(key)}
-    description={<><span className="block">{`${key.baseUrl ? new URL(key.baseUrl).host : t('apiKey')} · ••••${key.last4} · ${agentsLine(key)}`}</span>{modelsLine(key)}</>}>
+    description={<><span className="block">{`${key.baseUrl ? new URL(key.baseUrl).host : t('apiKey')} · ••••${key.last4} · ${agentsLine(key)}`}</span>{modelsLine(key)}{featuresLine(key)}</>}>
     <span className="flex items-center gap-4">
       {data?.canShare && <Label className="flex items-center gap-2 font-normal text-muted-foreground">
         {shareT('others')}

@@ -99,4 +99,6 @@ export interface ApiKeyView {
   modelsError: 'invalid' | 'unavailable' | null
   /** Whether the OpenAI endpoint serves the Responses API, which Codex runs on. Probed for custom providers only; presets serve it. */
   responsesApi: boolean
+  /** Request features this provider rejects, turned off (decision 2026-11-15-2000); absent means all on. */
+  features?: import('./model-gateway/features').GatewayFeatures
 }

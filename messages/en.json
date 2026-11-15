@@ -3142,7 +3142,13 @@
       "protocolAgents": "{protocols} protocol · runs on {agents}",
       "customAgents": "Pick a protocol to see which Agent runs it",
       "noResponsesApi": "{protocol} protocol · No Responses API · Codex can't use it",
-      "afterQuotaSection": "When quota runs out"
+      "afterQuotaSection": "When quota runs out",
+      "features": {
+        "strict": "Strict tools",
+        "customTools": "Custom tools",
+        "fallbacks": "Fallbacks",
+        "thinking": "Thinking"
+      }
     },
     "modelOrder": {
       "fallbackNeedsKey": "Add an API key and connect a subscription to use this.",

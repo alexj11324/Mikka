@@ -3142,7 +3142,13 @@
       "protocolAgents": "{protocols} 协议 · 可用 {agents}",
       "customAgents": "选了协议才知道能用哪个 Agent",
       "noResponsesApi": "{protocol} 协议 · 不支持 Responses API · Codex 用不了",
-      "afterQuotaSection": "额度用完时"
+      "afterQuotaSection": "额度用完时",
+      "features": {
+        "strict": "严格工具格式",
+        "customTools": "自定义工具",
+        "fallbacks": "备用路由",
+        "thinking": "思考"
+      }
     },
     "modelOrder": {
       "fallbackNeedsKey": "需先添加 API 密钥并连接订阅。",

@@ -6,7 +6,7 @@ import { pool } from '@/lib/db'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { requireUser } from '@/lib/issue-access'
 import type { ApiKeyView } from '@/lib/model-api-key-providers'
-import { addApiKey, listApiKeys, refreshApiKeyModels, removeApiKey, setApiKeyAfterQuota, setApiKeyShare, usableApiKeys, type ApiKeysPage, type UsableApiKey } from '@/lib/model-api-keys'
+import { addApiKey, listApiKeys, refreshApiKeyModels, removeApiKey, setApiKeyAfterQuota, setApiKeyFeatures, setApiKeyShare, usableApiKeys, type ApiKeysPage, type UsableApiKey } from '@/lib/model-api-keys'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { settingsWorkspaceAction, type SettingsActionResult } from '@/lib/workspace-admin/settings-action'
@@ -63,6 +63,15 @@ export async function updateApiKeyAfterQuota(on: boolean, workspaceId?: string):
   return settingsWorkspaceAction(async () => {
     const { userId, workspace } = await actor(workspaceId)
     await setApiKeyAfterQuota(pool, userId, on)
+    return listApiKeys(pool, userId, workspace)
+  })
+}
+
+/** Turns off request features a custom provider rejects (decision 2026-11-15-2000). Owner only. */
+export async function updateApiKeyFeatures(id: string, features: import('@/lib/model-gateway/features').GatewayFeatures, workspaceId?: string): Promise<SettingsActionResult<ApiKeysPage>> {
+  return settingsWorkspaceAction(async () => {
+    const { userId, workspace } = await actor(workspaceId)
+    await setApiKeyFeatures(pool, userId, id, features)
     return listApiKeys(pool, userId, workspace)
   })
 }

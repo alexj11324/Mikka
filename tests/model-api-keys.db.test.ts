@@ -56,6 +56,14 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     const enabledMigration = await readFile(new URL('../drizzle/20261108120101_enabled_models.sql', import.meta.url), 'utf8')
     await pool.query(enabledMigration)
     await pool.query(enabledMigration)
+    // Decision 2026-11-15-1900: a chat's Mikka 额度 model.
+    const creditsMigration = await readFile(new URL('../drizzle/20261115175552_bot_model_choices_credits_model.sql', import.meta.url), 'utf8')
+    await pool.query(creditsMigration)
+    await pool.query(creditsMigration)
+    // Decision 2026-11-15-2000: a custom endpoint's turned-off request features; replays cleanly.
+    const gatewayMigration = await readFile(new URL('../drizzle/20261115204738_model_gateway_tokens.sql', import.meta.url), 'utf8')
+    await pool.query(gatewayMigration)
+    await pool.query(gatewayMigration)
     assert.equal(await store.apiKeyAfterQuota(pool, 'alice'), true, 'on by default')
 
     const personal = { id: randomUUID(), kind: 'personal' as const }
@@ -99,6 +107,13 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     assert.deepEqual(calls.slice(-2).map(call => call.url), ['https://gateway.example.com/v1/models', 'https://gateway.example.com/v1/responses'])
     assert.equal(gateway.responsesApi, true)
     assert.deepEqual([gateway.baseUrl, gateway.protocol, gateway.models], ['https://gateway.example.com/v1', 'openai', ['qwen-max']])
+    // Decision 2026-11-15-2000: the owner turns off request features the provider rejects; only the off ones are kept.
+    assert.equal(gateway.features, undefined, 'every feature on by default')
+    await store.setApiKeyFeatures(pool, 'bob', gateway.id, { thinking: false, strict: true })
+    assert.deepEqual((await store.openGatewayApiKey(pool, gateway.id, env)).features, { thinking: false })
+    await assert.rejects(store.setApiKeyFeatures(pool, 'alice', gateway.id, { thinking: false }), { code: 'apiKeyNotFound' }, 'only the owner')
+    await store.setApiKeyFeatures(pool, 'bob', gateway.id, {})
+    assert.deepEqual((await store.openGatewayApiKey(pool, gateway.id, env)).features, {})
     const local = await store.addApiKey(pool, 'bob', { provider: 'custom', name: 'Local', baseUrl: 'http://127.0.0.1:8787', protocol: 'anthropic', apiKey: localKey }, { env: { ...env, MIKKA_MODEL_KEY_LOOPBACK: '1' }, fetch: fetchWith(() => models(['glm-5'])) })
     assert.equal(calls.at(-1)!.url, 'http://127.0.0.1:8787/v1/models')
 

@@ -7,6 +7,7 @@ import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
+import { gatewayFeaturesSchema, parseGatewayFeatures, type GatewayFeatures } from './model-gateway/features'
 import { isPrivateAddress } from '@/lib/link-preview-parse'
 import { isLoopbackHost } from '@/lib/loopback'
 import { memberSubscriptionsAllowed } from '@/lib/personal-policy'
@@ -111,9 +112,10 @@ export async function probeResponsesApi(baseUrl: string, apiKey: string, fetchIm
   } catch { return null }
 }
 
-interface Row { id: string; ownerId: string; provider: ApiKeyProvider; name: string | null; baseUrl: string | null; protocol: ApiKeyProtocol; last4: string; models: string[]; modelsError: ApiKeyView['modelsError']; responsesApi: boolean; modelSettings?: ModelSettings | null }
-const COLUMNS = 'id,"ownerId",provider,name,"baseUrl",protocol,last4,models,"modelsError","responsesApi"'
-const view = (row: Row): ApiKeyView => ({ id: row.id, provider: row.provider, name: row.name, baseUrl: row.baseUrl, protocol: row.protocol, last4: row.last4, models: row.models, modelsError: row.modelsError ?? null, responsesApi: row.responsesApi })
+interface Row { id: string; ownerId: string; provider: ApiKeyProvider; name: string | null; baseUrl: string | null; protocol: ApiKeyProtocol; last4: string; models: string[]; modelsError: ApiKeyView['modelsError']; responsesApi: boolean; modelSettings?: ModelSettings | null; features?: unknown }
+const COLUMNS = 'id,"ownerId",provider,name,"baseUrl",protocol,last4,models,"modelsError","responsesApi",features'
+const view = (row: Row): ApiKeyView => ({ id: row.id, provider: row.provider, name: row.name, baseUrl: row.baseUrl, protocol: row.protocol, last4: row.last4, models: row.models, modelsError: row.modelsError ?? null, responsesApi: row.responsesApi,
+  ...(row.features ? { features: parseGatewayFeatures(row.features) } : {}) })
 /** Only a custom OpenAI-protocol provider is probed; the presets' endpoints serve the Responses API. */
 const probed = (row: Pick<Row, 'provider' | 'protocol' | 'baseUrl'>) => row.provider === 'custom' && row.protocol === 'openai' && row.baseUrl
 
@@ -299,9 +301,17 @@ async function openKey(query: Query, keyId: string, env: Env) {
 export async function openGatewayApiKey(query: Query, keyId: string, env: Env = process.env) {
   z.uuid().parse(keyId)
   const { row, apiKey } = await openKey(query, keyId, env)
-  const { rows: [extra] } = await query.query<{ features: unknown }>('SELECT features FROM model_api_keys WHERE id=$1', [keyId])
-  const { parseGatewayFeatures } = await import('./model-gateway/features')
-  return { key: view(row), apiKey, features: parseGatewayFeatures(extra?.features) }
+  return { key: view(row), apiKey, features: parseGatewayFeatures(row.features) }
+}
+
+/** The owner turns request features off for a provider that rejects them (decision 2026-11-15-2000). */
+export async function setApiKeyFeatures(query: Query, ownerId: string, id: string, features: GatewayFeatures): Promise<void> {
+  z.uuid().parse(id)
+  const parsed = gatewayFeaturesSchema.parse(features)
+  const off = Object.fromEntries(Object.entries(parsed).filter(([, on]) => on === false))
+  const { rowCount } = await query.query('UPDATE model_api_keys SET features=$3::jsonb WHERE id=$1 AND "ownerId"=$2',
+    [id, ownerId, Object.keys(off).length ? JSON.stringify(off) : null])
+  if (!rowCount) throw new WorkspaceError('apiKeyNotFound')
 }
 
 /** A bot's saved API key model (bot_model_choices), with the Agents its threads can run on (§ 3). */
