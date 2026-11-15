@@ -1897,6 +1897,13 @@
     "test": "tests/task-resource-registration.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "lib/task-stage-comments.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Task detail reads persisted Factory stage message IDs from the installation's PostgreSQL and includes only IDs already visible in the authorized Task document.",
+    "test": "tests/task-presentation.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
   "lib/task-state-query.ts": {
     "mode": "built-in",
     "environment": [],
