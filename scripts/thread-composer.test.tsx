@@ -27,6 +27,7 @@ const browser = new Window({ url: 'https://mikka.example/en' })
 for (const key of ['window', 'document', 'navigator', 'location', 'customElements', 'HTMLElement', 'Element', 'Node', 'CSS', 'MutationObserver', 'ResizeObserver'] as const) Object.defineProperty(globalThis, key, { configurable: true, value: key === 'window' ? browser : browser[key] })
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, getComputedStyle: browser.getComputedStyle.bind(browser), requestAnimationFrame: (callback: FrameRequestCallback) => setTimeout(() => callback(Date.now()), 0), cancelAnimationFrame: (id: number) => clearTimeout(id) })
 const actualSWR = await import('swr')
+let versionScenario: { read: () => Promise<unknown[]>; write: (request: { change: { requestId: string } }) => Promise<unknown> } | null = null
 let liveRead = false
 let readFailure: unknown = null
 let readHold: Promise<void> | null = null
@@ -40,7 +41,7 @@ mock.module('sonner', { namedExports: { toast: {
   dismiss: (id: string) => { notices.delete(id) }, success: () => {},
 } } })
 mock.module('swr', {
-  defaultExport: (key: unknown, fetcher: never, options: never) => liveRead && Array.isArray(key) && (key[0] === 'issue-thread' || observeChanges && key[0] === 'thread-changes')
+  defaultExport: (key: unknown, fetcher: never, options: never) => versionScenario || liveRead && Array.isArray(key) && (key[0] === 'issue-thread' || observeChanges && key[0] === 'thread-changes')
     ? actualSWR.default(key, fetcher, options)
     : Array.isArray(key) && key[0] === 'issue-thread'
     ? { data: thread && { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: [] }, mutate: () => {} }
@@ -59,8 +60,8 @@ mock.module(at('lib/app-build.ts'), { namedExports: { ...actualAppBuild, checkPa
 mock.module(at('app/actions/agents.ts'), { namedExports: {
   getThreadContinuationModels: async () => null,
   changeQueuedThreadReply: async () => { throw new Error('Composer interactions must not change a queue') },
-  getThreadReplyVersions: async () => [],
-  createThreadReplyVersion: async () => { throw new Error('Composer interactions must not start a new version') },
+  getThreadReplyVersions: async () => versionScenario?.read() ?? [],
+  createThreadReplyVersion: async (request: {change: {requestId: string}}) => { if (versionScenario) return versionScenario.write(request); throw new Error('Composer interactions must not start a new version') },
   retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null, getThreadName: async () => null, listIssueThreads: async () => null, pollIssueThreads: async () => null, getIssueThread: async () => {
   issueReads++
   if (readHold) await readHold
@@ -100,7 +101,7 @@ before(async () => { ({ createRoot } = await import('react-dom/client')); ({ Iss
 const base = { id: 'run-1', issueId: 'issue-1', status: 'succeeded', outcome: null, question: null, continuation: null, stopping: false, ownedByCurrentUser: true,
   createdAt: new Date(0), finishedAt: new Date(0), latestRunId: 'run-1', prompt: 'Fix it', stopRequestedAt: null, replyAvailable: true, retryAvailable: true, quota: null, feedbackEligible: false,
   detail: { name: 'ZHIX-2 Fix it', agentName: 'Claude Code', harness: 'claude_code', summary: null } }
-beforeEach(() => { buildGate = undefined; postReply = async () => ({ sent: true }); thread = { ...base }; acceptance = null; composer = null; replyCalls = 0; draftText = ''; pageChecks = 0; liveRead = false; observeChanges = false; changesReads = 0; readFailure = null; readHold = null; changesRead = null; issueReads = 0; notices.clear(); browser.sessionStorage.clear() })
+beforeEach(() => { versionScenario = null; buildGate = undefined; postReply = async () => ({ sent: true }); thread = { ...base }; acceptance = null; composer = null; replyCalls = 0; draftText = ''; pageChecks = 0; liveRead = false; observeChanges = false; changesReads = 0; readFailure = null; readHold = null; changesRead = null; issueReads = 0; notices.clear(); browser.sessionStorage.clear() })
 afterEach(async () => { if (root) { await act(async () => root!.unmount()); root = null; container.remove() } })
 after(() => browser.close())
 const render = (props: Partial<Parameters<typeof IssueThreadPanel>[0]> = {}) => renderToStaticMarkup(<IntlProvider locale="en" timeZone="UTC" messages={messages}>
@@ -578,4 +579,51 @@ test('Inbox waiting replies keep the original thread, viewer, workspace and requ
     postReply = async () => { throw new DesktopTransportError('desktop_rpc_request_rejected', { status }) }
     await act(async () => { assert.deepEqual(await submit(issueId, runId, 'Denied ' + status), { status: 'failed', error: expected }) })
   }
+})
+
+test('a version with a lost confirmation or stale read-back keeps its request until the same anchor and result run are visible', async () => {
+  const { ThreadReplyVersions } = await import('../components/workspace/thread-reply-versions')
+  const issueId = crypto.randomUUID(), runId = crypto.randomUUID(), versionId = crypto.randomUUID(), resultId = crypto.randomUUID()
+  const anchorKey = 'reply-1', ids: string[] = []
+  let rows: { id: string; anchorKey: string; anchorRunId: string; resultRunId: string; text: string }[] = []
+  let refreshes = 0
+  versionScenario = {
+    read: async () => rows,
+    write: async ({ change }) => {
+      ids.push(change.requestId)
+      if (ids.length === 1) throw new Error('lost response')
+      return { versionId, runId: resultId }
+    },
+  }
+  container = document.createElement('div')
+  document.body.append(container)
+  root = createRoot(container)
+  const { SWRConfig } = actualSWR
+  await act(async () => root!.render(<SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}>
+    <IntlProvider locale="en" timeZone="UTC" messages={messages}>
+      <ThreadReplyVersions issueId={issueId} runId={runId} anchorRunId={runId} anchorKey={anchorKey} operation="rerun"
+        text="Original answer" canRun refresh={() => { refreshes++ }} />
+    </IntlProvider>
+  </SWRConfig>))
+  async function click(label: string) {
+    const button = [...document.querySelectorAll('button')].find(el => el.textContent === label)
+    assert.ok(button, label)
+    assert.equal(button.disabled, false)
+    await act(async () => button.click())
+  }
+  await click(messages.IssueThreads.versionRerun)
+  await click(messages.IssueThreads.versionRun)
+  assert.equal(refreshes, 0)
+  const row = { id: versionId, anchorKey, anchorRunId: runId, resultRunId: resultId, text: 'Retried answer' }
+  for (const stale of [[], [{ ...row, resultRunId: crypto.randomUUID() }], [{ ...row, anchorKey: 'another-reply' }]]) {
+    rows = stale
+    await click(messages.IssueThreads.versionRun)
+    assert.equal(refreshes, 0, 'an incomplete or unrelated version must not confirm the write')
+    assert.ok(document.body.textContent?.includes(messages.Errors.threadSubmissionOutcomeUnconfirmed))
+  }
+  rows = [row]
+  await click(messages.IssueThreads.versionRun)
+  assert.equal(refreshes, 1)
+  assert.equal(ids.length, 5)
+  assert.equal(new Set(ids).size, 1, 'each retry recovers the original operation')
 })
