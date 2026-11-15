@@ -134,11 +134,18 @@ export async function verifyConversationOrganization({ page, fixture, rpc, passe
   const viewport = transcript.locator(':scope > div.overflow-y-auto')
   await expect(viewport.locator('[data-slot="collapsible-message"]').filter({ hasText: 'Desktop inspection line 120' })).toHaveCount(1)
   await expect(viewport).toBeVisible()
-  const scroll = edge => viewport.evaluate((node, destination) => {
-    node.scrollTop = destination === 'top' ? 0 : node.scrollHeight
-    return node.scrollHeight - node.clientHeight
-  }, edge)
-  assert.ok(await scroll('top') > 100, 'a genuine scrollable transcript must hide the read boundary')
+  const distanceToEnd = () => viewport.evaluate(node => node.scrollHeight - node.scrollTop - node.clientHeight)
+  // Expansion can lay out the long message before the initial follow-to-end
+  // scroll. Wait for that scroll so the upward wheel actually moves the view.
+  await page.evaluate(() => document.fonts.ready.then(() => undefined))
+  await expect.poll(() => viewport.evaluate(node => node.clientHeight > 0
+    && node.scrollHeight - node.clientHeight > 100
+    && node.scrollHeight - node.scrollTop - node.clientHeight <= 2)).toBe(true)
+  const bottom = await viewport.evaluate(node => node.scrollTop)
+  await viewport.hover()
+  await page.mouse.wheel(0, -bottom)
+  await expect.poll(() => viewport.evaluate(node => node.scrollTop)).toBeLessThan(bottom - 100)
+  await expect.poll(distanceToEnd).toBeGreaterThan(100)
   const messagesPath = '/conversations/' + target.id + '/messages'
   const { data: previouslyRead } = await api(page, messagesPath.slice(1))
   assert.ok(Number.isSafeInteger(previouslyRead.readRevision))
@@ -152,12 +159,13 @@ export async function verifyConversationOrganization({ page, fixture, rpc, passe
   const marked = await api(page, 'conversations/read-state', { action: 'unread', chatId: target.id })
   assert.equal(marked.status, 200)
   const history = await (await refreshedHistory).json()
-  await expect.poll(() => viewport.evaluate(node => node.scrollHeight - node.scrollTop - node.clientHeight)).toBeGreaterThan(100)
+  await expect.poll(distanceToEnd).toBeGreaterThan(100)
   assert.equal((await directory(title))?.unread, true)
   const acknowledgement = page.waitForResponse(res => res.ok() && res.request().method() === 'POST'
     && new URL(res.url()).pathname.endsWith('/conversations/' + target.id + '/read')
     && res.request().postDataJSON()?.readRevision === history.readRevision, { timeout: 20_000 })
-  await scroll('bottom')
+  await viewport.hover()
+  await page.mouse.wheel(0, await viewport.evaluate(node => node.scrollHeight))
   await acknowledgement
   await expect.poll(async () => (await directory(title))?.unread, { timeout: 20_000 }).toBe(false)
   passed('named_conversation_stays_unread_above_the_transcript_end_until_visible')
