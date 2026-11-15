@@ -742,7 +742,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
       onCreated={id => { refreshTaskPages(); open(id) }} onAdded={() => { void refreshTaskPages() }} initialText={typedAhead}
 
       onOpenChange={open => { setCreating(open); if (!open) setTypedAhead('') }} />}
-    {onboardingOpen && <Onboarding computer={onboarding?.computer} saveKey={saveOnboardingKey} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} onDone={bot => { setOnboardingOpen(false); if (bot) openChat({ kind: 'bot', botId: bot.id }, bot) }} />}
+    {onboardingOpen && <Onboarding computer={onboarding?.computer} saveKey={saveOnboardingKey} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} onDone={bot => { setOnboardingOpen(false); if (bot) openChat({ kind: 'bot', botId: bot.id }, bot); else setCreating(true) }} />}
     {(workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null) && <NewGroupDialog key={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null} workspaceId={(workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null)!} bots={bots} purpose={creation === 'conversation' ? creation : undefined} open={creation !== null} onOpenChange={open => { if (!open) closeComposer() }}
       onCreated={group => {
         if (creation === 'conversation') setDirectoryRevision(value => value + 1)

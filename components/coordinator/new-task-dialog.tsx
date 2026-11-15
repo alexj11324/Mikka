@@ -30,6 +30,7 @@ import { ChatFileCards } from '@/components/chat/chat-file-cards'
 import { CHAT_FILE_ACCEPT } from '@mikka/protocol/chat-attachments'
 import { taskProfileSelectable, useAgentProfiles } from '@/components/settings/factory-profiles-data'
 import { TaskProfileNotice, useTaskProfileChoices } from './task-profile-picker'
+import { SetupChecklist } from './setup-checklist'
 import { NewTask } from '@ui-slot/new-task'
 import type { NewTaskMachine } from '@/components/slots/new-task-contract'
 import { DEFAULT_MACHINE_SIZE, machineHourlyUsd } from '@/lib/cloud-computer/machine-pricing'
@@ -228,6 +229,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
     {!only && <TaskProfileNotice value={profileId ?? null} data={profiles.data} error={profiles.error} onRetry={() => { void profiles.mutate() }} />}
     {!only && !available && <p className="text-sm text-muted-foreground">{t('unavailable')}</p>}
     {!only && coordinatorUnavailable && <Alert variant="destructive"><AlertTitle>{tCoordinator('unavailable', { name: 'Coordinator' })}</AlertTitle></Alert>}
+    {!only && <SetupChecklist workspaceId={workspaceId} />}
   </>
   return <>
     {paywall.dialog}
