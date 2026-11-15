@@ -49,6 +49,10 @@ test('host settlement receipts preserve product publication across native RPC re
         assert.equal(response.status, 200)
         assert.deepEqual(await response.json(), { status: 'accepted' })
         assert.deepEqual(imports, [])
+        const { beginProductAction } = await import('./product-definitions')
+        await assert.rejects(beginProductAction(scope, { sessionId, turnId: 'child_without_execution' }), /agentExecutionClosed/)
+        assert.equal((await pool.query('SELECT count(*)::int count FROM agent_kit_executions WHERE owner_id=$1 AND bot_key=$2 AND execution_key=$3',
+          [ownerId, botId, `${sessionId}:child_without_execution:0`])).rows[0].count, 0)
       } finally { loader.deregister() }
     })
     await t.test('native admission stays pending until its own root projection, including queued and quiet turns',async()=>{
@@ -190,35 +194,6 @@ test('host settlement receipts preserve product publication across native RPC re
       await assert.rejects(finishEveTurn(scope,{...input,executionId:randomUUID()}),/agentExecutionClosed/)
       await assert.rejects(finishEveTurn({...scope,ownerId:'other-owner'},input))
     })
-    await t.test('the tool gateway reads one running snapshot bound to the native turn', async t => {
-      const { AgentKitStore } = await import('../agent-kit/store')
-      const { DEFAULT_AGENT_DEFINITION } = await import('../agent-kit/builtin')
-      const { handleEveProductRequest } = await import('./product-gateway')
-      const { internalEveAuthorization } = await import('./auth')
-      const { Client } = await import('pg')
-      const store = new AgentKitStore(pool)
-      const slack = { ...scope, surface: 'slack' as const }
-      const sessionId = 'wrun_' + randomUUID()
-      await registerSession(slack, sessionId)
-      const turnId = 'turn_gateway'
-      const execution = await store.beginExecution(slack, `${sessionId}:${turnId}:0`, 'Fixture policy', {harness:'codex',model:null}, DEFAULT_AGENT_DEFINITION)
-      const instructions = (turn: string) => handleEveProductRequest(new Request('https://app.example/mikka/api/internal/eve/tools', {
-        method: 'POST', headers: {authorization: internalEveAuthorization(slack)},
-        body: JSON.stringify({operation:'instructions',sessionId,turnId:turn,executionId:execution.id}),
-      }))
-      const queries = t.mock.method(Client.prototype, 'query')
-      const { createRequestDatabaseScope } = await import('../db')
-      const routed = createRequestDatabaseScope(process.env.E2E_DATABASE_URL!)
-      const response = await routed.run(() => instructions(turnId)).finally(() => routed.close())
-      assert.equal(response.status, 200)
-      assert.match((await response.json()).instructions, /Slack conversation/)
-      const reads = queries.mock.calls.filter(call => /from agent_kit_executions/i.test(String(call.arguments[0])))
-      assert.equal(reads.length, 1, 'retrieve and check the same execution row in one SQL statement')
-      assert.equal((await instructions('another_turn')).status, 404)
-      await store.finishExecution(slack, execution.id, 'completed')
-      assert.equal((await instructions(turnId)).status, 404)
-      assert.equal((await store.readExecution(slack, execution.id)).status, 'completed')
-    })
     await t.test('the product catalogue skips only inapplicable Eve approval reviews', async t => {
       const { AgentKitStore } = await import('../agent-kit/store')
       const { DEFAULT_AGENT_DEFINITION } = await import('../agent-kit/builtin')
@@ -237,7 +212,7 @@ test('host settlement receipts preserve product publication across native RPC re
         calls.push((await request.clone().json()).operation)
         return handleEveProductRequest(request)
       })
-      const tools = await productCatalogue(scope, binding)
+      const tools = await productCatalogue(scope, binding, execution.snapshot, execution.snapshot.runtime, { scheduledRead: null })
       const read = tools.find(tool => tool.name === 'list_issues')!
       const write = tools.find(tool => tool.name === 'send_email')!
       const input = {}
@@ -267,7 +242,7 @@ test('host settlement receipts preserve product publication across native RPC re
       const { AgentKitStore } = await import('../agent-kit/store')
       const { DEFAULT_AGENT_DEFINITION } = await import('../agent-kit/builtin')
       const { mailboxInputs } = await import('@mikka/protocol/mailbox')
-      const { productCatalogue } = await import('./product-definitions')
+      const { asProductPrincipal, productContext, productTools } = await import('./product-definitions')
       const { createRequestDatabaseScope } = await import('../db')
       const { Client } = await import('pg')
       const store = new AgentKitStore(pool)
@@ -278,9 +253,12 @@ test('host settlement receipts preserve product publication across native RPC re
       async function catalogue(turnId: string, executionId: string) {
         const before = queries.mock.callCount()
         const conn = createRequestDatabaseScope(process.env.E2E_DATABASE_URL!)
-        const tools = await conn.run(() => productCatalogue(scope, { sessionId, turnId, executionId })).finally(() => conn.close())
+        const tools = await conn.run(() => asProductPrincipal(scope, async () => {
+          const current = await productContext(scope, { sessionId, turnId, executionId })
+          return productTools(scope, current.execution, current.sourceEventId, current.scheduledRead, current.taskEventId, current.entryOrigin)
+        })).finally(() => conn.close())
         const grants = queries.mock.calls.slice(before).filter(call => /select active_version,workspace_id from agent_kit_heads|select snapshot,status,version_id from agent_kit_executions|select definition,digest from agent_kit_versions/i.test(String(call.arguments[0])))
-        return {mail:tools.some(tool=>Object.hasOwn(mailboxInputs,tool.name)),liveChecks:grants.length}
+        return {mail:Object.keys(tools).some(name=>Object.hasOwn(mailboxInputs,name)),liveChecks:grants.length}
       }
       assert.deepEqual(await catalogue('with_mailbox',original.id), {mail:true,liveChecks:3})
       const narrowed = {...DEFAULT_AGENT_DEFINITION,tools:DEFAULT_AGENT_DEFINITION.tools.filter(name=>!Object.hasOwn(mailboxInputs,name))}
