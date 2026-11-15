@@ -1,0 +1,282 @@
+'use client'
+
+import { useEffect, useMemo, useRef, useState } from 'react'
+import useSWR from 'swr'
+import { useFormatter, useTranslations } from 'next-intl'
+import { toast } from 'sonner'
+import { ArrowLeft, Play } from 'lucide-react'
+import { listDevices } from '@/app/actions/agents'
+import { listBots } from '@/app/actions/bots'
+import { cancelAutomation, createAutomation, pauseAutomation, resumeAutomation, runAutomationNow, updateAutomation } from '@/app/actions/automations'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { InlineLoadError } from '@/components/load-error'
+import { SettingRow, SettingsSection } from '@/components/settings/primitives'
+import { useAgentProfiles } from '@/components/settings/factory-profiles-data'
+import { useTaskProfileChoices } from '@/components/coordinator/task-profile-picker'
+import { openTask } from '@/components/workspace/workspace-navigation'
+import { useAutomation } from '@/hooks/use-automations'
+import { useActionError } from '@/lib/use-action-error'
+import { newTaskBotChoices } from '@/lib/new-task-bot'
+import { TASK_TITLE_MAX } from '@/lib/task-title-input'
+import { runTask, type AutomationRun, type AutomationView } from '@/lib/schedules/automation-view'
+import { definitionFrom, draftFrom, emptyDraft, foldNeeded, type AutomationDraft, type IntervalUnit, type ScheduleKind } from './automation-draft'
+import { useWorkspaceBotNames } from './automations-page'
+import { useNextRunLabel, useTimingSummary } from './automation-summary'
+
+const zones = (() => { try { return Intl.supportedValuesOf('timeZone') } catch { return ['UTC'] } })()
+const localZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' } catch { return 'UTC' } }
+const runVariant = { pending: 'outline', running: 'secondary', succeeded: 'secondary', failed: 'destructive', skipped: 'outline', cancelled: 'outline' } as const
+
+/**
+ * One automation, as Capy's automation editor lays it out (layout and interaction only): name, 启用 and 创建者; then
+ * 设置, 满足任一条件就运行, 要它做什么, 限制 and 历史 as sections; 暂停 / 恢复 and 删除 at the end. A new one
+ * (`id` 'new') is created on 创建 and opens as itself. Saves go through the automation actions and the page reads again
+ * only when the live channel says the schedule changed.
+ */
+export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { workspaceId: string | null; userId: string; id: string | 'new'; onOpen: (id: string) => void; onBack: () => void }) {
+  const t = useTranslations('Automations.editor')
+  const tAll = useTranslations('Automations')
+  const tCommon = useTranslations('Common')
+  const actionError = useActionError()
+  const creating = id === 'new'
+  const { automation, history } = useAutomation(workspaceId, creating ? null : id)
+  const current = automation.data ?? null
+  const [draft, setDraft] = useState<AutomationDraft | null>(() => creating ? emptyDraft(localZone()) : null)
+  const loaded = useRef<string | null>(null)
+  // The fields start from the stored definition once per version; a later live read does not overwrite edits.
+  useEffect(() => {
+    if (!current) return
+    const version = `${current.id}:${current.version}`
+    if (loaded.current === version) return
+    loaded.current = version
+    setDraft(draftFrom(current.definition))
+  }, [current])
+  const requestId = useRef(crypto.randomUUID())
+  const [busy, setBusy] = useState<null | 'save' | 'toggle' | 'run' | 'delete'>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const set = (patch: Partial<AutomationDraft>) => setDraft(value => value ? { ...value, ...patch } : value)
+
+  const { data: bots = [] } = useSWR('bots', listBots, { revalidateOnFocus: false })
+  const { data: devices = [] } = useSWR('devices', listDevices, { revalidateOnFocus: false })
+  const workspaceBots = useWorkspaceBotNames(workspaceId)
+  const profiles = useAgentProfiles(workspaceId ?? undefined, true)
+  const profileChoices = useTaskProfileChoices({ workspaceId: workspaceId ?? undefined, value: draft && draft.profileId !== 'auto' ? draft.profileId : null, data: profiles.data })
+  const check = useMemo(() => draft ? definitionFrom(draft) : null, [draft])
+  const needsFold = draft ? foldNeeded(draft) : false
+  // The stored next run only describes the trigger as saved; an edited one says when it runs, not when it next will.
+  const unchanged = useMemo(() => Boolean(current && check && JSON.stringify(definitionFrom(draftFrom(current.definition))) === JSON.stringify(check)), [current, check])
+  const summary = useTimingSummary()
+  const nextRun = useNextRunLabel()
+
+  if (!creating && automation.error && !current) return <EditorFrame onBack={onBack} backLabel={t('back')}><InlineLoadError message={tAll('loadError')} retryLabel={tCommon('retry')} onRetry={() => { void automation.mutate() }} /></EditorFrame>
+  if (!creating && automation.data === null) return <EditorFrame onBack={onBack} backLabel={t('back')}><p role="status" className="text-sm text-muted-foreground">{t('notFound')}</p></EditorFrame>
+  if (!draft) return <EditorFrame onBack={onBack} backLabel={t('back')}><div role="status" aria-label={tAll('loading')} className="flex flex-col gap-3">{[0, 1, 2].map(index => <Skeleton key={index} className="h-24 w-full rounded-2xl" />)}</div></EditorFrame>
+
+  async function save() {
+    if (!check || !('definition' in check) || busy) return
+    setBusy('save')
+    try {
+      const result = creating
+        ? await createAutomation({ requestId: requestId.current, definition: check.definition })
+        : await updateAutomation({ scheduleId: current!.id, version: current!.version, definition: check.definition })
+      if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
+      const saved = (result as { schedule: AutomationView }).schedule
+      toast.success(t('saved'))
+      if (creating) onOpen(saved.id)
+      else { loaded.current = null; await automation.mutate(saved, { revalidate: false }) }
+    } finally { setBusy(null) }
+  }
+  async function toggle(on: boolean) {
+    if (!current || busy) return
+    setBusy('toggle')
+    try {
+      const result = await (on ? resumeAutomation : pauseAutomation)({ scheduleId: current.id, version: current.version })
+      if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
+      loaded.current = null
+      await automation.mutate((result as { schedule: AutomationView }).schedule, { revalidate: false })
+    } finally { setBusy(null) }
+  }
+  async function runNow() {
+    if (!current || busy) return
+    setBusy('run')
+    try {
+      const result = await runAutomationNow({ scheduleId: current.id, version: current.version, requestId: crypto.randomUUID() })
+      if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
+      toast.success(t('started'))
+      await history.mutate()
+    } finally { setBusy(null) }
+  }
+  async function remove() {
+    if (!current || busy) return
+    setBusy('delete')
+    try {
+      const result = await cancelAutomation({ scheduleId: current.id, version: current.version })
+      if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
+      setConfirmDelete(false)
+      onBack()
+    } finally { setBusy(null) }
+  }
+
+  const ownBots = newTaskBotChoices(bots)
+  const otherBot = draft.botId && !ownBots.some(bot => bot.id === draft.botId) ? workspaceBots.get(draft.botId) : null
+  const localDevices = devices.filter(device => device.enabled || device.id === draft.machine)
+  const active = current?.status === 'active'
+  const canSave = Boolean(check && 'definition' in check) && !busy
+  const creator = !current || current.owner_id === userId ? t('you') : current.owner_name ?? ''
+  const field = (label: string, control: React.ReactNode) => <SettingRow title={label}><div className="flex flex-wrap items-center justify-end gap-2">{control}</div></SettingRow>
+
+  return <EditorFrame onBack={onBack} backLabel={t('back')}>
+    <header className="flex flex-col gap-3">
+      <div className="flex items-start gap-3">
+        <Input aria-label={t('name')} value={draft.title} maxLength={200} placeholder={t('namePlaceholder')} onChange={event => set({ title: event.target.value })}
+          className="h-auto min-w-0 flex-1 border-0 bg-transparent px-0 text-xl font-semibold shadow-none focus-visible:ring-0 md:text-xl dark:bg-transparent" />
+        {!creating && <div className="flex shrink-0 items-center gap-2 pt-1.5">
+          <Label htmlFor="automation-enabled">{t('enabled')}</Label>
+          <Switch id="automation-enabled" checked={active} disabled={busy !== null || current?.status === 'completed'} onCheckedChange={on => { void toggle(on) }} />
+        </div>}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+        <span>{t('creator')} · {creator}</span>
+        {current && <Badge variant={current.status === 'active' ? 'secondary' : 'outline'}>{tAll(`status.${current.status}`)}</Badge>}
+      </div>
+    </header>
+
+    {!draft.otherTask && <SettingsSection id="automation-settings" title={t('settings')}>
+      {field(t('bot'), <NativeSelect aria-label={t('bot')} value={draft.botId ?? ''} onChange={event => set({ botId: event.target.value || null })}>
+        <NativeSelectOption value="">{tAll('coordinator')}</NativeSelectOption>
+        {ownBots.map(bot => <NativeSelectOption key={bot.id} value={bot.id}>{bot.name}</NativeSelectOption>)}
+        {otherBot && <NativeSelectOption value={otherBot.id}>{otherBot.name}</NativeSelectOption>}
+      </NativeSelect>)}
+      {field(t('machine'), <NativeSelect aria-label={t('machine')} value={draft.machine} onChange={event => set({ machine: event.target.value })}>
+        <NativeSelectOption value="auto">{t('machineDefault')}</NativeSelectOption>
+        <NativeSelectOption value="cloud">{t('machineCloud')}</NativeSelectOption>
+        {draft.machine === 'cloudflare' && <NativeSelectOption value="cloudflare">{t('machineCloud')}</NativeSelectOption>}
+        {localDevices.map(device => <NativeSelectOption key={device.id} value={device.id}>{device.name}</NativeSelectOption>)}
+      </NativeSelect>)}
+      {field(t('profile'), <NativeSelect aria-label={t('profile')} value={draft.profileId} disabled={!workspaceId} onChange={event => set({ profileId: event.target.value })}>
+        {profileChoices.choices.map(choice => <NativeSelectOption key={choice.value} value={choice.value} disabled={'disabled' in choice && choice.disabled}>{choice.label}</NativeSelectOption>)}
+      </NativeSelect>)}
+      {field(t('timezone'), <NativeSelect aria-label={t('timezone')} value={draft.timezone} onChange={event => set({ timezone: event.target.value, fold: null })}>
+        {(zones.includes(draft.timezone) ? zones : [draft.timezone, ...zones]).map(zone => <NativeSelectOption key={zone} value={zone}>{zone}</NativeSelectOption>)}
+      </NativeSelect>)}
+    </SettingsSection>}
+
+    <SettingsSection id="automation-triggers" title={t('triggers')}>
+      <SettingRow title={t('schedule')}>
+        <Switch aria-label={t('schedule')} checked={draft.scheduleOn} onCheckedChange={on => set({ scheduleOn: on })} />
+      </SettingRow>
+      {draft.scheduleOn && <div className="flex flex-col gap-3 px-5 pt-1 pb-4">
+        <ToggleGroup aria-label={t('schedule')} size="sm" variant="segment" spacing={0.5} value={[draft.scheduleKind]}
+          onValueChange={values => { const next = values[0] as ScheduleKind | undefined; if (next) set({ scheduleKind: next }) }}>
+          {(['once', 'interval', 'daily', 'cron'] as const).map(kind => <ToggleGroupItem key={kind} value={kind}>{t(`scheduleKind.${kind}`)}</ToggleGroupItem>)}
+        </ToggleGroup>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          {draft.scheduleKind === 'once' && <Input type="datetime-local" aria-label={t('at')} className="w-auto" value={draft.onceAt} onChange={event => set({ onceAt: event.target.value })} />}
+          {draft.scheduleKind === 'interval' && <>
+            <span className="text-muted-foreground">{t('start')}</span>
+            <Input type="datetime-local" aria-label={t('start')} className="w-auto" value={draft.intervalStart} onChange={event => set({ intervalStart: event.target.value })} />
+            <span className="text-muted-foreground">{t('every')}</span>
+            <Input type="number" min={1} aria-label={t('every')} className="w-20" value={draft.intervalValue} onChange={event => set({ intervalValue: Number(event.target.value) })} />
+            <NativeSelect aria-label={t('every')} value={draft.intervalUnit} onChange={event => set({ intervalUnit: event.target.value as IntervalUnit })}>
+              {(['minutes', 'hours', 'days'] as const).map(unit => <NativeSelectOption key={unit} value={unit}>{t(`unit.${unit}`)}</NativeSelectOption>)}
+            </NativeSelect>
+          </>}
+          {draft.scheduleKind === 'daily' && <Input type="time" aria-label={t('at')} className="w-auto" value={draft.dailyTime} onChange={event => set({ dailyTime: event.target.value, fold: null })} />}
+          {draft.scheduleKind === 'cron' && <Input aria-label={t('expression')} className="w-48 font-mono" value={draft.cron} maxLength={100} onChange={event => set({ cron: event.target.value })} />}
+        </div>
+        {check && 'definition' in check && <p className="text-sm text-muted-foreground">
+          {summary(check.definition)}{current?.status === 'active' && current.next_at && unchanged && <> · {tAll('nextRun', { time: nextRun(current.next_at, current.definition.timezone) })}</>}
+        </p>}
+        {needsFold && <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span>{t('fold', { time: draft.dailyTime })}</span>
+          <ToggleGroup aria-label={t('fold')} size="sm" variant="segment" spacing={0.5} value={draft.fold ? [draft.fold] : []}
+            onValueChange={values => { const next = values[0]; if (next === 'earlier' || next === 'later') set({ fold: next }) }}>
+            <ToggleGroupItem value="earlier">{t('foldEarlier')}</ToggleGroupItem>
+            <ToggleGroupItem value="later">{t('foldLater')}</ToggleGroupItem>
+          </ToggleGroup>
+        </div>}
+      </div>}
+      <SettingRow title={t('manual')}>
+        {!creating && <Button size="sm" variant="secondary" disabled={!active || busy !== null} onClick={() => { void runNow() }}><Play data-icon="inline-start" />{t('runNow')}</Button>}
+      </SettingRow>
+    </SettingsSection>
+
+    <SettingsSection id="automation-task" title={t('task')}>
+      {draft.otherTask ? <SettingRow title={tAll(`kind.${draft.otherTask.kind}`)} description={'text' in draft.otherTask ? draft.otherTask.text : 'prompt' in draft.otherTask ? draft.otherTask.prompt : undefined} />
+        : <div className="flex flex-col gap-3 p-4">
+          <Textarea aria-label={t('prompt')} value={draft.prompt} maxLength={8000} rows={4} placeholder={t('promptPlaceholder')} onChange={event => set({ prompt: event.target.value })} />
+          <Input aria-label={t('taskTitle')} value={draft.taskTitle} maxLength={TASK_TITLE_MAX} placeholder={t('taskTitlePlaceholder')} onChange={event => set({ taskTitle: event.target.value })} />
+        </div>}
+    </SettingsSection>
+
+    <SettingsSection id="automation-limits" title={t('limits')}>
+      {field(t('misfire'), <NativeSelect aria-label={t('misfire')} value={draft.misfire} onChange={event => set({ misfire: event.target.value as AutomationDraft['misfire'] })}>
+        <NativeSelectOption value="skip">{t('misfireSkip')}</NativeSelectOption>
+        <NativeSelectOption value="catch_up_once">{t('misfireCatchUp')}</NativeSelectOption>
+      </NativeSelect>)}
+      {field(t('lateness'), <><Input type="number" min={1} max={10080} aria-label={t('lateness')} className="w-24" value={draft.lateness} onChange={event => set({ lateness: Number(event.target.value) })} /><span className="text-muted-foreground">{t('minutes')}</span></>)}
+      {field(t('concurrent'), <NativeSelect aria-label={t('concurrent')} value={String(draft.concurrent)} onChange={event => set({ concurrent: Number(event.target.value) })}>
+        {[1, 2, 3, 4, 5].map(count => <NativeSelectOption key={count} value={String(count)}>{count}</NativeSelectOption>)}
+      </NativeSelect>)}
+    </SettingsSection>
+
+    {!creating && <SettingsSection id="automation-history" title={t('history')}>
+      {history.error && !history.data ? <div className="p-4"><InlineLoadError message={tAll('loadError')} retryLabel={tCommon('retry')} onRetry={() => { void history.mutate() }} /></div>
+        : !history.data ? <div className="p-4"><Skeleton className="h-10 w-full" /></div>
+          : !history.data.occurrences.length ? <p className="px-5 py-4 text-sm text-muted-foreground">{t('historyEmpty')}</p>
+            : history.data.occurrences.map(run => <RunRow key={run.id} run={run} />)}
+    </SettingsSection>}
+
+    <footer className="flex flex-wrap items-center justify-between gap-2 pb-8">
+      <div className="flex items-center gap-2">
+        {current && current.status !== 'completed' && <Button variant="outline" disabled={busy !== null} onClick={() => { void toggle(!active) }}>{active ? t('pause') : t('resume')}</Button>}
+        {current && <Button variant="ghost" className="text-destructive-foreground" disabled={busy !== null} onClick={() => setConfirmDelete(true)}>{t('delete')}</Button>}
+      </div>
+      <div className="flex items-center gap-3">
+        {check && 'missing' in check && <span role="status" className="text-sm text-muted-foreground">{t(`missing.${check.missing}`)}</span>}
+        <Button disabled={!canSave} onClick={() => { void save() }}>{busy === 'save' ? t('saving') : creating ? t('create') : t('save')}</Button>
+      </div>
+    </footer>
+
+    <AlertDialog open={confirmDelete} onOpenChange={open => { if (!busy) setConfirmDelete(open) }}>
+      <AlertDialogContent>
+        <AlertDialogHeader><AlertDialogTitle>{t('deleteTitle')}</AlertDialogTitle><AlertDialogDescription>{t('deleteBody')}</AlertDialogDescription></AlertDialogHeader>
+        <AlertDialogFooter><AlertDialogCancel disabled={busy === 'delete'}>{t('cancel')}</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={busy === 'delete'} onClick={() => { void remove() }}>{t('delete')}</AlertDialogAction></AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </EditorFrame>
+}
+
+function EditorFrame({ children, onBack, backLabel }: { children: React.ReactNode; onBack: () => void; backLabel: string }) {
+  return <section aria-label={backLabel} className="flex min-h-0 flex-1 flex-col overflow-auto">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6">
+      <div><Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft data-icon="inline-start" />{backLabel}</Button></div>
+      {children}
+    </div>
+  </section>
+}
+
+/** One run: when, how it ended (and why when it did not), and the task it made as a chip that opens it. */
+function RunRow({ run }: { run: AutomationRun }) {
+  const t = useTranslations('Automations')
+  const tErrors = useTranslations('Errors')
+  const format = useFormatter()
+  const task = runTask(run)
+  const at = run.started_at ?? run.due_at
+  const reason = run.error ? (t.has(`runErrors.${run.error}` as never) ? t(`runErrors.${run.error}` as never) : tErrors.has(run.error as never) ? tErrors(run.error as never) : run.error) : null
+  return <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 text-sm">
+    <time className="tabular-nums text-muted-foreground" dateTime={new Date(at).toISOString()}>{format.dateTime(new Date(at), { dateStyle: 'medium', timeStyle: 'short' })}</time>
+    <Badge variant={runVariant[run.status]}>{t(`run.${run.status}`)}</Badge>
+    {task && <Button size="xs" variant="secondary" title={task.title} onClick={() => openTask(task.id)}><bdi>{task.identifier ?? task.title}</bdi></Button>}
+    {reason && <span className="min-w-0 text-muted-foreground">{reason}</span>}
+  </div>
+}

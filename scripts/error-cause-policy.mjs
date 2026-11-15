@@ -150,7 +150,6 @@ export const droppedCauseAllowlist = {
   'lib/run-control.ts': 1,
   'lib/run-publications.ts': 3,
   'lib/run-repository-retry.ts': 1,
-  'lib/schedules/time.ts': 1,
   'lib/search/firecrawl.ts': 1,
   'lib/secrets/checkpoint.ts': 1,
   'lib/secrets/e2b-runtime.ts': 1,

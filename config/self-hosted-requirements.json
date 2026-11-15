@@ -2362,5 +2362,12 @@
     "behavior": "Compute schedule times and repeated daylight-saving times with the runtime's time zone data; no I/O.",
     "test": "lib/schedules/time.test.ts",
     "suite": "test:schedules"
+  },
+  "lib/schedules/wall-time.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Wall-clock arithmetic and repeated daylight-saving times in an IANA zone with the runtime time zone data; no I/O.",
+    "test": "lib/schedules/time.test.ts",
+    "suite": "test:schedules"
   }
 }

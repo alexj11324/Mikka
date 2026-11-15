@@ -13,6 +13,8 @@ export type AutomationView = {
   next_at: string | Date | null
   created_at?: string | Date
   updated_at?: string | Date
+  /** The creator's name in this workspace (null when they left it). */
+  owner_name?: string | null
 }
 export type AutomationList = { schedules: AutomationView[]; nextCursor: string | null }
 
