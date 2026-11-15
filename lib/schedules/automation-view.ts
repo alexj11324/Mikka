@@ -35,7 +35,8 @@ export type AutomationRun = {
   error: string | null
   result: unknown
   /** The event a run started on (blank for a member who is neither its creator nor an owner or admin). */
-  trigger?: { event: { event: string; repository: string; number: number | null; title: string | null; url: string | null } } | { webhook: { requests: { at: string }[] } } | null
+  trigger?: { event: { source?: 'github'; event: string; repository: string; number: number | null; title: string | null; url: string | null } }
+    | { event: { source: 'linear'; event: string; identifier: string | null; title: string | null; url: string | null } } | { webhook: { requests: { at: string }[] } } | null
 }
 export type AutomationHistory = { occurrences: AutomationRun[] }
 export type AutomationUsageDay = { day: string; runs: number; skipped: number; tasks: number; costMicroUsd: number | null }

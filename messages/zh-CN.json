@@ -1228,6 +1228,8 @@
     "scheduleStandingTaskUnavailable": "追加的那个任务已经不在了。",
     "scheduleStandingTaskNotStarted": "追加的那个任务还没开始，稍后再试。",
     "scheduleWebhookOff": "先打开 Webhook 并保存，再生成地址。",
+    "scheduleLinearUnavailable": "Linear 触发器用到的团队你的 Linear 连接看不到，或者 Linear 没有连接。",
+    "scheduleLinearUnreachable": "现在连不上 Linear，稍后会重试。",
     "scheduleRunConflict": "运行未开始，请重试。",
     "scheduleTimeMustBeFuture": "开始时间必须晚于现在。",
     "invalidIanaTimezone": "时区无效。",
@@ -7885,7 +7887,8 @@
       "weekly": "每{weekday} {time}",
       "monthly": "每月 {day} 日 {time}",
       "cron": "cron {expression}",
-      "webhook": "Webhook"
+      "webhook": "Webhook",
+      "linear": "Linear：{event}{count, plural, =0 {} other { 等 # 项}}"
     },
     "kind": {
       "reminder": "提醒",
@@ -7986,7 +7989,8 @@
         "time": "这个时间不存在或格式不对",
         "fold": "选较早或较晚后才能保存",
         "interval": "间隔要在 1 分钟到 1 年之间",
-        "cron": "cron 表达式要有 5 段"
+        "cron": "cron 表达式要有 5 段",
+        "team": "选一个 Linear 团队"
       },
       "webhook": {
         "title": "Webhook",
@@ -8003,6 +8007,21 @@
         "made": "地址已生成。",
         "make": "生成地址",
         "remake": "重新生成地址"
+      },
+      "linear": {
+        "title": "Linear 事件",
+        "show": "添加 Linear 事件",
+        "item": "Linear 事件 {number}",
+        "event": "事件",
+        "team": "团队",
+        "remove": "移除",
+        "labels": "标签（可选，逗号分隔）",
+        "runWhen": "条件",
+        "runWhenPlaceholder": "条件（可选）：例如「标题里提到计费」",
+        "add": "添加 Linear 事件",
+        "notConnected": "先在设置里连接 Linear",
+        "noTeams": "你的 Linear 里没有团队",
+        "teamsError": "Linear 团队没加载出来"
       }
     },
     "run": {
@@ -8025,6 +8044,13 @@
       "scheduleChanged": "自动化已修改",
       "scheduleRecoveryExhausted": "多次重试后失败",
       "scheduleExecutionUnavailable": "无法执行"
+    },
+    "linearEvent": {
+      "issue_created": "新建议题",
+      "issue_status_changed": "议题状态变化",
+      "issue_label_added": "议题加了标签",
+      "issue_assigned": "议题被指派",
+      "comment_created": "新评论"
     }
   }
 }

@@ -13,6 +13,8 @@ export const ACTION_ERROR_CODES = [
   'scheduleStandingTaskUnavailable',
   'scheduleStandingTaskNotStarted',
   'scheduleWebhookOff',
+  'scheduleLinearUnavailable',
+  'scheduleLinearUnreachable',
   'scheduleRunConflict',
   'scheduleTimeMustBeFuture',
   'invalidIanaTimezone',

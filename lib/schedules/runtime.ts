@@ -72,7 +72,7 @@ export const automationSeams:AutomationSeams={
       }
     }
     const {eventId}=await recordPersonalSubmission(db,ownerId,text,{botId,submissionId:occurrenceId,
-      taskCommand:{version:1,intent:'create_and_dispatch',description:text},schedule:{scheduleId,occurrenceId,...(event&&source==='webhook'?{webhook:true as const}:event?{event:true as const}:{})},
+      taskCommand:{version:1,intent:'create_and_dispatch',description:text},schedule:{scheduleId,occurrenceId,...(event&&source==='webhook'?{webhook:true as const}:event&&source==='linear'?{linear:true as const}:event?{event:true as const}:{})},
       ...(task.title?{taskTitle:task.title}:{}),...(task.destination?{taskDestination:task.destination}:{}),...(task.profileId?{profileId:task.profileId}:{})})
     const created=await createIssueFromRequest(ownerId,{sourceEventId:eventId,title:task.title??task.prompt.split(/\r?\n/,1)[0]!.slice(0,200)})
     const row=(await pool.query<{title:string;status:string;identifier:string|null}>(`SELECT i.title,i.status,r.identifier FROM issues i
@@ -81,6 +81,14 @@ export const automationSeams:AutomationSeams={
     return {id:created.issueId,title:row.title,status:row.status,identifier:row.identifier,eventId,requestedBy:ownerId}
   },
   async changed(tx,workspaceId){await (await import('@/lib/live/lists')).scheduleListChanged(tx,workspaceId)},
+  /** Teams of the person's own Linear connection; null without one. Linear unreachable is retryable, not a lost authority. */
+  async linearTeams(ownerId){
+    const [{linearAccessToken},{linearTeams}]=await Promise.all([import('@/lib/linear-sync/tokens'),import('@/lib/linear-sync/client')])
+    const connected=(await pool.query('SELECT 1 FROM linear_connections WHERE "userId"=$1 AND "revokedAt" IS NULL',[ownerId])).rowCount
+    if(!connected)return null
+    try{return new Set((await linearTeams(await linearAccessToken(ownerId))).map(team=>team.id))}
+    catch(error){throw new ScheduleError('scheduleLinearUnreachable',503,{cause:error})}
+  },
   async repository(workspaceId,repository){
     const {repositoryAvailable}=await import('@/lib/workspace-admin/bots')
     return repositoryAvailable(workspaceId,repository)
@@ -144,5 +152,17 @@ export async function receiveAutomationWebhook(key:string,body:string,requestKey
   const received=await schedules().receiveWebhook(webhookKeyHash(key),body,requestKey)
   if(received.status==='queued')armDueTimerSoon('schedules')
   return received
+}
+/**
+ * A verified Linear delivery, before it is acknowledged: one run per automation that takes one of its events. A failure
+ * here makes the receiver answer 503 so Linear redelivers; the delivery ID makes the redelivery add nothing.
+ */
+export async function fireLinearAutomations(deliveryId:string,payload:Record<string,unknown>){
+  const {linearAutomationEvents}=await import('./linear-events')
+  const events=linearAutomationEvents(payload)
+  if(!events.length)return 0
+  const queued=await schedules().fireLinearEvents(`linear:${deliveryId}`,events)
+  if(queued)armDueTimerSoon('schedules')
+  return queued
 }
 export async function assertScheduledRead(owner:string,botId:string|null,scope:ScheduledRead){return schedules().assertRead(owner,botId,scope)}

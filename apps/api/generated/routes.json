@@ -2664,7 +2664,16 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "b566d22ac335332ce9233e474edbe1dfab48d01f168a817b19463bbddcf15983"
+      "sourceHash": "e6b232f6a14d27adf1bfb05dbdfa9786bad256489987c617f6e2a238cc372561"
+    },
+    {
+      "path": "/mikka/api/webhooks/linear/automations",
+      "template": "/api/webhooks/linear/automations",
+      "source": "app/api/webhooks/linear/automations/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "80e032d4401805c04aa1791dc938760772f055204373f4e06636fc6b1d93761c"
     },
     {
       "path": "/mikka/api/webhooks/slack",

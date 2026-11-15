@@ -84,7 +84,7 @@ const lower = (values: readonly string[] | undefined) => values?.map(value => va
 
 /** Whether this trigger's structured filters (event, repository, branch, labels) take the event. `runWhen` is judged later. */
 export function triggerMatches(trigger: EventTrigger, event: GitHubAutomationEvent): boolean {
-  if (trigger.source !== event.source || trigger.event !== event.event) return false
+  if (trigger.source !== 'github' || trigger.event !== event.event) return false
   if (!trigger.repositories.includes(event.repository)) return false
   if (trigger.branches?.length && !(event.branch && trigger.branches.includes(event.branch))) return false
   const wanted = lower(trigger.labels)
