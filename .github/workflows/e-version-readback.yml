@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: f19dffd045d4cee99c0f6960cd0978b1a96bd129
+          ref: 473cf431a5143034b9b3d38083d0e78f35502728
           persist-credentials: false
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
         with:
@@ -23,8 +23,8 @@ jobs:
       - name: Pin the source and install its lockfile
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = f19dffd045d4cee99c0f6960cd0978b1a96bd129
-          test "$(git rev-parse 'HEAD^{tree}')" = 8cd4be321b3e03be0c3862d1fbbe3c7bb7a8965c
+          test "$(git rev-parse HEAD)" = 473cf431a5143034b9b3d38083d0e78f35502728
+          test "$(git rev-parse 'HEAD^{tree}')" = df71de52cdd61c331a9fb55a34c5f23cd2136aa6
           pnpm install --frozen-lockfile
       - name: Execute original complete group and conversation unit suites
         run: |
