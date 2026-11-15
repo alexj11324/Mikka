@@ -80,7 +80,7 @@ try {
   return expected===204?null:res.json()
  }
 
- const registration=await dcall('devices/register','POST',{deviceId,workspaceId:ws.id,name:'Isolated Linux evaluator',platform:'linux',arch:'x64',daemonVersion:SOURCE_DAEMON_VERSION,protocolVersion:DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'claude_code',installed:true,models:[model],toolApproval:true}]})
+ const registration=await dcall('devices/register','POST',{deviceId,workspaceId:ws.id,name:'Isolated Linux evaluator',platform:'linux',arch:'x64',daemonVersion:SOURCE_DAEMON_VERSION,protocolVersion:DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'claude_code',installed:true,version:process.env.E_CODEX_VERSION,models:[model],toolApproval:true}]})
  assert.equal(registration.deviceId,deviceId)
  const sourceDir=join(dir,'fixture','work'),work=join(dir,'fixture','report-execute'),reviewWork=join(dir,'fixture','report-review')
  const git=(cwd:string,...args:string[])=>execFileSync('git',['-C',cwd,...args],{encoding:'utf8'}).trim()
