@@ -8020,7 +8020,8 @@
         "runWhenPlaceholder": "条件（可选）：例如「标题里提到计费」",
         "add": "添加 Linear 事件",
         "notConnected": "先在设置里连接 Linear",
-        "noTeams": "你的 Linear 里没有团队"
+        "noTeams": "你的 Linear 里没有团队",
+        "teamsError": "Linear 团队没加载出来"
       }
     },
     "run": {

@@ -8020,7 +8020,8 @@
         "runWhenPlaceholder": "Condition (optional): e.g. \"the title mentions billing\"",
         "add": "Add a Linear event",
         "notConnected": "Connect Linear in Settings first",
-        "noTeams": "Your Linear has no teams"
+        "noTeams": "Your Linear has no teams",
+        "teamsError": "Could not load your Linear teams"
       }
     },
     "run": {
