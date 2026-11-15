@@ -79,3 +79,12 @@ test('GitHub trigger rows round-trip; each needs a repository; lists split on ei
   const plain = definitionFrom(filled({ scheduleKind: 'daily', dailyTime: '09:00' }), now)
   assert.ok('definition' in plain && !('events' in plain.definition), 'no rows, no events key')
 })
+
+test('每天最多运行: 0 is no limit and leaves the key out; a number round-trips', () => {
+  const none = definitionFrom(filled({ scheduleOn: false }), now)
+  assert.ok('definition' in none && !('maxRunsPerDay' in none.definition))
+  const capped = definitionFrom(filled({ scheduleOn: false, perDay: 10 }), now)
+  assert.ok('definition' in capped)
+  assert.equal(capped.definition.maxRunsPerDay, 10)
+  assert.equal(draftFrom(capped.definition, now).perDay, 10)
+})

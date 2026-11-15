@@ -188,3 +188,25 @@ Decision [2026-11-15-1704](../design/decisions/2026-11-15-1704-automation-github
   (`user_schedules_event_triggers`); `tests/github-webhook-statements.db.test.ts`
   carries it in each budget.
 
+
+## Limits and usage (2026-11-15)
+
+Decision [2026-11-15-1730](../design/decisions/2026-11-15-1730-automation-limits-usage.md).
+
+- **`maxRunsPerDay`** counts `pending`, `running`, `succeeded` and `failed` runs created
+  since local midnight in the definition's time zone. `execute` skips a timed or retried
+  run past it (`dailyRunLimit`, reported like other skips), `fireEvents` records an event
+  past it as a quiet skip, and `run_now` refuses with `scheduleDailyRunLimit`.
+- **`usage`** command (`automationUsage` action): per local day, newest first, for up to
+  90 days (default 14): `runs`, `skipped`, `tasks` (runs that created a task) and
+  `costMicroUsd`, the sum of `hosted_usage."costMicroUsd"` whose `usageRunId` is a run of
+  a task the automation created, on the day the automation run started. Cost is null for
+  a member who is neither the creator nor an owner/admin.
+- **Auto-pause.** When a run fails terminally with an authority code
+  (`scheduleWorkspaceAccessDenied`, `scheduleOwnerUnavailable`,
+  `scheduleConversationUnavailable`, `scheduleBotUnavailable`,
+  `scheduleRepositoryUnavailable`, `scheduleDeviceUnavailable`,
+  `scheduleProfileUnavailable`), the same transaction pauses the automation, stores the
+  code in `user_schedules.disabled_reason`, bumps its version and cancels its other
+  waiting runs without chat reports. `resume` re-checks authority and clears the reason;
+  a person's own pause stores none.

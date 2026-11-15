@@ -15,6 +15,8 @@ export type AutomationView = {
   updated_at?: string | Date
   /** The creator's name in this workspace (null when they left it). */
   owner_name?: string | null
+  /** Why the host paused it (the creator lost the authority it runs on); null when a person paused it or it runs. */
+  disabled_reason?: string | null
 }
 export type AutomationList = { schedules: AutomationView[]; nextCursor: string | null }
 
@@ -32,6 +34,8 @@ export type AutomationRun = {
   trigger?: { event: { event: string; repository: string; number: number | null; title: string | null; url: string | null } } | null
 }
 export type AutomationHistory = { occurrences: AutomationRun[] }
+export type AutomationUsageDay = { day: string; runs: number; skipped: number; tasks: number; costMicroUsd: number | null }
+export type AutomationUsage = { timezone: string; maxRunsPerDay: number | null; days: AutomationUsageDay[] }
 
 /** The task a dispatch_task run made, when the reader may see it. */
 export function runTask(run: Pick<AutomationRun, 'result'>): { id: string; title: string; identifier: string | null } | null {

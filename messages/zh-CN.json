@@ -1224,6 +1224,7 @@
     "scheduleNotPaused": "自动化没有暂停。",
     "scheduleNotActive": "自动化已暂停或已结束，恢复后才能运行。",
     "scheduleConcurrencyLimit": "已达到同时运行的上限，请等当前运行结束。",
+    "scheduleDailyRunLimit": "今天的运行次数已经到上限了。",
     "scheduleRunConflict": "运行未开始，请重试。",
     "scheduleTimeMustBeFuture": "开始时间必须晚于现在。",
     "invalidIanaTimezone": "时区无效。",
@@ -7820,6 +7821,16 @@
     "loadError": "无法加载个人文件。"
   },
   "Automations": {
+    "usage": {
+      "title": "用量",
+      "empty": "最近 14 天没有运行",
+      "day": "日期",
+      "runs": "运行",
+      "skipped": "跳过",
+      "tasks": "任务",
+      "cost": "花费",
+      "ofCap": "{runs} / {cap}"
+    },
     "githubEvent": {
       "pull_request_opened": "PR 打开",
       "draft_opened": "草稿 PR 打开",
@@ -7846,6 +7857,7 @@
       "paused": "已暂停"
     },
     "status": {
+      "autoPaused": "已自动暂停",
       "active": "已启用",
       "paused": "已暂停",
       "completed": "已结束",
@@ -7878,6 +7890,9 @@
       "dispatch_task": "交给 Bot"
     },
     "editor": {
+      "perDay": "每天最多运行",
+      "unlimited": "不限",
+      "autoPaused": "已自动暂停：{reason}",
       "github": {
         "title": "GitHub 事件",
         "item": "GitHub 事件 {number}",
@@ -7973,6 +7988,7 @@
       "cancelled": "已取消"
     },
     "runErrors": {
+      "dailyRunLimit": "今天的运行次数已到上限，已跳过",
       "runWhenNotMet": "不满足运行条件，已跳过",
       "scheduleRunWhenUnavailable": "暂时无法判断运行条件，稍后重试",
       "misfireSkipped": "错过了时间，已跳过",

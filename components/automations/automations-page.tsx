@@ -110,7 +110,7 @@ export function AutomationsPage({ workspaceId, href, onOpen, onAskBot }: { works
                   </ItemDescription>
                 </ItemContent>
                 <ItemMedia className="hidden max-w-40 text-sm sm:flex"><AutomationBot automation={row} bots={bots} /></ItemMedia>
-                <ItemActions><Badge variant={statusVariant[row.status]}>{t(`status.${row.status}`)}</Badge></ItemActions>
+                <ItemActions><Badge variant={statusVariant[row.status]}>{row.status === 'paused' && row.disabled_reason ? t('status.autoPaused') : t(`status.${row.status}`)}</Badge></ItemActions>
               </Item></Fragment>)}
             </ItemGroup>}
       {more && <Button variant="outline" disabled={isValidating} onClick={() => void setSize(size + 1)}>{t('more')}</Button>}

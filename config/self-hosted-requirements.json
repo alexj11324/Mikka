@@ -2404,5 +2404,12 @@
     "behavior": "Run automations as their creator through the installation PostgreSQL database, including runs started by verified GitHub deliveries; a trigger condition uses the configured Decision model and fails retryably without one.",
     "test": "lib/schedules/dispatch.db.test.ts",
     "suite": "test:schedules-db"
+  },
+  "drizzle/20261115172546_schedule_limits_usage.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Record why the host paused an automation and index its runs by creation time for the daily cap and usage.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
   }
 }

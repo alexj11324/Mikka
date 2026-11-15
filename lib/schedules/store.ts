@@ -34,12 +34,16 @@ export type AutomationSeams = {
   /** A trigger's one-sentence condition against the event: true, false, or null when no answer could be had. */
   runWhen?: (input: RunWhenInput) => Promise<boolean | null>
 }
-export type Schedule = { id: string; owner_id: string; workspace_id: string | null; bot_id: string | null; visibility: 'owner' | 'workspace'; source_event_id: string; definition: Definition; request_definition: Definition; status: string; version: number; next_at: Date | null }
+export type Schedule = { id: string; owner_id: string; workspace_id: string | null; bot_id: string | null; visibility: 'owner' | 'workspace'; source_event_id: string; definition: Definition; request_definition: Definition; status: string; version: number; next_at: Date | null; disabled_reason?: string | null }
 export type Occurrence = { id: string; schedule_id: string; operation_id: string; event_id: string | null; definition: Definition; version: number; due_at: Date; status: string; attempts: number; lease_token: string | null; lease_until: Date; error: string | null; execution_decision: 'execute' | 'skip'; trigger: OccurrenceTrigger | null; report_next_at: Date; report_attempts: number; started_at: Date | null; created_at: Date }
 export const SCHEDULE_LEASE_MS = 5 * 60_000
 const MAX_ATTEMPTS = 3
 // The frozen request key is internal; keep the existing tool-response fields.
-const SCHEDULE_COLUMNS = 'id,owner_id,workspace_id,bot_id,visibility,source_event_id,request_id,definition,request_definition,status,version,next_at,created_at,updated_at'
+const SCHEDULE_COLUMNS = 'id,owner_id,workspace_id,bot_id,visibility,source_event_id,request_id,definition,request_definition,status,version,next_at,disabled_reason,created_at,updated_at'
+/** A run that fails one of these lost its creator's authority: the automation is paused with the code as its reason. */
+const AUTHORITY_LOST = new Set(['scheduleWorkspaceAccessDenied','scheduleOwnerUnavailable','scheduleConversationUnavailable','scheduleBotUnavailable','scheduleRepositoryUnavailable','scheduleDeviceUnavailable','scheduleProfileUnavailable'])
+/** Runs that count toward maxRunsPerDay: queued, running and finished, not skipped or cancelled. */
+const COUNTED = "status IN ('pending','running','succeeded','failed')"
 
 /** The earliest persisted due time of any schedule work (epoch ms, rounded up from PostgreSQL microseconds), or null. */
 /** Each persisted due time of schedule work, as rows of `at` (no parameters). */
@@ -152,6 +156,21 @@ export class ScheduleStore {
         const privileged=row.owner_id===actor.ownerId||access.role!=='member'
         return {occurrences:privileged?seen.rows:seen.rows.map(o=>({...o,operation_id:null,event_id:null,result:null,error:null,trigger:null}))}
       }
+      if(cmd.action==='usage'){
+        // Days in the automation's own time zone. Cost is what the tasks it made spent through hosted models, billed
+        // to the day the run started; like a run's result it is shown to the creator and owners/admins only.
+        const days=cmd.days??14, zone=row.definition.timezone
+        const runs=await tx.query<{day:string;runs:number;skipped:number;tasks:number}>(`SELECT to_char((created_at AT TIME ZONE $2)::date,'YYYY-MM-DD') AS day,
+          count(*) FILTER (WHERE ${COUNTED})::int runs,count(*) FILTER (WHERE status='skipped')::int skipped,count(*) FILTER (WHERE result ? 'eventId')::int tasks
+          FROM schedule_occurrences WHERE schedule_id=$1 AND created_at>=(date_trunc('day',now() AT TIME ZONE $2)-($3::int-1)*interval '1 day') AT TIME ZONE $2 GROUP BY 1 ORDER BY 1 DESC`,[row.id,zone,days])
+        const privileged=row.owner_id===actor.ownerId||access.role!=='member'
+        const cost=privileged?(await tx.query<{day:string;cost:string}>(`SELECT to_char((o.created_at AT TIME ZONE $2)::date,'YYYY-MM-DD') AS day,COALESCE(sum(u."costMicroUsd"),0)::text cost
+          FROM schedule_occurrences o JOIN agent_runs r ON r."issueId"=(o.result->>'id')::uuid JOIN hosted_usage u ON u."usageRunId"=r.id
+          WHERE o.schedule_id=$1 AND o.definition#>>'{task,kind}'='dispatch_task' AND o.result ? 'eventId'
+            AND o.created_at>=(date_trunc('day',now() AT TIME ZONE $2)-($3::int-1)*interval '1 day') AT TIME ZONE $2 GROUP BY 1`,[row.id,zone,days])).rows:[]
+        const spent=new Map(cost.map(item=>[item.day,Number(item.cost)]))
+        return {timezone:zone,maxRunsPerDay:row.definition.maxRunsPerDay??null,days:runs.rows.map(item=>({...item,costMicroUsd:privileged?spent.get(item.day)??0:null}))}
+      }
       await this.source(tx,actor,row.workspace_id)
       if(row.version!==cmd.version) throw new ScheduleError('scheduleVersionConflict')
       if(row.status==='cancelled') throw new ScheduleError('scheduleCancelled')
@@ -169,7 +188,7 @@ export class ScheduleStore {
           await this.report(tx,row,item,'cancelled',null,'scheduleChanged')
         }
       }
-      const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET definition=$2,status=$3,next_at=$4,version=version+1,updated_at=$5 WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,def,status,next,this.clock()])).rows[0]
+      const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET definition=$2,status=$3,next_at=$4,version=version+1,updated_at=$5,disabled_reason=CASE WHEN $3='paused' THEN disabled_reason END WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,def,status,next,this.clock()])).rows[0]
       await this.listChanged(tx,row.workspace_id)
       return {schedule:updated}
     }))
@@ -188,6 +207,7 @@ export class ScheduleStore {
     await this.permission(tx, row.owner_id, row.bot_id, row.workspace_id, row.definition)
     const { rows: [busy] } = await tx.query<{ n: number }>(`SELECT count(*)::int n FROM schedule_occurrences WHERE schedule_id=$1 AND status IN ('pending','running')`, [row.id])
     if (busy.n >= (row.definition.maxConcurrent ?? 1)) throw new ScheduleError('scheduleConcurrencyLimit')
+    if (await this.dailyFull(tx, row)) throw new ScheduleError('scheduleDailyRunLimit')
     const now = this.clock()
     const { rows: [occurrence] } = await tx.query<Occurrence>(`INSERT INTO schedule_occurrences(id,schedule_id,version,due_at,definition,status,operation_id,next_retry_at,execution_decision)
       VALUES($1,$2,$3,$4,$5,'pending',$6,$4,'execute') ON CONFLICT DO NOTHING RETURNING *`, [randomUUID(), row.id, row.version, now, row.definition, operation])
@@ -249,7 +269,8 @@ export class ScheduleStore {
       if(o.attempts>MAX_ATTEMPTS)throw new ScheduleError('scheduleRecoveryExhausted')
       const misfireSkipped=o.execution_decision==='skip'
       const concurrencyLimited=!misfireSkipped&&await this.concurrencyLimited(tx,o,current.definition.maxConcurrent??1)
-      const skipReason=misfireSkipped?'misfireSkipped':concurrencyLimited?'concurrencyLimit':null
+      const dailyLimited=!misfireSkipped&&!concurrencyLimited&&await this.dailyFull(tx,current,o.id)
+      const skipReason=misfireSkipped?'misfireSkipped':concurrencyLimited?'concurrencyLimit':dailyLimited?'dailyRunLimit':null
       const issue=skipReason?null:await this.permission(tx,row.owner_id,row.bot_id,row.workspace_id,o.definition)
       const task=o.definition.task
       // The task is created and handed over after this commit, outside the schedule's locks; the lease fences it.
@@ -337,21 +358,38 @@ export class ScheduleStore {
         const operation=scheduleOperationId(row.id,`event:${deliveryKey}`)
         if((await tx.query('SELECT 1 FROM schedule_occurrences WHERE operation_id=$1',[operation])).rowCount)return 0
         const {rows:[busy]}=await tx.query<{n:number}>(`SELECT count(*)::int n FROM schedule_occurrences WHERE schedule_id=$1 AND status IN ('pending','running')`,[row.id])
-        const limited=busy.n>=(row.definition.maxConcurrent??1)
+        const reason=busy.n>=(row.definition.maxConcurrent??1)?'concurrencyLimit':await this.dailyFull(tx,row)?'dailyRunLimit':null
+        const limited=reason!==null
         const inserted=await tx.query(`INSERT INTO schedule_occurrences(id,schedule_id,version,due_at,definition,status,operation_id,next_retry_at,execution_decision,trigger,error,finished_at,reported_at)
           VALUES($1,$2,$3,clock_timestamp(),$4,$5,$6,clock_timestamp(),'execute',$7,$8,CASE WHEN $5='skipped' THEN clock_timestamp() END,CASE WHEN $5='skipped' THEN clock_timestamp() END) ON CONFLICT DO NOTHING`,
-          [randomUUID(),row.id,row.version,row.definition,limited?'skipped':'pending',operation,trigger,limited?'concurrencyLimit':null])
+          [randomUUID(),row.id,row.version,row.definition,limited?'skipped':'pending',operation,trigger,reason])
         if(inserted.rowCount)await this.listChanged(tx,row.workspace_id)
         return inserted.rowCount&&!limited?1:0
       })
     }
     return queued
   }
+  /** Whether maxRunsPerDay runs already started (or wait) today in the automation's time zone, not counting `except`. */
+  private async dailyFull(tx:PoolClient,row:Schedule,except?:string){
+    const max=row.definition.maxRunsPerDay
+    if(!max)return false
+    const {rows:[today]}=await tx.query<{n:number}>(`SELECT count(*)::int n FROM schedule_occurrences WHERE schedule_id=$1 AND ${COUNTED} AND id IS DISTINCT FROM $3::uuid
+      AND created_at>=date_trunc('day',now() AT TIME ZONE $2) AT TIME ZONE $2`,[row.id,row.definition.timezone,except??null])
+    return today.n>=max
+  }
   async fail(claim:Pick<Occurrence,'id'|'lease_token'>,error:unknown){
     const terminal=error instanceof ScheduleError&&(error.status===403||error.code==='scheduleRecoveryExhausted')
     const code=error instanceof ScheduleError?error.code:'scheduleExecutionUnavailable'
     const failed=await this.transaction(async tx=>{
       const row=(await tx.query<Occurrence>(`UPDATE schedule_occurrences SET status=CASE WHEN $3 OR attempts >= $4 THEN 'failed' ELSE 'pending' END,error=$5,next_retry_at=$6,finished_at=CASE WHEN $3 OR attempts >= $4 THEN $7::timestamptz ELSE NULL END,lease_token=NULL,lease_until=NULL,report_next_at=$7 WHERE id=$1 AND status='running' AND lease_token=$2 RETURNING *`,[claim.id,claim.lease_token,terminal,MAX_ATTEMPTS,code,new Date(this.clock().getTime()+30_000),this.clock()])).rows[0]
+      // The creator's authority no longer holds: stop the automation and say why, rather than fail every run after.
+      if(row&&terminal&&AUTHORITY_LOST.has(code)){
+        const paused=(await tx.query<Schedule>(`UPDATE user_schedules SET status='paused',next_at=NULL,disabled_reason=$2,version=version+1,updated_at=$3 WHERE id=$1 AND status='active' RETURNING *`,[row.schedule_id,code,this.clock()])).rows[0]
+        if(paused){
+          await tx.query(`UPDATE schedule_occurrences SET status='cancelled',error='scheduleChanged',lease_token=NULL,lease_until=NULL,finished_at=$2,reported_at=$2 WHERE schedule_id=$1 AND id<>$3 AND status IN ('pending','running')`,[paused.id,this.clock(),row.id])
+          await this.listChanged(tx,paused.workspace_id)
+        }
+      }
       if(row?.event_id){const schedule=(await tx.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1',[row.schedule_id])).rows[0];if(schedule)await this.lockChat(tx,schedule);await this.retireEvent(tx,row.event_id)}
       return row?.status==='failed'?row:null
     })

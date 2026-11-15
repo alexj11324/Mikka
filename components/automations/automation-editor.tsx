@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import useSWR from 'swr'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { ArrowLeft, Play } from 'lucide-react'
 import { listDevices } from '@/app/actions/agents'
@@ -31,6 +31,7 @@ import { runTask, type AutomationRun, type AutomationView } from '@/lib/schedule
 import { definitionFrom, draftFrom, emptyDraft, foldNeeded, type AutomationDraft, type IntervalUnit, type ScheduleKind } from './automation-draft'
 import { useWorkspaceBotNames } from './automations-page'
 import { GitHubTriggers } from './github-triggers'
+import { AutomationUsagePanel } from './automation-usage'
 import { useNextRunLabel, useTimingSummary } from './automation-summary'
 
 const zones = (() => { try { return Intl.supportedValuesOf('timeZone') } catch { return ['UTC'] } })()
@@ -48,6 +49,8 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
   const tAll = useTranslations('Automations')
   const tCommon = useTranslations('Common')
   const actionError = useActionError()
+  const tErrors = useTranslations('Errors')
+  const errorText = (code: string) => tErrors.has(code as never) ? tErrors(code as never) : code
   const creating = id === 'new'
   const { automation, history } = useAutomation(workspaceId, creating ? null : id)
   const current = automation.data ?? null
@@ -153,6 +156,7 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         <span>{t('creator')} · {creator}</span>
         {current && <Badge variant={current.status === 'active' ? 'secondary' : 'outline'}>{tAll(`status.${current.status}`)}</Badge>}
+        {current?.status === 'paused' && current.disabled_reason && <span role="status" className="text-destructive-foreground">{t('autoPaused', { reason: errorText(current.disabled_reason) })}</span>}
       </div>
     </header>
 
@@ -237,13 +241,19 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
       {field(t('concurrent'), <NativeSelect aria-label={t('concurrent')} value={String(draft.concurrent)} onChange={event => set({ concurrent: Number(event.target.value) })}>
         {[1, 2, 3, 4, 5].map(count => <NativeSelectOption key={count} value={String(count)}>{count}</NativeSelectOption>)}
       </NativeSelect>)}
+      {field(t('perDay'), <NativeSelect aria-label={t('perDay')} value={String(draft.perDay)} onChange={event => set({ perDay: Number(event.target.value) })}>
+        <NativeSelectOption value="0">{t('unlimited')}</NativeSelectOption>
+        {[...new Set([1, 2, 3, 5, 10, 20, 50, 100, draft.perDay])].filter(count => count > 0).sort((a, b) => a - b).map(count => <NativeSelectOption key={count} value={String(count)}>{count}</NativeSelectOption>)}
+      </NativeSelect>)}
     </SettingsSection>
+
+    {!creating && current && <AutomationUsagePanel workspaceId={workspaceId} id={current.id} />}
 
     {!creating && <SettingsSection id="automation-history" title={t('history')}>
       {history.error && !history.data ? <div className="p-4"><InlineLoadError message={tAll('loadError')} retryLabel={tCommon('retry')} onRetry={() => { void history.mutate() }} /></div>
         : !history.data ? <div className="p-4"><Skeleton className="h-10 w-full" /></div>
           : !history.data.occurrences.length ? <p className="px-5 py-4 text-sm text-muted-foreground">{t('historyEmpty')}</p>
-            : history.data.occurrences.map(run => <RunRow key={run.id} run={run} />)}
+            : history.data.occurrences.map(run => <RunRow key={run.id} run={run} timezone={current?.definition.timezone ?? draft.timezone} />)}
     </SettingsSection>}
 
     <footer className="flex flex-wrap items-center justify-between gap-2 pb-8">
@@ -276,16 +286,17 @@ function EditorFrame({ children, onBack, backLabel }: { children: React.ReactNod
 }
 
 /** One run: when, how it ended (and why when it did not), and the task it made as a chip that opens it. */
-function RunRow({ run }: { run: AutomationRun }) {
+function RunRow({ run, timezone }: { run: AutomationRun; timezone: string }) {
   const t = useTranslations('Automations')
   const tEvent = useTranslations('Automations.githubEvent')
   const tErrors = useTranslations('Errors')
-  const format = useFormatter()
+  // On the automation's own clock, like its summary, next run and usage days.
+  const when = useNextRunLabel()
   const task = runTask(run)
   const at = run.started_at ?? run.due_at
   const reason = run.error ? (t.has(`runErrors.${run.error}` as never) ? t(`runErrors.${run.error}` as never) : tErrors.has(run.error as never) ? tErrors(run.error as never) : run.error) : null
   return <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 text-sm">
-    <time className="tabular-nums text-muted-foreground" dateTime={new Date(at).toISOString()}>{format.dateTime(new Date(at), { dateStyle: 'medium', timeStyle: 'short' })}</time>
+    <time className="tabular-nums text-muted-foreground" dateTime={new Date(at).toISOString()}>{when(at, timezone)}</time>
     <Badge variant={runVariant[run.status]}>{t(`run.${run.status}`)}</Badge>
     {run.trigger && <span className="min-w-0 text-muted-foreground">{t('run.from', { event: tEvent.has(run.trigger.event.event as never) ? tEvent(run.trigger.event.event as never) : run.trigger.event.event,
       what: run.trigger.event.number !== null ? `${run.trigger.event.repository.replace(/^v2\/github\.com\//, '')}#${run.trigger.event.number}` : run.trigger.event.repository.replace(/^v2\/github\.com\//, '') })}</span>}

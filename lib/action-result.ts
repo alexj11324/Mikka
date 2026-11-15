@@ -9,6 +9,7 @@ export const ACTION_ERROR_CODES = [
   'scheduleNotPaused',
   'scheduleNotActive',
   'scheduleConcurrencyLimit',
+  'scheduleDailyRunLimit',
   'scheduleRunConflict',
   'scheduleTimeMustBeFuture',
   'invalidIanaTimezone',
