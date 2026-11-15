@@ -93,7 +93,11 @@ test('switching signed-in accounts removes the previous archive choice and its r
   const view = (ownerId: string, role: 'admin' | 'member') => <AuthenticatedReadCache ownerId={ownerId} workspace={{ workspaceId: 'workspace', role }} build="qa">
     <ConversationDirectory ownerId={ownerId} workspaceId="workspace" botId={null} />
   </AuthenticatedReadCache>
-  const select = () => document.querySelector('label select') as HTMLSelectElement
+  const select = () => {
+    const field = document.querySelector('label select')
+    assert.ok(field instanceof browser.HTMLSelectElement)
+    return field
+  }
   try {
     canSave = false
     days = 3
