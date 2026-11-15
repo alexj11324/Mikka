@@ -135,14 +135,15 @@ export async function verifyConversationOrganization({ page, fixture, rpc, passe
   await expect(viewport.locator('[data-slot="collapsible-message"]').filter({ hasText: 'Desktop inspection line 120' })).toHaveCount(1)
   await expect(viewport).toBeVisible()
   const distanceToEnd = () => viewport.evaluate(node => node.scrollHeight - node.scrollTop - node.clientHeight)
-  // Expansion can lay out the long message before the initial follow-to-end
-  // scroll. Wait for that scroll so the upward wheel actually moves the view.
+  // Expanding an existing message can preserve the reader's position. Establish
+  // the starting read position with the same real input a reader would use.
   await page.evaluate(() => document.fonts.ready.then(() => undefined))
   await expect.poll(() => viewport.evaluate(node => node.clientHeight > 0
-    && node.scrollHeight - node.clientHeight > 100
-    && node.scrollHeight - node.scrollTop - node.clientHeight <= 2)).toBe(true)
-  const bottom = await viewport.evaluate(node => node.scrollTop)
+    && node.scrollHeight - node.clientHeight > 100)).toBe(true)
   await viewport.hover()
+  await page.mouse.wheel(0, await viewport.evaluate(node => node.scrollHeight))
+  await expect.poll(distanceToEnd).toBeLessThanOrEqual(2)
+  const bottom = await viewport.evaluate(node => node.scrollTop)
   await page.mouse.wheel(0, -bottom)
   await expect.poll(() => viewport.evaluate(node => node.scrollTop)).toBeLessThan(bottom - 100)
   await expect.poll(distanceToEnd).toBeGreaterThan(100)
