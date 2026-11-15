@@ -1,0 +1,307 @@
+{
+  "at": "2026-11-15 03:17:08 UTC",
+  "main": "d59c85cb321b2b466616960db49dea8f038c2384",
+  "native": {
+    "basePublic": "5c85ee16410fe5586ad6fef708e8630ef67fe1c3",
+    "basePrivate": "97608f89e23c69f043771c114c7716b50263c62b",
+    "deviceInventory": {
+      "utc": "2026-11-15T03:06:19.584878Z",
+      "os": "Linux",
+      "physicalUsbBridge": false,
+      "usbmuxd": false,
+      "foundDeviceCLI": [],
+      "deviceGridConfigurationIndicatorCount": 0
+    },
+    "references": [
+      "https://github.com/alexj11324/Mikka/issues/2279#issuecomment-6885580906",
+      "https://github.com/alexj11324/Mikka/issues/1296#issuecomment-6875399604",
+      "https://github.com/alexj11324/Mikka/issues/2135#issuecomment-6875399404",
+      "https://github.com/alexj11324/Mikka/issues/2143#issuecomment-6819456900"
+    ],
+    "verifiedNonProductionPreview": {
+      "ownerPR": 2276,
+      "pullRequestHead": "b6bd484b29a359c72926f69f363f17acee8edfdc",
+      "actualCheckout": "d58d88aada1ee8603920a797b0863527f63682ac",
+      "job": 132673999728,
+      "run": 43668793461,
+      "branch": "pr-2276",
+      "reportedAt": "2026-11-15T02:46:33Z",
+      "runtimeVersion": "da97ae9032044d2d7f3987849f29aa4388c64c98",
+      "updateGroup": "49e92886-3673-4ec6-945d-ed8d2bdbac45",
+      "iosUpdate": "01a1dd19-6c48-7e31-9530-f1b59acd3178",
+      "officialPrivateUI": "checkout and mount both skipped",
+      "observedPhysicalDevice": false
+    },
+    "macOS": {
+      "run": 42597917647,
+      "job": 129095001861,
+      "source": "scripts/release/mobile-screenshots-build.sh",
+      "device": "xcrun simctl with iphonesimulator SDK, no physical device",
+      "result": "simulator capture step failed"
+    },
+    "testFlight": {
+      "run": 43340243545,
+      "job": 131606464050,
+      "pushBranch": "main",
+      "boundary": "EAS iOS build and TestFlight submission; no installation or physical device validation"
+    },
+    "desktop": {
+      "run": 43665873858,
+      "job": 132665240723,
+      "sha": "a714b75efb07b80f71b6c54c74826dea4e15ab26",
+      "scope": "Linux public fixture; six actual packaged-client checkpoints passed; official paired overlay was skipped"
+    }
+  },
+  "subscription": {
+    "baseE2BCustodyRun": 43661235459,
+    "releaseWorkflowRun": 43661235535,
+    "publicProtocolTests": "success",
+    "liveReleaseCheck": "skipped",
+    "liveRelease": "skipped",
+    "commercialProviderAccessed": false,
+    "policy": "Public AGENTS.md at source line 46 assigns real external subscription acceptance to serving production; issue #1954 retains release ownership. Existing isolated real-model evidence is recorded separately."
+  },
+  "publicPrs": [
+    {
+      "number": 2265,
+      "head": "5c85ee16410fe5586ad6fef708e8630ef67fe1c3",
+      "base": "main",
+      "baseSha": "d59c85cb321b2b466616960db49dea8f038c2384",
+      "state": "open",
+      "isMerged": false,
+      "mergeableState": "clean",
+      "observedChecksHead": "5c85ee16410fe5586ad6fef708e8630ef67fe1c3",
+      "complete": 25,
+      "conditionalSkipped": 6,
+      "stillActiveOrFailed": []
+    },
+    {
+      "number": 2266,
+      "head": "b3a80bd634092dbcb1b79c0bbe43c02054b3d701",
+      "base": "main",
+      "baseSha": "78d7b0409fe819b2df065786e9e1c9633838e96c",
+      "state": "closed",
+      "isMerged": true,
+      "mergeableState": "unknown",
+      "observedChecksHead": "b3a80bd634092dbcb1b79c0bbe43c02054b3d701",
+      "complete": 18,
+      "conditionalSkipped": 3,
+      "stillActiveOrFailed": []
+    },
+    {
+      "number": 2267,
+      "head": "5c2d408d110a9a782ea6579a563787df9a2fc8f8",
+      "base": "main",
+      "baseSha": "d59c85cb321b2b466616960db49dea8f038c2384",
+      "state": "open",
+      "isMerged": false,
+      "mergeableState": "clean",
+      "observedChecksHead": "5c2d408d110a9a782ea6579a563787df9a2fc8f8",
+      "complete": 29,
+      "conditionalSkipped": 8,
+      "stillActiveOrFailed": []
+    },
+    {
+      "number": 2268,
+      "head": "1381d115207c2f54512f6f7b79906b2ee0796da4",
+      "base": "main",
+      "baseSha": "d59c85cb321b2b466616960db49dea8f038c2384",
+      "state": "open",
+      "isMerged": false,
+      "mergeableState": "clean",
+      "observedChecksHead": "1381d115207c2f54512f6f7b79906b2ee0796da4",
+      "complete": 27,
+      "conditionalSkipped": 7,
+      "stillActiveOrFailed": []
+    },
+    {
+      "number": 2270,
+      "head": "a0aec8cee2a1b2bd0edf069d65e16bad429c62ac",
+      "base": "claude/vercel-cf-migration-progress-r6yom2",
+      "baseSha": "5c85ee16410fe5586ad6fef708e8630ef67fe1c3",
+      "state": "open",
+      "isMerged": false,
+      "mergeableState": "clean",
+      "observedChecksHead": "a0aec8cee2a1b2bd0edf069d65e16bad429c62ac",
+      "complete": 19,
+      "conditionalSkipped": 3,
+      "stillActiveOrFailed": []
+    },
+    {
+      "number": 2272,
+      "head": "ea696b1c1087655d54f208d3605ed7c041785bad",
+      "base": "feat/2255-conversation-organization",
+      "baseSha": "a0aec8cee2a1b2bd0edf069d65e16bad429c62ac",
+      "state": "open",
+      "isMerged": false,
+      "mergeableState": "clean",
+      "observedChecksHead": "ea696b1c1087655d54f208d3605ed7c041785bad",
+      "complete": 20,
+      "conditionalSkipped": 6,
+      "stillActiveOrFailed": []
+    },
+    {
+      "number": 2273,
+      "head": "fc0b87c1b577ea1872a33b6c67c1298126f30e64",
+      "base": "feat/2252-conversation-directory",
+      "baseSha": "ea696b1c1087655d54f208d3605ed7c041785bad",
+      "state": "open",
+      "isMerged": false,
+      "mergeableState": "clean",
+      "observedChecksHead": "fc0b87c1b577ea1872a33b6c67c1298126f30e64",
+      "complete": 24,
+      "conditionalSkipped": 7,
+      "stillActiveOrFailed": []
+    },
+    {
+      "number": 2274,
+      "head": "5aa029183192c360d8951bbfa7d6982466102abc",
+      "base": "feat/2252-conversation-directory",
+      "baseSha": "ea696b1c1087655d54f208d3605ed7c041785bad",
+      "state": "open",
+      "isMerged": false,
+      "mergeableState": "unstable",
+      "observedChecksHead": "5aa029183192c360d8951bbfa7d6982466102abc",
+      "complete": 18,
+      "conditionalSkipped": 4,
+      "stillActiveOrFailed": [
+        {
+          "job": 132674389865,
+          "name": "image-checks / image",
+          "status": "in_progress",
+          "conclusion": null
+        }
+      ]
+    },
+    {
+      "number": 2275,
+      "head": "5692b5736352c2ca2d5d672c652de6af4c659d94",
+      "base": "feat/2257-thread-delivery",
+      "baseSha": "5c2d408d110a9a782ea6579a563787df9a2fc8f8",
+      "state": "open",
+      "isMerged": false,
+      "mergeableState": "clean",
+      "observedChecksHead": "5692b5736352c2ca2d5d672c652de6af4c659d94",
+      "complete": 23,
+      "conditionalSkipped": 6,
+      "stillActiveOrFailed": []
+    },
+    {
+      "number": 2276,
+      "head": "b6bd484b29a359c72926f69f363f17acee8edfdc",
+      "base": "feat/2252-conversation-directory",
+      "baseSha": "ea696b1c1087655d54f208d3605ed7c041785bad",
+      "state": "open",
+      "isMerged": false,
+      "mergeableState": "unstable",
+      "observedChecksHead": "b6bd484b29a359c72926f69f363f17acee8edfdc",
+      "complete": 22,
+      "conditionalSkipped": 7,
+      "stillActiveOrFailed": [
+        {
+          "job": 132676205252,
+          "name": "image-checks / image",
+          "status": "in_progress",
+          "conclusion": null
+        }
+      ]
+    },
+    {
+      "number": 2277,
+      "head": "19bdaecc2a3aeb6bed4098a08710756641eb8fd6",
+      "base": "feat/2252-conversation-directory",
+      "baseSha": "ea696b1c1087655d54f208d3605ed7c041785bad",
+      "state": "open",
+      "isMerged": false,
+      "mergeableState": "unstable",
+      "observedChecksHead": "19bdaecc2a3aeb6bed4098a08710756641eb8fd6",
+      "complete": 25,
+      "conditionalSkipped": 7,
+      "stillActiveOrFailed": [
+        {
+          "job": 132675298951,
+          "name": "image-checks / image",
+          "status": "in_progress",
+          "conclusion": null
+        }
+      ]
+    },
+    {
+      "number": 2278,
+      "head": "8401cbacb3066263ef210283565f69321cd53aab",
+      "base": "feat/2252-conversation-directory",
+      "baseSha": "ea696b1c1087655d54f208d3605ed7c041785bad",
+      "state": "open",
+      "isMerged": false,
+      "mergeableState": "unstable",
+      "observedChecksHead": "8401cbacb3066263ef210283565f69321cd53aab",
+      "complete": 19,
+      "conditionalSkipped": 4,
+      "stillActiveOrFailed": [
+        {
+          "job": 132675642567,
+          "name": "image-checks / image",
+          "status": "in_progress",
+          "conclusion": null
+        }
+      ]
+    },
+    {
+      "number": 2288,
+      "head": "7aa2cfbe8f6bcdec14cd0ad3578a80326ee85e1a",
+      "base": "claude/vercel-cf-migration-progress-r6yom2",
+      "baseSha": "5c85ee16410fe5586ad6fef708e8630ef67fe1c3",
+      "state": "open",
+      "isMerged": false,
+      "mergeableState": "clean",
+      "observedChecksHead": "7aa2cfbe8f6bcdec14cd0ad3578a80326ee85e1a",
+      "complete": 25,
+      "conditionalSkipped": 6,
+      "stillActiveOrFailed": []
+    },
+    {
+      "number": 2293,
+      "head": "ce794a5f0b5d210e765ba27c29cca7accece8062",
+      "base": "codex/2254-directory-read-actions",
+      "baseSha": "fc0b87c1b577ea1872a33b6c67c1298126f30e64",
+      "state": "open",
+      "isMerged": false,
+      "mergeableState": "clean",
+      "observedChecksHead": "ce794a5f0b5d210e765ba27c29cca7accece8062",
+      "complete": 22,
+      "conditionalSkipped": 6,
+      "stillActiveOrFailed": []
+    },
+    {
+      "number": 2364,
+      "head": "6717676486671cc827b134eccc1695e55fe05c72",
+      "base": "main",
+      "baseSha": "d59c85cb321b2b466616960db49dea8f038c2384",
+      "state": "open",
+      "isMerged": false,
+      "mergeableState": "blocked",
+      "observedChecksHead": "6717676486671cc827b134eccc1695e55fe05c72",
+      "complete": 27,
+      "conditionalSkipped": 9,
+      "stillActiveOrFailed": [
+        {
+          "job": 132682507764,
+          "name": "Production build and browser interactions",
+          "status": "queued",
+          "conclusion": null
+        },
+        {
+          "job": 132680019345,
+          "name": "image-checks / image",
+          "status": "in_progress",
+          "conclusion": null
+        }
+      ]
+    }
+  ],
+  "dependencyAnalysis": {
+    "issue2261": "No true iPhone or subscription required by #2261. Original public #2274 targets #2272 directory; does not merge into main independently.",
+    "issue2256": "Issue-level prior Web checks and sorting, 50→8, and preferences documented. #2276 explicitly assigns physical cross-device checks to #2279, and stack targets unmerged #2272. New OTA does not establish device run.",
+    "issue2254": "Product issue has no listed functional dependency. Git #2268 current source directly has #2265 as parent; main lacks 47 baseline commits. It is 63 commits/159 files ahead overall. #2273 adds directory read controls, and #2293 adds the native full directory. A completed original #2268 merge would bring that baseline into main as well. Exact current HTTP/PG receipt is separate."
+  }
+}

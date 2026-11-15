@@ -1,0 +1,49 @@
+{
+  "source": "1381d115207c2f54512f6f7b79906b2ee0796da4",
+  "tree": "c0a7ef86b6ab51dc588c6b86df76f2dc4e2b5bec",
+  "started": "2026-11-15T03:17:15.846Z",
+  "passed": [
+    {
+      "at": "2026-11-15T03:17:21.781Z",
+      "name": "Two signed-in identities joined and selected the same existing Workspace via product routes"
+    },
+    {
+      "at": "2026-11-15T03:17:21.879Z",
+      "name": "Previously unseen completion returned unread with its own event watermark"
+    },
+    {
+      "at": "2026-11-15T03:17:21.926Z",
+      "name": "Observed watermark persisted and rereading the product endpoint cleared unread"
+    },
+    {
+      "at": "2026-11-15T03:17:21.990Z",
+      "name": "Manual unread advanced its persisted revision and survived a stale receipt"
+    },
+    {
+      "at": "2026-11-15T03:17:22.019Z",
+      "name": "Same-Workspace Member could neither read nor change the Owner run; unrelated Workspace selection was rejected"
+    },
+    {
+      "at": "2026-11-15T03:17:22.060Z",
+      "name": "Bulk read persisted for the active Owner and was returned by a fresh HTTP request"
+    }
+  ],
+  "backend": "Original apps/api/src/index.ts, generated application routes, real Better Auth and PostgreSQL; loopback HTTP adapter. No renderer or native device is included.",
+  "pgVersion": "170012",
+  "ended": "2026-11-15T03:17:22.060Z",
+  "originalTests": "ok 1 - run read receipts preserve new replies and explicit unread marks across clients and tenants\nok 2 - unified directory marks named chats unread and bulk-reads only the owner\u2019s admitted chat snapshots\n# tests 2\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n",
+  "workflow": {
+    "job": 132682531781,
+    "run": 43671565961,
+    "id": 14143688724,
+    "name": "original-unread-1381d115",
+    "digest": "sha256:89c671f1d735e2a9eb8afa8080f08309a1896cbf7dc93ee9ca4ca049b9d330c9",
+    "size": 1063,
+    "qaSha": "bb19eeaed1600ca00bc289c4597318da05ace3ff"
+  },
+  "initialRun": {
+    "run": 43671253056,
+    "job": 132681576524,
+    "outcome": "Readiness request used localhost while the HTTP adapter enforced a numeric loopback authority and returned 400. Original two DB tests passed. Revised QA only aligned the bootstrap authority with the configured adapter. Product unchanged."
+  }
+}
