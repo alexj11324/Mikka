@@ -43,6 +43,7 @@ import * as actions33 from '@/app/actions/workspace'
 import * as actions34 from '@/app/actions/workspace-secrets'
 import * as actions35 from '@/app/actions/workspace-settings'
 import * as actions36 from '@/app/actions/thread-title-settings'
+import * as automations from '@/app/actions/automations'
 
 // This literal is the complete callable surface, independent of Next build IDs.
 const functions = {
@@ -109,6 +110,15 @@ const functions = {
   'bots.updateBot': actions6.updateBot,
   'bots.listWorkspaceBots': actions6.listWorkspaceBots,
   'bots.getWorkspaceBotDefaults': actions6.getWorkspaceBotDefaults,
+  'automations.listAutomations': automations.listAutomations,
+  'automations.getAutomation': automations.getAutomation,
+  'automations.automationHistory': automations.automationHistory,
+  'automations.createAutomation': automations.createAutomation,
+  'automations.updateAutomation': automations.updateAutomation,
+  'automations.pauseAutomation': automations.pauseAutomation,
+  'automations.resumeAutomation': automations.resumeAutomation,
+  'automations.cancelAutomation': automations.cancelAutomation,
+  'automations.runAutomationNow': automations.runAutomationNow,
   'bots.listBotsForWorkspace': actions6.listBotsForWorkspace,
   'collaboration.exchangeDocument': actions7.exchangeDocument,
   'collaboration.listMembers': actions7.listMembers,

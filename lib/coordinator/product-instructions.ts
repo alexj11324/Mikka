@@ -1,5 +1,5 @@
 import { deploymentSwitch } from '@/lib/deployment-switches'
-import { SCHEDULE_INSTRUCTIONS } from '@/lib/schedules/contract'
+import { SCHEDULE_INSTRUCTIONS } from '@/lib/schedules/instructions'
 import { FACTORY_QUESTION_INSTRUCTIONS, FACTORY_CHECK_RECOVERY_INSTRUCTIONS } from '@/lib/factory/instructions'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
 import { personalMailboxInstructions } from '@/lib/personal-mailbox-instructions'
