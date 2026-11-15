@@ -122,6 +122,8 @@ test('mobile task endpoints with real task ACL, current workspace membership and
   }
   const request = (id: string, options?: ReadOptions) => run('/api/mobile/tasks/' + id, req => GET(req, { params: Promise.resolve({ id }) }), options)
   const listRequest = (options?: ReadOptions) => run('/api/mobile/tasks', list, options)
+  const { GET: readThreadArtifacts } = await import('../app/api/mobile/threads/[id]/artifacts/route')
+  const threadArtifacts = (id: string, options?: ReadOptions) => run('/api/mobile/threads/' + id + '/artifacts', req => readThreadArtifacts(req, { params: Promise.resolve({ id }) }), options)
   const persisted = async () => (await pool.query(`select
     (select coalesce(jsonb_agg(jsonb_build_array(id,"workspaceId","ownershipState",status,title) order by id),'[]') from issues where "userId"=$1) as tasks,
     (select coalesce(jsonb_agg(jsonb_build_array(id,"workspaceId","issueId","botId",status) order by id),'[]') from agent_runs where "userId"=$1) as runs,
@@ -318,9 +320,44 @@ test('mobile task endpoints with real task ACL, current workspace membership and
       assert.equal(peerResponse.status, 200)
       const peerWork = (await peerResponse.json()).work
       assert.ok(peerWork.pullRequests.every((pull: { sourceConversationId?: string }) => !pull.sourceConversationId))
+      // The thread's Artifact segment on iOS: the task's conversation lists the whole Factory task's PRs and its own documents.
+      const shown = await threadArtifacts(latest, { workspaceId: teamWorkspace.id })
+      assert.equal(shown.status, 200)
+      const groups = (await shown.json()).groups
+      assert.deepEqual(groups.pullRequests.map((pull: { url: string }) => pull.url).sort(), ['https://github.com/acme/app/pull/1', 'https://github.com/acme/app/pull/42'])
+      assert.deepEqual(groups.reports.map((item: { artifactId: string; kind: string }) => [item.artifactId, item.kind]), [[artifactIds[1], 'html']])
+      assert.equal((await threadArtifacts(latest, { bearer: peer.token, workspaceId: teamWorkspace.id })).status, 404, 'another person never reads the thread\'s Artifacts')
+      assert.equal((await threadArtifacts(latest, { workspaceId: secondWorkspace.id })).status, 404, 'another workspace reads nothing')
     } finally {
       await pool.query('DELETE FROM factory_tasks WHERE id=$1 AND "userId"=$2', [factoryId, owner])
       await pool.query('DELETE FROM coordinator_events WHERE id=$1 AND "userId"=$2', [source, owner])
+    }
+  })
+  await t.test('a thread without a task lists its own runs\' evidence for its owner only, in its own workspace', async () => {
+    const thread = await seedRun(pool, { userId: owner, agentId: agent, workspaceId: teamWorkspace.id, botId: bot })
+    const capture = randomUUID(), document = randomUUID()
+    await pool.query(`INSERT INTO run_captures(id,"userId","runId",kind,"contentType",source,status,title,size,"inlineContent","storageKey",sha256)
+      VALUES($1,$2,$3,'image','image/png','local','ready','Preview',4,$4,$5,'0')`, [capture, owner, thread, Buffer.from('PNG!'), 'fixture/' + capture])
+    await pool.query(`insert into artifacts(id,"userId","workspaceId",kind,title,"runId") values($1,$2,$3,'markdown','Thread report',$4)`, [document, owner, teamWorkspace.id, thread])
+    try {
+      // The app names its workspace; without it the request reads the default (Personal) one, where this thread is not.
+      assert.equal((await threadArtifacts(thread)).status, 404)
+      const response = await threadArtifacts(thread, { workspaceId: teamWorkspace.id })
+      assert.equal(response.status, 200)
+      const body = await response.json()
+      assert.equal(body.count, 2)
+      assert.deepEqual(body.groups.captures.map((item: { captureId: string; kind: string; webPath: string | null }) => [item.captureId, item.kind, item.webPath]), [[capture, 'image', null]])
+      assert.deepEqual(body.groups.reports.map((item: { artifactId: string; kind: string; version: number }) => [item.artifactId, item.kind, item.version]), [[document, 'markdown', 1]])
+      assert.deepEqual([body.groups.plans, body.groups.pullRequests], [[], []])
+      assert.equal((await threadArtifacts(thread, { bearer: peer.token, workspaceId: teamWorkspace.id })).status, 404)
+      assert.equal((await threadArtifacts(thread, { workspaceId: secondWorkspace.id })).status, 404)
+      assert.equal((await threadArtifacts(secondRun, { workspaceId: teamWorkspace.id })).status, 404)
+      assert.equal((await threadArtifacts(randomUUID(), { workspaceId: teamWorkspace.id })).status, 404)
+      assert.equal((await threadArtifacts(thread, { bearer: null, workspaceId: teamWorkspace.id })).status, 401)
+    } finally {
+      await pool.query('DELETE FROM run_captures WHERE id=$1', [capture])
+      await pool.query('DELETE FROM artifacts WHERE id=$1', [document])
+      await pool.query('DELETE FROM agent_runs WHERE id=$1', [thread])
     }
   })
   await t.test('detail includes contract fields, every attempt, replacement time and creation; excludes raw errors', async () => {
