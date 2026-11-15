@@ -2313,5 +2313,47 @@
     "behavior": "The installation's existing tool definitions supply both native Eve discovery and application action execution, preserving the configured Bot capability selection.",
     "test": "lib/agent-kit/tool-defaults-compat.test.ts",
     "suite": "test:agent-kit-model"
+  },
+  "app/actions/automations.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The signed-in member lists, reads and runs the workspace's automations, and creates, changes, pauses, resumes or cancels them, through the schedule store in the installation PostgreSQL database; each run re-checks the creator's authority.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
+  },
+  "drizzle/20261115132401_schedule_page_requests.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Allow a schedule created on the automations page to record no source chat event, only when its request origin is the page.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
+  },
+  "lib/schedules/automation-view.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Types and the run-to-task projection the automations page reads; no I/O.",
+    "test": "lib/schedules/contract.test.ts",
+    "suite": "test:schedules"
+  },
+  "lib/schedules/instructions.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The scheduling instructions given to the chat model, as text; no I/O.",
+    "test": "lib/schedules/contract.test.ts",
+    "suite": "test:schedules"
+  },
+  "lib/schedules/store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Create, run now and execute automations that hand a Bot a new task through the installation PostgreSQL database, idempotent on the occurrence ID and bounded by maxConcurrent.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
+  },
+  "lib/schedules/time.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Compute schedule times and repeated daylight-saving times with the runtime's time zone data; no I/O.",
+    "test": "lib/schedules/time.test.ts",
+    "suite": "test:schedules"
   }
 }
