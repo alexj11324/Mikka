@@ -21,7 +21,6 @@ import type { LegacyChatRequest } from './legacy-chat-archive'
 import { TeamHome } from '@/components/teams/team-home'
 import { ArtifactsPage } from '@ui-slot/artifacts'
 import { MemoryPage } from '@ui-slot/memory'
-import { AutomationsSection } from '@/components/automations/automations-section'
 import type { CoordinatorPrefill } from '@/components/coordinator/coordinator-chat'
 import { INBOX_PHONE_HEADER, INBOX_TITLE, InboxPage } from '@ui-slot/inbox'
 import { AppFrame, AppShellContent, FRAME_OWNS_HEADER, FRAME_OWNS_PANEL, SignOutBoundary, WindowBar } from '@/components/app-shell'
@@ -121,6 +120,7 @@ function DetailLoading() {
 const TaskDetail = dynamic(() => import('./task-detail').then(module => module.TaskDetail), { loading: DetailLoading })
 const ArtifactWindow = dynamic(() => import('@/components/artifacts/artifact-window').then(module => module.ArtifactWindow), { ssr: false })
 const ProjectWorkspace = dynamic(() => import('./project-workspace').then(module => module.ProjectWorkspace), { loading: DetailLoading })
+const AutomationsSection = dynamic(() => import('@/components/automations/automations-section').then(module => module.AutomationsSection), { loading: DetailLoading })
 // Settings chunks load inside the persistent frame, leaving its navigation and providers mounted.
 // OWN_SETTINGS_FRAME is optional (lib/ui-overlay.mjs UI_SLOT_EXPORTS): a layer without it keeps the workspace frame.
 const ownSettingsFrame = (settingsFrameSlot as { OWN_SETTINGS_FRAME?: boolean }).OWN_SETTINGS_FRAME === true
