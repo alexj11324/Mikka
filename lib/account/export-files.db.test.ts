@@ -35,17 +35,33 @@ test('portable account files preserve owned bytes/versions and abort missing, al
     return response.body
   } } })
   const { accountExportFiles, accountExportBody } = await import('./export-files')
-  const { buildAccountExport } = await import('./export')
+  const { buildAccountExport, claimExport, isExportCurrent, releaseExport, reserveExport } = await import('./export')
   const { pool } = await import('../db')
   const { workspacePool } = await import('../workspace-db')
   const artifactIds: string[] = []
   t.after(async () => {
     await database.query('DELETE FROM artifacts WHERE id=ANY($1::uuid[])', [artifactIds])
-    await database.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[])', [[ownerRun, peerRun]])
+    await database.query('DELETE FROM agent_runs WHERE "userId"=ANY($1::text[])', [[owner, peer]])
     await database.query('DELETE FROM agents WHERE id=ANY($1::uuid[])', [[ownerAgent, peerAgent]])
     await database.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[owner, peer]])
     await Promise.all([database.end(), pool.end(), workspacePool.end()])
     server.closeAllConnections(); server.close()
+  })
+  await t.test('stream rechecks preserve the download timestamp and row version until the grant expires or is removed', async () => {
+    const start = new Date('2026-01-11T12:00:00Z')
+    const grant = await reserveExport(owner, start)
+    assert.ok(grant.ok)
+    assert.ok(await claimExport(owner, grant.token, start))
+    const readReceipt = async () => (await database.query('SELECT "downloadedAt", xmin::text AS revision FROM account_data_exports WHERE id=$1', [grant.id])).rows[0]
+    const receipt = await readReceipt()
+    const later = new Date(start.getTime() + 1_000)
+    assert.ok(await isExportCurrent(owner, grant.token, later))
+    assert.ok(await isExportCurrent(owner, grant.token, later))
+    assert.equal(await isExportCurrent(peer, grant.token, later), false)
+    assert.equal(await isExportCurrent(owner, grant.token, grant.expiresAt), false)
+    assert.deepEqual(await readReceipt(), receipt)
+    await releaseExport(owner, grant.id)
+    assert.equal(await isExportCurrent(owner, grant.token, later), false)
   })
   async function artifact(userId: string, versions: Buffer[], remote = false) {
     const id = randomUUID(); artifactIds.push(id)
@@ -77,7 +93,15 @@ test('portable account files preserve owned bytes/versions and abort missing, al
   await database.query(`INSERT INTO run_captures(id,"userId","runId",kind,"contentType",source,status,title,"storageKey",sha256,size) VALUES($1,$2,$3,'image','image/png','local','ready','Owned capture',$4,$5,$6)`, [captureId, owner, ownerRun, captureKey, hash(capture), capture.length])
   await database.query('INSERT INTO run_checkpoints("runId","userId","baseCommit",patch,files,"takenAt","updatedAt") VALUES($1,$2,$3,$4,1,$5,$6)', [ownerRun, owner, baseCommit, patch, takenAt, updatedAt])
   await database.query('INSERT INTO run_checkpoints("runId","userId","baseCommit",patch,files,"takenAt") VALUES($1,$2,$3,$4,1,now())', [peerRun, peer, 'b'.repeat(40), gzipSync('peer private checkpoint')])
+  const emptyRun = await seedRun(database, { userId: owner, agentId: ownerAgent })
+  await database.query(`INSERT INTO run_messages (id,"runId","userId",text,"createdAt") VALUES
+    (gen_random_uuid(),$1,$3,'second','2026-01-01T00:01Z'), (gen_random_uuid(),$1,$3,'first','2026-01-01T00:00Z'),
+    (gen_random_uuid(),$2,$4,'peer','2026-01-01T00:00Z')`, [ownerRun, peerRun, owner, peer])
   const data = await buildAccountExport(owner)
+  const thread = (id: string) => data.threads.find(row => 'id' in row && row.id === id)
+  assert.deepEqual(thread(ownerRun)?.messages.map(row => row.text), ['first', 'second'])
+  assert.deepEqual(thread(emptyRun)?.messages, [])
+  assert.equal(thread(peerRun), undefined)
   const options = { database, signal: new AbortController().signal, assertCurrent: async () => {} }
   await t.test('all owned versions, binary capture and masked checkpoint round-trip; peer object IDs never reach storage', async () => {
     const files = await accountExportFiles(owner, database)

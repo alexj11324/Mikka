@@ -6,7 +6,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { refreshPublishedPullRequest } from './publication-webhook'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { readFactoryFlow } from '../factory/public-flow'
 import type { FactoryTask } from '../factory/store'
 import type { CoordinatorEventInput } from '../coordinator-events'
@@ -34,7 +34,7 @@ test('a PR webhook records its line counts on the delivery and on the tasks it b
   const admin = guarded(base!)
   const name = `prw_${randomUUID().replaceAll('-', '')}_e2e`
   const adminPool = new Pool({ connectionString: admin.toString(), max: 1 })
-  await adminPool.query(`CREATE DATABASE ${name} TEMPLATE template0`)
+  await createTestDatabase(adminPool, name, 'template0')
   const target = new URL(admin.toString()); target.pathname = `/${name}`; guarded(target.toString())
   const pool = new Pool({ connectionString: target.toString(), max: 2 })
   // The race clients are real transaction executors, just like the application
@@ -55,6 +55,34 @@ test('a PR webhook records its line counts on the delivery and on the tasks it b
       [runId, delivered, JSON.stringify({ url, state: 'open' })])
     const task = async (id: string) => (await pool.query<{ content: { attrs: { mikka: { pullRequests: Record<string, unknown>[] } }; content: unknown[] }; revision: number }>('SELECT content, revision FROM issues WHERE id=$1', [id])).rows[0]
     const versions = async (id: string) => (await pool.query<{ actor_type: string; actor_id: string; revision: number }>('SELECT actor_type, actor_id, revision FROM issue_versions WHERE "issueId"=$1 ORDER BY revision', [id])).rows
+
+    await t.test('the same GitHub repository preserves publication identity when the owner changes its capitalization', async () => {
+      const original = event({ additions: 12, deletions: 3 })
+      const renamed = { ...original, repository: { full_name: 'O/R' }, pull_request: { ...original.pull_request, html_url: 'https://github.com/O/R/pull/7' } }
+      const fixture = await pool.connect()
+      try {
+        await fixture.query('BEGIN')
+        await refreshPublishedPullRequest('pull_request', renamed, fixture)
+        const result = await fixture.query('SELECT "pullRequest" FROM run_publications WHERE "runId"=$1', [runId])
+        assert.equal(result.rows[0].pullRequest.additions, 12)
+        assert.equal(result.rows[0].pullRequest.url, url, 'retain the exact recorded public URL')
+        const savedTask = await fixture.query('SELECT content,revision FROM issues WHERE id=$1', [delivered])
+        assert.equal(savedTask.rows[0].content.attrs.mikka.pullRequests[1].deletions, 3)
+        assert.equal(savedTask.rows[0].revision, 2)
+        await refreshPublishedPullRequest('pull_request', renamed, fixture)
+        const replay = await fixture.query('SELECT revision FROM issues WHERE id=$1', [delivered])
+        assert.equal(replay.rows[0].revision, 2)
+        const mismatch = { ...renamed, pull_request: { ...renamed.pull_request, additions: 99, html_url: 'https://github.com/different/r/pull/7' } }
+        await refreshPublishedPullRequest('pull_request', mismatch, fixture)
+        const same = await fixture.query('SELECT "pullRequest" FROM run_publications WHERE "runId"=$1', [runId])
+        assert.equal(same.rows[0].pullRequest.additions, 12, 'a different repository cannot change this delivery')
+        const untouched = await fixture.query('SELECT revision FROM issues WHERE id=$1', [unrelated])
+        assert.equal(untouched.rows[0].revision, 1)
+      } finally {
+        await fixture.query('ROLLBACK')
+        fixture.release()
+      }
+    })
 
     await refreshPublishedPullRequest('pull_request', event({ additions: 18, deletions: 4 }, 'closed', true), pool)
     const saved = await task(delivered)

@@ -71,7 +71,7 @@ export function boundary(previous: Attempt, next: Attempt): Boundary {
 /** 活动 on the task's page: its creation and replaced threads, and one row per Agent's stretch, oldest first. */
 export type ActivityEntry = Exclude<TaskActivity, Attempt> | TaskActivityFact | TaskFactoryEvent | { kind: 'agent'; run: AgentRun }
 
-export function nativeActivityLabel(item: TaskActivityFact | TaskFactoryEvent) {
+export function nativeActivityLabel(item: TaskActivityFact | TaskFactoryEvent, subject?: { taskId: string; code: string | null }) {
   if (item.kind === 'factory_gate' || item.kind === 'evidence') return taskFactoryLabel(item, {
     ...mobileMessages.GroupTask, ...mobileMessages.FactoryAcceptance.kind, pullRequest: mobileMessages.FactoryAcceptance.pullRequest,
   })
@@ -83,7 +83,7 @@ export function nativeActivityLabel(item: TaskActivityFact | TaskFactoryEvent) {
     activity: (key, values = {}) => Workspace.activity[key].replace(/\{(\w+)\}/g, (whole, name: string) => values[name] ?? whole),
     status: value => lookup(Issue.status, value),
     priority: value => lookup(Issue.priority, value),
-  })
+  }, subject)
   return [item.event.actor?.name, description].filter(Boolean).join(' · ')
 }
 

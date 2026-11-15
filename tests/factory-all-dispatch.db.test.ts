@@ -7,6 +7,7 @@ import { mock, test } from 'node:test'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { connectGitHub, githubAppStub } from './support/github-app-stub'
+import { addFactoryPublicationEvidence, addFactoryVisualEvidence } from './helpers/factory-visual-evidence'
 
 mock.module(new URL('../lib/coordinator/decide.ts', import.meta.url).href, { namedExports: { invokeDecision: async () => null } })
 
@@ -63,6 +64,9 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
     [sourceEventId, userId, botId, `acme:${sourceEventId}`, JSON.stringify({ text: `Please fix the checkout tax rounding in ${REPO}.` })])
 
   const dispatched = await steps.dispatchRun(userId, { issueId, repo: REPO, requestKey: `acme:${randomUUID()}`, sourceEventId }, undefined, botId) as unknown as { runId?: string; error?: string }
+  assert.equal((await pool.query(`SELECT i.content->'attrs'->'mikka'->'delegate'->>'id'=r."agentId"::text AS assigned
+    FROM issues i JOIN agent_runs r ON r."issueId"=i.id WHERE r.id=$1 AND i.id=$2`,[dispatched.runId,issueId])).rows[0]?.assigned,true)
+
   const counts = (await pool.query(`SELECT
       (SELECT count(*)::int FROM factory_tasks WHERE "userId"=$1) AS tasks,
       (SELECT count(*)::int FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId" WHERE t."userId"=$1) AS attempts,
@@ -103,7 +107,12 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
       verify: check ? { status: 'passed', command, exitCode: 0, signal: null, timedOut: false, output: 'passed' } : { status: 'not_run' },
       ...(check ? { check: { sha, readOnly: true }, criteria: [{ text: 'Tax rounds to the cent', passed: true, evidence: 'The fixture command passed.', command, exitCode: 0 }] } : { publish: { commit: sha, pushed: true, branch: 'mikka/fixture', remote: 'origin' } }),
     })])
+    if (!check) await addFactoryVisualEvidence(pool, id)
     await runtime.reconcile.run(userId, id)
+    if (!check) {
+      const { rows: [task] } = await pool.query('SELECT t.id FROM factory_tasks t JOIN factory_candidates c ON c.id=t."candidateId" WHERE c."runId"=$1', [id])
+      await addFactoryPublicationEvidence(pool, task.id)
+    }
   }
   await finish(dispatched.runId!, false)
   const current = async () => (await pool.query(`SELECT t.id,t.route,t.stage,t.status,a."runId",r.kind,r."baseBranch",r."agentDefinition" FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" LEFT JOIN agent_runs r ON r.id=a."runId" WHERE t."userId"=$1`, [userId])).rows[0]
@@ -207,7 +216,7 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
         modelDispatch: { mode: selectionMode ?? 'preference' as const, location: 'local' as const, entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
         ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}),
         ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }
-      return { issueId: issue, botId, agentId: agent.id as string, deviceRepoId: repo.id as string,
+      return { issueId: issue, botId, ownerRequested:true, agentId: agent.id as string, deviceRepoId: repo.id as string,
         sourceEventId: source, key: `spec:${randomUUID()}`, needsSpec: true, note: 'Plan first.', selection,
         queue: (...args: Parameters<import('../lib/factory/dispatch').FactoryQueue>) => queueFactoryRun(...args, undefined, selection) }
     }
@@ -220,6 +229,10 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
     const input = await request()
     const [first, replay] = await Promise.all([queueFactoryTask(pool, userId, input), queueFactoryTask(pool, userId, input)])
     assert.equal(replay.runId, first.runId)
+    const delegate = await pool.query(`SELECT i.content->'attrs'->'mikka'->'delegate'->>'id' AS id,
+      (SELECT count(*)::int FROM issue_versions v WHERE v."issueId"=i.id AND v.actor_id=$2) AS assignments
+      FROM issues i WHERE i.id=$1`,[input.issueId,agent.id])
+    assert.deepEqual(delegate.rows,[{id:agent.id,assignments:1}])
     const { rows: [plan] } = await pool.query(`SELECT r.kind,r."agentDefinition",t.stage,t.status,t."sourceEventId"
       FROM agent_runs r JOIN factory_attempts a ON a."runId"=r.id JOIN factory_tasks t ON t.id=a."taskId" WHERE r.id=$1`, [first.runId])
     assert.deepEqual([plan.kind, plan.stage, plan.status, plan.sourceEventId, plan.agentDefinition.readOnly], ['plan', 'spec', 'running', input.sourceEventId, true])

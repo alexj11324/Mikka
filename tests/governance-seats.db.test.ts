@@ -6,7 +6,7 @@ import { Pool } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { eq } from 'drizzle-orm'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 import * as workspaceSchema from '../lib/db/workspace-schema'
 import { workspaceEntitlements } from '../lib/db/team-entitlements-schema'
 import { activeHumanSeats, assertActiveHumanAdmission, lockWorkspaceEntitlements } from '../lib/governance/entitlements'
@@ -24,7 +24,7 @@ if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 test('real PostgreSQL serializes seats across acceptance and restoration', { skip: !url, timeout: 120_000 }, async t => {
   const admin = new Pool({ connectionString: url, max: 1 })
   const name = `governance_seats_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${name}" TEMPLATE template0`)
+  await createTestDatabase(admin, name, 'template0')
   const target = new URL(url!); target.pathname = `/${name}`
   const pool = new Pool({ connectionString: target.toString(), max: 10 })
   const quotaPool = new Pool({ connectionString: target.toString(), max: 5 })

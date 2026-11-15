@@ -88,3 +88,33 @@ export function attemptStateOf(run: TaskStateRun): AttemptState {
   if (run.status === 'failed' || run.outcome === 'failed') return 'failed'
   return 'done'
 }
+
+/**
+ * What a task's Agent is doing, shown as a small mark beside the task's status and never as a status, a group or a
+ * column (decision 2026-11-13-1405): `working` while a run is queued or under way, `waiting` when it has stopped for
+ * the person (a question, an approval, a PR to review, a login, quota), `error` when the run failed. Null otherwise.
+ */
+export type RunIndicator = 'working' | 'waiting' | 'error'
+export function runIndicatorOf(state: TaskState | 'idle'): RunIndicator | null {
+  switch (state) {
+    case 'running': case 'queued': return 'working'
+    case 'waiting': case 'blocked': return 'waiting'
+    case 'failed': return 'error'
+    default: return null
+  }
+}
+
+/**
+ * What a conversation (a run) is doing, for the one small mark on the conversation's own surfaces: its title link, its
+ * dispatch card (decision 2026-11-13-1405). Working while it runs or waits for a machine, waiting when it has stopped
+ * for the person, error when it failed; null when it is idle, finished or replaced. The task's chip never carries it.
+ */
+export function conversationIndicatorOf(run: { status: string; outcome?: string | null; stopReason?: string | null; pauseReason?: string | null }): RunIndicator | null {
+  const outcome = run.outcome === 'done' || run.outcome === 'blocked' || run.outcome === 'needs_input' || run.outcome === 'failed' || run.outcome === 'idle' ? run.outcome : null
+  switch (attemptStateOf({ runId: '', status: run.status, outcome, stopReason: run.stopReason ?? null, pauseReason: run.pauseReason === 'human_control' || run.pauseReason === 'quota_exhausted' ? run.pauseReason : null })) {
+    case 'running': return 'working'
+    case 'paused': case 'blocked': return 'waiting'
+    case 'failed': return 'error'
+    default: return null
+  }
+}

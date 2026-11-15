@@ -1,3 +1,4 @@
+import { mobileMessages } from '../lib/messages.ts'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { ModelMenuRead } from '../lib/model-menu-read.ts'
@@ -33,6 +34,6 @@ test('generation does not add timing text to the collapsed model chip', () => {
   assert.equal(modelMenuLabel(current, false), 'Chosen Model')
 })
 test('the absent-menu chip has explicit loading and retry states', () => {
-  assert.equal(modelMenuReadLabel(true), '正在读取模型')
-  assert.equal(modelMenuReadLabel(false), '模型加载失败，重试')
+  assert.equal(modelMenuReadLabel(true), mobileMessages.Common.loading)
+  assert.equal(modelMenuReadLabel(false), mobileMessages.Coordinator.modelPicker.retryLoad)
 })

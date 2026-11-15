@@ -7,7 +7,7 @@ import { Pool } from 'pg'
 import { observePoolCommits } from '../lib/db/commit-effects'
 import { orderMigrations } from '../scripts/migration-order.mjs'
 import { isE2eTarget, E2E_DB_RULE } from './helpers/e2e-target.mjs'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 import { fakeThreadMachines } from './support/thread-machine-fake'
 import { sealSecret, userE2bKeyAad } from '../lib/secrets/crypto'
 import { seedRunProjectResources } from './helpers/run-project-resources'
@@ -19,7 +19,7 @@ else if (process.env.REQUIRE_DB === '1') assert.fail('REQUIRE_DB=1 needs an isol
 test('admitted Cloud tasks park their real binding before normal local recovery', { skip: !url, timeout: 180_000 }, async t => {
   const admin = new Pool({ connectionString: url, max: 1 })
   const database = `cloud_handoff_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(url!); target.pathname = `/${database}`
   const pool = new Pool({ connectionString: target.toString(), max: 8 })
   observePoolCommits(pool)

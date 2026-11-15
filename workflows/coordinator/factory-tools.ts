@@ -1,5 +1,6 @@
 import {tool,zodSchema,jsonSchema} from 'ai'
 import {z} from 'zod'
+import { requestIssueInput } from '@/lib/coordinator/issue-input'
 import { routeSchema } from '@/lib/factory/contract'
 import {factoryDispatchSchema} from '@/lib/factory/dispatch-schema'
 import {questionReferenceSchema} from '@/lib/factory/questions/schema'
@@ -10,8 +11,8 @@ const coordinatorQuestionReferenceSchema = questionReferenceSchema.pick({ questi
 const skillEvaluationInput = zodSchema(skillEvaluationCommandSchema)
 export function factoryCoordinatorTools(userId:string,scope?:NativeToolScope){const id=z.uuid();return {
 create_issue_from_request: tool({
-      description: 'Create one personal issue from an actual authenticated user request when it needs a new task. Use the sourceEventId from list_factory_requests and a concise title; the server copies the original request into the description. Replaying the same source returns its existing accessible issue. Use the returned issueId for Factory routing.',
-      inputSchema: z.object({ sourceEventId: id, title: z.string().trim().min(1).max(200) }).strict(),
+      description: 'Create one task in the source conversation’s workspace. Use its sourceEventId from list_factory_requests, a concise title and a human-readable summary of the goal. The linked conversation retains the full instructions. A replay returns the existing accessible issueId for Factory routing.',
+      inputSchema: requestIssueInput,
       execute: input => steps.createIssueFromRequestStep(userId, input, scope),
     }),
 route_factory_task: tool({

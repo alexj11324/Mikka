@@ -7,6 +7,9 @@
   详情页里面，应该是专门打开验收页统一来看……截图之类的东西……你放在一页不就好了吗？
   ……我希望它能够验收页能够是 HTML……或者是 Markdown 的形式。」
 - Rule: —
+- Superseded by: [2026-11-08-2328](2026-11-08-2328-factory-visual-evidence-required.md)
+  only for rule 2's UI-only default recording and handoff without visual evidence.
+  Every other rule remains in force.
 - Replaces: in `2026-11-03-0415-all-dispatch-through-factory.md`, the clause
   "execute, then independent review, then independent verification, then
   acceptance — and none of them may be skipped", rule 2 (the host always

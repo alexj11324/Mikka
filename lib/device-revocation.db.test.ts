@@ -38,7 +38,7 @@ const raw = new Pool({ connectionString: target.toString(), max: 8 })
 const scope = createRequestDatabaseScope(target.toString())
 before(async () => {
   await admin.query(`CREATE SCHEMA ${schema}`)
-  for (const table of ['devices', 'device_tokens', 'device_token_devices', 'agents', 'agent_runs', 'run_tokens', 'run_chunks', 'run_messages', 'device_management_commands']) {
+  for (const table of ['devices', 'device_tokens', 'device_token_devices', 'agents', 'agent_runs', 'run_tokens', 'run_chunks', 'run_messages', 'coordinator_events', 'device_management_commands']) {
     await raw.query(`CREATE TABLE ${table} (LIKE public.${table} INCLUDING DEFAULTS INCLUDING INDEXES)`)
   }
   await raw.query(await readFile(new URL('../drizzle/20261031002605_daemon_credential_revocation.sql', import.meta.url), 'utf8'))

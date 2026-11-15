@@ -6,7 +6,7 @@ import test, { mock } from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { enterprisePrincipal } from './principal'
 import { tokenWorkspace } from '../tokens/principal'
 
@@ -22,7 +22,7 @@ function errorCode(error: unknown): string | undefined {
 test('Enterprise execution authority keeps verified device/workflow/cron provenance and current tenant policy with pools of one', { skip: !allowed, timeout: 180_000 }, async t => {
   const admin = new Pool({ connectionString: target, max: 1 })
   const database = 'enterprise_execution_' + randomUUID().replaceAll('-', '') + '_e2e'
-  await admin.query('CREATE DATABASE "' + database + '" TEMPLATE template0')
+  await createTestDatabase(admin, database, 'template0')
   const isolated = new URL(target!); isolated.pathname = '/' + database
   const url = isolated.toString()
   const control = new Pool({ connectionString: url, max: 3 })

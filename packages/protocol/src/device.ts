@@ -654,6 +654,7 @@ export const COMMANDS_MAX_SKIP_DEVICE_COMMANDS = 10
  * until acked); `stop` repeats until the run has ended.
  */
 /** Older daemons reject unknown command kinds; advertise this extension. */
+export const ACTIVE_TURN_STEER_HEADER = 'x-mikka-active-turn-steer'
 export const MAILBOX_NOTICE_HEADER = 'x-mikka-mailbox-notices'
 
 export const runCommandSchema = z.discriminatedUnion("kind", [
@@ -663,6 +664,7 @@ export const runCommandSchema = z.discriminatedUnion("kind", [
     messageId: z.uuid(),
     text: z.string().min(1).max(100_000),
   }),
+  z.object({ kind: z.literal("steer"), runId: id, messageId: z.uuid(), text: z.string().min(1).max(100_000) }),
   z.object({ kind: z.literal("stop"), runId: id }),
   // A host notification carries addresses only; peer content remains behind
   // the authenticated mailbox read and retains its original provenance.
@@ -696,6 +698,7 @@ export type RunCommandsResponse = z.infer<typeof runCommandsResponse>
 /** `POST /v1/devices/:deviceId/commands/ack`: inputs the agent now has. */
 export const runCommandsAck = z.object({
   delivered: z.array(z.uuid()).max(500),
+  refusedSteers: z.array(z.uuid()).max(500).optional(),
 })
 export type RunCommandsAck = z.infer<typeof runCommandsAck>
 

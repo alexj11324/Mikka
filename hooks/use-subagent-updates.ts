@@ -4,16 +4,16 @@ import { useMemo, useSyncExternalStore } from 'react'
 import { withBasePath } from '@/lib/base-path'
 import { pageRefreshSignal } from '@/lib/app-build'
 import { ComputerEventFeed } from '@/lib/computer/event-stream'
-import type { LiveChannels } from '@/lib/live/channels'
+import type { LiveChannelRegistry } from '@/lib/live/channels'
 import type { SubagentUpdate } from '@/lib/subagents/login-needs'
 import { useLiveScope } from './use-live-key'
 
-const feeds = new WeakMap<LiveChannels, Map<string, ComputerEventFeed>>()
+const feeds = new WeakMap<LiveChannelRegistry, Map<string, ComputerEventFeed>>()
 const empty: ReadonlyMap<string, SubagentUpdate> = new Map()
 const emptySnapshot = () => empty
 const noSubscribe = () => () => {}
 
-function sharedFeed(channels: LiveChannels, workspaceId: string) {
+function sharedFeed(channels: LiveChannelRegistry, workspaceId: string) {
   let scoped = feeds.get(channels)
   if (!scoped) { scoped = new Map(); feeds.set(channels, scoped) }
   let feed = scoped.get(workspaceId)

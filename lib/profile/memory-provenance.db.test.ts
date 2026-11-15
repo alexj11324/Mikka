@@ -5,7 +5,7 @@ import { promisify } from 'node:util'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { factInput, type ConsolidationDecider } from './facts'
 import { withBasePath } from '../base-path'
 import { workspaceLink } from '../../components/workspace/workspace-navigation'
@@ -23,8 +23,8 @@ test('real memory producers persist authorized sources across separate applicati
   let app: Pool | undefined, workspace: Pool | undefined
   let modulePools: Pool[] = []
   try {
-    await admin.query(`CREATE DATABASE "${appName}" TEMPLATE template0`)
-    await admin.query(`CREATE DATABASE "${workspaceName}" TEMPLATE template0`)
+    await createTestDatabase(admin, appName, 'template0')
+    await createTestDatabase(admin, workspaceName, 'template0')
     process.env.MIKKA_DATABASE_URL = appUrl.href; process.env.DATABASE_URL = workspaceUrl.href
     delete process.env.VERCEL_ENV
     assert.notEqual(appUrl.href, workspaceUrl.href)

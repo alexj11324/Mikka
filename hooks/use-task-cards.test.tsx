@@ -65,7 +65,7 @@ test('mounted review/citation cards batch and deduplicate IDs including a task o
   }
 })
 
-test('Task citations use the read-only viewer’s detail state and batch historical IDs once', async () => {
+test('Task citations use the authorized task status, show one glyph and batch historical IDs once', async () => {
   const { IssueCitation } = await import('../components/workspace/agent-citations')
   const { TaskPresentationsContext } = await import('./use-task-collection')
   const { useSelectedTaskPresentation } = await import('./use-selected-task-presentation')
@@ -77,7 +77,7 @@ test('Task citations use the read-only viewer’s detail state and batch histori
   function ReadOnlyView() {
     const [selected, setSelected] = useState<string>()
     const detail = useSelectedTaskPresentation('viewer', 'citation-workspace', selected)
-    return <><output>{detail.data?.state}</output>{[...ids, hidden, ids[1]].map((id, index) => <IssueCitation key={index}
+    return <><output>{detail.data?.primaryStatus}</output>{[...ids, hidden, ids[1]].map((id, index) => <IssueCitation key={index}
       issue={{ kind: 'issue', id, number: null, identifier: null, title: id, priority: 'normal', status: 'done' }}
       onOpen={id => { opened.push(id); setSelected(id) }} />)}</>
   }
@@ -94,7 +94,11 @@ test('Task citations use the read-only viewer’s detail state and batch histori
     assert.equal(chip(hidden).dataset.taskChip, '', 'an omitted Task never inherits a state from the saved citation')
     for (const id of ids.slice(0, 2)) {
       await act(async () => chip(id).click())
-      assert.equal(chip(id).dataset.taskChip, host.querySelector('output')?.textContent)
+      const status = id === ids[0] ? 'backlog' : 'doing'
+      assert.equal(host.querySelector('output')?.textContent, status)
+      assert.equal(chip(id).dataset.taskChip, status)
+      assert.deepEqual([...chip(id).querySelectorAll('[data-task-status]')].map(icon => icon.getAttribute('data-task-status')), [status])
+      assert.equal(chip(id).querySelector('[data-run-indicator]'), null)
     }
     assert.deepEqual(opened, ids.slice(0, 2))
     assert.deepEqual(selectedCalls, [{ workspaceId: 'citation-workspace', issueIds: [ids[1]] }])

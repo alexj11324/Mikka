@@ -143,9 +143,15 @@
       "emptyTitle": "No tasks yet",
       "newTask": "New task"
     },
-    "createdAtDate": "Created {date}"
+    "createdAtDate": "Created {date}",
+    "agentMark": {
+      "working": "Agent working",
+      "waiting": "Needs you",
+      "error": "Agent error"
+    }
   },
   "Nav": {
+    "startConversation": "New conversation",
     "switchLanguage": "Switch language",
     "workspaceAll": "{name} — all tasks",
     "tagline": "Tasks and documents",
@@ -585,6 +591,7 @@
     "openableDraggableTask": "Openable, draggable task"
   },
   "Editor": {
+    "executionInstructions": "Execution instructions",
     "draftAuthor": "Draft author",
     "unsavedDraft": "Unsaved draft",
     "editorLabel": "Task description editor",
@@ -1071,6 +1078,9 @@
       "subtitle": "Updates and discussion",
       "threads": "{count, plural, =0 {No discussions} =1 {1 discussion} other {# discussions}}",
       "resolved": "Resolved",
+      "timelinePullOpened": "Opened {repo}#{number} {title}",
+      "timelinePullMerged": "Merged {repo}#{number} {title}",
+      "timelinePullFailed": "Could not load linked pull request activity. Retry",
       "anchorRemoved": "Original text removed",
       "reply": "Reply",
       "reopen": "Reopen",
@@ -1082,16 +1092,33 @@
       "commentPlaceholder": "Leave a comment…",
       "shortcut": "⌘ / Ctrl + Enter to send",
       "sendComment": "Send comment",
-      "changedStatus": "Changed status to {status}",
-      "changedPriority": "Changed priority to {priority}",
-      "changedTitle": "Renamed the task to {title}",
-      "assigned": "Assigned to {name}",
-      "unassigned": "Cleared the assignee",
-      "delegated": "Delegated to {name}",
-      "undelegated": "Cleared the delegate",
-      "addedSubtask": "Added subtask {title}",
+      "created": "created {code}",
+      "changedStatus": "moved it to {status}",
+      "changedStatusCode": "moved {code} to {status}",
+      "changedPriority": "set priority to {priority}",
+      "changedTitle": "renamed the task to {title}",
+      "assigned": "assigned {name}",
+      "unassigned": "cleared the assignee",
+      "unassignedNamed": "unassigned {name}",
+      "delegated": "handed it to {name}",
+      "undelegated": "stopped handing it over",
+      "undelegatedNamed": "stopped handing it to {name}",
+      "addedSubtask": "added subtask {title}",
+      "addedSubtaskCode": "added sub-issue {code}",
       "addedLabel": "Added label {name}",
       "removedLabel": "Removed label {name}",
+      "parentChanged": "changed the parent task",
+      "blockerAdded": "added a blocking task",
+      "blockerRemoved": "removed a blocking task",
+      "relatedAdded": "linked a related task",
+      "relatedRemoved": "unlinked a related task",
+      "dueDateChanged": "set the due date to {date}",
+      "dueDateRemoved": "removed the due date",
+      "projectChanged": "moved it to {name}",
+      "projectRemoved": "removed it from the project",
+      "estimateChanged": "set the estimate to {estimate}",
+      "estimateRemoved": "removed the estimate",
+      "descriptionChanged": "edited the description",
       "unknownAssignee": "someone",
       "separator": ", "
     },
@@ -1229,6 +1256,7 @@
     "artifactNotFound": "This artifact does not exist.",
     "messageRequired": "A message cannot be empty.",
     "submissionConflict": "This submission ID was already used for a different message.",
+    "threadSubmissionOutcomeUnconfirmed": "We couldn’t confirm what happened to this message. Refresh the conversation to check its status.",
     "pendingActionUnavailable": "This action was already handled or has expired.",
     "deviceSaveFailed": "The save failed. Please try again.",
     "tokenCreateFailed": "Could not create a token. Please try again.",
@@ -1367,6 +1395,7 @@
     "accountSoleAdmin": "You’re the only admin of {workspaces}. Make another member an admin before deleting your account.",
     "accountLastOrganizationOwner": "Keep at least one active organization owner.",
     "runChainEnded": "This task has already stopped; there is nothing left to stop.",
+    "threadDeliveryUnavailable": "This conversation cannot use that delivery mode right now.",
     "threadStopping": "The thread is stopping",
     "secretNotFound": "That secret or variable no longer exists.",
     "secretNameReserved": "This name is reserved by the runtime (for example PATH, HOME, proxy, TLS, loader, git, E2B or MIKKA variables). Choose another name.",
@@ -1415,6 +1444,17 @@
     "viewProjects": "View projects"
   },
   "IssueDetail": {
+    "work": {
+      "heading": "Work",
+      "system": "System",
+      "agent": "Agent",
+      "states": {
+        "open": "Open",
+        "closed": "Closed",
+        "draft": "Draft",
+        "merged": "Merged"
+      }
+    },
     "frame": {
       "delegate": "Handed to",
       "open": "Open",
@@ -3877,6 +3917,7 @@
     "contextEstimated": "Estimated from stored text, not a provider token count",
     "contextNoWindow": "Mikka stores no model context window, so no share of one is shown",
     "modelPicker": {
+      "retryLoad": "Couldn’t load models. Retry",
       "label": "Model: {name}",
       "labelUnavailable": "Model: {name}, unavailable",
       "hosted": "Mikka Default",
@@ -4399,6 +4440,7 @@
       "starting": "Starting",
       "running": "Running",
       "paused": "Sleeping",
+      "restore": "Restoring",
       "ended": "Stopped",
       "error": "Error"
     },
@@ -4413,7 +4455,75 @@
     "copied": "ID copied",
     "copyFailed": "Couldn't copy"
   },
+  "ConversationDirectory": {
+    "unread": "Unread",
+    "readAll": "Mark all as read",
+    "markUnread": "Mark as unread",
+    "writeError": "Couldn’t save the read status. Try again.",
+    "archiveIdle": "Automatically archive idle conversations",
+    "archiveDays": "{days, plural, one {# day} other {# days}}",
+    "archiveOff": "Off",
+    "archiveUnavailable": "This server does not support automatic archiving.",
+    "archiveSaveError": "The archive preference could not be saved.",
+    "viewAll": "View all",
+    "title": "Conversations",
+    "search": "Search conversations",
+    "all": "All",
+    "working": "Working",
+    "waiting": "Waiting",
+    "idle": "Idle",
+    "failed": "Failed",
+    "archived": "Archived",
+    "loadError": "Could not load conversations.",
+    "retry": "Retry",
+    "loading": "Loading conversations…",
+    "empty": "No matching conversations.",
+    "untitled": "Untitled conversation",
+    "more": "Load more"
+  },
+  "ThreadReferences": {
+    "sourceUnavailable": "Source file and folder references are unavailable for this conversation.",
+    "references": "References",
+    "task": "Task",
+    "thread": "Conversation",
+    "pr": "Pull request",
+    "searching": "Searching…",
+    "error": "Couldn’t load references",
+    "empty": "No matching references"
+  },
   "IssueThreads": {
+    "composerModelUnknown": "Model not reported",
+    "composerModelRequested": "Requested {model}",
+    "organization": {
+      "archive": "Archive conversation",
+      "unarchive": "Unarchive conversation",
+      "pin": "Pin conversation",
+      "unpin": "Unpin conversation",
+      "unavailable": "This conversation is no longer available.",
+      "failed": "Could not save the conversation change."
+    },
+    "deliveryMode": "While the agent is working",
+    "deliveryModes": {
+      "queue": "Queue for the next turn",
+      "steer": "Steer this turn",
+      "interrupt": "Interrupt and replace"
+    },
+    "deliveryQueued": "Queued",
+    "deliverySending": "Sending",
+    "deliveryFailed": "Delivery failed",
+    "deliverySendNow": "Send now",
+    "deliveryCancel": "Cancel",
+    "versionEdit": "Edit message",
+    "versionRerun": "Rerun reply",
+    "versionEffects": "A new run starts at this message. Existing commits, pull requests and previous replies stay in history.",
+    "versionHistory": "Message versions",
+    "versionOriginal": "Original",
+    "versionNumber": "Version {number}",
+    "versionRun": "Start a new version",
+    "versionPullRequest": "Open pull request",
+    "versionClose": "Close",
+    "versionPending": "Waiting for a reply",
+    "deliveryTooLate": "The agent has already claimed this message.",
     "title": "Threads",
     "modelSwitched": "Switched to",
     "agent": "Bot",
@@ -4613,7 +4723,14 @@
     },
     "errorDetails": "Details",
     "fullInstructions": "View full instructions",
-    "hideInstructions": "Hide full instructions"
+    "hideInstructions": "Hide full instructions",
+    "conversationTitle": {
+      "rename": "Rename",
+      "regenerate": "Regenerate title",
+      "label": "Title",
+      "renameFailed": "Title not saved",
+      "regenerateFailed": "Couldn't generate a new title"
+    }
   },
   "Computer": {
     "status": {
@@ -4736,6 +4853,17 @@
       "create": "Create",
       "creating": "Creating…"
     },
+    "createConversation": {
+      "title": "New conversation",
+      "name": "Conversation name",
+      "bots": "Choose Bots (first selected leads)",
+      "noBots": "No bots available",
+      "newBot": "New bot",
+      "create": "Start conversation",
+      "failed": "Couldn’t create the conversation",
+      "unconfirmed": "Creation not confirmed",
+      "reviewGroups": "View conversations"
+    },
     "newGroup": {
       "title": "New group chat",
       "name": "Group name",
@@ -4803,11 +4931,22 @@
         "label": "Public role",
         "hint": "Group chats use this role to choose the bot. Tools still require authorization.",
         "placeholder": "Responsibilities in group chats; leave empty to clear",
-        "count": "{count} / {max}",
         "tooLong": "Public role can be at most {max} characters",
         "loadError": "Public role failed to load",
         "saveError": "Save not confirmed. Your draft is kept.",
-        "saved": "Saved"
+        "saved": "Saved",
+        "add": "Add a public role",
+        "edit": "Edit public role"
+      },
+      "glance": {
+        "running": "{count} in progress",
+        "waiting": "{count} waiting on you",
+        "idle": "Nothing in progress",
+        "prReview": "{count} waiting for review",
+        "prRunning": "{count} in progress",
+        "prNone": "No open PRs",
+        "computerScreen": "View screen",
+        "computerMissing": "Needs an E2B API key"
       },
       "threads": "Threads",
       "tasks": "Tasks",
@@ -4993,11 +5132,6 @@
     "board": {
       "toolbar": "Board toolbar",
       "scopeLabel": "Task scope",
-      "scope": {
-        "all": "All",
-        "workspace": "Workspace",
-        "personal": "Personal"
-      },
       "filter": "Filter",
       "filterField": {
         "status": "Status",
@@ -5006,7 +5140,7 @@
         "creator": "Created by me",
         "labels": "Labels",
         "project": "Project",
-        "agentState": "Thread status"
+        "agentState": "Agent activity"
       },
       "removeFilter": "Remove {field} filter",
       "me": "Me",
@@ -5037,7 +5171,7 @@
         "labels": "Labels",
         "pullRequests": "PR",
         "subtasks": "Subtasks",
-        "agentState": "Thread status",
+        "agentState": "Agent activity",
         "project": "Project",
         "dueDate": "Due date",
         "createdAt": "Created"
@@ -5051,8 +5185,6 @@
       "inlineTitle": "Task title",
       "discussPrefill": "Let's talk about {id} {title}: ",
       "card": {
-        "personal": "Personal task",
-        "personalHint": "Personal task · only you can see it",
         "status": "Status",
         "priority": "Priority",
         "subtasks": "Subtasks",
@@ -5063,9 +5195,9 @@
         "discuss": "Discuss",
         "delete": "Delete",
         "agent": {
-          "running": "Running",
-          "waiting": "Waiting for you",
-          "blocked": "Blocked"
+          "running": "Agent working",
+          "waiting": "Needs you",
+          "blocked": "Agent error"
         },
         "block": {
           "question": "Needs your answer",
@@ -5898,7 +6030,7 @@
     "evidence": "Results and verification evidence",
     "artifact": "Artifact {number}",
     "approvalRequired": "Independent review and verification are recorded in Factory. Complete the required human acceptance in the task.",
-    "repositoryRemedy": "Select a repository you have authorized in Bot settings, then try again.",
+    "repositoryRemedy": "Select a repository you have authorized in the workspace settings, then try again.",
     "runtimeRemedy": "Connect your local Agent and keep it online, or configure an authorized cloud computer in runtime settings.",
     "toolRemedy": "Ask the Bot owner to enable task delegation in the existing Agent settings.",
     "authorizationRemedy": "Check your model, subscription or API key authorization and runtime settings, then try again. Other members’ personal credentials cannot be used.",
@@ -5912,6 +6044,24 @@
     "chatUnavailable": "This Bot uses its owner’s personal chat model settings, which this request cannot access. Use your own Bot or ask its owner to start this chat. Task delegation checks your own execution resources separately."
   },
   "RunErrors": {
+    "review_auth_required": {"default":"Sign in to review this task."},
+    "review_not_found": {"default":"This task review is unavailable."},
+    "not_owner_terminal": {"default":"Only the task owner can use this terminal."},
+    "review_machine_gone": {"default":"The task environment is no longer available."},
+    "review_binding_changed": {"default":"The task environment has changed. Open the review again."},
+    "review_checkout_unavailable": {"default":"This task has no available working directory."},
+    "review_preview_unavailable": {"default":"Preview is unavailable","configuration":"This environment does not support a secure preview","runtime":"The preview server is unavailable","protocol":"The preview response is invalid","scope_changed":"The task environment or authorization has changed","limit":"The preview has reached its usage limit"},
+    "terminal_unsupported": {"default":"This environment does not support the task terminal.","local_device":"Remote terminal access is not available on this local device.","runtime_version":"Update the task runtime to use its terminal."},
+    "terminal_already_controlled": {"default":"The Agent is still using this environment. End its work before opening the terminal."},
+    "terminal_binding_changed": {"default":"The terminal environment or authorization has changed."},
+    "terminal_ended": {"default":"This terminal session has ended."},
+    "terminal_input_too_large": {"default":"Terminal input exceeds 16 KiB."},
+    "terminal_invalid_request": {"default":"The terminal request is invalid."},
+    "terminal_request_conflict": {"default":"This input request ID was already used for different input."},
+    "terminal_input_uncertain": {"default":"Input delivery is uncertain. Check the terminal before sending it again."},
+    "terminal_limit": {"default":"The terminal has reached its usage limit."},
+    "terminal_unavailable": {"default":"The terminal is unavailable.","configuration":"Secure terminal access is not configured.","runtime":"The terminal runtime is unavailable.","protocol":"The terminal response is invalid.","installation":"The terminal runtime could not be prepared.","lease":"The terminal authorization has expired or changed."},
+    "terminal_control_unavailable": {"default":"Exclusive control of the task environment is unavailable.","fence_unavailable":"The task environment control lock is unavailable.","fence_lost":"The task environment control lock was lost."},
     "review_scope_denied": {
       "default": "You do not have access to review this task.",
       "sponsored_placement": "The hosted workspace is no longer available for reviewing this task."
@@ -6234,6 +6384,12 @@
     "factory_spec_approval_required": {
       "default": "Review and approve the specification before implementation starts."
     },
+    "factory_visual_evidence_required": {
+      "default": "Record the running application, test or API result, or rendered documentation before handing over this implementation."
+    },
+    "factory_public_evidence_required": {
+      "default": "Check the visual evidence contains no private data, mark it safe to share, and publish its links in the pull request before handoff."
+    },
     "cloud_not_connected": {
       "default": "Mikka Cloud is not connected."
     },
@@ -6543,6 +6699,7 @@
     },
     "archive": {
       "title": "Danger zone",
+      "listTitle": "Archived organizations",
       "label": "Archive Organization",
       "body": "Unbind every workspace first, this one included, and turn off every sign-in method and SCIM connection. After archiving, its audit records are kept under the retention period and legal hold.",
       "action": "Archive Organization"
@@ -7021,6 +7178,7 @@
     "noTasks": "No tasks"
   },
   "HostedInbox": {
+    "writeError": "Could not confirm the inbox change. Refresh and try again.",
     "dismiss": "Dismiss",
     "dismissed": "Dismissed",
     "reason": {

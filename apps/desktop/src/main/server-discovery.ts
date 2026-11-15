@@ -84,13 +84,11 @@ export async function probeServer(input: unknown, options: { fetch: Fetcher; app
   if (typeof address === 'string') return { status: address }
   const get = (url: string) => options.fetch(url, { headers: { accept: 'application/json', 'x-mikka-client': 'desktop', 'x-mikka-client-version': options.appVersion, 'x-mikka-desktop-protocol': String(DESKTOP_PROTOCOL) }, redirect: 'manual', credentials: 'omit', cache: 'no-store', signal: AbortSignal.timeout(options.timeoutMs ?? 10_000) })
   const paths = address.pathname === '/' || address.pathname === '' ? ['', '/mikka'] : [address.pathname]
-  let reachable = false
-  let olderMikka: string | null | undefined
+  const legacyCandidates: string[] = []
   for (const path of paths) {
     const base = `${address.origin}${path}`
     let response: Response
     try { response = await get(`${base}/api/desktop/discovery`) } catch { continue }
-    reachable = true
     const body = await readJson(response).catch(() => null) as Record<string, unknown> | null
     // #1415's fixed answer to an app the server no longer serves.
     const error = body && typeof body === 'object' ? body.error : null
@@ -105,15 +103,18 @@ export async function probeServer(input: unknown, options: { fetch: Fetcher; app
       if (options.enforceMinimum && discovery.minDesktopVersion && !meetsMinimumVersion(options.appVersion, discovery.minDesktopVersion)) return { status: 'app_update_required', minimum: discovery.minDesktopVersion }
       return { status: 'ok', server: { url: canonicalServerUrl(`${address.origin}${discovery.basePath}`), name: discovery.name, version: discovery.version, edition: discovery.edition, signIn: discovery.signIn } }
     }
-    // A Mikka server from before the discovery read still answers /api/version.
-    if (olderMikka === undefined) {
-      try {
-        const legacy = await readJson(await get(`${base}/api/version`)) as Record<string, unknown> | null
-        // Its `build` is a commit, not a version a person upgrades from: say only that it is too old.
-        if (legacy && typeof legacy === 'object' && typeof legacy.build === 'string' && 'minDesktopVersion' in legacy) olderMikka = null
-      } catch { /* not this path */ }
-    }
+    legacyCandidates.push(base)
   }
-  if (olderMikka !== undefined) return { status: 'server_update_required', version: olderMikka }
-  return { status: reachable ? 'not_mikka' : 'unreachable' }
+  // A pre-discovery server still answers /api/version. Check only after every
+  // modern candidate has had a chance to report its installation and protocol.
+  for (const base of legacyCandidates) {
+    try {
+      const legacy = await readJson(await get(`${base}/api/version`)) as Record<string, unknown> | null
+      if (legacy && typeof legacy === 'object' && typeof legacy.build === 'string' && 'minDesktopVersion' in legacy) {
+        // Its build identifies a commit. The server's release version is unknown.
+        return { status: 'server_update_required', version: null }
+      }
+    } catch { /* not this path */ }
+  }
+  return { status: legacyCandidates.length ? 'not_mikka' : 'unreachable' }
 }

@@ -1,4 +1,5 @@
 import { runChanged } from './live/panels'
+import { scheduleConversationTitle } from '@/lib/conversation-title-schedule'
 import 'server-only'
 import { runListChanged } from './live/lists'
 import { rebindExecutionDevice, revalidateExecutionIdentity, ExecutionIdentityError } from './execution-identity'
@@ -330,6 +331,8 @@ async function reclaimAuthorizedLostRun(run: Run, outcome: Extract<ReturnType<ty
     await runListChanged(tx, run.id)
     await runChanged(tx, run.id)
     if (cloud) return true
+    // The conversation is named once this commits (decision 2026-11-13-1405); a run that continues one takes its title.
+    scheduleConversationTitle(tx, retryId, run.userId, 'created')
     await tx.insert(agentRuns).values({
       id: retryId, userId: run.userId, issueId: run.issueId, agentId: run.agentId, botId: run.botId, source: run.source,
       // A device retry continues the same entry; a legacy source keeps the

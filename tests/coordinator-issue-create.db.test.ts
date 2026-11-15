@@ -55,7 +55,8 @@ test('authenticated request creates one real issue across ten concurrent calls a
     )
     for (const id of [owner, stranger]) personalBots.set(id, await seedCoordinator(id))
     const sourceEventId = await event()
-    const created = await Promise.all(Array.from({ length: 10 }, () => createIssueFromRequest(owner, { sourceEventId, title: '  Implement requested change  ' })))
+    const summary = 'Preserve the original workspace across sign-in.'
+    const created = await Promise.all(Array.from({ length: 10 }, () => createIssueFromRequest(owner, { sourceEventId, title: '  Implement requested change  ', summary })))
     const { issueId } = created[0]
     assert.ok(created.every(result => result.issueId === issueId && result.title === 'Implement requested change'))
     const [issue] = await db.select().from(issues).where(eq(issues.id, issueId))
@@ -65,7 +66,7 @@ test('authenticated request creates one real issue across ten concurrent calls a
     assert.equal(issue.ownershipState, 'bound')
     assert.equal(issue.status, 'todo')
     assert.equal(issue.revision, 1)
-    assert.deepEqual(issue.content.content, [{ type: 'paragraph', content: [{ type: 'text', text }] }])
+    assert.deepEqual(issue.content.content, [{ type: 'paragraph', content: [{ type: 'text', text: summary }] }])
     assert.equal(readIssueMetadata(issue.content).number, 1)
     assert.equal((await db.select().from(issues).where(eq(issues.userId, owner))).length, 1)
     const history = await versions(issueId)
@@ -73,8 +74,11 @@ test('authenticated request creates one real issue across ten concurrent calls a
     assert.equal(history[0].actorType, 'system')
     assert.equal(history[0].actorId, 'coordinator')
     assert.deepEqual(history[0].content, issue.content)
-    assert.equal((await db.select().from(coordinatorEvents).where(eq(coordinatorEvents.id, sourceEventId)))[0].issueId, issueId)
-    assert.deepEqual(await createIssueFromRequest(owner, { sourceEventId, title: 'Replay cannot rename' }), created[0])
+    const [conversationRequest] = await db.select().from(coordinatorEvents).where(eq(coordinatorEvents.id, sourceEventId))
+    assert.equal(conversationRequest.issueId, issueId)
+    assert.equal(conversationRequest.payload.text, text)
+    assert.deepEqual(await createIssueFromRequest(owner, { sourceEventId, title: 'Replay cannot rename', summary: 'Replay cannot replace the brief.' }), created[0])
+    assert.deepEqual((await db.select().from(issues).where(eq(issues.id, issueId)))[0].content, issue.content)
 
     // The returned id passes the existing Factory source/issue authorization boundary.
     const factory = createFactoryStore(pool, async (userId, id, tx) => Boolean(await issueForUser(userId, id, false, drizzle(tx))), personalBots.get(owner)!.botId)
@@ -96,6 +100,8 @@ test('authenticated request creates one real issue across ten concurrent calls a
     await assert.rejects(createIssueFromRequest(owner, { sourceEventId, title: 'Forged', actorId: stranger } as Parameters<typeof createIssueFromRequest>[1]), { code: 'factoryInvalid' })
 
     const foreign = await createIssueFromRequest(stranger, { sourceEventId: await event(stranger), title: 'Private task' })
+    const [withoutBrief] = await db.select().from(issues).where(eq(issues.id, foreign.issueId))
+    assert.deepEqual(withoutBrief.content.content, [{ type: 'paragraph', content: [{ type: 'text', text: 'Private task' }] }])
     await expectError(await event(owner, { issueId: foreign.issueId }), 'factoryNotFound')
     await db.update(issues).set({ content: withIssueMetadata(issue.content, { ...readIssueMetadata(issue.content), deletedAt: new Date().toISOString() }) }).where(eq(issues.id, issueId))
     await expectError(sourceEventId, 'factoryNotFound')

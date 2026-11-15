@@ -1,11 +1,12 @@
 import { useRef, useState, type ComponentRef } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { Text } from '@/components/Text'
-import { groupTag, groupTitle, modelMenuLabel, modelMenuReadLabel, modelSourceLabel, optionName, type ModelMenuState } from '@/lib/model-menu'
+import { groupTag, groupTitle, modelMenuLabel, modelMenuReadLabel, modelSourceLabel, optionName, type ModelMenuControls } from '@/lib/model-menu'
 import { colors } from '@/lib/theme'
+import { mobileMessages as copy } from '@/lib/messages'
 
 /** Expo Web exposes the same saved choices and source groups as the native menu. */
-export function ModelMenu({ model, running = false, label }: { model: ModelMenuState; running?: boolean; label?: string }) {
+export function ModelMenu({ model, running = false, label }: { model: ModelMenuControls; running?: boolean; label?: string }) {
   const { menu, loading, retryRead, busy, choosing, choose, refresh, refreshing, refreshFailed } = model
   const [open, setOpen] = useState(false)
   const trigger = useRef<ComponentRef<typeof View>>(null)
@@ -15,15 +16,15 @@ export function ModelMenu({ model, running = false, label }: { model: ModelMenuS
     onPress={() => { void retryRead().catch(() => undefined) }} style={styles.chip}><Text style={styles.label}>{modelMenuReadLabel(loading)}</Text></Pressable>
   const { current, groups } = menu
   return <>
-    <Pressable ref={trigger} accessibilityRole="button" accessibilityLabel={`选择模型，${modelSourceLabel(current)}`} accessibilityState={{ expanded: open, busy }} aria-expanded={open} aria-busy={busy} aria-disabled={false} onPress={() => setOpen(true)} style={styles.chip}>
+    <Pressable ref={trigger} accessibilityRole="button" accessibilityLabel={copy.Coordinator.modelPicker.label.replace('{name}', modelSourceLabel(current))} accessibilityState={{ expanded: open, busy }} aria-expanded={open} aria-busy={busy} aria-disabled={false} onPress={() => setOpen(true)} style={styles.chip}>
       <Text style={[styles.label, label ? { color: colors.accent } : null]}>{label ?? `${modelMenuLabel(current, running)} ▾`}</Text>
     </Pressable>
     <Modal visible={open} transparent animationType="none" onRequestClose={close} onShow={() => closeButton.current?.focus()}>
       <View style={styles.overlay}>
         <View accessibilityViewIsModal style={styles.menu}>
           <View style={styles.heading}>
-            <Text accessibilityRole="header" style={styles.title}>模型</Text>
-            <Pressable ref={closeButton} accessibilityRole="button" accessibilityLabel="关闭模型菜单" onPress={close} style={styles.close}><Text style={styles.action}>关闭</Text></Pressable>
+            <Text accessibilityRole="header" style={styles.title}>{copy.Coordinator.modelPicker.changeModel}</Text>
+            <Pressable ref={closeButton} accessibilityRole="button" accessibilityLabel={copy.Common.close} onPress={close} style={styles.close}><Text style={styles.action}>{copy.Common.close}</Text></Pressable>
           </View>
           <ScrollView contentContainerStyle={styles.options}>
             {groups.map((group, index) => <View key={`${group.kind}-${index}`} style={styles.group}>
@@ -36,7 +37,7 @@ export function ModelMenu({ model, running = false, label }: { model: ModelMenuS
               </Pressable>)}
             </View>)}
             <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy, busy: refreshing }} aria-disabled={busy} aria-busy={refreshing} disabled={busy} onPress={() => { void refresh() }} style={styles.option}>
-              <Text style={styles.action}>{refreshing ? '正在刷新' : refreshFailed ? '刷新失败，重试' : '刷新'}</Text>
+              <Text style={styles.action}>{refreshing ? copy.Common.loading : refreshFailed ? copy.Coordinator.modelPicker.refreshFailed : copy.Coordinator.modelPicker.refresh}</Text>
             </Pressable>
           </ScrollView>
         </View>

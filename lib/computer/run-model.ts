@@ -60,9 +60,9 @@ export async function latestThreadRunModel(pool: Pick<Pool, 'query'>, userId: st
  * A new cloud run's model by 优先使用的模型 (decision 2026-11-02-1400): the first usable cloud entry for
  * this harness. A subscription entry is bound to the Agent so the run uses that account.
  */
-export async function chooseCloudRunModel(pool: Pool, scope: { ownerId: string; workspaceId: string; botId: string | null }, agentId: string, harness: 'claude_code' | 'codex', asked?: string, purpose: 'task' | 'desktop' = 'desktop'): Promise<RunModel | { error: 'machineUnavailable'; reason?: string }> {
+export async function chooseCloudRunModel(pool: Pool, scope: { ownerId: string; workspaceId: string; botId: string | null }, agentId: string, harness: 'claude_code' | 'codex', asked?: string, purpose: 'task' | 'desktop' = 'desktop', exactEntry?: OrderEntry): Promise<RunModel | { error: 'machineUnavailable'; reason?: string }> {
   const { resolveModelDispatch, bindAgentToConnection } = await import('@/lib/model-dispatch')
-  const target = await resolveModelDispatch(pool, scope, asked ? { harness, model: asked } : null, 'cloud', undefined, { cloudPurpose: purpose, harness })
+  const target = await resolveModelDispatch(pool, scope, asked ? { harness, model: asked } : null, 'cloud', undefined, { cloudPurpose: purpose, harness, ...(exactEntry ? { exactEntry } : {}) })
   if (target.kind !== 'cloud') return { error: 'machineUnavailable', ...(target.kind === 'none' ? { reason: target.reason } : {}) }
   const source = target.entry.source
   const modelDispatch: WorkerModelDispatch = { mode: asked ? 'picked' : 'preference', location: 'cloud', entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) }

@@ -47,6 +47,8 @@ export interface ContextUsage {
   promptBudget: number
   /** The model the run was frozen with, when it recorded one. */
   model: string | null
+  /** Frozen selection and the model reported by the current attempt, when recorded. */
+  composerModel?: { selected: string | null; served: string | null }
   /** A task thread never folds older turns: there is no threshold to report. */
   compactAtTokens: null
   /** No provider context window is stored, so no share of one is shown. */
@@ -108,6 +110,10 @@ export const PROMPT_BUDGET_TOKENS = Math.ceil(PROMPT_MAX_CHARS / ASCII_CHARS_PER
  */
 export const CONVERSATION_CHUNK_KEYS = ['delta', 'output', 'errorText'] as const
 
+export const threadModelProjection = `left(latest."agentDefinition"->>'model',200) AS "selectedModel",
+    CASE WHEN jsonb_typeof(latest.report#>'{runtime,observedModel}')='string'
+        THEN left(latest.report#>>'{runtime,observedModel}',500) END AS "servedModel"`
+
 /**
  * The SQL that counts characters instead of returning them, so a cursor read
  * stays small: the whole point of `chunkCursor` is that a later read does not
@@ -150,13 +156,14 @@ export const CONTEXT_CHARS_SQL = `
     (SELECT other FROM counted) AS "conversationOther",
     (SELECT ascii FROM spoken) AS "messageAscii",
     (SELECT other FROM spoken) AS "messageOther",
-    length(regexp_replace(prompt, '[^[:ascii:]]', '', 'g')) AS "promptAscii",
-    length(prompt) - length(regexp_replace(prompt, '[^[:ascii:]]', '', 'g')) AS "promptOther",
+    length(regexp_replace(brief.prompt, '[^[:ascii:]]', '', 'g')) AS "promptAscii",
+    length(brief.prompt) - length(regexp_replace(brief.prompt, '[^[:ascii:]]', '', 'g')) AS "promptOther",
     -- The recorded task, sliced here so its text never leaves the server.
     length(regexp_replace(task, '[^[:ascii:]]', '', 'g')) AS "taskAscii",
     length(task) - length(regexp_replace(task, '[^[:ascii:]]', '', 'g')) AS "taskOther",
-    model
-  FROM brief`
+    brief.model,
+    ${threadModelProjection}
+  FROM brief LEFT JOIN agent_runs latest ON latest.id=$3 AND latest.id=ANY($1::uuid[])`
 
 /** Everything about a run this host can read, as counted characters. */
 export interface ContextCharSources {
@@ -170,6 +177,7 @@ export interface ContextCharSources {
   conversation: CharCounts
   /** The model the run was frozen with. */
   model?: string | null
+  composerModel?: ContextUsage['composerModel']
 }
 
 /**
@@ -199,6 +207,7 @@ export function contextUsageFromCounts(sources: ContextCharSources): ContextUsag
     promptUsed: promptTokens,
     promptBudget: PROMPT_BUDGET_TOKENS,
     model: sources.model ?? null,
+    ...(sources.composerModel ? { composerModel: sources.composerModel } : {}),
     compactAtTokens: null,
     windowTokens: null,
   }
@@ -212,6 +221,7 @@ export function contextUsage(sources: {
   messages: readonly string[]
   chunks: readonly { chunk: Record<string, unknown> }[]
   model?: string | null
+  composerModel?: ContextUsage['composerModel']
 }): ContextUsage {
   // `task` is attributed to the conversation and never added twice: it is
   // counted once, as part of `prompt` and again as what the person asked.
@@ -221,6 +231,7 @@ export function contextUsage(sources: {
     messages: sumCounts(sources.messages.map(countChars)),
     conversation: sumCounts(sources.chunks.map(({ chunk }) => countChars(chunkText(chunk) ?? ''))),
     model: sources.model,
+    composerModel: sources.composerModel,
   })
 }
 

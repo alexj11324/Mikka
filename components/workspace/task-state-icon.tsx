@@ -1,37 +1,66 @@
 'use client'
 
-// A task's one state as an icon (decision 2026-11-07-2230, 受阻 split out on #1681), drawn as the official build's
-// task rows draw it (mikka-hosted-ui components/mikka/task-state.tsx): the hand is 等你处理, an octagon 受阻, a
-// triangle 失败, the ring 运行中, a clock 排队中, a circle 待办, a dashed circle 暂不处理, a check 完成, ✕ 已取消.
-// The state comes from localTaskState; this file only draws it. Colour follows what the state asks of the person.
-import type { ComponentType } from 'react'
+// A task has one status, its status field, drawn with the same icon on every surface (decision 2026-11-13-1405):
+// TaskStatusIcon, and a task's chip carries that one icon only. What an Agent is doing belongs to the conversation:
+// TaskRunMark is its small mark (working, waiting for the person, error), drawn on the conversation's own surfaces and
+// never beside a status icon. TaskStatusMark is a conversation card's one glyph: the mark while active, else the status.
+import { useCallback } from 'react'
 import { useTranslations } from 'next-intl'
-import { Ban, Circle, CircleCheck, CircleDashed, CircleDot, CircleX, Clock, Hand, OctagonAlert, TriangleAlert, type LucideProps } from 'lucide-react'
+import { Hand, LoaderCircle, TriangleAlert, type LucideIcon } from 'lucide-react'
 import { cn } from 'cn'
-import type { TaskReason, TaskState } from '@/hooks/use-bot-tasks'
+import { ISSUE_STATUSES } from '@/components/workspace/issue-properties'
+import { runIndicatorOf, type RunIndicator, type TaskState } from '@/lib/task-state'
 import { statusIconTints, type StatusTone } from '@/lib/status-appearance'
 
-const STATE_ICONS: Record<TaskState, ComponentType<LucideProps>> = {
-  waiting: Hand, blocked: OctagonAlert, failed: TriangleAlert, running: CircleDot, queued: Clock, todo: Circle, idle: CircleDashed,
-  done: CircleCheck, canceled: CircleX, duplicate: Ban,
+const STATUS_ICONS = new Map<string, LucideIcon>(ISSUE_STATUSES.map(status => [status.value, status.icon]))
+// R-34's colours, as ISSUE_STATUSES' indicatorClassName names them: 进行中 amber, 评审中 blue, 已完成 green, the rest grey.
+const STATUS_TONES: Record<string, StatusTone> = { doing: 'warning', review: 'info', done: 'success' }
+export type TaskIconSize = 'sm' | 'md' | 'lg'
+
+/**
+ * A task's status icon: the status field's, in its colour. An unknown status draws the first one's shape, grey.
+ * `plain` draws the shape alone, in the colour of where it sits: for a paid block's own status slot, which keeps its
+ * colour tokens (decision 2026-11-13-1405, the status-icon exception).
+ */
+export function TaskStatusIcon({ status, size = 'sm', plain = false }: { status: string; size?: TaskIconSize; plain?: boolean }) {
+  const Icon = STATUS_ICONS.get(status) ?? ISSUE_STATUSES[0].icon
+  return <Icon aria-hidden="true" data-task-status={status} className={cn('shrink-0', size === 'lg' ? 'size-[18px]' : size === 'md' ? 'size-4' : 'size-3.5', !plain && statusIconTints[STATUS_TONES[status] ?? 'neutral'])} />
 }
 
-// Blue waits on you, amber is under way or held, red failed, green done, greys are not active (as the official rows).
-const STATE_TONES: Record<TaskState, StatusTone> = {
-  waiting: 'info', blocked: 'warning', failed: 'destructive', running: 'warning', queued: 'warning', todo: 'neutral', idle: 'neutral',
-  done: 'success', canceled: 'neutral', duplicate: 'neutral',
+const RUN_MARKS: Record<RunIndicator, { icon: LucideIcon; tone: StatusTone }> = {
+  working: { icon: LoaderCircle, tone: 'warning' },
+  waiting: { icon: Hand, tone: 'info' },
+  error: { icon: TriangleAlert, tone: 'destructive' },
 }
 
-/** A task's own state icon; never a run's result or its thread group. */
-export function TaskStateIcon({ state }: { state: TaskState }) {
-  const Icon = STATE_ICONS[state]
-  return <Icon aria-hidden="true" data-task-state={state} className={cn('size-3.5 shrink-0', statusIconTints[STATE_TONES[state]])} />
+/** The words of a run mark, for its tooltip and for assistive technology. They are not status names. */
+export function useRunIndicatorLabel() {
+  const t = useTranslations('Issue.agentMark')
+  return useCallback((indicator: RunIndicator) => t(indicator), [t])
 }
 
-/** A task state's words, as its rows lead with them: the reason it waits when there is one, else the state's name. */
-export function useTaskStateLabel() {
-  const t = useTranslations('Shell.panel')
-  return (state: TaskState, reason: TaskReason | null) => reason ? t(`task.reason.${reason}`) : state === 'waiting' ? t('taskGroup.pending') : t(`task.state.${state}`)
+/** What the task's Agent is doing, as a small mark; nothing when no run is under way, waiting or failed. */
+export function TaskRunMark({ state, indicator = state ? runIndicatorOf(state) : null, plain = false }: { state?: TaskState | 'idle' | null; indicator?: RunIndicator | null; /** The shape alone, in the colour of where it sits (a paid block's slot). */ plain?: boolean }) {
+  const label = useRunIndicatorLabel()
+  if (!indicator) return null
+  const mark = RUN_MARKS[indicator]
+  return <span role="img" aria-label={label(indicator)} title={label(indicator)} data-run-indicator={indicator} className="inline-flex shrink-0">
+    <mark.icon aria-hidden="true" className={cn('size-3', !plain && statusIconTints[mark.tone], indicator === 'working' && 'motion-safe:animate-spin [animation-duration:1.6s]')} />
+  </span>
+}
+
+/**
+ * The one glyph of a conversation's card (a dispatch card): what the conversation is doing while it is working, waiting
+ * or failed, otherwise its task's status icon. Never both: two status-like glyphs are never side by side.
+ */
+export function TaskStatusMark({ status, indicator, size }: { status: string; indicator?: RunIndicator | null; size?: TaskIconSize }) {
+  return indicator ? <TaskRunMark indicator={indicator} /> : <TaskStatusIcon status={status} size={size} />
+}
+
+/** A status's name, as the board's column and the status menu write it. */
+export function useTaskStatusLabel() {
+  const t = useTranslations('Issue.status')
+  return (status: string) => t.has(status as never) ? t(status as never) : status
 }
 
 type ThreadRun = { id: string; status: string; outcome?: string | null; createdAt: Date | string; continuation?: { status: string; outcome?: string | null } | null }

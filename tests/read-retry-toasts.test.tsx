@@ -34,11 +34,13 @@ stub('app/actions/artifacts.ts', {
   getArtifactText: () => read('text', 'Retained document body.'), listRunArtifacts: async () => [],
 })
 stub('app/actions/agents.ts', {
+  getThreadReplyVersions: async () => [],
+  createThreadReplyVersion: async () => { throw new Error('This read test must not start a new version') },
   listAgents: async () => [],
   findThreadIssue: () => read('lookup', { issueId: 'issue' }),
   getIssueThread: () => read('thread', { thread, chunks: [{ chunk: { type: 'text-delta', id: 'reply', delta: 'Retained reply.' }, at: new Date(0) }], messages: [], chunksAppend: false }),
   getThreadChanges: async () => ({ state: 'none' }), getThreadInstructions: async () => '',
-  getThreadMachine: async () => null, getThreadName: async () => null,
+  getThreadMachine: async () => null, getThreadName: async () => null, getThreadContinuationModels: async () => null,
   listIssueThreads: async () => [], pollIssueThreads: async () => [],
   retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null,
   sendIssueThreadReply: async () => { throw new Error('This read test must not send') }, stopRun: async () => ({}),
@@ -47,7 +49,7 @@ stub('hooks/use-live-key.tsx', { useLiveKey: Empty, useLiveKeys: Empty, useLiveS
 stub('components/artifacts/artifact-card.tsx', { ArtifactKindIcon: Empty, ArtifactAuthorAvatar: Empty })
 stub('components/artifacts/artifact-share.tsx', { ArtifactShare: Empty })
 stub('components/artifacts/selection-actions.tsx', { SelectionActions: Empty })
-stub('components/ui/dialog.tsx', { Dialog: Pass, DialogContent: ({ children }: { children?: ReactNode }) => <div role="dialog">{children}</div>, DialogTitle: Pass, DialogDescription: Pass, DialogHeader: Pass })
+stub('components/ui/dialog.tsx', { Dialog: Pass, DialogContent: ({ children }: { children?: ReactNode }) => <div role="dialog">{children}</div>, DialogTitle: Pass, DialogDescription: Pass, DialogHeader: Pass, DialogTrigger: Pass })
 stub('components/workspace/factory-acceptance.tsx', { useAcceptanceTasks: () => ({ tasks: [], allTasks: [] }), useThreadAcceptance: () => null, AcceptanceStateBadge: Empty, FactoryAcceptance: Empty, FactoryAcceptancePanel: Empty })
 stub('components/workspace/factory-acceptance-pane.tsx', { FactoryAcceptancePane: Empty })
 stub('components/workspace/thread-changes.tsx', { ThreadChangesPane: Empty, ChangesTabLabel: Empty })
@@ -57,7 +59,7 @@ stub('components/workspace/thread-execution-identity.tsx', { ThreadExecutionIden
 stub('components/workspace/artifact-review.tsx', { ThreadArtifactButton: Empty, ThreadArtifactCards: Empty })
 stub('components/workspace/thread-quota.tsx', { ThreadModelFallbackNotice: Empty, ThreadQuotaPausedCard: Empty, ThreadQuotaSwitchLine: Empty })
 stub('components/computer/computer-card.tsx', { ComputerCard: Empty })
-stub('components/workspace/issue-threads.tsx', { harnessLabel: () => 'Agent', IssueThreads: Empty, ThreadEventRow: Empty, useIssueThreads: () => ({ data: [] }), useAgentActivity: () => ({ rows: [], error: null }) })
+stub('components/workspace/issue-threads.tsx', { harnessLabel: () => 'Agent', IssueThreads: Empty, ThreadEventRow: Empty, useIssueThreads: () => ({ data: [] }), useAgentActivity: () => ({ rows: [], error: null }), useTaskWork: () => ({ work: null, threads: [], failed: null }) })
 stub('components/nav/context-panel.tsx', { PANEL_WIDTH: { storageKey: 'fixture-panel-width', min: 320, max: 'half', initial: 360, edge: 'start' } })
 stub('components/coordinator/chat-composer.tsx', { ChatComposer: ({ value, onChange }: { value: string; onChange: (value: string) => void }) => <Textarea value={value} onChange={event => onChange(event.target.value)} /> })
 mock.module('next/dynamic', { defaultExport: () => Empty })

@@ -817,7 +817,8 @@ function safeIdentity(identity) {
     subscriptionAccess: identity.resourceBindings?.filter(resource => resource.kind === 'subscription').map(resource => resource.access) ?? [] }
 }
 
-export async function subscriptionProof(client, record, scope, profile) {
+export async function subscriptionProof(client, record, scope, profile, { profileSource = 'explicit' } = {}) {
+  assert(['explicit', 'decision'].includes(profileSource), 'profile_source_mismatch')
   const personal = scope.workspaceKind === 'personal', owned = scope.actor === OWNED_CODEX_ACTOR
   const payerId = personal || owned ? scope.ownerId : scope.adminId, access = personal || owned ? 'owner' : 'workspace_share'
   const evidence = await client.json(`/api/runs/${record.runId}/evidence`), run = evidence.run
@@ -847,7 +848,7 @@ export async function subscriptionProof(client, record, scope, profile) {
     && subscription.ownerId === payerId && subscription.access === access
     && /^(0|[1-9][0-9]*)$/.test(subscription.revision ?? '')
     && payer.ownerId === payerId && payer.resourceId === subscription.id
-    && run.agentProfile.version === profile.version && run.agentProfile.digest === profile.digest && run.agentProfile.source === 'explicit',
+    && run.agentProfile.version === profile.version && run.agentProfile.digest === profile.digest && run.agentProfile.source === profileSource,
   personal ? 'personal_subscription_identity_mismatch' : owned ? 'owned_subscription_identity_mismatch' : 'shared_subscription_identity_mismatch')
   record.execution = { harness: run.harness, model: run.model, credentialType: run.credentialType,
     deviceId: device.id, subscriptionRoute: run.subscriptionRoute, identity: safeIdentity(identity),
@@ -931,7 +932,7 @@ export async function cleanupCase(client, record, target, { timeoutMs = 60000, W
       const verified = await step(`machineVerified_${runId}`, async () => {
         const machine = await client.rpc('agents.getThreadMachine', [record.issueId, runId])
         const view = { runId, observedAt: iso(now()), kind: ['cloud', 'laptop', 'server'].includes(machine?.kind) ? machine.kind : null,
-          state: ['online', 'offline', 'starting', 'running', 'paused', 'ended', 'error'].includes(machine?.state) ? machine.state : null,
+          state: ['online', 'offline', 'starting', 'running', 'paused', 'restore', 'ended', 'error'].includes(machine?.state) ? machine.state : null,
           sandboxIdHash: typeof machine?.cloud?.sandboxId === 'string' ? sha(machine.cloud.sandboxId).slice(0, 16) : null }
         cleanup.machineViews ??= []
         cleanup.machineViews.push(view)

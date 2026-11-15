@@ -50,8 +50,8 @@ export function SettingsPage({ title, children, footer }: { title: string; child
   )
 }
 
-export function Row({ icon, label, detail, value, onPress, onLongPress, trailing, destructive, disabled = false }: {
-  icon?: ReactNode; label: string; detail?: string; value?: string; onPress?: () => void; onLongPress?: () => void; trailing?: ReactNode; destructive?: boolean; disabled?: boolean
+export function Row({ icon, label, detail, value, onPress, onLongPress, trailing, destructive, expanded, disabled = false }: {
+  icon?: ReactNode; label: string; detail?: string; value?: string; onPress?: () => void; onLongPress?: () => void; trailing?: ReactNode; destructive?: boolean; expanded?: boolean; disabled?: boolean
 }) {
   const content = (
     <>
@@ -67,7 +67,7 @@ export function Row({ icon, label, detail, value, onPress, onLongPress, trailing
   // A row without its own action stays a View, so a button in `trailing` is not nested in another button.
   if (!onPress) return <View style={styles.row}>{content}</View>
   return (
-    <Pressable accessibilityRole="button" accessibilityState={{ disabled }} aria-disabled={Platform.OS === 'web' ? disabled : undefined} disabled={disabled} onPress={onPress} onLongPress={onLongPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }, disabled && { opacity: 0.5 }]}>
+    <Pressable accessibilityRole="button" accessibilityState={{ disabled, expanded }} aria-disabled={Platform.OS === 'web' ? disabled : undefined} disabled={disabled} onPress={onPress} onLongPress={onLongPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }, disabled && { opacity: 0.5 }]}>
       {content}
     </Pressable>
   )

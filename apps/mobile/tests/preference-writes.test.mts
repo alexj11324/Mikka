@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { DESKTOP_RPC_VERSION } from '../../../lib/desktop-rpc/wire'
+import { DESKTOP_RPC_VERSION } from '../../../lib/desktop-rpc/version'
 import { saveProfileName } from '../lib/profile-name'
 import { PreferenceWrites } from '../lib/preference-writes.ts'
 import { ApiCache } from '../lib/api-cache.ts'

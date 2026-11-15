@@ -19,7 +19,7 @@ export { SettingsFrame }
 
 /** Where a rail item lands when it is chosen from Settings. */
 export function railHref(destination: RailDestination) {
-  return workspaceLink({ section: destination === 'chats' ? 'coordinator' : destination === 'board' ? 'all-issues' : destination })
+  return workspaceLink({ section: destination === 'chats' ? 'conversations' : destination === 'board' ? 'all-issues' : destination })
 }
 
 /**

@@ -1,6 +1,7 @@
 import { withFactoryBackgroundWorkspace } from './background-workspace'
 import { randomUUID } from 'node:crypto'
 import { factoryChanged } from '../live/factory'
+import { runChanged } from '../live/panels'
 import { runControlChanged } from '../device-gateway-notify'
 import type { Pool, PoolClient } from 'pg'
 import { ActionFailureError } from '../action-error'
@@ -112,7 +113,7 @@ export async function advanceFactoryRequest(tx: PoolClient, task: FactoryTask, s
 
 /** Owner messages to an active thread use the same epoch path as terminal
  * continuations. Peer/model messages never call this entry point. */
-export async function continueActiveFactoryRequest(pool: Pool, userId: string, runId: string, text: string, sourceEventId?: string, submission?: { recordOwnerMessage: true }) {
+export async function continueActiveFactoryRequest(pool: Pool, userId: string, runId: string, text: string, sourceEventId?: string, submission?: { recordOwnerMessage: true; interrupt?: boolean }) {
   const { rows: [identity] } = await pool.query(`SELECT t.id,t."botId",t."issueId" FROM factory_attempts a
     JOIN factory_tasks t ON t.id=a."taskId" WHERE a."runId"=$1 AND t."userId"=$2`, [runId, userId])
   if (!identity) return false
@@ -132,11 +133,28 @@ export async function continueActiveFactoryRequest(pool: Pool, userId: string, r
     if (sourceEventId === task.sourceEventId && !['cancelled', 'revoked'].includes(task.status)) {
       await tx.query('COMMIT'); return 'replayed' as const
     }
+    // A second window may still show the previous turn while its device
+    // acknowledges a stop. Only this exact active attempt can be interrupted.
+    if (submission?.interrupt) {
+      const current = await tx.query(`SELECT 1 FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId"
+        WHERE a.id=$1 AND a."taskId"=$2 AND a.status='running' AND r.id=$3
+          AND r."userId"=$4 AND r."workspaceId"=$5 AND r."issueId"=$6
+          AND r.status IN ('preparing','running','finishing','queued') AND r."stopRequestedAt" IS NULL FOR UPDATE OF r`,
+      [task.attemptId, task.id, runId, userId, task.workspaceId, task.issueId])
+      if (task.status !== 'running' || !current.rowCount) throw new ActionFailureError('threadDeliveryUnavailable')
+    }
     const id = sourceEventId ? await factoryContinuationSource(tx, task, sourceEventId, runId) : randomUUID()
     if (!sourceEventId) await tx.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload,tier,"deliveredAt")
       VALUES($1,$2,$3,$4,'user_message',$5,$6,'background',now()) ON CONFLICT DO NOTHING`, [id, userId, task.botId, task.issueId, `thread-continuation:${id}`,
       JSON.stringify({ text, source: 'thread_continuation', previousRunId: runId, postedToChat: true })])
     await advanceFactoryRequest(tx, task, id, supersededRunIds)
+    if (submission?.interrupt) {
+      // Closing the displayed attempt and its waiting input is one write. The
+      // replacement can receive its own input before the old device acknowledges.
+      const held = await tx.query(`UPDATE thread_queued_messages SET status='failed',"failureCode"='threadDeliveryUnavailable'
+        WHERE "runId"=$1 AND "userId"=$2 AND "workspaceId"=$3 AND status='queued'`, [runId, userId, task.workspaceId])
+      if (held.rowCount) await runChanged(tx, runId)
+    }
     if (!sourceEventId || submission?.recordOwnerMessage) await tx.query(`INSERT INTO run_messages(id,"runId","userId",text,origin,"mailboxWakeDepth","deliveredAt")
       VALUES($1,$2,$3,$4,'owner',-1,now()) ON CONFLICT DO NOTHING`, [id, runId, userId, text])
     await tx.query('COMMIT')

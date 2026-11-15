@@ -5,6 +5,7 @@ import { ActionFailureError } from '@/lib/action-error'
 import { db, pool, withDatabaseClient } from '@/lib/db'
 import { issues } from '@/lib/db/schema'
 import { readTaskAttention } from '@/lib/inbox/store'
+import { readTaskStageComments } from './task-stage-comments'
 import { readTaskDispatches } from '@/lib/task-dispatches'
 import { teamIssues } from '@/lib/db/team-schema'
 import { factorySourceAllowed, readFactoryFlowStates } from '@/lib/factory/public-flow'
@@ -13,7 +14,7 @@ import { factoryScopeAllows } from '@/lib/factory/scope'
 import { FactoryError } from '@/lib/factory/contract'
 import type { FactoryTask } from '@/lib/factory/store'
 import { ISSUE_STATUS_CODES } from '@/lib/issue-meta'
-import { readIssueMetadata } from '@/lib/issue-metadata'
+import { pullRequestSchema, readIssueMetadata, type IssuePullRequest } from '@/lib/issue-metadata'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import { taskSchedule } from '@/lib/task-block-runs'
@@ -57,8 +58,8 @@ type FactoryStateRow = Pick<FactoryTask, 'id' | 'issueId' | 'userId' | 'workspac
 /** One bounded read for a visible list. APP reads share a read-only snapshot;
  * live tenant membership stays locked through its commit in the separate WS DB.
  * Neither full task bodies nor private Run/Factory payloads are selected. */
-export function readTaskPresentations(user: Reader, input: TaskPresentationsInput): Promise<TaskPresentations> {
-  return readPresentationBatch(user, input, false)
+export function readTaskPresentations(user: Reader, input: TaskPresentationsInput, work?: { includeDiscussionSources: true }): Promise<TaskPresentations> {
+  return readPresentationBatch(user, input, false, work)
 }
 
 /** Keep the detail endpoint's explicit Factory denial while sharing every
@@ -70,7 +71,7 @@ export async function readTaskPresentation(user: Reader, workspaceId: string, is
   return item
 }
 
-async function readPresentationBatch(user: Reader, input: TaskPresentationsInput, requireFactoryAccess: boolean): Promise<TaskPresentations> {
+async function readPresentationBatch(user: Reader, input: TaskPresentationsInput, requireFactoryAccess: boolean, work?: { includeDiscussionSources: true }): Promise<TaskPresentations> {
   const parsed = taskPresentationsInput.parse(input)
   const { workspaceId } = parsed
   const wanted = [...new Set(parsed.issueIds)]
@@ -95,6 +96,37 @@ async function readPresentationBatch(user: Reader, input: TaskPresentationsInput
         const visible = tasks.filter(readable)
         if (!visible.length) return {}
         const ids = visible.map(task => task.id)
+        const chatsByIssue = new Map<string, NonNullable<TaskPresentation['linkedChats']>>()
+        if (parsed.includeLinkedChats) {
+          // The outer workspace lease proves active tenant membership in WS.
+          // A Task link never grants access to somebody else's conversation.
+          const { rows: chats } = await client.query<{ issueId: string; id: string; title: string }>(`
+            SELECT binding."issueId", c.id, c.title
+            FROM group_task_bindings binding JOIN conversations c ON c.id=binding."conversationId"
+            JOIN conversation_members member ON member."conversationId"=c.id
+              AND member."memberType"='user' AND member."memberId"=$2 AND member."leftAt" IS NULL
+            WHERE binding."issueId"=ANY($1::uuid[]) AND binding."userId"=$2 AND c."workspaceId"=$3
+              AND c.kind='group' AND (c."creationPurpose"='group' OR c."createdBy"=$2)
+            ORDER BY binding."issueId",binding."createdAt" DESC,c.id`, [ids, reader.id, workspaceId])
+          for (const { issueId, id, title } of chats) {
+            const entries = chatsByIssue.get(issueId)
+            if (entries) entries.push({ id, title })
+            else chatsByIssue.set(issueId, [{ id, title }])
+          }
+        }
+        const pullsByIssue = new Map<string, IssuePullRequest[]>()
+        if (parsed.includePullRequests) {
+          const { rows: links } = await client.query<{ issueId: string; receipt: unknown }>(`
+            SELECT p."issueId", p.receipt FROM task_pull_links p
+            WHERE p."issueId"=ANY($1::uuid[]) ORDER BY p."issueId",p.ordinal`, [ids])
+          for (const link of links) {
+            const receipt = pullRequestSchema.safeParse(link.receipt)
+            if (!receipt.success) continue
+            const pulls = pullsByIssue.get(link.issueId) ?? []
+            pulls.push(receipt.data)
+            pullsByIssue.set(link.issueId, pulls)
+          }
+        }
         const dispatchByIssue = new Map<string, NonNullable<TaskPresentation['botDispatches']>>()
         if (parsed.includeBotDispatches) {
           const dispatches = await readTaskDispatches(reader.id, workspaceId, ids)
@@ -105,6 +137,7 @@ async function readPresentationBatch(user: Reader, input: TaskPresentationsInput
             else dispatchByIssue.set(issueId, [dispatch])
           }
         }
+        const stageComments = work?.includeDiscussionSources ? await readTaskStageComments(workspaceId, ids) : undefined
         const attention = parsed.includeInboxReason ? await readTaskAttention(client, reader.id, workspaceId, ids) : undefined
         const byId = new Map(visible.map(task => [task.id, task]))
         const status = new Map(rows.filter(readable).map(task => [task.id, task.status]))
@@ -131,6 +164,9 @@ async function readPresentationBatch(user: Reader, input: TaskPresentationsInput
         }, runByIssue.get(task.id), flowByIssue.get(task.id) ?? null,
         id => !['done', 'canceled', 'duplicate'].includes(status.get(id) ?? 'todo'),
         { schedule: task.schedule, blockerIdentifier: id => identifiers.get(id) ?? null }),
+        ...(parsed.includeLinkedChats ? { linkedChats: chatsByIssue.get(task.id) ?? [] } : {}),
+        ...(stageComments ? { factoryStageComments: stageComments.get(task.id) ?? [] } : {}),
+        ...(parsed.includePullRequests ? { pullRequests: pullsByIssue.get(task.id) ?? [] } : {}),
         ...(attention ? { inboxReason: attention.get(task.id) ?? null } : {}),
         ...(parsed.includeBotDispatches ? { botDispatches: dispatchByIssue.get(task.id) ?? [] } : {}),
         ...((parsed.includeFactoryIdentity || counts) && factoryByIssue.has(task.id) ? { factoryTaskId: factoryByIssue.get(task.id) } : {}),

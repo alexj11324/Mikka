@@ -4,7 +4,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { createApprovedWrites } from './approved-writes'
 import type { WriteProvider } from './write-contract'
@@ -19,7 +19,7 @@ test('full migrations preserve personal approved writes and all deletion fences'
   let database: Pool | undefined
   let created = false
   try {
-    await admin.query('CREATE DATABASE "' + name + '" TEMPLATE template0')
+    await createTestDatabase(admin, name, 'template0')
     created = true
     const target = new URL(url!)
     target.pathname = '/' + name

@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { build, createNitro, prepare } from 'nitro/builder'
+import { build as bundle, transform } from 'esbuild'
 import { productWorkflowDirectories } from '../build-contract.mjs'
 
 const repository = fileURLToPath(new URL('../../../', import.meta.url))
@@ -47,4 +48,14 @@ export async function product() {
     assert.ok(steps.stepFiles.includes(join(root, 'lib/nonce.ts')))
     assert.doesNotMatch(JSON.stringify([workflow, steps]), /apps\/eve/)
   } finally { await nitro?.close(); process.chdir(previous); await rm(root, { recursive: true, force: true }) }
+})
+
+test('server Project validation compiles as JavaScript in generated Workflow steps', async () => {
+  // The Workflow compiler preserves JSX in its first pass. Nitro reads the
+  // generated steps.mjs as JavaScript, the same boundary these two passes use.
+  const result = await bundle({
+    absWorkingDir: repository, entryPoints: ['lib/project-input.ts'], bundle: true, write: false,
+    platform: 'node', format: 'esm', jsx: 'preserve', packages: 'external', tsconfig: 'tsconfig.json',
+  })
+  await transform(result.outputFiles[0].text, { loader: 'js', sourcefile: 'steps.mjs' })
 })

@@ -124,8 +124,10 @@ test('one GitHub delivery stays within its statement budget', { skip: !valid, ti
   await budget('pull_request opened, a PR Mikka never delivered', 'pull_request', pullRequest(unrelated, number + 1, 'opened'), 1)
   await budget('pull_request synchronize, new line counts', 'pull_request', pullRequest(delivered, number, 'synchronize'), 2)
   await budget('pull_request synchronize, nothing stored changed', 'pull_request', pullRequest(delivered, number, 'synchronize'), 2)
+  // One more than before (3 → 4): a merged delivery also moves its task to 已完成 in a single statement
+  // (decision 2026-11-13-1405, lib/task-status-advance.ts ADVANCE_MERGED_TASKS). Only a merge pays it.
   const merged = await budget('pull_request closed+merged', 'pull_request',
-    pullRequest(delivered, number, 'closed', { state: 'closed', merged: true, merged_at: '2026-11-05T01:00:00Z', merge_commit_sha: 'b'.repeat(40) }), 3)
+    pullRequest(delivered, number, 'closed', { state: 'closed', merged: true, merged_at: '2026-11-05T01:00:00Z', merge_commit_sha: 'b'.repeat(40) }), 4)
   assert.ok(merged.some(text => text.includes('factory_tasks')), 'the merge still looks for Factory tasks waiting on the PR')
   const { rows: [publication] } = await pool.query('SELECT "pullRequest" FROM run_publications WHERE "runId"=$1', [runId])
   assert.equal(publication.pullRequest.state, 'merged', 'the delivery shows the merge')

@@ -1,3 +1,4 @@
+import { Pool } from 'pg'
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
@@ -5,6 +6,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
+import { measured } from '../../tests/helpers/read-metrics'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 
 // Run captures belong to one run and its owner: teammates, other devices and
@@ -25,24 +27,82 @@ const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...B
 const MP4 = new Uint8Array([0, 0, 0, 0x18, ...Buffer.from('ftypisom-test-video')])
 const sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
 
+dbTest('capture metadata reads do not transfer the inline file', async t => {
+  const [{ createRequestDatabaseScope, pool }, { runEvidence, readCapture }] = await Promise.all([import('../db'), import('./store')])
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const owner = 'capture-summary-' + randomUUID(), run = randomUUID(), agent = randomUUID(), id = randomUUID()
+  const at = new Date('2026-01-02T12:00:00.000Z')
+  try {
+    await scope.run(async () => {
+      await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [owner, owner + '@example.invalid'])
+      await pool.query(`INSERT INTO agents(id,"userId",name,harness) VALUES($1,$2,'Capture','codex')`, [agent, owner])
+      await pool.query(`INSERT INTO agent_runs(id,"userId","agentId",status) VALUES($1,$2,$3,'succeeded')`, [run, owner, agent])
+      await pool.query(`INSERT INTO run_captures(id,"userId","runId",kind,"contentType",source,status,title,size,"inlineContent","createdAt","storageKey",sha256)
+        VALUES($1,$2,$3,'image','image/png','local','ready','Preview',$4,$5,$6,$7,$8)`, [id, owner, run, PNG.length, PNG, at, 'fixture/' + id, sha(PNG)])
+      const small = await measured(() => runEvidence(owner, run))
+      const expected = { id, kind: 'image', contentType: 'image/png', source: 'local', title: 'Preview', size: PNG.length, durationMs: null, createdAt: at.toISOString() }
+      assert.deepEqual(small.value?.captures, [expected])
+      const payload = Buffer.concat([PNG, Buffer.alloc(256 * 1024)])
+      await pool.query('UPDATE run_captures SET "inlineContent"=$2,size=$3,sha256=$4 WHERE id=$1', [id, payload, payload.length, sha(payload)])
+      const large = await measured(() => runEvidence(owner, run))
+      assert.deepEqual(large.value?.captures, [{ ...expected, size: payload.length }])
+      assert.equal(await runEvidence('foreign-' + owner, run), null)
+      assert.deepEqual((await readCapture(owner, id))?.bytes, new Uint8Array(payload))
+      t.diagnostic(JSON.stringify({ inlineBytes: payload.length, smallResultBytes: small.resultBytes, largeResultBytes: large.resultBytes,
+        smallSocketBytes: small.bytes, largeSocketBytes: large.bytes }))
+      assert.ok(large.resultBytes < small.resultBytes + 256, 'metadata reads must not transfer the inline file')
+    })
+  } finally {
+    try { await scope.run(async () => {
+      await pool.query('DELETE FROM run_captures WHERE id=$1', [id])
+      await pool.query('DELETE FROM agent_runs WHERE id=$1', [run])
+      await pool.query('DELETE FROM agents WHERE id=$1', [agent])
+      await pool.query('DELETE FROM "user" WHERE id=$1', [owner])
+    }) } finally { await scope.close() }
+  }
+})
+
 dbTest('artifact evidence follows each real submission version, not the artifact creator or mutable latest version', async t => {
   const [{ createRequestDatabaseScope, pool }, { submitArtifact, readArtifactContent }, { runEvidence }, { artifactStorage }, { workAsyncStorage }, { workUnitAsyncStorage }] = await Promise.all([
     import('../db'), import('../artifacts/store'), import('./store'), import('../artifacts/storage'),
     import('next/dist/server/app-render/work-async-storage.external'), import('next/dist/server/app-render/work-unit-async-storage.external'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
+  const observer = new Pool({ connectionString: databaseUrl!, max: 1 })
   const alice = `artifact-versions-${randomUUID()}`, bob = `artifact-foreign-${randomUUID()}`
   const agentId = randomUUID(), otherAgentId = randomUUID(), issueId = randomUUID(), otherIssueId = randomUUID()
   const firstRun = randomUUID(), nextRun = randomUUID(), otherRun = randomUUID()
   // Only the post-response scheduler is a fixture. Submit, receipt, version,
   // evidence and file reads use their real code and the isolated database.
   let scheduled = 0
-  const afterContext = { after: () => { scheduled++ } }
   const request = { type: 'request', phase: 'action' } as NonNullable<ReturnType<typeof workUnitAsyncStorage.getStore>>
-  const submit = (runId: string, input: Parameters<typeof submitArtifact>[1], userId = alice, issue: string = issueId) => workAsyncStorage.run(
-    { afterContext } as unknown as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>,
-    () => workUnitAsyncStorage.run(request, () => submitArtifact({ userId, runId, issueId: issue, authorName: 'Fixture Agent' }, input)),
-  )
+  const submit = async (runId: string, input: Parameters<typeof submitArtifact>[1], userId = alice, issue: string = issueId) => {
+    type CommittedVersion = { artifactId: string; version: number; sha256: string }
+    const notifications: Promise<CommittedVersion[]>[] = []
+    const afterContext = { after: () => {
+      scheduled++
+      // Live run/chat/artifact/project-map notifications depend on gateway
+      // configuration. Check the committed data they announce, not their count.
+      // This independent connection cannot see the writer's uncommitted rows.
+      notifications.push(observer.query<CommittedVersion>(`SELECT a.id AS "artifactId",v.version,v.sha256
+        FROM coordinator_events e JOIN artifacts a ON a.id::text=e.payload->>'artifactId'
+        JOIN artifact_versions v ON v."artifactId"=a.id AND v.version::text=e.payload->>'version'
+        WHERE e."userId"=$1 AND e."runId"=$2 AND e."issueId"=$3 AND e.kind='artifact_submitted'
+          AND e."dedupeKey"='artifact_submitted:'||a.id::text||':'||v.version::text`, [userId, runId, issue]).then(result => result.rows))
+    } }
+    const result = await workAsyncStorage.run(
+      { afterContext } as unknown as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>,
+      () => workUnitAsyncStorage.run(request, () => submitArtifact({ userId, runId, issueId: issue, authorName: 'Fixture Agent' }, input)),
+    )
+    const observed = await Promise.all(notifications)
+    if ('error' in result) assert.deepEqual(observed, [], 'a refused submission schedules no background work')
+    else {
+      assert.ok(observed.length > 0, 'each committed version schedules its background notifications')
+      for (const rows of observed) assert.deepEqual(rows, [{ artifactId: result.artifactId, version: result.version, sha256: sha(Buffer.from(input.content)) }],
+        'notifications see the matching version and durable receipt from an independent connection')
+    }
+    return result
+  }
   t.after(async () => {
     await scope.run(async () => {
       await pool.query('DELETE FROM coordinator_events WHERE "userId"=ANY($1::text[])', [[alice, bob]])
@@ -52,6 +112,7 @@ dbTest('artifact evidence follows each real submission version, not the artifact
       await pool.query('DELETE FROM agents WHERE id=ANY($1::uuid[])', [[agentId, otherAgentId]])
       await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[alice, bob]])
     })
+    await observer.end()
     await scope.close()
   })
   await scope.run(async () => {
@@ -69,6 +130,7 @@ dbTest('artifact evidence follows each real submission version, not the artifact
     assert.ok(!('error' in next)); assert.equal(next.artifactId, first.artifactId); assert.equal(next.version, 2)
 
     await t.test('v2 belongs to the continuation and each run downloads its own bytes', async () => {
+      const beforeRead = scheduled
       const older = await runEvidence(alice, firstRun), newer = await runEvidence(alice, nextRun)
       assert.deepEqual(older?.artifacts.map(row => [row.id, row.latestVersion]), [[first.artifactId, 1]])
       assert.deepEqual(newer?.artifacts.map(row => [row.id, row.latestVersion]), [[first.artifactId, 2]])
@@ -78,7 +140,7 @@ dbTest('artifact evidence follows each real submission version, not the artifact
       assert.deepEqual(original, { runId: firstRun, latestVersion: 2 }, 'the creator is immutable, while global latest remains useful outside per-run evidence')
       const receipts = (await pool.query(`SELECT "runId",payload->>'version' AS version FROM coordinator_events WHERE "dedupeKey" LIKE $1 ORDER BY "dedupeKey"`, [`artifact_submitted:${first.artifactId}:%`])).rows
       assert.deepEqual(receipts, [{ runId: firstRun, version: '1' }, { runId: nextRun, version: '2' }])
-      assert.equal(scheduled, 2, 'each committed version schedules one wake for its submission receipt')
+      assert.equal(scheduled, beforeRead, 'reading versioned evidence never schedules another wake or invalidation')
     })
 
     await t.test('a foreign owner cannot read the run, replace the file, or download its version', async () => {
@@ -86,6 +148,26 @@ dbTest('artifact evidence follows each real submission version, not the artifact
       assert.equal(await readArtifactContent(bob, first.artifactId, 2), null)
       const denied = await submit(otherRun, { artifactId: first.artifactId, title: 'Foreign', kind: 'markdown', content: 'must not overwrite' }, bob, otherIssueId)
       assert.ok('error' in denied); assert.equal(denied.error, 'not_found')
+    })
+
+    await t.test('evidence is the owner-only read that exposes opaque entry provenance', async () => {
+      const entryRun = randomUUID()
+      const originRef = { kind: 'slack', teamId: 'T1', channelId: 'C1', threadTs: '1.1' }
+      await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","issueId",status,origin,"originRef") VALUES($1,$2,$3,$4,'succeeded','slack',$5::jsonb)`,
+        [entryRun, alice, agentId, issueId, JSON.stringify(originRef)])
+      try {
+        const evidence = await runEvidence(alice, entryRun)
+        assert.equal(evidence?.run.origin, 'slack')
+        assert.deepEqual(evidence?.run.originRef, originRef)
+        assert.equal(await runEvidence(bob, entryRun), null)
+        // A legacy row stays unknown; it is never reported as 'web'.
+        await pool.query(`UPDATE agent_runs SET origin=NULL,"originRef"=NULL WHERE id=$1`, [entryRun])
+        const legacy = await runEvidence(alice, entryRun)
+        assert.equal(legacy?.run.origin, null)
+        assert.equal(legacy?.run.originRef, null)
+      } finally {
+        await pool.query('DELETE FROM agent_runs WHERE id=$1', [entryRun])
+      }
     })
 
     await t.test('evidence is the owner-only read that exposes opaque entry provenance', async () => {
@@ -252,6 +334,9 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     assert.ok('error' in await store.resumeUpload({ ...local, runId: bobRun, userId: bob }, begun.captureId), 'another owner cannot resume it')
     assert.deepEqual(await store.resumeUpload(local, begun.captureId), begun)
     assert.deepEqual(await store.receiveUpload(local, begun.captureId, PNG), { ok: true })
+    const missing = await measured(() => store.completeUpload(local, randomUUID()))
+    assert.equal('error' in missing.value && missing.value.error, 'not_found')
+    assert.equal(missing.statements, 4, 'begin, account guard, one capture read, commit')
     const completed = await store.completeUpload(local, begun.captureId)
     assert.ok(!('error' in completed))
     assert.equal(completed.title, 'Checkout')
@@ -356,6 +441,13 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
       assert.ok(!('error' in verified))
       await fetch(r2.upload.url, { method: 'PUT', headers: r2.upload.headers, body: swapped })
       assert.deepEqual((await store.readCapture(alice, r2.captureId))?.bytes, PNG, 'replayed signed PUT cannot replace verified evidence')
+      const objectShare = await store.createCaptureShare(alice, r2.captureId)
+      assert.ok(objectShare)
+      const sharedObject = await measured(() => store.sharedCapture(objectShare.token))
+      assert.deepEqual(sharedObject.value?.bytes, PNG, 'the authorized shared object still uses its normal storage reader')
+      assert.equal(sharedObject.statements, 1)
+      assert.equal(await store.revokeCaptureShares(alice, r2.captureId), 1)
+      assert.equal(await store.sharedCapture(objectShare.token), null)
     } finally {
       globalThis.fetch = originalFetch
       for (const name of names) if (previous[name] === undefined) delete process.env[name]; else process.env[name] = previous[name]
@@ -381,7 +473,12 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     assert.equal(await store.createCaptureShare(bob, saved.id), null)
     const share = await store.createCaptureShare(alice, saved.id)
     assert.ok(share?.token.startsWith('mkc_'))
-    assert.deepEqual((await store.sharedCapture(share!.token))?.bytes, PNG)
+    const linked = await measured(() => store.sharedCapture(share!.token))
+    assert.deepEqual(linked.value?.bytes, PNG)
+    assert.equal(linked.statements, 1, 'share authority and ready media must be read in one statement')
+    await pool.query("UPDATE run_captures SET status='failed' WHERE id=$1", [saved.id])
+    try { assert.equal(await store.sharedCapture(share!.token), null, 'a live link cannot reveal an unready capture') }
+    finally { await pool.query("UPDATE run_captures SET status='ready' WHERE id=$1", [saved.id]) }
     assert.equal(await store.revokeCaptureShares(bob, saved.id), 0)
     assert.equal(await store.revokeCaptureShares(alice, saved.id), 1)
     assert.equal(await store.sharedCapture(share!.token), null)

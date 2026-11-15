@@ -52,7 +52,7 @@ export interface ExitEvent {
 export type AgentReport = Partial<
   Pick<
     HandoffReport,
-    "summary" | "openQuestions" | "nextStep" | "blockedOn" | "plan" | "criteria" | "question" | "previewDatabaseBranch" | "verificationCommand" | "repositorySelection" | "reviewVerdict"
+    "summary" | "openQuestions" | "nextStep" | "blockedOn" | "plan" | "criteria" | "question" | "previewDatabaseBranch" | "verificationCommand" | "repositorySelection" | "reviewVerdict" | "visualEvidence"
   >
 >
 
@@ -176,7 +176,7 @@ export interface AgentSession {
   /** Single-consumer stream; ends after the `exit` event. */
   events(): AsyncIterable<AgentEvent>
   /** User message / interjection. */
-  send(text: string): Promise<void>
+  send(text: string, mode?: "steer"): Promise<void>
   cancel(): Promise<void>
   /**
    * Optional: the daemon stops consuming this session without ending it

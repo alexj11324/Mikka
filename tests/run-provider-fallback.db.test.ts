@@ -19,6 +19,7 @@ import { ALLOWED_MODEL, codexWithModel, seedAllowedModel } from './support/allow
 import type { DecisionAnswer } from '../lib/coordinator/decision'
 import { MODEL_ROUTING_TIERS, modelTier } from '../lib/model-routing'
 import { isolateCoordinatorWakes } from './support/coordinator-wake'
+import { addFactoryVisualEvidence } from './helpers/factory-visual-evidence'
 import { threadPromptView } from '../lib/thread-prompt'
 
 test('provider failure continues the same task through its authorized preferred models', { skip: !dbUrl }, async t => {
@@ -234,6 +235,7 @@ test('provider failure continues the same task through its authorized preferred 
       const sessionId = `candidate-implementation-${first.runId}`
       await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"startedAt"=now()-interval '1 second',"finishedAt"=now(),"sessionId"=$2,report=$3 WHERE id=$1`,
         [first.runId, sessionId, JSON.stringify({ ...emptyRunReport('Completed fixture candidate'), sourceCommit: sha, publish: { commit: sha }, verify: { status: 'passed' } })])
+      await addFactoryVisualEvidence(pool, first.runId)
       let state = await factory.apply(p.id, first.binding, randomUUID(), { action: 'candidate', runId: first.runId,
         candidate: { sha, repository: p.remote, environment: `device:${p.deviceId}`, scope: `issue:${issueId}` } })
       state = await factory.apply(p.id, factoryBinding(state.task), randomUUID(), { action: 'finish', status: 'passed', reason: 'The implementation yielded the fixed candidate',
@@ -416,6 +418,7 @@ test('provider failure continues the same task through its authorized preferred 
       })
       await reconciler.run(p.id, first.runId)
     } else {
+      await addFactoryVisualEvidence(pool, first.runId)
       let state = await factory.apply(p.id, first.binding, randomUUID(), { action: 'candidate', runId: first.runId,
         candidate: { sha, repository: p.remote, environment: `device:${p.deviceId}`, scope: `issue:${issueId}` } })
       state = await factory.apply(p.id, factoryBinding(state.task), randomUUID(), { action: 'finish', status: 'passed', reason: 'Synthetic completed implementation',

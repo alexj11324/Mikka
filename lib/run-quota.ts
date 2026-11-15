@@ -1,4 +1,5 @@
 import { runChanged } from './live/panels'
+import { scheduleConversationTitle } from '@/lib/conversation-title-schedule'
 import { serverRunFailure } from './run-failure-details'
 import { CodedError } from '@mikka/protocol/coded-error'
 import 'server-only'
@@ -173,6 +174,8 @@ async function queueDeviceContinuation(tx: Tx, query: Query, run: Run, key: RunA
   const id = crypto.randomUUID()
   const copied = quotaContinuationPrompt(run)
   const { prompt } = copied
+  // The conversation is named once this commits (decision 2026-11-13-1405); a run that continues one takes its title.
+  scheduleConversationTitle(tx, id, run.userId, 'created')
   await tx.insert(agentRuns).values({
     id, userId: run.userId, workspaceId: run.workspaceId, issueId: run.issueId, agentId: run.agentId, botId: run.botId, source: run.source,
     // The continuation keeps the paused run's entry; a legacy run keeps the

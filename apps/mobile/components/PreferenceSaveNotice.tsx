@@ -15,7 +15,9 @@ export function PreferenceSaveNotice() {
   const saving = preferenceSave.status === 'saving'
   return <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ gap: 8, marginTop: 12, marginBottom: 16 }}>
     {Object.entries(preferenceSave.intent).map(([key, value]) => <Text key={key} style={{ fontSize: 13, color: saving ? colors.secondary : colors.danger }}>
-      {`${names[key] ?? key} · ${saving ? value ? copy.savingOn : copy.savingOff : value ? copy.unconfirmedOn : copy.unconfirmedOff}`}
+      {key === 'archiveIdleAfterDays'
+        ? (saving ? messages.Common.saving : messages.ConversationDirectory.archiveSaveError)
+        : `${names[key] ?? key} · ${saving ? value ? copy.savingOn : copy.savingOff : value ? copy.unconfirmedOn : copy.unconfirmedOff}`}
     </Text>)}
     {!saving ? <CardButton label={copy.retrySave} onPress={() => void retryPreferences()} /> : null}
   </View>

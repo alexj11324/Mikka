@@ -7,6 +7,7 @@ export type Outgoing = ChatDelivery<{
   submissionId: string
   at: number
   sourceCardId?: string
+  turnPolicy?: 'queue' | 'steer'
   botId: string | null
   chatKey: string
   context: number
@@ -16,7 +17,7 @@ export type Outgoing = ChatDelivery<{
 
 export const outgoingKey = (newId: () => string = () => globalThis.crypto.randomUUID()) => newId()
 
-export function personalMessage(id: string, text: string, images: readonly OutgoingImage[], scope: Pick<Outgoing, 'botId' | 'chatKey' | 'context' | 'sourceCardId'>): Outgoing {
+export function personalMessage(id: string, text: string, images: readonly OutgoingImage[], scope: Pick<Outgoing, 'botId' | 'chatKey' | 'context' | 'sourceCardId' | 'turnPolicy'>): Outgoing {
   return { ...scope, id, key: id, submissionId: id, at: Date.now(), text, images: images.map(image => ({ ...image })), phase: 'sending' }
 }
 

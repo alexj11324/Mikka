@@ -6,14 +6,14 @@ import { Pool, type PoolClient } from 'pg'
 import type { ApiSession } from '../api-auth'
 import { tokenWorkspace } from '../tokens/principal'
 import { dbUrl, seedUser, seedWorkspace, seedBot, seedAgent, seedTeam } from '../../tests/support/workspace-admin-db'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 
 test('task review: current owner, session, tenant and immutable physical checkout', { skip: !dbUrl, timeout: 120_000 }, async t => {
   assert.ok(dbUrl)
   const admin = new Pool({ connectionString: dbUrl, max: 1 })
   const database = `review_authority_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   const url = new URL(dbUrl); url.pathname = `/${database}`
   const pool = new Pool({ connectionString: url.toString(), max: 8 })
   const saved = { E2E_DATABASE_URL: process.env.E2E_DATABASE_URL, MIKKA_DATABASE_URL: process.env.MIKKA_DATABASE_URL, DATABASE_URL: process.env.DATABASE_URL }

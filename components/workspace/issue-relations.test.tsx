@@ -13,10 +13,10 @@ const parent = { id: 'parent', revision: 1, status: 'todo', metadata } as IssueV
 const child = { id: 'child', revision: 1, status: 'todo', metadata: { ...metadata, parentId: parent.id } } as IssueView
 let rows = [parent, child]
 let available = true
-const read = async () => {
+const read = mock.fn(async () => {
   if (!available) throw new Error('Task relations unavailable')
   return rows
-}
+})
 const errorToast = mock.fn((message: string) => message)
 mock.module('sonner', { namedExports: { toast: { error: errorToast, success() {} } } })
 const save = mock.fn(async (_input: { revision: number }): Promise<{ issue?: IssueView; error?: string }> => ({}))
@@ -41,9 +41,10 @@ before(async () => {
 after(async () => { if (root) await act(async () => root.unmount()); await win.happyDOM.abort() })
 
 let savedParent = parent
-function Probe() {
+type Snapshot = NonNullable<Parameters<typeof useIssueConnections>[0]['snapshot']>
+function Probe({ snapshot }: { snapshot?: Snapshot }) {
   const { data = parent } = useSWR(issueKeys.detail(parent.id), async () => savedParent)
-  state = useIssueConnections({ viewerId: 'viewer', task: data, getCurrent: async () => data, onSaved() {}, disabled: false })
+  state = useIssueConnections({ snapshot, viewerId: 'viewer', task: data, getCurrent: async () => data, onSaved() {}, disabled: false })
   return null
 }
 
@@ -98,4 +99,30 @@ test('a stale status save refreshes the child revision without resubmitting', as
   await act(async () => { await state.status(child.id, state.children[0].revision, 'done') })
   assert.equal(save.mock.callCount(), 2)
   assert.equal(save.mock.calls[1].arguments[0].revision, 2)
+})
+
+
+test('task Work supplies relation rows, retries the same read, and withdraws failed data', async () => {
+  read.mock.resetCalls()
+  save.mock.resetCalls()
+  const projected = [parent, child].map(task => ({
+    id: task.id, title: task.id, ownerId: 'viewer', priority: 'normal', status: task.status,
+    identifier: null, workspaceId: 'workspace', scope: 'workspace' as const, scopeVersion: 1,
+    revision: task.revision, createdAt: new Date(0), metadata: task.metadata,
+  }))
+  const refresh = mock.fn(async () => projected)
+  const render = (snapshot: Snapshot) => act(async () => root.render(
+    <SWRConfig key="aggregate" value={{ provider: () => new Map() }}><Probe snapshot={snapshot} /></SWRConfig>,
+  ))
+  await render({ refresh })
+  assert.equal(state.children.length, 0)
+  await render({ rows: projected, refresh })
+  assert.deepEqual(state.children.map(row => row.id), [child.id])
+  await act(async () => { await state.mutate() })
+  assert.equal(refresh.mock.callCount(), 1)
+  await render({ rows: projected, error: new Error('access withdrawn'), refresh })
+  assert.equal(state.rows, undefined)
+  await state.remove('child', child.id)
+  assert.equal(save.mock.callCount(), 0)
+  assert.equal(read.mock.callCount(), 0)
 })

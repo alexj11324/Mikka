@@ -2,7 +2,7 @@ import { runMessagePrompt } from './run-message-prompt'
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
-import { and, asc, eq, getTableColumns, inArray, isNull } from 'drizzle-orm'
+import { and, asc, eq, sql, getTableColumns, inArray, isNull } from 'drizzle-orm'
 import { db, pool } from '@/lib/db'
 import { cloudDeviceScopeAllows } from '@/lib/device-token-scope'
 import { z } from 'zod'
@@ -200,16 +200,17 @@ export function waitSeconds(request: Request, max: number): number {
  * statement also returns the oldest pending device command outside that list:
  * only its id and kind, which the heartbeat hands over too.
  */
-export async function deviceMayHaveWork(deviceId: string, skip: readonly string[], options: { mailboxNotices?: boolean; queued?: boolean; skipDeviceCommands?: readonly string[] } = {}): Promise<{ work: boolean; deviceCommand: { id: string; kind: DeviceCommandKind } | null }> {
+export async function deviceMayHaveWork(deviceId: string, skip: readonly string[], options: { activeTurnSteer?: boolean; mailboxNotices?: boolean; queued?: boolean; skipDeviceCommands?: readonly string[] } = {}): Promise<{ work: boolean; deviceCommand: { id: string; kind: DeviceCommandKind } | null }> {
   const uuid = (id: string) => z.uuid().safeParse(id).success
   const { readUnderDeviceAuthority } = await import('@/lib/db')
   const [work, deviceCommand] = await readUnderDeviceAuthority<[boolean, { id: string; kind: DeviceCommandKind } | null]>(`json_build_array(EXISTS (SELECT 1 FROM agent_runs r WHERE r."deviceId"=$1 AND r.status = ANY($2::text[]) AND NOT (r.id = ANY($3::uuid[]))
     AND (r."stopRequestedAt" IS NOT NULL OR ($4 AND r.status='queued')
       OR ($5 AND r.status IN ('preparing','running','waiting_input'))
-      OR EXISTS (SELECT 1 FROM run_messages m WHERE m."runId"=r.id AND m."deliveredAt" IS NULL))),
+      OR EXISTS (SELECT 1 FROM run_messages m WHERE m."runId"=r.id AND m."deliveredAt" IS NULL AND m.failure IS NULL
+        AND ($8 OR NOT EXISTS (SELECT 1 FROM coordinator_events e WHERE e.id=m.id AND e."userId"=m."userId" AND e.payload#>>'{threadSubmission,delivery}'='steer'))))),
     CASE WHEN $6 THEN (SELECT json_build_object('id', c.id, 'kind', c.kind) FROM device_management_commands c
       WHERE c."deviceId"=$1 AND c."completedAt" IS NULL AND NOT (c.id = ANY($7::uuid[])) ORDER BY c."createdAt" LIMIT 1) END)`,
-  [deviceId, [...LIVE_RUN_STATUSES], skip.filter(uuid), Boolean(options.queued), Boolean(options.mailboxNotices), Boolean(options.skipDeviceCommands), (options.skipDeviceCommands ?? []).filter(uuid)])
+  [deviceId, [...LIVE_RUN_STATUSES], skip.filter(uuid), Boolean(options.queued), Boolean(options.mailboxNotices), Boolean(options.skipDeviceCommands), (options.skipDeviceCommands ?? []).filter(uuid), Boolean(options.activeTurnSteer)])
   return { work, deviceCommand }
 }
 
@@ -235,7 +236,7 @@ export async function deviceUpdateNotice(deviceId: string): Promise<{ id: string
  * - `queuedRuns`: runs waiting for it to claim them (only with `queued`).
  * Runs in `skip` are left out so a long-poll can wait for new ones.
  */
-export async function deviceWork(deviceId: string, skip: readonly string[], options: { mailboxNotices?: boolean; queued?: boolean } = {}): Promise<{ commands: RunCommand[]; queuedRuns: string[] }> {
+export async function deviceWork(deviceId: string, skip: readonly string[], options: { activeTurnSteer?: boolean; mailboxNotices?: boolean; queued?: boolean } = {}): Promise<{ commands: RunCommand[]; queuedRuns: string[] }> {
   const runs = await db
     .select({ id: agentRuns.id, status: agentRuns.status, stopRequestedAt: agentRuns.stopRequestedAt })
     .from(agentRuns)
@@ -245,30 +246,46 @@ export async function deviceWork(deviceId: string, skip: readonly string[], opti
   const queuedRuns = options.queued ? live.filter(run => run.status === 'queued').map(run => run.id).slice(0, 100) : []
   if (live.length === 0) return { commands: [], queuedRuns }
   const messages = await db
-    .select({ id: runMessages.id, runId: runMessages.runId, text: runMessages.text, origin: runMessages.origin })
+    .select({ id: runMessages.id, runId: runMessages.runId, text: runMessages.text, origin: runMessages.origin,
+      steer: sql<boolean>`EXISTS (SELECT 1 FROM coordinator_events e WHERE e.id=${runMessages.id} AND e."userId"=${runMessages.userId} AND e.payload#>>'{threadSubmission,delivery}'='steer')` })
     .from(runMessages)
-    .where(and(isNull(runMessages.deliveredAt), inArray(runMessages.runId, live.map(run => run.id))))
+    .where(and(isNull(runMessages.deliveredAt), sql`failure IS NULL`, inArray(runMessages.runId, live.map(run => run.id))))
     .orderBy(asc(runMessages.createdAt))
     .limit(500)
   // The runId filter above excludes mailbox messages, whose runId is null.
-  const inputs: RunCommand[] = messages.flatMap(({ id, runId, text, origin }) => runId ? [{ kind: 'input' as const, runId, messageId: id, text: runMessagePrompt({ id, runId, origin, text }) }] : [])
+  const inputs: RunCommand[] = messages.flatMap(({ id, runId, text, origin, steer }) => runId && (!steer || options.activeTurnSteer) ? [{ kind: steer ? 'steer' as const : 'input' as const, runId, messageId: id, text: runMessagePrompt({ id, runId, origin, text }) }] : [])
   const stops: RunCommand[] = live.filter(run => run.stopRequestedAt).map(run => ({ kind: 'stop', runId: run.id }))
   const notices = options.mailboxNotices ? await pendingMailboxNotices(deviceId, live.filter(run => !run.stopRequestedAt).map(run => run.id)) : []
   return { commands: [...stops, ...notices, ...inputs].slice(0, 500), queuedRuns }
 }
 
 /** Marks messages the agent now holds; called by the daemon's ack. */
-export async function ackCommands(deviceId: string, delivered: readonly string[]): Promise<void> {
+export async function ackCommands(deviceId: string, delivered: readonly string[], refusedSteers: readonly string[] = []): Promise<void> {
+  if (refusedSteers.length) {
+    const refused = await pool.query<{ runId: string }>(`UPDATE run_messages m SET failure='threadDeliveryUnavailable'
+      FROM agent_runs r,coordinator_events e WHERE m.id=ANY($2::uuid[]) AND m."runId"=r.id AND r."deviceId"=$1
+        AND r."userId"=m."userId" AND e.id=m.id AND e."userId"=m."userId" AND e.payload#>>'{threadSubmission,delivery}'='steer'
+        AND m."deliveredAt" IS NULL AND m.failure IS NULL RETURNING m."runId"`, [deviceId, refusedSteers])
+    const { runChanged } = await import('./live/panels')
+    for (const runId of new Set(refused.rows.map(row => row.runId))) await runChanged(pool, runId)
+  }
   if (delivered.length === 0) return
   await ackMailboxNotices(deviceId, delivered)
   const owned = await db
-    .select({ id: runMessages.id })
+    .select({ id: runMessages.id, runId: runMessages.runId, steer: sql<boolean>`EXISTS (SELECT 1 FROM coordinator_events e WHERE e.id=${runMessages.id}
+      AND e."userId"=${runMessages.userId} AND e.payload#>>'{threadSubmission,delivery}'='steer')` })
     .from(runMessages)
     .innerJoin(agentRuns, eq(agentRuns.id, runMessages.runId))
     .where(and(eq(agentRuns.deviceId, deviceId), inArray(runMessages.id, [...delivered])))
   if (owned.length === 0) return
-  await db
+  const acknowledged = await db
     .update(runMessages)
     .set({ deliveredAt: new Date() })
-    .where(and(inArray(runMessages.id, owned.map(row => row.id)), isNull(runMessages.deliveredAt)))
+    .where(and(inArray(runMessages.id, owned.map(row => row.id)), isNull(runMessages.deliveredAt),sql`failure IS NULL`)).returning({ id: runMessages.id })
+  const changed = new Set(acknowledged.map(row => row.id))
+  const steered = owned.flatMap(row => row.steer && row.runId && changed.has(row.id) ? [row.runId] : [])
+  if (steered.length) {
+    const { runChanged } = await import('./live/panels')
+    for (const runId of new Set(steered)) await runChanged(pool, runId)
+  }
 }

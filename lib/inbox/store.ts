@@ -264,17 +264,15 @@ export class InboxStore {
   }
 
   async expire() {
-    // Delete atomically, then publish committed invalidations. Concurrent due
-    // timers cannot return the same persisted snooze twice.
-    const tx = await this.pool.connect()
+    // A single statement on an independent client commits both deletions before
+    // publishing. Concurrent timers cannot return the same persisted snooze twice.
+    const client = await this.pool.connect()
     let rows: { userId: string; workspaceId: string }[]
     try {
-      await tx.query('BEGIN')
-      rows = (await tx.query<{ userId: string; workspaceId: string }>(`WITH legacy AS (DELETE FROM inbox_snoozes WHERE "snoozedUntil"<=$1 RETURNING "userId","workspaceId"),
+      rows = (await client.query<{ userId: string; workspaceId: string }>(`WITH legacy AS (DELETE FROM inbox_snoozes WHERE "snoozedUntil"<=$1 RETURNING "userId","workspaceId"),
         conversations AS (DELETE FROM inbox_conversation_snoozes WHERE "snoozedUntil"<=$1 RETURNING "userId","workspaceId")
         SELECT * FROM legacy UNION ALL SELECT * FROM conversations`, [this.now()])).rows
-      await tx.query('COMMIT')
-    } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+    } finally { client.release() }
     const scopes = new Map(rows.map(row => [JSON.stringify([row.userId, row.workspaceId]), row]))
     await Promise.all([...scopes.values()].map(row => this.changed(row.userId, row.workspaceId)))
   }

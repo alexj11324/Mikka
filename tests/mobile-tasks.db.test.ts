@@ -128,6 +128,201 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     (select coalesce(jsonb_agg(jsonb_build_array(id,"workspaceId","issueId","runId") order by id),'[]') from artifacts where "userId"=$1) as artifacts,
     (select coalesce(jsonb_agg(jsonb_build_array(id,workspace_id,status,next_at) order by id),'[]') from user_schedules where owner_id=$1) as schedules`, [owner])).rows[0]
 
+  await t.test('an authorized task owner label follows its member or admitted Agent, with no private run access for the teammate', async () => {
+    const task = await workspaceTask()
+    const delegate = { kind: 'agent', id: randomUUID(), name: 'Builder', image: null }
+    const member = { kind: 'member', id: owner, name: 'Task owner', image: null }
+    async function setOwner(assignee: typeof member | null) {
+      const content = { type: 'doc', attrs: { mikka: { delegate, assignee } } }
+      await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [task, JSON.stringify(content)])
+    }
+    try {
+      await setOwner(null)
+      assert.deepEqual((await (await request(task)).json()).task.workOwner, { kind: 'agent', name: 'Builder' })
+      assert.deepEqual((await (await request(task, { bearer: peer.token, workspaceId: teamWorkspace.id })).json()).task.workOwner, { kind: 'agent', name: 'Builder' })
+      assert.equal((await request(task, { bearer: peer.token, workspaceId: secondWorkspace.id })).status, 404)
+      await setOwner(member)
+      assert.deepEqual((await (await request(task)).json()).task.workOwner, { kind: 'member', name: 'Task owner' })
+    } finally {
+      await pool.query('DELETE FROM issues WHERE id=$1', [task])
+    }
+  })
+
+  await t.test('the versioned work request returns task state, readable PRs and chat links in one owner-authorized detail', async () => {
+    const load = (options?: ReadOptions) => run('/api/mobile/tasks/' + issueId + '?work=1', req => GET(req, { params: Promise.resolve({ id: issueId }) }), options)
+    const child = await workspaceTask()
+    const foreign = await workspaceTask(secondWorkspace.id, false)
+    const childContent = { type: 'doc', attrs: { mikka: { parentId: issueId } } }
+    await pool.query('update issues set content=$1 where id=any($2::uuid[])', [childContent, [child, foreign]])
+    const response = await load()
+    assert.equal(response.status, 200)
+    const detail = await response.json()
+    assert.equal(detail.work.version, 1)
+    assert.deepEqual(detail.work.pullRequests, [{ url: 'https://github.com/acme/app/pull/1', state: 'open' }])
+    assert.deepEqual(detail.work.linkedChats, [])
+    assert.deepEqual(detail.work.connections.map((row: { id: string; kinds: string[] }) => [row.id, row.kinds]), [[child, ['child']]])
+    const ownedThread = detail.work.conversations.find((row: { id: string }) => row.id === latest)
+    assert.ok(ownedThread?.detail?.name)
+    assert.equal(ownedThread.detail.observedModel, null, 'a requested model must not stand in for the observed model')
+    const teammate = await load({ bearer: peer.token, workspaceId: teamWorkspace.id })
+    assert.equal(teammate.status, 200)
+    const peerWork = (await teammate.json()).work
+    assert.ok(peerWork.conversations.some((row: { id: string }) => row.id === latest))
+    assert.ok(peerWork.conversations.every((row: { detail: unknown }) => row.detail === null), 'teammates see only the shared status')
+    assert.equal(detail.task.id, issueId)
+    assert.ok(Array.isArray(detail.timeline))
+    assert.equal((await load({ bearer: null })).status, 401)
+    assert.equal((await load({ bearer: peer.token, workspaceId: secondWorkspace.id })).status, 404)
+    await pool.query('delete from issues where id=any($1::uuid[])', [[child, foreign]])
+  })
+  await t.test('native archive days persist across settings and Bot rows for the authenticated owner only', async () => {
+    const { GET: directory } = await import('../app/api/mobile/conversations/route')
+    const { GET: preference, PATCH: update } = await import('../app/api/mobile/preferences/route')
+    const { readPreferences } = await import('../lib/preferences')
+    const pref = '/api/mobile/preferences'
+    const selected = teamWorkspace.id
+    const readPreference = (options?: ReadOptions) => run(pref, preference, options)
+    const setDays = (days: number, options?: ReadOptions) => run(pref, request => update(new Request(request, {
+      method: 'PATCH', headers: { ...Object.fromEntries(request.headers), 'content-type': 'application/json' },
+      body: JSON.stringify({ archiveIdleAfterDays: days }),
+    })), options)
+    const rows = (archived: boolean, botId: string = bot, options?: ReadOptions) => run(
+      '/api/mobile/conversations?' + new URLSearchParams({ workspaceId: selected, archived: String(archived), botId }),
+      directory, { workspaceId: selected, ...options },
+    )
+    const ids = async (archived: boolean, botId: string = bot, options?: ReadOptions) => {
+      const response = await rows(archived, botId, options)
+      assert.equal(response.status, 200)
+      return (await response.json()).items.map((row: { id: string }) => row.id)
+    }
+    const idle = await seedRun(pool, { userId: owner, agentId: agent, workspaceId: selected, botId: bot, status: 'succeeded' })
+    await pool.query(`UPDATE agent_runs SET "createdAt"=now()-interval '9 days',"updatedAt"=now()-interval '9 days' WHERE id=$1`, [idle])
+    const ownDays = (await (await readPreference()).json()).archiveIdleAfterDays
+    const otherDays = (await (await readPreference({ bearer: peer.token })).json()).archiveIdleAfterDays
+    assert.equal(ownDays, 30)
+    assert.equal(otherDays, 30)
+    assert.equal((await readPreference({ bearer: null })).status, 401)
+    try {
+      assert.equal((await setDays(7)).status, 200)
+      assert.equal((await (await readPreference()).json()).archiveIdleAfterDays, 7)
+      assert.equal((await pool.query(`SELECT "archiveIdleAfterDays" FROM user_preferences WHERE "userId"=$1`, [owner])).rows[0].archiveIdleAfterDays, 7)
+      assert.equal((await readPreferences(owner)).archiveIdleAfterDays, 7)
+      assert.ok((await ids(true)).includes(idle))
+      assert.ok(!(await ids(false)).includes(idle))
+      assert.ok(!(await ids(true, secondBot)).includes(idle))
+      assert.ok(!(await ids(true, bot, { bearer: peer.token })).includes(idle))
+      assert.equal((await (await readPreference({ bearer: peer.token })).json()).archiveIdleAfterDays, otherDays)
+      assert.equal((await rows(true, bot, { workspaceId: secondWorkspace.id })).status, 403)
+      assert.equal((await setDays(7, { bearer: null })).status, 401)
+      assert.equal((await setDays(1)).status, 400)
+      assert.equal((await (await readPreference()).json()).archiveIdleAfterDays, 7)
+      assert.equal((await setDays(0)).status, 200)
+      assert.equal((await readPreferences(owner)).archiveIdleAfterDays, 0)
+      assert.equal((await (await readPreference()).json()).archiveIdleAfterDays, 0)
+      assert.ok((await ids(false)).includes(idle))
+      assert.ok(!(await ids(true)).includes(idle))
+    } finally {
+      assert.equal((await setDays(ownDays)).status, 200)
+      await pool.query('DELETE FROM agent_runs WHERE id=$1', [idle])
+    }
+  })
+  await t.test('the native Bot detail ranks eight of fifty conversations, distinguishes overflow and enforces the workspace and owner', async () => {
+    const { GET: directory } = await import('../app/api/mobile/conversations/route')
+    const childBot = await seedBot(pool, teamWorkspace.id, owner)
+    const ids = Array.from({ length: 50 }, () => randomUUID())
+    await pool.query(`INSERT INTO agent_runs(id,"userId","workspaceId","agentId","botId",status,title,"titleSource","createdAt","updatedAt","conversationPinnedAt","conversationArchivedAt")
+      SELECT id,$2,$3,$4,$5,CASE n WHEN 7 THEN 'waiting_input' WHEN 3 THEN 'running' ELSE 'succeeded' END,
+        'Bot conversation '||n,'manual',now()-n*interval '1 hour',now()-n*interval '1 hour',
+        CASE WHEN n=48 THEN now() END,CASE WHEN n=1 THEN now() END
+      FROM unnest($1::uuid[]) WITH ORDINALITY input(id,n)`, [ids, owner, teamWorkspace.id, agent, childBot])
+    const read = (options?: ReadOptions, id: string = childBot) => run('/api/mobile/conversations?' + new URLSearchParams({
+      view: 'botChildren', workspaceId: teamWorkspace.id, botId: id,
+    }), directory, { workspaceId: teamWorkspace.id, ...options })
+    try {
+      const { changeThreadRead } = await import('../lib/thread-reads')
+      // Eleven marked roots include one archived row and several outside the visible eight.
+      for (const runId of ids.slice(0, 11)) {
+        assert.equal(await changeThreadRead(owner, teamWorkspace.id, { action: 'unread', runId }), true)
+      }
+      const response = await read()
+      assert.equal(response.status, 200)
+      const group = await response.json()
+      assert.equal(group.unreadCount, 10)
+      const { GET: home } = await import('../app/api/mobile/home/route')
+      const homeResponse = await run('/api/mobile/home', home, { workspaceId: teamWorkspace.id })
+      assert.equal(homeResponse.status, 200)
+      const homeData = await homeResponse.json()
+      assert.equal(homeData.workspace.id, teamWorkspace.id)
+      assert.equal(homeData.bots.find((entry: { id: string }) => entry.id === childBot)?.unreadCount, 10)
+      assert.equal(group.workspaceId, teamWorkspace.id)
+      assert.equal(group.botId, childBot)
+      assert.equal(group.more, true)
+      assert.deepEqual(group.items.map((row: { id: string }) => row.id), [47, 6, 2, 1, 3, 4, 5, 7].map(index => ids[index]))
+      const memberGroup = await (await read({ bearer: peer.token })).json()
+      assert.deepEqual(memberGroup.items, [])
+      assert.equal(memberGroup.unreadCount, 0)
+      assert.deepEqual((await (await read({}, secondBot)).json()).items, [])
+      assert.equal((await read({ workspaceId: secondWorkspace.id })).status, 403)
+      assert.equal((await read({ bearer: null })).status, 401)
+      assert.equal((await read({}, 'invalid')).status, 422)
+      await pool.query('UPDATE agent_runs SET "conversationArchivedAt"=now() WHERE id=ANY($1::uuid[])', [ids.slice(3)])
+      const remainder = await (await read()).json()
+      assert.equal(remainder.more, false)
+      assert.equal(remainder.unreadCount, 2)
+      assert.deepEqual(remainder.items.map((row: { id: string }) => row.id), [ids[2], ids[1]])
+    } finally {
+      await pool.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[])', [ids])
+      await pool.query('DELETE FROM bots WHERE id=$1', [childBot])
+    }
+  })
+  await t.test('the native PR directory filters canonical publications with the requested workspace and authenticated reader', async () => {
+    const { GET: directory } = await import('../app/api/mobile/conversations/route')
+    const read = (space: string, filter: string, options?: ReadOptions) =>
+      run(`/api/mobile/conversations?workspaceId=${space}&archived=any&pullState=${filter}`, directory, { workspaceId: space, ...options })
+    const allowed = await read(teamWorkspace.id, 'open')
+    assert.equal(allowed.status, 200)
+    const page = await allowed.json()
+    assert.ok(page.items.some((row: { id: string; pulls: { url: string }[] }) =>
+      row.id === latest && row.pulls.some(pull => pull.url === 'https://github.com/acme/app/pull/42')))
+    const closed = await read(teamWorkspace.id, 'closed')
+    assert.equal(closed.status, 200)
+    assert.deepEqual((await closed.json()).items, [])
+    const member = await read(teamWorkspace.id, 'linked', { bearer: peer.token })
+    assert.equal(member.status, 200)
+    assert.deepEqual((await member.json()).items, [])
+    assert.equal((await read(teamWorkspace.id, 'invented')).status, 422)
+    assert.equal((await read(teamWorkspace.id, 'linked', { bearer: null })).status, 401)
+    assert.equal((await read(teamWorkspace.id, 'linked', { workspaceId: secondWorkspace.id })).status, 403)
+  })
+  await t.test('a verified Factory PR identifies its conversation for the owner while a teammate sees only the shared work', async () => {
+    const factoryId = randomUUID(), attempt = randomUUID(), source = randomUUID()
+    const tx = await pool.connect()
+    try {
+      await tx.query('BEGIN')
+      await tx.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload)
+        VALUES($1::uuid,$2,$3,$4,'user_message',$1::text,'{"text":"Native pull request fixture"}')`, [source, owner, bot, issueId])
+      await tx.query(`INSERT INTO factory_tasks(id,"userId","botId","issueId","sourceEventId","scopeVersion",route,stage,status,"attemptId",reason)
+        SELECT $1,$2,$3,$4,$5,"scopeVersion",'{}','execute','passed',$6,'Native work fixture' FROM issues WHERE id=$4`, [factoryId, owner, bot, issueId, source, attempt])
+      await tx.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,"runId",reason)
+        VALUES($1,$2,'execute',1,1,'passed',$3,'Native work fixture')`, [attempt, factoryId, latest])
+      await tx.query('COMMIT')
+    } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+    try {
+      const load = (options?: ReadOptions) => run('/api/mobile/tasks/' + issueId + '?work=1', req => GET(req, { params: Promise.resolve({ id: issueId }) }), options)
+      const response = await load()
+      assert.equal(response.status, 200)
+      const ownerWork = (await response.json()).work
+      assert.equal(ownerWork.pullRequests.find((pull: { url: string }) => pull.url.endsWith('/42'))?.sourceConversationId, latest)
+      assert.ok(!('sourceConversationId' in ownerWork.pullRequests.find((pull: { url: string }) => pull.url.endsWith('/1'))))
+      const peerResponse = await load({ bearer: peer.token, workspaceId: teamWorkspace.id })
+      assert.equal(peerResponse.status, 200)
+      const peerWork = (await peerResponse.json()).work
+      assert.ok(peerWork.pullRequests.every((pull: { sourceConversationId?: string }) => !pull.sourceConversationId))
+    } finally {
+      await pool.query('DELETE FROM factory_tasks WHERE id=$1 AND "userId"=$2', [factoryId, owner])
+      await pool.query('DELETE FROM coordinator_events WHERE id=$1 AND "userId"=$2', [source, owner])
+    }
+  })
   await t.test('detail includes contract fields, every attempt, replacement time and creation; excludes raw errors', async () => {
     const response = await request(issueId)
     assert.equal(response.status, 200)
@@ -576,7 +771,8 @@ test('mobile task endpoints with real task ACL, current workspace membership and
       const waitBlockedBy = async () => {
         for (let attempt = 0; attempt < 300; attempt++) {
           const { rows } = await pool.query<{ query: string }>(`select query from pg_stat_activity
-            where datname=current_database() and $1::int=any(pg_blocking_pids(pid))`, [pid])
+            where datname=current_database() and state='active' and wait_event_type='Lock'
+              and query ilike '%mikka_workspace_members%for share%' and $1::int=any(pg_blocking_pids(pid))`, [pid])
           if (rows.length) return rows[0]
           await new Promise(resolve => setTimeout(resolve, 10))
         }

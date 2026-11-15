@@ -2,24 +2,14 @@
 
 import { useTranslations } from 'next-intl'
 import type { IssuePullRequest } from '@/lib/issue-metadata'
-import { PULL_REQUEST_COLORS, PULL_REQUEST_ICONS } from '@/lib/pull-request-appearance'
+import { PULL_REQUEST_COLORS, PULL_REQUEST_ICONS, pullRequestsState } from '@/lib/pull-request-appearance'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 
 /** A PR as a thread card lists it; additions and deletions show only where a reader supplies them. */
 export type BadgePullRequest = IssuePullRequest & { additions?: number; deletions?: number }
 
-type State = IssuePullRequest['state']
-
-/**
- * One state for a set of PRs, as Claude Code's session list shows it: any open
- * one is open, else any draft is a draft, else any merged one is merged, else
- * they were all closed without merging.
- */
-export function pullRequestsState(pullRequests: readonly Pick<IssuePullRequest, 'state'>[]): State {
-  for (const state of ['open', 'draft', 'merged'] as const) if (pullRequests.some(pr => pr.state === state)) return state
-  return 'closed'
-}
+export { pullRequestsState } from '@/lib/pull-request-appearance'
 
 /** Only a GitHub address becomes a link; anything else stored as a PR shows as text. */
 export function isGitHubUrl(url: string) {

@@ -13,7 +13,10 @@ function reader() {
   const context = apiCache.context()
   const get = <T>(path: string) => {
     if (context !== apiCache.context()) throw new ApiError(403, 'workspaceAccessDenied')
-    return api<T>(path, {}, connection)
+    return api<T>(path, {}, connection).then(value => {
+      if (context !== apiCache.context()) throw new ApiError(403, 'workspaceAccessDenied')
+      return value
+    })
   }
   return {
     get,
@@ -38,9 +41,10 @@ export async function readPresentedTasks(path: string) {
 
 export async function readPresentedTask(path: string): Promise<TaskDetail> {
   const read = reader()
-  const detail = await read.get<TaskDetail>(path)
+  const detail = await read.get<TaskDetail>(path + (path.includes('?') ? '&' : '?') + 'work=1')
   const workspaceId = detail.live?.workspaceId
   if (!workspaceId) throw new ApiError(403, 'workspaceAccessDenied')
+  if (detail.work?.version === 1) return detail
   const presentation = (await read.project(workspaceId, [detail.task.id], detail.live?.factoryActivityVersion === 1)).get(detail.task.id)
   if (!presentation) throw new ApiError(404, 'issueNotFound')
   const { factoryTaskId, ...view } = presentation

@@ -40,7 +40,7 @@ test('an open thread\'s later reads leave its prompt and report in the database 
   // A long prompt whose name is on its third line, and a report with large fields beside its summary.
   const prompt = `\n\n\`\`\`\n**Fix** the checkout rounding\n${'Context line with details. '.repeat(1_500)}`
   const instructions = '\n\nINTERNAL_HOST_GUIDANCE 🔍 must stay out of the user message.'
-  const report = { summary: '  Fixed the rounding.  ', files: 'diff '.repeat(8_000), notes: 'note '.repeat(4_000) }
+  const report = { runtime: { observedModel: 'observed-fixture' }, summary: '  Fixed the rounding.  ', files: 'diff '.repeat(8_000), notes: 'note '.repeat(4_000) }
   const as = <T>(work: () => Promise<T>) => withActivitySession(owner, work) as Promise<T>
   const chunk = (seq: number) => pool.query('insert into run_chunks(id,"runId",seq,chunk) values($1,$2,$3,$4)', [randomUUID(), run, seq, JSON.stringify({ type: 'text-delta', id: 't1', delta: `part ${seq} ` })])
   try {
@@ -48,6 +48,7 @@ test('an open thread\'s later reads leave its prompt and report in the database 
     await pool.query('insert into agents(id,"userId",name,harness) values($1,$2,$3,$4)', [agent, owner, 'Fixture agent', 'codex'])
     await pool.query('insert into issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState") values($1,$2,$3,$4,$5,$6,$7,\'bound\')', [issue, owner, 'Checkout task', JSON.stringify({ type: 'doc', content: [] }), 'doing', 'normal', await seedFixtureWorkspace(pool, owner)])
     await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt,report,"promptTaskStart","promptTaskLength") values($1,$2,$3,$4,$5,$6,$7,0,$8)', [run, owner, issue, agent, 'running', prompt + instructions, JSON.stringify(report), Array.from(prompt).length])
+    await pool.query(`UPDATE agent_runs SET "agentDefinition"=jsonb_build_object('model','selected-fixture') WHERE id=$1`, [run])
     for (let seq = 1; seq <= 3; seq++) await chunk(seq)
 
     const first = await measured(() => as(() => getIssueThread(issue, run)))
@@ -55,6 +56,7 @@ test('an open thread\'s later reads leave its prompt and report in the database 
     assert.equal(first.value.thread.detail?.name, 'Fix the checkout rounding')
     assert.equal(first.value.thread.detail?.summary, 'Fixed the rounding.')
     assert.equal(first.value.promptOmitted, undefined)
+    assert.deepEqual(first.value.context?.composerModel, { selected: 'selected-fixture', served: 'observed-fixture' })
     assert.ok(first.bytes < prompt.length + JSON.stringify(report).length / 4, `the report's other fields stay in the database: ${first.bytes} B`)
 
     await chunk(4)

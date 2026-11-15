@@ -13,7 +13,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   if (!await ownsDevice(deviceId, caller.userId)) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
   const parsed = runCommandsAck.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Invalid ack.' }, { status: 400 })
-  await ackCommands(deviceId, parsed.data.delivered)
+  await ackCommands(deviceId, parsed.data.delivered, parsed.data.refusedSteers)
   return new NextResponse(null, { status: 204 })
 }
 

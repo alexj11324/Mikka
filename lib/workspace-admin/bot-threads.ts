@@ -44,7 +44,8 @@ export function decodeBotThreadCursor(cursor: string): BotThreadPosition | null 
  * a chat thread's prompt only to the person who started it. Anything else is
  * null and the UI shows a generic 私有线程 label — never a redacted fragment.
  */
-export function botThreadTitle(input: { issueTitle: string | null; issueVisible: boolean; prompt: string | null; startedByViewer: boolean }): string | null {
+export function botThreadTitle(input: { conversationTitle?: string | null; issueTitle: string | null; issueVisible: boolean; prompt: string | null; startedByViewer: boolean }): string | null {
+  if (input.startedByViewer && input.conversationTitle && (input.issueTitle === null || input.issueVisible)) return input.conversationTitle
   const raw = input.issueTitle !== null ? (input.issueVisible ? input.issueTitle : null) : (input.startedByViewer ? input.prompt : null)
   const line = raw?.split('\n').map(part => part.trim()).find(Boolean)
   if (!line) return null

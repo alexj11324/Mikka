@@ -1,3 +1,6 @@
+import { useThreadReadEnd } from '@/features/chat/model/use-thread-read-end'
+import { MobileReplyVersions } from '@/features/chat/components/thread-reply-versions'
+import { useThreadDeliveryControls } from '@/features/chat/components/thread-delivery-controls'
 import { conversationAccessDenied, useConversationDelivery } from '@/features/chat/components/conversation-delivery'
 import { mobileMessages } from '@/lib/messages'
 import { useCallback, useRef, useState, type ReactNode } from 'react'
@@ -18,7 +21,7 @@ import { ReadNotice } from '@/components/ReadNotice'
 import { StopFailed } from '@/components/StopFailed'
 import { Text } from '@/components/Text'
 import { ThreadQuotaPaused } from '@/components/ThreadQuotaPaused'
-import { Composer } from '@/features/chat/components/chat-composer'
+import { ThreadComposer } from '@/features/chat/components/thread-composer'
 import { api, ApiError } from '@/lib/api'
 import { useHome } from '@/lib/home'
 import { tasksLive, threadLive } from '@/lib/live-keys'
@@ -66,12 +69,14 @@ export function TaskConversationScreen() {
   const newest = data && conversationReplyRun(data.detail.task, data.detail.activity)
   const live = newest ? data?.threads[newest] ?? null : null
   const canSend = Boolean(newest && live && live.canReply !== false && !conversationAccessDenied(error))
-  const delivery = useConversationDelivery(newest && canSend ? { kind: 'thread', id: newest, issueId: id } : null,
-    Object.values(data?.threads ?? {}).flatMap(thread => thread.confirmedSubmissionIds ?? []), reload)
+  const controls = useThreadDeliveryControls(newest ?? null, id, canSend ? live?.delivery : undefined, reload)
+  const delivery = useConversationDelivery(newest && canSend ? { kind: 'thread', id: newest, issueId: id, delivery: controls.mode } : null,
+    Object.values(data?.threads ?? {}).flatMap(thread => [...(thread.confirmedSubmissionIds ?? []), ...(thread.delivery?.queued.map(row => row.requestId) ?? [])]), reload)
   const stopper = useStop(() => api(`/api/mobile/threads/${newest}/stop`, { method: 'POST' }).catch(failure => {
     if (!(failure instanceof ApiError && failure.status === 409)) throw failure
   }), Boolean(live?.active), reload)
 
+  const readEnd = useThreadReadEnd(id, error ? undefined : Object.values(data?.threads ?? {}).flatMap(thread => thread.readReceipts ?? []), bar.onScroll)
   const task = data?.detail.task
   const agent = currentAgent(segments)
   // Opened on an attempt from 活动: scrolled to its part, once. Opened plainly: at the newest, at the bottom, as a chat.
@@ -98,7 +103,7 @@ export function TaskConversationScreen() {
           </View>
         ) : undefined}
       />
-      <KeyboardChatScrollView onScroll={bar.onScroll} scrollEventThrottle={16} ref={scroller as never} onContentSizeChange={place} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
+      <KeyboardChatScrollView key={id} {...readEnd} scrollEventThrottle={16} ref={scroller as never} onContentSizeChange={(width, height) => { readEnd.onContentSizeChange(width, height); place() }} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
         {!data && !error ? <View style={styles.center}><Spinner /></View> : null}
         <ReadNotice error={error} hasData={Boolean(data)} label={mobileMessages.Coordinator.conversation} onRetry={reload} />
         {/* A factory task's one stage, and what it needs from you (2026-11-04-2200); nothing without a flow. */}
@@ -112,7 +117,8 @@ export function TaskConversationScreen() {
               ? <ReviewCard flow={data?.detail.task.flow} running={data?.threads[segment.attempt.runId]?.active === true}>
                 {segment.items.map((item, at) => <Item key={item.id} item={item} live={data?.threads[segment.attempt.runId]?.active === true && at === segment.items.length - 1} />)}
               </ReviewCard>
-              : segment.items.map((item, at) => <Item key={item.id} item={item} live={data?.threads[segment.attempt.runId]?.active === true && at === segment.items.length - 1} />)}
+              : segment.items.map((item, at) => <View key={item.id}><Item item={item} live={data?.threads[segment.attempt.runId]?.active === true && at === segment.items.length - 1} />
+                {(item.kind==='person' || item.kind==='agent') && <MobileReplyVersions detail={data?.threads[segment.attempt.runId]} runId={segment.attempt.runId} itemId={item.id} text={item.text} reload={reload} working={!!live?.active} />}</View>)}
             {/* A failed attempt's cause stays inside it, in words, with the raw code under 详情 (2026-11-05-0330). */}
             {segment.error && !(data?.threads[segment.attempt.runId]?.active) && !segment.items.some(item => item.kind === 'error') ? <AttemptError raw={segment.error} /> : null}
           </View>
@@ -123,7 +129,8 @@ export function TaskConversationScreen() {
       </KeyboardChatScrollView>
       <OfflineBanner top={insets.top + 66} />
       {/* R-10: the conversation ends in the composer; a message to an ended attempt runs it again (R-81). */}
-      {live && newest ? <Composer placeholder={mobileMessages.MobileCore.messageTask} onSend={text => delivery.send(text)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'thread', id: newest }}
+      {controls.controls}
+      {live && newest ? <ThreadComposer detail={live} runId={newest} placeholder={mobileMessages.MobileCore.messageTask} onSend={(text, choice) => delivery.send(text, [], choice)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'thread', id: newest }}
         onStop={composerStops(live) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
     </View>
   )
@@ -135,7 +142,7 @@ function Item({ item, live }: { item: ThreadItem; live: boolean }) {
       return <ThreadSteps steps={item.steps} count={item.count} live={live} />
     case 'agent': return <View style={styles.message}><BotBubble><Markdown text={item.text} /></BotBubble></View>
     case 'error': return <AttemptError raw={item.text} />
-    case 'person': return <View style={styles.message}><MyBubble text={item.text} /></View>
+    case 'person': return <View style={styles.message}><MyBubble text={item.text} threadReferences /></View>
   }
 }
 

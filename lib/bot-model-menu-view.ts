@@ -87,6 +87,19 @@ export function isCurrent(menu: Pick<BotModelMenu, 'current'>, option: BotModelM
 }
 
 /**
+ * The menu as it reads the moment the person picks `id`, before the server answers: the chip and the check mark move
+ * at once. Only what the menu already knows is claimed (the option, its group's kind and label); a fallback or a used-up
+ * quota is the server's to say when it answers. Null when the menu has no such option.
+ */
+export function withChosenModel(menu: BotModelMenu, id: string): BotModelMenu | null {
+  for (const group of menu.groups) {
+    const option = group.options.find(item => item.id === id)
+    if (option) return { ...menu, current: { ...option, kind: group.kind, chosen: true, available: true, ...(group.credentialLabel ? { credentialLabel: group.credentialLabel } : {}) } }
+  }
+  return null
+}
+
+/**
  * The person's own subscription a refused Mikka 默认 turn can move to (decision
  * 2240): the first in the menu's order, its first model. Null with none.
  */

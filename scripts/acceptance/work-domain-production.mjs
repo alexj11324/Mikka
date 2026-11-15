@@ -541,6 +541,13 @@ async function cleanupCase(client, record, shared) {
   record.runIds = [...runIds]
 }
 
+/** The strict normal RPC transports tenant scope in the existing header. */
+export function createDomainIssue(client, shared, item, document) {
+  return client.rpc('issues.saveIssue', [{ title: item.title,
+    status: 'todo', priority: 'normal', content: document.content }],
+  { headers: { 'x-mikka-workspace-id': shared.workspaceId } })
+}
+
 async function runCase(client, shared, options, item, deps, pin) {
   const document = caseDocument(options, item)
   const record = { case: item.id, harness: item.harness, model: item.model, status: 'blocked', phase: 'preflight',
@@ -552,14 +559,13 @@ async function runCase(client, shared, options, item, deps, pin) {
     const state = await inventory(client, shared), selected = await selectedScope(client, shared, state, options.scope)
     record.selection = selected.summary
     check(['any', item.harness].includes(selected.environment.configuration.harness), 'environment_incompatible')
-    const chat = await client.rpc('coordinator.getCoordinatorChat', [shared.botId])
+    const chat = await client.rpc('coordinator.pollCoordinatorChat', [shared.botId])
     check(chat.botId === shared.botId && chat.enabled === true && chat.working === false && !chat.streamRunId, 'bot_busy')
     await refuseDuplicate(client, shared, item, document.fingerprint)
     const profile = await profileFor(client, state, options.scope, item, document.fingerprint, record)
     await basicScope(client, shared, await inventory(client, shared), options.scope)
     record.phase = 'task_create'
-    const { issue } = await client.rpc('issues.saveIssue', [{ workspaceId: shared.workspaceId, title: item.title,
-      status: 'todo', priority: 'normal', content: document.content }])
+    const { issue } = await createDomainIssue(client, shared, item, document)
     check(uuid(issue?.id) && Number.isInteger(issue.revision), 'task_invalid'); record.issueId = issue.id
     await client.rpc('projects.moveIssueToProject', [{ workspaceId: shared.workspaceId, issueId: issue.id, revision: issue.revision, projectId: options.scope.projectId }])
     const saved = (await client.rpc('issues.getIssue', [issue.id])).issue

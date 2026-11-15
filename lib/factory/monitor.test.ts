@@ -4,6 +4,7 @@ import { coordinatorWakeTransport } from '../coordinator/wake-after-commit';
 import { builtinGateway } from '../builtin-gateway/runtime';
 import { isDeviceOnline } from '@mikka/protocol/device';
 import { claimFixtureFactoryCheck, createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
+import { addFactoryPublicationEvidence, addFactoryVisualEvidence } from '../../tests/helpers/factory-visual-evidence';
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import { createFactoryDispatch } from "./dispatch";
@@ -514,6 +515,7 @@ test(
         runId: execute,
       });
       await complete(execute);
+      await addFactoryVisualEvidence(pool,execute);
       state = await store.apply(owner, binding(state.task), randomUUID(), {
         action: "candidate",
         runId: execute,
@@ -605,6 +607,7 @@ test(
           output,
         });
       }
+      await addFactoryPublicationEvidence(pool,state.task.id);
       state = await store.apply(owner, binding(state.task), randomUUID(), {
         action: "advance",
         stage: "approval",

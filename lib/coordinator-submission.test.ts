@@ -83,6 +83,15 @@ test('concurrent identical submissions use the existing unique target and one im
   assert.deepEqual([...f.rows.values()], before)
 })
 
+test('a native submission retry keeps its original turn policy', async () => {
+  const f = fixture()
+  const options = { botId: COORDINATOR_BOT, submissionId, turnPolicy: 'steer' as const }
+  const first = await recordPersonalSubmission(f.executor, 'owner', 'same words', options)
+  const again = await recordPersonalSubmission(f.executor, 'owner', 'same words', options)
+  assert.equal(first.eventId, again.eventId)
+  await assert.rejects(recordPersonalSubmission(f.executor, 'owner', 'same words', { ...options, turnPolicy: 'queue' }), SubmissionConflictError)
+})
+
 test('attachment bytes are part of the existing immutable submission identity', async () => {
   const f = fixture()
   const images = [{dataUrl:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg=='}]

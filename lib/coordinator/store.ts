@@ -12,7 +12,8 @@ import { taskReviewSummaries } from '../coding-workspace/task-review/summaries'
 import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
+import { botUnreadCounts } from '@/lib/conversation-reads-store'
 import { agentRuns, bots, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { citedIds, namedCitations, type CitationName, type CitationSource } from '@/lib/coordinator/citations'
@@ -268,13 +269,14 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
   // The prompt and tool count belong to the same authorized owner runs. One
   // bounded projection avoids opening a third APP connection beside tasks.
   const [ownedRuns, tasks] = await Promise.all([
-    ownIds.length ? db.select({ id: agentRuns.id, prompt: threadNamePrompt,
+    ownIds.length ? db.select({ id: agentRuns.id, prompt: threadNamePrompt, title: agentRuns.title,
       steps: sql<number>`(select count(*) from ${runChunks} c where c."runId" = agent_runs.id
         and c.chunk->>'type' = 'tool-input-available')`.mapWith(Number),
     }).from(agentRuns).where(and(inArray(agentRuns.id, ownIds), eq(agentRuns.userId, userId))) : [],
     issuesForUser(reader, runIssueIds, false, db, { projection: 'citation', withTeamLinks: false }),
   ])
   const prompts = new Map(ownedRuns.map(row => [row.id, row.prompt]))
+  const titles = new Map(ownedRuns.map(row => [row.id, row.title]))
   const steps = new Map(ownedRuns.map(row => [row.id, row.steps]))
   // Every cited and run task's display identifier in one lookup.
   const identifiers = await taskIdentifiers([
@@ -305,7 +307,9 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
     const group = threadGroup({ id: row.id, status: row.status, issueId: task?.id ?? null, createdAt: row.createdAt.toISOString(), outcome: (row.outcome ?? null) as ThreadOutcome | null }, task ? { status: task.status, metadata: { pullRequests } } : undefined)
     sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, outcome: row.outcome ?? null, stopReason: row.stopReason ?? null, group, issue,
       pullRequests,
-      name: threadName(prompts.get(row.id) ?? '', row.agentName), summary: runSummaryText(row), steps: steps.get(row.id) ?? 0,
+      // The full source and compact bot preview use the same authorized name, including a teammate's public harness.
+      title: titles.get(row.id) ?? null,
+      name: titles.get(row.id) || threadName(prompts.get(row.id) ?? '', issue && row.agentId ? '' : row.agentName), summary: runSummaryText(row), steps: steps.get(row.id) ?? 0,
       createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null }
   }
   return sources
@@ -333,7 +337,7 @@ export async function citationNames(reader: IssueReader, texts: readonly string[
   ])
   for (const task of tasks) names[task.id] = { kind: 'issue', title: task.title }
   // A teammate's thread is named by its harness, as its bare projection (workspaceRunView) is.
-  for (const run of runs) names[run.id] = { kind: 'run', name: run.own ? threadName(run.promptHead ?? '', run.agentName) : threadName('', run.harness) }
+  for (const run of runs) names[run.id] = { kind: 'run', name: run.own ? run.title || threadName(run.promptHead ?? '', run.hasIssue ? '' : run.agentName) : threadName('', run.harness) }
   return names
 }
 
@@ -524,6 +528,7 @@ export async function chatVersionState(userId: string, limit = 200, botId: strin
 }
 
 export interface BotChatSummary {
+  unreadCount?: number
   /** The latest reply or message, with cited threads and tasks written as their names; null before the first. */
   line: string | null
   at: string | null
@@ -581,6 +586,9 @@ export async function botChatSnapshot(reader: IssueReader) {
   for (const line of lines) {
     const text = line.text && line.from === 'coordinator' ? namedCitations(line.text, sources) : line.text
     result[line.botId] = { ...(result[line.botId] ?? { working: false }), line: text || null, at: line.at }
+  }
+  for (const [botId, count] of await botUnreadCounts(pool, userId, botIds)) {
+    if (count) result[botId] = { ...(result[botId] ?? { line: null, at: null, working: false }), unreadCount: count }
   }
   return { items: result, expiries, observedAt: now.getTime() }
 }

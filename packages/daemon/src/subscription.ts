@@ -57,14 +57,14 @@ export async function startSubscriptionSession(
   return {
     sessionId: session.sessionId,
     events: () => session.events(),
-    async send(text) {
+    async send(text, mode) {
       try {
         await check()
       } catch (error) {
         await session.cancel()
         throw error
       }
-      await session.send(text)
+      await session.send(text, mode)
     },
     cancel: () => session.cancel(),
     ...(session.detach ? { detach: () => session.detach!() } : {}),

@@ -2,7 +2,7 @@
 Viewer capabilities only receive JPEG frames. Broker capabilities are minted by
 the server for a specific owner/bot/subagent and may enter one guarded fill.
 """
-import asyncio, base64, fcntl, hashlib, hmac, json, math, os, secrets, time
+import asyncio, base64, fcntl, hashlib, hmac, json, math, os, secrets, socket, time
 from pathlib import Path
 from urllib.parse import urlsplit
 from aiohttp import web, WSMsgType
@@ -262,17 +262,17 @@ async def stop(request):
 async def viewer(request):
     raw,grant=authorize(request,'view');b=browser(grant)
     ws=web.WebSocketResponse(max_msg_size=1024);await ws.prepare(request);b.viewer.add(ws)
-    async def consume_control_frames():
-        # aiohttp handles CLOSE/PING while receiving. Application input remains
-        # ignored: a view capability never gains browser or CDP control.
-        async for _ in ws:pass
-    receiver=asyncio.create_task(consume_control_frames())
+    async def receive_control():
+        # aiohttp processes CLOSE and ping/pong only while receive is active.
+        # Application input stays ignored: a viewer never receives a CDP path.
+        async for message in ws:
+            if message.type==WSMsgType.ERROR:break
+    receiver=asyncio.create_task(receive_control())
     try:
         while not ws.closed and not b.stopped and not receiver.done():
             token(raw,'view')
-            # Server-only send. Any input is ignored; viewers never get CDP.
             if not b.guard and b.frame:await ws.send_json({'type':'frame','data':b.frame})
-            await asyncio.sleep(.25)
+            await asyncio.wait({receiver},timeout=.25)
     except (ValueError,ConnectionError,RuntimeError):pass
     finally:
         receiver.cancel();await asyncio.gather(receiver,return_exceptions=True)
@@ -595,4 +595,9 @@ async def version(_request):
 app=web.Application(client_max_size=16384)
 app.router.add_get('/version',version)
 for suffix,handler,method in [('/start',start,'POST'),('/state',state,'GET'),('/stop',stop,'POST'),('/viewer',viewer,'GET'),('/action',action,'POST'),('/credentials/begin',begin,'POST'),('/credentials/cdp',cdp,'GET'),('/credentials/end',end,'POST'),('/credentials/observe',observe_credentials,'GET'),('/credentials/continue',continue_credentials,'POST')]:app.router.add_route(method,'/agents/{id}'+suffix,handler)
-if __name__=='__main__':web.run_app(app,host='0.0.0.0',port=6082,access_log=None,print=None)
+if __name__=='__main__':
+    listener=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    listener.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+    listener.setsockopt(socket.SOL_SOCKET,socket.SO_MARK,0x4D4B5056)
+    listener.bind(('0.0.0.0',6082));listener.listen(128)
+    web.run_app(app,sock=listener,access_log=None,print=None)

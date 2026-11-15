@@ -1,7 +1,7 @@
 // Actual packaged Electron → actual disposable community image. The model is
 // explicitly synthetic; this is not Google OAuth or native-subscription proof.
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFile, rm, mkdir, stat, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -9,6 +9,7 @@ import { decode, encode } from '../../../lib/desktop-rpc/wire.ts'
 import { launchElectron } from './electron-launch.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
+import { readNativeStartup } from './native-startup.mjs'
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
 export function validateSelfHostedDesktopTarget(value, env) {
@@ -27,10 +28,18 @@ export function validateSelfHostedDesktopTarget(value, env) {
 async function main() {
   const directory = resolve(process.env.RUNNER_TEMP, 'mikka-selfhost-desktop')
   const privateFile = join(directory, 'session.json'), profile = join(directory, 'profile')
+  const protocolOnly = process.argv.includes('--protocol-only')
+  assert.deepEqual(process.argv.slice(2), protocolOnly ? ['--protocol-only'] : [])
+  const overlaySha = process.env.MIKKA_UI_OVERLAY_SHA
+  if (overlaySha) {
+    assert.match(overlaySha, /^[a-f0-9]{40}$/)
+    assert.equal(protocolOnly, false)
+  }
   const output = resolve('.artifacts/self-hosted/desktop')
   await mkdir(output, { recursive: true })
   const report = { schemaVersion: 1, revision: process.env.GITHUB_SHA, origin: 'http://localhost:3000',
     startedAt: new Date().toISOString(), status: 'running', checks: [],
+    scope: protocolOnly ? 'public-fixture-protocol' : 'complete-desktop', overlaySha: overlaySha ?? null,
     provider: 'synthetic-openai-compatible', realGoogleOAuth: false, subscriptionAcceptance: false,
     cleanup: { session: false, electron: false, daemon: false, privateFile: false } }
   let application, page, fixture, phase = 'private_fixture', failed
@@ -57,6 +66,19 @@ async function main() {
     application = await launchElectron({ executablePath: process.env.MIKKA_DESKTOP_EXECUTABLE,
       args: [], cwd: fileURLToPath(new URL('../../..', import.meta.url)),
       env: { ...process.env, MIKKA_USER_DATA_DIR: profile, MIKKA_DESKTOP_RENDERER: 'bundled' }, timeout: 90_000 })
+    if (overlaySha) {
+      phase = 'packaged_official_overlay'
+      const matches = await application.evaluate(async ({ app }, expected) => {
+        const path = process.getBuiltinModule('node:path')
+        const fs = process.getBuiltinModule('node:fs')
+        const archive = app.getAppPath()
+        if (!app.isPackaged || archive !== path.join(process.resourcesPath, 'app.asar')) return false
+        const manifest = JSON.parse(fs.readFileSync(path.join(archive, 'dist', 'mikka-ui-overlay.json'), 'utf8'))
+        return manifest.overlaySha === expected
+      }, overlaySha)
+      assert.equal(matches, true, 'the launched official application must contain the selected UI revision')
+      passed('packaged_official_overlay_matches_selected_revision')
+    }
     page = await application.firstWindow({ timeout: 90_000 })
     await page.waitForFunction(() => Boolean(window.mikka?.bundled))
     assert.equal(new URL(page.url()).protocol, 'mikka:')
@@ -116,20 +138,28 @@ async function main() {
       state.unsubscribe(); await window.mikka.bundled.live.close(state.id)
       delete window.__selfHostedAcceptance
     })
-    await page.goto(`mikka://app/mikka/en/?bot=${fixture.botId}`, { waitUntil: 'domcontentloaded' })
+    phase = 'open_bot_workspace'
+    assert.equal(bootstrap.onboarding, true, 'the new account still requires its ordinary first-run setup')
+    await page.goto(`mikka://app/mikka/en/?workspace=${fixture.workspaceId}&bot=${fixture.botId}`, { waitUntil: 'domcontentloaded' })
     // A newly registered community account still has the ordinary first-run
     // overlay. A DOM-visible chat underneath it is not screenshot evidence.
     // Complete the real Skip setup action; never hide or remove the overlay.
-    phase = 'first_run_and_visible_chat'
+    phase = 'first_run_skip_button_visible'
     const skipSetup = page.getByRole('button', { name: 'Skip setup', exact: true })
     await skipSetup.waitFor({ state: 'visible' })
+    phase = 'first_run_dismissal'
     await skipSetup.click()
     await skipSetup.waitFor({ state: 'hidden' })
-    const reply = page.getByText('SELF_HOSTED_REPLY_32', { exact: false }).first()
-    await reply.waitFor({ state: 'visible' })
-    await reply.scrollIntoViewIfNeeded()
-    passed('normal_first_run_dismissed_and_reply_visible')
-    await page.screenshot({ path: join(output, 'self-hosted-chat.png'), animations: 'disabled' })
+    passed('normal_first_run_dismissed')
+    if (!protocolOnly) {
+      phase = 'fixture_reply_visible'
+      const reply = page.getByText('SELF_HOSTED_REPLY_32', { exact: false }).first()
+      await reply.waitFor({ state: 'visible' })
+      await reply.scrollIntoViewIfNeeded()
+      passed('normal_first_run_dismissed_and_reply_visible')
+      const screenshot = await page.screenshot({ path: join(output, 'self-hosted-chat.png'), animations: 'disabled' })
+      report.visibleChatScreenshotSha256 = createHash('sha256').update(screenshot).digest('hex')
+    }
     phase = 'sign_out_and_return'
     await page.evaluate(() => window.mikka.bundled.signOut())
     assert.equal(await page.evaluate(() => window.mikka.bundled.session()), null)
@@ -140,6 +170,25 @@ async function main() {
     report.status = 'passed'
   } catch (error) {
     failed = error; report.status = 'failed'; report.failure = { phase, name: error instanceof Error ? error.name : 'UnknownError' }
+    if (page && fixture && ['open_bot_workspace', 'first_run_skip_button_visible', 'first_run_dismissal', 'fixture_reply_visible'].includes(phase)) {
+      // Retain only observations about this generated fixture. Raw DOM, URLs,
+      // request bodies and exception messages can contain credentials.
+      report.failure.view = await page.evaluate(({ botId, workspaceId }) => {
+        const url = new URL(location.href)
+        return {
+          requestedWorkspace: url.searchParams.get('workspace') === workspaceId,
+          requestedBot: url.searchParams.get('bot') === botId,
+          english: document.documentElement.lang === 'en',
+          skipButtonPresent: [...document.querySelectorAll('button')].some(button => button.textContent.trim() === 'Skip setup'),
+          loading: Boolean(document.querySelector('[data-loading-placeholder]')),
+          offline: Boolean(document.querySelector('.desktop-offline')),
+          renderFailed: document.body.innerText.includes('This view could not open'),
+          composer: Boolean(document.querySelector('textarea[data-chat-composer]')),
+          expectedReply: document.body.innerText.includes('SELF_HOSTED_REPLY_32'),
+        }
+      }, { botId: fixture.botId, workspaceId: fixture.workspaceId }).catch(() => null)
+      report.failure.startup = await readNativeStartup(application, page).catch(() => null)
+    }
   } finally {
     if (page && !report.cleanup.session) {
       try { await page.evaluate(() => window.mikka?.bundled.signOut()); report.cleanup.session = true } catch { report.cleanup.session = false }
@@ -156,7 +205,7 @@ async function main() {
     if (fixture) for (const secret of [fixture.password, fixture.email]) assert.ok(!json.includes(secret))
     await writeFile(join(output, 'report.json'), json + '\n')
   }
-  console.log(JSON.stringify({ status: report.status, checks: report.checks, cleanup: report.cleanup, failure: report.failure }))
+  console.log(JSON.stringify({ scope: report.scope, overlaySha: report.overlaySha, status: report.status, checks: report.checks, cleanup: report.cleanup, failure: report.failure }))
   if (failed || report.status !== 'passed') process.exitCode = 1
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

@@ -17,7 +17,7 @@ import { readWorkspaceDiffReceipt } from '../../../packages/daemon/src/coding-wo
 import type { JournalEntry } from '../../../packages/daemon/src/runs/journal'
 import { orderMigrations } from '../../../scripts/migration-order.mjs'
 import { disposableDatabase, E2E_DB_RULE } from '../../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../../tests/support/drop-test-database'
 import type { ReviewActor } from '../diff/authority'
 
 const url = process.env.E2E_DATABASE_URL
@@ -36,7 +36,7 @@ test('Task review summaries preserve current source and tenant boundaries on Pos
   const database = 'task_review_summaries_' + randomUUID().replaceAll('-', '') + '_e2e'
   const version = Number((await admin.query('SHOW server_version_num')).rows[0].server_version_num)
   assert.ok(version >= 170000 && version < 180000, 'Task review summaries require PostgreSQL 17')
-  await admin.query('CREATE DATABASE "' + database + '" TEMPLATE template0')
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(url!); target.pathname = '/' + database
   const pool = new Pool({ connectionString: target.toString(), max: 8, connectionTimeoutMillis: 5000 })
   const directory = await mkdtemp(join(tmpdir(), 'mikka-task-summary-db-'))

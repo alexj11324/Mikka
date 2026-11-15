@@ -335,7 +335,8 @@ test('provider policy preserves task tenancy and independent membership gates on
           assert.equal((await pool.query('select status from agent_runs where id=$1',[run])).rows[0].status,'preparing')
           const preview=await inWorkspace(owner,()=>previewIssuePersonalScope(id))
           assert.ok('preview' in preview && preview.preview)
-          const changed=await inWorkspace(owner,()=>confirmIssuePersonalScope({id,revision:1,confirmation:preview.preview.confirmation}))
+          // A claimed run can advance the task to doing. Confirm the revision the owner actually previewed.
+          const changed=await inWorkspace(owner,()=>confirmIssuePersonalScope({id,revision:preview.preview.revision,confirmation:preview.preview.confirmation}))
           assert.ok('issue' in changed)
           await blocker.query('select pg_advisory_unlock($1)',[barrier]);held=false
           const response=await responsePromise
@@ -378,7 +379,8 @@ test('provider policy preserves task tenancy and independent membership gates on
   await scopeSubtest(t, 'concurrent clicks commit one revision, one tombstone, and cancel old outbox work', async () => {
     const original=await inWorkspace(owner,()=>issueScopeActions.getIssue(issue))
     assert.ok('issue' in original && original.issue)
-    const results = await Promise.all([localFlip(issue),localFlip(issue)])
+    const revision = original.issue.revision
+    const results = await Promise.all([localFlip(issue, revision),localFlip(issue, revision)])
     assert.equal(results.filter(result=>'issue' in result).length,1)
     assert.equal(results.filter(result=>'error' in result && result.error==='issueStale').length,1)
     const saved = results.find(result=>'issue' in result)!
@@ -386,8 +388,8 @@ test('provider policy preserves task tenancy and independent membership gates on
     assert.equal(saved.issue.identifier,original.issue.identifier,'provider policy must retain the existing task identifier')
     assert.equal(readIssueMetadata(saved.issue.content).number,12)
     const row = (await pool.query('select scope,"workspaceId","linearSyncPolicy","scopeSetBy","scopeConfidence",revision from issues where id=$1',[issue])).rows[0]
-    assert.deepEqual(row,{scope:'workspace',workspaceId:workspace,linearSyncPolicy:'disabled',scopeSetBy:'user',scopeConfidence:null,revision:2})
-    assert.equal((await pool.query('select count(*)::int n from issue_versions where "issueId"=$1',[issue])).rows[0].n,2)
+    assert.deepEqual(row,{scope:'workspace',workspaceId:workspace,linearSyncPolicy:'disabled',scopeSetBy:'user',scopeConfidence:null,revision:revision+1})
+    assert.equal((await pool.query('select count(*)::int n from issue_versions where "issueId"=$1',[issue])).rows[0].n,revision+1)
     assert.equal((await pool.query('select count(*)::int n from linear_issue_detachments where "issueId"=$1',[issue])).rows[0].n,1)
     assert.equal((await pool.query('select count(*)::int n from linear_issue_links where "issueId"=$1',[issue])).rows[0].n,0)
     assert.equal((await pool.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1 and operation=\'sync\' and status<>\'done\'',[issue])).rows[0].n,0)
@@ -637,6 +639,10 @@ test('provider policy preserves task tenancy and independent membership gates on
     if(withIssue) {
       fixtureIds.push(id)
       await registeredTask(pool, issueOwner, fixtureWorkspace, id, client => client.query(`insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState","linearSyncPolicy") values ($1,$2,'Completion fixture',$3,'todo','normal',$4,$5,'bound',$6)`,[id,issueOwner,doc,scope,fixtureWorkspace,scope==='workspace'?'explicit':'disabled']))
+      // A real task has a creation revision. Later changes to synchronization with the same status
+      // must compare against that original version, so only an actual human status transition blocks review.
+      await pool.query(`insert into issue_versions (id,"issueId","userId",revision,title,content,status,priority,actor_type,actor_id)
+        select $2,id,"userId",revision,title,content,status,priority,'user',"userId" from issues where id=$1`, [id,randomUUID()])
       if(withTeam && scope==='workspace') await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)',[id,team,workspace,issueOwner])
     }
     await pool.query(`insert into agent_runs (id,"userId","issueId","workspaceId","agentId","deviceId",status,kind,"leaseExpiresAt") values ($1,$2,$3,$4,$5,$6,'running',$7,$8)`,[run,actor,withIssue?id:null,fixtureWorkspace,actor===owner?ownerAgent:agent,actor===owner?ownerDevice:device,kind,new Date(Date.now()+RUN_LEASE_MS)])
@@ -831,12 +837,20 @@ test('provider policy preserves task tenancy and independent membership gates on
       }
       await locker.query('commit')
       const completed=await finishing;assert.ok(completed)
-      assert.ok('issue' in await privatizing)
+      // Completing the run commits review as a task revision. A concurrent edit that observed revision 1
+      // must be rejected before the owner can retire synchronization on the fresh revision.
+      assert.deepEqual(await privatizing, { error: 'issueStale' })
+      const observed = await inWorkspace(member, () => previewIssuePersonalScope(fixture.id))
+      assert.ok('preview' in observed && observed.preview)
+      const retired = await inWorkspace(member, () => confirmIssuePersonalScope({
+        id: fixture.id, revision: observed.preview.revision, confirmation: observed.preview.confirmation,
+      }))
+      assert.ok('issue' in retired && retired.issue)
       assert.equal((await pool.query('select status from agent_runs where id=$1',[fixture.run])).rows[0].status,'succeeded')
       assert.deepEqual((await pool.query('select status,scope from issues where id=$1',[fixture.id])).rows[0],{status:'review',scope:'workspace'})
       let dispatched=0
       assert.equal(await dispatchCompletedIssue(completed,()=>{dispatched++}),false)
-      assert.ok('issue' in await promoteExistingIssueForUser(member,{requestId:randomUUID(),issueId:fixture.id,revision:2,teamId:team,expectedTeamId:team}))
+      assert.ok('issue' in await promoteExistingIssueForUser(member,{requestId:randomUUID(),issueId:fixture.id,revision:retired.issue.revision,teamId:team,expectedTeamId:team}))
       await pool.query('update issues set status=\'doing\' where id=$1',[fixture.id])
       assert.equal(await dispatchCompletedIssue(completed,()=>{dispatched++}),false)
       assert.equal(dispatched,0)

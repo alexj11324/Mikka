@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { Pool } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
-import { dropTestDatabase } from "../../tests/support/drop-test-database";
+import { createTestDatabase, dropTestDatabase } from "../../tests/support/drop-test-database";
 
 const url = process.env.E2E_DATABASE_URL;
 if (url) {
@@ -21,7 +21,7 @@ if (url) {
 test("a stop-requested queued run ends instead of provisioning, at both check points", { skip: !url, timeout: 180000 }, async (t) => {
   const admin = new Pool({ connectionString: url, max: 1 });
   const database = `thr_stop_${randomUUID().replaceAll("-", "")}_e2e`;
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`);
+  await createTestDatabase(admin, database, 'template0');
   const target = new URL(url!);
   target.pathname = `/${database}`;
   const saved = { m: process.env.MIKKA_DATABASE_URL, d: process.env.DATABASE_URL };

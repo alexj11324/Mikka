@@ -5,11 +5,14 @@ import { useRouter } from 'expo-router'
 import { ChevronRight, Plus } from 'lucide-react-native'
 import { Spinner } from '@/components/icons'
 import { NavBar, underBar } from '@/components/NavBar'
+import { Row } from '@/components/settings'
 import { ReadNotice } from '@/components/ReadNotice'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { restartToUpdate, useUpdateReady } from '@/lib/updates'
-import { prefetch, useRefresh } from '@/lib/useApi'
+import { useHome } from '@/lib/home'
+import { inboxLive } from '@/lib/live-keys'
+import { prefetch, useLiveApi, useRefresh } from '@/lib/useApi'
 import { colors, LIST_INSET } from '@/lib/theme'
 import { HomeChatRow } from '../components/home-chat-row'
 import { PinnedGrid } from '../components/pinned-grid'
@@ -25,6 +28,8 @@ import { useHomeChats, type HomeChat } from '../model/use-home-chats'
  */
 export function HomeScreen() {
   const router = useRouter()
+  const workspace = useHome().data?.workspace.id
+  const counts = useLiveApi<{ count: number }>(workspace ? '/api/inbox?' + new URLSearchParams({ workspaceId: workspace, count: '1' }) : null, () => inboxLive(workspace))
   const actions = useHomeChats('')
   const { chats, loading, error, reload } = actions
   const [collapsed, setCollapsed] = useState<ReadonlySet<SectionId>>(new Set())
@@ -48,8 +53,9 @@ export function HomeScreen() {
       <NavBar
         title="Bot"
         topTitle
-        right={{ icon: 'plus', label: mobileMessages.Nav.create, web: <Plus size={22} color={colors.ink} strokeWidth={2} />, onOpen: () => router.push('/new-bot'),
+        right={{ icon: 'plus', label: mobileMessages.Nav.create, web: <Plus size={22} color={colors.ink} strokeWidth={2} />, onOpen: () => router.push({ pathname: '/new-group', params: { purpose: 'conversation' } }),
           items: [
+            { label: mobileMessages.Nav.newConversation, icon: 'bubble.left', onPress: () => router.push({ pathname: '/new-group', params: { purpose: 'conversation' } }) },
             { label: mobileMessages.Nav.newBot, icon: 'person.crop.circle.badge.plus', onPress: () => router.push('/new-bot') },
             { label: mobileMessages.Nav.newGroup, icon: 'person.2', onPress: () => router.push('/new-group') },
           ] }}
@@ -70,6 +76,9 @@ export function HomeScreen() {
                 <Text style={styles.updateText}>{mobileMessages.MobileCore.restartToUpdate}</Text>
               </Pressable>
             ) : null}
+            <Row label={mobileMessages.Nav.inbox} value={counts.data?.count ? String(counts.data.count) : undefined} onPress={() => router.push('/inbox')} />
+            <Row label={mobileMessages.ConversationDirectory.title} onPress={() => router.push('/conversations')} />
+            <Row label={mobileMessages.ArtifactsPage.category.pullRequests} onPress={() => router.push({ pathname: '/conversations', params: { view: 'pulls' } })} />
             <PinnedGrid pinned={pinned} actions={actions} />
           </View>
         }

@@ -18,13 +18,14 @@ test('a done task settles a failed run; no run shows nothing', () => {
   assert.equal(agentStateOf(undefined, open), null)
 })
 
-test('a card\'s status line is the task\'s own state: open ones draw none, closed ones are done', () => {
+test('a card\'s mark is what its Agent is doing; a status alone, open or closed, draws none', () => {
   assert.equal(cardStateKind('running'), 'running')
   assert.equal(cardStateKind('queued'), 'running')
   assert.equal(cardStateKind('waiting'), 'waiting')
-  assert.equal(cardStateKind('blocked'), 'blocked')
+  assert.equal(cardStateKind('blocked'), 'waiting', 'a run stopped for a login or quota waits for the person')
   assert.equal(cardStateKind('failed'), 'blocked')
-  assert.equal(cardStateKind('canceled'), 'done')
+  assert.equal(cardStateKind('canceled'), null)
+  assert.equal(cardStateKind('done'), null)
   assert.equal(cardStateKind('todo'), null)
   assert.equal(cardStateKind('idle'), null)
 })

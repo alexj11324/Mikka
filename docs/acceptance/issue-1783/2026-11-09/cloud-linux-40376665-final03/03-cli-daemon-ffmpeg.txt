@@ -1,0 +1,150 @@
+Mikka issue #1783 | Real MCP CLI, daemon finalization and FFmpeg readback
+Revision: 40376665ac416ce2228c08b60d7ea8cee97a3de6
+Started: 2026-11-09T15:38:38.712Z
+Cloud Linux / real isolated PostgreSQL / synthetic fixtures
+No live model or external GitHub acceptance is claimed.
+
+
+[1/3] $ /usr/local/bin/node node_modules/vitest/vitest.mjs run test/captures.test.ts test/terminal-checkpoint.test.ts test/publication-cancel.test.ts test/server-link-http.test.ts --reporter=verbose
+
+ RUN  v5.0.5 /vercel/Mikka/packages/daemon
+
+ ✓ test/publication-cancel.test.ts > cancels during report without creating an external branch 257ms
+ ✓ test/terminal-checkpoint.test.ts > uploads the final workspace before asked_human releases its lease 263ms
+ ✓ test/publication-cancel.test.ts > cancels during before_verify without creating an external branch 156ms
+ ✓ test/terminal-checkpoint.test.ts > uploads the final workspace before blocked releases its lease 165ms
+ ✓ test/publication-cancel.test.ts > cancels during verify without creating an external branch 186ms
+ ✓ test/terminal-checkpoint.test.ts > uploads the final workspace before submitted releases its lease 190ms
+ ✓ test/captures.test.ts > submit_capture > is offered only when the run has a captures dir 210ms
+ ✓ test/captures.test.ts > submit_capture > queues a screenshot from the worktree with its title 94ms
+ ✓ test/publication-cancel.test.ts > cancels during after_verify without creating an external branch 195ms
+ ✓ test/terminal-checkpoint.test.ts > uploads the final workspace before turn_ended releases its lease 176ms
+ ✓ test/captures.test.ts > submit_capture > refuses files outside the roots, links out of them, and files that are not media 95ms
+ ✓ test/terminal-checkpoint.test.ts > uploads the final workspace before error releases its lease 190ms
+ ✓ test/publication-cancel.test.ts > cancels during publish without creating an external branch 226ms
+ ✓ test/captures.test.ts > capture upload > sends what the bytes are, with their hash, then removes the queued files 164ms
+ ✓ test/captures.test.ts > capture upload > retains the processed video and identical reservation digest across an upload retry 130ms
+ ✓ test/captures.test.ts > capture upload > never reserves a malformed video whose MP4 header alone looks valid 11ms
+ ✓ test/captures.test.ts > capture upload > drops what the agent planted: wrong bytes, a link, no title 2ms
+ ✓ test/captures.test.ts > capture upload > keeps files while the server is unreachable and drops ones it refuses 2ms
+ ✓ test/captures.test.ts > capture upload > persists a reservation and resumes it after a restart without beginning a new upload 4ms
+ ✓ test/captures.test.ts > capture upload > recovers a lost begin response using the id saved before the request 3ms
+ ✓ test/captures.test.ts > capture upload > does not create a new reservation after the run ends 1ms
+ ✓ test/captures.test.ts > capture upload > recognizes a completion whose response was lost without uploading again 3ms
+ ✓ test/captures.test.ts > capture upload > does not duplicate an upload still running when terminal retry starts 3ms
+ ✓ test/captures.test.ts > capture upload > cancels an existing background upload and drains it before the final flush fails 6ms
+ ✓ test/captures.test.ts > capture upload > reports an incomplete final flush when the server cannot accept the evidence 4ms
+ ✓ test/publication-cancel.test.ts > honors local lease revoke after verification waits and prevents publication 178ms
+ ✓ test/terminal-checkpoint.test.ts > does not replace an unavailable final upload with an older heartbeat 233ms
+ ✓ test/publication-cancel.test.ts > honors local lease expiry after verification waits and prevents publication 184ms
+ ✓ test/terminal-checkpoint.test.ts > cannot report completion before the final upload has been acknowledged 190ms
+ ✓ test/terminal-checkpoint.test.ts > a legacy upload acknowledgement without a server receipt cannot certify retirement 206ms
+ ✓ test/publication-cancel.test.ts > keeps a late pushed stop authoritative while the successful receipt waits for captures 348ms
+ ✓ test/terminal-checkpoint.test.ts > does not certify retirement from another run in an upload receipt 217ms
+ ✓ test/publication-cancel.test.ts > terminates an in-flight Git push and its real remote helper on local abort 196ms
+ ✓ test/terminal-checkpoint.test.ts > does not certify retirement from invalid server time in an upload receipt 176ms
+ ✓ test/publication-cancel.test.ts > aborts both real gh receipt children before removing their credential directory 222ms
+ ✓ test/terminal-checkpoint.test.ts > does not certify retirement from noncanonical server time in an upload receipt 194ms
+ ✓ test/terminal-checkpoint.test.ts > does not certify retirement from unknown receipt fields in an upload receipt 179ms
+ ✓ test/captures.test.ts > capture upload > cancels real oversized-video preparation before it can reserve an upload after the final deadline 1223ms
+ ✓ test/captures.test.ts > capture upload > retains the file and stops retries when authorization is denied 4ms
+ ✓ test/captures.test.ts > capture upload > runs one pass at a time per run 1ms
+ ✓ test/terminal-checkpoint.test.ts > does not turn an exhausted stream into a confirmed session exit 244ms
+ ✓ test/captures.test.ts > a run's captures > go up to that run before it reports its end 495ms
+ ✓ test/terminal-checkpoint.test.ts > does not certify an adapter error without a confirmed native exit 239ms
+ ✓ test/terminal-checkpoint.test.ts > does not certify retirement when capture upload fails after the CLI exits 192ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > cancels the capture begin transport with the final flush deadline 7ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > cancels the capture resume transport with the final flush deadline 1ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > cancels the capture send transport with the final flush deadline 1ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > cancels the capture complete transport with the final flush deadline 1ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > returns the authoritative checkpoint receipt through the authenticated upload 10ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > keeps a legacy checkpoint 204 compatible without inventing a snapshot receipt 2ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > rejects a checkpoint response with another run 4ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > rejects a checkpoint response with missing server time 2ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > rejects a checkpoint response with invalid server time 2ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > rejects a checkpoint response with noncanonical server time 1ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > rejects a checkpoint response with unknown fields 1ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > advertises strict local-worktree continuation and preserves the required assignment 5ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > renews task grants through the existing authenticated heartbeat without extra requests 10ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > preserves negotiated catalogue evidence in the natural-expiry lease response 4ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > uses only the claimed local lease for every provider/tool check 7ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > revokes a prepared approval gate when its run aborts, including before preparation 1ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > sends a private preview bypass only to the fixed HTTPS preview origin and refuses redirects 1ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > sends exact computer reviews over the authenticated device channel 3ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > registers with the session and the client version header 1ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > uses the device session for the device's routes and the run's 3ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > asks the commands poll for releases and device commands, and passes on what the server names 4ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > passes on the release a server names when it refuses a claim from a daemon too old 1ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > marks a claim refused because the daemon is too old 1ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > maps statuses: 5xx/429/network retry later, 409 on claim, 401 needs login 8ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > does not follow deployment SSO redirects or mistake their 401 for device rejection 5ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > preserves the saved credential on redirect and removes it only for the app's 401 14ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > preserves the saved credential on protection401 and removes it only for the app's 401 9ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > does not revoke a session for an unrecognized direct 401 body {"access":"protected","error":{"message":"Protected deployment","code":"401"},"mcp":{},"message":"Protected deployment","protection":{}} 2ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > does not revoke a session for an unrecognized direct 401 body {"error":"Unauthorized","protection":{}} 1ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > does not revoke a session for an unrecognized direct 401 body {"error":"Unknown gateway failure"} 1ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > recognizes the app's exact Unauthorized 401 without consuming its response 1ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > recognizes the app's exact authRequired 401 without consuming its response 1ms
+ ✓ test/server-link-http.test.ts > HttpServerLink > refuses a response that does not match the protocol 1ms
+ ✓ test/server-link-http.test.ts > machine run control without remote permission checks (#1505) > makes no auth request on idle, hint or mode switch: legacy 6ms
+ ✓ test/server-link-http.test.ts > machine run control without remote permission checks (#1505) > makes no auth request on idle, hint or mode switch: push 1ms
+ ✓ test/server-link-http.test.ts > machine run control without remote permission checks (#1505) > makes no auth request on idle, hint or mode switch: fallback 1ms
+ ✓ test/server-link-http.test.ts > mikka daemon login (device authorization) > shows the code, polls until approved and returns only a device token 4ms
+ ✓ test/server-link-http.test.ts > mikka daemon login (device authorization) > stops on a denied or expired code 2ms
+ ✓ test/server-link-http.test.ts > mikka daemon login (device authorization) > never persists a web session from an unupgraded server 1ms
+ ✓ test/server-link-http.test.ts > HttpServerLink.decide > posts the request to the run decision route and keys answers by name 3ms
+ ✓ test/server-link-http.test.ts > HttpServerLink.decide > returns null for no decision, a refusal, a server error or a malformed response 5ms
+ ✓ test/server-link-http.test.ts > requests and decodes the initial repository only on the explicitly selected claim 4ms
+ ✓ test/server-link-http.test.ts > drops unknown or malformed initial settings while retaining the assignment 1ms
+ ✓ test/server-link-http.test.ts > drops unknown or malformed initial settings while retaining the assignment 1ms
+ ✓ test/terminal-checkpoint.test.ts > cancels capture work at the final deadline and waits for cleanup before reporting completion 168ms
+ ✓ test/terminal-checkpoint.test.ts > drains real video preparation after report failure before an error completion can close the upload fence 1130ms
+ ✓ test/terminal-checkpoint.test.ts > does not certify a session detached after ignoring cancellation 257ms
+
+ Test Files  4 passed (4)
+      Tests  91 passed (91)
+   Start at  15:38:40
+   Duration  5.78s (tests 69%, import 26%, transform 5%)
+
+
+Command exit: 0; PASS; {"total":91,"passed":91,"failed":0,"skipped":0}
+
+[2/3] $ /usr/local/bin/node --test --test-reporter=spec packages/daemon/test/capture-video.node-test.mjs
+✔ private capture tools are one protected pair; a partial or writable install never falls back to PATH (20.217135ms)
+✔ tool installation is additive, offline-idempotent and preserves the previous release and official files (18.93354ms)
+✔ compressed and decompressed hashes are both required before an atomic install becomes visible (4.483881ms)
+✔ a private bootstrap umask still leaves the pinned tools readable and executable by the non-root worker (4.014745ms)
+✔ an altered cached binary, symlink destination or escaping manifest is refused without overwriting it (7.390924ms)
+✔ only complete action timing proves a gap is safe to remove (1.098613ms)
+✔ real FFmpeg removes idle time and preserves the first and last actions with mapped steps (309.662261ms)
+✔ real FFmpeg compacts a video over the 100 MB publication limit without truncating its final action (728.592904ms)
+✔ bitrate fallback fits a small real budget while retaining the full unmarked video duration (723.080417ms)
+✔ refuses symlinks, malformed media and an impossible output budget without publishing a file (157.872642ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2093.696139
+
+Command exit: 0; PASS; {"total":10,"passed":10,"failed":0,"skipped":0}
+
+[3/3] $ /usr/local/bin/node /vercel/validation/issue-1783-harness/oversize-readback.mjs /vercel/Mikka /vercel/validation/issue-1783-2026-11-09-40376665ac41-final-03/ffmpeg-readback
+Synthetic FFmpeg fixture; the terminal recording captures this actual execution.
+$ ffmpeg: generate a real 20-second red / idle gray / blue MP4
+Source ffprobe: {"programs":[],"stream_groups":[],"streams":[{"codec_name":"h264","width":160,"height":120,"nb_frames":"200"}],"format":{"duration":"20.000000","size":"100004592"}}
+$ ffmpeg -i oversized-source.mp4 -f null -   [full input decode]
+$ processCaptureVideo: real bounded processing from the pinned repository revision
+Output ffprobe: {"programs":[],"stream_groups":[],"streams":[{"codec_name":"h264","width":160,"height":120,"nb_frames":"83"}],"format":{"duration":"5.533333","size":"3780"}}
+$ ffmpeg -i processed.mp4 -f null -   [full output decode]
+$ copied standalone computer helper with PATH unavailable; real pinned ffmpeg/ffprobe
+READBACK PASS: {"inputBytes":100004592,"outputBytes":3780,"durationMs":5533,"trimmedMs":14500,"offsets":[1500,5000],"first":[254,0,0],"last":[0,0,255],"productToolchain":"ffmpeg-static-b6.1.1-linux-x64-e7e7fb30477f-4f231a1960d8","copiedHelperSameSha":"2b00d582dbcce67936cb465a913a9249a245072a1058fe0de66bd8a020c62ccb","systemPathAvailable":false}
+
+Command exit: 0; PASS
+
+Real MCP CLI, daemon finalization and FFmpeg readback
+Revision: 40376665ac416ce2228c08b60d7ea8cee97a3de6
+RESULT: PASS | commands 3/3
+Finished: 2026-11-09T15:38:56.337Z

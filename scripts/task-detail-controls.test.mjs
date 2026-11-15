@@ -13,7 +13,7 @@ const translate = Object.assign(key => key, { has: () => true })
 const stub = (path, namedExports) => mock.module(new URL('../' + path, import.meta.url).href, { namedExports })
 let teamId, response, issue, child, frame, teamWrites, favoriteDenied, saveMetadata, createChild, connectionsError, moves, reads, optionsRead
 const teams = ['existing', 'another'].map(id => ({ id, identifier: id, name: id }))
-mock.module('next-intl', { namedExports: { useTranslations: () => translate, useFormatter: () => ({ relativeTime: noop, dateTime: date => date.toISOString().slice(0, 10) }), useNow: () => new Date() } })
+mock.module('next-intl', { namedExports: { useTranslations: () => translate, useMessages: () => ({ IssueDetail: { work: { states: {} } }, GroupTask: { stage: {}, status: {} } }), useFormatter: () => ({ relativeTime: noop, dateTime: date => date.toISOString().slice(0, 10) }), useNow: () => new Date() } })
 mock.module('sonner', { namedExports: { toast: { error: noop, success: noop } } })
 mock.module('swr', { defaultExport: key => {
   if (key?.[0] === 'issue-property-options') return optionsRead
@@ -55,10 +55,10 @@ stub('hooks/use-live-key.tsx', { useLiveKey: noop, useLiveKeys: noop, useLiveSco
 stub('hooks/use-bot-tasks.ts', { localTaskState: () => ({ state: 'todo' }) })
 stub('lib/hooks/use-relation-search.ts', { useRelationSearch: noop })
 stub('lib/use-action-error.ts', { useActionError: () => translate })
-stub('components/workspace/issue-activity-feed.tsx', { useActivityEvents: () => [] })
+stub('components/workspace/issue-activity-feed.tsx', { useActivityEvents: () => () => [] })
 stub('components/workspace/issue-activity.tsx', { useActivityDrafts: () => ({}) })
 stub('components/workspace/issue-threads.tsx', { useIssueThreads: () => ({ data: [{ detail: { agentName: 'Former delegate', bot: { color: 'blue', shape: 'round' } } }] }) })
-stub('components/workspace/issue-metadata-controls.tsx', { useIssueMetadataSave: () => ({}), IssueMetadataControls: noop, AccessChangeDialog: noop })
+stub('components/workspace/issue-metadata-controls.tsx', { useIssueMetadataSave: () => ({ persist: patch => saveMetadata({ patch }) }), IssueMetadataControls: noop, AccessChangeDialog: noop })
 stub('components/workspace/issue-assignee-menu.tsx', { AgentSphere: noop })
 stub('components/workspace/issue-detail-properties.tsx', { overdue: () => false })
 stub('components/workspace/issue-pull-request-link.tsx', { PullRequestStatus: noop })
@@ -91,13 +91,59 @@ async function mount({ showDialogs = false, ...props } = {}) {
   const Capture = props => { frame = props; return showDialogs ? props.dialogs : null }
   function Task() {
     const [task, setTask] = useState(issue)
-    return createElement(FramedTask, { Frame: Capture, task, userId: 'owner', title: task.title, status: task.status, priority: 'normal', locked: false, ...props,
-      agentActivity: { items: [] }, versions: [], getCurrent: async () => issue, adopt: saved => { issue = saved; setTask(saved) } })
+    return createElement(FramedTask, { Frame: Capture, task, userId: 'owner', title: task.title, status: task.status, priority: 'normal', locked: false, agentActivity: { items: [] }, ...props,
+      versions: [], getCurrent: async () => issue, adopt: saved => { issue = saved; setTask(saved) } })
   }
   await act(async () => root.render(createElement(Task)))
   return () => act(async () => { root.unmount(); host.remove() })
 }
 const row = id => frame.rows.find(item => item.id === id)
+test('properties and Work use the same authorized pull receipts, including an empty set', async () => {
+  issue.metadata.pullRequests = [{ url: 'https://github.com/example/legacy/pull/1', state: 'open' }]
+  const current = { url: 'https://github.com/example/review/pull/2', state: 'merged' }
+  for (const receipts of [[current], []]) {
+    const done = await mount({ agentActivity: { items: [], work: { presentation: { pullRequests: receipts } } } })
+    try {
+      assert.deepEqual(frame.work.props.pulls, receipts)
+      assert.deepEqual(row('pullRequests')?.chips.map(chip => chip.href) ?? [], receipts.map(pull => pull.url))
+    } finally { await done() }
+  }
+})
+
+test('both activity layouts preserve the genuine reply and its target in a mixed Factory thread', async () => {
+  const first = { id: 'stage', at: '2026-11-15T00:00:00Z', author: 'Bot', body: 'Review' }
+  const reply = { id: 'genuine', at: '2026-11-15T00:01:00Z', author: 'Alex', body: 'Review' }
+  const discussion = { anchors: [], threads: [{ id: 'factory', author: first.author, createdAt: first.at, resolved: false, messages: [first, reply] }] }
+  const done = await mount({ agentActivity: { items: [], work: { presentation: { factoryStageComments: [{ threadId: 'factory', messageId: 'stage' }] } } } })
+  try {
+    const folded = frame.activity.items(discussion)
+    assert.deepEqual(folded.map(row => [row.thread.id, row.thread.author, row.at]), [['factory', 'Alex', reply.at]])
+    const expanded = frame.activity.timeline(discussion, [])
+    assert.deepEqual(expanded.map(row => [row.id, row.thread.id, row.message.first, row.message.last]), [['discussion:factory:genuine', 'factory', true, true]])
+  } finally { await done() }
+})
+
+test('properties link only admitted conversations and show the recorded Factory branch', async () => {
+  const opened = []
+  const done = await mount({ agentActivity: {
+    threads: [
+      { id: 'run', createdAt: '2026-11-14T10:00:00Z', detail: { name: 'Worker review', harness: 'codex' } },
+      { id: 'hidden', createdAt: '2026-11-14T10:05:00Z', detail: null },
+    ],
+    openThread: id => opened.push(id), work: {
+      presentation: { linkedChats: [{ id: 'chat', title: 'Planning' }] },
+      factory: { task: { review: { summary: { branch: 'feature/review' } } } },
+    },
+  } })
+  try {
+    assert.equal(row('branch').value.text, 'feature/review')
+    const { chips } = row('conversations')
+    assert.deepEqual(chips.map(chip => [chip.id, chip.text]), [['chat:chat', 'Planning'], ['run:run', 'Worker review']])
+    await act(async () => chips[1].menu[0].onSelect())
+    assert.deepEqual(opened, ['run'])
+  } finally { await done() }
+})
+
 const pickTeam = id => act(async () => row('team').menu.find(item => item.id === id).onSelect())
 
 test('confirmed deletion refreshes the viewer list without reading connections for the deleted task', async () => {
@@ -197,9 +243,55 @@ test('clearing current delegation leaves historical Bot runs out of the Task del
   } finally { await dispose() }
 })
 
-test('the saved delegate is visible before its first run and favorites immediately adopt the server revision', async () => {
+test('a saved Bot is the only displayed assignee before its first run when no member owns the Task', async () => {
   const dispose = await mount()
   try {
+    assert.equal(row('assignee').value.text, 'Assigned bot')
+    assert.equal(row('delegate'), undefined)
+  } finally { await dispose() }
+})
+
+test('the assignee menu selects the effective owner and changes only the human assignment', async () => {
+  const agent = { kind: 'agent', id: 'agent', name: 'Build Agent', image: null }
+  const member = { kind: 'member', id: 'alice', name: 'Alice', image: null }
+  const writes = []
+  saveMetadata = input => writes.push(input.patch)
+  optionsRead = { data: { members: [member], labels: [], isOwner: false } }
+  for (const { assignee, delegate, fallback, selected } of [
+    { assignee: null, delegate: agent, fallback: 'Build Agent', selected: 'Build Agent' },
+    { assignee: member, delegate: agent, fallback: 'Build Agent', selected: 'Alice' },
+    { assignee: member, delegate: null, fallback: 'unassigned', selected: 'Alice' },
+    { assignee: null, delegate: null, fallback: 'unassigned', selected: 'unassigned' },
+    { assignee: agent, delegate: null, fallback: 'Build Agent', selected: 'Build Agent' },
+  ]) {
+    issue.metadata = { ...issue.metadata, assignee, delegate }
+    const dispose = await mount()
+    try {
+      await act(async () => row('assignee').onOpen())
+      const choices = row('assignee').menu
+      assert.deepEqual(choices.filter(choice => choice.checked).map(choice => choice.label), [selected])
+      assert.deepEqual(choices.map(choice => choice.label), [fallback, 'Alice'])
+      const [withoutMember, alice] = choices
+      writes.length = 0
+      if (assignee === member) {
+        await act(async () => alice.onSelect())
+        assert.deepEqual(writes, [])
+        await act(async () => withoutMember.onSelect())
+        assert.deepEqual(writes, [{ assignee: null }])
+      } else {
+        assert.equal(withoutMember.onSelect, undefined)
+        await act(async () => alice.onSelect())
+        assert.deepEqual(writes, [{ assignee: { kind: 'member', id: 'alice' } }])
+      }
+    } finally { await dispose() }
+  }
+})
+
+test('the saved delegate is visible before its first run and favorites immediately adopt the server revision', async () => {
+  issue.metadata = { ...issue.metadata, assignee: { kind: 'member', id: 'member', name: 'Assigned member', image: null } }
+  const dispose = await mount()
+  try {
+    assert.equal(row('assignee').value.text, 'Assigned member')
     assert.equal(row('delegate').value.text, 'Assigned bot')
     await act(async () => frame.favorite.toggle())
     assert.equal(issue.revision, 4)

@@ -1,4 +1,5 @@
 import { seedFixtureWorkspace } from '../../../tests/helpers/task-workspace';
+import { addFactoryVisualEvidence } from '../../../tests/helpers/factory-visual-evidence';
 import { bindFixtureWorkspaceDatabase } from '../../../tests/helpers/workspace-database';
 // Isolated PostgreSQL fixtures model immutable host receipts, not live model acceptance.
 import assert from 'node:assert/strict'
@@ -7,7 +8,7 @@ import { randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { Pool, type PoolClient } from 'pg'
 import { orderMigrations } from '../../../scripts/migration-order.mjs'
-import { dropTestDatabase } from '../../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../../tests/support/drop-test-database'
 import { createFactoryStore } from '../store'
 import { createFactoryDispatch, factoryBinding } from '../dispatch'
 import { factoryEventId } from '../event-id'
@@ -29,7 +30,7 @@ if (url) {
 test('real PG: question receipts preserve one execution without opening a repair-cap bypass', { skip: !url, timeout: 120_000 }, async t => {
   const admin = new Pool({ connectionString: url, max: 1 })
   const database = `question_cap_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(url!); target.pathname = '/' + database
   const pool = new Pool({ connectionString: target.toString(), max: 8 })
   let closeWorkspaceDatabase: (() => Promise<void>) | undefined
@@ -480,6 +481,7 @@ test('real PG: question receipts preserve one execution without opening a repair
       await pool.query('UPDATE factory_events SET "createdAt"=$3 WHERE "taskId"=$1 AND "eventId"=$2', [child.task.id, child.eventId, at(240)])
       await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"=$2,"worktreePath"=$3,"startedAt"=$4,"finishedAt"=$5,report=$6 WHERE id=$1`,
         [child.runId, f.sessionId, worktree, at(300), at(540), JSON.stringify({ sourceCommit: base, deliverableCommit: head, summary: 'Synthetic complete report', verify: { status: 'not_run' } })])
+      await addFactoryVisualEvidence(pool,child.runId)
       for (const id of [f.originRunId, child.runId]) await pool.query('INSERT INTO byos_native_runs("runId","bindingId") VALUES($1,$2)', [id, f.bindingId])
       const inputId = randomUUID(), outputId = randomUUID()
       await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,2,$3,$4),($5,$2,3,$6,$7)`,

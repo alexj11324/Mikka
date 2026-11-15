@@ -1,3 +1,6 @@
+import { useThreadReadEnd } from '@/features/chat/model/use-thread-read-end'
+import { MobileReplyVersions } from '@/features/chat/components/thread-reply-versions'
+import { useThreadDeliveryControls } from '@/features/chat/components/thread-delivery-controls'
 import { conversationAccessDenied, useConversationDelivery } from '@/features/chat/components/conversation-delivery'
 import { StyleSheet, View } from 'react-native'
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
@@ -14,7 +17,7 @@ import { NavBar, underBar } from '@/components/NavBar'
 import { mobileMessages } from '@/lib/messages'
 import { useScrolledUnderBar } from '@/components/BarBackdrop'
 import { ThreadSteps } from '@/features/tasks/components/thread-steps'
-import { Composer } from '@/features/chat/components/chat-composer'
+import { ThreadComposer } from '@/features/chat/components/thread-composer'
 import { api, ApiError } from '@/lib/api'
 import { ReadNotice } from '@/components/ReadNotice'
 import { StopFailed } from '@/components/StopFailed'
@@ -43,11 +46,14 @@ export default function ThreadScreen() {
   // ended thread changes only when it runs again. Each read is the whole conversation.
   const { data, error, reload } = useLiveApi<ThreadDetail>(`/api/mobile/threads/${id}`, current => threadLive(current, id))
   const canSend = Boolean(data && data.canReply !== false && !conversationAccessDenied(error))
-  const delivery = useConversationDelivery(canSend ? { kind: 'thread', id, issueId: data?.issueId ?? null } : null,
-    data?.confirmedSubmissionIds ?? [], reload)
+  const liveRunId = data?.liveRunId ?? id
+  const controls = useThreadDeliveryControls(liveRunId, data?.issueId ?? null, canSend ? data?.delivery : undefined, reload)
+  const delivery = useConversationDelivery(canSend ? { kind: 'thread', id: liveRunId, issueId: data?.issueId ?? null, delivery: controls.mode } : null,
+    [...(data?.confirmedSubmissionIds ?? []), ...(data?.delivery?.queued.map(row => row.requestId) ?? [])], reload)
+  const readEnd = useThreadReadEnd(id, error ? undefined : data?.readReceipts, bar.onScroll)
   const thread = data?.thread
   // 停止 a working thread, as on the web; a thread that ended meanwhile (409) has nothing left to stop.
-  const stopper = useStop(() => api(`/api/mobile/threads/${id}/stop`, { method: 'POST' }).catch(failure => {
+  const stopper = useStop(() => api(`/api/mobile/threads/${liveRunId}/stop`, { method: 'POST' }).catch(failure => {
     if (!(failure instanceof ApiError && failure.status === 409)) throw failure
   }), Boolean(data?.active), reload)
 
@@ -72,16 +78,16 @@ export default function ThreadScreen() {
         // Stop for every live thread, also one waiting for your answer, whose composer sends (N1).
         right={data?.active && !stopper.sending ? { icon: 'stop.fill', label: IssueThreads.stop, web: <Square size={18} color={colors.ink} fill={colors.ink} />, onPress: () => void stopper.stop() } : undefined}
       />
-      <KeyboardChatScrollView onScroll={bar.onScroll} scrollEventThrottle={16} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
+      <KeyboardChatScrollView key={id} {...readEnd} scrollEventThrottle={16} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
         {!data && !error ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : null}
         <ReadNotice error={error} hasData={Boolean(data)} label={IssueThreads.hidden} onRetry={reload} />
         {data?.items.map((item, index) => {
           switch (item.kind) {
             case 'steps':
               return <ThreadSteps key={item.id} steps={item.steps} count={item.count} live={data.active && index === data.items.length - 1} />
-            case 'agent': return <View key={item.id} style={{ marginVertical: 4 }}><BotBubble><Markdown text={item.text} /></BotBubble></View>
+            case 'agent': return <View key={item.id} style={{ marginVertical: 4 }}><BotBubble><Markdown text={item.text} /></BotBubble><MobileReplyVersions detail={data} runId={id} itemId={item.id} text={item.text} reload={reload} working={data.active} /></View>
             case 'error': return <Text key={item.id} style={styles.error}>{item.text}</Text>
-            case 'person': return <View key={item.id} style={{ marginVertical: 4 }}><MyBubble text={item.text} /></View>
+            case 'person': return <View key={item.id} style={{ marginVertical: 4 }}><MyBubble text={item.text} threadReferences /><MobileReplyVersions detail={data} runId={id} itemId={item.id} text={item.text} reload={reload} working={data.active} /></View>
           }
         })}
         {delivery.bubbles}
@@ -91,7 +97,8 @@ export default function ThreadScreen() {
       </KeyboardChatScrollView>
       <OfflineBanner top={insets.top + 66} />
       {/* R-10: a thread ends in the composer, finished or not; a message to an ended thread runs it again (R-81). */}
-      {data ? <Composer placeholder={MobileCore.messageThread} onSend={text => delivery.send(text)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'thread', id }} onStop={composerStops(data) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
+      {controls.controls}
+      {data ? <ThreadComposer detail={data} runId={liveRunId} placeholder={MobileCore.messageThread} onSend={(text, choice) => delivery.send(text, [], choice)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'thread', id: liveRunId }} onStop={composerStops(data) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
     </View>
   )
 }

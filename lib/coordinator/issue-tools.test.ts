@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { afterEach, before, beforeEach, mock, test } from 'node:test'
-import { createIssueInput, updateIssueInput } from './issue-input'
+import { createIssueInput, requestIssueInput, updateIssueInput } from './issue-input'
 import { DEFAULT_AGENT_DEFINITION } from '@/lib/agent-kit/builtin'
 import { AGENT_TOOL_IDS, SCHEDULE_TOOL_IDS } from '@/lib/agent-kit/registry'
 import { issueMutationsEnabled } from './issue-tools-enabled'
@@ -102,6 +102,11 @@ test('schedule tools use the host source event and SDK call identity', async () 
 })
 
 test('schemas allow a human assignee and reject execution identities and workspace DB mutations', () => {
+  const requested = { sourceEventId: '550e8400-e29b-41d4-a716-446655440000', title: 'Review login' }
+  assert.deepEqual(requestIssueInput.parse({ ...requested, summary: '  Restore login redirects  ' }), { ...requested, summary: 'Restore login redirects' })
+  assert.deepEqual(requestIssueInput.parse(requested), requested)
+  assert.equal(requestIssueInput.safeParse({ ...requested, summary: 'a'.repeat(2001) }).success, false)
+  assert.equal(requestIssueInput.safeParse({ ...requested, workspaceId: requested.sourceEventId }).success, false)
   assert.ok(createIssueInput.safeParse({ title: 'Review login', assigneeUserId: 'person' }).success)
   assert.ok(updateIssueInput.safeParse({ issueId: '550e8400-e29b-41d4-a716-446655440000', status: 'done', assigneeUserId: null }).success)
   assert.equal(createIssueInput.safeParse({ title: 'Task', assigneeAgentId: 'worker' }).success, false)

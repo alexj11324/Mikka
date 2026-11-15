@@ -1,5 +1,7 @@
 'use client'
 
+import { taskWorkOwner } from '@/lib/issue-metadata'
+
 import { useRef, useState, type ComponentType, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
@@ -9,6 +11,7 @@ import { TaskAttachments } from './task-attachments'
 import type { TaskActivityItem, TaskDetailFrameProps, TaskDetailRow, TaskMenuItem, TaskSubtask } from '@/components/slots/task-detail-contract'
 import { useIssueTeam } from '@/components/teams/issue-team-control'
 import { formatDateOnly } from '@/lib/date-only'
+import { withBasePath } from '@/lib/base-path'
 import { taskProjectOptions } from '@/lib/task-project-options'
 import { useActionError } from '@/lib/use-action-error'
 import type { IssueDetailNavigation } from './issue-detail-header'
@@ -19,16 +22,55 @@ import { ISSUE_PRIORITIES, ISSUE_STATUSES } from './issue-properties'
 import { useIssueConnections, type RelationKind } from './issue-relations'
 import { useTaskOwnershipRows } from './issue-scope-control'
 import { AgentSphere } from './issue-assignee-menu'
-import type { useAgentActivity } from './issue-threads'
-import { useSelectedTaskPresentation } from '@/hooks/use-selected-task-presentation'
+import type { useTaskWork } from './issue-threads'
+import { agentStretches } from '@/lib/issue-threads'
+import { openGroupConversation } from './workspace-navigation'
+import { TaskWorkSection } from './task-work-section'
 import { useActivityEvents } from './issue-activity-feed'
 import { useActivityDrafts, type DiscussionSave } from './issue-activity'
 import type { IssueDiscussions } from './issue-editor'
-import { chronologicalActivity, taskDiscussionEvents } from '@/lib/task-activity-timeline'
+import { chronologicalActivity, pullRequestActivityEvents, taskActivityThreads, taskDiscussionEvents, type PullRequestActivitySource } from '@/lib/task-activity-timeline'
 import type { ActivityVersion } from '@/lib/issue-activity'
 import { PullRequestStatus } from './issue-pull-request-link'
 
 type Issue = IssueView
+
+type PullRequestStatusPayload = {
+  viewerId: string
+  url: string
+  state: 'open' | 'closed' | 'merged'
+  title: string | null
+  createdAt: string | null
+  mergedAt: string | null
+}
+
+function isPullRequestStatusPayload(value: unknown): value is PullRequestStatusPayload {
+  if (!value || typeof value !== 'object') return false
+  const item = value as Record<string, unknown>
+  return typeof item.viewerId === 'string' && typeof item.url === 'string'
+    && (item.state === 'open' || item.state === 'closed' || item.state === 'merged')
+    && (item.title === null || typeof item.title === 'string')
+    && (item.createdAt === null || typeof item.createdAt === 'string')
+    && (item.mergedAt === null || typeof item.mergedAt === 'string')
+}
+
+async function pullRequestTimelineFetcher(key: readonly [string, string, string, string]) {
+  const [, viewerId, issueId, serializedUrls] = key
+  const urls: unknown = JSON.parse(serializedUrls)
+  if (!Array.isArray(urls) || !urls.every(url => typeof url === 'string')) return { items: [] as PullRequestActivitySource[], failed: true }
+  const results = await Promise.all(urls.map(async url => {
+    try {
+      const response = await fetch(withBasePath('/api/github/pull-request-status'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store', body: JSON.stringify({ issueId, url }),
+      })
+      if (!response.ok) return null
+      const value: unknown = await response.json()
+      if (!isPullRequestStatusPayload(value) || value.viewerId !== viewerId || value.url.replace(/\/$/, '').toLowerCase() !== url.replace(/\/$/, '').toLowerCase()) return null
+      return { url: value.url, title: value.title, state: value.state, createdAt: value.createdAt, mergedAt: value.mergedAt } satisfies PullRequestActivitySource
+    } catch { return null }
+  }))
+  return { items: results.filter((item): item is PullRequestActivitySource => item !== null), failed: results.some(item => item === null) }
+}
 
 /** Data and commands the shared Task controller supplies to the official renderer. */
 export type FramedTaskProps = {
@@ -60,7 +102,7 @@ export type FramedTaskProps = {
   acceptance: ReactNode
   versions: ActivityVersion[]
   historyFailed: (() => void) | null
-  agentActivity: ReturnType<typeof useAgentActivity>
+  agentActivity: ReturnType<typeof useTaskWork>
   documentTools: boolean
   actionRequest: IssueActionRequest | null
   propertyRequest: MetadataRequest | null
@@ -88,6 +130,8 @@ export function FramedTask(props: FramedTaskProps) {
   const tCommon = useTranslations('Common')
   const tFrame = useTranslations('IssueDetail.frame')
   const tDetail = useTranslations('Workspace.detail')
+  const tDirectory = useTranslations('ConversationDirectory')
+  const tArtifact = useTranslations('ArtifactReview')
   const tActivity = useTranslations('Workspace.activity')
   const tIssue = useTranslations('Issue')
   const tMenu = useTranslations('IssueDetail.menu')
@@ -109,23 +153,45 @@ export function FramedTask(props: FramedTaskProps) {
   const metadata = useIssueMetadataSave({ task, disabled: locked, onSaved: adopt, onBusyChange: props.onMetadataBusy })
   const ownershipRows = useTaskOwnershipRows(task, userId, preview, locked, adopt)
   const team = useIssueTeam({ issueId: task.id, viewerId: userId, disabled: locked })
-  const presentation = useSelectedTaskPresentation(userId, task.workspaceId, preview ? undefined : task.id)
-  const connections = useIssueConnections({ liveWorkspaceId: props.liveWorkspaceId, viewerId: userId, task, getCurrent, onSaved: adopt, disabled: locked, enabled: !preview })
+  const presentation = { data: props.agentActivity.work?.presentation, error: props.agentActivity.failed, retry: props.agentActivity.retry }
+
+  const connections = useIssueConnections({ snapshot: props.agentActivity.connections, liveWorkspaceId: props.liveWorkspaceId, viewerId: userId, task, getCurrent, onSaved: adopt, disabled: locked, enabled: !preview })
 
   const loading = (text = tCommon('loading')): TaskMenuItem[] => optionsError
     ? [{ id: 'reload', label: tCommon('retry'), onSelect: () => { void reloadOptions() } }]
     : [{ id: 'loading', label: text }]
   const busy = locked || metadata.pending
   const meta = task.metadata
+  const pullRequests = presentation.data?.pullRequests ?? meta.pullRequests
+  const pullRequestUrls = pullRequests.map(pr => pr.url)
+  const pullRequestTimeline = useSWR(
+    !preview && pullRequestUrls.length ? ['issue-pull-request-timeline', userId, task.id, JSON.stringify(pullRequestUrls)] as const : null,
+    pullRequestTimelineFetcher,
+  )
 
-  // 负责人 is a person; a Bot the task is handed to has its own line under it (R-60).
+  // The human assignment picker and the execution delegate keep their independent write authority.
+  const workOwner = taskWorkOwner(meta)
   const member = meta.assignee?.kind === 'member' ? meta.assignee : null
+  const ownerWithoutMember = member ? meta.delegate : workOwner
   const assigneeItems: TaskMenuItem[] = [
-    { id: 'none', label: tAssignee('unassigned'), mark: { kind: 'icon', icon: 'person' }, checked: !member, onSelect: () => { if (member) void metadata.persist({ assignee: null }) } },
+    {
+      id: 'none', label: ownerWithoutMember?.name ?? tAssignee('unassigned'),
+      mark: ownerWithoutMember ? { kind: 'node', node: <AgentSphere name={ownerWithoutMember.name} compact /> } : { kind: 'icon', icon: 'person' },
+      checked: !member, onSelect: member ? () => { void metadata.persist({ assignee: null }) } : undefined,
+    },
     ...options ? options.members.map(person => ({ id: person.id, label: person.name, mark: { kind: 'person', name: person.name } as const, checked: member?.id === person.id, onSelect: () => { if (member?.id !== person.id) void metadata.persist({ assignee: { kind: 'member', id: person.id } }) } })) : loading(tAssignee('loading')),
     ...options?.isOwner ? [{ id: 'invite', label: tAssignee('invite'), mark: { kind: 'icon', icon: 'mail' }, divider: true, onSelect: () => props.requestProperty('invite') } satisfies TaskMenuItem] : [],
   ]
   const delegate = meta.delegate?.name
+  const conversations = [
+    ...(presentation.data?.linkedChats ?? []).map(chat => ({
+      id: 'chat:' + chat.id, text: chat.title || tDirectory('untitled'), open: () => openGroupConversation(chat.id),
+    })),
+    ...(props.agentActivity.threads ?? []).flatMap(thread => thread.detail ? [{
+      id: 'run:' + thread.id, text: thread.detail.name || tDirectory('untitled'), open: () => props.agentActivity.openThread(thread.id),
+    }] : []),
+  ]
+  const reviewBranch = props.agentActivity.work?.factory?.task.review?.summary?.branch
 
   const allLabels = [...new Map([...(options?.labels ?? []), ...meta.labels].map(label => [label.name, label])).values()]
   const labelItems: TaskMenuItem[] = [
@@ -159,8 +225,8 @@ export function FramedTask(props: FramedTaskProps) {
     },
     { id: 'priority', label: tIssue('priorityLabel'), disabled: locked, value: { text: priorityLabel(props.priority), mark: { kind: 'priority', value: props.priority } }, menu: ISSUE_PRIORITIES.map(item => ({ id: item.value, label: priorityLabel(item.value), mark: { kind: 'priority', value: item.value }, checked: item.value === props.priority, onSelect: () => props.onPriority(item.value) })) },
     ...ownershipRows,
-    { id: 'assignee', label: tProperty('assignee'), disabled: busy, onOpen: loadOptions, value: member ? { text: member.name, mark: { kind: 'person', name: member.name }, aria: tAssignee('aria', { name: member.name }) } : { text: tAssignee('unassignedLabel'), mark: { kind: 'icon', icon: 'person' }, muted: true, aria: tAssignee('aria', { name: tAssignee('unassigned') }) }, menu: assigneeItems },
-    ...delegate ? [{ id: 'delegate', label: tFrame('delegate'), value: { text: delegate, aria: tAssignee('delegatedTo', { name: delegate }), mark: { kind: 'node', node: <AgentSphere name={delegate} compact /> } } } satisfies TaskDetailRow] : [],
+    { id: 'assignee', label: tProperty('assignee'), disabled: busy, onOpen: loadOptions, value: member ? { text: member.name, mark: { kind: 'person', name: member.name }, aria: tAssignee('aria', { name: member.name }) } : workOwner ? { text: workOwner.name, mark: { kind: 'node', node: <AgentSphere name={workOwner.name} compact /> }, aria: tAssignee('aria', { name: workOwner.name }) } : { text: tAssignee('unassignedLabel'), mark: { kind: 'icon', icon: 'person' }, muted: true, aria: tAssignee('aria', { name: tAssignee('unassigned') }) }, menu: assigneeItems },
+    ...member && delegate ? [{ id: 'delegate', label: tFrame('delegate'), value: { text: delegate, aria: tAssignee('delegatedTo', { name: delegate }), mark: { kind: 'node', node: <AgentSphere name={delegate} compact /> } } } satisfies TaskDetailRow] : [],
     { id: 'labels', label: tProperty('labels'), disabled: busy, onOpen: loadOptions, chips: meta.labels.map(label => ({ id: label.name, text: label.name, title: label.name })), add: { label: tProperty('editLabels'), menu: labelItems } },
     { id: 'project', label: tProperty('project'), disabled: busy, onOpen: loadOptions, value: { text: meta.project ?? tProperty('addToProject'), mark: { kind: 'icon', icon: 'project' }, muted: !meta.project, title: meta.project ?? undefined, aria: tProperty('projectAria', { name: meta.project ?? tProperty('unset') }) }, menu: projectItems },
     { id: 'team', label: team.label, disabled: locked || team.unavailable, value: { text: team.currentLabel, mark: { kind: 'icon', icon: 'team' }, muted: !team.selected, title: team.currentLabel }, menu: team.choices.map(choice => ({ id: choice.value, label: choice.label, mark: { kind: 'icon', icon: 'team' }, checked: choice.value === (team.selected || 'none'), onSelect: () => {
@@ -170,7 +236,11 @@ export function FramedTask(props: FramedTaskProps) {
     } })) },
     ...meta.dueDate ? [{ id: 'dueDate', label: tProperty('dueDate'), disabled: locked, onClick: () => props.requestAction('dueDate'), value: { text: formatDateOnly(format, meta.dueDate, { month: 'short', day: 'numeric' }), mark: { kind: 'icon', icon: 'calendar' }, danger: overdue(meta.dueDate, props.status, now) } } satisfies TaskDetailRow] : [],
     ...meta.estimate !== null ? [{ id: 'estimate', label: tProperty('estimate'), disabled: locked, onClick: () => props.requestAction('estimate'), value: { text: tProperty('estimatePoints', { count: meta.estimate }), mark: { kind: 'icon', icon: 'estimate' } } } satisfies TaskDetailRow] : [],
-    ...meta.pullRequests.length ? [{ id: 'pullRequests', label: tProperty('pullRequests'), disabled: locked, chips: meta.pullRequests.map(pr => ({ id: pr.url, text: `#${pr.url.split('/').filter(Boolean).at(-1)}`, href: pr.url, mark: { kind: 'icon', icon: 'pullRequest' }, live: draw => <PullRequestStatus issueId={task.id} pr={pr}>{view => draw({ text: view.text ? `#${view.number} ${view.text}` : `#${view.number}`, title: view.title, state: view.state, confirmed: view.confirmed })}</PullRequestStatus> })), add: { label: tProperty('managePullRequestsAria'), onClick: () => props.requestProperty('pullRequests') } } satisfies TaskDetailRow] : [],
+    ...conversations.length ? [{ id: 'conversations', label: tDirectory('title'),
+      chips: conversations.map(({ id, text, open }) => ({ id, text, menu: [{ id: 'open', label: tFrame('open'), onSelect: open }] })),
+    } satisfies TaskDetailRow] : [],
+    ...reviewBranch ? [{ id: 'branch', label: tArtifact('branch'), value: { text: reviewBranch } } satisfies TaskDetailRow] : [],
+    ...pullRequests.length ? [{ id: 'pullRequests', label: tProperty('pullRequests'), disabled: locked, chips: pullRequests.map(pr => ({ id: pr.url, text: `#${pr.url.split('/').filter(Boolean).at(-1)}`, href: pr.url, mark: { kind: 'icon', icon: 'pullRequest' }, live: draw => <PullRequestStatus issueId={task.id} pr={pr}>{view => draw({ text: view.text ? `#${view.number} ${view.text}` : `#${view.number}`, title: view.title, state: view.state, confirmed: view.confirmed })}</PullRequestStatus> })), add: { label: tProperty('managePullRequestsAria'), onClick: () => props.requestProperty('pullRequests') } } satisfies TaskDetailRow] : [],
     ...preview ? [] : connections.groups.filter(group => group.items.length).map((group): TaskDetailRow => ({
       id: `relation-${group.kind}`, label: group.label, disabled: locked || connections.pending,
       chips: group.items.map(row => ({
@@ -199,30 +269,40 @@ export function FramedTask(props: FramedTaskProps) {
   })
 
   // 活动: the task's events, its Agent rows and its discussions in one log, oldest first.
-  const subtaskRows = (connections.rows ?? []).filter(row => row.metadata.parentId === task.id).map(row => ({ id: row.id, title: row.title, createdAt: row.createdAt }))
-  const eventsFor = useActivityEvents(props.historyFailed ? [] : props.versions, props.historyFailed ? [] : subtaskRows)
+  const subtaskRows = (connections.rows ?? []).filter(row => row.metadata.parentId === task.id).map(row => ({ id: row.id, title: row.title, identifier: row.identifier, createdAt: row.createdAt }))
+  const eventsFor = useActivityEvents(props.historyFailed ? [] : props.versions, props.historyFailed ? [] : subtaskRows, {
+    task: { taskId: task.id, code: task.identifier },
+    stretches: agentStretches(props.agentActivity.threads ?? []).map(({ first, agentId }) => ({
+      at: new Date(first.createdAt).toISOString(), runId: first.id, agentId, linked: first.detail !== null,
+    })),
+  })
   const discussions = useRef<IssueDiscussions | null>(null)
   const drafts = useActivityDrafts(task.id,
     (body, operationId) => discussions.current ? discussions.current.onComment(body, operationId) : false,
     (id, body, operationId) => discussions.current ? discussions.current.onReply(id, body, operationId) : false,
     props.discussionSave)
   const time = (at: string) => format.dateTime(new Date(at), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  const pullRequestEvents: TaskActivityItem[] = pullRequestActivityEvents(pullRequestTimeline.data?.items ?? [], {
+    opened: (repo, number, title) => tActivity('timelinePullOpened', { repo, number, title }),
+    merged: (repo, number, title) => tActivity('timelinePullMerged', { repo, number, title }),
+    time,
+  })
   const activityItems = (current: IssueDiscussions, expandReplies = false, additional: readonly TaskActivityItem[] = []): TaskActivityItem[] => {
     const anchors = new Map(current.anchors.map(anchor => [anchor.id, anchor.excerpt]))
-    const byId = new Map(current.threads.map(thread => [thread.id, thread]))
+    const threads = taskActivityThreads(current.threads, presentation.data?.factoryStageComments ?? [])
+    const byId = new Map(threads.map(thread => [thread.id, thread]))
     const excerpt = (id: string) => id.startsWith('discussion-') ? null : anchors.get(id) ?? tActivity('anchorRemoved')
     const comments: TaskActivityItem[] = expandReplies
-      ? taskDiscussionEvents(current.threads).map(fact => {
+      ? taskDiscussionEvents(threads).map(fact => {
         const thread = byId.get(fact.threadId)!
         return { kind: 'comment', id: fact.id, at: fact.at, thread, time, excerpt: excerpt(thread.id),
           message: { record: { id: fact.messageId, body: fact.body, author: fact.author, at: fact.at }, first: fact.kind === 'comment', last: fact.messageId === thread.messages.at(-1)?.id } }
       })
-      : current.threads.map(thread => ({ kind: 'comment', id: thread.id, at: thread.createdAt, thread, time, excerpt: excerpt(thread.id) }))
-    const history = eventsFor([...props.agentActivity.items, ...comments, ...additional])
+      : threads.map(thread => ({ kind: 'comment', id: thread.id, at: thread.createdAt, thread, time, excerpt: excerpt(thread.id) }))
+    const history = eventsFor([...comments, ...additional])
     return chronologicalActivity<TaskActivityItem>([
-      ...history.map((item): TaskActivityItem => ({ kind: 'event', id: `history:${item.id}`, at: item.at, who: item.actor?.name ?? null, mark: item.actor?.name ? (item.actor.type === 'agent' ? { kind: 'node', node: <AgentSphere name={item.actor.name} compact /> } : { kind: 'person', name: item.actor.name }) : undefined, text: item.text, time: item.time })),
-      ...props.agentActivity.items.map((item): TaskActivityItem => ({ kind: 'agent', id: item.id, at: item.at, who: item.name, mark: { kind: 'node', node: item.mark }, text: item.result, time: item.time, open: item.open, onOpen: item.onOpen, openLabel: tFrame('openThread', { name: item.name }) })),
-      ...comments, ...additional,
+      ...history.map((item): TaskActivityItem => ({ kind: 'event', id: `history:${item.id}`, at: item.at, who: item.actor?.name || (item.actor?.type === 'system' ? t('work.system') : item.actor?.type === 'agent' ? t('work.agent') : null), mark: item.actor?.name ? (item.actor.type === 'agent' ? { kind: 'node', node: <AgentSphere name={item.actor.name} compact /> } : { kind: 'person', name: item.actor.name }) : undefined, text: item.text, parts: item.parts, time: item.time })),
+      ...comments, ...additional, ...pullRequestEvents,
     ])
   }
 
@@ -236,6 +316,9 @@ export function FramedTask(props: FramedTaskProps) {
     attachments={preview ? undefined : trigger => <TaskAttachments key={task.id} taskId={task.id} trigger={trigger} />}
     workspaceId={preview ? undefined : task.workspaceId}
     factoryTaskId={presentation.data?.factoryTaskId}
+    factorySnapshot={props.agentActivity.work?.factory ?? null}
+    work={!preview && <TaskWorkSection threads={props.agentActivity.threads ?? []} pulls={pullRequests} linkedChats={presentation.data?.linkedChats}
+      factory={props.agentActivity.work?.factory} open={props.agentActivity.openThread} />}
     rootRef={props.rootRef} onKeyDown={props.onKeyDown} label={props.label} busy={preview}
     origin={props.origin} identifier={task.identifier} title={props.title} saveLabel={props.saveLabel} saved={props.saved} saveHint={t('autosaveHint')}
     navigation={props.navigation} onClose={props.onClose}
@@ -255,7 +338,7 @@ export function FramedTask(props: FramedTaskProps) {
     subtasks={preview ? null : { items: subtasks, done: subtasks.filter(item => item.done).length, total: subtasks.length, onCreate: connections.error ? async () => false : menu.createChild, disabled: locked || connections.pending || Boolean(connections.error), failed: connections.error ? { text: tRelations('readFailedRetry'), retry: () => { void connections.mutate() } } : null }}
     activity={preview ? null : {
       items: activityItems, timeline: (current, additional) => activityItems(current, true, additional),
-      failed: [...props.historyFailed ? [{ text: tDetail('activityFailed'), retry: props.historyFailed }] : [], ...props.agentActivity.failed ? [{ text: props.agentActivity.failed.label, retry: props.agentActivity.failed.retry }] : []],
+      failed: [...props.historyFailed ? [{ text: tDetail('activityFailed'), retry: props.historyFailed }] : [], ...props.agentActivity.failed ? [{ text: props.agentActivity.failed.label, retry: props.agentActivity.failed.retry }] : [], ...pullRequestTimeline.data?.failed ? [{ text: tActivity('timelinePullFailed'), retry: () => { void pullRequestTimeline.mutate() } }] : []],
       drafts, subscribed: menu.subscribed, onSubscribe: menu.toggleSubscribed, subscribeLabel: menu.subscribed ? tFrame('unsubscribe') : tFrame('subscribe'),
     }}
     rows={rows}

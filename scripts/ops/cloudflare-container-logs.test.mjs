@@ -42,15 +42,35 @@ test('one scoped Container query feeds the existing outcome and egress consumers
   assert.ok(!JSON.stringify(result).includes('REDACT-THIS'))
   await assert.rejects(publish(result.egress,'unused',()=>assert.fail()), /production_telemetry_required/)
 })
-test('a full native page is subdivided and deduplicated at the shared millisecond; an inseparable burst fails closed', async () => {
-  const mid = start + WINDOW_MS / 2
-  const row = event('api_request_started', 4, mid)
-  const read = ({timeframe}) => timeframe.from === start && timeframe.to === now ?
-    page(Array(1000).fill(row)) : page([row])
+test('native offsets drain an equal-timestamp burst without subdividing the window or double-counting records', async () => {
+  const at = start + 1000
+  const rows = Array.from({ length: 1002 }, (_, index) => event('api_request_started', index, at))
+  const offsets = []
+  const read = ({ timeframe, offset, offsetDirection }) => {
+    assert.deepEqual(timeframe, { from: start, to: now })
+    assert.equal(offsetDirection, offset ? 'next' : undefined)
+    offsets.push(offset)
+    return offset ? page(rows.slice(999), rows.length) : page(rows.slice(0, 1000), rows.length)
+  }
   const window = await readContainerWindow({ ...options, read })
-  assert.equal(window.pages, 3)
-  assert.equal(window.events.length, 1)
-  await assert.rejects(readContainerWindow({ ...options, read: () => page(Array(1000).fill(row)) }), /saturated|budget_exceeded/)
+  assert.deepEqual(offsets, [undefined, '999'])
+  assert.equal(window.pages, 2)
+  assert.equal(window.records, rows.length)
+  assert.equal(window.events.length, rows.length)
+})
+
+test('an exact full last page is confirmed; repeated or incomplete pages cannot produce a healthy window', async () => {
+  const rows = Array.from({ length: 1000 }, (_, index) => event('api_request_started', index, start + 1000))
+  const read = ({ offset }) => {
+    if (!offset) return page(rows)
+    assert.equal(offset, '999')
+    return { ...page([]), statistics: {} }
+  }
+  const window = await readContainerWindow({ ...options, read })
+  assert.equal(window.pages, 2)
+  assert.equal(window.records, 1000)
+  await assert.rejects(readContainerWindow({ ...options, read: () => page(rows) }), /incomplete/)
+  await assert.rejects(readContainerWindow({ ...options, read: ({ offset }) => offset ? page([]) : page(rows, 1001) }), /incomplete/)
 })
 test('scope, provider omissions and truncated rows cannot turn into a healthy zero', async () => {
   for (const bad of [

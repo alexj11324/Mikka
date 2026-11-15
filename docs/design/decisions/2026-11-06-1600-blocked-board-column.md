@@ -3,6 +3,7 @@
 - Date: 2026-11-06
 - Source: Alex, about the task board: 「我们现在的看板里面缺少一个 block 的 category，导致我在看板里面看不到这些被 block 的 issue 卡片。」 He asked for the leading products' approach without a further design review.
 - Rule: —
+- Superseded in part by: [2026-11-13-1405](2026-11-13-1405-one-task-status.md) (what a run says no longer moves a task into 受阻; the column holds flagged tasks and tasks a dependency holds back).
 - Replaces: —
 
 Why the cards were missing: a task's column was its status alone. ALEX-2 stayed

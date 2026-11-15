@@ -94,6 +94,8 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
   creation?: { eventId: string; botId: string; workspaceId: string }
   /** A browser submission already bound its original target before taking the task lock. */
   expectedRunId?: string
+  /** A selected model applies only to a newly admitted run. */
+  requireContinuation?: boolean
   /** The caller asked for a new thread; it is granted only when `explicit()` says the person asked for it. */
   newThread?: boolean
   /** The dispatch names another place than where the thread ran: moving a thread is a new thread, granted the same way. */
@@ -136,6 +138,7 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
     if (wantsNew && await (input.explicit?.() ?? Promise.resolve(false))) {
       // The old thread stops; one thread works on a task at a time.
       if (working) {
+      if (input.requireContinuation) throw new ActionFailureError('threadCannotContinue')
         // A previous epoch may already have requested this stop. Queued runs
         // still need the canonical stop to finish; a flag alone is not an ack.
         try { await (await import('@/lib/agent-runs')).requestRunStop(userId, previous.id) }
@@ -148,6 +151,7 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
       return { ...result, thread: 'new' as const, threadId: result.runId, replacedThreadId: threadId }
     }
     if (working) {
+      if (input.requireContinuation) throw new ActionFailureError('threadCannotContinue')
       // Stopping: its next run would race it for the worktree. The person can send again once it has stopped.
       if (previous.stopRequestedAt) throw new ActionFailureError('threadStopping')
       if (!input.note?.trim()) return { thread: 'message' as const, runId: previous.id, threadId, status: 'alreadyWorking' as const }

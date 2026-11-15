@@ -300,12 +300,16 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     development = await startDevelopment({ args: process.argv.slice(2) })
     if (stopping) await development.close()
+    else if (process.send) process.send({ type: 'api-ready', origin: development.origin })
   } catch (error) {
     // A stale route manifest is a condition the developer can fix, and the
     // refusal text is the whole value of stopping: print it as written rather
     // than folding it into the one-line diagnostic that hides its detail.
     if (error?.code === 'API_DEV_ROUTES_STALE') console.error(error.message)
-    else console.error('[dev] Startup failed', { name: error?.name ?? 'Error', code: error?.code ?? 'API_DEV_START_FAILED' })
+    else {
+      const known = new Set(['EVE_SERVICE_START_FAILED', 'EVE_SERVICE_START_TIMEOUT', 'EVE_SERVICE_EXITED', 'EVE_SERVICE_STORAGE_MISMATCH', 'API_CONFIG_NOT_LOADED', 'API_DEV_LOCAL_WORLD_REQUIRED'])
+      console.error('[dev] Startup failed', { name: error?.name ?? 'Error', code: error?.code ?? (known.has(error?.message) ? error.message : 'API_DEV_START_FAILED') })
+    }
     process.exitCode = 1
   }
 }

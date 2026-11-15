@@ -20,6 +20,7 @@ let reads = 0
 let currentRole: 'owner' | 'member' = 'owner'
 let leaveStatus = 200
 let leftId = ''
+let namedRevision: number | undefined
 mock.module('next-intl', { namedExports: { useTranslations: () => translate, useMessages: () => ({ AgentCopy: {} }), useFormatter: () => ({}) } })
 mock.module('@/lib/group-messages', { namedExports: { ...groupMessages, leaveGroupConversation: async (id: string, self: string) => {
   assert.equal(id, 'group-one'); assert.equal(self, 'owner')
@@ -28,8 +29,9 @@ mock.module('@/lib/group-messages', { namedExports: { ...groupMessages, leaveGro
   reads++
   if (readWait) await readWait
   if (failure) throw failure
-  return { messages: [{ id: 'message-one', conversationId: 'group-one', position: '1', authorType: 'user', authorId: 'owner', body: 'Stored history', mentions: [], replyToId: null, createdAt: '2026-11-07T00:00:00Z' }], nextBefore: null } satisfies groupMessages.GroupMessagePage
+  return { messages: [{ id: 'message-one', conversationId: 'group-one', position: '1', authorType: 'user', authorId: 'owner', body: 'Stored history', mentions: [], replyToId: null, createdAt: '2026-11-07T00:00:00Z' }], nextBefore: null, readRevision: namedRevision } satisfies groupMessages.GroupMessagePage
 } } })
+mock.module('@/components/workspace/thread-header', { namedExports: { ThreadHeader: empty } })
 mock.module('sonner', { namedExports: { toast: { error: nothing, dismiss: nothing } } })
 mock.module('@/hooks/use-live-key', { namedExports: { ...live, useLiveKey: nothing } })
 mock.module('@/lib/use-action-error', { namedExports: { useActionError: () => translate } })
@@ -66,7 +68,7 @@ before(async () => {
   ;({ GroupChatView } = await import('./group-chat-view'))
 })
 beforeEach(() => {
-  currentRole = 'owner'; leaveStatus = 200; leftId = ''; failure = null; readWait = null; reads = 0; cache = new Map(); browser.sessionStorage.clear()
+  currentRole = 'owner'; leaveStatus = 200; leftId = ''; namedRevision = undefined; failure = null; readWait = null; reads = 0; cache = new Map(); browser.sessionStorage.clear()
   container = browser.document.createElement('div') as unknown as HTMLDivElement; document.body.append(container); root = createRoot(container)
 })
 afterEach(async () => { await act(async () => root.unmount()); container.remove() })
@@ -74,11 +76,42 @@ after(() => browser.happyDOM.close())
 async function render(visible = true) {
   await act(async () => root.render(<SWRConfig value={{ provider: () => cache, shouldRetryOnError: false, revalidateOnFocus: false, revalidateOnReconnect: false }}>
     <ReadControl /><ViewStateProvider scope="owner:workspace">
-      {visible && <GroupChatView group={{ id: 'group-one', title: 'Fixture group', workspaceId: 'workspace' }} userId="owner" people={new Map()} onLeft={id => { leftId = id }} />}
+      {visible && <GroupChatView group={{ id: 'group-one', title: 'Fixture group', workspaceId: 'workspace', creationPurpose: namedRevision === undefined ? 'group' : 'conversation' }} userId="owner" people={new Map()} onLeft={id => { leftId = id }} />}
     </ViewStateProvider>
   </SWRConfig>))
 }
 const input = () => container.querySelector('textarea')!
+test('a named transcript sends the observed manual-mark revision only when its end enters view', async t => {
+  namedRevision = 0
+  let observer: IntersectionObserverCallback | undefined
+  class ObservedEnd {
+    constructor(callback: IntersectionObserverCallback) { observer = callback }
+    observe() {}
+    disconnect() {}
+  }
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'IntersectionObserver')
+  Object.defineProperty(globalThis, 'IntersectionObserver', { configurable: true, value: ObservedEnd })
+  t.after(() => { if (original) Object.defineProperty(globalThis, 'IntersectionObserver', original); else Reflect.deleteProperty(globalThis, 'IntersectionObserver') })
+  const writes: { messageId: string; readRevision: number }[] = []
+  t.mock.method(globalThis, 'fetch', async (url: RequestInfo | URL, options?: RequestInit) => {
+    assert.match(String(url), /\/api\/conversations\/group-one\/read$/)
+    writes.push(JSON.parse(String(options?.body)))
+    return new Response('{}', {status:200})
+  })
+  await render()
+  assert.ok(observer)
+  const visibility = (seen: boolean) => observer!([{isIntersecting:seen,intersectionRatio:Number(seen)} as IntersectionObserverEntry], {} as IntersectionObserver)
+  visibility(false)
+  assert.deepEqual(writes, [])
+  visibility(true)
+  visibility(true)
+  assert.deepEqual(writes, [{messageId:'message-one',readRevision:0}])
+  namedRevision = 1
+  await act(async () => { await refresh() })
+  visibility(true)
+  assert.deepEqual(writes.at(-1), {messageId:'message-one',readRevision:1})
+})
+
 test('a refused group retry completing across a quick remount unlocks the current view', async () => {
   await render()
   for (let attempt = 0; attempt < 30 && !container.querySelector('ol'); attempt++) await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)) })

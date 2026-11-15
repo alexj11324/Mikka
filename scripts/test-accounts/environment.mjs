@@ -136,7 +136,12 @@ export async function assertDeploymentIdentity(descriptor, fetchImpl = fetch) {
     const expected = deploymentAttestation(descriptor, challenge, key)
     const url = `${descriptor.origin}${descriptor.basePath}/api/test-environment?challenge=${challenge}`
     const response = await fetchImpl(url, { method: 'GET', redirect: 'error', credentials: 'omit', cache: 'no-store', signal: AbortSignal.timeout(10_000) })
-    if (!response.ok || response.headers.has('set-cookie')) fail('DEPLOYMENT_ATTESTATION_REJECTED')
+    if (!response.ok) {
+      const error = new EnvironmentError('DEPLOYMENT_ATTESTATION_REJECTED')
+      error.httpStatus = response.status
+      throw error
+    }
+    if (response.headers.has('set-cookie')) fail('DEPLOYMENT_ATTESTATION_REJECTED')
     let body
     try { body = new TextDecoder().decode(await readBoundedBody(response, 4096)) }
     catch { fail('DEPLOYMENT_ATTESTATION_REJECTED') }

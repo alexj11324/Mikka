@@ -10,7 +10,7 @@ import { createFactoryApprovals, deferPublication, markPublicationSucceeded, res
 import { handleFactoryApproval } from './approval-http';
 import { PublicationDeferred } from './publication-operation';
 import { FactoryError } from './approval-contract';
-import { dropTestDatabase } from '../../tests/support/drop-test-database';
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database';
 
 const base = process.env.E2E_DATABASE_URL;
 const required = process.env.REQUIRE_DB === '1' || (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true');
@@ -26,7 +26,7 @@ test('B2/B4: failed publications are terminal and a superseded candidate invalid
   const admin = guarded(base!);
   const name = `fac_x_${randomUUID().replaceAll('-', '')}_e2e`;
   const adminPool = new Pool({ connectionString: admin.toString(), max: 1 });
-  await adminPool.query(`CREATE DATABASE ${name} TEMPLATE template0`);
+  await createTestDatabase(adminPool, name, 'template0');
   const target = new URL(admin.toString()); target.pathname = `/${name}`; guarded(target.toString());
   const pool = new Pool({ connectionString: target.toString(), max: 4 });
   try {

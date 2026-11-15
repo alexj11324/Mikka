@@ -252,12 +252,18 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
     assert.equal((await pool.query('select count(*) from mikka_organization_audit_events where "organizationId"=$1 and action=\'organization.retention_applied\'', [organizationId])).rows[0].count, '1')
   })
   await t.test('archive is owner-only, retains audit and leaves detached Workspace history intact', async () => {
+    const retainedName = (await org.listOrganizations(owner.id)).find(row => row.id === organizationId)!.name
+    assert.deepEqual(await org.listArchivedOrganizations(owner.id), [])
     await org.detachOrganizationWorkspace(organizationId, wsA, owner.id)
     await org.detachOrganizationWorkspace(organizationId, wsB, owner.id)
     await assert.rejects(org.archiveOrganization(organizationId, admin.id))
     assert.deepEqual(await org.archiveOrganization(organizationId, owner.id), { archived: true })
     assert.deepEqual(await org.archiveOrganization(organizationId, owner.id), { archived: true })
     assert.equal((await org.listOrganizations(owner.id)).some(row => row.id === organizationId), false)
+    assert.deepEqual(await org.listArchivedOrganizations(owner.id), [{ id: organizationId, name: retainedName }])
+    for (const userId of [admin.id, member.id, randomUUID()]) {
+      assert.deepEqual(await org.listArchivedOrganizations(userId), [])
+    }
     await assert.rejects(org.renameOrganization(organizationId, owner.id, { name: 'Cannot restore by rename' }))
     assert.equal((await pool.query('select count(*) from mikka_workspaces where id=any($1::uuid[])', [[wsA, wsB]])).rows[0].count, '2')
     assert.ok((await createOrganizationAuditExport(organizationId, owner.id, {})).events.some(event => event.action === 'organization.archived'))

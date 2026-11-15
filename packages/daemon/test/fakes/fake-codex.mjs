@@ -319,6 +319,8 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
       })
       return runTurn(params.input[0].text)
     case "turn/steer": {
+      if (params.input[0].text === "REFUSE_STEER")
+        return send({ id, error: { code: -32000, message: "private-fixture-rpc-diagnostic" } })
       if (params.expectedTurnId !== open)
         return send({ id, error: { code: -1, message: "no such turn" } })
       send({ id, result: {} })

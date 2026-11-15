@@ -164,18 +164,19 @@ export async function listBotThreadsFor(viewerId: string, workspaceId: string, i
     createdAt: agentRuns.createdAt,
     id: agentRuns.id,
     activity: sql<Date>`${activity}`.as('activity'),
+    conversationTitle: sql<string | null>`case when ${agentRuns.userId}=${viewerId} then ${agentRuns.title} end`.as('conversationTitle'),
     // The prompt leaves the database only for the viewer's own chat runs.
     prompt: sql<string | null>`case when ${agentRuns.issueId} is null and ${agentRuns.userId} = ${viewerId} then ${agentRuns.prompt} end`.as('prompt'),
-  }).from(agentRuns).where(eq(agentRuns.botId, botId)))
+  }).from(agentRuns).where(and(eq(agentRuns.botId, botId), eq(agentRuns.workspaceId, workspaceId))))
   const threads = db.$with('bot_threads').as(db.with(runs).selectDistinctOn([runs.threadId], {
-    threadId: runs.threadId, runId: runs.id, issueId: runs.issueId, ownerId: runs.ownerId, status: runs.status,
+    conversationTitle: runs.conversationTitle, threadId: runs.threadId, runId: runs.id, issueId: runs.issueId, ownerId: runs.ownerId, status: runs.status,
     lastActivity: sql<Date>`max(${runs.activity}) over (partition by ${runs.threadId})`.as('lastActivity'),
     initiatorId: sql<string>`first_value(${runs.ownerId}) over (partition by ${runs.threadId} order by ${runs.createdAt}, ${runs.id})`.as('initiatorId'),
     opening: sql<string | null>`first_value(${runs.prompt}) over (partition by ${runs.threadId} order by ${runs.createdAt}, ${runs.id})`.as('opening'),
   }).from(runs).orderBy(runs.threadId, desc(runs.createdAt), desc(runs.id)))
   const after = position ? sql`(${threads.lastActivity}, ${threads.threadId}) < (${position.at}::timestamptz, ${position.threadId})` : undefined
   const rows = await db.with(runs, threads).select({
-    threadId: threads.threadId, runId: threads.runId, issueId: threads.issueId, ownerId: threads.ownerId, initiatorId: threads.initiatorId, status: threads.status, opening: threads.opening,
+    conversationTitle: threads.conversationTitle, threadId: threads.threadId, runId: threads.runId, issueId: threads.issueId, ownerId: threads.ownerId, initiatorId: threads.initiatorId, status: threads.status, opening: threads.opening,
     lastActivityAt: iso(sql`${threads.lastActivity}`), issueTitle: issues.title,
   }).from(threads).leftJoin(issues, eq(issues.id, threads.issueId))
     .where(after).orderBy(desc(threads.lastActivity), desc(threads.threadId)).limit(limit + 1)
@@ -206,7 +207,7 @@ export async function listBotThreadsFor(viewerId: string, workspaceId: string, i
     return {
       threadId: row.threadId,
       initiator: { id: row.initiatorId, name: memberName.get(row.initiatorId) ?? profile.get(row.initiatorId)?.name ?? null, avatarUrl: profile.get(row.initiatorId)?.image ?? null },
-      title: botThreadTitle({ issueTitle: row.issueTitle, issueVisible, prompt: row.opening, startedByViewer: row.ownerId === viewerId }),
+      title: botThreadTitle({ conversationTitle: row.conversationTitle, issueTitle: row.issueTitle, issueVisible, prompt: row.opening, startedByViewer: row.ownerId === viewerId }),
       status: unfinished.has(row.status) ? 'running' as const : 'done' as const,
       lastActivityAt: row.lastActivityAt,
       canOpen: href !== null,

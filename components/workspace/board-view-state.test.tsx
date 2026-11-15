@@ -116,6 +116,34 @@ for (const change of [{ owner: 'owner-one', workspace: 'workspace-two' }, { owne
   assert.deepEqual(shown(), ['workspace-one task one'])
 })
 
+test('the Board shows every task by default, and a stored copy of the retired 负责人：我 default no longer hides tasks a bot holds', async () => {
+  const held = { ...issue('owner-one', 'workspace-one', 'held'), metadata: { ...issue('owner-one', 'workspace-one', 'held').metadata, assignee: null } } as Issue
+  const show = async () => act(async () => root.render(<ViewStateProvider scope="owner-one:workspace-one">
+    <BoardPage presentationRead={{ isLoading: false, mutate: async () => undefined }} issues={[held]} userId="owner-one" workspaceId="workspace-one" onOpen={nothing} onUpdated={async () => {}} onBusyChange={nothing} />
+  </ViewStateProvider>))
+  await show()
+  assert.deepEqual(shown(), ['workspace-one task held'])
+  assert.equal(!!chip('assignee'), false)
+  await act(async () => root.unmount()); root = createRoot(container)
+  browser.sessionStorage.setItem('mikka:view:v1:owner-one:workspace-one:board:filters', JSON.stringify({ assignee: ['me'] }))
+  await show()
+  assert.deepEqual(shown(), ['workspace-one task held'], 'the old default is not a saved choice')
+  await act(async () => root.unmount()); root = createRoot(container)
+  browser.sessionStorage.setItem('mikka:view:v1:owner-one:workspace-one:board:filters', JSON.stringify({ assignee: ['me'], priority: ['normal'] }))
+  await show()
+  assert.deepEqual(shown(), [], 'a selection the person changed is kept')
+  assert.ok(chip('assignee'))
+})
+
+test('a personal task sits on the Board with the workspace\'s other tasks, whatever scope an old browser preference names', async () => {
+  browser.localStorage.setItem('mikka:board-v2', JSON.stringify({ scope: 'workspace', view: 'board' }))
+  const personal = { ...issue('owner-one', 'workspace-one', 'personal'), scope: 'personal' } as Issue
+  await act(async () => root.render(<ViewStateProvider scope="owner-one:workspace-one">
+    <BoardPage presentationRead={{ isLoading: false, mutate: async () => undefined }} issues={[issue('owner-one', 'workspace-one', 'one'), personal]} userId="owner-one" workspaceId="workspace-one" onOpen={nothing} onUpdated={async () => {}} onBusyChange={nothing} />
+  </ViewStateProvider>))
+  assert.deepEqual(shown(), ['workspace-one task one', 'workspace-one task personal'])
+})
+
 test('legacy unscoped filter names are discarded while durable view and display preferences remain', async () => {
   const display = { sort: 'created', completed: 'all', showEmpty: false, properties: ['labels'], hidden: ['canceled'] }
   browser.localStorage.setItem('mikka:board-v2', JSON.stringify({ scope: 'workspace', view: 'list', filters: { project: ['Legacy private project'], labels: ['Legacy private label'] }, display }))
@@ -126,7 +154,8 @@ test('legacy unscoped filter names are discarded while durable view and display 
   assert.deepEqual(shown(), ['workspace-one task one', 'workspace-one task two'])
   const saved = JSON.parse(browser.localStorage.getItem('mikka:board-v2')!)
   assert.equal(saved.filters, undefined)
-  assert.deepEqual({ scope: saved.scope, view: saved.view, display: saved.display }, { scope: 'workspace', view: 'list', display })
+  assert.equal(saved.scope, undefined, 'the retired 全部 / 工作区 / 个人 segment is not kept')
+  assert.deepEqual({ view: saved.view, display: saved.display }, { view: 'list', display })
 })
 
 test('changing browser display preferences never writes scoped filter names back into the shared preference key', async () => {

@@ -6,6 +6,7 @@
 import type { ComponentType, ReactNode } from 'react'
 import type { AgentState, BoardColumn } from '@/components/blocks/kanban-board-1/components/data'
 import type { BlockReason } from '@/lib/task-blocked'
+import type { RunIndicator } from '@/lib/task-state'
 
 export type BoardColumnFrameProps = {
   status: BoardColumn
@@ -38,7 +39,7 @@ export type BoardCardProps = {
   identifier: string | null
   /** Done, canceled or duplicate: a quieter title. */
   done: boolean
-  /** The lock for a personal task, with its tooltip; null for a workspace task. */
+  /** Always null: a card no longer marks 归属 (2026-11-13-1405). Kept so released layers compile. */
   personal: ReactNode
   /** The status menu (an icon button); its click never opens the task. */
   status: ReactNode
@@ -78,13 +79,13 @@ export type BoardScreenCard = {
   detail: string
   /** urgent, high, normal or low; null when the 优先级 property is off. */
   priority: string | null
-  /** The newest thread's state or why it is 受阻 when 线程状态 is on, else done/canceled/duplicate; with its words. */
-  state: { kind: AgentState | 'done'; label: string } | null
+  /** What the task's Agent is doing (working, waiting for the person, error) when Agent 活动 is on, or why the task sits in 受阻; with its words. Never the task's status: its column is. */
+  state: { kind: AgentState; label: string; /** Set when the line is the Agent's mark, so a layer can draw Mikka's shared mark for it; absent for a 受阻 reason. */ indicator?: RunIndicator } | null
 }
 
 /**
  * The official BoardScreen renders the toolbar, columns and list. Mikka keeps the
- * filters, 显示 options, scope and view in BoardPage and every save in useIssueBoardSaves; the layer shows them and
+ * filters, 显示 options and view in BoardPage and every save in useIssueBoardSaves; the layer shows them and
  * calls back. The Coordinator sidebar stays beside it.
  */
 export type BoardScreenProps = {
@@ -93,7 +94,7 @@ export type BoardScreenProps = {
   cards: BoardScreenCard[]
   view: 'board' | 'list'
   onView: (view: 'board' | 'list') => void
-  /** 全部 / 工作区 / 个人 with their counts; one tab in a personal workspace. */
+  /** Empty: the board holds every task of its workspace, so there is nothing to switch between (2026-11-13-1405). A layer draws no tab for it. */
   scopes: { id: string; label: string; count: number }[]
   scope: string
   onScope: (id: string) => void

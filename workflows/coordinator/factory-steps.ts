@@ -14,12 +14,13 @@ import type { QuestionReference, ContextQuestionAnswer } from '@/lib/factory/que
 import { improvementStore, skillAssignments, improvementFactory, skillRegistry, skillEvaluations } from '@/lib/self-improvement/server'
 import { readCommittedSkill } from '@/lib/self-improvement/source'
 import { ImprovementError, type Feedback, type ImprovementHandoff, type ImprovementRehearsal, type ImprovementRegistration, type SkillEvaluationCommand } from '@/lib/self-improvement/contract'
+import { withRunSpan } from '@/lib/tracing/context'
 
 type ToolResult<T> = T | { error: string }
 
 async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
   try {
-    return await fn()
+    return await withRunSpan('coordinator.tool', {}, fn)
   } catch (error) {
     if (error instanceof ActionFailureError || error instanceof FactoryError || error instanceof ImprovementError) return { error: error.code }
     throw error
@@ -144,7 +145,7 @@ export async function listFactoryRequests(userId: string, scope?: NativeToolScop
   }))
 }
 
-export async function createIssueFromRequestStep(userId: string, input: { sourceEventId: string; title: string }, scope?: NativeToolScope) {
+export async function createIssueFromRequestStep(userId: string, input: Parameters<typeof createIssueFromRequest>[1], scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,scope)
   return asToolResult(() => createIssueFromRequest(userId, input))

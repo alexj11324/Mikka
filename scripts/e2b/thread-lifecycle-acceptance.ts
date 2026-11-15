@@ -23,7 +23,7 @@ import { APPLICATION_DATABASE_URLS, assertE2eTarget, disposableDatabase } from '
 import { assertDevLocal } from '../dev-local/guard.mjs'
 import { cloudAcceptanceRelease } from './cloud-acceptance-release.mjs'
 import { orderMigrations } from '../migration-order.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { taskTemplate } from '../../lib/secrets/e2b-runtime'
 import type { ThreadProviderInfo } from '../../lib/cloud-computer/thread-lifecycle-provider'
 import type { ThreadMachineFence } from '../../lib/cloud-computer/thread-machines'
@@ -123,7 +123,7 @@ export async function runThreadLifecycleAcceptance({ checkOnly = false } = {}) {
     catch (error) { if (!missing(error)) throw error }
   }
   try {
-    await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`); databaseCreated = true
+    await createTestDatabase(admin, database, 'template0'); databaseCreated = true
     pool = new Pool({ connectionString: target.toString(), max: 4, statement_timeout: 20_000, connectionTimeoutMillis: 10_000 })
     const migrations = new URL('../../drizzle/', import.meta.url)
     for (const name of orderMigrations((await readdir(migrations)).filter(name => name.endsWith('.sql')))) {

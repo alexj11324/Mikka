@@ -17,7 +17,7 @@ export function WorkspaceContentLoading() {
 
 /** The first paint: the same window frame as the app (window bar, rail, one card) so nothing jumps when it arrives. */
 export function WorkspaceLoading() {
-  return <div className="flex h-svh flex-col overflow-hidden bg-shell-chrome text-foreground in-data-desktop-translucent:bg-transparent">
+  return <div className="flex h-screen flex-col overflow-hidden bg-shell-chrome supports-[height:100dvh]:h-dvh text-foreground in-data-desktop-translucent:bg-transparent">
     {/* bg-muted is the light chrome ground itself: the chrome's placeholders take a step of the text colour instead. */}
     <div aria-hidden="true" className="hidden h-11 shrink-0 grid-cols-[1fr_minmax(0,26rem)_1fr] items-center gap-3 pr-2 pl-3 md:grid"><span /><Skeleton className="h-7 w-full rounded-full bg-foreground/[0.07]" /><span /></div>
     <div className="flex min-h-0 flex-1 md:pr-2 md:pb-2">

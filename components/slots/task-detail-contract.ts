@@ -6,6 +6,7 @@ import { createContext, type CompositionEvent, type KeyboardEvent, type ReactNod
 import type { IssueDetailNavigation } from '@/components/workspace/issue-detail-header'
 import type { IssueDiscussions } from '@/components/workspace/issue-editor'
 import type { TaskReason, TaskState } from '@/hooks/use-bot-tasks'
+import type { ActivityPiece } from '@/lib/task-activity-timeline'
 
 /** A glyph the layer draws from its own set. */
 export type TaskIcon =
@@ -91,7 +92,7 @@ export type TaskSubtask = {
 }
 
 export type TaskActivityItem =
-  | { kind: 'event'; id: string; at: string; who: string | null; mark?: TaskMark; text: string; time: string; onOpen?: () => void }
+  | { kind: 'event'; id: string; at: string; who: string | null; mark?: TaskMark; text: string; parts?: ActivityPiece[]; time: string; onOpen?: () => void }
   /** An Agent's stretch of runs (R-62): opens the task's conversation at its first thread. */
   | { kind: 'agent'; id: string; at: string; who: string; mark: TaskMark; text: string; time: string; open: boolean; onOpen: (() => void) | null; openLabel: string }
   | { kind: 'comment'; id: string; at: string; thread: IssueDiscussions['threads'][number]; message?: { record: IssueDiscussions['threads'][number]['messages'][number]; first: boolean; last: boolean }; excerpt: string | null; time: (at: string) => string }

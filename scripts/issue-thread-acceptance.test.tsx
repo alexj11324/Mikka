@@ -12,18 +12,19 @@ const messages = JSON.parse(readFileSync(new URL('../messages/en.json', import.m
 const at = (path: string) => new URL(`../${path}`, import.meta.url).href
 let threads: IssueThread[] = []
 let tasks: FactoryTask[] = []
+const acceptanceRead = mock.fn(() => ({ tasks, allTasks: tasks }))
 mock.module('swr', {
   defaultExport: (key: unknown) => Array.isArray(key) && key[0] === 'issue-threads'
     ? { data: { threads, live: { workspaceId: 'workspace-1' } }, mutate: () => {} }
     : { data: undefined, mutate: () => {} },
-  namedExports: { unstable_serialize: (key: unknown) => JSON.stringify(key) },
+  namedExports: { useSWRConfig: () => ({ cache: new Map() }), unstable_serialize: (key: unknown) => JSON.stringify(key) },
 })
 mock.module(at('app/actions/agents.ts'), { namedExports: { pollIssueThreads: async () => null } })
 mock.module(at('hooks/use-live-key.tsx'), { namedExports: { useLiveKey: () => {} } })
 // The old component need not consume this hook to mount. Its positive cases
 // fail on the rendered Waiting badge, not on an absent future helper import.
 mock.module(at('components/workspace/factory-acceptance.tsx'), { namedExports: {
-  useAcceptanceTasks: () => ({ tasks, allTasks: tasks }),
+  useAcceptanceTasks: acceptanceRead,
   useThreadAcceptance: () => null,
   AcceptanceStateBadge: () => null,
 } })
@@ -124,3 +125,16 @@ for (const scenario of retainedRowStates) {
     else expectRowGroup(html, scenario.group)
   })
 }
+
+
+test('Task Work opens its conversation list without fetching the separate Factory acceptance list', async () => {
+  const { useTaskWork } = await import('../components/workspace/issue-threads')
+  acceptanceRead.mock.resetCalls()
+  function Work() {
+    const { threads } = useTaskWork('issue-1', () => {}, true, 'viewer')
+    return <>{threads.length}</>
+  }
+  const html = renderToStaticMarkup(<IntlProvider locale="en" timeZone="UTC" messages={messages}><Work /></IntlProvider>)
+  assert.equal(html, '1')
+  assert.equal(acceptanceRead.mock.callCount(), 0)
+})

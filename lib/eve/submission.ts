@@ -20,7 +20,7 @@ export const eveProductContext = z.object({
 }).strict()
 
 const ingress = new WeakMap<Request, { scope:EveScope; eventId:string }>()
-export async function acceptEveMessage(scope:EveScope,message:MessageContent,context:unknown,request:Request) {
+export async function acceptEveMessage(scope:EveScope,message:MessageContent,context:unknown,request:Request,turnPolicy?: 'steer') {
   const product = eveProductContext.parse(context ?? {})
   const retry=product.retryOf?await (await import('./retry-source')).loadEveRetrySource(scope,product.retryOf):null
   if (product.expectedOwnerId && product.expectedOwnerId !== scope.ownerId || product.expectedWorkspaceId && product.expectedWorkspaceId !== scope.workspaceId || product.botId && product.botId !== scope.botId) throw new Error('workspaceAccessDenied')
@@ -57,7 +57,7 @@ export async function acceptEveMessage(scope:EveScope,message:MessageContent,con
     if (session?.user.id === scope.ownerId && !session.tokenWorkspaceId) humanSessionId = session.session.id
   }
   if ((product.taskCommand?.teamId || product.taskCommand?.projectId) && !humanSessionId) throw new Error('teamIssueAccessDenied')
-  const options={botId:scope.botId,submissionId:input.submissionId,images:input.images,taskDestination:product.taskDestination,profileId:product.profileId,taskTitle:product.taskTitle,taskCommand:product.taskCommand,...(product.retryOf?{retryOf:product.retryOf}:{}),...(retry?{taskRequestSourceEventId:retry.taskRequestSourceEventId}:{}),...(humanSessionId ? {humanSessionId} : {})}
+  const options={turnPolicy,botId:scope.botId,submissionId:input.submissionId,images:input.images,taskDestination:product.taskDestination,profileId:product.profileId,taskTitle:product.taskTitle,taskCommand:product.taskCommand,...(product.retryOf?{retryOf:product.retryOf}:{}),...(retry?{taskRequestSourceEventId:retry.taskRequestSourceEventId}:{}),...(humanSessionId ? {humanSessionId} : {})}
   const record=(executor:Parameters<typeof recordPersonalSubmission>[0])=>recordPersonalSubmission(executor,scope.ownerId,text,options)
   async function recordMessage() {
     if (!product.retryOf) return record(db)

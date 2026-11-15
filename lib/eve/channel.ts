@@ -16,6 +16,9 @@ async function sessionFor(args: RouteHandlerArgs, scope: EveScope) {
 }
 
 const accessRefusals = new WeakSet<Request>()
+// The native channel consumes the request body before its onMessage hook.
+// Bind the selected admission policy to the forwarded, authenticated request.
+const steeringRequests = new WeakSet<Request>()
 
 /** Keep eve's protocol, changing only ownership, prior history and product ingress. */
 export function mikkaEveChannel() {
@@ -38,7 +41,7 @@ export function mikkaEveChannel() {
     async onMessage(ctx, message) {
       const scope = scopeFromAuth(ctx.eve.caller)
       const { acceptEveMessage } = await import('./submission')
-      const accepted = await acceptEveMessage(scope, message, ctx.eve.clientContext, ctx.eve.request).catch(error => {
+      const accepted = await acceptEveMessage(scope, message, ctx.eve.clientContext, ctx.eve.request, steeringRequests.has(ctx.eve.request) ? 'steer' : undefined).catch(error => {
         if (error instanceof ActionFailureError && error.code === 'accessChangeConfirmationRequired' && error.confirmable) accessRefusals.add(ctx.eve.request)
         throw error
       })
@@ -64,13 +67,21 @@ export function mikkaEveChannel() {
           if (submission) payload.idempotencyKey = z.uuid().parse(submission)
           const url = new URL(request.url); url.pathname = `/eve/v1/session/${session.id}`
           const forwarded = forwardEveRequest(request,url,JSON.stringify(payload))
+          if (payload.turnPolicy === 'steer') steeringRequests.add(forwarded)
           const response = await admit(forwarded, auth, () => follow.handler(forwarded, { ...args, params:{sessionId:session.id} }))
           if (response.ok) await (await import('./submission')).commitEveIngress(forwarded)
           return response
         }
         const sessionId = args.params.sessionId ?? args.params.parentSessionId
         if (!sessionId) return Response.json({ ok:false,error:'notFound' }, { status:404 })
-        try { await assertSessionScope(scope,sessionId) } catch { return Response.json({ok:false,error:'notFound'},{status:404}) }
+        try {
+          await assertSessionScope(scope, sessionId)
+        } catch (error) {
+          if (error instanceof Error && ['notFound', 'botNotFound', 'workspaceAccessDenied'].includes(error.message)) {
+            return Response.json({ ok: false, error: 'notFound' }, { status: 404 })
+          }
+          throw error
+        }
         let forwarded = request
         let streamAfter=0
         if (request.method === 'GET' && route.path.endsWith('/stream')) {
@@ -85,6 +96,7 @@ export function mikkaEveChannel() {
           const payload = await request.clone().json()
           payload.idempotencyKey = z.uuid().parse(request.headers.get('x-mikka-submission-id'))
           forwarded = forwardEveRequest(request,request.url,JSON.stringify(payload))
+          if (payload.turnPolicy === 'steer') steeringRequests.add(forwarded)
         }
         const response = await admit(forwarded, auth, () => withSessionControlDelivery(route, sessionId, () => route.handler(forwarded,args)))
         if (response.ok) await (await import('./submission')).commitEveIngress(forwarded)

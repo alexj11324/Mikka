@@ -116,8 +116,8 @@ test('the bot list reads each bot\'s preview and its citations\' names only, wit
     const lines = Object.fromEntries(Object.entries(after.value.items).map(([bot, item]) => [bot, { line: item.line, at: item.at }]))
     assert.deepEqual(lines, before.value, 'every bot\'s preview line and time are the same')
     // The fixture exercises names from later lines, teammates and hidden or deleted tasks.
-    assert.match(lines[bots[0]].line ?? '', /^Started Fix the login bug that drops a session when the token refre… for Task /)
-    assert.equal(lines[bots[5]].line, `const session = refresh() · Real name after an empty list item · --- · ${'短'.repeat(59)}… · 12345 · Owner agent claude_code    Task ${shared.slice(0, 4)}`)
+    assert.match(lines[bots[0]].line ?? '', /^Started Fix the login bug that drops for Task /)
+    assert.equal(lines[bots[5]].line, `const session = refresh() · Real name after an empty list · --- · ${'短'.repeat(12)} · 12345 · Owner agent claude_code    Task ${shared.slice(0, 4)}`)
     const welcome = latest.findIndex(message => JSON.stringify(message).includes(COORDINATOR_WELCOME_MARK))
     assert.equal(after.value.items[bots[welcome]], undefined, 'a failed welcome has no preview')
     assert.ok(after.bytes < before.bytes / 5, JSON.stringify({ before: before.bytes, after: after.bytes }))

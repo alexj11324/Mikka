@@ -42,6 +42,21 @@ test('a server switch while keychain reads cannot send the old cookie to the new
   assert.equal(ended, 0)
 })
 
+test('a native Inbox write sends the origin of the same saved server connection as its session', async t => {
+  const target = { account: first, client: { ...apiConnection().client, getCookie: async () => 'better-auth.session_token=synthetic' } }
+  current = second
+  t.mock.method(globalThis, 'fetch', async (input: string, init: RequestInit) => {
+    const headers = new Headers(init.headers)
+    assert.equal(String(input), first.server.url + '/api/inbox')
+    assert.equal(headers.get('origin'), new URL(first.server.url).origin)
+    assert.equal(headers.get('cookie'), 'better-auth.session_token=synthetic')
+    assert.equal(headers.get('x-mikka-rpc'), null)
+    assert.equal(init.redirect, 'error')
+    return Response.json({ changed: true })
+  })
+  assert.deepEqual(await api('/api/inbox', { method: 'POST', body: { action: 'dismiss' } }, target), { changed: true })
+})
+
 test('an old explicit server connection cannot acquire the current server home proof', async t => {
   const requests: { url: string; scope: string | null }[] = []
   const original = globalThis.fetch

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
@@ -84,7 +84,10 @@ export default defineHandler(async event => {
         const inFlight = fetch(new URL('/during-reload', listener.url), { signal: AbortSignal.timeout(15_000) })
         await Promise.race([held.promise, inFlight.then(() => { throw Error('request ended before reaching the first worker') })])
         worker = developmentWorkerReady(api, { phase: 'hot-replacement' })
-        await writeFile(route, routeSource(version), { mode: 0o600 })
+        // The watched module becomes visible only after its complete replacement is on disk.
+        const replacement = join(directory, 'replacement.tmp')
+        await writeFile(replacement, routeSource(version), { mode: 0o600 })
+        await rename(replacement, route)
         await worker.wait(AbortSignal.timeout(30_000))
         release.resolve()
         const heldResponse = await inFlight

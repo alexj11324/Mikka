@@ -14,13 +14,13 @@ export function groupTitle(group: ModelGroup) {
     case 'hosted': return 'Mikka'
     case 'subscription': return `${group.plan ? `${providerName(group.provider)} ${group.plan}` : providerName(group.provider)}${credential}`
     case 'apiKey': return `API Key${credential}`
-    case 'shared': return `团队成员分享的${credential}`
+    case 'shared': return `${messages.Coordinator.modelPicker.shared}${credential}`
   }
 }
 export function groupTag(group: ModelGroup) {
-  if (group.kind === 'hosted') return group.hostedSource === 'cloud' ? messages.Coordinator.modelPicker.cloudCredits : group.hostedSource === 'self-hosted' ? messages.Coordinator.modelPicker.ownProvider : '点数'
-  if (group.kind === 'apiKey') return '按量'
-  if (group.kind === 'shared' && group.owner) return `${group.owner}的 Key`
+  if (group.kind === 'hosted') return group.hostedSource === 'cloud' ? messages.Coordinator.modelPicker.cloudCredits : group.hostedSource === 'self-hosted' ? messages.Coordinator.modelPicker.ownProvider : messages.Coordinator.modelPicker.credits
+  if (group.kind === 'apiKey') return messages.Coordinator.modelPicker.metered
+  if (group.kind === 'shared' && group.owner) return messages.Coordinator.modelPicker.sharedKey.replace('{name}', group.owner)
   return null
 }
 const BRANDS: Record<string, string> = { gpt: 'GPT', claude: 'Claude', deepseek: 'DeepSeek', kimi: 'Kimi', gemini: 'Gemini', qwen: 'Qwen', glm: 'GLM' }
@@ -52,10 +52,10 @@ export function modelMenuLabel(current: BotModelCurrent, _running = false) {
 }
 export function modelSourceLabel(current: BotModelCurrent) {
   const metered = current.kind === 'apiKey' || current.kind === 'shared'
-  const status = current.availability === 'checking' ? '待检查' : !current.available ? '不可用' : null
-  return [optionName(current), current.hostedSource === 'cloud' ? messages.Coordinator.modelPicker.cloudCredits : null, current.credentialLabel, metered ? '按量' : null, current.fallback ? '已切换' : null, status].filter(Boolean).join(' · ')
+  const status = current.availability === 'checking' ? messages.Coordinator.modelPicker.checking : !current.available ? messages.Coordinator.modelPicker.unavailable : null
+  return [optionName(current), current.hostedSource === 'cloud' ? messages.Coordinator.modelPicker.cloudCredits : null, current.credentialLabel, metered ? messages.Coordinator.modelPicker.metered : null, current.fallback ? messages.Coordinator.modelPicker.fallback : null, status].filter(Boolean).join(' · ')
 }
-export const modelMenuReadLabel = (busy: boolean) => busy ? '正在读取模型' : '模型加载失败，重试'
+export const modelMenuReadLabel = (busy: boolean) => busy ? messages.Common.loading : messages.Coordinator.modelPicker.retryLoad
 /**
  * The line above the composer, only when the next message will go differently (#1386): the subscription ran out
  * (what the next one uses, or when it comes back), the model cannot run (with 换模型), or the next one uses

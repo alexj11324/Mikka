@@ -9,6 +9,7 @@ const sessionId = 'wrun_fixture'
 let sessionReads = 0
 let revoked = false
 let sendFails = false
+let scopeReadFailure: Error | undefined
 let pauseAuthentication: Promise<void> | undefined
 let forwarded: Request
 let nativeAuth: (request: Request) => unknown
@@ -38,6 +39,7 @@ mock.module(new URL('../task-workspace.ts', import.meta.url).href, { namedExport
 } })
 mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { pool: {
   async query(sql: string, values: string[]) {
+    if (scopeReadFailure && sql.includes('FROM eve_sessions')) throw scopeReadFailure
     const matches = sql.includes('FROM eve_sessions')
       ? values[0] === sessionId && values[1] === 'alice' && values[2] === botId && values[3] === workspaceId && values[4] === 'web'
       : true
@@ -83,6 +85,7 @@ beforeEach(() => {
   mock.property(process, 'env', { ...process.env, MIKKA_API_INGRESS: '', MIKKA_EVE_HOST: '', BETTER_AUTH_URL: 'https://app.test' })
   sessionReads = 0
   revoked = sendFails = false
+  scopeReadFailure = undefined
   pauseAuthentication = undefined
   admittedOwners.length = 0
 })
@@ -134,4 +137,11 @@ test('concurrent requests retain their own credentials and forged scope headers 
   assert.deepEqual(admittedOwners, ['alice'])
   assert.equal((await sendRoute.handler(request(sessionId, { authorization: 'Bearer invalid' }), args)).status, 401)
   assert.equal((await sendRoute.handler(request(sessionId, { origin: 'https://other.test' }), args)).status, 401)
+})
+
+test('session lookup failures reach Eve error handling without admitting the message', async () => {
+  const outage = new Error('fixture database unavailable')
+  scopeReadFailure = outage
+  await assert.rejects(async () => sendRoute.handler(request(), args), error => error === outage)
+  assert.deepEqual(admittedOwners, [])
 })

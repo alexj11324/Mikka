@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { WORKSPACE_NAME } from '@/components/workspace/issue-properties'
+import { WORKSPACE_NAME } from './workspace-defaults'
 
 export const DEFAULT_PROJECT_PROPERTIES = { color: 'green' as const, members: [] as string[], labels: [] as string[], dependencyIds: [] as string[], milestones: [] as { id: string; name: string; targetDate: string; completed: boolean }[] }
 const date = z.union([z.literal(''), z.iso.date()])

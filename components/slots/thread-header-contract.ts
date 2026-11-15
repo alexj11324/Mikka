@@ -27,6 +27,8 @@ export type ThreadHeaderProps = {
   acceptanceBadge: ReactNode
   /** The execution identity (ThreadExecutionIdentity), for its owner; null otherwise. */
   identity: ReactNode
+  /** A named, member-owned chat offers conversation controls without a run identity. */
+  standalone?: boolean
   /** The Artifact button (ThreadArtifactButton); null when the read was rejected. */
   artifact: ReactNode
   /** 对话 / 验收 tabs when they share the header row; null otherwise. */

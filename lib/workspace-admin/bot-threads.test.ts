@@ -37,6 +37,14 @@ test('href: the thread beside its task for its owner, the task for another membe
   assert.equal(botThreadHref({ issueId: null, ownerId: 'u1', botId, runId }, { id: 'u2', issueVisible: true }), null)
 })
 
+test('a stored conversation name is visible only for its owner and a readable linked task', () => {
+  const data = { conversationTitle: 'Chosen title', issueTitle: 'Shared task', prompt: 'Older opening' }
+  assert.equal(botThreadTitle({ ...data, issueVisible: true, startedByViewer: true }), 'Chosen title')
+  assert.equal(botThreadTitle({ ...data, issueVisible: true, startedByViewer: false }), 'Shared task')
+  assert.equal(botThreadTitle({ ...data, issueVisible: false, startedByViewer: true }), null)
+  assert.equal(botThreadTitle({ ...data, issueVisible: false, issueTitle: null, startedByViewer: false }), null)
+})
+
 test('public thread ids are opaque, stable and per bot', () => {
   const issueId = '00000000-0000-4000-8000-000000000001', bot = '00000000-0000-4000-8000-0000000000b0'
   const id = botThreadPublicId(bot, `issue:${issueId}`)

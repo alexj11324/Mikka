@@ -29,7 +29,7 @@ import { setDeviceEnabled } from '@/app/actions/agents'
 export function useAgentDecision() {
   const agentCopy = useAgentCopy()
 
-  const { busy, continueFromAnswer } = useAgentInteraction()
+  const { busy, continueFromAnswer, answer } = useAgentInteraction()
   const streaming = useIsStreaming()
   const operation = useDecisionSubmission()
   const receipt = operation.state('reply')
@@ -40,7 +40,10 @@ export function useAgentDecision() {
     if (busy || streaming) return
     await operation.submit('reply', async () => {
       if (!prompt.trim() || prompt.length > 8000) return { status: 'failed', error: agentCopy.theQuestionIsEmptyOrTooLong2 }
-      return await continueFromAnswer(prompt) ? { status: 'accepted' } : { status: 'failed', error: agentCopy.unableToContinueYourChoicesAndAnswers }
+      // The card says why the answer did not go when the chat knows (offline, refresh needed, the server's reason);
+      // the general sentence is only for a send that gives none.
+      const outcome = answer ? await answer(prompt) : { sent: await continueFromAnswer(prompt) }
+      return outcome.sent ? { status: 'accepted' } : { status: 'failed', error: ('reason' in outcome && outcome.reason) || agentCopy.unableToContinueYourChoicesAndAnswers }
     }, agentCopy.submissionFailedYourChoicesAndAnswersAre)
   }
 
