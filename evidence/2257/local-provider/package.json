@@ -1,0 +1,1 @@
+{"name":"e-local-model-inference","private":true,"version":"1.0.0","dependencies":{"@node-llama-cpp/linux-x64":"^3.22.3","node-llama-cpp":"^3.22.3"}}
