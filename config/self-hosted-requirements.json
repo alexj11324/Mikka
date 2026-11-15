@@ -2034,13 +2034,6 @@
     "test": "apps/mobile/tests/server-api.test.mts",
     "suite": "test:mobile"
   },
-  "lib/task-stage-comments.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Filter persisted Factory stage messages from Task discussion activity using the installation’s PostgreSQL receipts and the currently readable shared Task document in the same workspace.",
-    "test": "tests/task-presentation.db.test.ts",
-    "suite": "test:task-presentation-db"
-  },
   "lib/task-presentation-read.ts": {
     "mode": "built-in",
     "environment": [],
@@ -2067,6 +2060,13 @@
     "behavior": "Task resource registration persists its workspace and privacy defaults under the authorized PostgreSQL transaction.",
     "test": "tests/task-resource-registration.db.test.ts",
     "suite": "test:visibility-db"
+  },
+  "lib/task-stage-comments.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Task detail reads persisted Factory stage message IDs from the installation's PostgreSQL and includes only IDs already visible in the authorized Task document.",
+    "test": "tests/task-presentation.db.test.ts",
+    "suite": "test:task-presentation-db"
   },
   "lib/task-state-query.ts": {
     "mode": "built-in",
