@@ -238,7 +238,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "2c246d5e510373955a80eaf6dd4d49464632bc169e995802bb74806648b445f5"
+      "sourceHash": "4f5ac142ca842a69f32ae7b5c58ad5dcbdb9529f22d92d494dd9e8be20d97fd8"
     },
     {
       "path": "/mikka/api/bots/[botId]/computer/runtimes",
@@ -1580,7 +1580,7 @@
         "POST",
         "PUT"
       ],
-      "sourceHash": "40afa67a3d516a46b49ec19fe2f1a844f2be44398532387802ff262d34de6f17"
+      "sourceHash": "23a3215de76b54441b4045cb9b6f67dee883894ff5c087b761613b4b37560d69"
     },
     {
       "path": "/mikka/api/mobile/open",
@@ -1721,6 +1721,33 @@
         "POST"
       ],
       "sourceHash": "d6790ecc50cc9c10ae2e296ac8ed635e353cdfd6dc3ef515893786b4729af725"
+    },
+    {
+      "path": "/mikka/api/model-gateway/anthropic/v1/messages",
+      "template": "/api/model-gateway/anthropic/v1/messages",
+      "source": "app/api/model-gateway/anthropic/v1/messages/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "e896201f9f1ef03032b672a73e1381fd2d864ec5a6496c83b6e665d0c013386c"
+    },
+    {
+      "path": "/mikka/api/model-gateway/anthropic/v1/messages/count_tokens",
+      "template": "/api/model-gateway/anthropic/v1/messages/count_tokens",
+      "source": "app/api/model-gateway/anthropic/v1/messages/count_tokens/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "8b0103e1c37c5c210eecab37f6d0e193ca8a4816478d0bb43736fae9c50d8aba"
+    },
+    {
+      "path": "/mikka/api/model-gateway/openai/v1/responses",
+      "template": "/api/model-gateway/openai/v1/responses",
+      "source": "app/api/model-gateway/openai/v1/responses/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "4552f19311ae8b4ba8fd1bcc56e8b8c7f7486707513ec03c00dacff3582e5b23"
     },
     {
       "path": "/mikka/api/organization-invitations/accept",
@@ -2947,7 +2974,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "22f6430b0f4f1830e4eea02a5d8667eb707c39fc840a8fcc3b761e7619e15d57"
+      "sourceHash": "6cca5862bbfa534cf662536336d6aee4ee0ced188bf41ee7d553817562336aaa"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/runs/[runId]/computer-authority",

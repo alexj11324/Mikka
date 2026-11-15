@@ -291,6 +291,19 @@ async function openKey(query: Query, keyId: string, env: Env) {
   }
 }
 
+/**
+ * A key opened for one request of the Mikka model gateway (decision
+ * 2026-11-15-2000): the run that may use it was checked at claim
+ * (`validateRunApiKey`) and is checked again by its gateway token.
+ */
+export async function openGatewayApiKey(query: Query, keyId: string, env: Env = process.env) {
+  z.uuid().parse(keyId)
+  const { row, apiKey } = await openKey(query, keyId, env)
+  const { rows: [extra] } = await query.query<{ features: unknown }>('SELECT features FROM model_api_keys WHERE id=$1', [keyId])
+  const { parseGatewayFeatures } = await import('./model-gateway/features')
+  return { key: view(row), apiKey, features: parseGatewayFeatures(extra?.features) }
+}
+
 /** A bot's saved API key model (bot_model_choices), with the Agents its threads can run on (§ 3). */
 export interface BotApiKeyChoice { keyId: string; model: string; harnesses: ApiKeyHarness[] }
 
@@ -349,7 +362,7 @@ const ACTIVE_RUN = ['queued', 'preparing', 'running', 'paused', 'waiting_input',
  * otherwise, so a withdrawn share or a deleted key stops the run instead of
  * switching (§ 2).
  */
-export async function apiKeyForRun(query: Query, runId: string, keyId: string, harness: ApiKeyHarness, env: Env = process.env): Promise<ApiKeyRunCredential> {
+export async function validateRunApiKey(query: Query, runId: string, keyId: string): Promise<{ ownerId: string; workspaceId: string | null }> {
   z.uuid().parse(runId); z.uuid().parse(keyId)
   const { rows: [run] } = await query.query<{ userId: string; botId: string | null; deviceId: string | null; agentDefinition: WorkerDefinitionSnapshot | null; workspaceId: string | null; status: string; stopRequestedAt: Date | null }>(
     'SELECT r."userId",r."botId",r."deviceId",r."agentDefinition",b."workspaceId"::text AS "workspaceId",r.status,r."stopRequestedAt" FROM agent_runs r LEFT JOIN bots b ON b.id=r."botId" WHERE r.id=$1', [runId])
@@ -364,12 +377,22 @@ export async function apiKeyForRun(query: Query, runId: string, keyId: string, h
   if (!usable) throw new WorkspaceError('apiKeyNotFound')
   const { rows: [owner] } = await query.query<{ ownerId: string }>('SELECT "ownerId" FROM model_api_keys WHERE id=$1', [keyId])
   if (!owner || (owner.ownerId !== run.userId && (!run.agentDefinition?.apiKey || !run.workspaceId || !await executionMembersActive(run.workspaceId, [run.userId, owner.ownerId])))) throw new WorkspaceError('apiKeyNotFound')
-  const { row, apiKey } = await openKey(query, keyId, env)
-  const endpoint = apiKeyEndpoint(row, harness)
-  if (!endpoint) throw new WorkspaceError('apiKeyNotFound')
   // Recorded so withdrawing the key or its share stops this run (stopRunsUsingApiKeys).
   await query.query(`INSERT INTO model_api_key_runs ("runId","keyId","workspaceId") VALUES ($1,$2,$3)
     ON CONFLICT ("runId") DO UPDATE SET "keyId"=EXCLUDED."keyId","workspaceId"=EXCLUDED."workspaceId"`, [runId, keyId, run.workspaceId])
+  return { ownerId: owner.ownerId, workspaceId: run.workspaceId }
+}
+
+/**
+ * The key a run uses, opened for injection at the start of that run, for a
+ * deployment without the Mikka model gateway: the endpoint of the protocol the
+ * run's Agent speaks. Same checks as `validateRunApiKey`.
+ */
+export async function apiKeyForRun(query: Query, runId: string, keyId: string, harness: ApiKeyHarness, env: Env = process.env): Promise<ApiKeyRunCredential> {
+  await validateRunApiKey(query, runId, keyId)
+  const { row, apiKey } = await openKey(query, keyId, env)
+  const endpoint = apiKeyEndpoint(row, harness)
+  if (!endpoint) throw new WorkspaceError('apiKeyNotFound')
   if (harness === 'claude_code') return { harness: 'claude_code', keyId: row.id, ownerId: row.ownerId, env: { ANTHROPIC_API_KEY: apiKey, ANTHROPIC_BASE_URL: endpoint.baseUrl } }
   return {
     harness: 'codex', keyId: row.id, ownerId: row.ownerId, env: { MIKKA_MODEL_API_KEY: apiKey },
