@@ -51,6 +51,8 @@ mock.module('swr', {
     // Where the thread runs is its own read (thread-run-place.tsx); none here.
     : Array.isArray(key) && key[0] === 'thread-machine' ? { data: null, mutate: () => {} }
     : Array.isArray(key) && key[0] === 'thread-changes' ? { data: changesRead, mutate: () => {} }
+    // The task's work read behind the Artifact tab (thread-artifacts.tsx): not loaded here.
+    : Array.isArray(key) && key[0] === 'issue-threads' ? { data: undefined, mutate: () => {} }
     : { data: [], mutate: () => {} },
   namedExports: { useSWRConfig: () => liveRead ? actualSWR.useSWRConfig() : ({ mutate: () => {}, cache: new Map() }), unstable_serialize: actualSWR.unstable_serialize },
 })

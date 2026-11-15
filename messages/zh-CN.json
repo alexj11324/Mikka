@@ -4617,6 +4617,14 @@
     "waiting": "等你回复",
     "chatTab": "对话",
     "acceptanceTab": "验收",
+    "artifactsTab": "Artifact",
+    "artifacts": {
+      "plans": "方案",
+      "pullRequests": "PR",
+      "reports": "报告",
+      "captures": "截图和录屏",
+      "open": "打开 {title}"
+    },
     "changesTab": "改动",
     "changesFiles": "{count} 个文件",
     "changesFileList": "文件列表",
