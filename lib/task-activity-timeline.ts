@@ -78,7 +78,7 @@ export type ActivityPiece =
 export type ActivitySubject = { taskId: string; code: string | null }
 
 /** One Agent stretch on this task. `linked` is false when that run has no conversation to open. */
-export type ActivityStretch = { at: string; runId: string; linked: boolean }
+export type ActivityStretch = { at: string; runId: string; agentId: string | null; linked: boolean }
 
 export type ActivityLabels = {
   created: string
@@ -141,17 +141,24 @@ export function taskHistoryLabel(event: IssueActivityEvent, labels: ActivityLabe
  * The last linked Agent stretch that had already started when this event happened.
  * A person's name, an unmatched Agent and a run with no conversation stay text.
  */
-export function activityRunId(at: string, actor: { type?: string | null } | null | undefined, stretches: readonly ActivityStretch[]): string | null {
-  if (actor?.type !== 'agent') return null
+export function activityRunId(at: string, actor: { type?: string | null; id?: string | null } | null | undefined, stretches: readonly ActivityStretch[]): string | null {
+  if (actor?.type !== 'agent' || !actor.id) return null
   const time = Date.parse(at)
   if (Number.isNaN(time)) return null
-  let runId: string | null = null
-  const ordered = [...stretches].sort((a, b) => Date.parse(a.at) - Date.parse(b.at) || a.runId.localeCompare(b.runId))
-  for (const stretch of ordered) {
-    const started = Date.parse(stretch.at)
-    if (stretch.linked && !Number.isNaN(started) && started <= time) runId = stretch.runId
+  const ordered = stretches.map(stretch => ({ stretch, time: Date.parse(stretch.at) }))
+    .filter(item => Number.isFinite(item.time))
+    .sort((a, b) => a.time - b.time || a.stretch.runId.localeCompare(b.stretch.runId))
+  let active = -1
+  for (let index = 0; index < ordered.length; index += 1) {
+    if (ordered[index].time <= time) active = index
+    else break
   }
-  return runId
+  if (active < 0) return null
+  // Equal start times leave the originating conversation ambiguous; do not guess.
+  if ((active > 0 && ordered[active - 1].time === ordered[active].time) ||
+      (active + 1 < ordered.length && ordered[active + 1].time === ordered[active].time)) return null
+  const candidate = ordered[active].stretch
+  return candidate.linked && candidate.agentId === actor.id ? candidate.runId : null
 }
 
 /** One row: the name once, then each clause joined by the locale's separator. The name is a thread part only when a run matches. */
@@ -160,7 +167,7 @@ export function activityLineParts(
   labels: ActivityLabels,
   subject: ActivitySubject | null | undefined,
   separator: string,
-  actor: { type?: string | null; name?: string | null } | null | undefined,
+  actor: { type?: string | null; id?: string | null; name?: string | null } | null | undefined,
   stretches: readonly ActivityStretch[] = [],
 ): ActivityPiece[] {
   const clause = events.flatMap((event, index) => [

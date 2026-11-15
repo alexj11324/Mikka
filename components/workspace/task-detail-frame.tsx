@@ -202,7 +202,7 @@ export function FramedTask(props: FramedTaskProps) {
   const subtaskRows = (connections.rows ?? []).filter(row => row.metadata.parentId === task.id).map(row => ({ id: row.id, title: row.title, identifier: row.identifier, createdAt: row.createdAt }))
   const eventsFor = useActivityEvents(props.historyFailed ? [] : props.versions, props.historyFailed ? [] : subtaskRows, {
     task: { taskId: task.id, code: task.identifier },
-    stretches: (props.agentActivity.items ?? []).map(item => ({ at: item.at, runId: item.runId, linked: item.onOpen !== null })),
+    stretches: (props.agentActivity.items ?? []).map(item => ({ at: item.at, runId: item.runId, agentId: item.agentId, linked: item.onOpen !== null })),
   })
   const discussions = useRef<IssueDiscussions | null>(null)
   const drafts = useActivityDrafts(task.id,

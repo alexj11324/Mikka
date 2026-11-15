@@ -17,12 +17,12 @@ function labels(catalog: typeof en): ActivityLabels {
 }
 
 const subject = { taskId: 'task-1', code: 'MIK-12' }
-const agent = { type: 'agent' as const, name: 'Ada' }
+const agent = { type: 'agent' as const, id: 'agent-a', name: 'Ada' }
 const person = { type: 'user' as const, name: 'Ada' }
 const stretches: ActivityStretch[] = [
-  { at: '2026-11-14T14:00:00.000Z', runId: 'run-1', linked: true },
-  { at: '2026-11-14T15:00:00.000Z', runId: 'run-2', linked: false },
-  { at: '2026-11-14T16:00:00.000Z', runId: 'run-3', linked: true },
+  { at: '2026-11-14T14:00:00.000Z', runId: 'run-1', agentId: 'agent-a', linked: true },
+  { at: '2026-11-14T15:00:00.000Z', runId: 'run-2', agentId: 'agent-b', linked: false },
+  { at: '2026-11-14T16:00:00.000Z', runId: 'run-3', agentId: 'agent-a', linked: true },
 ]
 
 function event(partial: IssueActivityEvent): IssueActivityEvent {
@@ -32,7 +32,7 @@ function event(partial: IssueActivityEvent): IssueActivityEvent {
 test('an Agent status change names the task and opens that run', () => {
   const line = activityLineParts([
     event({ id: 's', at: '2026-11-14T14:02:00.000Z', kind: 'status', status: 'Done' }),
-  ], labels(en), subject, en.Workspace.activity.separator, agent, stretches)
+  ], labels(en), subject, en.Workspace.activity.separator, { ...agent, id: 'agent-a' }, stretches)
   assert.deepEqual(line, [
     { kind: 'thread', text: 'Ada', runId: 'run-1' },
     { kind: 'text', text: ' ' },
@@ -71,11 +71,17 @@ test('a missing code or an unmatched Agent does not invent a link', () => {
   assert.deepEqual(taskHistoryPieces(event({ id: 'c', at: 't', kind: 'created' }), labels(en), null), [
     { kind: 'text', text: 'Created the task' },
   ])
-  assert.equal(activityRunId('2026-11-14T13:00:00.000Z', agent, stretches), null)
-  assert.equal(activityRunId('2026-11-14T14:00:00.000Z', agent, [{ at: '2026-11-14T14:00:00Z', runId: 'run-1', linked: true }]), 'run-1')
-  assert.equal(activityRunId('2026-11-14T15:30:00.000Z', agent, stretches), 'run-1')
-  assert.equal(activityRunId('2026-11-14T16:30:00.000Z', agent, stretches), 'run-3')
+  assert.equal(activityRunId('2026-11-14T13:00:00.000Z', { ...agent, id: 'agent-a' }, stretches), null)
+  assert.equal(activityRunId('2026-11-14T14:00:00.000Z', { ...agent, id: 'agent-a' }, [{ at: '2026-11-14T14:00:00Z', runId: 'run-1', agentId: 'agent-a', linked: true }]), 'run-1')
+  assert.equal(activityRunId('2026-11-14T15:30:00.000Z', { ...agent, id: 'agent-a' }, stretches), null)
+  assert.equal(activityRunId('2026-11-14T16:30:00.000Z', { ...agent, id: 'agent-a' }, stretches), 'run-3')
+  assert.equal(activityRunId('2026-11-14T16:30:00.000Z', { ...agent, id: 'agent-b' }, stretches), null)
+  assert.equal(activityRunId('2026-11-14T16:30:00.000Z', { ...agent, id: null }, stretches), null)
   assert.equal(activityRunId('2026-11-14T14:30:00.000Z', person, stretches), null)
+  assert.equal(activityRunId('2026-11-14T14:30:00.000Z', { ...agent, id: 'agent-a' }, [
+    { at: '2026-11-14T14:00:00Z', runId: 'run-1', agentId: 'agent-a', linked: true },
+    { at: '2026-11-14T14:00:00Z', runId: 'run-2', agentId: 'agent-a', linked: true },
+  ]), null)
   const title = taskHistoryPieces(event({ id: 's', at: 't', kind: 'subtask', title: 'Child', targetId: 'child' }), labels(en))
   assert.deepEqual(title, [
     { kind: 'text', text: 'added subtask ' },
