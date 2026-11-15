@@ -1,0 +1,380 @@
+{
+  "publicHead": "6717676486671cc827b134eccc1695e55fe05c72",
+  "publicTree": "924418a9b453ed387665a1bca96c4c11783fea6d",
+  "qaHead": "b89a2caa26046b9f1958c14106e11404b43a30c9",
+  "run": 43669282643,
+  "correctedAdditionalProbe": {
+    "qaHead": "84276b522f55f91540e2127043dabd7a81645865",
+    "run": 43669881645,
+    "change": "Load the auxiliary case through the same TypeScript/server-only machinery as the repository governance suite. Initial CommonJS resolver failed on its data URL before reaching any product database assertion."
+  },
+  "artifacts": [
+    {
+      "target": "governance",
+      "job": 132675488160,
+      "id": 14144175424,
+      "digest": "sha256:79970a1e5071cddd3b36c8a789a8dd735054596ff36d0b14f52a6badfcb17d1e",
+      "size": 2367,
+      "run": 43669282643,
+      "qaHead": "b89a2caa26046b9f1958c14106e11404b43a30c9"
+    },
+    {
+      "target": "workspace",
+      "job": 132675488348,
+      "id": 14143916604,
+      "digest": "sha256:d2f78286e792180138e1867c76fc38f32aa2b6d3f5f23651e66810435ee907d7",
+      "size": 2524,
+      "run": 43669282643,
+      "qaHead": "b89a2caa26046b9f1958c14106e11404b43a30c9"
+    },
+    {
+      "target": "accounts",
+      "job": 132675488350,
+      "id": 14143606806,
+      "digest": "sha256:6058fb6e61b8372550c046971390dbee427ed03a3c315b82b130aaa0b0a77bb2",
+      "size": 1484,
+      "run": 43669282643,
+      "qaHead": "b89a2caa26046b9f1958c14106e11404b43a30c9"
+    },
+    {
+      "target": "active-owner",
+      "job": 132677356642,
+      "id": 14143289101,
+      "digest": "sha256:3ddfd4d5b6a720ece6fd62876e4510d67d5b84aa6ca86901ca36dee9a3c3a9d3",
+      "size": 991,
+      "run": 43669881645,
+      "qaHead": "84276b522f55f91540e2127043dabd7a81645865"
+    }
+  ],
+  "testResults": {
+    "governance": {
+      "label": "governance",
+      "source": "6717676486671cc827b134eccc1695e55fe05c72",
+      "tree": "924418a9b453ed387665a1bca96c4c11783fea6d",
+      "pgVersion": "170012",
+      "started": "2026-11-15T02:51:57.989Z",
+      "ended": "2026-11-15T02:52:03.034Z",
+      "status": 0,
+      "signal": null,
+      "argv": [
+        "node",
+        "--experimental-test-module-mocks",
+        "--import",
+        "./scripts/server-test.mjs",
+        "--import",
+        "tsx",
+        "--test-force-exit",
+        "--test",
+        "lib/enterprise/governance.db.test.ts"
+      ],
+      "declaration": {
+        "mode": "built-in",
+        "environment": [],
+        "behavior": "Read retained archived organization names for currently active owners from the existing workspace database. The active directory remains separate and no additional service or credential is required.",
+        "test": "lib/enterprise/governance.db.test.ts",
+        "suite": "test:enterprise-db"
+      },
+      "counts": {
+        "tests": 16,
+        "pass": 16,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "named": [
+        "▶ Organization CRUD, resource approvals and audit export retain Workspace authorization boundaries",
+        "✔ Org roles cannot grant Workspace access or elevate other owners (58.636257ms)",
+        "✔ operator Enterprise grants serialize expected-plan changes and preserve historical seat metadata without payments (20.43323ms)",
+        "✔ a bound Workspace cannot acquire a dormant local grant behind its Organization plan (4.163532ms)",
+        "✔ the operator CLI previews, applies once and refuses bound Workspace grants without printing rejected input (1121.012258ms)",
+        "✔ identity configuration keeps its audit intent through Workspace-store failure and retries exactly once (176.84593ms)",
+        "✔ an expired Enterprise grant can close identity controls but cannot enable new enterprise authority (105.226611ms)",
+        "✔ an identity mutation retains Organization authorization until its Auth DB commit (29.09738ms)",
+        "✔ resource owners request explicit approval; an Org admin cannot bypass the Workspace source grant (297.705286ms)",
+        "✔ a member can request approval for their own installed Skill and an administrator can decide it (24.039906ms)",
+        "✔ removing Org membership suspends only its Workspaces and revokes scoped PATs without deleting identity (144.614167ms)",
+        "✔ audit exports enforce current Org admin authority, tenant binding, caps and integrity (79.385768ms)",
+        "✔ retention respects legal hold and live export leases, then records bounded deletion (32.315365ms)",
+        "✔ archive is owner-only, retains audit and leaves detached Workspace history intact (45.873504ms)",
+        "✔ the last Organization owner cannot start account cleanup or leave durable guards behind (472.335301ms)",
+        "✔ canonical split-store ownership survives concurrent account requests and cleans only the departing membership (732.22902ms)",
+        "✔ Organization CRUD, resource approvals and audit export retain Workspace authorization boundaries (4671.760696ms)",
+        "ℹ tests 16",
+        "ℹ pass 16",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0"
+      ]
+    },
+    "initial-qa-loader-error": {
+      "label": "active-owner",
+      "source": "6717676486671cc827b134eccc1695e55fe05c72",
+      "tree": "924418a9b453ed387665a1bca96c4c11783fea6d",
+      "pgVersion": "170012",
+      "started": "2026-11-15T02:52:03.035Z",
+      "ended": "2026-11-15T02:52:03.220Z",
+      "status": 1,
+      "signal": null,
+      "argv": [
+        "node",
+        "--experimental-test-module-mocks",
+        "--import",
+        "./scripts/server-test.mjs",
+        "--import",
+        "tsx",
+        "--test-force-exit",
+        "--test",
+        "qa-harness/evidence/2262/org-compat/archive-access.test.cjs"
+      ],
+      "declaration": {
+        "mode": "built-in",
+        "environment": [],
+        "behavior": "Read retained archived organization names for currently active owners from the existing workspace database. The active directory remains separate and no additional service or credential is required.",
+        "test": "lib/enterprise/governance.db.test.ts",
+        "suite": "test:enterprise-db"
+      },
+      "counts": {
+        "tests": 1,
+        "pass": 0,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "named": [
+        "✖ archived organization lookup rechecks active ownership after demotion, suspension and removal on the next read (11.289507ms)",
+        "ℹ tests 1",
+        "ℹ pass 0",
+        "ℹ fail 1",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "✖ failing tests:",
+        "✖ archived organization lookup rechecks active ownership after demotion, suspension and removal on the next read (11.289507ms)"
+      ]
+    },
+    "workspace-acl": {
+      "label": "workspace-acl",
+      "source": "6717676486671cc827b134eccc1695e55fe05c72",
+      "tree": "924418a9b453ed387665a1bca96c4c11783fea6d",
+      "pgVersion": "170012",
+      "started": "2026-11-15T02:55:08.873Z",
+      "ended": "2026-11-15T02:55:19.042Z",
+      "status": 0,
+      "signal": null,
+      "argv": [
+        "node",
+        "--experimental-test-module-mocks",
+        "--test-force-exit",
+        "--import",
+        "./scripts/server-test.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "tests/task-workspace-governance.db.test.ts"
+      ],
+      "declaration": {
+        "mode": "built-in",
+        "environment": [],
+        "behavior": "Read retained archived organization names for currently active owners from the existing workspace database. The active directory remains separate and no additional service or credential is required.",
+        "test": "lib/enterprise/governance.db.test.ts",
+        "suite": "test:enterprise-db"
+      },
+      "counts": {
+        "tests": 15,
+        "pass": 15,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "named": [
+        "▶ workspace ownership: real split-database migration, ACL, immutable provenance and membership races",
+        "✔ pending resources never inherit the creator personal workspace (105.894093ms)",
+        "✔ members can read a tenant task without a Team; selected/PAT tenant has no owner bypass (18.746574ms)",
+        "✔ direct task-only citations preserve the reader workspace pin without a run lookup (763.034966ms)",
+        "✔ lists, search and push targets use the tenant even for one account in both workspaces (23.671993ms)",
+        "✔ real Factory storage honors browser selection and token pin; denied routing creates no rows or events (1207.821224ms)",
+        "✔ tenant cannot be changed or cleared; run and artifact provenance must agree (79.432781ms)",
+        "✔ conversation envelopes use persisted mailbox tenancy; mismatched run or sender writes leave no message (53.508424ms)",
+        "✔ legacy and task-free leases require current persisted tenant membership with no creator bypass (184.468041ms)",
+        "✔ membership is pinned until the app commit and the next read observes suspension (13.986213ms)",
+        "✔ suspending an artifact issuer closes shared links but leaves other workspace access intact (25.0525ms)",
+        "✔ task-run aggregates exclude an interrupted migration's unbound run until its own tenant is proved (232.507427ms)",
+        "✔ migration locks workspace before relations and APP rows; changed task evidence stays unresolved until a fresh pass (110.687453ms)",
+        "✔ derived migration holds no APP row while waiting for workspace; changed computer authority is retried safely (70.958852ms)",
+        "✔ derived evidence is read from a fresh statement after waiting for the APP row lock (66.209111ms)",
+        "✔ workspace ownership: real split-database migration, ACL, immutable provenance and membership races (9774.811396ms)",
+        "ℹ tests 15",
+        "ℹ pass 15",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0"
+      ]
+    },
+    "run-share-lease": {
+      "label": "run-share-lease",
+      "source": "6717676486671cc827b134eccc1695e55fe05c72",
+      "tree": "924418a9b453ed387665a1bca96c4c11783fea6d",
+      "pgVersion": "170012",
+      "started": "2026-11-15T02:55:19.044Z",
+      "ended": "2026-11-15T02:55:21.444Z",
+      "status": 0,
+      "signal": null,
+      "argv": [
+        "node",
+        "--test-force-exit",
+        "--experimental-test-module-mocks",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "tests/run-share-lease.db.test.ts"
+      ],
+      "declaration": {
+        "mode": "built-in",
+        "environment": [],
+        "behavior": "Read retained archived organization names for currently active owners from the existing workspace database. The active directory remains separate and no additional service or credential is required.",
+        "test": "lib/enterprise/governance.db.test.ts",
+        "suite": "test:enterprise-db"
+      },
+      "counts": {
+        "tests": 5,
+        "pass": 5,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "named": [
+        "▶ device runs on a shared subscription",
+        "✔ a member's run is bound to a teammate's subscription only while it is shared for members (47.517365ms)",
+        "✔ the owner and, while shared for members, a member take the lease and read the credential; nobody else (259.819393ms)",
+        "✔ the run harness must pass its current self-test even when an old broker flag remains (19.125438ms)",
+        "✔ the admin switch, leaving the team, another workspace or a stop request refuse a member's lease (55.649816ms)",
+        "✔ device runs on a shared subscription (1393.710789ms)",
+        "ℹ tests 5",
+        "ℹ pass 5",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0"
+      ]
+    },
+    "test-account-leases": {
+      "label": "test-account-leases",
+      "source": "6717676486671cc827b134eccc1695e55fe05c72",
+      "tree": "924418a9b453ed387665a1bca96c4c11783fea6d",
+      "pgVersion": "170012",
+      "started": "2026-11-15T02:53:22.452Z",
+      "ended": "2026-11-15T02:53:26.847Z",
+      "status": 0,
+      "signal": null,
+      "argv": [
+        "pnpm",
+        "-s",
+        "test:test-accounts-db"
+      ],
+      "declaration": {
+        "mode": "built-in",
+        "environment": [],
+        "behavior": "Read retained archived organization names for currently active owners from the existing workspace database. The active directory remains separate and no additional service or credential is required.",
+        "test": "lib/enterprise/governance.db.test.ts",
+        "suite": "test:enterprise-db"
+      },
+      "counts": {
+        "tests": 17,
+        "pass": 17,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "named": [
+        "▶ native test cleanup fences the real lease, baseline and database graph",
+        "✔ cleanup requires real daemon drain and preserves both leased baseline and foreign rows (119.989742ms)",
+        "✔ a changed baseline refuses all deletion (58.249267ms)",
+        "✔ new cloud devices and foreign device bindings are never cleanup targets (80.997239ms)",
+        "✔ a cascade-linked runtime turn is detected before any graph rows are deleted (73.523011ms)",
+        "✔ ownership and expired-lease fences hold before cleanup writes (53.567144ms)",
+        "✔ native test cleanup fences the real lease, baseline and database graph (470.854321ms)",
+        "✔ inspect and cleanup-plan do not mutate pool, auth users, accounts or sessions (64.038847ms)",
+        "✔ wrong descriptor or actual PostgreSQL schema is rejected before pool writes (21.135729ms)",
+        "✔ lease deadlines use the PostgreSQL clock despite a skewed worker clock (24.088668ms)",
+        "✔ two independent processes competing for one pair produce exactly one exclusive lease (277.00791ms)",
+        "✔ acquire retries across processes are idempotent and reject a different holder (322.180216ms)",
+        "✔ distinct workers concurrently hold disjoint account slots (292.16445ms)",
+        "✔ holder, run and generation fencing reject renewal, release and reset from stale actors (61.603115ms)",
+        "✔ dirty and cancelled leases are quarantined; pool exhaustion terminates without provisioning fallback (24.555904ms)",
+        "✔ SIGKILL and TTL expiry quarantine an account pair until safety can be proved (178.53666ms)",
+        "✔ partial provisioning preserves reservation provenance and cannot return to the available pool (28.602851ms)",
+        "✔ a lease that expires while renewal waits for a real PostgreSQL lock cannot be extended (2044.498283ms)",
+        "ℹ tests 17",
+        "ℹ pass 17",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0"
+      ]
+    },
+    "active-owner": {
+      "label": "active-owner",
+      "source": "6717676486671cc827b134eccc1695e55fe05c72",
+      "tree": "924418a9b453ed387665a1bca96c4c11783fea6d",
+      "pgVersion": "170012",
+      "started": "2026-11-15T02:55:49.503Z",
+      "ended": "2026-11-15T02:55:50.903Z",
+      "status": 0,
+      "signal": null,
+      "argv": [
+        "node",
+        "--experimental-test-module-mocks",
+        "--import",
+        "./scripts/server-test.mjs",
+        "--import",
+        "tsx",
+        "--test-force-exit",
+        "--test",
+        "qa-harness/evidence/2262/org-compat-recovery/archive-access.test.ts"
+      ],
+      "declaration": {
+        "mode": "built-in",
+        "environment": [],
+        "behavior": "Read retained archived organization names for currently active owners from the existing workspace database. The active directory remains separate and no additional service or credential is required.",
+        "test": "lib/enterprise/governance.db.test.ts",
+        "suite": "test:enterprise-db"
+      },
+      "counts": {
+        "tests": 5,
+        "pass": 5,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "named": [
+        "▶ archived organization lookup rechecks active ownership after demotion, suspension and removal on the next read",
+        "✔ active owners read their own retained names across two independent organizations (7.543168ms)",
+        "✔ demoted former owner immediately loses the retained name (2.601564ms)",
+        "✔ suspended owner cannot read another owner’s archived organization (3.447428ms)",
+        "✔ removed membership grants no archived listing and does not alter the other tenant (18.882498ms)",
+        "✔ archived organization lookup rechecks active ownership after demotion, suspension and removal on the next read (1181.224004ms)",
+        "ℹ tests 5",
+        "ℹ pass 5",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0"
+      ]
+    }
+  },
+  "sourcePlan": {
+    "mergeParent": "9be0ca745eb894291bee53266d42462cd080ebf5",
+    "mergedOriginalSource": "46d2bd9d383214e19ec22d89fce54d6aa527375f",
+    "scope": "The original tracked lease and workspace DB files and targeted operational archived-list checks ran against the public E candidate on three different selected Linux runner PostgreSQL 17 service containers. The product reader was invoked after synthetic role/membership transitions. The actual package-defined node loaders/flags, auth/deployment marker and tracked migrations were used. UI/official paired builds, production and device behavior are separately scoped."
+  }
+}
