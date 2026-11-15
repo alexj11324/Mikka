@@ -2,9 +2,9 @@
 
 import { Fragment } from 'react'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 import { PersonAvatar } from '@/components/person-avatar'
+import { Button } from '@/components/ui/button'
 import { AgentSphere } from './issue-assignee-menu'
 import type { AgentActivityRow } from './issue-threads'
 import { activityLineParts, chronologicalActivity, type ActivityPiece, type ActivityStretch, type ActivitySubject, type IssueActivityEvent } from '@/lib/task-activity-timeline'
@@ -27,7 +27,7 @@ export function IssueActivityFeed({ versions, children, agents = [], task, stret
   const eventsFor = useActivityEvents(versions, children, { task, stretches })
   const items = eventsFor(agents)
   if (!items.length && !agents.length) return null
-  // R-63: one person's events in the same minute are one plain row, led by who did them.
+  // Capy gives each event its own row.
   const events = items.map(item => ({ id: item.id, at: item.at, node: <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
     <ActorMark actor={item.actor} />
     <ActivitySentence parts={item.parts} />
@@ -36,7 +36,7 @@ export function IssueActivityFeed({ versions, children, agents = [], task, stret
   return <>{chronologicalActivity([...events, ...agents]).map(row => <Fragment key={row.id}>{row.node}</Fragment>)}</>
 }
 
-/** One 活动 line: who (if known) once, then the clauses, and when (R-63: one person's events in the same minute are one line). */
+/** One 活动 line: who (if known) once, then the clauses, and when. */
 export type ActivityEventItem = {
   id: string
   at: string
@@ -53,6 +53,7 @@ export type ActivityEventItem = {
   status?: string
   priority?: string
   relation?: 'blockedBy' | 'related'
+  pullHref?: string
   pullAction?: 'linked' | 'unlinked' | 'merged'
 }
 
@@ -83,7 +84,7 @@ export function useActivityEvents(versions: ActivityVersion[], children: Activit
         ...event.kind === 'status' && event.status ? { status: event.status } : {},
         ...event.kind === 'priority' && event.priority ? { priority: event.priority } : {},
         ...event.kind === 'relation' && event.relation ? { relation: event.relation } : {},
-        ...event.kind === 'pull' && event.pull ? { pullAction: event.pull.action } : {},
+        ...event.kind === 'pull' && event.pull ? { pullAction: event.pull.action, pullHref: event.pull.href } : {},
       }]
     })
   }
@@ -95,15 +96,13 @@ function ActorMark({ actor }: { actor: ActivityActorView | null }) {
   return actor.type === 'agent' ? <AgentSphere name={actor.name} /> : <PersonAvatar name={actor.name} image={actor.avatarUrl} />
 }
 
-/** A chip in a sentence reads as words: no padding or height of its own. */
-const LINK = 'h-auto p-0 font-medium text-foreground'
-
 function ActivitySentence({ parts }: { parts: ActivityPiece[] }) {
   const t = useTranslations('IssueDetail.frame')
+  const chip = 'h-auto p-0 font-medium text-foreground hover:underline'
   return <span className="min-w-0">{parts.map((part, index) => {
-    if (part.kind === 'thread') return <Button key={`${part.runId}:${index}`} type="button" variant="link" size="xs" className={LINK} aria-label={t('openThread', { name: part.text })} onClick={() => openThread(part.runId)}>{part.text}</Button>
-    if (part.kind === 'task') return <Button key={`${part.taskId}:${index}`} type="button" variant="link" size="xs" className={LINK} onClick={() => openTask(part.taskId)}>{part.text}</Button>
+    if (part.kind === 'thread') return <Button key={`${part.runId}:${index}`} type="button" variant="bare" size="bare" className={chip} aria-label={t('openThread', { name: part.text })} onClick={() => openThread(part.runId)}>{part.text}</Button>
+    if (part.kind === 'task') return <Button key={`${part.taskId}:${index}`} type="button" variant="bare" size="bare" className={chip} onClick={() => openTask(part.taskId)}>{part.text}</Button>
     if (part.kind === 'pull') return <a key={`${part.href}:${index}`} className="font-medium text-foreground underline-offset-2 hover:underline" href={part.href} target="_blank" rel="noreferrer">{part.text}</a>
-    return <span key={index} className={cn(part.name ? 'font-medium text-foreground' : 'text-muted-foreground')}>{part.text}</span>
+    return <span key={index} className={cn(part.name && 'font-medium text-foreground', !part.name && 'text-muted-foreground')}>{part.text}</span>
   })}</span>
 }

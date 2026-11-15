@@ -4,7 +4,7 @@ import { escapeLiteral, type PoolClient, type QueryResult } from 'pg'
 export const THREAD_CREDENTIAL_SQL = "INSERT INTO device_tokens (id,\"userId\",name,\"tokenHash\",\"boundDeviceId\",\"boundWorkspaceId\",\"expiresAt\") VALUES ($1,$2,$3,$4,$5,$6,now()+interval '24 hours') RETURNING clock_timestamp() AS now"
 
 export const FINISH_THREAD_REGISTRATION = `UPDATE thread_machines m SET state='running',"lastActiveAt"=now(),"runningSince"=COALESCE(m."runningSince",now()),
-"workerLeaseId"=NULL,"workerLeaseUntil"=NULL,"lifecycleAt"=now(),
+"workerLeaseId"=NULL,"workerLeaseUntil"=NULL,"restoreStartedAt"=NULL,"lifecycleAt"=now(),
 lifecycle=m.lifecycle||jsonb_build_object('phase',CASE WHEN m.lifecycle->>'phase'='create_requested' THEN 'created' ELSE 'resumed' END,'owner','run-recovery','failures',0)
 FROM devices d JOIN device_tokens t ON t."boundDeviceId"=d.id,agent_runs r
 WHERE m."runId"=$1 AND m."workerLeaseId"=$2 AND m.state<>'ended'

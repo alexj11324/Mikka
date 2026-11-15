@@ -10,6 +10,10 @@ export const AVATAR_MAX_BYTES = 200 * 1024
 export const AVATAR_CONTENT_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const
 export type AvatarContentType = (typeof AVATAR_CONTENT_TYPES)[number]
 
+export function isAvatarContentType(value: string): value is AvatarContentType {
+  return (AVATAR_CONTENT_TYPES as readonly string[]).includes(value)
+}
+
 export const AVATAR_EXTENSIONS: Record<AvatarContentType, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }
 
 /** `/api/avatars/<userId>/<sha256>`: content-addressed, so a new picture is a new URL. */
@@ -38,7 +42,7 @@ export type AvatarCheck =
 
 /** Checks an uploaded file: one of the three image types (declared and actual agree) and at most 200 KB. */
 export function checkAvatarFile(declaredType: string, bytes: Uint8Array): AvatarCheck {
-  if (!(AVATAR_CONTENT_TYPES as readonly string[]).includes(declaredType)) return { ok: false, reason: 'type' }
+  if (!isAvatarContentType(declaredType)) return { ok: false, reason: 'type' }
   if (bytes.length === 0) return { ok: false, reason: 'type' }
   if (bytes.length > AVATAR_MAX_BYTES) return { ok: false, reason: 'size' }
   const actual = sniffAvatarType(bytes)

@@ -1085,6 +1085,9 @@
       "subtitle": "Updates and discussion",
       "threads": "{count, plural, =0 {No discussions} =1 {1 discussion} other {# discussions}}",
       "resolved": "Resolved",
+      "timelinePullOpened": "Opened {repo}#{number} {title}",
+      "timelinePullMerged": "Merged {repo}#{number} {title}",
+      "timelinePullFailed": "Could not load linked pull request activity. Retry",
       "anchorRemoved": "Original text removed",
       "reply": "Reply",
       "reopen": "Reopen",
@@ -1119,7 +1122,32 @@
       "merged": "Merged {pull} {title}",
       "unsupported": "This update needs a newer version of Mikka",
       "system": "Mikka",
-      "untitledThread": "Untitled thread"
+      "untitledThread": "Untitled thread",
+      "changedStatus": "moved it to {status}",
+      "changedStatusCode": "moved {code} to {status}",
+      "changedPriority": "set priority to {priority}",
+      "changedTitle": "renamed the task to {title}",
+      "unassignedNamed": "unassigned {name}",
+      "delegated": "handed it to {name}",
+      "undelegated": "stopped handing it over",
+      "undelegatedNamed": "stopped handing it to {name}",
+      "addedSubtaskCode": "added sub-issue {code}",
+      "addedLabel": "Added label {name}",
+      "removedLabel": "Removed label {name}",
+      "parentChanged": "changed the parent task",
+      "blockerAdded": "added a blocking task",
+      "blockerRemoved": "removed a blocking task",
+      "relatedAdded": "linked a related task",
+      "relatedRemoved": "unlinked a related task",
+      "dueDateChanged": "set the due date to {date}",
+      "dueDateRemoved": "removed the due date",
+      "projectChanged": "moved it to {name}",
+      "projectRemoved": "removed it from the project",
+      "estimateChanged": "set the estimate to {estimate}",
+      "estimateRemoved": "removed the estimate",
+      "descriptionChanged": "edited the description",
+      "unknownAssignee": "someone",
+      "separator": ", "
     },
     "detail": {
       "readFailed": "Could not load this task. Please try again.",
@@ -4473,6 +4501,7 @@
       "starting": "Starting",
       "running": "Running",
       "paused": "Sleeping",
+      "restore": "Restoring",
       "ended": "Stopped",
       "error": "Error"
     },
@@ -6072,7 +6101,7 @@
     "evidence": "Results and verification evidence",
     "artifact": "Artifact {number}",
     "approvalRequired": "Independent review and verification are recorded in Factory. Complete the required human acceptance in the task.",
-    "repositoryRemedy": "Select a repository you have authorized in Bot settings, then try again.",
+    "repositoryRemedy": "Select a repository you have authorized in the workspace settings, then try again.",
     "runtimeRemedy": "Connect your local Agent and keep it online, or configure an authorized cloud computer in runtime settings.",
     "toolRemedy": "Ask the Bot owner to enable task delegation in the existing Agent settings.",
     "authorizationRemedy": "Check your model, subscription or API key authorization and runtime settings, then try again. Other members’ personal credentials cannot be used.",
@@ -6086,6 +6115,24 @@
     "chatUnavailable": "This Bot uses its owner’s personal chat model settings, which this request cannot access. Use your own Bot or ask its owner to start this chat. Task delegation checks your own execution resources separately."
   },
   "RunErrors": {
+    "review_auth_required": {"default":"Sign in to review this task."},
+    "review_not_found": {"default":"This task review is unavailable."},
+    "not_owner_terminal": {"default":"Only the task owner can use this terminal."},
+    "review_machine_gone": {"default":"The task environment is no longer available."},
+    "review_binding_changed": {"default":"The task environment has changed. Open the review again."},
+    "review_checkout_unavailable": {"default":"This task has no available working directory."},
+    "review_preview_unavailable": {"default":"Preview is unavailable","configuration":"This environment does not support a secure preview","runtime":"The preview server is unavailable","protocol":"The preview response is invalid","scope_changed":"The task environment or authorization has changed","limit":"The preview has reached its usage limit"},
+    "terminal_unsupported": {"default":"This environment does not support the task terminal.","local_device":"Remote terminal access is not available on this local device.","runtime_version":"Update the task runtime to use its terminal."},
+    "terminal_already_controlled": {"default":"The Agent is still using this environment. End its work before opening the terminal."},
+    "terminal_binding_changed": {"default":"The terminal environment or authorization has changed."},
+    "terminal_ended": {"default":"This terminal session has ended."},
+    "terminal_input_too_large": {"default":"Terminal input exceeds 16 KiB."},
+    "terminal_invalid_request": {"default":"The terminal request is invalid."},
+    "terminal_request_conflict": {"default":"This input request ID was already used for different input."},
+    "terminal_input_uncertain": {"default":"Input delivery is uncertain. Check the terminal before sending it again."},
+    "terminal_limit": {"default":"The terminal has reached its usage limit."},
+    "terminal_unavailable": {"default":"The terminal is unavailable.","configuration":"Secure terminal access is not configured.","runtime":"The terminal runtime is unavailable.","protocol":"The terminal response is invalid.","installation":"The terminal runtime could not be prepared.","lease":"The terminal authorization has expired or changed."},
+    "terminal_control_unavailable": {"default":"Exclusive control of the task environment is unavailable.","fence_unavailable":"The task environment control lock is unavailable.","fence_lost":"The task environment control lock was lost."},
     "review_scope_denied": {
       "default": "You do not have access to review this task.",
       "sponsored_placement": "The hosted workspace is no longer available for reviewing this task."
@@ -6407,6 +6454,12 @@
     },
     "factory_spec_approval_required": {
       "default": "Review and approve the specification before implementation starts."
+    },
+    "factory_visual_evidence_required": {
+      "default": "Record the running application, test or API result, or rendered documentation before handing over this implementation."
+    },
+    "factory_public_evidence_required": {
+      "default": "Check the visual evidence contains no private data, mark it safe to share, and publish its links in the pull request before handoff."
     },
     "cloud_not_connected": {
       "default": "Mikka Cloud is not connected."

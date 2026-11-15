@@ -481,13 +481,40 @@ test("a done action's step goes on the recording timeline only while recording; 
   await b.captureRequest(token, { name: "start_screen_recording", arguments: { title: "Flow" } });
   await b.request(token, { name: "click", arguments: { x: 1, y: 2, step: "点击登录按钮" } });
   await tick();
-  assert.deepEqual(relayed.at(-1), { action: "step", label: "点击登录按钮", source: "action" });
+  assert.deepEqual(relayed.at(-1), { action: "step", label: "点击登录按钮", source: "action", durationMs: 0 });
   assert.deepEqual(executed.at(-1), { name: "click", arguments: { x: 1, y: 2 } }, "the driver gets the action, never the description");
   await b.captureRequest(token, { name: "stop_screen_recording", arguments: {} });
   const count = relayed.length;
   await b.request(token, { name: "scroll", arguments: { direction: "down", amount: 3, x: 1, y: 2, step: "After" } });
   await tick();
   assert.equal(relayed.length, count, "a stopped recording takes no more steps");
+});
+test('recording timings exclude human approval wait and finish before stop', async t => {
+  let clock = 1000, releaseStep, stopped = false;
+  const calls = [];
+  const saved = new Promise(resolve => { releaseStep = resolve; });
+  const b = await fixture(t, {
+    now: () => clock,
+    execute: async () => { clock += 750; return 'done'; },
+    capture: async (_runId, call) => {
+      calls.push(call);
+      if (call.action === 'start_recording') return { stopsAt: new Date(clock + 60_000).toISOString() };
+      if (call.action === 'step') { await saved; return { recorded: true }; }
+      if (call.action === 'stop_recording') stopped = true;
+      return {};
+    },
+  });
+  const { token } = b.spec('run', 'ask');
+  await b.captureRequest(token, { name: 'start_screen_recording', arguments: { title: 'Flow' } });
+  const action = b.request(token, { name: 'click', arguments: { x: 1, y: 2, step: 'Submit form' } });
+  const review = b.list()[0]; clock += 10_000;
+  await b.decide(review.id, review.digest, true); await action;
+  const stop = b.captureRequest(token, { name: 'stop_screen_recording', arguments: {} });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(stopped, false, 'stop waits for the pending action timing write');
+  assert.deepEqual(calls.find(call => call.action === 'step'), { action: 'step', label: 'Submit form', source: 'action', durationMs: 750 });
+  releaseStep(); await stop;
+  assert.equal(stopped, true);
 });
 test("under ask the Decisions API says which actions need the person; no answer executes, logged", async (t) => {
   const asked = [];

@@ -5,6 +5,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { isDeepStrictEqual } from 'node:util'
 import { CASES, fixtureTask, ORIGIN } from './run-observability.mjs'
+import { ACCEPTANCE_REPLAY_MARKER } from '../../lib/replay-readiness.ts'
 
 const REPORT = 'production-run-observability-report/browser-actor.receipt.json'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -152,6 +153,21 @@ export async function startObservabilityBrowser({ ready, env = process.env, sign
     gate(); pageIsOfficial()
     await run(ms => locator.click({ timeout: ms }))
   }
+  // These are the two checked-in UI contracts: the default controls and the
+  // hosted shell/create window. An absent or mixed surface is never a default.
+  async function controlFor(legacy, hosted, code = 'browser_selection_failed') {
+    await unique(legacy.or(hosted), code)
+    const legacyCount = await run(() => legacy.count()), hostedCount = await run(() => hosted.count())
+    check(legacyCount + hostedCount === 1, code)
+    return { control: hostedCount === 1 ? hosted : legacy, hosted: hostedCount === 1 }
+  }
+  async function pickHosted(control, label) {
+    await click(control, 'browser_selection_failed')
+    const menu = owned.page.getByRole('menu')
+    await unique(menu, 'browser_selection_failed')
+    await click(menu.getByRole('menuitemradio').filter({ has: owned.page.getByText(label, { exact: true }) }), 'browser_selection_failed')
+    await run(ms => menu.waitFor({ state: 'hidden', timeout: ms }))
+  }
   async function read(path, method = 'GET', cleanupUntil) {
     check(['/api/version', '/api/auth/get-session', '/api/workspace', '/api/workspace/switcher', '/api/auth/sign-out'].includes(path)
       && (method === 'GET' && path !== '/api/auth/sign-out' || method === 'POST' && path === '/api/auth/sign-out'), 'browser_configuration')
@@ -243,6 +259,12 @@ export async function startObservabilityBrowser({ ready, env = process.env, sign
     await allocate('browser', () => chromium.launch({ headless: true, timeout: Math.min(30_000, config.deadline - now()), env: launchEnv }))
     await allocate('context', () => owned.browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 900 } }))
     report.freshContext = true
+    // Only this owned context opts real automation into the official SDK filter.
+    await run(() => owned.context.addInitScript(({ marker, origin, deadline }) => {
+      if (window.top !== window || window.location.origin !== origin
+        || !/^\/mikka(?:\/|$)/.test(window.location.pathname) || Date.now() >= deadline) return
+      Object.defineProperty(window, marker, { value: deadline })
+    }, { marker: ACCEPTANCE_REPLAY_MARKER, origin: ORIGIN, deadline: config.deadline }))
     await allocate('page', () => owned.context.newPage())
     owned.page.on('pageerror', () => { report.pageErrorCount = Math.min(1_000_000, report.pageErrorCount + 1) })
     owned.page.on('request', request => {
@@ -298,16 +320,31 @@ export async function startObservabilityBrowser({ ready, env = process.env, sign
     check(matches.length === 1 && typeof matches[0].name === 'string' && matches[0].name.length > 0
       && choices.filter(value => value.name === matches[0].name).length === 1, 'browser_workspace_ambiguous')
     if (switcher.workspace?.id !== ready.workspaceId) {
-      await click(owned.page.getByRole('button', { name: 'Workspace menu', exact: true }))
-      const menu = owned.page.getByRole('menu', { name: 'Workspace menu', exact: true })
+      const workspaceControl = await controlFor(
+        owned.page.getByRole('button', { name: 'Workspace menu', exact: true }),
+        owned.page.locator('.ui-as-ws-menu > button[aria-haspopup="menu"]:visible'), 'browser_workspace_ambiguous')
+      // The hosted menu is flat. A label shared by another account is not an
+      // authorized selector even when it is unique within the current account.
+      if (workspaceControl.hosted) check(switcher.accounts.every(account => Array.isArray(account.choices))
+        && switcher.accounts.flatMap(account => account.choices).filter(value => value.name === matches[0].name).length === 1,
+      'browser_workspace_ambiguous')
+      await click(workspaceControl.control, 'browser_workspace_ambiguous')
+      const menu = workspaceControl.hosted ? owned.page.getByRole('menu')
+        : owned.page.getByRole('menu', { name: 'Workspace menu', exact: true })
       await unique(menu)
-      const group = menu.getByRole('group').filter({ has: owned.page.getByText(owners[0].email, { exact: true }) })
-      await unique(group, 'browser_workspace_ambiguous')
+      let workspaceChoice
+      if (workspaceControl.hosted) workspaceChoice = menu.getByRole('menuitemradio')
+        .filter({ has: owned.page.getByText(matches[0].name, { exact: true }) })
+      else {
+        const group = menu.getByRole('group').filter({ has: owned.page.getByText(owners[0].email, { exact: true }) })
+        await unique(group, 'browser_workspace_ambiguous')
+        workspaceChoice = group.getByRole('menuitem', { name: matches[0].name, exact: true })
+      }
       // The old page can already be HOME. Wait for the next actual document
       // navigation, not an immediately true URL or the menu's close animation.
       const moved = owned.page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: Math.min(30_000, config.deadline - now()) })
       void moved.catch(() => {})
-      await click(group.getByRole('menuitem', { name: matches[0].name, exact: true }), 'browser_workspace_ambiguous')
+      await click(workspaceChoice, 'browser_workspace_ambiguous')
       const navigation = await run(() => moved)
       check(navigation?.status() === 200 && [HOME, HOME + '/'].includes(navigation.url()), 'browser_workspace_failed')
       report.workspaceSelection = 'switched_ui'
@@ -324,30 +361,54 @@ export async function startObservabilityBrowser({ ready, env = process.env, sign
     report.stage = 'new_task'
     // The existing global-search quick action is available on the root page;
     // unlike a board-only button, it cannot inherit a project selection here.
-    await click(owned.page.getByRole('button', { name: 'Search everything', exact: true }))
+    const searchControl = await controlFor(
+      owned.page.getByRole('button', { name: 'Search everything', exact: true }),
+      owned.page.locator('button.ui-as-side__search[aria-haspopup="dialog"]:visible'))
+    await click(searchControl.control)
     const search = owned.page.getByRole('dialog', { name: 'Search everything', exact: true })
     await unique(search)
     await click(search.getByRole('option', { name: 'New task', exact: true }))
     await run(ms => search.waitFor({ state: 'hidden', timeout: ms }))
     const dialog = owned.page.getByRole('dialog', { name: 'New task', exact: true })
     await unique(dialog)
-    const bot = dialog.getByRole('combobox', { name: 'Bot to hand it to', exact: true })
+    const machineControl = await controlFor(
+      dialog.getByRole('combobox', { name: 'Machine', exact: true }),
+      dialog.getByRole('button', { name: /^Machine: .+$/ }))
+    const hostedTask = machineControl.hosted, machine = machineControl.control
+    check(await run(() => dialog.locator('.ui-kb-create').count()) === (hostedTask ? 1 : 0), 'browser_selection_failed')
+    const bot = hostedTask ? dialog.getByRole('button', { name: /^Bot to hand it to: .+$/ })
+      : dialog.getByRole('combobox', { name: 'Bot to hand it to', exact: true })
     const botCount = await run(() => bot.count())
     check(botCount <= 1, 'browser_selection_failed')
+    if (hostedTask) check(await run(() => dialog.locator('.ui-kb-create__row')
+      .filter({ has: owned.page.getByText('Hand to', { exact: true }) }).count()) === botCount, 'browser_selection_failed')
     if (botCount === 1) {
-      await click(bot)
-      await click(owned.page.getByRole('option', { name: 'Coordinator', exact: true }))
+      if (hostedTask) await pickHosted(bot, 'Coordinator')
+      else {
+        await click(bot)
+        await click(owned.page.getByRole('option', { name: 'Coordinator', exact: true }))
+      }
       await unique(bot.getByText('Coordinator', { exact: true }), 'browser_selection_failed')
     }
     report.coordinatorSelected = true
-    const machine = dialog.getByRole('combobox', { name: 'Machine', exact: true })
-    await click(machine)
-    await click(owned.page.getByRole('option').filter({ has: owned.page.getByText('Mikka Cloud', { exact: true }) }), 'browser_selection_failed')
+    if (hostedTask) await pickHosted(machine, 'Mikka Cloud')
+    else {
+      await click(machine)
+      await click(owned.page.getByRole('option').filter({ has: owned.page.getByText('Mikka Cloud', { exact: true }) }), 'browser_selection_failed')
+    }
     await unique(machine.getByText('Mikka Cloud', { exact: true }), 'browser_selection_failed')
     report.cloudDestinationSelected = true
-    const profile = dialog.getByRole('combobox', { name: 'Agent profile', exact: true })
-    await click(profile)
-    await click(owned.page.getByRole('option').filter({ has: owned.page.getByText(ready.marker, { exact: true }) }), 'browser_selection_failed')
+    let profile
+    if (hostedTask) {
+      const row = dialog.locator('.ui-kb-create__row').filter({ has: owned.page.getByText('Agent profile', { exact: true }) })
+      await unique(row, 'browser_selection_failed')
+      profile = row.getByRole('button')
+      await pickHosted(profile, ready.marker)
+    } else {
+      profile = dialog.getByRole('combobox', { name: 'Agent profile', exact: true })
+      await click(profile)
+      await click(owned.page.getByRole('option').filter({ has: owned.page.getByText(ready.marker, { exact: true }) }), 'browser_selection_failed')
+    }
     await unique(profile.getByText(ready.marker, { exact: true }), 'browser_selection_failed')
     report.profileMatched = true
     await run(ms => dialog.getByLabel('Task description', { exact: true }).fill(ready.input, { timeout: ms }))
@@ -360,8 +421,8 @@ export async function startObservabilityBrowser({ ready, env = process.env, sign
     report.versionBeforeSubmit = true
     check((await read('/api/workspace'))?.workspace?.id === ready.workspaceId, 'browser_workspace_failed')
     homeOnly()
-    if (await run(() => bot.count()) === 1) await unique(bot.getByText('Coordinator', { exact: true }), 'browser_selection_failed')
-    const submit = dialog.getByRole('button', { name: 'Create task', exact: true })
+    const submit = hostedTask ? dialog.getByRole('button', { name: /^Create task\s*⌘↵$/ })
+      : dialog.getByRole('button', { name: 'Create task', exact: true })
     await unique(submit)
     check(await run(() => submit.isEnabled()), 'browser_selection_failed')
     report.stage = 'replay'
@@ -382,6 +443,12 @@ export async function startObservabilityBrowser({ ready, env = process.env, sign
       throw refusal('browser_replay_unready')
     }
     report.stage = 'submit'
+    // A menu can close without applying a disabled choice. Recheck the exact
+    // values after Replay readiness, immediately before the one paid click.
+    check(await run(() => bot.count()) === botCount, 'browser_selection_failed')
+    if (botCount === 1) await unique(bot.getByText('Coordinator', { exact: true }), 'browser_selection_failed')
+    await unique(machine.getByText('Mikka Cloud', { exact: true }), 'browser_selection_failed')
+    await unique(profile.getByText(ready.marker, { exact: true }), 'browser_selection_failed')
     gate(); pageIsOfficial()
     report.submitClicks = 1; report.submissionOutcome = 'unknown'
     // Never retry, even if the click's result is unknown. The driver observes

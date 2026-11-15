@@ -68,9 +68,15 @@ jobs:
         run: |
           echo 'GITHUB_APP_ID=' >> "$GITHUB_ENV"
           echo 'GITHUB_APP_PRIVATE_KEY=' >> "$GITHUB_ENV"
+      - name: Check out the pinned private operations source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: alexj11324/mikka-cloud
+          ref: ${{ inputs.cloud_source_sha }}
+          token: ${{ steps.source-token.outputs.token }}
+          path: .mikka-cloud
+          persist-credentials: false
       - name: Qualify the pinned Cloud Services source
-        env:
-          MIKKA_CLOUD_READ_TOKEN: ${{ steps.source-token.outputs.token }}
         run: node scripts/cloudflare-cloud-ci.mjs build
       - name: Verify the Cloud Services qualification
         run: node scripts/cloudflare-cloud-ci.mjs verify

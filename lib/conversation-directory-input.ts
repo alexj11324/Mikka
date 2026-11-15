@@ -18,8 +18,8 @@ export const directoryInput = z.strictObject({
 export type DirectoryInput = z.input<typeof directoryInput>
 export type DirectoryState = Exclude<z.output<typeof directoryInput>['state'], 'all'>
 
-export function directoryConversationKey(row: { kind: 'run' | 'chat'; id: string }) {
-  return row.kind + ':' + row.id
+export function directoryConversationKey(row: { kind?: 'run' | 'chat'; id: string }) {
+  return (row.kind ?? 'run') + ':' + row.id
 }
 
 export type DirectoryTaskLink = { id: string; identifier: string | null; title: string }

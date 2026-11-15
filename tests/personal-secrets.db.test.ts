@@ -192,6 +192,7 @@ test('personal secrets', { skip: !dbUrl }, async t => {
       values ($1,$2,$3,$4,'running',now()+interval '10 minutes')`, [otherRunId, other, otherAgent, otherDevice])
     const window = { comment: 'https://github.com/alexj11324/Mikka/issues/1752#issuecomment-123',
       expiresAt: new Date(Date.now() + 20 * 60_000).toISOString() }
+    const readControl = { signal: t.signal, timeoutMs: 5000 }
     const verifier = await createOwnerIdleVerifier({ connectionString: dbUrl, ownerId: owner, email: `${owner}@example.invalid`,
       window, sourceCommit: 'a'.repeat(40), fixtureId: randomUUID() })
     try {
@@ -199,33 +200,35 @@ test('personal secrets', { skip: !dbUrl }, async t => {
       // workspace. The exact production driver must still refuse a write.
       for (const status of ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing']) {
         await pool.query('update agent_runs set status=$2 where id=$1', [oldRunId, status])
-        await assert.rejects(verifier.assertIdle([]), /canary_idle_unverified/)
+        await assert.rejects(verifier.assertIdle([], readControl), (error: unknown) =>
+          error instanceof Error && error.message === 'task_secrets_canary_idle_unverified' &&
+          error.cause instanceof Error && error.cause.message === 'task_secrets_owner_busy')
       }
-      const occupied = await verifier.assertIdle([oldRunId])
+      const occupied = await verifier.assertIdle([oldRunId], readControl)
       assert.equal(occupied.unfinishedCount, 1)
       assert.equal(occupied.ownedActiveCount, 1)
       assert.equal(occupied.ownedStopRequestedCount, 0)
       assert.equal(occupied.readOnly, true)
       assert.equal(occupied.atomicWithMutation, false)
       await pool.query('update agent_runs set status=\'stopped\' where id=$1', [oldRunId])
-      assert.equal((await verifier.assertIdle([])).unfinishedCount, 0, 'another owner does not block this owner window')
+      assert.equal((await verifier.assertIdle([], readControl)).unfinishedCount, 0, 'another owner does not block this owner window')
 
       const row = await personal.createUserSecret(owner, { name: 'CANARY_IDLE_ROTATION', kind: 'secret', value: VALUE }, {})
       const activeRunId = randomUUID()
       await pool.query(`insert into agent_runs (id,"userId","agentId","botId","deviceId",status,"leaseExpiresAt")
         values ($1,$2,$3,$4,$5,'running',now()+interval '10 minutes')`, [activeRunId, owner, agentId, firstBot, deviceId])
       const requestedAt = new Date().toISOString()
-      await assert.rejects(verifier.assertRevoked(activeRunId, requestedAt), /canary_revocation/)
+      await assert.rejects(verifier.assertRevoked(activeRunId, requestedAt, readControl), /canary_revocation/)
       await personal.replaceUserSecret(owner, { id: row.id, value: VALUE + '-rotated' })
-      assert.equal((await verifier.assertIdle([activeRunId])).ownedStopRequestedCount, 1)
-      await assert.rejects(verifier.assertRevoked(activeRunId, requestedAt), /canary_revocation/,
+      assert.equal((await verifier.assertIdle([activeRunId], readControl)).ownedStopRequestedCount, 1)
+      await assert.rejects(verifier.assertRevoked(activeRunId, requestedAt, readControl), /canary_revocation/,
         'an expired lease without terminal acknowledgement is incomplete evidence')
       // The actual store has set stopRequestedAt and expired the lease. This
       // isolated fixture supplies the daemon terminal acknowledgement only.
       await pool.query('update agent_runs set status=\'stopped\' where id=$1', [activeRunId])
-      const revoked = await verifier.assertRevoked(activeRunId, requestedAt)
+      const revoked = await verifier.assertRevoked(activeRunId, requestedAt, readControl)
       assert.equal(revoked.status, 'stopped'); assert.equal(revoked.leaseExpired, true)
-      assert.equal((await verifier.assertIdle([])).unfinishedCount, 0)
+      assert.equal((await verifier.assertIdle([], readControl)).unfinishedCount, 0)
       assert.equal((await pool.query('select "stopRequestedAt" from agent_runs where id=$1', [otherRunId])).rows[0].stopRequestedAt, null)
       await personal.deleteUserSecret(owner, { id: row.id })
       assert.equal((await personal.listUserSecrets(owner)).some(secret => secret.id === row.id), false)
@@ -234,7 +237,7 @@ test('personal secrets', { skip: !dbUrl }, async t => {
 
     const mismatched = await createOwnerIdleVerifier({ connectionString: dbUrl, ownerId: owner, email: 'wrong-owner@example.invalid',
       window, sourceCommit: 'a'.repeat(40), fixtureId: randomUUID() })
-    try { await assert.rejects(mismatched.assertIdle([]), /canary_idle_unverified/) }
+    try { await assert.rejects(mismatched.assertIdle([], readControl), /canary_idle_unverified/) }
     finally { await mismatched.close() }
   })
 })

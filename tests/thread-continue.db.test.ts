@@ -12,6 +12,7 @@ import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { connectGitHub, githubAppStub } from './support/github-app-stub'
 import { isolateCoordinatorWakes } from './support/coordinator-wake'
+import { addFactoryVisualEvidence } from './helpers/factory-visual-evidence'
 
 // The computer's Codex reported gpt-5, the model the person's ChatGPT account lists (decision 2026-11-02-1400).
 const mac = [{ harness: 'codex', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'gpt-5', model: 'gpt-5', name: 'gpt-5' }] }]
@@ -86,6 +87,15 @@ test('a message to an ended thread runs it again in the same thread; only its ow
   t.beforeEach(async () => {
     await pool.query(`UPDATE byos_connections SET quota=jsonb_set(quota, '{observedAt}', to_jsonb(now()::text)) WHERE "ownerId"=ANY($1)`, [users])
   })
+
+  async function observeFixtureAllowance(account: { id: string; connection: string }) {
+    const result = await pool.query(
+      `UPDATE byos_connections SET quota=jsonb_set(quota,'{observedAt}',to_jsonb($3::text))
+       WHERE id=$1 AND "ownerId"=$2 AND state='connected'`,
+      [account.connection, account.id, new Date().toISOString()],
+    )
+    assert.equal(result.rowCount, 1)
+  }
 
   const a = await person()
   const first = await steps.dispatchRun(a.id, { issueId: a.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, a.botId) as unknown as { runId: string; thread: string }
@@ -360,6 +370,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       await assert.rejects(sendThreadMessage(b.id, initial.runId, 'Changed answer.', human, requestId), { code: 'submissionConflict' })
       await assert.rejects(sendThreadMessage(a.id, initial.runId, text, human, requestId), { code: 'runNotFound' })
       await pool.query('UPDATE thread_machines SET "workerLeaseUntil"=NULL WHERE "runId"=$1', [initial.runId])
+      await observeFixtureAllowance(b)
       const retried = await Promise.all(Array.from({ length: 3 }, () => sendThreadMessage(b.id, initial.runId, text, human, requestId)))
       const accepted = retried[0]
       for (const result of retried) assert.deepEqual(result, accepted)
@@ -469,10 +480,12 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       current = (await runtime.store.apply(b.id, factoryBinding(current), randomUUID(), { action: 'candidate', runId: next.id,
         candidate: { kind: 'deliverable', sha: null, repository: worktree, environment: `device:${childDevice}`, scope: 'Question artifact' } })).task
       const candidate = { id: current.candidateId!, executionSha: head, producerExecution: { runId: next.id, sessionId: nativeSessionId } }
+      await addFactoryVisualEvidence(pool, next.id)
       current = (await runtime.store.apply(b.id, factoryBinding(current), randomUUID(), { action: 'finish', status: 'passed',
         reason: 'Synthetic producer submitted its artifact', output: { runId: next.id },
         evidence: [{ artifact: `run-report:${next.id}`, kind: 'report', runId: next.id, sessionId: nativeSessionId,
           candidateId: candidate.id, sha: null, environment: `device:${childDevice}`, recordedAt: new Date().toISOString() }] })).task
+      assert.equal(current.status, 'passed', 'the submitted producer already has ready same-run visual evidence')
       const producerAttemptId = current.attemptId
       current = (await runtime.store.apply(b.id, factoryBinding(current), randomUUID(), {
         action: 'advance', stage: 'review', reason: 'Independent review remains required' })).task
@@ -691,6 +704,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
   })
 
   await t.test('repeated owner text is a fresh request after an intervening target', async () => {
+    await observeFixtureAllowance(a)
     const epochs: string[] = [];
     for (const text of ['Use exactly 74 bytes.', 'Use exactly 77 bytes.', 'Use exactly 74 bytes.']) {
       await sendThreadMessage(a.id, first.runId, text);
@@ -705,6 +719,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     // executor. End the current run, while keeping the original thread URL.
     let last = (await readRunChain(pool, a.id, first.runId))!.latestRunId
     for (const status of ['succeeded', 'failed', 'stopped', 'cancelled']) {
+      await observeFixtureAllowance(a)
       await end(last, status)
       const text = `Go on after ${status}.`
       // Sent from the thread as it was opened: the first run's id, never the newest.
@@ -1017,7 +1032,13 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     assert.equal(repairQueues, 1, 'same automatic repair/source replay does not queue another execute')
     const repaired = (await pool.query('SELECT t."sourceEventId",r.prompt FROM factory_tasks t JOIN agent_runs r ON r.id=$2 WHERE t.id=$1', [task.id, repairId])).rows[0]
     assert.equal(repaired.sourceEventId, event.id)
-    assert.ok(repaired.prompt.startsWith('Current owner request for this Factory task:'))
+    const validationEnd = repaired.prompt.indexOf('\n\n')
+    const validationBrief = repaired.prompt.slice(0, validationEnd)
+    assert.match(validationBrief, /^Factory implementation owns validation\./)
+    assert.match(validationBrief, /Every implementation must produce at least one ready visual capture, video by default\./)
+    assert.match(validationBrief, /Text logs, a report, and an unverified label never replace visual evidence\./)
+    assert.ok(repaired.prompt.slice(validationEnd + 2).startsWith('Current owner request for this Factory task:'),
+      'the current owner request immediately follows required visual validation guidance')
     assert.ok(repaired.prompt.indexOf(request) < repaired.prompt.indexOf('Historical issue:'))
     await pool.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [repairId, sent.runId])
     await end(repairId, 'failed')
