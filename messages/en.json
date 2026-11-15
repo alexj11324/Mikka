@@ -1225,6 +1225,8 @@
     "scheduleNotActive": "The automation is paused or finished. Resume it to run it.",
     "scheduleConcurrencyLimit": "It's already running as many times as allowed. Please wait for a run to finish.",
     "scheduleDailyRunLimit": "It has already run as many times as allowed today.",
+    "scheduleStandingTaskUnavailable": "The task it adds to no longer exists.",
+    "scheduleStandingTaskNotStarted": "The task it adds to hasn't started yet. It will try again shortly.",
     "scheduleRunConflict": "The run didn't start. Please try again.",
     "scheduleTimeMustBeFuture": "The start time must be in the future.",
     "invalidIanaTimezone": "The time zone is invalid.",
@@ -7890,6 +7892,9 @@
       "dispatch_task": "Hand to a Bot"
     },
     "editor": {
+      "eachRun": "Each run",
+      "eachRunNew": "Makes a new task",
+      "eachRunSame": "Adds to the same task",
       "perDay": "At most per day",
       "unlimited": "No limit",
       "autoPaused": "Paused automatically: {reason}",
@@ -7988,6 +7993,7 @@
       "cancelled": "Cancelled"
     },
     "runErrors": {
+      "scheduleStandingTaskNotStarted": "The task hasn't started yet; will retry",
       "dailyRunLimit": "Daily run limit reached; skipped",
       "runWhenNotMet": "Condition not met; skipped",
       "scheduleRunWhenUnavailable": "Couldn't check the condition; will retry",

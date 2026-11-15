@@ -35,6 +35,8 @@ export type AutomationDraft = {
   concurrent: number
   /** 0 is 不限. */
   perDay: number
+  /** 每次运行: a new task, or added to the first run's task. */
+  eachRun: 'new_task' | 'same_task'
   /** 满足任一条件就运行: GitHub event triggers beside the timing. */
   github: GitHubTriggerDraft[]
   /** A chat-made automation's own task (reminder, snapshot, read): kept as it is. */
@@ -63,7 +65,7 @@ export function emptyDraft(timezone: string, now = new Date()): AutomationDraft 
     title: '', botId: null, machine: 'auto', profileId: 'auto', timezone,
     scheduleOn: true, scheduleKind: 'daily', onceAt: wallTime(soon, timezone), intervalStart: wallTime(soon, timezone),
     intervalValue: 1, intervalUnit: 'hours', dailyTime: '09:00', fold: null, cron: '0 9 * * 1-5',
-    prompt: '', taskTitle: '', misfire: 'skip', lateness: 30, concurrent: 1, perDay: 0, github: [], otherTask: null,
+    prompt: '', taskTitle: '', misfire: 'skip', lateness: 30, concurrent: 1, perDay: 0, eachRun: 'new_task', github: [], otherTask: null,
   }
 }
 
@@ -90,7 +92,7 @@ export function draftFrom(definition: Definition, now = new Date()): AutomationD
     cron: timing.kind === 'cron' ? timing.expression : draft.cron,
     prompt: task.kind === 'dispatch_task' ? task.prompt : '',
     taskTitle: task.kind === 'dispatch_task' ? task.title ?? '' : '',
-    misfire: definition.misfire, lateness: definition.maxLatenessMinutes, concurrent: definition.maxConcurrent ?? 1, perDay: definition.maxRunsPerDay ?? 0,
+    misfire: definition.misfire, lateness: definition.maxLatenessMinutes, concurrent: definition.maxConcurrent ?? 1, perDay: definition.maxRunsPerDay ?? 0, eachRun: definition.eachRun ?? 'new_task',
     github: (definition.events ?? []).map(trigger => ({ event: trigger.event, repositories: [...trigger.repositories],
       branches: (trigger.branches ?? []).join(', '), labels: (trigger.labels ?? []).join(', '), runWhen: trigger.runWhen ?? '' })),
     otherTask: task.kind === 'dispatch_task' ? null : task,
@@ -152,7 +154,7 @@ export function definitionFrom(draft: AutomationDraft, now = new Date()): { defi
     ...(draft.profileId !== 'auto' ? { profileId: draft.profileId } : {}),
   }
   const events = draft.otherTask ? [] : draft.github.map(eventTrigger)
-  return { definition: { title, timezone: draft.timezone, timing, task, misfire: draft.misfire, maxLatenessMinutes: Math.round(draft.lateness), maxConcurrent: Math.round(draft.concurrent), ...(draft.perDay > 0 ? { maxRunsPerDay: Math.round(draft.perDay) } : {}), ...(events.length ? { events } : {}) } }
+  return { definition: { title, timezone: draft.timezone, timing, task, misfire: draft.misfire, maxLatenessMinutes: Math.round(draft.lateness), maxConcurrent: Math.round(draft.concurrent), ...(draft.perDay > 0 ? { maxRunsPerDay: Math.round(draft.perDay) } : {}), ...(!draft.otherTask && draft.eachRun === 'same_task' ? { eachRun: 'same_task' as const } : {}), ...(events.length ? { events } : {}) } }
 }
 
 /** 5-field cron forms the list can name: every day, weekdays, one weekday, one day of the month. Anything else shows the expression. */

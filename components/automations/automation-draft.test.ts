@@ -88,3 +88,12 @@ test('每天最多运行: 0 is no limit and leaves the key out; a number round-t
   assert.equal(capped.definition.maxRunsPerDay, 10)
   assert.equal(draftFrom(capped.definition, now).perDay, 10)
 })
+
+test('每次运行: 追加到同一个任务 round-trips; 新建任务 leaves the key out', () => {
+  const single = definitionFrom(filled({ scheduleOn: false, eachRun: 'same_task' }), now)
+  assert.ok('definition' in single)
+  assert.equal(single.definition.eachRun, 'same_task')
+  assert.equal(draftFrom(single.definition, now).eachRun, 'same_task')
+  const fresh = definitionFrom(filled({ scheduleOn: false }), now)
+  assert.ok('definition' in fresh && !('eachRun' in fresh.definition))
+})

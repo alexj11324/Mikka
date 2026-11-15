@@ -49,11 +49,27 @@ export const automationSeams:AutomationSeams={
     }
   },
   /** The creator's 创建并派发, keyed by the occurrence: a retried run finds the same request and the same task. */
-  async dispatch({ownerId,workspaceId,scheduleId,occurrenceId,task,event}){
+  async dispatch({ownerId,workspaceId,scheduleId,occurrenceId,task,event,single}){
     const botId=await dispatchBot(ownerId,workspaceId,task)
     const [{db},{recordPersonalSubmission},{createIssueFromRequest}]=await Promise.all([import('@/lib/db'),import('@/lib/coordinator-submission'),import('@/lib/coordinator/issue-create')])
     // An event-started run carries the event after the creator's request, marked as GitHub's data.
     const text=event?`${task.prompt}\n\n${event}`:task.prompt
+    // 追加到同一个任务: after the first run made the task, a run is a follow-up in that task's thread, as the creator
+    // would type it there. The occurrence ID is the request ID, so a retried run sends it once.
+    if(single){
+      const standing=(await pool.query<{id:string}>(`SELECT result->>'id' id FROM schedule_occurrences WHERE schedule_id=$1 AND id<>$2 AND status='succeeded' AND result ? 'eventId' ORDER BY created_at LIMIT 1`,[scheduleId,occurrenceId])).rows[0]
+      if(standing){
+        const issue=(await pool.query<{title:string;status:string;identifier:string|null}>(`SELECT i.title,i.status,r.identifier FROM issues i LEFT JOIN task_creation_receipts r ON r."taskId"=i.id AND r."userId"=$2
+          WHERE i.id=$1 AND i."workspaceId"=$3`,[standing.id,ownerId,workspaceId])).rows[0]
+        if(!issue)throw new ScheduleError('scheduleStandingTaskUnavailable',403)
+        const run=(await pool.query<{id:string}>(`SELECT id FROM agent_runs WHERE "issueId"=$1 AND "userId"=$2 ORDER BY "createdAt" DESC LIMIT 1`,[standing.id,ownerId])).rows[0]
+        // The Bot has not started the task yet: retried shortly, never a second task.
+        if(!run)throw new ScheduleError('scheduleStandingTaskNotStarted',503)
+        const {sendThreadMessage}=await import('@/lib/thread-continue')
+        const sent=await sendThreadMessage(ownerId,run.id,text,'user',occurrenceId)
+        return {id:standing.id,title:issue.title,status:issue.status,identifier:issue.identifier,runId:sent.runId,continued:true as const}
+      }
+    }
     const {eventId}=await recordPersonalSubmission(db,ownerId,text,{botId,submissionId:occurrenceId,
       taskCommand:{version:1,intent:'create_and_dispatch',description:text},schedule:{scheduleId,occurrenceId,...(event?{event:true as const}:{})},
       ...(task.title?{taskTitle:task.title}:{}),...(task.destination?{taskDestination:task.destination}:{}),...(task.profileId?{profileId:task.profileId}:{})})

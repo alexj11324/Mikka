@@ -1225,6 +1225,8 @@
     "scheduleNotActive": "自动化已暂停或已结束，恢复后才能运行。",
     "scheduleConcurrencyLimit": "已达到同时运行的上限，请等当前运行结束。",
     "scheduleDailyRunLimit": "今天的运行次数已经到上限了。",
+    "scheduleStandingTaskUnavailable": "追加的那个任务已经不在了。",
+    "scheduleStandingTaskNotStarted": "追加的那个任务还没开始，稍后再试。",
     "scheduleRunConflict": "运行未开始，请重试。",
     "scheduleTimeMustBeFuture": "开始时间必须晚于现在。",
     "invalidIanaTimezone": "时区无效。",
@@ -7890,6 +7892,9 @@
       "dispatch_task": "交给 Bot"
     },
     "editor": {
+      "eachRun": "每次运行",
+      "eachRunNew": "新建任务",
+      "eachRunSame": "追加到同一个任务",
       "perDay": "每天最多运行",
       "unlimited": "不限",
       "autoPaused": "已自动暂停：{reason}",
@@ -7988,6 +7993,7 @@
       "cancelled": "已取消"
     },
     "runErrors": {
+      "scheduleStandingTaskNotStarted": "追加的任务还没开始，稍后重试",
       "dailyRunLimit": "今天的运行次数已到上限，已跳过",
       "runWhenNotMet": "不满足运行条件，已跳过",
       "scheduleRunWhenUnavailable": "暂时无法判断运行条件，稍后重试",
