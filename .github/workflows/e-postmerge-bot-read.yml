@@ -28,8 +28,8 @@ jobs:
       matrix:
         include:
           - label: bot-children-2276
-            source: e52a959ea214f33e95ed724fc440fafe5fe59cc7
-            tree: b5dbe97e36949bb61116c2315eaebe40afe70453
+            source: 69f071e0b39bad61cb617f495e04e7328cdd749e
+            tree: d3fb07e89811cdeddb1754d46df549b5e84fc632
     if: github.repository == 'alexj11324/Mikka'
     runs-on: ubuntu-22.04
     timeout-minutes: 24
@@ -100,7 +100,7 @@ jobs:
           date -u +%FT%TZ > "$dir/start"
           git rev-parse HEAD > "$dir/source"
           git rev-parse 'HEAD^{tree}' > "$dir/tree"
-          files=(tests/conversation-title.db.test.ts lib/live/chat-preferences.db.test.ts tests/settings-preferences.db.test.ts components/workspace/conversation-directory-archive.test.tsx components/nav/bot-work-tree.test.ts)
+          files=(tests/thread-title.db.test.ts lib/live/chat-preferences.db.test.ts tests/settings-preferences.db.test.ts components/workspace/conversation-directory-archive.test.tsx components/nav/bot-work-tree.test.ts)
           native=apps/mobile/tests/conversation-directory-read.test.mts
           printf '%s\n' "${files[@]}" "$native" > "$dir/inputs"
           set +e
