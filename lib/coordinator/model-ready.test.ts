@@ -12,6 +12,8 @@ let fallback: { key: UsableApiKey; model: string } | null = null
 const scopes: Array<{ ownerId: string; workspaceId: string }> = []
 mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { pool: { query: async (sql: string, args: unknown[]) => {
   assert.match(sql, /^SELECT /, 'readiness never writes a default or clones a binding')
+  // No Mikka Cloud connection: this community server has no model of its own to fall back to.
+  if (sql.includes('FROM cloud_service_bindings')) return { rows: [] }
   if (sql.includes("to_jsonb(u)->>'hostedModelEnabled'")) {
     assert.deepEqual(args, ['alice'])
     return { rows: [{ enabled: true }] }

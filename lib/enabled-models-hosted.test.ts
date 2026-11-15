@@ -4,7 +4,7 @@ import type { Pool } from 'pg'
 import { FEATURED_MODELS } from './model-catalog'
 let kind = 'self-hosted', targetReads = 0
 mock.module(new URL('./default-model.ts', import.meta.url).href, { namedExports: {
-  defaultModelTarget: async () => { targetReads++; return { kind, serviceUrl: 'https://cloud.example.invalid' } },
+  defaultModelTarget: async () => { targetReads++; return kind === 'none' ? null : { kind, serviceUrl: 'https://cloud.example.invalid' } },
 } })
 
 import type { BotSubscriptionChoice } from './bot-model-choice'
@@ -163,8 +163,15 @@ test('no choice and nothing to fill in is no model, never a silent Mikka 额度 
   assert.deepEqual(await choose(f), { kind: 'none', chosen: false })
   assert.equal(f.calls.filter(call => call === 'hosted').length, 0)
   process.env.MIKKA_EDITION = 'community'
-  try { assert.deepEqual(await choose(fixture('alice', [true])), { kind: 'none', chosen: false }) }
-  finally { process.env.MIKKA_EDITION = 'cloud' }
+  const configured = kind
+  try {
+    // A self-hosted server offers only its administrator's model: with nothing to choose, a chat uses it.
+    const { COORDINATOR_MODEL } = await import('./coordinator/model')
+    assert.deepEqual(await choose(fixture('alice', [true])), { kind: 'hosted', model: COORDINATOR_MODEL, chosen: false })
+    // A server with no model of its own still has no model to run.
+    kind = 'none'
+    assert.deepEqual(await choose(fixture('alice', [true])), { kind: 'none', chosen: false })
+  } finally { process.env.MIKKA_EDITION = 'cloud'; kind = configured }
 })
 
 test('actual hosted policy failure on a Mikka 额度 pick propagates and the next invocation can recover', async () => {

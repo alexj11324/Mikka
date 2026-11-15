@@ -149,5 +149,12 @@ export async function resolveBotModelChoice(
     const nextBinding = await settings.chatBinding(scope, next.bindingId)
     if (nextBinding) return { kind: 'subscription', binding: nextBinding, chosen: false, fallback: 'preference' }
   }
+  // A self-hosted server offers exactly the one model its administrator
+  // configured: there is nothing to choose, so a chat with no choice uses it.
+  // Mikka Cloud keeps no silent default (decision 2026-11-15-1900).
+  if (!isCloudEdition()) {
+    const offered = await (await import('./credits-models')).creditsModels(scope.ownerId)
+    if (offered.length === 1 && await hostedAllowed()) return hosted(state, offered[0].id)
+  }
   return { kind: 'none', ...state }
 }
