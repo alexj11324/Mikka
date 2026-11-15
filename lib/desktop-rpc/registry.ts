@@ -108,6 +108,7 @@ const functions = {
   'bots.createBot': actions6.createBot,
   'bots.updateBot': actions6.updateBot,
   'bots.listWorkspaceBots': actions6.listWorkspaceBots,
+  'bots.getWorkspaceBotDefaults': actions6.getWorkspaceBotDefaults,
   'bots.listBotsForWorkspace': actions6.listBotsForWorkspace,
   'collaboration.exchangeDocument': actions7.exchangeDocument,
   'collaboration.listMembers': actions7.listMembers,
