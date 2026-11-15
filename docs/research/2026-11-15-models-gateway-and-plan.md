@@ -206,10 +206,10 @@ Mikka 的 Cloudflare 编程机器（Cloudflare Containers：内存 $0.009/GiB·�
 
 编程 Agent 大部分时间在等模型回复，CPU 不高，跑构建和测试时才满。所以按 Capy 的「每 GB 每小时 $0.025」定价：standard-1 卖 $0.10、standard-3 卖 $0.20、standard-4 卖 $0.30，CPU 正常时毛利约 40–50%，只有 standard-4 长时间跑满 CPU 时会亏（成本 $0.40，卖 $0.30）。
 
-## 5b. 待定
+## 5b. 已定（Alex，2026-11-15）
 
-1. 机器怎么定价：按 Capy 的每 GB 每小时 $0.025（同配置同价，方便对比），还是 standard-4 也卖 $0.40（不亏，但比 Capy 少 4 GB 内存）。
-2. 默认哪一档：Capy 默认 Large（4 vCPU / 16 GB）；我们现在是 standard-1。
+1. 机器按 Capy 的规则定价：每 GB 内存每小时 $0.025。standard-1 $0.10、standard-2 $0.15、standard-3 $0.20、standard-4 $0.30。
+2. 默认机器从 standard-1 换成 standard-3（2 vCPU / 8 GiB）。
 
 ## 6. 分几步做
 
