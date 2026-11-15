@@ -29,7 +29,7 @@ const { TextSelection } = await import('@tiptap/pm/state')
 const Y = await import('yjs')
 const { Collaboration } = await import('@tiptap/extension-collaboration')
 const { createEditorExtensions, createDocumentSeed } = await import('../components/workspace/issue-editor.tsx')
-const { bindThreadRepaint, createThreadStore } = await import('../components/blocks/rich-text-editor-4/components/rich-text-comments.ts')
+const { addThread, bindThreadRepaint, createThreadStore, replyToThread } = await import('../components/blocks/rich-text-editor-4/components/rich-text-comments.ts')
 const { nextSyncSnapshot } = await import('../lib/document-sync-snapshot.ts')
 
 function settle() {
@@ -175,4 +175,27 @@ test('splitting and joining paragraphs does not loop through the live Yjs editor
     seeded.doc.off('update', onUpdate)
     seeded.destroy()
   }
+})
+
+
+test('replies to an older Factory stage keep its actual message anchor across Yjs reload and retries', () => {
+  const doc = new Y.Doc()
+  const reloaded = new Y.Doc()
+  const at = '2026-11-15T00:00:00Z'
+  try {
+    addThread(doc, { id: 'factory', author: 'Bot', createdAt: at, messages: [
+      { id: 'review', author: 'Bot', at, body: 'Review' }, { id: 'accepted', author: 'Bot', at, body: 'Accepted' },
+    ] })
+    const reply = { id: 'reply', replyToMessageId: 'review', author: 'Alex', at, body: 'A question about review' }
+    assert.equal(replyToThread(doc, 'factory', { ...reply, replyToMessageId: 'unknown' }), false)
+    assert.equal(replyToThread(doc, 'factory', reply), true)
+    assert.equal(replyToThread(doc, 'factory', reply), true)
+    Y.applyUpdate(reloaded, Y.encodeStateAsUpdate(doc))
+    const store = createThreadStore(reloaded)
+    try {
+      const { messages } = store.getSnapshot().factory
+      assert.equal(messages.length, 3)
+      assert.deepEqual(messages[2], reply)
+    } finally { store.destroy() }
+  } finally { doc.destroy(); reloaded.destroy() }
 })

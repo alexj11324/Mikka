@@ -321,7 +321,7 @@ test('Task presentation batches keep current tenant authority and one Factory pr
       assert.equal((await batch([legacy])).items[legacy].pullRequests, undefined)
     })
 
-    await t.test('Task Activity filters only recorded stage messages from authorized documents on Web and mobile', async () => {
+    await t.test('Task Activity identifies only present authorized Bot stage comments and preserves cross-thread matches as ordinary discussion', async () => {
       const { loadIssueDocument, encodedIssueDocument, upsertLinearComment } = await import('../lib/linear-sync/document')
       const { readTaskWork } = await import('../lib/task-work-read')
       const { requireUser } = await import('../lib/issue-access')
@@ -353,8 +353,10 @@ test('Task presentation batches keep current tenant authority and one Factory pr
           assert.ok(detail, JSON.stringify({ owner: reader === owner, work }))
           const discussions = detail.timeline.filter(fact => fact.kind !== 'history')
           assert.deepEqual(discussions.map(fact => fact.id).sort(), [
-            `discussion:${a.id}:${humanId}`, `discussion:${b.id}:${stageId}`,
+            `discussion:${a.id}:${stageId}`, `discussion:${a.id}:${humanId}`, `discussion:${b.id}:${stageId}`,
           ].sort())
+          assert.deepEqual(discussions.filter(fact => fact.actor === 'bot').map(fact => [fact.threadId, fact.messageId, fact.body]),
+            [[a.id, stageId, 'Review']])
         }
       }
       assert.equal((await batch([task])).items[task].factoryStageComments, undefined)

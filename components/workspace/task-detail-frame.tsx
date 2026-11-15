@@ -317,7 +317,14 @@ export function FramedTask(props: FramedTaskProps) {
   const discussions = useRef<IssueDiscussions | null>(null)
   const drafts = useActivityDrafts(task.id,
     (body, operationId) => discussions.current ? discussions.current.onComment(body, operationId) : false,
-    (id, body, operationId) => discussions.current ? discussions.current.onReply(id, body, operationId) : false,
+    (id, body, operationId) => {
+      const current = discussions.current
+      if (!current) return false
+      // A physical discussion may contain more than one stage card. Old renderers still submit its thread ID.
+      if (current.threads.some(thread => thread.id === id)) return current.onReply(id, body, operationId)
+      const stage = presentation.data?.factoryStageComments?.find(source => `discussion:${source.threadId}:${source.messageId}` === id)
+      return stage ? current.onReply(stage.threadId, body, operationId, stage.messageId) : false
+    },
     props.discussionSave)
   // Every row says how long ago, as Capy's log does; the date and time is the tooltip. `now` ticks once a minute: a comment sent since reads 「现在」.
   const time = (at: string) => format.relativeTime(new Date(Math.min(Date.parse(at), now.getTime())), now)
@@ -331,16 +338,16 @@ export function FramedTask(props: FramedTaskProps) {
     githubPullRequestKey(event.id.slice('pull:'.length, -':merged'.length))))
   const activityItems = (current: IssueDiscussions, expandReplies = false, additional: readonly TaskActivityItem[] = []): TaskActivityItem[] => {
     const anchors = new Map(current.anchors.map(anchor => [anchor.id, anchor.excerpt]))
-    const threads = taskActivityThreads(current.threads, presentation.data?.factoryStageComments ?? [])
-    const byId = new Map(threads.map(thread => [thread.id, thread]))
-    const excerpt = (id: string) => id.startsWith('discussion-') ? null : anchors.get(id) ?? tActivity('anchorRemoved')
-    const comments: TaskActivityItem[] = expandReplies
-      ? taskDiscussionEvents(threads).map(fact => {
-        const thread = byId.get(fact.threadId)!
-        return { kind: 'comment', id: fact.id, at: fact.at, thread, time, exact, excerpt: excerpt(thread.id),
-          message: { record: { id: fact.messageId, body: fact.body, author: fact.author, at: fact.at }, first: fact.kind === 'comment', last: fact.messageId === thread.messages.at(-1)?.id } }
-      })
-      : threads.map(thread => ({ kind: 'comment', id: thread.id, at: thread.createdAt, thread, time, exact, excerpt: excerpt(thread.id) }))
+    const groups = taskActivityThreads(current.threads, presentation.data?.factoryStageComments ?? [])
+    const comments: TaskActivityItem[] = groups.flatMap((group): TaskActivityItem[] => {
+      const { thread } = group
+      const excerpt = group.actor || thread.id.startsWith('discussion-') ? null : anchors.get(thread.id) ?? tActivity('anchorRemoved')
+      if (!expandReplies) return [{ kind: 'comment', id: group.id, actor: group.actor, at: thread.createdAt, thread, time, exact, excerpt }]
+      return taskDiscussionEvents(group).map(fact => ({
+        kind: 'comment', id: fact.id, actor: fact.actor, at: fact.at, thread, time, exact, excerpt,
+        message: { record: { id: fact.messageId, body: fact.body, author: fact.author, at: fact.at }, first: fact.kind === 'comment', last: fact.messageId === thread.messages.at(-1)?.id },
+      }))
+    })
     const history = eventsFor([...comments, ...additional]).filter(item =>
       item.pullAction !== 'merged' || !item.pullHref || !reportedMerges.has(githubPullRequestKey(item.pullHref)))
     return chronologicalActivity<TaskActivityItem>([
