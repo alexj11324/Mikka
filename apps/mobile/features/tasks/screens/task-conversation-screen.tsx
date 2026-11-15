@@ -31,6 +31,8 @@ import type { TaskDetail, ThreadDetail, ThreadItem } from '@/lib/types'
 import { useLiveApi } from '@/lib/useApi'
 import { useStop } from '@/lib/useStop'
 import { colors } from '@/lib/theme'
+import { ThreadArtifactsList, ThreadSegments } from '../components/thread-artifacts'
+import { hasThreadArtifacts, threadArtifactsPath, type ThreadArtifacts, type ThreadSegment } from '../model/thread-artifacts'
 import { boundary, conversationReplyRun, conversationSegments, currentAgent, reviewRun, type Attempt } from '../model/task-conversation'
 import { STAGE_WORD, stageLine, verdictWord, type TaskFlow } from '../model/task-flow'
 
@@ -79,6 +81,12 @@ export function TaskConversationScreen() {
   const readEnd = useThreadReadEnd(id, error ? undefined : Object.values(data?.threads ?? {}).flatMap(thread => thread.readReceipts ?? []), bar.onScroll)
   const task = data?.detail.task
   const agent = currentAgent(segments)
+  // 线程 | Artifact (Alex, 2026-11-15): the task's conversation lists the whole Factory task's Artifacts, read through
+  // its head; the toggle replaces the title only once there is one.
+  const artifacts = useLiveApi<ThreadArtifacts>(threadArtifactsPath(newest), () => newest ? threadLive(live, newest) : { refs: [] })
+  const [segment, setSegment] = useState<ThreadSegment>('thread')
+  const toggled = hasThreadArtifacts(artifacts.data)
+  const viewingArtifacts = toggled && segment === 'artifacts' && artifacts.data
   // Opened on an attempt from 活动: scrolled to its part, once. Opened plainly: at the newest, at the bottom, as a chat.
   const scroller = useRef<{ scrollTo: (to: { y: number; animated: boolean }) => void; scrollToEnd: (options: { animated: boolean }) => void } | null>(null)
   const offsets = useRef(new Map<string, number>())
@@ -96,14 +104,14 @@ export function TaskConversationScreen() {
       <NavBar
         scrolled={bar.scrolled}
         back={() => (router.canGoBack() ? router.back() : router.replace(`/task/${id}`))}
-        titleView={task ? (
+        titleView={task && toggled ? <ThreadSegments value={segment} onChange={setSegment} /> : task ? (
           <View style={styles.titleBox}>
             <Text style={styles.title} numberOfLines={1}>{task.title}</Text>
             {agent ? <Text style={styles.subtitle} numberOfLines={1}>{agent}</Text> : null}
           </View>
         ) : undefined}
       />
-      <KeyboardChatScrollView key={id} {...readEnd} scrollEventThrottle={16} ref={scroller as never} onContentSizeChange={(width, height) => { readEnd.onContentSizeChange(width, height); place() }} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
+      {viewingArtifacts ? <ThreadArtifactsList data={viewingArtifacts} /> : <KeyboardChatScrollView key={id} {...readEnd} scrollEventThrottle={16} ref={scroller as never} onContentSizeChange={(width, height) => { readEnd.onContentSizeChange(width, height); place() }} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
         {!data && !error ? <View style={styles.center}><Spinner /></View> : null}
         <ReadNotice error={error} hasData={Boolean(data)} label={mobileMessages.Coordinator.conversation} onRetry={reload} />
         {/* A factory task's one stage, and what it needs from you (2026-11-04-2200); nothing without a flow. */}
@@ -126,11 +134,11 @@ export function TaskConversationScreen() {
         {delivery.bubbles}
         {live?.paused ? <ThreadQuotaPaused key={live.paused.runId} paused={live.paused} onContinued={() => reload()} /> : null}
         {stopper.stuck ? <StopFailed busy={stopper.sending} onRetry={() => void stopper.stop()} /> : null}
-      </KeyboardChatScrollView>
+      </KeyboardChatScrollView>}
       <OfflineBanner top={insets.top + 66} />
       {/* R-10: the conversation ends in the composer; a message to an ended attempt runs it again (R-81). */}
-      {controls.controls}
-      {live && newest ? <ThreadComposer detail={live} runId={newest} placeholder={mobileMessages.MobileCore.messageTask} onSend={(text, choice) => delivery.send(text, [], choice)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'thread', id: newest }}
+      {viewingArtifacts ? null : controls.controls}
+      {live && newest && !viewingArtifacts ? <ThreadComposer detail={live} runId={newest} placeholder={mobileMessages.MobileCore.messageTask} onSend={(text, choice) => delivery.send(text, [], choice)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'thread', id: newest }}
         onStop={composerStops(live) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
     </View>
   )

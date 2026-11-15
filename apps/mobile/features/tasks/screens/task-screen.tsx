@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { ChartNoAxesColumn, ChevronRight, Circle, CircleUserRound, Flag, GitBranch, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, Link, ListTree, MessageSquare, MessagesSquare, Sparkles, UserRound } from 'lucide-react-native'
+import { ChartNoAxesColumn, ChevronRight, Circle, CircleUserRound, Flag, GitBranch, GitPullRequest, Link, ListTree, MessageSquare, MessagesSquare, Sparkles, UserRound } from 'lucide-react-native'
 import { Spinner } from '@/components/icons'
 import { Segmented } from '@/components/Segmented'
 import { TaskDescription } from '../components/task-description'
@@ -26,7 +26,8 @@ import { colors, LIST_INSET, SPACE } from '@/lib/theme'
 import { AttemptIcon, BOARD_LABEL, PriorityIcon, priorityLabel, TaskStateIcon } from '../components/task-icons'
 import { ATTEMPT_WORD, attemptState, rowState } from '../model/task-groups'
 import { activityEntries, activityEntryId, filteredTaskActivity, nativeActivityLabel, nativeHistoryPieces, type TaskActivityFilter, type ActivityEntry } from '../model/task-conversation'
-import { taskProperties, type TaskProperty, type TaskPullLine } from '../model/task-properties'
+import { taskProperties, type TaskProperty } from '../model/task-properties'
+import { PullLine } from '../components/pull-line'
 import { AgentName } from '../components/agent-name'
 import { ReviewSummaryRow } from '@/features/review/components/review-summary-row'
 import { reviewHref } from '@/features/review/model/routes'
@@ -131,14 +132,6 @@ const PROPERTY_ICON = {
   pullRequests: GitPullRequest, threads: MessagesSquare, child: ListTree, blockedBy: Flag, blocks: Flag, duplicate: Link, related: Link,
 } as const
 
-/** Capy's PR marks: open green, merged purple, closed red, draft grey (lib/pull-request-appearance.ts). */
-const PULL_MARK = {
-  open: { Icon: GitPullRequest, color: colors.prOpen },
-  draft: { Icon: GitPullRequestDraft, color: colors.tertiary },
-  merged: { Icon: GitMerge, color: colors.merged },
-  closed: { Icon: GitPullRequestClosed, color: colors.danger },
-} as const
-
 function propertyLabel(id: TaskProperty['id'], count: number) {
   const { Metadata, Issue } = mobileMessages
   switch (id) {
@@ -203,19 +196,6 @@ function Line({ mark, quiet, text, detail, muted, onPress }: { mark: ReactNode; 
   </>
   if (!onPress) return <View style={styles.line}>{body}</View>
   return <Pressable accessibilityRole="link" onPress={onPress} style={({ pressed }) => [styles.line, pressed && { opacity: 0.5 }]}>{body}</Pressable>
-}
-
-/** As Capy writes a pull request: the state's coloured mark, repo#n quiet, then the title, with no state word. */
-function PullLine({ pull }: { pull: TaskPullLine }) {
-  const { Icon, color } = PULL_MARK[pull.state] ?? PULL_MARK.open
-  const state = mobileMessages.IssueDetail.work.states[pull.state]
-  return <Pressable accessibilityRole="link" accessibilityLabel={[state, pull.ref, pull.title].filter(Boolean).join(' ')} onPress={() => { void Linking.openURL(pull.url) }}
-    style={({ pressed }) => [styles.line, pressed && { opacity: 0.5 }]}>
-    <View style={styles.lineMark}><Icon size={15} color={color} strokeWidth={1.9} /></View>
-    <Text style={styles.lineText} numberOfLines={1}>
-      {pull.ref ? <Text style={styles.lineQuiet}>{pull.title ? pull.ref + ' ' : pull.ref}</Text> : null}{pull.title ?? (pull.ref ? '' : pull.url)}
-    </Text>
-  </Pressable>
 }
 
 /**
