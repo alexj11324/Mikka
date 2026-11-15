@@ -1,0 +1,116 @@
+name: E organization compatibility and account leases
+on:
+  push:
+    branches: [evidence/2254-sidebar-85dfc396]
+    paths: [.github/workflows/e-org-compat.yml, 'evidence/2262/org-compat/**']
+permissions:
+  contents: read
+env:
+  # Existing accounting/admission suites exercise the hosted deployment.
+  # The self-hosted image workflow separately runs the default community mode.
+  MIKKA_EDITION: cloud
+  # A cache restore that fails (e.g. the account's cache egress limit) would
+  # otherwise hang for actions/cache's 10-minute default before falling back
+  # to a normal install, which outlasts the short jobs' own timeouts.
+  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+  # Ephemeral CI registration fixtures share one loopback IP. Keep finite
+  # limits while leaving the production defaults at 5 signups/IP/hour.
+  MIKKA_SIGNUP_IP_HOURLY: '1000'
+  MIKKA_SIGNUP_GLOBAL_HOURLY: '10000'
+  MIKKA_VERIFICATION_IP_HOURLY: '1000'
+  MIKKA_VERIFICATION_GLOBAL_HOURLY: '10000'
+
+jobs:
+  governance:
+    name: PostgreSQL 17 (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [governance, workspace, accounts]
+    if: github.repository == 'alexj11324/Mikka'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-local-only
+          POSTGRES_DB: mikka_e2e
+          # Parallel full-schema DROP CASCADE needs more than PG17's default
+          # cluster-wide lock table. This applies only to the disposable service.
+          POSTGRES_INITDB_ARGS: --set=max_locks_per_transaction=512
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d mikka_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: 'true'
+      REQUIRE_DB: '1'
+      MIKKA_TEST_DB_PORT: '5432'
+      E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      BETTER_AUTH_URL: http://localhost:3100
+      MIKKA_TEST_DEPLOYMENT_SHA: 6717676486671cc827b134eccc1695e55fe05c72
+      MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 2
+          ref: 6717676486671cc827b134eccc1695e55fe05c72
+          persist-credentials: false
+      - name: Verify the immutable E integration candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MIKKA_TEST_DEPLOYMENT_SHA"
+          test "$(git rev-parse 'HEAD^{tree}')" = 924418a9b453ed387665a1bca96c4c11783fea6d
+          mkdir -m 700 "$RUNNER_TEMP/compat-qa-receipt"
+      - name: Load isolated public permission checks
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: qa-harness
+          persist-credentials: false
+          sparse-checkout: evidence/2262/org-compat
+
+      - uses: ./.github/actions/pnpm-install
+      - name: Verify self-hosted requirements for the full candidate delta
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse 'HEAD^1')" = 9be0ca745eb894291bee53266d42462cd080ebf5
+          test "$(git rev-parse 'HEAD^2')" = 46d2bd9d383214e19ec22d89fce54d6aa527375f
+          env -u GITHUB_EVENT_PATH node scripts/ci/self-hosted-requirements.mjs
+          test "$(env -u GITHUB_EVENT_PATH node scripts/ci/self-hosted-requirements.mjs --needs-db)" = true
+      - name: Generate ephemeral test-only auth secret
+        run: |
+          node --input-type=commonjs - <<'NODE'
+          const { appendFileSync, writeSync } = require('node:fs')
+          const secret = require('node:crypto').randomBytes(32).toString('hex')
+          writeSync(1, `::add-mask::${secret}\n`)
+          appendFileSync(process.env.GITHUB_ENV, `BETTER_AUTH_SECRET=${secret}\n`)
+          NODE
+      - name: Bootstrap empty database using tracked migrations only
+        run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
+        env:
+          MIGRATION_BOOTSTRAP_CI: '1'
+      - run: pnpm test:e2e:setup
+      - name: Bind the disposable test environment to the exact checkout
+        run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
+      - name: Run the complete original files on this job's PostgreSQL service
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+        run: node qa-harness/evidence/2262/org-compat/check.mjs "$TARGET"
+      - name: Record named test results and exact source
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: e-governance-67176764-${{ matrix.target }}
+          path: ${{ runner.temp }}/compat-qa-receipt
+          retention-days: 7
+          if-no-files-found: error
