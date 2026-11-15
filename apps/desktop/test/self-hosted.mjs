@@ -138,9 +138,15 @@ async function main() {
       state.unsubscribe(); await window.mikka.bundled.live.close(state.id)
       delete window.__selfHostedAcceptance
     })
-    phase = 'open_bot_workspace'
+    phase = 'open_workspace'
     assert.equal(bootstrap.onboarding, true, 'the new account still requires its ordinary first-run setup')
-    await page.goto(`mikka://app/mikka/en/?workspace=${fixture.workspaceId}&bot=${fixture.botId}`, { waitUntil: 'domcontentloaded' })
+    const workspace = new URL('mikka://app/mikka/en/')
+    workspace.searchParams.set('workspace', fixture.workspaceId)
+    // The public directory hosts the ordinary guide without loading the
+    // official-only bot overview. The full client opens the actual chat.
+    if (protocolOnly) workspace.searchParams.set('section', 'conversations')
+    else workspace.searchParams.set('bot', fixture.botId)
+    await page.goto(workspace.href, { waitUntil: 'domcontentloaded' })
     // A newly registered community account still has the ordinary first-run
     // overlay. A DOM-visible chat underneath it is not screenshot evidence.
     // Complete the real Skip setup action; never hide or remove the overlay.
@@ -150,6 +156,8 @@ async function main() {
     phase = 'first_run_dismissal'
     await skipSetup.click()
     await skipSetup.waitFor({ state: 'hidden' })
+    assert.equal((await rpc('desktop.bootstrap', [fixture.workspaceId])).onboarding, false,
+      'the real Skip setup action must persist for this account')
     passed('normal_first_run_dismissed')
     if (!protocolOnly) {
       phase = 'fixture_reply_visible'
@@ -170,7 +178,7 @@ async function main() {
     report.status = 'passed'
   } catch (error) {
     failed = error; report.status = 'failed'; report.failure = { phase, name: error instanceof Error ? error.name : 'UnknownError' }
-    if (page && fixture && ['open_bot_workspace', 'first_run_skip_button_visible', 'first_run_dismissal', 'fixture_reply_visible'].includes(phase)) {
+    if (page && fixture && ['open_workspace', 'first_run_skip_button_visible', 'first_run_dismissal', 'fixture_reply_visible'].includes(phase)) {
       // Retain only observations about this generated fixture. Raw DOM, URLs,
       // request bodies and exception messages can contain credentials.
       report.failure.view = await page.evaluate(({ botId, workspaceId }) => {
