@@ -194,42 +194,9 @@ test('an unavailable provider read keeps checking even when the HTTP request suc
 })
 
 
-test('automatic model routing reflects the saved setting and saves each toggle for the current workspace', async () => {
+test('the retired difficulty-routing switch is not shown', async () => {
   await render()
-  const toggle = () => container.querySelector<HTMLButtonElement>('[role="switch"][aria-label="autoRouting"]')!
-  assert.equal(toggle().getAttribute('aria-checked'), 'true')
-  await act(async () => toggle().click())
-  assert.deepEqual(changes, [{ kind: 'autoRouting', enabled: false }])
-  assert.equal(toggle().getAttribute('aria-checked'), 'false')
-  assert.equal(data.autoModelRouting, false)
-  await act(async () => toggle().click())
-  assert.deepEqual(changes[1], { kind: 'autoRouting', enabled: true })
-  assert.equal(toggle().getAttribute('aria-checked'), 'true')
-  assert.equal(container.querySelector('[role="alert"]'), null)
-})
-
-test('a refused routing change restores the saved setting and retry applies the intended value', async () => {
-  changeFails = 'response'
-  await render()
-  const toggle = () => container.querySelector<HTMLButtonElement>('[role="switch"][aria-label="autoRouting"]')!
-  await act(async () => toggle().click())
-  assert.equal(toggle().getAttribute('aria-checked'), 'true')
-  assert.equal(savedAutoRouting, true)
-  assert.ok(container.querySelector('[role="alert"]'))
-  changeFails = null
-  await act(async () => button('retry')!.click())
-  assert.equal(toggle().getAttribute('aria-checked'), 'false')
-  assert.equal(container.querySelector('[role="alert"]'), null)
-})
-
-test('an offline routing save restores the last saved setting even when revalidation fails', async () => {
-  changeFails = 'network'; rereadFails = true
-  await render()
-  const toggle = container.querySelector<HTMLButtonElement>('[role="switch"][aria-label="autoRouting"]')!
-  await act(async () => toggle.click())
-  assert.equal(data.autoModelRouting, true)
-  assert.equal(toggle.getAttribute('aria-checked'), 'true')
-  assert.ok(container.querySelector('[role="alert"]'))
+  assert.equal(container.querySelector('[role="switch"][aria-label="autoRouting"]'), null)
 })
 
 test('the list is the 优先使用的 Agent\'s own: the other Agent\'s rows stay out, a move sends only its rows, and the list re-reads on a live push', async () => {
