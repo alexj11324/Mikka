@@ -153,6 +153,49 @@ test('Task presentation batches keep current tenant authority and one Factory pr
       assert.equal((await batch([legacy])).items[legacy].pullRequests, undefined)
     })
 
+    await t.test('Task Activity filters only recorded stage messages from authorized documents on Web and mobile', async () => {
+      const { loadIssueDocument, encodedIssueDocument, upsertLinearComment } = await import('../lib/linear-sync/document')
+      const { readTaskWork } = await import('../lib/task-work-read')
+      const { requireUser } = await import('../lib/issue-access')
+      const { mobileTask } = await import('../lib/mobile-tasks')
+      const task = await makeTask(shared), foreign = await makeTask(other)
+      const a = await makeFactory(task), b = await makeFactory(foreign, { workspaceId: other })
+      const stageId = randomUUID(), humanId = randomUUID()
+      for (const factory of [a, b]) {
+        await application.query(`INSERT INTO factory_stage_updates("taskId", stage, "commentId", "bodyHash")
+          VALUES($1, 'review', $2, 'historical')`, [factory.id, stageId])
+      }
+      await application.query(`INSERT INTO factory_stage_updates("taskId", stage, "commentId", "bodyHash")
+        VALUES($1, 'triage', $2, 'removed')`, [a.id, randomUUID()])
+      const doc = loadIssueDocument(null, { type: 'doc', content: [{type: 'paragraph'}] })
+      try {
+        const msg = { author: 'Reporter', at: '2026-11-15T00:00:00Z', body: 'Review' }
+        upsertLinearComment(doc, { ...msg, threadId: a.id, messageId: stageId })
+        upsertLinearComment(doc, { ...msg, threadId: a.id, messageId: humanId, authorUserId: owner })
+        upsertLinearComment(doc, { ...msg, threadId: b.id, messageId: stageId })
+        await application.query('INSERT INTO issue_documents("issueId","userId",state) VALUES($1,$2,$3)', [task, owner, encodedIssueDocument(doc)])
+      } finally { doc.destroy() }
+      for (const reader of [owner, peer]) {
+        const presentation = await as(reader, shared, async () => (await readTaskWork(await requireUser(), shared, task)).presentation)
+        assert.deepEqual(presentation?.factoryStageComments, [{ threadId: a.id, messageId: stageId }])
+        const denied = await as(reader, shared, async () => readTaskWork(await requireUser(), shared, foreign))
+        assert.equal(denied.presentation, null)
+        for (const work of [false, true]) {
+          const detail = await as(reader, shared, async () => mobileTask(await requireUser(), task, shared, work))
+          assert.ok(detail, JSON.stringify({ owner: reader === owner, work }))
+          const discussions = detail.timeline.filter(fact => fact.kind !== 'history')
+          assert.deepEqual(discussions.map(fact => fact.id).sort(), [
+            `discussion:${a.id}:${humanId}`, `discussion:${b.id}:${stageId}`,
+          ].sort())
+        }
+      }
+      assert.equal((await batch([task])).items[task].factoryStageComments, undefined)
+      const { taskPresentationsInput } = await import('../lib/task-presentation-input')
+      assert.equal(taskPresentationsInput.safeParse({
+        workspaceId: shared, issueIds: [task], includeFactoryStageComments: true,
+      }).success, false, 'source identity lookup is internal to Task detail')
+    })
+
     await t.test('the action returns current-tenant business status without another actor private Run or Factory', async () => {
       const issue = await makeTask(shared, {}, 'doing', peer)
       await makeRun(issue, { userId: peer, status: 'waiting_input' })

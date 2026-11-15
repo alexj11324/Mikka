@@ -7,6 +7,8 @@ import type { FactoryFlowView } from './factory/public-flow'
 import { taskStateOf, type TaskStateContext, type TaskStateRun, type TaskStateView } from './task-state'
 
 export type TaskPresentation = TaskStateView & {
+  /** Identities already written to this Task's shared discussion document. */
+  factoryStageComments?: import('./task-activity-timeline').FactoryStageComment[]
   pullRequests?: IssuePullRequest[]
   version: 1
   /** Missing on cached snapshots from before the Inbox attention projection. */

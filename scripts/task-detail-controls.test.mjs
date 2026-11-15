@@ -55,7 +55,7 @@ stub('hooks/use-live-key.tsx', { useLiveKey: noop, useLiveKeys: noop, useLiveSco
 stub('hooks/use-bot-tasks.ts', { localTaskState: () => ({ state: 'todo' }) })
 stub('lib/hooks/use-relation-search.ts', { useRelationSearch: noop })
 stub('lib/use-action-error.ts', { useActionError: () => translate })
-stub('components/workspace/issue-activity-feed.tsx', { useActivityEvents: () => [] })
+stub('components/workspace/issue-activity-feed.tsx', { useActivityEvents: () => () => [] })
 stub('components/workspace/issue-activity.tsx', { useActivityDrafts: () => ({}) })
 stub('components/workspace/issue-threads.tsx', { useIssueThreads: () => ({ data: [{ detail: { agentName: 'Former delegate', bot: { color: 'blue', shape: 'round' } } }] }) })
 stub('components/workspace/issue-metadata-controls.tsx', { useIssueMetadataSave: () => ({ persist: patch => saveMetadata({ patch }) }), IssueMetadataControls: noop, AccessChangeDialog: noop })
@@ -108,6 +108,19 @@ test('properties and Work use the same authorized pull receipts, including an em
       assert.deepEqual(row('pullRequests')?.chips.map(chip => chip.href) ?? [], receipts.map(pull => pull.url))
     } finally { await done() }
   }
+})
+
+test('both activity layouts preserve the genuine reply and its target in a mixed Factory thread', async () => {
+  const first = { id: 'stage', at: '2026-11-15T00:00:00Z', author: 'Bot', body: 'Review' }
+  const reply = { id: 'genuine', at: '2026-11-15T00:01:00Z', author: 'Alex', body: 'Review' }
+  const discussion = { anchors: [], threads: [{ id: 'factory', author: first.author, createdAt: first.at, resolved: false, messages: [first, reply] }] }
+  const done = await mount({ agentActivity: { items: [], work: { presentation: { factoryStageComments: [{ threadId: 'factory', messageId: 'stage' }] } } } })
+  try {
+    const folded = frame.activity.items(discussion)
+    assert.deepEqual(folded.map(row => [row.thread.id, row.thread.author, row.at]), [['factory', 'Alex', reply.at]])
+    const expanded = frame.activity.timeline(discussion, [])
+    assert.deepEqual(expanded.map(row => [row.id, row.thread.id, row.message.first, row.message.last]), [['discussion:factory:genuine', 'factory', true, true]])
+  } finally { await done() }
 })
 
 test('properties link only admitted conversations and show the recorded Factory branch', async () => {

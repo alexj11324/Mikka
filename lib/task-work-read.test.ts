@@ -15,8 +15,9 @@ const activity = { task: { id: 'factory', issueId: 'task', pullRequest: candidat
   { kind: 'pull_request', url: 'https://example.invalid/untrusted', state: 'open' },
 ] }
 const at = (path: string) => new URL(path, import.meta.url).href
-mock.module(at('./task-presentation-read.ts'), { namedExports: { readTaskPresentations: async (_reader: unknown, query: { workspaceId: string; issueIds: string[]; includeFactoryIdentity: boolean }) => {
+mock.module(at('./task-presentation-read.ts'), { namedExports: { readTaskPresentations: async (_reader: unknown, query: { workspaceId: string; issueIds: string[]; includeFactoryIdentity: boolean }, work: unknown) => {
   assert.deepEqual(query, { workspaceId: 'workspace', issueIds: ['task'], includeFactoryIdentity: true, includePullRequests: true })
+  assert.deepEqual(work, { includeDiscussionSources: true })
   return { items: visible ? { task: { factoryTaskId: 'factory', pullRequests: [published] } } : {} }
 } } })
 mock.module(at('./acting-user.ts'), { namedExports: { actAs: async (principal: unknown, work: () => Promise<unknown>) => { assert.equal(principal, reader); return work() } } })

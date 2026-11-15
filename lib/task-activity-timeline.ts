@@ -25,6 +25,28 @@ export function chronologicalActivity<T extends { id: string; at: string }>(item
   return [...items].sort((a, b) => Date.parse(a.at) - Date.parse(b.at) || a.id.localeCompare(b.id))
 }
 
+export type FactoryStageComment = { threadId: string; messageId: string }
+
+/** The stage writer shares its Yjs thread with genuine replies. Only its exact
+ * message identities belong to Factory progress instead of Task discussion. */
+export function taskActivityThreads(threads: readonly ThreadRecord[], stageComments: readonly FactoryStageComment[]): readonly ThreadRecord[] {
+  if (!stageComments.length) return threads
+  const byThread = new Map<string, Set<string>>()
+  for (const { threadId, messageId } of stageComments) {
+    const ids = byThread.get(threadId)
+    if (ids) ids.add(messageId)
+    else byThread.set(threadId, new Set([messageId]))
+  }
+  return threads.flatMap(thread => {
+    const ids = byThread.get(thread.id)
+    if (!ids) return [thread]
+    const messages = thread.messages.filter(message => !ids.has(message.id))
+    if (messages.length === thread.messages.length) return [thread]
+    const first = messages[0]
+    return first ? [{ ...thread, author: first.author, createdAt: first.at, messages }] : []
+  })
+}
+
 export type TaskDiscussionEvent = {
   kind: 'comment' | 'reply'
   id: string
@@ -52,10 +74,10 @@ export function taskDiscussionEvents(threads: readonly ThreadRecord[]): TaskDisc
   })))
 }
 
-export function taskActivityFacts(history: readonly IssueActivityEvent[], threads: readonly ThreadRecord[]): TaskActivityFact[] {
+export function taskActivityFacts(history: readonly IssueActivityEvent[], threads: readonly ThreadRecord[], stageComments: readonly FactoryStageComment[] = []): TaskActivityFact[] {
   return chronologicalActivity<TaskActivityFact>([
     ...history.map(event => ({ kind: 'history' as const, id: `history:${event.id}`, at: event.at, event })),
-    ...taskDiscussionEvents(threads),
+    ...taskDiscussionEvents(taskActivityThreads(threads, stageComments)),
   ])
 }
 
