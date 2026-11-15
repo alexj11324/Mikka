@@ -2323,7 +2323,9 @@
   },
   "app/actions/automations.ts": {
     "mode": "built-in",
-    "environment": [],
+    "environment": [
+      "SLACK_APP_ID"
+    ],
     "behavior": "The signed-in member lists, reads and runs the workspace's automations, and creates, changes, pauses, resumes or cancels them, through the schedule store in the installation PostgreSQL database; each run re-checks the creator's authority.",
     "test": "lib/schedules/dispatch.db.test.ts",
     "suite": "test:schedules-db"
@@ -2400,7 +2402,9 @@
   },
   "lib/schedules/runtime.ts": {
     "mode": "built-in",
-    "environment": [],
+    "environment": [
+      "SLACK_APP_ID"
+    ],
     "behavior": "Run automations as their creator through the installation PostgreSQL database, including runs started by verified GitHub, Linear and Slack deliveries and by requests to an automation's webhook URL; a trigger condition uses the configured Decision model and fails retryably without one.",
     "test": "lib/schedules/dispatch.db.test.ts",
     "suite": "test:schedules-db"
