@@ -7892,9 +7892,9 @@
       "dispatch_task": "交给 Bot"
     },
     "editor": {
-      "threadMode": "每次运行",
-      "threadNew": "新建任务",
-      "threadSingle": "追加到同一个任务",
+      "eachRun": "每次运行",
+      "eachRunNew": "新建任务",
+      "eachRunSame": "追加到同一个任务",
       "perDay": "每天最多运行",
       "unlimited": "不限",
       "autoPaused": "已自动暂停：{reason}",

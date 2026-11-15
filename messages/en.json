@@ -7892,9 +7892,9 @@
       "dispatch_task": "Hand to a Bot"
     },
     "editor": {
-      "threadMode": "Each run",
-      "threadNew": "Makes a new task",
-      "threadSingle": "Adds to the same task",
+      "eachRun": "Each run",
+      "eachRunNew": "Makes a new task",
+      "eachRunSame": "Adds to the same task",
       "perDay": "At most per day",
       "unlimited": "No limit",
       "autoPaused": "Paused automatically: {reason}",

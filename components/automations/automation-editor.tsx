@@ -175,9 +175,9 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
       {field(t('profile'), <NativeSelect aria-label={t('profile')} value={draft.profileId} disabled={!workspaceId} onChange={event => set({ profileId: event.target.value })}>
         {profileChoices.choices.map(choice => <NativeSelectOption key={choice.value} value={choice.value} disabled={'disabled' in choice && choice.disabled}>{choice.label}</NativeSelectOption>)}
       </NativeSelect>)}
-      {field(t('threadMode'), <NativeSelect aria-label={t('threadMode')} value={draft.threadMode} onChange={event => set({ threadMode: event.target.value === 'single' ? 'single' : 'new' })}>
-        <NativeSelectOption value="new">{t('threadNew')}</NativeSelectOption>
-        <NativeSelectOption value="single">{t('threadSingle')}</NativeSelectOption>
+      {field(t('eachRun'), <NativeSelect aria-label={t('eachRun')} value={draft.eachRun} onChange={event => set({ eachRun: event.target.value === 'same_task' ? 'same_task' : 'new_task' })}>
+        <NativeSelectOption value="new_task">{t('eachRunNew')}</NativeSelectOption>
+        <NativeSelectOption value="same_task">{t('eachRunSame')}</NativeSelectOption>
       </NativeSelect>)}
       {field(t('timezone'), <NativeSelect aria-label={t('timezone')} value={draft.timezone} onChange={event => set({ timezone: event.target.value, fold: null })}>
         {(zones.includes(draft.timezone) ? zones : [draft.timezone, ...zones]).map(zone => <NativeSelectOption key={zone} value={zone}>{zone}</NativeSelectOption>)}

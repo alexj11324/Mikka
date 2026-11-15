@@ -298,7 +298,7 @@ export class ScheduleStore {
     if(!this.automation.dispatch||!row.workspace_id||o.definition.task.kind!=='dispatch_task')throw new ScheduleError('scheduleDispatchUnavailable',503)
     const event=o.trigger?describeGitHubEvent(o.trigger.event):undefined
     if(o.trigger&&event&&!await this.runWhenHolds(row,o,event))return this.skipQuietly(row,o,'runWhenNotMet')
-    const result=await this.automation.dispatch({ownerId:row.owner_id,workspaceId:row.workspace_id,scheduleId:row.id,occurrenceId:o.id,task:o.definition.task,...(event?{event}:{}),...(o.definition.threadMode==='single'?{single:true as const}:{})})
+    const result=await this.automation.dispatch({ownerId:row.owner_id,workspaceId:row.workspace_id,scheduleId:row.id,occurrenceId:o.id,task:o.definition.task,...(event?{event}:{}),...(o.definition.eachRun==='same_task'?{single:true as const}:{})})
     const recorded=await this.workspace(row.owner_id,row.workspace_id,()=>this.transaction(async tx=>{
       await tx.query('SELECT id FROM user_schedules WHERE id=$1 FOR UPDATE',[row.id])
       // A lost lease means another worker owns this occurrence; it repeats the same idempotent dispatch.

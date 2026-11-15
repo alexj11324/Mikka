@@ -273,7 +273,7 @@ test('dispatch_task automations run as their creator through the existing create
     assert.equal(seen.days[0]!.costMicroUsd, null, 'another member sees runs, not spend')
   })
   await t.test('追加到同一个任务: later runs add to the first run’s task; a deleted task pauses the automation', async () => {
-    const standing = (await create({ ...definition(builder), maxConcurrent: 3, threadMode: 'single' })).schedule
+    const standing = (await create({ ...definition(builder), maxConcurrent: 3, eachRun: 'same_task' })).schedule
     const first = await runNow(standing)
     await tick()
     const made = await occurrence(first.occurrence.id)

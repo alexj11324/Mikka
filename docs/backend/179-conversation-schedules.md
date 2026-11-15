@@ -212,11 +212,11 @@ Decision [2026-11-15-1730](../design/decisions/2026-11-15-1730-automation-limits
   waiting runs without chat reports. `resume` re-checks authority and clears the reason;
   a person's own pause stores none.
 
-## Thread mode (2026-11-15)
+## Each run: a new task or the same task (2026-11-15)
 
-Decision [2026-11-15-1810](../design/decisions/2026-11-15-1810-automation-thread-mode.md).
+Decision [2026-11-15-1810](../design/decisions/2026-11-15-1810-automation-each-run.md).
 
-- `threadMode: 'new' | 'single'` (default `new`) on a `dispatch_task` definition. With
+- `eachRun: 'new_task' | 'same_task'` (default `new`) on a `dispatch_task` definition. With
   `single`, the first run that creates a task (its result has `eventId`) is the standing
   task. Each later run sends the prompt (plus any event block) to that task's latest run
   of the creator with `sendThreadMessage(owner, runId, text, 'user', occurrenceId)`: a

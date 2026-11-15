@@ -12,4 +12,4 @@ Alex，2026-11-15：自动化可以选每次运行新建任务，还是追加到
 
 **运行身份**：暂时仍以创建者身份运行；Capy 那种服务账号 Mikka 还没有，另行决定。
 
-实现：`docs/backend/179-conversation-schedules.md` § Thread mode。
+实现：`docs/backend/179-conversation-schedules.md` § Each run。
