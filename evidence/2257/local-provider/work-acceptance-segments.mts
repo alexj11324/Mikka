@@ -119,6 +119,29 @@ try {
   const report={...terminal.report,sourceCommit:fixed.sha,filesChanged:[],verify:{status:'not_run'},...(review?{check:{sha:fixed.sha,readOnly:true}}:{})}
   if(review){assert.ok(report.criteria?.length,'Reviewer tool must provide its own criterion and evidence')}
   if(chunks.length)await dcall('runs/'+id+'/events','POST',{fromSeq:1,chunks})
+  if(!review){
+    const { chromium }=await import('@playwright/test')
+    const { pathToFileURL }=await import('node:url')
+    const escape=(value:string)=>value.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')
+    // This is the real report the CLI just handed in, rendered from a local report file.
+    // It is the producer's visual evidence, not a screenshot of the Task client or of an external site.
+    const localReport=join(dir,'fixture','producer-delivery.html')
+    writeFileSync(localReport,'<!doctype html><meta charset=utf-8><title>Daytime sky observation</title><main><h1>Daytime sky observation</h1><p>'+escape(brief)+'</p><article>'+escape(terminal.report.summary)+'</article></main>')
+    const browser=await chromium.launch({executablePath:'/usr/bin/google-chrome',chromiumSandbox:true,headless:true})
+    let bytes:Buffer
+    try{const page=await browser.newPage({viewport:{width:800,height:420}});await page.goto(pathToFileURL(localReport).href);assert.equal(await page.locator('article').innerText(),terminal.report.summary);bytes=await page.screenshot({type:'png'})}
+    finally{await browser.close()}
+    const digest=createHash('sha256').update(bytes).digest('hex'),base='runs/'+id+'/captures'
+    const opened=await dcall(base,'POST',{title:'Submitted report shown in Chromium',contentType:'image/png',size:bytes.length,sha256:digest},201)
+    assert.equal(opened.upload.target,'server')
+    const sent=await fetch(origin+'/mikka/v1/'+base+'/'+opened.captureId,{method:'PUT',body:bytes,headers:{authorization:'Bearer '+token,[CLIENT_VERSION_HEADER]:SOURCE_DAEMON_VERSION,'content-type':'image/png'}})
+    assert.equal(sent.status,204)
+    const stored=await dcall(base+'/'+opened.captureId+'/complete','POST',{})
+    assert.equal(stored.capture.id,opened.captureId)
+    const {rows:[facts]}=await independent.query(`SELECT status,sha256,size,"runId","userId","inlineContent" AS content FROM run_captures WHERE id=$1`,[opened.captureId])
+    assert.equal(facts.status,'ready');assert.equal(facts.sha256,digest);assert.equal(createHash('sha256').update(facts.content).digest('hex'),digest);assert.equal(Number(facts.size),bytes.length);assert.equal(facts.runId,id);assert.equal(facts.userId,owner)
+    note('genuine producer Chromium PNG submitted via canonical run capture REST before daemon completion',{runId:id,captureId:opened.captureId,sha256:digest,bytes:bytes.length,storedStatus:facts.status,content:'The actual native MCP report rendered from a local report file'})
+  }
   await dcall('runs/'+id+'/complete','POST',{stopReason:terminal.stopReason,report},204)
   const {rows:[saved]}=await independent.query('SELECT status,"stopReason",report,"sessionId" FROM agent_runs WHERE id=$1',[id])
   assert.equal(saved.status,'succeeded');assert.equal(saved.report.summary,terminal.report.summary)
@@ -131,6 +154,7 @@ try {
 
 
  const prior=await getTask()
+ note('independent Factory state after canonical producer completion',{stage:prior.stage,status:prior.status,candidate:prior.candidateId,output:prior.output})
  assert.equal(prior.stage,'review');assert.equal(prior.status,'running');assert.ok(prior.runId&&prior.candidateId&&prior.runId!==runId)
  note('producer receipt created a real candidate and allocated its independent reviewer',{taskId:prior.id,producer:runId,candidateId:prior.candidateId,reviewRunId:prior.runId,sourceSha:candidate,issueStatus:(await issue()).status,delegate:(await issue()).delegate})
  const {rows:[actualCandidate]}=await independent.query('SELECT id,sha,kind,"runId",repository,environment FROM factory_candidates WHERE id=$1 AND "taskId"=$2',[prior.candidateId,prior.id])

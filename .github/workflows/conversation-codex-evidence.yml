@@ -15,9 +15,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: capy-public-main-bfac62db
-            source: bfac62db8db1eb11d17d1a022e71179e01d1a33f
-            tree: 0a965939b07568f6c79f0572c650078bc86fce50
+          - label: capy-typed-main-bfee6b08
+            source: bfee6b083e83e22b792decc1e686c12d39cf4f51
+            tree: e5354fa4cf071a41d774b71b1b98ea846d0f9fdf
     env:
       SOURCE: ${{ matrix.source }}
       SOURCE_TREE: ${{ matrix.tree }}
@@ -46,6 +46,7 @@ jobs:
           set -euo pipefail
           test "$(git -C product rev-parse HEAD)" = "$SOURCE"
           test "$(git -C product rev-parse 'HEAD^{tree}')" = "$SOURCE_TREE"
+          /usr/bin/google-chrome --version
           cd product
           pnpm install --frozen-lockfile
           cd ../harness/evidence/2257/local-provider
