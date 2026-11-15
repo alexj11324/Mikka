@@ -184,4 +184,66 @@ test('dispatch_task automations run as their creator through the existing create
     const hidden = await page<{ occurrences: Occurrence[] }>(member, memberChat, { action: 'history', scheduleId: schedule.id })
     assert.equal(hidden.occurrences[0]!.result, null, 'another member sees the run, not its task')
   })
+  await t.test('a GitHub event runs each automation that takes it once, with the event marked as GitHub data', async () => {
+    for (const repo of ['acme/web', 'acme/limits', 'acme/gate']) await fixture.query(`INSERT INTO github_repository_installations("userId","remoteKey","githubAccountId","installationId","repositoryId") VALUES($1,$2,'1',1,$3)`, [owner, `v2/github.com/${repo}`, repo.length])
+    const triggered = (repository: string, extra: Partial<NonNullable<Definition['events']>[number]> = {}, max = 1): Definition => ({
+      ...definition(builder), maxConcurrent: max, events: [{ source: 'github', event: 'pull_request_opened', repositories: [`v2/github.com/${repository}`], ...extra }],
+    })
+    const pr = (repository: string, number: number, sender = 'User') => ({ action: 'opened', sender: { login: 'ada', type: sender },
+      repository: { full_name: repository }, pull_request: { number, title: `PR ${number}`, html_url: `https://github.com/${repository}/pull/${number}`, base: { ref: 'main' }, labels: [], user: { login: 'ada' } } })
+    const runs = async (id: string) => (await fixture.query<{ status: string; error: string | null; trigger: { event: { number: number } } | null; reported_at: Date | null; id: string }>('SELECT id,status,error,trigger,reported_at FROM schedule_occurrences WHERE schedule_id=$1 ORDER BY created_at', [id])).rows
+
+    await assert.rejects(create(triggered('acme/api')), /scheduleRepositoryUnavailable/, 'a repository nobody here installed cannot be named')
+    const { schedule } = await create(triggered('Acme/Web'.toLowerCase()))
+    assert.equal(await runtime.fireGitHubAutomations('github:d1', 'pull_request', pr('Acme/Web', 7)), 1)
+    assert.equal(await runtime.fireGitHubAutomations('github:d1', 'pull_request', pr('Acme/Web', 7)), 0, 'a redelivery adds nothing')
+    assert.equal(await runtime.fireGitHubAutomations('github:d2', 'pull_request', pr('Acme/Web', 8, 'Bot')), 0, 'a bot’s own activity does not trigger')
+    assert.equal(await runtime.fireGitHubAutomations('github:d3', 'pull_request', pr('Acme/Other', 9)), 0)
+    const [run] = await runs(schedule.id)
+    assert.deepEqual([run!.status, run!.trigger?.event.number], ['pending', 7])
+    await tick()
+    const done = await occurrence(run!.id)
+    assert.equal(done.status, 'succeeded')
+    const request = (await fixture.query('SELECT payload FROM coordinator_events WHERE id=$1', [done.result!.eventId])).rows[0].payload
+    assert.match(request.text, /^Check the failing CI on main and fix it\n\n<github_event>\nevent: pull_request_opened\nrepository: acme\/web\nnumber: #7/)
+    assert.equal(request.schedule.event, true)
+
+    const limited = (await create(triggered('acme/limits'))).schedule
+    assert.equal(await runtime.fireGitHubAutomations('github:d4', 'pull_request', pr('acme/limits', 1)), 1)
+    assert.equal(await runtime.fireGitHubAutomations('github:d5', 'pull_request', pr('acme/limits', 2)), 0, 'over maxConcurrent the event is recorded as skipped')
+    const [first, second] = await runs(limited.id)
+    assert.deepEqual([first!.status, second!.status, second!.error, Boolean(second!.reported_at)], ['pending', 'skipped', 'concurrencyLimit', true])
+    await tick()
+  })
+
+  await t.test('a trigger’s condition is judged before the run; a miss is skipped quietly and no answer is retried', async () => {
+    const gated = (await create({ ...definition(builder), events: [{ source: 'github', event: 'pull_request_opened', repositories: ['v2/github.com/acme/gate'], runWhen: 'The PR changes billing.' }] })).schedule
+    const pr = (number: number) => ({ action: 'opened', sender: { login: 'ada', type: 'User' }, repository: { full_name: 'acme/gate' },
+      pull_request: { number, title: `PR ${number}`, base: { ref: 'main' }, labels: [] } })
+    const original = runtime.automationSeams.runWhen
+    const asked: string[] = []
+    try {
+      runtime.automationSeams.runWhen = async input => { asked.push(input.condition); return false }
+      await runtime.fireGitHubAutomations('github:g1', 'pull_request', pr(1))
+      await tick()
+      const [missed] = (await fixture.query<{ id: string; status: string; error: string; reported_at: Date | null }>('SELECT id,status,error,reported_at FROM schedule_occurrences WHERE schedule_id=$1', [gated.id])).rows
+      assert.deepEqual([missed!.status, missed!.error, Boolean(missed!.reported_at)], ['skipped', 'runWhenNotMet', true])
+      assert.deepEqual(asked, ['The PR changes billing.'])
+      assert.equal(Number((await fixture.query(`SELECT count(*) FROM coordinator_events WHERE "dedupeKey"=$1`, [`schedule_result:${missed!.id}`])).rows[0].count), 0, 'a skipped event posts nothing to the chat')
+
+      runtime.automationSeams.runWhen = async () => null
+      await runtime.fireGitHubAutomations('github:g2', 'pull_request', pr(2))
+      await tick()
+      const unanswered = (await fixture.query<{ status: string; error: string }>(`SELECT status,error FROM schedule_occurrences WHERE schedule_id=$1 AND trigger#>>'{event,number}'='2'`, [gated.id])).rows[0]!
+      assert.deepEqual([unanswered.status, unanswered.error], ['pending', 'scheduleRunWhenUnavailable'], 'no answer is retried, never a silent pass')
+
+      runtime.automationSeams.runWhen = async () => true
+      await fixture.query(`UPDATE schedule_occurrences SET next_retry_at=now() WHERE schedule_id=$1 AND status='pending'`, [gated.id])
+      await tick()
+      await runtime.fireGitHubAutomations('github:g3', 'pull_request', pr(3))
+      await tick()
+      const statuses = (await fixture.query<{ status: string }>(`SELECT status FROM schedule_occurrences WHERE schedule_id=$1 ORDER BY created_at`, [gated.id])).rows.map(row => row.status)
+      assert.deepEqual(statuses, ['skipped', 'succeeded', 'succeeded'])
+    } finally { runtime.automationSeams.runWhen = original }
+  })
 })
