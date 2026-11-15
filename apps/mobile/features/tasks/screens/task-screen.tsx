@@ -1,4 +1,4 @@
-import { presentedFactoryEvents, taskEvidenceHref, taskFactoryProgress, type TaskFactoryProgress } from '../../../../../lib/task-factory-events'
+import { presentedFactoryEvents, taskEvidenceHref, taskFactoryProgress } from '../../../../../lib/task-factory-events'
 import { mobileMessages } from '@/lib/messages'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native'
@@ -6,6 +6,7 @@ import { useLocalSearchParams, useRouter, type Href } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { CalendarClock, ChevronRight, Sparkles, UserRound } from 'lucide-react-native'
 import { BotAvatar, MachineIcon, Spinner } from '@/components/icons'
+import { Segmented } from '@/components/Segmented'
 import { TaskDescription } from '../components/task-description'
 import { NavBar, underBar } from '@/components/NavBar'
 import { useScrolledUnderBar } from '@/components/BarBackdrop'
@@ -25,7 +26,7 @@ import { shortWhen } from '@/lib/clock'
 import { colors, LIST_INSET, SPACE } from '@/lib/theme'
 import { AttemptIcon, BOARD_LABEL, PriorityIcon, priorityLabel, STATE_LABEL, TaskStateIcon } from '../components/task-icons'
 import { ATTEMPT_WORD, attemptState, rowState } from '../model/task-groups'
-import { activityEntries, activityEntryId, nativeActivityLabel, type ActivityEntry } from '../model/task-conversation'
+import { activityEntries, activityEntryId, filteredTaskActivity, nativeActivityLabel, nativeHistoryPieces, type TaskActivityFilter, type ActivityEntry } from '../model/task-conversation'
 import { AgentName } from '../components/agent-name'
 import { ReviewSummaryRow } from '@/features/review/components/review-summary-row'
 import { reviewHref } from '@/features/review/model/routes'
@@ -55,13 +56,25 @@ export function TaskScreen() {
   // 活动 runs oldest first, from the task's creation down (Alex 2026-11-07); the server sends it newest first.
   const receipts = presentedFactoryEvents(data?.factoryEvents, task?.factoryTaskId)
   const conversations = data?.work?.conversations
-  const progress = conversations ? taskFactoryProgress(receipts) : []
+  const progress = new Map(taskFactoryProgress(receipts).flatMap(group => group.runId ? [[group.runId, group.current] as const] : []))
+  const readableThreads = conversations?.filter(thread => thread.detail) ?? []
+  const stretches = readableThreads.flatMap(thread => thread.detail?.createdAt ? [{
+    at: thread.detail.createdAt, runId: thread.id, agentId: thread.detail.agentId ?? null, linked: true, title: thread.detail.name,
+  }] : [])
+  const property = mobileMessages.Metadata.property
   const activity = data ? activityEntries(
     conversations ? data.activity.filter(item => item.kind === 'created') : data.activity,
     [...data.timeline ?? [], ...receipts],
   ) : []
 
   // Only the authorized Task detail can match a link to one of its runs.
+  const [filter, setFilter] = useState<TaskActivityFilter>('all')
+  const [shownRows, setShownRows] = useState(50)
+  const filtered = filteredTaskActivity(activity, filter)
+  const visibleActivity = filtered.slice(-shownRows)
+  const earlier = filtered.length - visibleActivity.length
+  useEffect(() => { setFilter('all'); setShownRows(50) }, [id])
+  const filterLabels = mobileMessages.IssueDetail.frame
   const target = !loading && !error ? taskLinkAttempt(id, attempt, data) : undefined
   const opened = useRef(false)
   useEffect(() => { opened.current = false }, [id, attempt])
@@ -96,23 +109,21 @@ export function TaskScreen() {
               {task.schedule ? <Chip icon={<CalendarClock size={14} color={colors.secondary} strokeWidth={2} />} label={task.schedule.label} /> : null}
             </View>
             <Row label={mobileMessages.MobileCore.taskPropertiesOnWeb} onPress={openTaskOnWeb} />
-            {task.description ? <View style={styles.description}><TaskDescription key={task.id} body={task.description} /></View> : null}
-            {data?.work && (data.work.linkedChats.length > 0 || data.work.pullRequests.length > 0 || Boolean(conversations?.length) || progress.length > 0) ? <View>
-              <Text accessibilityRole="header" style={styles.section}>{mobileMessages.IssueDetail.work.heading}</Text>
+            {data?.work && (data.work.linkedChats.length || readableThreads.length) ? <View>
+              <Text accessibilityRole="header" style={styles.section}>{data.work.linkedChats.length + readableThreads.length > 1 ? property.threadMany : property.threadOne}</Text>
               {data.work.linkedChats.map(chat => <Row key={chat.id} label={chat.title || mobileMessages.ConversationDirectory.untitled}
                 onPress={() => router.push(`/groups/${chat.id}`)} />)}
-              {conversations?.map(thread => {
-                const label = thread.detail?.name || (thread.ownerName ? mobileMessages.IssueThreads.ownerThread.replace('{name}', thread.ownerName) : mobileMessages.IssueThreads.hidden)
-                const status = thread.stopping ? mobileMessages.IssueThreads.stopping : thread.state === 'replaced' ? mobileMessages.MobileCore.threadReplaced : ATTEMPT_WORD[thread.state]
-                const detail = [thread.detail?.agent, thread.detail?.observedModel, status, thread.detail?.summary].filter(Boolean).join(' · ')
-                return <Row key={thread.id} label={label} detail={detail} onPress={thread.detail ? () => router.push(`/thread/${thread.id}`) : undefined} />
+              {readableThreads.map(thread => {
+                const gate = [thread.id, ...thread.detail?.attemptIds ?? []].map(id => progress.get(id)).find(Boolean)
+                const result = thread.stopping ? mobileMessages.IssueThreads.stopping : thread.state === 'replaced' ? mobileMessages.MobileCore.threadReplaced : ATTEMPT_WORD[thread.state]
+                return <Row key={thread.id} label={thread.detail?.name || mobileMessages.ConversationDirectory.untitled}
+                  detail={gate ? nativeActivityLabel(gate) : result} onPress={() => router.push(`/thread/${thread.id}`)} />
               })}
-              {data.work.pullRequests.map(pull => {
-                const source = pull.sourceConversationId ? conversations?.find(thread => thread.id === pull.sourceConversationId)?.detail : null
-                const detail = [source?.name, source?.agent, source?.observedModel, mobileMessages.IssueDetail.work.states[pull.state], source?.summary].filter(Boolean).join(' · ')
-                return <Row key={pull.url} label={pull.title || pull.url} detail={detail} onPress={() => { void Linking.openURL(pull.url) }} />
-              })}
-              {progress.map(group => <FactoryProgressRow key={group.id} group={group} />)}
+            </View> : null}
+            {data?.work?.pullRequests.length ? <View>
+              <Text accessibilityRole="header" style={styles.section}>{data.work.pullRequests.length > 1 ? property.pullRequestMany : property.pullRequestOne}</Text>
+              {data.work.pullRequests.map(pull => <Row key={pull.url} label={pull.title || pull.url}
+                detail={mobileMessages.IssueDetail.work.states[pull.state]} onPress={() => { void Linking.openURL(pull.url) }} />)}
             </View> : null}
             {(['child', 'parent', 'blockedBy', 'blocks', 'duplicate', 'related'] as const).map(kind => {
               const rows = data?.work?.connections?.filter(row => row.kinds.includes(kind)) ?? []
@@ -124,9 +135,14 @@ export function TaskScreen() {
                   onPress={() => router.push(`/task/${row.id}`)} />)}
               </View>
             })}
+            {task.description ? <View style={styles.description}><TaskDescription key={task.id} body={task.description} /></View> : null}
             {activity.length ? <Text accessibilityRole="header" style={styles.section}>{mobileMessages.MobileCore.activity}</Text> : null}
-            {activity.map((item, index) => <ActivityRow key={activityEntryId(item)} item={item} first={index === 0} last={index === activity.length - 1}
-              taskId={task.id} code={task.identifier}
+            {activity.length && conversations ? <Segmented value={filter} onChange={value => { setFilter(value); setShownRows(50) }} options={[
+              { value: 'all', label: filterLabels.filterAll }, { value: 'comments', label: filterLabels.filterComments }, { value: 'agents', label: filterLabels.filterAgents },
+            ]} /> : null}
+            {earlier > 0 ? <Row label={filterLabels.showEarlier.replace('{count}', String(Math.min(50, earlier)))} onPress={() => setShownRows(n => n + 50)} /> : null}
+            {visibleActivity.map((item, index) => <ActivityRow key={activityEntryId(item)} item={item} first={index === 0} last={index === visibleActivity.length - 1}
+              taskId={task.id} code={task.identifier} stretches={stretches}
               onOpen={item.kind === 'agent' ? () => router.push(conversationHref(task.id, item.run.attempts[0]!.runId))
                 : item.kind === 'evidence' ? () => { const href = taskEvidenceHref(task.id, item.factoryTaskId, item.sourceId); if (href) void openOnWeb(href) } : undefined} />)}
           </>
@@ -140,14 +156,6 @@ export function TaskScreen() {
       ) : null}
     </View>
   )
-}
-
-function FactoryProgressRow({ group }: { group: TaskFactoryProgress }) {
-  const [expanded, setExpanded] = useState(false)
-  return <View>
-    <Row label={nativeActivityLabel(group.current)} expanded={expanded} onPress={() => setExpanded(value => !value)} />
-    {expanded && group.steps.map(step => <Row key={step.id} label={nativeActivityLabel(step)} detail={shortWhen(step.at)} />)}
-  </View>
 }
 
 function Chip({ icon, label }: { icon: ReactNode; label: string }) {
@@ -164,7 +172,8 @@ function Chip({ icon, label }: { icon: ReactNode; label: string }) {
  * row: the Agent's glyph and name, 「Codex」, with its latest run's result (2026-11-07-2230) and date; another Agent starts
  * its own row, with no 「换」 (2026-11-09, as Warp). A row opens the task's conversation at its first run; a replaced thread and the creation are lines.
  */
-function ActivityRow({ item, first, last, onOpen, taskId, code }: { item: ActivityEntry; first: boolean; last: boolean; onOpen?: () => void; taskId: string; code: string | null }) {
+function ActivityRow({ item, first, last, onOpen, taskId, code, stretches }: { item: ActivityEntry; first: boolean; last: boolean; onOpen?: () => void; taskId: string; code: string | null; stretches: Parameters<typeof nativeHistoryPieces>[2] }) {
+  const router = useRouter()
   const latest = item.kind === 'agent' ? item.run.attempts.at(-1)! : null
   // Its own run's result, never the task's reason: a run that finished and opened a PR is 完成; only the task waits.
   const result = latest ? attemptState(latest) : null
@@ -181,7 +190,14 @@ function ActivityRow({ item, first, last, onOpen, taskId, code }: { item: Activi
       </View>
       <View style={styles.activityText}>
         {item.kind === 'agent' ? <AgentName harness={item.run.harness} style={styles.activityTitle} /> : <Text style={styles.activityTitle} numberOfLines={1}>
-          {'at' in item ? nativeActivityLabel(item, { taskId, code }) : item.kind === 'replaced' ? mobileMessages.MobileCore.threadReplaced : item.by ? mobileMessages.MobileCore.taskCreatedBy.replace('{name}', item.by) : mobileMessages.MobileCore.taskCreated}
+          {item.kind === 'history' ? nativeHistoryPieces(item.event, { taskId, code }, stretches).map((piece, index) => {
+            if (piece.kind === 'text') return piece.text
+            return <Text key={index} accessibilityRole="link" style={styles.activityLink} onPress={() => {
+              if (piece.kind === 'thread') router.push(`/thread/${piece.runId}`)
+              else if (piece.kind === 'pull') void Linking.openURL(piece.href)
+              else router.push(`/task/${piece.taskId}`)
+            }}>{piece.text}</Text>
+          }) : 'at' in item ? nativeActivityLabel(item, { taskId, code }) : item.kind === 'replaced' ? mobileMessages.MobileCore.threadReplaced : item.by ? mobileMessages.MobileCore.taskCreatedBy.replace('{name}', item.by) : mobileMessages.MobileCore.taskCreated}
         </Text>}
         <Text style={styles.activityMeta} numberOfLines={2}>
           {result && latest ? [ATTEMPT_WORD[result], result === 'done' && pullRequest ? mobileMessages.MobileCore.openedPullRequest.replace('{number}', String(pullRequest.number)) : null, shortWhen(latest.createdAt)].filter(Boolean).join(' · ') : item.kind === 'agent' ? null : shortWhen('at' in item ? item.at : item.createdAt)}
@@ -196,6 +212,7 @@ function ActivityRow({ item, first, last, onOpen, taskId, code }: { item: Activi
 }
 
 const styles = StyleSheet.create({
+  activityLink: { color: colors.text, textDecorationLine: 'underline' },
   screen: { flex: 1, backgroundColor: colors.page },
   body: { paddingHorizontal: LIST_INSET, paddingTop: 8, gap: 0 },
   center: { paddingTop: 40, alignItems: 'center' },

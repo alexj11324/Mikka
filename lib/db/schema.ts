@@ -411,6 +411,7 @@ export const agentRuns = pgTable('agent_runs', {
   dispatchFingerprint: text('dispatchFingerprint'),
   baseBranch: text('baseBranch').default('main'),
   sessionId: text('sessionId'), worktreePath: text('worktreePath'),
+  observedModel: varchar('observedModel', { length: 500 }),
   stopReason: text('stopReason'), error: text('error'),
   failureDetails: jsonb('failureDetails').$type<RunFailure | null>(),
   report: jsonb('report').$type<Record<string, unknown> | null>(),

@@ -70,6 +70,11 @@ export function persistentReadData(key: unknown, data: unknown): unknown {
   const family = Array.isArray(key) ? key[0] : key
   const context: Projection = { sensitive: false, changed: false, needsChatMetadataRefresh: false, issue: ['issue', 'issues', 'issue-activity-versions'].includes(family), chat: family === 'coordinator-chat', issuePrefix: key === 'settings:issue-prefix' }
   let projected = data
+  if (family === 'issue' && data && typeof data === 'object' && 'taskWork' in data) {
+    // The joined Work/Factory response was always memory-only. Persist the document preview alone.
+    const { taskWork: _work, ...document } = data
+    projected = document
+  }
   if (family === 'coordinator-chat' && data && typeof data === 'object' && 'items' in data && Array.isArray(data.items)) {
     // The existing continuation proves the server's latest 200-message window.
     // Older pages and optimistic/inbox messages have no such proof after reload.

@@ -37,6 +37,7 @@ mock.module('next-intl', { namedExports: {
   useLocale: () => 'en', useFormatter: () => format, useNow: () => new Date('2026-11-05T08:08:00Z'),
 } })
 
+let joinedReads = 0, serveJoined = false
 let stored: IssueView
 let versions: ActivityVersion[]
 let issueReads = 0, versionReads = 0, fullVersionReads = 0, documentReads = 0
@@ -62,14 +63,19 @@ mock.module(at('app/actions/task-domain.ts'), { namedExports: {
 } })
 let afterCommit: (() => void) | undefined
 let writes: Parameters<typeof import('../app/actions/issues')['saveIssue']>[0][]
-mock.module(at('app/actions/issues.ts'), { namedExports: {
-  pollIssue: async (id: string, known?: string) => {
+async function readFixtureIssue(id: string, known?: string, cursor?: object) {
     assert.equal(id, issueId); issueReads++; knownVersions.push(known)
     const issue = readOverride ? await readOverride() : structuredClone(stored)
     if (readFailure) return { error: readFailure }
     const version = String(issue.revision).padStart(32, '0')
-    return known === version ? { viewerId: readViewerId, version, unchanged: true } : { viewerId: readViewerId, issue, version }
-  },
+    const document = known === version ? { viewerId: readViewerId, version, unchanged: true } : { viewerId: readViewerId, issue, version }
+    if (!serveJoined || !cursor) return document
+    joinedReads++
+    return { ...document, taskWork: { live: { workspaceId }, viewerId: readViewerId, work: null, connections: [], threads: [], activity: { version, items: structuredClone(versions), hasMore: false, predecessor: null } } }
+  }
+mock.module(at('app/actions/agents.ts'), { namedExports: { pollTaskDetail: readFixtureIssue } })
+mock.module(at('app/actions/issues.ts'), { namedExports: {
+  pollIssue: readFixtureIssue,
   pollIssueVersionSummaries: async (id: string) => {
     assert.equal(id, issueId); versionReads++
     return { viewerId: readViewerId, snapshot: { version: String(versions.length).padStart(32, '0'), items: structuredClone(versions) } }
@@ -119,7 +125,7 @@ mock.module(at('components/workspace/issue-description-history.tsx'), { namedExp
     open ? <output data-restore-available={String(Boolean(onRestore))} /> : null,
 } })
 const emptyThreads = { data: [] }
-mock.module(at('components/workspace/issue-threads.tsx'), { namedExports: { IssueThreads: none, ThreadEventRow: none, useIssueThreads: () => emptyThreads, useTaskWork: () => ({ rows: [], error: null }) } })
+mock.module(at('components/workspace/issue-threads.tsx'), { namedExports: { IssueThreads: none, ThreadEventRow: none, useIssueThreads: () => emptyThreads, useTaskWork: (_id: string, _open: () => void, _enabled: boolean, _viewer: string, joined?: { data: { history: { items: ActivityVersion[] } }; refresh: () => Promise<unknown> }) => ({ rows: [], error: null, history: joined && { rows: joined.data.history.items, refresh: joined.refresh } }) } })
 // The controller is mounted with a minimal renderer for the official frame contract.
 const { IssueActivityFeed } = await import('../components/workspace/issue-activity-feed')
 mock.module(at('components/workspace/task-detail-frame.tsx'), { namedExports: {
@@ -200,6 +206,7 @@ beforeEach(() => {
   deletedTask = null
   restoreOverride = null
   versions = [version(stored)]; writes = []; issueReads = 0; versionReads = 0; fullVersionReads = 0; documentReads = 0; knownVersions = []; readFailure = null; readViewerId = owner; readOverride = null; documentHold = null; documentWaits = 0; latestDocumentUpdate = undefined; flush = null; cache = new Map(); sockets.length = 0
+  joinedReads = 0; serveJoined = false
   afterCommit = undefined
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
@@ -829,4 +836,20 @@ test('the server restore decision wins even when the client clock says a Task is
   assert.equal(writes, 1)
   assert.equal(restoreButton(), undefined)
   assert.doesNotMatch(container.textContent ?? '', /IssueDetail\.deletedDescription/)
+})
+
+test('the mounted task receives its body, activity and Work in one authorized read and one refresh', async () => {
+  serveJoined = true
+  await renderDetail(true, 'Tasks', undefined, false)
+  await until(() => activity().includes('createdTask'), 'initial activity came with the document')
+  assert.equal(issueReads, 1)
+  assert.equal(joinedReads, 1)
+  assert.equal(versionReads, 0)
+  stored = { ...stored, revision: stored.revision + 1, status: 'done' }
+  versions.push(version(stored))
+  await renderDetail(false, 'Tasks', undefined, false)
+  await renderDetail(true, 'Tasks', undefined, false)
+  await until(() => properties().textContent === 'done:normal', 'reopening refreshed the joined document')
+  assert.equal(joinedReads, 2)
+  assert.equal(versionReads, 0)
 })

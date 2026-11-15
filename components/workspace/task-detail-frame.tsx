@@ -9,7 +9,7 @@ import { getIssuePropertyOptions } from '@/app/actions/issue-metadata'
 import type { IssueView } from '@/app/actions/issues'
 import { TaskAttachments } from './task-attachments'
 import type { TaskActivityGlyph, TaskActivityItem, TaskDetailFrameProps, TaskDetailRow, TaskMenuItem, TaskSubtask } from '@/components/slots/task-detail-contract'
-import { useIssueTeam } from '@/components/teams/issue-team-control'
+import { useIssueTeam, type TaskTeamSnapshot } from '@/components/teams/issue-team-control'
 import { formatDateOnly } from '@/lib/date-only'
 import { withBasePath } from '@/lib/base-path'
 import { taskProjectOptions } from '@/lib/task-project-options'
@@ -107,6 +107,7 @@ export type FramedTaskProps = {
   activityPredecessor?: ActivityVersion | null
   historyFailed: (() => void) | null
   earlierActivity: { hasMore: boolean; loading: boolean; failed: boolean; load: () => void }
+  teamSnapshot?: TaskTeamSnapshot
   agentActivity: ReturnType<typeof useTaskWork>
   documentTools: boolean
   actionRequest: IssueActionRequest | null
@@ -162,7 +163,7 @@ export function FramedTask(props: FramedTaskProps) {
   const loadOptions = () => setWantOptions(true)
   const metadata = useIssueMetadataSave({ task, disabled: locked, onSaved: adopt, onBusyChange: props.onMetadataBusy })
   const ownershipRows = useTaskOwnershipRows(task, userId, preview, locked, adopt)
-  const team = useIssueTeam({ issueId: task.id, viewerId: userId, disabled: locked })
+  const team = useIssueTeam({ issueId: task.id, viewerId: userId, disabled: locked }, props.teamSnapshot, !preview)
   const presentation = { data: props.agentActivity.work?.presentation, error: props.agentActivity.failed, retry: props.agentActivity.retry }
 
   const connections = useIssueConnections({ snapshot: props.agentActivity.connections, liveWorkspaceId: props.liveWorkspaceId, viewerId: userId, task, getCurrent, onSaved: adopt, disabled: locked, enabled: !preview })

@@ -19,7 +19,9 @@ mock.module('next-intl', { namedExports: {
 } })
 const infinite: { config?: Record<string, unknown> } = {}
 const liveKeys: unknown[][] = []
-mock.module('swr', { defaultExport: () => ({ data: undefined }), namedExports: { useSWRConfig: () => ({ mutate: async () => {} }), unstable_serialize: (key: unknown) => JSON.stringify(key) } })
+const refreshed: unknown[] = []
+let headerTitleChanged: (() => void) | undefined
+mock.module('swr', { defaultExport: () => ({ data: undefined }), namedExports: { useSWRConfig: () => ({ mutate: async (key: unknown) => { refreshed.push(key) } }), unstable_serialize: (key: unknown) => JSON.stringify(key) } })
 mock.module('swr/infinite', {
   defaultExport: (_key: unknown, _fetcher: unknown, config: Record<string, unknown>) => { infinite.config = config; return { data: pages, size: 1, setSize: async () => {}, mutate: async () => {}, isValidating: false } },
   namedExports: { unstable_serialize: (getKey: (index: number, previous: null) => unknown) => '$inf$' + JSON.stringify(getKey(0, null)) },
@@ -35,7 +37,7 @@ mock.module(new URL('../../lib/hooks/view-state.tsx', import.meta.url).href, { n
   useViewScroll: () => useRef(null),
 } })
 mock.module(new URL('../../app/actions/task-runs.ts', import.meta.url).href, { namedExports: { findThreadReferences: async () => [{ kind: 'task', id: issueId, title: 'Authorized task' }] } })
-mock.module(new URL('./thread-header.tsx', import.meta.url).href, { namedExports: { ThreadHeader: () => null } })
+mock.module(new URL('./thread-header.tsx', import.meta.url).href, { namedExports: { ThreadHeader: ({ onTitleChanged }: { onTitleChanged?: () => void }) => { headerTitleChanged = onTitleChanged; return null } } })
 mock.module(new URL('../coordinator/bot-model-picker.tsx', import.meta.url).href, { namedExports: { BotModelPicker: ({ botId, running }: { botId: string; running: boolean }) => <span aria-label="Fixture Bot model">{botId} {running ? 'next message' : 'current'}</span> } })
 mock.module(new URL('../coordinator/chat-composer.tsx', import.meta.url).href, { namedExports: { ChatComposer: ({ ref, value, onChange, model }: ChatComposerProps) => <>{model}<Textarea ref={ref} value={value} onChange={event => onChange(event.currentTarget.value)} /></> } })
 mock.module(new URL('../nav/conversation-pill.tsx', import.meta.url).href, { namedExports: { ConversationPill: () => null } })
@@ -89,6 +91,18 @@ test('Factory task and thread references in bot and agent replies are real links
   const ownText = container.querySelector('[data-slot="user-message-text"]')!
   assert.equal(ownText.textContent, handoff)
   assert.equal(ownText.querySelector('a'), null)
+})
+
+test('a committed named chat title revalidates only the group list supplying the current viewer and workspace', async () => {
+  const { botKeys } = await import('@/lib/swr/keys')
+  pages = [{ messages: [], nextBefore: null, readRevision: 0 }]
+  for (const [owner, workspace] of [['owner-a', 'workspace-a'], ['owner-b', 'workspace-b']]) {
+    await act(async () => root.render(<GroupChatView group={{ id: 'same-chat-id', title: 'Chat', workspaceId: workspace, creationPurpose: 'conversation' }} userId={owner} people={new Map()} />))
+    refreshed.length = 0
+    assert.ok(headerTitleChanged)
+    await act(async () => headerTitleChanged?.())
+    assert.deepEqual(refreshed, [botKeys.groups(owner, workspace)])
+  }
 })
 
 test('group replies use the existing Markdown HTML and URL protections', async () => {

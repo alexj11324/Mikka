@@ -100,6 +100,18 @@ test('group chat keys reach only current members, after the actual writer commit
       await drain(); assert.deepEqual(sent, [], 'a read receipt changes the list row, not the group page')
     })
 
+    await t.test('marking unread wakes only the reader whose open transcript needs the new revision', async () => {
+      const { setGroupPreference } = await import('../chat-preferences')
+      sent.length = 0
+      assert.equal(await scope.run(() => setGroupPreference('owner', groupId, { markedUnread: true })), 'ok')
+      await drain()
+      assert.deepEqual(delivered(), [{ scope: { ownerId: 'owner', workspaceId: team }, events: key }])
+      sent.length = 0
+      assert.equal(await scope.run(() => setGroupPreference('outsider', groupId, { markedUnread: true })), 'notFound')
+      await drain()
+      assert.deepEqual(delivered(), [])
+    })
+
     await t.test('a rejected write sends nothing', async () => {
       sent.length = 0
       const refused = await scope.run(() => handleGroup(database, directory, { ...base, userId: 'outsider', method: 'POST', resource: 'messages', body: JSON.stringify({ body: 'Not a member' }) }))

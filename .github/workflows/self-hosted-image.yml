@@ -157,7 +157,7 @@ jobs:
       - &community_services
         name: Exercise Mailpit, MinIO, two app replicas and 31 synthetic model replies
         timeout-minutes: 10
-        run: docker compose exec -T -e MIKKA_DESKTOP_ACCEPTANCE=1 app node scripts/acceptance/self-hosted-services.mjs
+        run: docker compose exec -T -e MIKKA_DESKTOP_ACCEPTANCE=1 -e MIKKA_DESKTOP_MEMBER_FIXTURE="${MIKKA_DESKTOP_MEMBER_FIXTURE:-0}" app node scripts/acceptance/self-hosted-services.mjs
       - name: Ensure FFmpeg and ffprobe for community media regressions
         timeout-minutes: 5
         run: |
@@ -323,6 +323,7 @@ jobs:
       COMPOSE_FILE: docker-compose.yml:tests/self-hosted/compose.services.yml
       COMPOSE_PROJECT_NAME: mikka-selfhost-ci
       EXPECTED_OVERLAY_SHA: ${{ inputs.overlay_sha }}
+      MIKKA_DESKTOP_MEMBER_FIXTURE: '1'
     steps:
       - name: Verify the trusted workflow and fixed source pair
         env:

@@ -19,6 +19,7 @@ export function ThreadReplyVersions({ issueId,runId,anchorRunId,anchorKey,operat
   const actionError = useActionError()
   const [open,setOpen] = useState(false), [selected,setSelected] = useState('original')
   const [draft,setDraft] = useState(text), [busy,setBusy] = useState(false), [error,setError] = useState('')
+  const submitting = useRef(false)
   const pending = useRef<{ id:string; text:string } | null>(null)
   const { data,mutate,error:readError } = useSWR(open ? ['reply-versions',issueId,runId] : null, () => getThreadReplyVersions(issueId,runId))
   const versions = data?.filter(row => row.anchorRunId===anchorRunId && row.anchorKey===anchorKey) ?? []
@@ -27,22 +28,28 @@ export function ThreadReplyVersions({ issueId,runId,anchorRunId,anchorKey,operat
   const pullRequest=version ? version.pullRequest : versions[0]?.originalPullRequest
   const label = operation==='edit' ? t('versionEdit') : t('versionRerun')
   async function submit() {
-    if (busy || !canRun) return
+    if (submitting.current || !canRun) return
     const value = draft.trim()
     if (operation==='edit' && !value) return
     const request = pending.current?.text===value ? pending.current : {id:crypto.randomUUID(),text:value}
+    submitting.current = true
     pending.current=request
     setBusy(true); setError('')
     try {
       const base = {anchorKey,anchorRunId,requestId:request.id}
       const result=await createThreadReplyVersion({issueId,runId,change:operation==='edit' ? {...base,operation,text:value} : {...base,operation}})
       if (result.error) { setError(actionError(result.error)); return }
-      pending.current=null
-      await mutate()
-      setSelected(result.versionId)
+      const rows = await mutate()
+      const saved = rows?.find(row => row.id === result.versionId && row.anchorRunId === anchorRunId && row.anchorKey === anchorKey)
+      if (!saved || saved.resultRunId !== result.runId) {
+        setError(actionError('threadSubmissionOutcomeUnconfirmed'))
+        return
+      }
+      setSelected(saved.id)
+      pending.current = null
       refresh()
     } catch { setError(t('loadFailed')) }
-    finally { setBusy(false) }
+    finally { submitting.current = false; setBusy(false) }
   }
   return <Dialog open={open} onOpenChange={setOpen}>
     <DialogTrigger render={<Button type="button" size="xs" variant="ghost" />}>{label}</DialogTrigger>

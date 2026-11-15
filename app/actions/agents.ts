@@ -13,6 +13,7 @@ import { threadModelChoice, type ThreadModelChoice } from '@/lib/thread-model-ch
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import type { SelectResult } from 'drizzle-orm/query-builders/select.types'
 import { z } from 'zod'
+import { cacheReadAction } from '@/lib/cache-read-action'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
@@ -38,7 +39,7 @@ import { factoryEventId } from '@/lib/factory/event-id'
 import { FactoryError } from '@/lib/factory/contract'
 import { readThreadChunks, threadChunkCursor, type ThreadChunkCursor } from '@/lib/thread-chunks'
 import { executionBotName, runBotId, runBotName, threadNameLines } from '@/lib/run-bot-name'
-import { requireIssueAccess } from '@/lib/issue-access'
+import { requireIssueAccessWithoutBody } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, threadQuestionRunId, withRunChain, type IssueThread } from '@/lib/issue-threads'
@@ -219,11 +220,11 @@ export async function listAgents(): Promise<AgentView[]> {
 
 /** Who currently collaborates on the issue (R-26): they see that its threads exist. */
 async function issueThreadAccess(issueId: string) {
-  const { issue, user } = await requireIssueAccess(issueId)
+  const { issue, user, teamId } = await requireIssueAccessWithoutBody(issueId)
   if (!issue.workspaceId) throw new ActionFailureError('issueNotFound')
   const members = await workspaceDb.select({ id: workspaceMembers.userId }).from(workspaceMembers)
     .where(and(eq(workspaceMembers.workspaceId, issue.workspaceId), eq(workspaceMembers.status, 'active')))
-  return { issue, user, memberIds: new Set(members.map(member => member.id)) }
+  return { issue, user, teamId, memberIds: new Set(members.map(member => member.id)) }
 }
 
 const threadColumns = {
@@ -255,9 +256,9 @@ export async function listIssueThreads(issueId: string): Promise<IssueThread[]> 
 
 /** The same list, plus the channel its `issue_threads` key arrives on: the issue's
  * workspace, or the owner's home for a personal issue; null reads once a minute. */
-export async function pollIssueThreads(issueId: string, includeTaskWork = false, activityCursor?: { version?: string; positions?: import('@/lib/list-poll').ListPosition[] }) {
+export async function pollIssueThreads(issueId: string, includeTaskWork = false, activityCursor?: { version?: string; positions?: import('@/lib/list-poll').ListPosition[]; paged?: boolean }) {
   return withDatabaseOperation('/actions/threads/issue-list', async () => {
-    const { threads, issue, user } = await readIssueThreads(issueId)
+    const { threads, issue, user, teamId } = await readIssueThreads(issueId)
     const [{ documentLiveWorkspace }, { workspacePool }] = await Promise.all([import('@/lib/live/panels'), import('@/lib/workspace-db')])
     const workspaceId = await documentLiveWorkspace(pool, workspacePool, issue.id, user.id)
     const work = includeTaskWork && issue.workspaceId
@@ -267,17 +268,34 @@ export async function pollIssueThreads(issueId: string, includeTaskWork = false,
     if (!includeTaskWork) return snapshot
     const { listIssueConnections } = await import('@/app/actions/issue-operations')
     const connections = await listIssueConnections(issue.id)
-    const { pollIssueVersionSummaries } = await import('@/app/actions/issues')
-    const activity = await pollIssueVersionSummaries(issue.id, activityCursor?.version, activityCursor?.positions)
+    const { pollIssueVersionSummaries, pollIssueActivityPage } = await import('@/app/actions/issues')
+    const activity = activityCursor?.paged
+      ? await pollIssueActivityPage(issue.id, activityCursor.version)
+      : await pollIssueVersionSummaries(issue.id, activityCursor?.version, activityCursor?.positions)
     if (activity.error) throw new ActionFailureError(activity.error)
     if (activity.viewerId !== user.id) throw new ActionFailureError('issueNotFound')
-    return { ...snapshot, connections, activity: activity.snapshot, viewerId: user.id }
+    return { ...snapshot, teamId, connections, activity: activity.snapshot, viewerId: user.id }
+  })
+}
+
+export type IssueWorkSnapshot = Extract<Awaited<ReturnType<typeof pollIssueThreads>>, { viewerId: string }>
+
+/** Reuse the authorized content read, then release its document lock before
+ * reading the Work view. The stable task and both viewer identities must agree. */
+export async function pollTaskDetail(issueId: string, known?: string, activityCursor?: { version?: string; positions?: import('@/lib/list-poll').ListPosition[]; paged?: boolean }) {
+  return cacheReadAction(async () => {
+    const { pollIssue } = await import('@/app/actions/issues')
+    const document = await pollIssue(issueId, known)
+    if (document.error) throw new ActionFailureError(document.error)
+    const work = await pollIssueThreads(issueId, true, activityCursor)
+    if (!('activity' in work) || work.viewerId !== document.viewerId) throw new ActionFailureError('issueNotFound')
+    return { ...document, taskWork: work }
   })
 }
 
 async function readIssueThreads(issueId: string) {
-  const { issue, user, memberIds } = await issueThreadAccess(issueId)
-  const result = (threads: IssueThread[]) => ({ threads, issue, user })
+  const { issue, user, teamId, memberIds } = await issueThreadAccess(issueId)
+  const result = (threads: IssueThread[]) => ({ threads, issue, user, teamId })
   if (!memberIds.has(user.id)) return result([])
   // BE-18: fold continuation chains by root first, then take the newest ISSUE_THREAD_LIMIT
   // roots, so continuations never use up a slot (lib/run-chain.ts). Read-only, no locks.

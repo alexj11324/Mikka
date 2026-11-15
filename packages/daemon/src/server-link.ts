@@ -466,7 +466,7 @@ export class MemoryServer {
         this.check()
         const run = this.runs.get(runId)
         if (!run) return
-        run.state = patch.state
+        if (patch.observedModel === undefined) run.state = patch.state
         run.patches.push(patch)
       },
       checkpointRun: async (runId, checkpoint) => {

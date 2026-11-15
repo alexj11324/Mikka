@@ -68,6 +68,7 @@ const functions = {
   'agents.renameDevice': actions1.renameDevice,
   'agents.removeDevice': actions1.removeDevice,
   'agents.listAgents': actions1.listAgents,
+  'agents.pollTaskDetail': actions1.pollTaskDetail,
   'agents.pollIssueThreads': actions1.pollIssueThreads,
   'agents.findThreadIssue': actions1.findThreadIssue,
   'agents.getIssueThread': actions1.getIssueThread,

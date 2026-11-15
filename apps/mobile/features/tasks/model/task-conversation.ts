@@ -1,5 +1,5 @@
 import { taskFactoryLabel, type TaskFactoryEvent } from '../../../../../lib/task-factory-events'
-import { chronologicalActivity, taskHistoryLabel, type TaskActivityFact } from '../../../../../lib/task-activity-timeline'
+import { activityLineParts, chronologicalActivity, type ActivityStretch, type TaskActivityFact } from '../../../../../lib/task-activity-timeline'
 import { HARNESS } from '@/lib/harness'
 import { mobileMessages } from '@/lib/messages'
 import type { TaskActivity, TaskDetail, ThreadItem } from '@/lib/types'
@@ -71,19 +71,32 @@ export function boundary(previous: Attempt, next: Attempt): Boundary {
 /** 活动 on the task's page: its creation and replaced threads, and one row per Agent's stretch, oldest first. */
 export type ActivityEntry = Exclude<TaskActivity, Attempt> | TaskActivityFact | TaskFactoryEvent | { kind: 'agent'; run: AgentRun }
 
+export function nativeHistoryPieces(event: Extract<TaskActivityFact, { kind: 'history' }>['event'], subject?: { taskId: string; code: string | null }, stretches: ActivityStretch[] = []) {
+  const { Workspace, Issue } = mobileMessages
+  const lookup = (map: Record<string, string>, key: string) => map[key] ?? key
+  return activityLineParts(event, {
+    activity: (key, values = {}) => Workspace.activity[key].replace(/\{(\w+)\}/g, (whole, name: string) => values[name] ?? whole),
+    status: value => lookup(Issue.status, value),
+    priority: value => lookup(Issue.priority, value),
+  }, subject, stretches)
+}
+
 export function nativeActivityLabel(item: TaskActivityFact | TaskFactoryEvent, subject?: { taskId: string; code: string | null }) {
   if (item.kind === 'factory_gate' || item.kind === 'evidence') return taskFactoryLabel(item, {
     ...mobileMessages.GroupTask, ...mobileMessages.FactoryAcceptance.kind, pullRequest: mobileMessages.FactoryAcceptance.pullRequest,
   })
   if (item.kind !== 'history') return [item.author, item.body].filter(Boolean).join(' · ')
-  const { Workspace, Issue } = mobileMessages
-  const lookup = (map: Record<string, string>, key: string) => map[key] ?? key
-  const description = taskHistoryLabel(item.event, {
-    activity: (key, values = {}) => Workspace.activity[key].replace(/\{(\w+)\}/g, (whole, name: string) => values[name] ?? whole),
-    status: value => lookup(Issue.status, value),
-    priority: value => lookup(Issue.priority, value),
-  }, subject)
-  return [item.event.actor?.name, description].filter(Boolean).join(' · ')
+  return nativeHistoryPieces(item.event, subject).map(part => part.text).join('')
+}
+
+export type TaskActivityFilter = 'all' | 'comments' | 'agents'
+
+export function filteredTaskActivity(items: ActivityEntry[], filter: TaskActivityFilter) {
+  if (filter === 'all') return items
+  return items.filter(item => {
+    if (item.kind === 'comment' || item.kind === 'reply') return filter === 'comments' || item.actor === 'bot'
+    return filter === 'agents' && (item.kind === 'agent' || item.kind === 'history' && item.event.actor?.type === 'agent')
+  })
 }
 
 export function activityEntryId(item: ActivityEntry) {
