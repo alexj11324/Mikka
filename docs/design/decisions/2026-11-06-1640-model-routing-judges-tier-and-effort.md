@@ -3,6 +3,7 @@
 - Date: 2026-11-06
 - Source: Alex, 2026-11-06, relayed by the coordinator, on the thread detail 「难度未判断 → claude-opus-5-5」: 「按照道理来说，只应该判断模型跟推理强度吧」, and use the Decisions API as OpenAI's guide recommends.
 - Rule: —
+- Superseded by: [2026-11-15-1630](2026-11-15-1630-agent-profile-is-a-role.md): automatic model routing is removed. Runs frozen with a routing snapshot keep showing it.
 - Replaces: the difficulty, model-candidate and reason questions of [model-difficulty-routing.md](../model-difficulty-routing.md) (issue #1329)
 
 Automatic model routing asks the Decision judge two independent `score`

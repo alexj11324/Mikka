@@ -7,13 +7,11 @@ import { credentialStates, orderCandidates, selectedOrderCandidates, readOrder, 
 import { entryKey, planDispatch, type OrderEntry, type OrderHarness, type RunLocation } from '@/lib/model-order-plan'
 import { cloudModelSupport } from '@/lib/cloud-template-models'
 import { cloudReady } from '@/lib/rule-dispatch'
-import type { invokeDecision } from '@/lib/coordinator/decide'
 import { BUILTIN_AGENT_PROFILE_ID, BUILTIN_AGENT_PROFILE_VERSION, builtinAgentProfileDefinition, builtinAgentProfileSelection, profileFixedModel, profileHarness, AgentProfileError, agentProfileDigest, agentProfileInstructions, agentProfileLegacyInstructions, parseAgentProfile, type AgentProfileScope, type AgentProfileSelection } from './agent-profile-definition'
 import { acquireProfileMembership, profileView, readProfileRow, readProfileRows, validateProfileScope, type ProfileMembership, type ProfileQuery, type ProfileRow } from './agent-profile-store'
 import { agentProfileSkillAvailability, agentProfileSkillCatalog, agentProfileSkillSource } from './agent-profile-skills'
 import { resolveProfileMark, type ProfileMarkValue } from './agent-profile-mark'
 import type { PublicAgentProfile } from './agent-profile-decision'
-import type { ModelRoutingContext } from '@/lib/model-routing-server'
 
 export * from './agent-profile-definition'
 export { AgentProfileStore } from './agent-profile-store'
@@ -33,8 +31,6 @@ export interface AgentProfileDispatchRequest {
   defaultHarness?: OrderHarness
   /** Host-only continuation of a default/legacy thread; never reselect its role. */
   defaultOnly?: boolean
-  /** Existing retry/repair host context; never a client-supplied model choice. */
-  routing?: Pick<ModelRoutingContext, 'previous' | 'escalate'>
 }
 export interface AgentProfileDispatchResult {
   target: ModelDispatch
@@ -47,7 +43,6 @@ type DispatchDependencies = {
   transaction?: PoolClient
   membership?: (scope: AgentProfileScope) => Promise<ProfileMembership>
   resolve?: typeof resolveModelDispatch
-  modelDecision?: typeof invokeDecision
 }
 const requestConstraints = async (pool: Pool, scope: AgentProfileScope, request: Partial<AgentProfileDispatchRequest>) => {
   let harness = request.asked?.harness, deviceId = request.deviceId
@@ -249,8 +244,7 @@ export async function resolveAgentProfileDispatch(pool: Pool, scope: DispatchSco
   // The model and machine come from the task, never from the Profile.
   const resolveTarget = async () => {
     const constraints = await requestConstraints(pool, scope, request)
-    return (deps.resolve ?? resolveModelDispatch)(pool, scope, request.asked?.model ? request.asked : undefined, request.location, constraints.deviceId, { withoutCloud: request.withoutCloud, cloudPurpose: request.cloudPurpose, harness: constraints.harness ?? request.defaultHarness, agentId: request.agentId, bindSubscription: false,
-      routing: { issueId: request.issueId, stage: request.stage, note: request.note, ...request.routing }, decision: deps.modelDecision })
+    return (deps.resolve ?? resolveModelDispatch)(pool, scope, request.asked?.model ? request.asked : undefined, request.location, constraints.deviceId, { withoutCloud: request.withoutCloud, cloudPurpose: request.cloudPurpose, harness: constraints.harness ?? request.defaultHarness, agentId: request.agentId, bindSubscription: false })
   }
   const selectionMode = request.asked?.model ? 'picked' as const : 'preference' as const
   if (request.defaultOnly && request.profileId && request.profileId !== BUILTIN_AGENT_PROFILE_ID) throw new AgentProfileError('agentProfilePinConflict')

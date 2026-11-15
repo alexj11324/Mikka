@@ -24,7 +24,7 @@ import { providerContinuationPrompt } from './run-retry'
 import { recordCoordinatorEvent } from './coordinator-event-store'
 import { runFinishedEvent } from './coordinator-events'
 import { defaultAgentCopy } from './agent-copy'
-import { profileFixedModel } from './factory/agent-profile-definition'
+import { profileFixedModel, profileHarness } from './factory/agent-profile-definition'
 import { ActionFailureError } from './action-error'
 import { ComputerError } from './computer/store'
 import { runChanged } from './live/panels'
@@ -144,7 +144,7 @@ async function fallbackScope(query: Query, run: Run): Promise<Scope> {
   return { ownerId: run.userId, workspaceId: scope?.workspaceId ?? await (await import('./execution-settings')).executionWorkspace(run.userId, run.botId), botId: scope?.botId ?? run.botId }
 }
 
-async function attemptedEntries(query: Query, run: Run, entries: OrderEntry[], smartRouting: boolean): Promise<Set<string>> {
+async function attemptedEntries(query: Query, run: Run, entries: OrderEntry[]): Promise<Set<string>> {
   // A bounded recursive chain is owner/task scoped and contains only earlier
   // provider continuations; old tasks cannot exhaust this task's order.
   const { rows } = await query.query<{ report: unknown; entry: OrderEntry | null }>(`WITH RECURSIVE chain AS (
@@ -161,9 +161,9 @@ async function attemptedEntries(query: Query, run: Run, entries: OrderEntry[], s
   }
   const current = run.agentDefinition?.modelDispatch?.entry
   const index = current ? entries.findIndex(entry => attemptKey(entry) === attemptKey(current)) : -1
-  // Difficulty routing may deliberately start later in the preference list.
-  // Earlier, stronger entries have not been attempted by that run.
-  if (!smartRouting || !run.agentDefinition?.modelDispatch?.routing)
+  // A run frozen by the retired difficulty routing may have started later in
+  // the preference list. Earlier, stronger entries have not been attempted.
+  if (!run.agentDefinition?.modelDispatch?.routing)
     for (const entry of entries.slice(0, index + 1)) attempted.add(attemptKey(entry))
   return attempted
 }
@@ -253,8 +253,7 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
       if (target && source.agentDefinition && source.issueId) {
         const policyCeiling = await providerContinuationPolicy(client, source.userId, source.id)
         const { routing: _previousRouting, ...dispatch } = source.agentDefinition.modelDispatch!
-        const modelDispatch = { ...dispatch, mode: 'preference' as const, entry: target.entry,
-          ...(target.routing ? { routing: target.routing } : {}) }
+        const modelDispatch = { ...dispatch, mode: 'preference' as const, entry: target.entry }
         const selection = { model: target.model, modelDispatch, ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}),
           ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }
         let runId: string
@@ -361,8 +360,7 @@ async function recoverAuthorizedProviderFailure(pool: Pool, source: Run, initial
   const userId = source.userId
   // The order dispatch tried (优先使用的 Agent's list first, decision 2026-11-05-0400), so what came before this run is what was tried.
   const scope = await fallbackScope(pool, source), stored = await readOrder(pool, scope)
-  const { autoModelRouting } = stored
-  const attempted = await attemptedEntries(pool, source, dispatchOrder(stored.entries, stored.preferredHarness), autoModelRouting)
+  const attempted = await attemptedEntries(pool, source, dispatchOrder(stored.entries, stored.preferredHarness))
   // The Owner requested these checks on their original subscription/model.
   // Keep the historical preference snapshot intact; the host receipt pins
   // this round before any alternate model selection or runtime preparation.
@@ -383,9 +381,7 @@ async function recoverAuthorizedProviderFailure(pool: Pool, source: Run, initial
   for (let index = 0; index <= stored.entries.length; index++) {
     const selected: ModelDispatch = await resolveModelDispatch(pool, scope, null, location, source.agentDefinition.pinnedDeviceId ?? ((monitor || checkpointUnavailable) && origin.kind === 'local' ? source.deviceId ?? undefined : undefined),
       { excludeEntryKeys: [...attempted].map(key => decodeURIComponent(key)), cloudPurpose: origin.remoteUrl ? 'task' : 'desktop',
-        ...(autoModelRouting && source.agentDefinition.modelDispatch.routing ? { routing: { issueId: source.issueId ?? undefined,
-          previous: source.agentDefinition.modelDispatch.routing, escalate: true, effort: source.agentDefinition.agentProfile?.effort } } : {}),
-        ...(source.agentDefinition.agentProfile?.definition.harness && source.agentDefinition.agentProfile.definition.harness !== 'auto' ? { harness: source.agentDefinition.agentProfile.definition.harness } : {}) })
+        ...(profileHarness(source.agentDefinition.agentProfile) ? { harness: profileHarness(source.agentDefinition.agentProfile) } : {}) })
     if (selected.kind === 'none') return settle(pool, source, await unavailableRecord(pool, scope, source, attempted, [...skipped, ...selected.skipped ?? []]))
     attempted.add(attemptKey(selected.entry))
     try {
@@ -427,7 +423,6 @@ async function recoverAuthorizedProviderFailure(pool: Pool, source: Run, initial
           if (!current) { skipped.push({ entry: selected.entry, block: { usable: false, reason: 'noDevice' } }); continue }
           const repoId = origin.remoteUrl ? (await (await import('./device-repositories')).ensureDeviceRepository(userId, current.deviceId, origin.remoteUrl)).id : current.repoId
           target = { agentId: ready.agentId, deviceId: current.deviceId, deviceRepoId: repoId, model: selected.model, entry: selected.entry,
-            ...(selected.routing ? { routing: selected.routing } : {}),
             ...(binding ? { subscriptionBindingId: binding } : {}), cloud: true, botId, workspaceId: scope.workspaceId }
         }
       }

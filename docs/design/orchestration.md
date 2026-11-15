@@ -189,14 +189,11 @@ not report the model ([1400](decisions/2026-11-02-1400-model-order-dispatch.md),
 
 1. A machine the run asks for is used as asked: a thread continuing in its
    environment, a device-only source event, or a device the person picked.
-2. Otherwise the thread's own model, when the person picked one, then
-   优先使用的模型. With 按任务难度自动选模型 on (the default), the host
-   filters usable credentials, quota and machines before the Decision API
-   chooses an enumerated model and supported reasoning effort. An explicit
-   model or an Agent 配置 with a fixed model wins; a selected configuration
-   that inherits the list uses routing only after the configuration is chosen.
-   A low-confidence, invalid or unavailable decision preserves the existing
-   list and placement order. Turning the setting off also preserves that order.
+2. Otherwise the model the person picked; else, for a new thread, the
+   dispatching chat's own model when a thread can run it (a subscription or
+   API-key model); else 优先使用的模型 in order. An Agent 配置 never sets the
+   model. There is no automatic routing
+   ([2026-11-15-1630](decisions/2026-11-15-1630-agent-profile-is-a-role.md)).
    运行位置 decides where, trying places in order and moving on only when
    no allowed model runs in the one before
    ([2330](decisions/2026-11-02-2330-cloud-first-dispatch.md)): 云端 (the
@@ -213,17 +210,7 @@ not report the model ([1400](decisions/2026-11-02-1400-model-order-dispatch.md),
    rows that fix it: 打开模型与订阅, 连接电脑, 填入 E2B Key. Answering a row makes
    the bot dispatch again.
 
-**Task difficulty (#1329).** Model tiers are metadata for authorized candidates,
-never a catalogue: unknown models count as `standard`. The untouched default
-list retains its existing leading entries and, while routing is on, includes
-the other reported models from those same credentials on the preferred Agent.
-It does not silently add a different paid key. A customized list is never
-expanded. The run freezes difficulty, selected model, supported effort and a
-localized reason code; execution details read that snapshot. Existing failure
-and review-repair paths can move an automatically routed run to the next
-available tier, without a second retry loop or overriding a fixed choice.
-Terminal outcomes enter the existing `factory_events` ledger, scoped to that
-owner and task. See [the feature spec](model-difficulty-routing.md).
+**Task difficulty (#1329), retired.** Automatic routing by task difficulty was removed on 2026-11-15 ([decision 1630](decisions/2026-11-15-1630-agent-profile-is-a-role.md)). Runs frozen with a routing snapshot still show it in their execution details; a provider failure on such a run may still try the earlier, stronger entries it skipped. See [the retired spec](model-difficulty-routing.md).
 
 **Runtime provider failure (#1225).** A thread dispatched from 优先使用的模型
 can discover an empty balance, refused credentials or a provider outage only

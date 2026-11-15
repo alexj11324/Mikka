@@ -2,7 +2,7 @@
 
 - Date: 2026-11-15
 - Source: Alex, 2026-11-15, after comparing Mikka with Capy and Warp: 「我感觉我们把它过度复杂化了」, 「太复杂用户看不懂」, 「capy 似乎没有这么复杂」, then: 「Agent profile 还是要有，但只需包含 skill 和 instruction，不要限制它的 device 和模型，也就是它只有内容。到时候调用时，直接调用这个 Agent profile 即可。至于模型和设备，都由主线程自己去做选择，默认跟随主线程的模型和设备。用户也可以明确进行指定」.
-- Status: decided. Implemented: Agent 配置 hold content only and nothing chooses one automatically. Not yet implemented: model and machine following the main thread, and removing automatic model routing.
+- Status: decided. Implemented: Agent 配置 hold content only and nothing chooses one automatically; automatic model routing is removed; a new task dispatched from a chat follows that chat's model when a thread can run it. Not yet implemented: a thread's own child tasks following its machine; following a chat on 「Mikka 默认」 (needs the model-gateway plan, `docs/research/2026-11-15-models-gateway-and-plan.md` on branch `claude/sweet-lovelace-yjn2jy`).
 - Rule: —
 - Replaces:
   - in [factory-agent-profiles.md](../factory-agent-profiles.md): the Profile's Agent/model policy, harness, reasoning effort and `roles` capability tags; automatic Profile selection by the Decision API; the built-in Default as a selectable object and its `default` reference; availability of a Profile per destination;
@@ -16,7 +16,9 @@
 2. **调用：** 派发任务时直接点名一个 Agent 配置，也可以不点。点名的可以是用户，也可以是主线程。
 3. **模型和机器：** 用户明确指定的优先；否则由主线程决定；主线程没决定，就跟随主线程自己的模型和机器。
 
-主线程是派发这个任务的线程：Coordinator，或者派发子任务的那个线程。
+主线程是派发这个任务的线程：Coordinator 或 Bot 的对话，或者派发子任务的那个线程。
+
+**机器（对齐 Capy）：** Coordinator 和 Bot 的对话自己没有机器，它们派出的任务按「运行位置」跑，相当于 Capy Captain 的 Crew runs on；只有线程派出的子任务才跟随父线程的机器，相当于 Capy 子代理共用父机器。
 
 ## 具体
 
@@ -39,8 +41,9 @@
 
 ## 待定
 
-- Coordinator 自己的模型若不能作为任务的 Agent 运行（例如只在 Mikka 点数上可用），派发时由 Coordinator 另选，并照上面的规则写理由。
-- 「优先使用的模型」和「运行位置」不再决定派发任务的默认值。设置页是否保留它们，另行决定。
+- 对话用「Mikka 默认」时，线程跑不了它，任务暂时按「优先使用的模型」。模型网关的方案去掉「Mikka 默认」并让线程用 Mikka 额度跑任意模型后，跟随就总能成立；Capy 也是这样（所有模型都能用它的额度跑）。
+- 「运行位置」保留，作为对话派出任务的机器默认值。它在云端起不来时会换服务器、再换电脑；Capy 不换，只报错。是否去掉这条后备链，待 Alex 定。
+- 跟随的模型额度用完时，Capy 换同一模型的另一个来源，不换模型；Mikka 目前只试第一个来源。来源解析由模型网关那一步负责。
 
 ## 实现时要动的地方
 

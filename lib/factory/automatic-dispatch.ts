@@ -10,7 +10,7 @@ import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { tiptapToText } from '@/lib/tiptap-text'
 import { createFactoryDispatch, defaultFactoryDispatchAdapters, factoryBinding } from './dispatch'
 import { configureFactoryCheck } from './checks'
-import { profileFixedModel, profileHarness } from './agent-profile-definition'
+import { profileFixedModel } from './agent-profile-definition'
 import { checkFactoryRepairBudget } from './check-recovery-evidence'
 import { observeFactoryProfileDispatch } from './reconcile'
 import { FactoryError } from './contract'
@@ -118,55 +118,6 @@ export function automaticFactoryDispatch(pool: Pool) {
     if (profileChoice?.target.kind === 'none') throw new FactoryError('factoryCheckHarnessUnavailable')
     const { rows: [pending] } = await tx.query('SELECT output,position FROM factory_attempts WHERE id=$1 AND "taskId"=$2', [task.attemptId, task.id])
     const recovery = pending?.output?.watchdogRecovery
-    const previousRouting = source.agentDefinition?.modelDispatch?.routing
-    const frozenProfile = source.agentDefinition?.agentProfile
-    let routingScope: { ownerId: string; workspaceId: string } | undefined
-    if (continueImplementation && !recovery && previousRouting && source.agentDefinition.modelDispatch.mode === 'preference' && !profileFixedModel(frozenProfile)) {
-      // Only the adjacent, persisted failed attempt in this request can raise
-      // a model. A repeated dispatch or a watchdog migration is not a failure.
-      const { rows: [failed] } = await tx.query(`SELECT a.stage,a.output,a."runId" FROM factory_attempts a
-        WHERE a."taskId"=$1 AND a.position=$2-1 AND a.status='failed'
-          AND COALESCE(a.output->>'requestEpoch',$3::text)=$3::text
-          AND ((a.stage IN ('review','verify') AND a.output->'completion'->'trustedFailureProvenance'='true'::jsonb)
-            OR (a.stage='execute' AND a."runId"=$4 AND a.output->>'reasonCode'='run_failed'))`,
-      [task.id, pending?.position, task.sourceEventId, source.id])
-      if (failed) {
-        const scope = {
-          ownerId: task.userId, workspaceId, botId: task.botId,
-        }
-        let target = await (await import('@/lib/model-dispatch')).resolveModelDispatch(pool, scope, null, source.deviceKind === 'cloud' ? 'cloud' : 'local', source.agentDefinition.pinnedDeviceId, {
-          cloudPurpose: source.remoteUrl ? 'task' : 'desktop', bindSubscription: false,
-          ...(profileHarness(frozenProfile) ? { harness: profileHarness(frozenProfile) } : {}),
-          routing: { issueId: task.issueId, stage: task.stage, previous: previousRouting, escalate: true, effort: frozenProfile?.effort },
-        })
-        // An off switch keeps the existing frozen choice. Preserve the role,
-        // policy and skill digest; only its actual execution target changes.
-        if (target.kind !== 'none' && target.routing) {
-          const agentProfile = frozenProfile ? { ...structuredClone(frozenProfile), targetEntry: structuredClone(target.entry) } : undefined
-          // As with Profile planning, only an adopted target may write a
-          // binding. Keep source authorization and binding on the owner tx,
-          // before the queue takes any current Profile lock.
-          if (agentProfile) await (await import('./agent-profile')).assertProfileTarget(tx, scope, agentProfile)
-          if (target.kind === 'device' && target.entry.source.kind === 'subscription') target = { ...target,
-            subscriptionBindingId: await (await import('@/lib/model-dispatch')).bindAgentToConnection(tx, scope, target.agentId, target.entry.harness, target.entry.source.connectionId, target.model) }
-          profileChoice = { target, selectionMode: 'preference', ...(agentProfile ? { agentProfile } : {}) }
-          routingScope = scope
-        }
-      }
-    }
-    const registerRoutingAdmission = async (runId: string) => {
-      if (!routingScope) return
-      const { rows: [queued] } = await tx.query<{ profileOriginRunId: string | null }>(
-        `SELECT "agentDefinition"->>'profileOriginRunId' AS "profileOriginRunId" FROM agent_runs
-          WHERE id=$1 AND "userId"=$2 AND "issueId"=$3 AND "agentDefinition"->'executionIdentity'->>'workspaceId'=$4`,
-        [runId, task.userId, task.issueId, routingScope.workspaceId])
-      if (!queued) throw new FactoryError('factoryRunMismatch')
-      // Only the queue's verified native grant may retain an older role.
-      // Fresh repairs recheck the Profile at COMMIT; both pin membership.
-      const { registerFactoryProfile } = await import('./transaction')
-      registerFactoryProfile(tx, routingScope,
-        queued.profileOriginRunId === source.id ? undefined : profileChoice?.agentProfile)
-    }
     let agentId = checkStart?.run.agentId ?? source.agentId, deviceId = checkStart?.run.deviceId ?? source.deviceId, deviceRepoId = checkStart?.run.deviceRepoId ?? source.deviceRepoId
     if (recovery && !check && source.deviceKind !== 'cloud') {
       if (recovery.requestEpoch !== task.sourceEventId || recovery.previousRunId !== source.id || !source.remoteUrl)
@@ -211,7 +162,7 @@ export function automaticFactoryDispatch(pool: Pool) {
         deviceId = target.deviceId
         deviceRepoId = (await ensureDeviceRepository(task.userId, target.deviceId, source.remoteUrl, tx)).id
         selection = { ...inheritedPolicy, model: target.model, agentProfile: profileChoice.agentProfile,
-          modelDispatch: { mode: profileChoice.selectionMode ?? 'preference', location: 'local', entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
+          modelDispatch: { mode: profileChoice.selectionMode ?? 'preference', location: 'local', entry: target.entry },
           ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}),
           ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }
       }
@@ -222,7 +173,6 @@ export function automaticFactoryDispatch(pool: Pool) {
         } } : defaultFactoryDispatchAdapters)
       const result = await dispatch(task.userId, { binding: factoryBinding(task), agentId, deviceRepoId }, tx)
       await assertFrozenDispatch(result.runId)
-      await registerRoutingAdmission(result.runId)
       if (continueImplementation) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [result.runId, source.id])
       if (recovery && !check) await tx.query('UPDATE agent_runs SET "retryOf"=$2,attempt=$3 WHERE id=$1', [result.runId, source.id, source.attempt + 1])
       return async () => { notifyDeviceWork(deviceId) }
@@ -239,7 +189,7 @@ export function automaticFactoryDispatch(pool: Pool) {
       if (target.kind !== 'cloud') throw new FactoryError('factoryCheckHarnessUnavailable')
       const entry = target.entry.source
       model = { model: target.model, agentProfile: profileChoice.agentProfile,
-        modelDispatch: { mode: profileChoice.selectionMode ?? 'preference', location: 'cloud', entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
+        modelDispatch: { mode: profileChoice.selectionMode ?? 'preference', location: 'cloud', entry: target.entry },
         ...(entry.kind === 'api_key' ? { apiKeyId: entry.keyId } : { subscriptionBindingId: await (await import('@/lib/model-dispatch')).bindAgentToConnection(tx,
           { ownerId: task.userId, workspaceId: source.workspaceId }, runtime.agentId, target.harness, entry.connectionId, target.model) }) }
     } else if (selectStageProfile && !checkStart) model = await chooseCloudRunModel(pool, { ownerId: task.userId, workspaceId: source.workspaceId, botId: task.botId }, runtime.agentId, source.harness, undefined, source.remoteUrl ? 'task' : 'desktop')
@@ -262,7 +212,6 @@ export function automaticFactoryDispatch(pool: Pool) {
     } })
     const result = await dispatch(task.userId, { binding: factoryBinding(task), agentId: runtime.agentId, deviceRepoId: repoId }, tx)
     await assertFrozenDispatch(result.runId)
-    await registerRoutingAdmission(result.runId)
     if (continueImplementation) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [result.runId, source.id])
     return async () => {
       // A host workflow owns the handoff. Parking revokes the completed
