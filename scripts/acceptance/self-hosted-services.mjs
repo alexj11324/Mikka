@@ -203,9 +203,9 @@ export async function runAcceptance(env = process.env) {
     sockets.push(mailbox); await mailbox.ready
     const email = `selfhost-${randomUUID()}@selfhost.example.test`
     const password = randomBytes(24).toString('base64url'), replacement = randomBytes(24).toString('base64url')
-    const nextMail = async subject => {
+    const nextMail = async (subject, recipient = email) => {
       let event
-      try { event = await mailbox.next(value => value.Type === 'new' && value.Data?.Subject === subject && value.Data?.To?.some(to => to.Address === email)) }
+      try { event = await mailbox.next(value => value.Type === 'new' && value.Data?.Subject === subject && value.Data?.To?.some(to => to.Address === recipient)) }
       catch (error) {
         if (error?.message === 'SELF_HOSTED_EVENT_TIMEOUT') {
           report.mailObservation = { kind: subject === 'Verify your Mikka email address' ? 'verification' : 'password-reset',
@@ -214,7 +214,7 @@ export async function runAcceptance(env = process.env) {
           // substitute for receiving the required WebSocket event.
           try {
             const response = await fetch(`${mailpit}/api/v1/messages?limit=50`, { redirect: 'error', signal: AbortSignal.timeout(5000) })
-            if (response.ok) Object.assign(report.mailObservation, mailpitObservation(await response.json(), { email, subject, from: sender }))
+            if (response.ok) Object.assign(report.mailObservation, mailpitObservation(await response.json(), { email: recipient, subject, from: sender }))
             else { Object.assign(report.mailObservation, { read: 'http_error', httpStatus: response.status }); await response.body?.cancel() }
           } catch { /* Keep the closed unavailable result; never retain provider errors. */ }
         }
@@ -224,7 +224,7 @@ export async function runAcceptance(env = process.env) {
       const response = await fetch(`${mailpit}/api/v1/message/${encodeURIComponent(event.Data.ID)}`, { redirect: 'error', signal: AbortSignal.timeout(10_000) })
       check(response.ok, 'MAIL_READ')
       const message = await response.json()
-      check(message.From?.Address === sender && message.To?.some(to => to.Address === email), 'MAIL_RECIPIENT')
+      check(message.From?.Address === sender && message.To?.some(to => to.Address === recipient), 'MAIL_RECIPIENT')
       const links = String(message.Text).match(/http:\/\/localhost:3000\/mikka\/[^\s]+/g)
       check(links?.length === 1, 'MAIL_LINK')
       return new URL(links[0])
@@ -408,8 +408,24 @@ export async function runAcceptance(env = process.env) {
       ownerId: session.user.id, workspaceId: workspace.workspace.id,
       cookie: [...cookies].map(([name, value]) => `${name}=${value}`).join('; ') }), { flag: 'wx', mode: 0o600 })
     if (process.env.MIKKA_DESKTOP_ACCEPTANCE === '1') {
+      let member
+      if (env.MIKKA_DESKTOP_MEMBER_FIXTURE === '1') {
+        // This fixture goes to the one-run mode-0600 handoff. The packaged client
+        // must authenticate this second account independently through native IPC.
+        const account = { email: `selfhost-${randomUUID()}@selfhost.example.test`, password: randomBytes(24).toString('base64url') }
+        const registered = await (await request('/mikka/api/auth/sign-up/email', {
+          method: 'POST', useCookies: false, expected: [200, 201], body: { name: 'Desktop conversation member', ...account },
+        })).json()
+        check(typeof registered.user?.id === 'string' && registered.user.id !== session.user.id, 'DESKTOP_MEMBER_REGISTERED')
+        const memberLink = await nextMail('Verify your Mikka email address', account.email)
+        check(memberLink.origin === origin && memberLink.pathname === '/mikka/api/auth/verify-email', 'DESKTOP_MEMBER_LINK')
+        const memberVerified = await request(memberLink.pathname + memberLink.search, { expected: [302], useCookies: false })
+        check(memberVerified.headers.get('location') === `${origin}/mikka/sign-in`, 'DESKTOP_MEMBER_VERIFIED')
+        member = { ...account, id: registered.user.id }
+      }
       await writeFile('/data/self-hosted-desktop-session.private.json', JSON.stringify({ revision: version.build, origin,
-        ownerId: session.user.id, workspaceId: workspace.workspace.id, botId: bot.id, email, password: replacement }),
+        ownerId: session.user.id, workspaceId: workspace.workspace.id, botId: bot.id, email, password: replacement,
+        ...(member && { member }) }),
       { flag: 'wx', mode: 0o600 })
     }
     report.status = 'passed'; report.stage = 'complete'

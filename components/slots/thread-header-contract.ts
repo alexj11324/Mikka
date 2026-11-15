@@ -11,6 +11,8 @@ export type ThreadHeaderProps = {
   runId: string
   /** The name the thread's row shows (its task, else what it was asked). */
   title: string
+  /** Revalidate the scoped reader supplying this title once its write succeeds. */
+  onTitleChanged?: () => void
   /** The heading Esc and focus return to. */
   headingRef: RefObject<HTMLHeadingElement | null>
   /** ← and Esc: back to where it was opened from. */

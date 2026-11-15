@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import useSWRInfinite, { unstable_serialize as infiniteKey } from 'swr/infinite'
-import useSWR, { unstable_serialize } from 'swr'
+import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
 import { listAgents } from '@/app/actions/agents'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { GroupLeaveAction } from './group-leave-action'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
+import { botKeys } from '@/lib/swr/keys'
 import { withBasePath } from '@/lib/base-path'
 import { PersonReferences, ThreadReferencePicker } from './thread-references'
 import { VisibleReadEnd } from './visible-read-end'
@@ -69,6 +70,7 @@ export function GroupChatView({ group, userId, people, ownedBots, onLeft }: {
   const t = useTranslations('GroupChat')
   const composerInput = useRef<HTMLTextAreaElement>(null)
   const titleHeading = useRef<HTMLHeadingElement>(null)
+  const { mutate: refreshCache } = useSWRConfig()
   const namedChat = group.creationPurpose === 'conversation'
   const feedback = useTranslations('Coordinator')
   const { data: agents = [] } = useSWR('agents', listAgents)
@@ -209,6 +211,7 @@ export function GroupChatView({ group, userId, people, ownedBots, onLeft }: {
   return <section aria-label={group.title || t('untitled')} data-testid="group-chat" className={cn('relative flex min-h-0 w-full flex-1 flex-col', CHAT_SURFACE)}>
     {namedChat
       ? <ThreadHeader standalone issueId={null} runId={group.id} title={group.title || t('untitled')} headingRef={titleHeading}
+          onTitleChanged={() => { void refreshCache(botKeys.groups(userId, group.workspaceId)) }}
           onStop={null} place={null} acceptanceBadge={null} identity={null} artifact={null} tabs={null} wraps={false} />
       : <ConversationPill name={group.title || t('untitled')} avatar={<GroupAvatar title={group.title || t('untitled')} members={members} />} />}
     {onLeft && !refused && !accessRejected && mayLeaveGroup(members, userId)

@@ -145,9 +145,15 @@ test('the isolated model supports ordinary and streaming OpenAI requests with ex
   assert.equal(JSON.parse(chunks[0].slice(6)).choices[0].delta.content, 'SELF_HOSTED_REPLY_02')
   assert.equal(JSON.parse(chunks[1].slice(6)).choices[0].finish_reason, 'stop')
   assert.equal(chunks[2], 'data: [DONE]')
+  const title = await call({ model: 'selfhost-ci', messages: [
+    { role: 'system', content: 'Answer with one JSON object only, no Markdown: {"title": "<short title>"}.' },
+    { role: 'user', content: '{"task":{"title":"Desktop conversation"}}' },
+  ] })
+  assert.equal(title.status, 200)
+  assert.deepEqual(JSON.parse((await title.json()).choices[0].message.content), { title: 'Desktop inbox review' })
   const refused = await call({ model: 'selfhost-ci', messages: [] }, 'Bearer other')
   assert.equal(refused.status, 400); await refused.body.cancel()
-  assert.deepEqual(await (await fetch(`${base}/evidence`)).json(), { synthetic: true, calls: 2, turns: ['01', '02'] })
+  assert.deepEqual(await (await fetch(`${base}/evidence`)).json(), { synthetic: true, calls: 3, turns: ['01', '02'] })
 })
 
 
