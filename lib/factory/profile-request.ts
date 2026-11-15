@@ -5,14 +5,18 @@ import { agentProfileReferenceSchema, BUILTIN_AGENT_PROFILE_ID } from './agent-p
 import { readProfileRow } from './agent-profile-store'
 import { taskDestinationSchema, type TaskDestination } from '../task-destination'
 
-/** A selection from the owner's task form is authoritative. A model may carry
- * an explicitly named profile, but cannot manufacture an explicit user pin. */
+/** A selection from the owner's task form is authoritative. Otherwise the
+ * Coordinator may choose one of the owner's Agent 配置 itself (decision
+ * 2026-11-15-1630): a Profile is content only and grants no permission. */
 export async function requestedTaskSelection(pool: Pick<Pool, 'query'>, scope: { ownerId: string; workspaceId: string; botId: string },
   eventId: string | undefined, offered: string | undefined): Promise<{ profileId?: string; taskDestination?: TaskDestination; commandIssueId?: string }> {
-  if (!eventId) {
-    if (offered) throw new AgentProfileError('agentProfilePinConflict')
-    return {}
+  const chosen = async (selection: { taskDestination?: TaskDestination; commandIssueId?: string }) => {
+    if (!offered) return selection
+    // The retired built-in route is never chosen by a model.
+    if (offered === BUILTIN_AGENT_PROFILE_ID) throw new AgentProfileError('agentProfilePinConflict')
+    return { ...selection, profileId: (await readProfileRow(pool, scope, agentProfileReferenceSchema.parse(offered))).id }
   }
+  if (!eventId) return chosen({})
   const { rows: [event] } = await pool.query(`SELECT e.payload,c."taskId" AS "commandIssueId" FROM coordinator_events e
     LEFT JOIN task_creation_receipts c ON c."taskId"=e."issueId" AND c."userId"=e."userId"
       AND c."workspaceId"=$4 AND c."requestId"::text=e.payload->>'taskCreationRequestId' AND e."deliveredAt" IS NOT NULL
@@ -25,14 +29,7 @@ export async function requestedTaskSelection(pool: Pick<Pool, 'query'>, scope: {
   const selection = { ...(destination.success ? { taskDestination: destination.data } : {}), ...(explicit ? { commandIssueId: String(event.commandIssueId) } : {}) }
   const selected = agentProfileReferenceSchema.safeParse(event?.payload?.profileId)
   if (selected.success) return { ...selection, profileId: selected.data }
-  if (!offered) return selection
-  // The built-in route requires the structured task-form choice. Neither a
-  // model's tool parameter nor matching words can bypass Automatic selection.
-  if (!event || offered === BUILTIN_AGENT_PROFILE_ID) throw new AgentProfileError('agentProfilePinConflict')
-  const profile = await readProfileRow(pool, scope, offered)
-  const words = typeof event.payload?.text === 'string' ? event.payload.text.normalize('NFKC').toLocaleLowerCase() : ''
-  if (!words.includes(profile.id.toLowerCase()) && !words.includes(profile.definition.name.normalize('NFKC').toLocaleLowerCase())) throw new AgentProfileError('agentProfilePinConflict')
-  return { ...selection, profileId: profile.id }
+  return chosen(selection)
 }
 
 /** Existing Profile-only callers keep their result and one source read. */

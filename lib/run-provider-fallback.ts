@@ -24,6 +24,7 @@ import { providerContinuationPrompt } from './run-retry'
 import { recordCoordinatorEvent } from './coordinator-event-store'
 import { runFinishedEvent } from './coordinator-events'
 import { defaultAgentCopy } from './agent-copy'
+import { profileFixedModel } from './factory/agent-profile-definition'
 import { ActionFailureError } from './action-error'
 import { ComputerError } from './computer/store'
 import { runChanged } from './live/panels'
@@ -367,7 +368,7 @@ async function recoverAuthorizedProviderFailure(pool: Pool, source: Run, initial
   // this round before any alternate model selection or runtime preparation.
   if (await (await import('./factory/candidate-recheck')).candidateRecheckPinsRun(pool, userId, source.id))
     return settle(pool, source, await unavailableRecord(pool, scope, source, attempted, [], true))
-  if (source.agentDefinition?.modelDispatch?.mode !== 'preference' || source.questionContinuation || source.agentDefinition?.agentProfile?.definition.model.mode === 'fixed')
+  if (source.agentDefinition?.modelDispatch?.mode !== 'preference' || source.questionContinuation || profileFixedModel(source.agentDefinition?.agentProfile) !== undefined)
     return settle(pool, source, await unavailableRecord(pool, scope, source, attempted))
   const { rows: [origin] } = await pool.query<{ kind: string; repoPath: string | null; remoteUrl: string | null }>(`SELECT d.kind,repo."repoPath",repo."remoteUrl" FROM devices d
     LEFT JOIN device_repos repo ON repo.id=$3 AND repo."userId"=$2 WHERE d.id=$1 AND d."ownerId"=$2`, [source.deviceId, source.userId, source.deviceRepoId])

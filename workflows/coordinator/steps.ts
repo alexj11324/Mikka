@@ -1,4 +1,4 @@
-import { AgentProfileError, builtinAgentProfileSelection } from '@/lib/factory/agent-profile-definition'
+import { AgentProfileError, builtinAgentProfileSelection, profileFixedModel, profileHarness } from '@/lib/factory/agent-profile-definition'
 import { AgentProfileAdmissionError } from '@/lib/factory/profile-admission'
 import { queueTaskRun } from '@/lib/factory/queue-local'
 import { deploymentSwitch } from '@/lib/deployment-switches'
@@ -529,12 +529,12 @@ async function dispatchByRules(userId: string, input: { threadRunId?: string; is
     // 云端 could not start it (the key refused, a limit, the template, E2B down, the worker never came up;
     // the queued cloud run is already ended): a server, else a computer, unless the person asked for the cloud.
     if (place !== 'cloud' && !('recoveryBlocked' in cloud && cloud.recoveryBlocked)) {
-      const exact = selectionMode === 'picked' || agentProfile?.definition.model.mode === 'fixed'
-      const profileHarness = agentProfile?.definition.harness
+      const exact = selectionMode === 'picked' || profileFixedModel(agentProfile) !== undefined
+      const pinnedHarness = profileHarness(agentProfile)
       const fallback = await resolveModelDispatch(pool, { ownerId: userId, workspaceId, botId }, input.model ?? null, undefined, undefined, {
         withoutCloud: true, agentId: input.agentId,
         routing: { issueId: input.issueId, stage, note: input.note, effort: agentProfile?.effort },
-        ...(exact ? { exactEntry: target.entry, harness: target.entry.harness } : profileHarness && profileHarness !== 'auto' ? { harness: profileHarness } : {}),
+        ...(exact ? { exactEntry: target.entry, harness: target.entry.harness } : pinnedHarness ? { harness: pinnedHarness } : {}),
       })
       // An admitted but unclaimed startup failure is the same Factory intent.
       // Its server-confirmed failed run supplies ancestry for the normal retry.

@@ -4,7 +4,6 @@ import test from 'node:test'
 import { agentProfileDigest, parseAgentProfile } from './agent-profile-definition'
 import { agentProfileSkillSource, agentProfileSkillsCatalog, profileSkillRunAssignment, resolveAgentProfileSkills } from './agent-profile-skills'
 import { AGENT_PROFILE_TEMPLATES, agentProfileTemplateDefinition } from './agent-profile-templates'
-import { profileDecisionInput, type PublicAgentProfile } from './agent-profile-decision'
 
 const digestOf = (value: string) => createHash('sha256').update(value).digest('hex')
 
@@ -59,21 +58,7 @@ test('the run assignment carries pinned bodies and repository names, never an un
   assert.deepEqual(profileSkillRunAssignment(resolveAgentProfileSkills(['repository:review'])), { repositorySkills: ['review'] })
 })
 
-test('Decision input receives skill names and purposes but no body, path or revision', () => {
-  const skills = resolveAgentProfileSkills(['systematic-debugging', 'independent-review'])
-  const selection = { id: randomUUID(), name: 'Backend', description: 'Backend implementation', roles: ['implementation'], harness: 'codex' as const, model: 'luna-fixture',
-    skills: skills.map(skill => ({ id: skill.id, name: skill.name, description: skill.description, source: 'official' as const })) }
-  const input = profileDecisionInput({ title: 'Fix checkout', content: 'Checkout returns 500', stage: 'execute' }, [selection])
-  for (const skill of skills) {
-    assert.ok(input.includes(skill.name))
-    assert.ok(input.includes(skill.description))
-    assert.ok(!input.includes(skill.content), 'a Skill body must never enter the Decision input')
-    assert.ok(!input.includes(skill.digest))
-  }
-  for (const forbidden of ['instructions', 'sourceRevision', 'ownerId', 'connectionId']) assert.ok(!input.includes(`"${forbidden}"`))
-})
-
-test('the four role templates are copies with fixed contracts, auto agent and inherited model', () => {
+test('the four role templates are content-only copies', () => {
   assert.deepEqual(AGENT_PROFILE_TEMPLATES.map(template => template.id), ['investigator', 'planner', 'implementer', 'reviewer'])
   const copy = { name: 'Role', description: 'Purpose' }
   for (const template of AGENT_PROFILE_TEMPLATES) {
@@ -82,7 +67,7 @@ test('the four role templates are copies with fixed contracts, auto agent and in
     assert.equal(definition.description, 'Purpose')
     assert.equal(definition.harness, 'auto')
     assert.deepEqual(definition.model, { mode: 'inherit' })
-    assert.deepEqual(definition.roles, [...template.roles])
+    assert.deepEqual(definition.roles, [])
     assert.deepEqual(definition.skills, [...template.skills])
     assert.ok(definition.instructions.length > 0 && definition.instructions.length <= 24_000)
     assert.ok(definition.skills.every(id => agentProfileSkillsCatalog().some(skill => skill.id === id)), 'template Skills must exist in the official catalogue')
@@ -96,12 +81,4 @@ test('the four role templates are copies with fixed contracts, auto agent and in
   const generated = agentProfileTemplateDefinition('reviewer', copy)
   assert.equal(generated.enabled, true)
   assert.ok(!('botId' in generated) && !('agentId' in generated))
-})
-
-test('templates stay out of the automatic Profile catalogue until a person saves one', () => {
-  // The Decision catalog is built only from stored rows; templates are editor data.
-  const publicProfile = (name: string): PublicAgentProfile => ({ id: randomUUID(), name, description: '', roles: [], harness: 'codex', model: 'luna-fixture' })
-  const stored = [publicProfile('My reviewer')]
-  const input = profileDecisionInput({ title: 'Task', content: 'Body', stage: 'execute' }, stored)
-  for (const template of AGENT_PROFILE_TEMPLATES) assert.ok(!input.includes(`"${template.id}"`))
 })

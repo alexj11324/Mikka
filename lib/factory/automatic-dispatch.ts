@@ -9,15 +9,15 @@ import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { tiptapToText } from '@/lib/tiptap-text'
 import { createFactoryDispatch, defaultFactoryDispatchAdapters, factoryBinding } from './dispatch'
-import { configureFactoryCheck, currentFactoryRequest } from './checks'
+import { configureFactoryCheck } from './checks'
+import { profileFixedModel, profileHarness } from './agent-profile-definition'
 import { checkFactoryRepairBudget } from './check-recovery-evidence'
 import { observeFactoryProfileDispatch } from './reconcile'
-import { FactoryError, factoryFlowVersion } from './contract'
+import { FactoryError } from './contract'
 import { notifyDeviceWork } from '../device-gateway-notify'
 import type { FactoryTask, createFactoryStore } from './store'
 import { assertRecoveredCheck, type FrozenFactoryCheck } from './check-start-recovery'
 import { candidateRecheckRound, candidateRecheckDispatchSource, refreshRecheckSource, admitRecheckSource } from './candidate-recheck'
-import type { ProfileCheckWork } from './agent-profile-decision'
 
 /** Provider I/O boundary; no model input selects these callbacks. */
 export const factoryAutomaticRuntime = {
@@ -84,8 +84,6 @@ export function automaticFactoryDispatch(pool: Pool) {
       // still exists can contradict it.
       (source.deviceKind === 'cloud' && source.runtimeWorkspaceId != null && source.runtimeWorkspaceId !== workspaceId)) throw new FactoryError('factoryRunMismatch')
     const check = task.stage !== 'execute'
-    const checkStage = task.stage === 'review' || task.stage === 'verify' ? task.stage : undefined
-    const candidateId = task.candidateId
     // A newly approved specification starts an executor, not a continuation of
     // the planner's role, credential, read-only grant or native session.
     const firstImplementation = !check && source.kind === 'plan'
@@ -102,45 +100,28 @@ export function automaticFactoryDispatch(pool: Pool) {
     const inheritedPolicy = checkStart ? { policyCeiling: checkStart.selection.policyCeiling }
       : source.agentDefinition?.policyCeiling ? { policyCeiling: source.agentDefinition.policyCeiling } : {}
     let selection: Partial<RunModel> = checkStart?.selection ?? (selectStageProfile ? inheritedPolicy : threadRunModel(source.agentDefinition) ?? inheritedPolicy)
-    let checkWork: ProfileCheckWork | undefined
     if (check && !checkStart) {
-      // Select the current check's role from its actual candidate, not from the
-      // original implementation prompt or whichever execution ran most recently.
-      const { rows: [candidate] } = await tx.query<{ id: string; kind: ProfileCheckWork['candidate']['kind']; sha: string | null; runId: string;
-        harness: ProfileCheckWork['producer']['harness']; model: string | null; profileId: string | null; profileVersion: number | null }>(
-        `SELECT c.id,c.kind,c.sha,c."runId",COALESCE(producer."agentDefinition"->>'harness',a.harness) AS harness,
-           producer."agentDefinition"->>'model' AS model,producer."agentDefinition"->'agentProfile'->>'profileId' AS "profileId",
-           producer."agentDefinition"->'agentProfile'->'version' AS "profileVersion"
-         FROM factory_candidates c JOIN agent_runs producer ON producer.id=c."runId" AND producer."userId"=$3 AND producer."issueId"=$4
-         JOIN agents a ON a.id=producer."agentId" AND a."userId"=producer."userId"
+      // The check's candidate must still belong to this task's producer.
+      const { rows: [candidate] } = await tx.query(
+        `SELECT c.id FROM factory_candidates c JOIN agent_runs producer ON producer.id=c."runId" AND producer."userId"=$3 AND producer."issueId"=$4
          WHERE c.id=$1 AND c."taskId"=$2`, [task.candidateId, task.id, task.userId, task.issueId])
       if (!candidate) throw new FactoryError('factoryCheckBindingMismatch')
-      checkWork = {
-        stage: task.stage as 'review' | 'verify', flowVersion: factoryFlowVersion(task), taskId: task.id, attemptId: task.attemptId, requestEpoch: task.sourceEventId,
-        candidate: { id: candidate.id, kind: candidate.kind, sha: candidate.sha },
-        producer: { runId: candidate.runId, harness: candidate.harness, model: candidate.model,
-          ...(candidate.profileId && Number.isInteger(candidate.profileVersion) && candidate.profileVersion! > 0
-            ? { profile: { id: candidate.profileId, version: candidate.profileVersion! } } : {}) },
-      }
     }
+    // A stage's role is never chosen automatically (decision 2026-11-15-1630):
+    // the check and a first implementation run without a custom Agent 配置.
     let profileChoice = selectStageProfile && !checkStart ? await (await import('./agent-profile')).resolveAgentProfileDispatch(pool, {
       ownerId: task.userId, workspaceId, botId: task.botId,
     }, { issueId: task.issueId, stage: task.stage, location: source.deviceKind === 'cloud' ? 'cloud' : 'local',
       defaultHarness: source.harness, cloudPurpose: source.remoteUrl ? 'task' : 'desktop',
       ...(source.agentDefinition?.pinnedDeviceId ? { deviceId: source.agentDefinition.pinnedDeviceId } : {}),
-    }, { transaction: tx, checkWork,
-      ...(checkStage && candidateId ? { independentCheck: async () => ({
-        taskId: task.id, requestEpoch: task.sourceEventId, candidateId, stage: checkStage,
-        currentOwnerRequest: await currentFactoryRequest(tx, task),
-      }) } : {}),
-    }) : undefined
+    }, { transaction: tx }) : undefined
     if (profileChoice?.target.kind === 'none') throw new FactoryError('factoryCheckHarnessUnavailable')
     const { rows: [pending] } = await tx.query('SELECT output,position FROM factory_attempts WHERE id=$1 AND "taskId"=$2', [task.attemptId, task.id])
     const recovery = pending?.output?.watchdogRecovery
     const previousRouting = source.agentDefinition?.modelDispatch?.routing
     const frozenProfile = source.agentDefinition?.agentProfile
     let routingScope: { ownerId: string; workspaceId: string } | undefined
-    if (continueImplementation && !recovery && previousRouting && source.agentDefinition.modelDispatch.mode === 'preference' && frozenProfile?.definition.model.mode !== 'fixed') {
+    if (continueImplementation && !recovery && previousRouting && source.agentDefinition.modelDispatch.mode === 'preference' && !profileFixedModel(frozenProfile)) {
       // Only the adjacent, persisted failed attempt in this request can raise
       // a model. A repeated dispatch or a watchdog migration is not a failure.
       const { rows: [failed] } = await tx.query(`SELECT a.stage,a.output,a."runId" FROM factory_attempts a
@@ -155,7 +136,7 @@ export function automaticFactoryDispatch(pool: Pool) {
         }
         let target = await (await import('@/lib/model-dispatch')).resolveModelDispatch(pool, scope, null, source.deviceKind === 'cloud' ? 'cloud' : 'local', source.agentDefinition.pinnedDeviceId, {
           cloudPurpose: source.remoteUrl ? 'task' : 'desktop', bindSubscription: false,
-          ...(frozenProfile?.definition.harness && frozenProfile.definition.harness !== 'auto' ? { harness: frozenProfile.definition.harness } : {}),
+          ...(profileHarness(frozenProfile) ? { harness: profileHarness(frozenProfile) } : {}),
           routing: { issueId: task.issueId, stage: task.stage, previous: previousRouting, escalate: true, effort: frozenProfile?.effort },
         })
         // An off switch keeps the existing frozen choice. Preserve the role,
@@ -200,7 +181,7 @@ export function automaticFactoryDispatch(pool: Pool) {
       const targets = candidates.filter(c => online.get(c.deviceId)).slice(0, 5)
       let selected = false
       const profile = source.agentDefinition?.agentProfile
-      const exactEntry = profile?.definition.model.mode === 'fixed' ? profile.targetEntry
+      const exactEntry = profile && profileFixedModel(profile) ? profile.targetEntry
         : source.agentDefinition?.modelDispatch?.mode === 'picked' ? source.agentDefinition.modelDispatch.entry : undefined
       for (const target of targets) {
         const model = await chooseLocalRunModel(pool, { ownerId: task.userId, workspaceId, botId: task.botId }, target, source.agentDefinition?.model, exactEntry)

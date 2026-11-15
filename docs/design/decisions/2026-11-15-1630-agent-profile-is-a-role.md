@@ -2,7 +2,7 @@
 
 - Date: 2026-11-15
 - Source: Alex, 2026-11-15, after comparing Mikka with Capy and Warp: 「我感觉我们把它过度复杂化了」, 「太复杂用户看不懂」, 「capy 似乎没有这么复杂」, then: 「Agent profile 还是要有，但只需包含 skill 和 instruction，不要限制它的 device 和模型，也就是它只有内容。到时候调用时，直接调用这个 Agent profile 即可。至于模型和设备，都由主线程自己去做选择，默认跟随主线程的模型和设备。用户也可以明确进行指定」.
-- Status: decided; not implemented.
+- Status: decided. Implemented: Agent 配置 hold content only and nothing chooses one automatically. Not yet implemented: model and machine following the main thread, and removing automatic model routing.
 - Rule: —
 - Replaces:
   - in [factory-agent-profiles.md](../factory-agent-profiles.md): the Profile's Agent/model policy, harness, reasoning effort and `roles` capability tags; automatic Profile selection by the Decision API; the built-in Default as a selectable object and its `default` reference; availability of a Profile per destination;

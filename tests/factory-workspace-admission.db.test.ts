@@ -328,14 +328,21 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
 
   await t.test('Profile COMMIT rechecks Enterprise policy on its sole owned APP client and rolls back the new version', async () => {
     const organizationId = randomUUID(), profileId = randomUUID()
-    const { AgentProfileStore } = await import('../lib/factory/agent-profile-store')
+    const { AgentProfileStore, acquireProfileMembership } = await import('../lib/factory/agent-profile-store')
     await controls.query('INSERT INTO mikka_organizations(id,name,"createdBy") VALUES($1,\'Profile borrow fixture\',$2)', [organizationId, owner])
     await controls.query('INSERT INTO mikka_organization_workspaces("organizationId","workspaceId") VALUES($1,$2)', [organizationId, alpha])
     await controls.query('INSERT INTO enterprise_org_policy("organizationId","enforceSso","allowMachineCredentials") VALUES($1,false,false)', [organizationId])
-    const store = new AgentProfileStore(app, { validateModel: async () => {
-      // Inherit has no external model source to validate. This owned-fixture
-      // barrier changes real APP policy after admission, before the real COMMIT.
-      await controls.query('UPDATE enterprise_org_policy SET "enforceSso"=true WHERE "organizationId"=$1', [organizationId])
+    const store = new AgentProfileStore(app, { membership: async scope => {
+      // The real borrowed membership, with an owned-fixture barrier that changes
+      // real APP policy after admission, just before its final check and COMMIT.
+      const member = await acquireProfileMembership(scope)
+      return {
+        check: async client => {
+          await controls.query('UPDATE enterprise_org_policy SET "enforceSso"=true WHERE "organizationId"=$1', [organizationId])
+          await member.check(client)
+        },
+        close: () => member.close(),
+      }
     } })
     try {
       await assert.rejects(actAs({ id: session.user.id, [tokenWorkspace]: alpha, [enterprisePrincipal]: session.user[enterprisePrincipal] }, () => withFactoryMembership(owner, () => store.create({ ownerId: owner, workspaceId: alpha }, {
