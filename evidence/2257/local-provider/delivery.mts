@@ -18,12 +18,13 @@ const dir=process.env.E_CODEX_QA!,origin=process.env.BETTER_AUTH_URL!
 const model='SmolLM2-135M-Instruct-Q4_K_M'
 const interrupt=process.env.E_FACTORY_INTERRUPT==='1'
 const runId=randomUUID(),deviceId=randomUUID(),agentId=randomUUID(),repoId=randomUUID()
+const handin=process.env.E_AFTER_RUN==='1'
 const trace:any={source:process.env.E_RUN_SOURCE,runId,deviceId,cli:process.env.E_CODEX_VERSION,model,weightSha256:process.env.E_WEIGHT_SHA,cliSha256:process.env.E_CLI_BINARY_SHA,stages:[],scope:'Actual cookie-authenticated browser RPC and device REST over loopback HTTP. Only the bridge between returned device commands and the unmodified CodexAdapter is an explicit QA driver. Provider uses real GGUF inference and paced transport. No subscription or production release.'}
 const persist=()=>writeFileSync(join(dir,'delivery.json'),JSON.stringify(trace,null,2),{mode:0o600})
 const note=(stage:string,data:any={})=>{trace.stages.push({stage,at:new Date().toISOString(),...data});persist()}
 const wait=(ms:number)=>new Promise(r=>setTimeout(r,ms))
 const mark=(s:string)=>'E2262_QA_BEGIN '+s+' E2262_QA_END'
-const initial='List twenty vegetables with a sentence about each.',steer='Name the capital of France in one short sentence.'
+const initial=handin?'The user wants the finished report delivered. Choose submit, not answer. The report should say which color a clear daytime sky is.':'List twenty vegetables with a sentence about each.',steer='Name the capital of France in one short sentence.'
 const h=(s:string)=>createHash('sha256').update(s).digest('hex')
 const dbUrl=process.env.E2E_DATABASE_URL!
 assert.equal(new URL(dbUrl).hostname,'127.0.0.1');assert.equal(new URL(dbUrl).pathname,'/mikka_e2e')
@@ -49,12 +50,12 @@ try {
  const issueId=await seedIssue(independent,owner,ws.id,{registered:true})
  await independent.query('UPDATE issues SET content=$2 WHERE id=$1',[issueId,{type:'doc',attrs:{mikka:{number:1}}}])
  const remote='https://github.com/octo/fixture.git'
- await independent.query(`insert into devices(id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) values($1,$2,'Synthetic CI Linux','local','laptop',true,now(),$3)`,[deviceId,owner,JSON.stringify([{harness:'codex',installed:true,activeTurnSteer:true}])])
+ await independent.query(`insert into devices(id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) values($1,$2,'Synthetic CI Linux','local','laptop',true,now(),$3)`,[deviceId,owner,JSON.stringify([{harness:'codex',installed:true,toolApproval:true,activeTurnSteer:true}])])
  await independent.query(`insert into agents(id,"userId","deviceId",harness,name) values($1,$2,$3,'codex','Synthetic CPU model')`,[agentId,owner,deviceId])
  await independent.query(`insert into device_repos(id,"deviceId","userId","repoPath","remoteUrl") values($1,$2,$3,$4,$5)`,[repoId,deviceId,owner,normalizeRepository(remote).key,remote])
  const {acceptLocalRun}=await import('../../lib/run-admission-store')
  const prompt=mark(initial)
- const seedInput={id:runId,userId:owner,issueId,agentId,deviceId,deviceRepoId:repoId,botId:null,origin:'web',prompt,promptTaskStart:0,promptTaskLength:[...prompt].length,definition:{schemaVersion:1,kind:'worker',harness:'codex',instructions:'Use only the local model for this synthetic prompt.',definitionDigest:h('synthetic'),promptDigest:h(prompt),modelSource:'native-default',parent:null,readOnly:true} as never,dispatch:{issueId,agentId,deviceRepoId:repoId,requestKey:randomUUID()}}
+ const seedInput={id:runId,userId:owner,issueId,agentId,deviceId,deviceRepoId:repoId,botId:null,origin:'web',prompt,promptTaskStart:0,promptTaskLength:[...prompt].length,definition:{schemaVersion:1,kind:'worker',harness:'codex',instructions:'Use only the local model for this synthetic prompt.',definitionDigest:h('synthetic'),promptDigest:h(prompt),model,modelSource:'native-default',parent:null,readOnly:true} as never,dispatch:{issueId,agentId,deviceRepoId:repoId,requestKey:randomUUID()}}
  const {pool}=await import('../../lib/db')
  const {withProjectResourceLease}=await import('../../lib/project-resources/store')
  const {queueFactoryTask}=await import('../../lib/factory/task-dispatch')
@@ -105,6 +106,7 @@ try {
   if(event.type==='exit'){terminal=event;continue}
   if(event.type!=='chunk')continue
   const c=event.chunk;chunks.push(c)
+  if(handin)continue
   if(c.type!=='text-delta')continue
   transcript+=c.delta
   if(changed)continue
@@ -139,28 +141,61 @@ try {
   const after=(await independent.query('SELECT "deliveredAt" FROM run_messages WHERE id=$1',[command.messageId])).rows[0];assert.ok(after.deliveredAt)
   note('queue send-now via owner RPC, device REST command, native steer, device ACK',{sent,commandKind:command.kind,deliveredAt:after.deliveredAt,messageId:command.messageId})
  }
- assert.equal(terminal?.outcome,interrupt?'cancelled':'succeeded');assert.ok(changed)
- const provider=interrupt?null:readFileSync(join(dir,'results.jsonl'),'utf8').trim().split('\n').map(s=>JSON.parse(s)).find(v=>v.prompt===steer)
- if(!interrupt)assert.ok(provider&&provider.outputTokens>0&&transcript.includes(provider.result))
- else assert.ok(readFileSync(join(dir,'first-token.jsonl'),'utf8').includes(initial)&&transcript.length>0)
+ assert.equal(terminal?.outcome,interrupt?'cancelled':'succeeded');if(!handin)assert.ok(changed)
+ const provider=interrupt||handin?null:readFileSync(join(dir,'results.jsonl'),'utf8').trim().split('\n').map(s=>JSON.parse(s)).find(v=>v.prompt===steer)
+ if(!interrupt&&!handin)assert.ok(provider&&provider.outputTokens>0&&transcript.includes(provider.result))
+ else if(!handin)assert.ok(readFileSync(join(dir,'first-token.jsonl'),'utf8').includes(initial)&&transcript.length>0)
  const batch={fromSeq:1,chunks},eventsUrl='runs/'+runId+'/events'
  const first=await dcall(eventsUrl,'POST',batch),retry=await dcall(eventsUrl,'POST',batch)
  assert.deepEqual(retry,first)
  const rows=(await independent.query('SELECT seq,chunk FROM run_chunks WHERE "runId"=$1 ORDER BY seq',[runId])).rows
- assert.equal(rows.length,chunks.length);assert.equal(rows.map(v=>v.chunk.type==='text-delta'?v.chunk.delta:'').join(''),transcript)
+ assert.equal(rows.length,chunks.length);if(!handin)assert.equal(rows.map(v=>v.chunk.type==='text-delta'?v.chunk.delta:'').join(''),transcript)
  // Mirror the existing supervisor stopReasonOf rules for the two observed
  // cases. No tool submission or handoff can be inferred from a model answer.
- assert.equal(terminal.stopReason,undefined)
- const completion={stopReason:interrupt?'cancelled':'turn_ended'}
+ if(!handin)assert.equal(terminal.stopReason,undefined)
+ const completion=handin?{stopReason:terminal.stopReason,report:{...terminal.report,filesChanged:[],verify:{status:'not_run'}}}:{stopReason:interrupt?'cancelled':'turn_ended'}
+ if(handin){
+  assert.equal(terminal.stopReason,'submitted')
+  const decisions=readFileSync(join(dir,'decisions.jsonl'),'utf8').trim().split('\n').map(s=>JSON.parse(s))
+  assert.ok(decisions.some(v=>{const out=JSON.parse(v.generated);return out.action==='submit'&&out.summary===terminal.report.summary}))
+  assert.equal((await queueRow(reqId)).status,'queued')
+  note('authentic MCP handoff before completion writer',{submitted:terminal.report.summary})
+ }
  await dcall('runs/'+runId+'/complete','POST',completion,204)
  const stored=(await independent.query('SELECT status,"stopReason","finishedAt","sessionId",report->>\'summary\' AS summary FROM agent_runs WHERE id=$1',[runId])).rows[0]
- assert.equal(stored.status,interrupt?'cancelled':'stopped');assert.equal(stored.stopReason,completion.stopReason);assert.equal(stored.sessionId,session.sessionId);assert.equal(stored.summary,null);assert.ok(stored.finishedAt)
+ assert.equal(stored.status,handin?'succeeded':interrupt?'cancelled':'stopped');assert.equal(stored.stopReason,completion.stopReason);assert.equal(stored.sessionId,session.sessionId);assert.equal(stored.summary,handin?terminal.report.summary:null);assert.ok(stored.finishedAt)
  const copies=(await independent.query('SELECT count(*)::int AS n FROM run_messages WHERE "runId"=$1 AND text=$2',[runId,text])).rows[0].n
- assert.equal(copies,interrupt?0:1)
+ if(!handin)assert.equal(copies,interrupt?0:1)
+ if(handin){
+  const queued=await queueRow(reqId);note('automatic queue receipt after actual parent completion',{queued,stored})
+  assert.equal(queued.status,'sent','terminal writer must automatically admit a follow-up')
+  assert.equal(queued.claimMode,'afterRun');assert.ok(queued.sentRunId&&queued.sentRunId!==runId)
+  const resultRun=queued.sentRunId
+  const getRun=async(id:string)=>(await independent.query(`SELECT id,prompt,status,"sessionId","continuesRunId","issueId","workspaceId","stopReason","lastReply","agentDefinition"->>'model' AS model FROM agent_runs WHERE id=$1`,[id])).rows[0]
+  const accepted=await getRun(resultRun);assert.equal(accepted.continuesRunId,runId);assert.equal(accepted.issueId,issueId);assert.equal(accepted.workspaceId,ws.id);assert.equal(accepted.model,model);assert.ok(accepted.prompt.includes(text))
+  assert.equal((await independent.query('SELECT count(*)::int AS n FROM agent_runs WHERE "continuesRunId"=$1',[runId])).rows[0].n,1)
+  const offered=(await dcall(devicePath+'?wait=0')).queued??[];assert.ok(offered.includes(resultRun),JSON.stringify(offered))
+  const realSession=await adapter.start({runId:resultRun,cwd,prompt:accepted.prompt,model:accepted.model,log:createLogger({level:'silent'}),env:buildChildEnv({host:{PATH:process.env.PATH,HOME:home,SSL_CERT_FILE:join(dir,'ephemeral-ca.pem'),LANG:'C.UTF-8'},runId:resultRun}),credential:{kind:'provider',protocol:'openai',baseUrl:'https://127.0.0.1:3857/v1',key:process.env.E_LOOPBACK_KEY!},toolApproval:new ToolApprovalGate(resultRun,{isLive:()=>true})})
+  await dcall('runs/'+resultRun,'PATCH',{state:'running',sessionId:realSession.sessionId},204)
+  const followChunks:any[]=[];let followExit:any
+  for await(const e of realSession.events()){if(e.type==='chunk')followChunks.push(e.chunk);else if(e.type==='exit')followExit=e}
+  assert.equal(followExit.outcome,'succeeded');assert.equal(followExit.stopReason,undefined)
+  const answer=readFileSync(join(dir,'results.jsonl'),'utf8').trim().split('\n').map(s=>JSON.parse(s)).find(s=>s.prompt===steer)
+  assert.ok(answer&&answer.outputTokens>0)
+  const body=followChunks.filter(c=>c.type==='text-delta').map(c=>c.delta).join('');assert.equal(body,answer.result)
+  await dcall('runs/'+resultRun+'/events','POST',{fromSeq:1,chunks:followChunks})
+  await dcall('runs/'+resultRun+'/complete','POST',{stopReason:'turn_ended'},204)
+  const final=await getRun(resultRun);assert.equal(final.lastReply,answer.result);assert.equal(final.status,'stopped');assert.equal(final.stopReason,'turn_ended')
+  assert.equal(final.sessionId,realSession.sessionId)
+  await dcall('runs/'+runId+'/complete','POST',completion,204)
+  assert.deepEqual(await queueRow(reqId),queued)
+  const record=(await independent.query('SELECT id,"runId","deliveredAt" FROM run_messages WHERE "userId"=$1 AND text=$2',[owner,text])).rows;assert.equal(record.length,1);assert.equal(record[0].runId,resultRun)
+  note('automatic child executed actual queued request through native Codex, persistent independent read after completion and replay',{parent:runId,child:resultRun,model:final.model,childThread:final.sessionId,childOutcome:final.status,childText:final.lastReply,modelTokens:answer.outputTokens,ownerMessage:record[0]})
+ }
  if(interrupt){const held=await queueRow(reqId);assert.equal(held.status,'failed');assert.equal(held.sentRunId,null);note('terminal cancelled attempt held the queued message and created no unauthorized continuation',{held})}
- note('actual CPU result and completion persisted; event replay deduplicated',{model:provider,mode:interrupt?'interrupt':'steer',modelText:transcript,terminal,chunks:rows.length,durable:stored,ownerMessageCopies:copies,cancelledQueue:(await queueRow(cancelledId)).status})
+ note('actual CPU result and completion persisted; event replay deduplicated',{model:provider,mode:handin?'afterRun':interrupt?'interrupt':'steer',modelText:transcript,terminal,chunks:rows.length,durable:stored,ownerMessageCopies:copies,cancelledQueue:(await queueRow(cancelledId)).status})
  trace.success=true;persist()
- writeFileSync(join(dir,interrupt?'interrupt-result.json':'steer-result.json'),JSON.stringify(trace,null,2),{mode:0o600})
+ writeFileSync(join(dir,handin?'after-run-result.json':interrupt?'interrupt-result.json':'steer-result.json'),JSON.stringify(trace,null,2),{mode:0o600})
 }catch(e){
  trace.failure={name:e.name,message:String(e.message).replaceAll(process.env.E_LOOPBACK_KEY!,'[redacted]').slice(0,750),location:String(e.stack).split('\n').slice(1,5).join('\n').slice(0,800)};persist();process.exitCode=1
 }finally{

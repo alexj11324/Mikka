@@ -79,6 +79,7 @@ jobs:
             ${{ runner.temp }}/receipt/steer-result.json
             ${{ runner.temp }}/receipt/interrupt-result.json
             ${{ runner.temp }}/receipt/setup-diagnostic.txt
+            ${{ runner.temp }}/receipt/after-run-result.json
             ${{ runner.temp }}/receipt/handoff.json
             ${{ runner.temp }}/receipt/tools.jsonl
             ${{ runner.temp }}/receipt/decisions.jsonl
