@@ -223,7 +223,7 @@ try {
   const held=await queueRow(reqId)
   if(held.status!=='failed'){
    const {readRunChain}=await import('../../lib/run-chain')
-   const state=async()=>({queue:await queueRow(reqId),chain:await readRunChain(independent,owner,runId),attempts:(await independent.query('select id,status,"sourceEventId","runId" from factory_attempts where "taskId"=(select "taskId" from factory_attempts where "runId"=$1) order by "createdAt"',[runId])).rows})
+   const state=async()=>({queue:await queueRow(reqId),chain:await readRunChain(independent,owner,runId),attempts:(await independent.query('select a.id,a.status,t."sourceEventId" as "currentSourceEventId",a."runId" from factory_attempts a join factory_tasks t on t.id=a."taskId" where a."taskId"=(select "taskId" from factory_attempts where "runId"=$1) order by a."createdAt"',[runId])).rows})
    note('unexpected unfinished automatic hold after committed receipt; diagnostic before replay',await state())
    await wait(900)
    note('delayed independent original row before any retry',{row:await queueRow(reqId)})
