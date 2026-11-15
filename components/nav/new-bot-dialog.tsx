@@ -2,30 +2,84 @@
 import { isBotListKey } from '@/lib/live/list-read'
 
 import { useEffect, useState } from 'react'
-import { useSWRConfig } from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
 import { toast } from 'sonner'
-import { createBot, type BotView } from '@/app/actions/bots'
+import { useTranslations } from 'next-intl'
+import { createBot, getWorkspaceBotDefaults, type BotView } from '@/app/actions/bots'
+import { chooseBotModel, getBotModelMenu } from '@/app/actions/execution-settings'
+import { botModelMenuKey, modelGroupHeading, modelGroupTag } from '@/hooks/use-bot-model-picker'
+import { HOSTED_CHOICE, type BotModelMenu } from '@/lib/bot-model-menu-view'
+import { modelDisplayName } from '@/lib/model-display-name'
 import { useActionError } from '@/lib/use-action-error'
 import { DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotColor, type BotShape } from './bot-avatar'
+import { NO_REPOSITORY, type NewBotChoice, type NewBotDetail } from '@/components/slots/new-bot-contract'
 import { NewBot } from '@ui-slot/new-bot'
 
 const NAME_LENGTH = 60
 
+/**
+ * 新建 Bot, with Capy's new Captain details beside the look: the model its runs use and the repository it works in.
+ * The model menu is the one the Coordinator's chip reads (the same person, the same choices); a pick is saved on the
+ * new Bot after it exists. The repository starts at the workspace's default and is checked again by createBot.
+ */
 export function NewBotDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (open: boolean) => void; onCreated: (bot: BotView) => void }) {
   const actionError = useActionError()
+  const t = useTranslations('Shell.newBot')
+  const tModel = useTranslations('Coordinator.modelPicker')
   const { mutate } = useSWRConfig()
   const [name, setName] = useState('')
   const [color, setColor] = useState<BotColor>(DEFAULT_BOT_COLOR)
   const [shape, setShape] = useState<BotShape>(DEFAULT_BOT_SHAPE)
+  // Undefined until the person picks: the Bot then takes what it would get anyway.
+  const [model, setModel] = useState<string | undefined>()
+  const [repository, setRepository] = useState<string | undefined>()
   const [saving, setSaving] = useState(false)
-  useEffect(() => { if (!open) { setName(''); setColor(DEFAULT_BOT_COLOR); setShape(DEFAULT_BOT_SHAPE) } }, [open])
+  useEffect(() => { if (!open) { setName(''); setColor(DEFAULT_BOT_COLOR); setShape(DEFAULT_BOT_SHAPE); setModel(undefined); setRepository(undefined) } }, [open])
+
+  // Read once when the window opens; nothing here refreshes on its own.
+  const menu = useSWR<BotModelMenu | null>(open ? botModelMenuKey(null) : null, () => getBotModelMenu(null), { shouldRetryOnError: false, revalidateOnFocus: false })
+  const defaults = useSWR(open ? ['new-bot-defaults'] : null, async () => {
+    const result = await getWorkspaceBotDefaults()
+    if (result.error) throw new Error(result.error)
+    return result
+  }, { shouldRetryOnError: false, revalidateOnFocus: false })
+
+  const modelChoices: NewBotChoice[] = (menu.data?.groups ?? []).flatMap(group => {
+    const source = group.kind === 'hosted' ? undefined : modelGroupHeading(tModel, group)
+    const tag = modelGroupTag(tModel, group) ?? undefined
+    return group.options.map(option => ({
+      value: option.id,
+      label: option.id === HOSTED_CHOICE || !option.modelId ? tModel('hosted') : modelDisplayName(option.modelId).name,
+      detail: tag, group: source ?? tModel('hosted'),
+    }))
+  })
+  const modelValue = model ?? menu.data?.current?.id ?? null
+  const modelDetail: NewBotDetail = {
+    choices: modelChoices, value: modelValue,
+    label: modelChoices.find(choice => choice.value === modelValue)?.label ?? (menu.error ? tModel('unavailable') : t('loading')),
+    onChange: setModel, disabled: saving || modelChoices.length === 0,
+  }
+
+  const repositories = defaults.data?.repositories ?? []
+  const repositoryValue = repository ?? (defaults.data ? defaults.data.defaultRepository ?? NO_REPOSITORY : null)
+  const repositoryChoices: NewBotChoice[] = [{ value: NO_REPOSITORY, label: t('noRepository') }, ...repositories.map(item => ({ value: item, label: item }))]
+  const repositoryDetail: NewBotDetail = {
+    choices: repositoryChoices, value: repositoryValue,
+    label: repositoryValue === null ? (defaults.error ? t('noRepository') : t('loading')) : repositoryValue === NO_REPOSITORY ? t('noRepository') : repositoryValue,
+    onChange: setRepository, disabled: saving || !defaults.data,
+  }
 
   async function submit() {
     const trimmed = name.trim()
     if (!trimmed || saving) return
     setSaving(true)
     try {
-      const bot = await createBot({ name: trimmed, color, shape })
+      const bot = await createBot({ name: trimmed, color, shape, ...(repository === undefined ? {} : { repository: repository === NO_REPOSITORY ? null : repository }) })
+      if (model !== undefined && model !== menu.data?.current?.id) {
+        // The Bot exists either way; a model that did not save stays the default and says so.
+        const saved = await chooseBotModel(bot.id, model).catch(() => ({ error: 'notSaved' }))
+        if (saved.error) toast.error(tModel('notSaved'))
+      }
       await mutate(isBotListKey)
       onCreated(bot)
     } catch (error) {
@@ -37,5 +91,5 @@ export function NewBotDialog({ open, onOpenChange, onCreated }: { open: boolean;
   }
 
   return open ? <NewBot onClose={() => onOpenChange(false)} name={name} onName={setName} maxLength={NAME_LENGTH} color={color} shape={shape}
-    onColor={setColor} onShape={setShape} saving={saving} onSubmit={() => { void submit() }} /> : null
+    onColor={setColor} onShape={setShape} model={modelDetail} repository={repositoryDetail} saving={saving} onSubmit={() => { void submit() }} /> : null
 }

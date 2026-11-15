@@ -63,6 +63,8 @@ export type NewTaskProps = {
   }
   /** Profile checks, 未开启任务创建 and Coordinator unavailable, as Mikka draws them; null when there are none. */
   notices: ReactNode
+  /** 继续新建 (Capy's Create more): on, a created task clears the window and leaves it open for the next one. */
+  more: { checked: boolean; onChange: (checked: boolean) => void }
   sending: boolean
   /** Whether 创建任务 can send now (a title or text, a usable profile, files done, creation available). */
   canSubmit: boolean

@@ -4923,7 +4923,11 @@
         "ecran": "Screen"
       },
       "create": "Create",
-      "creating": "Creating…"
+      "creating": "Creating…",
+      "model": "Model",
+      "repository": "Repository",
+      "noRepository": "No repository",
+      "loading": "Loading…"
     },
     "createConversation": {
       "title": "New conversation",
@@ -5198,7 +5202,9 @@
       "botRow": "Hand to",
       "details": "Details",
       "expand": "Bigger window",
-      "collapse": "Smaller window"
+      "collapse": "Smaller window",
+      "createMore": "Create more",
+      "created": "Task created"
     },
     "board": {
       "toolbar": "Board toolbar",

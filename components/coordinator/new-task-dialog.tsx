@@ -91,6 +91,8 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
   // 标题 (optional): written by the person, the task gets exactly it; empty, the Bot writes one.
   const [title, setTitle] = useState('')
   const [sending, setSending] = useState(false)
+  // 继续新建: after a create the window stays, cleared, with the same machine, Bot and profile, for the next task.
+  const [more, setMore] = useState(false)
   const [picked, setPicked] = useState<string | null>(null)
   const profiles = useAgentProfiles(workspaceId, dispatching, picked ? (picked === 'cloud' || picked === 'cloudflare') ? { location: 'cloud' } : { location: 'local', deviceId: picked } : undefined)
   const [profilePick, setProfilePick] = useState<{ workspaceId: string; id: string } | null>(null)
@@ -169,6 +171,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
         createRequests.current.delete(fingerprint)
         setDraft('')
         setTitle('')
+        if (more) { toast.success(t('created')); return }
         onOpenChange(false)
         onCreated?.(result.taskId)
         return
@@ -187,13 +190,14 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
       if (outcome.kind !== 'accepted') { const message = failureMessage(outcome); if (message) toast.error(message); return }
       setDraft('')
       setTitle('')
+      composed.current = null
+      void mutate('coordinator-chat')
+      if (more) { toast.success(t('created')); return }
       setPicked(null)
       setProfilePick(null)
-      composed.current = null
       onOpenChange(false)
       if (outcome.task && onCreated) onCreated(outcome.task.taskId)
       else onSent?.()
-      void mutate('coordinator-chat')
     } catch {
       toast.error(t('failed'))
     } finally {
@@ -235,7 +239,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
       bots={!only && botChoices.length > 0 ? [{ id: null, name: 'Coordinator', avatar: <CoordinatorAvatar size="row" /> }, ...botChoices.map(bot => ({ id: bot.id, name: bot.name, avatar: <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="row" /> }))] : []}
       bot={handler?.id ?? null} onBot={setBotPick}
       profile={{ ...profileChoices, value: profileId ?? 'auto', onChange: id => setProfilePick(id !== 'auto' && workspaceId ? { workspaceId, id } : null), disabled: sending || !workspaceId }}
-      intent={only || chooseIntent ? intent : undefined} notices={notices} sending={sending} canSubmit={(only ? Boolean(workspaceId) : available && profileAllowed && (!botPick || !!handler)) && !!(draft.trim() || title.trim()) && !attachments.locked} onSubmit={() => { void submit() }} />}
+      intent={only || chooseIntent ? intent : undefined} more={{ checked: more, onChange: setMore }} notices={notices} sending={sending} canSubmit={(only ? Boolean(workspaceId) : available && profileAllowed && (!botPick || !!handler)) && !!(draft.trim() || title.trim()) && !attachments.locked} onSubmit={() => { void submit() }} />}
     {keyDialogNode}
     {accessChange && <AccessChangeDialog change={accessChange} pending={sending} onCancel={() => setAccessChange(null)} onConfirm={async () => {
       const current = accessChange
