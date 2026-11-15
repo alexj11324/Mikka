@@ -172,12 +172,19 @@ Capy 套餐里的「cloud machines」对应的是第三种：跑线程的云端 
 - 被邀请的人从第 2 步开始，第 1 步标为已完成。
 - 进度改存服务端（`user_onboarding` 加 `step`、`status`），刷新和换设备都能续上。
 
-## 4. 待定
+## 4. 新用户第一屏和没钱时（照抄 Capy）
 
-1. Cloudflare 编程机器的小时价和 Lite 的并发上限。
-2. 去掉「Mikka 默认」以后，新用户没订阅、没 key、没充值时什么都跑不了。这和 Capy 的免费版一致，但第一屏要讲清楚：去绑订阅、填 key，或者订 Lite。
+- **落地页**：引导结束跳到新建线程页（Capy 代码里是 `navigate({ to: '/new' })`），不建 Captain。页面正中是输入框，模型选择器在输入框里；没有项目时下面三个按钮「Add project」「Start without a repository」「Create a Captain」，旁边是引导清单。Mikka：引导结束落在新建任务页，输入框下放「连接这台电脑」「绑定订阅或 Key」「新建 Bot」，加引导清单。
+- **选择器里不提前标余额**：Capy 的选择器只用来源小标区分（没有小标就是走额度），不显示余额。
+- **点发送时拦**：Capy 在发送前检查（`Gtn`）：这次要花 Capy 额度（云机器，或者模型走 Capy 额度），而组织没有套餐、没有可用余额，就不发，弹出全屏的套餐窗口：标题「Choose a plan」，副标题「Plans include monthly usage, switch anytime」；不是管理员的人看到「Ask an organization admin to choose a plan or add balance」。用自己的电脑加自己的订阅或 key 的请求不拦。
+- **已经在跑、中途没钱**：线程里出提示卡。模型额度用完是「Your organization is out of credits」+「Add credits」+「Set up auto-reload so this doesn't happen again」；机器是「Not enough credits / Add credits to buy machine time」，机器状态行「Out of credits · Cloud machines need Capy credits, see Settings → Billing」；套餐不含该模型是「Not covered by the {plan} plan, upgrade or choose another model」。
+- Mikka 照抄：发送前同样检查，要花 Mikka 额度而工作区没套餐、没余额时，弹 affectUI / 设置里现有的套餐窗口「选择套餐」「套餐每月包含用量，随时可换」，成员看到「请管理员选择套餐或充值」；运行中没钱沿用现在 `Billing.refusal` 的卡，文案换成上面几句的中文。
 
-## 5. 分几步做
+## 5. 待定
+
+1. Cloudflare 编程机器的小时价和 Lite 的并发上限。照抄 Capy 的话：默认机器 $0.40/小时，Lite 并发内存合计 128 GB。
+
+## 6. 分几步做
 
 1. **网关目录、图标、来源说明、去掉 Mikka 默认**（公开仓库 + 私有 UI）。不碰钱的部分，可以先做。
 2. **线程用额度跑**：Claude Code 和 Codex 通过网关的 Anthropic / OpenAI 协议跑，扣 Mikka 额度。
