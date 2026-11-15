@@ -4,7 +4,7 @@ import { ScheduleError } from './contract'
 export function timezone(value: string): string {
   if ((!value.includes('/') && !['UTC', 'GMT'].includes(value)) || !/^[A-Za-z_]+(?:\/[A-Za-z0-9_+-]+)*$/.test(value)) throw new ScheduleError('invalidIanaTimezone', 400)
   try { return new Intl.DateTimeFormat('en', { timeZone: value }).resolvedOptions().timeZone }
-  catch { throw new ScheduleError('invalidIanaTimezone', 400) }
+  catch (error) { throw new ScheduleError('invalidIanaTimezone', 400, { cause: error }) }
 }
 const formats = new Map<string, Intl.DateTimeFormat>()
 export function wall(at: number, zone: string) {
