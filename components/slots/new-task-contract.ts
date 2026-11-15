@@ -23,6 +23,8 @@ export type NewTaskProfile = { value: string; label: string; detail?: string; di
 
 export type NewTaskProps = {
   intent?: 'create_only' | 'create_and_dispatch'
+  /** 创建方式, when the person may switch between 只创建 and 创建并派发 (a page that can open the created task). */
+  chooseIntent?: { onChange: (intent: 'create_only' | 'create_and_dispatch') => void; disabled: boolean }
   onClose: () => void
   /** The project page the request came from. */
   project?: string | null

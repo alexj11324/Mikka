@@ -27,6 +27,8 @@ mock.module(new URL('../slots/new-task.tsx', import.meta.url).href, { namedExpor
   NewTask: (props: import('../slots/new-task-contract').NewTaskProps) => <>
     <Input id="new-task-name" value={props.title} maxLength={props.titleMax} onChange={event => props.onTitle(event.target.value)} />
     {props.notices}
+    {props.chooseIntent && (['create_only', 'create_and_dispatch'] as const).map(value => <Button key={value} data-option={value}
+      disabled={props.chooseIntent!.disabled} onClick={() => props.chooseIntent!.onChange(value)}>{value}</Button>)}
     {props.intent !== 'create_only' && props.profile.choices.map(choice => <Button key={choice.value} data-option={choice.value}
       disabled={choice.disabled || props.profile.disabled} onClick={() => props.profile.onChange(choice.value)}>{choice.label}</Button>)}
     <Button data-more={props.more.checked} onClick={() => props.more.onChange(!props.more.checked)}>Shell.newTaskDialog.createMore</Button>
