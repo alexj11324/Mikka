@@ -214,9 +214,13 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   the bot on its own line under the assignee, joined by an elbow line, and
   the activity records 「<人> 把任务交给 <Bot>，自己负责」 (Linear's delegate).
 - **R-61** The page has a header line under the breadcrumb and one vertical
-  line before the properties column or an open thread. Nothing else gets a
-  line; sections are separated by space. The content column is centred in
-  the main area, up to 680px wide.
+  line before an open thread. Nothing else gets a line; sections are
+  separated by space. The content column is centred in the main area, up to
+  680px wide. As Capy's issue page
+  ([2026-11-14-2330](decisions/2026-11-14-2330-capy-activity-and-conversation-titles.md)),
+  under the title come the code and how long ago, then the properties in one
+  column (an icon and label, then the value, ▾ where it opens choices) in
+  Capy's order; a property with nothing set is left out and the ⋯ menu sets it.
 - **R-79** No breadcrumb, title bar or page header shows the workspace's
   name. There is one workspace on screen, the name cannot be clicked there,
   and it is shown and switched only from the avatar menu at the bottom left.

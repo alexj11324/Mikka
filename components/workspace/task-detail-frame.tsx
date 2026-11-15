@@ -29,8 +29,7 @@ import { threadQuestionView } from '@/lib/issue-threads'
 import { presentedFactoryEvents, taskFactoryProgress } from '@/lib/task-factory-events'
 import { runResult, useRunResultLabel } from '@/hooks/use-run-result'
 import { pullLabel } from '@/lib/issue-activity'
-import { TaskRunMark } from './task-state-icon'
-import { conversationIndicatorOf } from '@/lib/task-state'
+import { ThreadStatusIcon } from './thread-status-icon'
 import type { IssueDiscussions } from './issue-editor'
 import { chronologicalActivity, taskDiscussionEvents } from '@/lib/task-activity-timeline'
 import type { ActivityVersion } from '@/lib/issue-activity'
@@ -164,7 +163,8 @@ export function FramedTask(props: FramedTaskProps) {
       const detail = gate ? [labelStage(gate.stage), labelGate(gate.status)].filter(Boolean).join(' · ')
         : stage ? [labelStage(stage), view.stopping ? tThreads('stopping') : resultLabel(result, reason)].join(' · ')
         : view.stopping ? tThreads('stopping') : resultLabel(result, reason)
-      return [{ id: 'run:' + thread.id, text: thread.detail.name || tDirectory('untitled'), detail, mark: <TaskRunMark indicator={conversationIndicatorOf(run)} /> as ReactNode, open: () => props.agentActivity.openThread(thread.id) }]
+      // Capy's thread line leads with the conversation's coloured status mark, done or not.
+      return [{ id: 'run:' + thread.id, text: thread.detail.name || tDirectory('untitled'), detail, mark: <ThreadStatusIcon status={view.status} outcome={view.outcome} waiting={view.waiting} small dot={false} /> as ReactNode, open: () => props.agentActivity.openThread(thread.id) }]
     }),
   ]
   const reviewBranch = props.agentActivity.work?.factory?.task.review?.summary?.branch
@@ -186,6 +186,7 @@ export function FramedTask(props: FramedTaskProps) {
     })) : loading(),
   ]
 
+  const creator = props.versions.find(version => version.revision === 1)?.actor?.name ?? null
   const rows: TaskDetailRow[] = [
     {
       id: 'status', label: tIssue('statusLabel'), disabled: locked,
@@ -210,14 +211,16 @@ export function FramedTask(props: FramedTaskProps) {
       if (value === (team.data ?? '')) return
       void team.save(value)
     } })) },
+    // Capy's Created by: whoever made the task's first revision (the same actor 活动 starts with).
+    ...creator ? [{ id: 'createdBy', label: tProperty('createdBy'), value: { text: creator, mark: { kind: 'person', name: creator } } } satisfies TaskDetailRow] : [],
     ...meta.dueDate ? [{ id: 'dueDate', label: tProperty('dueDate'), disabled: locked, onClick: () => props.requestAction('dueDate'), value: { text: formatDateOnly(format, meta.dueDate, { month: 'short', day: 'numeric' }), mark: { kind: 'icon', icon: 'calendar' }, danger: overdue(meta.dueDate, props.status, now) } } satisfies TaskDetailRow] : [],
     ...meta.estimate !== null ? [{ id: 'estimate', label: tProperty('estimate'), disabled: locked, onClick: () => props.requestAction('estimate'), value: { text: tProperty('estimatePoints', { count: meta.estimate }), mark: { kind: 'icon', icon: 'estimate' } } } satisfies TaskDetailRow] : [],
-    ...conversations.length ? [{ id: 'conversations', label: tDirectory('title'), stacked: true,
+    ...conversations.length ? [{ id: 'conversations', label: tProperty(conversations.length > 1 ? 'conversationMany' : 'conversationOne'), stacked: true,
       chips: conversations.map(({ id, text, detail, mark, open }) => ({ id, text, ...detail ? { detail } : {}, ...mark ? { mark: { kind: 'node' as const, node: mark } } : {}, menu: [{ id: 'open', label: tFrame('open'), onSelect: open }] })),
     } satisfies TaskDetailRow] : [],
     ...reviewBranch ? [{ id: 'branch', label: tArtifact('branch'), value: { text: reviewBranch } } satisfies TaskDetailRow] : [],
     // Capy's Pull requests lines: repo#n and its title, its live state, and + to link one, shown even before there is one.
-    ...preview ? [] : [{ id: 'pullRequests', label: tProperty('pullRequests'), disabled: locked, stacked: true, chips: pullRequests.map(pr => ({ id: pr.url, text: [pullLabel(pr.url), pr.title].filter(Boolean).join(' '), href: pr.url, mark: { kind: 'icon', icon: 'pullRequest' }, live: draw => <PullRequestStatus issueId={task.id} pr={pr}>{view => draw({ text: [pullLabel(pr.url), view.text || pr.title].filter(Boolean).join(' '), title: view.title, state: view.state, confirmed: view.confirmed })}</PullRequestStatus> })), add: { label: tProperty('linkPullRequest'), onClick: () => props.requestProperty('pullRequests') } } satisfies TaskDetailRow],
+    ...preview ? [] : [{ id: 'pullRequests', label: tProperty(pullRequests.length > 1 ? 'pullRequestMany' : 'pullRequestOne'), disabled: locked, stacked: true, chips: pullRequests.map(pr => ({ id: pr.url, text: [pullLabel(pr.url), pr.title].filter(Boolean).join(' '), href: pr.url, mark: { kind: 'icon', icon: 'pullRequest' }, ...pr.state ? { state: pr.state } : {}, live: draw => <PullRequestStatus issueId={task.id} pr={pr}>{view => draw({ text: [pullLabel(pr.url), view.text || pr.title].filter(Boolean).join(' '), title: view.title, state: view.state, confirmed: view.confirmed })}</PullRequestStatus> })), add: { label: tProperty('linkPullRequest'), onClick: () => props.requestProperty('pullRequests') } } satisfies TaskDetailRow],
     ...preview ? [] : connections.groups.filter(group => group.items.length).map((group): TaskDetailRow => ({
       id: `relation-${group.kind}`, label: group.label, disabled: locked || connections.pending,
       chips: group.items.map(row => ({
@@ -289,7 +292,9 @@ export function FramedTask(props: FramedTaskProps) {
   const readerMenu = locked && !preview
   const menuItems = readerMenu
     ? menu.items.filter(item => item.id === 'history')
-    : menu.items.map(item => item.id === 'assignee' ? { ...item, onSelect: undefined, submenu: assigneeItems } : item.id === 'project' ? { ...item, onSelect: undefined, submenu: projectItems } : item.id === 'labels' ? { ...item, onSelect: undefined, submenu: labelItems } : item)
+    : [...menu.items.map(item => item.id === 'assignee' ? { ...item, onSelect: undefined, submenu: assigneeItems } : item.id === 'project' ? { ...item, onSelect: undefined, submenu: projectItems } : item.id === 'labels' ? { ...item, onSelect: undefined, submenu: labelItems } : item),
+      // The task page shows the team only once it has one (as Capy shows only set properties): the ⋯ menu sets it.
+      ...team.unavailable || team.selected ? [] : [{ id: 'team', label: team.label, mark: { kind: 'icon', icon: 'team' } as const, submenu: rows.find(row => row.id === 'team')?.menu ?? [] } satisfies TaskMenuItem]]
   const created = new Date(task.createdAt)
   return <Frame
     taskId={preview ? undefined : task.id}
@@ -321,7 +326,8 @@ export function FramedTask(props: FramedTaskProps) {
     }}
     rows={rows}
     rowsError={metadata.error || team.failed || (presentation.error ? actionError() : '')}
-    meta={[task.identifier, tFrame('created', { when: format.relativeTime(created, now) })].filter(Boolean).join(' · ')}
+    // Capy's line under the title: the code and how long ago it was made.
+    meta={[task.identifier, format.relativeTime(created, now)].filter(Boolean).join(' · ')}
     panel={props.panel} wide={props.wide} resize={props.resize}
     dialogs={<>{props.dialogs}{menu.dialogs}<AccessChangeDialog change={metadata.accessChange} pending={metadata.pending} onConfirm={metadata.confirmAccess} onCancel={metadata.cancelAccessChange} /><IssueMetadataControls task={task} section="dialog" disabled={locked} onSaved={adopt} onBusyChange={props.onMetadataBusy} request={props.propertyRequest} /></>}
   />

@@ -458,7 +458,12 @@
       "saveFailed": "The save failed. Please try again.",
       "saveFailedRetry": "The save failed. Please try again shortly.",
       "estimatePoints": "{count} point estimate",
-      "linkPullRequest": "Link pull request"
+      "linkPullRequest": "Link pull request",
+      "createdBy": "Created by",
+      "pullRequestOne": "Pull request",
+      "pullRequestMany": "Pull requests",
+      "conversationOne": "Thread",
+      "conversationMany": "Threads"
     },
     "colors": {
       "violet": "Violet",
@@ -525,7 +530,7 @@
       "aria": "Assignee: {name}",
       "ariaShortcut": "Assignee: {name} · A",
       "unassigned": "Unassigned",
-      "unassignedLabel": "Unassigned",
+      "unassignedLabel": "No assignee",
       "assignPlaceholder": "Assign to…",
       "searchAria": "Search assignees",
       "readFailed": "Could not load members. Please try again",

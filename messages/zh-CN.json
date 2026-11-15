@@ -458,7 +458,12 @@
       "saveFailed": "保存失败，请重试。",
       "saveFailedRetry": "保存失败，请稍后重试。",
       "estimatePoints": "{count} 点估算",
-      "linkPullRequest": "关联 PR"
+      "linkPullRequest": "关联 PR",
+      "createdBy": "创建者",
+      "pullRequestOne": "PR",
+      "pullRequestMany": "PR",
+      "conversationOne": "对话",
+      "conversationMany": "对话"
     },
     "colors": {
       "violet": "紫色",
@@ -525,7 +530,7 @@
       "aria": "负责人：{name}",
       "ariaShortcut": "负责人：{name} · A",
       "unassigned": "未分配",
-      "unassignedLabel": "未分配负责人",
+      "unassignedLabel": "无负责人",
       "assignPlaceholder": "分配给…",
       "searchAria": "搜索负责人",
       "readFailed": "成员读取失败，请重试",

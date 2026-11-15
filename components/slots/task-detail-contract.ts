@@ -50,6 +50,8 @@ export type TaskChip = {
   href?: string
   /** A quiet word after the text, as Capy's property lines: a conversation's Factory stage or run result, a PR's state. */
   detail?: string
+  /** The PR's stored state (open, draft, merged, closed), which colours its mark until GitHub answers. */
+  state?: string
   /** A PR's live GitHub state: `draw` gets the words to show while GitHub answers. */
   live?: (draw: (view: { text: string; title: string; state: string; confirmed: boolean }) => ReactNode) => ReactNode
   /** The chip opens these choices. */
