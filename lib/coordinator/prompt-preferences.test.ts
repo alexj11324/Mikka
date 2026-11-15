@@ -10,7 +10,7 @@ import { DEFAULT_AGENT_DEFINITION } from '../agent-kit/builtin'
 import { executionInstructions } from '../agent-kit/execution-instructions'
 import { withCoordinatorPresentation } from './native-prompt'
 import { instructionsWithPersonal, cachedContextLines, promptWithCachedContext } from './context'
-import { SCHEDULE_INSTRUCTIONS } from '../schedules/contract'
+import { SCHEDULE_INSTRUCTIONS } from '../schedules/instructions'
 
 const owner = 'synthetic-prompt-owner', peer = 'synthetic-prompt-peer'
 const bot = '10000000-0000-4000-8000-000000000001'

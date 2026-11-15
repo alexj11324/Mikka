@@ -1,8 +1,8 @@
 import { isDeepStrictEqual } from 'node:util'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
-import { commandSchema, definitionSchema, ScheduleError, SCHEDULE_PAGE_MAX, type Actor, type Definition, type ScheduledRead } from './contract'
-import { nextTime, timezone } from './time'
+import { commandSchema, definitionSchema, ScheduleError, SCHEDULE_PAGE_MAX, type Actor, type Definition, type DispatchTask, type ScheduledRead } from './contract'
+import { nextTime, runsOnSchedule, timezone } from './time'
 import { botChatChanged } from '../live/chats'
 import { observePoolCommits } from '../db/commit-effects'
 import { coordinatorSessionChanged } from '../live/coordinator-session'
@@ -13,6 +13,19 @@ export type WorkspaceAccess = { role: 'owner' | 'admin' | 'member' }
 export type WorkspaceGuard = <T>(ownerId: string, workspaceId: string | null, work: (access: WorkspaceAccess) => Promise<T>) => Promise<T>
 export type MessageGuard = (tx: PoolClient, ownerId: string, value: unknown) => Promise<void>
 export type IssueReader = (tx: PoolClient, ownerId: string, issueId: string) => Promise<{ id: string; title: string; status: string } | null>
+/** What one dispatch_task run made: the task (as the chat's task line shows it) and the request event behind it. */
+export type DispatchResult = { id: string; title: string; status: string; identifier: string | null; eventId: string }
+export type DispatchInput = { ownerId: string; workspaceId: string; scheduleId: string; occurrenceId: string; task: DispatchTask }
+/**
+ * dispatch_task's two host seams. `check` re-authorizes the creator's request at create, update, resume and every run
+ * (403 when it no longer holds: the run fails and says so). `dispatch` creates and hands over the task through the
+ * ordinary 创建并派发 path; it is idempotent per occurrence. `changed` publishes the workspace's schedule list.
+ */
+export type AutomationSeams = {
+  check?: (tx: PoolClient, ownerId: string, workspaceId: string, task: DispatchTask) => Promise<void>
+  dispatch?: (input: DispatchInput) => Promise<DispatchResult>
+  changed?: (tx: PoolClient, workspaceId: string) => Promise<void>
+}
 export type Schedule = { id: string; owner_id: string; workspace_id: string | null; bot_id: string | null; visibility: 'owner' | 'workspace'; source_event_id: string; definition: Definition; request_definition: Definition; status: string; version: number; next_at: Date | null }
 export type Occurrence = { id: string; schedule_id: string; operation_id: string; event_id: string | null; definition: Definition; version: number; due_at: Date; status: string; attempts: number; lease_token: string | null; lease_until: Date; error: string | null; execution_decision: 'execute' | 'skip'; report_next_at: Date; report_attempts: number; started_at: Date | null; created_at: Date }
 export const SCHEDULE_LEASE_MS = 5 * 60_000
@@ -43,7 +56,8 @@ export function scheduledInbox(row: Occurrence | undefined, now: Date): { eventI
 /** Definitions, due slots and original-chat publication share PostgreSQL commits.
  * Model reads use the existing inbox; no external write permission is created. */
 export class ScheduleStore {
-  constructor(private pool: Pool, private workspace: WorkspaceGuard, private issue: IssueReader, private safeMessage: MessageGuard, private agentAvailable: (ownerId: string, botId: string | null) => boolean | Promise<boolean>, private clock: () => Date = () => new Date()) {}
+  constructor(private pool: Pool, private workspace: WorkspaceGuard, private issue: IssueReader, private safeMessage: MessageGuard, private agentAvailable: (ownerId: string, botId: string | null) => boolean | Promise<boolean>, private clock: () => Date = () => new Date(), private automation: AutomationSeams = {}) {}
+  private async listChanged(tx: PoolClient, workspaceId: string | null) { if (workspaceId) await this.automation.changed?.(tx, workspaceId) }
   private async transaction<T>(work: (tx: PoolClient) => Promise<T>): Promise<T> {
     observePoolCommits(this.pool)
     const tx = await this.pool.connect()
@@ -56,10 +70,17 @@ export class ScheduleStore {
     if (actor.botId && !(await tx.query('SELECT id FROM bots WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 FOR SHARE', [actor.botId,actor.ownerId,actor.workspaceId])).rowCount) throw new ScheduleError('scheduleConversationUnavailable',403)
   }
   private async source(tx: PoolClient, actor: Actor, workspaceId: string | null) {
+    // The 自动化 page's server action authenticated the person; a chat command names their message instead.
+    if (actor.direct) return
     if (!actor.sourceEventId || !(await tx.query(`SELECT 1 FROM coordinator_events e LEFT JOIN bots b ON b.id=e."botId" WHERE e.id=$1 AND e."userId"=$2 AND e.kind='user_message' AND (e."botId" IS NULL OR b."workspaceId" IS NOT DISTINCT FROM $3::uuid)`,[actor.sourceEventId,actor.ownerId,workspaceId])).rowCount) throw new ScheduleError('scheduleUserSourceRequired',403)
   }
-  private async permission(tx: PoolClient, owner: string, botId: string | null, def: Definition) {
+  private async permission(tx: PoolClient, owner: string, botId: string | null, workspaceId: string | null, def: Definition) {
     if(def.task.kind==='agent_read'&&!await this.agentAvailable(owner,botId))throw new ScheduleError('scheduleAgentReadUnavailable',503)
+    if(def.task.kind==='dispatch_task'){
+      if(!workspaceId||!this.automation.check)throw new ScheduleError('scheduleDispatchUnavailable',503)
+      await this.automation.check(tx,owner,workspaceId,def.task)
+      return null
+    }
     if (def.task.kind !== 'issue_snapshot') return null
     const issue = await this.issue(tx,owner,def.task.issueId)
     if (!issue) throw new ScheduleError('scheduleTaskAccessDenied',403)
@@ -95,19 +116,22 @@ export class ScheduleStore {
         if (!actor.workspaceId) throw new ScheduleError('scheduleWorkspaceRequired',400)
         await this.source(tx,actor,actor.workspaceId)
         const def = definitionSchema.parse(cmd.definition); def.timezone = timezone(def.timezone)
-        await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[JSON.stringify(['schedule',actor.ownerId,actor.botId,cmd.requestId])])
-        const old = (await tx.query<Schedule>(`SELECT ${SCHEDULE_COLUMNS} FROM user_schedules WHERE owner_id=$1 AND request_origin=CASE WHEN $2::uuid IS NULL THEN 'coordinator' ELSE 'bot:'||$2::uuid::text END AND request_id=$3`,[actor.ownerId,actor.botId,cmd.requestId])).rows[0]
+        // A page request has its own identity space: a chat's tool call IDs never collide with it.
+        const origin = actor.direct ? 'page' : actor.botId ? `bot:${actor.botId}` : 'coordinator'
+        await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[JSON.stringify(['schedule',actor.ownerId,origin,cmd.requestId])])
+        const old = (await tx.query<Schedule>(`SELECT ${SCHEDULE_COLUMNS} FROM user_schedules WHERE owner_id=$1 AND request_origin=$2 AND request_id=$3`,[actor.ownerId,origin,cmd.requestId])).rows[0]
         if (old) { if (!isDeepStrictEqual(old.request_definition,def) || old.workspace_id!==actor.workspaceId) throw new ScheduleError('scheduleRequestConflict'); return { schedule:old,replayed:true } }
-        await this.permission(tx,actor.ownerId,actor.botId,def)
+        await this.permission(tx,actor.ownerId,actor.botId,actor.workspaceId,def)
         const next=nextTime(def,this.clock(),true)
-        const {rows}=await tx.query<Schedule>(`INSERT INTO user_schedules(id,owner_id,workspace_id,bot_id,visibility,source_event_id,request_id,definition,request_definition,status,next_at,request_origin) VALUES($1,$2,$3,$4,'workspace',$5,$6,$7,$7,'active',$8,CASE WHEN $4::uuid IS NULL THEN 'coordinator' ELSE 'bot:'||$4::uuid::text END) RETURNING ${SCHEDULE_COLUMNS}`,[randomUUID(),actor.ownerId,actor.workspaceId,actor.botId,actor.sourceEventId,cmd.requestId,def,next])
+        const {rows}=await tx.query<Schedule>(`INSERT INTO user_schedules(id,owner_id,workspace_id,bot_id,visibility,source_event_id,request_id,definition,request_definition,status,next_at,request_origin) VALUES($1,$2,$3,$4,'workspace',$5,$6,$7,$7,'active',$8,$9) RETURNING ${SCHEDULE_COLUMNS}`,[randomUUID(),actor.ownerId,actor.workspaceId,actor.botId,actor.direct?null:actor.sourceEventId,cmd.requestId,def,next,origin])
+        await this.listChanged(tx,actor.workspaceId)
         return {schedule:rows[0],replayed:false}
       }
       const row=(await tx.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1 AND workspace_id IS NOT DISTINCT FROM $2::uuid FOR UPDATE',[cmd.scheduleId,actor.workspaceId])).rows[0]
       if(!row) throw new ScheduleError('scheduleNotFound',404)
       if(row.visibility==='owner'&&(row.owner_id!==actor.ownerId||row.bot_id!==actor.botId)) throw new ScheduleError('scheduleNotFound',404)
       if(row.visibility==='workspace'&&!actor.workspaceId) throw new ScheduleError('scheduleNotFound',404)
-      if((cmd.action==='update'||cmd.action==='resume')&&row.visibility==='workspace'&&row.owner_id!==actor.ownerId&&access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
+      if((cmd.action==='update'||cmd.action==='resume'||cmd.action==='run_now')&&row.visibility==='workspace'&&row.owner_id!==actor.ownerId&&access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
       if(cmd.action==='history'){
         const seen=await tx.query('SELECT id,schedule_id,operation_id,event_id,version,due_at,status,attempts,result,error,started_at,finished_at,reported_at FROM schedule_occurrences WHERE schedule_id=$1 ORDER BY due_at DESC LIMIT 100',[row.id])
         // Seeing that a workspace schedule ran is collaboration; reading what it returned is not. Only the
@@ -120,11 +144,12 @@ export class ScheduleStore {
       await this.source(tx,actor,row.workspace_id)
       if(row.version!==cmd.version) throw new ScheduleError('scheduleVersionConflict')
       if(row.status==='cancelled') throw new ScheduleError('scheduleCancelled')
+      if(cmd.action==='run_now') return this.runNow(tx,row,cmd.requestId)
       let def=row.definition, status=row.status, next=row.next_at
-      if(cmd.action==='update'){def=cmd.definition;def.timezone=timezone(def.timezone);await this.permission(tx,row.owner_id,row.bot_id,def);next=nextTime(def,this.clock(),true);if(status==='completed')status='active'}
+      if(cmd.action==='update'){def=cmd.definition;def.timezone=timezone(def.timezone);await this.permission(tx,row.owner_id,row.bot_id,row.workspace_id,def);next=nextTime(def,this.clock(),true);if(status==='completed')status='active'}
       else if(cmd.action==='pause'){status='paused';next=null}
       else if(cmd.action==='cancel'){status='cancelled';next=null}
-      else {if(status!=='paused')throw new ScheduleError('scheduleNotPaused');await this.permission(tx,row.owner_id,row.bot_id,def);next=nextTime(def,this.clock());status=next?'active':'completed'}
+      else {if(status!=='paused')throw new ScheduleError('scheduleNotPaused');await this.permission(tx,row.owner_id,row.bot_id,row.workspace_id,def);next=nextTime(def,this.clock());status=next||!runsOnSchedule(def)?'active':'completed'}
       const stale=await tx.query<Occurrence>(`UPDATE schedule_occurrences SET status='cancelled',error='scheduleChanged',lease_token=NULL,lease_until=NULL,finished_at=$2 WHERE schedule_id=$1 AND status IN ('pending','running') RETURNING *`,[row.id,this.clock()])
       if (stale.rows.length) {
         await this.lockChat(tx,row)
@@ -133,8 +158,31 @@ export class ScheduleStore {
           await this.report(tx,row,item,'cancelled',null,'scheduleChanged')
         }
       }
-      return {schedule:(await tx.query<Schedule>(`UPDATE user_schedules SET definition=$2,status=$3,next_at=$4,version=version+1,updated_at=$5 WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,def,status,next,this.clock()])).rows[0]}
+      const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET definition=$2,status=$3,next_at=$4,version=version+1,updated_at=$5 WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,def,status,next,this.clock()])).rows[0]
+      await this.listChanged(tx,row.workspace_id)
+      return {schedule:updated}
     }))
+  }
+  /**
+   * 立即运行: one occurrence due now, run by the same claim and execute path as a timed one (so maxConcurrent, the
+   * creator's authority and the report apply unchanged). Its operation ID derives from the request, so a repeated
+   * request returns the first occurrence instead of adding another.
+   */
+  private async runNow(tx: PoolClient, row: Schedule, requestId: string) {
+    const operation = scheduleOperationId(row.id, requestId)
+    const replay = async () => (await tx.query<Occurrence>('SELECT * FROM schedule_occurrences WHERE operation_id=$1 AND schedule_id=$2', [operation, row.id])).rows[0]
+    const prior = await replay()
+    if (prior) return { schedule: scheduleView(row), occurrence: prior, replayed: true }
+    if (row.status !== 'active') throw new ScheduleError('scheduleNotActive')
+    await this.permission(tx, row.owner_id, row.bot_id, row.workspace_id, row.definition)
+    const { rows: [busy] } = await tx.query<{ n: number }>(`SELECT count(*)::int n FROM schedule_occurrences WHERE schedule_id=$1 AND status IN ('pending','running')`, [row.id])
+    if (busy.n >= (row.definition.maxConcurrent ?? 1)) throw new ScheduleError('scheduleConcurrencyLimit')
+    const now = this.clock()
+    const { rows: [occurrence] } = await tx.query<Occurrence>(`INSERT INTO schedule_occurrences(id,schedule_id,version,due_at,definition,status,operation_id,next_retry_at,execution_decision)
+      VALUES($1,$2,$3,$4,$5,'pending',$6,$4,'execute') ON CONFLICT DO NOTHING RETURNING *`, [randomUUID(), row.id, row.version, now, row.definition, operation])
+    if (!occurrence) throw new ScheduleError('scheduleRunConflict')
+    await this.listChanged(tx, row.workspace_id)
+    return { schedule: scheduleView(row), occurrence, replayed: false }
   }
   async materialize(limit=50){return this.transaction(async tx=>{
     const now=this.clock()
@@ -142,6 +190,7 @@ export class ScheduleStore {
     for(const row of rows){const late=now.getTime()-row.next_at!.getTime()>row.definition.maxLatenessMinutes*60000;const skip=late&&row.definition.misfire==='skip';const next=nextTime(row.definition,now)
       await tx.query(`INSERT INTO schedule_occurrences(id,schedule_id,version,due_at,definition,status,operation_id,next_retry_at,execution_decision) VALUES($1,$2,$3,$4,$5,'pending',$6,$7,$8) ON CONFLICT(schedule_id,version,due_at) DO NOTHING`,[randomUUID(),row.id,row.version,row.next_at,row.definition,randomUUID(),now,skip?'skip':'execute'])
       await tx.query('UPDATE user_schedules SET next_at=$2,status=$3,updated_at=$4 WHERE id=$1',[row.id,next,next?'active':'completed',now])
+      await this.listChanged(tx,row.workspace_id)
     } return rows.length
   })}
   async claim(){return this.transaction(async tx=>{
@@ -163,6 +212,7 @@ export class ScheduleStore {
     await tx.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1,$2,$3,'run_report',$4,$5) ON CONFLICT("dedupeKey") DO NOTHING`,[o.id,row.owner_id,row.bot_id,`schedule_result:${o.id}`,{source:'schedule_result',scheduleId:row.id,title:o.definition.title,occurrenceId:o.id,operationId:o.operation_id,status,error}])
     wakeCoordinatorAfterCommit(tx,row.owner_id)
     await tx.query('UPDATE schedule_occurrences SET reported_at=$2,report_attempts=report_attempts+1 WHERE id=$1',[o.id,this.clock()])
+    await this.listChanged(tx,row.workspace_id)
   }
   private async concurrencyLimited(tx:PoolClient,o:Occurrence,max:number){
     const started=o.started_at??o.created_at
@@ -177,7 +227,7 @@ export class ScheduleStore {
       await this.publishFailedReport(claim)
       return
     }
-    try{return await this.workspace(row.owner_id,row.workspace_id,()=>this.transaction(async tx=>{
+    try{const outcome=await this.workspace(row.owner_id,row.workspace_id,()=>this.transaction(async (tx):Promise<string|{dispatch:Occurrence}|undefined>=>{
       const current=(await tx.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1 FOR UPDATE',[row.id])).rows[0]
       const o=(await tx.query<Occurrence>(`SELECT * FROM schedule_occurrences WHERE id=$1 AND status='running' AND lease_token=$2 AND lease_until>$3 FOR UPDATE`,[claim.id,claim.lease_token,this.clock()])).rows[0]
       if(!o)return
@@ -189,8 +239,10 @@ export class ScheduleStore {
       const misfireSkipped=o.execution_decision==='skip'
       const concurrencyLimited=!misfireSkipped&&await this.concurrencyLimited(tx,o,current.definition.maxConcurrent??1)
       const skipReason=misfireSkipped?'misfireSkipped':concurrencyLimited?'concurrencyLimit':null
-      const issue=skipReason?null:await this.permission(tx,row.owner_id,row.bot_id,o.definition)
+      const issue=skipReason?null:await this.permission(tx,row.owner_id,row.bot_id,row.workspace_id,o.definition)
       const task=o.definition.task
+      // The task is created and handed over after this commit, outside the schedule's locks; the lease fences it.
+      if(!skipReason&&task.kind==='dispatch_task')return {dispatch:o}
       if(!skipReason&&task.kind==='agent_read'){
         const eventId=randomUUID()
         await tx.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload,tier) VALUES($1,$2,$3,'run_report',$4,$5,'attention')`,[eventId,row.owner_id,row.bot_id,`schedule_due:${o.id}:${o.attempts}`,{source:'schedule_due',scheduleId:row.id,title:o.definition.title,occurrenceId:o.id,text:task.prompt}])
@@ -202,7 +254,25 @@ export class ScheduleStore {
       const status=skipReason?'skipped':'succeeded'
       await tx.query('UPDATE schedule_occurrences SET status=$2,result=$3,error=$4,finished_at=$5,lease_token=NULL,lease_until=NULL WHERE id=$1',[o.id,status,result,skipReason,this.clock()])
       await this.report(tx,row,o,status,result,skipReason)
-    }))}catch(error){await this.fail(claim,error)}
+    }))
+    return typeof outcome==='object'?await this.finishDispatch(row,outcome.dispatch):outcome
+    }catch(error){await this.fail(claim,error)}
+  }
+  /** Creates and hands over the task as its creator, then records the run and posts its task line in the chat. */
+  private async finishDispatch(row:Schedule,o:Occurrence){
+    if(!this.automation.dispatch||!row.workspace_id||o.definition.task.kind!=='dispatch_task')throw new ScheduleError('scheduleDispatchUnavailable',503)
+    const result=await this.automation.dispatch({ownerId:row.owner_id,workspaceId:row.workspace_id,scheduleId:row.id,occurrenceId:o.id,task:o.definition.task})
+    const recorded=await this.workspace(row.owner_id,row.workspace_id,()=>this.transaction(async tx=>{
+      await tx.query('SELECT id FROM user_schedules WHERE id=$1 FOR UPDATE',[row.id])
+      // A lost lease means another worker owns this occurrence; it repeats the same idempotent dispatch.
+      const done=(await tx.query<Occurrence>(`UPDATE schedule_occurrences SET status='succeeded',result=$3,error=NULL,finished_at=$4,lease_token=NULL,lease_until=NULL WHERE id=$1 AND status='running' AND lease_token=$2 RETURNING *`,[o.id,o.lease_token,result,this.clock()])).rows[0]
+      if(!done)return false
+      await this.lockChat(tx,row)
+      await this.report(tx,row,done,'succeeded',result,null)
+      return true
+    }))
+    // The request event waits in the Bot's chat: waking the creator's chats delivers it.
+    return recorded?row.owner_id:undefined
   }
   async fail(claim:Pick<Occurrence,'id'|'lease_token'>,error:unknown){
     const terminal=error instanceof ScheduleError&&(error.status===403||error.code==='scheduleRecoveryExhausted')
@@ -254,4 +324,14 @@ export class ScheduleStore {
       await this.report(tx,row,o,'succeeded',{text},null,streamId)
     }))
   }
+}
+
+/** A run_now request's occurrence identity: stable for one schedule and request, never a client-chosen ID. */
+export function scheduleOperationId(scheduleId: string, requestId: string) {
+  const hex = createHash('sha256').update(`schedule-run-now:${scheduleId}:${requestId}`).digest('hex')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${((parseInt(hex[16]!, 16) & 3) | 8).toString(16)}${hex.slice(17, 20)}-${hex.slice(20, 32)}`
+}
+function scheduleView(row: Schedule) {
+  const { id, owner_id, workspace_id, bot_id, visibility, source_event_id, definition, request_definition, status, version, next_at } = row
+  return { id, owner_id, workspace_id, bot_id, visibility, source_event_id, definition, request_definition, status, version, next_at }
 }

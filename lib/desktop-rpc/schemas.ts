@@ -18,6 +18,7 @@ import { setAppPolicyInput } from '@/lib/app-policy/apps'
 import { POINTS_PURCHASE_AMOUNTS } from '@/lib/billing/hosted-usage'
 import { MAX_READ_BATCH, READ_BATCH_ACTIONS, type ReadBatchCall } from './read-batch-contract'
 import { USER_FACT_KINDS } from '@/lib/profile/kinds'
+import { definitionSchema as scheduleDefinition } from '@/lib/schedules/contract'
 
 const uuid = z.uuid()
 const id = z.string().min(1).max(200)
@@ -178,6 +179,15 @@ export const desktopActionSchemas = {
   'bots.updateBot': tuple(object({ botId: uuid, name: text(200).trim().min(1).optional(), color: text(50).min(1).optional(), shape: text(50).min(1).optional(), publicRole: text(2000).optional() })),
   'bots.listWorkspaceBots': none,
   'bots.getWorkspaceBotDefaults': none,
+  'automations.listAutomations': tuple(object({ cursor: text(100).optional() })),
+  'automations.getAutomation': oneId,
+  'automations.automationHistory': oneId,
+  'automations.createAutomation': tuple(object({ requestId: uuid, definition: scheduleDefinition })),
+  'automations.updateAutomation': tuple(object({ scheduleId: uuid, version: positive, definition: scheduleDefinition })),
+  'automations.pauseAutomation': tuple(object({ scheduleId: uuid, version: positive })),
+  'automations.resumeAutomation': tuple(object({ scheduleId: uuid, version: positive })),
+  'automations.cancelAutomation': tuple(object({ scheduleId: uuid, version: positive })),
+  'automations.runAutomationNow': tuple(object({ scheduleId: uuid, version: positive, requestId: uuid })),
   'bots.listBotsForWorkspace': oneId,
   'collaboration.exchangeDocument': tuple(object({ id: uuid, vector: text(1_400_000).regex(/^[A-Za-z0-9+/]*={0,2}$/).optional(), update: text(1_400_000).regex(/^[A-Za-z0-9+/]*={0,2}$/).optional(), seed: text(1_400_000).regex(/^[A-Za-z0-9+/]*={0,2}$/).optional(), known: version.optional() })),
   'collaboration.listMembers': oneId,

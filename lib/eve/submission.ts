@@ -88,6 +88,17 @@ export async function acceptEveMessage(scope:EveScope,message:MessageContent,con
   return {eventId,context:contextual}
 }
 
+/**
+ * Model-only provenance for a request an automation queued as its creator (lib/schedules/runtime.ts). It says who
+ * sent it and which Task the host created; it grants nothing the person would otherwise approve.
+ */
+function scheduledTaskContext(event: { kind: string; issueId: string | null; payload: Record<string, unknown> }) {
+  const command = dispatchTaskIntent.safeParse(event.payload.taskCommand)
+  const schedule = z.object({ scheduleId: z.uuid(), occurrenceId: z.uuid() }).safeParse(event.payload.schedule)
+  if (event.kind !== 'user_message' || !event.issueId || !command.success || !schedule.success) return []
+  return [`This request was sent by an automation the person set up (schedule ${schedule.data.scheduleId}), not typed by them now. The host has created Task ${event.issueId} for it as the person. Dispatch that Task with the existing Machine, Profile, approval and resource checks; the automation grants no approval the person would otherwise give. Reuse any execution receipt for this request.`]
+}
+
 /** A relational compatibility row is a projection, written once after eve accepted input. */
 export async function markEventAccepted(scope:EveScope,eventId:string) {
   const [{ db },{ sql },{ botChatChanged },{ coordinatorSessionChanged },{ sourcedEventMessage },{ eventPrompt },{ maskDeep,credentialMasker }] = await Promise.all([
@@ -116,8 +127,10 @@ export async function deliverEveEvent(scope:EveScope,session:Session,eventId:str
   const event = (await pool.query('SELECT * FROM coordinator_events WHERE id=$1 AND "userId"=$2 AND "botId"=$3',[eventId,scope.ownerId,scope.botId])).rows[0]
   if (!event) throw new Error('notFound')
   const { eventPrompt } = await import('../coordinator/context')
+  const context = scheduledTaskContext(event)
   const delivery = await session.send(eventPrompt(event),{
     auth:{...scopeAuth(scope),attributes:{...scopeAuth(scope).attributes,sourceEventId:event.id}},
+    ...(context.length ? { context } : {}),
     idempotencyKey:'mikka-event:'+event.id,turnPolicy:'queue',
   })
   await markEventAccepted(scope,eventId)

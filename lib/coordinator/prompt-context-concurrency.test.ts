@@ -6,7 +6,7 @@ import { DEFAULT_AGENT_DEFINITION } from '../agent-kit/builtin'
 import { executionInstructions } from '../agent-kit/execution-instructions'
 import { withCoordinatorPresentation } from './native-prompt'
 import { cachedContextLines, instructionsWithPersonal, promptWithCachedContext, type StoredMessage } from './context'
-import { SCHEDULE_INSTRUCTIONS } from '../schedules/contract'
+import { SCHEDULE_INSTRUCTIONS } from '../schedules/instructions'
 
 const owner = 'synthetic-prompt-owner', bot = '10000000-0000-4000-8000-000000000001'
 const snapshot = makeSnapshot('10000000-0000-4000-8000-000000000002', 1, DEFAULT_AGENT_DEFINITION, 'Synthetic frozen host policy', { harness: 'ai_sdk', model: 'synthetic' })

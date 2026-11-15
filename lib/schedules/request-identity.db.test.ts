@@ -15,8 +15,10 @@ test('schedule request identity survives bot removal through the production comm
   target.pathname = `/${database}`
   const admin = new Pool({ connectionString: dbUrl, max: 1 })
   await admin.query(`CREATE DATABASE ${database}`)
-  const previous = Object.fromEntries(['E2E_DATABASE_URL', 'DATABASE_URL', 'MIKKA_DATABASE_URL'].map(key => [key, process.env[key]]))
-  for (const key of Object.keys(previous)) process.env[key] = target.href
+  const previous = Object.fromEntries(['E2E_DATABASE_URL', 'DATABASE_URL', 'MIKKA_DATABASE_URL', 'BETTER_AUTH_URL'].map(key => [key, process.env[key]]))
+  for (const key of ['E2E_DATABASE_URL', 'DATABASE_URL', 'MIKKA_DATABASE_URL']) process.env[key] = target.href
+  // No live gateway here: a deferred live notify would outlive the pools this test closes before dropping its database.
+  delete process.env.BETTER_AUTH_URL
   const fixture = new Pool({ connectionString: target.href })
   let closeRuntime = async () => {}
   t.after(async () => {

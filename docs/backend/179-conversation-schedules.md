@@ -1,7 +1,8 @@
 # Conversation schedules (#179)
 
 The existing Coordinator and Bot chat tools create, list/history, update,
-pause/resume and cancel workspace schedules. No management UI is added.
+pause/resume and cancel workspace schedules. The 自动化 page manages the same
+schedules through `app/actions/automations.ts` (see § Automations below).
 The seven tool IDs are `schedule_create`, `schedule_list`, `schedule_history`,
 `schedule_update`, `schedule_pause`, `schedule_resume`, `schedule_cancel`.
 Mutations require the host's current user-message event, never a model-supplied
@@ -73,8 +74,8 @@ host-filtered read catalog intersected with the user's stored allowed actions
 and the execution's frozen grant. Each business read rechecks the occurrence;
 native calls also retain their real holder/turn/call fence. Completion publishes
 through the occurrence's CAS instead of the ordinary chat append path.
-Scheduling does not grant external write, approval, credential, dispatch or
-additional scheduling permissions. Already-started read/provider requests cannot
+Scheduling does not grant external write, approval, credential or additional
+scheduling permissions; `dispatch_task` dispatches only as its creator could. Already-started read/provider requests cannot
 be retracted; cancellation blocks subsequent tool authority and result publication.
 
 No new default-off feature flag, scheduler service, provider, identity or paid
@@ -82,6 +83,50 @@ resource is introduced. Model tasks require the already-configured Coordinator
 runtime and its current model/connection admission. Model inference, connected
 provider reads and budget/resource admission still need the issue's fixed-version
 runtime acceptance; a mocked model response is not that evidence.
+
+## Automations (v1, 2026-11-15)
+
+Decision [2026-11-15-1337](../design/decisions/2026-11-15-1337-automations-v1.md).
+
+- **Page commands.** The 自动化 page's server actions call `executeScheduleCommand`
+  with `{ direct: true }` as the signed-in person, in the workspace they have open,
+  with that workspace's Coordinator as the schedule's chat (run reports go there).
+  A direct request has no source chat event: `source_event_id` is null and its
+  request key lives in `request_origin='page'` (a database check allows a null
+  source only there). A Bot acting for the person (`actingContext`) cannot use
+  these actions; chat tools still require the person's message. List, history,
+  pause, cancel, update and resume keep the rules above.
+- **`dispatch_task`** (`botId` or null for the Coordinator, `prompt`, optional
+  `title`, `destination`, `profileId`) runs as its creator. At each run the host
+  records the creator's user message to that Bot with the same
+  `create_and_dispatch` task command the 新建任务 form sends, keyed by the
+  occurrence ID (`submissionId` and task `requestId`), creates the Task through
+  `createIssueFromRequest`, and wakes the creator's chats; the Bot dispatches it
+  with the existing Machine, Profile, approval and resource checks. A retried run
+  finds the same event and Task. The event carries `payload.schedule`, and the Bot
+  is told the request came from the person's automation; it grants no approval.
+- **Re-authorization.** Create, update, resume, 立即运行 and every run check that
+  the creator is still an active member, the Bot is still theirs, unarchived and in
+  the workspace, its repository is still installed there, a picked computer is
+  still theirs and enabled, a picked Agent profile still exists and is enabled,
+  and task creation is on. A failed check at run time fails the occurrence with
+  its code (`scheduleBotUnavailable`, `scheduleRepositoryUnavailable`, …) and
+  reports it; nothing is skipped silently. Tasks made this way are ordinary tasks:
+  their access and Secret exposure follow the task rules, unlike `agent_read`,
+  which stays read-only.
+- **`manual` timing** has no next time; the schedule stays `active` with a null
+  `next_at` and runs only through 立即运行. Resuming it returns to `active`.
+- **`run_now`** (`scheduleId`, `version`, `requestId`): creator or owner/admin;
+  only an active schedule. It inserts one `pending` occurrence due now with an
+  operation ID derived from the schedule and request, so a repeated request returns
+  the first occurrence. It refuses with `scheduleConcurrencyLimit` when waiting and
+  running occurrences already reach `maxConcurrent`; execution re-applies the
+  limit as for any slot.
+- **Live updates.** Commands, materialized slots and reports publish
+  `schedule_list` for the workspace; the page reads only on that signal.
+
+Not in v1: GitHub, Slack and Linear event triggers, per-automation webhook URLs,
+templates, run-count and spend limits, and Slack posting options.
 
 ## Historical local evidence
 

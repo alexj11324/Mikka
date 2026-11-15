@@ -8,7 +8,7 @@ import { ownerLiveScope } from './owner-scope'
 
 type Database = Pick<PoolClient, 'query'>
 export type OwnerListKind = 'thread_list' | 'task_run_list' | 'bot_chat_list' | 'device_list'
-export type WorkspaceListKind = 'issue_list' | 'bot_list' | 'group_list' | 'workspace_settings'
+export type WorkspaceListKind = 'issue_list' | 'bot_list' | 'group_list' | 'workspace_settings' | 'schedule_list'
 type ListKind = OwnerListKind | WorkspaceListKind | 'model_settings'
 type Target = { scope: LiveScope; events: LiveInvalidation[] }
 
@@ -151,6 +151,8 @@ export const archivePreferenceChanged = (executor: object, ownerId: string) => c
   return rows.map(scope => target(scope, ['thread_list', 'group_list']))
 })
 export const ownerListChanged = (executor: object, ownerId: string, kinds: readonly OwnerListKind[]) => changed(executor, `owner:${ownerId}:${[...kinds].sort().join(',')}`, (_db, workspace) => ownerListTargets(workspace, ownerId, kinds))
+/** 自动化: a workspace's schedules, their next run and their history. */
+export const scheduleListChanged = (executor: object, workspaceId: string) => workspaceListChanged(executor, workspaceId, ['schedule_list'])
 export const workspaceListChanged = (executor: object, workspaceId: string, kinds: readonly WorkspaceListKind[]) => changed(executor, `workspace:${workspaceId}:${[...kinds].sort().join(',')}`, (_db, workspace) => workspaceListTargets(workspace, workspaceId, kinds))
 
 /** Personal prefixes and owner profile labels are resolved while reading the
