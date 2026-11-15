@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      MIKKA_BUILD_REVISION: 02a747d6f62efd85701c34540d6f445867da1923
+      MIKKA_BUILD_REVISION: 30629ee1f18fa70b3713836017b437c22af915ee
       WORKFLOW_TARGET_WORLD: '@workflow/world-postgres'
       NITRO_PRESET: node-server
       NODE_OPTIONS: --max-old-space-size=6144
@@ -20,12 +20,12 @@ jobs:
       - name: Check out the fixed public product revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: 02a747d6f62efd85701c34540d6f445867da1923
+          ref: 30629ee1f18fa70b3713836017b437c22af915ee
           persist-credentials: false
       - name: Verify source commit and tree
         run: |
           test "$(git rev-parse HEAD)" = "$MIKKA_BUILD_REVISION"
-          test "$(git rev-parse 'HEAD^{tree}')" = 068fbf87ac3507d4ed43bab1b4b31e78bf3703c8
+          test "$(git rev-parse 'HEAD^{tree}')" = e7c4c9fb3a72be9b06993a4ec244c5b25a1c3b26
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
         with:
           version: 10.34.3
@@ -52,7 +52,7 @@ jobs:
           assert.deepEqual(marker,{version:1,eve:'1.0.0-rc.9',revision:process.env.MIKKA_BUILD_REVISION,preset:'node-server',world:'@workflow/world-postgres',worldVersion:'5.2.0'})
           assert.ok(fs.statSync(path.join(output,'server/index.mjs')).size>0)
           assert.ok(fs.statSync(path.join(output,'nitro.json')).size>0)
-          fs.writeFileSync(path.join(process.env.RUNNER_TEMP,'eve-receipt','source.json'),JSON.stringify({source:marker.revision,tree:'068fbf87ac3507d4ed43bab1b4b31e78bf3703c8',qualificationRun:process.env.GITHUB_RUN_ID,build:marker},null,2)+'\n')
+          fs.writeFileSync(path.join(process.env.RUNNER_TEMP,'eve-receipt','source.json'),JSON.stringify({source:marker.revision,tree:'e7c4c9fb3a72be9b06993a4ec244c5b25a1c3b26',qualificationRun:process.env.GITHUB_RUN_ID,build:marker},null,2)+'\n')
           JS
           tar -C apps/eve/.output -czf "$RUNNER_TEMP/eve-receipt/eve.tar.gz" .
           cd "$RUNNER_TEMP/eve-receipt"
@@ -60,7 +60,7 @@ jobs:
           sha256sum --check SHA256SUMS
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: eve-2364-02a747d6f62efd85701c34540d6f445867da1923
+          name: eve-2364-30629ee1f18fa70b3713836017b437c22af915ee
           path: ${{ runner.temp }}/eve-receipt/
           if-no-files-found: error
           retention-days: 2
