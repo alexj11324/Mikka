@@ -1,11 +1,12 @@
 import { dailyTimeRepeats, resolveLocal } from '@/lib/schedules/wall-time'
-import type { Definition, DispatchTask, EventTrigger, GitHubTriggerEvent, LinearTriggerEvent } from '@/lib/schedules/contract'
+import type { Definition, DispatchTask, EventTrigger, GitHubTriggerEvent, LinearTriggerEvent, SlackTriggerEvent } from '@/lib/schedules/contract'
 import type { TaskDestination } from '@/lib/task-destination'
 
 export type ScheduleKind = 'once' | 'interval' | 'daily' | 'cron'
 /** One GitHub event trigger as the editor holds it; lists are comma-separated text. */
 export type GitHubTriggerDraft = { event: GitHubTriggerEvent; repositories: string[]; branches: string; labels: string; runWhen: string }
 export type LinearTriggerDraft = { event: LinearTriggerEvent; teams: string[]; labels: string; runWhen: string }
+export type SlackTriggerDraft = { event: SlackTriggerEvent; channels: string[]; reactions: string; runWhen: string }
 export type IntervalUnit = 'minutes' | 'hours' | 'days'
 const UNIT_MINUTES: Record<IntervalUnit, number> = { minutes: 1, hours: 60, days: 1440 }
 
@@ -42,6 +43,8 @@ export type AutomationDraft = {
   github: GitHubTriggerDraft[]
   /** 满足任一条件就运行: Linear event triggers, on teams of the person's own Linear connection. */
   linear: LinearTriggerDraft[]
+  /** 满足任一条件就运行: Slack event triggers, on channels of the workspace's Slack installation. */
+  slack: SlackTriggerDraft[]
   /** Webhook: its own URL starts a run; null is off, otherwise the minutes requests are gathered into one run. */
   webhook: number | null
   /** A chat-made automation's own task (reminder, snapshot, read): kept as it is. */
@@ -70,7 +73,7 @@ export function emptyDraft(timezone: string, now = new Date()): AutomationDraft 
     title: '', botId: null, machine: 'auto', profileId: 'auto', timezone,
     scheduleOn: true, scheduleKind: 'daily', onceAt: wallTime(soon, timezone), intervalStart: wallTime(soon, timezone),
     intervalValue: 1, intervalUnit: 'hours', dailyTime: '09:00', fold: null, cron: '0 9 * * 1-5',
-    prompt: '', taskTitle: '', misfire: 'skip', lateness: 30, concurrent: 1, perDay: 0, eachRun: 'new_task', github: [], linear: [], webhook: null, otherTask: null,
+    prompt: '', taskTitle: '', misfire: 'skip', lateness: 30, concurrent: 1, perDay: 0, eachRun: 'new_task', github: [], linear: [], slack: [], webhook: null, otherTask: null,
   }
 }
 
@@ -102,6 +105,8 @@ export function draftFrom(definition: Definition, now = new Date()): AutomationD
       branches: (trigger.branches ?? []).join(', '), labels: (trigger.labels ?? []).join(', '), runWhen: trigger.runWhen ?? '' }] : []),
     linear: (definition.events ?? []).flatMap(trigger => trigger.source === 'linear' ? [{ event: trigger.event, teams: [...trigger.teams],
       labels: (trigger.labels ?? []).join(', '), runWhen: trigger.runWhen ?? '' }] : []),
+    slack: (definition.events ?? []).flatMap(trigger => trigger.source === 'slack' ? [{ event: trigger.event, channels: [...trigger.channels],
+      reactions: (trigger.reactions ?? []).join(', '), runWhen: trigger.runWhen ?? '' }] : []),
     webhook: definition.webhook?.batchMinutes ?? null,
     otherTask: task.kind === 'dispatch_task' ? null : task,
   }
@@ -112,6 +117,10 @@ function eventTrigger(draft: GitHubTriggerDraft): EventTrigger {
   const branches = list(draft.branches), labels = list(draft.labels)
   return { source: 'github', event: draft.event, repositories: draft.repositories,
     ...(branches.length ? { branches } : {}), ...(labels.length ? { labels } : {}), ...(draft.runWhen.trim() ? { runWhen: draft.runWhen.trim() } : {}) }
+}
+function slackTrigger(draft: SlackTriggerDraft): EventTrigger {
+  const reactions = list(draft.reactions).map(name => name.replace(/^:|:$/g, '').toLowerCase()).filter(Boolean)
+  return { source: 'slack', event: draft.event, channels: draft.channels, ...(draft.event === 'reaction_added' && reactions.length ? { reactions } : {}), ...(draft.runWhen.trim() ? { runWhen: draft.runWhen.trim() } : {}) }
 }
 function linearTrigger(draft: LinearTriggerDraft): EventTrigger {
   const labels = list(draft.labels)
@@ -132,12 +141,13 @@ export function foldNeeded(draft: Pick<AutomationDraft, 'scheduleOn' | 'schedule
 }
 
 /** The definition to save, or the first field that keeps it from saving. */
-export function definitionFrom(draft: AutomationDraft, now = new Date()): { definition: Definition } | { missing: 'title' | 'prompt' | 'time' | 'fold' | 'interval' | 'cron' | 'repository' | 'team' } {
+export function definitionFrom(draft: AutomationDraft, now = new Date()): { definition: Definition } | { missing: 'title' | 'prompt' | 'time' | 'fold' | 'interval' | 'cron' | 'repository' | 'team' | 'channel' } {
   const title = draft.title.trim()
   if (!title) return { missing: 'title' }
   if (!draft.otherTask && !draft.prompt.trim()) return { missing: 'prompt' }
   if (draft.github.some(trigger => !trigger.repositories.length)) return { missing: 'repository' }
   if (draft.linear.some(trigger => !trigger.teams.length)) return { missing: 'team' }
+  if (draft.slack.some(trigger => !trigger.channels.length)) return { missing: 'channel' }
   let timing: Definition['timing']
   if (!draft.scheduleOn) timing = { kind: 'manual' }
   else if (draft.scheduleKind === 'once') {
@@ -166,7 +176,7 @@ export function definitionFrom(draft: AutomationDraft, now = new Date()): { defi
     ...(destination ? { destination } : {}),
     ...(draft.profileId !== 'auto' ? { profileId: draft.profileId } : {}),
   }
-  const events = draft.otherTask ? [] : [...draft.github.map(eventTrigger), ...draft.linear.map(linearTrigger)]
+  const events = draft.otherTask ? [] : [...draft.github.map(eventTrigger), ...draft.linear.map(linearTrigger), ...draft.slack.map(slackTrigger)]
   return { definition: { title, timezone: draft.timezone, timing, task, misfire: draft.misfire, maxLatenessMinutes: Math.round(draft.lateness), maxConcurrent: Math.round(draft.concurrent), ...(draft.perDay > 0 ? { maxRunsPerDay: Math.round(draft.perDay) } : {}), ...(!draft.otherTask && draft.eachRun === 'same_task' ? { eachRun: 'same_task' as const } : {}), ...(events.length ? { events } : {}), ...(!draft.otherTask && draft.webhook !== null ? { webhook: { batchMinutes: Math.round(draft.webhook) } } : {}) } }
 }
 

@@ -2323,7 +2323,9 @@
   },
   "app/actions/automations.ts": {
     "mode": "built-in",
-    "environment": [],
+    "environment": [
+      "SLACK_APP_ID"
+    ],
     "behavior": "The signed-in member lists, reads and runs the workspace's automations, and creates, changes, pauses, resumes or cancels them, through the schedule store in the installation PostgreSQL database; each run re-checks the creator's authority.",
     "test": "lib/schedules/dispatch.db.test.ts",
     "suite": "test:schedules-db"
@@ -2400,8 +2402,10 @@
   },
   "lib/schedules/runtime.ts": {
     "mode": "built-in",
-    "environment": [],
-    "behavior": "Run automations as their creator through the installation PostgreSQL database, including runs started by verified GitHub and Linear deliveries and by requests to an automation's webhook URL; a trigger condition uses the configured Decision model and fails retryably without one.",
+    "environment": [
+      "SLACK_APP_ID"
+    ],
+    "behavior": "Run automations as their creator through the installation PostgreSQL database, including runs started by verified GitHub, Linear and Slack deliveries and by requests to an automation's webhook URL; a trigger condition uses the configured Decision model and fails retryably without one.",
     "test": "lib/schedules/dispatch.db.test.ts",
     "suite": "test:schedules-db"
   },
@@ -2453,6 +2457,42 @@
       "LINEAR_WEBHOOK_SECRET"
     ],
     "behavior": "Take Linear deliveries forwarded by the Linear Worker for automation triggers, checking Linear's signature again.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
+  },
+  "lib/schedules/slack-events.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Map a signed Slack event to automation events and match them to Slack triggers; no I/O.",
+    "test": "lib/schedules/slack-events.test.ts",
+    "suite": "test:schedules"
+  },
+  "lib/slack/automation-route.ts": {
+    "mode": "built-in",
+    "environment": [
+      "SLACK_SIGNING_SECRET",
+      "SLACK_APP_ID"
+    ],
+    "behavior": "Take Slack events forwarded by Eve for automation triggers, checking Slack's signature and app again.",
+    "test": "lib/slack/automation-route.test.ts",
+    "suite": "test:schedules"
+  },
+  "app/api/webhooks/slack/automations/route.ts": {
+    "mode": "built-in",
+    "environment": [
+      "SLACK_SIGNING_SECRET",
+      "SLACK_APP_ID"
+    ],
+    "behavior": "Serve the Slack automation hand-off route on the installation.",
+    "test": "lib/slack/automation-route.test.ts",
+    "suite": "test:schedules"
+  },
+  "lib/slack/automation-channels.ts": {
+    "mode": "built-in",
+    "environment": [
+      "SLACK_APP_ID"
+    ],
+    "behavior": "List the channels the workspace's Slack installation can see, with its bot token, for a member of that installation.",
     "test": "lib/schedules/dispatch.db.test.ts",
     "suite": "test:schedules-db"
   }

@@ -1230,6 +1230,8 @@
     "scheduleWebhookOff": "Turn on Webhook and save first, then make the URL.",
     "scheduleLinearUnavailable": "Your Linear connection cannot see a team this Linear trigger uses, or Linear is not connected.",
     "scheduleLinearUnreachable": "Linear could not be reached. It will try again shortly.",
+    "scheduleSlackUnavailable": "Mikka's Slack app cannot see a channel this Slack trigger uses, or you are not in this workspace's Slack.",
+    "scheduleSlackUnreachable": "Slack could not be reached. It will try again shortly.",
     "scheduleRunConflict": "The run didn't start. Please try again.",
     "scheduleTimeMustBeFuture": "The start time must be in the future.",
     "invalidIanaTimezone": "The time zone is invalid.",
@@ -7888,7 +7890,8 @@
       "monthly": "Monthly on day {day} at {time}",
       "cron": "cron {expression}",
       "webhook": "Webhook",
-      "linear": "Linear: {event}{count, plural, =0 {} other { and # more}}"
+      "linear": "Linear: {event}{count, plural, =0 {} other { and # more}}",
+      "slack": "Slack: {event}{count, plural, =0 {} other { and # more}}"
     },
     "kind": {
       "reminder": "Reminder",
@@ -7990,7 +7993,8 @@
         "fold": "Choose earlier or later to save",
         "interval": "The interval must be between 1 minute and 1 year",
         "cron": "A cron expression has 5 fields",
-        "team": "Choose a Linear team"
+        "team": "Choose a Linear team",
+        "channel": "Choose a Slack channel"
       },
       "webhook": {
         "title": "Webhook",
@@ -8022,6 +8026,21 @@
         "notConnected": "Connect Linear in Settings first",
         "noTeams": "Your Linear has no teams",
         "teamsError": "Could not load your Linear teams"
+      },
+      "slack": {
+        "title": "Slack events",
+        "show": "Add a Slack event",
+        "item": "Slack event {number}",
+        "event": "Event",
+        "channel": "Channel",
+        "remove": "Remove",
+        "reactions": "Emoji (optional, comma-separated, e.g. eyes, white_check_mark)",
+        "runWhen": "Condition",
+        "runWhenPlaceholder": "Condition (optional): e.g. \"the message asks about a deploy\"",
+        "add": "Add a Slack event",
+        "notInstalled": "Connect Slack to this workspace in Settings first",
+        "noChannels": "Mikka's Slack app cannot see any channels yet. Add it to a channel first",
+        "channelsError": "Could not load Slack channels"
       }
     },
     "run": {
@@ -8051,6 +8070,11 @@
       "issue_label_added": "Label added to an issue",
       "issue_assigned": "Issue assigned",
       "comment_created": "New comment"
+    },
+    "slackEvent": {
+      "message": "New message in a channel",
+      "mention": "Mikka is mentioned",
+      "reaction_added": "Reaction added"
     }
   }
 }

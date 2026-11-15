@@ -1230,6 +1230,8 @@
     "scheduleWebhookOff": "先打开 Webhook 并保存，再生成地址。",
     "scheduleLinearUnavailable": "Linear 触发器用到的团队你的 Linear 连接看不到，或者 Linear 没有连接。",
     "scheduleLinearUnreachable": "现在连不上 Linear，稍后会重试。",
+    "scheduleSlackUnavailable": "Slack 触发器用到的频道 Mikka 的 Slack 应用看不到，或者你不在这个工作区的 Slack 里。",
+    "scheduleSlackUnreachable": "现在连不上 Slack，稍后会重试。",
     "scheduleRunConflict": "运行未开始，请重试。",
     "scheduleTimeMustBeFuture": "开始时间必须晚于现在。",
     "invalidIanaTimezone": "时区无效。",
@@ -7888,7 +7890,8 @@
       "monthly": "每月 {day} 日 {time}",
       "cron": "cron {expression}",
       "webhook": "Webhook",
-      "linear": "Linear：{event}{count, plural, =0 {} other { 等 # 项}}"
+      "linear": "Linear：{event}{count, plural, =0 {} other { 等 # 项}}",
+      "slack": "Slack：{event}{count, plural, =0 {} other { 等 # 项}}"
     },
     "kind": {
       "reminder": "提醒",
@@ -7990,7 +7993,8 @@
         "fold": "选较早或较晚后才能保存",
         "interval": "间隔要在 1 分钟到 1 年之间",
         "cron": "cron 表达式要有 5 段",
-        "team": "选一个 Linear 团队"
+        "team": "选一个 Linear 团队",
+        "channel": "选一个 Slack 频道"
       },
       "webhook": {
         "title": "Webhook",
@@ -8022,6 +8026,21 @@
         "notConnected": "先在设置里连接 Linear",
         "noTeams": "你的 Linear 里没有团队",
         "teamsError": "Linear 团队没加载出来"
+      },
+      "slack": {
+        "title": "Slack 事件",
+        "show": "添加 Slack 事件",
+        "item": "Slack 事件 {number}",
+        "event": "事件",
+        "channel": "频道",
+        "remove": "移除",
+        "reactions": "表情（可选，逗号分隔，例如 eyes, white_check_mark）",
+        "runWhen": "条件",
+        "runWhenPlaceholder": "条件（可选）：例如「消息里在问部署」",
+        "add": "添加 Slack 事件",
+        "notInstalled": "先在设置里把 Slack 连到这个工作区",
+        "noChannels": "Mikka 的 Slack 应用还看不到频道，先把它加进频道",
+        "channelsError": "Slack 频道没加载出来"
       }
     },
     "run": {
@@ -8051,6 +8070,11 @@
       "issue_label_added": "议题加了标签",
       "issue_assigned": "议题被指派",
       "comment_created": "新评论"
+    },
+    "slackEvent": {
+      "message": "频道新消息",
+      "mention": "提到 Mikka",
+      "reaction_added": "加了表情回应"
     }
   }
 }
