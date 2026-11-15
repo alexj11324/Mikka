@@ -217,11 +217,13 @@ test('Native Activity keeps canonical Bot progress as a real comment once while 
 test('Native uses Capy activity sentences, conversation identity and the shared comment filters', async () => {
   const { filteredTaskActivity, nativeHistoryPieces } = await import('../features/tasks/model/task-conversation.ts')
   const at = '2026-11-15T01:00:00Z'
-  const event = { id: 'revision', at, kind: 'created' as const, actor: { type: 'agent' as const, id: 'agent', name: 'Claude Code', avatarUrl: null } }
+  const event = { id: 'revision', at, kind: 'created' as const, source: { kind: 'revision' as const, id: 'revision', revision: 1, runId: 'owned-thread' }, actor: { type: 'agent' as const, id: 'agent', name: 'Claude Code', avatarUrl: null } }
   const stretch = { at, runId: 'owned-thread', agentId: 'agent', linked: true, title: 'Investigate the queue' }
   const subject = { taskId: 'task', code: 'ENG-1' }
   assert.deepEqual(nativeHistoryPieces(event, subject, [stretch])[0], { kind: 'thread', text: stretch.title, runId: stretch.runId, title: stretch.title })
   assert.ok(!nativeHistoryPieces(event, subject, [{ ...stretch, linked: false }]).some(piece => piece.kind === 'thread'))
+  assert.ok(!nativeHistoryPieces({ ...event, source: { ...event.source, runId: null } }, subject, [stretch]).some(piece => piece.kind === 'thread'))
+  assert.ok(!nativeHistoryPieces(event, subject, [{ ...stretch, agentId: 'another-agent' }]).some(piece => piece.kind === 'thread'))
   assert.equal(nativeHistoryPieces({ ...event, actor: null }, subject)[0]?.text, 'Mikka')
   const history = { kind: 'history' as const, id: 'history:1', at, event }
   const bot = { kind: 'comment' as const, actor: 'bot' as const, id: 'comment:1', threadId: 't', messageId: 'b', at, author: 'Coordinator', authorId: null, body: 'Ready', resolved: false }
