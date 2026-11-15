@@ -2,6 +2,7 @@ import 'server-only'
 import { createTranslator } from 'next-intl'
 import { pool } from '@/lib/db'
 import { BASE_PATH } from '@/lib/base-path'
+import { workspaceLink } from '@/components/workspace/workspace-navigation'
 import { installationCredential } from './installation-store'
 import type { RunNotice } from '@/lib/schedules/store'
 
@@ -12,7 +13,7 @@ const escape = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;
 function taskLink(id: string, env: NodeJS.ProcessEnv) {
   const origin = env.BETTER_AUTH_URL ?? env.MIKKA_APP_ORIGIN
   if (!origin) return null
-  try { return `${new URL(origin).origin}${BASE_PATH}/?issue=${encodeURIComponent(id)}` } catch { return null }
+  try { return `${new URL(origin).origin}${BASE_PATH}${workspaceLink({ issue: id })}` } catch { return null }
 }
 
 /**
