@@ -1,0 +1,254 @@
+name: E ordinary native CLI claim and observed Composer model on PostgreSQL 17
+on:
+  push:
+    branches: [evidence/2254-sidebar-85dfc396]
+    paths: [.github/workflows/e-native-composer-model.yml]
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    if: github.repository == 'alexj11324/Mikka'
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    env:
+      SOURCE: 7dfabca41b06a64bbf3c157a946984310c7a9e5f
+    steps:
+      - name: Check out the public harness only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: harness
+          ref: e3240ae4583a31bd0d6bd7ba0b321455b1e84fa5
+          persist-credentials: false
+          sparse-checkout: evidence/2257/local-provider
+      - name: Check out the immutable public product
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: product
+          ref: 7dfabca41b06a64bbf3c157a946984310c7a9e5f
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.22.1
+      - name: Install the exact public product and CPU inference runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C product rev-parse HEAD)" = "$SOURCE"
+          test "$(git -C product rev-parse 'HEAD^{tree}')" = f5d8beb6369dab232614cab42185b0352e99e906
+          cd product
+          pnpm install --frozen-lockfile
+          cd ../harness/evidence/2257/local-provider
+          npm ci --ignore-scripts --no-audit --no-fund
+          mkdir -m 700 "$RUNNER_TEMP/model-fixture" "$RUNNER_TEMP/isolated-home" "$RUNNER_TEMP/receipt"
+          python prepare.py "$GITHUB_WORKSPACE/product" "$RUNNER_TEMP/model-fixture"
+          mkdir -p "$GITHUB_WORKSPACE/product/.cache/e-codex-actual"
+          cat > "$GITHUB_WORKSPACE/product/.cache/e-codex-actual/title-lifecycle.mts" <<'E_NATIVE_PROOF'
+          import assert from 'node:assert/strict'
+          import { createHash,randomUUID } from 'node:crypto'
+          import { existsSync,mkdirSync,readFileSync,writeFileSync } from 'node:fs'
+          import { createServer } from 'node:http'
+          import { join } from 'node:path'
+          import { Pool } from 'pg'
+          import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
+          import { REPO_ORIGIN_HEADER, SOURCE_DAEMON_VERSION } from '@mikka/protocol/device'
+          import { CLIENT_VERSION_HEADER } from '@mikka/protocol/version'
+          import { normalizeRepository } from '@mikka/protocol/repository'
+          import { seedUser,seedWorkspace,seedIssue } from '../../tests/support/workspace-admin-db'
+          import { CodexAdapter } from '../../packages/daemon/src/adapters/codex'
+          import { NoSandbox } from '../../packages/daemon/src/agents/sandbox'
+          import { ToolApprovalGate } from '../../packages/daemon/src/agents/tool-approval'
+          import { buildChildEnv } from '../../packages/daemon/src/env'
+          import { createLogger } from '../../packages/daemon/src/log'
+          
+          const dir=process.env.E_CODEX_QA!,origin=process.env.BETTER_AUTH_URL!
+          const model='SmolLM2-135M-Instruct-Q4_K_M'
+          const interrupt=process.env.E_FACTORY_INTERRUPT==='1'
+          const runId=randomUUID(),deviceId=randomUUID(),agentId=randomUUID(),repoId=randomUUID()
+          const handin=true
+          const trace:any={source:process.env.E_RUN_SOURCE,runId,deviceId,cli:process.env.E_CODEX_VERSION,model,weightSha256:process.env.E_WEIGHT_SHA,cliSha256:process.env.E_CLI_BINARY_SHA,stages:[],scope:'#2259 ordinary source-bound served model and #2265 titles on isolated PG17. Synthetic owner/member, real HTTPS official Codex + actual MCP handoff, device completion and GGUF-backed automatic creation/terminal titles. A QA driver bridges the device poll to the unchanged official adapter. No customer data, subscription, private overlay or publication.'}
+          const persist=()=>writeFileSync(join(dir,'title-lifecycle.json'),JSON.stringify(trace,null,2),{mode:0o600})
+          const note=(stage:string,data:any={})=>{trace.stages.push({stage,at:new Date().toISOString(),...data});persist()}
+          const wait=(ms:number)=>new Promise(r=>setTimeout(r,ms))
+          const mark=(s:string)=>'E2262_QA_BEGIN '+s+' E2262_QA_END'
+          const initial=handin?'The user wants the finished report delivered. Choose submit, not answer. The report should say which color a clear daytime sky is.':'List twenty vegetables with a sentence about each.',steer='Name the capital of France in one short sentence.'
+          const h=(s:string)=>createHash('sha256').update(s).digest('hex')
+          const dbUrl=process.env.E2E_DATABASE_URL!
+          assert.equal(new URL(dbUrl).hostname,'127.0.0.1');assert.equal(new URL(dbUrl).pathname,'/mikka_e2e')
+          assert.equal(origin,'http://127.0.0.1:3859')
+          const independent=new Pool({connectionString:dbUrl,max:2})
+          let http:any,session:any
+          try {
+           const version=(await independent.query('show server_version_num')).rows[0].server_version_num
+           assert.match(version,/^17/);note('isolated migrated PostgreSQL', {version})
+           const {default:api}=await import('../../apps/api/src/index')
+           http=createServer(async(req,res)=>{
+            try{
+             const chunks=[];for await(const chunk of req)chunks.push(chunk)
+             const request=new Request(origin+req.url,{method:req.method,headers:req.headers as Record<string,string>,...(chunks.length?{body:Buffer.concat(chunks)}:{})})
+             const result=await api.fetch(request);res.statusCode=result.status
+             for(const [k,v] of result.headers)res.setHeader(k,v)
+             res.end(Buffer.from(await result.arrayBuffer()))
+            }catch{res.writeHead(500);res.end()}
+           })
+           await new Promise<void>((resolve,reject)=>{http.once('error',reject);http.listen(3859,'127.0.0.1',resolve)})
+           const owner=await seedUser(independent,'e-owner'),member=await seedUser(independent,'e-member')
+           const ws=await seedWorkspace(independent,owner,[{userId:owner,role:'admin'},{userId:member,role:'member'}])
+           const issueId=await seedIssue(independent,owner,ws.id,{registered:true})
+           await independent.query('UPDATE issues SET content=$2 WHERE id=$1',[issueId,{type:'doc',attrs:{mikka:{number:1}}}])
+           const remote='https://github.com/octo/fixture.git'
+           await independent.query(`insert into devices(id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) values($1,$2,'Synthetic CI Linux','local','laptop',true,now(),$3)`,[deviceId,owner,JSON.stringify([{harness:'codex',installed:true,toolApproval:true,activeTurnSteer:true}])])
+           await independent.query(`insert into agents(id,"userId","deviceId",harness,name) values($1,$2,$3,'codex','Synthetic CPU model')`,[agentId,owner,deviceId])
+           await independent.query(`insert into device_repos(id,"deviceId","userId","repoPath","remoteUrl") values($1,$2,$3,$4,$5)`,[repoId,deviceId,owner,normalizeRepository(remote).key,remote])
+           const {acceptLocalRun}=await import('../../lib/run-admission-store')
+           const task='Prepare a clear daytime sky report.'
+           const prompt=task+'\n'+mark(initial)
+           const seedInput={id:runId,userId:owner,issueId,agentId,deviceId,deviceRepoId:repoId,botId:null,origin:'web',prompt,promptTaskStart:0,promptTaskLength:[...task].length,definition:{schemaVersion:1,kind:'worker',harness:'codex',instructions:'Use only the local model for this synthetic prompt.',definitionDigest:h('synthetic'),promptDigest:h(prompt),model,modelSource:'native-default',parent:null,readOnly:true} as never,dispatch:{issueId,agentId,deviceRepoId:repoId,requestKey:randomUUID()}}
+           const admitted=await acceptLocalRun(seedInput)
+           assert.equal(admitted.runId,runId);note('canonical admission',{issueId,workspaceId:ws.id})
+           const {auth}=await import('../../lib/auth')
+           const signIn=async(user:string)=>{
+            const context=await auth.$context,password=randomUUID()+randomUUID()
+            await context.internalAdapter.createAccount({userId:user,accountId:user,providerId:'credential',password:await context.password.hash(password)})
+            const resp=await auth.api.signInEmail({body:{email:user+'@example.invalid',password},headers:new Headers({origin}),returnHeaders:true})
+            const jar=resp.headers.getSetCookie().map(v=>v.split(';')[0]).join('; ');assert.ok(jar);return jar+'; mikka-workspace='+ws.id
+           }
+           const ownerCookie=await signIn(owner),memberCookie=await signIn(member)
+           const {issueDeviceToken}=await import('../../lib/device-link')
+           const token=await issueDeviceToken(owner,'Synthetic acceptance')
+           const dcall=async(path:string,method='GET',payload?:unknown,expected=200)=>{
+            note('device REST request',{method,path:path.split('?')[0]})
+            const res=await fetch(origin+'/mikka/v1/'+path,{method,headers:{authorization:'Bearer '+token,[CLIENT_VERSION_HEADER]:SOURCE_DAEMON_VERSION,'content-type':'application/json',[REPO_ORIGIN_HEADER]:'1'},...(payload===undefined?{}:{body:JSON.stringify(payload)})})
+            note('device REST response',{method,path:path.split('?')[0],status:res.status})
+            assert.equal(res.status,expected,method+' '+path+' '+res.status)
+            return expected===204?null:res.json()
+           }
+           const get=async()=> (await independent.query(`SELECT r.id,r."issueId",r."workspaceId",r."sessionId",r."finishedAt",r."updatedAt",r.status,r.title,r."titleSource",r.report->>'summary' AS summary, i.title AS "taskTitle" FROM agent_runs r JOIN issues i ON i.id=r."issueId" WHERE r.id=$1 AND r."userId"=$2`,[runId,owner])).rows[0]
+           const file=join(dir,'inference.jsonl')
+           const allTitles=()=>existsSync(file)?readFileSync(file,'utf8').trim().split('\n').filter(Boolean).map(s=>JSON.parse(s)):[]
+           const snapshot=async(label:string,calls:number)=>{
+            const {parseShortTitle}=await import('../../lib/short-title')
+            const end=Date.now()+30000
+            while(Date.now()<end){
+             const row=await get(), infer=allTitles()
+             if(row && infer.length===calls && row.titleSource==='generated' && row.title===parseShortTitle(infer[calls-1].output,false)){
+              assert.ok(infer[calls-1].outputTokens>0);assert.equal(row.issueId,issueId);assert.equal(row.workspaceId,ws.id);assert.notEqual(runId,issueId)
+              note(label,{row,inference:infer[calls-1]});return row
+             }
+             await wait(150)
+            }
+            throw Error('Title did not match independent persisted inference '+label+' count='+allTitles().length+' source='+(await get())?.titleSource)
+           }
+           const created=await snapshot('created title accepted by independent SQL',1)
+           const offered=await dcall('devices/'+deviceId+'/commands?wait=0')
+           assert.ok(offered.queuedRuns?.includes(runId),'Canonical admitted run must be offered by the real device service')
+           await independent.query('UPDATE devices SET "protocolVersion"=$2,"daemonVersion"=$3 WHERE id=$1',[deviceId,DAEMON_PROTOCOL_VERSION,SOURCE_DAEMON_VERSION])
+           const assignment=await dcall('devices/'+deviceId+'/runs/'+runId+'/claim','POST')
+           assert.equal(assignment.runId,runId);assert.equal(assignment.acceptsModelObservations,true);assert.ok(!assignment.skillReceipt)
+           note('canonical claim advertises native observations without a Skill',{run:assignment.runId,harness:assignment.harness})
+           const root=join(dir,'fixture'),cwd=join(root,'work'),home=join(root,'home'),stateDir=join(root,'adapters')
+           mkdirSync(stateDir,{recursive:true})
+           const adapter=new CodexAdapter({stateDir,binary:process.env.E_CLI_BINARY!,sandbox:new NoSandbox()})
+           session=await adapter.start({runId,cwd,prompt,model,log:createLogger({level:'silent'}),env:buildChildEnv({host:{PATH:process.env.PATH,HOME:home,SSL_CERT_FILE:join(dir,'ephemeral-ca.pem'),LANG:'C.UTF-8'},runId}),credential:{kind:'provider',protocol:'openai',baseUrl:'https://127.0.0.1:3857/v1',key:process.env.E_LOOPBACK_KEY!},toolApproval:new ToolApprovalGate(runId,{isLive:()=>true})})
+           await dcall('runs/'+runId,'PATCH',{state:'running',sessionId:session.sessionId},204)
+           const observed=session.runtimeModel
+           assert.ok(typeof observed==='string' && observed.length>0)
+           await dcall('runs/'+runId,'PATCH',{state:'running',sessionId:session.sessionId,observedModel:observed},204)
+           const readComposer=async(cookie:string)=>{const response=await fetch(origin+'/mikka/api/mobile/threads/'+runId,{headers:{cookie,origin}});const value=await response.json();return {status:response.status,model:value.composerModel}}
+           const readOwner=await readComposer(ownerCookie),readMember=await readComposer(memberCookie)
+           assert.equal(readOwner.status,200);assert.equal(readOwner.model.selectedModel,model);assert.equal(readOwner.model.servedModel,observed)
+           assert.equal(readMember.status,404)
+           const actualPersisted=(await independent.query('SELECT "observedModel", status FROM agent_runs WHERE id=$1',[runId])).rows[0]
+           assert.equal(actualPersisted.observedModel,observed);assert.equal(actualPersisted.status,'running')
+           note('ordinary native protocol model was persisted and returned through the signed in Composer route',{sessionId:session.sessionId,requested:model,actualCliObservation:observed,database:actualPersisted,owner:readOwner,memberStatus:readMember.status})
+           const chunks:any[]=[];let terminal:any
+           for await(const event of session.events()){if(event.type==='chunk')chunks.push(event.chunk);else if(event.type==='exit')terminal=event}
+           assert.equal(terminal?.outcome,'succeeded');assert.equal(terminal.stopReason,'submitted')
+           const decisions=readFileSync(join(dir,'decisions.jsonl'),'utf8').trim().split('\n').map(s=>JSON.parse(s))
+           const actual=decisions.find(x=>{const v=JSON.parse(x.generated);return v.action==='submit' && v.summary===terminal.report.summary})
+           assert.ok(actual && actual.generatedTokens>0)
+           assert.ok(chunks.length && chunks.some(c=>c.type==='tool-input-available'))
+           note('official native CLI handed in its actual model-generated summary',{terminal,decision:actual,session:session.sessionId,chunkCount:chunks.length})
+           const eventBatch={fromSeq:1,chunks}
+           assert.deepEqual(await dcall('runs/'+runId+'/events','POST',eventBatch),await dcall('runs/'+runId+'/events','POST',eventBatch))
+           const completion={stopReason:terminal.stopReason,report:{...terminal.report,filesChanged:[],verify:{status:'not_run'}}}
+           await dcall('runs/'+runId+'/complete','POST',completion,204)
+           const ended=await snapshot('first terminal regenerated through actual final device REST and independent SQL',2)
+           assert.equal(ended.status,'succeeded');assert.ok(ended.finishedAt);assert.equal(ended.sessionId,session.sessionId)
+           assert.equal(ended.summary,terminal.report.summary);assert.equal(ended.taskTitle,created.taskTitle)
+           assert.equal(allTitles()[1].syntheticTask.text,terminal.report.summary)
+           const titleRpc=async(cookie:string,action:string,args:any[])=>{
+            const res=await fetch(origin+'/mikka/api/rpc',{method:'POST',headers:{cookie,origin,'content-type':'application/json','x-mikka-rpc':'1','sec-fetch-site':'same-origin'},body:JSON.stringify({version:1,action:'task-runs.'+action,args})})
+            const body=await res.json();assert.equal(res.status,200,JSON.stringify(body));assert.equal(body.ok,true,JSON.stringify(body));return body.result
+           }
+           const denied=await titleRpc(memberCookie,'renameConversation',[runId,'Unauthorised title'])
+           assert.equal(denied.error,'runNotFound');assert.equal((await get()).title,ended.title)
+           const manual='Owner sky report';assert.deepEqual(await titleRpc(ownerCookie,'renameConversation',[runId,manual]),{title:manual})
+           await dcall('runs/'+runId+'/complete','POST',completion,204)
+           const kept=await get();assert.equal(kept.title,manual);assert.equal(kept.titleSource,'manual');assert.equal(allTitles().length,2)
+           note('member denied, owner manual title survives replay',{denied,kept})
+           const regen=await titleRpc(ownerCookie,'regenerateConversationTitle',[runId]);assert.equal(regen.regenerated,true)
+           const regenerated=await snapshot('explicit authenticated owner regeneration persisted',3);assert.equal(regenerated.title,regen.title)
+           const terminalRead=await readComposer(ownerCookie);assert.deepEqual(terminalRead,readOwner);note('observed model survives canonical terminal completion and later reread',{model:terminalRead.model})
+           trace.success=true;persist()
+          } catch(e){trace.failure={name:e.name,message:String(e.message).replaceAll(process.env.E_LOOPBACK_KEY!,'[redacted]').slice(0,750),location:String(e.stack).split('\n').slice(1,4).join('\n')};persist();process.exitCode=1}
+          finally{
+           await independent.end()
+           if(http)await new Promise<void>(resolve=>http.close(()=>resolve()))
+           try{const {builtinGateway}=await import('../../lib/builtin-gateway/runtime');await builtinGateway()?.stop()}catch{}
+           const [{pool},{workspacePool}]=await Promise.all([import('../../lib/db'),import('../../lib/workspace-db')]);await Promise.allSettled([pool.end(),workspacePool.end()])
+          }
+          
+          E_NATIVE_PROOF
+          if [ ! -x /usr/lib/postgresql/17/bin/initdb ]; then
+            . /etc/os-release
+            curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o "$RUNNER_TEMP/pgdg-signing.asc"
+            test "$(gpg --show-keys --with-colons "$RUNNER_TEMP/pgdg-signing.asc" | awk -F: '/^fpr:/ {print $10;exit}')" = B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8
+            sudo install -m 0644 "$RUNNER_TEMP/pgdg-signing.asc" /usr/share/keyrings/pgdg-evidence.asc
+            echo "deb [signed-by=/usr/share/keyrings/pgdg-evidence.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg-evidence.list >/dev/null
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends postgresql-17
+          fi
+      - name: Run the official Codex adapter and verified GGUF inside isolated loopback
+        shell: bash
+        run: |
+          set -euo pipefail
+          worker_uid="$(id -u)"
+          worker_gid="$(id -g)"
+          src="$GITHUB_WORKSPACE/product"
+          harness="$GITHUB_WORKSPACE/harness/evidence/2257/local-provider"
+          sudo unshare --net bash -euc '
+            ip link set lo up
+            test "$(ls /sys/class/net)" = lo || test "$(ip -o link show | wc -l)" = 1
+            test -z "$(ip route show default)"
+            exec setpriv --reuid="$1" --regid="$2" --clear-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs env -i PATH="$3" HOME="$4" bash "$5/verify-title.sh" "$5" "$6" "$7/receipt" "$7/model-fixture/codex" "$7/model-fixture/model.gguf"
+          ' isolated "$worker_uid" "$worker_gid" "$PATH" "$RUNNER_TEMP/isolated-home" "$harness" "$src" "$RUNNER_TEMP"
+      - name: Retain only the sanitized source, model and event receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: codex-pg-native-title-7dfabca4
+          path: |
+            ${{ runner.temp }}/receipt/title-lifecycle.json
+            ${{ runner.temp }}/receipt/inference.jsonl
+            ${{ runner.temp }}/receipt/steer-result.json
+            ${{ runner.temp }}/receipt/interrupt-result.json
+            ${{ runner.temp }}/receipt/setup-diagnostic.txt
+            ${{ runner.temp }}/receipt/pg-waits.jsonl
+            ${{ runner.temp }}/receipt/after-run-result.json
+            ${{ runner.temp }}/receipt/handoff.json
+            ${{ runner.temp }}/receipt/tools.jsonl
+            ${{ runner.temp }}/receipt/decisions.jsonl
+            ${{ runner.temp }}/receipt/requests.jsonl
+            ${{ runner.temp }}/receipt/results.jsonl
+            ${{ runner.temp }}/receipt/provider-ends.jsonl
+            ${{ runner.temp }}/receipt/first-token.jsonl
+            ${{ runner.temp }}/receipt/start
+            ${{ runner.temp }}/receipt/end
+            ${{ runner.temp }}/receipt/exit
+          if-no-files-found: warn
+          retention-days: 7
+
