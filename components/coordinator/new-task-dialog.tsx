@@ -57,11 +57,13 @@ function MachineIcon({ machine, cloudBotId }: { machine: Machine; cloudBotId: st
  * request goes into the Coordinator conversation, where its reply shows up. A UI layer's new-task slot draws the
  * window instead (docs/ui-overlay.md); the data, state and sending stay here.
  */
-export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, workspaceId, teamId, onCreated, initialIntent = 'create_and_dispatch', initialBotId, initialText = '' }: {
+export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, workspaceId, teamId, onCreated, onAdded, initialIntent = 'create_and_dispatch', initialBotId, initialText = '' }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSent?: () => void
   onCreated?: (taskId: string) => void
+  /** 继续新建: a task was created and the window stays; the page re-reads the task lists it shows (onCreated is not called). */
+  onAdded?: () => void
   initialIntent?: 'create_only' | 'create_and_dispatch'
   initialBotId?: string
   /** Project page the request came from. */
@@ -168,7 +170,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
         createRequests.current.delete(fingerprint)
         setDraft('')
         setTitle('')
-        if (more) { toast.success(t('created')); return }
+        if (more) { toast.success(t('created')); onAdded?.(); return }
         onOpenChange(false)
         onCreated?.(result.taskId)
         return
@@ -189,7 +191,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
       setTitle('')
       composed.current = null
       void mutate('coordinator-chat')
-      if (more) { toast.success(t('created')); return }
+      if (more) { toast.success(t('created')); if (outcome.task) onAdded?.(); return }
       setPicked(null)
       setProfilePick(null)
       onOpenChange(false)

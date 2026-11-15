@@ -52,6 +52,7 @@ mock.module(new URL('../../app/actions/issues.ts', import.meta.url).href, { name
   return { version: 1, taskId: 'one-task', identifier: 'TEST-1', dispatch: null }
 } } })
 let refreshes = 0
+let dispatchedTask: string | undefined
 const cacheRefreshes: unknown[] = []
 const toasts: string[] = []
 mock.module('sonner', { namedExports: { toast: { success: (text: string) => { toasts.push(text) }, error: (text: string) => { toasts.push(`error:${text}`) } } } })
@@ -67,7 +68,7 @@ mock.module(new URL('../../app/actions/bots.ts', import.meta.url).href, { namedE
 mock.module(new URL('../../app/actions/coordinator.ts', import.meta.url).href, { namedExports: { issueCreationAvailable: async () => true } })
 mock.module(new URL('./use-coordinator-submit.ts', import.meta.url).href, { namedExports: {
   useCoordinatorSubmit: () => ({ submit: async (text: string, context?: CoordinatorMessageContext) => {
-    submitted.push({ text, context }); return { kind: 'accepted' }
+    submitted.push({ text, context }); return { kind: 'accepted', ...(dispatchedTask ? { task: { taskId: dispatchedTask } } : {}) }
   }, failureMessage: () => null }),
 } })
 mock.module(new URL('../../hooks/use-computer.ts', import.meta.url).href, { namedExports: { useComputer: () => ({ data: undefined }) } })
@@ -105,7 +106,7 @@ before(async () => {
 })
 beforeEach(() => {
   manualCommands.length = 0; failManual = false; requireConsent = false
-  submitted.length = 0; refreshes = 0; readError = undefined; cacheRefreshes.length = 0; toasts.length = 0
+  submitted.length = 0; refreshes = 0; readError = undefined; cacheRefreshes.length = 0; toasts.length = 0; dispatchedTask = undefined
   data = { profiles: [{
     id: customId, name: 'Fixture role', description: '', roles: ['review'], icon: 'lens', color: 'pink', enabled: true, harness: 'claude_code',
     model: { mode: 'inherit' }, instructions: '', skills: [], version: 1, digest: 'a'.repeat(64),
@@ -315,9 +316,9 @@ const moreSwitch = () => [...container.querySelectorAll<HTMLButtonElement>('butt
 const textField = () => container.querySelector<HTMLTextAreaElement>('textarea[data-text]')!
 
 test('继续新建 on a backlog entry creates, clears the window and keeps it open without opening the Task', async () => {
-  let opened = '', closed = false
+  let opened = '', closed = false, added = 0
   await render(<NewTaskDialog open workspaceId={workspaceId} initialIntent="create_only" initialText="First backlog entry."
-    onCreated={id => { opened = id }} onOpenChange={next => { if (!next) closed = true }} />)
+    onCreated={id => { opened = id }} onAdded={() => { added++ }} onOpenChange={next => { if (!next) closed = true }} />)
   await act(async () => moreSwitch().click())
   assert.equal(moreSwitch().dataset.more, 'true')
   await typeTitle('First title')
@@ -326,6 +327,7 @@ test('继续新建 on a backlog entry creates, clears the window and keeps it op
   assert.equal(manualCommands[0].title, 'First title')
   assert.equal(opened, '', 'onCreated is not called while 继续新建 is on')
   assert.equal(closed, false, 'the window stays open')
+  assert.equal(added, 1, 'the page re-reads its task lists')
   assert.deepEqual(toasts, ['Shell.newTaskDialog.created'])
   assert.equal(titleInput().value, '')
   assert.equal(textField().value, '')
@@ -337,9 +339,10 @@ test('继续新建 on a backlog entry creates, clears the window and keeps it op
 })
 
 test('继续新建 on dispatch sends, refreshes the Coordinator chat, clears the request and keeps the profile', async () => {
-  let closed = false, sent = false
+  let closed = false, sent = false, added = 0, opened = ''
+  dispatchedTask = 'dispatched-task'
   await render(<NewTaskDialog open workspaceId={workspaceId} initialText="Dispatch the first one."
-    onSent={() => { sent = true }} onOpenChange={next => { if (!next) closed = true }} />)
+    onSent={() => { sent = true }} onCreated={id => { opened = id }} onAdded={() => { added++ }} onOpenChange={next => { if (!next) closed = true }} />)
   await act(async () => option(customId).click())
   await act(async () => moreSwitch().click())
   await act(async () => create().click())
@@ -348,6 +351,8 @@ test('继续新建 on dispatch sends, refreshes the Coordinator chat, clears the
   assert.ok(cacheRefreshes.includes('coordinator-chat'), 'the Coordinator chat refreshes')
   assert.equal(closed, false)
   assert.equal(sent, false)
+  assert.equal(opened, '', 'onCreated is not called while 继续新建 is on')
+  assert.equal(added, 1, 'the page re-reads its task lists')
   assert.deepEqual(toasts, ['Shell.newTaskDialog.created'])
   assert.equal(textField().value, '')
   await act(async () => { const field = textField(); Object.getOwnPropertyDescriptor(browser.HTMLTextAreaElement.prototype, 'value')!.set!.call(field, 'Dispatch the second one.'); field.dispatchEvent(new browser.Event('input', { bubbles: true }) as unknown as Event) })
