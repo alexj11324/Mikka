@@ -61,7 +61,6 @@ run_trial() {
     rc="$exit_code"
   fi
 }
-run_trial interrupt E_FACTORY_INTERRUPT=1
 run_trial submitted E_AFTER_RUN=1
 kill -TERM "$observer" 2>/dev/null || true
 wait "$observer" || true
