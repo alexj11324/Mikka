@@ -208,7 +208,8 @@ test('Task presentation batches keep current tenant authority and one Factory pr
       const visible: string[] = []
       const foreign = await makeTask(other), hidden = await makeTask(shared, {}, 'doing', peer)
       const deleted = await makeTask(shared, { deletedAt: new Date().toISOString() })
-      const legacyDeleted = await makeTask(shared, {}, 'doing', owner, { type: 'doc', attrs: { mikka: null, orvilo: { deletedAt: new Date().toISOString() } } })
+      const tombstone = { deletedAt: new Date().toISOString() }
+      const legacyDeleted = await makeTask(shared, {}, 'doing', owner, { type: 'doc', attrs: { mikka: tombstone, orvilo: tombstone } })
       const malformed = await makeTask(), team = randomUUID(), unrelated = await makeTask()
       await workspace.query(`INSERT INTO mikka_teams(id,"workspaceId","userId",name,identifier) VALUES($1,$2,$3,'Other team','MAL')`, [team,other,owner])
       await workspace.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [malformed,team,other,owner])
