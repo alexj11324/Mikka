@@ -72,7 +72,7 @@ export const automationSeams:AutomationSeams={
       }
     }
     const {eventId}=await recordPersonalSubmission(db,ownerId,text,{botId,submissionId:occurrenceId,
-      taskCommand:{version:1,intent:'create_and_dispatch',description:text},schedule:{scheduleId,occurrenceId,...(event&&source==='webhook'?{webhook:true as const}:event&&source==='linear'?{linear:true as const}:event?{event:true as const}:{})},
+      taskCommand:{version:1,intent:'create_and_dispatch',description:text},schedule:{scheduleId,occurrenceId,...(event&&source==='webhook'?{webhook:true as const}:event&&source==='linear'?{linear:true as const}:event&&source==='slack'?{slack:true as const}:event?{event:true as const}:{})},
       ...(task.title?{taskTitle:task.title}:{}),...(task.destination?{taskDestination:task.destination}:{}),...(task.profileId?{profileId:task.profileId}:{})})
     const created=await createIssueFromRequest(ownerId,{sourceEventId:eventId,title:task.title??task.prompt.split(/\r?\n/,1)[0]!.slice(0,200)})
     const row=(await pool.query<{title:string;status:string;identifier:string|null}>(`SELECT i.title,i.status,r.identifier FROM issues i
@@ -88,6 +88,14 @@ export const automationSeams:AutomationSeams={
     if(!connected)return null
     try{return new Set((await linearTeams(await linearAccessToken(ownerId))).map(team=>team.id))}
     catch(error){throw new ScheduleError('scheduleLinearUnreachable',503,{cause:error})}
+  },
+  /** Channels the workspace's Slack installation can see, for a creator who is a member of it; null otherwise. */
+  async slackChannels(ownerId,workspaceId){
+    const app=process.env.SLACK_APP_ID
+    if(!app)return null
+    const {slackInstallationChannels}=await import('@/lib/slack/automation-channels')
+    try{const channels=await slackInstallationChannels(app,ownerId,workspaceId);return channels?new Set(channels.map(channel=>channel.id)):null}
+    catch(error){throw new ScheduleError('scheduleSlackUnreachable',503,{cause:error})}
   },
   async repository(workspaceId,repository){
     const {repositoryAvailable}=await import('@/lib/workspace-admin/bots')
@@ -162,6 +170,15 @@ export async function fireLinearAutomations(deliveryId:string,payload:Record<str
   const events=linearAutomationEvents(payload)
   if(!events.length)return 0
   const queued=await schedules().fireLinearEvents(`linear:${deliveryId}`,events)
+  if(queued)armDueTimerSoon('schedules')
+  return queued
+}
+/** A signed Slack event (forwarded by Eve), before it is acknowledged; the Slack event ID makes a retry add nothing. */
+export async function fireSlackAutomations(payload:Record<string,unknown>){
+  const {slackAutomationEvents}=await import('./slack-events')
+  const events=slackAutomationEvents(payload)
+  if(!events.length||typeof payload.event_id!=='string')return 0
+  const queued=await schedules().fireSlackEvents(`slack:${events[0]!.teamId}:${payload.event_id}`,events)
   if(queued)armDueTimerSoon('schedules')
   return queued
 }

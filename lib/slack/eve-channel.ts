@@ -54,6 +54,21 @@ const authFor = (grant: SlackGrantScope) => ({
   },
 })
 
+/**
+ * 自动化 Slack triggers run in the app, next to the automations (decision 2026-11-15-2010): a signed event callback is
+ * passed on with Slack's own body and signature headers, and the app checks the signature again. Slack wants an answer
+ * within 3 seconds, so the hand-off waits at most 1.5 and never holds up the chat; the app takes each event ID once.
+ */
+async function forwardToAutomations(url: string | undefined, payload: unknown, raw: string, headers: Headers) {
+  if (!url || !payload || typeof payload !== 'object' || (payload as { type?: unknown }).type !== 'event_callback') return
+  const forwarded = new Headers({ 'content-type': 'application/json' })
+  for (const name of ['x-slack-request-timestamp', 'x-slack-signature']) forwarded.set(name, headers.get(name) ?? '')
+  try {
+    const answer = await fetch(url, { method: 'POST', headers: forwarded, body: raw, signal: AbortSignal.timeout(1_500) })
+    if (!answer.ok) console.error('slack_automations_handoff_refused', answer.status)
+  } catch { console.error('slack_automations_handoff_failed') }
+}
+
 /** Slack's signed envelope selects the installation; Mikka authorizes the human, and Eve owns delivery. */
 export function createMikkaSlackChannel(dependencies: SlackChannelDependencies = {}): SlackChannel {
   const env = dependencies.env ?? (() => process.env)
@@ -209,6 +224,7 @@ export function createMikkaSlackChannel(dependencies: SlackChannelDependencies =
                 return Response.json({ challenge: payload.challenge })
               const app = channelEnv.SLACK_APP_ID
               if (!app) return new Response(null, { status: 503 })
+              await forwardToAutomations(channelEnv.SLACK_AUTOMATIONS_FORWARD_URL, payload, raw, request.headers)
               const removal = signedRevocation(app, payload)
               if (removal) {
                 if (removal.member) await memberRemoved(app, removal.team, removal.member, removal.eventAt)

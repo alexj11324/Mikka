@@ -4,6 +4,7 @@ import type { Pool, PoolClient } from 'pg'
 import { commandSchema, definitionSchema, ScheduleError, SCHEDULE_PAGE_MAX, type Actor, type Definition, type DispatchTask, type EventTrigger, type ScheduledRead } from './contract'
 import { describeGitHubEvent, triggerMatches, type GitHubAutomationEvent } from './github-events'
 import { describeLinearEvent, linearTriggerMatches, type LinearAutomationEvent } from './linear-events'
+import { describeSlackEvent, slackTriggerMatches, type SlackAutomationEvent } from './slack-events'
 import { describeWebhook, newWebhookKey, webhookKeyHash, WEBHOOK_BATCH_BYTES, WEBHOOK_BATCH_REQUESTS, type WebhookRequest } from './webhook'
 import { nextTime, runsOnSchedule, timezone } from './time'
 import { botChatChanged } from '../live/chats'
@@ -18,9 +19,9 @@ export type MessageGuard = (tx: PoolClient, ownerId: string, value: unknown) => 
 export type IssueReader = (tx: PoolClient, ownerId: string, issueId: string) => Promise<{ id: string; title: string; status: string } | null>
 /** What one dispatch_task run made: the task (as the chat's task line shows it) and the request event behind it. */
 export type DispatchResult = { id: string; title: string; status: string; identifier: string | null; eventId?: string; requestedBy?: string; runId?: string; continued?: true }
-export type DispatchInput = { ownerId: string; workspaceId: string; scheduleId: string; occurrenceId: string; task: DispatchTask; event?: string; source?: 'github' | 'linear' | 'webhook'; single?: true }
+export type DispatchInput = { ownerId: string; workspaceId: string; scheduleId: string; occurrenceId: string; task: DispatchTask; event?: string; source?: 'github' | 'linear' | 'slack' | 'webhook'; single?: true }
 /** What started a run: a GitHub event and the indexes of the triggers that took it, or the webhook requests it batched. */
-export type OccurrenceTrigger = { event: GitHubAutomationEvent | LinearAutomationEvent; triggers: number[] } | { webhook: { requests: WebhookRequest[] } }
+export type OccurrenceTrigger = { event: GitHubAutomationEvent | LinearAutomationEvent | SlackAutomationEvent; triggers: number[] } | { webhook: { requests: WebhookRequest[] } }
 export type RunWhenInput = { ownerId: string; workspaceId: string; condition: string; event: string }
 /**
  * dispatch_task's two host seams. `check` re-authorizes the creator's request at create, update, resume and every run
@@ -33,6 +34,8 @@ export type AutomationSeams = {
   changed?: (tx: PoolClient, workspaceId: string) => Promise<void>
   /** The Linear team IDs the person's own Linear connection can see, or null without one. */
   linearTeams?: (ownerId: string) => Promise<Set<string> | null>
+  /** The channel IDs the workspace's Slack installation can see for the person, or null when they are not in it. */
+  slackChannels?: (ownerId: string, workspaceId: string) => Promise<Set<string> | null>
   /** Whether the workspace can still use a repository an event trigger names. */
   repository?: (workspaceId: string, repository: string) => Promise<boolean>
   /** A trigger's one-sentence condition against the event: true, false, or null when no answer could be had. */
@@ -45,7 +48,7 @@ const MAX_ATTEMPTS = 3
 // The frozen request key is internal; keep the existing tool-response fields.
 const SCHEDULE_COLUMNS = 'id,owner_id,workspace_id,bot_id,visibility,source_event_id,request_id,definition,request_definition,status,version,next_at,disabled_reason,webhook_key_hash IS NOT NULL AS webhook_key_set,created_at,updated_at'
 /** A run that fails one of these lost its creator's authority: the automation is paused with the code as its reason. */
-const AUTHORITY_LOST = new Set(['scheduleStandingTaskUnavailable','scheduleWorkspaceAccessDenied','scheduleOwnerUnavailable','scheduleConversationUnavailable','scheduleBotUnavailable','scheduleRepositoryUnavailable','scheduleLinearUnavailable','scheduleDeviceUnavailable','scheduleProfileUnavailable'])
+const AUTHORITY_LOST = new Set(['scheduleStandingTaskUnavailable','scheduleWorkspaceAccessDenied','scheduleOwnerUnavailable','scheduleConversationUnavailable','scheduleBotUnavailable','scheduleRepositoryUnavailable','scheduleLinearUnavailable','scheduleSlackUnavailable','scheduleDeviceUnavailable','scheduleProfileUnavailable'])
 /** Runs that count toward maxRunsPerDay: queued, running and finished, not skipped or cancelled. */
 const COUNTED = "status IN ('pending','running','succeeded','failed')"
 
@@ -103,6 +106,12 @@ export class ScheduleStore {
         // A Linear trigger names teams the creator's own Linear connection can see.
         const visible=this.automation.linearTeams?await this.automation.linearTeams(owner):null
         if(!visible||[...teams].some(team=>!visible.has(team)))throw new ScheduleError('scheduleLinearUnavailable',403)
+      }
+      const channels=new Set((def.events??[]).flatMap(trigger=>trigger.source==='slack'?trigger.channels:[]))
+      if(channels.size){
+        // A Slack trigger names channels of the workspace's Slack installation, which the creator is a member of.
+        const visible=this.automation.slackChannels?await this.automation.slackChannels(owner,workspaceId):null
+        if(!visible||[...channels].some(channel=>!visible.has(channel)))throw new ScheduleError('scheduleSlackUnavailable',403)
       }
       return null
     }
@@ -346,7 +355,7 @@ export class ScheduleStore {
   private async finishDispatch(row:Schedule,o:Occurrence){
     if(!this.automation.dispatch||!row.workspace_id||o.definition.task.kind!=='dispatch_task')throw new ScheduleError('scheduleDispatchUnavailable',503)
     const source=!o.trigger?undefined:'event' in o.trigger?o.trigger.event.source:'webhook' as const
-    const event=!o.trigger?undefined:'event' in o.trigger?(o.trigger.event.source==='linear'?describeLinearEvent(o.trigger.event):describeGitHubEvent(o.trigger.event)):describeWebhook(o.trigger.webhook.requests)
+    const event=!o.trigger?undefined:'event' in o.trigger?(o.trigger.event.source==='linear'?describeLinearEvent(o.trigger.event):o.trigger.event.source==='slack'?describeSlackEvent(o.trigger.event):describeGitHubEvent(o.trigger.event)):describeWebhook(o.trigger.webhook.requests)
     if(o.trigger&&'event' in o.trigger&&event&&!await this.runWhenHolds(row,o,event))return this.skipQuietly(row,o,'runWhenNotMet')
     const result=await this.automation.dispatch({ownerId:row.owner_id,workspaceId:row.workspace_id,scheduleId:row.id,occurrenceId:o.id,task:o.definition.task,...(event&&source?{event,source}:{}),...(o.definition.eachRun==='same_task'?{single:true as const}:{})})
     const recorded=await this.workspace(row.owner_id,row.workspace_id,()=>this.transaction(async tx=>{
@@ -421,6 +430,28 @@ export class ScheduleStore {
     let queued=0
     for(const candidate of candidates){
       const matched=events.flatMap(event=>(candidate.definition.events??[]).flatMap((trigger,index)=>trigger.source==='linear'&&linearTriggerMatches(trigger,event)?[{event,index}]:[]))
+      if(!matched.length)continue
+      const event=matched[0]!.event
+      queued+=await this.queueEvent(candidate,deliveryKey,{event,triggers:[...new Set(matched.filter(item=>item.event===event).map(item=>item.index))]})
+    }
+    return queued
+  }
+  /**
+   * A signed Slack event, the same way: one run per automation whose Slack trigger takes it, in a workspace whose Slack
+   * installation is this app's install in this team, while the creator is still a member of that installation.
+   */
+  async fireSlackEvents(deliveryKey:string,events:readonly SlackAutomationEvent[]){
+    if(!events.length)return 0
+    const first=events[0]!
+    const names=[...new Set(events.map(event=>event.event))], channels=[...new Set(events.map(event=>event.channel))]
+    const candidates=(await this.pool.query<Schedule>(`SELECT s.* FROM user_schedules s
+      JOIN mikka_slack_installations i ON i.workspace_id=s.workspace_id AND i.app_id=$3 AND i.team_id=$4 AND NOT i.revoking
+      JOIN mikka_slack_members m ON m.installation_id=i.id AND m.user_id=s.owner_id
+      WHERE s.status='active' AND s.definition ? 'events'
+      AND EXISTS(SELECT 1 FROM jsonb_array_elements(s.definition->'events') t WHERE t->>'source'='slack' AND t->>'event'=ANY($1::text[]) AND (t->'channels') ?| $2::text[])`,[names,channels,first.appId,first.teamId])).rows
+    let queued=0
+    for(const candidate of candidates){
+      const matched=events.flatMap(event=>(candidate.definition.events??[]).flatMap((trigger,index)=>trigger.source==='slack'&&slackTriggerMatches(trigger,event)?[{event,index}]:[]))
       if(!matched.length)continue
       const event=matched[0]!.event
       queued+=await this.queueEvent(candidate,deliveryKey,{event,triggers:[...new Set(matched.filter(item=>item.event===event).map(item=>item.index))]})

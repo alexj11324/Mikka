@@ -124,6 +124,25 @@ export async function automationLinearTeams(): Promise<ActionResult<{ connected:
   })
 }
 
+/** Slack triggers' channels: those of the workspace's Slack installation; `installed: false` when the person is not in one. */
+export async function automationSlackChannels(): Promise<ActionResult<{ installed: boolean; channels: { id: string; name: string; private: boolean }[] }>> {
+  return runAction(async () => {
+    if (actingContext.getStore()) throw new ActionFailureError('authRequired')
+    const app = process.env.SLACK_APP_ID
+    let actor
+    try { actor = await currentWorkspaceActor() } catch (error) {
+      if (error instanceof WorkspaceError) throw new ActionFailureError(isActionErrorCode(error.code) ? error.code : 'generic', undefined, undefined, { cause: error })
+      throw error
+    }
+    if (!app) return { installed: false, channels: [] }
+    const { slackInstallationChannels } = await import('@/lib/slack/automation-channels')
+    try {
+      const channels = await slackInstallationChannels(app, actor.userId, actor.workspaceId)
+      return channels ? { installed: true, channels } : { installed: false, channels: [] }
+    } catch (error) { throw new ActionFailureError('scheduleSlackUnreachable', undefined, undefined, { cause: error }) }
+  })
+}
+
 /** 删除: cancels every future run. Past runs and the tasks they made stay. */
 export async function cancelAutomation(input: { scheduleId: string; version: number }): Promise<ActionResult<{ schedule: AutomationView }>> {
   const parsed = versioned.safeParse(input)

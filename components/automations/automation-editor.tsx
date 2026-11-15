@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { ArrowLeft, Play } from 'lucide-react'
 import { listDevices } from '@/app/actions/agents'
 import { getWorkspaceBotDefaults, listBots } from '@/app/actions/bots'
-import { automationLinearTeams, cancelAutomation, createAutomation, pauseAutomation, resumeAutomation, runAutomationNow, takeOverAutomation, updateAutomation } from '@/app/actions/automations'
+import { automationLinearTeams, automationSlackChannels, cancelAutomation, createAutomation, pauseAutomation, resumeAutomation, runAutomationNow, takeOverAutomation, updateAutomation } from '@/app/actions/automations'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -33,6 +33,7 @@ import { useWorkspaceBotNames } from './automations-page'
 import { GitHubTriggers } from './github-triggers'
 import { WebhookTrigger } from './webhook-trigger'
 import { LinearTriggers } from './linear-triggers'
+import { SlackTriggers } from './slack-triggers'
 import { AutomationUsagePanel } from './automation-usage'
 import { useNextRunLabel, useTimingSummary } from './automation-summary'
 
@@ -86,6 +87,13 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
     const result = await automationLinearTeams()
     if ('error' in result && result.error) throw new Error(result.error)
     return result as { connected: boolean; teams: { id: string; key: string; name: string }[] }
+  }, { revalidateOnFocus: false })
+  // Slack triggers' channels, read only once the person adds a Slack event or the automation has one.
+  const [slackWanted, setSlackWanted] = useState(false)
+  const slackChannels = useSWR(slackWanted || Boolean(draft?.slack.length) ? ['automation-slack-channels', workspaceId] : null, async () => {
+    const result = await automationSlackChannels()
+    if ('error' in result && result.error) throw new Error(result.error)
+    return result as { installed: boolean; channels: { id: string; name: string; private: boolean }[] }
   }, { revalidateOnFocus: false })
   const profiles = useAgentProfiles(workspaceId ?? undefined, true)
   const profileChoices = useTaskProfileChoices({ workspaceId: workspaceId ?? undefined, value: draft && draft.profileId !== 'auto' ? draft.profileId : null, data: profiles.data })
@@ -252,6 +260,13 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
           {linearTeams.error && <div className="px-5 pb-2"><InlineLoadError message={t('linear.teamsError')} retryLabel={tCommon('retry')} onRetry={() => { void linearTeams.mutate() }} /></div>}
           <LinearTriggers value={draft.linear} teams={linearTeams.data?.teams ?? []} connected={linearTeams.data?.connected ?? true} disabled={busy !== null || (!linearTeams.data && !linearTeams.error)} onChange={linear => set({ linear })} />
         </>}
+        <SettingRow title={t('slack.title')}>
+          {!slackWanted && !draft.slack.length && <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => setSlackWanted(true)}>{t('slack.show')}</Button>}
+        </SettingRow>
+        {(slackWanted || draft.slack.length > 0) && <>
+          {slackChannels.error && <div className="px-5 pb-2"><InlineLoadError message={t('slack.channelsError')} retryLabel={tCommon('retry')} onRetry={() => { void slackChannels.mutate() }} /></div>}
+          <SlackTriggers value={draft.slack} channels={slackChannels.data?.channels ?? []} installed={slackChannels.data?.installed ?? true} disabled={busy !== null || (!slackChannels.data && !slackChannels.error)} onChange={slack => set({ slack })} />
+        </>}
         <WebhookTrigger value={draft.webhook} onChange={webhook => set({ webhook })} automation={current ?? null} disabled={busy !== null}
           onSaved={schedule => automation.mutate(schedule, { revalidate: false })} />
       </>}
@@ -332,6 +347,7 @@ function RunRow({ run, timezone }: { run: AutomationRun; timezone: string }) {
   const t = useTranslations('Automations')
   const tEvent = useTranslations('Automations.githubEvent')
   const tLinear = useTranslations('Automations.linearEvent')
+  const tSlack = useTranslations('Automations.slackEvent')
   const tErrors = useTranslations('Errors')
   // On the automation's own clock, like its summary, next run and usage days.
   const when = useNextRunLabel()
@@ -343,7 +359,9 @@ function RunRow({ run, timezone }: { run: AutomationRun; timezone: string }) {
     <Badge variant={runVariant[run.status]}>{t(`run.${run.status}`)}</Badge>
     {run.trigger && 'event' in run.trigger && run.trigger.event.source === 'linear' && <span className="min-w-0 text-muted-foreground">{t('run.from', { event: tLinear.has(run.trigger.event.event as never) ? tLinear(run.trigger.event.event as never) : run.trigger.event.event,
       what: run.trigger.event.identifier ?? run.trigger.event.title ?? '' })}</span>}
-    {run.trigger && 'event' in run.trigger && run.trigger.event.source !== 'linear' && <span className="min-w-0 text-muted-foreground">{t('run.from', { event: tEvent.has(run.trigger.event.event as never) ? tEvent(run.trigger.event.event as never) : run.trigger.event.event,
+    {run.trigger && 'event' in run.trigger && run.trigger.event.source === 'slack' && <span className="min-w-0 text-muted-foreground">{t('run.from', { event: tSlack.has(run.trigger.event.event as never) ? tSlack(run.trigger.event.event as never) : run.trigger.event.event,
+      what: run.trigger.event.reaction ? `${run.trigger.event.channel} :${run.trigger.event.reaction}:` : run.trigger.event.channel })}</span>}
+    {run.trigger && 'event' in run.trigger && run.trigger.event.source !== 'linear' && run.trigger.event.source !== 'slack' && <span className="min-w-0 text-muted-foreground">{t('run.from', { event: tEvent.has(run.trigger.event.event as never) ? tEvent(run.trigger.event.event as never) : run.trigger.event.event,
       what: run.trigger.event.number !== null ? `${run.trigger.event.repository.replace(/^v2\/github\.com\//, '')}#${run.trigger.event.number}` : run.trigger.event.repository.replace(/^v2\/github\.com\//, '') })}</span>}
     {run.trigger && 'webhook' in run.trigger && <span className="min-w-0 text-muted-foreground">{t('run.fromWebhook', { count: run.trigger.webhook.requests.length })}</span>}
     {task && <Button size="xs" variant="secondary" title={task.title} onClick={() => openTask(task.id)}><bdi>{task.identifier ?? task.title}</bdi></Button>}

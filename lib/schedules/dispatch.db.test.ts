@@ -382,6 +382,38 @@ test('dispatch_task automations run as their creator through the existing create
     }
   })
 
+  await t.test('Slack: a person’s event in a channel of the workspace’s Slack runs each automation that takes it once, while the creator is a member', async () => {
+    const installation = randomUUID()
+    await fixture.query(`INSERT INTO mikka_slack_installations(id,workspace_id,app_id,team_id,team_name,bot_user_id,installed_by,bot_secret,scopes) VALUES($1,$2,'A-SLACK','T-SLACK','Acme','UBOT',$3,'{}'::jsonb,'{}')`, [installation, workspace.id, owner])
+    await fixture.query(`INSERT INTO mikka_slack_members(installation_id,user_id,slack_user_id,link_id,enabled) VALUES($1,$2,'U-ADA',gen_random_uuid(),true)`, [installation, owner])
+    const seen = runtime.automationSeams.slackChannels
+    runtime.automationSeams.slackChannels = async (who, ws) => who === owner && ws === workspace.id ? new Set(['C0DEPLOY']) : null
+    try {
+      const slack = (channels: string[], extra = {}, bot: string | null = builder): Definition => ({ ...definition(bot), maxConcurrent: 3, events: [{ source: 'slack', event: 'reaction_added', channels, reactions: ['eyes'], ...extra }] })
+      await assert.rejects(create(slack(['C0OTHER'])), /scheduleSlackUnavailable/, 'a channel the app cannot see')
+      await assert.rejects(page(member, memberChat, { action: 'create', requestId: randomUUID(), definition: slack(['C0DEPLOY'], {}, null) }), /scheduleSlackUnavailable/, 'not a member of the Slack installation')
+      const { schedule } = await create(slack(['C0DEPLOY']))
+      const delivery = (eventId: string, extra: Record<string, unknown> = {}, event: Record<string, unknown> = {}) => ({ type: 'event_callback', api_app_id: 'A-SLACK', team_id: 'T-SLACK', event_id: eventId, ...extra,
+        event: { type: 'reaction_added', user: 'U-GRACE', reaction: 'eyes', item: { type: 'message', channel: 'C0DEPLOY', ts: '1700.1' }, ...event } })
+      assert.equal(await runtime.fireSlackAutomations(delivery('Ev1')), 1)
+      assert.equal(await runtime.fireSlackAutomations(delivery('Ev1')), 0, 'a retry adds nothing')
+      assert.equal(await runtime.fireSlackAutomations(delivery('Ev2', { team_id: 'T-OTHER' })), 0, 'another Slack team')
+      assert.equal(await runtime.fireSlackAutomations(delivery('Ev3', {}, { reaction: 'tada' })), 0, 'another emoji')
+      assert.equal(await runtime.fireSlackAutomations(delivery('Ev4', {}, { bot_id: 'B1' })), 0, 'a bot')
+      await tick()
+      const ran = (await fixture.query<{ status: string; result: { eventId: string } }>('SELECT status,result FROM schedule_occurrences WHERE schedule_id=$1', [schedule.id])).rows
+      assert.deepEqual(ran.map(row => row.status), ['succeeded'])
+      const request = (await fixture.query<{ payload: { text: string; schedule: { slack?: true } } }>('SELECT payload FROM coordinator_events WHERE id=$1', [ran[0]!.result.eventId])).rows[0]!.payload
+      assert.equal(request.schedule.slack, true)
+      assert.match(request.text, /<slack_event>\nevent: reaction_added\nchannel: C0DEPLOY\nuser: U-GRACE\nts: 1700\.1\nreaction: eyes\n<\/slack_event>$/)
+      await fixture.query('DELETE FROM mikka_slack_members WHERE installation_id=$1', [installation])
+      assert.equal(await runtime.fireSlackAutomations(delivery('Ev5')), 0, 'the creator left the Slack installation')
+    } finally {
+      runtime.automationSeams.slackChannels = seen
+      await fixture.query('DELETE FROM mikka_slack_installations WHERE id=$1', [installation])
+    }
+  })
+
   await t.test('追加到同一个任务: later runs add to the first run’s task; a deleted task pauses the automation', async () => {
     const standing = (await create({ ...definition(builder), maxConcurrent: 3, eachRun: 'same_task' })).schedule
     const first = await runNow(standing)

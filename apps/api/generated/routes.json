@@ -2686,6 +2686,15 @@
       "sourceHash": "95cbf7838529897157a8a12cb8351a708ff9f9aee30d5c9e385c858ed6012a52"
     },
     {
+      "path": "/mikka/api/webhooks/slack/automations",
+      "template": "/api/webhooks/slack/automations",
+      "source": "app/api/webhooks/slack/automations/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "8d049a73007975f463572d7708ff672337efe862d8beec91908381d8ccd3c303"
+    },
+    {
       "path": "/mikka/api/webhooks/telegram",
       "template": "/api/webhooks/telegram",
       "source": "app/api/webhooks/telegram/route.ts",

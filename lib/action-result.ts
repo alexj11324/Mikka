@@ -15,6 +15,8 @@ export const ACTION_ERROR_CODES = [
   'scheduleWebhookOff',
   'scheduleLinearUnavailable',
   'scheduleLinearUnreachable',
+  'scheduleSlackUnavailable',
+  'scheduleSlackUnreachable',
   'scheduleRunConflict',
   'scheduleTimeMustBeFuture',
   'invalidIanaTimezone',

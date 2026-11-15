@@ -120,6 +120,7 @@ const functions = {
   'automations.takeOverAutomation': automations.takeOverAutomation,
   'automations.automationWebhookKey': automations.automationWebhookKey,
   'automations.automationLinearTeams': automations.automationLinearTeams,
+  'automations.automationSlackChannels': automations.automationSlackChannels,
   'automations.resumeAutomation': automations.resumeAutomation,
   'automations.cancelAutomation': automations.cancelAutomation,
   'automations.runAutomationNow': automations.runAutomationNow,

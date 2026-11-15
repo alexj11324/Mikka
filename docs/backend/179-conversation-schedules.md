@@ -290,3 +290,20 @@ Decision [2026-11-15-1930](../design/decisions/2026-11-15-1930-automation-linear
   the sync kill switch (503 on failure); `app/api/webhooks/linear/automations/route.ts` takes
   the Linear Worker's forward (`LINEAR_AUTOMATIONS_FORWARD_URL`, Linear's own headers and body,
   signature checked again). The submission carries `schedule.linear: true`.
+
+## Slack triggers (2026-11-15)
+
+Decision [2026-11-15-2010](../design/decisions/2026-11-15-2010-automation-slack-triggers.md).
+
+- `events[]` may hold `{ source: 'slack', event: 'message' | 'mention' | 'reaction_added', channels (1–20 IDs), reactions?, runWhen? }`.
+  A message or `app_mention` with no `bot_id`/`bot_profile` and no subtype (or `thread_broadcast`), or a
+  `reaction_added` on a message, by a user (`lib/schedules/slack-events.ts`).
+- `permission` asks the `slackChannels(owner, workspace)` seam: the workspace's installation of `SLACK_APP_ID` the
+  creator is a member of, its bot token's `conversations.list` (`lib/slack/automation-channels.ts`); null →
+  `scheduleSlackUnavailable` 403 (authority loss), Slack unreachable → `scheduleSlackUnreachable` 503. Page action
+  `automationSlackChannels`.
+- `fireSlackAutomations(payload)` → `ScheduleStore.fireSlackEvents`: candidates join `mikka_slack_installations`
+  (workspace, app, team, not revoking) and `mikka_slack_members` (the creator); operation `event:slack:<team>:<event_id>`.
+- Eve's Slack channel forwards signed `event_callback`s to `SLACK_AUTOMATIONS_FORWARD_URL` (Slack's body and
+  `x-slack-*` headers, 1.5 s timeout, failures logged); `/api/webhooks/slack/automations` checks the signature and
+  `api_app_id` again. The submission carries `schedule.slack: true`.
