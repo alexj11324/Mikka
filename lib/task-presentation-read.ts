@@ -137,7 +137,7 @@ async function readPresentationBatch(user: Reader, input: TaskPresentationsInput
             else dispatchByIssue.set(issueId, [dispatch])
           }
         }
-        const stageComments = work?.includeDiscussionSources ? await readTaskStageComments(client, workspaceId, ids) : undefined
+        const stageComments = work?.includeDiscussionSources ? await readTaskStageComments(workspaceId, ids) : undefined
         const attention = parsed.includeInboxReason ? await readTaskAttention(client, reader.id, workspaceId, ids) : undefined
         const byId = new Map(visible.map(task => [task.id, task]))
         const status = new Map(rows.filter(readable).map(task => [task.id, task.status]))

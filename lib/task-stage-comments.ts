@@ -1,22 +1,29 @@
 import 'server-only'
-import type { Pool, PoolClient } from 'pg'
+import { and, eq, inArray, sql } from 'drizzle-orm'
+import { db } from './db'
+import { issueDocuments, issues } from './db/schema'
 import { loadIssueDocument, readIssueThreads } from './linear-sync/document'
 import type { FactoryStageComment } from './task-activity-timeline'
 
-/** The caller admits the Tasks. A reader of the shared document can already
- * see its discussion identities. Never expose stage receipts for a deleted
- * message, a different Task, or another workspace. */
-export async function readTaskStageComments(db: Pick<Pool | PoolClient, 'query'>, workspaceId: string, issueIds: string[]) {
-  const { rows } = await db.query<{ issueId: string; state: string; comments: FactoryStageComment[] }>(`
-    SELECT i.id AS "issueId", d.state, stages.comments
-    FROM issues i JOIN issue_documents d ON d."issueId"=i.id AND d."userId"=i."userId"
-    JOIN LATERAL (
-      SELECT json_agg(json_build_object('threadId', u."taskId", 'messageId', u."commentId")
-        ORDER BY u."taskId", u."commentId") AS comments
-      FROM factory_tasks t JOIN factory_stage_updates u ON u."taskId"=t.id
-      WHERE t."issueId"=i.id AND t."workspaceId"=i."workspaceId"
-    ) stages ON stages.comments IS NOT NULL
-    WHERE i."workspaceId"=$1 AND i.id=ANY($2::uuid[]) AND length(d.state)>0 AND i."ownershipState"='bound'`, [workspaceId, issueIds])
+/** Correlate this projection with an already-authorized Task document.
+ * The caller intersects the result with the messages in that document before
+ * sending a source identity to a client. */
+export function taskDocumentStageComments(issueId: typeof issues.id | typeof issueDocuments.issueId, workspaceId: string) {
+  return sql<FactoryStageComment[]>`(
+    SELECT COALESCE(json_agg(json_build_object('threadId', u."taskId", 'messageId', u."commentId")
+      ORDER BY u."taskId", u."commentId"), '[]'::json)
+    FROM factory_tasks t JOIN factory_stage_updates u ON u."taskId"=t.id
+    WHERE t."issueId"=${issueId} AND t."workspaceId"=${workspaceId})`
+}
+
+/** The caller holds the Task ACL and supplies only visible Task IDs. Keep the
+ * lookup on its already-open APP transaction and omit deleted Yjs messages. */
+export async function readTaskStageComments(workspaceId: string, issueIds: string[]) {
+  const comments = taskDocumentStageComments(issues.id, workspaceId)
+  const rows = await db.select({ issueId: issues.id, state: issueDocuments.state, comments }).from(issues)
+    .innerJoin(issueDocuments, and(eq(issueDocuments.issueId, issues.id), eq(issueDocuments.userId, issues.userId)))
+    .where(and(inArray(issues.id, issueIds), eq(issues.workspaceId, workspaceId), eq(issues.ownershipState, 'bound'),
+      sql`json_array_length(${comments}) > 0`))
   const byIssue = new Map<string, FactoryStageComment[]>()
   for (const { issueId, state, comments } of rows) {
     const doc = loadIssueDocument(state, {})
