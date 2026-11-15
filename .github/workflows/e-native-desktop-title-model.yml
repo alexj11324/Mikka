@@ -24,8 +24,8 @@ jobs:
       E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       BETTER_AUTH_URL: http://localhost:3000
       AUTH_TRUSTED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
-      MIKKA_BUILD_REVISION: '30629ee1f18fa70b3713836017b437c22af915ee'
-      MIKKA_TEST_DEPLOYMENT_SHA: '30629ee1f18fa70b3713836017b437c22af915ee'
+      MIKKA_BUILD_REVISION: '362698c408e02582ce523df39debe7ea16320bb9'
+      MIKKA_TEST_DEPLOYMENT_SHA: '362698c408e02582ce523df39debe7ea16320bb9'
       NEXT_TELEMETRY_DISABLED: '1'
     defaults:
       run:
@@ -50,7 +50,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           path: product
-          ref: '30629ee1f18fa70b3713836017b437c22af915ee'
+          ref: '362698c408e02582ce523df39debe7ea16320bb9'
           persist-credentials: false
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
         with:
@@ -64,7 +64,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$MIKKA_BUILD_REVISION"
-          test "$(git rev-parse 'HEAD^{tree}')" = e7c4c9fb3a72be9b06993a4ec244c5b25a1c3b26
+          test "$(git rev-parse 'HEAD^{tree}')" = f6908b3e196c35cf63a92bbeac2ee712733f71d3
           test ! -e .hosted-ui
           pnpm install --frozen-lockfile
       - name: Install pinned Linux Electron with OS keyring, display and setuid sandbox
@@ -125,7 +125,7 @@ jobs:
           import { closeElectron, stopLocalDaemons } from '../../apps/desktop/test/native-cleanup.mjs'
           import { waitForBundledSession } from '../../apps/desktop/test/bundled-session.mjs'
           
-          const sha = '30629ee1f18fa70b3713836017b437c22af915ee'
+          const sha = '362698c408e02582ce523df39debe7ea16320bb9'
           const origin = 'http://localhost:3000'
           assert.equal(process.env.BETTER_AUTH_URL,origin)
           assert.equal(new URL(process.env.DATABASE_URL).hostname,'127.0.0.1')
@@ -307,7 +307,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: 30629ee1-public-native-model-title
+          name: 362698c4-public-native-model-title
           path: ${{ runner.temp }}/native-controls.json
           if-no-files-found: warn
           retention-days: 14
