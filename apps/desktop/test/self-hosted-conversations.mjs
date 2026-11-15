@@ -128,22 +128,36 @@ export async function verifyConversationOrganization({ page, fixture, rpc, passe
     body: message, mentions: [], requestId: randomUUID(), expectedOwnerId: fixture.ownerId, expectedWorkspaceId: workspaceId,
   })
   assert.equal(sent.status, 201)
-  const viewport = page.locator('div.overflow-y-auto').filter({ has: page.getByText('Desktop inspection line 120', { exact: false }) }).last()
+  const transcript = page.getByTestId('group-chat')
+  const body = transcript.locator('[data-slot="collapsible-message"]').filter({ hasText: 'Desktop inspection line 120' })
+  await body.getByRole('button', { name: english.Common.showMore, exact: true }).click()
+  const viewport = transcript.locator('div.overflow-y-auto').filter({ has: body }).last()
   await expect(viewport).toBeVisible()
   const scroll = edge => viewport.evaluate((node, destination) => {
     node.scrollTop = destination === 'top' ? 0 : node.scrollHeight
     return node.scrollHeight - node.clientHeight
   }, edge)
   assert.ok(await scroll('top') > 100, 'a genuine scrollable transcript must hide the read boundary')
+  const messagesPath = '/conversations/' + target.id + '/messages'
+  const { data: previouslyRead } = await api(page, messagesPath.slice(1))
+  assert.ok(Number.isSafeInteger(previouslyRead.readRevision))
+  // Only the app's own live history read includes a page size. A separate
+  // verifier request must never satisfy the transcript's revision check.
+  const refreshedHistory = page.waitForResponse(async res => {
+    const url = new URL(res.url())
+    return res.ok() && res.request().method() === 'GET' && url.pathname.endsWith(messagesPath)
+      && url.searchParams.has('limit') && (await res.json()).readRevision > previouslyRead.readRevision
+  }, { timeout: 20_000 })
   const marked = await api(page, 'conversations/read-state', { action: 'unread', chatId: target.id })
   assert.equal(marked.status, 200)
-  // Wait for the changed server revision in the live read while the marker is
-  // outside the viewport. Scrolling back is the only step that exposes it.
-  const messagePage = () => api(page, 'conversations/' + target.id + '/messages')
-  const before = (await messagePage()).data.readRevision
-  assert.ok(Number.isSafeInteger(before) && before > 0)
+  const history = await (await refreshedHistory).json()
+  await expect.poll(() => viewport.evaluate(node => node.scrollHeight - node.scrollTop - node.clientHeight)).toBeGreaterThan(100)
   assert.equal((await directory(title))?.unread, true)
+  const acknowledgement = page.waitForResponse(res => res.ok() && res.request().method() === 'POST'
+    && new URL(res.url()).pathname.endsWith('/conversations/' + target.id + '/read')
+    && res.request().postDataJSON()?.readRevision === history.readRevision, { timeout: 20_000 })
   await scroll('bottom')
+  await acknowledgement
   await expect.poll(async () => (await directory(title))?.unread, { timeout: 20_000 }).toBe(false)
   passed('named_conversation_stays_unread_above_the_transcript_end_until_visible')
   setPhase('conversation_unread_persistence')
