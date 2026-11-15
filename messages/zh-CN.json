@@ -7740,7 +7740,13 @@
     "tomorrow": "明天",
     "content": "内容",
     "readFailed": "{label}加载失败。",
-    "refreshFailed": "{label}更新失败，仍显示上次内容。"
+    "refreshFailed": "{label}更新失败，仍显示上次内容。",
+    "ago": {
+      "now": "刚刚",
+      "minutes": "{count} 分钟前",
+      "hours": "{count} 小时前",
+      "days": "{count} 天前"
+    }
   },
   "PersonalFiles": {
     "archiveFolderTitle": "归档“{name}”？",

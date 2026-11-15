@@ -7740,7 +7740,13 @@
     "tomorrow": "Tomorrow",
     "content": "Content",
     "readFailed": "Unable to load {label}.",
-    "refreshFailed": "Unable to refresh {label}. Previous content is shown."
+    "refreshFailed": "Unable to refresh {label}. Previous content is shown.",
+    "ago": {
+      "now": "Just now",
+      "minutes": "{count}m ago",
+      "hours": "{count}h ago",
+      "days": "{count}d ago"
+    }
   },
   "PersonalFiles": {
     "archiveFolderTitle": "Archive {name}?",
