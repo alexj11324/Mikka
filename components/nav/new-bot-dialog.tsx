@@ -7,8 +7,8 @@ import { toast } from 'sonner'
 import { useTranslations } from 'next-intl'
 import { createBot, getWorkspaceBotDefaults, type BotView } from '@/app/actions/bots'
 import { chooseBotModel, getBotModelMenu } from '@/app/actions/execution-settings'
-import { botModelMenuKey, modelGroupHeading, modelGroupTag } from '@/hooks/use-bot-model-picker'
-import { HOSTED_CHOICE, type BotModelMenu } from '@/lib/bot-model-menu-view'
+import { botModelMenuKey, modelGroupHeading, modelGroupTag, modelPriceTag } from '@/hooks/use-bot-model-picker'
+import type { BotModelMenu } from '@/lib/bot-model-menu-view'
 import { modelDisplayName } from '@/lib/model-display-name'
 import { useActionError } from '@/lib/use-action-error'
 import { DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotColor, type BotShape } from './bot-avatar'
@@ -45,15 +45,16 @@ export function NewBotDialog({ open, onOpenChange, onCreated }: { open: boolean;
   }, { shouldRetryOnError: false, revalidateOnFocus: false })
 
   const modelChoices: NewBotChoice[] = (menu.data?.groups ?? []).flatMap(group => {
-    const source = group.kind === 'hosted' ? undefined : modelGroupHeading(tModel, group)
+    const source = modelGroupHeading(tModel, group)
     const tag = modelGroupTag(tModel, group) ?? undefined
-    return group.options.map(option => ({
+    // Mikka 额度 offers its featured models here; the chat's picker searches the whole catalogue.
+    return group.options.filter(option => group.kind !== 'hosted' || option.featured).map(option => ({
       value: option.id,
-      label: option.id === HOSTED_CHOICE || !option.modelId ? tModel('hosted') : modelDisplayName(option.modelId).name,
-      detail: tag, group: source ?? tModel('hosted'),
+      label: option.name || (option.modelId ? modelDisplayName(option.modelId).name : tModel('unknownModel')),
+      detail: modelPriceTag(option) ?? tag, group: source,
     }))
   })
-  const modelValue = model ?? menu.data?.current?.id ?? null
+  const modelValue = model ?? (menu.data?.current?.id || null)
   const modelDetail: NewBotDetail = {
     choices: modelChoices, value: modelValue,
     label: modelChoices.find(choice => choice.value === modelValue)?.label ?? (menu.error ? tModel('unavailable') : t('loading')),

@@ -4015,7 +4015,7 @@
       "ownProvider": "自带服务商",
       "points": "{points} 点",
       "trialLeft": "剩 {count} 条免费",
-      "hostedUnavailable": "Mikka 默认在这个工作区不可用",
+      "hostedUnavailable": "Mikka 额度在这个工作区不可用",
       "changeModel": "换模型",
       "useMyPoints": "把我的点数用于这个团队",
       "apiKey": "API Key",
@@ -4030,7 +4030,22 @@
       "refreshFailed": "刷新失败，重试",
       "nextMessage": "下一条",
       "fallback": "自动改用",
-      "checking": "待检查"
+      "checking": "待检查",
+      "choose": "选择模型",
+      "creditsGroup": "Mikka 额度",
+      "search": "搜索模型",
+      "noMatch": "没有匹配的模型",
+      "source": {
+        "subscription": "用你的 {service} 订阅",
+        "sharedSubscription": "用 {name} 共享的 {service} 订阅",
+        "apiKey": "用 {vendor} API Key（尾号 {last4}），不扣 Mikka 额度",
+        "apiKeyPlain": "用 {vendor} API Key，不扣 Mikka 额度",
+        "sharedKey": "用 {name} 共享的 {vendor} API Key，不扣 Mikka 额度",
+        "credits": "用 Mikka 额度，按厂商原价",
+        "ownProvider": "用这台服务器自带的服务商",
+        "usedUntil": "{service} 订阅到 {time} 前用完了",
+        "usedUp": "{service} 订阅额度用完了"
+      }
     },
     "empty": "告诉 {name} 你要做什么",
     "starters": {

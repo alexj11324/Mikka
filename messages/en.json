@@ -4015,7 +4015,7 @@
       "ownProvider": "Own provider",
       "points": "{points} points",
       "trialLeft": "{count} free left",
-      "hostedUnavailable": "Mikka Default can’t run in this workspace",
+      "hostedUnavailable": "Mikka credits can’t run in this workspace",
       "changeModel": "Change model",
       "useMyPoints": "Use my points for this team",
       "apiKey": "API Key",
@@ -4030,7 +4030,22 @@
       "refreshFailed": "Refresh failed. Try again",
       "nextMessage": "Next message",
       "fallback": "Fallback",
-      "checking": "Checking"
+      "checking": "Checking",
+      "choose": "Choose a model",
+      "creditsGroup": "Mikka credits",
+      "search": "Search models",
+      "noMatch": "No matching models",
+      "source": {
+        "subscription": "Runs on your {service} subscription",
+        "sharedSubscription": "Runs on {name}'s {service} subscription",
+        "apiKey": "Runs on your {vendor} key (…{last4}), not charged",
+        "apiKeyPlain": "Runs on your {vendor} key, not charged",
+        "sharedKey": "Runs on {name}'s {vendor} key, not charged",
+        "credits": "Runs on Mikka credits at list price",
+        "ownProvider": "Runs on this server's own provider",
+        "usedUntil": "{service} subscription is used up until {time}",
+        "usedUp": "{service} subscription is used up"
+      }
     },
     "empty": "Tell {name} what you need",
     "starters": {
