@@ -129,7 +129,7 @@ try {
     writeFileSync(localReport,'<!doctype html><meta charset=utf-8><title>Daytime sky observation</title><main><h1>Daytime sky observation</h1><p>'+escape(brief)+'</p><article>'+escape(terminal.report.summary)+'</article></main>')
     const browser=await chromium.launch({executablePath:'/usr/bin/google-chrome',chromiumSandbox:true,headless:true})
     let bytes:Buffer
-    try{const page=await browser.newPage({viewport:{width:800,height:420}});await page.goto(pathToFileURL(localReport).href);assert.equal(await page.locator('article').innerText(),terminal.report.summary);bytes=await page.screenshot({type:'png'})}
+    try{const page=await browser.newPage({viewport:{width:800,height:420}});await page.goto(pathToFileURL(localReport).href);assert.equal(await page.locator('article').textContent(),terminal.report.summary);bytes=await page.screenshot({type:'png'})}
     finally{await browser.close()}
     const digest=createHash('sha256').update(bytes).digest('hex'),base='runs/'+id+'/captures'
     const opened=await dcall(base,'POST',{title:'Submitted report shown in Chromium',contentType:'image/png',size:bytes.length,sha256:digest},201)
