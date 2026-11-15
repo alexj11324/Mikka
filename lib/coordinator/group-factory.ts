@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg'
 import { createHash } from 'node:crypto'
 import { groupListChanged } from '@/lib/live/lists'
 import { groupChatChanged } from '@/lib/live/groups'
+import { connectForCommitEffects } from '@/lib/db/commit-effects'
 import { factoryEventId } from '@/lib/factory/event-id'
 import type { GroupRuntime, GroupReply } from './group-turns'
 import type { GroupTaskReference } from './group-routing'
@@ -291,7 +292,7 @@ export async function groupsWithPendingTaskReports(client:Query):Promise<string[
 export async function reconcileGroupTaskReports(conversationId:string, dependencies?:{pool:Pool;authorize:GroupFactoryAdapters['authorize']}):Promise<number> {
   const pool=dependencies?.pool ?? (await import('@/lib/db')).pool
   const authorize=dependencies?.authorize ?? (await productionAdapters()).authorize
-  const client=await pool.connect()
+  const client=await connectForCommitEffects(pool)
   let count=0
   try {
     const {rows:bindings}=await client.query(`SELECT b.*,c."workspaceId" FROM group_task_bindings b JOIN conversations c ON c.id=b."conversationId" WHERE b."conversationId"=$1`,[conversationId])
