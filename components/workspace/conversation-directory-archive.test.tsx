@@ -25,7 +25,8 @@ stub('../../app/actions/preferences.ts', { getPreferences: readPreferences, upda
   return { archiveIdleAfterDays }
 } })
 stub('../../app/actions/task-runs.ts', { listConversations: async () => ({ items: [], cursor: null }) })
-stub('./workspace-navigation.ts', { openGroupConversation() {}, openTask() {}, openThread() {} })
+stub('./workspace-navigation.ts', { openGroupConversation() {}, openThread() {}, openTask() {} })
+stub('./pull-requests-badge.tsx', { pullRequestRef: () => ({}), PullRequestsBadge: () => null })
 stub('../../hooks/use-live-key.tsx', { useLiveKey(kind: string, id: string | null, keys: readonly string[], scope: string | null) {
   const { mutate } = useSWRConfig()
   useEffect(() => {
@@ -94,9 +95,9 @@ test('switching signed-in accounts removes the previous archive choice and its r
     <ConversationDirectory ownerId={ownerId} workspaceId="workspace" botId={null} />
   </AuthenticatedReadCache>
   const select = () => {
-    const element = browser.document.querySelector('label select')
-    assert.ok(element instanceof browser.HTMLSelectElement)
-    return element
+    const field = document.querySelector('label select')
+    assert.ok(field instanceof browser.HTMLSelectElement)
+    return field
   }
   try {
     canSave = false
