@@ -408,7 +408,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   </>
   // A layer's thread screen (slot `thread`) draws the conversation from these rows: each part as Mikka renders it, the
   // run's Agent as the author line, its steps as tool rows.
-  const author = detail?.harness ? { id: detail.harness, name: harnessName(detail.harness), mark: <HarnessMark harness={detail.harness} /> } : undefined
+  // As Capy, an Agent's reply is its words alone: the author stays for screen readers and the switch of Agent, unseen.
+  const author = detail?.harness ? { id: detail.harness, name: harnessName(detail.harness), mark: <HarnessMark harness={detail.harness} />, quiet: true } : undefined
   const at = (value: number | string | Date | undefined) => (value === undefined ? 0 : new Date(value).getTime()) || (data ? new Date(data.thread.createdAt).getTime() : Date.now())
   const entries: ThreadEntry[] = []
   if (data && (collect || (!bare && !transcriptOnly && detail))) {
@@ -439,9 +440,22 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     // Mikka's ask to a review or verify comes first too, before the run's own status line.
     if ((attempt?.first || (!attempt && sender.id === 'mikka')) && asked) entries.push({ id: `${runId}:dispatch`, role: 'bot', at: at(data.thread.createdAt), author: sender,
       parts: [{ kind: 'text', text: asked, node: <p className="whitespace-pre-wrap wrap-anywhere">{asked}</p> }] })
-    // A later attempt's status line says nothing unless it is stopping (the thread-header slot): no empty row for it.
-    if (!attempt || stopRequested) bot('status', [{ kind: 'text', text: '', node: <ThreadStatusLine pauseReason={view?.pauseReason} status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} startedAt={new Date(data.thread.createdAt).toISOString()} dispatchedBy={detail?.agentName || null}
-      issueId={issueId} runId={runId} harness={detail?.harness ?? null} {...(attempt ? { attempt: { ...attempt, harness: detail?.harness ?? null, prompt: data.thread.prompt.trim() || null } } : {})} /> }])
+    // As Capy, how the run went is one quiet centred line between rules where its work starts: 「工作了 2 分 3 秒」,
+    // 「正在工作 · 12 秒」, 「在等你回复」; it replaces the old 「完成 · 开始于 … · Agent」 status line (Alex, 2026-11-15).
+    {
+      const status = view?.status ?? data.thread.status
+      const started = new Date(data.thread.createdAt).getTime()
+      const ended = data.thread.finishedAt ? new Date(data.thread.finishedAt).getTime() : Date.now()
+      const seconds = Math.max(0, Math.round((ended - started) / 1000))
+      const duration = seconds < 60 ? t('activityLine.seconds', { s: seconds })
+        : seconds < 3600 ? (seconds % 60 ? t('activityLine.minutes', { m: Math.floor(seconds / 60), s: seconds % 60 }) : t('activityLine.minutesOnly', { m: seconds / 60 }))
+        : t('activityLine.hours', { h: Math.floor(seconds / 3600), m: Math.floor(seconds / 60) % 60 })
+      const line = stopRequested ? t('stopping') : question === 'waiting' ? t('activityLine.waiting')
+        : active ? t('activityLine.working', { duration })
+        : [t('activityLine.worked', { duration }), ...status === 'failed' ? [t('activityLine.failed')] : status === 'stopped' || status === 'cancelled' ? [t('activityLine.stopped')] : []].join(' · ')
+      entries.push({ id: `${runId}:activity`, role: 'bot', at: at(data.thread.createdAt), event: true, parts: [{ kind: 'text', text: line, node:
+        <p role="status" data-event-line="" data-activity-line="" className="flex items-center gap-2 text-xs text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">{line}</p> }] })
+    }
     if (!attempt && asked && sender.id !== 'mikka') { open = null; entries.push({ id: `${runId}:prompt`, role: 'person', at: at(data.thread.createdAt), text: asked }) }
     if (!attempt && data.thread.hasInstructions) bot('instructions', [{ kind: 'text', text: '', node: <ThreadInstructions issueId={issueId} runId={runId} mine={data.thread.ownedByCurrentUser} /> }])
     for (const item of items) {

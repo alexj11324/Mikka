@@ -4762,6 +4762,17 @@
       "label": "标题",
       "renameFailed": "标题未保存",
       "regenerateFailed": "未能生成新标题"
+    },
+    "activityLine": {
+      "worked": "工作了 {duration}",
+      "working": "正在工作 · {duration}",
+      "waiting": "在等你回复",
+      "failed": "失败",
+      "stopped": "已停止",
+      "seconds": "{s} 秒",
+      "minutes": "{m} 分 {s} 秒",
+      "minutesOnly": "{m} 分",
+      "hours": "{h} 小时 {m} 分"
     }
   },
   "Computer": {
@@ -7304,6 +7315,18 @@
       "useRecording": "使用录音",
       "sent": "已发送。",
       "selected": "已选中。"
+    },
+    "toolKinds": {
+      "search": "搜索了 {count} 次",
+      "read": "读了 {count} 个文件",
+      "edit": "改了 {count} 个文件",
+      "command": "跑了 {count} 条命令",
+      "web": "查了 {count} 次网页",
+      "delegate": "派出了 {count} 个子线程",
+      "todo": "更新了待办",
+      "other": "用了 {count} 个工具",
+      "separator": "，",
+      "failed": "{failed} 个失败"
     }
   },
   "HostedOnboarding": {

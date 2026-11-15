@@ -4762,6 +4762,17 @@
       "label": "Title",
       "renameFailed": "Title not saved",
       "regenerateFailed": "Couldn't generate a new title"
+    },
+    "activityLine": {
+      "worked": "Worked for {duration}",
+      "working": "Working for {duration}",
+      "waiting": "Waiting on you",
+      "failed": "failed",
+      "stopped": "stopped",
+      "seconds": "{s}s",
+      "minutes": "{m}m {s}s",
+      "minutesOnly": "{m}m",
+      "hours": "{h}h {m}m"
     }
   },
   "Computer": {
@@ -7304,6 +7315,18 @@
       "useRecording": "Use recording",
       "sent": "Message sent.",
       "selected": "selected."
+    },
+    "toolKinds": {
+      "search": "{count, plural, one {Searched once} other {Searched # times}}",
+      "read": "{count, plural, one {Read a file} other {Read # files}}",
+      "edit": "{count, plural, one {Edited a file} other {Edited # files}}",
+      "command": "{count, plural, one {Ran a command} other {Ran # commands}}",
+      "web": "{count, plural, one {Searched the web} other {Searched the web # times}}",
+      "delegate": "{count, plural, one {Started a subagent} other {Started # subagents}}",
+      "todo": "Updated todos",
+      "other": "{count, plural, one {Used a tool} other {Used # tools}}",
+      "separator": ", ",
+      "failed": "{failed} failed"
     }
   },
   "HostedOnboarding": {
