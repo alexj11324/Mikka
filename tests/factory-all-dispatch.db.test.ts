@@ -213,7 +213,7 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
       assert.equal(target.kind, 'device')
       if (target.kind !== 'device') throw new Error('fixtureDeviceUnavailable')
       const selection = { model: target.model, agentProfile,
-        modelDispatch: { mode: selectionMode ?? 'preference' as const, location: 'local' as const, entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
+        modelDispatch: { mode: selectionMode ?? 'preference' as const, location: 'local' as const, entry: target.entry },
         ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}),
         ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }
       return { issueId: issue, botId, ownerRequested:true, agentId: agent.id as string, deviceRepoId: repo.id as string,

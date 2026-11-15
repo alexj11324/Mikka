@@ -1256,7 +1256,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       title: 'Claim the frozen Profile', body: 'Synthetic freshness boundary', model: model.claude_code,
       ...(inherit ? { sourceEventId: f.sourceEventId } : {}),
       subscriptionBindingId, agentProfile: selected.agentProfile, readOnly: !inherit,
-      ...(inherit ? { modelDispatch: { mode: selected.selectionMode ?? 'preference', location: 'cloud', entry: selected.target.entry, ...(selected.target.routing ? { routing: selected.target.routing } : {}) } } : {}),
+      ...(inherit ? { modelDispatch: { mode: selected.selectionMode ?? 'preference', location: 'cloud', entry: selected.target.entry } } : {}),
     })
     // The same handoff as provisioning, with no provider or model call.
     const threadDevice = randomUUID()
