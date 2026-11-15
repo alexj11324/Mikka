@@ -50,7 +50,7 @@ export async function verifyConversationOrganization({ page, fixture, rpc, passe
   const bot = await api(page, 'bots', { name: 'Desktop conversation QA' })
   assert.equal(bot.status, 201)
   assert.equal(bot.data.workspaceId, workspaceId)
-  const firstTitle = 'Desktop thread ' + suffix
+  const firstTitle = 'Investigate the desktop inbox and summarize signed in work for ' + suffix
   const title = 'Renamed desktop thread ' + suffix
   const named = await api(page, 'conversations', { workspaceId, purpose: 'conversation', title: firstTitle,
     members: [{ memberType: 'bot', memberId: bot.data.id }], leadBotId: bot.data.id })
@@ -74,14 +74,33 @@ export async function verifyConversationOrganization({ page, fixture, rpc, passe
     await header.getByRole('button', { name: english.Shell.panel.task.more, exact: true }).click()
     await page.getByRole('button', { name: item, exact: true }).filter({ visible: true }).click()
   }
-  setPhase('conversation_title_reload')
+  setPhase('conversation_regenerate_title')
   await open({ group: target.id })
-  await menuItem(firstTitle, english.IssueThreads.threadTitle.rename)
+  const response = page.waitForResponse(res => {
+    if (!new URL(res.url()).pathname.endsWith('/rpc') || res.request().method() !== 'POST') return false
+    return res.request().postDataJSON()?.action === 'task-runs.regenerateConversationTitle'
+  })
+  await menuItem(firstTitle, english.IssueThreads.threadTitle.regenerate)
+  const issued = await response
+  assert.equal(issued.status(), 200)
+  const result = await issued.json()
+  assert.equal(result.ok, true)
+  assert.equal(result.result?.regenerated, true)
+  const newTitle = result.result.title
+  assert.ok(typeof newTitle === 'string' && newTitle.trim() && newTitle !== firstTitle)
+  assert.equal((await directory(newTitle))?.title, newTitle)
+  await expect(heading(newTitle).first()).toBeVisible({ timeout: 15_000 })
+  await page.reload()
+  await expect(heading(newTitle).first()).toBeVisible()
+  passed('model_generated_title_through_header_and_reopened_conversation')
+  setPhase('conversation_title_reload')
+  await menuItem(newTitle, english.IssueThreads.threadTitle.rename)
   const dialog = page.getByRole('dialog', { name: english.IssueThreads.threadTitle.rename })
   await dialog.getByRole('textbox').fill(title)
   await dialog.getByRole('button', { name: english.Common.save, exact: true }).click()
   await expect(dialog).toBeHidden()
   await expect.poll(async () => (await directory(title))?.title).toBe(title)
+  await expect(heading(title).first()).toBeVisible({ timeout: 15_000 })
   await page.reload()
   await expect(heading(title).first()).toBeVisible()
   passed('named_conversation_manual_title_persisted_after_reload')
@@ -103,6 +122,30 @@ export async function verifyConversationOrganization({ page, fixture, rpc, passe
     assert.equal((await directory(title))?.id, target.id)
   }
   passed('named_conversation_pin_unpin_archive_restore_after_reopen')
+  setPhase('conversation_end_visibility')
+  const message = Array.from({ length: 120 }, (_, n) => `Desktop inspection line ${n + 1}`).join('\n')
+  const sent = await api(page, 'conversations/' + target.id + '/messages', {
+    body: message, mentions: [], requestId: randomUUID(), expectedOwnerId: fixture.ownerId, expectedWorkspaceId: workspaceId,
+  })
+  assert.equal(sent.status, 201)
+  const viewport = page.locator('div.overflow-y-auto').filter({ has: page.getByText('Desktop inspection line 120', { exact: false }) }).last()
+  await expect(viewport).toBeVisible()
+  const scroll = edge => viewport.evaluate((node, destination) => {
+    node.scrollTop = destination === 'top' ? 0 : node.scrollHeight
+    return node.scrollHeight - node.clientHeight
+  }, edge)
+  assert.ok(await scroll('top') > 100, 'a genuine scrollable transcript must hide the read boundary')
+  const marked = await api(page, 'conversations/read-state', { action: 'unread', chatId: target.id })
+  assert.equal(marked.status, 200)
+  // Wait for the changed server revision in the live read while the marker is
+  // outside the viewport. Scrolling back is the only step that exposes it.
+  const messagePage = () => api(page, 'conversations/' + target.id + '/messages')
+  const before = (await messagePage()).data.readRevision
+  assert.ok(Number.isSafeInteger(before) && before > 0)
+  assert.equal((await directory(title))?.unread, true)
+  await scroll('bottom')
+  await expect.poll(async () => (await directory(title))?.unread, { timeout: 20_000 }).toBe(false)
+  passed('named_conversation_stays_unread_above_the_transcript_end_until_visible')
   setPhase('conversation_unread_persistence')
   await open({ section: 'conversations' })
   const region = page.getByRole('region', { name: words.title, exact: true })
