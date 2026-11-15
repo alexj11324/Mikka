@@ -1028,6 +1028,13 @@
     "test": "lib/issue-activity.test.ts",
     "suite": "test:issues"
   },
+  "lib/thread-artifacts.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Group a thread's plans, pull requests, reports and captures for its Artifact tab from reads the reader is already authorized for.",
+    "test": "lib/thread-artifacts.test.ts",
+    "suite": "test:lib-units"
+  },
   "lib/thread-title-schedule.ts": {
     "mode": "built-in",
     "environment": [],
