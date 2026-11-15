@@ -7,7 +7,6 @@ import { Pool } from 'pg'
 import { dbUrl, seedUser, seedWorkspace, seedIssue, seedBot, seedPersonalWorkspace, seedAgent } from '../../tests/support/workspace-admin-db'
 import type { OrderEntry, OrderHarness } from '@/lib/model-order-plan'
 import { normalizeRepository } from '@mikka/protocol/repository'
-import type { DecisionAnswer } from '@/lib/coordinator/decision'
 process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
 process.env.MIKKA_BYOS_ENABLED = '1'
 
@@ -68,6 +67,19 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
   ])])
   for (const harness of ['claude_code', 'codex'] as const) await pool.query('INSERT INTO agents (id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,$4,$4)', [agents[harness], scope.ownerId, deviceId, harness])
   const definition = (name: string, harness: OrderHarness, sourceId: string, model: string) => ({ name, harness, description: `${name} public capability`, roles: [name], model: { mode: 'fixed', harness, model, source: { kind: 'subscription', connectionId: sourceId } }, instructions: 'PRIVATE_PROFILE_INSTRUCTIONS_DO_NOT_SEND_TO_DECISION', skills: ['systematic-debugging'], effort: 'low' })
+  // Saved Profiles are content only (decision 2026-11-15-1630). A selection
+  // frozen before that kept its fixed model; tests that cover those runs build
+  // the old row and selection directly, never through the store.
+  const content = (name: string) => ({ name, description: `${name} public capability`, instructions: 'PRIVATE_PROFILE_INSTRUCTIONS', skills: ['systematic-debugging'] })
+  const legacyFixedRow = async (who: { ownerId: string; workspaceId: string }, row: { id: string }, legacy: Record<string, unknown>) => {
+    const { agentProfileDigest, parseAgentProfile } = await import('./agent-profile-definition')
+    const definition = parseAgentProfile(legacy)
+    const { rows: [current] } = await pool.query('SELECT skills FROM factory_agent_profiles WHERE id=$1', [row.id])
+    const digest = agentProfileDigest(definition, current.skills)
+    await pool.query('UPDATE factory_agent_profiles SET definition=$4,digest=$5 WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3', [row.id, who.ownerId, who.workspaceId, JSON.stringify(definition), digest])
+    await pool.query('UPDATE factory_agent_profile_versions SET definition=$2,digest=$3 WHERE "profileId"=$1 AND version=(SELECT version FROM factory_agent_profiles WHERE id=$1)', [row.id, JSON.stringify(definition), digest])
+    return { definition, digest }
+  }
 
   // The two real 21-second waits must not age shared fixtures out of unrelated
   // admission tests. Preserve quota usage and authorization; stale-quota cases own separate sources.
@@ -460,9 +472,9 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     })
   })
 
-  const ui = await store.create(scope, definition('UI', 'claude_code', exactClaude, 'claude-haiku-5-5'), randomUUID())
-  const backend = await store.create(scope, definition('Backend', 'codex', codex, 'gpt-6-luna'))
-  const review = await store.create(scope, { ...definition('Review', 'codex', codex, 'gpt-6-luna'), roles: ['review'], skills: ['independent-review'] })
+  const ui = await store.create(scope, content('UI'), randomUUID())
+  const backend = await store.create(scope, content('Backend'))
+  const review = await store.create(scope, { ...content('Review'), skills: ['independent-review'] })
 
   await t.test('a persisted task-form Default choice uses preferred models with custom roles present and retains its continuation pin', async () => {
     const [{ db }, { recordPersonalSubmission }, { requestedAgentProfile }] = await Promise.all([
@@ -478,7 +490,6 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     const beforeBindings = (await pool.query('SELECT * FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [scope.ownerId])).rows
     assert.deepEqual(await profiles.agentProfileDispatchAvailability(pool, owner, { profileId, asked: { harness: 'codex' }, location: 'local' }), { available: true })
     assert.deepEqual((await pool.query('SELECT * FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [scope.ownerId])).rows, beforeBindings, 'preview remains read-only')
-    const decision = async () => { throw new Error('A real task-form Default pin must not ask Decision for another role') }
     for (const request of [
       { asked: { harness: 'codex' as const } },
       { asked: { harness: 'codex' as const }, defaultOnly: true },
@@ -486,7 +497,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     ]) {
       const purposes: string[] = []
       const result = await profiles.resolveAgentProfileDispatch(pool, owner, { issueId, profileId, location: 'local', ...request }, {
-        decision, modelDecision: async purpose => { purposes.push(purpose); return null },
+        modelDecision: async purpose => { purposes.push(purpose); return null },
       })
       if (result.target.kind !== 'device') assert.fail('the explicit Default choice must retain its authorized local target')
       assert.equal(result.target.agentId, agents.codex)
@@ -546,25 +557,21 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     } finally { await order.changeOrder(pool, scope, { kind: 'autoRouting', enabled: true }) }
   })
 
-  await t.test('custom Profile survives a 21-second Decision wait and binds its exact authorized source', { timeout: 45_000 }, async () => {
-    const selected = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, location: 'local' }, {
-      decision: async () => {
-        await new Promise(resolve => setTimeout(resolve, 21_000))
-        await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [deviceId])
-        return { answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([['profile', { name: 'profile', type: 'choice', choice: `${ui.id}:capability_fit`, confidence: .95 }]]), execution: { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions', providerGenerationId: 'fixture-delayed-decision', startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' } }
-      },
-    })
+  await t.test('a named Profile is content only: the task decides the target and its source binding is exact', async () => {
+    const selected = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, profileId: ui.id, location: 'local', asked: { harness: 'claude_code' } })
     assert.equal(selected.agentProfile?.profileId, ui.id)
     assert.equal(selected.agentProfile?.version, ui.version)
     assert.equal(selected.agentProfile?.digest, ui.digest)
-    assert.equal(selected.agentProfile?.source, 'decision')
+    assert.equal(selected.agentProfile?.source, 'explicit')
+    assert.equal(selected.agentProfile?.contentOnly, true)
     assert.ok(selected.agentProfile)
-    if (selected.target.kind !== 'device') assert.fail('the delayed Decision still selects its authorized local device')
+    if (selected.target.kind !== 'device') assert.fail('the named Profile runs on the authorized local device')
     assert.deepEqual(selected.agentProfile.targetEntry, selected.target.entry)
     assert.equal(selected.target.agentId, agents.claude_code)
+    assert.equal(selected.target.entry.source.kind, 'subscription')
     const binding = (await pool.query('SELECT "consumerId","connectionId","modelId" FROM byos_bindings WHERE id=$1', [selected.target.subscriptionBindingId])).rows[0]
     assert.equal(binding.consumerId, selected.target.agentId)
-    assert.equal(binding.connectionId, exactClaude)
+    assert.equal(binding.connectionId, selected.target.entry.source.kind === 'subscription' ? selected.target.entry.source.connectionId : undefined)
     assert.equal(binding.modelId, selected.target.model)
   })
 
@@ -574,7 +581,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     const device = randomUUID(), agentId = randomUUID(), taskIssue = await seedIssue(pool, who.ownerId, who.workspaceId)
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Outer transaction','local',true,now(),$3)`, [device, who.ownerId, JSON.stringify([{ harness: 'codex', installed: true, models: ['gpt-6-luna'], subscriptionBroker: true }])])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,'Outer transaction','codex')`, [agentId, who.ownerId, device])
-    const profile = custom ? await store.create(who, definition('Outer role', 'codex', sourceId, 'gpt-6-luna')) : undefined
+    const profile = custom ? await store.create(who, content('Outer role')) : undefined
     const select = (tx: import('pg').PoolClient) => profiles.resolveAgentProfileDispatch(new Proxy(pool, { get(target, key) {
       if (key === 'connect') return () => assert.fail('borrowed Profile finalization must not check out a second APP connection')
       const value = Reflect.get(target, key, target)
@@ -712,7 +719,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     const device = randomUUID(), agentId = randomUUID(), taskIssue = await seedIssue(pool, who.ownerId, who.workspaceId)
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Planning boundary','local',true,now(),$3)`, [device, who.ownerId, JSON.stringify([{ harness: 'codex', installed: true, models: ['gpt-6-luna'], subscriptionBroker: true }])])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,'Planning boundary','codex')`, [agentId, who.ownerId, device])
-    const input = definition('Planning role', 'codex', sourceId, 'gpt-6-luna')
+    const input = content('Planning role')
     const profile = change.startsWith('default-') ? undefined : await store.create(who, input)
     let planned = false
     await assert.rejects(profiles.resolveAgentProfileDispatch(pool, who, { issueId: taskIssue, location: 'local', profileId: profile?.id }, {
@@ -750,7 +757,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     const device = randomUUID(), agentId = randomUUID(), taskIssue = await seedIssue(pool, who.ownerId, who.workspaceId)
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Shared source','local',true,now(),$3)`, [device, who.ownerId, JSON.stringify([{ harness: 'codex', installed: true, models: ['gpt-6-luna'], subscriptionBroker: true }])])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,'Shared source','codex')`, [agentId, who.ownerId, device])
-    const input = definition('Shared role', 'codex', connectionId, 'gpt-6-luna')
+    const input = content('Shared role')
     const profile = mode === 'default' ? undefined : await store.create(who, input)
     if (mode === 'edited-concurrently') {
       const { acquireWorkspaceMembership } = await import('../workspace-membership-guard')
@@ -846,23 +853,25 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
   })
 
   await t.test('default thread recovery never reselects a role when custom profiles were enabled later', async () => {
-    const selected = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, location: 'local', defaultOnly: true }, {
-      decision: async () => { throw new Error('An existing default thread must not enter Decision again') },
-    })
+    const selected = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, location: 'local', defaultOnly: true })
     assert.equal(selected.agentProfile?.source, 'default')
     assert.equal(selected.agentProfile?.instructions, '')
     await assert.rejects(profiles.resolveAgentProfileDispatch(pool, scope, { issueId, profileId: ui.id, defaultOnly: true }), { code: 'agentProfilePinConflict' })
   })
 
-  await t.test('scope isolation, creation replay and controlled source validation', async () => {
+  await t.test('scope isolation, creation replay, and saving keeps only the content', async () => {
     assert.equal((await store.list(foreign)).length, 0)
     await assert.rejects(store.get(foreign, ui.id), { code: 'agentProfileNotFound' })
     const second = await seedWorkspace(pool, scope.ownerId, [{ userId: scope.ownerId, role: 'admin' }]); workspaces.push(second.id)
     await assert.rejects(store.get({ ...scope, workspaceId: second.id }, ui.id), { code: 'agentProfileNotFound' })
-    await assert.rejects(store.create(scope, definition('Foreign', 'codex', foreignSource, 'gpt-6-luna')), { code: 'agentProfileModelUnavailable' })
-    const replay = await store.create(scope, definition('UI', 'claude_code', exactClaude, 'claude-haiku-5-5'), ui.id)
+    const replay = await store.create(scope, content('UI'), ui.id)
     assert.equal(replay.id, ui.id); assert.equal(replay.version, 1)
-    await assert.rejects(store.create(scope, { ...definition('UI', 'claude_code', exactClaude, 'claude-haiku-5-5'), name: 'Other name' }, ui.id), { code: 'agentProfileRequestConflict' })
+    await assert.rejects(store.create(scope, { ...content('UI'), name: 'Other name' }, ui.id), { code: 'agentProfileRequestConflict' })
+    // A model, Agent, effort or tag in the input is not kept, even a foreign source.
+    const saved = await store.create(scope, definition('Foreign', 'codex', foreignSource, 'gpt-6-luna'))
+    assert.deepEqual({ roles: saved.roles, harness: saved.harness, model: saved.model, effort: saved.effort }, { roles: [], harness: 'auto', model: { mode: 'inherit' }, effort: undefined })
+    assert.ok(!JSON.stringify((await pool.query('SELECT definition FROM factory_agent_profiles WHERE id=$1', [saved.id])).rows[0].definition).includes(foreignSource))
+    await store.archive(scope, saved.id, saved.version)
   })
 
   await t.test('catalogue enumeration writes no binding and selected source remains exact', async () => {
@@ -872,82 +881,64 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     assert.deepEqual(await profiles.agentProfileDispatchAvailability(pool, scope, { location: 'local', deviceId }), { available: true })
     assert.equal((await profiles.agentProfileDispatchAvailability(pool, scope, { location: 'local', deviceId: randomUUID() })).available, false)
     const unavailableDestination = await profiles.readAgentProfileManagement(pool, scope, { location: 'local', deviceId: randomUUID() })
-    assert.equal(unavailableDestination.availability[ui.id].available, false)
+    // A Profile's own availability is its content; whether anything can run there is the destination's.
+    assert.equal(unavailableDestination.availability[ui.id].available, true)
     assert.equal(unavailableDestination.defaultAvailability.available, false)
 
     assert.deepEqual((await pool.query('SELECT id,"createdAt" FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [scope.ownerId])).rows, before)
     assert.ok(!JSON.stringify(view.catalog).includes('synthetic-profile-'))
     const selected = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, profileId: ui.id, location: 'local' })
-    assert.equal(selected.selectionMode, 'picked'); assert.equal(selected.target.kind, 'device')
+    assert.equal(selected.selectionMode, 'preference'); assert.equal(selected.target.kind, 'device')
     if (selected.target.kind !== 'device') assert.fail('device expected')
-    assert.equal(selected.target.agentId, agents.claude_code)
-    assert.deepEqual(selected.target.entry.source, { kind: 'subscription', connectionId: exactClaude })
+    assert.equal(selected.target.entry.source.kind, 'subscription')
     assert.ok(selected.target.subscriptionBindingId)
     const binding = (await pool.query('SELECT "connectionId"::text,"modelId" FROM byos_bindings WHERE id=$1', [selected.target.subscriptionBindingId])).rows[0]
-    assert.deepEqual(binding, { connectionId: exactClaude, modelId: 'claude-haiku-5-5' })
+    assert.deepEqual(binding, { connectionId: selected.target.entry.source.kind === 'subscription' ? selected.target.entry.source.connectionId : null, modelId: selected.target.model })
     // Progressive disclosure: the brief names the capability and how to load
     // it, while the frozen body stays in the pinned envelope.
     assert.ok(selected.agentProfile!.instructions.includes('load_skill'))
     assert.ok(selected.agentProfile!.instructions.includes('official:systematic-debugging'))
     assert.ok(!selected.agentProfile!.instructions.includes('Start from the observed failure'))
     assert.ok(selected.agentProfile!.skills[0]?.content.includes('Start from the observed failure'))
-    assert.equal(selected.agentProfile!.effort, 'low')
-    await assert.rejects(profiles.resolveAgentProfileDispatch(pool, scope, { issueId, profileId: ui.id, asked: { harness: 'codex', model: 'gpt-6-luna' } }), { code: 'agentProfilePinConflict' })
+    assert.equal(selected.agentProfile!.effort, undefined)
+    // The task's named model wins; the Profile has no model of its own to conflict with it.
+    const named = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, profileId: ui.id, location: 'local', asked: { harness: 'codex', model: 'gpt-6-luna' } })
+    assert.equal(named.selectionMode, 'picked'); assert.equal(named.agentProfile!.profileId, ui.id)
+    if (named.target.kind === 'none') assert.fail('the named model runs')
+    assert.deepEqual([named.target.entry.harness, named.target.model], ['codex', 'gpt-6-luna'])
   })
 
-  await t.test('Decision sees public capabilities only and selects exact profiles for three task scenarios', async () => {
-    for (const [selected, stage, title] of [[ui, 'execute', 'Build an interface'], [backend, 'execute', 'Repair a backend failure'], [review, 'review', 'Review the frozen candidate']] as const) {
-      await pool.query('UPDATE issues SET title=$2 WHERE id=$1', [issueId, title])
-      const result = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, stage, location: 'local' }, {
-        decision: async (_purpose, input, questions) => {
-          const serialized = JSON.stringify(input)
-          assert.ok(serialized.includes(title)); assert.ok(serialized.includes(stage))
-          for (const forbidden of ['PRIVATE_PROFILE_INSTRUCTIONS', 'connectionId', 'providerSubject', 'synthetic-profile-', 'Start from the observed failure']) assert.ok(!serialized.includes(forbidden), forbidden)
-          assert.ok(JSON.stringify(questions).includes(selected.id))
-          return { answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([['profile', { name: 'profile', type: 'choice', choice: `${selected.id}:capability_fit`, confidence: .95 }]]), execution: { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions', providerGenerationId: 'fixture-decision', startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' } }
-        },
-      })
-      assert.equal(result.agentProfile!.profileId, selected.id); assert.equal(result.agentProfile!.source, 'decision')
-      assert.equal(result.agentProfile!.decision!.modelId, 'openai/gpt-6-luna-decisions')
+  await t.test('without a named Profile no custom role is chosen, even with enabled Profiles', async () => {
+    assert.ok((await store.list(scope)).some(row => row.enabled))
+    for (const stage of ['execute', 'review', 'verify'] as const) {
+      const result = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, stage, location: 'local' })
+      assert.equal(result.agentProfile?.source, 'default', stage)
+      assert.equal(result.agentProfile?.instructions, '', stage)
     }
-    await assert.rejects(profiles.resolveAgentProfileDispatch(pool, scope, { issueId }, { decision: async () => null }), { code: 'agentProfileDecisionUnavailable' })
   })
 
-  await t.test('Decision racing a profile edit cannot bind or dispatch the stale selection', async () => {
-    const current = await store.create(scope, definition('Race', 'codex', codex, 'gpt-6-luna'))
-    const before = (await pool.query('SELECT id,"createdAt" FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [scope.ownerId])).rows
-    await assert.rejects(profiles.resolveAgentProfileDispatch(pool, scope, { issueId, location: 'local' }, {
-      decision: async () => {
-        await store.update(scope, current.id, current.version, { ...definition('Race', 'codex', codex, 'gpt-6-luna'), instructions: 'Edited during Decision' })
-        return { answers: new Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>>([['profile', { name: 'profile', type: 'choice', choice: `${current.id}:stage_fit`, confidence: .95 }]]), execution: { executionId: randomUUID(), modelId: 'openai/gpt-6-luna-decisions', providerGenerationId: 'fixture-racing-decision', startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'b'.repeat(64), imageDigests: [], vision: 'no-image-input' } }
-      },
-    }), { code: 'agentProfileVersionConflict' })
-    assert.deepEqual((await pool.query('SELECT id,"createdAt" FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [scope.ownerId])).rows, before)
-    await store.archive(scope, current.id, 2)
-  })
-
-  await t.test('disconnect does not prevent disabling the same fixed source', async () => {
-    const current = await store.create(scope, definition('Disable after disconnect', 'claude_code', claude, 'claude-haiku-5-5'))
+  await t.test('a paused source does not prevent disabling a Profile', async () => {
+    const current = await store.create(scope, content('Disable after disconnect'))
     await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [claude])
-    const disabled = await store.update(scope, current.id, current.version, { ...definition('Disable after disconnect', 'claude_code', claude, 'claude-haiku-5-5'), enabled: false })
+    const disabled = await store.update(scope, current.id, current.version, { ...content('Disable after disconnect'), enabled: false })
     assert.equal(disabled.enabled, false)
     await pool.query('UPDATE byos_connections SET paused=false WHERE id=$1', [claude])
     await store.archive(scope, current.id, disabled.version)
   })
 
-  await t.test('inheritance stays inside the chosen harness and preserves preferred model order', async () => {
-    const inherited = await store.create(scope, { name: 'Inherited Claude', harness: 'claude_code', model: { mode: 'inherit' } })
+  await t.test('the task\'s harness and the preferred model order decide a named Profile\'s target', async () => {
+    const inherited = await store.create(scope, content('Inherited Claude'))
     await pool.query('UPDATE model_order_settings SET customized=true WHERE "ownerId"=$1 AND "workspaceId"=$2', [scope.ownerId, scope.workspaceId])
     for (const [index, harness, model, connection] of [[0, 'codex', 'gpt-6-luna', codex], [1, 'claude_code', 'claude-haiku-5-5', claude], [2, 'claude_code', 'claude-haiku-5-5', exactClaude]] as const) await pool.query('INSERT INTO model_order_entries (id,"ownerId","workspaceId",position,harness,model,"sourceKind","sourceId") VALUES ($1,$2,$3,$4,$5,$6,\'subscription\',$7)', [randomUUID(), scope.ownerId, scope.workspaceId, index, harness, model, connection])
     await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [claude, JSON.stringify(quota('claude', 1))])
-    const result = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, profileId: inherited.id, location: 'local' })
+    const result = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, profileId: inherited.id, location: 'local', asked: { harness: 'claude_code' } })
     assert.equal(result.selectionMode, 'preference'); assert.equal(result.agentProfile!.targetEntry.harness, 'claude_code')
     assert.deepEqual(result.agentProfile!.targetEntry.source, { kind: 'subscription', connectionId: exactClaude })
   })
 
   await t.test('admission binds exact target/source and only a started native continuation retains the frozen profile', async () => {
     const { admitProfileSelection, assertRunProfileClaim } = await import('./profile-admission')
-    const resolved = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, profileId: review.id, location: 'local' })
+    const resolved = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, profileId: review.id, location: 'local', asked: { harness: 'codex' } })
     assert.equal(resolved.target.kind, 'device')
     if (resolved.target.kind !== 'device') assert.fail('device expected')
     const selection = resolved.agentProfile!, bindingId = resolved.target.subscriptionBindingId!
@@ -1037,15 +1028,21 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
   })
 
   await t.test('first admission rejects changed source authorization, tampered snapshot and offline device', async () => {
-    const frozen = (await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, profileId: ui.id, location: 'local' })).agentProfile!
+    const picked = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, profileId: ui.id, location: 'local' })
+    const frozen = picked.agentProfile!, source = frozen.targetEntry.source
+    if (source.kind !== 'subscription') assert.fail('the fixture dispatches on a subscription')
     await assert.rejects(profiles.assertProfileSelection(pool, foreign, frozen), { code: 'agentProfileScopeNotFound' })
     await assert.rejects(profiles.assertProfileSelection(pool, scope, { ...frozen, instructions: 'Injected privilege' }), { code: 'agentProfileSelectionInvalid' })
-    await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [exactClaude])
+    await assert.rejects(profiles.assertProfileSelection(pool, scope, { ...frozen, effort: 'max' }), { code: 'agentProfileSelectionInvalid' })
+    await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [source.connectionId])
     await assert.rejects(profiles.assertProfileSelection(pool, scope, frozen), { code: 'agentProfileModelUnavailable' })
-    await assert.rejects(profiles.resolveAgentProfileDispatch(pool, scope, { issueId, profileId: ui.id }), { code: 'agentProfileUnavailable' })
-    await pool.query('UPDATE byos_connections SET paused=false WHERE id=$1', [exactClaude])
+    // A new dispatch of the same Profile takes the task's next runnable source.
+    const next = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, profileId: ui.id, location: 'local' })
+    if (next.target.kind === 'none') assert.fail('another source can run')
+    assert.notDeepEqual(next.target.entry.source, source)
+    await pool.query('UPDATE byos_connections SET paused=false WHERE id=$1', [source.connectionId])
     await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [deviceId])
-    await assert.rejects(profiles.resolveAgentProfileDispatch(pool, scope, { issueId, profileId: ui.id, location: 'local' }), { code: 'agentProfileUnavailable' })
+    await assert.rejects(profiles.resolveAgentProfileDispatch(pool, scope, { issueId, profileId: ui.id, location: 'local' }), { code: 'agentProfileModelUnavailable' })
     await pool.query('UPDATE devices SET enabled=true WHERE id=$1', [deviceId])
     await store.archive(scope, ui.id, 1)
     await assert.rejects(profiles.assertProfileSelection(pool, scope, frozen), { code: 'agentProfileArchived' })
@@ -1082,13 +1079,21 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
       machines.push({ id, agentId, repoId })
     }
     const [a, b] = machines
-    const profile = mode === 'legacy' ? undefined : await store.create(who, { name: `Frozen ${mode} role`, roles: ['implementation'], harness: 'codex',
-      model: mode === 'fixed' ? { mode, harness: 'codex', model: 'gpt-6-luna', source: { kind: 'subscription', connectionId: primary } } : { mode: 'inherit' },
-      effort: 'high', instructions: 'Keep the original implementation responsibility.', skills: ['systematic-debugging'] })
+    let profile = mode === 'legacy' ? undefined : await store.create(who, { name: `Frozen ${mode} role`, instructions: 'Keep the original implementation responsibility.', skills: ['systematic-debugging'] })
     const picked = await profiles.resolveAgentProfileDispatch(pool, { ...who, botId }, { issueId: taskIssue, profileId: profile?.id, location: 'local', deviceId: a.id })
     if (picked.target.kind !== 'device') assert.fail('A must be runnable')
+    if (mode === 'fixed' && profile && picked.agentProfile) {
+      // A run admitted before 2026-11-15 froze a fixed-model Profile with its effort and no contentOnly mark.
+      assert.deepEqual(picked.target.entry.source, { kind: 'subscription', connectionId: primary })
+      const legacy = await legacyFixedRow(who, profile, { name: profile.name, roles: ['implementation'], harness: 'codex', model: { mode: 'fixed', harness: 'codex', model: 'gpt-6-luna', source: { kind: 'subscription', connectionId: primary } },
+        effort: 'high', instructions: profile.instructions, skills: profile.skills })
+      const { agentProfileInstructions } = await import('./agent-profile-definition')
+      const { contentOnly: _contentOnly, ...rest } = picked.agentProfile
+      picked.agentProfile = { ...rest, definition: legacy.definition, digest: legacy.digest, effort: 'high', instructions: agentProfileInstructions(legacy.definition, rest.skills) }
+      profile = { ...profile, ...legacy.definition, digest: legacy.digest }
+    }
     const initialModel = { model: picked.target.model, subscriptionBindingId: picked.target.subscriptionBindingId, ...(profile ? { agentProfile: picked.agentProfile } : {}),
-      modelDispatch: { mode: picked.selectionMode!, location: 'local' as const, entry: picked.target.entry } }
+      modelDispatch: { mode: mode === 'fixed' ? 'picked' as const : picked.selectionMode!, location: 'local' as const, entry: picked.target.entry } }
     const [{ factoryCheckGates }, { factoryCheckIndependent }] = await Promise.all([import('./checks'), import('./check-independence')])
     const factory = createFactoryStore(pool, async (owner, issue, tx) => (await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2', [issue, owner])).rowCount === 1, botId, { independent: factoryCheckIndependent, gates: factoryCheckGates })
     const routed = await factory.route(who.ownerId, { issueId: taskIssue, sourceEventId: epoch, eventId: randomUUID(), rationale: 'Actual watchdog Profile recovery fixture' })
@@ -1140,7 +1145,8 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     assert.equal(run.retryOf, first.runId); assert.equal(run.continuesRunId, first.runId); assert.equal(run.sessionId, null)
     assert.equal(run.agentDefinition.profileOriginRunId, undefined)
     if (profile) {
-      assert.equal(run.agentDefinition.agentProfile.version, 1); assert.equal(run.agentDefinition.agentProfile.effort, 'high')
+      assert.equal(run.agentDefinition.agentProfile.version, 1); assert.equal(run.agentDefinition.agentProfile.effort, mode === 'fixed' ? 'high' : undefined)
+      assert.equal(run.agentDefinition.agentProfile.contentOnly, mode === 'fixed' ? undefined : true)
       assert.deepEqual({ ...run.agentDefinition.agentProfile, targetEntry: undefined }, { ...original.agentDefinition.agentProfile, targetEntry: undefined })
       assert.deepEqual(run.agentDefinition.agentProfile.targetEntry, run.agentDefinition.modelDispatch.entry)
     } else assert.equal(run.agentDefinition.agentProfile, undefined)
@@ -1189,9 +1195,9 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     await assert.rejects(store.list(scope), { code: 'agentProfileScopeNotFound' })
     await assert.rejects(store.create(scope, { name: 'Blocked' }), { code: 'agentProfileScopeNotFound' })
   })
-  // Decision 2026-11-05-0400: a Profile (or the Decision API's choice of one) comes first; the per-Agent lists of
-  // 优先使用的模型 only order what an inheriting Profile, or a dispatch with no Profile, may run.
-  await t.test('per-Agent lists: an inheriting Profile follows 优先使用的 Agent; a fixed-Agent Profile never takes the other list', async () => {
+  // Decisions 2026-11-05-0400 and 2026-11-15-1630: a named Profile is content only, so its target comes from
+  // the task: 优先使用的 Agent and its per-Agent list, unless the task names an Agent.
+  await t.test('per-Agent lists: a named Profile follows 优先使用的 Agent unless the task names an Agent', async () => {
     const who = await person('profiles-per-agent')
     const ownClaude = await subscribe(who, 'claude', ['claude-haiku-5-5']), ownCodex = await subscribe(who, 'codex', ['gpt-6-luna'])
     const machine = randomUUID()
@@ -1205,7 +1211,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     const issue = await seedIssue(pool, who.ownerId, who.workspaceId)
     const whoStore = new profiles.AgentProfileStore(pool)
     // Inherit + either Agent: Codex's list first, as 优先使用的 Agent says.
-    const inherit = await whoStore.create(who, { name: 'Inherits order', harness: 'auto', model: { mode: 'inherit' } })
+    const inherit = await whoStore.create(who, { name: 'Inherits order' })
     const inherited = await profiles.resolveAgentProfileDispatch(pool, who, { issueId: issue, profileId: inherit.id, location: 'local' })
     assert.equal(inherited.agentProfile!.targetEntry.harness, 'codex')
     assert.equal(inherited.agentProfile!.targetEntry.model, 'gpt-6-luna')
@@ -1213,13 +1219,11 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [ownCodex, JSON.stringify(quota('codex', 1))])
     const fallback = await profiles.resolveAgentProfileDispatch(pool, who, { issueId: issue, profileId: inherit.id, location: 'local' })
     assert.equal(fallback.agentProfile!.targetEntry.harness, 'claude_code')
-    // A fixed-Agent Profile (Codex, inheriting models) never takes Claude Code's list, even with Codex out of quota.
-    const codexOnly = await whoStore.create(who, { name: 'Codex only', harness: 'codex', model: { mode: 'inherit' } })
-    await assert.rejects(profiles.resolveAgentProfileDispatch(pool, who, { issueId: issue, profileId: codexOnly.id, location: 'local' }))
+    // A task that names Codex never takes Claude Code's list, even with Codex out of quota.
+    await assert.rejects(profiles.resolveAgentProfileDispatch(pool, who, { issueId: issue, profileId: inherit.id, location: 'local', asked: { harness: 'codex' } }), { code: 'agentProfileModelUnavailable' })
     await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [ownCodex, JSON.stringify(quota('codex'))])
-    // And a Claude Code Profile runs Claude Code although 优先使用的 Agent is Codex.
-    const claudeOnly = await whoStore.create(who, { name: 'Claude only', harness: 'claude_code', model: { mode: 'inherit' } })
-    const pinned = await profiles.resolveAgentProfileDispatch(pool, who, { issueId: issue, profileId: claudeOnly.id, location: 'local' })
+    // And a task that names Claude Code runs Claude Code with the same Profile although 优先使用的 Agent is Codex.
+    const pinned = await profiles.resolveAgentProfileDispatch(pool, who, { issueId: issue, profileId: inherit.id, location: 'local', asked: { harness: 'claude_code' } })
     assert.equal(pinned.agentProfile!.targetEntry.harness, 'claude_code')
   })
 })
@@ -1242,22 +1246,23 @@ test('Agent Profile marks: derived on create, kept or cleared on update, closed 
   })
   const scope = { ownerId, workspaceId: workspace.id }
   // Membership and model checks have their own suites above; this one is about the mark columns.
-  const store = new profiles.AgentProfileStore(pool, { validateModel: async () => {}, membership: async () => ({ check: async () => {}, close: async () => {} }) })
-  const reviewer = { name: 'Reviewer', roles: ['review'], harness: 'auto', model: { mode: 'inherit' } }
+  const store = new profiles.AgentProfileStore(pool, { membership: async () => ({ check: async () => {}, close: async () => {} }) })
+  // Saved Profiles keep no tags, so the derived mark reads the name and description.
+  const reviewer = { name: 'Reviewer', description: 'Reviews pull requests' }
   const created = await store.create(scope, reviewer)
-  assert.deepEqual({ icon: created.icon, color: created.color }, deriveProfileMark({ name: 'Reviewer', roles: ['review'] }))
+  assert.deepEqual({ icon: created.icon, color: created.color }, deriveProfileMark(reviewer))
   assert.equal(created.icon, 'lens')
   const stored = (await pool.query('SELECT icon,color FROM factory_agent_profiles WHERE id=$1', [created.id])).rows[0]
   assert.deepEqual(stored, { icon: created.icon, color: created.color }, 'a new Profile stores its derived mark')
   const chosen = await store.create(scope, { ...reviewer, name: 'Chosen' }, undefined, { icon: 'diamond' })
-  assert.equal(chosen.icon, 'diamond'); assert.equal(chosen.color, deriveProfileMark({ name: 'Chosen', roles: ['review'] }).color)
+  assert.equal(chosen.icon, 'diamond'); assert.equal(chosen.color, deriveProfileMark({ ...reviewer, name: 'Chosen' }).color)
   const recolored = await store.update(scope, chosen.id, chosen.version, { ...reviewer, name: 'Chosen' }, { color: 'pink' })
   assert.deepEqual([recolored.icon, recolored.color, recolored.digest], ['diamond', 'pink', chosen.digest], 'the mark is outside the digest')
   const toggled = await store.update(scope, chosen.id, recolored.version, { ...reviewer, name: 'Chosen', enabled: false })
   assert.deepEqual([toggled.icon, toggled.color], ['diamond', 'pink'], 'a save without a mark keeps it')
-  const cleared = await store.update(scope, chosen.id, toggled.version, { ...reviewer, name: 'Chosen', roles: ['deploy'] }, { icon: null, color: null })
+  const cleared = await store.update(scope, chosen.id, toggled.version, { ...reviewer, name: 'Chosen', description: 'Deploys releases' }, { icon: null, color: null })
   assert.deepEqual((await pool.query('SELECT icon,color FROM factory_agent_profiles WHERE id=$1', [chosen.id])).rows[0], { icon: null, color: null })
-  assert.deepEqual({ icon: cleared.icon, color: cleared.color }, deriveProfileMark({ name: 'Chosen', roles: ['deploy'] }), 'null reads as the derived default')
+  assert.deepEqual({ icon: cleared.icon, color: cleared.color }, deriveProfileMark({ name: 'Chosen', description: 'Deploys releases' }), 'null reads as the derived default')
   await assert.rejects(store.create(scope, reviewer, undefined, { icon: 'skull' } as never))
   await assert.rejects(pool.query("UPDATE factory_agent_profiles SET icon='skull' WHERE id=$1", [created.id]), { code: '23514' })
   await assert.rejects(pool.query("UPDATE factory_agent_profiles SET color='red' WHERE id=$1", [created.id]), { code: '23514' })

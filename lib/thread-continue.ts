@@ -14,6 +14,7 @@ import { readRunChain } from '@/lib/run-chain'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { splitChatFiles } from '@mikka/protocol/chat-attachments'
 import { runChanged } from '@/lib/live/panels'
+import { profileFixedModel } from '@/lib/factory/agent-profile-definition'
 
 type Source = Parameters<typeof addRunMessage>[2]
 const isActionErrorCode = (code: string): code is ActionErrorCode => (ACTION_ERROR_CODES as readonly string[]).includes(code)
@@ -246,7 +247,7 @@ async function queueNextRun(userId: string, run: typeof agentRuns.$inferSelect, 
   if (modelChoice) {
     const harness = previous.harness
     if ((harness !== 'codex' && harness !== 'claude_code') || !run.workspaceId ||
-      (run.agentDefinition?.agentProfile && run.agentDefinition.agentProfile.definition.model.mode !== 'inherit') ||
+      profileFixedModel(run.agentDefinition?.agentProfile) !== undefined ||
       run.questionContinuation?.requireSessionResume) throw new ActionFailureError('threadCannotContinue')
     const scope = { ownerId: userId, workspaceId: run.workspaceId, botId: run.botId }
     const entry: OrderEntry = { ...modelChoice, harness, id: threadModelKey(modelChoice) }

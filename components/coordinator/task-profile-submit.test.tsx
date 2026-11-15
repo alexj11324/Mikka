@@ -108,7 +108,7 @@ beforeEach(() => {
   manualCommands.length = 0; failManual = false; requireConsent = false
   submitted.length = 0; refreshes = 0; readError = undefined; cacheRefreshes.length = 0; toasts.length = 0; dispatchedTask = undefined
   data = { profiles: [{
-    id: customId, name: 'Fixture role', description: '', roles: ['review'], icon: 'lens', color: 'pink', enabled: true, harness: 'claude_code',
+    id: customId, name: 'Fixture role', description: '', roles: [], icon: 'lens', color: 'pink', enabled: true, harness: 'auto',
     model: { mode: 'inherit' }, instructions: '', skills: [], version: 1, digest: 'a'.repeat(64),
     createdAt: '2026-11-05T00:00:00Z', updatedAt: '2026-11-05T00:00:00Z', archivedAt: null,
   }], catalog: { models: [], skills: [] }, availability: { [customId]: { available: true } }, defaultAvailability: { available: true } }
@@ -122,52 +122,23 @@ const option = (value: string) => container.querySelector<HTMLButtonElement>(`[d
 const create = () => [...container.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Shell.newTaskDialog.create')!
 const dialog = () => <NewTaskDialog open onOpenChange={() => {}} workspaceId={workspaceId} initialText="Perform this one fixture task." />
 
-test('Default awaiting an allowance check stays selectable and keeps its unresolved state visible', async () => {
-  data!.defaultAvailability = { available: false, reason: 'checking' }
-  data!.availability[customId] = { available: false, reason: 'checking' }
-  let picked: string | null | undefined
-  await render(<TaskProfilePicker workspaceId={workspaceId} value={null} onChange={value => { picked = value }} data={data} />)
-  assert.equal(option('default').disabled, false)
-  assert.match(option('default').textContent ?? '', /reasons.checking/)
-  assert.doesNotMatch(option('default').textContent ?? '', /inherit/)
-  assert.equal(option(customId).disabled, false, 'enabled custom Profiles may request the same authoritative allowance check')
-  await act(async () => option('default').click())
-  assert.equal(picked, 'default')
-  assert.deepEqual(data!.defaultAvailability, { available: false, reason: 'checking' }, 'selection is not an availability grant')
-  assert.equal(refreshes, 0)
-})
-
-test('a selected Default can submit its structured intent when allowance becomes checking, without a preview refresh', async () => {
+test('the menu offers no Agent 配置 and each Profile; none submits without a profileId', async () => {
+  let picked: string | null | undefined = 'unset'
+  await render(<TaskProfilePicker workspaceId={workspaceId} value={customId} onChange={value => { picked = value }} data={data} />)
+  assert.equal(container.querySelector('[data-option="default"]'), null, 'the retired Default is not a choice')
+  assert.equal(option('auto').disabled, false)
+  await act(async () => option('auto').click())
+  assert.equal(picked, null)
   await render(dialog())
-  await act(async () => option('default').click())
-  data!.defaultAvailability = { available: false, reason: 'checking' }
-  await render(dialog())
-  assert.equal(create().disabled, false)
-  assert.match(container.querySelector('[role="status"]')?.textContent ?? '', /reasons.checking/)
   await act(async () => create().click())
   assert.equal(submitted.length, 1)
-  assert.equal(submitted[0].context?.profileId, 'default')
-  assert.equal(refreshes, 0, 'no manual/automatic management refresh is required to submit the intent')
+  assert.equal(submitted[0].context?.profileId, undefined, 'no Agent 配置 sends no reference')
 })
 
-test('confirmed Default refusal, missing preview, read failure and disabled custom roles prevent task submission', async () => {
+test('disabled and archived Profiles prevent task submission; a read failure blocks a chosen Profile', async () => {
   await render(dialog())
-  await act(async () => option('default').click())
-  for (const reason of ['balance', 'quota', 'disabled', 'paused', 'missing', 'noModels', 'noDevice', 'expired', 'keyRefused', 'providerUnavailable']) {
-    data!.defaultAvailability = { available: false, reason }
-    await render(dialog())
-    assert.equal(option('default').disabled, true, reason)
-    assert.equal(create().disabled, true, reason)
-  }
-  data!.defaultAvailability = undefined
-  await render(dialog())
-  assert.equal(option('default').disabled, true); assert.equal(create().disabled, true)
-  data!.defaultAvailability = { available: false, reason: 'checking' }; readError = new Error('fixture read failure')
-  await render(dialog())
-  assert.equal(create().disabled, true, 'cached checking data cannot override a failed read')
-  readError = undefined
   await act(async () => option(customId).click())
-  data!.availability[customId] = { available: false, reason: 'checking' }; data!.profiles[0].enabled = false
+  data!.profiles[0].enabled = false
   await render(dialog())
   assert.equal(option(customId).disabled, true); assert.equal(create().disabled, true)
   assert.match(container.querySelector('[role="alert"]')?.textContent ?? '', /reasons.disabled/)
@@ -175,14 +146,13 @@ test('confirmed Default refusal, missing preview, read failure and disabled cust
   await render(dialog())
   assert.equal(option(customId).disabled, true); assert.equal(create().disabled, true)
   assert.match(container.querySelector('[role="alert"]')?.textContent ?? '', /reasons.archived/)
+  data!.profiles[0].archivedAt = null; readError = new Error('fixture read failure')
+  await render(dialog())
+  assert.equal(create().disabled, true, 'cached data cannot override a failed read')
   assert.equal(submitted.length, 0); assert.equal(refreshes, 0)
 })
 
-test('checking is a non-blocking Default status; other unavailable choices retain their alert', async () => {
-  data!.defaultAvailability = { available: false, reason: 'checking' }
-  await render(<TaskProfileNotice value="default" data={data} onRetry={() => { refreshes++ }} />)
-  assert.match(container.querySelector('[role="status"]')?.textContent ?? '', /reasons.checking/)
-  assert.equal(container.querySelector('[role="alert"]'), null)
+test('checking is a non-blocking status; a disabled Profile keeps its alert', async () => {
   data!.availability[customId] = { available: false, reason: 'checking' }
   await render(<TaskProfileNotice value={customId} data={data} onRetry={() => { refreshes++ }} />)
   assert.match(container.querySelector('[role="status"]')?.textContent ?? '', /reasons.checking/)
@@ -190,6 +160,8 @@ test('checking is a non-blocking Default status; other unavailable choices retai
   data!.profiles[0].enabled = false
   await render(<TaskProfileNotice value={customId} data={data} onRetry={() => { refreshes++ }} />)
   assert.match(container.querySelector('[role="alert"]')?.textContent ?? '', /reasons.disabled/)
+  await render(<TaskProfileNotice value="default" data={data} onRetry={() => { refreshes++ }} />)
+  assert.equal(container.querySelector('[role="alert"]'), null, 'a retired Default draft reads as none')
 })
 
 test('an enabled custom Profile submits only its structured reference while allowance is checking', async () => {
@@ -273,7 +245,7 @@ test('the same form explicitly switches to dispatch and sends only its selected 
   await render(<NewTaskDialog open workspaceId={workspaceId} initialIntent="create_only" initialText="Run now."
     onCreated={() => {}} onOpenChange={() => {}} />)
   await act(async () => option('create_and_dispatch').click())
-  assert.ok(option('default'))
+  assert.ok(option('auto'))
   await act(async () => container.querySelector<HTMLButtonElement>('button[aria-keyshortcuts]')!.click())
   assert.equal(manualCommands.length, 0)
   assert.equal(submitted.length, 1)

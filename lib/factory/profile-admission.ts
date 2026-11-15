@@ -7,6 +7,7 @@ import { MODEL_ROUTING_TIERS, modelTier } from '@/lib/model-routing'
 import { credentialStates, orderCandidates, selectedOrderCandidates } from '@/lib/model-order'
 import { executionIdentityForRun, ExecutionIdentityError } from '@/lib/execution-identity'
 import { assertProfileTarget, assertProfileSelection, BUILTIN_AGENT_PROFILE_ID, isBuiltinAgentProfileSelection, type AgentProfileSelection } from './agent-profile'
+import { profileFixedModel } from './agent-profile-definition'
 
 import { watchdogProfileAdmission, watchdogProfileClaimContext, type ProfileFactoryContext } from './profile-watchdog'
 
@@ -14,7 +15,7 @@ type Query = Pick<Pool | PoolClient, 'query'>
 // Match the fixed-Profile target fence. Inherited/default roles still need the
 // complete preference catalogue; a frozen custom source cannot choose another.
 function profileQuotaCandidates(pool: Pool, scope: { ownerId: string; workspaceId: string }, selection: AgentProfileSelection) {
-  return selection.profileId !== BUILTIN_AGENT_PROFILE_ID && (selection.source === 'explicit' || selection.source === 'decision') && selection.definition.model.mode === 'fixed'
+  return selection.profileId !== BUILTIN_AGENT_PROFILE_ID && (selection.source === 'explicit' || selection.source === 'decision') && profileFixedModel(selection) !== undefined
     ? selectedOrderCandidates(pool, scope, selection.targetEntry) : orderCandidates(pool, scope)
 }
 
@@ -123,7 +124,7 @@ export async function admitProfileSelection(query: Query, input: {
       let routingRepair = false
       if (!same && input.selection && input.factoryContext && !input.factoryContext.runId && previous &&
           source.agentDefinition.modelDispatch?.mode === 'preference' &&
-          source.agentDefinition.agentProfile.definition.model.mode === 'inherit' &&
+          !profileFixedModel(source.agentDefinition.agentProfile) &&
           !source.stopRequestedAt && ['succeeded', 'failed', 'stopped'].includes(source.status) && input.model &&
           MODEL_ROUTING_TIERS.indexOf(modelTier(input.model)) > MODEL_ROUTING_TIERS.indexOf(previous.tier) &&
           isDeepStrictEqual({ ...source.agentDefinition.agentProfile, targetEntry: undefined }, { ...input.selection, targetEntry: undefined })) {

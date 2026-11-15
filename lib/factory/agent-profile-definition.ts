@@ -61,6 +61,26 @@ export interface AgentProfileSelection {
   effort?: AgentProfileDefinition['effort']
   targetEntry: OrderEntry
   decision?: DecisionExecution
+  /** Set on every selection made since 2026-11-15 (decision 1630): the Profile
+   * is content only, so a stored model, harness or effort is ignored and the
+   * target came from the task. Older frozen selections omit it and keep the
+   * model fence they were admitted with. */
+  contentOnly?: true
+}
+
+/** A frozen selection's own model pin, if it still has one. Content-only
+ * selections never pin a model or harness, whatever their stored row says. */
+export function profileFixedModel(selection: Pick<AgentProfileSelection, 'definition' | 'contentOnly'> | null | undefined) {
+  return selection && !selection.contentOnly && selection.definition.model.mode === 'fixed' ? selection.definition.model : undefined
+}
+export function profileHarness(selection: Pick<AgentProfileSelection, 'definition' | 'contentOnly'> | null | undefined) {
+  return selection && !selection.contentOnly && selection.definition.harness !== 'auto' ? selection.definition.harness : undefined
+}
+/** What a person saves: the name, description, instructions and Skills. The
+ * model fields stay in the schema only so older stored rows still parse. */
+export function contentOnlyAgentProfile(definition: AgentProfileDefinition): AgentProfileDefinition {
+  const { effort: _effort, ...rest } = definition
+  return { ...rest, roles: [], harness: 'auto', model: { mode: 'inherit' } }
 }
 export type AgentProfileErrorDetail = ProfileDecisionFailure
   | 'checking' | 'quota' | 'expired' | 'paused' | 'missing' | 'removed' | 'model_gone' | 'key_refused' | 'balance' | 'provider_unavailable'

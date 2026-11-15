@@ -11,7 +11,7 @@ import { apiKeyHarnesses } from './model-api-key-providers'
 import { hasStaleOfficialAllowance, shownSubscriptionAvailability, subscriptionAvailability } from './subscription-quota'
 import { providerHealthStates, providerSourceKey } from './model-provider-health'
 import {
-  agentsByOffer, defaultOrderByAgent, deviceModel, dispatchOrder, entryKey, latestDefaultCandidates, offerKey, onPreferredAgent, placeStage, planDispatch, whyNoDevice,
+  agentsByOffer, defaultOrderByAgent, deviceModel, dispatchOrder, entryKey, latestDefaultCandidates, offerKey, placeStage, planDispatch, whyNoDevice,
   type CredentialState, type DeviceStage, type NoDeviceWhy, type OrderCandidate, type OrderEntry, type OrderHarness, type PoolDevice, type RunLocation,
 } from './model-order-plan'
 
@@ -160,13 +160,9 @@ export async function readOrder(query: Query, scope: OrderScope, candidates?: (O
   if (!settings.customized) {
     const available = latestDefaultCandidates(candidates ?? await orderCandidates(query, scope))
     const defaults = defaultOrderByAgent(available, settings.preferredHarness)
-    // Include lighter reported models from the default credentials without
-    // silently adding a different paid key. Turning routing off restores each
-    // Agent's default list; saved lists remain exactly as set.
-    const sources = new Set(defaults.map(item => `${item.source.kind}:${sourceId(item)}`))
-    const extra = settings.autoModelRouting ? onPreferredAgent(available, settings.preferredHarness)
-      .filter(item => sources.has(`${item.source.kind}:${sourceId(item)}`)) : []
-    const list = [...new Map([...defaults, ...extra].map(item => [entryKey(item), item])).values()]
+    // Each Agent's default list. The lighter models it once added for the
+    // retired difficulty routing are no longer included (decision 2026-11-15-1630).
+    const list = [...new Map(defaults.map(item => [entryKey(item), item])).values()]
     // The entry is also frozen in a run's JSONB definition. Keep the NUL-separated
     // identity key in memory, but give its opaque row id a stable JSONB-safe form.
     return { ...settings, entries: list.map(item => ({ id: `default:${encodeURIComponent(entryKey(item))}`, harness: item.harness, model: item.model, source: item.source })) }
