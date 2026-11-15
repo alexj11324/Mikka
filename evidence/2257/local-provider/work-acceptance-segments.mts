@@ -41,11 +41,14 @@ try {
  await http.ready()
  const owner=await seedUser(independent,'e-owner'),member=await seedUser(independent,'e-member')
  const ws=await seedWorkspace(independent,owner,[{userId:owner,role:'admin'},{userId:member,role:'member'}])
- const issueId=await seedIssue(independent,owner,ws.id,{registered:true})
- await independent.query('UPDATE issues SET content=$2 WHERE id=$1',[issueId,{type:'doc',attrs:{mikka:{number:1}}}])
  const bot=await seedBot(independent,ws.id,owner,'Report desk')
  const brief='Assess the colour of a clear daytime sky for the team.'
- await independent.query('UPDATE issues SET title=$2,content=$3 WHERE id=$1',[issueId,'Daytime sky observation',{type:'doc',attrs:{mikka:{number:1,delegateSelection:'dispatch'}},content:[{type:'paragraph',content:[{type:'text',text:brief}]}]}])
+ const {withTaskWorkspace}=await import('../../lib/task-workspace')
+ const {db}=await import('../../lib/db')
+ const {createIssueForUserInTransaction}=await import('../../lib/issue-create')
+ const {userActor}=await import('../../lib/activity-actor')
+ const created=await withTaskWorkspace(owner,ws.id,()=>db.transaction(tx=>createIssueForUserInTransaction(tx,owner,{title:'Daytime sky observation',content:{type:'doc',content:[{type:'paragraph',content:[{type:'text',text:brief}]}]},priority:'normal',status:'todo'},userActor(owner),{workspaceId:ws.id})))
+ assert.ok(created?.id);const issueId=created.id
  const remote='https://github.com/octo/fixture.git'
  await independent.query(`insert into devices(id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) values($1,$2,'Synthetic CI Linux','local','laptop',true,now(),$3)`,[deviceId,owner,JSON.stringify([{harness:'claude_code',installed:true,toolApproval:true}])])
  await independent.query(`insert into agents(id,"userId","deviceId",harness,name) values($1,$2,$3,'claude_code','Synthetic CPU model')`,[agentId,owner,deviceId])
