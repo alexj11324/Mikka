@@ -41,6 +41,7 @@ test('environment settings GET keeps canonical storage, fresh membership and pri
     '@/app/actions/billing': ['cardVerificationStatus', 'getBilling', 'getCreditBilling'],
     '@/app/actions/audit-log': ['listAuditLog'], '@/app/actions/model-order': ['getModelOrder'],
     '@/app/actions/bots': ['listBots', 'listWorkspaceBots'], '@/app/actions/model-api-keys': ['getApiKeys'],
+    '@/app/actions/thread-title-settings': ['getThreadTitleSettings'],
   })) mocks.push(mock.module(module, { namedExports: Object.fromEntries(names.map(name => [name, unexpected])) }))
   const store = await import('../lib/project-resources/store')
   const environment = await store.saveEnvironment(owner, { workspaceId: workspace.id, name: 'Canonical environment', configuration: { setup: { copyFiles: [], command: 'node --version', approved: true } } })
