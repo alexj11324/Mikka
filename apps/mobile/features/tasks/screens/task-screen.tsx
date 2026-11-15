@@ -58,7 +58,7 @@ export function TaskScreen() {
   const progress = conversations ? taskFactoryProgress(receipts) : []
   const activity = data ? activityEntries(
     conversations ? data.activity.filter(item => item.kind === 'created') : data.activity,
-    [...data.timeline ?? [], ...(conversations ? receipts.filter(item => item.kind === 'evidence') : receipts)],
+    [...data.timeline ?? [], ...receipts],
   ) : []
 
   // Only the authorized Task detail can match a link to one of its runs.

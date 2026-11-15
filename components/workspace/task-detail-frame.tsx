@@ -1,6 +1,6 @@
 'use client'
 
-import { taskWorkOwner } from '@/lib/issue-metadata'
+import { githubPullRequestKey, taskWorkOwner } from '@/lib/issue-metadata'
 
 import { useRef, useState, type ComponentType, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import useSWR from 'swr'
@@ -11,6 +11,7 @@ import { TaskAttachments } from './task-attachments'
 import type { TaskActivityGlyph, TaskActivityItem, TaskDetailFrameProps, TaskDetailRow, TaskMenuItem, TaskSubtask } from '@/components/slots/task-detail-contract'
 import { useIssueTeam } from '@/components/teams/issue-team-control'
 import { formatDateOnly } from '@/lib/date-only'
+import { withBasePath } from '@/lib/base-path'
 import { taskProjectOptions } from '@/lib/task-project-options'
 import { useActionError } from '@/lib/use-action-error'
 import type { IssueDetailNavigation } from './issue-detail-header'
@@ -31,11 +32,48 @@ import { runResult, useRunResultLabel } from '@/hooks/use-run-result'
 import { pullLabel } from '@/lib/issue-activity'
 import { ThreadStatusIcon } from './thread-status-icon'
 import type { IssueDiscussions } from './issue-editor'
-import { chronologicalActivity, taskActivityThreads, taskDiscussionEvents } from '@/lib/task-activity-timeline'
+import { chronologicalActivity, pullRequestActivityEvents, taskActivityThreads, taskDiscussionEvents, type PullRequestActivitySource } from '@/lib/task-activity-timeline'
 import type { ActivityVersion } from '@/lib/issue-activity'
 import { PullRequestStatus } from './issue-pull-request-link'
 
 type Issue = IssueView
+
+type PullRequestStatusPayload = {
+  viewerId: string
+  url: string
+  state: 'open' | 'closed' | 'merged'
+  title: string | null
+  createdAt: string | null
+  mergedAt: string | null
+}
+
+function isPullRequestStatusPayload(value: unknown): value is PullRequestStatusPayload {
+  if (!value || typeof value !== 'object') return false
+  const item = value as Record<string, unknown>
+  return typeof item.viewerId === 'string' && typeof item.url === 'string'
+    && (item.state === 'open' || item.state === 'closed' || item.state === 'merged')
+    && (item.title === null || typeof item.title === 'string')
+    && (item.createdAt === null || typeof item.createdAt === 'string')
+    && (item.mergedAt === null || typeof item.mergedAt === 'string')
+}
+
+async function pullRequestTimelineFetcher(key: readonly [string, string, string, string]) {
+  const [, viewerId, issueId, serializedUrls] = key
+  const urls: unknown = JSON.parse(serializedUrls)
+  if (!Array.isArray(urls) || !urls.every(url => typeof url === 'string')) return { items: [] as PullRequestActivitySource[], failed: true }
+  const results = await Promise.all(urls.map(async url => {
+    try {
+      const response = await fetch(withBasePath('/api/github/pull-request-status'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store', body: JSON.stringify({ issueId, url }),
+      })
+      if (!response.ok) return null
+      const value: unknown = await response.json()
+      if (!isPullRequestStatusPayload(value) || value.viewerId !== viewerId || value.url.replace(/\/$/, '').toLowerCase() !== url.replace(/\/$/, '').toLowerCase()) return null
+      return { url: value.url, title: value.title, state: value.state, createdAt: value.createdAt, mergedAt: value.mergedAt } satisfies PullRequestActivitySource
+    } catch { return null }
+  }))
+  return { items: results.filter((item): item is PullRequestActivitySource => item !== null), failed: results.some(item => item === null) }
+}
 
 /** Data and commands the shared Task controller supplies to the official renderer. */
 export type FramedTaskProps = {
@@ -133,6 +171,11 @@ export function FramedTask(props: FramedTaskProps) {
   const busy = locked || metadata.pending
   const meta = task.metadata
   const pullRequests = presentation.data?.pullRequests ?? meta.pullRequests
+  const pullRequestUrls = pullRequests.map(pr => pr.url)
+  const pullRequestTimeline = useSWR(
+    !preview && pullRequestUrls.length ? ['issue-pull-request-timeline', userId, task.id, JSON.stringify(pullRequestUrls)] as const : null,
+    pullRequestTimelineFetcher,
+  )
 
   // The human assignment picker and the execution delegate keep their independent write authority.
   const workOwner = taskWorkOwner(meta)
@@ -274,27 +317,42 @@ export function FramedTask(props: FramedTaskProps) {
   const discussions = useRef<IssueDiscussions | null>(null)
   const drafts = useActivityDrafts(task.id,
     (body, operationId) => discussions.current ? discussions.current.onComment(body, operationId) : false,
-    (id, body, operationId) => discussions.current ? discussions.current.onReply(id, body, operationId) : false,
+    (id, body, operationId) => {
+      const current = discussions.current
+      if (!current) return false
+      // A physical discussion may contain more than one stage card. Old renderers still submit its thread ID.
+      if (current.threads.some(thread => thread.id === id)) return current.onReply(id, body, operationId)
+      const stage = presentation.data?.factoryStageComments?.find(source => `discussion:${source.threadId}:${source.messageId}` === id)
+      return stage ? current.onReply(stage.threadId, body, operationId, stage.messageId) : false
+    },
     props.discussionSave)
   // Every row says how long ago, as Capy's log does; the date and time is the tooltip. `now` ticks once a minute: a comment sent since reads 「现在」.
   const time = (at: string) => format.relativeTime(new Date(Math.min(Date.parse(at), now.getTime())), now)
   const exact = (at: string) => format.dateTime(new Date(at), { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  const pullRequestEvents = pullRequestActivityEvents(pullRequestTimeline.data?.items ?? [], {
+    opened: (repo, number, title) => tActivity('timelinePullOpened', { repo, number, title }),
+    merged: (repo, number, title) => tActivity('timelinePullMerged', { repo, number, title }),
+    time,
+  })
+  const reportedMerges = new Set(pullRequestEvents.filter(event => event.id.endsWith(':merged')).map(event =>
+    githubPullRequestKey(event.id.slice('pull:'.length, -':merged'.length))))
   const activityItems = (current: IssueDiscussions, expandReplies = false, additional: readonly TaskActivityItem[] = []): TaskActivityItem[] => {
     const anchors = new Map(current.anchors.map(anchor => [anchor.id, anchor.excerpt]))
-    const threads = taskActivityThreads(current.threads, presentation.data?.factoryStageComments ?? [])
-    const byId = new Map(threads.map(thread => [thread.id, thread]))
-    const excerpt = (id: string) => id.startsWith('discussion-') ? null : anchors.get(id) ?? tActivity('anchorRemoved')
-    const comments: TaskActivityItem[] = expandReplies
-      ? taskDiscussionEvents(threads).map(fact => {
-        const thread = byId.get(fact.threadId)!
-        return { kind: 'comment', id: fact.id, at: fact.at, thread, time, exact, excerpt: excerpt(thread.id),
-          message: { record: { id: fact.messageId, body: fact.body, author: fact.author, at: fact.at }, first: fact.kind === 'comment', last: fact.messageId === thread.messages.at(-1)?.id } }
-      })
-      : threads.map(thread => ({ kind: 'comment', id: thread.id, at: thread.createdAt, thread, time, exact, excerpt: excerpt(thread.id) }))
-    const history = eventsFor([...comments, ...additional])
+    const groups = taskActivityThreads(current.threads, presentation.data?.factoryStageComments ?? [])
+    const comments: TaskActivityItem[] = groups.flatMap((group): TaskActivityItem[] => {
+      const { thread } = group
+      const excerpt = group.actor || thread.id.startsWith('discussion-') ? null : anchors.get(thread.id) ?? tActivity('anchorRemoved')
+      if (!expandReplies) return [{ kind: 'comment', id: group.id, actor: group.actor, at: thread.createdAt, thread, time, exact, excerpt }]
+      return taskDiscussionEvents(group).map(fact => ({
+        kind: 'comment', id: fact.id, actor: fact.actor, at: fact.at, thread, time, exact, excerpt,
+        message: { record: { id: fact.messageId, body: fact.body, author: fact.author, at: fact.at }, first: fact.kind === 'comment', last: fact.messageId === thread.messages.at(-1)?.id },
+      }))
+    })
+    const history = eventsFor([...comments, ...additional]).filter(item =>
+      item.pullAction !== 'merged' || !item.pullHref || !reportedMerges.has(githubPullRequestKey(item.pullHref)))
     return chronologicalActivity<TaskActivityItem>([
       ...history.map((item): TaskActivityItem => ({ kind: 'event', id: `history:${item.id}`, at: item.at, who: item.actor?.name || (item.actor?.type === 'system' ? t('work.system') : item.actor?.type === 'agent' ? t('work.agent') : null), mark: item.actor?.name ? (item.actor.type === 'agent' ? { kind: 'node', node: <AgentSphere name={item.actor.name} compact /> } : { kind: 'person', name: item.actor.name }) : undefined, text: item.text, parts: item.parts, time: item.time, exact: item.exact, actor: item.pullAction === 'merged' || !item.actor ? null : item.actor.type === 'agent' ? 'agent' : 'person', glyph: glyphOf(item) })),
-      ...comments, ...additional,
+      ...comments, ...additional, ...pullRequestEvents,
     ])
   }
 
@@ -330,7 +388,7 @@ export function FramedTask(props: FramedTaskProps) {
     subtasks={preview ? null : { items: subtasks, done: subtasks.filter(item => item.done).length, total: subtasks.length, onCreate: connections.error ? async () => false : menu.createChild, disabled: locked || connections.pending || Boolean(connections.error), failed: connections.error ? { text: tRelations('readFailedRetry'), retry: () => { void connections.mutate() } } : null }}
     activity={preview ? null : {
       items: activityItems, timeline: (current, additional) => activityItems(current, true, additional),
-      failed: [...props.historyFailed ? [{ text: tDetail('activityFailed'), retry: props.historyFailed }] : [], ...props.agentActivity.failed ? [{ text: props.agentActivity.failed.label, retry: props.agentActivity.failed.retry }] : []],
+      failed: [...props.historyFailed ? [{ text: tDetail('activityFailed'), retry: props.historyFailed }] : [], ...props.agentActivity.failed ? [{ text: props.agentActivity.failed.label, retry: props.agentActivity.failed.retry }] : [], ...pullRequestTimeline.data?.failed ? [{ text: tActivity('timelinePullFailed'), retry: () => { void pullRequestTimeline.mutate() } }] : []],
       drafts, subscribed: menu.subscribed, onSubscribe: menu.toggleSubscribed, subscribeLabel: menu.subscribed ? tFrame('unsubscribe') : tFrame('subscribe'),
     }}
     rows={rows}
@@ -348,7 +406,7 @@ function glyphOf(item: ActivityEventItem): TaskActivityGlyph {
     case 'status': return item.status ? { kind: 'status', value: item.status } : { kind: 'event', value: 'edit' }
     case 'priority': return item.priority ? { kind: 'priority', value: item.priority } : { kind: 'event', value: 'edit' }
     case 'created': return { kind: 'event', value: 'created' }
-    case 'title': case 'description': return { kind: 'event', value: 'edit' }
+    case 'title': case 'description': case 'dueDateChanged': case 'projectChanged': case 'estimateChanged': return { kind: 'event', value: 'edit' }
     case 'assigned': case 'unassigned': return { kind: 'event', value: 'assignee' }
     case 'parent': case 'subtask': return { kind: 'event', value: 'hierarchy' }
     case 'relation': return { kind: 'event', value: item.relation === 'related' ? 'related' : 'blocked' }

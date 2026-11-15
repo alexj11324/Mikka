@@ -11,11 +11,12 @@ const browser = new Window({ url: 'https://mikka.example/mikka' })
 const noop = () => {}
 const translate = Object.assign(key => key, { has: () => true })
 const stub = (path, namedExports) => mock.module(new URL('../' + path, import.meta.url).href, { namedExports })
-let teamId, response, issue, child, frame, teamWrites, favoriteDenied, saveMetadata, createChild, connectionsError, moves, reads, optionsRead
+let timeline, timelineHistory, teamId, response, issue, child, frame, teamWrites, favoriteDenied, saveMetadata, createChild, connectionsError, moves, reads, optionsRead
 const teams = ['existing', 'another'].map(id => ({ id, identifier: id, name: id }))
 mock.module('next-intl', { namedExports: { useTranslations: () => translate, useMessages: () => ({ IssueDetail: { work: { states: {} } }, GroupTask: { stage: {}, status: {} } }), useFormatter: () => ({ relativeTime: noop, dateTime: date => date.toISOString().slice(0, 10) }), useNow: () => new Date() } })
 mock.module('sonner', { namedExports: { toast: { error: noop, success: noop } } })
 mock.module('swr', { defaultExport: key => {
+  if (key?.[0] === 'issue-pull-request-timeline') return { data: timeline }
   if (key?.[0] === 'issue-property-options') return optionsRead
   if (key === 'teams') return { data: teams }
   if (key?.[0] === 'issue-team') return { data: teamId, mutate: async value => { teamId = value } }
@@ -55,8 +56,8 @@ stub('hooks/use-live-key.tsx', { useLiveKey: noop, useLiveKeys: noop, useLiveSco
 stub('hooks/use-bot-tasks.ts', { localTaskState: () => ({ state: 'todo' }) })
 stub('lib/hooks/use-relation-search.ts', { useRelationSearch: noop })
 stub('lib/use-action-error.ts', { useActionError: () => translate })
-stub('components/workspace/issue-activity-feed.tsx', { useActivityEvents: () => () => [] })
-stub('components/workspace/issue-activity.tsx', { useActivityDrafts: () => ({}) })
+stub('components/workspace/issue-activity-feed.tsx', { useActivityEvents: () => () => timelineHistory ?? [] })
+stub('components/workspace/issue-activity.tsx', { useActivityDrafts: (_id, _comment, onReply) => ({ sendReply: onReply }) })
 stub('components/workspace/issue-threads.tsx', { useIssueThreads: () => ({ data: [{ detail: { agentName: 'Former delegate', bot: { color: 'blue', shape: 'round' } } }] }) })
 stub('components/workspace/issue-metadata-controls.tsx', { useIssueMetadataSave: () => ({ persist: patch => saveMetadata({ patch }) }), IssueMetadataControls: noop, AccessChangeDialog: noop })
 stub('components/workspace/issue-assignee-menu.tsx', { AgentSphere: noop })
@@ -76,6 +77,7 @@ before(async () => {
   ;({ FramedTask } = await import('../components/workspace/task-detail-frame.tsx'))
 })
 beforeEach(() => {
+  timeline = undefined; timelineHistory = []
   issue = { id: 'task', userId: 'owner', title: 'Task', identifier: 'T-1', status: 'todo', revision: 3, scope: 'personal', createdAt: new Date(),
     metadata: metadataSchema.parse({ delegate: { id: 'bot', name: 'Assigned bot', kind: 'bot', image: null } }) }
   child = { ...issue, id: 'child', title: 'Child', revision: 2, metadata: { ...issue.metadata, parentId: issue.id } }
@@ -111,22 +113,51 @@ test('the Pull requests property shows the authorized pull receipts, including a
   }
 })
 
-test('both activity layouts preserve the genuine reply and its target in a mixed Factory thread', async () => {
+test('a provider merge uses its actual time once; the revision remains when the matching provider receipt is absent', async () => {
+  const url = 'https://github.com/Example/repo/pull/5'
+  issue.metadata.pullRequests = [{ url, title: 'Change', state: 'merged' }]
+  const at = '2026-11-14T13:00:00.000Z', mergedAt = '2026-11-14T12:00:00.000Z'
+  timelineHistory = [
+    { id: 'merged-revision', kind: 'pull', at, pullAction: 'merged', pullHref: url.toLowerCase() + '/', text: 'Merged' },
+    { id: 'linked-revision', kind: 'pull', at, pullAction: 'linked', pullHref: url, text: 'Linked' },
+  ]
+  for (const available of [true, false]) {
+    timeline = { items: available ? [{ url, title: 'Change', state: 'merged', createdAt: null, mergedAt }] : [] }
+    const done = await mount()
+    try {
+      const items = frame.activity.items({ threads: [], anchors: [] })
+      assert.deepEqual(items.map(item => [item.id, item.at]), available
+        ? [[`pull:${url}:merged`, mergedAt], ['history:linked-revision', at]]
+        : [['history:linked-revision', at], ['history:merged-revision', at]])
+    } finally { await done() }
+  }
+})
+
+test('both activity layouts show the official Bot comment exactly once and retain the human reply and its original write target', async () => {
   const first = { id: 'stage', at: '2026-11-15T00:00:00Z', author: 'Bot', body: 'Review' }
   const reply = { id: 'genuine', at: '2026-11-15T00:01:00Z', author: 'Alex', body: 'Review' }
-  const discussion = { anchors: [], threads: [{ id: 'factory', author: first.author, createdAt: first.at, resolved: false, messages: [first, reply] }] }
-  const done = await mount({ agentActivity: { items: [], work: { presentation: { factoryStageComments: [{ threadId: 'factory', messageId: 'stage' }] } } } })
+  const writes = []
+  const discussion = { onReply: (...args) => writes.push(args), anchors: [], threads: [{ id: 'factory', author: first.author, createdAt: first.at, resolved: false, messages: [first, reply] }] }
+  const done = await mount({ editor: (_after, activity) => activity(discussion), agentActivity: { items: [], work: { presentation: { factoryStageComments: [{ threadId: 'factory', messageId: 'stage' }] } } } })
   try {
+    frame.description({ afterDescription: null, activity: () => null })
     const folded = frame.activity.items(discussion)
-    assert.deepEqual(folded.map(row => [row.thread.id, row.thread.author, row.at]), [['factory', 'Alex', reply.at]])
+    assert.deepEqual(folded.map(row => [row.actor, row.thread.id, row.thread.author, row.at, row.thread.messages.map(m => m.id)]), [['bot', 'factory', 'Bot', first.at, ['stage', 'genuine']]])
+    frame.activity.drafts.sendReply(folded[0].id, 'Reply to review', 'operation')
+    frame.activity.drafts.sendReply(discussion.threads[0].id, 'Legacy reply', 'legacy')
+    assert.equal(frame.activity.drafts.sendReply('discussion:foreign:stage', 'Unknown target', 'unknown'), false)
+    assert.deepEqual(writes, [['factory', 'Reply to review', 'operation', 'stage'], ['factory', 'Legacy reply', 'legacy']])
     const expanded = frame.activity.timeline(discussion, [])
-    assert.deepEqual(expanded.map(row => [row.id, row.thread.id, row.message.first, row.message.last]), [['discussion:factory:genuine', 'factory', true, true]])
+    assert.deepEqual(expanded.map(row => [row.id, row.actor, row.thread.id, row.message.first, row.message.last]), [
+      ['discussion:factory:stage', 'bot', 'factory', true, false], ['discussion:factory:genuine', undefined, 'factory', false, true],
+    ])
   } finally { await done() }
 })
 
 test('properties link only admitted conversations and show the recorded Factory branch', async () => {
   const opened = []
   const done = await mount({ agentActivity: {
+    items: [],
     threads: [
       { id: 'run', createdAt: '2026-11-14T10:00:00Z', attempts: [], detail: { name: 'Worker review', harness: 'codex' } },
       { id: 'hidden', createdAt: '2026-11-14T10:05:00Z', attempts: [], detail: null },

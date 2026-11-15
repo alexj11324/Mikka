@@ -49,7 +49,7 @@ export type IssueDiscussions = {
   threads: import("@/components/blocks/rich-text-editor-4/components/rich-text-comments").ThreadRecord[]
   anchors: import("@/components/blocks/rich-text-editor-4/components/rich-text-comments").CommentAnchor[]
   onComment: (body: string, operationId?: string) => void | false
-  onReply: (id: string, body: string, operationId?: string) => void | false
+  onReply: (id: string, body: string, operationId?: string, replyToMessageId?: string) => void | false
   onResolve: (id: string, resolved: boolean) => void
   /** Selects the text a discussion is about. */
   onSelect: (id: string) => void
@@ -190,9 +190,9 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
       const now = new Date().toISOString()
       addThread(threadDoc, { id, author, authorUserId, createdAt: now, messages: [{ author, authorUserId, body, at: now }] }, 'issue-discussion')
     },
-    onReply: (id, body, operationId) => {
+    onReply: (id, body, operationId, replyToMessageId) => {
       if (!editable) return false
-      if (!replyToThread(threadDoc, id, { author, authorUserId, body, at: new Date().toISOString(), id: operationId })) return false
+      if (!replyToThread(threadDoc, id, { author, authorUserId, body, at: new Date().toISOString(), id: operationId, ...(replyToMessageId ? { replyToMessageId } : {}) })) return false
     },
     onResolve: (id, resolved) => { if (editable) setThreadResolved(threadDoc, id, resolved) },
     onSelect: id => {

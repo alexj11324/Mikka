@@ -5,7 +5,7 @@ export type IssueActivityEvent = {
   id: string
   at: string
   /** Capy's issue events, as they apply to a task (labels are not an activity event in Capy). */
-  kind: 'created' | 'status' | 'priority' | 'title' | 'description' | 'assigned' | 'unassigned' | 'subtask' | 'parent' | 'relation' | 'pull' | 'unsupported'
+  kind: 'created' | 'status' | 'priority' | 'title' | 'description' | 'assigned' | 'unassigned' | 'subtask' | 'parent' | 'relation' | 'pull' | 'unsupported' | 'dueDateChanged' | 'projectChanged' | 'estimateChanged'
   status?: string
   priority?: string
   title?: string
@@ -13,6 +13,8 @@ export type IssueActivityEvent = {
   targetId?: string
   /** That task's identifier, when the event itself knows it. */
   code?: string
+  dueDate?: string | null
+  estimate?: number | null
   assigneeName?: string
   /** Kept for data: a delegate is said the same way as an assignee, as Capy's assignees include its threads. */
   assignmentTarget?: 'delegate'
@@ -36,10 +38,12 @@ export function chronologicalActivity<T extends { id: string; at: string }>(item
 
 export type FactoryStageComment = { threadId: string; messageId: string }
 
-/** The stage writer shares its Yjs thread with genuine replies. Only its exact
- * message identities belong to Factory progress instead of Task discussion. */
-export function taskActivityThreads(threads: readonly ThreadRecord[], stageComments: readonly FactoryStageComment[]): readonly ThreadRecord[] {
-  if (!stageComments.length) return threads
+type ActivityDiscussion = { id: string; thread: ThreadRecord; actor?: 'bot' }
+
+/** A stage has one Bot-written comment. Older stages share a Yjs thread:
+ * retain the actual reply target; legacy replies follow document order.
+ * Only the recorded source pair identifies a Bot update. */
+export function taskActivityThreads(threads: readonly ThreadRecord[], stageComments: readonly FactoryStageComment[] = []): ActivityDiscussion[] {
   const byThread = new Map<string, Set<string>>()
   for (const { threadId, messageId } of stageComments) {
     const ids = byThread.get(threadId)
@@ -48,15 +52,31 @@ export function taskActivityThreads(threads: readonly ThreadRecord[], stageComme
   }
   return threads.flatMap(thread => {
     const ids = byThread.get(thread.id)
-    if (!ids) return [thread]
-    const messages = thread.messages.filter(message => !ids.has(message.id))
-    if (messages.length === thread.messages.length) return [thread]
-    const first = messages[0]
-    return first ? [{ ...thread, author: first.author, createdAt: first.at, messages }] : []
+    if (!ids || !thread.messages.some(message => ids.has(message.id))) return [{ id: thread.id, thread }]
+    const groups: ActivityDiscussion[] = []
+    const stages = new Map<string, ActivityDiscussion>()
+    for (const message of thread.messages) {
+      const isStage = ids.has(message.id)
+      const target = message.replyToMessageId ? stages.get(message.replyToMessageId) : undefined
+      const previous = target ?? groups.at(-1)
+      if (previous && !isStage) {
+        previous.thread.messages.push(message)
+        continue
+      }
+      const group: ActivityDiscussion = {
+        id: isStage ? `discussion:${thread.id}:${message.id}` : thread.id,
+        thread: { ...thread, author: message.author, createdAt: message.at, messages: [message] },
+        ...(isStage ? { actor: 'bot' } : {}),
+      }
+      groups.push(group)
+      if (isStage) stages.set(message.id, group)
+    }
+    return groups
   })
 }
 
 export type TaskDiscussionEvent = {
+  actor?: 'bot'
   kind: 'comment' | 'reply'
   id: string
   threadId: string
@@ -68,32 +88,60 @@ export type TaskDiscussionEvent = {
   resolved: boolean
 }
 
+export type PullRequestActivitySource = { url: string; title: string | null; createdAt: string | null; mergedAt: string | null; state: 'open' | 'closed' | 'merged' }
+export type PullRequestTimelineEvent = { kind: 'event'; id: string; at: string; who: null; mark: { kind: 'icon'; icon: 'pullRequest' }; text: string; time: string }
+
+/** Build only events whose exact provider timestamps are available; updatedAt is deliberately not a fallback. */
+export function pullRequestActivityEvents(items: readonly PullRequestActivitySource[], labels: {
+  opened: (repo: string, number: string, title: string) => string
+  merged: (repo: string, number: string, title: string) => string
+  time: (at: string) => string
+}): PullRequestTimelineEvent[] {
+  const rows: PullRequestTimelineEvent[] = []
+  const seen = new Set<string>()
+  for (const item of items) {
+    const match = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/([1-9]\d*)\/?$/.exec(item.url)
+    if (!match || seen.has(item.url) || !item.title?.trim()) continue
+    seen.add(item.url)
+    const [, repo, number] = match
+    const validTime = (value: string | null) => value && Number.isFinite(Date.parse(value)) ? value : null
+    const createdAt = validTime(item.createdAt)
+    if (createdAt) rows.push({ kind: 'event', id: `pull:${item.url}:opened`, at: createdAt, who: null, mark: { kind: 'icon', icon: 'pullRequest' }, text: labels.opened(repo, number, item.title), time: labels.time(createdAt) })
+    const mergedAt = item.state === 'merged' ? validTime(item.mergedAt) : null
+    if (mergedAt) rows.push({ kind: 'event', id: `pull:${item.url}:merged`, at: mergedAt, who: null, mark: { kind: 'icon', icon: 'pullRequest' }, text: labels.merged(repo, number, item.title), time: labels.time(mergedAt) })
+  }
+  return rows
+}
+
 export type TaskActivityFact =
   | { kind: 'history'; id: string; at: string; event: IssueActivityEvent }
   | TaskDiscussionEvent
 
 /** Read each discussion from its Yjs identity. Reply/resolve still address
  * that thread; transcript and Factory commands never receive these ids. */
-export function taskDiscussionEvents(threads: readonly ThreadRecord[]): TaskDiscussionEvent[] {
-  return threads.flatMap(thread => thread.messages.map((message, i) => ({
+export function taskDiscussionEvents(discussion: ActivityDiscussion | readonly ThreadRecord[]): TaskDiscussionEvent[] {
+  if (!('thread' in discussion)) return discussion.flatMap(thread => taskDiscussionEvents({ id: thread.id, thread }))
+  const { thread } = discussion
+  return thread.messages.map((message, i) => ({
+    ...(i === 0 && discussion.actor ? { actor: discussion.actor } : {}),
     kind: i === 0 ? 'comment' as const : 'reply' as const,
     id: `discussion:${thread.id}:${message.id}`, threadId: thread.id, messageId: message.id,
     author: message.author, authorId: message.authorUserId ?? null,
     body: message.body, at: message.at, resolved: thread.resolved,
-  })))
+  }))
 }
 
 export function taskActivityFacts(history: readonly IssueActivityEvent[], threads: readonly ThreadRecord[], stageComments: readonly FactoryStageComment[] = []): TaskActivityFact[] {
   return chronologicalActivity<TaskActivityFact>([
     ...history.map(event => ({ kind: 'history' as const, id: `history:${event.id}`, at: event.at, event })),
-    ...taskDiscussionEvents(taskActivityThreads(threads, stageComments)),
+    ...taskActivityThreads(threads, stageComments).flatMap(taskDiscussionEvents),
   ])
 }
 
 type HistoryLabels = Pick<typeof import('../messages/en.json')['Workspace']['activity'],
   'created' | 'createdTask' | 'moved' | 'movedTask' | 'setPriority' | 'renamed' | 'editedDescription' | 'assigned' | 'unassigned' | 'unassignedTask' |
   'someone' | 'setParent' | 'removedParent' | 'aTask' | 'addedSubtask' | 'markedBlockedBy' | 'markedRelated' | 'removedRelation' | 'linked' | 'unlinked' |
-  'merged' | 'unsupported' | 'system' | 'untitledThread'>
+  'merged' | 'unsupported' | 'system' | 'untitledThread' | 'dueDateChanged' | 'dueDateRemoved' | 'projectChanged' | 'projectRemoved' | 'estimateChanged' | 'estimateRemoved'>
 
 /** A sentence is words plus the task, conversation or pull request a word opens. */
 export type ActivityPiece =
@@ -111,7 +159,7 @@ export type RunPreview = { harness?: string; title?: string; result?: string; ti
 export type ActivitySubject = { taskId: string; code: string | null; refs?: Readonly<Record<string, { code: string | null } & TaskPreview>> } & TaskPreview
 
 /** One conversation on this task. `linked` is false when it has no transcript to open. `title` is the conversation's own. */
-export type ActivityStretch = { at: string; runId: string; /** The Agent that ran it, when the read carries it: an Agent's change matches only its own threads. */ agentId?: string | null; linked: boolean } & RunPreview
+export type ActivityStretch = { at: string; runId: string; agentId: string | null; linked: boolean } & RunPreview
 
 export type ActivityLabels = {
   activity: (key: keyof HistoryLabels, values?: Record<string, string>) => string
@@ -177,6 +225,9 @@ export function taskHistoryPieces(event: IssueActivityEvent, labels: ActivityLab
       if (event.pull.action === 'merged') return withChips(t('merged', { pull: SLOT, title: event.pull.title ?? '' }).trim(), [chip])
       return withChips(t(event.pull.action === 'linked' ? 'linked' : 'unlinked', { pull: SLOT }), [chip])
     }
+    case 'dueDateChanged': return words(event.dueDate ? t('dueDateChanged', { date: event.dueDate }) : t('dueDateRemoved'))
+    case 'projectChanged': return words(event.title ? t('projectChanged', { name: event.title }) : t('projectRemoved'))
+    case 'estimateChanged': return words(event.estimate !== null && event.estimate !== undefined ? t('estimateChanged', { estimate: String(event.estimate) }) : t('estimateRemoved'))
     case 'unsupported': return words(t('unsupported'))
   }
 }
@@ -187,24 +238,32 @@ export function taskHistoryLabel(event: IssueActivityEvent, labels: ActivityLabe
 }
 
 /**
- * The conversation that had already started when this Agent change happened: the last one, as Capy names the thread
- * that made the change. A person's change, an unmatched Agent and a conversation with no transcript match nothing.
+ * The uniquely matching Agent stretch at the event time. Issue versions store actor identity,
+ * not a run id; if time would have to choose among this Agent's runs, keep the name plain.
  */
 export function activityStretch(at: string, actor: { type?: string | null; id?: string | null } | null | undefined, stretches: readonly ActivityStretch[]): ActivityStretch | null {
-  if (actor?.type !== 'agent') return null
+  if (actor?.type !== 'agent' || !actor.id) return null
   const time = Date.parse(at)
   if (Number.isNaN(time)) return null
-  // Issue history stores who changed it, not which run: an Agent's change matches only its own threads that had
-  // started, and when more than one could have made it the thread is not guessed (fail closed, as main's #2538 rule).
-  const candidates = stretches.filter(stretch => {
-    const started = Date.parse(stretch.at)
-    return stretch.linked && !Number.isNaN(started) && started <= time
-      && (!actor.id || stretch.agentId === undefined || stretch.agentId === null || stretch.agentId === actor.id)
-  })
-  return candidates.length === 1 ? candidates[0] : null
+  const ordered = stretches.map(stretch => ({ stretch, time: Date.parse(stretch.at) }))
+    .filter(item => Number.isFinite(item.time))
+    .sort((a, b) => a.time - b.time || a.stretch.runId.localeCompare(b.stretch.runId))
+  let active = -1
+  for (let index = 0; index < ordered.length; index += 1) {
+    if (ordered[index].time <= time) active = index
+    else break
+  }
+  if (active < 0) return null
+  // Equal start times or multiple preceding stretches for the same actor leave the run ambiguous.
+  if ((active > 0 && ordered[active - 1].time === ordered[active].time) ||
+      (active + 1 < ordered.length && ordered[active + 1].time === ordered[active].time)) return null
+  const candidate = ordered[active].stretch
+  if (!candidate.linked || candidate.agentId !== actor.id) return null
+  const actorMatches = ordered.filter(item => item.time <= time && item.stretch.agentId === actor.id)
+  return actorMatches.length === 1 ? candidate : null
 }
 
-export function activityRunId(at: string, actor: { type?: string | null } | null | undefined, stretches: readonly ActivityStretch[]): string | null {
+export function activityRunId(at: string, actor: { type?: string | null; id?: string | null } | null | undefined, stretches: readonly ActivityStretch[]): string | null {
   return activityStretch(at, actor, stretches)?.runId ?? null
 }
 
@@ -227,8 +286,6 @@ export function activityLineParts(
     const stretch = activityStretch(event.at, actor, stretches)
     lead = stretch
       ? { kind: 'thread', text: stretch.title || t('untitledThread'), runId: stretch.runId, ...defined({ harness: stretch.harness, title: stretch.title, result: stretch.result, time: stretch.time }) }
-      // No thread to name, or more than one that could have made it: an untitled thread, never a guessed link
-      // and never the Agent's name as the actor (Alex: a change is said by its thread).
       : { kind: 'text', text: t('untitledThread'), name: true }
   } else if (actor?.type === 'user' && actor.name) lead = { kind: 'text', text: actor.name, name: true }
   else lead = { kind: 'text', text: t('system'), name: true }
