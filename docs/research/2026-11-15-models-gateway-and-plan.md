@@ -143,7 +143,7 @@ Capy 套餐里的「cloud machines」对应的是第三种：跑线程的云端 
 
 | | Free | Mikka Lite |
 | --- | --- | --- |
-| 价格 | $0 | $20/月，年付 $16/月 |
+| 价格 | $0 | $20/月（只有月付） |
 | 每月 Mikka 额度 | 无 | $20，当月有效，不结转 |
 | 模型 | 自带订阅和 key；充值后可用网关上全部模型 | 同左，每月带 $20 |
 | 线程机器 | 只用自己的电脑；充值后可用 Cloudflare 编程机器，按小时扣额度 | Cloudflare 编程机器，按小时扣额度，有并发上限 |
@@ -155,7 +155,7 @@ Capy 套餐里的「cloud machines」对应的是第三种：跑线程的云端 
 - 所以现在的「20 条免费消息」和「验证银行卡送 $1」都去掉。
 - 不收 Capy 那种按 token 的团队费。
 - Cloudflare 编程机器要从「Mikka 付费、名单放开」改成「按小时扣额度、有额度就能用」，并定一个小时价（参照 Capy：Large $0.40/小时）。
-- Stripe 上要新建一个 $20/月和一个 $192/年的价格，挂到现有的 `STRIPE_TEAM_RESOURCE_PRICE_ID` 那条套餐链路上（`metadata.mikka_monthly_points = 2000`）。这一步需要 Stripe 账户的权限，这个会话里没有。
+- Stripe：Mikka Pro $20/月已建（`price_1UcAlnLiChExGYzi2iAArOam`），只有月付。
 
 ### 3.7 引导：affectUI 的四步，内容对齐 Capy
 
