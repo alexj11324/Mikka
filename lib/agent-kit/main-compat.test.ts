@@ -288,7 +288,7 @@ function cloudQueueFixture(instructions='Review',priorRun?:Record<string,unknown
    if(sql==='SELECT subscriptions FROM workspace_personal_policies WHERE "workspaceId"=$1'){
     assert.deepEqual(args,[workspace]);return fixtureRows([])
    }
-   const keyColumns='id,"ownerId",provider,name,"baseUrl",protocol,last4,models,"modelsError","responsesApi"'
+   const keyColumns='id,"ownerId",provider,name,"baseUrl",protocol,last4,models,"modelsError","responsesApi",features'
    if(sql===`SELECT ${keyColumns},to_jsonb(model_api_keys)->'modelSettings' AS "modelSettings" FROM model_api_keys WHERE "ownerId"=$1 ORDER BY "createdAt",id`){
     assert.deepEqual(args,[owner]);return fixtureRows([])
    }
