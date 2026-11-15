@@ -523,6 +523,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
         ...(settings?.networkAllow ? { networkAllow: settings.networkAllow } : {}) }).data : undefined
     return NextResponse.json({
     ...publication,
+    acceptsModelObservations: true,
     ...(initialRepository ? { repo: initialRepository } : {}),
     // Profile Skills: the frozen pinned bodies for the owner's daemon and the
     // repository names it pins from its own checkout. Only the daemon sees the

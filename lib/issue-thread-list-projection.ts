@@ -34,8 +34,8 @@ export function issueThreadListText(viewerId: string) {
   return {
     failureDetails: runFailureBrief,
     observedModel: sql<string | null>`case when ${agentRuns.userId}=${viewerId}
-      and jsonb_typeof(${agentRuns.report}#>'{runtime,observedModel}')='string'
-      then nullif(left(${agentRuns.report}#>>'{runtime,observedModel}',500),'') end`,
+      then coalesce(${agentRuns.observedModel}, case when jsonb_typeof(${agentRuns.report}#>'{runtime,observedModel}')='string'
+        then nullif(left(${agentRuns.report}#>>'{runtime,observedModel}',500),'') end) end`,
     name: sql<string>`case when ${agentRuns.userId}=${viewerId} then coalesce(${agentRuns.title}, ${title}, ${runBotName}) else '' end`,
     summary: sql<string | null>`case when ${agentRuns.userId}=${viewerId} then ${summary} end`,
   }
