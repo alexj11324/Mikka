@@ -1,0 +1,132 @@
+name: Post-merge Bot ordering, preference and native directory
+on:
+  push:
+    branches: [evidence/2254-sidebar-85dfc396]
+    paths: [.github/workflows/e-postmerge-bot-read.yml]
+permissions:
+  contents: read
+env:
+  # Existing accounting/admission suites exercise the hosted deployment.
+  # The self-hosted image workflow separately runs the default community mode.
+  MIKKA_EDITION: cloud
+  # A cache restore that fails (e.g. the account's cache egress limit) would
+  # otherwise hang for actions/cache's 10-minute default before falling back
+  # to a normal install, which outlasts the short jobs' own timeouts.
+  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+  # Ephemeral CI registration fixtures share one loopback IP. Keep finite
+  # limits while leaving the production defaults at 5 signups/IP/hour.
+  MIKKA_SIGNUP_IP_HOURLY: '1000'
+  MIKKA_SIGNUP_GLOBAL_HOURLY: '10000'
+  MIKKA_VERIFICATION_IP_HOURLY: '1000'
+  MIKKA_VERIFICATION_GLOBAL_HOURLY: '10000'
+
+jobs:
+  exact-branch:
+    name: ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: bot-children-2276
+            source: e52a959ea214f33e95ed724fc440fafe5fe59cc7
+            tree: b5dbe97e36949bb61116c2315eaebe40afe70453
+    if: github.repository == 'alexj11324/Mikka'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 24
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-local-only
+          POSTGRES_DB: mikka_e2e
+          # Parallel full-schema DROP CASCADE needs more than PG17's default
+          # cluster-wide lock table. This applies only to the disposable service.
+          POSTGRES_INITDB_ARGS: --set=max_locks_per_transaction=512
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d mikka_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: 'true'
+      REQUIRE_DB: '1'
+      MIKKA_TEST_DB_PORT: '5432'
+      E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      BETTER_AUTH_URL: http://localhost:3100
+      MIKKA_TEST_DEPLOYMENT_SHA: ${{ matrix.source }}
+      MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ matrix.source }}
+          persist-credentials: false
+      - name: Verify the immutable original branch and source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MIKKA_TEST_DEPLOYMENT_SHA"
+          test "$(git rev-parse 'HEAD^{tree}')" = ${{ matrix.tree }}
+          test -z "${DB_TEST_SELECTED+x}" && test -z "${DB_TEST_SHARD+x}"
+          mkdir -m 700 "$RUNNER_TEMP/baseline-db-receipt"
+          git rev-parse HEAD > "$RUNNER_TEMP/baseline-db-receipt/source"
+      - uses: ./.github/actions/pnpm-install
+      - name: Generate ephemeral test-only auth secret
+        run: |
+          node --input-type=commonjs - <<'NODE'
+          const { appendFileSync, writeSync } = require('node:fs')
+          const secret = require('node:crypto').randomBytes(32).toString('hex')
+          writeSync(1, `::add-mask::${secret}\n`)
+          appendFileSync(process.env.GITHUB_ENV, `BETTER_AUTH_SECRET=${secret}\n`)
+          NODE
+      - run: pnpm test:e2e:setup
+      - name: Bind the disposable PostgreSQL and identities to the exact public commit
+        run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
+      - name: Exercise the original named product tests
+        shell: bash
+        env:
+          QUALIFICATION: ${{ matrix.label }}
+          RUN_DISPATCH_DB_TESTS: '1'
+          MIKKA_EDITION: cloud
+          NODE_ENV: test
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/baseline-db-receipt"
+          date -u +%FT%TZ > "$dir/start"
+          git rev-parse HEAD > "$dir/source"
+          git rev-parse 'HEAD^{tree}' > "$dir/tree"
+          files=(tests/conversation-title.db.test.ts lib/live/chat-preferences.db.test.ts tests/settings-preferences.db.test.ts components/workspace/conversation-directory-archive.test.tsx components/nav/bot-work-tree.test.ts)
+          native=apps/mobile/tests/conversation-directory-read.test.mts
+          printf '%s\n' "${files[@]}" "$native" > "$dir/inputs"
+          set +e
+          node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-concurrency=1 --test-reporter=tap "${files[@]}" >"$RUNNER_TEMP/core.tap" 2>&1
+          core=$?
+          TSX_TSCONFIG_PATH=apps/mobile/tsconfig.json node --experimental-test-module-mocks --import tsx --test --test-reporter=tap "$native" >"$RUNNER_TEMP/mobile.tap" 2>&1
+          mobile=$?
+          cat "$RUNNER_TEMP/core.tap" "$RUNNER_TEMP/mobile.tap" >"$RUNNER_TEMP/original.tap"
+          test "$core" = 0 && test "$mobile" = 0
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > "$dir/exit-code"
+          date -u +%FT%TZ > "$dir/end"
+          sed -nE '/^# (tests|pass|fail|cancelled|skipped|todo|duration_ms) /p; /^[[:space:]]*(not )?ok [0-9]+/p' "$RUNNER_TEMP/original.tap" > "$dir/named-results.tap"
+          cat "$dir/named-results.tap"
+          if [ "$rc" != 0 ]; then
+            sed -nE '/ERR_MODULE_NOT_FOUND|ERR_ASSERTION|Cannot find module|SyntaxError|not ok|ReferenceError|TypeError/p' "$RUNNER_TEMP/original.tap" | cut -c1-230 | head -45 || true
+          fi
+          test "$rc" = 0
+          grep -Eq '^# tests [1-9][0-9]*$' "$dir/named-results.tap"
+          grep -qx '# skipped 0' "$dir/named-results.tap"
+          grep -qx '# fail 0' "$dir/named-results.tap"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: ${{ matrix.label }}-exact
+          path: ${{ runner.temp }}/baseline-db-receipt
+          retention-days: 7
+          if-no-files-found: error
