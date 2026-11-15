@@ -201,3 +201,14 @@ test('native task activity interleaves discussion and history facts with runs, o
   assert.deepEqual(activityEntries(activity, [history, discussion]).map(activityEntryId), ['discussion:t:m2', 'history:created-v1', 'run:a'])
   assert.deepEqual(activityEntries(activity).map(activityEntryId), ['created', 'run:a'])
 })
+
+test('Native Activity keeps canonical Bot progress as a real comment once while the transition stays in Factory progress', () => {
+  const at = '2026-11-15T00:00:00Z'
+  const bot = { kind: 'comment' as const, actor: 'bot' as const, id: 'discussion:f:s', threadId: 'f', messageId: 's', at, author: 'Coordinator', authorId: null, body: 'Ready for review', resolved: false }
+  const reply = { ...bot, actor: undefined, kind: 'reply' as const, id: 'discussion:f:h', messageId: 'h', author: 'Ada' }
+  const gate = { kind: 'factory_gate' as const, id: 'gate:f:raw', factoryTaskId: 'f', sourceId: 'raw', at, revision: 7,
+    stage: 'review', status: 'pending', attemptId: null, runId: null, candidateId: null }
+  const result = activityEntries([], [gate, bot, reply])
+  assert.deepEqual(result.map(activityEntryId), ['discussion:f:h', 'discussion:f:s'])
+  assert.equal(result.find(item => item.kind === 'comment'), bot)
+})

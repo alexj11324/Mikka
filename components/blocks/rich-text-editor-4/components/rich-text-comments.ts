@@ -313,6 +313,7 @@ export function replyToThread(
   // The writer's client id keeps two replies sent apart (offline) distinct.
   const messageId = message.id ?? `${id}-${doc.clientID}-${messages.length + 1}`
   if (message.id && messages.toArray().some(item => item.id === messageId)) return true
+  if (message.replyToMessageId && !messages.toArray().some(item => item.id === message.replyToMessageId)) return false
   doc.transact(() => messages.push([{ ...message, id: messageId }]), origin)
   return true
 }
