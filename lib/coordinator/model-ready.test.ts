@@ -61,11 +61,12 @@ test('Claude and ChatGPT choices enable only their authorized bot without a serv
   assert.equal(await botModelReady('alice', 'other-bot'), false)
 })
 
-test('an explicit default stays unavailable even with a connected subscription', async () => {
+test('a former 「Mikka 默认」 row is no choice and follows the connected subscription; a withdrawn one with nothing left is not ready', async () => {
+  // 「Mikka 默认」 is gone (decision 2026-11-15-1900): its saved rows read as no choice, and no choice uses the person's own connection.
   rows = [subscription()]; selected = HOSTED_CHOICE
-  assert.equal(await botModelReady('alice', botId), false)
+  assert.equal(await botModelReady('alice', botId), true)
   selected = null
-  assert.equal(await botModelReady('alice', botId), false)
+  assert.equal(await botModelReady('alice', botId), true)
   selected = 'withdrawn-binding'; rows = []
   assert.equal(await botModelReady('alice', botId), false)
 })
