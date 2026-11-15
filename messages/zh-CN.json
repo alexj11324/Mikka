@@ -7971,6 +7971,10 @@
       "delete": "删除",
       "deleteTitle": "删除这个自动化？",
       "deleteBody": "过去的运行和任务会保留。",
+      "takeOver": "接手",
+      "takeOverTitle": "接手这个自动化？",
+      "takeOverBody": "接手后它以你的身份运行：用你的权限和你的 Bot，运行报告发给你。{name} 不再是它的创建者。还没开始的运行会取消。",
+      "tookOver": "已接手",
       "cancel": "取消",
       "notFound": "自动化不存在或已删除",
       "missing": {

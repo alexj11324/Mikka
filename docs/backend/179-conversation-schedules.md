@@ -216,9 +216,9 @@ Decision [2026-11-15-1730](../design/decisions/2026-11-15-1730-automation-limits
 
 Decision [2026-11-15-1810](../design/decisions/2026-11-15-1810-automation-each-run.md).
 
-- `eachRun: 'new_task' | 'same_task'` (default `new`) on a `dispatch_task` definition. With
-  `single`, the first run that creates a task (its result has `eventId`) is the standing
-  task. Each later run sends the prompt (plus any event block) to that task's latest run
+- `eachRun: 'new_task' | 'same_task'` (default `new_task`) on a `dispatch_task` definition. With
+  `same_task`, the first run that creates a task for the current creator (its result has
+  `eventId` and `requestedBy` = the creator) is the standing task. Each later run sends the prompt (plus any event block) to that task's latest run
   of the creator with `sendThreadMessage(owner, runId, text, 'user', occurrenceId)`: a
   message if the thread is working, a continuation if it ended; the occurrence ID is the
   request ID, so a retry sends once. Its result is
@@ -226,3 +226,21 @@ Decision [2026-11-15-1810](../design/decisions/2026-11-15-1810-automation-each-r
 - No run of the creator on the task yet: `scheduleStandingTaskNotStarted` (503, retried).
   The task gone from the workspace: `scheduleStandingTaskUnavailable` (403), which
   auto-pauses like a lost authority.
+
+## 接手: take over (2026-11-15)
+
+Decision [2026-11-15-1840](../design/decisions/2026-11-15-1840-automation-take-over.md).
+
+- Command `{ action: 'take_over', scheduleId, version }`; page action `takeOverAutomation`
+  (RPC `automations.takeOverAutomation`). Only on a workspace automation, only by an owner
+  or admin (`scheduleAdminRequired`); on one's own it returns the row unchanged.
+- `owner_id` and `bot_id` become the actor's (their chat gets the reports), `source_event_id`
+  becomes NULL (a page command), version + 1. Pending and running occurrences are cancelled
+  with `scheduleChanged` and reported to the previous creator's chat.
+- An active automation, or one the host paused (`disabled_reason` set), is checked with the
+  new creator's authority. Passing: active (an auto-paused one resumes). A lost-authority
+  code: paused with that code as `disabled_reason`, so they can change it and resume. A
+  person's pause stays.
+- `list` rows carry `can_take_over` (workspace row, someone else's, reader not a member).
+- `same_task`: the standing task is matched by `result.requestedBy`, so after 接手 the new
+  creator's next run makes their own task.

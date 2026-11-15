@@ -98,6 +98,12 @@ export async function resumeAutomation(input: { scheduleId: string; version: num
   return parsed.success ? command({ action: 'resume', ...parsed.data }) : { error: 'validationGeneric' }
 }
 
+/** 接手: an owner or admin makes another person's automation theirs; it runs as them from now on. */
+export async function takeOverAutomation(input: { scheduleId: string; version: number }): Promise<ActionResult<{ schedule: AutomationView }>> {
+  const parsed = versioned.safeParse(input)
+  return parsed.success ? command({ action: 'take_over', ...parsed.data }) : { error: 'validationGeneric' }
+}
+
 /** 删除: cancels every future run. Past runs and the tasks they made stay. */
 export async function cancelAutomation(input: { scheduleId: string; version: number }): Promise<ActionResult<{ schedule: AutomationView }>> {
   const parsed = versioned.safeParse(input)

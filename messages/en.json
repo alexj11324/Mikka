@@ -7971,6 +7971,10 @@
       "delete": "Delete",
       "deleteTitle": "Delete this automation?",
       "deleteBody": "Past runs and their tasks stay.",
+      "takeOver": "Take over",
+      "takeOverTitle": "Take over this automation?",
+      "takeOverBody": "It will run as you, with your access and your Bots, and report to you. {name} is no longer its creator. Runs that have not started are cancelled.",
+      "tookOver": "Taken over",
       "cancel": "Cancel",
       "notFound": "The automation doesn't exist or was deleted",
       "missing": {
