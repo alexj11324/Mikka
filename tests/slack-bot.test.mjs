@@ -185,3 +185,26 @@ test('eve decision screening retains the existing model billing and admission bo
   decisionAnswer = null
   await assert.rejects(shouldJoinSlack(scope, 'Help'), /decisionProviderUnavailable/)
 })
+
+test('a signed event callback is handed to 自动化 with Slack’s own body and signature; a reaction still answers Eve as before', async t => {
+  const forwarded = []
+  t.mock.method(globalThis, 'fetch', async (input, init) => {
+    forwarded.push({ url: String(input), body: String(init.body), headers: new Headers(init.headers) })
+    return new Response(null, { status: 200 })
+  })
+  const h = harness({ channelEnv: { ...env, SLACK_AUTOMATIONS_FORWARD_URL: 'https://app.example.test/mikka/api/webhooks/slack/automations' } })
+  const payload = { type: 'event_callback', api_app_id: 'A123', team_id: 'T123', event_id: 'Ev1', event: { type: 'reaction_added', user: 'U456', reaction: 'eyes', item: { type: 'message', channel: 'C123', ts: '1.2' } } }
+  const request = signed(payload)
+  const response = await h.route.handler(request.clone(), h.args)
+  assert.equal(response.status, 204)
+  assert.equal(forwarded.length, 1)
+  assert.equal(forwarded[0].url, 'https://app.example.test/mikka/api/webhooks/slack/automations')
+  assert.equal(forwarded[0].body, JSON.stringify(payload))
+  assert.equal(forwarded[0].headers.get('x-slack-signature'), request.headers.get('x-slack-signature'))
+  assert.equal(forwarded[0].headers.get('x-slack-request-timestamp'), request.headers.get('x-slack-request-timestamp'))
+  forwarded.length = 0
+  assert.equal((await harness().post(payload)).status, 204)
+  assert.equal(forwarded.length, 0, 'unset, nothing is handed off')
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('app unreachable') })
+  assert.equal((await h.post(payload)).status, 204, 'a failed hand-off never holds up Slack')
+})

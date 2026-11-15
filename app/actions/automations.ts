@@ -8,7 +8,7 @@ import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 import { isActionErrorCode } from '@/lib/workspace-admin/action'
 import { WorkspaceError } from '@/lib/workspace-access'
 import { definitionSchema, ScheduleError, scheduleListInput, type Command, type Definition } from '@/lib/schedules/contract'
-import type { AutomationHistory, AutomationList, AutomationView } from '@/lib/schedules/automation-view'
+import type { AutomationHistory, AutomationList, AutomationUsage, AutomationView } from '@/lib/schedules/automation-view'
 
 /**
  * 自动化: the page's commands. Every one goes through the schedules' one writer, `executeScheduleCommand`, as the
@@ -69,6 +69,13 @@ export async function automationHistory(scheduleId: string): Promise<ActionResul
   return command({ action: 'history', scheduleId })
 }
 
+/** 用量: runs and, for the creator and owners/admins, what the tasks it made spent, per day in its own time zone. */
+export async function automationUsage(input: { scheduleId: string; days?: number }): Promise<ActionResult<AutomationUsage>> {
+  const parsed = z.object({ scheduleId: z.uuid(), days: z.number().int().min(1).max(90).optional() }).strict().safeParse(input)
+  if (!parsed.success) return { error: 'validationGeneric' }
+  return command({ action: 'usage', ...parsed.data })
+}
+
 export async function createAutomation(input: { requestId: string; definition: Definition }): Promise<ActionResult<{ schedule: AutomationView; replayed: boolean }>> {
   const parsed = z.object({ requestId: z.uuid(), definition: definitionSchema }).strict().safeParse(input)
   if (!parsed.success) return { error: 'validationGeneric' }
@@ -89,6 +96,63 @@ export async function pauseAutomation(input: { scheduleId: string; version: numb
 export async function resumeAutomation(input: { scheduleId: string; version: number }): Promise<ActionResult<{ schedule: AutomationView }>> {
   const parsed = versioned.safeParse(input)
   return parsed.success ? command({ action: 'resume', ...parsed.data }) : { error: 'validationGeneric' }
+}
+
+/** 接手: an owner or admin makes another person's automation theirs; it runs as them from now on. */
+export async function takeOverAutomation(input: { scheduleId: string; version: number }): Promise<ActionResult<{ schedule: AutomationView }>> {
+  const parsed = versioned.safeParse(input)
+  return parsed.success ? command({ action: 'take_over', ...parsed.data }) : { error: 'validationGeneric' }
+}
+
+/** Webhook 地址: a new secret URL key for the automation, returned once; the previous URL stops working. */
+export async function automationWebhookKey(input: { scheduleId: string; version: number }): Promise<ActionResult<{ schedule: AutomationView; key: string }>> {
+  const parsed = versioned.safeParse(input)
+  return parsed.success ? command({ action: 'webhook_key', ...parsed.data }) : { error: 'validationGeneric' }
+}
+
+/** Linear triggers' teams: those of the person's own Linear connection; `connected: false` without one. */
+export async function automationLinearTeams(): Promise<ActionResult<{ connected: boolean; teams: { id: string; key: string; name: string }[] }>> {
+  return runAction(async () => {
+    if (actingContext.getStore()) throw new ActionFailureError('authRequired')
+    const [{ requireUser }, { pool }] = await Promise.all([import('@/lib/issue-access'), import('@/lib/db')])
+    const user = await requireUser()
+    if (!(await pool.query('SELECT 1 FROM linear_connections WHERE "userId"=$1 AND "revokedAt" IS NULL', [user.id])).rowCount) return { connected: false, teams: [] }
+    const [{ linearAccessToken }, { linearTeams }] = await Promise.all([import('@/lib/linear-sync/tokens'), import('@/lib/linear-sync/client')])
+    try {
+      return { connected: true, teams: (await linearTeams(await linearAccessToken(user.id))).map(({ id, key, name }) => ({ id, key, name })) }
+    } catch (error) { throw new ActionFailureError('scheduleLinearUnreachable', undefined, undefined, { cause: error }) }
+  })
+}
+
+/** Slack triggers' channels: those of the workspace's Slack installation; `installed: false` when the person is not in one. */
+export async function automationSlackChannels(): Promise<ActionResult<{ installed: boolean; channels: { id: string; name: string; private: boolean }[] }>> {
+  return runAction(async () => {
+    if (actingContext.getStore()) throw new ActionFailureError('authRequired')
+    const app = process.env.SLACK_APP_ID
+    let actor
+    try { actor = await currentWorkspaceActor() } catch (error) {
+      if (error instanceof WorkspaceError) throw new ActionFailureError(isActionErrorCode(error.code) ? error.code : 'generic', undefined, undefined, { cause: error })
+      throw error
+    }
+    if (!app) return { installed: false, channels: [] }
+    const { slackInstallationChannels } = await import('@/lib/slack/automation-channels')
+    try {
+      const channels = await slackInstallationChannels(app, actor.userId, actor.workspaceId)
+      return channels ? { installed: true, channels } : { installed: false, channels: [] }
+    } catch (error) { throw new ActionFailureError('scheduleSlackUnreachable', undefined, undefined, { cause: error }) }
+  })
+}
+
+/** 置顶: the signed-in person's own pin. */
+export async function pinAutomation(input: { scheduleId: string; pinned: boolean }): Promise<ActionResult<{ pinned: boolean }>> {
+  const parsed = z.object({ scheduleId: z.uuid(), pinned: z.boolean() }).strict().safeParse(input)
+  return parsed.success ? command({ action: 'pin', ...parsed.data }) : { error: 'validationGeneric' }
+}
+
+/** 文件夹和标签: the workspace's folder and tags for an automation (its creator or an owner/admin). */
+export async function organizeAutomation(input: { scheduleId: string; folder: string | null; tags: string[] }): Promise<ActionResult<{ schedule: AutomationView }>> {
+  const parsed = z.object({ scheduleId: z.uuid(), folder: z.string().trim().min(1).max(60).nullable(), tags: z.array(z.string().trim().min(1).max(30)).max(10) }).strict().safeParse(input)
+  return parsed.success ? command({ action: 'organize', ...parsed.data }) : { error: 'validationGeneric' }
 }
 
 /** 删除: cancels every future run. Past runs and the tasks they made stay. */

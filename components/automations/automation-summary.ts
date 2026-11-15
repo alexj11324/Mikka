@@ -6,8 +6,29 @@ import { cronShape } from './automation-draft'
 
 const clock = (hour: number, minute: number) => `${hour}:${String(minute).padStart(2, '0')}`
 
-/** 「工作日 9:00」: one line for an automation's timing, in its own time zone. */
+/** 「工作日 9:00」: one line for an automation's timing, in its own time zone, then its GitHub triggers and webhook. */
 export function useTimingSummary() {
+  const t = useTranslations('Automations.summary')
+  const tEvent = useTranslations('Automations.githubEvent')
+  const tLinear = useTranslations('Automations.linearEvent')
+  const tSlack = useTranslations('Automations.slackEvent')
+  const timing = useScheduleSummary()
+  return (definition: Pick<Definition, 'timing' | 'timezone' | 'events' | 'webhook'>) => {
+    const github = (definition.events ?? []).flatMap(trigger => trigger.source === 'github' ? [trigger] : [])
+    const linear = (definition.events ?? []).flatMap(trigger => trigger.source === 'linear' ? [trigger] : [])
+    const slack = (definition.events ?? []).flatMap(trigger => trigger.source === 'slack' ? [trigger] : [])
+    const parts = [
+      ...(github.length ? [t('github', { event: tEvent(github[0]!.event), count: github.length - 1 })] : []),
+      ...(linear.length ? [t('linear', { event: tLinear(linear[0]!.event), count: linear.length - 1 })] : []),
+      ...(slack.length ? [t('slack', { event: tSlack(slack[0]!.event), count: slack.length - 1 })] : []),
+      ...(definition.webhook ? [t('webhook')] : []),
+    ]
+    if (!parts.length) return timing(definition)
+    return [...(definition.timing.kind === 'manual' ? [] : [timing(definition)]), ...parts].join(' · ')
+  }
+}
+
+function useScheduleSummary() {
   const t = useTranslations('Automations.summary')
   const format = useFormatter()
   return (definition: Pick<Definition, 'timing' | 'timezone'>) => {

@@ -27,11 +27,67 @@ export const taskSchema = z.discriminatedUnion('kind', [
   }).strict(),
 ])
 export type DispatchTask = Extract<z.infer<typeof taskSchema>, { kind: 'dispatch_task' }>
+/** GitHub events an automation can run on: those the GitHub App subscribes to (decision 2026-11-15-1704). */
+export const GITHUB_TRIGGER_EVENTS = [
+  'pull_request_opened', 'draft_opened', 'pull_request_pushed', 'pull_request_merged', 'pull_request_closed', 'label_change',
+  'issue_opened', 'comment', 'review_submitted', 'review_comment', 'checks_completed', 'checks_failed',
+] as const
+export type GitHubTriggerEvent = typeof GITHUB_TRIGGER_EVENTS[number]
+/** A repository as the workspace names it, `v2/github.com/<owner>/<name>` in lower case. */
+export const githubRepositoryKey = z.string().regex(/^v2\/github\.com\/[a-z0-9-]{1,39}\/[a-z0-9._-]{1,100}$/)
+/** Linear events an automation can run on (decision 2026-11-15-1930): those the Linear app's webhook already sends. */
+export const LINEAR_TRIGGER_EVENTS = ['issue_created', 'issue_status_changed', 'issue_label_added', 'issue_assigned', 'comment_created'] as const
+export type LinearTriggerEvent = typeof LINEAR_TRIGGER_EVENTS[number]
+/** Slack events an automation can run on (decision 2026-11-15-2010); reaction_added needs the app's reactions subscription. */
+export const SLACK_TRIGGER_EVENTS = ['message', 'mention', 'reaction_added'] as const
+export type SlackTriggerEvent = typeof SLACK_TRIGGER_EVENTS[number]
+export const eventTriggerSchema = z.discriminatedUnion('source', [
+  z.object({
+    source: z.literal('github'), event: z.enum(GITHUB_TRIGGER_EVENTS),
+    repositories: z.array(githubRepositoryKey).min(1).max(20),
+    branches: z.array(z.string().trim().min(1).max(250)).max(20).optional(),
+    labels: z.array(z.string().trim().min(1).max(100)).max(20).optional(),
+    /** One sentence checked against each event before a run starts; an event that does not match is skipped. */
+    runWhen: z.string().trim().min(1).max(500).optional(),
+  }).strict(),
+  z.object({
+    source: z.literal('linear'), event: z.enum(LINEAR_TRIGGER_EVENTS),
+    /** Linear team IDs from the creator's own Linear connection. */
+    teams: z.array(z.string().min(1).max(128)).min(1).max(20),
+    labels: z.array(z.string().trim().min(1).max(100)).max(20).optional(),
+    runWhen: z.string().trim().min(1).max(500).optional(),
+  }).strict(),
+  z.object({
+    source: z.literal('slack'), event: z.enum(SLACK_TRIGGER_EVENTS),
+    /** Channel IDs of the workspace's Slack installation the Bot can see. */
+    channels: z.array(z.string().regex(/^[CG][A-Z0-9]{2,30}$/)).min(1).max(20),
+    /** reaction_added: the emoji names that count (without colons); empty or absent is any. */
+    reactions: z.array(z.string().trim().regex(/^[a-z0-9_+'-]{1,100}$/)).max(20).optional(),
+    runWhen: z.string().trim().min(1).max(500).optional(),
+  }).strict(),
+])
+export type EventTrigger = z.infer<typeof eventTriggerSchema>
+export type GitHubEventTrigger = Extract<EventTrigger, { source: 'github' }>
+export type LinearEventTrigger = Extract<EventTrigger, { source: 'linear' }>
+export type SlackEventTrigger = Extract<EventTrigger, { source: 'slack' }>
 export const definitionSchema = z.object({
   title: z.string().trim().min(1).max(200), timezone: z.string().min(1).max(100), timing: timingSchema, task: taskSchema,
   misfire: z.enum(['skip', 'catch_up_once']), maxLatenessMinutes: z.number().int().min(1).max(10080),
   maxConcurrent: z.number().int().min(1).max(5).optional(),
+  /** Runs started on one day in the automation's time zone; past it, timed and event runs are skipped and 立即运行 refused. */
+  maxRunsPerDay: z.number().int().min(1).max(500).optional(),
+  /** dispatch_task: 'new' makes a task at every run; 'single' makes one and sends each later run to it as a follow-up. */
+  eachRun: z.enum(['new_task', 'same_task']).optional(),
+  /** 满足任一条件就运行: event triggers beside the timing. Only an automation that hands a Bot a task has them. */
+  events: z.array(eventTriggerSchema).min(1).max(20).optional(),
+  /** Webhook: the automation's own URL starts a run; requests within `batchMinutes` of the first go to one run. */
+  webhook: z.object({ batchMinutes: z.number().int().min(0).max(60) }).strict().optional(),
+  /** 运行后发到 Slack: each finished run is posted to this channel of the workspace's Slack, in the locale saved here. */
+  notify: z.object({ slack: z.object({ channel: z.string().regex(/^[CG][A-Z0-9]{2,30}$/), locale: z.enum(['zh-CN', 'en']) }).strict() }).strict().optional(),
 }).strict()
+  .refine(value => !value.events || value.task.kind === 'dispatch_task', { message: 'eventTriggersNeedDispatchTask', path: ['events'] })
+  .refine(value => !value.webhook || value.task.kind === 'dispatch_task', { message: 'eventTriggersNeedDispatchTask', path: ['webhook'] })
+  .refine(value => !value.notify || value.task.kind === 'dispatch_task', { message: 'eventTriggersNeedDispatchTask', path: ['notify'] })
 export const SCHEDULE_PAGE_MAX = 100
 const scheduleCursor = z.templateLiteral([z.iso.datetime({ precision: 6 }), '/', z.uuid()])
 export const scheduleListInput = z.object({
@@ -46,8 +102,18 @@ export const commandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('history'), scheduleId: z.uuid() }).strict(),
   z.object({ action: z.literal('update'), scheduleId: z.uuid(), version: z.number().int().positive(), definition: definitionSchema }).strict(),
   z.object({ action: z.enum(['pause', 'resume', 'cancel']), scheduleId: z.uuid(), version: z.number().int().positive() }).strict(),
+  // 接手: an owner or admin makes a workspace automation theirs; from then on it runs as them (decision 2026-11-15-1840).
+  z.object({ action: z.literal('take_over'), scheduleId: z.uuid(), version: z.number().int().positive() }).strict(),
+  // Webhook 地址: a new secret URL for the automation; the previous one stops working. Returned once.
+  z.object({ action: z.literal('webhook_key'), scheduleId: z.uuid(), version: z.number().int().positive() }).strict(),
+  // 置顶: the reader's own pin.
+  z.object({ action: z.literal('pin'), scheduleId: z.uuid(), pinned: z.boolean() }).strict(),
+  // 文件夹和标签: the workspace's; set by the creator or an owner/admin, without changing the automation's version.
+  z.object({ action: z.literal('organize'), scheduleId: z.uuid(), folder: z.string().trim().min(1).max(60).nullable(), tags: z.array(z.string().trim().min(1).max(30)).max(10) }).strict(),
   // 立即运行: one occurrence due now. The same requestId never adds a second one.
   z.object({ action: z.literal('run_now'), scheduleId: z.uuid(), version: z.number().int().positive(), requestId: z.uuid() }).strict(),
+  // 用量: runs and cost per day in the automation's time zone, newest first.
+  z.object({ action: z.literal('usage'), scheduleId: z.uuid(), days: z.number().int().min(1).max(90).optional() }).strict(),
 ])
 export type Definition = z.infer<typeof definitionSchema>
 export type Command = z.infer<typeof commandSchema>

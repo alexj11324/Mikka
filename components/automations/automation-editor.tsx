@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import useSWR from 'swr'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { ArrowLeft, Play } from 'lucide-react'
 import { listDevices } from '@/app/actions/agents'
-import { listBots } from '@/app/actions/bots'
-import { cancelAutomation, createAutomation, pauseAutomation, resumeAutomation, runAutomationNow, updateAutomation } from '@/app/actions/automations'
+import { getWorkspaceBotDefaults, listBots } from '@/app/actions/bots'
+import { automationLinearTeams, automationSlackChannels, cancelAutomation, createAutomation, pauseAutomation, resumeAutomation, runAutomationNow, takeOverAutomation, updateAutomation } from '@/app/actions/automations'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -30,6 +30,12 @@ import { TASK_TITLE_MAX } from '@/lib/task-title-input'
 import { runTask, type AutomationRun, type AutomationView } from '@/lib/schedules/automation-view'
 import { definitionFrom, draftFrom, emptyDraft, foldNeeded, type AutomationDraft, type IntervalUnit, type ScheduleKind } from './automation-draft'
 import { useWorkspaceBotNames } from './automations-page'
+import { GitHubTriggers } from './github-triggers'
+import { WebhookTrigger } from './webhook-trigger'
+import { templateDraft, type AutomationTemplate } from './automation-templates'
+import { LinearTriggers } from './linear-triggers'
+import { SlackTriggers } from './slack-triggers'
+import { AutomationUsagePanel } from './automation-usage'
 import { useNextRunLabel, useTimingSummary } from './automation-summary'
 
 const zones = (() => { try { return Intl.supportedValuesOf('timeZone') } catch { return ['UTC'] } })()
@@ -42,15 +48,20 @@ const runVariant = { pending: 'outline', running: 'secondary', succeeded: 'secon
  * (`id` 'new') is created on 创建 and opens as itself. Saves go through the automation actions and the page reads again
  * only when the live channel says the schedule changed.
  */
-export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { workspaceId: string | null; userId: string; id: string | 'new'; onOpen: (id: string) => void; onBack: () => void }) {
+export function AutomationEditor({ workspaceId, userId, id, template, onOpen, onBack }: { workspaceId: string | null; userId: string; id: string | 'new'; template?: AutomationTemplate; onOpen: (id: string) => void; onBack: () => void }) {
   const t = useTranslations('Automations.editor')
+  const locale = useLocale()
   const tAll = useTranslations('Automations')
   const tCommon = useTranslations('Common')
   const actionError = useActionError()
+  const tErrors = useTranslations('Errors')
+  const errorText = (code: string) => tErrors.has(code as never) ? tErrors(code as never) : code
   const creating = id === 'new'
   const { automation, history } = useAutomation(workspaceId, creating ? null : id)
   const current = automation.data ?? null
-  const [draft, setDraft] = useState<AutomationDraft | null>(() => creating ? emptyDraft(localZone()) : null)
+  const tTemplates = useTranslations('Automations.templates')
+  const [draft, setDraft] = useState<AutomationDraft | null>(() => !creating ? null
+    : template ? templateDraft(template, emptyDraft(localZone()), { title: tTemplates(`${template}.title`), prompt: tTemplates(`${template}.prompt`) }) : emptyDraft(localZone()))
   const loaded = useRef<string | null>(null)
   // The fields start from the stored definition once per version; a later live read does not overwrite edits.
   useEffect(() => {
@@ -61,13 +72,33 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
     setDraft(draftFrom(current.definition))
   }, [current])
   const requestId = useRef(crypto.randomUUID())
-  const [busy, setBusy] = useState<null | 'save' | 'toggle' | 'run' | 'delete'>(null)
+  const [busy, setBusy] = useState<null | 'save' | 'toggle' | 'run' | 'delete' | 'takeOver'>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmTakeOver, setConfirmTakeOver] = useState(false)
   const set = (patch: Partial<AutomationDraft>) => setDraft(value => value ? { ...value, ...patch } : value)
 
   const { data: bots = [] } = useSWR('bots', listBots, { revalidateOnFocus: false })
   const { data: devices = [] } = useSWR('devices', listDevices, { revalidateOnFocus: false })
   const workspaceBots = useWorkspaceBotNames(workspaceId)
+  // The workspace's installed repositories, the ones a GitHub trigger may name (any member may read them).
+  const { data: repositories = [] } = useSWR(workspaceId ? ['automation-repositories', workspaceId] : null, async () => {
+    const result = await getWorkspaceBotDefaults()
+    return 'error' in result && result.error ? [] : (result as { repositories: string[] }).repositories
+  }, { revalidateOnFocus: false })
+  // Linear triggers' teams, read only once the person adds a Linear event or the automation has one.
+  const [linearWanted, setLinearWanted] = useState(false)
+  const linearTeams = useSWR(linearWanted || Boolean(draft?.linear.length) ? 'automation-linear-teams' : null, async () => {
+    const result = await automationLinearTeams()
+    if ('error' in result && result.error) throw new Error(result.error)
+    return result as { connected: boolean; teams: { id: string; key: string; name: string }[] }
+  }, { revalidateOnFocus: false })
+  // Slack triggers' channels, read only once the person adds a Slack event or the automation has one.
+  const [slackWanted, setSlackWanted] = useState(false)
+  const slackChannels = useSWR(slackWanted || Boolean(draft?.slack.length) || Boolean(draft?.notify) ? ['automation-slack-channels', workspaceId] : null, async () => {
+    const result = await automationSlackChannels()
+    if ('error' in result && result.error) throw new Error(result.error)
+    return result as { installed: boolean; channels: { id: string; name: string; private: boolean }[] }
+  }, { revalidateOnFocus: false })
   const profiles = useAgentProfiles(workspaceId ?? undefined, true)
   const profileChoices = useTaskProfileChoices({ workspaceId: workspaceId ?? undefined, value: draft && draft.profileId !== 'auto' ? draft.profileId : null, data: profiles.data })
   const check = useMemo(() => draft ? definitionFrom(draft) : null, [draft])
@@ -115,6 +146,18 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
       await history.mutate()
     } finally { setBusy(null) }
   }
+  async function takeOver() {
+    if (!current || busy) return
+    setBusy('takeOver')
+    try {
+      const result = await takeOverAutomation({ scheduleId: current.id, version: current.version })
+      if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
+      setConfirmTakeOver(false)
+      toast.success(t('tookOver'))
+      loaded.current = null
+      await automation.mutate({ ...(result as { schedule: AutomationView }).schedule, owner_name: null, can_take_over: false }, { revalidate: false })
+    } finally { setBusy(null) }
+  }
   async function remove() {
     if (!current || busy) return
     setBusy('delete')
@@ -146,7 +189,9 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
       </div>
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         <span>{t('creator')} · {creator}</span>
+        {current?.can_take_over && <Button size="xs" variant="outline" disabled={busy !== null} onClick={() => setConfirmTakeOver(true)}>{t('takeOver')}</Button>}
         {current && <Badge variant={current.status === 'active' ? 'secondary' : 'outline'}>{tAll(`status.${current.status}`)}</Badge>}
+        {current?.status === 'paused' && current.disabled_reason && <span role="status" className="text-destructive-foreground">{t('autoPaused', { reason: errorText(current.disabled_reason) })}</span>}
       </div>
     </header>
 
@@ -165,6 +210,18 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
       {field(t('profile'), <NativeSelect aria-label={t('profile')} value={draft.profileId} disabled={!workspaceId} onChange={event => set({ profileId: event.target.value })}>
         {profileChoices.choices.map(choice => <NativeSelectOption key={choice.value} value={choice.value} disabled={'disabled' in choice && choice.disabled}>{choice.label}</NativeSelectOption>)}
       </NativeSelect>)}
+      {field(t('eachRun'), <NativeSelect aria-label={t('eachRun')} value={draft.eachRun} onChange={event => set({ eachRun: event.target.value === 'same_task' ? 'same_task' : 'new_task' })}>
+        <NativeSelectOption value="new_task">{t('eachRunNew')}</NativeSelectOption>
+        <NativeSelectOption value="same_task">{t('eachRunSame')}</NativeSelectOption>
+      </NativeSelect>)}
+      {field(t('notify'), slackWanted || draft.notify
+        ? <NativeSelect aria-label={t('notify')} value={draft.notify?.channel ?? ''} disabled={!slackChannels.data && !draft.notify}
+          onChange={event => set({ notify: event.target.value ? { channel: event.target.value, locale: locale === 'en' ? 'en' : 'zh-CN' } : null })}>
+          <NativeSelectOption value="">{t('notifyOff')}</NativeSelectOption>
+          {draft.notify && !slackChannels.data?.channels.some(channel => channel.id === draft.notify!.channel) && <NativeSelectOption value={draft.notify.channel}>{draft.notify.channel}</NativeSelectOption>}
+          {(slackChannels.data?.channels ?? []).map(channel => <NativeSelectOption key={channel.id} value={channel.id}>#{channel.name}</NativeSelectOption>)}
+        </NativeSelect>
+        : <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => setSlackWanted(true)}>{t('notifyChoose')}</Button>)}
       {field(t('timezone'), <NativeSelect aria-label={t('timezone')} value={draft.timezone} onChange={event => set({ timezone: event.target.value, fold: null })}>
         {(zones.includes(draft.timezone) ? zones : [draft.timezone, ...zones]).map(zone => <NativeSelectOption key={zone} value={zone}>{zone}</NativeSelectOption>)}
       </NativeSelect>)}
@@ -205,6 +262,26 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
           </ToggleGroup>
         </div>}
       </div>}
+      {!draft.otherTask && <>
+        <SettingRow title={t('github.title')} />
+        <GitHubTriggers value={draft.github} repositories={repositories} disabled={busy !== null} onChange={github => set({ github })} />
+        <SettingRow title={t('linear.title')}>
+          {!linearWanted && !draft.linear.length && <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => setLinearWanted(true)}>{t('linear.show')}</Button>}
+        </SettingRow>
+        {(linearWanted || draft.linear.length > 0) && <>
+          {linearTeams.error && <div className="px-5 pb-2"><InlineLoadError message={t('linear.teamsError')} retryLabel={tCommon('retry')} onRetry={() => { void linearTeams.mutate() }} /></div>}
+          <LinearTriggers value={draft.linear} teams={linearTeams.data?.teams ?? []} connected={linearTeams.data?.connected ?? true} disabled={busy !== null || (!linearTeams.data && !linearTeams.error)} onChange={linear => set({ linear })} />
+        </>}
+        <SettingRow title={t('slack.title')}>
+          {!slackWanted && !draft.slack.length && <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => setSlackWanted(true)}>{t('slack.show')}</Button>}
+        </SettingRow>
+        {(slackWanted || draft.slack.length > 0) && <>
+          {slackChannels.error && <div className="px-5 pb-2"><InlineLoadError message={t('slack.channelsError')} retryLabel={tCommon('retry')} onRetry={() => { void slackChannels.mutate() }} /></div>}
+          <SlackTriggers value={draft.slack} channels={slackChannels.data?.channels ?? []} installed={slackChannels.data?.installed ?? true} disabled={busy !== null || (!slackChannels.data && !slackChannels.error)} onChange={slack => set({ slack })} />
+        </>}
+        <WebhookTrigger value={draft.webhook} onChange={webhook => set({ webhook })} automation={current ?? null} disabled={busy !== null}
+          onSaved={schedule => automation.mutate(schedule, { revalidate: false })} />
+      </>}
       <SettingRow title={t('manual')}>
         {!creating && <Button size="sm" variant="secondary" disabled={!active || busy !== null} onClick={() => { void runNow() }}><Play data-icon="inline-start" />{t('runNow')}</Button>}
       </SettingRow>
@@ -227,13 +304,19 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
       {field(t('concurrent'), <NativeSelect aria-label={t('concurrent')} value={String(draft.concurrent)} onChange={event => set({ concurrent: Number(event.target.value) })}>
         {[1, 2, 3, 4, 5].map(count => <NativeSelectOption key={count} value={String(count)}>{count}</NativeSelectOption>)}
       </NativeSelect>)}
+      {field(t('perDay'), <NativeSelect aria-label={t('perDay')} value={String(draft.perDay)} onChange={event => set({ perDay: Number(event.target.value) })}>
+        <NativeSelectOption value="0">{t('unlimited')}</NativeSelectOption>
+        {[...new Set([1, 2, 3, 5, 10, 20, 50, 100, draft.perDay])].filter(count => count > 0).sort((a, b) => a - b).map(count => <NativeSelectOption key={count} value={String(count)}>{count}</NativeSelectOption>)}
+      </NativeSelect>)}
     </SettingsSection>
+
+    {!creating && current && <AutomationUsagePanel workspaceId={workspaceId} id={current.id} />}
 
     {!creating && <SettingsSection id="automation-history" title={t('history')}>
       {history.error && !history.data ? <div className="p-4"><InlineLoadError message={tAll('loadError')} retryLabel={tCommon('retry')} onRetry={() => { void history.mutate() }} /></div>
         : !history.data ? <div className="p-4"><Skeleton className="h-10 w-full" /></div>
           : !history.data.occurrences.length ? <p className="px-5 py-4 text-sm text-muted-foreground">{t('historyEmpty')}</p>
-            : history.data.occurrences.map(run => <RunRow key={run.id} run={run} />)}
+            : history.data.occurrences.map(run => <RunRow key={run.id} run={run} timezone={current?.definition.timezone ?? draft.timezone} />)}
     </SettingsSection>}
 
     <footer className="flex flex-wrap items-center justify-between gap-2 pb-8">
@@ -253,6 +336,12 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
         <AlertDialogFooter><AlertDialogCancel disabled={busy === 'delete'}>{t('cancel')}</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={busy === 'delete'} onClick={() => { void remove() }}>{t('delete')}</AlertDialogAction></AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+    <AlertDialog open={confirmTakeOver} onOpenChange={open => { if (!busy) setConfirmTakeOver(open) }}>
+      <AlertDialogContent>
+        <AlertDialogHeader><AlertDialogTitle>{t('takeOverTitle')}</AlertDialogTitle><AlertDialogDescription>{t('takeOverBody', { name: creator })}</AlertDialogDescription></AlertDialogHeader>
+        <AlertDialogFooter><AlertDialogCancel disabled={busy === 'takeOver'}>{t('cancel')}</AlertDialogCancel><AlertDialogAction disabled={busy === 'takeOver'} onClick={() => { void takeOver() }}>{t('takeOver')}</AlertDialogAction></AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </EditorFrame>
 }
 
@@ -266,16 +355,27 @@ function EditorFrame({ children, onBack, backLabel }: { children: React.ReactNod
 }
 
 /** One run: when, how it ended (and why when it did not), and the task it made as a chip that opens it. */
-function RunRow({ run }: { run: AutomationRun }) {
+function RunRow({ run, timezone }: { run: AutomationRun; timezone: string }) {
   const t = useTranslations('Automations')
+  const tEvent = useTranslations('Automations.githubEvent')
+  const tLinear = useTranslations('Automations.linearEvent')
+  const tSlack = useTranslations('Automations.slackEvent')
   const tErrors = useTranslations('Errors')
-  const format = useFormatter()
+  // On the automation's own clock, like its summary, next run and usage days.
+  const when = useNextRunLabel()
   const task = runTask(run)
   const at = run.started_at ?? run.due_at
   const reason = run.error ? (t.has(`runErrors.${run.error}` as never) ? t(`runErrors.${run.error}` as never) : tErrors.has(run.error as never) ? tErrors(run.error as never) : run.error) : null
   return <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 text-sm">
-    <time className="tabular-nums text-muted-foreground" dateTime={new Date(at).toISOString()}>{format.dateTime(new Date(at), { dateStyle: 'medium', timeStyle: 'short' })}</time>
+    <time className="tabular-nums text-muted-foreground" dateTime={new Date(at).toISOString()}>{when(at, timezone)}</time>
     <Badge variant={runVariant[run.status]}>{t(`run.${run.status}`)}</Badge>
+    {run.trigger && 'event' in run.trigger && run.trigger.event.source === 'linear' && <span className="min-w-0 text-muted-foreground">{t('run.from', { event: tLinear.has(run.trigger.event.event as never) ? tLinear(run.trigger.event.event as never) : run.trigger.event.event,
+      what: run.trigger.event.identifier ?? run.trigger.event.title ?? '' })}</span>}
+    {run.trigger && 'event' in run.trigger && run.trigger.event.source === 'slack' && <span className="min-w-0 text-muted-foreground">{t('run.from', { event: tSlack.has(run.trigger.event.event as never) ? tSlack(run.trigger.event.event as never) : run.trigger.event.event,
+      what: run.trigger.event.reaction ? `${run.trigger.event.channel} :${run.trigger.event.reaction}:` : run.trigger.event.channel })}</span>}
+    {run.trigger && 'event' in run.trigger && run.trigger.event.source !== 'linear' && run.trigger.event.source !== 'slack' && <span className="min-w-0 text-muted-foreground">{t('run.from', { event: tEvent.has(run.trigger.event.event as never) ? tEvent(run.trigger.event.event as never) : run.trigger.event.event,
+      what: run.trigger.event.number !== null ? `${run.trigger.event.repository.replace(/^v2\/github\.com\//, '')}#${run.trigger.event.number}` : run.trigger.event.repository.replace(/^v2\/github\.com\//, '') })}</span>}
+    {run.trigger && 'webhook' in run.trigger && <span className="min-w-0 text-muted-foreground">{t('run.fromWebhook', { count: run.trigger.webhook.requests.length })}</span>}
     {task && <Button size="xs" variant="secondary" title={task.title} onClick={() => openTask(task.id)}><bdi>{task.identifier ?? task.title}</bdi></Button>}
     {reason && <span className="min-w-0 text-muted-foreground">{reason}</span>}
   </div>

@@ -1,7 +1,11 @@
 import { isDeepStrictEqual } from 'node:util'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
-import { commandSchema, definitionSchema, ScheduleError, SCHEDULE_PAGE_MAX, type Actor, type Definition, type DispatchTask, type ScheduledRead } from './contract'
+import { commandSchema, definitionSchema, ScheduleError, SCHEDULE_PAGE_MAX, type Actor, type Definition, type DispatchTask, type EventTrigger, type ScheduledRead } from './contract'
+import { describeGitHubEvent, triggerMatches, type GitHubAutomationEvent } from './github-events'
+import { describeLinearEvent, linearTriggerMatches, type LinearAutomationEvent } from './linear-events'
+import { describeSlackEvent, slackTriggerMatches, type SlackAutomationEvent } from './slack-events'
+import { describeWebhook, newWebhookKey, webhookKeyHash, WEBHOOK_BATCH_BYTES, WEBHOOK_BATCH_REQUESTS, type WebhookRequest } from './webhook'
 import { nextTime, runsOnSchedule, timezone } from './time'
 import { botChatChanged } from '../live/chats'
 import { observePoolCommits } from '../db/commit-effects'
@@ -14,8 +18,13 @@ export type WorkspaceGuard = <T>(ownerId: string, workspaceId: string | null, wo
 export type MessageGuard = (tx: PoolClient, ownerId: string, value: unknown) => Promise<void>
 export type IssueReader = (tx: PoolClient, ownerId: string, issueId: string) => Promise<{ id: string; title: string; status: string } | null>
 /** What one dispatch_task run made: the task (as the chat's task line shows it) and the request event behind it. */
-export type DispatchResult = { id: string; title: string; status: string; identifier: string | null; eventId: string }
-export type DispatchInput = { ownerId: string; workspaceId: string; scheduleId: string; occurrenceId: string; task: DispatchTask }
+export type DispatchResult = { id: string; title: string; status: string; identifier: string | null; eventId?: string; requestedBy?: string; runId?: string; continued?: true }
+export type DispatchInput = { ownerId: string; workspaceId: string; scheduleId: string; occurrenceId: string; task: DispatchTask; event?: string; source?: 'github' | 'linear' | 'slack' | 'webhook'; single?: true }
+/** What started a run: a GitHub event and the indexes of the triggers that took it, or the webhook requests it batched. */
+export type OccurrenceTrigger = { event: GitHubAutomationEvent | LinearAutomationEvent | SlackAutomationEvent; triggers: number[] } | { webhook: { requests: WebhookRequest[] } }
+/** One finished run to post: the automation, how it ended, and the task it made or added to. */
+export type RunNotice = { ownerId: string; workspaceId: string; scheduleId: string; title: string; channel: string; locale: 'zh-CN' | 'en'; status: 'succeeded' | 'failed'; task: { id: string; identifier: string | null; title: string } | null; error: string | null }
+export type RunWhenInput = { ownerId: string; workspaceId: string; condition: string; event: string }
 /**
  * dispatch_task's two host seams. `check` re-authorizes the creator's request at create, update, resume and every run
  * (403 when it no longer holds: the run fails and says so). `dispatch` creates and hands over the task through the
@@ -25,13 +34,27 @@ export type AutomationSeams = {
   check?: (tx: PoolClient, ownerId: string, workspaceId: string, task: DispatchTask) => Promise<void>
   dispatch?: (input: DispatchInput) => Promise<DispatchResult>
   changed?: (tx: PoolClient, workspaceId: string) => Promise<void>
+  /** The Linear team IDs the person's own Linear connection can see, or null without one. */
+  linearTeams?: (ownerId: string) => Promise<Set<string> | null>
+  /** 运行后发到 Slack: post a finished run to the channel, as the workspace's Slack app. */
+  notify?: (input: RunNotice) => Promise<void>
+  /** The channel IDs the workspace's Slack installation can see for the person, or null when they are not in it. */
+  slackChannels?: (ownerId: string, workspaceId: string) => Promise<Set<string> | null>
+  /** Whether the workspace can still use a repository an event trigger names. */
+  repository?: (workspaceId: string, repository: string) => Promise<boolean>
+  /** A trigger's one-sentence condition against the event: true, false, or null when no answer could be had. */
+  runWhen?: (input: RunWhenInput) => Promise<boolean | null>
 }
-export type Schedule = { id: string; owner_id: string; workspace_id: string | null; bot_id: string | null; visibility: 'owner' | 'workspace'; source_event_id: string; definition: Definition; request_definition: Definition; status: string; version: number; next_at: Date | null }
-export type Occurrence = { id: string; schedule_id: string; operation_id: string; event_id: string | null; definition: Definition; version: number; due_at: Date; status: string; attempts: number; lease_token: string | null; lease_until: Date; error: string | null; execution_decision: 'execute' | 'skip'; report_next_at: Date; report_attempts: number; started_at: Date | null; created_at: Date }
+export type Schedule = { id: string; owner_id: string; workspace_id: string | null; bot_id: string | null; visibility: 'owner' | 'workspace'; source_event_id: string; definition: Definition; request_definition: Definition; status: string; version: number; next_at: Date | null; disabled_reason?: string | null }
+export type Occurrence = { id: string; schedule_id: string; operation_id: string; event_id: string | null; definition: Definition; version: number; due_at: Date; status: string; attempts: number; lease_token: string | null; lease_until: Date; error: string | null; execution_decision: 'execute' | 'skip'; trigger: OccurrenceTrigger | null; report_next_at: Date; report_attempts: number; started_at: Date | null; created_at: Date }
 export const SCHEDULE_LEASE_MS = 5 * 60_000
 const MAX_ATTEMPTS = 3
 // The frozen request key is internal; keep the existing tool-response fields.
-const SCHEDULE_COLUMNS = 'id,owner_id,workspace_id,bot_id,visibility,source_event_id,request_id,definition,request_definition,status,version,next_at,created_at,updated_at'
+const SCHEDULE_COLUMNS = 'id,owner_id,workspace_id,bot_id,visibility,source_event_id,request_id,definition,request_definition,status,version,next_at,disabled_reason,webhook_key_hash IS NOT NULL AS webhook_key_set,folder,tags,created_at,updated_at'
+/** A run that fails one of these lost its creator's authority: the automation is paused with the code as its reason. */
+const AUTHORITY_LOST = new Set(['scheduleStandingTaskUnavailable','scheduleWorkspaceAccessDenied','scheduleOwnerUnavailable','scheduleConversationUnavailable','scheduleBotUnavailable','scheduleRepositoryUnavailable','scheduleLinearUnavailable','scheduleSlackUnavailable','scheduleDeviceUnavailable','scheduleProfileUnavailable'])
+/** Runs that count toward maxRunsPerDay: queued, running and finished, not skipped or cancelled. */
+const COUNTED = "status IN ('pending','running','succeeded','failed')"
 
 /** The earliest persisted due time of any schedule work (epoch ms, rounded up from PostgreSQL microseconds), or null. */
 /** Each persisted due time of schedule work, as rows of `at` (no parameters). */
@@ -79,6 +102,21 @@ export class ScheduleStore {
     if(def.task.kind==='dispatch_task'){
       if(!workspaceId||!this.automation.check)throw new ScheduleError('scheduleDispatchUnavailable',503)
       await this.automation.check(tx,owner,workspaceId,def.task)
+      for(const repository of new Set((def.events??[]).flatMap(trigger=>trigger.source==='github'?trigger.repositories:[]))){
+        if(!this.automation.repository||!await this.automation.repository(workspaceId,repository))throw new ScheduleError('scheduleRepositoryUnavailable',403)
+      }
+      const teams=new Set((def.events??[]).flatMap(trigger=>trigger.source==='linear'?trigger.teams:[]))
+      if(teams.size){
+        // A Linear trigger names teams the creator's own Linear connection can see.
+        const visible=this.automation.linearTeams?await this.automation.linearTeams(owner):null
+        if(!visible||[...teams].some(team=>!visible.has(team)))throw new ScheduleError('scheduleLinearUnavailable',403)
+      }
+      const channels=new Set([...(def.events??[]).flatMap(trigger=>trigger.source==='slack'?trigger.channels:[]),...(def.notify?.slack?[def.notify.slack.channel]:[])])
+      if(channels.size){
+        // A Slack trigger names channels of the workspace's Slack installation, which the creator is a member of.
+        const visible=this.automation.slackChannels?await this.automation.slackChannels(owner,workspaceId):null
+        if(!visible||[...channels].some(channel=>!visible.has(channel)))throw new ScheduleError('scheduleSlackUnavailable',403)
+      }
       return null
     }
     if (def.task.kind !== 'issue_snapshot') return null
@@ -97,7 +135,7 @@ export class ScheduleStore {
         const limit = cmd.limit ?? SCHEDULE_PAGE_MAX
         const [at, id] = cmd.cursor?.split('/') ?? []
         const { rows } = await tx.query<Schedule & { page_cursor: string }>(`
-          SELECT ${SCHEDULE_COLUMNS}, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') || '/' || id AS page_cursor
+          SELECT ${SCHEDULE_COLUMNS}, EXISTS(SELECT 1 FROM schedule_pins p WHERE p.schedule_id=user_schedules.id AND p.user_id=$2) AS pinned, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') || '/' || id AS page_cursor
           FROM user_schedules
           WHERE workspace_id IS NOT DISTINCT FROM $1::uuid
             AND ((visibility = 'workspace' AND $1::uuid IS NOT NULL)
@@ -108,7 +146,8 @@ export class ScheduleStore {
           LIMIT $6`, [actor.workspaceId, actor.ownerId, actor.botId, at ?? null, id ?? null, limit + 1, cmd.scheduleId ?? null])
         const page = rows.slice(0, limit)
         return {
-          schedules: page.map(({ page_cursor: _cursor, ...schedule }) => schedule),
+          // 接手 is offered to an owner or admin on another person's workspace automation.
+          schedules: page.map(({ page_cursor: _cursor, ...schedule }) => ({ ...schedule, can_take_over: schedule.visibility === 'workspace' && schedule.owner_id !== actor.ownerId && access.role !== 'member' })),
           nextCursor: rows.length > limit ? page[limit - 1]!.page_cursor : null,
         }
       }
@@ -133,18 +172,60 @@ export class ScheduleStore {
       if(row.visibility==='workspace'&&!actor.workspaceId) throw new ScheduleError('scheduleNotFound',404)
       if((cmd.action==='update'||cmd.action==='resume'||cmd.action==='run_now')&&row.visibility==='workspace'&&row.owner_id!==actor.ownerId&&access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
       if(cmd.action==='history'){
-        const seen=await tx.query('SELECT id,schedule_id,operation_id,event_id,version,due_at,status,attempts,result,error,started_at,finished_at,reported_at FROM schedule_occurrences WHERE schedule_id=$1 ORDER BY due_at DESC LIMIT 100',[row.id])
+        const seen=await tx.query('SELECT id,schedule_id,operation_id,event_id,version,due_at,status,attempts,result,error,trigger,started_at,finished_at,reported_at FROM schedule_occurrences WHERE schedule_id=$1 ORDER BY due_at DESC LIMIT 100',[row.id])
         // Seeing that a workspace schedule ran is collaboration; reading what it returned is not. Only the
         // creator, and an owner/admin, get result, error and the operation identity; any other active member
         // sees the run's status and timestamps with those fields blank. A member of a workspace that has no
         // roles runs as 'member'. Visibility is unchanged: an owner-only row is already 404 above.
         const privileged=row.owner_id===actor.ownerId||access.role!=='member'
-        return {occurrences:privileged?seen.rows:seen.rows.map(o=>({...o,operation_id:null,event_id:null,result:null,error:null}))}
+        return {occurrences:privileged?seen.rows:seen.rows.map(o=>({...o,operation_id:null,event_id:null,result:null,error:null,trigger:null}))}
+      }
+      if(cmd.action==='pin'){
+        if(cmd.pinned)await tx.query('INSERT INTO schedule_pins(user_id,schedule_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[actor.ownerId,row.id])
+        else await tx.query('DELETE FROM schedule_pins WHERE user_id=$1 AND schedule_id=$2',[actor.ownerId,row.id])
+        await this.listChanged(tx,row.workspace_id)
+        return {pinned:cmd.pinned}
+      }
+      if(cmd.action==='organize'){
+        if(row.visibility==='workspace'&&row.owner_id!==actor.ownerId&&access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
+        const tags=[...new Set(cmd.tags.map(tag=>tag.normalize('NFC')))]
+        const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET folder=$2,tags=$3,updated_at=$4 WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,cmd.folder?.normalize('NFC')??null,tags,this.clock()])).rows[0]
+        await this.listChanged(tx,row.workspace_id)
+        return {schedule:updated}
+      }
+      if(cmd.action==='usage'){
+        // Days in the automation's own time zone. Cost is what the tasks it made spent through hosted models, billed
+        // to the day the run started; like a run's result it is shown to the creator and owners/admins only.
+        const days=cmd.days??14, zone=row.definition.timezone
+        const runs=await tx.query<{day:string;runs:number;skipped:number;tasks:number}>(`SELECT to_char((created_at AT TIME ZONE $2)::date,'YYYY-MM-DD') AS day,
+          count(*) FILTER (WHERE ${COUNTED})::int runs,count(*) FILTER (WHERE status='skipped')::int skipped,count(*) FILTER (WHERE result ? 'eventId')::int tasks
+          FROM schedule_occurrences WHERE schedule_id=$1 AND created_at>=(date_trunc('day',now() AT TIME ZONE $2)-($3::int-1)*interval '1 day') AT TIME ZONE $2 GROUP BY 1 ORDER BY 1 DESC`,[row.id,zone,days])
+        const privileged=row.owner_id===actor.ownerId||access.role!=='member'
+        // Each task the automation made counts once, whether a run made it or added to it ('single'), on the day it spent.
+        const cost=privileged?(await tx.query<{day:string;cost:string}>(`SELECT to_char((u."createdAt" AT TIME ZONE $2)::date,'YYYY-MM-DD') AS day,COALESCE(sum(u."costMicroUsd"),0)::text cost
+          FROM (SELECT DISTINCT (result->>'id')::uuid task FROM schedule_occurrences WHERE schedule_id=$1 AND definition#>>'{task,kind}'='dispatch_task' AND result ? 'id') t
+          JOIN agent_runs r ON r."issueId"=t.task JOIN hosted_usage u ON u."usageRunId"=r.id
+          WHERE u."createdAt">=(date_trunc('day',now() AT TIME ZONE $2)-($3::int-1)*interval '1 day') AT TIME ZONE $2 GROUP BY 1`,[row.id,zone,days])).rows:[]
+        const spent=new Map(cost.map(item=>[item.day,Number(item.cost)]))
+        const byDay=new Map(runs.rows.map(item=>[item.day,item]))
+        for(const day of spent.keys())if(!byDay.has(day))byDay.set(day,{day,runs:0,skipped:0,tasks:0})
+        return {timezone:zone,maxRunsPerDay:row.definition.maxRunsPerDay??null,days:[...byDay.values()].sort((a,b)=>b.day.localeCompare(a.day)).map(item=>({...item,costMicroUsd:privileged?spent.get(item.day)??0:null}))}
       }
       await this.source(tx,actor,row.workspace_id)
       if(row.version!==cmd.version) throw new ScheduleError('scheduleVersionConflict')
       if(row.status==='cancelled') throw new ScheduleError('scheduleCancelled')
       if(cmd.action==='run_now') return this.runNow(tx,row,cmd.requestId)
+      if(cmd.action==='take_over') return this.takeOver(tx,actor,access,row)
+      if(cmd.action==='webhook_key'){
+        // The URL is a secret: it is made on the page and shown to the person, never handed to a chat model.
+        if(!actor.direct) throw new ScheduleError('scheduleWebhookPageOnly',403)
+        if(row.visibility==='workspace'&&row.owner_id!==actor.ownerId&&access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
+        if(!row.definition.webhook||row.status==='completed') throw new ScheduleError('scheduleWebhookOff',409)
+        const key=newWebhookKey()
+        const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET webhook_key_hash=$2,updated_at=$3 WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,webhookKeyHash(key),this.clock()])).rows[0]
+        await this.listChanged(tx,row.workspace_id)
+        return {schedule:updated,key}
+      }
       let def=row.definition, status=row.status, next=row.next_at
       if(cmd.action==='update'){def=cmd.definition;def.timezone=timezone(def.timezone);await this.permission(tx,row.owner_id,row.bot_id,row.workspace_id,def);next=nextTime(def,this.clock(),true);if(status==='completed')status='active'}
       else if(cmd.action==='pause'){status='paused';next=null}
@@ -158,10 +239,37 @@ export class ScheduleStore {
           await this.report(tx,row,item,'cancelled',null,'scheduleChanged')
         }
       }
-      const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET definition=$2,status=$3,next_at=$4,version=version+1,updated_at=$5 WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,def,status,next,this.clock()])).rows[0]
+      const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET definition=$2,status=$3,next_at=$4,version=version+1,updated_at=$5,disabled_reason=CASE WHEN $3='paused' THEN disabled_reason END WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,def,status,next,this.clock()])).rows[0]
       await this.listChanged(tx,row.workspace_id)
       return {schedule:updated}
     }))
+  }
+  /**
+   * 接手: the automation becomes the actor's. It runs as them from now on, reports to their chat, and its authority is
+   * theirs, checked now. When something it uses is not theirs to use (another person's Bot, a repository outside the
+   * workspace), it is taken over paused with that reason, so they can change it and turn it back on. Runs that had not
+   * started are cancelled; a 追加到同一个任务 automation starts a new task of theirs on its next run.
+   */
+  private async takeOver(tx:PoolClient,actor:Actor,access:WorkspaceAccess,row:Schedule){
+    if(row.visibility!=='workspace'||!row.workspace_id) throw new ScheduleError('scheduleNotFound',404)
+    if(row.owner_id===actor.ownerId) return {schedule:row}
+    if(access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
+    let status=row.status, next=row.next_at, reason:string|null=null
+    if(status==='active'||(status==='paused'&&row.disabled_reason)){
+      try{await this.permission(tx,actor.ownerId,actor.botId,row.workspace_id,row.definition);if(status==='paused'){next=nextTime(row.definition,this.clock());status=next||!runsOnSchedule(row.definition)?'active':'completed'}}
+      catch(error){if(!(error instanceof ScheduleError)||!AUTHORITY_LOST.has(error.code))throw error;status='paused';next=null;reason=error.code}
+    }
+    const stale=await tx.query<Occurrence>(`UPDATE schedule_occurrences SET status='cancelled',error='scheduleChanged',lease_token=NULL,lease_until=NULL,finished_at=$2 WHERE schedule_id=$1 AND status IN ('pending','running') RETURNING *`,[row.id,this.clock()])
+    if (stale.rows.length) {
+      await this.lockChat(tx,row)
+      for (const item of stale.rows) {
+        await this.retireEvent(tx,item.event_id)
+        await this.report(tx,row,item,'cancelled',null,'scheduleChanged')
+      }
+    }
+    const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET owner_id=$2,bot_id=$3,source_event_id=NULL,status=$4,next_at=$5,disabled_reason=$6,version=version+1,updated_at=$7 WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,actor.ownerId,actor.botId,status,next,reason,this.clock()])).rows[0]
+    await this.listChanged(tx,row.workspace_id)
+    return {schedule:updated}
   }
   /**
    * 立即运行: one occurrence due now, run by the same claim and execute path as a timed one (so maxConcurrent, the
@@ -177,6 +285,7 @@ export class ScheduleStore {
     await this.permission(tx, row.owner_id, row.bot_id, row.workspace_id, row.definition)
     const { rows: [busy] } = await tx.query<{ n: number }>(`SELECT count(*)::int n FROM schedule_occurrences WHERE schedule_id=$1 AND status IN ('pending','running')`, [row.id])
     if (busy.n >= (row.definition.maxConcurrent ?? 1)) throw new ScheduleError('scheduleConcurrencyLimit')
+    if (await this.dailyFull(tx, row)) throw new ScheduleError('scheduleDailyRunLimit')
     const now = this.clock()
     const { rows: [occurrence] } = await tx.query<Occurrence>(`INSERT INTO schedule_occurrences(id,schedule_id,version,due_at,definition,status,operation_id,next_retry_at,execution_decision)
       VALUES($1,$2,$3,$4,$5,'pending',$6,$4,'execute') ON CONFLICT DO NOTHING RETURNING *`, [randomUUID(), row.id, row.version, now, row.definition, operation])
@@ -238,7 +347,8 @@ export class ScheduleStore {
       if(o.attempts>MAX_ATTEMPTS)throw new ScheduleError('scheduleRecoveryExhausted')
       const misfireSkipped=o.execution_decision==='skip'
       const concurrencyLimited=!misfireSkipped&&await this.concurrencyLimited(tx,o,current.definition.maxConcurrent??1)
-      const skipReason=misfireSkipped?'misfireSkipped':concurrencyLimited?'concurrencyLimit':null
+      const dailyLimited=!misfireSkipped&&!concurrencyLimited&&await this.dailyFull(tx,current,o.id)
+      const skipReason=misfireSkipped?'misfireSkipped':concurrencyLimited?'concurrencyLimit':dailyLimited?'dailyRunLimit':null
       const issue=skipReason?null:await this.permission(tx,row.owner_id,row.bot_id,row.workspace_id,o.definition)
       const task=o.definition.task
       // The task is created and handed over after this commit, outside the schedule's locks; the lease fences it.
@@ -261,7 +371,10 @@ export class ScheduleStore {
   /** Creates and hands over the task as its creator, then records the run and posts its task line in the chat. */
   private async finishDispatch(row:Schedule,o:Occurrence){
     if(!this.automation.dispatch||!row.workspace_id||o.definition.task.kind!=='dispatch_task')throw new ScheduleError('scheduleDispatchUnavailable',503)
-    const result=await this.automation.dispatch({ownerId:row.owner_id,workspaceId:row.workspace_id,scheduleId:row.id,occurrenceId:o.id,task:o.definition.task})
+    const source=!o.trigger?undefined:'event' in o.trigger?o.trigger.event.source:'webhook' as const
+    const event=!o.trigger?undefined:'event' in o.trigger?(o.trigger.event.source==='linear'?describeLinearEvent(o.trigger.event):o.trigger.event.source==='slack'?describeSlackEvent(o.trigger.event):describeGitHubEvent(o.trigger.event)):describeWebhook(o.trigger.webhook.requests)
+    if(o.trigger&&'event' in o.trigger&&event&&!await this.runWhenHolds(row,o,event))return this.skipQuietly(row,o,'runWhenNotMet')
+    const result=await this.automation.dispatch({ownerId:row.owner_id,workspaceId:row.workspace_id,scheduleId:row.id,occurrenceId:o.id,task:o.definition.task,...(event&&source?{event,source}:{}),...(o.definition.eachRun==='same_task'?{single:true as const}:{})})
     const recorded=await this.workspace(row.owner_id,row.workspace_id,()=>this.transaction(async tx=>{
       await tx.query('SELECT id FROM user_schedules WHERE id=$1 FOR UPDATE',[row.id])
       // A lost lease means another worker owns this occurrence; it repeats the same idempotent dispatch.
@@ -271,18 +384,190 @@ export class ScheduleStore {
       await this.report(tx,row,done,'succeeded',result,null)
       return true
     }))
+    if(recorded)await this.notice(o.id,'succeeded')
     // The request event waits in the Bot's chat: waking the creator's chats delivers it.
     return recorded?row.owner_id:undefined
+  }
+  /**
+   * 满足任一条件就运行: the run goes ahead when any trigger that took the event has no condition, or one of their
+   * conditions holds. No answer from the Decision model is a retryable failure, never a silent pass or skip.
+   */
+  private async runWhenHolds(row:Schedule,o:Occurrence,event:string){
+    const triggers=(o.trigger&&'triggers' in o.trigger?o.trigger.triggers:[]).map(index=>o.definition.events?.[index]).filter((trigger):trigger is EventTrigger=>Boolean(trigger))
+    if(!triggers.length||triggers.some(trigger=>!trigger.runWhen))return true
+    if(!this.automation.runWhen||!row.workspace_id)throw new ScheduleError('scheduleRunWhenUnavailable',503)
+    for(const trigger of triggers){
+      const holds=await this.automation.runWhen({ownerId:row.owner_id,workspaceId:row.workspace_id,condition:trigger.runWhen!,event})
+      if(holds===null)throw new ScheduleError('scheduleRunWhenUnavailable',503)
+      if(holds)return true
+    }
+    return false
+  }
+  /** An event that did not need a run: recorded in the history, not posted to the chat. */
+  private async skipQuietly(row:Schedule,o:Occurrence,reason:string){
+    await this.transaction(async tx=>{
+      await tx.query(`UPDATE schedule_occurrences SET status='skipped',error=$3,finished_at=$4,reported_at=$4,lease_token=NULL,lease_until=NULL WHERE id=$1 AND status='running' AND lease_token=$2`,[o.id,o.lease_token,reason,this.clock()])
+      await this.listChanged(tx,row.workspace_id)
+    })
+    return undefined
+  }
+  /**
+   * A verified GitHub delivery: one run for each active automation that has a trigger taking any of its events, keyed
+   * by the delivery so a redelivery adds nothing. The repository must still be usable in the automation's workspace.
+   * Over the concurrency limit the event is recorded as skipped. Returns how many runs were queued.
+   */
+  async fireEvents(deliveryKey:string,events:readonly GitHubAutomationEvent[]){
+    if(!events.length)return 0
+    const repositories=[...new Set(events.map(event=>event.repository))]
+    const names=[...new Set(events.map(event=>event.event))]
+    const candidates=(await this.pool.query<Schedule>(`SELECT * FROM user_schedules s WHERE status='active' AND definition ? 'events' AND workspace_id IS NOT NULL
+      AND EXISTS(SELECT 1 FROM jsonb_array_elements(s.definition->'events') t WHERE t->>'event'=ANY($1::text[]) AND (t->'repositories') ?| $2::text[])`,[names,repositories])).rows
+    let queued=0
+    const usable=new Map<string,Promise<boolean>>()
+    for(const candidate of candidates){
+      const matched=events.flatMap(event=>(candidate.definition.events??[]).flatMap((trigger,index)=>triggerMatches(trigger,event)?[{event,index}]:[]))
+      if(!matched.length)continue
+      const event=matched[0]!.event
+      const key=`${candidate.workspace_id}:${event.repository}`
+      if(!usable.has(key))usable.set(key,this.automation.repository?this.automation.repository(candidate.workspace_id!,event.repository).catch(()=>false):Promise.resolve(false))
+      if(!await usable.get(key))continue
+      queued+=await this.queueEvent(candidate,deliveryKey,{event,triggers:[...new Set(matched.filter(item=>item.event===event).map(item=>item.index))]})
+    }
+    return queued
+  }
+  /**
+   * A verified Linear delivery, the same way: one run per automation whose Linear trigger takes one of its events, while
+   * the creator still has a Linear connection to the event's organization (that is what lets them see its teams).
+   */
+  async fireLinearEvents(deliveryKey:string,events:readonly LinearAutomationEvent[]){
+    if(!events.length)return 0
+    const names=[...new Set(events.map(event=>event.event))], teams=[...new Set(events.map(event=>event.teamId))]
+    const candidates=(await this.pool.query<Schedule>(`SELECT s.* FROM user_schedules s JOIN linear_connections c ON c."userId"=s.owner_id AND c."organizationId"=$3 AND c."revokedAt" IS NULL
+      WHERE s.status='active' AND s.definition ? 'events' AND s.workspace_id IS NOT NULL
+      AND EXISTS(SELECT 1 FROM jsonb_array_elements(s.definition->'events') t WHERE t->>'source'='linear' AND t->>'event'=ANY($1::text[]) AND (t->'teams') ?| $2::text[])`,[names,teams,events[0]!.organizationId])).rows
+    let queued=0
+    for(const candidate of candidates){
+      const matched=events.flatMap(event=>(candidate.definition.events??[]).flatMap((trigger,index)=>trigger.source==='linear'&&linearTriggerMatches(trigger,event)?[{event,index}]:[]))
+      if(!matched.length)continue
+      const event=matched[0]!.event
+      queued+=await this.queueEvent(candidate,deliveryKey,{event,triggers:[...new Set(matched.filter(item=>item.event===event).map(item=>item.index))]})
+    }
+    return queued
+  }
+  /**
+   * A signed Slack event, the same way: one run per automation whose Slack trigger takes it, in a workspace whose Slack
+   * installation is this app's install in this team, while the creator is still a member of that installation.
+   */
+  async fireSlackEvents(deliveryKey:string,events:readonly SlackAutomationEvent[]){
+    if(!events.length)return 0
+    const first=events[0]!
+    const names=[...new Set(events.map(event=>event.event))], channels=[...new Set(events.map(event=>event.channel))]
+    const candidates=(await this.pool.query<Schedule>(`SELECT s.* FROM user_schedules s
+      JOIN mikka_slack_installations i ON i.workspace_id=s.workspace_id AND i.app_id=$3 AND i.team_id=$4 AND NOT i.revoking
+      JOIN mikka_slack_members m ON m.installation_id=i.id AND m.user_id=s.owner_id
+      WHERE s.status='active' AND s.definition ? 'events'
+      AND EXISTS(SELECT 1 FROM jsonb_array_elements(s.definition->'events') t WHERE t->>'source'='slack' AND t->>'event'=ANY($1::text[]) AND (t->'channels') ?| $2::text[])`,[names,channels,first.appId,first.teamId])).rows
+    let queued=0
+    for(const candidate of candidates){
+      const matched=events.flatMap(event=>(candidate.definition.events??[]).flatMap((trigger,index)=>trigger.source==='slack'&&slackTriggerMatches(trigger,event)?[{event,index}]:[]))
+      if(!matched.length)continue
+      const event=matched[0]!.event
+      queued+=await this.queueEvent(candidate,deliveryKey,{event,triggers:[...new Set(matched.filter(item=>item.event===event).map(item=>item.index))]})
+    }
+    return queued
+  }
+  /** One event run for an automation, once per delivery; over maxConcurrent or the daily cap it is a skipped run. */
+  private async queueEvent(candidate:Schedule,deliveryKey:string,trigger:OccurrenceTrigger){
+    return this.transaction(async tx=>{
+      const row=(await tx.query<Schedule>(`SELECT * FROM user_schedules WHERE id=$1 AND status='active' FOR UPDATE`,[candidate.id])).rows[0]
+      if(!row||row.version!==candidate.version)return 0
+      const operation=scheduleOperationId(row.id,`event:${deliveryKey}`)
+      if((await tx.query('SELECT 1 FROM schedule_occurrences WHERE operation_id=$1',[operation])).rowCount)return 0
+      const {rows:[busy]}=await tx.query<{n:number}>(`SELECT count(*)::int n FROM schedule_occurrences WHERE schedule_id=$1 AND status IN ('pending','running')`,[row.id])
+      const reason=busy.n>=(row.definition.maxConcurrent??1)?'concurrencyLimit':await this.dailyFull(tx,row)?'dailyRunLimit':null
+      const limited=reason!==null
+      const inserted=await tx.query(`INSERT INTO schedule_occurrences(id,schedule_id,version,due_at,definition,status,operation_id,next_retry_at,execution_decision,trigger,error,finished_at,reported_at)
+        VALUES($1,$2,$3,clock_timestamp(),$4,$5,$6,clock_timestamp(),'execute',$7,$8,CASE WHEN $5='skipped' THEN clock_timestamp() END,CASE WHEN $5='skipped' THEN clock_timestamp() END) ON CONFLICT DO NOTHING`,
+        [randomUUID(),row.id,row.version,row.definition,limited?'skipped':'pending',operation,trigger,reason])
+      if(inserted.rowCount)await this.listChanged(tx,row.workspace_id)
+      return inserted.rowCount&&!limited?1:0
+    })
+  }
+  /**
+   * A request to an automation's webhook URL. With batchMinutes 0 it is a run now; otherwise it joins the run that is
+   * still gathering requests, or starts one due batchMinutes from now. Over maxConcurrent or the daily cap the request
+   * is recorded as a skipped run, with its body, and no chat report. The sender's request ID is taken once.
+   */
+  async receiveWebhook(keyHash:string,body:string,requestKey?:string):Promise<{status:'queued'|'batched'|'duplicate'|'skipped';reason?:string;dueAt?:string}>{
+    return this.transaction(async tx=>{
+      const row=(await tx.query<Schedule>('SELECT * FROM user_schedules WHERE webhook_key_hash=$1 FOR UPDATE',[keyHash])).rows[0]
+      if(!row||!row.definition.webhook||row.status==='cancelled'||row.status==='completed'||!row.workspace_id) throw new ScheduleError('scheduleNotFound',404)
+      if(row.status!=='active') throw new ScheduleError('scheduleNotActive',409)
+      if(requestKey&&(await tx.query(`SELECT 1 FROM schedule_occurrences WHERE schedule_id=$1 AND trigger->'webhook'->'requests' @> $2::jsonb LIMIT 1`,[row.id,JSON.stringify([{key:requestKey}])])).rowCount) return {status:'duplicate' as const}
+      const now=(await tx.query<{now:Date}>('SELECT clock_timestamp() now')).rows[0]!.now
+      const request:WebhookRequest={at:now.toISOString(),body,...(requestKey?{key:requestKey}:{})}
+      const batch=row.definition.webhook.batchMinutes
+      if(batch>0){
+        const open=(await tx.query<{id:string;n:number;bytes:number;due:Date}>(`SELECT id,jsonb_array_length(trigger->'webhook'->'requests')::int n,octet_length(trigger::text)::int bytes,next_retry_at due FROM schedule_occurrences
+          WHERE schedule_id=$1 AND version=$2 AND status='pending' AND attempts=0 AND trigger ? 'webhook' AND next_retry_at>$3 ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,[row.id,row.version,now])).rows[0]
+        if(open&&open.n<WEBHOOK_BATCH_REQUESTS&&open.bytes+Buffer.byteLength(body)<=WEBHOOK_BATCH_BYTES){
+          await tx.query(`UPDATE schedule_occurrences SET trigger=jsonb_set(trigger,'{webhook,requests}',(trigger->'webhook'->'requests')||$2::jsonb) WHERE id=$1`,[open.id,JSON.stringify([request])])
+          await this.listChanged(tx,row.workspace_id)
+          return {status:'batched' as const,dueAt:open.due.toISOString()}
+        }
+      }
+      const {rows:[busy]}=await tx.query<{n:number}>(`SELECT count(*)::int n FROM schedule_occurrences WHERE schedule_id=$1 AND status IN ('pending','running')`,[row.id])
+      const reason=busy.n>=(row.definition.maxConcurrent??1)?'concurrencyLimit':await this.dailyFull(tx,row)?'dailyRunLimit':null
+      const due=new Date(now.getTime()+batch*60_000)
+      const operation=requestKey?scheduleOperationId(row.id,`webhook:${requestKey}`):randomUUID()
+      await tx.query(`INSERT INTO schedule_occurrences(id,schedule_id,version,due_at,definition,status,operation_id,next_retry_at,execution_decision,trigger,error,finished_at,reported_at)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$4,'execute',$8,$9,CASE WHEN $6='skipped' THEN $10::timestamptz END,CASE WHEN $6='skipped' THEN $10::timestamptz END)`,
+        [randomUUID(),row.id,row.version,due,row.definition,reason?'skipped':'pending',operation,{webhook:{requests:[request]}},reason,now])
+      await this.listChanged(tx,row.workspace_id)
+      return reason?{status:'skipped' as const,reason}:{status:'queued' as const,dueAt:due.toISOString()}
+    })
+  }
+  /**
+   * 运行后发到 Slack: a finished run is claimed once (notified_at) and posted; a post that fails is logged, never retried
+   * into a second post, and never changes the run.
+   */
+  private async notice(occurrenceId:string,status:'succeeded'|'failed'){
+    if(!this.automation.notify)return
+    try{
+      const o=(await this.pool.query<Occurrence&{result:DispatchResult|null;owner_id:string;workspace_id:string|null}>(`UPDATE schedule_occurrences o SET notified_at=clock_timestamp() FROM user_schedules s
+        WHERE o.id=$1 AND s.id=o.schedule_id AND o.notified_at IS NULL AND o.definition ? 'notify' RETURNING o.*,s.owner_id,s.workspace_id`,[occurrenceId])).rows[0]
+      const slack=o?.definition.notify?.slack
+      if(!o||!slack||!o.workspace_id)return
+      await this.automation.notify({ownerId:o.owner_id,workspaceId:o.workspace_id,scheduleId:o.schedule_id,title:o.definition.title,channel:slack.channel,locale:slack.locale,status,
+        task:o.result?.id?{id:o.result.id,identifier:o.result.identifier,title:o.result.title}:null,error:o.error})
+    }catch(error){console.error('schedule_notice_failed',error instanceof ScheduleError?error.code:error instanceof Error?error.name:'unknown')}
+  }
+  /** Whether maxRunsPerDay runs already started (or wait) today in the automation's time zone, not counting `except`. */
+  private async dailyFull(tx:PoolClient,row:Schedule,except?:string){
+    const max=row.definition.maxRunsPerDay
+    if(!max)return false
+    const {rows:[today]}=await tx.query<{n:number}>(`SELECT count(*)::int n FROM schedule_occurrences WHERE schedule_id=$1 AND ${COUNTED} AND id IS DISTINCT FROM $3::uuid
+      AND created_at>=date_trunc('day',now() AT TIME ZONE $2) AT TIME ZONE $2`,[row.id,row.definition.timezone,except??null])
+    return today.n>=max
   }
   async fail(claim:Pick<Occurrence,'id'|'lease_token'>,error:unknown){
     const terminal=error instanceof ScheduleError&&(error.status===403||error.code==='scheduleRecoveryExhausted')
     const code=error instanceof ScheduleError?error.code:'scheduleExecutionUnavailable'
     const failed=await this.transaction(async tx=>{
       const row=(await tx.query<Occurrence>(`UPDATE schedule_occurrences SET status=CASE WHEN $3 OR attempts >= $4 THEN 'failed' ELSE 'pending' END,error=$5,next_retry_at=$6,finished_at=CASE WHEN $3 OR attempts >= $4 THEN $7::timestamptz ELSE NULL END,lease_token=NULL,lease_until=NULL,report_next_at=$7 WHERE id=$1 AND status='running' AND lease_token=$2 RETURNING *`,[claim.id,claim.lease_token,terminal,MAX_ATTEMPTS,code,new Date(this.clock().getTime()+30_000),this.clock()])).rows[0]
+      // The creator's authority no longer holds: stop the automation and say why, rather than fail every run after.
+      if(row&&terminal&&AUTHORITY_LOST.has(code)){
+        const paused=(await tx.query<Schedule>(`UPDATE user_schedules SET status='paused',next_at=NULL,disabled_reason=$2,version=version+1,updated_at=$3 WHERE id=$1 AND status='active' RETURNING *`,[row.schedule_id,code,this.clock()])).rows[0]
+        if(paused){
+          await tx.query(`UPDATE schedule_occurrences SET status='cancelled',error='scheduleChanged',lease_token=NULL,lease_until=NULL,finished_at=$2,reported_at=$2 WHERE schedule_id=$1 AND id<>$3 AND status IN ('pending','running')`,[paused.id,this.clock(),row.id])
+          await this.listChanged(tx,paused.workspace_id)
+        }
+      }
       if(row?.event_id){const schedule=(await tx.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1',[row.schedule_id])).rows[0];if(schedule)await this.lockChat(tx,schedule);await this.retireEvent(tx,row.event_id)}
       return row?.status==='failed'?row:null
     })
     if(failed)await this.publishFailedReport(failed)
+    if(failed)await this.notice(failed.id,'failed')
   }
   private async publishFailedReport(o:Occurrence){
     const row=(await this.pool.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1',[o.schedule_id])).rows[0]

@@ -155,3 +155,181 @@ Logs: `/tmp/mikka-old179-setup.log`, `/tmp/mikka-old179-store-db-final.log`,
 The parent must still run the combined Next/automatic-account acceptance and
 Git-linked CI on its final integration head. No live model/provider, production
 migration/Worker deployment, real external write or final issue closure is claimed.
+
+## Event triggers (2026-11-15)
+
+Decision [2026-11-15-1704](../design/decisions/2026-11-15-1704-automation-github-triggers.md).
+
+- **Definition.** A `dispatch_task` definition may carry `events`: 1–20 GitHub
+  triggers `{ source: 'github', event, repositories, branches?, labels?, runWhen? }`.
+  Events are those the GitHub App already subscribes to; `push` and `workflow_run`
+  are not offered. Each repository is a workspace key (`v2/github.com/<owner>/<name>`)
+  and must be usable in the workspace at create, update and resume, and again when
+  an event arrives (`AutomationSeams.repository`).
+- **Fan-out.** `dispatchVerifiedGitHubWebhook` maps a verified delivery to automation
+  events (`lib/schedules/github-events.ts`; a `Bot` sender maps to none) and calls
+  `fireGitHubAutomations` before GitHub is acknowledged. A failure answers 503 so the
+  delivery is retried. Each active automation whose trigger takes an event gets at
+  most one occurrence per delivery: its operation ID derives from the automation and
+  the delivery ID (or a body hash when GitHub sent none), so a redelivery adds
+  nothing. The occurrence stores the event and the indexes of the triggers that took
+  it in `schedule_occurrences.trigger`. At `maxConcurrent` the event is recorded as
+  `skipped` with `concurrencyLimit` and not reported to the chat.
+- **Conditions.** Before the dispatch, the run goes ahead when one taking trigger has
+  no `runWhen` or one of their conditions holds, judged by the Decision model for the
+  creator (`AutomationSeams.runWhen`, billed like their other judgments). A miss is
+  `skipped` with `runWhenNotMet` and not reported; no answer is the retryable
+  `scheduleRunWhenUnavailable`, never a silent pass.
+- **The request.** The dispatched user message is the automation's prompt followed by
+  a `<github_event>` block of plain fields. The event's `payload.schedule.event` marks
+  it, and eve's context tells the Bot the block is GitHub's data, not the person's
+  instruction.
+- **Cost.** One indexed read per PR, issue, comment, review or check delivery
+  (`user_schedules_event_triggers`); `tests/github-webhook-statements.db.test.ts`
+  carries it in each budget.
+
+
+## Limits and usage (2026-11-15)
+
+Decision [2026-11-15-1730](../design/decisions/2026-11-15-1730-automation-limits-usage.md).
+
+- **`maxRunsPerDay`** counts `pending`, `running`, `succeeded` and `failed` runs created
+  since local midnight in the definition's time zone. `execute` skips a timed or retried
+  run past it (`dailyRunLimit`, reported like other skips), `fireEvents` records an event
+  past it as a quiet skip, and `run_now` refuses with `scheduleDailyRunLimit`.
+- **`usage`** command (`automationUsage` action): per local day, newest first, for up to
+  90 days (default 14): `runs`, `skipped`, `tasks` (runs that created a task) and
+  `costMicroUsd`, the sum of `hosted_usage."costMicroUsd"` whose `usageRunId` is a run of
+  a task the automation created or added to (each task once), on the day it was spent; a
+  day with spend and no runs is listed too. Cost is null for a member who is neither the
+  creator nor an owner/admin.
+- **Auto-pause.** When a run fails terminally with an authority code
+  (`scheduleWorkspaceAccessDenied`, `scheduleOwnerUnavailable`,
+  `scheduleConversationUnavailable`, `scheduleBotUnavailable`,
+  `scheduleRepositoryUnavailable`, `scheduleDeviceUnavailable`,
+  `scheduleProfileUnavailable`), the same transaction pauses the automation, stores the
+  code in `user_schedules.disabled_reason`, bumps its version and cancels its other
+  waiting runs without chat reports. `resume` re-checks authority and clears the reason;
+  a person's own pause stores none.
+
+## Each run: a new task or the same task (2026-11-15)
+
+Decision [2026-11-15-1810](../design/decisions/2026-11-15-1810-automation-each-run.md).
+
+- `eachRun: 'new_task' | 'same_task'` (default `new_task`) on a `dispatch_task` definition. With
+  `same_task`, the first run that creates a task for the current creator (its result has
+  `eventId` and `requestedBy` = the creator) is the standing task. Each later run sends the prompt (plus any event block) to that task's latest run
+  of the creator with `sendThreadMessage(owner, runId, text, 'user', occurrenceId)`: a
+  message if the thread is working, a continuation if it ended; the occurrence ID is the
+  request ID, so a retry sends once. Its result is
+  `{ id, title, status, identifier, runId, continued: true }` with no `eventId`.
+- No run of the creator on the task yet: `scheduleStandingTaskNotStarted` (503, retried).
+  The task gone from the workspace: `scheduleStandingTaskUnavailable` (403), which
+  auto-pauses like a lost authority.
+
+## 接手: take over (2026-11-15)
+
+Decision [2026-11-15-1840](../design/decisions/2026-11-15-1840-automation-take-over.md).
+
+- Command `{ action: 'take_over', scheduleId, version }`; page action `takeOverAutomation`
+  (RPC `automations.takeOverAutomation`). Only on a workspace automation, only by an owner
+  or admin (`scheduleAdminRequired`); on one's own it returns the row unchanged.
+- `owner_id` and `bot_id` become the actor's (their chat gets the reports), `source_event_id`
+  becomes NULL (a page command), version + 1. Pending and running occurrences are cancelled
+  with `scheduleChanged` and reported to the previous creator's chat.
+- An active automation, or one the host paused (`disabled_reason` set), is checked with the
+  new creator's authority. Passing: active (an auto-paused one resumes). A lost-authority
+  code: paused with that code as `disabled_reason`, so they can change it and resume. A
+  person's pause stays.
+- `list` rows carry `can_take_over` (workspace row, someone else's, reader not a member).
+- `same_task`: the standing task is matched by `result.requestedBy`, so after 接手 the new
+  creator's next run makes their own task.
+
+## Webhook (2026-11-15)
+
+Decision [2026-11-15-1830](../design/decisions/2026-11-15-1830-automation-webhook.md).
+
+- Definition `webhook: { batchMinutes: 0..60 }` (dispatch_task only). Command
+  `{ action: 'webhook_key', scheduleId, version }` (page only, `scheduleWebhookPageOnly`
+  from a chat; creator or owner/admin) returns `{ schedule, key }` once; `key` is
+  `mwh_` + 32 random bytes base64url, stored as `user_schedules.webhook_key_hash`
+  (SHA-256, unique). `list` rows carry `webhook_key_set`. Page action
+  `automationWebhookKey`, RPC `automations.automationWebhookKey`.
+- `POST /api/webhooks/automations/<key>` (`lib/schedules/webhook-route.ts`): body ≤ 64 KB
+  UTF-8 text, CRLF normalised; `Idempotency-Key` or `X-Request-Id` (printable, ≤ 200) is
+  the request ID. `ScheduleStore.receiveWebhook` under the schedule row lock:
+  - unknown, off, cancelled or completed: 404 `scheduleNotFound`; paused: 409 `scheduleNotActive`;
+  - a request ID already in this automation's runs: `duplicate`;
+  - `batchMinutes > 0` and a pending, unclaimed run of this version still gathering
+    (`next_retry_at` in the future) under 50 requests and 256 KB: appended (`batched`);
+  - otherwise a new occurrence due `now + batchMinutes` (`queued`), or `skipped` with
+    `concurrencyLimit` / `dailyRunLimit` and no chat report.
+- The occurrence's `trigger` is `{ webhook: { requests: [{ at, body, key? }] } }`; history
+  blanks it for members as it does GitHub triggers. The dispatch appends
+  `describeWebhook(requests)` and marks the submission `schedule.webhook: true`, which
+  eve's context names as data from whoever called the URL.
+- `scrubString` masks `mwh_…` in exported traces.
+
+## Linear triggers (2026-11-15)
+
+Decision [2026-11-15-1930](../design/decisions/2026-11-15-1930-automation-linear-triggers.md).
+
+- `events[]` may hold `{ source: 'linear', event, teams (1–20 Linear team IDs), labels?, runWhen? }`;
+  events `issue_created`, `issue_status_changed` (`updatedFrom.stateId`), `issue_label_added`
+  (labels not in `updatedFrom.labelIds`; `labels` match the added ones), `issue_assigned`
+  (`updatedFrom.assigneeId`, now assigned), `comment_created`. An actor whose `type` is not
+  `user` yields no event (`lib/schedules/linear-events.ts`).
+- `permission` asks the `linearTeams(owner)` seam (the person's own Linear connection's teams;
+  null without one → `scheduleLinearUnavailable` 403, an authority loss; Linear unreachable →
+  `scheduleLinearUnreachable` 503, retried). Page action `automationLinearTeams`.
+- `fireLinearAutomations(deliveryId, payload)` → `ScheduleStore.fireLinearEvents`: candidates are
+  active automations with a matching Linear trigger whose creator has an unrevoked
+  `linear_connections` row for the event's organization; then the shared `queueEvent`
+  (operation `event:linear:<delivery>`, caps and concurrency as GitHub's).
+- Receivers: `app/api/webhooks/linear/route.ts` calls it after the signature check and before
+  the sync kill switch (503 on failure); `app/api/webhooks/linear/automations/route.ts` takes
+  the Linear Worker's forward (`LINEAR_AUTOMATIONS_FORWARD_URL`, Linear's own headers and body,
+  signature checked again). The submission carries `schedule.linear: true`.
+
+## Slack triggers (2026-11-15)
+
+Decision [2026-11-15-2010](../design/decisions/2026-11-15-2010-automation-slack-triggers.md).
+
+- `events[]` may hold `{ source: 'slack', event: 'message' | 'mention' | 'reaction_added', channels (1–20 IDs), reactions?, runWhen? }`.
+  A message or `app_mention` with no `bot_id`/`bot_profile` and no subtype (or `thread_broadcast`), or a
+  `reaction_added` on a message, by a user (`lib/schedules/slack-events.ts`).
+- `permission` asks the `slackChannels(owner, workspace)` seam: the workspace's installation of `SLACK_APP_ID` the
+  creator is a member of, its bot token's `conversations.list` (`lib/slack/automation-channels.ts`); null →
+  `scheduleSlackUnavailable` 403 (authority loss), Slack unreachable → `scheduleSlackUnreachable` 503. Page action
+  `automationSlackChannels`.
+- `fireSlackAutomations(payload)` → `ScheduleStore.fireSlackEvents`: candidates join `mikka_slack_installations`
+  (workspace, app, team, not revoking) and `mikka_slack_members` (the creator); operation `event:slack:<team>:<event_id>`.
+- Eve's Slack channel forwards signed `event_callback`s to `SLACK_AUTOMATIONS_FORWARD_URL` (Slack's body and
+  `x-slack-*` headers, 1.5 s timeout, failures logged); `/api/webhooks/slack/automations` checks the signature and
+  `api_app_id` again. The submission carries `schedule.slack: true`.
+
+## Posting runs to Slack (2026-11-15)
+
+Decision [2026-11-15-2040](../design/decisions/2026-11-15-2040-automation-slack-posts.md).
+
+- Definition `notify: { slack: { channel, locale: 'zh-CN' | 'en' } }` (dispatch_task only); `permission` checks the
+  channel with the `slackChannels` seam like a Slack trigger's.
+- After a run is recorded `succeeded`, or `failed` for good, `ScheduleStore.notice` claims it once
+  (`schedule_occurrences.notified_at`, migration `20261115203000_schedule_notified`) and calls the `notify` seam:
+  `postRunNotice` (`lib/slack/automation-notice.ts`) writes `AutomationSlack.*` in the saved locale (the task as a
+  link to `<app>/?issue=<id>`, a failure as its `Errors.*` copy) and `chat.postMessage`s with the installation's bot
+  token. A failed post is logged and not retried; the run is unchanged.
+
+## Templates, pins, folders and tags (2026-11-15)
+
+Decision [2026-11-15-2100](../design/decisions/2026-11-15-2100-automation-templates-organize.md).
+
+- Templates are client-side drafts (`components/automations/automation-templates.ts`): `automation=new:<template>`
+  opens the editor with the template's timing or trigger and the localized `Automations.templates.<key>` title and
+  request. Nothing is stored until the person saves.
+- Migration `20261115204500_schedule_organize`: `user_schedules.folder`, `user_schedules.tags text[]`, and
+  `schedule_pins(user_id, schedule_id)`.
+- Commands `{ action: 'pin', scheduleId, pinned }` (any reader; their own row in `schedule_pins`) and
+  `{ action: 'organize', scheduleId, folder, tags }` (creator or owner/admin, `scheduleAdminRequired`; no version
+  bump). `list` rows carry `folder`, `tags` and the reader's `pinned`. Page actions `pinAutomation`,
+  `organizeAutomation`.

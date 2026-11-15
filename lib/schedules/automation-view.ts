@@ -15,6 +15,16 @@ export type AutomationView = {
   updated_at?: string | Date
   /** The creator's name in this workspace (null when they left it). */
   owner_name?: string | null
+  /** Why the host paused it (the creator lost the authority it runs on); null when a person paused it or it runs. */
+  disabled_reason?: string | null
+  /** 接手 is offered: the reader is an owner or admin and someone else created it. */
+  can_take_over?: boolean
+  /** A webhook URL was made for it (the URL itself is shown only once). */
+  webhook_key_set?: boolean
+  /** 文件夹 and 标签: the workspace's; 置顶: the reader's own. */
+  folder?: string | null
+  tags?: string[]
+  pinned?: boolean
 }
 export type AutomationList = { schedules: AutomationView[]; nextCursor: string | null }
 
@@ -28,8 +38,14 @@ export type AutomationRun = {
   attempts: number
   error: string | null
   result: unknown
+  /** The event a run started on (blank for a member who is neither its creator nor an owner or admin). */
+  trigger?: { event: { source?: 'github'; event: string; repository: string; number: number | null; title: string | null; url: string | null } }
+    | { event: { source: 'linear'; event: string; identifier: string | null; title: string | null; url: string | null } }
+    | { event: { source: 'slack'; event: string; channel: string; reaction: string | null } } | { webhook: { requests: { at: string }[] } } | null
 }
 export type AutomationHistory = { occurrences: AutomationRun[] }
+export type AutomationUsageDay = { day: string; runs: number; skipped: number; tasks: number; costMicroUsd: number | null }
+export type AutomationUsage = { timezone: string; maxRunsPerDay: number | null; days: AutomationUsageDay[] }
 
 /** The task a dispatch_task run made, when the reader may see it. */
 export function runTask(run: Pick<AutomationRun, 'result'>): { id: string; title: string; identifier: string | null } | null {

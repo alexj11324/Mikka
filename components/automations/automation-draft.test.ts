@@ -68,3 +68,61 @@ test('cronShape names every day, weekdays, one weekday and one day of the month;
   assert.equal(cronShape('0 9 32 * *'), null)
   assert.equal(cronShape('0 25 * * *'), null)
 })
+
+test('GitHub trigger rows round-trip; each needs a repository; lists split on either comma', () => {
+  const github = [{ event: 'pull_request_opened' as const, repositories: ['v2/github.com/acme/web'], branches: 'main，release', labels: ' bug , bug', runWhen: ' The PR touches billing. ' }]
+  const result = definitionFrom(filled({ scheduleOn: false, github }), now)
+  assert.ok('definition' in result)
+  assert.deepEqual(result.definition.events, [{ source: 'github', event: 'pull_request_opened', repositories: ['v2/github.com/acme/web'], branches: ['main', 'release'], labels: ['bug'], runWhen: 'The PR touches billing.' }])
+  assert.deepEqual(draftFrom(result.definition, now).github, [{ event: 'pull_request_opened', repositories: ['v2/github.com/acme/web'], branches: 'main, release', labels: 'bug', runWhen: 'The PR touches billing.' }])
+  assert.deepEqual(definitionFrom(filled({ github: [{ ...github[0]!, repositories: [] }] }), now), { missing: 'repository' })
+  const plain = definitionFrom(filled({ scheduleKind: 'daily', dailyTime: '09:00' }), now)
+  assert.ok('definition' in plain && !('events' in plain.definition), 'no rows, no events key')
+})
+
+test('每天最多运行: 0 is no limit and leaves the key out; a number round-trips', () => {
+  const none = definitionFrom(filled({ scheduleOn: false }), now)
+  assert.ok('definition' in none && !('maxRunsPerDay' in none.definition))
+  const capped = definitionFrom(filled({ scheduleOn: false, perDay: 10 }), now)
+  assert.ok('definition' in capped)
+  assert.equal(capped.definition.maxRunsPerDay, 10)
+  assert.equal(draftFrom(capped.definition, now).perDay, 10)
+})
+
+test('每次运行: 追加到同一个任务 round-trips; 新建任务 leaves the key out', () => {
+  const single = definitionFrom(filled({ scheduleOn: false, eachRun: 'same_task' }), now)
+  assert.ok('definition' in single)
+  assert.equal(single.definition.eachRun, 'same_task')
+  assert.equal(draftFrom(single.definition, now).eachRun, 'same_task')
+  const fresh = definitionFrom(filled({ scheduleOn: false }), now)
+  assert.ok('definition' in fresh && !('eachRun' in fresh.definition))
+})
+
+test('Webhook: off leaves the key out; 0 and a batch window round-trip', () => {
+  const off = definitionFrom(filled({ scheduleOn: false }), now)
+  assert.ok('definition' in off && !('webhook' in off.definition))
+  for (const minutes of [0, 15]) {
+    const on = definitionFrom(filled({ scheduleOn: false, webhook: minutes }), now)
+    assert.ok('definition' in on)
+    assert.deepEqual(on.definition.webhook, { batchMinutes: minutes })
+    assert.equal(draftFrom(on.definition, now).webhook, minutes)
+  }
+})
+
+test('运行后发到 Slack: off leaves the key out; a channel round-trips with the locale it was saved in', () => {
+  const off = definitionFrom(filled({ scheduleOn: false }), now)
+  assert.ok('definition' in off && !('notify' in off.definition))
+  const on = definitionFrom(filled({ scheduleOn: false, notify: { channel: 'C0RUNS', locale: 'en' } }), now)
+  assert.ok('definition' in on)
+  assert.deepEqual(on.definition.notify, { slack: { channel: 'C0RUNS', locale: 'en' } })
+  assert.deepEqual(draftFrom(on.definition, now).notify, { channel: 'C0RUNS', locale: 'en' })
+})
+
+test('从模板开始: each template opens a draft with its timing or trigger; one that needs a repository, team or channel says so', async () => {
+  const { AUTOMATION_TEMPLATES, templateDraft } = await import('./automation-templates')
+  const missing = Object.fromEntries(AUTOMATION_TEMPLATES.map(template => {
+    const result = definitionFrom(templateDraft(template, filled({}), { title: `T ${template}`, prompt: 'Do it' }), now)
+    return [template, 'missing' in result ? result.missing : result.definition.timing.kind === 'cron' ? result.definition.timing.expression : 'ok']
+  }))
+  assert.deepEqual(missing, { standup: '0 9 * * 1-5', weeklyDeps: '0 10 * * 1', prReview: 'repository', ciFix: 'repository', linearTriage: 'team', slackQuestion: 'channel' })
+})

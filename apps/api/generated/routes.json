@@ -2658,6 +2658,15 @@
       "sourceHash": "bc4a3e01effdf4ef88e44029e1fe7cfc221e02848cd21b1c7b6c71f2c8a33681"
     },
     {
+      "path": "/mikka/api/webhooks/automations/[key]",
+      "template": "/api/webhooks/automations/[key]",
+      "source": "app/api/webhooks/automations/[key]/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "73e07fb4281fc67e33628f668cd932616f5bdb53ae9eeed89220427b77a84ca0"
+    },
+    {
       "path": "/mikka/api/webhooks/composio",
       "template": "/api/webhooks/composio",
       "source": "app/api/webhooks/composio/route.ts",
@@ -2673,7 +2682,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "7b7d07203fd1f2be46d676f90809953c84bfc3ddcdd132e1b1c7c1a409384e8e"
+      "sourceHash": "03ebe3b8bd92bca8169d028333da6f340eb038fbe8af703c365c92dda2c6437a"
     },
     {
       "path": "/mikka/api/webhooks/linear",
@@ -2682,7 +2691,16 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "b566d22ac335332ce9233e474edbe1dfab48d01f168a817b19463bbddcf15983"
+      "sourceHash": "e6b232f6a14d27adf1bfb05dbdfa9786bad256489987c617f6e2a238cc372561"
+    },
+    {
+      "path": "/mikka/api/webhooks/linear/automations",
+      "template": "/api/webhooks/linear/automations",
+      "source": "app/api/webhooks/linear/automations/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "80e032d4401805c04aa1791dc938760772f055204373f4e06636fc6b1d93761c"
     },
     {
       "path": "/mikka/api/webhooks/slack",
@@ -2693,6 +2711,15 @@
       ],
       "maxDuration": 60,
       "sourceHash": "95cbf7838529897157a8a12cb8351a708ff9f9aee30d5c9e385c858ed6012a52"
+    },
+    {
+      "path": "/mikka/api/webhooks/slack/automations",
+      "template": "/api/webhooks/slack/automations",
+      "source": "app/api/webhooks/slack/automations/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "8d049a73007975f463572d7708ff672337efe862d8beec91908381d8ccd3c303"
     },
     {
       "path": "/mikka/api/webhooks/telegram",

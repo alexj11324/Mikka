@@ -1224,6 +1224,14 @@
     "scheduleNotPaused": "自动化没有暂停。",
     "scheduleNotActive": "自动化已暂停或已结束，恢复后才能运行。",
     "scheduleConcurrencyLimit": "已达到同时运行的上限，请等当前运行结束。",
+    "scheduleDailyRunLimit": "今天的运行次数已经到上限了。",
+    "scheduleStandingTaskUnavailable": "追加的那个任务已经不在了。",
+    "scheduleStandingTaskNotStarted": "追加的那个任务还没开始，稍后再试。",
+    "scheduleWebhookOff": "先打开 Webhook 并保存，再生成地址。",
+    "scheduleLinearUnavailable": "Linear 触发器用到的团队你的 Linear 连接看不到，或者 Linear 没有连接。",
+    "scheduleLinearUnreachable": "现在连不上 Linear，稍后会重试。",
+    "scheduleSlackUnavailable": "Slack 触发器用到的频道 Mikka 的 Slack 应用看不到，或者你不在这个工作区的 Slack 里。",
+    "scheduleSlackUnreachable": "现在连不上 Slack，稍后会重试。",
     "scheduleRunConflict": "运行未开始，请重试。",
     "scheduleTimeMustBeFuture": "开始时间必须晚于现在。",
     "invalidIanaTimezone": "时区无效。",
@@ -7865,7 +7873,80 @@
     "saveUnconfirmed": "无法确认修改结果，请刷新文件夹后再试。",
     "loadError": "无法加载个人文件。"
   },
+  "AutomationSlack": {
+    "succeeded": "自动化「{title}」运行完成：{task}",
+    "succeededNoTask": "自动化「{title}」运行完成",
+    "failed": "自动化「{title}」没运行成功：{reason}",
+    "failedUnknown": "出了点问题，详情在 Mikka 的运行记录里"
+  },
   "Automations": {
+    "fromTemplate": "从模板开始",
+    "pin": "置顶",
+    "unpin": "取消置顶",
+    "pinned": "已置顶",
+    "organize": "文件夹和标签",
+    "organizeTitle": "文件夹和标签",
+    "folder": "文件夹",
+    "folderPlaceholder": "不放进文件夹",
+    "tags": "标签",
+    "tagsPlaceholder": "用逗号分隔，最多 10 个",
+    "save": "保存",
+    "cancel": "取消",
+    "saved": "已保存",
+    "noFolder": "未分组",
+    "tagFilter": "标签：{tag}",
+    "clearTag": "清除标签筛选",
+    "rowMenu": "更多操作",
+    "templates": {
+      "standup": {
+        "title": "工作日站会小结",
+        "prompt": "整理昨天合并的 PR 和关闭的议题，写一段简短的站会更新：做了什么、今天做什么、有什么卡住。"
+      },
+      "prReview": {
+        "title": "新 PR 先审一遍",
+        "prompt": "审阅这个 PR：指出风险、遗漏的测试和可以简化的地方，在 PR 上留一条评论。"
+      },
+      "ciFix": {
+        "title": "CI 失败就修",
+        "prompt": "看看失败的检查，找到根本原因并修复；修不了就在 PR 上说明卡在哪里。"
+      },
+      "linearTriage": {
+        "title": "新议题分诊",
+        "prompt": "给这个新议题分诊：判断优先级，补充复现步骤，建议负责人，在议题上留一条评论。"
+      },
+      "slackQuestion": {
+        "title": "回答 Slack 里的提问",
+        "prompt": "回答这条 Slack 消息里的问题，必要时查代码和文档，答案要简短。"
+      },
+      "weeklyDeps": {
+        "title": "每周检查依赖更新",
+        "prompt": "检查依赖有没有安全更新或重要的新版本，开一个升级 PR，说明改了什么。"
+      }
+    },
+    "usage": {
+      "title": "用量",
+      "empty": "最近 14 天没有运行",
+      "day": "日期",
+      "runs": "运行",
+      "skipped": "跳过",
+      "tasks": "任务",
+      "cost": "花费",
+      "ofCap": "{runs} / {cap}"
+    },
+    "githubEvent": {
+      "pull_request_opened": "PR 打开",
+      "draft_opened": "草稿 PR 打开",
+      "pull_request_pushed": "PR 有新提交",
+      "pull_request_merged": "PR 合并",
+      "pull_request_closed": "PR 关闭未合并",
+      "label_change": "标签变化",
+      "issue_opened": "Issue 打开",
+      "comment": "新评论",
+      "review_submitted": "提交 review",
+      "review_comment": "review 行内评论",
+      "checks_completed": "检查完成",
+      "checks_failed": "检查失败"
+    },
     "title": "自动化",
     "new": "新建自动化",
     "askBot": "让 Bot 帮你建",
@@ -7878,6 +7959,7 @@
       "paused": "已暂停"
     },
     "status": {
+      "autoPaused": "已自动暂停",
       "active": "已启用",
       "paused": "已暂停",
       "completed": "已结束",
@@ -7891,6 +7973,7 @@
     "nextRun": "下次 {time}",
     "coordinator": "Coordinator",
     "summary": {
+      "github": "GitHub：{event}{count, plural, =0 {} other { 等 # 项}}",
       "manual": "手动运行",
       "once": "一次 · {time}",
       "intervalMinutes": "每 {count} 分钟",
@@ -7900,7 +7983,10 @@
       "weekdays": "工作日 {time}",
       "weekly": "每{weekday} {time}",
       "monthly": "每月 {day} 日 {time}",
-      "cron": "cron {expression}"
+      "cron": "cron {expression}",
+      "webhook": "Webhook",
+      "linear": "Linear：{event}{count, plural, =0 {} other { 等 # 项}}",
+      "slack": "Slack：{event}{count, plural, =0 {} other { 等 # 项}}"
     },
     "kind": {
       "reminder": "提醒",
@@ -7909,6 +7995,28 @@
       "dispatch_task": "交给 Bot"
     },
     "editor": {
+      "eachRun": "每次运行",
+      "eachRunNew": "新建任务",
+      "eachRunSame": "追加到同一个任务",
+      "notify": "运行后发到 Slack",
+      "notifyOff": "不发送",
+      "notifyChoose": "选择频道",
+      "perDay": "每天最多运行",
+      "unlimited": "不限",
+      "autoPaused": "已自动暂停：{reason}",
+      "github": {
+        "title": "GitHub 事件",
+        "item": "GitHub 事件 {number}",
+        "event": "事件",
+        "repository": "仓库",
+        "branches": "分支（可选）",
+        "labels": "标签（可选）",
+        "runWhen": "运行条件",
+        "runWhenPlaceholder": "可选：一句话说明什么时候才运行，比如「改动涉及计费」",
+        "remove": "删除这个事件",
+        "add": "添加 GitHub 事件",
+        "noRepositories": "工作区里还没有安装 GitHub 仓库"
+      },
       "back": "自动化",
       "namePlaceholder": "自动化名称",
       "name": "名称",
@@ -7969,31 +8077,102 @@
       "delete": "删除",
       "deleteTitle": "删除这个自动化？",
       "deleteBody": "过去的运行和任务会保留。",
+      "takeOver": "接手",
+      "takeOverTitle": "接手这个自动化？",
+      "takeOverBody": "接手后它以你的身份运行：用你的权限和你的 Bot，运行报告发给你。{name} 不再是它的创建者。还没开始的运行会取消。",
+      "tookOver": "已接手",
       "cancel": "取消",
       "notFound": "自动化不存在或已删除",
       "missing": {
+        "repository": "每个 GitHub 事件都要选仓库",
         "title": "写上名称才能保存",
         "prompt": "写上要它做什么才能保存",
         "time": "这个时间不存在或格式不对",
         "fold": "选较早或较晚后才能保存",
         "interval": "间隔要在 1 分钟到 1 年之间",
-        "cron": "cron 表达式要有 5 段"
+        "cron": "cron 表达式要有 5 段",
+        "team": "选一个 Linear 团队",
+        "channel": "选一个 Slack 频道"
+      },
+      "webhook": {
+        "title": "Webhook",
+        "description": "向这个自动化自己的地址发 POST 请求就会运行，正文最多 64 KB。",
+        "batch": "合并请求",
+        "batchNone": "每个请求单独运行",
+        "batchMinutes": "{minutes} 分钟内的请求合成一次运行",
+        "url": "Webhook 地址",
+        "copy": "复制地址",
+        "copied": "已复制",
+        "copyFailed": "复制失败",
+        "once": "地址只显示这一次。忘了就重新生成，旧地址会失效。",
+        "saveFirst": "保存后可以生成地址。",
+        "made": "地址已生成。",
+        "make": "生成地址",
+        "remake": "重新生成地址"
+      },
+      "linear": {
+        "title": "Linear 事件",
+        "show": "添加 Linear 事件",
+        "item": "Linear 事件 {number}",
+        "event": "事件",
+        "team": "团队",
+        "remove": "移除",
+        "labels": "标签（可选，逗号分隔）",
+        "runWhen": "条件",
+        "runWhenPlaceholder": "条件（可选）：例如「标题里提到计费」",
+        "add": "添加 Linear 事件",
+        "notConnected": "先在设置里连接 Linear",
+        "noTeams": "你的 Linear 里没有团队",
+        "teamsError": "Linear 团队没加载出来"
+      },
+      "slack": {
+        "title": "Slack 事件",
+        "show": "添加 Slack 事件",
+        "item": "Slack 事件 {number}",
+        "event": "事件",
+        "channel": "频道",
+        "remove": "移除",
+        "reactions": "表情（可选，逗号分隔，例如 eyes, white_check_mark）",
+        "runWhen": "条件",
+        "runWhenPlaceholder": "条件（可选）：例如「消息里在问部署」",
+        "add": "添加 Slack 事件",
+        "notInstalled": "先在设置里把 Slack 连到这个工作区",
+        "noChannels": "Mikka 的 Slack 应用还看不到频道，先把它加进频道",
+        "channelsError": "Slack 频道没加载出来"
       }
     },
     "run": {
+      "from": "由「{event}」触发 · {what}",
       "pending": "等待中",
       "running": "运行中",
       "succeeded": "完成",
       "failed": "失败",
       "skipped": "已跳过",
-      "cancelled": "已取消"
+      "cancelled": "已取消",
+      "fromWebhook": "由 Webhook 触发 · {count} 个请求"
     },
     "runErrors": {
+      "scheduleStandingTaskNotStarted": "追加的任务还没开始，稍后重试",
+      "dailyRunLimit": "今天的运行次数已到上限，已跳过",
+      "runWhenNotMet": "不满足运行条件，已跳过",
+      "scheduleRunWhenUnavailable": "暂时无法判断运行条件，稍后重试",
       "misfireSkipped": "错过了时间，已跳过",
       "concurrencyLimit": "达到同时运行上限",
       "scheduleChanged": "自动化已修改",
       "scheduleRecoveryExhausted": "多次重试后失败",
       "scheduleExecutionUnavailable": "无法执行"
+    },
+    "linearEvent": {
+      "issue_created": "新建议题",
+      "issue_status_changed": "议题状态变化",
+      "issue_label_added": "议题加了标签",
+      "issue_assigned": "议题被指派",
+      "comment_created": "新评论"
+    },
+    "slackEvent": {
+      "message": "频道新消息",
+      "mention": "提到 Mikka",
+      "reaction_added": "加了表情回应"
     }
   },
   "SetupChecklist": {

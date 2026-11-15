@@ -2,9 +2,9 @@
 
 import useSWR, { unstable_serialize as serialize } from 'swr'
 import useSWRInfinite, { unstable_serialize } from 'swr/infinite'
-import { automationHistory, getAutomation, listAutomations } from '@/app/actions/automations'
+import { automationHistory, automationUsage, getAutomation, listAutomations } from '@/app/actions/automations'
 import { useLiveKey } from '@/hooks/use-live-key'
-import type { AutomationHistory, AutomationList, AutomationView } from '@/lib/schedules/automation-view'
+import type { AutomationHistory, AutomationList, AutomationUsage, AutomationView } from '@/lib/schedules/automation-view'
 
 type Read<T> = { error?: string } | T
 
@@ -42,4 +42,12 @@ export function useAutomation(workspaceId: string | null, id: string | null) {
     { revalidateOnFocus: false, shouldRetryOnError: false })
   useLiveKey('schedule_list', workspaceId, key && historyKey ? [serialize(key), serialize(historyKey)] : [], workspaceId)
   return { automation, history }
+}
+
+/** 用量 per day, read on open and again when the live channel says a schedule changed. */
+export function useAutomationUsage(workspaceId: string | null, id: string | null) {
+  const key = workspaceId && id ? ['automation-usage', workspaceId, id] as const : null
+  const usage = useSWR<AutomationUsage>(key, () => automationUsage({ scheduleId: id! }).then(unwrap<AutomationUsage>), { revalidateOnFocus: false, shouldRetryOnError: false })
+  useLiveKey('schedule_list', workspaceId, key ? [serialize(key)] : [], workspaceId)
+  return usage
 }

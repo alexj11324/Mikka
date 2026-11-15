@@ -364,6 +364,7 @@ describe('helpers', () => {
     assert.equal(scrubString('fetch POST https://api.example.com/v1/a?key=k#frag'), 'fetch POST https://api.example.com/v1/a')
     assert.equal(scrubString('from bob@example.com at 10.1.2.3 or 2001:db8::1'), 'from [email] at [ip] or [ip]')
     assert.equal(scrubString('/v1/devices/[deviceId]/commands'), '/v1/devices/[deviceId]/commands')
+    assert.equal(scrubString('POST /mikka/api/webhooks/automations/mwh_AbC-d_123'), 'POST /mikka/api/webhooks/automations/mwh_[key]', 'an automation webhook key never leaves the process')
   })
 
   test('a multi-statement result sums its rows and keeps the last command', () => {

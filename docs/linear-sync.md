@@ -120,6 +120,7 @@ Set these server-only environment variables in the Mikka app and the Linear sync
 | `LINEAR_CLIENT_SECRET` | OAuth code and refresh-token exchange; set in both deployments |
 | `LINEAR_TOKEN_ENCRYPTION_KEY` | 32 random bytes encoded as 64 hex characters; encrypts OAuth tokens stored in Neon; set in both deployments |
 | `LINEAR_WEBHOOK_SECRET` | Linear OAuth application's webhook signing secret; set on the Worker |
+| `LINEAR_AUTOMATIONS_FORWARD_URL` | The app's `https://<host>/mikka/api/webhooks/linear/automations`; set on the Worker so Issue and Comment deliveries also reach 自动化 Linear triggers (the app checks the signature again with its own `LINEAR_WEBHOOK_SECRET`). Unset, Linear starts no automations. |
 | `CRON_SECRET` | Authenticates HTTP calls to `/mikka/api/cron/linear-sync`. Cloudflare Cron Triggers invoke `scheduled()` directly. |
 | `LINEAR_REDIRECT_URL` | Optional exact callback URL override; required on any non-production deployment so its OAuth state is not stored in Production (Mikka's branches have no Vercel Preview) |
 | `HYPERDRIVE` binding | Cloudflare Hyperdrive connection to the same Neon branch used by the app |

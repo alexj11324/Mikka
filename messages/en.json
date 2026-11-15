@@ -1224,6 +1224,14 @@
     "scheduleNotPaused": "The automation isn't paused.",
     "scheduleNotActive": "The automation is paused or finished. Resume it to run it.",
     "scheduleConcurrencyLimit": "It's already running as many times as allowed. Please wait for a run to finish.",
+    "scheduleDailyRunLimit": "It has already run as many times as allowed today.",
+    "scheduleStandingTaskUnavailable": "The task it adds to no longer exists.",
+    "scheduleStandingTaskNotStarted": "The task it adds to hasn't started yet. It will try again shortly.",
+    "scheduleWebhookOff": "Turn on Webhook and save first, then make the URL.",
+    "scheduleLinearUnavailable": "Your Linear connection cannot see a team this Linear trigger uses, or Linear is not connected.",
+    "scheduleLinearUnreachable": "Linear could not be reached. It will try again shortly.",
+    "scheduleSlackUnavailable": "Mikka's Slack app cannot see a channel this Slack trigger uses, or you are not in this workspace's Slack.",
+    "scheduleSlackUnreachable": "Slack could not be reached. It will try again shortly.",
     "scheduleRunConflict": "The run didn't start. Please try again.",
     "scheduleTimeMustBeFuture": "The start time must be in the future.",
     "invalidIanaTimezone": "The time zone is invalid.",
@@ -7865,7 +7873,80 @@
     "saveUnconfirmed": "The change could not be confirmed. Refresh the folder before trying again.",
     "loadError": "Could not load personal files."
   },
+  "AutomationSlack": {
+    "succeeded": "Automation \"{title}\" ran: {task}",
+    "succeededNoTask": "Automation \"{title}\" ran",
+    "failed": "Automation \"{title}\" did not run: {reason}",
+    "failedUnknown": "Something went wrong; see the run history in Mikka"
+  },
   "Automations": {
+    "fromTemplate": "Start from a template",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "pinned": "Pinned",
+    "organize": "Folder and tags",
+    "organizeTitle": "Folder and tags",
+    "folder": "Folder",
+    "folderPlaceholder": "No folder",
+    "tags": "Tags",
+    "tagsPlaceholder": "Comma-separated, up to 10",
+    "save": "Save",
+    "cancel": "Cancel",
+    "saved": "Saved",
+    "noFolder": "No folder",
+    "tagFilter": "Tag: {tag}",
+    "clearTag": "Clear tag filter",
+    "rowMenu": "More actions",
+    "templates": {
+      "standup": {
+        "title": "Weekday standup notes",
+        "prompt": "Gather the PRs merged and issues closed yesterday and write a short standup update: what was done, what is next, what is blocked."
+      },
+      "prReview": {
+        "title": "Review new PRs",
+        "prompt": "Review this PR: point out risks, missing tests and what could be simpler, and leave one comment on the PR."
+      },
+      "ciFix": {
+        "title": "Fix failing CI",
+        "prompt": "Look at the failed checks, find the root cause and fix it; if you cannot, say on the PR what blocks you."
+      },
+      "linearTriage": {
+        "title": "Triage new issues",
+        "prompt": "Triage this new issue: set a priority, add reproduction steps, suggest an owner, and leave one comment on the issue."
+      },
+      "slackQuestion": {
+        "title": "Answer questions in Slack",
+        "prompt": "Answer the question in this Slack message, checking the code and docs when needed; keep the answer short."
+      },
+      "weeklyDeps": {
+        "title": "Weekly dependency check",
+        "prompt": "Check dependencies for security updates or important new versions, open an upgrade PR, and say what changed."
+      }
+    },
+    "usage": {
+      "title": "Usage",
+      "empty": "No runs in the last 14 days",
+      "day": "Day",
+      "runs": "Runs",
+      "skipped": "Skipped",
+      "tasks": "Tasks",
+      "cost": "Spend",
+      "ofCap": "{runs} / {cap}"
+    },
+    "githubEvent": {
+      "pull_request_opened": "PR opened",
+      "draft_opened": "Draft PR opened",
+      "pull_request_pushed": "New commits on a PR",
+      "pull_request_merged": "PR merged",
+      "pull_request_closed": "PR closed without merging",
+      "label_change": "Label changed",
+      "issue_opened": "Issue opened",
+      "comment": "New comment",
+      "review_submitted": "Review submitted",
+      "review_comment": "Review comment",
+      "checks_completed": "Checks finished",
+      "checks_failed": "Checks failed"
+    },
     "title": "Automations",
     "new": "New automation",
     "askBot": "Ask a Bot to set it up",
@@ -7878,6 +7959,7 @@
       "paused": "Paused"
     },
     "status": {
+      "autoPaused": "Paused automatically",
       "active": "On",
       "paused": "Paused",
       "completed": "Finished",
@@ -7891,6 +7973,7 @@
     "nextRun": "Next {time}",
     "coordinator": "Coordinator",
     "summary": {
+      "github": "GitHub: {event}{count, plural, =0 {} other { and # more}}",
       "manual": "Manual",
       "once": "Once · {time}",
       "intervalMinutes": "{count, plural, one {Every minute} other {Every # minutes}}",
@@ -7900,7 +7983,10 @@
       "weekdays": "Weekdays at {time}",
       "weekly": "{weekday}s at {time}",
       "monthly": "Monthly on day {day} at {time}",
-      "cron": "cron {expression}"
+      "cron": "cron {expression}",
+      "webhook": "Webhook",
+      "linear": "Linear: {event}{count, plural, =0 {} other { and # more}}",
+      "slack": "Slack: {event}{count, plural, =0 {} other { and # more}}"
     },
     "kind": {
       "reminder": "Reminder",
@@ -7909,6 +7995,28 @@
       "dispatch_task": "Hand to a Bot"
     },
     "editor": {
+      "eachRun": "Each run",
+      "eachRunNew": "Makes a new task",
+      "eachRunSame": "Adds to the same task",
+      "notify": "Post runs to Slack",
+      "notifyOff": "Don't post",
+      "notifyChoose": "Choose a channel",
+      "perDay": "At most per day",
+      "unlimited": "No limit",
+      "autoPaused": "Paused automatically: {reason}",
+      "github": {
+        "title": "GitHub events",
+        "item": "GitHub event {number}",
+        "event": "Event",
+        "repository": "Repository",
+        "branches": "Branches (optional)",
+        "labels": "Labels (optional)",
+        "runWhen": "Condition",
+        "runWhenPlaceholder": "Optional: one sentence on when to run, like “the change touches billing”",
+        "remove": "Remove this event",
+        "add": "Add GitHub event",
+        "noRepositories": "No GitHub repository is installed in this workspace"
+      },
       "back": "Automations",
       "namePlaceholder": "Automation name",
       "name": "Name",
@@ -7969,31 +8077,102 @@
       "delete": "Delete",
       "deleteTitle": "Delete this automation?",
       "deleteBody": "Past runs and their tasks stay.",
+      "takeOver": "Take over",
+      "takeOverTitle": "Take over this automation?",
+      "takeOverBody": "It will run as you, with your access and your Bots, and report to you. {name} is no longer its creator. Runs that have not started are cancelled.",
+      "tookOver": "Taken over",
       "cancel": "Cancel",
       "notFound": "The automation doesn't exist or was deleted",
       "missing": {
+        "repository": "Choose a repository for each GitHub event",
         "title": "Add a name to save",
         "prompt": "Say what it should do to save",
         "time": "That time does not exist or is not valid",
         "fold": "Choose earlier or later to save",
         "interval": "The interval must be between 1 minute and 1 year",
-        "cron": "A cron expression has 5 fields"
+        "cron": "A cron expression has 5 fields",
+        "team": "Choose a Linear team",
+        "channel": "Choose a Slack channel"
+      },
+      "webhook": {
+        "title": "Webhook",
+        "description": "A POST to this automation's own URL runs it. The body can be up to 64 KB.",
+        "batch": "Combine requests",
+        "batchNone": "Each request runs on its own",
+        "batchMinutes": "Requests within {minutes} min run together",
+        "url": "Webhook URL",
+        "copy": "Copy URL",
+        "copied": "Copied",
+        "copyFailed": "Could not copy",
+        "once": "The URL is shown only this once. If you lose it, make a new one; the old one stops working.",
+        "saveFirst": "Save to make the URL.",
+        "made": "A URL was made.",
+        "make": "Make URL",
+        "remake": "Make a new URL"
+      },
+      "linear": {
+        "title": "Linear events",
+        "show": "Add a Linear event",
+        "item": "Linear event {number}",
+        "event": "Event",
+        "team": "Team",
+        "remove": "Remove",
+        "labels": "Labels (optional, comma-separated)",
+        "runWhen": "Condition",
+        "runWhenPlaceholder": "Condition (optional): e.g. \"the title mentions billing\"",
+        "add": "Add a Linear event",
+        "notConnected": "Connect Linear in Settings first",
+        "noTeams": "Your Linear has no teams",
+        "teamsError": "Could not load your Linear teams"
+      },
+      "slack": {
+        "title": "Slack events",
+        "show": "Add a Slack event",
+        "item": "Slack event {number}",
+        "event": "Event",
+        "channel": "Channel",
+        "remove": "Remove",
+        "reactions": "Emoji (optional, comma-separated, e.g. eyes, white_check_mark)",
+        "runWhen": "Condition",
+        "runWhenPlaceholder": "Condition (optional): e.g. \"the message asks about a deploy\"",
+        "add": "Add a Slack event",
+        "notInstalled": "Connect Slack to this workspace in Settings first",
+        "noChannels": "Mikka's Slack app cannot see any channels yet. Add it to a channel first",
+        "channelsError": "Could not load Slack channels"
       }
     },
     "run": {
+      "from": "Started by {event} · {what}",
       "pending": "Waiting",
       "running": "Running",
       "succeeded": "Done",
       "failed": "Failed",
       "skipped": "Skipped",
-      "cancelled": "Cancelled"
+      "cancelled": "Cancelled",
+      "fromWebhook": "From the webhook · {count, plural, one {# request} other {# requests}}"
     },
     "runErrors": {
+      "scheduleStandingTaskNotStarted": "The task hasn't started yet; will retry",
+      "dailyRunLimit": "Daily run limit reached; skipped",
+      "runWhenNotMet": "Condition not met; skipped",
+      "scheduleRunWhenUnavailable": "Couldn't check the condition; will retry",
       "misfireSkipped": "Missed its time, skipped",
       "concurrencyLimit": "At the concurrency limit",
       "scheduleChanged": "The automation changed",
       "scheduleRecoveryExhausted": "Failed after retries",
       "scheduleExecutionUnavailable": "Couldn't run"
+    },
+    "linearEvent": {
+      "issue_created": "Issue created",
+      "issue_status_changed": "Issue status changed",
+      "issue_label_added": "Label added to an issue",
+      "issue_assigned": "Issue assigned",
+      "comment_created": "New comment"
+    },
+    "slackEvent": {
+      "message": "New message in a channel",
+      "mention": "Mikka is mentioned",
+      "reaction_added": "Reaction added"
     }
   },
   "SetupChecklist": {

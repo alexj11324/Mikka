@@ -2323,7 +2323,9 @@
   },
   "app/actions/automations.ts": {
     "mode": "built-in",
-    "environment": [],
+    "environment": [
+      "SLACK_APP_ID"
+    ],
     "behavior": "The signed-in member lists, reads and runs the workspace's automations, and creates, changes, pauses, resumes or cancels them, through the schedule store in the installation PostgreSQL database; each run re-checks the creator's authority.",
     "test": "lib/schedules/dispatch.db.test.ts",
     "suite": "test:schedules-db"
@@ -2383,5 +2385,140 @@
     "behavior": "Wall-clock arithmetic and repeated daylight-saving times in an IANA zone with the runtime time zone data; no I/O.",
     "test": "lib/schedules/time.test.ts",
     "suite": "test:schedules"
+  },
+  "drizzle/20261115170535_schedule_event_triggers.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Record the GitHub event an automation run started on and index the active automations that have event triggers.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
+  },
+  "lib/schedules/github-events.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Map a verified GitHub delivery to automation events and match them to triggers; no I/O.",
+    "test": "lib/schedules/github-events.test.ts",
+    "suite": "test:schedules"
+  },
+  "lib/schedules/runtime.ts": {
+    "mode": "built-in",
+    "environment": [
+      "SLACK_APP_ID"
+    ],
+    "behavior": "Run automations as their creator through the installation PostgreSQL database, including runs started by verified GitHub, Linear and Slack deliveries and by requests to an automation's webhook URL; a trigger condition uses the configured Decision model and fails retryably without one.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
+  },
+  "drizzle/20261115172546_schedule_limits_usage.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Record why the host paused an automation and index its runs by creation time for the daily cap and usage.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
+  },
+  "drizzle/20261115182500_schedule_webhook_key.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Keep the SHA-256 of an automation's webhook URL key, unique among automations.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
+  },
+  "lib/schedules/webhook.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Make and hash automation webhook URL keys, read the sender's request ID and mark request bodies as data; no I/O.",
+    "test": "lib/schedules/webhook.test.ts",
+    "suite": "test:schedules"
+  },
+  "lib/schedules/webhook-route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Take a request to an automation's webhook URL: refuse a malformed key, a body over 64 KB or not text, and hand the rest to the installation's schedule store.",
+    "test": "lib/schedules/webhook-route.test.ts",
+    "suite": "test:schedules"
+  },
+  "app/api/webhooks/automations/[key]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Serve automation webhook URLs on the installation; the key in the path is the only credential.",
+    "test": "lib/schedules/webhook-route.test.ts",
+    "suite": "test:schedules"
+  },
+  "lib/schedules/linear-events.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Map a verified Linear delivery to automation events and match them to Linear triggers; no I/O.",
+    "test": "lib/schedules/linear-events.test.ts",
+    "suite": "test:schedules"
+  },
+  "app/api/webhooks/linear/automations/route.ts": {
+    "mode": "built-in",
+    "environment": [
+      "LINEAR_WEBHOOK_SECRET"
+    ],
+    "behavior": "Take Linear deliveries forwarded by the Linear Worker for automation triggers, checking Linear's signature again.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
+  },
+  "lib/schedules/slack-events.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Map a signed Slack event to automation events and match them to Slack triggers; no I/O.",
+    "test": "lib/schedules/slack-events.test.ts",
+    "suite": "test:schedules"
+  },
+  "lib/slack/automation-route.ts": {
+    "mode": "built-in",
+    "environment": [
+      "SLACK_SIGNING_SECRET",
+      "SLACK_APP_ID"
+    ],
+    "behavior": "Take Slack events forwarded by Eve for automation triggers, checking Slack's signature and app again.",
+    "test": "lib/slack/automation-route.test.ts",
+    "suite": "test:schedules"
+  },
+  "app/api/webhooks/slack/automations/route.ts": {
+    "mode": "built-in",
+    "environment": [
+      "SLACK_SIGNING_SECRET",
+      "SLACK_APP_ID"
+    ],
+    "behavior": "Serve the Slack automation hand-off route on the installation.",
+    "test": "lib/slack/automation-route.test.ts",
+    "suite": "test:schedules"
+  },
+  "lib/slack/automation-channels.ts": {
+    "mode": "built-in",
+    "environment": [
+      "SLACK_APP_ID"
+    ],
+    "behavior": "List the channels the workspace's Slack installation can see, with its bot token, for a member of that installation.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
+  },
+  "drizzle/20261115203000_schedule_notified.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Record when a finished automation run was posted to Slack, so it is posted once.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
+  },
+  "lib/slack/automation-notice.ts": {
+    "mode": "built-in",
+    "environment": [
+      "BETTER_AUTH_URL",
+      "MIKKA_APP_ORIGIN",
+      "SLACK_APP_ID"
+    ],
+    "behavior": "Post a finished automation run to its Slack channel with the workspace installation's bot token, in the saved locale.",
+    "test": "lib/slack/automation-notice.test.ts",
+    "suite": "test:schedules"
+  },
+  "drizzle/20261115204500_schedule_organize.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Add an automation's workspace folder and tags, and each person's own pins.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
   }
 }
