@@ -181,6 +181,10 @@ try {
   const queued=await queueRow(reqId);note('automatic queue receipt after actual parent completion',{queued,stored})
   assert.equal(queued.status,'sent','terminal writer must automatically admit a follow-up')
   assert.equal(queued.claimMode,'afterRun');assert.ok(queued.sentRunId&&queued.sentRunId!==runId)
+  const tooLate=await rpc(ownerCookie,'changeQueuedThreadReply',{messageId:queued.id,action:'cancel'})
+  assert.deepEqual(tooLate,{status:'tooLate'})
+  assert.deepEqual(await queueRow(reqId),queued)
+  note('cancelling after automatic child admission returns tooLate and leaves the same exactly-once receipt',{tooLate,queued})
   const resultRun=queued.sentRunId
 
   const accepted=await getRun(resultRun);assert.equal(accepted.continuesRunId,runId);assert.equal(accepted.issueId,issueId);assert.equal(accepted.workspaceId,ws.id);assert.equal(accepted.model,model);assert.ok(accepted.prompt.includes(text))

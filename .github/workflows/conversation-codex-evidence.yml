@@ -1,4 +1,4 @@
-name: Integrated E supported Claude Code queue and Factory interrupt with new real model attempt
+name: Integrated E native Claude Code edit and rerun with retained versions and too-late cancellation
 on:
   push:
     branches: [evidence/2254-sidebar-85dfc396]
@@ -73,7 +73,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: integrated-9be0-claude-queue-interrupt
+          name: integrated-9be0-claude-version-persistence
           path: |
             ${{ runner.temp }}/receipt/*-trial.json
             ${{ runner.temp }}/receipt/cleanup-*.jsonl
