@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { ArrowLeft, Play } from 'lucide-react'
 import { listDevices } from '@/app/actions/agents'
 import { getWorkspaceBotDefaults, listBots } from '@/app/actions/bots'
-import { cancelAutomation, createAutomation, pauseAutomation, resumeAutomation, runAutomationNow, takeOverAutomation, updateAutomation } from '@/app/actions/automations'
+import { automationLinearTeams, cancelAutomation, createAutomation, pauseAutomation, resumeAutomation, runAutomationNow, takeOverAutomation, updateAutomation } from '@/app/actions/automations'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -32,6 +32,7 @@ import { definitionFrom, draftFrom, emptyDraft, foldNeeded, type AutomationDraft
 import { useWorkspaceBotNames } from './automations-page'
 import { GitHubTriggers } from './github-triggers'
 import { WebhookTrigger } from './webhook-trigger'
+import { LinearTriggers } from './linear-triggers'
 import { AutomationUsagePanel } from './automation-usage'
 import { useNextRunLabel, useTimingSummary } from './automation-summary'
 
@@ -78,6 +79,13 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
   const { data: repositories = [] } = useSWR(workspaceId ? ['automation-repositories', workspaceId] : null, async () => {
     const result = await getWorkspaceBotDefaults()
     return 'error' in result && result.error ? [] : (result as { repositories: string[] }).repositories
+  }, { revalidateOnFocus: false })
+  // Linear triggers' teams, read only once the person adds a Linear event or the automation has one.
+  const [linearWanted, setLinearWanted] = useState(false)
+  const linearTeams = useSWR(linearWanted || Boolean(draft?.linear.length) ? 'automation-linear-teams' : null, async () => {
+    const result = await automationLinearTeams()
+    if ('error' in result && result.error) throw new Error(result.error)
+    return result as { connected: boolean; teams: { id: string; key: string; name: string }[] }
   }, { revalidateOnFocus: false })
   const profiles = useAgentProfiles(workspaceId ?? undefined, true)
   const profileChoices = useTaskProfileChoices({ workspaceId: workspaceId ?? undefined, value: draft && draft.profileId !== 'auto' ? draft.profileId : null, data: profiles.data })
@@ -237,6 +245,12 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
       {!draft.otherTask && <>
         <SettingRow title={t('github.title')} />
         <GitHubTriggers value={draft.github} repositories={repositories} disabled={busy !== null} onChange={github => set({ github })} />
+        <SettingRow title={t('linear.title')}>
+          {!linearWanted && !draft.linear.length && <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => setLinearWanted(true)}>{t('linear.show')}</Button>}
+        </SettingRow>
+        {(linearWanted || draft.linear.length > 0) && (linearTeams.error
+          ? <div className="px-5 pb-4"><InlineLoadError message={tAll('loadError')} retryLabel={tCommon('retry')} onRetry={() => { void linearTeams.mutate() }} /></div>
+          : <LinearTriggers value={draft.linear} teams={linearTeams.data?.teams ?? []} connected={linearTeams.data?.connected ?? true} disabled={busy !== null || !linearTeams.data} onChange={linear => set({ linear })} />)}
         <WebhookTrigger value={draft.webhook} onChange={webhook => set({ webhook })} automation={current ?? null} disabled={busy !== null}
           onSaved={schedule => automation.mutate(schedule, { revalidate: false })} />
       </>}
@@ -316,6 +330,7 @@ function EditorFrame({ children, onBack, backLabel }: { children: React.ReactNod
 function RunRow({ run, timezone }: { run: AutomationRun; timezone: string }) {
   const t = useTranslations('Automations')
   const tEvent = useTranslations('Automations.githubEvent')
+  const tLinear = useTranslations('Automations.linearEvent')
   const tErrors = useTranslations('Errors')
   // On the automation's own clock, like its summary, next run and usage days.
   const when = useNextRunLabel()
@@ -325,7 +340,9 @@ function RunRow({ run, timezone }: { run: AutomationRun; timezone: string }) {
   return <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 text-sm">
     <time className="tabular-nums text-muted-foreground" dateTime={new Date(at).toISOString()}>{when(at, timezone)}</time>
     <Badge variant={runVariant[run.status]}>{t(`run.${run.status}`)}</Badge>
-    {run.trigger && 'event' in run.trigger && <span className="min-w-0 text-muted-foreground">{t('run.from', { event: tEvent.has(run.trigger.event.event as never) ? tEvent(run.trigger.event.event as never) : run.trigger.event.event,
+    {run.trigger && 'event' in run.trigger && run.trigger.event.source === 'linear' && <span className="min-w-0 text-muted-foreground">{t('run.from', { event: tLinear.has(run.trigger.event.event as never) ? tLinear(run.trigger.event.event as never) : run.trigger.event.event,
+      what: run.trigger.event.identifier ?? run.trigger.event.title ?? '' })}</span>}
+    {run.trigger && 'event' in run.trigger && run.trigger.event.source !== 'linear' && <span className="min-w-0 text-muted-foreground">{t('run.from', { event: tEvent.has(run.trigger.event.event as never) ? tEvent(run.trigger.event.event as never) : run.trigger.event.event,
       what: run.trigger.event.number !== null ? `${run.trigger.event.repository.replace(/^v2\/github\.com\//, '')}#${run.trigger.event.number}` : run.trigger.event.repository.replace(/^v2\/github\.com\//, '') })}</span>}
     {run.trigger && 'webhook' in run.trigger && <span className="min-w-0 text-muted-foreground">{t('run.fromWebhook', { count: run.trigger.webhook.requests.length })}</span>}
     {task && <Button size="xs" variant="secondary" title={task.title} onClick={() => openTask(task.id)}><bdi>{task.identifier ?? task.title}</bdi></Button>}

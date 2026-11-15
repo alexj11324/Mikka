@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { describeGitHubEvent, githubAutomationEvents, triggerMatches } from './github-events'
-import { definitionSchema, type EventTrigger } from './contract'
+import { definitionSchema, type GitHubEventTrigger } from './contract'
 
 const repository = { full_name: 'Acme/Web', html_url: 'https://github.com/Acme/Web' }
 const person = { login: 'ada', type: 'User' }
@@ -38,7 +38,7 @@ test('issues, comments, reviews and check suites map; a bot sender and an unknow
 
 test('a trigger takes an event by event, repository, branch and any of its labels', () => {
   const [event] = githubAutomationEvents('pull_request', { action: 'opened', repository, sender: person, pull_request: pr() })
-  const trigger = (extra: Partial<EventTrigger> = {}): EventTrigger => ({ source: 'github', event: 'pull_request_opened', repositories: ['v2/github.com/acme/web'], ...extra })
+  const trigger = (extra: Partial<GitHubEventTrigger> = {}): GitHubEventTrigger => ({ source: 'github', event: 'pull_request_opened', repositories: ['v2/github.com/acme/web'], ...extra })
   assert.equal(triggerMatches(trigger(), event!), true)
   assert.equal(triggerMatches(trigger({ event: 'pull_request_merged' }), event!), false)
   assert.equal(triggerMatches(trigger({ repositories: ['v2/github.com/acme/api'] }), event!), false)

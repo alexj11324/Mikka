@@ -10,11 +10,14 @@ const clock = (hour: number, minute: number) => `${hour}:${String(minute).padSta
 export function useTimingSummary() {
   const t = useTranslations('Automations.summary')
   const tEvent = useTranslations('Automations.githubEvent')
+  const tLinear = useTranslations('Automations.linearEvent')
   const timing = useScheduleSummary()
   return (definition: Pick<Definition, 'timing' | 'timezone' | 'events' | 'webhook'>) => {
-    const events = definition.events ?? []
+    const github = (definition.events ?? []).flatMap(trigger => trigger.source === 'github' ? [trigger] : [])
+    const linear = (definition.events ?? []).flatMap(trigger => trigger.source === 'linear' ? [trigger] : [])
     const parts = [
-      ...(events.length ? [t('github', { event: tEvent(events[0]!.event), count: events.length - 1 })] : []),
+      ...(github.length ? [t('github', { event: tEvent(github[0]!.event), count: github.length - 1 })] : []),
+      ...(linear.length ? [t('linear', { event: tLinear(linear[0]!.event), count: linear.length - 1 })] : []),
       ...(definition.webhook ? [t('webhook')] : []),
     ]
     if (!parts.length) return timing(definition)

@@ -2401,7 +2401,7 @@
   "lib/schedules/runtime.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Run automations as their creator through the installation PostgreSQL database, including runs started by verified GitHub deliveries and by requests to an automation's webhook URL; a trigger condition uses the configured Decision model and fails retryably without one.",
+    "behavior": "Run automations as their creator through the installation PostgreSQL database, including runs started by verified GitHub and Linear deliveries and by requests to an automation's webhook URL; a trigger condition uses the configured Decision model and fails retryably without one.",
     "test": "lib/schedules/dispatch.db.test.ts",
     "suite": "test:schedules-db"
   },
@@ -2439,5 +2439,21 @@
     "behavior": "Serve automation webhook URLs on the installation; the key in the path is the only credential.",
     "test": "lib/schedules/webhook-route.test.ts",
     "suite": "test:schedules"
+  },
+  "lib/schedules/linear-events.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Map a verified Linear delivery to automation events and match them to Linear triggers; no I/O.",
+    "test": "lib/schedules/linear-events.test.ts",
+    "suite": "test:schedules"
+  },
+  "app/api/webhooks/linear/automations/route.ts": {
+    "mode": "built-in",
+    "environment": [
+      "LINEAR_WEBHOOK_SECRET"
+    ],
+    "behavior": "Take Linear deliveries forwarded by the Linear Worker for automation triggers, checking Linear's signature again.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
   }
 }

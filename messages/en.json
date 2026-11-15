@@ -1228,6 +1228,8 @@
     "scheduleStandingTaskUnavailable": "The task it adds to no longer exists.",
     "scheduleStandingTaskNotStarted": "The task it adds to hasn't started yet. It will try again shortly.",
     "scheduleWebhookOff": "Turn on Webhook and save first, then make the URL.",
+    "scheduleLinearUnavailable": "Your Linear connection cannot see a team this Linear trigger uses, or Linear is not connected.",
+    "scheduleLinearUnreachable": "Linear could not be reached. It will try again shortly.",
     "scheduleRunConflict": "The run didn't start. Please try again.",
     "scheduleTimeMustBeFuture": "The start time must be in the future.",
     "invalidIanaTimezone": "The time zone is invalid.",
@@ -7885,7 +7887,8 @@
       "weekly": "{weekday}s at {time}",
       "monthly": "Monthly on day {day} at {time}",
       "cron": "cron {expression}",
-      "webhook": "Webhook"
+      "webhook": "Webhook",
+      "linear": "Linear: {event}{count, plural, =0 {} other { and # more}}"
     },
     "kind": {
       "reminder": "Reminder",
@@ -7986,7 +7989,8 @@
         "time": "That time does not exist or is not valid",
         "fold": "Choose earlier or later to save",
         "interval": "The interval must be between 1 minute and 1 year",
-        "cron": "A cron expression has 5 fields"
+        "cron": "A cron expression has 5 fields",
+        "team": "Choose a Linear team"
       },
       "webhook": {
         "title": "Webhook",
@@ -8003,6 +8007,20 @@
         "made": "A URL was made.",
         "make": "Make URL",
         "remake": "Make a new URL"
+      },
+      "linear": {
+        "title": "Linear events",
+        "show": "Add a Linear event",
+        "item": "Linear event {number}",
+        "event": "Event",
+        "team": "Team",
+        "remove": "Remove",
+        "labels": "Labels (optional, comma-separated)",
+        "runWhen": "Condition",
+        "runWhenPlaceholder": "Condition (optional): e.g. \"the title mentions billing\"",
+        "add": "Add a Linear event",
+        "notConnected": "Connect Linear in Settings first",
+        "noTeams": "Your Linear has no teams"
       }
     },
     "run": {
@@ -8025,6 +8043,13 @@
       "scheduleChanged": "The automation changed",
       "scheduleRecoveryExhausted": "Failed after retries",
       "scheduleExecutionUnavailable": "Couldn't run"
+    },
+    "linearEvent": {
+      "issue_created": "Issue created",
+      "issue_status_changed": "Issue status changed",
+      "issue_label_added": "Label added to an issue",
+      "issue_assigned": "Issue assigned",
+      "comment_created": "New comment"
     }
   }
 }

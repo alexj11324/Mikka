@@ -269,3 +269,24 @@ Decision [2026-11-15-1830](../design/decisions/2026-11-15-1830-automation-webhoo
   `describeWebhook(requests)` and marks the submission `schedule.webhook: true`, which
   eve's context names as data from whoever called the URL.
 - `scrubString` masks `mwh_…` in exported traces.
+
+## Linear triggers (2026-11-15)
+
+Decision [2026-11-15-1930](../design/decisions/2026-11-15-1930-automation-linear-triggers.md).
+
+- `events[]` may hold `{ source: 'linear', event, teams (1–20 Linear team IDs), labels?, runWhen? }`;
+  events `issue_created`, `issue_status_changed` (`updatedFrom.stateId`), `issue_label_added`
+  (labels not in `updatedFrom.labelIds`; `labels` match the added ones), `issue_assigned`
+  (`updatedFrom.assigneeId`, now assigned), `comment_created`. An actor whose `type` is not
+  `user` yields no event (`lib/schedules/linear-events.ts`).
+- `permission` asks the `linearTeams(owner)` seam (the person's own Linear connection's teams;
+  null without one → `scheduleLinearUnavailable` 403, an authority loss; Linear unreachable →
+  `scheduleLinearUnreachable` 503, retried). Page action `automationLinearTeams`.
+- `fireLinearAutomations(deliveryId, payload)` → `ScheduleStore.fireLinearEvents`: candidates are
+  active automations with a matching Linear trigger whose creator has an unrevoked
+  `linear_connections` row for the event's organization; then the shared `queueEvent`
+  (operation `event:linear:<delivery>`, caps and concurrency as GitHub's).
+- Receivers: `app/api/webhooks/linear/route.ts` calls it after the signature check and before
+  the sync kill switch (503 on failure); `app/api/webhooks/linear/automations/route.ts` takes
+  the Linear Worker's forward (`LINEAR_AUTOMATIONS_FORWARD_URL`, Linear's own headers and body,
+  signature checked again). The submission carries `schedule.linear: true`.

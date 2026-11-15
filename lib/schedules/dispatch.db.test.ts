@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { dbUrl, seedBot, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
-import type { Command, Definition } from './contract'
+import type { Command, Definition, GitHubEventTrigger } from './contract'
 
 type Schedule = { id: string; version: number; status: string; owner_id?: string; bot_id?: string | null; source_event_id: string | null; next_at: Date | null }
 type Occurrence = { id: string; status: string; error: string | null; result: { id: string; title: string; identifier: string | null; eventId: string } | null }
@@ -194,7 +194,7 @@ test('dispatch_task automations run as their creator through the existing create
   })
   await t.test('a GitHub event runs each automation that takes it once, with the event marked as GitHub data', async () => {
     for (const repo of ['acme/web', 'acme/limits', 'acme/gate']) await fixture.query(`INSERT INTO github_repository_installations("userId","remoteKey","githubAccountId","installationId","repositoryId") VALUES($1,$2,'1',1,$3)`, [owner, `v2/github.com/${repo}`, repo.length])
-    const triggered = (repository: string, extra: Partial<NonNullable<Definition['events']>[number]> = {}, max = 1): Definition => ({
+    const triggered = (repository: string, extra: Partial<GitHubEventTrigger> = {}, max = 1): Definition => ({
       ...definition(builder), maxConcurrent: max, events: [{ source: 'github', event: 'pull_request_opened', repositories: [`v2/github.com/${repository}`], ...extra }],
     })
     const pr = (repository: string, number: number, sender = 'User') => ({ action: 'opened', sender: { login: 'ada', type: sender },
@@ -350,6 +350,36 @@ test('dispatch_task automations run as their creator through the existing create
     assert.deepEqual(waiting, [{ status: 'pending', bodies: ['one', 'two'] }], 'one run gathers both and waits for the window')
     assert.equal((await runtime.receiveAutomationWebhook(key, 'three')).status, 'batched')
     await assert.rejects(runtime.receiveAutomationWebhook('mwh_' + 'A'.repeat(43), 'x'), /scheduleNotFound/)
+  })
+
+  await t.test('Linear: an event on a team of the creator’s own Linear runs each automation that takes it once, while the connection lasts', async () => {
+    await fixture.query(`INSERT INTO linear_connections("userId","linearUserId","organizationId","organizationName","accessToken","refreshToken","expiresAt") VALUES($1,'lin-ada','org-1','Acme','x','y',now()+interval '1 day')`, [owner])
+    const seen = runtime.automationSeams.linearTeams
+    runtime.automationSeams.linearTeams = async who => who === owner ? new Set(['team-1']) : null
+    try {
+      const linear = (teams: string[], extra = {}, bot: string | null = builder): Definition => ({ ...definition(bot), maxConcurrent: 3, events: [{ source: 'linear', event: 'issue_created', teams, ...extra }] })
+      await assert.rejects(create(linear(['team-9'])), /scheduleLinearUnavailable/, 'a team the creator’s Linear cannot see')
+      await assert.rejects(page(member, memberChat, { action: 'create', requestId: randomUUID(), definition: linear(['team-1'], {}, null) }), /scheduleLinearUnavailable/, 'no Linear connection')
+      const { schedule } = await create(linear(['team-1'], { labels: ['bug'] }))
+      const payload = (extra: Record<string, unknown> = {}) => ({ type: 'Issue', action: 'create', organizationId: 'org-1', webhookTimestamp: Date.now(), actor: { type: 'user', name: 'Grace' },
+        data: { id: 'i1', identifier: 'ENG-7', title: 'Checkout fails', teamId: 'team-1', labels: [{ id: 'l1', name: 'bug' }], description: 'Steps', url: 'https://linear.app/acme/issue/ENG-7' }, ...extra })
+      assert.equal(await runtime.fireLinearAutomations('lin-1', payload()), 1)
+      assert.equal(await runtime.fireLinearAutomations('lin-1', payload()), 0, 'a redelivery adds nothing')
+      assert.equal(await runtime.fireLinearAutomations('lin-2', payload({ organizationId: 'org-2' })), 0, 'another organization')
+      assert.equal(await runtime.fireLinearAutomations('lin-3', payload({ actor: { type: 'OauthClient', name: 'Mikka' } })), 0, 'Mikka’s own Linear write')
+      assert.equal(await runtime.fireLinearAutomations('lin-4', payload({ data: { ...payload().data, labels: [] } })), 0, 'without the label')
+      await tick()
+      const ran = (await fixture.query<{ status: string; result: { eventId: string } }>(`SELECT status,result FROM schedule_occurrences WHERE schedule_id=$1`, [schedule.id])).rows
+      assert.deepEqual(ran.map(row => row.status), ['succeeded'])
+      const request = (await fixture.query<{ payload: { text: string; schedule: { linear?: true } } }>('SELECT payload FROM coordinator_events WHERE id=$1', [ran[0]!.result.eventId])).rows[0]!.payload
+      assert.equal(request.schedule.linear, true)
+      assert.match(request.text, /<linear_event>\nevent: issue_created\nissue: ENG-7\ntitle: Checkout fails\nlabels: bug\nauthor: Grace\nurl: https:\/\/linear\.app\/acme\/issue\/ENG-7\nbody:\nSteps\n<\/linear_event>$/)
+      await fixture.query(`UPDATE linear_connections SET "revokedAt"=now() WHERE "userId"=$1`, [owner])
+      assert.equal(await runtime.fireLinearAutomations('lin-5', payload()), 0, 'a revoked connection starts nothing')
+    } finally {
+      runtime.automationSeams.linearTeams = seen
+      await fixture.query('DELETE FROM linear_connections WHERE "userId"=$1', [owner])
+    }
   })
 
   await t.test('追加到同一个任务: later runs add to the first run’s task; a deleted task pauses the automation', async () => {

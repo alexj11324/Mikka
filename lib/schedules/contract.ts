@@ -35,6 +35,9 @@ export const GITHUB_TRIGGER_EVENTS = [
 export type GitHubTriggerEvent = typeof GITHUB_TRIGGER_EVENTS[number]
 /** A repository as the workspace names it, `v2/github.com/<owner>/<name>` in lower case. */
 export const githubRepositoryKey = z.string().regex(/^v2\/github\.com\/[a-z0-9-]{1,39}\/[a-z0-9._-]{1,100}$/)
+/** Linear events an automation can run on (decision 2026-11-15-1930): those the Linear app's webhook already sends. */
+export const LINEAR_TRIGGER_EVENTS = ['issue_created', 'issue_status_changed', 'issue_label_added', 'issue_assigned', 'comment_created'] as const
+export type LinearTriggerEvent = typeof LINEAR_TRIGGER_EVENTS[number]
 export const eventTriggerSchema = z.discriminatedUnion('source', [
   z.object({
     source: z.literal('github'), event: z.enum(GITHUB_TRIGGER_EVENTS),
@@ -44,8 +47,17 @@ export const eventTriggerSchema = z.discriminatedUnion('source', [
     /** One sentence checked against each event before a run starts; an event that does not match is skipped. */
     runWhen: z.string().trim().min(1).max(500).optional(),
   }).strict(),
+  z.object({
+    source: z.literal('linear'), event: z.enum(LINEAR_TRIGGER_EVENTS),
+    /** Linear team IDs from the creator's own Linear connection. */
+    teams: z.array(z.string().min(1).max(128)).min(1).max(20),
+    labels: z.array(z.string().trim().min(1).max(100)).max(20).optional(),
+    runWhen: z.string().trim().min(1).max(500).optional(),
+  }).strict(),
 ])
 export type EventTrigger = z.infer<typeof eventTriggerSchema>
+export type GitHubEventTrigger = Extract<EventTrigger, { source: 'github' }>
+export type LinearEventTrigger = Extract<EventTrigger, { source: 'linear' }>
 export const definitionSchema = z.object({
   title: z.string().trim().min(1).max(200), timezone: z.string().min(1).max(100), timing: timingSchema, task: taskSchema,
   misfire: z.enum(['skip', 'catch_up_once']), maxLatenessMinutes: z.number().int().min(1).max(10080),
