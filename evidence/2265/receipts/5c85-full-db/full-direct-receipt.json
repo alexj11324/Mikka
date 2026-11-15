@@ -1,0 +1,4162 @@
+{
+  "source": "5c85ee16410fe5586ad6fef708e8630ef67fe1c3",
+  "tree": "e0a1b294790ffda17cf089fa3b78571dbb70a40b",
+  "rawPnpmExit": 0,
+  "workflow": {
+    "id": 14143501319,
+    "name": "baseline-db-5c85ee16",
+    "digest": "sha256:0b202ec26815a5003fb9b627464415e172295eaf6e7599299c6a6c22d89249b5",
+    "size": 228815,
+    "expired": false,
+    "workflowRun": 43667642114,
+    "workflowHead": "3074b32f5329c1be5d0b94b379b150de0054f34a",
+    "job": 132670483904
+  },
+  "archiveSha256": "0b202ec26815a5003fb9b627464415e172295eaf6e7599299c6a6c22d89249b5",
+  "started": "2026-11-15T02:26:27Z",
+  "ended": "2026-11-15T02:39:37Z",
+  "actualSelection": {
+    "shard": "all",
+    "total": 86,
+    "scripts": [
+      "test:abuse-db",
+      "test:account-db",
+      "test:active-agents",
+      "test:activity-actor-db",
+      "test:agent-kit-db",
+      "test:agent-tool-approval-db",
+      "test:approved-writes-db",
+      "test:artifact-migration-db",
+      "test:audit-db",
+      "test:bot-chats-db",
+      "test:bot-threads-db",
+      "test:captures-db",
+      "test:chat-attachments-db",
+      "test:cloud-backend-db",
+      "test:cloud-services-db",
+      "test:coding-workspace-db",
+      "test:computer-db",
+      "test:conversation-reads",
+      "test:coordinator-issue-create-db",
+      "test:coordinator-issue-tools-db",
+      "test:coordinator-native",
+      "test:coordinator-task-binding-db",
+      "test:credentials-db",
+      "test:desktop-auth",
+      "test:device-enrollment-db",
+      "test:device-revocation-db",
+      "test:domain-lifecycle-db",
+      "test:drive-db",
+      "test:enterprise-db",
+      "test:eve-db",
+      "test:execution-settings-db",
+      "test:factory",
+      "test:factory-activity-db",
+      "test:factory-activity-http-db",
+      "test:factory-all-dispatch-db",
+      "test:factory-approval-db",
+      "test:factory-check-independence-db",
+      "test:factory-checks-db",
+      "test:factory-monitor-db",
+      "test:factory-routing-db",
+      "test:github-connections-db",
+      "test:group-turns",
+      "test:groups",
+      "test:inbox-db",
+      "test:issue-search-db",
+      "test:live-db",
+      "test:local-repository-migration-db",
+      "test:migration-steps-db",
+      "test:model-admission-db",
+      "test:onboarding-db",
+      "test:ops-db",
+      "test:organization-invitations-db",
+      "test:organization-join-domains-db",
+      "test:pat-api-db",
+      "test:pat-db",
+      "test:personal-mailbox-default-off-db",
+      "test:plugins-db",
+      "test:preview-driver",
+      "test:project-decisions-db",
+      "test:project-resources-db",
+      "test:project-v2-db",
+      "test:relation-cycle",
+      "test:run-dispatch",
+      "test:run-publication-db",
+      "test:run-recovery-db",
+      "test:schedules-db",
+      "test:scope-detachment-db",
+      "test:secrets-db",
+      "test:self-improvement-db",
+      "test:self-improvement-unit",
+      "test:session-mailbox-db",
+      "test:settings-activity-db",
+      "test:settings-prefs-db",
+      "test:skill-semantic-db",
+      "test:slack-installation-db",
+      "test:suggestion-artifact-db",
+      "test:task-identity-db",
+      "test:task-presentation-db",
+      "test:test-accounts-db",
+      "test:user-facts-db",
+      "test:visibility-db",
+      "test:web-auth-db",
+      "test:worker-authorization-db",
+      "test:workspace-admin-db",
+      "test:workspace-migration-db",
+      "test:workspace-permissions-migration-db"
+    ]
+  },
+  "totals": {
+    "tests": 4875,
+    "pass": 4875,
+    "fail": 0,
+    "skipped": 0,
+    "todo": 0,
+    "cancelled": 0
+  },
+  "suiteTotals": {
+    "test:abuse-db": {
+      "tests": 32,
+      "pass": 32,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:account-db": {
+      "tests": 46,
+      "pass": 46,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:active-agents": {
+      "tests": 14,
+      "pass": 14,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:activity-actor-db": {
+      "tests": 76,
+      "pass": 76,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:agent-kit-db": {
+      "tests": 23,
+      "pass": 23,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:agent-tool-approval-db": {
+      "tests": 20,
+      "pass": 20,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:approved-writes-db": {
+      "tests": 27,
+      "pass": 27,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:artifact-migration-db": {
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:audit-db": {
+      "tests": 45,
+      "pass": 45,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:bot-chats-db": {
+      "tests": 119,
+      "pass": 119,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:bot-threads-db": {
+      "tests": 391,
+      "pass": 391,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:captures-db": {
+      "tests": 30,
+      "pass": 30,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:chat-attachments-db": {
+      "tests": 9,
+      "pass": 9,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:cloud-backend-db": {
+      "tests": 216,
+      "pass": 216,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:cloud-services-db": {
+      "tests": 14,
+      "pass": 14,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:coding-workspace-db": {
+      "tests": 303,
+      "pass": 303,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:computer-db": {
+      "tests": 8,
+      "pass": 8,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:conversation-reads": {
+      "tests": 22,
+      "pass": 22,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:coordinator-issue-create-db": {
+      "tests": 16,
+      "pass": 16,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:coordinator-issue-tools-db": {
+      "tests": 2,
+      "pass": 2,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:coordinator-native": {
+      "tests": 20,
+      "pass": 20,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:coordinator-task-binding-db": {
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:credentials-db": {
+      "tests": 3,
+      "pass": 3,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:desktop-auth": {
+      "tests": 140,
+      "pass": 140,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:device-enrollment-db": {
+      "tests": 12,
+      "pass": 12,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:device-revocation-db": {
+      "tests": 32,
+      "pass": 32,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:domain-lifecycle-db": {
+      "tests": 6,
+      "pass": 6,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:drive-db": {
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:enterprise-db": {
+      "tests": 80,
+      "pass": 80,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:eve-db": {
+      "tests": 49,
+      "pass": 49,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:execution-settings-db": {
+      "tests": 5,
+      "pass": 5,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:factory": {
+      "tests": 550,
+      "pass": 550,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:factory-activity-db": {
+      "tests": 50,
+      "pass": 50,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:factory-activity-http-db": {
+      "tests": 9,
+      "pass": 9,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:factory-all-dispatch-db": {
+      "tests": 2,
+      "pass": 2,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:factory-approval-db": {
+      "tests": 67,
+      "pass": 67,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:factory-check-independence-db": {
+      "tests": 55,
+      "pass": 55,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:factory-checks-db": {
+      "tests": 331,
+      "pass": 331,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:factory-monitor-db": {
+      "tests": 12,
+      "pass": 12,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:factory-routing-db": {
+      "tests": 310,
+      "pass": 310,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:github-connections-db": {
+      "tests": 28,
+      "pass": 28,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:group-turns": {
+      "tests": 130,
+      "pass": 130,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:groups": {
+      "tests": 105,
+      "pass": 105,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:inbox-db": {
+      "tests": 14,
+      "pass": 14,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:issue-search-db": {
+      "tests": 11,
+      "pass": 11,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:live-db": {
+      "tests": 186,
+      "pass": 186,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:local-repository-migration-db": {
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:migration-steps-db": {
+      "tests": 2,
+      "pass": 2,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:model-admission-db": {
+      "tests": 15,
+      "pass": 15,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:onboarding-db": {
+      "tests": 5,
+      "pass": 5,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:ops-db": {
+      "tests": 17,
+      "pass": 17,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:organization-invitations-db": {
+      "tests": 7,
+      "pass": 7,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:organization-join-domains-db": {
+      "tests": 5,
+      "pass": 5,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:pat-api-db": {
+      "tests": 41,
+      "pass": 41,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:pat-db": {
+      "tests": 16,
+      "pass": 16,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:personal-mailbox-default-off-db": {
+      "tests": 42,
+      "pass": 42,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:plugins-db": {
+      "tests": 20,
+      "pass": 20,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:preview-driver": {
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:project-decisions-db": {
+      "tests": 39,
+      "pass": 39,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:project-resources-db": {
+      "tests": 15,
+      "pass": 15,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:project-v2-db": {
+      "tests": 22,
+      "pass": 22,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:relation-cycle": {
+      "tests": 6,
+      "pass": 6,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:run-dispatch": {
+      "tests": 11,
+      "pass": 11,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:run-publication-db": {
+      "tests": 29,
+      "pass": 29,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:run-recovery-db": {
+      "tests": 78,
+      "pass": 78,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:schedules-db": {
+      "tests": 32,
+      "pass": 32,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:scope-detachment-db": {
+      "tests": 78,
+      "pass": 78,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:secrets-db": {
+      "tests": 100,
+      "pass": 100,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:self-improvement-db": {
+      "tests": 28,
+      "pass": 28,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:self-improvement-unit": {
+      "tests": 102,
+      "pass": 102,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:session-mailbox-db": {
+      "tests": 5,
+      "pass": 5,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:settings-activity-db": {
+      "tests": 6,
+      "pass": 6,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:settings-prefs-db": {
+      "tests": 15,
+      "pass": 15,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:skill-semantic-db": {
+      "tests": 2,
+      "pass": 2,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:slack-installation-db": {
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:suggestion-artifact-db": {
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:task-identity-db": {
+      "tests": 41,
+      "pass": 41,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:task-presentation-db": {
+      "tests": 18,
+      "pass": 18,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:test-accounts-db": {
+      "tests": 17,
+      "pass": 17,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:user-facts-db": {
+      "tests": 20,
+      "pass": 20,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:visibility-db": {
+      "tests": 132,
+      "pass": 132,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:web-auth-db": {
+      "tests": 27,
+      "pass": 27,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:worker-authorization-db": {
+      "tests": 81,
+      "pass": 81,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:workspace-admin-db": {
+      "tests": 163,
+      "pass": 163,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:workspace-migration-db": {
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "test:workspace-permissions-migration-db": {
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    }
+  },
+  "suiteTimings": {
+    "shard": "all",
+    "concurrency": 4,
+    "cpus": 4,
+    "suites": [
+      {
+        "script": "test:coding-workspace-db",
+        "seconds": 405.8
+      },
+      {
+        "script": "test:factory",
+        "seconds": 222.2
+      },
+      {
+        "script": "test:live-db",
+        "seconds": 216.9
+      },
+      {
+        "script": "test:bot-threads-db",
+        "seconds": 212.9
+      },
+      {
+        "script": "test:factory-routing-db",
+        "seconds": 202.2
+      },
+      {
+        "script": "test:factory-checks-db",
+        "seconds": 165.2
+      },
+      {
+        "script": "test:activity-actor-db",
+        "seconds": 134.4
+      },
+      {
+        "script": "test:factory-activity-http-db",
+        "seconds": 64.8
+      },
+      {
+        "script": "test:workspace-admin-db",
+        "seconds": 59.9
+      },
+      {
+        "script": "test:groups",
+        "seconds": 55.9
+      },
+      {
+        "script": "test:bot-chats-db",
+        "seconds": 51.9
+      },
+      {
+        "script": "test:device-revocation-db",
+        "seconds": 50.1
+      },
+      {
+        "script": "test:approved-writes-db",
+        "seconds": 39.7
+      },
+      {
+        "script": "test:visibility-db",
+        "seconds": 39.7
+      },
+      {
+        "script": "test:project-decisions-db",
+        "seconds": 35.6
+      },
+      {
+        "script": "test:factory-activity-db",
+        "seconds": 35.3
+      },
+      {
+        "script": "test:run-publication-db",
+        "seconds": 34.2
+      },
+      {
+        "script": "test:device-enrollment-db",
+        "seconds": 33.6
+      },
+      {
+        "script": "test:group-turns",
+        "seconds": 33.5
+      },
+      {
+        "script": "test:personal-mailbox-default-off-db",
+        "seconds": 33.3
+      },
+      {
+        "script": "test:worker-authorization-db",
+        "seconds": 32.8
+      },
+      {
+        "script": "test:factory-approval-db",
+        "seconds": 32.5
+      },
+      {
+        "script": "test:self-improvement-db",
+        "seconds": 32.4
+      },
+      {
+        "script": "test:desktop-auth",
+        "seconds": 32.3
+      },
+      {
+        "script": "test:agent-tool-approval-db",
+        "seconds": 32.3
+      },
+      {
+        "script": "test:user-facts-db",
+        "seconds": 32
+      },
+      {
+        "script": "test:coordinator-issue-create-db",
+        "seconds": 30.9
+      },
+      {
+        "script": "test:cloud-backend-db",
+        "seconds": 30.7
+      },
+      {
+        "script": "test:scope-detachment-db",
+        "seconds": 30.6
+      },
+      {
+        "script": "test:factory-monitor-db",
+        "seconds": 30.2
+      },
+      {
+        "script": "test:run-recovery-db",
+        "seconds": 29.8
+      },
+      {
+        "script": "test:enterprise-db",
+        "seconds": 29.6
+      },
+      {
+        "script": "test:settings-prefs-db",
+        "seconds": 28.5
+      },
+      {
+        "script": "test:captures-db",
+        "seconds": 26.7
+      },
+      {
+        "script": "test:relation-cycle",
+        "seconds": 26.7
+      },
+      {
+        "script": "test:abuse-db",
+        "seconds": 26.4
+      },
+      {
+        "script": "test:computer-db",
+        "seconds": 25.4
+      },
+      {
+        "script": "test:secrets-db",
+        "seconds": 24.7
+      },
+      {
+        "script": "test:active-agents",
+        "seconds": 23.4
+      },
+      {
+        "script": "test:schedules-db",
+        "seconds": 23.1
+      },
+      {
+        "script": "test:skill-semantic-db",
+        "seconds": 23.1
+      },
+      {
+        "script": "test:pat-api-db",
+        "seconds": 19.6
+      },
+      {
+        "script": "test:self-improvement-unit",
+        "seconds": 19.4
+      },
+      {
+        "script": "test:web-auth-db",
+        "seconds": 18.7
+      },
+      {
+        "script": "test:task-identity-db",
+        "seconds": 18.1
+      },
+      {
+        "script": "test:plugins-db",
+        "seconds": 15.7
+      },
+      {
+        "script": "test:audit-db",
+        "seconds": 15.4
+      },
+      {
+        "script": "test:account-db",
+        "seconds": 14.1
+      },
+      {
+        "script": "test:eve-db",
+        "seconds": 14
+      },
+      {
+        "script": "test:ops-db",
+        "seconds": 13.8
+      },
+      {
+        "script": "test:migration-steps-db",
+        "seconds": 12.1
+      },
+      {
+        "script": "test:issue-search-db",
+        "seconds": 12
+      },
+      {
+        "script": "test:execution-settings-db",
+        "seconds": 11.6
+      },
+      {
+        "script": "test:factory-all-dispatch-db",
+        "seconds": 11.4
+      },
+      {
+        "script": "test:model-admission-db",
+        "seconds": 10.7
+      },
+      {
+        "script": "test:local-repository-migration-db",
+        "seconds": 10.4
+      },
+      {
+        "script": "test:github-connections-db",
+        "seconds": 10.2
+      },
+      {
+        "script": "test:conversation-reads",
+        "seconds": 9.1
+      },
+      {
+        "script": "test:coordinator-native",
+        "seconds": 7.8
+      },
+      {
+        "script": "test:project-v2-db",
+        "seconds": 7.2
+      },
+      {
+        "script": "test:settings-activity-db",
+        "seconds": 7.1
+      },
+      {
+        "script": "test:domain-lifecycle-db",
+        "seconds": 7
+      },
+      {
+        "script": "test:task-presentation-db",
+        "seconds": 6.5
+      },
+      {
+        "script": "test:inbox-db",
+        "seconds": 6.4
+      },
+      {
+        "script": "test:test-accounts-db",
+        "seconds": 6.2
+      },
+      {
+        "script": "test:project-resources-db",
+        "seconds": 6
+      },
+      {
+        "script": "test:coordinator-issue-tools-db",
+        "seconds": 5.3
+      },
+      {
+        "script": "test:run-dispatch",
+        "seconds": 5
+      },
+      {
+        "script": "test:pat-db",
+        "seconds": 5
+      },
+      {
+        "script": "test:drive-db",
+        "seconds": 4.1
+      },
+      {
+        "script": "test:organization-join-domains-db",
+        "seconds": 4
+      },
+      {
+        "script": "test:suggestion-artifact-db",
+        "seconds": 4
+      },
+      {
+        "script": "test:organization-invitations-db",
+        "seconds": 3.6
+      },
+      {
+        "script": "test:cloud-services-db",
+        "seconds": 3.3
+      },
+      {
+        "script": "test:coordinator-task-binding-db",
+        "seconds": 3.2
+      },
+      {
+        "script": "test:factory-check-independence-db",
+        "seconds": 3.2
+      },
+      {
+        "script": "test:slack-installation-db",
+        "seconds": 3.2
+      },
+      {
+        "script": "test:session-mailbox-db",
+        "seconds": 2.9
+      },
+      {
+        "script": "test:chat-attachments-db",
+        "seconds": 2.8
+      },
+      {
+        "script": "test:workspace-permissions-migration-db",
+        "seconds": 2.3
+      },
+      {
+        "script": "test:agent-kit-db",
+        "seconds": 1.5
+      },
+      {
+        "script": "test:onboarding-db",
+        "seconds": 1.5
+      },
+      {
+        "script": "test:credentials-db",
+        "seconds": 1.3
+      },
+      {
+        "script": "test:preview-driver",
+        "seconds": 1.1
+      },
+      {
+        "script": "test:workspace-migration-db",
+        "seconds": 0.6
+      },
+      {
+        "script": "test:artifact-migration-db",
+        "seconds": 0.5
+      }
+    ]
+  },
+  "inventory": {
+    "scripts": [
+      "test:abuse-db",
+      "test:account-db",
+      "test:active-agents",
+      "test:activity-actor-db",
+      "test:agent-kit-db",
+      "test:agent-tool-approval-db",
+      "test:approved-writes-db",
+      "test:artifact-migration-db",
+      "test:audit-db",
+      "test:bot-chats-db",
+      "test:bot-threads-db",
+      "test:captures-db",
+      "test:chat-attachments-db",
+      "test:cloud-backend-db",
+      "test:cloud-services-db",
+      "test:coding-workspace-db",
+      "test:computer-db",
+      "test:conversation-reads",
+      "test:coordinator-issue-create-db",
+      "test:coordinator-issue-tools-db",
+      "test:coordinator-native",
+      "test:coordinator-task-binding-db",
+      "test:credentials-db",
+      "test:desktop-auth",
+      "test:device-enrollment-db",
+      "test:device-revocation-db",
+      "test:domain-lifecycle-db",
+      "test:drive-db",
+      "test:enterprise-db",
+      "test:eve-db",
+      "test:execution-settings-db",
+      "test:factory",
+      "test:factory-activity-db",
+      "test:factory-activity-http-db",
+      "test:factory-all-dispatch-db",
+      "test:factory-approval-db",
+      "test:factory-check-independence-db",
+      "test:factory-checks-db",
+      "test:factory-monitor-db",
+      "test:factory-routing-db",
+      "test:github-connections-db",
+      "test:group-turns",
+      "test:groups",
+      "test:inbox-db",
+      "test:issue-search-db",
+      "test:live-db",
+      "test:local-repository-migration-db",
+      "test:migration-steps-db",
+      "test:model-admission-db",
+      "test:onboarding-db",
+      "test:ops-db",
+      "test:organization-invitations-db",
+      "test:organization-join-domains-db",
+      "test:pat-api-db",
+      "test:pat-db",
+      "test:personal-mailbox-default-off-db",
+      "test:plugins-db",
+      "test:preview-driver",
+      "test:project-decisions-db",
+      "test:project-resources-db",
+      "test:project-v2-db",
+      "test:relation-cycle",
+      "test:run-dispatch",
+      "test:run-publication-db",
+      "test:run-recovery-db",
+      "test:schedules-db",
+      "test:scope-detachment-db",
+      "test:secrets-db",
+      "test:self-improvement-db",
+      "test:self-improvement-unit",
+      "test:session-mailbox-db",
+      "test:settings-activity-db",
+      "test:settings-prefs-db",
+      "test:skill-semantic-db",
+      "test:slack-installation-db",
+      "test:suggestion-artifact-db",
+      "test:task-identity-db",
+      "test:task-presentation-db",
+      "test:test-accounts-db",
+      "test:user-facts-db",
+      "test:visibility-db",
+      "test:web-auth-db",
+      "test:worker-authorization-db",
+      "test:workspace-admin-db",
+      "test:workspace-migration-db",
+      "test:workspace-permissions-migration-db"
+    ],
+    "files": [
+      "lib/abuse/alerts.db.test.ts",
+      "lib/abuse/card.db.test.ts",
+      "lib/abuse/model-generation.db.test.ts",
+      "lib/abuse/model-postpay.db.test.ts",
+      "lib/abuse/store.db.test.ts",
+      "lib/account-deletions-due.db.test.ts",
+      "lib/account/cloud-cleanup.db.test.ts",
+      "lib/account/deletion-jobs.db.test.ts",
+      "lib/account/deletion-lock.db.test.ts",
+      "lib/account/deletion-restore.db.test.ts",
+      "lib/account/export-files.db.test.ts",
+      "lib/account/owner-cleanup.db.test.ts",
+      "lib/account/store.db.test.ts",
+      "lib/active-agents.test.ts",
+      "lib/agent-kit/store.db.test.ts",
+      "lib/agent-tool-approval/local-cloud-issuer.db.test.ts",
+      "lib/agent-tool-approval/store.db.test.ts",
+      "lib/agent-tool-approval/task-policy.db.test.ts",
+      "lib/audit-retention-due.db.test.ts",
+      "lib/audit/export.db.test.ts",
+      "lib/audit/retention.db.test.ts",
+      "lib/auth-schema-check.db.test.ts",
+      "lib/bot-model-menu.db.test.ts",
+      "lib/builtin-gateway/postgres.db.test.ts",
+      "lib/builtin-gateway/session-revocation.db.test.ts",
+      "lib/captures/bootstrap-evidence.db.test.ts",
+      "lib/captures/store.db.test.ts",
+      "lib/chat-attachments/store.db.test.ts",
+      "lib/cloud-computer/backend.db.test.ts",
+      "lib/cloud-computer/thread-credential-batch.db.test.ts",
+      "lib/cloud-computer/thread-machine-sessions.db.test.ts",
+      "lib/cloud-computer/thread-machine-stop.db.test.ts",
+      "lib/cloud-computer/thread-machine-task.db.test.ts",
+      "lib/cloud-computer/thread-registration.db.test.ts",
+      "lib/cloud-computer/unattended.db.test.ts",
+      "lib/cloud-computer/workspace-teardown.db.test.ts",
+      "lib/cloud-services/client.db.test.ts",
+      "lib/cloud-subscription-lease-route.db.test.ts",
+      "lib/coding-workspace/diff/agent-delivery.db.test.ts",
+      "lib/coding-workspace/diff/github-delivery.db.test.ts",
+      "lib/coding-workspace/diff/store.db.test.ts",
+      "lib/coding-workspace/files.db.test.ts",
+      "lib/coding-workspace/git/operations.db.test.ts",
+      "lib/coding-workspace/http-daemon-personal.db.test.ts",
+      "lib/coding-workspace/http-daemon.db.test.ts",
+      "lib/coding-workspace/review-authority.db.test.ts",
+      "lib/coding-workspace/review-team-scope.db.test.ts",
+      "lib/coding-workspace/task-review/merge.db.test.ts",
+      "lib/coding-workspace/task-review/read.db.test.ts",
+      "lib/coding-workspace/task-review/send.db.test.ts",
+      "lib/coding-workspace/task-review/summaries.db.test.ts",
+      "lib/composio-account-store.db.test.ts",
+      "lib/computer/bot-runtime.db.test.ts",
+      "lib/computer/event-broker.db.test.ts",
+      "lib/computer/event-log.db.test.ts",
+      "lib/computer/event-session.db.test.ts",
+      "lib/computer/event-writers.db.test.ts",
+      "lib/computer/local-reviews.db.test.ts",
+      "lib/computer/provision.db.test.ts",
+      "lib/computer/reconcile.db.test.ts",
+      "lib/computer/store.db.test.ts",
+      "lib/computer/task-runtime.db.test.ts",
+      "lib/conversation-reads-route.test.ts",
+      "lib/conversation-reads-store.test.ts",
+      "lib/coordinator/bot-chats.db.test.ts",
+      "lib/coordinator/chat-projection.db.test.ts",
+      "lib/coordinator/chat-version.db.test.ts",
+      "lib/coordinator/group-decision-consumer.test.ts",
+      "lib/coordinator/group-decision-quality.db.test.ts",
+      "lib/coordinator/group-drain.db.test.ts",
+      "lib/coordinator/group-factory.db.test.ts",
+      "lib/coordinator/group-turns.test.ts",
+      "lib/coordinator/native-store.test.ts",
+      "lib/coordinator/owner-event-wakes.db.test.ts",
+      "lib/coordinator/run-completion-delivery.db.test.ts",
+      "lib/coordinator/startup-receipt.db.test.ts",
+      "lib/coordinator/wake-event-driven.db.test.ts",
+      "lib/credentials/store.db.test.ts",
+      "lib/db/listen.db.test.ts",
+      "lib/db/preview-driver.test.ts",
+      "lib/db/request-scope-live.db.test.ts",
+      "lib/db/transport-sample.db.test.ts",
+      "lib/demo-device-cleanup.db.test.ts",
+      "lib/device-enrollment.db.test.ts",
+      "lib/device-heartbeat.db.test.ts",
+      "lib/device-mailbox-notices.db.test.ts",
+      "lib/device-presence.db.test.ts",
+      "lib/device-revocation.db.test.ts",
+      "lib/device-route-fence.db.test.ts",
+      "lib/device-unit-fence.db.test.ts",
+      "lib/device-work.db.test.ts",
+      "lib/drive/server.db.test.ts",
+      "lib/drive/store.db.test.ts",
+      "lib/enabled-models.db.test.ts",
+      "lib/enterprise/audit-outbox.db.test.ts",
+      "lib/enterprise/execution-authority.db.test.ts",
+      "lib/enterprise/governance.db.test.ts",
+      "lib/enterprise/http.db.test.ts",
+      "lib/enterprise/live-authority.db.test.ts",
+      "lib/eve/approval-bridge.db.test.ts",
+      "lib/eve/auth-bot.db.test.ts",
+      "lib/eve/evaluation-store.db.test.ts",
+      "lib/eve/outcome-delivery.db.test.ts",
+      "lib/eve/sandbox.db.test.ts",
+      "lib/eve/scheduled-read.db.test.ts",
+      "lib/eve/scope.db.test.ts",
+      "lib/eve/settlement.db.test.ts",
+      "lib/execution-identity.db.test.ts",
+      "lib/execution-model-options.db.test.ts",
+      "lib/execution-settings.db.test.ts",
+      "lib/factory/activity-artifacts.db.test.ts",
+      "lib/factory/activity.db.test.ts",
+      "lib/factory/agent-profile-skills.db.test.ts",
+      "lib/factory/agent-profile.db.test.ts",
+      "lib/factory/approval.db.test.ts",
+      "lib/factory/approval.test.ts",
+      "lib/factory/check-independence.db.test.ts",
+      "lib/factory/checks.db.test.ts",
+      "lib/factory/checks.test.ts",
+      "lib/factory/completion-reconcile.db.test.ts",
+      "lib/factory/continuity.db.test.ts",
+      "lib/factory/deliverable-recovery.db.test.ts",
+      "lib/factory/dispatch-http.db.test.ts",
+      "lib/factory/dispatch-recovery.db.test.ts",
+      "lib/factory/inherited-command-observations.db.test.ts",
+      "lib/factory/list.db.test.ts",
+      "lib/factory/merge.db.test.ts",
+      "lib/factory/monitor-cycle.test.ts",
+      "lib/factory/monitor-dispatch.test.ts",
+      "lib/factory/monitor-incidents.db.test.ts",
+      "lib/factory/monitor-sweep.db.test.ts",
+      "lib/factory/monitor-v2-binding.db.test.ts",
+      "lib/factory/monitor.test.ts",
+      "lib/factory/postgres.test.ts",
+      "lib/factory/profile-dispatch.db.test.ts",
+      "lib/factory/public-consumers.db.test.ts",
+      "lib/factory/publication-failed.db.test.ts",
+      "lib/factory/questions/ask-user.db.test.ts",
+      "lib/factory/questions/execution-continuation.db.test.ts",
+      "lib/factory/questions/postgres.test.ts",
+      "lib/factory/reject-store.db.test.ts",
+      "lib/factory/reject.db.test.ts",
+      "lib/factory/repository-selection.db.test.ts",
+      "lib/factory/route-http.db.test.ts",
+      "lib/factory/routing.db.test.ts",
+      "lib/factory/run-end-paths.db.test.ts",
+      "lib/factory/spec-artifact.db.test.ts",
+      "lib/factory/task-detail.db.test.ts",
+      "lib/factory/task-dispatch.db.test.ts",
+      "lib/factory/task-media.db.test.ts",
+      "lib/github/publication-webhook.db.test.ts",
+      "lib/group-conversations.test.ts",
+      "lib/group-reads.db.test.ts",
+      "lib/inbox/store.db.test.ts",
+      "lib/issue-relation-cycle.db.test.ts",
+      "lib/live/approved-writes.db.test.ts",
+      "lib/live/artifacts.db.test.ts",
+      "lib/live/billing.db.test.ts",
+      "lib/live/chat-preferences.db.test.ts",
+      "lib/live/chats.db.test.ts",
+      "lib/live/computer-state.db.test.ts",
+      "lib/live/devices.db.test.ts",
+      "lib/live/factory.db.test.ts",
+      "lib/live/groups.db.test.ts",
+      "lib/live/issue-detail.db.test.ts",
+      "lib/live/issue-threads.db.test.ts",
+      "lib/live/lists.db.test.ts",
+      "lib/live/notification-context.db.test.ts",
+      "lib/live/notify-workspace.db.test.ts",
+      "lib/live/panels.db.test.ts",
+      "lib/live/pending-actions.db.test.ts",
+      "lib/live/project-map.db.test.ts",
+      "lib/live/pull-requests.db.test.ts",
+      "lib/live/store.db.test.ts",
+      "lib/live/ticket-session.db.test.ts",
+      "lib/mailbox-pg-cancel.test.ts",
+      "lib/mcp/event-delivery.db.test.ts",
+      "lib/mcp/reply-live.db.test.ts",
+      "lib/mcp/reply-notifications.db.test.ts",
+      "lib/mcp/worker-authorization.db.test.ts",
+      "lib/mobile-push-delivery.db.test.ts",
+      "lib/model-admission/revocation-postpay.db.test.ts",
+      "lib/model-admission/store.db.test.ts",
+      "lib/model-admission/subscription.db.test.ts",
+      "lib/onboarding.db.test.ts",
+      "lib/operations/ledger.db.test.ts",
+      "lib/operations/personal-scope.db.test.ts",
+      "lib/operations/recovery.db.test.ts",
+      "lib/operations/workspace-app-permissions.db.test.ts",
+      "lib/operations/write-legacy-schema.db.test.ts",
+      "lib/operations/write-policy-chain.db.test.ts",
+      "lib/ops/egress-fallback.db.test.ts",
+      "lib/ops/monitor.db.test.ts",
+      "lib/personal-policy.db.test.ts",
+      "lib/plugins/native-mcp.db.test.ts",
+      "lib/plugins/read-skill-body.db.test.ts",
+      "lib/plugins/sharing-auth.db.test.ts",
+      "lib/plugins/store.db.test.ts",
+      "lib/plugins/workspace-mcp.db.test.ts",
+      "lib/profile/memory-authority.db.test.ts",
+      "lib/profile/memory-provenance.db.test.ts",
+      "lib/profile/memory.db.test.ts",
+      "lib/profile/store.db.test.ts",
+      "lib/project-map/decisions.db.test.ts",
+      "lib/project-map/http.db.test.ts",
+      "lib/project-map/read.db.test.ts",
+      "lib/project-map/sources.db.test.ts",
+      "lib/reconcile-due.db.test.ts",
+      "lib/run-prompt-copy.db.test.ts",
+      "lib/run-recovery-due.db.test.ts",
+      "lib/schedules/due-timer.db.test.ts",
+      "lib/schedules/request-identity.db.test.ts",
+      "lib/schedules/store.db.test.ts",
+      "lib/search/rate-limit.db.test.ts",
+      "lib/secrets/project-map-mask.db.test.ts",
+      "lib/self-improvement/activation-postgres.test.ts",
+      "lib/self-improvement/claim-composition-postgres.test.ts",
+      "lib/self-improvement/evaluation-comparison-postgres.test.ts",
+      "lib/self-improvement/evaluations-postgres.test.ts",
+      "lib/self-improvement/postgres.test.ts",
+      "lib/self-improvement/registry-postgres.test.ts",
+      "lib/self-improvement/skill-mounts-postgres.test.ts",
+      "lib/self-improvement/team-skills.db.test.ts",
+      "lib/self-improvement/test-database.test.ts",
+      "lib/self-improvement/wiring-postgres.test.ts",
+      "lib/short-title-schedule.db.test.ts",
+      "lib/subscription-acquire-expiry.db.test.ts",
+      "lib/subscription-repository.db.test.ts",
+      "lib/subscription-workspace-authorization.db.test.ts",
+      "lib/suggestions/briefing-delivery.db.test.ts",
+      "lib/thread-chunks.db.test.ts",
+      "lib/workspace-db.db.test.ts",
+      "lib/workspace-membership-guard.test.ts",
+      "tests/action-read-egress.db.test.ts",
+      "tests/activity-actor-db.test.ts",
+      "tests/api-key-runs.db.test.ts",
+      "tests/app-policy.db.test.ts",
+      "tests/artifact-delete.db.test.ts",
+      "tests/artifact-legacy-migration.test.mjs",
+      "tests/audit-delivery.db.test.ts",
+      "tests/audit-query.db.test.ts",
+      "tests/audit-record.db.test.ts",
+      "tests/authentication-audit.db.test.ts",
+      "tests/background-database-boundary.db.test.ts",
+      "tests/billing-history.db.test.ts",
+      "tests/billing-management.db.test.ts",
+      "tests/billing-points.db.test.ts",
+      "tests/billing.db.test.ts",
+      "tests/bot-summary-bytes.db.test.ts",
+      "tests/bot-threads.db.test.ts",
+      "tests/bot-update.db.test.ts",
+      "tests/checkpoint-recovery.db.test.ts",
+      "tests/citation-egress.db.test.ts",
+      "tests/claim-profile-lock.db.test.ts",
+      "tests/cloud-device-handoff.db.test.ts",
+      "tests/cloud-github-webhooks.db.test.ts",
+      "tests/cloud-runtime-auto.db.test.ts",
+      "tests/computer-policy-default-allow-migration.test.mjs",
+      "tests/conversation-completion-title.db.test.ts",
+      "tests/conversation-title.db.test.ts",
+      "tests/coordinator-bot.db.test.ts",
+      "tests/coordinator-chat-egress.db.test.ts",
+      "tests/coordinator-issue-create.db.test.ts",
+      "tests/coordinator-issue-team.db.test.ts",
+      "tests/coordinator-issue-title.db.test.ts",
+      "tests/coordinator-model-list.db.test.ts",
+      "tests/coordinator-task-binding.db.ts",
+      "tests/credit-shares.db.test.ts",
+      "tests/daemon-contract.db.test.ts",
+      "tests/desktop-auth-handoff.db.test.ts",
+      "tests/desktop-links.db.test.ts",
+      "tests/desktop-native-resources.db.test.mjs",
+      "tests/desktop-rpc-auth.db.test.ts",
+      "tests/desktop-session-cache.db.test.ts",
+      "tests/device-computer-migration.test.mjs",
+      "tests/document-sync-egress.db.test.ts",
+      "tests/domain-lifecycle.db.test.ts",
+      "tests/environment-settings-actions.db.test.ts",
+      "tests/environment-settings.db.test.ts",
+      "tests/environment-single-workflow.db.test.ts",
+      "tests/factory-activity-http.db.test.ts",
+      "tests/factory-admission.db.test.ts",
+      "tests/factory-all-dispatch.db.test.ts",
+      "tests/factory-background-workspace.db.test.ts",
+      "tests/factory-local-question.db.test.ts",
+      "tests/factory-monitor-followup.db.test.ts",
+      "tests/factory-monitor-issue-links.db.test.ts",
+      "tests/factory-pat-scope.db.test.ts",
+      "tests/factory-policy-denials.db.test.ts",
+      "tests/factory-workspace-admission.db.test.ts",
+      "tests/github-app-manifest.db.test.ts",
+      "tests/github-connect-intent.db.test.ts",
+      "tests/github-connections.db.test.ts",
+      "tests/github-webhook-statements.db.test.ts",
+      "tests/governance-seats.db.test.ts",
+      "tests/issue-list-egress.db.test.ts",
+      "tests/issue-numbering.db.test.ts",
+      "tests/issue-scope-detachment.db.test.ts",
+      "tests/issue-search.db.test.ts",
+      "tests/issue-tool-calls.db.test.ts",
+      "tests/issue-visibility-narrow.db.test.ts",
+      "tests/linear-archive.db.test.ts",
+      "tests/linear-responsibility.db.test.ts",
+      "tests/linear-status-wake.db.test.ts",
+      "tests/live-revision-reads.db.test.ts",
+      "tests/local-repository-migration.db.test.mjs",
+      "tests/migration-steps.db.test.mjs",
+      "tests/mobile-bot.db.test.ts",
+      "tests/mobile-chat-pages.db.test.ts",
+      "tests/mobile-chat-submission.db.test.ts",
+      "tests/mobile-push-workspace.db.test.ts",
+      "tests/mobile-service-members.db.test.ts",
+      "tests/mobile-tasks.db.test.ts",
+      "tests/model-api-keys.db.test.ts",
+      "tests/model-order.db.test.ts",
+      "tests/model-provider-health.db.test.ts",
+      "tests/model-routing-dispatch.db.test.ts",
+      "tests/model-routing-settings.db.test.ts",
+      "tests/one-thread-per-task.db.test.ts",
+      "tests/organization-invitations.db.test.ts",
+      "tests/organization-join-domains.db.test.ts",
+      "tests/personal-access-token-api.db.test.ts",
+      "tests/personal-access-token-scope.db.test.ts",
+      "tests/personal-access-tokens.db.test.ts",
+      "tests/personal-first.db.test.ts",
+      "tests/personal-mailbox-default-off.db.test.ts",
+      "tests/personal-resource-privacy.db.test.ts",
+      "tests/personal-secrets.db.test.ts",
+      "tests/personal-workspace.db.test.ts",
+      "tests/project-lifecycle.db.test.ts",
+      "tests/project-resource-lease.db.test.ts",
+      "tests/project-resources.db.test.ts",
+      "tests/project-v2.db.test.ts",
+      "tests/project-workspace-selection.db.test.ts",
+      "tests/read-cache-detail-egress.db.test.ts",
+      "tests/read-cache-scope.db.test.ts",
+      "tests/read-single-flight.db.test.ts",
+      "tests/repository-verification.db.test.ts",
+      "tests/request-query-count.db.test.ts",
+      "tests/resource-access.db.test.ts",
+      "tests/run-agent-names.db.test.ts",
+      "tests/run-bot-attribution.db.test.ts",
+      "tests/run-chain.db.test.ts",
+      "tests/run-dispatch.test.ts",
+      "tests/run-ending-wake.db.test.ts",
+      "tests/run-machine-fallback.db.test.ts",
+      "tests/run-outcomes.db.test.ts",
+      "tests/run-provider-fallback-cloud.db.test.ts",
+      "tests/run-provider-fallback.db.test.ts",
+      "tests/run-publications.db.test.ts",
+      "tests/run-quota.db.test.ts",
+      "tests/run-recovery.db.test.ts",
+      "tests/run-share-lease.db.test.ts",
+      "tests/secret-masking.db.test.ts",
+      "tests/security-lifecycle-audit.db.test.ts",
+      "tests/session-cookie-cache.db.test.ts",
+      "tests/session-mailbox.db.test.ts",
+      "tests/settings-activity.db.test.ts",
+      "tests/settings-preferences.db.test.ts",
+      "tests/shared-subscription-runs.db.test.ts",
+      "tests/slack-installation.db.test.ts",
+      "tests/subagent-report-wake.db.test.ts",
+      "tests/subscription-allowance.db.test.ts",
+      "tests/subscription-route-queries.db.test.ts",
+      "tests/suggestion-claim.integration.test.ts",
+      "tests/task-create-only.db.test.ts",
+      "tests/task-identity.db.test.ts",
+      "tests/task-list-pages.db.test.ts",
+      "tests/task-presentation.db.test.ts",
+      "tests/task-resource-registration.db.test.ts",
+      "tests/task-responsibility.db.test.ts",
+      "tests/task-secret-access.db.test.ts",
+      "tests/task-secret-local-claim.db.test.ts",
+      "tests/task-status-advance.db.test.ts",
+      "tests/task-workspace-governance.db.test.ts",
+      "tests/team-governance-api.db.test.ts",
+      "tests/team-issue-create.db.test.ts",
+      "tests/team-lifecycle.db.test.ts",
+      "tests/team-visibility.db.test.ts",
+      "tests/telegram-task-link.db.test.ts",
+      "tests/test-account-pool.db.test.mjs",
+      "tests/thread-continue.db.test.ts",
+      "tests/thread-detail-bytes.db.test.ts",
+      "tests/thread-dispatch-concurrency.db.test.ts",
+      "tests/thread-list-egress.db.test.ts",
+      "tests/thread-waiting-device.db.test.ts",
+      "tests/usage.db.test.ts",
+      "tests/web-auth-handoff.db.test.ts",
+      "tests/web-workspace-selection.db.test.ts",
+      "tests/workspace-admin.db.test.ts",
+      "tests/workspace-migration.test.mjs",
+      "tests/workspace-only-permissions-migration.test.mjs",
+      "tests/workspace-secrets.db.test.ts",
+      "tests/workspace-service-identities.db.test.ts"
+    ],
+    "selfManaged": [
+      "lib/auth-email.test.ts",
+      "tests/byos-application.test.mjs",
+      "tests/byos-enrollment-binding.test.mjs",
+      "tests/factory-monitor-cycle-http.test.ts",
+      "tests/factory-query-http.test.ts",
+      "tests/factory-question-http.test.ts",
+      "tests/test-account-pool.http.test.mjs"
+    ],
+    "browser": [
+      "tests/mvp/coordinator-streaming.spec.ts",
+      "tests/mvp/core-loop.spec.ts"
+    ],
+    "offlineGuarded": [
+      "lib/personal-mailbox-runtime-off.test.ts",
+      "scripts/scope-fresh.test.mjs",
+      "scripts/scope-native-offline.test.mjs",
+      "scripts/test-accounts/docker-environment.test.mjs"
+    ]
+  },
+  "processLifecycles": {
+    "test:live-db": [
+      {
+        "at": "2026-11-15T02:26:28.615376+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:30:05.511363+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:30:05.512640+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:bot-threads-db": [
+      {
+        "at": "2026-11-15T02:26:28.791002+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:30:01.686378+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:30:01.686427+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:factory": [
+      {
+        "at": "2026-11-15T02:26:29.119679+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:30:11.316777+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:30:11.316833+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:approved-writes-db": [
+      {
+        "at": "2026-11-15T02:27:06.784265+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:27:46.463639+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:27:46.463717+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:execution-settings-db": [
+      {
+        "at": "2026-11-15T02:27:46.472532+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:27:58.045995+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:27:58.046261+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:factory-checks-db": [
+      {
+        "at": "2026-11-15T02:27:58.047063+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:30:43.234365+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:30:43.234422+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:desktop-auth": [
+      {
+        "at": "2026-11-15T02:30:01.707974+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:30:33.963646+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:30:33.963894+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:factory-routing-db": [
+      {
+        "at": "2026-11-15T02:30:05.517280+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:33:27.758613+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:33:27.758665+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:workspace-admin-db": [
+      {
+        "at": "2026-11-15T02:30:11.320073+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:31:11.201166+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:31:11.201295+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:self-improvement-unit": [
+      {
+        "at": "2026-11-15T02:30:33.967652+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:30:53.361219+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:30:53.361274+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:ops-db": [
+      {
+        "at": "2026-11-15T02:30:43.237410+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:30:57.046014+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:30:57.048131+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:activity-actor-db": [
+      {
+        "at": "2026-11-15T02:30:53.363123+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:33:07.804700+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:33:07.804747+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:personal-mailbox-default-off-db": [
+      {
+        "at": "2026-11-15T02:30:57.048338+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:31:30.360947+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:31:30.361306+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:coding-workspace-db": [
+      {
+        "at": "2026-11-15T02:31:11.205520+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:37:57.024643+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:37:57.024698+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:run-dispatch": [
+      {
+        "at": "2026-11-15T02:31:30.361543+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:31:35.371065+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:31:35.372515+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:test-accounts-db": [
+      {
+        "at": "2026-11-15T02:31:35.372666+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:31:41.554774+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:31:41.554817+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:group-turns": [
+      {
+        "at": "2026-11-15T02:31:41.555571+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:32:15.046661+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:32:15.046716+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:visibility-db": [
+      {
+        "at": "2026-11-15T02:32:15.051583+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:32:54.773119+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:32:54.774455+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:groups": [
+      {
+        "at": "2026-11-15T02:32:54.775096+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:33:50.623850+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:33:50.623918+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:account-db": [
+      {
+        "at": "2026-11-15T02:33:07.808126+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:33:21.928547+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:33:21.928628+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:device-revocation-db": [
+      {
+        "at": "2026-11-15T02:33:21.930628+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:34:12.024257+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:34:12.026390+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:audit-db": [
+      {
+        "at": "2026-11-15T02:33:27.763520+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:33:43.189681+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:33:43.189738+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:computer-db": [
+      {
+        "at": "2026-11-15T02:33:43.190495+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:34:08.595901+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:34:08.600252+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:eve-db": [
+      {
+        "at": "2026-11-15T02:33:50.624724+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:34:04.587287+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:34:04.587337+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:bot-chats-db": [
+      {
+        "at": "2026-11-15T02:34:04.588026+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:34:56.483584+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:34:56.483655+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:run-recovery-db": [
+      {
+        "at": "2026-11-15T02:34:08.600421+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:34:38.347906+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:34:38.347947+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:self-improvement-db": [
+      {
+        "at": "2026-11-15T02:34:12.026782+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:34:44.388605+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:34:44.388660+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:abuse-db": [
+      {
+        "at": "2026-11-15T02:34:38.349508+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:35:04.712505+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:35:04.714578+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:cloud-backend-db": [
+      {
+        "at": "2026-11-15T02:34:44.390768+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:35:15.054110+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:35:15.055562+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:project-resources-db": [
+      {
+        "at": "2026-11-15T02:34:56.486248+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:35:02.454990+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:35:02.455048+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:run-publication-db": [
+      {
+        "at": "2026-11-15T02:35:02.455885+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:35:36.694078+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:35:36.694410+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:worker-authorization-db": [
+      {
+        "at": "2026-11-15T02:35:04.714781+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:35:37.518941+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:35:37.518996+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:enterprise-db": [
+      {
+        "at": "2026-11-15T02:35:15.076304+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:35:44.667196+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:35:44.667239+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:factory-activity-db": [
+      {
+        "at": "2026-11-15T02:35:36.695074+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:36:12.038056+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:36:12.038111+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:factory-approval-db": [
+      {
+        "at": "2026-11-15T02:35:37.519509+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:36:09.975271+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:36:09.975319+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:github-connections-db": [
+      {
+        "at": "2026-11-15T02:35:44.674505+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:35:54.851180+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:35:54.851224+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:plugins-db": [
+      {
+        "at": "2026-11-15T02:35:54.852507+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:36:10.552398+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:36:10.554559+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:project-decisions-db": [
+      {
+        "at": "2026-11-15T02:36:09.976124+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:36:45.531213+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:36:45.531265+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:secrets-db": [
+      {
+        "at": "2026-11-15T02:36:10.554756+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:36:35.213845+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:36:35.213969+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:task-identity-db": [
+      {
+        "at": "2026-11-15T02:36:12.038329+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:36:30.178199+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:36:30.178676+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:user-facts-db": [
+      {
+        "at": "2026-11-15T02:36:30.178912+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:37:02.155378+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:37:02.155435+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:coordinator-issue-create-db": [
+      {
+        "at": "2026-11-15T02:36:35.220634+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:37:06.130017+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:37:06.132353+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:factory-monitor-db": [
+      {
+        "at": "2026-11-15T02:36:45.538845+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:37:15.754891+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:37:15.755023+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:web-auth-db": [
+      {
+        "at": "2026-11-15T02:37:02.156032+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:37:20.858603+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:37:20.858662+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:conversation-reads": [
+      {
+        "at": "2026-11-15T02:37:06.132504+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:37:15.186864+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:37:15.187208+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:coordinator-native": [
+      {
+        "at": "2026-11-15T02:37:15.187776+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:37:22.950641+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:37:22.950701+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:model-admission-db": [
+      {
+        "at": "2026-11-15T02:37:15.755199+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:37:26.497612+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:37:26.497667+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:pat-api-db": [
+      {
+        "at": "2026-11-15T02:37:20.871456+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:37:40.438637+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:37:40.440836+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:schedules-db": [
+      {
+        "at": "2026-11-15T02:37:22.951742+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:37:46.046371+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:37:46.046427+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:scope-detachment-db": [
+      {
+        "at": "2026-11-15T02:37:26.497898+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:37:57.074383+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:37:57.074440+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:agent-tool-approval-db": [
+      {
+        "at": "2026-11-15T02:37:40.442110+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:38:12.772096+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:38:12.772200+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:captures-db": [
+      {
+        "at": "2026-11-15T02:37:46.049556+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:38:12.764815+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:38:12.766735+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:cloud-services-db": [
+      {
+        "at": "2026-11-15T02:37:57.028815+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:38:00.284848+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:38:00.286579+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:coordinator-issue-tools-db": [
+      {
+        "at": "2026-11-15T02:37:57.076720+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:38:02.415547+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:38:02.415597+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:drive-db": [
+      {
+        "at": "2026-11-15T02:38:00.286727+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:38:04.427334+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:38:04.428157+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:project-v2-db": [
+      {
+        "at": "2026-11-15T02:38:02.415665+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:38:09.653937+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:38:09.654326+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:settings-prefs-db": [
+      {
+        "at": "2026-11-15T02:38:04.428883+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:38:32.877745+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:38:32.877797+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:skill-semantic-db": [
+      {
+        "at": "2026-11-15T02:38:09.654706+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:38:32.710632+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:38:32.710684+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:task-presentation-db": [
+      {
+        "at": "2026-11-15T02:38:12.766925+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:38:19.275371+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:38:19.275423+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:active-agents": [
+      {
+        "at": "2026-11-15T02:38:12.774532+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:38:36.190488+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:38:36.191666+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:agent-kit-db": [
+      {
+        "at": "2026-11-15T02:38:19.276093+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:38:20.791754+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:38:20.791811+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:artifact-migration-db": [
+      {
+        "at": "2026-11-15T02:38:20.792710+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:38:21.241185+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:38:21.241252+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:chat-attachments-db": [
+      {
+        "at": "2026-11-15T02:38:21.241840+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:38:24.041767+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:38:24.041837+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:coordinator-task-binding-db": [
+      {
+        "at": "2026-11-15T02:38:24.042569+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:38:27.248700+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:38:27.248760+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:credentials-db": [
+      {
+        "at": "2026-11-15T02:38:27.249570+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:38:28.566397+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:38:28.566443+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:device-enrollment-db": [
+      {
+        "at": "2026-11-15T02:38:28.567122+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:39:02.171053+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:39:02.171106+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:domain-lifecycle-db": [
+      {
+        "at": "2026-11-15T02:38:32.711281+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:38:39.712960+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:38:39.713028+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:factory-activity-http-db": [
+      {
+        "at": "2026-11-15T02:38:32.878687+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:39:37.700205+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:39:37.700279+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:factory-all-dispatch-db": [
+      {
+        "at": "2026-11-15T02:38:36.191776+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:38:47.620642+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:38:47.620710+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:factory-check-independence-db": [
+      {
+        "at": "2026-11-15T02:38:39.713918+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:38:42.906146+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:38:42.906217+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:inbox-db": [
+      {
+        "at": "2026-11-15T02:38:42.908539+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:38:49.292598+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:38:49.292656+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:issue-search-db": [
+      {
+        "at": "2026-11-15T02:38:47.622529+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:38:59.624813+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:38:59.624867+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:local-repository-migration-db": [
+      {
+        "at": "2026-11-15T02:38:49.292757+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:38:59.736818+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:38:59.736908+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:migration-steps-db": [
+      {
+        "at": "2026-11-15T02:38:59.626566+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:39:11.685598+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:39:11.685650+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:onboarding-db": [
+      {
+        "at": "2026-11-15T02:38:59.739049+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:39:01.219204+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:39:01.219543+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:organization-invitations-db": [
+      {
+        "at": "2026-11-15T02:39:01.220142+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:39:04.852430+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:39:04.854657+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:organization-join-domains-db": [
+      {
+        "at": "2026-11-15T02:39:02.171204+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:39:06.197548+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:39:06.197607+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:pat-db": [
+      {
+        "at": "2026-11-15T02:39:04.854753+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:39:09.841808+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:39:09.841859+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:preview-driver": [
+      {
+        "at": "2026-11-15T02:39:06.197691+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:39:07.285290+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:39:07.285344+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:relation-cycle": [
+      {
+        "at": "2026-11-15T02:39:07.285433+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:39:34.012849+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:39:34.012894+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:session-mailbox-db": [
+      {
+        "at": "2026-11-15T02:39:09.843128+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:39:12.740194+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:39:12.740249+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:settings-activity-db": [
+      {
+        "at": "2026-11-15T02:39:11.685721+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:39:18.745575+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:39:18.745642+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:slack-installation-db": [
+      {
+        "at": "2026-11-15T02:39:12.740328+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:39:15.962570+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:39:15.964979+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:suggestion-artifact-db": [
+      {
+        "at": "2026-11-15T02:39:15.965058+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:39:19.955362+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:39:19.955767+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:workspace-migration-db": [
+      {
+        "at": "2026-11-15T02:39:18.746524+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:39:19.351589+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:39:19.351643+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ],
+    "test:workspace-permissions-migration-db": [
+      {
+        "at": "2026-11-15T02:39:19.351704+00:00",
+        "lifecycle": "start"
+      },
+      {
+        "at": "2026-11-15T02:39:21.655579+00:00",
+        "lifecycle": "exit code=0 signal=none"
+      },
+      {
+        "at": "2026-11-15T02:39:21.655630+00:00",
+        "lifecycle": "close code=0 signal=none"
+      }
+    ]
+  },
+  "setup": "Pinned source original install action, native CLI dependencies, original migration/SQL setup, source-bound test accounts, separately executed original local-runtime and issue-threads integration, fixed PG17 as in required CI",
+  "namedOutcomeRecords": 6175,
+  "declaredNamedFiles": {
+    "lib/abuse/alerts.db.test.ts": [
+      "test:abuse-db"
+    ],
+    "lib/abuse/card.db.test.ts": [
+      "test:abuse-db"
+    ],
+    "lib/abuse/model-generation.db.test.ts": [
+      "test:abuse-db"
+    ],
+    "lib/abuse/model-postpay.db.test.ts": [
+      "test:abuse-db"
+    ],
+    "lib/abuse/store.db.test.ts": [
+      "test:abuse-db"
+    ],
+    "lib/account-deletions-due.db.test.ts": [
+      "test:account-db"
+    ],
+    "lib/account/cloud-cleanup.db.test.ts": [
+      "test:account-db"
+    ],
+    "lib/account/deletion-jobs.db.test.ts": [
+      "test:account-db"
+    ],
+    "lib/account/deletion-lock.db.test.ts": [
+      "test:account-db"
+    ],
+    "lib/account/deletion-restore.db.test.ts": [
+      "test:account-db"
+    ],
+    "lib/account/export-files.db.test.ts": [
+      "test:account-db"
+    ],
+    "lib/account/owner-cleanup.db.test.ts": [
+      "test:account-db"
+    ],
+    "lib/account/store.db.test.ts": [
+      "test:account-db"
+    ],
+    "lib/active-agents.test.ts": [
+      "test:active-agents"
+    ],
+    "lib/agent-kit/store.db.test.ts": [
+      "test:agent-kit-db"
+    ],
+    "lib/agent-tool-approval/local-cloud-issuer.db.test.ts": [
+      "test:worker-authorization-db"
+    ],
+    "lib/agent-tool-approval/store.db.test.ts": [
+      "test:agent-tool-approval-db"
+    ],
+    "lib/agent-tool-approval/task-policy.db.test.ts": [
+      "test:worker-authorization-db"
+    ],
+    "lib/audit-retention-due.db.test.ts": [
+      "test:audit-db"
+    ],
+    "lib/audit/export.db.test.ts": [
+      "test:audit-db"
+    ],
+    "lib/audit/retention.db.test.ts": [
+      "test:audit-db"
+    ],
+    "lib/auth-schema-check.db.test.ts": [
+      "test:desktop-auth"
+    ],
+    "lib/bot-model-menu.db.test.ts": [
+      "test:execution-settings-db"
+    ],
+    "lib/builtin-gateway/postgres.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/builtin-gateway/session-revocation.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/captures/bootstrap-evidence.db.test.ts": [
+      "test:captures-db"
+    ],
+    "lib/captures/store.db.test.ts": [
+      "test:captures-db"
+    ],
+    "lib/chat-attachments/store.db.test.ts": [
+      "test:chat-attachments-db"
+    ],
+    "lib/cloud-computer/backend.db.test.ts": [
+      "test:cloud-backend-db"
+    ],
+    "lib/cloud-computer/thread-credential-batch.db.test.ts": [
+      "test:cloud-backend-db"
+    ],
+    "lib/cloud-computer/thread-machine-sessions.db.test.ts": [
+      "test:factory-activity-db"
+    ],
+    "lib/cloud-computer/thread-machine-stop.db.test.ts": [
+      "test:factory-routing-db"
+    ],
+    "lib/cloud-computer/thread-machine-task.db.test.ts": [
+      "test:cloud-backend-db"
+    ],
+    "lib/cloud-computer/thread-registration.db.test.ts": [
+      "test:cloud-backend-db"
+    ],
+    "lib/cloud-computer/unattended.db.test.ts": [
+      "test:cloud-backend-db"
+    ],
+    "lib/cloud-computer/workspace-teardown.db.test.ts": [
+      "test:account-db"
+    ],
+    "lib/cloud-services/client.db.test.ts": [
+      "test:cloud-services-db"
+    ],
+    "lib/cloud-subscription-lease-route.db.test.ts": [
+      "test:device-revocation-db"
+    ],
+    "lib/coding-workspace/diff/agent-delivery.db.test.ts": [
+      "test:coding-workspace-db"
+    ],
+    "lib/coding-workspace/diff/github-delivery.db.test.ts": [
+      "test:coding-workspace-db"
+    ],
+    "lib/coding-workspace/diff/store.db.test.ts": [
+      "test:coding-workspace-db"
+    ],
+    "lib/coding-workspace/files.db.test.ts": [
+      "test:coding-workspace-db"
+    ],
+    "lib/coding-workspace/git/operations.db.test.ts": [
+      "test:coding-workspace-db"
+    ],
+    "lib/coding-workspace/http-daemon-personal.db.test.ts": [
+      "test:coding-workspace-db"
+    ],
+    "lib/coding-workspace/http-daemon.db.test.ts": [
+      "test:coding-workspace-db"
+    ],
+    "lib/coding-workspace/review-authority.db.test.ts": [
+      "test:coding-workspace-db"
+    ],
+    "lib/coding-workspace/review-team-scope.db.test.ts": [
+      "test:coding-workspace-db"
+    ],
+    "lib/coding-workspace/task-review/merge.db.test.ts": [
+      "test:coding-workspace-db"
+    ],
+    "lib/coding-workspace/task-review/read.db.test.ts": [
+      "test:coding-workspace-db"
+    ],
+    "lib/coding-workspace/task-review/send.db.test.ts": [
+      "test:coding-workspace-db"
+    ],
+    "lib/coding-workspace/task-review/summaries.db.test.ts": [
+      "test:coding-workspace-db"
+    ],
+    "lib/composio-account-store.db.test.ts": [
+      "test:account-db"
+    ],
+    "lib/computer/bot-runtime.db.test.ts": [
+      "test:computer-db"
+    ],
+    "lib/computer/event-broker.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/computer/event-log.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/computer/event-session.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/computer/event-writers.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/computer/local-reviews.db.test.ts": [
+      "test:computer-db"
+    ],
+    "lib/computer/provision.db.test.ts": [
+      "test:computer-db"
+    ],
+    "lib/computer/reconcile.db.test.ts": [
+      "test:computer-db"
+    ],
+    "lib/computer/store.db.test.ts": [
+      "test:computer-db"
+    ],
+    "lib/computer/task-runtime.db.test.ts": [
+      "test:computer-db"
+    ],
+    "lib/conversation-reads-route.test.ts": [
+      "test:conversation-reads"
+    ],
+    "lib/conversation-reads-store.test.ts": [
+      "test:conversation-reads"
+    ],
+    "lib/coordinator/bot-chats.db.test.ts": [
+      "test:bot-chats-db"
+    ],
+    "lib/coordinator/chat-projection.db.test.ts": [
+      "test:bot-chats-db"
+    ],
+    "lib/coordinator/chat-version.db.test.ts": [
+      "test:bot-chats-db"
+    ],
+    "lib/coordinator/group-decision-consumer.test.ts": [
+      "test:group-turns"
+    ],
+    "lib/coordinator/group-decision-quality.db.test.ts": [
+      "test:group-turns"
+    ],
+    "lib/coordinator/group-drain.db.test.ts": [
+      "test:group-turns"
+    ],
+    "lib/coordinator/group-factory.db.test.ts": [
+      "test:group-turns"
+    ],
+    "lib/coordinator/group-turns.test.ts": [
+      "test:group-turns"
+    ],
+    "lib/coordinator/native-store.test.ts": [
+      "test:coordinator-native"
+    ],
+    "lib/coordinator/owner-event-wakes.db.test.ts": [
+      "test:approved-writes-db"
+    ],
+    "lib/coordinator/run-completion-delivery.db.test.ts": [
+      "test:bot-chats-db"
+    ],
+    "lib/coordinator/startup-receipt.db.test.ts": [
+      "test:bot-chats-db"
+    ],
+    "lib/coordinator/wake-event-driven.db.test.ts": [
+      "test:bot-chats-db"
+    ],
+    "lib/credentials/store.db.test.ts": [
+      "test:credentials-db"
+    ],
+    "lib/db/listen.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/db/preview-driver.test.ts": [
+      "test:preview-driver"
+    ],
+    "lib/db/request-scope-live.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/db/transport-sample.db.test.ts": [
+      "test:ops-db"
+    ],
+    "lib/demo-device-cleanup.db.test.ts": [
+      "test:device-revocation-db"
+    ],
+    "lib/device-enrollment.db.test.ts": [
+      "test:device-enrollment-db"
+    ],
+    "lib/device-heartbeat.db.test.ts": [
+      "test:device-revocation-db"
+    ],
+    "lib/device-mailbox-notices.db.test.ts": [
+      "test:device-revocation-db"
+    ],
+    "lib/device-presence.db.test.ts": [
+      "test:device-revocation-db"
+    ],
+    "lib/device-revocation.db.test.ts": [
+      "test:device-revocation-db"
+    ],
+    "lib/device-route-fence.db.test.ts": [
+      "test:device-revocation-db"
+    ],
+    "lib/device-unit-fence.db.test.ts": [
+      "test:device-revocation-db"
+    ],
+    "lib/device-work.db.test.ts": [
+      "test:device-revocation-db"
+    ],
+    "lib/drive/server.db.test.ts": [
+      "test:drive-db"
+    ],
+    "lib/drive/store.db.test.ts": [
+      "test:drive-db"
+    ],
+    "lib/enabled-models.db.test.ts": [
+      "test:execution-settings-db"
+    ],
+    "lib/enterprise/audit-outbox.db.test.ts": [
+      "test:enterprise-db"
+    ],
+    "lib/enterprise/execution-authority.db.test.ts": [
+      "test:enterprise-db"
+    ],
+    "lib/enterprise/governance.db.test.ts": [
+      "test:enterprise-db"
+    ],
+    "lib/enterprise/http.db.test.ts": [
+      "test:enterprise-db"
+    ],
+    "lib/enterprise/live-authority.db.test.ts": [
+      "test:enterprise-db"
+    ],
+    "lib/eve/approval-bridge.db.test.ts": [
+      "test:eve-db"
+    ],
+    "lib/eve/auth-bot.db.test.ts": [
+      "test:eve-db"
+    ],
+    "lib/eve/evaluation-store.db.test.ts": [
+      "test:eve-db"
+    ],
+    "lib/eve/outcome-delivery.db.test.ts": [
+      "test:eve-db"
+    ],
+    "lib/eve/sandbox.db.test.ts": [
+      "test:eve-db"
+    ],
+    "lib/eve/scheduled-read.db.test.ts": [
+      "test:eve-db"
+    ],
+    "lib/eve/scope.db.test.ts": [
+      "test:eve-db"
+    ],
+    "lib/eve/settlement.db.test.ts": [
+      "test:eve-db"
+    ],
+    "lib/execution-identity.db.test.ts": [
+      "test:worker-authorization-db"
+    ],
+    "lib/execution-model-options.db.test.ts": [
+      "test:execution-settings-db"
+    ],
+    "lib/execution-settings.db.test.ts": [
+      "test:execution-settings-db"
+    ],
+    "lib/factory/activity-artifacts.db.test.ts": [
+      "test:factory-activity-db"
+    ],
+    "lib/factory/activity.db.test.ts": [
+      "test:factory-activity-db"
+    ],
+    "lib/factory/agent-profile-skills.db.test.ts": [
+      "test:factory-routing-db"
+    ],
+    "lib/factory/agent-profile.db.test.ts": [
+      "test:factory-routing-db"
+    ],
+    "lib/factory/approval.db.test.ts": [
+      "test:factory-approval-db"
+    ],
+    "lib/factory/approval.test.ts": [
+      "test:factory"
+    ],
+    "lib/factory/check-independence.db.test.ts": [
+      "test:factory-check-independence-db"
+    ],
+    "lib/factory/checks.db.test.ts": [
+      "test:factory-checks-db"
+    ],
+    "lib/factory/checks.test.ts": [
+      "test:factory"
+    ],
+    "lib/factory/completion-reconcile.db.test.ts": [
+      "test:factory-routing-db"
+    ],
+    "lib/factory/continuity.db.test.ts": [
+      "test:factory-checks-db"
+    ],
+    "lib/factory/deliverable-recovery.db.test.ts": [
+      "test:factory-routing-db"
+    ],
+    "lib/factory/dispatch-http.db.test.ts": [
+      "test:factory-routing-db"
+    ],
+    "lib/factory/dispatch-recovery.db.test.ts": [
+      "test:factory-routing-db"
+    ],
+    "lib/factory/inherited-command-observations.db.test.ts": [
+      "test:factory-checks-db"
+    ],
+    "lib/factory/list.db.test.ts": [
+      "test:factory-routing-db"
+    ],
+    "lib/factory/merge.db.test.ts": [
+      "test:factory-approval-db"
+    ],
+    "lib/factory/monitor-cycle.test.ts": [
+      "test:factory"
+    ],
+    "lib/factory/monitor-dispatch.test.ts": [
+      "test:factory"
+    ],
+    "lib/factory/monitor-incidents.db.test.ts": [
+      "test:factory-monitor-db"
+    ],
+    "lib/factory/monitor-sweep.db.test.ts": [
+      "test:factory-routing-db"
+    ],
+    "lib/factory/monitor-v2-binding.db.test.ts": [
+      "test:factory-monitor-db"
+    ],
+    "lib/factory/monitor.test.ts": [
+      "test:factory"
+    ],
+    "lib/factory/postgres.test.ts": [
+      "test:factory"
+    ],
+    "lib/factory/profile-dispatch.db.test.ts": [
+      "test:factory-checks-db"
+    ],
+    "lib/factory/public-consumers.db.test.ts": [
+      "test:factory-approval-db"
+    ],
+    "lib/factory/publication-failed.db.test.ts": [
+      "test:factory-routing-db"
+    ],
+    "lib/factory/questions/ask-user.db.test.ts": [
+      "test:factory-routing-db"
+    ],
+    "lib/factory/questions/execution-continuation.db.test.ts": [
+      "test:factory-checks-db"
+    ],
+    "lib/factory/questions/postgres.test.ts": [
+      "test:factory"
+    ],
+    "lib/factory/reject-store.db.test.ts": [
+      "test:factory-approval-db"
+    ],
+    "lib/factory/reject.db.test.ts": [
+      "test:factory-approval-db"
+    ],
+    "lib/factory/repository-selection.db.test.ts": [
+      "test:factory-routing-db"
+    ],
+    "lib/factory/route-http.db.test.ts": [
+      "test:factory-routing-db"
+    ],
+    "lib/factory/routing.db.test.ts": [
+      "test:factory-routing-db"
+    ],
+    "lib/factory/run-end-paths.db.test.ts": [
+      "test:factory-routing-db"
+    ],
+    "lib/factory/spec-artifact.db.test.ts": [
+      "test:factory-activity-db"
+    ],
+    "lib/factory/task-detail.db.test.ts": [
+      "test:factory-routing-db"
+    ],
+    "lib/factory/task-dispatch.db.test.ts": [
+      "test:factory-routing-db"
+    ],
+    "lib/factory/task-media.db.test.ts": [
+      "test:factory-activity-db"
+    ],
+    "lib/github/publication-webhook.db.test.ts": [
+      "test:run-publication-db"
+    ],
+    "lib/group-conversations.test.ts": [
+      "test:groups"
+    ],
+    "lib/group-reads.db.test.ts": [
+      "test:conversation-reads"
+    ],
+    "lib/inbox/store.db.test.ts": [
+      "test:inbox-db"
+    ],
+    "lib/issue-relation-cycle.db.test.ts": [
+      "test:relation-cycle"
+    ],
+    "lib/live/approved-writes.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/live/artifacts.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/live/billing.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/live/chat-preferences.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/live/chats.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/live/computer-state.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/live/devices.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/live/factory.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/live/groups.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/live/issue-detail.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/live/issue-threads.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/live/lists.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/live/notification-context.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/live/notify-workspace.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/live/panels.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/live/pending-actions.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/live/project-map.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/live/pull-requests.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/live/store.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/live/ticket-session.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/mailbox-pg-cancel.test.ts": [
+      "test:personal-mailbox-default-off-db"
+    ],
+    "lib/mcp/event-delivery.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/mcp/reply-live.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/mcp/reply-notifications.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/mcp/worker-authorization.db.test.ts": [
+      "test:worker-authorization-db"
+    ],
+    "lib/mobile-push-delivery.db.test.ts": [
+      "test:cloud-services-db"
+    ],
+    "lib/model-admission/revocation-postpay.db.test.ts": [
+      "test:model-admission-db"
+    ],
+    "lib/model-admission/store.db.test.ts": [
+      "test:model-admission-db"
+    ],
+    "lib/model-admission/subscription.db.test.ts": [
+      "test:model-admission-db"
+    ],
+    "lib/onboarding.db.test.ts": [
+      "test:onboarding-db"
+    ],
+    "lib/operations/ledger.db.test.ts": [
+      "test:approved-writes-db"
+    ],
+    "lib/operations/personal-scope.db.test.ts": [
+      "test:approved-writes-db"
+    ],
+    "lib/operations/recovery.db.test.ts": [
+      "test:approved-writes-db"
+    ],
+    "lib/operations/workspace-app-permissions.db.test.ts": [
+      "test:approved-writes-db"
+    ],
+    "lib/operations/write-legacy-schema.db.test.ts": [
+      "test:approved-writes-db"
+    ],
+    "lib/operations/write-policy-chain.db.test.ts": [
+      "test:approved-writes-db"
+    ],
+    "lib/ops/egress-fallback.db.test.ts": [
+      "test:ops-db"
+    ],
+    "lib/ops/monitor.db.test.ts": [
+      "test:ops-db"
+    ],
+    "lib/personal-policy.db.test.ts": [
+      "test:worker-authorization-db"
+    ],
+    "lib/plugins/native-mcp.db.test.ts": [
+      "test:plugins-db"
+    ],
+    "lib/plugins/read-skill-body.db.test.ts": [
+      "test:plugins-db"
+    ],
+    "lib/plugins/sharing-auth.db.test.ts": [
+      "test:plugins-db"
+    ],
+    "lib/plugins/store.db.test.ts": [
+      "test:plugins-db"
+    ],
+    "lib/plugins/workspace-mcp.db.test.ts": [
+      "test:plugins-db"
+    ],
+    "lib/profile/memory-authority.db.test.ts": [
+      "test:user-facts-db"
+    ],
+    "lib/profile/memory-provenance.db.test.ts": [
+      "test:user-facts-db"
+    ],
+    "lib/profile/memory.db.test.ts": [
+      "test:user-facts-db"
+    ],
+    "lib/profile/store.db.test.ts": [
+      "test:user-facts-db"
+    ],
+    "lib/project-map/decisions.db.test.ts": [
+      "test:project-decisions-db"
+    ],
+    "lib/project-map/http.db.test.ts": [
+      "test:project-decisions-db"
+    ],
+    "lib/project-map/read.db.test.ts": [
+      "test:project-decisions-db"
+    ],
+    "lib/project-map/sources.db.test.ts": [
+      "test:project-decisions-db"
+    ],
+    "lib/reconcile-due.db.test.ts": [
+      "test:run-recovery-db"
+    ],
+    "lib/run-prompt-copy.db.test.ts": [
+      "test:run-recovery-db"
+    ],
+    "lib/run-recovery-due.db.test.ts": [
+      "test:run-recovery-db"
+    ],
+    "lib/schedules/due-timer.db.test.ts": [
+      "test:schedules-db"
+    ],
+    "lib/schedules/request-identity.db.test.ts": [
+      "test:schedules-db"
+    ],
+    "lib/schedules/store.db.test.ts": [
+      "test:schedules-db"
+    ],
+    "lib/search/rate-limit.db.test.ts": [
+      "test:abuse-db"
+    ],
+    "lib/secrets/project-map-mask.db.test.ts": [
+      "test:project-decisions-db"
+    ],
+    "lib/self-improvement/activation-postgres.test.ts": [
+      "test:self-improvement-db"
+    ],
+    "lib/self-improvement/claim-composition-postgres.test.ts": [
+      "test:skill-semantic-db"
+    ],
+    "lib/self-improvement/evaluation-comparison-postgres.test.ts": [
+      "test:skill-semantic-db"
+    ],
+    "lib/self-improvement/evaluations-postgres.test.ts": [
+      "test:self-improvement-db"
+    ],
+    "lib/self-improvement/postgres.test.ts": [
+      "test:self-improvement-db"
+    ],
+    "lib/self-improvement/registry-postgres.test.ts": [
+      "test:self-improvement-db"
+    ],
+    "lib/self-improvement/skill-mounts-postgres.test.ts": [
+      "test:self-improvement-db"
+    ],
+    "lib/self-improvement/team-skills.db.test.ts": [
+      "test:self-improvement-db"
+    ],
+    "lib/self-improvement/test-database.test.ts": [
+      "test:self-improvement-unit"
+    ],
+    "lib/self-improvement/wiring-postgres.test.ts": [
+      "test:self-improvement-db"
+    ],
+    "lib/short-title-schedule.db.test.ts": [
+      "test:live-db"
+    ],
+    "lib/subscription-acquire-expiry.db.test.ts": [
+      "test:workspace-admin-db"
+    ],
+    "lib/subscription-repository.db.test.ts": [
+      "test:workspace-admin-db"
+    ],
+    "lib/subscription-workspace-authorization.db.test.ts": [
+      "test:worker-authorization-db"
+    ],
+    "lib/suggestions/briefing-delivery.db.test.ts": [
+      "test:settings-prefs-db"
+    ],
+    "lib/thread-chunks.db.test.ts": [
+      "test:bot-chats-db"
+    ],
+    "lib/workspace-db.db.test.ts": [
+      "test:visibility-db"
+    ],
+    "lib/workspace-membership-guard.test.ts": [
+      "test:personal-mailbox-default-off-db"
+    ],
+    "tests/action-read-egress.db.test.ts": [
+      "test:activity-actor-db"
+    ],
+    "tests/activity-actor-db.test.ts": [
+      "test:activity-actor-db"
+    ],
+    "tests/api-key-runs.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/app-policy.db.test.ts": [
+      "test:workspace-admin-db"
+    ],
+    "tests/artifact-delete.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/artifact-legacy-migration.test.mjs": [
+      "test:artifact-migration-db"
+    ],
+    "tests/audit-delivery.db.test.ts": [
+      "test:audit-db"
+    ],
+    "tests/audit-query.db.test.ts": [
+      "test:workspace-admin-db"
+    ],
+    "tests/audit-record.db.test.ts": [
+      "test:audit-db"
+    ],
+    "tests/authentication-audit.db.test.ts": [
+      "test:audit-db"
+    ],
+    "tests/background-database-boundary.db.test.ts": [
+      "test:project-resources-db"
+    ],
+    "tests/billing-history.db.test.ts": [
+      "test:workspace-admin-db"
+    ],
+    "tests/billing-management.db.test.ts": [
+      "test:workspace-admin-db"
+    ],
+    "tests/billing-points.db.test.ts": [
+      "test:workspace-admin-db"
+    ],
+    "tests/billing.db.test.ts": [
+      "test:workspace-admin-db"
+    ],
+    "tests/bot-summary-bytes.db.test.ts": [
+      "test:activity-actor-db"
+    ],
+    "tests/bot-threads.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/bot-update.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/checkpoint-recovery.db.test.ts": [
+      "test:run-recovery-db"
+    ],
+    "tests/citation-egress.db.test.ts": [
+      "test:activity-actor-db"
+    ],
+    "tests/claim-profile-lock.db.test.ts": [
+      "test:factory-checks-db"
+    ],
+    "tests/cloud-device-handoff.db.test.ts": [
+      "test:run-recovery-db"
+    ],
+    "tests/cloud-github-webhooks.db.test.ts": [
+      "test:github-connections-db"
+    ],
+    "tests/cloud-runtime-auto.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/computer-policy-default-allow-migration.test.mjs": [
+      "test:computer-db"
+    ],
+    "tests/conversation-completion-title.db.test.ts": [
+      "test:run-publication-db"
+    ],
+    "tests/conversation-title.db.test.ts": [
+      "test:run-publication-db"
+    ],
+    "tests/coordinator-bot.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/coordinator-chat-egress.db.test.ts": [
+      "test:activity-actor-db"
+    ],
+    "tests/coordinator-issue-create.db.test.ts": [
+      "test:coordinator-issue-create-db"
+    ],
+    "tests/coordinator-issue-team.db.test.ts": [
+      "test:coordinator-issue-tools-db"
+    ],
+    "tests/coordinator-issue-title.db.test.ts": [
+      "test:coordinator-issue-create-db"
+    ],
+    "tests/coordinator-model-list.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/coordinator-task-binding.db.ts": [
+      "test:coordinator-task-binding-db"
+    ],
+    "tests/credit-shares.db.test.ts": [
+      "test:workspace-admin-db"
+    ],
+    "tests/daemon-contract.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/desktop-auth-handoff.db.test.ts": [
+      "test:desktop-auth"
+    ],
+    "tests/desktop-links.db.test.ts": [
+      "test:desktop-auth"
+    ],
+    "tests/desktop-native-resources.db.test.mjs": [
+      "test:test-accounts-db"
+    ],
+    "tests/desktop-rpc-auth.db.test.ts": [
+      "test:desktop-auth"
+    ],
+    "tests/desktop-session-cache.db.test.ts": [
+      "test:desktop-auth"
+    ],
+    "tests/device-computer-migration.test.mjs": [
+      "test:computer-db"
+    ],
+    "tests/document-sync-egress.db.test.ts": [
+      "test:activity-actor-db"
+    ],
+    "tests/domain-lifecycle.db.test.ts": [
+      "test:domain-lifecycle-db"
+    ],
+    "tests/environment-settings-actions.db.test.ts": [
+      "test:project-resources-db"
+    ],
+    "tests/environment-settings.db.test.ts": [
+      "test:project-resources-db"
+    ],
+    "tests/environment-single-workflow.db.test.ts": [
+      "test:project-resources-db"
+    ],
+    "tests/factory-activity-http.db.test.ts": [
+      "test:factory-activity-http-db"
+    ],
+    "tests/factory-admission.db.test.ts": [
+      "test:factory-routing-db"
+    ],
+    "tests/factory-all-dispatch.db.test.ts": [
+      "test:factory-all-dispatch-db"
+    ],
+    "tests/factory-background-workspace.db.test.ts": [
+      "test:visibility-db"
+    ],
+    "tests/factory-local-question.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/factory-monitor-followup.db.test.ts": [
+      "test:factory-monitor-db"
+    ],
+    "tests/factory-monitor-issue-links.db.test.ts": [
+      "test:factory-monitor-db"
+    ],
+    "tests/factory-pat-scope.db.test.ts": [
+      "test:pat-api-db"
+    ],
+    "tests/factory-policy-denials.db.test.ts": [
+      "test:factory-routing-db"
+    ],
+    "tests/factory-workspace-admission.db.test.ts": [
+      "test:visibility-db"
+    ],
+    "tests/github-app-manifest.db.test.ts": [
+      "test:github-connections-db"
+    ],
+    "tests/github-connect-intent.db.test.ts": [
+      "test:github-connections-db"
+    ],
+    "tests/github-connections.db.test.ts": [
+      "test:github-connections-db"
+    ],
+    "tests/github-webhook-statements.db.test.ts": [
+      "test:run-publication-db"
+    ],
+    "tests/governance-seats.db.test.ts": [
+      "test:visibility-db"
+    ],
+    "tests/issue-list-egress.db.test.ts": [
+      "test:activity-actor-db"
+    ],
+    "tests/issue-numbering.db.test.ts": [
+      "test:coordinator-issue-create-db"
+    ],
+    "tests/issue-scope-detachment.db.test.ts": [
+      "test:scope-detachment-db"
+    ],
+    "tests/issue-search.db.test.ts": [
+      "test:issue-search-db"
+    ],
+    "tests/issue-tool-calls.db.test.ts": [
+      "test:coordinator-issue-tools-db"
+    ],
+    "tests/issue-visibility-narrow.db.test.ts": [
+      "test:visibility-db"
+    ],
+    "tests/linear-archive.db.test.ts": [
+      "test:scope-detachment-db"
+    ],
+    "tests/linear-responsibility.db.test.ts": [
+      "test:task-identity-db"
+    ],
+    "tests/linear-status-wake.db.test.ts": [
+      "test:task-identity-db"
+    ],
+    "tests/live-revision-reads.db.test.ts": [
+      "test:activity-actor-db"
+    ],
+    "tests/local-repository-migration.db.test.mjs": [
+      "test:local-repository-migration-db"
+    ],
+    "tests/migration-steps.db.test.mjs": [
+      "test:migration-steps-db"
+    ],
+    "tests/mobile-bot.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/mobile-chat-pages.db.test.ts": [
+      "test:activity-actor-db"
+    ],
+    "tests/mobile-chat-submission.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/mobile-push-workspace.db.test.ts": [
+      "test:visibility-db"
+    ],
+    "tests/mobile-service-members.db.test.ts": [
+      "test:web-auth-db"
+    ],
+    "tests/mobile-tasks.db.test.ts": [
+      "test:workspace-admin-db"
+    ],
+    "tests/model-api-keys.db.test.ts": [
+      "test:workspace-admin-db"
+    ],
+    "tests/model-order.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/model-provider-health.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/model-routing-dispatch.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/model-routing-settings.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/one-thread-per-task.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/organization-invitations.db.test.ts": [
+      "test:organization-invitations-db"
+    ],
+    "tests/organization-join-domains.db.test.ts": [
+      "test:organization-join-domains-db"
+    ],
+    "tests/personal-access-token-api.db.test.ts": [
+      "test:pat-api-db"
+    ],
+    "tests/personal-access-token-scope.db.test.ts": [
+      "test:pat-api-db"
+    ],
+    "tests/personal-access-tokens.db.test.ts": [
+      "test:pat-db"
+    ],
+    "tests/personal-first.db.test.ts": [
+      "test:workspace-admin-db"
+    ],
+    "tests/personal-mailbox-default-off.db.test.ts": [
+      "test:personal-mailbox-default-off-db"
+    ],
+    "tests/personal-resource-privacy.db.test.ts": [
+      "test:visibility-db"
+    ],
+    "tests/personal-secrets.db.test.ts": [
+      "test:secrets-db"
+    ],
+    "tests/personal-workspace.db.test.ts": [
+      "test:workspace-admin-db"
+    ],
+    "tests/project-lifecycle.db.test.ts": [
+      "test:project-v2-db"
+    ],
+    "tests/project-resource-lease.db.test.ts": [
+      "test:project-resources-db"
+    ],
+    "tests/project-resources.db.test.ts": [
+      "test:project-resources-db"
+    ],
+    "tests/project-v2.db.test.ts": [
+      "test:project-v2-db"
+    ],
+    "tests/project-workspace-selection.db.test.ts": [
+      "test:web-auth-db"
+    ],
+    "tests/read-cache-detail-egress.db.test.ts": [
+      "test:activity-actor-db"
+    ],
+    "tests/read-cache-scope.db.test.ts": [
+      "test:activity-actor-db"
+    ],
+    "tests/read-single-flight.db.test.ts": [
+      "test:activity-actor-db"
+    ],
+    "tests/repository-verification.db.test.ts": [
+      "test:github-connections-db"
+    ],
+    "tests/request-query-count.db.test.ts": [
+      "test:activity-actor-db"
+    ],
+    "tests/resource-access.db.test.ts": [
+      "test:visibility-db"
+    ],
+    "tests/run-agent-names.db.test.ts": [
+      "test:workspace-admin-db"
+    ],
+    "tests/run-bot-attribution.db.test.ts": [
+      "test:workspace-admin-db"
+    ],
+    "tests/run-chain.db.test.ts": [
+      "test:factory-routing-db"
+    ],
+    "tests/run-dispatch.test.ts": [
+      "test:run-dispatch"
+    ],
+    "tests/run-ending-wake.db.test.ts": [
+      "test:run-recovery-db"
+    ],
+    "tests/run-machine-fallback.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/run-outcomes.db.test.ts": [
+      "test:workspace-admin-db"
+    ],
+    "tests/run-provider-fallback-cloud.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/run-provider-fallback.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/run-publications.db.test.ts": [
+      "test:run-publication-db"
+    ],
+    "tests/run-quota.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/run-recovery.db.test.ts": [
+      "test:run-recovery-db"
+    ],
+    "tests/run-share-lease.db.test.ts": [
+      "test:workspace-admin-db"
+    ],
+    "tests/secret-masking.db.test.ts": [
+      "test:secrets-db"
+    ],
+    "tests/security-lifecycle-audit.db.test.ts": [
+      "test:audit-db"
+    ],
+    "tests/session-cookie-cache.db.test.ts": [
+      "test:audit-db"
+    ],
+    "tests/session-mailbox.db.test.ts": [
+      "test:session-mailbox-db"
+    ],
+    "tests/settings-activity.db.test.ts": [
+      "test:settings-activity-db"
+    ],
+    "tests/settings-preferences.db.test.ts": [
+      "test:settings-prefs-db"
+    ],
+    "tests/shared-subscription-runs.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/slack-installation.db.test.ts": [
+      "test:slack-installation-db"
+    ],
+    "tests/subagent-report-wake.db.test.ts": [
+      "test:cloud-backend-db"
+    ],
+    "tests/subscription-allowance.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/subscription-route-queries.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/suggestion-claim.integration.test.ts": [
+      "test:suggestion-artifact-db"
+    ],
+    "tests/task-create-only.db.test.ts": [
+      "test:coordinator-issue-create-db"
+    ],
+    "tests/task-identity.db.test.ts": [
+      "test:task-identity-db"
+    ],
+    "tests/task-list-pages.db.test.ts": [
+      "test:task-presentation-db"
+    ],
+    "tests/task-presentation.db.test.ts": [
+      "test:task-presentation-db"
+    ],
+    "tests/task-resource-registration.db.test.ts": [
+      "test:visibility-db"
+    ],
+    "tests/task-responsibility.db.test.ts": [
+      "test:task-identity-db"
+    ],
+    "tests/task-secret-access.db.test.ts": [
+      "test:secrets-db"
+    ],
+    "tests/task-secret-local-claim.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/task-status-advance.db.test.ts": [
+      "test:run-publication-db"
+    ],
+    "tests/task-workspace-governance.db.test.ts": [
+      "test:visibility-db"
+    ],
+    "tests/team-governance-api.db.test.ts": [
+      "test:visibility-db"
+    ],
+    "tests/team-issue-create.db.test.ts": [
+      "test:scope-detachment-db"
+    ],
+    "tests/team-lifecycle.db.test.ts": [
+      "test:workspace-admin-db"
+    ],
+    "tests/team-visibility.db.test.ts": [
+      "test:visibility-db"
+    ],
+    "tests/telegram-task-link.db.test.ts": [
+      "test:task-identity-db"
+    ],
+    "tests/test-account-pool.db.test.mjs": [
+      "test:test-accounts-db"
+    ],
+    "tests/thread-continue.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/thread-detail-bytes.db.test.ts": [
+      "test:activity-actor-db"
+    ],
+    "tests/thread-dispatch-concurrency.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/thread-list-egress.db.test.ts": [
+      "test:activity-actor-db"
+    ],
+    "tests/thread-waiting-device.db.test.ts": [
+      "test:bot-threads-db"
+    ],
+    "tests/usage.db.test.ts": [
+      "test:workspace-admin-db"
+    ],
+    "tests/web-auth-handoff.db.test.ts": [
+      "test:web-auth-db"
+    ],
+    "tests/web-workspace-selection.db.test.ts": [
+      "test:web-auth-db"
+    ],
+    "tests/workspace-admin.db.test.ts": [
+      "test:workspace-admin-db"
+    ],
+    "tests/workspace-migration.test.mjs": [
+      "test:workspace-migration-db"
+    ],
+    "tests/workspace-only-permissions-migration.test.mjs": [
+      "test:workspace-permissions-migration-db"
+    ],
+    "tests/workspace-secrets.db.test.ts": [
+      "test:secrets-db"
+    ],
+    "tests/workspace-service-identities.db.test.ts": [
+      "test:visibility-db"
+    ]
+  },
+  "databaseClones": {
+    "template": "mikka_e2e",
+    "clones": 79,
+    "onTemplate": [
+      "test:approved-writes-db",
+      "test:execution-settings-db",
+      "test:factory-checks-db",
+      "test:ops-db",
+      "test:personal-mailbox-default-off-db",
+      "test:run-dispatch",
+      "test:test-accounts-db"
+    ],
+    "seconds": 38.6
+  },
+  "verifiedZeroExitLifecycles": 86,
+  "truncatedOutcomeLabels": 0,
+  "namedPassingLinesPerSuite": {
+    "test:factory": 551,
+    "test:live-db": 186,
+    "test:bot-threads-db": 391,
+    "test:approved-writes-db": 27,
+    "test:execution-settings-db": 5,
+    "test:factory-checks-db": 331,
+    "test:desktop-auth": 140,
+    "test:workspace-admin-db": 163,
+    "test:factory-routing-db": 310,
+    "test:self-improvement-unit": 102,
+    "test:ops-db": 17,
+    "test:personal-mailbox-default-off-db": 42,
+    "test:activity-actor-db": 76,
+    "test:coding-workspace-db": 303,
+    "test:run-dispatch": 11,
+    "test:test-accounts-db": 17,
+    "test:group-turns": 130,
+    "test:visibility-db": 132,
+    "test:groups": 105,
+    "test:account-db": 46,
+    "test:device-revocation-db": 32,
+    "test:audit-db": 45,
+    "test:computer-db": 8,
+    "test:eve-db": 49,
+    "test:bot-chats-db": 119,
+    "test:run-recovery-db": 78,
+    "test:self-improvement-db": 28,
+    "test:abuse-db": 32,
+    "test:cloud-backend-db": 216,
+    "test:project-resources-db": 15,
+    "test:run-publication-db": 29,
+    "test:enterprise-db": 80,
+    "test:worker-authorization-db": 81,
+    "test:factory-activity-db": 50,
+    "test:factory-approval-db": 67,
+    "test:github-connections-db": 28,
+    "test:plugins-db": 20,
+    "test:project-decisions-db": 39,
+    "test:secrets-db": 100,
+    "test:task-identity-db": 41,
+    "test:user-facts-db": 20,
+    "test:coordinator-issue-create-db": 16,
+    "test:factory-monitor-db": 12,
+    "test:conversation-reads": 22,
+    "test:web-auth-db": 27,
+    "test:model-admission-db": 15,
+    "test:coordinator-native": 20,
+    "test:schedules-db": 32,
+    "test:pat-api-db": 41,
+    "test:scope-detachment-db": 78,
+    "test:agent-tool-approval-db": 20,
+    "test:captures-db": 30,
+    "test:cloud-services-db": 14,
+    "test:coordinator-issue-tools-db": 2,
+    "test:drive-db": 4,
+    "test:project-v2-db": 22,
+    "test:settings-prefs-db": 15,
+    "test:skill-semantic-db": 2,
+    "test:active-agents": 14,
+    "test:task-presentation-db": 18,
+    "test:agent-kit-db": 23,
+    "test:artifact-migration-db": 1,
+    "test:chat-attachments-db": 9,
+    "test:coordinator-task-binding-db": 1,
+    "test:credentials-db": 3,
+    "test:device-enrollment-db": 12,
+    "test:factory-activity-http-db": 9,
+    "test:domain-lifecycle-db": 6,
+    "test:factory-check-independence-db": 55,
+    "test:inbox-db": 14,
+    "test:factory-all-dispatch-db": 2,
+    "test:issue-search-db": 11,
+    "test:local-repository-migration-db": 1,
+    "test:onboarding-db": 5,
+    "test:organization-invitations-db": 7,
+    "test:organization-join-domains-db": 5,
+    "test:preview-driver": 1,
+    "test:pat-db": 16,
+    "test:migration-steps-db": 2,
+    "test:session-mailbox-db": 5,
+    "test:relation-cycle": 6,
+    "test:slack-installation-db": 1,
+    "test:settings-activity-db": 6,
+    "test:workspace-migration-db": 1,
+    "test:suggestion-artifact-db": 4,
+    "test:workspace-permissions-migration-db": 4
+  },
+  "namedOutcomeEvidenceSha256": "606f9ef7880ecef5e8ce5a89ceb467536e5409532c3fdfdd1e08e29c212abe50",
+  "blueGreen": true
+}
