@@ -607,10 +607,10 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive-foreground">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
     </div>}
     </>
-  // 线程 | 改动 | 验收 | Artifact (Alex, 2026-11-15, as ChatGPT's 聊天 | 工作): one centred glass segmented control at the top
-  // of the thread, shown when the thread has a second segment; with only the conversation the header stands alone.
+  // 线程 | 改动 | 验收 | Artifact (Alex, 2026-11-15, as ChatGPT's 聊天 | 工作): one glass segmented control at the top right
+  // of the thread, in its header row, shown when the thread has a second segment; with only the conversation the header stands alone.
   const tabCount = 1 + Number(hasChanges) + Number(Boolean(acceptance)) + Number(hasArtifacts)
-  const segments = !bare && tabCount > 1 ? <div data-slot="thread-segments" className="flex shrink-0 justify-center px-3 pt-2 pb-1">
+  const segments = !bare && tabCount > 1 ? <div data-slot="thread-segments" className="flex shrink-0">
     <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="max-w-full">
       <TabsList variant="glass" className="max-w-full">
         <TabsTrigger value="chat">{t('chatTab')}</TabsTrigger>
@@ -631,8 +631,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       acceptanceBadge={acceptance ? <AcceptanceStateBadge task={acceptance} /> : null}
       identity={data?.thread.ownedByCurrentUser ? <ThreadExecutionIdentity runId={liveRunId} /> : null}
       artifact={!readRejected ? <ThreadArtifactButton runId={runId} status={data?.thread.status ?? ''} taskId={acceptance?.id} onOpen={hasArtifacts ? () => setTab('artifacts') : undefined} /> : null}
-      tabs={null} />}
-    {segments}
+      tabs={segments} />}
     {tabbed && data && !readRejected && <ThreadArtifactsReader issueId={issueId} runId={runId} runIds={[runId, ...(data.thread.attempts ?? []).map(attempt => attempt.runId)]}
       conversation={isThreadRun(data.thread)} status={view?.status ?? data.thread.status} onRead={setArtifacts} />}
     {viewingChanges ? (changes.state === 'ready'
