@@ -1,0 +1,130 @@
+name: E original conversation unread HTTP qualification
+on:
+  push:
+    branches: [evidence/2254-sidebar-85dfc396]
+    paths: [.github/workflows/e-original-unread.yml, 'evidence/2254/unread-1381/**']
+permissions:
+  contents: read
+env:
+  # Existing accounting/admission suites exercise the hosted deployment.
+  # The self-hosted image workflow separately runs the default community mode.
+  MIKKA_EDITION: cloud
+  # A cache restore that fails (e.g. the account's cache egress limit) would
+  # otherwise hang for actions/cache's 10-minute default before falling back
+  # to a normal install, which outlasts the short jobs' own timeouts.
+  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+  # Ephemeral CI registration fixtures share one loopback IP. Keep finite
+  # limits while leaving the production defaults at 5 signups/IP/hour.
+  MIKKA_SIGNUP_IP_HOURLY: '1000'
+  MIKKA_SIGNUP_GLOBAL_HOURLY: '10000'
+  MIKKA_VERIFICATION_IP_HOURLY: '1000'
+  MIKKA_VERIFICATION_GLOBAL_HOURLY: '10000'
+
+jobs:
+  governance:
+    name: Exact source, two sessions and PostgreSQL 17
+    if: github.repository == 'alexj11324/Mikka'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-local-only
+          POSTGRES_DB: mikka_e2e
+          # Parallel full-schema DROP CASCADE needs more than PG17's default
+          # cluster-wide lock table. This applies only to the disposable service.
+          POSTGRES_INITDB_ARGS: --set=max_locks_per_transaction=512
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d mikka_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: 'true'
+      REQUIRE_DB: '1'
+      MIKKA_TEST_DB_PORT: '5432'
+      E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      BETTER_AUTH_URL: http://localhost:3100
+      MIKKA_TEST_DEPLOYMENT_SHA: 1381d115207c2f54512f6f7b79906b2ee0796da4
+      MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 2
+          ref: 1381d115207c2f54512f6f7b79906b2ee0796da4
+          persist-credentials: false
+      - name: Verify the immutable E integration candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MIKKA_TEST_DEPLOYMENT_SHA"
+          test "$(git rev-parse 'HEAD^{tree}')" = c0a7ef86b6ab51dc588c6b86df76f2dc4e2b5bec
+          mkdir -m 700 "$RUNNER_TEMP/compat-qa-receipt"
+      - name: Load isolated public permission checks
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: qa-harness
+          persist-credentials: false
+          sparse-checkout: evidence/2254/unread-1381
+
+      - uses: ./.github/actions/pnpm-install
+      - name: Generate ephemeral test-only auth secret
+        run: |
+          node --input-type=commonjs - <<'NODE'
+          const { appendFileSync, writeSync } = require('node:fs')
+          const secret = require('node:crypto').randomBytes(32).toString('hex')
+          writeSync(1, `::add-mask::${secret}\n`)
+          appendFileSync(process.env.GITHUB_ENV, `BETTER_AUTH_SECRET=${secret}\n`)
+          NODE
+      - name: Bootstrap empty database using tracked migrations only
+        run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
+        env:
+          MIGRATION_BOOTSTRAP_CI: '1'
+      - run: pnpm test:e2e:setup
+      - name: Bind the disposable test environment to the exact checkout
+        run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
+      - name: Run two independently authenticated users against the source server and read persisted state
+        shell: bash
+        env:
+          MIKKA_EDITION: cloud
+          MIKKA_BASE_PATH: /mikka
+          AUTH_TRUSTED_ORIGINS: http://127.0.0.1:3100
+          WORKFLOW_TARGET_WORLD: local
+          MIKKA_DEV_SKIP_ENV_FILES: '1'
+          MIKKA_TRACE_SAMPLE_RATE: '0'
+          FACTORY_ACTIVITY_HTTP_NETWORK_RECEIPT: ${{ runner.temp }}/loopback-receipt.log
+        run: |
+          set -euo pipefail
+          node --import ./tests/fixtures/factory-activity-http-network.mjs --import ./scripts/server-test.mjs --import tsx --import ./qa-harness/evidence/2254/unread-1381/aliases.mjs ./qa-harness/evidence/2254/unread-1381/api.mjs > "$RUNNER_TEMP/product-api.log" 2>&1 & server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          for x in $(seq 1 120); do
+            if curl -fsS --max-time 1 "$BETTER_AUTH_URL/mikka/api/version" > /dev/null 2>&1; then break; fi
+            if ! kill -0 "$server" 2>/dev/null; then echo 'Product source API process exited before readiness'; exit 2; fi
+            sleep 1
+          done
+          curl -fsS --max-time 2 "$BETTER_AUTH_URL/mikka/api/version" >/dev/null
+          node qa-harness/evidence/2254/unread-1381/sessions.cjs
+      - name: Record original complete DB files
+        if: success() || failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test-force-exit --test --test-reporter=tap lib/thread-reads.db.test.ts > "$RUNNER_TEMP/read-db.tap" 2>&1
+          grep -E '^[[:space:]]*ok [0-9]+ - |^# (tests|pass|fail|cancelled|skipped|todo) ' "$RUNNER_TEMP/read-db.tap" > "$RUNNER_TEMP/compat-qa-receipt/original-tests.txt"
+          grep -qx '# skipped 0' "$RUNNER_TEMP/compat-qa-receipt/original-tests.txt"
+          cat "$RUNNER_TEMP/compat-qa-receipt/original-tests.txt"
+      - name: Preserve public test names, times and statuses
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: original-unread-1381d115
+          path: ${{ runner.temp }}/compat-qa-receipt
+          retention-days: 7
+          if-no-files-found: error
