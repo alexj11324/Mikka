@@ -22,9 +22,18 @@ export function directoryConversationKey(row: { kind?: 'run' | 'chat'; id: strin
   return (row.kind ?? 'run') + ':' + row.id
 }
 
+export type DirectoryTaskLink = { id: string; identifier: string | null; title: string }
+
+/** Older servers and Run conversations expose a single issued Task number. */
+export function directoryTaskNumbers(row: { linkedTasks?: DirectoryTaskLink[]; issueId: string | null; identifier: string | null }) {
+  const tasks = row.linkedTasks ?? [{ id: row.issueId, identifier: row.identifier }]
+  return tasks.flatMap(({ id, identifier }) => identifier ? [{ key: id ?? identifier, identifier }] : [])
+}
+
 export interface ConversationDirectoryPage {
   items: {
     pulls: IssuePullRequest[]; taskTitle: string | null; kind: 'run' | 'chat'; id: string; issueId: string | null; identifier: string | null; title: string
+    linkedTasks?: DirectoryTaskLink[]
     state: DirectoryState; at: string; pinned: boolean; unread?: boolean
   }[]
   cursor: NonNullable<DirectoryInput['cursor']> | null

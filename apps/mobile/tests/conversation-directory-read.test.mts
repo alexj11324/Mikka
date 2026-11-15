@@ -121,6 +121,9 @@ test('the native directory marks each conversation kind and all rows using their
   const root = createRoot(host)
   try {
     await act(async () => root.render(createElement(Conversations)))
+    items[1]!.linkedTasks = [{ id: 'a', identifier: 'WORK-2', title: 'First task' }, { id: 'b', identifier: 'WORK-3', title: 'Second task' }]
+    await act(async () => root.render(createElement(Conversations)))
+    assert.match(host.querySelector('section[aria-label="Independent chat"] a')!.textContent ?? '', /WORK-2.*WORK-3/)
     for (const [selector, label, body] of [
       ['section[aria-label="Independent chat"] button', labels.markUnread, { action: 'unread', chatId }],
       ['section[aria-label="Run conversation"] button', labels.markUnread, { action: 'unread', runId }],
@@ -138,6 +141,7 @@ test('the native directory marks each conversation kind and all rows using their
     assert.equal(chat.querySelector('button'), null)
   } finally {
     await act(async () => root.unmount())
+    delete items[1]!.linkedTasks
     host.remove()
     await browser.happyDOM.close()
   }

@@ -58,7 +58,7 @@ stub('lib/use-action-error.ts', { useActionError: () => translate })
 stub('components/workspace/issue-activity-feed.tsx', { useActivityEvents: () => [] })
 stub('components/workspace/issue-activity.tsx', { useActivityDrafts: () => ({}) })
 stub('components/workspace/issue-threads.tsx', { useIssueThreads: () => ({ data: [{ detail: { agentName: 'Former delegate', bot: { color: 'blue', shape: 'round' } } }] }) })
-stub('components/workspace/issue-metadata-controls.tsx', { useIssueMetadataSave: () => ({}), IssueMetadataControls: noop, AccessChangeDialog: noop })
+stub('components/workspace/issue-metadata-controls.tsx', { useIssueMetadataSave: () => ({ persist: patch => saveMetadata({ patch }) }), IssueMetadataControls: noop, AccessChangeDialog: noop })
 stub('components/workspace/issue-assignee-menu.tsx', { AgentSphere: noop })
 stub('components/workspace/issue-detail-properties.tsx', { overdue: () => false })
 stub('components/workspace/issue-pull-request-link.tsx', { PullRequestStatus: noop })
@@ -236,6 +236,42 @@ test('a saved Bot is the only displayed assignee before its first run when no me
     assert.equal(row('assignee').value.text, 'Assigned bot')
     assert.equal(row('delegate'), undefined)
   } finally { await dispose() }
+})
+
+test('the assignee menu selects the effective owner and changes only the human assignment', async () => {
+  const agent = { kind: 'agent', id: 'agent', name: 'Build Agent', image: null }
+  const member = { kind: 'member', id: 'alice', name: 'Alice', image: null }
+  const writes = []
+  saveMetadata = input => writes.push(input.patch)
+  optionsRead = { data: { members: [member], labels: [], isOwner: false } }
+  for (const { assignee, delegate, fallback, selected } of [
+    { assignee: null, delegate: agent, fallback: 'Build Agent', selected: 'Build Agent' },
+    { assignee: member, delegate: agent, fallback: 'Build Agent', selected: 'Alice' },
+    { assignee: member, delegate: null, fallback: 'unassigned', selected: 'Alice' },
+    { assignee: null, delegate: null, fallback: 'unassigned', selected: 'unassigned' },
+    { assignee: agent, delegate: null, fallback: 'Build Agent', selected: 'Build Agent' },
+  ]) {
+    issue.metadata = { ...issue.metadata, assignee, delegate }
+    const dispose = await mount()
+    try {
+      await act(async () => row('assignee').onOpen())
+      const choices = row('assignee').menu
+      assert.deepEqual(choices.filter(choice => choice.checked).map(choice => choice.label), [selected])
+      assert.deepEqual(choices.map(choice => choice.label), [fallback, 'Alice'])
+      const [withoutMember, alice] = choices
+      writes.length = 0
+      if (assignee === member) {
+        await act(async () => alice.onSelect())
+        assert.deepEqual(writes, [])
+        await act(async () => withoutMember.onSelect())
+        assert.deepEqual(writes, [{ assignee: null }])
+      } else {
+        assert.equal(withoutMember.onSelect, undefined)
+        await act(async () => alice.onSelect())
+        assert.deepEqual(writes, [{ assignee: { kind: 'member', id: 'alice' } }])
+      }
+    } finally { await dispose() }
+  }
 })
 
 test('the saved delegate is visible before its first run and favorites immediately adopt the server revision', async () => {

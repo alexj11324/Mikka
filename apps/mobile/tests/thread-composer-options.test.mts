@@ -18,6 +18,9 @@ const runAndChat = [
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL('../' + path, import.meta.url).href, { namedExports })
 mock.module('react-native', { namedExports: { View: 'div', Pressable: ({ onPress, children }: any) => createElement('button', { onClick: onPress }, children) } })
 stub('components/Text.tsx', { Text: 'span' })
+const botWrites: [string, string][] = []
+stub('components/ModelNotice.tsx', { ModelNotice: () => null })
+stub('lib/model-menu.ts', { useModelMenu: (botId: string) => ({ choose: (choiceId: string) => botWrites.push([botId, choiceId]) }) })
 stub('components/ModelMenu.tsx', { ModelMenu: ({ model }: any) => createElement('button', { id: 'choose', onClick: () => model.choose(option.id) }, option.modelId) })
 stub('lib/api-cache.ts', { apiCache: { context: () => 'test' } })
 stub('lib/home.tsx', { useHome: () => ({ data: { workspace: { id: 'workspace' } } }) })
@@ -29,7 +32,7 @@ stub('lib/api.ts', { api: async (_path: string, init: { body: unknown }) => {
 stub('features/chat/components/chat-composer.tsx', { Composer: (props: any) => createElement('div', null, props.notice, props.accessory,
   createElement('input', { value: props.value, onInput: (e: any) => { props.onChangeText(e.target.value); props.onCaretChange(e.target.selectionEnd) }, readOnly: true }),
   createElement('button', { id: 'send', onClick: () => props.onSend(props.value) }, 'send')) })
-const { ThreadComposer } = await import('../features/chat/components/thread-composer.tsx')
+const { ThreadComposer, NamedBotModel } = await import('../features/chat/components/thread-composer.tsx')
 
 test('the native composer selects a funded continuation, inserts the authorized mention at its caret, and keeps the served model separate', async () => {
   const browser = new Window()
@@ -151,4 +154,34 @@ test('the named chat composer keeps the group draft and inserts a canonical Task
     assert.equal(host.textContent?.includes('Saved task'), false)
     assert.equal(host.querySelector('#choose'), null)
   } finally { await act(async () => root.unmount()); await browser.happyDOM.close() }
+})
+
+test('a named conversation with one owned Bot opens that Bot’s existing native model control and writes to that Bot only', async () => {
+  const { namedConversationModelBot } = await import('../../../lib/named-conversation-model.ts')
+  const bot = { id: 'first', name: 'First Bot', memberType: 'bot' as const }
+  const other = { id: 'second', name: 'Second Bot', memberType: 'bot' as const }
+  const agent = { id: 'worker', name: 'Agent', memberType: 'agent' as const }
+  const person = { id: 'owner', name: 'Owner', memberType: 'user' as const }
+  const browser = new Window()
+  Object.assign(globalThis, { window: browser, document: browser.document, IS_REACT_ACT_ENVIRONMENT: true })
+  const { createRoot } = await import('react-dom/client')
+  const root = createRoot(document.body)
+  try {
+    const id = namedConversationModelBot('workspace', [person, bot], [bot])
+    assert.equal(id, bot.id)
+    await act(async () => root.render(createElement(NamedBotModel, { botId: id, running: true })))
+    const choose = document.getElementById('choose')
+    assert.ok(choose)
+    await act(async () => choose.click())
+    assert.deepEqual(botWrites, [[bot.id, option.id]])
+    assert.equal(namedConversationModelBot('workspace', [bot, other], [bot, other]), undefined)
+    const named = [bot, other, agent]
+    assert.equal(namedConversationModelBot('workspace', named, [bot, other], '@Second Bot reply'), other.id)
+    assert.equal(namedConversationModelBot('workspace', named, [bot, other], '@First Bot and @Second Bot'), undefined)
+    assert.equal(namedConversationModelBot('workspace', named, [bot, other], '@Agent'), undefined)
+    assert.equal(namedConversationModelBot('workspace', named, [bot], '@Second Bot'), undefined)
+    assert.equal(namedConversationModelBot('workspace', [bot, agent], [bot]), undefined)
+    assert.equal(namedConversationModelBot('workspace', [bot], [other]), undefined)
+    assert.equal(namedConversationModelBot(undefined, [bot], [bot]), undefined)
+  } finally { await act(async () => root.unmount()); botWrites.length = 0; await browser.happyDOM.abort() }
 })

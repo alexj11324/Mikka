@@ -1327,6 +1327,13 @@
     "test": "lib/eve/product-definitions.test.ts",
     "suite": "test:eve-product-tool"
   },
+  "lib/named-conversation-model.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The conversation composer uses the existing model selector only for a single responding Bot present in the current owner’s authorized Bot list. It requires no external service.",
+    "test": "components/workspace/group-chat-view.test.tsx",
+    "suite": "test:groups"
+  },
   "lib/eve/product-rpc.ts": {
     "mode": "operator-configured",
     "environment": [
@@ -1430,6 +1437,13 @@
     "test": "lib/github/comment-mention.test.ts",
     "suite": "test:github"
   },
+  "lib/github/publication-webhook.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "Verified GitHub webhooks update the existing installation's PostgreSQL delivery and task when the repository changes capitalization. Unrelated pull requests do not match.",
+    "test": "lib/github/publication-webhook.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
   "lib/github/workflow-result-store.ts": {
     "mode": "optional-cloud",
     "environment": [],
@@ -1525,6 +1539,13 @@
     "behavior": "Replace explicit grants only with Project management authority and list only active Projects the administrator may both read and share.",
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
+  },
+  "lib/group-task-links.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the current requester's Chat to Task bindings for the directory and decision context only after installation workspace, membership and Task authorization.",
+    "test": "tests/task-presentation.db.test.ts",
+    "suite": "test:task-presentation-db"
   },
   "lib/group-messages.ts": {
     "mode": "built-in",

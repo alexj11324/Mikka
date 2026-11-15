@@ -68,13 +68,13 @@ export const ADVANCE_ON_RUN_START = `SELECT r."issueId", r."createdAt" FROM agen
  */
 export const ADVANCE_MERGED_TASKS = `WITH due AS (
   SELECT p."issueId", min(r."createdAt") AS since FROM run_publications p JOIN agent_runs r ON r.id=p."runId"
-  WHERE p."pullRequest"->>'url'=$1 AND p."pullRequest"->>'state'='merged' AND p."issueId" IS NOT NULL
-    AND NOT EXISTS (SELECT 1 FROM run_publications o WHERE o."issueId"=p."issueId" AND o."pullRequest"->>'url'<>$1 AND o."pullRequest"->>'state' IN ('open','draft'))
+  WHERE lower(rtrim(p."pullRequest"->>'url','/'))=$1 AND p."pullRequest"->>'state'='merged' AND p."issueId" IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM run_publications o WHERE o."issueId"=p."issueId" AND lower(rtrim(o."pullRequest"->>'url','/'))<>$1 AND o."pullRequest"->>'state' IN ('open','draft'))
   GROUP BY p."issueId"
 ), target AS (
   SELECT i.id FROM issues i JOIN due d ON d."issueId"=i.id
   WHERE array_position(ARRAY['backlog','todo','doing','review','done'], i.status) < array_position(ARRAY['backlog','todo','doing','review','done'], 'done')
-    AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(coalesce(i.content #> '{attrs,mikka,pullRequests}','[]'::jsonb)) e WHERE rtrim(e->>'url','/')<>$1 AND e->>'state' IN ('open','draft'))
+    AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(coalesce(i.content #> '{attrs,mikka,pullRequests}','[]'::jsonb)) e WHERE lower(rtrim(e->>'url','/'))<>$1 AND e->>'state' IN ('open','draft'))
     AND NOT ${PERSON_CHANGED('i.id', 'd.since')}
   ORDER BY i.id FOR UPDATE OF i
 ), saved AS (

@@ -1,7 +1,7 @@
 // Actual packaged Electron → actual disposable community image. The model is
 // explicitly synthetic; this is not Google OAuth or native-subscription proof.
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFile, rm, mkdir, stat, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -28,10 +28,18 @@ export function validateSelfHostedDesktopTarget(value, env) {
 async function main() {
   const directory = resolve(process.env.RUNNER_TEMP, 'mikka-selfhost-desktop')
   const privateFile = join(directory, 'session.json'), profile = join(directory, 'profile')
+  const protocolOnly = process.argv.includes('--protocol-only')
+  assert.deepEqual(process.argv.slice(2), protocolOnly ? ['--protocol-only'] : [])
+  const overlaySha = process.env.MIKKA_UI_OVERLAY_SHA
+  if (overlaySha) {
+    assert.match(overlaySha, /^[a-f0-9]{40}$/)
+    assert.equal(protocolOnly, false)
+  }
   const output = resolve('.artifacts/self-hosted/desktop')
   await mkdir(output, { recursive: true })
   const report = { schemaVersion: 1, revision: process.env.GITHUB_SHA, origin: 'http://localhost:3000',
     startedAt: new Date().toISOString(), status: 'running', checks: [],
+    scope: protocolOnly ? 'public-fixture-protocol' : 'complete-desktop', overlaySha: overlaySha ?? null,
     provider: 'synthetic-openai-compatible', realGoogleOAuth: false, subscriptionAcceptance: false,
     cleanup: { session: false, electron: false, daemon: false, privateFile: false } }
   let application, page, fixture, phase = 'private_fixture', failed
@@ -58,6 +66,19 @@ async function main() {
     application = await launchElectron({ executablePath: process.env.MIKKA_DESKTOP_EXECUTABLE,
       args: [], cwd: fileURLToPath(new URL('../../..', import.meta.url)),
       env: { ...process.env, MIKKA_USER_DATA_DIR: profile, MIKKA_DESKTOP_RENDERER: 'bundled' }, timeout: 90_000 })
+    if (overlaySha) {
+      phase = 'packaged_official_overlay'
+      const matches = await application.evaluate(async ({ app }, expected) => {
+        const path = process.getBuiltinModule('node:path')
+        const fs = process.getBuiltinModule('node:fs')
+        const archive = app.getAppPath()
+        if (!app.isPackaged || archive !== path.join(process.resourcesPath, 'app.asar')) return false
+        const manifest = JSON.parse(fs.readFileSync(path.join(archive, 'dist', 'mikka-ui-overlay.json'), 'utf8'))
+        return manifest.overlaySha === expected
+      }, overlaySha)
+      assert.equal(matches, true, 'the launched official application must contain the selected UI revision')
+      passed('packaged_official_overlay_matches_selected_revision')
+    }
     page = await application.firstWindow({ timeout: 90_000 })
     await page.waitForFunction(() => Boolean(window.mikka?.bundled))
     assert.equal(new URL(page.url()).protocol, 'mikka:')
@@ -129,12 +150,16 @@ async function main() {
     phase = 'first_run_dismissal'
     await skipSetup.click()
     await skipSetup.waitFor({ state: 'hidden' })
-    phase = 'fixture_reply_visible'
-    const reply = page.getByText('SELF_HOSTED_REPLY_32', { exact: false }).first()
-    await reply.waitFor({ state: 'visible' })
-    await reply.scrollIntoViewIfNeeded()
-    passed('normal_first_run_dismissed_and_reply_visible')
-    await page.screenshot({ path: join(output, 'self-hosted-chat.png'), animations: 'disabled' })
+    passed('normal_first_run_dismissed')
+    if (!protocolOnly) {
+      phase = 'fixture_reply_visible'
+      const reply = page.getByText('SELF_HOSTED_REPLY_32', { exact: false }).first()
+      await reply.waitFor({ state: 'visible' })
+      await reply.scrollIntoViewIfNeeded()
+      passed('normal_first_run_dismissed_and_reply_visible')
+      const screenshot = await page.screenshot({ path: join(output, 'self-hosted-chat.png'), animations: 'disabled' })
+      report.visibleChatScreenshotSha256 = createHash('sha256').update(screenshot).digest('hex')
+    }
     phase = 'sign_out_and_return'
     await page.evaluate(() => window.mikka.bundled.signOut())
     assert.equal(await page.evaluate(() => window.mikka.bundled.session()), null)
@@ -180,7 +205,7 @@ async function main() {
     if (fixture) for (const secret of [fixture.password, fixture.email]) assert.ok(!json.includes(secret))
     await writeFile(join(output, 'report.json'), json + '\n')
   }
-  console.log(JSON.stringify({ status: report.status, checks: report.checks, cleanup: report.cleanup, failure: report.failure }))
+  console.log(JSON.stringify({ scope: report.scope, overlaySha: report.overlaySha, status: report.status, checks: report.checks, cleanup: report.cleanup, failure: report.failure }))
   if (failed || report.status !== 'passed') process.exitCode = 1
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

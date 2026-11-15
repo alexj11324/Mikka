@@ -6,6 +6,8 @@ import useSWR, { unstable_serialize } from 'swr'
 import { useTranslations } from 'next-intl'
 import { listAgents } from '@/app/actions/agents'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
+import { BotModelPicker } from '@/components/coordinator/bot-model-picker'
+import { namedConversationModelBot } from '@/lib/named-conversation-model'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { CHAT_SURFACE, ChatMessage } from '@ui-slot/chat-message'
 import { Button } from '@/components/ui/button'
@@ -56,7 +58,8 @@ export type GroupChatRequest = { id: string; title: string; workspaceId: string;
  * timer reads it (#1212). Names and bot avatars come from the
  * group's member list, then the workspace's members and the person's agents.
  */
-export function GroupChatView({ group, userId, people, onLeft }: {
+export function GroupChatView({ group, userId, people, ownedBots, onLeft }: {
+  ownedBots?: readonly { id: string }[]
   group: GroupChatRequest
   onLeft?: (id: string) => void
   userId: string
@@ -164,6 +167,7 @@ export function GroupChatView({ group, userId, people, onLeft }: {
   const first = pages?.[0]
   const readRevision = first?.readRevision
   const referenceWorkspace = namedChat && readRevision !== undefined && !blockingCode && !accessRejected && !refused && !departed.current ? group.workspaceId : null
+  const modelBot = namedConversationModelBot(referenceWorkspace && !membersError && !error ? referenceWorkspace : null, members, ownedBots, draft)
   const referenceText = referenceWorkspace ? (text: string, index: number) => <PersonReferences key={index} text={text} /> : undefined
   const lastMessageId = messages.at(-1)?.id ?? null
   const sentRead = useRef<string | null>(null)
@@ -262,6 +266,7 @@ export function GroupChatView({ group, userId, people, onLeft }: {
     <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
       {referenceWorkspace && <ThreadReferencePicker key={group.id} draft={draft} workspaceId={referenceWorkspace} input={composerInput} onChange={setDraft} />}
       <ChatComposer ref={composerInput} value={draft} onChange={value => { submittedDraft.current = null; setDraft(value) }} onSubmit={send} label={t('composer', { name: group.title || t('untitled') })} disabled={!!blockingCode} attachmentScope={{ kind: 'group', id: group.id }}
+        model={modelBot && <BotModelPicker key={modelBot} botId={modelBot} running={replying} />}
         sending={stopping} editableWhileSending={stopping} running={replying && !stopping} onStop={replying && !stopping ? () => { void stop() } : undefined} />
     </div>
   </section>
