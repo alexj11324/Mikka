@@ -248,9 +248,10 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
         <SettingRow title={t('linear.title')}>
           {!linearWanted && !draft.linear.length && <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => setLinearWanted(true)}>{t('linear.show')}</Button>}
         </SettingRow>
-        {(linearWanted || draft.linear.length > 0) && (linearTeams.error
-          ? <div className="px-5 pb-4"><InlineLoadError message={tAll('loadError')} retryLabel={tCommon('retry')} onRetry={() => { void linearTeams.mutate() }} /></div>
-          : <LinearTriggers value={draft.linear} teams={linearTeams.data?.teams ?? []} connected={linearTeams.data?.connected ?? true} disabled={busy !== null || !linearTeams.data} onChange={linear => set({ linear })} />)}
+        {(linearWanted || draft.linear.length > 0) && <>
+          {linearTeams.error && <div className="px-5 pb-2"><InlineLoadError message={tAll('loadError')} retryLabel={tCommon('retry')} onRetry={() => { void linearTeams.mutate() }} /></div>}
+          <LinearTriggers value={draft.linear} teams={linearTeams.data?.teams ?? []} connected={linearTeams.data?.connected ?? true} disabled={busy !== null || (!linearTeams.data && !linearTeams.error)} onChange={linear => set({ linear })} />
+        </>}
         <WebhookTrigger value={draft.webhook} onChange={webhook => set({ webhook })} automation={current ?? null} disabled={busy !== null}
           onSaved={schedule => automation.mutate(schedule, { revalidate: false })} />
       </>}
