@@ -72,7 +72,7 @@ async function readTaskRuns() {
   // run-recovery cron (sweepExpiredRunLeases), not by this poll.
   const latest = db.selectDistinctOn([agentRuns.issueId], {
     // A thread's name: its task's short title while the task keeps the title it was written from (lib/short-title.ts).
-    issueId: agentRuns.issueId, runId: agentRuns.id, issueTitle: issues.title,
+    issueId: agentRuns.issueId, runId: agentRuns.id, issueTitle: sql<string>`${issues.title}`.as('issueTitle'),
     // The conversation's own stored title and the opening of what it was asked: the run is named by threadTitle below.
     conversationTitle: agentRuns.title, asked: sql<string>`left(${runTaskPrompt}, 200)`.as('asked'), agentName: runAgentName.as('agentName'),
     status: agentRuns.status, outcome: agentRuns.outcome, failureDetails: runFailureBrief.as('failureDetails'),
