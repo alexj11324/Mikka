@@ -1,7 +1,8 @@
 import { isDeepStrictEqual } from 'node:util'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
-import { commandSchema, definitionSchema, ScheduleError, SCHEDULE_PAGE_MAX, type Actor, type Definition, type DispatchTask, type ScheduledRead } from './contract'
+import { commandSchema, definitionSchema, ScheduleError, SCHEDULE_PAGE_MAX, type Actor, type Definition, type DispatchTask, type EventTrigger, type ScheduledRead } from './contract'
+import { describeGitHubEvent, triggerMatches, type GitHubAutomationEvent } from './github-events'
 import { nextTime, runsOnSchedule, timezone } from './time'
 import { botChatChanged } from '../live/chats'
 import { observePoolCommits } from '../db/commit-effects'
@@ -15,7 +16,10 @@ export type MessageGuard = (tx: PoolClient, ownerId: string, value: unknown) => 
 export type IssueReader = (tx: PoolClient, ownerId: string, issueId: string) => Promise<{ id: string; title: string; status: string } | null>
 /** What one dispatch_task run made: the task (as the chat's task line shows it) and the request event behind it. */
 export type DispatchResult = { id: string; title: string; status: string; identifier: string | null; eventId: string }
-export type DispatchInput = { ownerId: string; workspaceId: string; scheduleId: string; occurrenceId: string; task: DispatchTask }
+export type DispatchInput = { ownerId: string; workspaceId: string; scheduleId: string; occurrenceId: string; task: DispatchTask; event?: string }
+/** The event a run started on and the indexes of the triggers that took it. */
+export type OccurrenceTrigger = { event: GitHubAutomationEvent; triggers: number[] }
+export type RunWhenInput = { ownerId: string; workspaceId: string; condition: string; event: string }
 /**
  * dispatch_task's two host seams. `check` re-authorizes the creator's request at create, update, resume and every run
  * (403 when it no longer holds: the run fails and says so). `dispatch` creates and hands over the task through the
@@ -25,9 +29,13 @@ export type AutomationSeams = {
   check?: (tx: PoolClient, ownerId: string, workspaceId: string, task: DispatchTask) => Promise<void>
   dispatch?: (input: DispatchInput) => Promise<DispatchResult>
   changed?: (tx: PoolClient, workspaceId: string) => Promise<void>
+  /** Whether the workspace can still use a repository an event trigger names. */
+  repository?: (workspaceId: string, repository: string) => Promise<boolean>
+  /** A trigger's one-sentence condition against the event: true, false, or null when no answer could be had. */
+  runWhen?: (input: RunWhenInput) => Promise<boolean | null>
 }
 export type Schedule = { id: string; owner_id: string; workspace_id: string | null; bot_id: string | null; visibility: 'owner' | 'workspace'; source_event_id: string; definition: Definition; request_definition: Definition; status: string; version: number; next_at: Date | null }
-export type Occurrence = { id: string; schedule_id: string; operation_id: string; event_id: string | null; definition: Definition; version: number; due_at: Date; status: string; attempts: number; lease_token: string | null; lease_until: Date; error: string | null; execution_decision: 'execute' | 'skip'; report_next_at: Date; report_attempts: number; started_at: Date | null; created_at: Date }
+export type Occurrence = { id: string; schedule_id: string; operation_id: string; event_id: string | null; definition: Definition; version: number; due_at: Date; status: string; attempts: number; lease_token: string | null; lease_until: Date; error: string | null; execution_decision: 'execute' | 'skip'; trigger: OccurrenceTrigger | null; report_next_at: Date; report_attempts: number; started_at: Date | null; created_at: Date }
 export const SCHEDULE_LEASE_MS = 5 * 60_000
 const MAX_ATTEMPTS = 3
 // The frozen request key is internal; keep the existing tool-response fields.
@@ -79,6 +87,9 @@ export class ScheduleStore {
     if(def.task.kind==='dispatch_task'){
       if(!workspaceId||!this.automation.check)throw new ScheduleError('scheduleDispatchUnavailable',503)
       await this.automation.check(tx,owner,workspaceId,def.task)
+      for(const repository of new Set((def.events??[]).flatMap(trigger=>trigger.repositories))){
+        if(!this.automation.repository||!await this.automation.repository(workspaceId,repository))throw new ScheduleError('scheduleRepositoryUnavailable',403)
+      }
       return null
     }
     if (def.task.kind !== 'issue_snapshot') return null
@@ -133,13 +144,13 @@ export class ScheduleStore {
       if(row.visibility==='workspace'&&!actor.workspaceId) throw new ScheduleError('scheduleNotFound',404)
       if((cmd.action==='update'||cmd.action==='resume'||cmd.action==='run_now')&&row.visibility==='workspace'&&row.owner_id!==actor.ownerId&&access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
       if(cmd.action==='history'){
-        const seen=await tx.query('SELECT id,schedule_id,operation_id,event_id,version,due_at,status,attempts,result,error,started_at,finished_at,reported_at FROM schedule_occurrences WHERE schedule_id=$1 ORDER BY due_at DESC LIMIT 100',[row.id])
+        const seen=await tx.query('SELECT id,schedule_id,operation_id,event_id,version,due_at,status,attempts,result,error,trigger,started_at,finished_at,reported_at FROM schedule_occurrences WHERE schedule_id=$1 ORDER BY due_at DESC LIMIT 100',[row.id])
         // Seeing that a workspace schedule ran is collaboration; reading what it returned is not. Only the
         // creator, and an owner/admin, get result, error and the operation identity; any other active member
         // sees the run's status and timestamps with those fields blank. A member of a workspace that has no
         // roles runs as 'member'. Visibility is unchanged: an owner-only row is already 404 above.
         const privileged=row.owner_id===actor.ownerId||access.role!=='member'
-        return {occurrences:privileged?seen.rows:seen.rows.map(o=>({...o,operation_id:null,event_id:null,result:null,error:null}))}
+        return {occurrences:privileged?seen.rows:seen.rows.map(o=>({...o,operation_id:null,event_id:null,result:null,error:null,trigger:null}))}
       }
       await this.source(tx,actor,row.workspace_id)
       if(row.version!==cmd.version) throw new ScheduleError('scheduleVersionConflict')
@@ -261,7 +272,9 @@ export class ScheduleStore {
   /** Creates and hands over the task as its creator, then records the run and posts its task line in the chat. */
   private async finishDispatch(row:Schedule,o:Occurrence){
     if(!this.automation.dispatch||!row.workspace_id||o.definition.task.kind!=='dispatch_task')throw new ScheduleError('scheduleDispatchUnavailable',503)
-    const result=await this.automation.dispatch({ownerId:row.owner_id,workspaceId:row.workspace_id,scheduleId:row.id,occurrenceId:o.id,task:o.definition.task})
+    const event=o.trigger?describeGitHubEvent(o.trigger.event):undefined
+    if(o.trigger&&event&&!await this.runWhenHolds(row,o,event))return this.skipQuietly(row,o,'runWhenNotMet')
+    const result=await this.automation.dispatch({ownerId:row.owner_id,workspaceId:row.workspace_id,scheduleId:row.id,occurrenceId:o.id,task:o.definition.task,...(event?{event}:{})})
     const recorded=await this.workspace(row.owner_id,row.workspace_id,()=>this.transaction(async tx=>{
       await tx.query('SELECT id FROM user_schedules WHERE id=$1 FOR UPDATE',[row.id])
       // A lost lease means another worker owns this occurrence; it repeats the same idempotent dispatch.
@@ -273,6 +286,66 @@ export class ScheduleStore {
     }))
     // The request event waits in the Bot's chat: waking the creator's chats delivers it.
     return recorded?row.owner_id:undefined
+  }
+  /**
+   * 满足任一条件就运行: the run goes ahead when any trigger that took the event has no condition, or one of their
+   * conditions holds. No answer from the Decision model is a retryable failure, never a silent pass or skip.
+   */
+  private async runWhenHolds(row:Schedule,o:Occurrence,event:string){
+    const triggers=(o.trigger?.triggers??[]).map(index=>o.definition.events?.[index]).filter((trigger):trigger is EventTrigger=>Boolean(trigger))
+    if(!triggers.length||triggers.some(trigger=>!trigger.runWhen))return true
+    if(!this.automation.runWhen||!row.workspace_id)throw new ScheduleError('scheduleRunWhenUnavailable',503)
+    for(const trigger of triggers){
+      const holds=await this.automation.runWhen({ownerId:row.owner_id,workspaceId:row.workspace_id,condition:trigger.runWhen!,event})
+      if(holds===null)throw new ScheduleError('scheduleRunWhenUnavailable',503)
+      if(holds)return true
+    }
+    return false
+  }
+  /** An event that did not need a run: recorded in the history, not posted to the chat. */
+  private async skipQuietly(row:Schedule,o:Occurrence,reason:string){
+    await this.transaction(async tx=>{
+      await tx.query(`UPDATE schedule_occurrences SET status='skipped',error=$3,finished_at=$4,reported_at=$4,lease_token=NULL,lease_until=NULL WHERE id=$1 AND status='running' AND lease_token=$2`,[o.id,o.lease_token,reason,this.clock()])
+      await this.listChanged(tx,row.workspace_id)
+    })
+    return undefined
+  }
+  /**
+   * A verified GitHub delivery: one run for each active automation that has a trigger taking any of its events, keyed
+   * by the delivery so a redelivery adds nothing. The repository must still be usable in the automation's workspace.
+   * Over the concurrency limit the event is recorded as skipped. Returns how many runs were queued.
+   */
+  async fireEvents(deliveryKey:string,events:readonly GitHubAutomationEvent[]){
+    if(!events.length)return 0
+    const repositories=[...new Set(events.map(event=>event.repository))]
+    const names=[...new Set(events.map(event=>event.event))]
+    const candidates=(await this.pool.query<Schedule>(`SELECT * FROM user_schedules s WHERE status='active' AND definition ? 'events' AND workspace_id IS NOT NULL
+      AND EXISTS(SELECT 1 FROM jsonb_array_elements(s.definition->'events') t WHERE t->>'event'=ANY($1::text[]) AND (t->'repositories') ?| $2::text[])`,[names,repositories])).rows
+    let queued=0
+    const usable=new Map<string,Promise<boolean>>()
+    for(const candidate of candidates){
+      const matched=events.flatMap(event=>(candidate.definition.events??[]).flatMap((trigger,index)=>triggerMatches(trigger,event)?[{event,index}]:[]))
+      if(!matched.length)continue
+      const event=matched[0]!.event
+      const key=`${candidate.workspace_id}:${event.repository}`
+      if(!usable.has(key))usable.set(key,this.automation.repository?this.automation.repository(candidate.workspace_id!,event.repository).catch(()=>false):Promise.resolve(false))
+      if(!await usable.get(key))continue
+      const trigger:OccurrenceTrigger={event,triggers:[...new Set(matched.filter(item=>item.event===event).map(item=>item.index))]}
+      queued+=await this.transaction(async tx=>{
+        const row=(await tx.query<Schedule>(`SELECT * FROM user_schedules WHERE id=$1 AND status='active' FOR UPDATE`,[candidate.id])).rows[0]
+        if(!row||row.version!==candidate.version)return 0
+        const operation=scheduleOperationId(row.id,`event:${deliveryKey}`)
+        if((await tx.query('SELECT 1 FROM schedule_occurrences WHERE operation_id=$1',[operation])).rowCount)return 0
+        const {rows:[busy]}=await tx.query<{n:number}>(`SELECT count(*)::int n FROM schedule_occurrences WHERE schedule_id=$1 AND status IN ('pending','running')`,[row.id])
+        const limited=busy.n>=(row.definition.maxConcurrent??1)
+        const inserted=await tx.query(`INSERT INTO schedule_occurrences(id,schedule_id,version,due_at,definition,status,operation_id,next_retry_at,execution_decision,trigger,error,finished_at,reported_at)
+          VALUES($1,$2,$3,clock_timestamp(),$4,$5,$6,clock_timestamp(),'execute',$7,$8,CASE WHEN $5='skipped' THEN clock_timestamp() END,CASE WHEN $5='skipped' THEN clock_timestamp() END) ON CONFLICT DO NOTHING`,
+          [randomUUID(),row.id,row.version,row.definition,limited?'skipped':'pending',operation,trigger,limited?'concurrencyLimit':null])
+        if(inserted.rowCount)await this.listChanged(tx,row.workspace_id)
+        return inserted.rowCount&&!limited?1:0
+      })
+    }
+    return queued
   }
   async fail(claim:Pick<Occurrence,'id'|'lease_token'>,error:unknown){
     const terminal=error instanceof ScheduleError&&(error.status===403||error.code==='scheduleRecoveryExhausted')

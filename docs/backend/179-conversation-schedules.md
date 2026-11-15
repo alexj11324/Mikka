@@ -155,3 +155,36 @@ Logs: `/tmp/mikka-old179-setup.log`, `/tmp/mikka-old179-store-db-final.log`,
 The parent must still run the combined Next/automatic-account acceptance and
 Git-linked CI on its final integration head. No live model/provider, production
 migration/Worker deployment, real external write or final issue closure is claimed.
+
+## Event triggers (2026-11-15)
+
+Decision [2026-11-15-1704](../design/decisions/2026-11-15-1704-automation-github-triggers.md).
+
+- **Definition.** A `dispatch_task` definition may carry `events`: 1–20 GitHub
+  triggers `{ source: 'github', event, repositories, branches?, labels?, runWhen? }`.
+  Events are those the GitHub App already subscribes to; `push` and `workflow_run`
+  are not offered. Each repository is a workspace key (`v2/github.com/<owner>/<name>`)
+  and must be usable in the workspace at create, update and resume, and again when
+  an event arrives (`AutomationSeams.repository`).
+- **Fan-out.** `dispatchVerifiedGitHubWebhook` maps a verified delivery to automation
+  events (`lib/schedules/github-events.ts`; a `Bot` sender maps to none) and calls
+  `fireGitHubAutomations` before GitHub is acknowledged. A failure answers 503 so the
+  delivery is retried. Each active automation whose trigger takes an event gets at
+  most one occurrence per delivery: its operation ID derives from the automation and
+  the delivery ID (or a body hash when GitHub sent none), so a redelivery adds
+  nothing. The occurrence stores the event and the indexes of the triggers that took
+  it in `schedule_occurrences.trigger`. At `maxConcurrent` the event is recorded as
+  `skipped` with `concurrencyLimit` and not reported to the chat.
+- **Conditions.** Before the dispatch, the run goes ahead when one taking trigger has
+  no `runWhen` or one of their conditions holds, judged by the Decision model for the
+  creator (`AutomationSeams.runWhen`, billed like their other judgments). A miss is
+  `skipped` with `runWhenNotMet` and not reported; no answer is the retryable
+  `scheduleRunWhenUnavailable`, never a silent pass.
+- **The request.** The dispatched user message is the automation's prompt followed by
+  a `<github_event>` block of plain fields. The event's `payload.schedule.event` marks
+  it, and eve's context tells the Bot the block is GitHub's data, not the person's
+  instruction.
+- **Cost.** One indexed read per PR, issue, comment, review or check delivery
+  (`user_schedules_event_triggers`); `tests/github-webhook-statements.db.test.ts`
+  carries it in each budget.
+

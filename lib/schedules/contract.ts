@@ -27,11 +27,32 @@ export const taskSchema = z.discriminatedUnion('kind', [
   }).strict(),
 ])
 export type DispatchTask = Extract<z.infer<typeof taskSchema>, { kind: 'dispatch_task' }>
+/** GitHub events an automation can run on: those the GitHub App subscribes to (decision 2026-11-15-1704). */
+export const GITHUB_TRIGGER_EVENTS = [
+  'pull_request_opened', 'draft_opened', 'pull_request_pushed', 'pull_request_merged', 'pull_request_closed', 'label_change',
+  'issue_opened', 'comment', 'review_submitted', 'review_comment', 'checks_completed', 'checks_failed',
+] as const
+export type GitHubTriggerEvent = typeof GITHUB_TRIGGER_EVENTS[number]
+/** A repository as the workspace names it, `v2/github.com/<owner>/<name>` in lower case. */
+export const githubRepositoryKey = z.string().regex(/^v2\/github\.com\/[a-z0-9-]{1,39}\/[a-z0-9._-]{1,100}$/)
+export const eventTriggerSchema = z.discriminatedUnion('source', [
+  z.object({
+    source: z.literal('github'), event: z.enum(GITHUB_TRIGGER_EVENTS),
+    repositories: z.array(githubRepositoryKey).min(1).max(20),
+    branches: z.array(z.string().trim().min(1).max(250)).max(20).optional(),
+    labels: z.array(z.string().trim().min(1).max(100)).max(20).optional(),
+    /** One sentence checked against each event before a run starts; an event that does not match is skipped. */
+    runWhen: z.string().trim().min(1).max(500).optional(),
+  }).strict(),
+])
+export type EventTrigger = z.infer<typeof eventTriggerSchema>
 export const definitionSchema = z.object({
   title: z.string().trim().min(1).max(200), timezone: z.string().min(1).max(100), timing: timingSchema, task: taskSchema,
   misfire: z.enum(['skip', 'catch_up_once']), maxLatenessMinutes: z.number().int().min(1).max(10080),
   maxConcurrent: z.number().int().min(1).max(5).optional(),
-}).strict()
+  /** 满足任一条件就运行: event triggers beside the timing. Only an automation that hands a Bot a task has them. */
+  events: z.array(eventTriggerSchema).min(1).max(20).optional(),
+}).strict().refine(value => !value.events || value.task.kind === 'dispatch_task', { message: 'eventTriggersNeedDispatchTask', path: ['events'] })
 export const SCHEDULE_PAGE_MAX = 100
 const scheduleCursor = z.templateLiteral([z.iso.datetime({ precision: 6 }), '/', z.uuid()])
 export const scheduleListInput = z.object({
