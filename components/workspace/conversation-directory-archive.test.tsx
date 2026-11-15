@@ -11,11 +11,12 @@ let days = 30
 let canSave = true
 const writes: number[] = []
 let reads = 0
+let pendingRead: Promise<{ archiveIdleAfterDays: number }> | null = null
 const subscriptions = new Map<string, () => Promise<unknown>>()
 
 mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) => key, useFormatter: () => ({ dateTime: () => '' }) } })
 const stub = (file: string, namedExports: Record<string, unknown>) => mock.module(new URL(file, import.meta.url).href, { namedExports })
-function readPreferences() { reads++; return { archiveIdleAfterDays: days } }
+function readPreferences() { reads++; return pendingRead ?? { archiveIdleAfterDays: days } }
 stub('../../lib/settings-read.ts', { settingsRead: readPreferences })
 stub('../../app/actions/preferences.ts', { getPreferences: readPreferences, updatePreferences: async ({ archiveIdleAfterDays }: { archiveIdleAfterDays: number }) => {
   writes.push(archiveIdleAfterDays)
@@ -35,6 +36,10 @@ stub('../../hooks/use-live-key.tsx', { useLiveKey(kind: string, id: string | nul
     return () => { subscriptions.delete(channel) }
   }, [kind, id, scope, JSON.stringify(keys), mutate])
 } })
+const router = { refresh() {} }
+mock.module('next/navigation', { namedExports: { useSearchParams: () => new URLSearchParams() } })
+stub('../../i18n/navigation.ts', { useRouter: () => router })
+const { AuthenticatedReadCache } = await import('../authenticated-read-cache')
 const { ConversationDirectory } = await import('./conversation-directory')
 
 async function mount() {
@@ -82,4 +87,35 @@ test('the existing scoped live invalidation refreshes the displayed personal int
     assert.equal(select.value, '90')
     assert.ok(reads > before)
   } finally { await act(async () => root.unmount()); await browser.happyDOM.abort() }
+})
+
+test('switching signed-in accounts removes the previous archive choice and its retry intent while the next read is pending', async () => {
+  const root = createRoot(document.body)
+  const view = (ownerId: string, role: 'admin' | 'member') => <AuthenticatedReadCache ownerId={ownerId} workspace={{ workspaceId: 'workspace', role }} build="qa">
+    <ConversationDirectory ownerId={ownerId} workspaceId="workspace" botId={null} />
+  </AuthenticatedReadCache>
+  const select = () => document.querySelector('label select') as HTMLSelectElement
+  try {
+    canSave = false
+    days = 3
+    writes.length = 0
+    await act(async () => root.render(view('owner', 'admin')))
+    assert.equal(select().value, '3')
+    await act(async () => { select().value = '14'; select().dispatchEvent(new browser.Event('change', { bubbles: true })) })
+    assert.ok(document.querySelector('[role=alert] button'))
+    let complete!: (value: { archiveIdleAfterDays: number }) => void
+    pendingRead = new Promise(resolve => { complete = resolve })
+    await act(async () => root.render(view('member', 'member')))
+    assert.equal(select().disabled, true)
+    assert.notEqual(select().value, '3')
+    assert.equal(document.querySelector('[role=alert]'), null)
+    await act(async () => { complete({ archiveIdleAfterDays: 90 }); await pendingRead })
+    assert.equal(select().value, '90')
+    assert.deepEqual(writes, [14])
+  } finally {
+    pendingRead = null
+    canSave = true
+    await act(async () => root.unmount())
+    await browser.happyDOM.abort()
+  }
 })
