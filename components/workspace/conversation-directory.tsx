@@ -3,10 +3,10 @@
 import { useState } from 'react'
 import type { ThreadReadChange } from '@/lib/thread-reads'
 import { setThreadRead } from '@/lib/thread-read-client'
-import { threadKeys } from '@/lib/swr/keys'
+import { settingsKeys, threadKeys } from '@/lib/swr/keys'
 import useSWRInfinite from 'swr/infinite'
-import useSWR, {useSWRConfig} from 'swr'
-import { getPreferences, updatePreferences } from '@/app/actions/preferences'
+import { useSWRConfig } from 'swr'
+import { usePreferences } from '@/components/settings/use-preferences'
 import { unstable_serialize } from 'swr/infinite'
 import { useFormatter, useTranslations } from 'next-intl'
 import { listConversations } from '@/app/actions/task-runs'
@@ -32,10 +32,8 @@ export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 
   const { mutate: refresh } = useSWRConfig()
   const [writing, setWriting] = useState(false)
   const [writeError, setWriteError] = useState(false)
-  const prefs = useSWR(['conversation-archive-preferences',ownerId], () => getPreferences())
-  const cache = useSWRConfig()
+  const prefs = usePreferences()
   const [saving,setSaving] = useState(false)
-  const [failed,setFailed] = useState(false)
   const [search, setSearch] = useState('')
   const [state, setState] = useState<DirectoryState | 'all'>('all')
   const [archived, setArchived] = useState(false)
@@ -46,7 +44,7 @@ export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 
     ([, , , selectedBot, text, selected, showArchive, cursor, , selectedPr]) => listConversations({ pullState: selectedPr, botId:selectedBot ?? undefined, search: text, state: selected, archived: showArchive, cursor: cursor ?? undefined }),
     { revalidateOnFocus: false, shouldRetryOnError: false })
   useLiveKey('thread_list', workspaceId, workspaceId ? [unstable_serialize(getKey)] : [], workspaceId)
-  useLiveKey('group_list', workspaceId, workspaceId ? [unstable_serialize(getKey)] : [], workspaceId)
+  useLiveKey('group_list', workspaceId, workspaceId ? [unstable_serialize(getKey), settingsKeys.preferences()] : [], workspaceId)
   const rows = [...new Map(data?.flatMap(page => page.items).map(item => [directoryConversationKey(item), item])).values()]
   const more = Boolean(data?.at(-1)?.cursor)
   async function mark(change: ThreadReadChange) {
@@ -59,15 +57,16 @@ export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 
     } catch { setWriteError(true) }
     finally { setWriting(false) }
   }
-  async function changeDays(days:number) {
-    setSaving(true); setFailed(false)
+  async function changeDays(days: number) {
+    if (saving) return
+    setSaving(true)
     try {
-      const saved=await updatePreferences({archiveIdleAfterDays:days})
-      if ('error' in saved && saved.error) throw new Error()
-      await prefs.mutate()
-      await Promise.all([mutate(),cache.mutate(['conversation-sidebar',ownerId,workspaceId])])
-    } catch {setFailed(true)} finally {setSaving(false)}
+      if (await prefs.save({ archiveIdleAfterDays: days })) {
+        await Promise.all([mutate(), refresh(['conversation-sidebar', ownerId, workspaceId])])
+      }
+    } finally { setSaving(false) }
   }
+  const failedDays = prefs.failed?.patch.archiveIdleAfterDays
   return <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4" aria-label={pullsOnly ? categories('pullRequests') : t('title')}>
     <Label className="flex items-center gap-2 text-sm">{t('archiveIdle')}
       <NativeSelect value={prefs.data?.archiveIdleAfterDays ?? 30} disabled={!prefs.data || saving}
@@ -75,7 +74,9 @@ export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 
         {archiveIdleDays.map(days=><NativeSelectOption key={days} value={days}>{days ? t('archiveDays',{days}) : t('archiveOff')}</NativeSelectOption>)}
       </NativeSelect>
     </Label>
-    {(failed || prefs.error) && <p role="alert">{t('loadError')} <Button size="sm" variant="ghost" onClick={()=>void prefs.mutate()}>{t('retry')}</Button></p>}
+    {failedDays !== undefined
+      ? <p role="alert">{t('archiveSaveError')} <Button size="sm" variant="ghost" disabled={saving} onClick={() => void changeDays(failedDays)}>{t('retry')}</Button></p>
+      : prefs.error && <p role="alert">{t('loadError')} <Button size="sm" variant="ghost" onClick={() => void prefs.mutate()}>{t('retry')}</Button></p>}
     <SearchInput type="search" value={search} maxLength={120} aria-label={t('search')} placeholder={t('search')}
       onChange={event => setSearch(event.target.value)} />
     <div className="flex flex-wrap items-center gap-2">
