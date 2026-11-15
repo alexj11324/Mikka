@@ -5,7 +5,7 @@ import type { EnterprisePrincipal } from './enterprise/principal'
 // verified session, MCP token or job that is running; never read from input.
 export { ACTIVITY_ACTOR_TYPES, type ActivityActorType } from './activity-actor-view'
 import type { ActivityActorType } from './activity-actor-view'
-export type ActivityActor = { actorType: ActivityActorType; actorId: string | null }
+export type ActivityActor = { actorType: ActivityActorType; actorId: string | null; sourceRunId?: string }
 
 export const userActor = (userId: string): ActivityActor => ({ actorType: 'user', actorId: userId })
 export const agentActor = (agentId: string | null): ActivityActor => ({ actorType: 'agent', actorId: agentId })

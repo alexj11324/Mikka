@@ -356,3 +356,12 @@ test('older meaningful events survive a save streak spanning several revision pa
   assert.equal(page.hasMore, false)
   assert.deepEqual(events.map(event => event.id), ['created-long-1', 'title-long-2', 'description-long-305'])
 })
+
+test('revision activity carries only recorded run provenance, leaving legacy rows unlinked', () => {
+  const versions = [version(1, {}), { ...version(2, {}, 'b0', 'agent:a'), title: 'Legacy' }, { ...version(3, {}, 'b0', 'agent:a'), title: 'Run update', sourceRunId: 'run-1' }]
+  const events = deriveIssueActivity(versions, [], Infinity)
+  const legacy = events.find(event => event.id === 'title-v2')
+  const sourced = events.find(event => event.id === 'title-v3')
+  assert.equal(legacy?.source?.kind === 'revision' ? legacy.source.runId : undefined, null)
+  assert.equal(sourced?.source?.kind === 'revision' ? sourced.source.runId : undefined, 'run-1')
+})

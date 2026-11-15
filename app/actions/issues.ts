@@ -19,7 +19,7 @@ import type { ThreadRecord } from '@/components/blocks/rich-text-editor-4/compon
 import { issueVisibilityPredicate } from '@/lib/issue-visibility-policy'
 import { issueTeamScope } from '@/lib/issue-team-access'
 import { db } from '@/lib/db'
-import { agents, issues, issueDocuments, issueVersions, issueMembers, users } from '@/lib/db/schema'
+import { agentRuns, agents, issues, issueDocuments, issueVersions, issueMembers, users } from '@/lib/db/schema'
 import { requireIssueAccess, requireIssueAccessWithoutBody, requireUser } from '@/lib/issue-access'
 import { checklistView, issueAttrsContent, issueChecklistChecked, issueChecklistTotal } from '@/lib/issue-summary-columns'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
@@ -340,7 +340,18 @@ async function persistIssue(input: SaveIssueInput, block?: BlockFlag): Promise<A
         if (changed) await recordCoordinatorEvent(tx, changed)
         if (!issue) return { error: 'issueStale' }
         reviewTaskChanged(tx, latest, issue)
-        await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority, ...activityActor(userId) })
+        const actor = activityActor(userId)
+        if (actor.sourceRunId) {
+          // Provenance is server supplied, but check the immutable run/task/tenant/agent
+          // association again inside the same transaction as the history write.
+          if (actor.actorType !== 'agent' || !actor.actorId) throw new ActionFailureError('workspaceAccessDenied')
+          const [source] = await tx.select({ id: agentRuns.id }).from(agentRuns).where(and(
+            eq(agentRuns.id, actor.sourceRunId), eq(agentRuns.userId, userId), eq(agentRuns.issueId, id),
+            eq(agentRuns.workspaceId, context.workspace.id), eq(agentRuns.agentId, actor.actorId),
+          )).limit(1)
+          if (!source) throw new ActionFailureError('workspaceAccessDenied')
+        }
+        await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority, ...actor })
         await issueListChanged(tx, id, latest.title !== issue.title)
         // Title, status and priority show in every connected task's relations panel.
         await issueRelationsChanged(tx, [id])
