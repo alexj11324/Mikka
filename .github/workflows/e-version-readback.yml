@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: 6d88ee3b24ff47862b34c89191b5a54a98aaf295
+          ref: f19dffd045d4cee99c0f6960cd0978b1a96bd129
           persist-credentials: false
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
         with:
@@ -23,8 +23,8 @@ jobs:
       - name: Pin the source and install its lockfile
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 6d88ee3b24ff47862b34c89191b5a54a98aaf295
-          test "$(git rev-parse 'HEAD^{tree}')" = b17d0cbb8f48156395d19d969d022e58a3d168c9
+          test "$(git rev-parse HEAD)" = f19dffd045d4cee99c0f6960cd0978b1a96bd129
+          test "$(git rev-parse 'HEAD^{tree}')" = 8cd4be321b3e03be0c3862d1fbbe3c7bb7a8965c
           pnpm install --frozen-lockfile
       - name: Execute original complete group and conversation unit suites
         run: |
@@ -37,6 +37,15 @@ jobs:
           set -e
           umask 077
           pg=/usr/lib/postgresql/17/bin
+          if [ ! -x "$pg/initdb" ]; then
+            . /etc/os-release
+            curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o "$RUNNER_TEMP/pgdg-signing.asc"
+            test "$(gpg --show-keys --with-colons "$RUNNER_TEMP/pgdg-signing.asc" | awk -F: '/^fpr:/ {print $10;exit}')" = B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8
+            sudo install -m 0644 "$RUNNER_TEMP/pgdg-signing.asc" /usr/share/keyrings/pgdg-evidence.asc
+            echo "deb [signed-by=/usr/share/keyrings/pgdg-evidence.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg-evidence.list >/dev/null
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends postgresql-17
+          fi
           test -x "$pg/initdb"
           fixture="$RUNNER_TEMP/version-postgres"
           mkdir -m 700 "$fixture"
@@ -63,6 +72,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: version-readback-6d88ee3b
+          name: version-readback-f19dffd0
           path: ${{ runner.temp }}/version-receipt/
           if-no-files-found: error
