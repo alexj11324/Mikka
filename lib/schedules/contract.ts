@@ -56,7 +56,11 @@ export const definitionSchema = z.object({
   eachRun: z.enum(['new_task', 'same_task']).optional(),
   /** 满足任一条件就运行: event triggers beside the timing. Only an automation that hands a Bot a task has them. */
   events: z.array(eventTriggerSchema).min(1).max(20).optional(),
-}).strict().refine(value => !value.events || value.task.kind === 'dispatch_task', { message: 'eventTriggersNeedDispatchTask', path: ['events'] })
+  /** Webhook: the automation's own URL starts a run; requests within `batchMinutes` of the first go to one run. */
+  webhook: z.object({ batchMinutes: z.number().int().min(0).max(60) }).strict().optional(),
+}).strict()
+  .refine(value => !value.events || value.task.kind === 'dispatch_task', { message: 'eventTriggersNeedDispatchTask', path: ['events'] })
+  .refine(value => !value.webhook || value.task.kind === 'dispatch_task', { message: 'eventTriggersNeedDispatchTask', path: ['webhook'] })
 export const SCHEDULE_PAGE_MAX = 100
 const scheduleCursor = z.templateLiteral([z.iso.datetime({ precision: 6 }), '/', z.uuid()])
 export const scheduleListInput = z.object({
@@ -73,6 +77,8 @@ export const commandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.enum(['pause', 'resume', 'cancel']), scheduleId: z.uuid(), version: z.number().int().positive() }).strict(),
   // 接手: an owner or admin makes a workspace automation theirs; from then on it runs as them (decision 2026-11-15-1840).
   z.object({ action: z.literal('take_over'), scheduleId: z.uuid(), version: z.number().int().positive() }).strict(),
+  // Webhook 地址: a new secret URL for the automation; the previous one stops working. Returned once.
+  z.object({ action: z.literal('webhook_key'), scheduleId: z.uuid(), version: z.number().int().positive() }).strict(),
   // 立即运行: one occurrence due now. The same requestId never adds a second one.
   z.object({ action: z.literal('run_now'), scheduleId: z.uuid(), version: z.number().int().positive(), requestId: z.uuid() }).strict(),
   // 用量: runs and cost per day in the automation's time zone, newest first.

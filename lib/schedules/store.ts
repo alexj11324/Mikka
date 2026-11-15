@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { commandSchema, definitionSchema, ScheduleError, SCHEDULE_PAGE_MAX, type Actor, type Definition, type DispatchTask, type EventTrigger, type ScheduledRead } from './contract'
 import { describeGitHubEvent, triggerMatches, type GitHubAutomationEvent } from './github-events'
+import { describeWebhook, newWebhookKey, webhookKeyHash, WEBHOOK_BATCH_BYTES, WEBHOOK_BATCH_REQUESTS, type WebhookRequest } from './webhook'
 import { nextTime, runsOnSchedule, timezone } from './time'
 import { botChatChanged } from '../live/chats'
 import { observePoolCommits } from '../db/commit-effects'
@@ -16,9 +17,9 @@ export type MessageGuard = (tx: PoolClient, ownerId: string, value: unknown) => 
 export type IssueReader = (tx: PoolClient, ownerId: string, issueId: string) => Promise<{ id: string; title: string; status: string } | null>
 /** What one dispatch_task run made: the task (as the chat's task line shows it) and the request event behind it. */
 export type DispatchResult = { id: string; title: string; status: string; identifier: string | null; eventId?: string; requestedBy?: string; runId?: string; continued?: true }
-export type DispatchInput = { ownerId: string; workspaceId: string; scheduleId: string; occurrenceId: string; task: DispatchTask; event?: string; single?: true }
-/** The event a run started on and the indexes of the triggers that took it. */
-export type OccurrenceTrigger = { event: GitHubAutomationEvent; triggers: number[] }
+export type DispatchInput = { ownerId: string; workspaceId: string; scheduleId: string; occurrenceId: string; task: DispatchTask; event?: string; source?: 'github' | 'webhook'; single?: true }
+/** What started a run: a GitHub event and the indexes of the triggers that took it, or the webhook requests it batched. */
+export type OccurrenceTrigger = { event: GitHubAutomationEvent; triggers: number[] } | { webhook: { requests: WebhookRequest[] } }
 export type RunWhenInput = { ownerId: string; workspaceId: string; condition: string; event: string }
 /**
  * dispatch_task's two host seams. `check` re-authorizes the creator's request at create, update, resume and every run
@@ -39,7 +40,7 @@ export type Occurrence = { id: string; schedule_id: string; operation_id: string
 export const SCHEDULE_LEASE_MS = 5 * 60_000
 const MAX_ATTEMPTS = 3
 // The frozen request key is internal; keep the existing tool-response fields.
-const SCHEDULE_COLUMNS = 'id,owner_id,workspace_id,bot_id,visibility,source_event_id,request_id,definition,request_definition,status,version,next_at,disabled_reason,created_at,updated_at'
+const SCHEDULE_COLUMNS = 'id,owner_id,workspace_id,bot_id,visibility,source_event_id,request_id,definition,request_definition,status,version,next_at,disabled_reason,webhook_key_hash IS NOT NULL AS webhook_key_set,created_at,updated_at'
 /** A run that fails one of these lost its creator's authority: the automation is paused with the code as its reason. */
 const AUTHORITY_LOST = new Set(['scheduleStandingTaskUnavailable','scheduleWorkspaceAccessDenied','scheduleOwnerUnavailable','scheduleConversationUnavailable','scheduleBotUnavailable','scheduleRepositoryUnavailable','scheduleDeviceUnavailable','scheduleProfileUnavailable'])
 /** Runs that count toward maxRunsPerDay: queued, running and finished, not skipped or cancelled. */
@@ -180,6 +181,16 @@ export class ScheduleStore {
       if(row.status==='cancelled') throw new ScheduleError('scheduleCancelled')
       if(cmd.action==='run_now') return this.runNow(tx,row,cmd.requestId)
       if(cmd.action==='take_over') return this.takeOver(tx,actor,access,row)
+      if(cmd.action==='webhook_key'){
+        // The URL is a secret: it is made on the page and shown to the person, never handed to a chat model.
+        if(!actor.direct) throw new ScheduleError('scheduleWebhookPageOnly',403)
+        if(row.visibility==='workspace'&&row.owner_id!==actor.ownerId&&access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
+        if(!row.definition.webhook||row.status==='completed') throw new ScheduleError('scheduleWebhookOff',409)
+        const key=newWebhookKey()
+        const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET webhook_key_hash=$2,updated_at=$3 WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,webhookKeyHash(key),this.clock()])).rows[0]
+        await this.listChanged(tx,row.workspace_id)
+        return {schedule:updated,key}
+      }
       let def=row.definition, status=row.status, next=row.next_at
       if(cmd.action==='update'){def=cmd.definition;def.timezone=timezone(def.timezone);await this.permission(tx,row.owner_id,row.bot_id,row.workspace_id,def);next=nextTime(def,this.clock(),true);if(status==='completed')status='active'}
       else if(cmd.action==='pause'){status='paused';next=null}
@@ -325,9 +336,10 @@ export class ScheduleStore {
   /** Creates and hands over the task as its creator, then records the run and posts its task line in the chat. */
   private async finishDispatch(row:Schedule,o:Occurrence){
     if(!this.automation.dispatch||!row.workspace_id||o.definition.task.kind!=='dispatch_task')throw new ScheduleError('scheduleDispatchUnavailable',503)
-    const event=o.trigger?describeGitHubEvent(o.trigger.event):undefined
-    if(o.trigger&&event&&!await this.runWhenHolds(row,o,event))return this.skipQuietly(row,o,'runWhenNotMet')
-    const result=await this.automation.dispatch({ownerId:row.owner_id,workspaceId:row.workspace_id,scheduleId:row.id,occurrenceId:o.id,task:o.definition.task,...(event?{event}:{}),...(o.definition.eachRun==='same_task'?{single:true as const}:{})})
+    const source=!o.trigger?undefined:'event' in o.trigger?'github' as const:'webhook' as const
+    const event=!o.trigger?undefined:'event' in o.trigger?describeGitHubEvent(o.trigger.event):describeWebhook(o.trigger.webhook.requests)
+    if(o.trigger&&'event' in o.trigger&&event&&!await this.runWhenHolds(row,o,event))return this.skipQuietly(row,o,'runWhenNotMet')
+    const result=await this.automation.dispatch({ownerId:row.owner_id,workspaceId:row.workspace_id,scheduleId:row.id,occurrenceId:o.id,task:o.definition.task,...(event&&source?{event,source}:{}),...(o.definition.eachRun==='same_task'?{single:true as const}:{})})
     const recorded=await this.workspace(row.owner_id,row.workspace_id,()=>this.transaction(async tx=>{
       await tx.query('SELECT id FROM user_schedules WHERE id=$1 FOR UPDATE',[row.id])
       // A lost lease means another worker owns this occurrence; it repeats the same idempotent dispatch.
@@ -345,7 +357,7 @@ export class ScheduleStore {
    * conditions holds. No answer from the Decision model is a retryable failure, never a silent pass or skip.
    */
   private async runWhenHolds(row:Schedule,o:Occurrence,event:string){
-    const triggers=(o.trigger?.triggers??[]).map(index=>o.definition.events?.[index]).filter((trigger):trigger is EventTrigger=>Boolean(trigger))
+    const triggers=(o.trigger&&'triggers' in o.trigger?o.trigger.triggers:[]).map(index=>o.definition.events?.[index]).filter((trigger):trigger is EventTrigger=>Boolean(trigger))
     if(!triggers.length||triggers.some(trigger=>!trigger.runWhen))return true
     if(!this.automation.runWhen||!row.workspace_id)throw new ScheduleError('scheduleRunWhenUnavailable',503)
     for(const trigger of triggers){
@@ -400,6 +412,40 @@ export class ScheduleStore {
       })
     }
     return queued
+  }
+  /**
+   * A request to an automation's webhook URL. With batchMinutes 0 it is a run now; otherwise it joins the run that is
+   * still gathering requests, or starts one due batchMinutes from now. Over maxConcurrent or the daily cap the request
+   * is recorded as a skipped run, with its body, and no chat report. The sender's request ID is taken once.
+   */
+  async receiveWebhook(keyHash:string,body:string,requestKey?:string):Promise<{status:'queued'|'batched'|'duplicate'|'skipped';reason?:string;dueAt?:string}>{
+    return this.transaction(async tx=>{
+      const row=(await tx.query<Schedule>('SELECT * FROM user_schedules WHERE webhook_key_hash=$1 FOR UPDATE',[keyHash])).rows[0]
+      if(!row||!row.definition.webhook||row.status==='cancelled'||row.status==='completed'||!row.workspace_id) throw new ScheduleError('scheduleNotFound',404)
+      if(row.status!=='active') throw new ScheduleError('scheduleNotActive',409)
+      if(requestKey&&(await tx.query(`SELECT 1 FROM schedule_occurrences WHERE schedule_id=$1 AND trigger->'webhook'->'requests' @> $2::jsonb LIMIT 1`,[row.id,JSON.stringify([{key:requestKey}])])).rowCount) return {status:'duplicate' as const}
+      const now=(await tx.query<{now:Date}>('SELECT clock_timestamp() now')).rows[0]!.now
+      const request:WebhookRequest={at:now.toISOString(),body,...(requestKey?{key:requestKey}:{})}
+      const batch=row.definition.webhook.batchMinutes
+      if(batch>0){
+        const open=(await tx.query<{id:string;n:number;bytes:number;due:Date}>(`SELECT id,jsonb_array_length(trigger->'webhook'->'requests')::int n,octet_length(trigger::text)::int bytes,next_retry_at due FROM schedule_occurrences
+          WHERE schedule_id=$1 AND version=$2 AND status='pending' AND attempts=0 AND trigger ? 'webhook' AND next_retry_at>$3 ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,[row.id,row.version,now])).rows[0]
+        if(open&&open.n<WEBHOOK_BATCH_REQUESTS&&open.bytes+Buffer.byteLength(body)<=WEBHOOK_BATCH_BYTES){
+          await tx.query(`UPDATE schedule_occurrences SET trigger=jsonb_set(trigger,'{webhook,requests}',(trigger->'webhook'->'requests')||$2::jsonb) WHERE id=$1`,[open.id,JSON.stringify([request])])
+          await this.listChanged(tx,row.workspace_id)
+          return {status:'batched' as const,dueAt:open.due.toISOString()}
+        }
+      }
+      const {rows:[busy]}=await tx.query<{n:number}>(`SELECT count(*)::int n FROM schedule_occurrences WHERE schedule_id=$1 AND status IN ('pending','running')`,[row.id])
+      const reason=busy.n>=(row.definition.maxConcurrent??1)?'concurrencyLimit':await this.dailyFull(tx,row)?'dailyRunLimit':null
+      const due=new Date(now.getTime()+batch*60_000)
+      const operation=requestKey?scheduleOperationId(row.id,`webhook:${requestKey}`):randomUUID()
+      await tx.query(`INSERT INTO schedule_occurrences(id,schedule_id,version,due_at,definition,status,operation_id,next_retry_at,execution_decision,trigger,error,finished_at,reported_at)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$4,'execute',$8,$9,CASE WHEN $6='skipped' THEN $10::timestamptz END,CASE WHEN $6='skipped' THEN $10::timestamptz END)`,
+        [randomUUID(),row.id,row.version,due,row.definition,reason?'skipped':'pending',operation,{webhook:{requests:[request]}},reason,now])
+      await this.listChanged(tx,row.workspace_id)
+      return reason?{status:'skipped' as const,reason}:{status:'queued' as const,dueAt:due.toISOString()}
+    })
   }
   /** Whether maxRunsPerDay runs already started (or wait) today in the automation's time zone, not counting `except`. */
   private async dailyFull(tx:PoolClient,row:Schedule,except?:string){

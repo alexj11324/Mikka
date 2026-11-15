@@ -104,6 +104,12 @@ export async function takeOverAutomation(input: { scheduleId: string; version: n
   return parsed.success ? command({ action: 'take_over', ...parsed.data }) : { error: 'validationGeneric' }
 }
 
+/** Webhook 地址: a new secret URL key for the automation, returned once; the previous URL stops working. */
+export async function automationWebhookKey(input: { scheduleId: string; version: number }): Promise<ActionResult<{ schedule: AutomationView; key: string }>> {
+  const parsed = versioned.safeParse(input)
+  return parsed.success ? command({ action: 'webhook_key', ...parsed.data }) : { error: 'validationGeneric' }
+}
+
 /** 删除: cancels every future run. Past runs and the tasks they made stay. */
 export async function cancelAutomation(input: { scheduleId: string; version: number }): Promise<ActionResult<{ schedule: AutomationView }>> {
   const parsed = versioned.safeParse(input)

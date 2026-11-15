@@ -2631,6 +2631,15 @@
       "sourceHash": "bc4a3e01effdf4ef88e44029e1fe7cfc221e02848cd21b1c7b6c71f2c8a33681"
     },
     {
+      "path": "/mikka/api/webhooks/automations/[key]",
+      "template": "/api/webhooks/automations/[key]",
+      "source": "app/api/webhooks/automations/[key]/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "73e07fb4281fc67e33628f668cd932616f5bdb53ae9eeed89220427b77a84ca0"
+    },
+    {
       "path": "/mikka/api/webhooks/composio",
       "template": "/api/webhooks/composio",
       "source": "app/api/webhooks/composio/route.ts",

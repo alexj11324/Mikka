@@ -19,6 +19,8 @@ export type AutomationView = {
   disabled_reason?: string | null
   /** 接手 is offered: the reader is an owner or admin and someone else created it. */
   can_take_over?: boolean
+  /** A webhook URL was made for it (the URL itself is shown only once). */
+  webhook_key_set?: boolean
 }
 export type AutomationList = { schedules: AutomationView[]; nextCursor: string | null }
 
@@ -33,7 +35,7 @@ export type AutomationRun = {
   error: string | null
   result: unknown
   /** The event a run started on (blank for a member who is neither its creator nor an owner or admin). */
-  trigger?: { event: { event: string; repository: string; number: number | null; title: string | null; url: string | null } } | null
+  trigger?: { event: { event: string; repository: string; number: number | null; title: string | null; url: string | null } } | { webhook: { requests: { at: string }[] } } | null
 }
 export type AutomationHistory = { occurrences: AutomationRun[] }
 export type AutomationUsageDay = { day: string; runs: number; skipped: number; tasks: number; costMicroUsd: number | null }

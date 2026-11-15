@@ -6,16 +6,19 @@ import { cronShape } from './automation-draft'
 
 const clock = (hour: number, minute: number) => `${hour}:${String(minute).padStart(2, '0')}`
 
-/** 「工作日 9:00」: one line for an automation's timing, in its own time zone, then its GitHub triggers. */
+/** 「工作日 9:00」: one line for an automation's timing, in its own time zone, then its GitHub triggers and webhook. */
 export function useTimingSummary() {
   const t = useTranslations('Automations.summary')
   const tEvent = useTranslations('Automations.githubEvent')
   const timing = useScheduleSummary()
-  return (definition: Pick<Definition, 'timing' | 'timezone' | 'events'>) => {
+  return (definition: Pick<Definition, 'timing' | 'timezone' | 'events' | 'webhook'>) => {
     const events = definition.events ?? []
-    if (!events.length) return timing(definition)
-    const github = t('github', { event: tEvent(events[0]!.event), count: events.length - 1 })
-    return definition.timing.kind === 'manual' ? github : `${timing(definition)} · ${github}`
+    const parts = [
+      ...(events.length ? [t('github', { event: tEvent(events[0]!.event), count: events.length - 1 })] : []),
+      ...(definition.webhook ? [t('webhook')] : []),
+    ]
+    if (!parts.length) return timing(definition)
+    return [...(definition.timing.kind === 'manual' ? [] : [timing(definition)]), ...parts].join(' · ')
   }
 }
 
