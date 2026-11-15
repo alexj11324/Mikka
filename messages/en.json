@@ -4885,7 +4885,6 @@
     },
     "newBot": {
       "title": "New bot",
-      "description": "Name the bot and pick a shape and colour.",
       "name": "Name",
       "namePlaceholder": "Name",
       "color": "Colour",

@@ -12,6 +12,7 @@ const Selection = createContext<{ pick?: (value: string) => void; disabled?: boo
 const Wrap = ({ children }: { children?: ReactNode }) => <div>{children}</div>
 let Button: typeof import('../ui/button')['Button']
 let Input: typeof import('../ui/input')['Input']
+let Textarea: typeof import('../ui/textarea')['Textarea']
 mock.module(new URL('../ui/select.tsx', import.meta.url).href, { namedExports: {
   Select: ({ children, onValueChange, disabled }: { children: ReactNode; onValueChange?: (value: string) => void; disabled?: boolean }) =>
     <Selection.Provider value={{ pick: onValueChange, disabled }}>{children}</Selection.Provider>,
@@ -28,6 +29,8 @@ mock.module(new URL('../slots/new-task.tsx', import.meta.url).href, { namedExpor
     {props.notices}
     {props.intent !== 'create_only' && props.profile.choices.map(choice => <Button key={choice.value} data-option={choice.value}
       disabled={choice.disabled || props.profile.disabled} onClick={() => props.profile.onChange(choice.value)}>{choice.label}</Button>)}
+    <Button data-more={props.more.checked} onClick={() => props.more.onChange(!props.more.checked)}>Shell.newTaskDialog.createMore</Button>
+    <Textarea data-text value={props.text} onChange={event => props.onText(event.target.value)} />
     <Button aria-keyshortcuts="Control+Enter Meta+Enter" disabled={!props.canSubmit || props.sending} onClick={props.onSubmit}>Shell.newTaskDialog.create</Button>
   </>,
 } })
@@ -47,13 +50,16 @@ mock.module(new URL('../../app/actions/issues.ts', import.meta.url).href, { name
   return { version: 1, taskId: 'one-task', identifier: 'TEST-1', dispatch: null }
 } } })
 let refreshes = 0
+const cacheRefreshes: unknown[] = []
+const toasts: string[] = []
+mock.module('sonner', { namedExports: { toast: { success: (text: string) => { toasts.push(text) }, error: (text: string) => { toasts.push(`error:${text}`) } } } })
 const mutate = async () => { refreshes++ }
 mock.module('swr', { defaultExport: (key: unknown) => {
   if (key === null) return { data: undefined, mutate }
   if (Array.isArray(key) && key[0] === 'factory-agent-profiles') return { data, error: readError, mutate }
   if (Array.isArray(key) && key[0] === 'settings:model-order') return { data: { location: 'cloud', first: { kind: 'cloud' }, entries: [], readyDeviceIds: [] }, mutate }
   return { data: key === 'issue-creation-available' ? true : [], mutate }
-}, namedExports: { useSWRConfig: () => ({ mutate: async () => {} }) } })
+}, namedExports: { useSWRConfig: () => ({ mutate: async (key: unknown) => { cacheRefreshes.push(key) } }) } })
 mock.module(new URL('../../app/actions/agents.ts', import.meta.url).href, { namedExports: { listDevices: async () => [] } })
 mock.module(new URL('../../app/actions/bots.ts', import.meta.url).href, { namedExports: { listBots: async () => [] } })
 mock.module(new URL('../../app/actions/coordinator.ts', import.meta.url).href, { namedExports: { issueCreationAvailable: async () => true } })
@@ -91,12 +97,13 @@ before(async () => {
   ;({ createRoot } = await import('react-dom/client'))
   ;({ Button } = await import('../ui/button'))
   ;({ Input } = await import('../ui/input'))
+  ;({ Textarea } = await import('../ui/textarea'))
   ;({ TaskProfilePicker, TaskProfileNotice } = await import('./task-profile-picker'))
   ;({ NewTaskDialog } = await import('./new-task-dialog'))
 })
 beforeEach(() => {
   manualCommands.length = 0; failManual = false; requireConsent = false
-  submitted.length = 0; refreshes = 0; readError = undefined
+  submitted.length = 0; refreshes = 0; readError = undefined; cacheRefreshes.length = 0; toasts.length = 0
   data = { profiles: [{
     id: customId, name: 'Fixture role', description: '', roles: ['review'], icon: 'lens', color: 'pink', enabled: true, harness: 'claude_code',
     model: { mode: 'inherit' }, instructions: '', skills: [], version: 1, digest: 'a'.repeat(64),
@@ -300,4 +307,49 @@ test('Project creation binds the UUID and retries only after a real access refus
   assert.equal(manualCommands[1].requestId, manualCommands[0].requestId)
   assert.equal(manualCommands[1].confirmAccess, true)
   assert.equal(submitted.length, 0)
+})
+
+const moreSwitch = () => [...container.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Shell.newTaskDialog.createMore')!
+const textField = () => container.querySelector<HTMLTextAreaElement>('textarea[data-text]')!
+
+test('继续新建 on a backlog entry creates, clears the window and keeps it open without opening the Task', async () => {
+  let opened = '', closed = false
+  await render(<NewTaskDialog open workspaceId={workspaceId} initialIntent="create_only" initialText="First backlog entry."
+    onCreated={id => { opened = id }} onOpenChange={next => { if (!next) closed = true }} />)
+  await act(async () => moreSwitch().click())
+  assert.equal(moreSwitch().dataset.more, 'true')
+  await typeTitle('First title')
+  await act(async () => create().click())
+  assert.equal(manualCommands.length, 1)
+  assert.equal(manualCommands[0].title, 'First title')
+  assert.equal(opened, '', 'onCreated is not called while 继续新建 is on')
+  assert.equal(closed, false, 'the window stays open')
+  assert.deepEqual(toasts, ['Shell.newTaskDialog.created'])
+  assert.equal(titleInput().value, '')
+  assert.equal(textField().value, '')
+  assert.equal(create().disabled, true, 'nothing to send until the next request is written')
+  await typeTitle('Second title')
+  await act(async () => create().click())
+  assert.equal(manualCommands.length, 2)
+  assert.notEqual(manualCommands[1].requestId, manualCommands[0].requestId, 'the next task is a new request')
+})
+
+test('继续新建 on dispatch sends, refreshes the Coordinator chat, clears the request and keeps the profile', async () => {
+  let closed = false, sent = false
+  await render(<NewTaskDialog open workspaceId={workspaceId} initialText="Dispatch the first one."
+    onSent={() => { sent = true }} onOpenChange={next => { if (!next) closed = true }} />)
+  await act(async () => option(customId).click())
+  await act(async () => moreSwitch().click())
+  await act(async () => create().click())
+  assert.equal(submitted.length, 1)
+  assert.equal(submitted[0].context?.profileId, customId)
+  assert.ok(cacheRefreshes.includes('coordinator-chat'), 'the Coordinator chat refreshes')
+  assert.equal(closed, false)
+  assert.equal(sent, false)
+  assert.deepEqual(toasts, ['Shell.newTaskDialog.created'])
+  assert.equal(textField().value, '')
+  await act(async () => { const field = textField(); Object.getOwnPropertyDescriptor(browser.HTMLTextAreaElement.prototype, 'value')!.set!.call(field, 'Dispatch the second one.'); field.dispatchEvent(new browser.Event('input', { bubbles: true }) as unknown as Event) })
+  await act(async () => create().click())
+  assert.equal(submitted.length, 2)
+  assert.equal(submitted[1].context?.profileId, customId, 'the Agent profile stays for the next task')
 })

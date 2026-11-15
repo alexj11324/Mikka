@@ -65,7 +65,8 @@ export function NewBotDialog({ open, onOpenChange, onCreated }: { open: boolean;
   const repositoryChoices: NewBotChoice[] = [{ value: NO_REPOSITORY, label: t('noRepository') }, ...repositories.map(item => ({ value: item, label: item }))]
   const repositoryDetail: NewBotDetail = {
     choices: repositoryChoices, value: repositoryValue,
-    label: repositoryValue === null ? (defaults.error ? t('noRepository') : t('loading')) : repositoryValue === NO_REPOSITORY ? t('noRepository') : repositoryValue,
+    // A failed read leaves the choice to createBot (the workspace's default); the row says it could not load, never 不用仓库.
+    label: repositoryValue === null ? (defaults.error ? tModel('unavailable') : t('loading')) : repositoryValue === NO_REPOSITORY ? t('noRepository') : repositoryValue,
     onChange: setRepository, disabled: saving || !defaults.data,
   }
 
@@ -75,9 +76,13 @@ export function NewBotDialog({ open, onOpenChange, onCreated }: { open: boolean;
     setSaving(true)
     try {
       const bot = await createBot({ name: trimmed, color, shape, ...(repository === undefined ? {} : { repository: repository === NO_REPOSITORY ? null : repository }) })
-      if (model !== undefined && model !== menu.data?.current?.id) {
+      // The menu is the Coordinator's: its row shows the Coordinator's model. A new Bot has no saved choice and would
+      // follow the default instead, so save what the row shows whenever it is a pick (the person's, or the Coordinator's
+      // own choice); an unchosen default is what the new Bot resolves to anyway.
+      const shown = model ?? (menu.data?.current?.chosen ? menu.data.current.id : undefined)
+      if (shown !== undefined) {
         // The Bot exists either way; a model that did not save stays the default and says so.
-        const saved = await chooseBotModel(bot.id, model).catch(() => ({ error: 'notSaved' }))
+        const saved = await chooseBotModel(bot.id, shown).catch(() => ({ error: 'notSaved' }))
         if (saved.error) toast.error(tModel('notSaved'))
       }
       await mutate(isBotListKey)
