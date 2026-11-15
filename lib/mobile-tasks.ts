@@ -4,7 +4,7 @@ import { attemptStateOf, taskStateOf } from './task-state'
 import { taskStateRunColumns } from './task-state-query'
 import { readCompactRunFailure } from './run-failure-projection'
 import { and, desc, eq, inArray, sql } from 'drizzle-orm'
-import { db, pool } from '@/lib/db'
+import { db } from '@/lib/db'
 import { agents, agentRuns, bots, devices, issues, issueDocuments, users, runPublications, RUN_OUTCOMES } from '@/lib/db/schema'
 import { issueForUser } from '@/lib/issue-access'
 import { withIssueWorkspace } from '@/lib/issue-scope-authorization'
@@ -20,8 +20,8 @@ import { runBotId } from '@/lib/run-bot-name'
 import { taskSchedule, taskScheduleLabels, taskScheduleView } from '@/lib/task-block-runs'
 import { enrichActivityActors } from '@/lib/activity-actor-server'
 import { taskActivityVersions } from './task-activity-versions'
-import { taskActivityFacts, type FactoryStageComment } from './task-activity-timeline'
-import { readTaskStageComments } from './task-stage-comments'
+import { taskActivityFacts } from './task-activity-timeline'
+import { taskDocumentStageComments } from './task-stage-comments'
 import { deriveIssueActivity } from './issue-activity'
 import { actAs } from './acting-user'
 import { threadQuestionView, latestConversationRun } from '@/lib/issue-threads'
@@ -39,7 +39,7 @@ export async function mobileTask(user: Exclude<IssueReader, string>, id: string,
     || (explicitWorkspaceId !== undefined && candidate.workspaceId !== explicitWorkspaceId)) return null
   const workspaceId = candidate.workspaceId
   const reader = { ...user, [tokenWorkspace]: workspaceId, [enterprisePrincipal]: user[enterprisePrincipal] }
-  const read = (stageComments?: FactoryStageComment[]) => withIssueWorkspace(reader, workspaceId, { issueId: id, action: 'canReadContent' }, () => readMobileTask(reader, workspaceId, id, stageComments))
+  const read = () => withIssueWorkspace(reader, workspaceId, { issueId: id, action: 'canReadContent' }, () => readMobileTask(reader, workspaceId, id))
   if (!includeWork) return read()
   const { withTaskWorkspace } = await import('./task-workspace')
   const { readTaskWork } = await import('./task-work-read')
@@ -70,7 +70,7 @@ export async function mobileTask(user: Exclude<IssueReader, string>, id: string,
       const source = sources.get(githubPullRequestKey(pull.url))
       return source ? { ...pull, sourceConversationId: source.id } : pull
     })
-    const detail = await read(presentation.factoryStageComments)
+    const detail = await read()
     if (!detail) return null
     return { ...detail, task: { ...detail.task, status: presentation.primaryStatus, group: presentation.group,
       state: presentation.state, reason: presentation.reason, blockedBy: presentation.blockedBy,
@@ -80,7 +80,7 @@ export async function mobileTask(user: Exclude<IssueReader, string>, id: string,
   })
 }
 
-async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: string, id: string, stageComments?: FactoryStageComment[]) {
+async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: string, id: string) {
   const issue = await issueForUser(user, id)
   if (!issue || issue.ownershipState !== 'bound' || issue.workspaceId !== workspaceId) return null
   const metadata = readIssueMetadata(issue.content)
@@ -106,7 +106,7 @@ async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: s
       .leftJoin(users, eq(users.id, issues.userId))
       .where(and(eq(issues.id, id), eq(issues.workspaceId, workspaceId), eq(issues.ownershipState, 'bound'))),
     db.select().from(taskActivityVersions(db, id, issue.userId)),
-    db.select({ state: issueDocuments.state }).from(issueDocuments)
+    db.select({ state: issueDocuments.state, stageComments: taskDocumentStageComments(issueDocuments.issueId, workspaceId) }).from(issueDocuments)
       .where(and(eq(issueDocuments.issueId, id), eq(issueDocuments.userId, issue.userId))),
     taskScheduleLabels(),
     visibleBlockers ? db.select({ id: issues.id, status: issues.status, userId: issues.userId, scope: issues.scope, content: issues.content, issuedIdentifier: issues.issuedIdentifier }).from(issues)
@@ -120,8 +120,7 @@ async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: s
   let timeline
   try {
     const threads = doc ? readIssueThreads(doc) : []
-    const stages = stageComments ?? (threads.length ? (await readTaskStageComments(pool, workspaceId, [id])).get(id) : [])
-    timeline = taskActivityFacts(history, threads, stages)
+    timeline = taskActivityFacts(history, threads, document?.stageComments)
   }
   finally { doc?.destroy() }
   const task = { ...issue, metadata }
