@@ -1,0 +1,34 @@
+'use client'
+
+import { useFormatter, useTranslations } from 'next-intl'
+import type { Definition } from '@/lib/schedules/contract'
+import { cronShape } from './automation-draft'
+
+const clock = (hour: number, minute: number) => `${hour}:${String(minute).padStart(2, '0')}`
+
+/** 「工作日 9:00」: one line for an automation's timing, in its own time zone. */
+export function useTimingSummary() {
+  const t = useTranslations('Automations.summary')
+  const format = useFormatter()
+  return (definition: Pick<Definition, 'timing' | 'timezone'>) => {
+    const timing = definition.timing
+    if (timing.kind === 'manual') return t('manual')
+    if (timing.kind === 'once') return t('once', { time: format.dateTime(new Date(timing.at), { dateStyle: 'medium', timeStyle: 'short', timeZone: definition.timezone }) })
+    if (timing.kind === 'interval') {
+      const minutes = timing.minutes
+      if (minutes % 1440 === 0) return t('intervalDays', { count: minutes / 1440 })
+      if (minutes % 60 === 0) return t('intervalHours', { count: minutes / 60 })
+      return t('intervalMinutes', { count: minutes })
+    }
+    if (timing.kind === 'daily') { const [hour, minute] = timing.time.split(':').map(Number); return t('daily', { time: clock(hour!, minute!) }) }
+    const shape = cronShape(timing.expression)
+    if (!shape) return t('cron', { expression: timing.expression })
+    const time = clock(shape.hour, shape.minute)
+    if (shape.kind === 'weekly') {
+      // 2026-11-15 is a Sunday: day 0 maps to it, 1 to Monday and so on.
+      const weekday = format.dateTime(new Date(Date.UTC(2026, 10, 15 + shape.day, 12)), { weekday: 'long', timeZone: 'UTC' })
+      return t('weekly', { weekday, time })
+    }
+    return t(shape.kind, { time })
+  }
+}

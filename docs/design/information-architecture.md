@@ -86,6 +86,7 @@ referenced by id (DDD).
 | Credits, allowance, billing | What a workspace spends and pays | Billing · workspace | `workspace_billing`, `workspace_credit_grants` (`schema.ts:1151-1180`), `hosted_allowances`, `hosted_usage` (drizzle `20261030230000`); `workspace_payment_designations`, `workspace_credit_shares` (team) | Stripe webhook (`lib/billing/service.ts:145`); allowance on verification | 设置 › 用量, 计费 | 设置 › 用量, 计费 |
 | Notifications | Pushes and alerts about runs and chats | Account · account | `user_preferences` switches (`components/settings/notifications-settings.tsx:9`), `mobile_push_tokens.userId` (`schema.ts:1071`) | — | 设置 › 通知 | Web: none; desktop: system notification and Dock badge for 等你 (`platforms.md`); phone: push |
 | Memory | Facts about the person | Account · account | `user_facts.userId` (`schema.ts:664`) | Extracted from chats | 设置 › 记忆与建议 | 设置 › 记忆与建议 |
+| Automation (schedule) | A schedule or manual trigger that hands a Bot a new Task, or a chat reminder, read or snapshot | Schedule · Workspace, run as its creator | `conversation_schedules (owner_id, workspace_id)`, `conversation_schedule_occurrences`; `request_origin='page'` for one made on the page | 自动化 page or a Bot chat (`executeScheduleCommand`) | 自动化 › an automation | 自动化 (hosted sidebar, `?section=automations`) |
 
 Repository and Environment configuration are Workspace resources. A Project can
 bind 0..N repository keys and 0..N reusable environments, including defaults.
@@ -234,6 +235,7 @@ Icon rail
 ├── 看板 → every task of the workspace (看板 / 列表 views), projects and teams; the one entry for tasks (2026-11-13-1405)
 ├── 插件
 ├── Artifact
+├── 自动化 → list, and one automation at `?section=automations&automation=<id>` (decision 2026-11-15-1337)
 └── Account menu → accounts, workspaces and Settings
 Right column beside the chat
 ├── Bot overview → 详情 / 任务 / PR / 电脑

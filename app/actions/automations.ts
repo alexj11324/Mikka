@@ -15,7 +15,7 @@ import type { AutomationHistory, AutomationList, AutomationView } from '@/lib/sc
  * signed-in person in the workspace they have open, with that workspace's Coordinator as the chat that gets the run
  * reports. Who may list, pause, cancel, update, resume and run is the store's rule, unchanged.
  */
-async function command<T>(input: Command): Promise<ActionResult<T>> {
+async function command<T>(input: Command, finish?: (workspaceId: string, result: T) => Promise<T>): Promise<ActionResult<T>> {
   return runAction(async () => {
     // A Bot acting for the person names their message instead (schedule tools); only a person uses this page.
     if (actingContext.getStore()) throw new ActionFailureError('authRequired')
@@ -27,7 +27,8 @@ async function command<T>(input: Command): Promise<ActionResult<T>> {
     const [{ chatBotId }, { executeScheduleCommand }] = await Promise.all([import('@/lib/coordinator/coordinator-bot'), import('@/lib/schedules/runtime')])
     const coordinator = await chatBotId(actor.userId, null, actor.workspaceId, { backfill: false })
     try {
-      return await executeScheduleCommand(actor.userId, coordinator, undefined, input, { direct: true }) as T
+      const result = await executeScheduleCommand(actor.userId, coordinator, undefined, input, { direct: true }) as T
+      return finish ? await finish(actor.workspaceId, result) : result
     } catch (error) {
       if (error instanceof ScheduleError) throw new ActionFailureError(isActionErrorCode(error.code) ? error.code : 'generic', undefined, undefined, { cause: error })
       throw error
@@ -36,19 +37,29 @@ async function command<T>(input: Command): Promise<ActionResult<T>> {
 }
 
 const id = z.uuid()
+
+/** 创建者: each row's creator as the workspace's member list names them (members only read their own workspace). */
+async function withCreators(workspaceId: string, list: AutomationList): Promise<AutomationList> {
+  const owners = [...new Set(list.schedules.map(row => row.owner_id))]
+  if (!owners.length) return list
+  const { workspacePool } = await import('@/lib/workspace-db')
+  const { rows } = await workspacePool.query<{ userId: string; name: string }>('SELECT "userId",name FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=ANY($2::text[])', [workspaceId, owners])
+  const names = new Map(rows.map(row => [row.userId, row.name]))
+  return { ...list, schedules: list.schedules.map(row => ({ ...row, owner_name: names.get(row.owner_id) ?? null })) }
+}
 const versioned = z.object({ scheduleId: z.uuid(), version: z.number().int().positive() }).strict()
 
 /** The workspace's automations, newest first; `cursor` continues a page. */
 export async function listAutomations(input: { cursor?: string } = {}): Promise<ActionResult<AutomationList>> {
   const parsed = scheduleListInput.safeParse({ cursor: input.cursor })
   if (!parsed.success) return { error: 'validationGeneric' }
-  return command({ action: 'list', ...parsed.data })
+  return command<AutomationList>({ action: 'list', ...parsed.data }, withCreators)
 }
 
 /** One automation, or `automation: null` when it is not visible here. */
 export async function getAutomation(scheduleId: string): Promise<ActionResult<{ automation: AutomationView | null }>> {
   if (!id.safeParse(scheduleId).success) return { error: 'validationGeneric' }
-  const result = await command<AutomationList>({ action: 'list', scheduleId })
+  const result = await command<AutomationList>({ action: 'list', scheduleId }, withCreators)
   return 'error' in result && result.error ? result : { automation: (result as AutomationList).schedules[0] ?? null }
 }
 
