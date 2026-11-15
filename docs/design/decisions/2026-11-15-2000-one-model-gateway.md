@@ -2,7 +2,7 @@
 
 - Date: 2026-11-15
 - Source: Alex, 2026-11-15: 「是不是走服务端计费啊，不然用超了怎么办」;「我觉得是不是网关统一起来最好」;「我就是需要支持很多杂牌啊」; chose option B (Mikka gateway + LiteLLM for protocol conversion) over rewriting threads on Mikka's own agent (Capy's way) and over new-api.
-- Status: decided. Not yet implemented.
+- Status: decided. Implemented (branch `claude/sweet-lovelace-yjn2jy`): run-bound gateway tokens, the Anthropic messages and Responses endpoints (`app/api/model-gateway`), per-request metering of Mikka 额度 at list price, key forwarding to the provider or through the LiteLLM sidecar (`deploy/litellm`), runs frozen on Mikka 额度, and custom-endpoint feature switches. Not yet: the thread's out-of-credit card for a 402 from the gateway, the private UI's feature switches, LiteLLM in production.
 - Replaces: for model requests paid by Mikka 额度 or a person's own API key, the "no placeholder/provider forwarding" part of [2026-11-06-1800](2026-11-06-1800-machine-is-the-execution-boundary.md) and the direct API-key delivery to CLIs. Builds on [2026-11-15-1900](2026-11-15-1900-models-on-gateway-like-capy.md).
 
 ## 规则
