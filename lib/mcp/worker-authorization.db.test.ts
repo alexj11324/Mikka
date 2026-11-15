@@ -138,7 +138,7 @@ test('run tokens recheck current task, workspace and execution authority', { ski
   })
   await t.test('the exported MCP HTTP handler rejects a removed member before report writes', async () => {
     const { createServer } = await import('node:http')
-    t.mock.module('@/lib/background', { exports: { afterJob: () => {} } })
+    t.mock.module('@/lib/background', { namedExports: { afterJob: () => {} } })
     const { POST } = await import('../../app/api/mcp/route')
     const run = await fixture()
     const server = createServer(async (incoming, outgoing) => {

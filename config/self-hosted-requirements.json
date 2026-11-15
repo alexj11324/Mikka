@@ -2320,5 +2320,19 @@
     "behavior": "The installation's existing tool definitions supply both native Eve discovery and application action execution, preserving the configured Bot capability selection.",
     "test": "lib/agent-kit/tool-defaults-compat.test.ts",
     "suite": "test:agent-kit-model"
+  },
+  "drizzle/20261115090000_issue_version_run_source.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Persist an authenticated worker task-run ID as issue-version provenance in the installation PostgreSQL database; rows without a verified run remain unlinked.",
+    "test": "lib/mcp/worker-authorization.db.test.ts",
+    "suite": "test:worker-authorization-db"
+  },
+  "lib/mcp/worker.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Authorize worker-scoped issue updates only from a verified task-run identity and retain the exact run ID as version provenance.",
+    "test": "lib/mcp/worker-authorization.db.test.ts",
+    "suite": "test:worker-authorization-db"
   }
 }
