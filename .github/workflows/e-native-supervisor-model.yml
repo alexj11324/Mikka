@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 24
     env:
-      SOURCE: e1da24fc7231f8b6ade6c603c8d0b12916e8a950
+      SOURCE: 30629ee1f18fa70b3713836017b437c22af915ee
     steps:
       - name: Check out the public harness only
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           path: product
-          ref: e1da24fc7231f8b6ade6c603c8d0b12916e8a950
+          ref: 30629ee1f18fa70b3713836017b437c22af915ee
           persist-credentials: false
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
         with:
@@ -38,7 +38,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git -C product rev-parse HEAD)" = "$SOURCE"
-          test "$(git -C product rev-parse 'HEAD^{tree}')" = 5f2e94509b7316de68a9f6edb6f03b238ff8dac5
+          test "$(git -C product rev-parse 'HEAD^{tree}')" = e7c4c9fb3a72be9b06993a4ec244c5b25a1c3b26
           cd product
           pnpm install --frozen-lockfile
           cd ../harness/evidence/2257/local-provider
@@ -219,6 +219,20 @@ jobs:
            note('member denied, owner manual title survives replay',{denied,kept})
            const regen=await titleRpc(ownerCookie,'regenerateConversationTitle',[runId]);assert.equal(regen.regenerated,true)
            const regenerated=await snapshot('explicit authenticated owner regeneration persisted',3);assert.equal(regenerated.title,regen.title)
+           const migration=readFileSync(join(process.cwd(),'drizzle/20261115054737_run_observed_model.sql'),'utf8')
+           const beforeReplay=(await independent.query('SELECT "observedModel",status,report,title FROM agent_runs WHERE id=$1',[runId])).rows[0]
+           const transaction=await independent.connect()
+           try {
+            await transaction.query('BEGIN')
+            await transaction.query(migration)
+            await transaction.query(migration)
+            const afterReplay=(await transaction.query('SELECT "observedModel",status,report,title FROM agent_runs WHERE id=$1',[runId])).rows[0]
+            assert.deepEqual(afterReplay,beforeReplay)
+            const schema=(await transaction.query("SELECT character_maximum_length,is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='agent_runs' AND column_name='observedModel'")).rows[0]
+            assert.deepEqual(schema,{character_maximum_length:500,is_nullable:'YES'})
+            await transaction.query('COMMIT')
+            note('two additive migration replays preserve the completed Agent output, actual served model and regenerated title',{schema,servedModel:afterReplay.observedModel,unchanged:true})
+           }catch(e){await transaction.query('ROLLBACK');throw e}finally{transaction.release()}
            const terminalRead=await readComposer(ownerCookie);assert.deepEqual(terminalRead,readOwner);note('observed model survives canonical terminal completion and later reread',{model:terminalRead.model})
            trace.success=true;persist()
           } catch(e){trace.failure={name:e.name,message:String(e.message).replaceAll(process.env.E_LOOPBACK_KEY!,'[redacted]').slice(0,750),location:String(e.stack).split('\n').slice(1,4).join('\n')};persist();process.exitCode=1}
@@ -257,7 +271,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: codex-supervisor-pg-e1da24fc
+          name: codex-supervisor-pg-30629ee1
           path: |
             ${{ runner.temp }}/receipt/title-lifecycle.json
             ${{ runner.temp }}/receipt/inference.jsonl
