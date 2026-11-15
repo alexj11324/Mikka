@@ -45,7 +45,7 @@ export const botKeys = {
 
 export const settingsKeys = {
   issuePrefix: () => 'settings:issue-prefix' as const,
-  conversationTitles: (workspaceId: string | null) => ['settings:conversation-titles', workspaceId ?? ''] as const,
+  threadTitles: (workspaceId: string | null) => ['settings:thread-titles', workspaceId ?? ''] as const,
   preferences: () => 'preferences' as const,
   password: () => 'account:password' as const,
   sessions: () => 'account:sessions' as const,

@@ -9,7 +9,7 @@ const SHORT_TITLE_MODEL = COORDINATOR_MODEL
 const SHORT_TITLE_TIMEOUT_MS = 10_000
 
 /**
- * One bounded short title from the small model, for a conversation (conversation-title-server.ts): the same
+ * One bounded short title from the small model, for a conversation (thread-title-server.ts): the same
  * model, admission, prompt, parsing and limits. Null when the model gives nothing usable. Throws what the model or
  * admission throws; callers decide that a title is never worth failing for.
  */

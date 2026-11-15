@@ -103,7 +103,7 @@ export const issuePrefixes = pgTable('issue_prefixes', {
  * How conversations are named (Capy's "Thread titles"): `userId` '' is the workspace default, a member's row adds their
  * instructions and, unless `triggers` is null, their own choice of when a generated title is written again.
  */
-export const conversationTitleSettings = pgTable('conversation_title_settings', {
+export const threadTitleSettings = pgTable('thread_title_settings', {
   workspaceId: uuid('workspaceId').notNull(),
   userId: text('userId').notNull().default(''),
   instructions: varchar('instructions', { length: 1000 }).notNull().default(''),

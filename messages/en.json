@@ -462,8 +462,8 @@
       "createdBy": "Created by",
       "pullRequestOne": "Pull request",
       "pullRequestMany": "Pull requests",
-      "conversationOne": "Thread",
-      "conversationMany": "Threads"
+      "threadOne": "Thread",
+      "threadMany": "Threads"
     },
     "colors": {
       "violet": "Violet",
@@ -3462,7 +3462,7 @@
       "copyFiles": "Files to copy into the worktree, one per line",
       "approveSetup": "Run this setup when a new worktree starts"
     },
-    "conversationTitles": {
+    "threadTitles": {
       "title": "Thread titles",
       "instructions": "Title instructions",
       "instructionsMine": "How Mikka names the threads you start, on top of the workspace's instructions",
@@ -4756,7 +4756,7 @@
     "errorDetails": "Details",
     "fullInstructions": "View full instructions",
     "hideInstructions": "Hide full instructions",
-    "conversationTitle": {
+    "threadTitle": {
       "rename": "Rename",
       "regenerate": "Regenerate title",
       "label": "Title",

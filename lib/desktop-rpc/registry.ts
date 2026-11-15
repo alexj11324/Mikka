@@ -42,7 +42,7 @@ import * as actions32 from '@/app/actions/user-secrets'
 import * as actions33 from '@/app/actions/workspace'
 import * as actions34 from '@/app/actions/workspace-secrets'
 import * as actions35 from '@/app/actions/workspace-settings'
-import * as actions36 from '@/app/actions/conversation-title-settings'
+import * as actions36 from '@/app/actions/thread-title-settings'
 
 // This literal is the complete callable surface, independent of Next build IDs.
 const functions = {
@@ -140,8 +140,8 @@ const functions = {
   'issue-operations.setIssueDeleted': actions12.setIssueDeleted,
   'issue-prefix.getIssuePrefixState': actions13.getIssuePrefixState,
   'issue-prefix.saveIssuePrefix': actions13.saveIssuePrefix,
-  'conversation-title-settings.getConversationTitleSettings': actions36.getConversationTitleSettings,
-  'conversation-title-settings.saveConversationTitleSettings': actions36.saveConversationTitleSettings,
+  'thread-title-settings.getThreadTitleSettings': actions36.getThreadTitleSettings,
+  'thread-title-settings.saveThreadTitleSettings': actions36.saveThreadTitleSettings,
   'issues.listIssues': actions14.listIssues,
   'issues.pollIssues': actions14.pollIssues,
   'issues.syncIssueList': actions14.syncIssueList,
@@ -229,8 +229,8 @@ const functions = {
   'task-runs.listConversationSidebar': actions26.listConversationSidebar,
   'task-runs.readConversationOrganization': actions26.readConversationOrganization,
   'task-runs.setConversationOrganization': actions26.setConversationOrganization,
-  'task-runs.renameConversation': actions26.renameConversation,
-  'task-runs.regenerateConversationTitle': actions26.regenerateConversationTitle,
+  'task-runs.renameThread': actions26.renameThread,
+  'task-runs.regenerateThreadTitle': actions26.regenerateThreadTitle,
   'team-relations.getIssueTeam': actions27.getIssueTeam,
   'team-relations.setIssueTeam': actions27.setIssueTeam,
   'team-relations.listProjectTeams': actions27.listProjectTeams,

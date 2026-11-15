@@ -134,7 +134,7 @@ test('Task presentation batches keep current tenant authority and one Factory pr
     await t.test('conversation lists and owner changes read workspace authority from the workspace database', async () => {
       const { conversationDirectory, conversationSidebar } = await import('../lib/conversation-directory')
       const { renameStandalone, standaloneOrganization, regenerateStandalone } = await import('../lib/standalone-chat-controls')
-      const { renameConversationTitle } = await import('../lib/conversation-title-server')
+      const { renameThreadTitle } = await import('../lib/thread-title-server')
       const { conversationOrganization } = await import('../lib/conversation-organization')
       const chat = randomUUID(), issue = await makeTask(), run = await makeRun(issue)
       await application.query(`INSERT INTO conversations(id,"workspaceId",kind,title,"createdBy","creationPurpose")
@@ -147,14 +147,14 @@ test('Task presentation batches keep current tenant authority and one Factory pr
       assert.ok(own.statements.some(row => row.database === workspaceName && row.sql.includes('mikka_workspace_members')))
       assert.ok(!own.statements.some(row => row.database === appName && row.sql.includes('mikka_workspace_members')))
       await conversationSidebar(application, owner, shared)
-      assert.equal(await renameConversationTitle(application, run, owner, 'Split run', shared), 'Split run')
+      assert.equal(await renameThreadTitle(application, run, owner, 'Split run', shared), 'Split run')
       assert.deepEqual(await conversationOrganization(application, owner, shared, run, { field: 'pinned', value: true }), { pinned: true, archived: false })
       assert.deepEqual(await standaloneOrganization(application, chat, owner, shared, { field: 'archived', value: true }), { pinned: false, archived: true })
       assert.equal(await renameStandalone(application, chat, owner, shared, 'Split chat'), 'Split chat')
       for (const [reader, space] of [[peer, shared], [owner, other]]) {
         assert.equal((await list(reader, space)).items.some(row => row.id === chat || row.id === run), false)
         assert.equal(await renameStandalone(application, chat, reader, space, 'Forbidden'), undefined)
-        assert.equal(await renameConversationTitle(application, run, reader, 'Forbidden', space), null)
+        assert.equal(await renameThreadTitle(application, run, reader, 'Forbidden', space), null)
       }
       const memberStatus = (status: string) => workspace.query('UPDATE mikka_workspace_members SET status=$3 WHERE "workspaceId"=$1 AND "userId"=$2', [shared, owner, status])
       try {

@@ -17,7 +17,7 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "The signed-in user reads workspace runs and manages the titles of owned conversations using installation PostgreSQL.",
-    "test": "tests/conversation-title.db.test.ts",
+    "test": "tests/thread-title.db.test.ts",
     "suite": "test:run-publication-db"
   },
   "app/api/conversations/read-state/route.ts": {
@@ -181,7 +181,7 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Serve the existing authorized conversation directory to an authenticated native client using the selected installation workspace.",
-    "test": "tests/conversation-title.db.test.ts",
+    "test": "tests/thread-title.db.test.ts",
     "suite": "test:run-publication-db"
   },
   "app/api/mobile/open/route.ts": {
@@ -540,7 +540,7 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Add nullable, bounded conversation titles and their source to existing runs in the installation database.",
-    "test": "tests/conversation-title.db.test.ts",
+    "test": "tests/thread-title.db.test.ts",
     "suite": "test:run-publication-db"
   },
   "drizzle/20261113164616_thread_read_watermarks.sql": {
@@ -563,7 +563,7 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Add two nullable PostgreSQL timestamps for pinning and archiving. Earlier application revisions can leave both columns in place.",
-    "test": "tests/conversation-title.db.test.ts",
+    "test": "tests/thread-title.db.test.ts",
     "suite": "test:run-publication-db"
   },
   "drizzle/20261113165436_thread_delivery_queue.sql": {
@@ -577,7 +577,7 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Rank only the current member’s authorized conversation roots by Bot, read their per-account idle policy, and preserve manual or automatic archive visibility in installation PostgreSQL.",
-    "test": "tests/conversation-title.db.test.ts",
+    "test": "tests/thread-title.db.test.ts",
     "suite": "test:run-publication-db"
   },
   "drizzle/20261113173501_thread_reply_versions.sql": {
@@ -591,14 +591,14 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Keep owner-created standalone chats in installation PostgreSQL and reopen them only through their active participant and workspace authorization.",
-    "test": "tests/conversation-title.db.test.ts",
+    "test": "tests/thread-title.db.test.ts",
     "suite": "test:run-publication-db"
   },
   "drizzle/20261113193638_standalone_conversation_organization.sql": {
     "mode": "built-in",
     "environment": [],
     "behavior": "Add nullable organization timestamps to independent conversations. Existing rows remain available without backfilling.",
-    "test": "tests/conversation-title.db.test.ts",
+    "test": "tests/thread-title.db.test.ts",
     "suite": "test:run-publication-db"
   },
   "drizzle/20261114061842_allow_exact_skill_sharing_approval.sql": {
@@ -889,21 +889,21 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Search authorized workspace conversations by their own titles, including task-free historical runs. Page by activity after resolving continuation chains in installation PostgreSQL.",
-    "test": "tests/conversation-title.db.test.ts",
+    "test": "tests/thread-title.db.test.ts",
     "suite": "test:run-publication-db"
   },
   "lib/conversation-directory.ts": {
     "mode": "built-in",
     "environment": [],
     "behavior": "Search authorized workspace conversations by their own titles, including task-free historical runs. Page by activity after resolving continuation chains in installation PostgreSQL.",
-    "test": "tests/conversation-title.db.test.ts",
+    "test": "tests/thread-title.db.test.ts",
     "suite": "test:run-publication-db"
   },
   "lib/conversation-organization.ts": {
     "mode": "built-in",
     "environment": [],
     "behavior": "Read and write pin and archive state on the conversation root inside the selected workspace and existing owner boundary. No external services are required.",
-    "test": "tests/conversation-title.db.test.ts",
+    "test": "tests/thread-title.db.test.ts",
     "suite": "test:run-publication-db"
   },
   "lib/conversation-reads-store.ts": {
@@ -913,25 +913,25 @@
     "test": "lib/conversation-reads-store.test.ts",
     "suite": "test:conversation-reads"
   },
-  "lib/conversation-title-schedule.ts": {
+  "lib/thread-title-schedule.ts": {
     "mode": "built-in",
     "environment": [],
     "behavior": "Schedule a title update only after the run event commits to the installation database.",
-    "test": "tests/conversation-title.db.test.ts",
+    "test": "tests/thread-title.db.test.ts",
     "suite": "test:run-publication-db"
   },
-  "lib/conversation-title-server.ts": {
+  "lib/thread-title-server.ts": {
     "mode": "built-in",
     "environment": [],
     "behavior": "Use the user's available default model to name a conversation. Keep its fallback when generation is unavailable and preserve manual titles on automatic triggers.",
-    "test": "tests/conversation-title.db.test.ts",
+    "test": "tests/thread-title.db.test.ts",
     "suite": "test:run-publication-db"
   },
-  "lib/conversation-title.ts": {
+  "lib/thread-title.ts": {
     "mode": "built-in",
     "environment": [],
     "behavior": "Apply the same title limits, generation triggers and manual precedence on every installation.",
-    "test": "lib/conversation-title.test.ts",
+    "test": "lib/thread-title.test.ts",
     "suite": "test:issues"
   },
   "lib/conversation-workspace.ts": {
@@ -1053,7 +1053,7 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Rank only the current member’s authorized conversation roots by Bot, read their per-account idle policy, and preserve manual or automatic archive visibility in installation PostgreSQL.",
-    "test": "tests/conversation-title.db.test.ts",
+    "test": "tests/thread-title.db.test.ts",
     "suite": "test:run-publication-db"
   },
   "lib/db/transaction-boundary.ts": {
@@ -1098,14 +1098,14 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Rank only the current member’s authorized conversation roots by Bot, read their per-account idle policy, and preserve manual or automatic archive visibility in installation PostgreSQL.",
-    "test": "tests/conversation-title.db.test.ts",
+    "test": "tests/thread-title.db.test.ts",
     "suite": "test:run-publication-db"
   },
   "lib/desktop-rpc/schemas.ts": {
     "mode": "built-in",
     "environment": [],
     "behavior": "Rank only the current member’s authorized conversation roots by Bot, read their per-account idle policy, and preserve manual or automatic archive visibility in installation PostgreSQL.",
-    "test": "tests/conversation-title.db.test.ts",
+    "test": "tests/thread-title.db.test.ts",
     "suite": "test:run-publication-db"
   },
   "lib/desktop-rpc/version.ts": {
@@ -1584,7 +1584,7 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Search authorized workspace conversations by their own titles, including task-free historical runs. Page by activity after resolving continuation chains in installation PostgreSQL.",
-    "test": "tests/conversation-title.db.test.ts",
+    "test": "tests/thread-title.db.test.ts",
     "suite": "test:run-publication-db"
   },
   "lib/run-completion-effects.ts": {
@@ -1626,7 +1626,7 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Generate a short title with the installation's existing default-model service when available, retaining the display fallback otherwise.",
-    "test": "tests/conversation-title.db.test.ts",
+    "test": "tests/thread-title.db.test.ts",
     "suite": "test:run-publication-db"
   },
   "lib/short-title.ts": {
@@ -1713,7 +1713,7 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Apply the same title, pin and archive menu to owned independent conversations, rechecking personal membership and the selected workspace on every change. Explicit regeneration uses the existing workspace title provider.",
-    "test": "tests/conversation-title.db.test.ts",
+    "test": "tests/thread-title.db.test.ts",
     "suite": "test:run-publication-db"
   },
   "lib/swr/keys.ts": {

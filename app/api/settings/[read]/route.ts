@@ -18,7 +18,7 @@ import { getModelOrder } from '@/app/actions/model-order'
 import { listBots, listWorkspaceBots } from '@/app/actions/bots'
 import { getApiKeys } from '@/app/actions/model-api-keys'
 import { listEnvironments } from '@/app/actions/environments'
-import { getConversationTitleSettings } from '@/app/actions/conversation-title-settings'
+import { getThreadTitleSettings } from '@/app/actions/thread-title-settings'
 import { auditScopeQuery } from '@/lib/audit/cursor'
 import type { SettingsRead } from '@/lib/settings-read'
 
@@ -54,7 +54,7 @@ const READS: Record<SettingsRead, (query: URLSearchParams) => Promise<unknown>> 
   'api-keys': query => getApiKeys(workspace(query)),
   environments: query => listEnvironments(workspace(query)),
   // Capy's "Thread titles": the workspace's and the reader's own naming settings.
-  'conversation-titles': query => getConversationTitleSettings(workspace(query)),
+  'thread-titles': query => getThreadTitleSettings(workspace(query)),
   audit: query => listAuditLog({ ...auditScopeQuery(query), cursor: query.get('cursor') } as Parameters<typeof listAuditLog>[0], workspace(query)),
 }
 

@@ -25,7 +25,7 @@ import type { useTaskWork } from './issue-threads'
 import { openGroupConversation } from './workspace-navigation'
 import { useActivityEvents, type ActivityEventItem } from './issue-activity-feed'
 import { useActivityDrafts, type DiscussionSave } from './issue-activity'
-import { isConversationRun, threadQuestionView } from '@/lib/issue-threads'
+import { isThreadRun, threadQuestionView } from '@/lib/issue-threads'
 import { presentedFactoryEvents, taskFactoryProgress } from '@/lib/task-factory-events'
 import { runResult, useRunResultLabel } from '@/hooks/use-run-result'
 import { pullLabel } from '@/lib/issue-activity'
@@ -153,7 +153,7 @@ export function FramedTask(props: FramedTaskProps) {
       id: 'chat:' + chat.id, text: chat.title || tDirectory('untitled'), detail: undefined as string | undefined, mark: undefined as ReactNode, open: () => openGroupConversation(chat.id),
     })),
     // Only the task's own conversations: a review or verify runs on its own and is a child conversation inside the one it checks.
-    ...(props.agentActivity.threads ?? []).filter(isConversationRun).flatMap(thread => {
+    ...(props.agentActivity.threads ?? []).filter(isThreadRun).flatMap(thread => {
       if (!thread.detail) return []
       const view = threadQuestionView(thread)
       const run = { status: view.waiting ? 'waiting_input' : view.status, outcome: view.outcome }
@@ -216,7 +216,7 @@ export function FramedTask(props: FramedTaskProps) {
     ...creator ? [{ id: 'createdBy', label: tProperty('createdBy'), value: { text: creator, mark: { kind: 'person', name: creator } } } satisfies TaskDetailRow] : [],
     ...meta.dueDate ? [{ id: 'dueDate', label: tProperty('dueDate'), disabled: locked, onClick: () => props.requestAction('dueDate'), value: { text: formatDateOnly(format, meta.dueDate, { month: 'short', day: 'numeric' }), mark: { kind: 'icon', icon: 'calendar' }, danger: overdue(meta.dueDate, props.status, now) } } satisfies TaskDetailRow] : [],
     ...meta.estimate !== null ? [{ id: 'estimate', label: tProperty('estimate'), disabled: locked, onClick: () => props.requestAction('estimate'), value: { text: tProperty('estimatePoints', { count: meta.estimate }), mark: { kind: 'icon', icon: 'estimate' } } } satisfies TaskDetailRow] : [],
-    ...conversations.length ? [{ id: 'conversations', label: tProperty(conversations.length > 1 ? 'conversationMany' : 'conversationOne'), stacked: true,
+    ...conversations.length ? [{ id: 'conversations', label: tProperty(conversations.length > 1 ? 'threadMany' : 'threadOne'), stacked: true,
       chips: conversations.map(({ id, text, detail, mark, open }) => ({ id, text, ...detail ? { detail } : {}, ...mark ? { mark: { kind: 'node' as const, node: mark } } : {}, menu: [{ id: 'open', label: tFrame('open'), onSelect: open }] })),
     } satisfies TaskDetailRow] : [],
     ...reviewBranch ? [{ id: 'branch', label: tArtifact('branch'), value: { text: reviewBranch } } satisfies TaskDetailRow] : [],

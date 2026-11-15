@@ -1,6 +1,6 @@
 // i18n-ignore-file: model prompt text and its examples, not UI copy.
 // A conversation's short title, as Capy names its threads: a few words that pick the conversation out of a long list.
-// The small model writes it (conversation-title-server.ts through short-title-server.ts). Tasks are not named by a
+// The small model writes it (thread-title-server.ts through short-title-server.ts). Tasks are not named by a
 // model: a task keeps the title a person or an Agent gave it, as Capy's issues do. Pure, and safe in client components.
 
 /** Strict compact-title limits; the stored column holds at most 60 characters. */
@@ -81,7 +81,7 @@ export function parseShortTitle(text: string, cjk: boolean): string | null {
  * is named (decision 2026-11-13-1405): its own stored title; until it has one, the bounded first line of what it was
  * asked; and only when that is empty, its task's title, bounded. A task's own title is not touched by this.
  */
-export function conversationTitle(run: { title?: string | null; name?: string | null; issue?: { title: string } | null }): string {
+export function threadTitle(run: { title?: string | null; name?: string | null; issue?: { title: string } | null }): string {
   for (const own of [run.title, run.name]) {
     const text = own?.replace(/…$/, '').trim()
     if (text) return compactTaskTitle({ title: text })

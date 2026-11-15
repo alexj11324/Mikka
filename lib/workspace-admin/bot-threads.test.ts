@@ -38,7 +38,7 @@ test('href: the thread beside its task for its owner, the task for another membe
 })
 
 test('a stored conversation name is visible only for its owner and a readable linked task', () => {
-  const data = { conversationTitle: 'Chosen title', issueTitle: 'Shared task', prompt: 'Older opening' }
+  const data = { threadTitle: 'Chosen title', issueTitle: 'Shared task', prompt: 'Older opening' }
   assert.equal(botThreadTitle({ ...data, issueVisible: true, startedByViewer: true }), 'Chosen title')
   assert.equal(botThreadTitle({ ...data, issueVisible: true, startedByViewer: false }), 'Shared task')
   assert.equal(botThreadTitle({ ...data, issueVisible: false, startedByViewer: true }), null)

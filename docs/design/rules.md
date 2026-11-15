@@ -90,7 +90,7 @@ source wins in a conflict is in [`README.md`](README.md).
   use the faint accent fill (`--object-chip`), rounded corners and accent
   text at the surrounding text's size and line height. A thread mentioned in
   chat is the conversation's own bounded short title in the link colour
-  (`conversationTitle`, [2026-11-13-1405](decisions/2026-11-13-1405-one-task-status.md)), with no fill, accent or state badge, and
+  (`threadTitle`, [2026-11-13-1405](decisions/2026-11-13-1405-one-task-status.md)), with no fill, accent or state badge, and
   one small Agent mark after it only while the conversation is working,
   waiting or failed; it never repeats the task's code or borrows the task's
   title. A task's
@@ -217,7 +217,7 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   line before an open thread. Nothing else gets a line; sections are
   separated by space. The content column is centred in the main area, up to
   680px wide. As Capy's issue page
-  ([2026-11-14-2330](decisions/2026-11-14-2330-capy-activity-and-conversation-titles.md)),
+  ([2026-11-14-2330](decisions/2026-11-14-2330-capy-activity-and-thread-titles.md)),
   under the title come the code and how long ago, then the properties in one
   column (an icon and label, then the value, ▾ where it opens choices) in
   Capy's order; a property with nothing set is left out and the ⋯ menu sets it.
@@ -230,7 +230,7 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   stays.
 - **R-62** A task page says where the work is and whether you are needed;
   the work itself is elsewhere (as Capy,
-  [2026-11-14-2330](decisions/2026-11-14-2330-capy-activity-and-conversation-titles.md)).
+  [2026-11-14-2330](decisions/2026-11-14-2330-capy-activity-and-thread-titles.md)).
   Its properties list each authorized conversation and PR on its own line: a
   conversation with its Factory stage (实现中, 交给你…) or run result, a PR with
   its title and live state, and + to link one. Stage changes and the Bot's one
@@ -251,7 +251,7 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   Administrators without a content grant see only the separate management and
   usage projection, never a private transcript or title.
 - **R-63** Activity reads as Capy's issue log
-  ([2026-11-14-2330](decisions/2026-11-14-2330-capy-activity-and-conversation-titles.md)):
+  ([2026-11-14-2330](decisions/2026-11-14-2330-capy-activity-and-thread-titles.md)):
   each event is its own quiet line (its icon, one sentence, · how long ago),
   never merged with others. The sentence starts with who: a person's name, the
   conversation an Agent worked in (a chip with that conversation's title), or

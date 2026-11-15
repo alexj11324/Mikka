@@ -5,13 +5,13 @@ import { pool } from '@/lib/db'
 import { defaultModelAvailable } from '@/lib/default-model'
 import { runListChanged } from '@/lib/live/lists'
 import { readRunChain } from '@/lib/run-chain'
-import { conversationTitlePlan, effectiveTitleSettings, manualConversationTitle, READ_CHAIN_TITLE, READ_TITLE_SETTINGS, titleTriggerAllows, WRITE_CONVERSATION_TITLE, type ConversationTitleSettingRow, type ConversationTitleSource, type ConversationTitleTrigger } from './conversation-title'
+import { threadTitlePlan, effectiveTitleSettings, manualThreadTitle, READ_CHAIN_TITLE, READ_TITLE_SETTINGS, titleTriggerAllows, WRITE_THREAD_TITLE, type ThreadTitleSettingRow, type ThreadTitleSource, type ThreadTitleTrigger } from './thread-title'
 
 type Query = { query: (text: string, values?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> }
 type Generate = (ownerId: string, text: { title: string; body: string }, workspaceId: string, naming?: readonly string[]) => Promise<string | null>
 
 /**
- * What the model names a conversation from: only the recorded task range of its prompt (lib/run-bot-name.ts; never
+ * What the model names a thread from: only the recorded task range of its prompt (lib/run-bot-name.ts; never
  * the execution instructions around it), what the run reported, and the title of a PR it delivered. $1 run, $2 owner.
  */
 const READ_RUN = `SELECT r."userId", r."workspaceId", r.title, r."titleSource",
@@ -26,29 +26,29 @@ async function chainOf(database: Query, ownerId: string, runId: string) {
   return chain ? chain.attempts.map(attempt => attempt.runId) : [runId]
 }
 
-async function write(database: Query, ownerId: string, workspaceId: string, runIds: string[], title: string, source: ConversationTitleSource, overManual: boolean, observedManual?: string | null) {
-  const { rows } = await database.query(WRITE_CONVERSATION_TITLE, [title, source, runIds, ownerId, overManual, observedManual !== undefined, observedManual ?? null, workspaceId])
+async function write(database: Query, ownerId: string, workspaceId: string, runIds: string[], title: string, source: ThreadTitleSource, overManual: boolean, observedManual?: string | null) {
+  const { rows } = await database.query(WRITE_THREAD_TITLE, [title, source, runIds, ownerId, overManual, observedManual !== undefined, observedManual ?? null, workspaceId])
   return rows.length > 0
 }
 
 /**
- * Names one conversation for a trigger (conversation-title.ts). Runs after the response, never on a render path; a
- * conversation with no usable prompt, an unavailable model or a refused admission keeps its bounded fallback.
+ * Names one thread for a trigger (thread-title.ts). Runs after the response, never on a render path; a
+ * thread with no usable prompt, an unavailable model or a refused admission keeps its bounded fallback.
  * Returns the title it wrote, or null. `generate` is the shared small-model call (short-title-server.ts).
  */
-export async function nameConversation(database: Query, runId: string, ownerId: string, trigger: ConversationTitleTrigger, generate: Generate): Promise<string | null> {
+export async function nameThread(database: Query, runId: string, ownerId: string, trigger: ThreadTitleTrigger, generate: Generate): Promise<string | null> {
   // Discover only the immutable tenant before reading the prompt or publication.
   const tenant = (await database.query('SELECT "workspaceId" FROM agent_runs WHERE id=$1 AND "userId"=$2', [runId, ownerId])).rows[0]?.workspaceId
   if (typeof tenant !== 'string') return null
   const input = await withConversationWorkspace(ownerId, tenant, async () => {
-    const run = (await database.query(READ_RUN, [runId, ownerId, tenant])).rows[0] as { title: string | null; titleSource: ConversationTitleSource | null; asked: string; summary: string } | undefined
+    const run = (await database.query(READ_RUN, [runId, ownerId, tenant])).rows[0] as { title: string | null; titleSource: ThreadTitleSource | null; asked: string; summary: string } | undefined
     if (!run) return null
     // Capy's "Thread titles" settings: the workspace's and the member's instructions, and when a title is written again.
-    const settings = effectiveTitleSettings((await database.query(READ_TITLE_SETTINGS, [tenant, ownerId])).rows as ConversationTitleSettingRow[], ownerId)
+    const settings = effectiveTitleSettings((await database.query(READ_TITLE_SETTINGS, [tenant, ownerId])).rows as ThreadTitleSettingRow[], ownerId)
     if (!titleTriggerAllows(trigger, settings.triggers)) return null
     const runIds = await chainOf(database, ownerId, runId)
-    const chain = ((await database.query(READ_CHAIN_TITLE, [runIds, ownerId])).rows[0] ?? { title: null, titleSource: null }) as { title: string | null; titleSource: ConversationTitleSource | null }
-    const plan = conversationTitlePlan(trigger, run, chain, runIds.length)
+    const chain = ((await database.query(READ_CHAIN_TITLE, [runIds, ownerId])).rows[0] ?? { title: null, titleSource: null }) as { title: string | null; titleSource: ThreadTitleSource | null }
+    const plan = threadTitlePlan(trigger, run, chain, runIds.length)
     if (plan.do === 'keep') return null
     if (plan.do === 'copy') {
       const changed = await write(database, ownerId, tenant, runIds, plan.title, plan.source, plan.source === 'manual')
@@ -69,21 +69,21 @@ export async function nameConversation(database: Query, runId: string, ownerId: 
   return changed ? title : null
 }
 
-/** The background job behind scheduleConversationTitle. Never throws. */
-export async function writeConversationTitle(runId: string, ownerId: string, trigger: ConversationTitleTrigger): Promise<void> {
+/** The background job behind scheduleThreadTitle. Never throws. */
+export async function writeThreadTitle(runId: string, ownerId: string, trigger: ThreadTitleTrigger): Promise<void> {
   try {
     if (!await defaultModelAvailable(ownerId)) return
     const { generateShortTitle } = await import('./short-title-server')
-    if (await nameConversation(pool, runId, ownerId, trigger, generateShortTitle)) await runListChanged(pool, runId)
+    if (await nameThread(pool, runId, ownerId, trigger, generateShortTitle)) await runListChanged(pool, runId)
   } catch (error) {
     // By name and code only: a failed query's message carries its parameters, which hold the prompt.
-    console.error('Conversation title failed', JSON.stringify(causeFields(error)))
+    console.error('Thread title failed', JSON.stringify(causeFields(error)))
   }
 }
 
-/** A person renames the conversation: every run of it takes the title, and nothing generated replaces it. */
-export async function renameConversationTitle(database: Query, runId: string, ownerId: string, raw: string, workspaceId: string): Promise<string | null> {
-  const title = manualConversationTitle(raw)
+/** A person renames the thread: every run of it takes the title, and nothing generated replaces it. */
+export async function renameThreadTitle(database: Query, runId: string, ownerId: string, raw: string, workspaceId: string): Promise<string | null> {
+  const title = manualThreadTitle(raw)
   if (!title) return null
   return withConversationWorkspace(ownerId, workspaceId, async () => {
     const keys = [runId, ownerId, workspaceId]

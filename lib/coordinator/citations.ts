@@ -3,7 +3,7 @@
 // URLs. The chat shows all of them as source chips: issues and runs looked up
 // for the person when the chat loads, web pages by their link preview.
 
-import { conversationTitle } from '../short-title'
+import { threadTitle } from '../short-title'
 
 import { splitCitations, type CitationPart } from './citation-parts'
 export { splitCitations, type CitationPart, type CitationKind } from './citation-parts'
@@ -61,11 +61,11 @@ export function runThreadName(run: Pick<RunSource, 'issue' | 'name' | 'title'>) 
 
 /**
  * A thread's title wherever it is named: the conversation's one bounded short title (lib/short-title.ts
- * conversationTitle, decision 2026-11-13-1405), never its task's full title and never with the code, which the task's
+ * threadTitle, decision 2026-11-13-1405), never its task's full title and never with the code, which the task's
  * own chip carries.
  */
 export function runTitle(run: Pick<RunSource, 'issue' | 'name' | 'title'>) {
-  return conversationTitle(run)
+  return threadTitle(run)
 }
 
 /**

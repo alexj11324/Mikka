@@ -462,8 +462,8 @@
       "createdBy": "创建者",
       "pullRequestOne": "PR",
       "pullRequestMany": "PR",
-      "conversationOne": "对话",
-      "conversationMany": "对话"
+      "threadOne": "对话",
+      "threadMany": "对话"
     },
     "colors": {
       "violet": "紫色",
@@ -3462,7 +3462,7 @@
       "copyFiles": "复制到工作树的文件，每行一个",
       "approveSetup": "新工作树启动时运行这些准备步骤"
     },
-    "conversationTitles": {
+    "threadTitles": {
       "title": "对话标题",
       "instructions": "标题说明",
       "instructionsMine": "Mikka 给你发起的对话起名时，在工作区说明之外再遵循这些",
@@ -4756,7 +4756,7 @@
     "errorDetails": "详情",
     "fullInstructions": "查看完整指令",
     "hideInstructions": "隐藏完整指令",
-    "conversationTitle": {
+    "threadTitle": {
       "rename": "重命名",
       "regenerate": "重新生成标题",
       "label": "标题",

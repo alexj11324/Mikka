@@ -2242,7 +2242,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "5462d666bfcc1f318f20e5320d938079dec2896f028445a0541fb976150dbc89"
+      "sourceHash": "0ba1e19f017b4f84406bddfb1d32f97a4fcbaa8678b9a419f333475374ca8d34"
     },
     {
       "path": "/mikka/api/skills",

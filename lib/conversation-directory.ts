@@ -10,7 +10,7 @@ import { runBotId } from './run-bot-name'
 import { runChainSql, RUN_CHAIN_MAX_DEPTH, type RunChainQueryable } from './run-chain'
 import { threadName } from './issue-threads'
 import { pullRequestSchema, type IssuePullRequest } from './issue-metadata'
-import { conversationTitle } from './short-title'
+import { threadTitle } from './short-title'
 
 type Row = {
   kind: 'run' | 'chat'; pulls: unknown[]
@@ -122,7 +122,7 @@ export async function effectiveConversationArchive(database: RunChainQueryable, 
 }
 
 function item(row: Row) {
-  return { pulls: row.pulls.flatMap((raw): IssuePullRequest[] => { const parsed = pullRequestSchema.safeParse(raw); return parsed.success ? [parsed.data] : [] }), taskTitle: row.taskTitle, kind: row.kind, id: row.id, issueId: row.issueId, identifier: row.identifier, title: row.kind === 'chat' ? row.title ?? '' : conversationTitle({ title: row.title,
+  return { pulls: row.pulls.flatMap((raw): IssuePullRequest[] => { const parsed = pullRequestSchema.safeParse(raw); return parsed.success ? [parsed.data] : [] }), taskTitle: row.taskTitle, kind: row.kind, id: row.id, issueId: row.issueId, identifier: row.identifier, title: row.kind === 'chat' ? row.title ?? '' : threadTitle({ title: row.title,
     name: threadName(row.asked, ''), issue: { title: row.taskTitle || row.agentName } }), state: row.state, unread:row.unread, at: row.at, pinned: row.pinned }
 }
 
