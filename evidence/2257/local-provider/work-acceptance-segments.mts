@@ -5,8 +5,8 @@ import { appendFileSync,mkdirSync,readFileSync,writeFileSync } from 'node:fs'
 import { serve } from 'srvx/node'
 import { join } from 'node:path'
 import { Pool } from 'pg'
-import { ACTIVE_TURN_STEER_HEADER,SOURCE_DAEMON_VERSION } from '@mikka/protocol/device'
-import {MODEL_CREDENTIAL_HEADER,REPO_ORIGIN_HEADER,RUN_CREDENTIALS_HEADER} from '@mikka/protocol/device'
+import { SOURCE_DAEMON_VERSION } from '@mikka/protocol/device'
+import {MODEL_CREDENTIAL_HEADER,REPO_ORIGIN_HEADER} from '@mikka/protocol/device'
 import {DAEMON_PROTOCOL_VERSION} from '@mikka/protocol/daemon'
 import { CLIENT_VERSION_HEADER } from '@mikka/protocol/version'
 import { normalizeRepository } from '@mikka/protocol/repository'
@@ -77,7 +77,7 @@ try {
  const token=await issueDeviceToken(owner,'Synthetic acceptance')
  const dcall=async(path:string,method='GET',payload?:unknown,expected=200)=>{
   note('device REST request',{method,path:path.split('?')[0]})
-  const res=await fetch(origin+'/mikka/v1/'+path,{method,headers:{authorization:'Bearer '+token,[CLIENT_VERSION_HEADER]:SOURCE_DAEMON_VERSION,[ACTIVE_TURN_STEER_HEADER]:'1',[MODEL_CREDENTIAL_HEADER]:'1',[REPO_ORIGIN_HEADER]:'1','content-type':'application/json'},...(payload===undefined?{}:{body:JSON.stringify(payload)})})
+  const res=await fetch(origin+'/mikka/v1/'+path,{method,headers:{authorization:'Bearer '+token,[CLIENT_VERSION_HEADER]:SOURCE_DAEMON_VERSION,[MODEL_CREDENTIAL_HEADER]:'1',[REPO_ORIGIN_HEADER]:'1','content-type':'application/json'},...(payload===undefined?{}:{body:JSON.stringify(payload)})})
   note('device REST response',{method,path:path.split('?')[0],status:res.status})
   if(res.status!==expected){const fail=await res.json().catch(()=>({}));throw Error(method+' '+path+' '+res.status+' '+String(fail.code??fail.error??''))}
   return expected===204?null:res.json()
