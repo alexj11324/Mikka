@@ -15,9 +15,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: capy-final-main-91def58f
-            source: 91def58f89dd8ca22be8c09fa217e58d555cd12b
-            tree: 0711ce51993a0eb4533abbbd3e6cc4e6faf829dd
+          - label: capy-merged-main-a6009e48
+            source: a6009e48494d308e627c7fe31be7fe7d97fb8017
+            tree: a0cde31341a9950370ab435d8829c18ad0e3671d
     env:
       SOURCE: ${{ matrix.source }}
       SOURCE_TREE: ${{ matrix.tree }}
