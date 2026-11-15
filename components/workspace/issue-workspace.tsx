@@ -36,6 +36,7 @@ import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'
 import { GlobalSearch, SearchPill } from '@/components/nav/global-search'
 import { ConversationDirectory } from './conversation-directory'
 import { ContextPanel } from '@/components/nav/context-panel'
+import { ConversationReferenceTitles, conversationReferenceTitles } from './conversation-reference-titles'
 import { GroupPanel } from '@/components/nav/group-panel'
 import { ConversationPillButton } from '@/components/nav/conversation-pill'
 import { GroupPillAvatar } from '@/components/nav/group-avatar'
@@ -616,7 +617,8 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const resolvingBot = section === 'coordinator' && !!activeBotId && activeBotId !== coordinatorBot?.id && !activeBot
   const activeChat: ChatTarget | null = resolvingBot ? null : section === 'coordinator' ? activeBot ? { kind: 'bot', botId: activeBot.id } : { kind: 'coordinator' } : section === 'agent' ? { kind: 'agent', sessionId: activeAgentId } : section === 'group' && groupRequest ? { kind: 'group', ...groupRequest } : null
   // The same rows as the bot list, for a frame that draws its own navigation (RailProps.chats).
-  const { entries: chatNav, reloadGroups } = useChatNav({ bots, workspaceId: workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null, active: activeChat, userId: user.id, threads, issues: tasks, presentations: presentation.items })
+  const { entries: chatNav, reloadGroups, referenceGroups } = useChatNav({ bots, workspaceId: workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null, active: activeChat, userId: user.id, threads, issues: tasks, presentations: presentation.items })
+  const referenceTitles = useMemo(() => conversationReferenceTitles(user.id, listWorkspaceId, threadsError ? undefined : threadList, referenceGroups), [user.id, listWorkspaceId, threadList, threadsError, referenceGroups])
   const beforeChange = (action: () => Promise<void>) => { if (!boardBusy && !leaving.current) void leave(action) }
   const openSettings = (href = '/settings') => { if (!boardBusy && !leaving.current) void leave(() => { if (!pushSettingsHistory(href)) router.push(href) }) }
   // Names for group messages, only from the member list already loaded for that same workspace.
@@ -788,7 +790,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   // A UI layer with its own settings frame (docs/ui-overlay.md) draws settings in it;
   // the default keeps the workspace frame mounted around settings (#1603).
   // Both visual frames share the workspace's pending notes and computer registry.
-  return <TaskPresentationsContext value={visiblePresentations}><TaskCardDataProvider key={JSON.stringify([user.id, listWorkspaceId])} ownerId={user.id} workspaceId={listWorkspaceId}><SignOutBoundary pending={signingOut}><EmbeddedTaskLifecycle value={embeddedLifecycle}><ComputerAgentsProvider><BrowserNotesProvider>{settingsShown && ownSettingsFrame
+  return <ConversationReferenceTitles value={referenceTitles}><TaskPresentationsContext value={visiblePresentations}><TaskCardDataProvider key={JSON.stringify([user.id, listWorkspaceId])} ownerId={user.id} workspaceId={listWorkspaceId}><SignOutBoundary pending={signingOut}><EmbeddedTaskLifecycle value={embeddedLifecycle}><ComputerAgentsProvider><BrowserNotesProvider>{settingsShown && ownSettingsFrame
     ? <SettingsFrame user={user} onRail={leaveSettings} onBack={backFromSettings} onSearch={searchFromBar} onBrowser={browserFromSettings} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>{settingsContent}</SettingsFrame>
     : <AppFrame settings={settingsShown}
     bar={FRAME_OWNS_HEADER ? <WindowBar center={null} /> : <WindowBar center={<SearchPill onSearch={searchFromBar} />} trailing={<>{!settingsShown && (isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}{!settingsShown && <AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} pending={tasksPending} onToggle={() => toggleAllThreads(!threadsView)} />}<BrowserToggle open={!settingsShown && browserShown && !threadsView} onToggle={settingsShown ? browserFromSettings : () => { if (threadsView) { toggleAllThreads(false); showBrowser('column') } else showBrowser(rightTaken ? 'closed' : 'column') }} /></>} />}
@@ -847,5 +849,5 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     {artifactId && <ArtifactWindow artifactId={artifactId} />}
     </>}
     {dialogs}
-  </AppFrame>}</BrowserNotesProvider></ComputerAgentsProvider></EmbeddedTaskLifecycle></SignOutBoundary></TaskCardDataProvider></TaskPresentationsContext>
+  </AppFrame>}</BrowserNotesProvider></ComputerAgentsProvider></EmbeddedTaskLifecycle></SignOutBoundary></TaskCardDataProvider></TaskPresentationsContext></ConversationReferenceTitles>
 }

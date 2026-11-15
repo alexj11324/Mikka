@@ -9,6 +9,7 @@ import { useLiveKey } from '@/hooks/use-live-key'
 import { pullRequestsState } from '@/lib/directory-pulls'
 import { listConversationSidebar } from '@/app/actions/task-runs'
 import type { Thread } from '@/app/actions/task-runs'
+import type { GroupSummary } from '@/lib/group-messages'
 import type { listIssues } from '@/app/actions/issues'
 import type { TaskPresentation } from '@/lib/task-presentation'
 import { CachedGroupAvatar } from './group-avatar'
@@ -30,12 +31,12 @@ function useChatRows({ bots, workspaceId, userId }: { bots: BotView[]; workspace
   const { data: chatList } = useLiveBotChatList(userId)
   const chats = chatList?.items ?? {}
   // Group chats sit among the bots (R-01), ordered by their latest message.
-  const { data: groups = [], mutate: reloadGroups } = useLiveGroupList(userId, workspaceId)
+  const { data: groups = [], error: groupsError, mutate: reloadGroups } = useLiveGroupList(userId, workspaceId)
   // The Coordinator's bot row is the entry pinned on top; the rest are the person's other bots.
   const rows = [...bots.filter(bot => !bot.coordinator).map(bot => ({ kind: 'bot' as const, bot, at: chats[bot.id]?.at ?? '' })), ...groups.filter(group => group.creationPurpose !== 'conversation').map(group => ({ kind: 'group' as const, group, at: group.lastMessage?.createdAt ?? group.createdAt }))]
     .sort((a, b) => b.at.localeCompare(a.at) || (a.kind === 'bot' ? a.bot.name : a.group.title).localeCompare(b.kind === 'bot' ? b.bot.name : b.group.title))
   const unreadCount = (id: string) => chats[id]?.unreadCount ?? 0
-  return { reloadGroups, rows, unreadCount }
+  return { reloadGroups, rows, unreadCount, referenceGroups: groupsError ? [] : groups }
 
 }
 
@@ -43,9 +44,9 @@ function useChatRows({ bots, workspaceId, userId }: { bots: BotView[]; workspace
 export type ChatNavEntry = { id: string; kind: 'coordinator' | 'bot' | 'group'; name: string; unread: boolean; unreadCount?: number; current: boolean; target: ChatTarget; avatar: ReactNode; work?: BotWorkTask[]; moreBotId?: string }
 
 /** The bot list's rows as data: what the hosted App Shell lists under Bots and 群聊, with the same unread dots. */
-export function useChatNav({ bots, workspaceId, active, userId, presentations }: { bots: BotView[]; workspaceId: string | null; active: ChatTarget | null; userId: string; threads?: Thread[]; issues?: Issue[]; presentations: Readonly<Record<string, TaskPresentation>> }): { entries: ChatNavEntry[]; reloadGroups: () => Promise<unknown> } {
+export function useChatNav({ bots, workspaceId, active, userId, presentations }: { bots: BotView[]; workspaceId: string | null; active: ChatTarget | null; userId: string; threads?: Thread[]; issues?: Issue[]; presentations: Readonly<Record<string, TaskPresentation>> }): { entries: ChatNavEntry[]; reloadGroups: () => Promise<unknown>; referenceGroups: GroupSummary[] } {
   const i18nText = useTranslations()
-  const { rows, unreadCount, reloadGroups } = useChatRows({ bots, workspaceId, active, userId })
+  const { rows, unreadCount, reloadGroups, referenceGroups } = useChatRows({ bots, workspaceId, active, userId })
   const coordinatorId = bots.find(bot => bot.coordinator)?.id
   const sidebarKey = workspaceId ? ['conversation-sidebar',userId,workspaceId] : null
   const {data: sidebar} = useSWR(sidebarKey, () => listConversationSidebar(), {revalidateOnFocus:false})
@@ -75,5 +76,5 @@ export function useChatNav({ bots, workspaceId, active, userId, presentations }:
   const entries = [coordinator, ...rows.map((row): ChatNavEntry => row.kind === 'group'
     ? { id: row.group.id, kind: 'group', name: row.group.title || i18nText('Nav.untitledConversation'), unread: Boolean(Number(row.group.unreadCount) || row.group.markedUnread), unreadCount: Number(row.group.unreadCount) || Number(Boolean(row.group.markedUnread)), current: active?.kind === 'group' && active.id === row.group.id, target: { kind: 'group', id: row.group.id, title: row.group.title, workspaceId: row.group.workspaceId }, avatar: <CachedGroupAvatar id={row.group.id} title={row.group.title || i18nText('Nav.untitledConversation')} /> }
     : { id: row.bot.id, kind: 'bot', name: row.bot.name, ...botUnread(row.bot.id), current: active?.kind === 'bot' && active.botId === row.bot.id, target: { kind: 'bot', botId: row.bot.id }, avatar: <BotAvatar id={row.bot.id} color={row.bot.color} shape={row.bot.shape} size="row" still />, ...workFor(row.bot.id) })]
-  return { entries, reloadGroups }
+  return { entries, reloadGroups, referenceGroups }
 }
