@@ -1,4 +1,4 @@
-name: E Capy Task Work human acceptance and verified Bot comments
+name: E Factory native producer and actual independent reviewer
 on:
   push:
     branches: [evidence/2254-sidebar-85dfc396]
@@ -15,7 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: capy-merged-main-a6009e48
+          - label: actual-independent-review-a6009e48
             source: a6009e48494d308e627c7fe31be7fe7d97fb8017
             tree: a0cde31341a9950370ab435d8829c18ad0e3671d
     env:
@@ -54,7 +54,7 @@ jobs:
           mkdir -m 700 "$RUNNER_TEMP/model-fixture" "$RUNNER_TEMP/isolated-home" "$RUNNER_TEMP/receipt"
           python prepare-claude.py "$GITHUB_WORKSPACE/product" "$RUNNER_TEMP/model-fixture"
           mkdir -p "$GITHUB_WORKSPACE/product/.cache/e-codex-actual"
-          cp work-acceptance-segments.mts observe-queue.mts "$GITHUB_WORKSPACE/product/.cache/e-codex-actual/"
+          cp work-independent-review.mts observe-queue.mts "$GITHUB_WORKSPACE/product/.cache/e-codex-actual/"
           if [ ! -x /usr/lib/postgresql/17/bin/initdb ]; then
             . /etc/os-release
             curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o "$RUNNER_TEMP/pgdg-signing.asc"
@@ -76,13 +76,13 @@ jobs:
             ip link set lo up
             test "$(ls /sys/class/net)" = lo || test "$(ip -o link show | wc -l)" = 1
             test -z "$(ip route show default)"
-            exec setpriv --reuid="$1" --regid="$2" --clear-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs env -i PATH="$3" HOME="$4" bash "$5/pg-work-segments.sh" "$5" "$6" "$7/receipt" "$7/model-fixture/claude" "$7/model-fixture/model.gguf"
+            exec setpriv --reuid="$1" --regid="$2" --clear-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs env -i PATH="$3" HOME="$4" bash "$5/pg-independent-review.sh" "$5" "$6" "$7/receipt" "$7/model-fixture/claude" "$7/model-fixture/model.gguf"
           ' isolated "$worker_uid" "$worker_gid" "$PATH" "$RUNNER_TEMP/isolated-home" "$harness" "$src" "$RUNNER_TEMP"
       - name: Retain only the sanitized source, model and event receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: ${{ matrix.label }}-human-acceptance-stage-provenance
+          name: ${{ matrix.label }}-actual-report-reviewer
           path: |
             ${{ runner.temp }}/receipt/*-trial.json
             ${{ runner.temp }}/receipt/cleanup-*.jsonl
