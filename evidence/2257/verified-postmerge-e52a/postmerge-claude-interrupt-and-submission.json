@@ -1,0 +1,491 @@
+{
+  "source": "e52a959ea214f33e95ed724fc440fafe5fe59cc7",
+  "sourceTree": "b5dbe97e36949bb61116c2315eaebe40afe70453",
+  "originalJob": {
+    "run": 43678340278,
+    "job": 132703309526,
+    "artifact": 14147645889,
+    "data": {
+      "sha256": "b60de17f0aa3567c0f32ac169fdab28fc07272294628db8bd0848238add60e23",
+      "size": 9991,
+      "start": "2026-11-15T04:49:43Z",
+      "end": "2026-11-15T04:50:39Z",
+      "exit": 1,
+      "trials": {
+        "interrupt": {
+          "passed": true,
+          "runId": "541ffe6d-f66f-4ad6-b872-48b010f60cfd",
+          "deviceId": "31a4559c-1157-4690-b3d8-9a0536ccdcc6",
+          "cli": "2.1.309 (Claude Code)",
+          "cliSha256": "4d704a8aecbe038affa3000f498ae17c1b4f753add8facb8764120affc99b658",
+          "model": "SmolLM2-135M-Instruct-Q4_K_M",
+          "weightsSha256": "2e8040ceae7815abe0dcb3540b9995eaa1fa0d2ca9e797d0a635ae4433c68c2d",
+          "failure": null,
+          "stages": [
+            {
+              "stage": "isolated migrated PostgreSQL",
+              "at": "2026-11-15T04:49:44.791Z",
+              "version": "170012"
+            },
+            {
+              "stage": "canonical admission",
+              "at": "2026-11-15T04:49:47.738Z",
+              "issueId": "d83edec7-2a53-4fae-b751-4952e9e2a73a",
+              "workspaceId": "4da757fa-17f7-4031-a9a9-415842d95c17"
+            },
+            {
+              "stage": "owner queued; replay returned same receipt; separate queue cancelled; member denied",
+              "at": "2026-11-15T04:49:49.697Z",
+              "messageId": "254453e8-2941-5833-97e3-16eb6bc9c5cb",
+              "denied": "runNotFound",
+              "waiting": {
+                "id": "254453e8-2941-5833-97e3-16eb6bc9c5cb",
+                "status": "queued",
+                "sentRunId": null,
+                "claimMode": null,
+                "requestedRunId": "541ffe6d-f66f-4ad6-b872-48b010f60cfd"
+              }
+            },
+            {
+              "stage": "device reported real native thread",
+              "at": "2026-11-15T04:49:49.846Z",
+              "thread": "5c7e278f-80a4-4c4d-a359-45a3b14e7df1",
+              "reportedModel": null
+            },
+            {
+              "stage": "actual product allowed modes and unsupported direct steer denial",
+              "at": "2026-11-15T04:49:49.903Z",
+              "modes": [
+                "queue",
+                "interrupt"
+              ],
+              "denied": "threadDeliveryUnavailable"
+            },
+            {
+              "stage": "explicit replacement atomically failed old pending input before device acknowledged",
+              "at": "2026-11-15T04:49:51.007Z",
+              "heldBeforeStop": {
+                "id": "254453e8-2941-5833-97e3-16eb6bc9c5cb",
+                "status": "failed",
+                "sentRunId": null,
+                "claimMode": null,
+                "requestedRunId": "541ffe6d-f66f-4ad6-b872-48b010f60cfd"
+              }
+            },
+            {
+              "stage": "owner interrupt RPC committed new request epoch and bound stop; member denied, owner replay idempotent",
+              "at": "2026-11-15T04:49:51.016Z",
+              "previous": {
+                "id": "938e4f00-92f6-40dd-8ac9-de2f51058770",
+                "attemptId": "5eb6e328-c7f5-4371-aa30-377857b8bb49",
+                "sourceEventId": "d77933e5-f433-5686-8642-8995cfd09b8e",
+                "status": "running"
+              },
+              "next": {
+                "id": "938e4f00-92f6-40dd-8ac9-de2f51058770",
+                "attemptId": "e8f8b62d-6232-4d2e-92d5-dac61d608aea",
+                "sourceEventId": "0a851705-9286-5056-84f1-990563838beb",
+                "status": "pending"
+              },
+              "old": {
+                "status": "cancelled",
+                "stopRequestedAt": "2026-11-15T04:49:50.911Z",
+                "superseded": "0a851705-9286-5056-84f1-990563838beb"
+              },
+              "denied": "runNotFound"
+            },
+            {
+              "stage": "terminal cancelled attempt held the queued message and created no unauthorized continuation",
+              "at": "2026-11-15T04:49:51.926Z",
+              "held": {
+                "id": "254453e8-2941-5833-97e3-16eb6bc9c5cb",
+                "status": "failed",
+                "sentRunId": null,
+                "claimMode": null,
+                "requestedRunId": "541ffe6d-f66f-4ad6-b872-48b010f60cfd"
+              }
+            },
+            {
+              "stage": "new authorized replacement ran its revised prompt and left earlier queued text visible without delivery",
+              "at": "2026-11-15T04:49:53.512Z",
+              "replacementId": "cb1edaeb-6a90-4ff9-af1e-c03e80eda3dc",
+              "model": "SmolLM2-135M-Instruct-Q4_K_M",
+              "output": "A ripe banana is a bright yellow color.",
+              "session": "86f6835d-a14e-4cd3-bcba-3ec6b531eb44",
+              "old": {
+                "id": "254453e8-2941-5833-97e3-16eb6bc9c5cb",
+                "status": "failed",
+                "sentRunId": null,
+                "claimMode": null,
+                "requestedRunId": "541ffe6d-f66f-4ad6-b872-48b010f60cfd"
+              },
+              "new": {
+                "id": "e8b4bd3a-12ae-5f4a-b2f0-dd590a6b2d24",
+                "status": "failed",
+                "sentRunId": null,
+                "claimMode": null,
+                "requestedRunId": "cb1edaeb-6a90-4ff9-af1e-c03e80eda3dc"
+              }
+            },
+            {
+              "stage": "actual CPU result and completion persisted; event replay deduplicated",
+              "at": "2026-11-15T04:49:53.513Z",
+              "model": null,
+              "mode": "interrupt",
+              "modelText": "",
+              "terminal": {
+                "type": "exit",
+                "outcome": "cancelled"
+              },
+              "chunks": 0,
+              "durable": {
+                "status": "cancelled",
+                "stopReason": "cancelled",
+                "finishedAt": "2026-11-15T04:49:51.789Z",
+                "sessionId": "5c7e278f-80a4-4c4d-a359-45a3b14e7df1",
+                "summary": null
+              },
+              "ownerMessageCopies": 0,
+              "cancelledQueue": "cancelled"
+            }
+          ]
+        },
+        "submitted": {
+          "passed": false,
+          "runId": "8b1b2ae1-1534-4494-9a02-58396709090a",
+          "deviceId": "d38851b3-12d5-4787-93e3-4161bfdda15b",
+          "cli": "2.1.309 (Claude Code)",
+          "cliSha256": "4d704a8aecbe038affa3000f498ae17c1b4f753add8facb8764120affc99b658",
+          "model": "SmolLM2-135M-Instruct-Q4_K_M",
+          "weightsSha256": "2e8040ceae7815abe0dcb3540b9995eaa1fa0d2ca9e797d0a635ae4433c68c2d",
+          "failure": {
+            "name": "AssertionError",
+            "message": "Expected values to be strictly equal:\n+ actual - expected\n\n+ undefined\n- 'submitted'\n",
+            "location": "+ actual - expected\n\n+ undefined\n- 'submitted'"
+          },
+          "stages": [
+            {
+              "stage": "isolated migrated PostgreSQL",
+              "at": "2026-11-15T04:50:14.859Z",
+              "version": "170012"
+            },
+            {
+              "stage": "canonical admission",
+              "at": "2026-11-15T04:50:16.438Z",
+              "issueId": "cb8f2aee-945f-426b-8b88-55edc1898b44",
+              "workspaceId": "0ef93a68-f7fe-4763-bce6-968ffa991db0"
+            },
+            {
+              "stage": "owner queued; replay returned same receipt; separate queue cancelled; member denied",
+              "at": "2026-11-15T04:50:17.848Z",
+              "messageId": "f8204053-b207-5aff-9997-40d2452b25d4",
+              "denied": "runNotFound",
+              "waiting": {
+                "id": "f8204053-b207-5aff-9997-40d2452b25d4",
+                "status": "queued",
+                "sentRunId": null,
+                "claimMode": null,
+                "requestedRunId": "8b1b2ae1-1534-4494-9a02-58396709090a"
+              }
+            },
+            {
+              "stage": "device reported real native thread",
+              "at": "2026-11-15T04:50:17.956Z",
+              "thread": "b39b7876-d32e-46ef-88da-1c6a58ab62db",
+              "reportedModel": null
+            },
+            {
+              "stage": "actual product allowed modes and unsupported direct steer denial",
+              "at": "2026-11-15T04:50:18.006Z",
+              "modes": [
+                "queue"
+              ],
+              "denied": "threadDeliveryUnavailable"
+            }
+          ]
+        }
+      },
+      "realToolSearchSelectionReturned": false,
+      "toolRowCount": 6,
+      "reportedSubmit": false
+    }
+  },
+  "correctedJob": {
+    "run": 43678896569,
+    "job": 132705001494,
+    "artifact": 14147925622,
+    "data": {
+      "sha256": "651e030387cab8ba7f4164c7f672b346870c995fc8e644fd6e541cfe1517f4c5",
+      "size": 14289,
+      "start": "2026-11-15T04:58:05Z",
+      "end": "2026-11-15T04:59:07Z",
+      "exit": 0,
+      "trials": {
+        "interrupt": {
+          "passed": true,
+          "runId": "17a6fbae-8225-4fe2-98bd-2f8fa8d306dd",
+          "deviceId": "401d975b-8417-4b9d-8c3a-55c2443fb470",
+          "cli": "2.1.309 (Claude Code)",
+          "cliSha256": "4d704a8aecbe038affa3000f498ae17c1b4f753add8facb8764120affc99b658",
+          "model": "SmolLM2-135M-Instruct-Q4_K_M",
+          "weightsSha256": "2e8040ceae7815abe0dcb3540b9995eaa1fa0d2ca9e797d0a635ae4433c68c2d",
+          "failure": null,
+          "stages": [
+            {
+              "stage": "isolated migrated PostgreSQL",
+              "at": "2026-11-15T04:58:06.882Z",
+              "version": "170012"
+            },
+            {
+              "stage": "canonical admission",
+              "at": "2026-11-15T04:58:09.843Z",
+              "issueId": "b21c38ba-ac0a-4efe-82a5-b211e1b817e1",
+              "workspaceId": "4df805b8-fea9-4dc0-b89b-33fb6470acc5"
+            },
+            {
+              "stage": "owner queued; replay returned same receipt; separate queue cancelled; member denied",
+              "at": "2026-11-15T04:58:11.790Z",
+              "messageId": "75fa0753-eb49-508e-b972-ff8a8e8aba7c",
+              "denied": "runNotFound",
+              "waiting": {
+                "id": "75fa0753-eb49-508e-b972-ff8a8e8aba7c",
+                "status": "queued",
+                "sentRunId": null,
+                "claimMode": null,
+                "requestedRunId": "17a6fbae-8225-4fe2-98bd-2f8fa8d306dd"
+              }
+            },
+            {
+              "stage": "device reported real native thread",
+              "at": "2026-11-15T04:58:11.933Z",
+              "thread": "3d17e598-a893-4bee-8125-bb03e111ba5a",
+              "reportedModel": null
+            },
+            {
+              "stage": "actual product allowed modes and unsupported direct steer denial",
+              "at": "2026-11-15T04:58:11.997Z",
+              "modes": [
+                "queue",
+                "interrupt"
+              ],
+              "denied": "threadDeliveryUnavailable"
+            },
+            {
+              "stage": "explicit replacement atomically failed old pending input before device acknowledged",
+              "at": "2026-11-15T04:58:13.113Z",
+              "heldBeforeStop": {
+                "id": "75fa0753-eb49-508e-b972-ff8a8e8aba7c",
+                "status": "failed",
+                "sentRunId": null,
+                "claimMode": null,
+                "requestedRunId": "17a6fbae-8225-4fe2-98bd-2f8fa8d306dd"
+              }
+            },
+            {
+              "stage": "owner interrupt RPC committed new request epoch and bound stop; member denied, owner replay idempotent",
+              "at": "2026-11-15T04:58:13.123Z",
+              "previous": {
+                "id": "acc0175f-a507-4df4-8661-47de5dae4ca1",
+                "attemptId": "f0910452-8cb7-4645-b6f1-decbe9ca3a6c",
+                "sourceEventId": "93300de0-4078-5cc8-bafe-22cc8532e856",
+                "status": "running"
+              },
+              "next": {
+                "id": "acc0175f-a507-4df4-8661-47de5dae4ca1",
+                "attemptId": "d5494fdc-1d87-4018-91e7-bbe43005a680",
+                "sourceEventId": "1af128bf-fb8c-53cf-a65e-211967edd36f",
+                "status": "pending"
+              },
+              "old": {
+                "status": "cancelled",
+                "stopRequestedAt": "2026-11-15T04:58:13.013Z",
+                "superseded": "1af128bf-fb8c-53cf-a65e-211967edd36f"
+              },
+              "denied": "runNotFound"
+            },
+            {
+              "stage": "terminal cancelled attempt held the queued message and created no unauthorized continuation",
+              "at": "2026-11-15T04:58:13.968Z",
+              "held": {
+                "id": "75fa0753-eb49-508e-b972-ff8a8e8aba7c",
+                "status": "failed",
+                "sentRunId": null,
+                "claimMode": null,
+                "requestedRunId": "17a6fbae-8225-4fe2-98bd-2f8fa8d306dd"
+              }
+            },
+            {
+              "stage": "new authorized replacement ran its revised prompt and left earlier queued text visible without delivery",
+              "at": "2026-11-15T04:58:15.454Z",
+              "replacementId": "085e450c-4894-46b7-beff-2e8d0d8335c3",
+              "model": "SmolLM2-135M-Instruct-Q4_K_M",
+              "output": "A ripe banana is a bright yellow color.",
+              "session": "a411fe1d-93ce-4e9d-84da-a52529898665",
+              "old": {
+                "id": "75fa0753-eb49-508e-b972-ff8a8e8aba7c",
+                "status": "failed",
+                "sentRunId": null,
+                "claimMode": null,
+                "requestedRunId": "17a6fbae-8225-4fe2-98bd-2f8fa8d306dd"
+              },
+              "new": {
+                "id": "e98ee367-4298-5ae9-8a31-40e047a6dc5a",
+                "status": "failed",
+                "sentRunId": null,
+                "claimMode": null,
+                "requestedRunId": "085e450c-4894-46b7-beff-2e8d0d8335c3"
+              }
+            },
+            {
+              "stage": "actual CPU result and completion persisted; event replay deduplicated",
+              "at": "2026-11-15T04:58:15.455Z",
+              "model": null,
+              "mode": "interrupt",
+              "modelText": "",
+              "terminal": {
+                "type": "exit",
+                "outcome": "cancelled"
+              },
+              "chunks": 0,
+              "durable": {
+                "status": "cancelled",
+                "stopReason": "cancelled",
+                "finishedAt": "2026-11-15T04:58:13.835Z",
+                "sessionId": "3d17e598-a893-4bee-8125-bb03e111ba5a",
+                "summary": null
+              },
+              "ownerMessageCopies": 0,
+              "cancelledQueue": "cancelled"
+            }
+          ]
+        },
+        "submitted": {
+          "passed": true,
+          "runId": "3d0b6f46-5daa-4780-9941-d4b8328dc2c9",
+          "deviceId": "6cb6c8fb-28b5-4bf8-9097-4db90e8a320e",
+          "cli": "2.1.309 (Claude Code)",
+          "cliSha256": "4d704a8aecbe038affa3000f498ae17c1b4f753add8facb8764120affc99b658",
+          "model": "SmolLM2-135M-Instruct-Q4_K_M",
+          "weightsSha256": "2e8040ceae7815abe0dcb3540b9995eaa1fa0d2ca9e797d0a635ae4433c68c2d",
+          "failure": null,
+          "stages": [
+            {
+              "stage": "isolated migrated PostgreSQL",
+              "at": "2026-11-15T04:58:36.694Z",
+              "version": "170012"
+            },
+            {
+              "stage": "canonical admission",
+              "at": "2026-11-15T04:58:38.131Z",
+              "issueId": "519a0000-a59b-4c44-97e4-ccecd39ccc71",
+              "workspaceId": "6a8a4c5a-fc39-423c-93b5-bee1f4e75bf3"
+            },
+            {
+              "stage": "owner queued; replay returned same receipt; separate queue cancelled; member denied",
+              "at": "2026-11-15T04:58:39.465Z",
+              "messageId": "2329ce3a-805b-52bb-9cb7-035695edf95e",
+              "denied": "runNotFound",
+              "waiting": {
+                "id": "2329ce3a-805b-52bb-9cb7-035695edf95e",
+                "status": "queued",
+                "sentRunId": null,
+                "claimMode": null,
+                "requestedRunId": "3d0b6f46-5daa-4780-9941-d4b8328dc2c9"
+              }
+            },
+            {
+              "stage": "device reported real native thread",
+              "at": "2026-11-15T04:58:39.576Z",
+              "thread": "154b1e6f-7292-4d12-86f5-bd5f531b7add",
+              "reportedModel": null
+            },
+            {
+              "stage": "actual product allowed modes and unsupported direct steer denial",
+              "at": "2026-11-15T04:58:39.625Z",
+              "modes": [
+                "queue"
+              ],
+              "denied": "threadDeliveryUnavailable"
+            },
+            {
+              "stage": "authentic MCP handoff before completion writer",
+              "at": "2026-11-15T04:58:43.520Z",
+              "submitted": "The sky is clear and blue during the day. The sky is blue during the day. The sky is blue during the day. The sky is blue during the day. A "
+            },
+            {
+              "stage": "automatic queue receipt after actual parent completion",
+              "at": "2026-11-15T04:58:44.358Z",
+              "queued": {
+                "id": "2329ce3a-805b-52bb-9cb7-035695edf95e",
+                "status": "sent",
+                "sentRunId": "911aee20-4ad8-41b3-99f0-5c2f50e98dbd",
+                "claimMode": "afterRun",
+                "requestedRunId": "3d0b6f46-5daa-4780-9941-d4b8328dc2c9"
+              },
+              "stored": {
+                "status": "succeeded",
+                "stopReason": "submitted",
+                "finishedAt": "2026-11-15T04:58:44.071Z",
+                "sessionId": "154b1e6f-7292-4d12-86f5-bd5f531b7add",
+                "summary": "The sky is clear and blue during the day. The sky is blue during the day. The sky is blue during the day. The sky is blue during the day. A "
+              }
+            },
+            {
+              "stage": "automatic child executed actual queued request through native Claude Code, persistent independent read after completion and replay",
+              "at": "2026-11-15T04:58:45.811Z",
+              "parent": "3d0b6f46-5daa-4780-9941-d4b8328dc2c9",
+              "child": "911aee20-4ad8-41b3-99f0-5c2f50e98dbd",
+              "model": "SmolLM2-135M-Instruct-Q4_K_M",
+              "childThread": "6997087b-30c4-4dbd-b1d4-4129e35f83f0",
+              "childOutcome": "stopped",
+              "childText": "The capital of France is Paris.",
+              "modelTokens": 7,
+              "ownerMessage": {
+                "id": "e807dee1-c159-5d96-a02e-b43035d823c2",
+                "runId": "911aee20-4ad8-41b3-99f0-5c2f50e98dbd",
+                "deliveredAt": "2026-11-15T04:58:44.323Z"
+              }
+            },
+            {
+              "stage": "actual CPU result and completion persisted; event replay deduplicated",
+              "at": "2026-11-15T04:58:45.812Z",
+              "model": null,
+              "mode": "afterRun",
+              "modelText": "The user wants the finished report delivered.",
+              "terminal": {
+                "type": "exit",
+                "outcome": "succeeded",
+                "stopReason": "submitted",
+                "report": {
+                  "summary": "The sky is clear and blue during the day. The sky is blue during the day. The sky is blue during the day. The sky is blue during the day. A ",
+                  "openQuestions": [],
+                  "nextStep": null
+                }
+              },
+              "chunks": 8,
+              "durable": {
+                "status": "succeeded",
+                "stopReason": "submitted",
+                "finishedAt": "2026-11-15T04:58:44.071Z",
+                "sessionId": "154b1e6f-7292-4d12-86f5-bd5f531b7add",
+                "summary": "The sky is clear and blue during the day. The sky is blue during the day. The sky is blue during the day. The sky is blue during the day. A "
+              },
+              "ownerMessageCopies": 0,
+              "cancelledQueue": "cancelled"
+            }
+          ]
+        }
+      },
+      "realToolSearchSelectionReturned": true,
+      "toolRowCount": 10,
+      "reportedSubmit": true
+    }
+  },
+  "change": {
+    "workflow": "7212edda51b056bea0b9cb5d3b8c7be55d86c3d2",
+    "originalHarness": "f50c0fb3f1cd3d04d51e1c6c533f833b01993e82",
+    "modelProvider": "62528f47e658f560880112fd98b877a54561d0fa",
+    "retained": "Both original interrupt and submitted trials; published ToolSearch-aware local provider only, with post-run presence, normal tool reference and real child validation."
+  },
+  "scope": "Real official CLI, public candidate PG17 and authenticated isolated local HTTPS. Locally hosted open-weight CPU GGUF. No commercial subscription and no production access."
+}
