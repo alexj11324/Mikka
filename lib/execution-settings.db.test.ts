@@ -33,7 +33,7 @@ test(
       // Install the existing points fixture before the first model menu read.
       // Points admission has its own DB tests; resource authorization below remains real.
       mock.module(new URL("./points-fallback.ts", import.meta.url).href, {
-        namedExports: { hostedPointsRefusal: async () => null, pointsFallback: async () => null, hostedPointsHere: async () => ({ points: 98, trialLeft: 0 }) },
+        namedExports: { hostedPointsRefusal: async () => null, pointsFallback: async () => null, hostedPointsHere: async () => ({ points: 98 }) },
       });
       await pool.query(`CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES ('alice'),('bob');
       CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"removedAt" timestamptz,"lastSeenAt" timestamptz,enabled boolean,"autoSchedule" boolean,"deviceType" text,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
@@ -80,6 +80,9 @@ test(
       );
       await pool.query(
         await readFile(new URL("../drizzle/20261115175552_bot_model_choices_credits_model.sql", import.meta.url), "utf8"),
+      );
+      await pool.query(
+        await readFile(new URL("../drizzle/20261115204738_model_gateway_tokens.sql", import.meta.url), "utf8"),
       );
       const catalogueMigration = await readFile(new URL('../drizzle/20261030233002_byos_model_catalog.sql',import.meta.url),'utf8');
       await pool.query(catalogueMigration); await pool.query(catalogueMigration);

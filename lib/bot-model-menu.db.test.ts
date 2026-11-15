@@ -36,7 +36,7 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
       CREATE TABLE mikka_workspace_members ("workspaceId" uuid,"userId" text,name text,status text);
       CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,epoch bigint,state text,provider text,"accountLabel" text,quota jsonb,"removedAt" timestamptz,paused boolean NOT NULL DEFAULT false,"modelSettings" jsonb);
       CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,"modelId" text,route text,"createdAt" timestamptz DEFAULT now())`);
-    for (const file of ["20261030193000_device_enrollment_management.sql", "20261030200610_execution_rules.sql", "20261030233002_byos_model_catalog.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101020201_workspace_personal_policies.sql", "20261101020202_bot_archive.sql", "20261101021000_model_api_keys.sql", "20261101021100_bot_api_key_choice.sql", "20261102120000_model_api_key_models_error.sql", "20261102190000_model_api_key_responses_api.sql", "20261115175552_bot_model_choices_credits_model.sql"])
+    for (const file of ["20261030193000_device_enrollment_management.sql", "20261030200610_execution_rules.sql", "20261030233002_byos_model_catalog.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101020201_workspace_personal_policies.sql", "20261101020202_bot_archive.sql", "20261101021000_model_api_keys.sql", "20261101021100_bot_api_key_choice.sql", "20261102120000_model_api_key_models_error.sql", "20261102190000_model_api_key_responses_api.sql", "20261115175552_bot_model_choices_credits_model.sql", "20261115204738_model_gateway_tokens.sql"])
       await pool.query(await readFile(new URL(`../drizzle/${file}`, import.meta.url), "utf8"));
     // Resource policy still runs against real non-Org rows in this isolated schema.
     await pool.query(await readFile(new URL("../drizzle/20261109035020_organization_governance.sql", import.meta.url), "utf8"));
@@ -48,9 +48,8 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     mock.module(new URL("./model-catalog-server.ts", import.meta.url).href, { namedExports: { modelCatalog: async () => [...CATALOG_SNAPSHOT] } });
     // Points and their fallback have their own tests: here Mikka 额度 has points.
     let hostedPoints = 98;
-    let hostedTrial = 0;
     let pointsChoice: { kind: "api_key"; keyId: string; model: string } | null = null;
-    mock.module(new URL("./points-fallback.ts", import.meta.url).href, { namedExports: { hostedPointsRefusal: async () => hostedPoints > 0 || hostedTrial > 0 ? null : "points_exhausted", pointsFallback: async () => pointsChoice, hostedPointsHere: async () => ({ points: hostedPoints, trialLeft: hostedTrial }) } });
+    mock.module(new URL("./points-fallback.ts", import.meta.url).href, { namedExports: { hostedPointsRefusal: async () => hostedPoints > 0 ? null : "points_exhausted", pointsFallback: async () => pointsChoice, hostedPointsHere: async () => ({ points: hostedPoints }) } });
     const { ExecutionSettings } = await import("./execution-settings");
     const { botModelMenu } = await import("./bot-model-menu");
     const { creditsOptionId } = await import("./bot-model-menu-view");
@@ -265,11 +264,6 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     assert.equal(pointsMenu.current.credentialLabel, `····${key.last4}`);
     assert.equal((pointsRun.modelSelection as { afterPoints?: boolean })?.afterPoints, true);
     pointsChoice = null;
-    // No card yet but free messages left: listed, the tag names them.
-    hostedTrial = 12;
-    const trial = await botModelMenu(pool, settings, alice, null);
-    assert.deepEqual([trial.groups.find((group) => group.kind === "hosted")?.trialLeft, trial.current.available], [12, true]);
-    hostedTrial = 0;
     hostedPoints = 98;
     // Picking the key again moves back to it.
     keyMenu = await chooseBotModel(pool, settings, alice, null, keyOption);

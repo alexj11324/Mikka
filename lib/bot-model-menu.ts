@@ -94,9 +94,9 @@ export async function botModelMenu(
   const { creditsModels } = await import("./credits-models");
   const local = !isCloudEdition();
   const target = local ? await defaultModelTarget(scope.ownerId) : null;
-  const { points, trialLeft } = local ? { points: 0, trialLeft: 0 } : await hostedPointsHere(scope.workspaceId);
+  const { points } = local ? { points: 0 } : await hostedPointsHere(scope.workspaceId);
   const enabled = await hostedModelEnabled(pool, scope.ownerId) && (!local || target !== null);
-  const usable = enabled && (local || points > 0 || trialLeft > 0);
+  const usable = enabled && (local || points > 0);
   const hostedSource = local ? target?.kind === "cloud" ? "cloud" as const : "self-hosted" as const : undefined;
   const catalogue = enabled ? await creditsModels(scope.ownerId) : [];
   const creditsOption = (model: { id: string; name?: string; pricing?: { input: number; output: number } | null }, featured?: boolean): BotModelMenuOption => ({
@@ -107,7 +107,7 @@ export async function botModelMenu(
   const { FEATURED_MODELS } = await import("./model-catalog");
   const featured = new Set<string>(FEATURED_MODELS);
   const groups: BotModelMenuGroup[] = [
-    ...(catalogue.length ? [{ kind: "hosted" as const, ...(hostedSource ? { hostedSource } : { points, ...(points > 0 ? {} : { trialLeft }) }),
+    ...(catalogue.length ? [{ kind: "hosted" as const, ...(hostedSource ? { hostedSource } : { points }),
       options: catalogue.map((model) => creditsOption(model, local || featured.has(model.id))) }] : []),
     ...subscriptions.values(),
     ...sharedSubscriptions.values(),

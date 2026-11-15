@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { test } from 'node:test'
-import { dbUrl, seedUser, seedWorkspace, useUpFreeMessages } from './support/workspace-admin-db'
+import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
 // Subscription chats answer only on validated routes (lib/subscription-routes.ts); these tests run with both on.
 process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
 
@@ -78,9 +78,9 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
 
   await t.test('an explicitly sponsored cloud uses the selected active subscription without an E2B key or catalogue', async () => {
     const scope = {...await person('sponsored-dispatch'), botId:null}
-    const previous = {cohort: process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES, token: process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN}
+    const previous = {cohort: process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED, token: process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN}
     try {
-      process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES = scope.workspaceId
+      delete process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED
       process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN = 'synthetic-test-only'
       for (const [provider, harness, model] of [
         ['claude','claude_code','claude-haiku-5-5'], ['codex','codex','gpt-6-luna'],
@@ -97,8 +97,8 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
         assert.equal((await resolve()).kind,'none')
       }
     } finally {
-      if (previous.cohort === undefined) delete process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES
-      else process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES = previous.cohort
+      if (previous.cohort === undefined) delete process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED
+      else process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED = previous.cohort
       if (previous.token === undefined) delete process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN
       else process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN = previous.token
     }
@@ -274,12 +274,9 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
   await t.test('no points for Mikka 默认: the next allowed model a chat can run on, in the person\'s order', async () => {
     const { hostedPointsRefusal, pointsFallback, hostedPointsHere } = await import('../lib/points-fallback')
     const scope = await person('order-points')
-    // A new workspace with nothing bought or verified: its free messages first (TRIAL_MESSAGES), then refused for points.
-    assert.equal(await hostedPointsRefusal(scope.workspaceId), null)
-    assert.deepEqual(await hostedPointsHere(scope.workspaceId), { points: 0, trialLeft: 20 }, 'the menu lists Mikka 默认 with its free messages')
-    await useUpFreeMessages(pool, scope.workspaceId, scope.ownerId)
-    assert.equal(await hostedPointsRefusal(scope.workspaceId), 'verification_required')
-    assert.deepEqual(await hostedPointsHere(scope.workspaceId), { points: 0, trialLeft: 0 }, 'the menu leaves Mikka 默认 out')
+    // A new workspace with nothing bought: no trial (decision 2026-11-15-1900), refused for points at once.
+    assert.equal(await hostedPointsRefusal(scope.workspaceId), 'points_exhausted')
+    assert.deepEqual(await hostedPointsHere(scope.workspaceId), { points: 0 }, 'nothing to spend on Mikka 额度')
     assert.equal(await pointsFallback(pool, scope), null, 'nothing else to run on')
     const claude = await subscribe(scope, 'claude', ['acct-opus-p'])
     const key = await keys.addApiKey(pool, scope.ownerId, { provider: 'deepseek', apiKey: `sk-${randomBytes(12).toString('hex')}` }, { fetch: (async () => Response.json({ data: [{ id: 'key-deepseek-p' }] })) as unknown as typeof fetch })
@@ -298,7 +295,7 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     // Points bought: Mikka 默认 runs, no fallback asked for.
     await pool.query(`INSERT INTO workspace_credit_grants (id,"workspaceId",bucket,points,reason,"externalId") VALUES ($1,$2,'purchased',100,'pack',$3)`, [randomUUID(), scope.workspaceId, `points-${randomUUID()}`])
     assert.equal(await hostedPointsRefusal(scope.workspaceId), null)
-    assert.deepEqual(await hostedPointsHere(scope.workspaceId), { points: 100, trialLeft: 0 }, 'the menu shows what this workspace can spend')
+    assert.deepEqual(await hostedPointsHere(scope.workspaceId), { points: 100 }, 'the menu shows what this workspace can spend')
   })
 
   await t.test('edits: the first change stores what was shown; adds must be candidates; reorder, remove and 运行位置 save', async () => {

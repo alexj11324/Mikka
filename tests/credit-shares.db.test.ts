@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
-import { dbUrl, seedUser, seedWorkspace, useUpFreeMessages } from './support/workspace-admin-db'
+import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
 /*
  * 我的点数也可用于这个团队 against real Postgres (decision 2026-10-31-2300 item 4):
@@ -21,23 +21,27 @@ test('credit shares: opt in, pay order, leave, scope', { skip: !dbUrl }, async t
 
   const owner = await seedUser(pool, 'share-owner'), member = await seedUser(pool, 'share-member'), second = await seedUser(pool, 'share-second'), outsider = await seedUser(pool, 'share-outsider')
   const team = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }, { userId: member, role: 'member' }, { userId: second, role: 'member' }])
-  // Past its free messages (no card): only points can pay here.
-  await useUpFreeMessages(pool, team.id, owner)
+  // No trial (decision 2026-11-15-1900): only points can pay here.
   const personal = async (userId: string) => {
     const id = randomUUID()
     await pool.query(`INSERT INTO mikka_workspaces (id,"userId",name,slug,kind) VALUES ($1,$2,'personal',$3,'personal')`, [id, userId, `p-${id.slice(0, 8)}`])
     await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role) VALUES ($1,$2,$2,$3,'admin')`, [id, userId, `${userId}@example.invalid`])
     return id
   }
+  // A balance granted before 2026-11-15 (the card allowance), still owned and spendable.
+  const fund = async (workspaceId: string) => {
+    await hostedUsage.verify(workspaceId, null, null)
+    await pool.query('INSERT INTO hosted_allowances ("workspaceId",remaining) VALUES ($1,1000000) ON CONFLICT DO NOTHING', [workspaceId])
+  }
   const memberOwn = await personal(member), secondOwn = await personal(second)
-  // Each verified a card: USD 1 on their personal workspace.
-  await hostedUsage.verify(memberOwn, null, null)
-  await hostedUsage.verify(secondOwn, null, null)
+  // Each holds USD 1 on their personal workspace.
+  await fund(memberOwn)
+  await fund(secondOwn)
   const admit = (workspaceId: string) => shares.withSharedCredits(workspaceId, async payer => { await hostedUsage.canUseMikkaPaid(payer); return payer })
   const reserve = (workspaceId: string) => shares.withSharedCredits(workspaceId, async payer => { await hostedUsage.reserve(payer, 'test-model', randomUUID()); return payer })
 
   await t.test('without a share the team\'s own refusal stands', async () => {
-    await assert.rejects(admit(team.id), { code: 'verification_required' })
+    await assert.rejects(admit(team.id), { code: 'points_exhausted' })
     assert.deepEqual(await shares.creditShareView(member, team.id), { mine: false, canShare: true, sharers: [], admin: false })
   })
 
@@ -60,7 +64,7 @@ test('credit shares: opt in, pay order, leave, scope', { skip: !dbUrl }, async t
   })
 
   await t.test('the team\'s own balance pays first', async () => {
-    await hostedUsage.verify(team.id, null, null)
+    await fund(team.id)
     assert.equal(await admit(team.id), team.id)
     await pool.query('UPDATE hosted_allowances SET remaining=0 WHERE "workspaceId"=$1', [team.id])
   })
@@ -73,38 +77,37 @@ test('credit shares: opt in, pay order, leave, scope', { skip: !dbUrl }, async t
     assert.deepEqual(await shares.sharedCreditWorkspaces(team.id), [memberOwn], 'a suspended member\'s credits do not pay')
     await releaseDepartingMember(team.id, member)
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM workspace_credit_shares WHERE "workspaceId"=$1 AND "userId"=$2', [team.id, member])).rows[0].n, 0)
-    await assert.rejects(admit(team.id), { code: 'free_allowance_used' })
+    await assert.rejects(admit(team.id), { code: 'points_exhausted' })
   })
 
   await t.test('solo teams never spend a personal balance without explicit consent', async () => {
     const { workspaceSoloMember } = await import('../lib/workspace-solo')
     const founder = await seedUser(pool, 'share-founder'), joiner = await seedUser(pool, 'share-joiner')
     const founderOwn = await personal(founder)
-    await hostedUsage.verify(founderOwn, null, null)
+    await fund(founderOwn)
     const alone = await seedWorkspace(pool, founder, [{ userId: founder, role: 'admin' }])
-    await useUpFreeMessages(pool, alone.id, founder)
     assert.equal(await workspaceSoloMember(alone.id), founder)
     assert.equal(await workspaceSoloMember(founderOwn), founder, 'a personal workspace is one person')
     assert.equal(await workspaceSoloMember(team.id), null)
     assert.deepEqual(await shares.sharedCreditWorkspaces(alone.id), [], 'membership is not payment consent')
-    await assert.rejects(admit(alone.id), { code: 'verification_required' })
+    await assert.rejects(admit(alone.id), { code: 'points_exhausted' })
     assert.deepEqual(await shares.creditShareView(founder, alone.id), { mine: false, canShare: true, sharers: [], admin: true }, 'the switch shows in every team')
     // Inviting, expiring, or suspending peers never changes who pays.
     const invitation = randomUUID()
     await pool.query(`INSERT INTO mikka_workspace_invitations (id,"workspaceId","userId",email,role,"tokenHash","expiresAt") VALUES ($1,$2,$3,'invitee@example.invalid','member',$4,now()+interval '1 day')`, [invitation, alone.id, founder, randomUUID().replaceAll('-', '')])
     assert.equal(await workspaceSoloMember(alone.id), null, 'a pending invitation counts')
     assert.deepEqual(await shares.sharedCreditWorkspaces(alone.id), [])
-    await assert.rejects(admit(alone.id), { code: 'verification_required' })
+    await assert.rejects(admit(alone.id), { code: 'points_exhausted' })
     await pool.query(`UPDATE mikka_workspace_invitations SET "expiresAt"=now()-interval '1 minute' WHERE id=$1`, [invitation])
     assert.equal(await workspaceSoloMember(alone.id), founder, 'an expired invitation does not')
     await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role) VALUES ($1,$2,$2,$3,'member')`, [alone.id, joiner, `${joiner}@example.invalid`])
     assert.equal(await workspaceSoloMember(alone.id), null)
-    await assert.rejects(admit(alone.id), { code: 'verification_required' })
+    await assert.rejects(admit(alone.id), { code: 'points_exhausted' })
     await shares.setOwnCreditShare(founder, alone.id, true)
     assert.equal(await admit(alone.id), founderOwn)
     await pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [alone.id, joiner])
     await shares.setOwnCreditShare(founder, alone.id, false)
-    await assert.rejects(admit(alone.id), { code: 'verification_required' })
+    await assert.rejects(admit(alone.id), { code: 'points_exhausted' })
     assert.equal((await hostedUsage.balance(founderOwn)).free, 1_000_000, 'personal balance stays owned and untouched')
   })
 

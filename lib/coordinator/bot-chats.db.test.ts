@@ -674,7 +674,7 @@ dbTest('own task completion returns to the original Bot with an exhausted team t
     await db.insert(schema.coordinatorEvents).values(Array.from({ length: 21 }, (_, n) => ({
       id: randomUUID(), userId: owner, botId, kind: 'user_message' as const, dedupeKey: `${owner}:${n}`, payload: { text: 'Earlier fixture input' }, tier: 'attention' as const, deliveredAt: new Date(),
     })))
-    await assert.rejects(new HostedUsageStore(pool).canUseMikkaPaid(workspaceId), { code: 'verification_required' }, 'the original Gateway classification is refused before a model call')
+    await assert.rejects(new HostedUsageStore(pool).canUseMikkaPaid(workspaceId), { code: 'points_exhausted' }, 'the original Gateway classification is refused before a model call')
     const agentId = randomUUID(), runId = randomUUID(), issueId = randomUUID(), eventId = randomUUID()
     await db.insert(schema.agents).values({ id: agentId, userId: owner, harness: 'claude_code', name: 'Completion fixture' })
     await db.insert(schema.issues).values({ id: issueId, userId: owner, workspaceId, title: 'Read-only completion', content: { type: 'doc', content: [] }, status: 'todo', priority: 'normal' })

@@ -66,7 +66,7 @@ let fallback: { kind: 'api_key'; keyId: string; model: string } | { kind: 'subsc
 mock.module(new URL('./points-fallback.ts', import.meta.url).href, { namedExports: {
   hostedPointsRefusal: async (workspaceId: string) => { assert.equal(workspaceId, scope.workspaceId); return pointsRefusal },
   pointsFallback: async () => fallback,
-  hostedPointsHere: async () => ({ points: 1, trialLeft: 0 }),
+  hostedPointsHere: async () => ({ points: 1 }),
 } })
 mock.module(new URL('./abuse/resolve.ts', import.meta.url).href, { namedExports: {
   resolveDefaultHostedModel: async (...args: unknown[]) => { hostedCalls.push(args); return hostedModel },

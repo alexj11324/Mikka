@@ -33,17 +33,14 @@ test('hosted Checkout verification on isolated PostgreSQL', { skip: !dbUrl }, as
   }
   const auditCount = async (id: string) => Number((await pool.query('SELECT count(*) AS n FROM workspace_audit_events WHERE "workspaceId"=$1 AND action=\'billing.card_verified\'', [id])).rows[0].n)
 
-  await t.test('completion and legacy duplicates verify, claim, grant and audit once', async () => {
+  await t.test('completion and legacy duplicates verify, claim and audit once; no allowance is granted any more', async () => {
     const ws = await workspace(), setup = await create(ws.id)
     await Promise.all([applyCardCheckout(setup.session, setup.fake), applyCardCheckout(setup.session, setup.fake)])
     await pool.query('INSERT INTO hosted_setup_intents (id,"workspaceId","customerId") VALUES ($1,$2,$3)', [setup.intent.id, ws.id, setup.intent.customer])
     await applyCardSetup(setup.intent, setup.fake)
     assert.equal(await auditCount(ws.id), 1)
     assert.equal((await pool.query('SELECT * FROM hosted_card_claims WHERE fingerprint=$1', [fingerprint])).rows[0].workspaceId, ws.id)
-    assert.deepEqual(await workspaceCardStatus(ws.id), { status: 'verified', last4: '4242', allowance: 'granted', remainingAllowanceMicroUsd: 1_000_000, remainingAllowancePoints: 100 })
-    await pool.query('UPDATE hosted_allowances SET remaining=0 WHERE "workspaceId"=$1', [ws.id])
-    assert.equal((await workspaceCardStatus(ws.id)).allowance, 'granted')
-    assert.equal((await workspaceCardStatus(ws.id)).remainingAllowancePoints, 0)
+    assert.deepEqual(await workspaceCardStatus(ws.id), { status: 'verified', last4: '4242', allowance: null, remainingAllowanceMicroUsd: 0, remainingAllowancePoints: 0 })
     const replacementFingerprint = `card_${randomUUID()}`
     const replacement = await create(ws.id, replacementFingerprint, '1111')
     await applyCardCheckout(replacement.session, replacement.fake)
@@ -66,6 +63,7 @@ test('hosted Checkout verification on isolated PostgreSQL', { skip: !dbUrl }, as
   await t.test('old verified workspace stores newly verified card without granting or auditing twice', async () => {
     const ws = await workspace()
     await hostedUsage.verify(ws.id, null, null)
+    await pool.query('INSERT INTO hosted_allowances ("workspaceId",remaining) VALUES ($1,1000000) ON CONFLICT DO NOTHING', [ws.id]) // granted before 2026-11-15
     const setup = await create(ws.id, `card_${randomUUID()}`, '1234')
     await pool.query('UPDATE hosted_allowances SET remaining=250000 WHERE "workspaceId"=$1', [ws.id])
     await applyCardCheckout(setup.session, setup.fake)
@@ -81,6 +79,7 @@ test('hosted Checkout verification on isolated PostgreSQL', { skip: !dbUrl }, as
   await t.test('old verification with the same card fills missing last4 without resetting its allowance', async () => {
     const ws = await workspace(), card = `card_${randomUUID()}`
     await hostedUsage.verify(ws.id, 'cus_old', card)
+    await pool.query('INSERT INTO hosted_allowances ("workspaceId",remaining) VALUES ($1,1000000) ON CONFLICT DO NOTHING', [ws.id]) // granted before 2026-11-15
     const setup = await create(ws.id, card, '5678')
     await pool.query('UPDATE hosted_allowances SET remaining=100000 WHERE "workspaceId"=$1', [ws.id])
     await applyCardCheckout(setup.session, setup.fake)
@@ -119,7 +118,7 @@ test('hosted Checkout verification on isolated PostgreSQL', { skip: !dbUrl }, as
     assert.equal((await cardVerificationStatus(member, team.id)).status, 'unverified', 'not an admin of the team, still their own status')
     const setup = await create(personal, `card_${randomUUID()}`, '4444')
     await applyCardCheckout(setup.session, setup.fake)
-    assert.deepEqual(await cardVerificationStatus(member, team.id), { status: 'verified', last4: '4444', allowance: 'granted', remainingAllowanceMicroUsd: 1_000_000, remainingAllowancePoints: 100 })
+    assert.deepEqual(await cardVerificationStatus(member, team.id), { status: 'verified', last4: '4444', allowance: null, remainingAllowanceMicroUsd: 0, remainingAllowancePoints: 0 })
     assert.equal((await pool.query('SELECT * FROM hosted_allowances WHERE "workspaceId"=$1', [team.id])).rowCount, 0, 'the team gets no allowance from it')
     // The owner verified cards on workspaces they own before (the subtests above): that counts for their personal workspace too.
     assert.equal((await cardVerificationStatus(owner, team.id)).status, 'verified')
