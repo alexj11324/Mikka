@@ -68,7 +68,7 @@ test('migration, toggles, source ownership, fresh keys, dispatch filters and row
     assert.deepEqual(result.models.find(item => item.id === 'newer'), { id: 'newer', family: null, enabled: false, fresh: true })
     await pool.query(`ALTER TABLE model_api_keys ADD COLUMN provider text DEFAULT 'deepseek', ADD COLUMN name text,
       ADD COLUMN "baseUrl" text, ADD COLUMN protocol text DEFAULT 'anthropic', ADD COLUMN last4 text DEFAULT 'test',
-      ADD COLUMN "responsesApi" boolean DEFAULT true;
+      ADD COLUMN "responsesApi" boolean DEFAULT true, ADD COLUMN features jsonb;
       CREATE TABLE workspace_personal_policies ("workspaceId" text,subscriptions boolean)`)
     await pool.query('INSERT INTO workspace_personal_policies VALUES ($1,false)', [workspaceId])
     // Use the canonical sharing schema for the real usable-key read below.
