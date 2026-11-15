@@ -1,6 +1,7 @@
 import { withFactoryBackgroundWorkspace } from './background-workspace'
 import { randomUUID } from 'node:crypto'
 import { factoryChanged } from '../live/factory'
+import { runChanged } from '../live/panels'
 import { runControlChanged } from '../device-gateway-notify'
 import type { Pool, PoolClient } from 'pg'
 import { ActionFailureError } from '../action-error'
@@ -147,6 +148,13 @@ export async function continueActiveFactoryRequest(pool: Pool, userId: string, r
       VALUES($1,$2,$3,$4,'user_message',$5,$6,'background',now()) ON CONFLICT DO NOTHING`, [id, userId, task.botId, task.issueId, `thread-continuation:${id}`,
       JSON.stringify({ text, source: 'thread_continuation', previousRunId: runId, postedToChat: true })])
     await advanceFactoryRequest(tx, task, id, supersededRunIds)
+    if (submission?.interrupt) {
+      // Closing the displayed attempt and its waiting input is one write. The
+      // replacement can receive its own input before the old device acknowledges.
+      const held = await tx.query(`UPDATE thread_queued_messages SET status='failed',"failureCode"='threadDeliveryUnavailable'
+        WHERE "runId"=$1 AND "userId"=$2 AND "workspaceId"=$3 AND status='queued'`, [runId, userId, task.workspaceId])
+      if (held.rowCount) await runChanged(tx, runId)
+    }
     if (!sourceEventId || submission?.recordOwnerMessage) await tx.query(`INSERT INTO run_messages(id,"runId","userId",text,origin,"mailboxWakeDepth","deliveredAt")
       VALUES($1,$2,$3,$4,'owner',-1,now()) ON CONFLICT DO NOTHING`, [id, runId, userId, text])
     await tx.query('COMMIT')
