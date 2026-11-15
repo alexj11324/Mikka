@@ -23,7 +23,7 @@ import { taskActivityFacts } from './task-activity-timeline'
 import { taskDocumentStageComments } from './task-stage-comments'
 import { deriveIssueActivity } from './issue-activity'
 import { actAs } from './acting-user'
-import { threadQuestionView, latestConversationRun } from '@/lib/issue-threads'
+import { isThreadRun, threadQuestionView, latestConversationRun } from '@/lib/issue-threads'
 import { mobileTaskActivity } from '@/lib/mobile-task-view'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import { taskBlock } from '@/lib/task-blocked'
@@ -56,13 +56,13 @@ export async function mobileTask(user: Exclude<IssueReader, string>, id: string,
     })
     const { listIssueThreads } = await import('@/app/actions/agents')
     const threads = await actAs(reader, () => listIssueThreads(id))
-    const conversations = threads.map(thread => {
+    const conversations = threads.filter(isThreadRun).map(thread => {
       const view = threadQuestionView(thread)
       const outcome = RUN_OUTCOMES.find(outcome => outcome === view.outcome) ?? null
       const state = attemptStateOf({ runId: view.runId, status: view.waiting ? 'waiting_input' : view.status, outcome, pauseReason: view.pauseReason })
       const source = thread.detail
       return { id: thread.id, ownerName: thread.ownerName, state, stopping: view.stopping,
-        detail: source ? { name: source.name, agent: source.profile?.name || source.agentName, observedModel: source.observedModel ?? null, summary: source.summary } : null }
+        detail: source ? { createdAt: thread.createdAt, agentId: source.agentId, attemptIds: (thread.attempts ?? []).map(attempt => attempt.runId), name: source.name, agent: source.profile?.name || source.agentName, observedModel: source.observedModel ?? null, summary: source.summary } : null }
     })
     const sources = taskPullConversations(threads, factory)
     const pullRequests = (presentation.pullRequests ?? []).map(pull => {

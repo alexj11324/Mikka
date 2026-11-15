@@ -3,8 +3,9 @@
 import type { ReactNode } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { heldListPositions, mergeList, type ListSnapshot } from '@/lib/list-poll'
+import { issueKeys } from '@/lib/swr/keys'
 import { waitForCacheHydration } from '@/lib/swr/persistent-cache'
-import type { listIssueVersions } from '@/app/actions/issues'
+import type { IssueWorkSnapshot, listIssueVersions } from '@/app/actions/issues'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { ChevronRight } from 'lucide-react'
 import { pollIssueThreads } from '@/app/actions/agents'
@@ -26,14 +27,15 @@ import { useAcceptanceTasks } from './factory-acceptance'
 /** Shared by the Task's workspace reads and its thread actions. */
 export const issueThreadsKey = (issueId: string) => ['issue-threads', issueId] as const
 export type IssueThreadsRead = Awaited<ReturnType<typeof pollIssueThreads>>
+type History = ListSnapshot<Awaited<ReturnType<typeof listIssueVersions>>[number]>
+type JoinedWork = { data: IssueWorkSnapshot & { history: History }; refresh: () => Promise<(IssueWorkSnapshot & { history: History }) | undefined> }
 
 /** No timer reads the list (#1212): a run change on this issue, a teammate's included, pushes
  * `issue_threads` to every member who can see it. While the channel is down it is read once a minute. */
-export function useIssueThreads(issueId: string, enabled = true, viewerId?: string) {
+export function useIssueThreads(issueId: string, enabled = true, viewerId?: string, joined?: JoinedWork) {
   const key = issueThreadsKey(issueId)
   const { cache } = useSWRConfig()
-  type History = ListSnapshot<Awaited<ReturnType<typeof listIssueVersions>>[number]>
-  const result = useSWR(enabled ? key : null, async () => {
+  const legacy = useSWR(enabled && !joined ? key : null, async () => {
     await waitForCacheHydration(cache)
     const cached = cache.get(unstable_serialize(key))?.data as { viewerId?: string; history?: History } | undefined
     const previous = viewerId && cached?.viewerId === viewerId ? cached.history : undefined
@@ -47,12 +49,14 @@ export function useIssueThreads(issueId: string, enabled = true, viewerId?: stri
       positions: 'positions' in next ? next.positions : previous?.positions }
     return { ...incoming, history }
   }, { revalidateOnReconnect: true })
+  const result = joined ? { ...legacy, data: joined.data, mutate: joined.refresh, error: undefined } : legacy
+  const liveKey = unstable_serialize(joined ? issueKeys.detail(issueId) : key)
   const scope = enabled ? result.data?.live.workspaceId ?? null : null
-  useLiveKey('issue_threads', scope ? issueId : UNRESOLVED_LIST_SCOPE, [unstable_serialize(key)], scope, { minIntervalMs: 2_000 })
-  useLiveKey('factory_issue', enabled && scope ? issueId : null, [unstable_serialize(key)], scope, { minIntervalMs: 2_000 })
-  useLiveKey('issue_list', enabled && scope ? scope : null, [unstable_serialize(key)], scope, { minIntervalMs: 2_000 })
+  useLiveKey('issue_threads', scope ? issueId : UNRESOLVED_LIST_SCOPE, [liveKey], scope, { minIntervalMs: 2_000 })
+  useLiveKey('factory_issue', enabled && scope ? issueId : null, [liveKey], scope, { minIntervalMs: 2_000 })
+  useLiveKey('issue_list', enabled && scope ? scope : null, [liveKey], scope, { minIntervalMs: 2_000 })
   const hasConnections = result.data && 'connections' in result.data
-  useLiveKey('issue_relations', hasConnections && scope ? issueId : null, [unstable_serialize(key)], scope, { minIntervalMs: 2_000 })
+  useLiveKey('issue_relations', hasConnections && scope ? issueId : null, [liveKey], scope, { minIntervalMs: 2_000 })
   // A cached client can still meet an earlier server during a rolling upgrade.
   const connections = !result.error && result.data && !hasConnections ? undefined : {
     rows: !result.error && result.data && 'connections' in result.data ? result.data.connections : undefined,
@@ -68,9 +72,9 @@ export function useIssueThreads(issueId: string, enabled = true, viewerId?: stri
   return { ...result, history, connections, data: result.data?.threads, work: result.error ? undefined : result.data?.work }
 }
 
-export function useTaskWork(issueId: string, onOpen: (id: string) => void, enabled: boolean, viewerId: string) {
+export function useTaskWork(issueId: string, onOpen: (id: string) => void, enabled: boolean, viewerId: string, joined?: JoinedWork) {
   const t = useTranslations('IssueThreads')
-  const { data, error, mutate, work, connections, history } = useIssueThreads(issueId, enabled, viewerId)
+  const { data, error, mutate, work, connections, history } = useIssueThreads(issueId, enabled, viewerId, joined)
   const retry = () => { void mutate() }
   return { work, connections, history, threads: error ? [] : data ?? [], openThread: onOpen, retry,
     failed: error ? { label: t('loadFailed'), retry } : null }

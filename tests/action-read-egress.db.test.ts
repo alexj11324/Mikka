@@ -232,6 +232,28 @@ test('task thread lists retain exact titles, summaries and privacy while details
     await assert.rejects(withActivitySession(outsider, () => pollIssueThreads(issue, true), workspace), { code: 'issueNotFound' })
     assert.ok(selected.bytes < baseline.reads[0].bytes / 20, 'list projection excludes full prompts, reports and error stacks')
     assert.equal(selected.route, '/actions/threads/issue-list')
+    const { pollIssue } = await import('../app/actions/issues')
+    const readDetail = (viewer: string, known?: string) => withActivitySession(viewer, () => pollIssue(issue, known, {}), workspace)
+    const combined = await measured(() => readDetail(owner))
+    assert.ok(!combined.value.error && combined.value.issue && combined.value.taskWork)
+    const snapshot = combined.value.taskWork
+    assert.equal(snapshot.viewerId, owner)
+    assert.deepEqual(snapshot.connections, work.connections)
+    assert.deepEqual(snapshot.threads, work.threads)
+    assert.equal(snapshot.threads.find(row => row.id === peerId)?.detail, null)
+    assert.ok(snapshot.work?.presentation)
+    const forbidden = await readDetail(outsider, combined.value.version)
+    assert.equal(forbidden.error, 'issueNotFound')
+    assert.equal('taskWork' in forbidden, false)
+    // A cursor for the document does not suppress authorization or refreshed work.
+    const reused = await readDetail(owner, combined.value.version)
+    assert.ok(!reused.error && reused.unchanged && reused.taskWork?.activity)
+    const before = combined.reads.filter(row => row.fields.includes('harness') && row.fields.includes('name')).length
+    await pool.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[])', [ids.slice(1)])
+    const fewer = await measured(() => readDetail(owner))
+    assert.ok(!fewer.value.error && fewer.value.taskWork)
+    assert.ok(fewer.value.taskWork.threads.length < snapshot.threads.length)
+    assert.equal(fewer.reads.filter(row => row.fields.includes('harness') && row.fields.includes('name')).length, before, 'thread detail reads are batched across the authorized collection')
     assert.ok(!selected.fields.includes('sessionId') && !selected.fields.includes('deviceRepoId'), 'detail-only identifiers stay out of the list')
   } finally {
     await pool.query('DELETE FROM agent_runs WHERE "issueId"=$1', [issue])

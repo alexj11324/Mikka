@@ -38,7 +38,7 @@ import { factoryEventId } from '@/lib/factory/event-id'
 import { FactoryError } from '@/lib/factory/contract'
 import { readThreadChunks, threadChunkCursor, type ThreadChunkCursor } from '@/lib/thread-chunks'
 import { executionBotName, runBotId, runBotName, threadNameLines } from '@/lib/run-bot-name'
-import { requireIssueAccess } from '@/lib/issue-access'
+import { requireIssueAccessWithoutBody } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, threadQuestionRunId, withRunChain, type IssueThread } from '@/lib/issue-threads'
@@ -219,7 +219,7 @@ export async function listAgents(): Promise<AgentView[]> {
 
 /** Who currently collaborates on the issue (R-26): they see that its threads exist. */
 async function issueThreadAccess(issueId: string) {
-  const { issue, user } = await requireIssueAccess(issueId)
+  const { issue, user } = await requireIssueAccessWithoutBody(issueId)
   if (!issue.workspaceId) throw new ActionFailureError('issueNotFound')
   const members = await workspaceDb.select({ id: workspaceMembers.userId }).from(workspaceMembers)
     .where(and(eq(workspaceMembers.workspaceId, issue.workspaceId), eq(workspaceMembers.status, 'active')))

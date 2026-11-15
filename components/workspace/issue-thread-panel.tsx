@@ -6,7 +6,7 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import type { ThreadDeliveryMode } from '@/lib/thread-delivery'
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { PersonAvatar } from '@/components/person-avatar'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useFormatter, useMessages, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
@@ -38,6 +38,8 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AgentMarkdown } from './agent-markdown'
 import { ComputerCard } from '@/components/computer/computer-card'
+import { issueKeys } from '@/lib/swr/keys'
+import type { IssueView, IssueWorkSnapshot } from '@/app/actions/issues'
 import { harnessLabel, type IssueThreadsRead } from './issue-threads'
 import { BotModelPicker } from '@/components/coordinator/bot-model-picker'
 import { choiceFromMenu, threadModelKey, type ThreadModelChoice } from '@/lib/thread-model-choice'
@@ -135,6 +137,11 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const runErrorText = useRunErrorText()
   const format = useFormatter()
   const { mutate: mutateCache, cache } = useSWRConfig()
+  // The task owns its mounted collection. Older servers still use the thread-list cache.
+  const listKey = useCallback(() => {
+    if (issueId && cache.get(unstable_serialize(issueKeys.detail(issueId)))?.data?.taskWork) return issueKeys.detail(issueId)
+    return ['issue-threads', issueId] as const
+  }, [cache, issueId])
   const key = ['issue-thread', issueId, runId]
   // Keep incremental chunks while shared invalidations schedule the reads.
   const { data: read, error, mutate } = useSWR(key, async () => {
@@ -252,8 +259,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   }, [active, requestedAt])
   useEffect(() => {
     // Acknowledgement updates the task's thread list as soon as this panel sees it.
-    void mutateCache(['issue-threads', issueId])
-  }, [issueId, view?.status, view?.stopping, question, mutateCache])
+    void mutateCache(listKey())
+  }, [listKey, view?.status, view?.stopping, question, mutateCache])
   // 要求修改 from the Artifact window puts the person straight into the composer.
   const requesting = Boolean(changeRequest)
   useEffect(() => { if (requesting) inputRef.current?.focus() }, [requesting])
@@ -288,7 +295,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
         ...(questionWake ? { questionWakeGeneration: questionWake.generation } : {}) } : command)
       if (result.status !== 'accepted') { fail(result.error); return }
       if (!retryOriginalSession) delivery.finish(command.id, {})
-      void mutate().catch(() => undefined); void mutateCache(['issue-threads', issueId])
+      void mutate().catch(() => undefined); void mutateCache(listKey())
     } catch (error) {
       const reason = error instanceof RequestError && error.status < 500 ? error.status === 429 ? feedback('sendRateLimited') : actionError(error.code) : feedback('sendUncertain')
       fail(reason)
@@ -301,14 +308,23 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     const attempt = Date.now()
     stopAttemptRef.current = attempt
     setStopAttempt(attempt); setStopFailed(false)
-    void mutateCache<IssueThreadsRead>(['issue-threads', issueId], read => read && { ...read, threads: read.threads.map(thread => thread.id === runId ? { ...thread, stopping: true, continuation: thread.continuation && { ...thread.continuation, stopping: true } } : thread) }, { revalidate: false })
-    try { await stopRun(liveRunId); void mutate(); void mutateCache(['issue-threads', issueId]) }
+    const where = listKey()
+    const stopping = (read: IssueThreadsRead) => read.threads.map(thread => thread.id === runId
+      ? { ...thread, stopping: true, continuation: thread.continuation && { ...thread.continuation, stopping: true } }
+      : thread)
+    if (where[0] === 'issue') {
+      void mutateCache<IssueView & { taskWork?: IssueWorkSnapshot }>(where, read => read?.taskWork
+        ? { ...read, taskWork: { ...read.taskWork, threads: stopping(read.taskWork) } } : read, { revalidate: false })
+    } else {
+      void mutateCache<IssueThreadsRead>(where, read => read && { ...read, threads: stopping(read) }, { revalidate: false })
+    }
+    try { await stopRun(liveRunId); void mutate(); void mutateCache(listKey()) }
     catch {
       // A late response from an earlier request must not cancel a retry.
       if (stopAttemptRef.current === attempt) {
         stopAttemptRef.current = null
         setStopAttempt(null); setStopFailed(true)
-        void mutateCache(['issue-threads', issueId])
+        void mutateCache(listKey())
       }
     }
   }
@@ -549,7 +565,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     notices={<>
       {queueControls}
       {references}
-      {data?.thread.quota?.paused && <ThreadQuotaPausedCard paused={data.thread.quota.paused} onContinued={() => { void mutate(); void mutateCache(['issue-threads', issueId]) }} />}
+      {data?.thread.quota?.paused && <ThreadQuotaPausedCard paused={data.thread.quota.paused} onContinued={() => { void mutate(); void mutateCache(listKey()) }} />}
       {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive-foreground">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
     </>}
@@ -560,7 +576,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       {after}
     </div>
     {data?.thread.quota?.paused && <div className="shrink-0 p-3">
-      <ThreadQuotaPausedCard paused={data.thread.quota.paused} onContinued={() => { void mutate(); void mutateCache(['issue-threads', issueId]) }} />
+      <ThreadQuotaPausedCard paused={data.thread.quota.paused} onContinued={() => { void mutate(); void mutateCache(listKey()) }} />
     </div>}
     {/* R-10: an open thread always ends in the composer, finished or not. A message to an ended thread runs it
         again in the same thread (R-81); only a thread the viewer cannot see in full (no `detail`) has none. */}

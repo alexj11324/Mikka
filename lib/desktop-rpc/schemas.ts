@@ -217,7 +217,7 @@ export const desktopActionSchemas = {
   'issues.listWorkspaceIssues': oneId,
   'issues.listWorkspaceTaskPage': tuple(taskListPageInput),
   'issues.getIssue': oneId,
-  'issues.pollIssue': tuple(uuid, version.optional()),
+  'issues.pollIssue': tuple(uuid, version.optional(), object({ version: version.optional(), positions: listPositions(51).optional() }).optional()),
   'issues.createTaskOnly': tuple(createOnlyCommand),
   'issues.getDispatchedTaskReceipt': tuple(dispatchReceiptInput),
   'issues.saveIssue': tuple(object({ id: uuid.optional(), revision: positive.optional(), workspaceId: uuid.optional(), title: text(200).trim().min(1), content: document, status: z.enum(ISSUE_STATUS_CODES), priority: z.enum(ISSUE_PRIORITY_CODES) })),
