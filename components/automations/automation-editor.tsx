@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import useSWR from 'swr'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { ArrowLeft, Play } from 'lucide-react'
 import { listDevices } from '@/app/actions/agents'
@@ -253,7 +253,7 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
       {history.error && !history.data ? <div className="p-4"><InlineLoadError message={tAll('loadError')} retryLabel={tCommon('retry')} onRetry={() => { void history.mutate() }} /></div>
         : !history.data ? <div className="p-4"><Skeleton className="h-10 w-full" /></div>
           : !history.data.occurrences.length ? <p className="px-5 py-4 text-sm text-muted-foreground">{t('historyEmpty')}</p>
-            : history.data.occurrences.map(run => <RunRow key={run.id} run={run} />)}
+            : history.data.occurrences.map(run => <RunRow key={run.id} run={run} timezone={current?.definition.timezone ?? draft.timezone} />)}
     </SettingsSection>}
 
     <footer className="flex flex-wrap items-center justify-between gap-2 pb-8">
@@ -286,16 +286,17 @@ function EditorFrame({ children, onBack, backLabel }: { children: React.ReactNod
 }
 
 /** One run: when, how it ended (and why when it did not), and the task it made as a chip that opens it. */
-function RunRow({ run }: { run: AutomationRun }) {
+function RunRow({ run, timezone }: { run: AutomationRun; timezone: string }) {
   const t = useTranslations('Automations')
   const tEvent = useTranslations('Automations.githubEvent')
   const tErrors = useTranslations('Errors')
-  const format = useFormatter()
+  // On the automation's own clock, like its summary, next run and usage days.
+  const when = useNextRunLabel()
   const task = runTask(run)
   const at = run.started_at ?? run.due_at
   const reason = run.error ? (t.has(`runErrors.${run.error}` as never) ? t(`runErrors.${run.error}` as never) : tErrors.has(run.error as never) ? tErrors(run.error as never) : run.error) : null
   return <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 text-sm">
-    <time className="tabular-nums text-muted-foreground" dateTime={new Date(at).toISOString()}>{format.dateTime(new Date(at), { dateStyle: 'medium', timeStyle: 'short' })}</time>
+    <time className="tabular-nums text-muted-foreground" dateTime={new Date(at).toISOString()}>{when(at, timezone)}</time>
     <Badge variant={runVariant[run.status]}>{t(`run.${run.status}`)}</Badge>
     {run.trigger && <span className="min-w-0 text-muted-foreground">{t('run.from', { event: tEvent.has(run.trigger.event.event as never) ? tEvent(run.trigger.event.event as never) : run.trigger.event.event,
       what: run.trigger.event.number !== null ? `${run.trigger.event.repository.replace(/^v2\/github\.com\//, '')}#${run.trigger.event.number}` : run.trigger.event.repository.replace(/^v2\/github\.com\//, '') })}</span>}
