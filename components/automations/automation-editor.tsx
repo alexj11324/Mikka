@@ -30,6 +30,7 @@ import { TASK_TITLE_MAX } from '@/lib/task-title-input'
 import { runTask, type AutomationRun, type AutomationView } from '@/lib/schedules/automation-view'
 import { definitionFrom, draftFrom, emptyDraft, foldNeeded, type AutomationDraft, type IntervalUnit, type ScheduleKind } from './automation-draft'
 import { useWorkspaceBotNames } from './automations-page'
+import { useNextRunLabel, useTimingSummary } from './automation-summary'
 
 const zones = (() => { try { return Intl.supportedValuesOf('timeZone') } catch { return ['UTC'] } })()
 const localZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' } catch { return 'UTC' } }
@@ -71,6 +72,10 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
   const profileChoices = useTaskProfileChoices({ workspaceId: workspaceId ?? undefined, value: draft && draft.profileId !== 'auto' ? draft.profileId : null, data: profiles.data })
   const check = useMemo(() => draft ? definitionFrom(draft) : null, [draft])
   const needsFold = draft ? foldNeeded(draft) : false
+  // The stored next run only describes the trigger as saved; an edited one says when it runs, not when it next will.
+  const unchanged = useMemo(() => Boolean(current && check && JSON.stringify(definitionFrom(draftFrom(current.definition))) === JSON.stringify(check)), [current, check])
+  const summary = useTimingSummary()
+  const nextRun = useNextRunLabel()
 
   if (!creating && automation.error && !current) return <EditorFrame onBack={onBack} backLabel={t('back')}><InlineLoadError message={tAll('loadError')} retryLabel={tCommon('retry')} onRetry={() => { void automation.mutate() }} /></EditorFrame>
   if (!creating && automation.data === null) return <EditorFrame onBack={onBack} backLabel={t('back')}><p role="status" className="text-sm text-muted-foreground">{t('notFound')}</p></EditorFrame>
@@ -133,7 +138,7 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
     <header className="flex flex-col gap-3">
       <div className="flex items-start gap-3">
         <Input aria-label={t('name')} value={draft.title} maxLength={200} placeholder={t('namePlaceholder')} onChange={event => set({ title: event.target.value })}
-          className="h-auto min-w-0 flex-1 border-0 bg-transparent px-0 text-xl font-semibold shadow-none focus-visible:ring-0 dark:bg-transparent" />
+          className="h-auto min-w-0 flex-1 border-0 bg-transparent px-0 text-xl font-semibold shadow-none focus-visible:ring-0 md:text-xl dark:bg-transparent" />
         {!creating && <div className="flex shrink-0 items-center gap-2 pt-1.5">
           <Label htmlFor="automation-enabled">{t('enabled')}</Label>
           <Switch id="automation-enabled" checked={active} disabled={busy !== null || current?.status === 'completed'} onCheckedChange={on => { void toggle(on) }} />
@@ -169,7 +174,7 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
       <SettingRow title={t('schedule')}>
         <Switch aria-label={t('schedule')} checked={draft.scheduleOn} onCheckedChange={on => set({ scheduleOn: on })} />
       </SettingRow>
-      {draft.scheduleOn && <div className="flex flex-col gap-3 px-5 pb-4">
+      {draft.scheduleOn && <div className="flex flex-col gap-3 px-5 pt-1 pb-4">
         <ToggleGroup aria-label={t('schedule')} size="sm" variant="segment" spacing={0.5} value={[draft.scheduleKind]}
           onValueChange={values => { const next = values[0] as ScheduleKind | undefined; if (next) set({ scheduleKind: next }) }}>
           {(['once', 'interval', 'daily', 'cron'] as const).map(kind => <ToggleGroupItem key={kind} value={kind}>{t(`scheduleKind.${kind}`)}</ToggleGroupItem>)}
@@ -188,6 +193,9 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
           {draft.scheduleKind === 'daily' && <Input type="time" aria-label={t('at')} className="w-auto" value={draft.dailyTime} onChange={event => set({ dailyTime: event.target.value, fold: null })} />}
           {draft.scheduleKind === 'cron' && <Input aria-label={t('expression')} className="w-48 font-mono" value={draft.cron} maxLength={100} onChange={event => set({ cron: event.target.value })} />}
         </div>
+        {check && 'definition' in check && <p className="text-sm text-muted-foreground">
+          {summary(check.definition)}{current?.status === 'active' && current.next_at && unchanged && <> · {tAll('nextRun', { time: nextRun(current.next_at, current.definition.timezone) })}</>}
+        </p>}
         {needsFold && <div className="flex flex-wrap items-center gap-2 text-sm">
           <span>{t('fold', { time: draft.dailyTime })}</span>
           <ToggleGroup aria-label={t('fold')} size="sm" variant="segment" spacing={0.5} value={draft.fold ? [draft.fold] : []}

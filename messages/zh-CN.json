@@ -7822,11 +7822,11 @@
     "search": "搜索自动化",
     "filter": {
       "all": "全部",
-      "active": "运行中",
+      "active": "已启用",
       "paused": "已暂停"
     },
     "status": {
-      "active": "运行中",
+      "active": "已启用",
       "paused": "已暂停",
       "completed": "已结束",
       "cancelled": "已删除"
@@ -7847,6 +7847,7 @@
       "daily": "每天 {time}",
       "weekdays": "工作日 {time}",
       "weekly": "每{weekday} {time}",
+      "monthly": "每月 {day} 日 {time}",
       "cron": "cron {expression}"
     },
     "kind": {

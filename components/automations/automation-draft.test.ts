@@ -58,11 +58,13 @@ test('a chat-made automation keeps its own task when edited here', () => {
   assert.deepEqual(result.definition.task, definition.task)
 })
 
-test('cronShape names every day, weekdays and one weekday; anything else is null', () => {
+test('cronShape names every day, weekdays, one weekday and one day of the month; anything else is null', () => {
   assert.deepEqual(cronShape('0 9 * * *'), { kind: 'daily', hour: 9, minute: 0 })
   assert.deepEqual(cronShape('30 8 * * 1-5'), { kind: 'weekdays', hour: 8, minute: 30 })
   assert.deepEqual(cronShape('0 9 * * 7'), { kind: 'weekly', hour: 9, minute: 0, day: 0 })
   assert.equal(cronShape('*/5 * * * *'), null)
-  assert.equal(cronShape('0 9 1 * *'), null)
+  assert.deepEqual(cronShape('0 18 28 * *'), { kind: 'monthly', hour: 18, minute: 0, day: 28 })
+  assert.equal(cronShape('0 9 1 * 1'), null)
+  assert.equal(cronShape('0 9 32 * *'), null)
   assert.equal(cronShape('0 25 * * *'), null)
 })

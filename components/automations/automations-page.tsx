@@ -2,7 +2,7 @@
 
 import { Fragment, useState, type MouseEvent } from 'react'
 import useSWR from 'swr'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { ChevronDown, Plus } from 'lucide-react'
 import { listWorkspaceBots } from '@/app/actions/bots'
 import { Badge } from '@/components/ui/badge'
@@ -18,7 +18,7 @@ import { BotAvatar, CoordinatorAvatar } from '@/components/nav/bot-avatar'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { useAutomations } from '@/hooks/use-automations'
 import type { AutomationView } from '@/lib/schedules/automation-view'
-import { useTimingSummary } from './automation-summary'
+import { useNextRunLabel, useTimingSummary } from './automation-summary'
 
 type Filter = 'all' | 'active' | 'paused'
 export type WorkspaceBotRow = { id: string; name: string; color: string; shape: string }
@@ -57,8 +57,8 @@ const statusVariant = { active: 'secondary', paused: 'outline', completed: 'outl
 export function AutomationsPage({ workspaceId, href, onOpen, onAskBot }: { workspaceId: string | null; href: (id: string) => string; onOpen: (id: string | 'new') => void; onAskBot: (text: string) => void }) {
   const t = useTranslations('Automations')
   const tCommon = useTranslations('Common')
-  const format = useFormatter()
   const summary = useTimingSummary()
+  const nextRun = useNextRunLabel()
   const { automations, error, data, mutate, setSize, size, more, isValidating } = useAutomations(workspaceId)
   const bots = useWorkspaceBotNames(workspaceId)
   const [query, setQuery] = useState('')
@@ -106,7 +106,7 @@ export function AutomationsPage({ workspaceId, href, onOpen, onAskBot }: { works
                   <ItemTitle className="w-full truncate">{row.definition.title}</ItemTitle>
                   <ItemDescription className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     <span>{summary(row.definition)}</span>
-                    {row.status === 'active' && row.next_at && <time dateTime={new Date(row.next_at).toISOString()}>{t('nextRun', { time: format.dateTime(new Date(row.next_at), { dateStyle: 'medium', timeStyle: 'short' }) })}</time>}
+                    {row.status === 'active' && row.next_at && <time dateTime={new Date(row.next_at).toISOString()}>{t('nextRun', { time: nextRun(row.next_at, row.definition.timezone) })}</time>}
                   </ItemDescription>
                 </ItemContent>
                 <ItemMedia className="hidden max-w-40 text-sm sm:flex"><AutomationBot automation={row} bots={bots} /></ItemMedia>

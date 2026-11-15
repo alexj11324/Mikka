@@ -7822,11 +7822,11 @@
     "search": "Search automations",
     "filter": {
       "all": "All",
-      "active": "Running",
+      "active": "On",
       "paused": "Paused"
     },
     "status": {
-      "active": "Running",
+      "active": "On",
       "paused": "Paused",
       "completed": "Finished",
       "cancelled": "Deleted"
@@ -7847,6 +7847,7 @@
       "daily": "Daily at {time}",
       "weekdays": "Weekdays at {time}",
       "weekly": "{weekday}s at {time}",
+      "monthly": "Monthly on day {day} at {time}",
       "cron": "cron {expression}"
     },
     "kind": {

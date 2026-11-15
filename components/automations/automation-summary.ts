@@ -24,6 +24,7 @@ export function useTimingSummary() {
     const shape = cronShape(timing.expression)
     if (!shape) return t('cron', { expression: timing.expression })
     const time = clock(shape.hour, shape.minute)
+    if (shape.kind === 'monthly') return t('monthly', { day: shape.day, time })
     if (shape.kind === 'weekly') {
       // 2026-11-15 is a Sunday: day 0 maps to it, 1 to Monday and so on.
       const weekday = format.dateTime(new Date(Date.UTC(2026, 10, 15 + shape.day, 12)), { weekday: 'long', timeZone: 'UTC' })
@@ -31,4 +32,12 @@ export function useTimingSummary() {
     }
     return t(shape.kind, { time })
   }
+}
+
+const viewerZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone } catch { return 'UTC' } }
+
+/** The next run as the automation's own clock reads it, naming the zone when it is not the viewer's, so it agrees with the summary. */
+export function useNextRunLabel() {
+  const format = useFormatter()
+  return (at: string | Date, timezone: string) => format.dateTime(new Date(at), { dateStyle: 'medium', timeStyle: 'short', timeZone: timezone, ...(timezone === viewerZone() ? {} : { timeZoneName: 'short' }) })
 }

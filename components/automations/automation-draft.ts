@@ -138,14 +138,15 @@ export function definitionFrom(draft: AutomationDraft, now = new Date()): { defi
   return { definition: { title, timezone: draft.timezone, timing, task, misfire: draft.misfire, maxLatenessMinutes: Math.round(draft.lateness), maxConcurrent: Math.round(draft.concurrent) } }
 }
 
-/** 5-field cron forms the list can name: every day, weekdays, one weekday. Anything else shows the expression. */
-export function cronShape(expression: string): { kind: 'daily' | 'weekdays'; hour: number; minute: number } | { kind: 'weekly'; hour: number; minute: number; day: number } | null {
+/** 5-field cron forms the list can name: every day, weekdays, one weekday, one day of the month. Anything else shows the expression. */
+export function cronShape(expression: string): { kind: 'daily' | 'weekdays'; hour: number; minute: number } | { kind: 'weekly' | 'monthly'; hour: number; minute: number; day: number } | null {
   const fields = expression.trim().split(/\s+/)
   if (fields.length !== 5) return null
   const [minute, hour, dayOfMonth, month, dayOfWeek] = fields
-  if (!/^\d{1,2}$/.test(minute!) || !/^\d{1,2}$/.test(hour!) || dayOfMonth !== '*' || month !== '*') return null
+  if (!/^\d{1,2}$/.test(minute!) || !/^\d{1,2}$/.test(hour!) || month !== '*') return null
   const time = { hour: Number(hour), minute: Number(minute) }
   if (time.hour > 23 || time.minute > 59) return null
+  if (dayOfMonth !== '*') return /^\d{1,2}$/.test(dayOfMonth!) && Number(dayOfMonth) >= 1 && Number(dayOfMonth) <= 31 && dayOfWeek === '*' ? { kind: 'monthly', ...time, day: Number(dayOfMonth) } : null
   if (dayOfWeek === '*') return { kind: 'daily', ...time }
   if (dayOfWeek === '1-5') return { kind: 'weekdays', ...time }
   if (/^[0-7]$/.test(dayOfWeek!)) return { kind: 'weekly', ...time, day: Number(dayOfWeek) % 7 }

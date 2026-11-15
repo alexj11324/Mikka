@@ -368,6 +368,14 @@ export function navigate(change: Partial<WorkspaceLocation>, mode: 'push' | 'rep
   window.dispatchEvent(new Event(NAVIGATE_EVENT))
 }
 
+/** A section's own page from a menu: its first page, even when the address already names that section and one of its pages (an open automation). */
+export function openSectionPage(section: WorkspaceSection) {
+  const url = new URL(workspaceHref(new URL(window.location.href), { section }), window.location.href)
+  for (const key of PAGE_KEYS) url.searchParams.delete(key)
+  write(`${url.pathname}${url.search}${url.hash}`, 'push')
+  window.dispatchEvent(new Event(NAVIGATE_EVENT))
+}
+
 /**
  * A chat's work area (the hosted chat, FRAME_OWNS_PANEL; decision 2026-11-10), while that chat is on screen: a task or
  * a thread opened from anywhere on the page opens as one of its tabs instead of a right column beside the chat.
