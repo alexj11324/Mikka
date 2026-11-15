@@ -53,10 +53,17 @@ Alex，2026-11-14。
 
 ### Artifact 按 Warp 放在线程里（Alex，2026-11-15）
 
-- 照 Warp 运行页右侧的 Artifacts 标签（Plans / PRs / Screencaptures，各带数量）：线程有产出时，标签行多一个「Artifact」，与「对话 / 改动 / 验收」同一行。分组依次是方案、PR、报告、截图和录屏，各带数量，空组不显示。工单、方案和 PR 都是 Artifact。
+- 照 Warp 运行页右侧的 Artifacts 标签（Plans / PRs / Screencaptures，各带数量）：线程有产出时，标签行多一个「Artifact」，与「线程 / 改动 / 验收」同一行（形状见下一节）。分组依次是方案、PR、报告、截图和录屏，各带数量，空组不显示。工单、方案和 PR 都是 Artifact。
 - 任务的对话显示整个 Factory 任务的产出（任务的工作读取，不另发请求）；审查、验证子线程只显示自己运行的产出；没有 Factory 任务的线程读它自己运行的证据（`/api/runs/:runId/evidence`）。方案和报告用 Artifact 阅读器打开，PR 打开 GitHub，截图和录屏用原来的证据查看器。
 - 线程顶部的 Artifact 按钮打开这个标签；完成消息下的 Artifact 卡片保留（2026-11-06 的决定）。
 - 任务页没有证据清单：删掉 `FactoryEvidence`。旧的证据链接（`?issue=…&factoryTask=…&evidence=…`，iOS「在网页打开」和 Bot 评论）打开产出它的运行所在的线程，切到 Artifact 并定位到那一项；读不到的回执停在任务页，不报 404。
+
+### 线程 | Artifact 切换，照 ChatGPT 聊天 | 工作（Alex，2026-11-15）
+
+- 线程顶部居中一个毛玻璃分段控件「线程 | Artifact」，照 ChatGPT iOS 顶栏的「聊天 | 工作」：选中的一段是稍深的内层胶囊。网页把原来的标签行换成它，有「改动」「验收」时也在同一个控件里；它是 Mikka 自己的 UI（语义色、背景模糊、半透明底、细边框），不是付费组件。顶栏的 Artifact 按钮、键盘和标签语义、`?evidence=` 深链（打开 Artifact）照旧。
+- iOS 的线程页（无任务的线程和任务的线程）在顶栏正中放系统分段控件（iOS 26 是 Liquid Glass），浮在内容上，左边仍是返回。线程没有 Artifact 时不显示控件，顶栏照旧显示标题。Artifact 一段按方案、PR、报告、截图和录屏分组：PR 打开 GitHub，方案和报告用 Artifact 阅读器（HTML 在网页打开），截图用图片查看器，录屏在网页打开。
+- 手机的读取是 `GET /api/mobile/threads/:id/artifacts`（`lib/mobile-thread-artifacts.ts`），和网页同源同权限：只读本人的线程，所选工作区之外读不到；任务的线程读任务的工作（任务内容权限再查一次），审查、验证子线程只读自己的运行，没有 Factory 任务的线程读自己运行的证据。
+- 同日：中文界面不再用「对话」一词，线程、Bot 的聊天、目录和新建入口都叫「线程」，群聊仍叫「群聊」，只有「对话框」保留（`pnpm i18n:check` 拦截）。
 
 ### iOS 任务页（Alex 批准，2026-11-15）
 
@@ -71,4 +78,3 @@ Alex，2026-11-14。
 - 对话编号（Capy 的 `FRO-12`）：不做（Alex，2026-11-15）。和 Cursor 一样，对话只用自动生成的标题。
 - 评论的「已编辑」：讨论消息没有编辑时间。
 - 未读「New」分隔线、评论附件和 @、可见性变化事件。
-- iOS 线程页还没有 Artifact 标签：手机的线程读取没有 Factory 回执和运行证据，要先补读取（2026-11-15）。
