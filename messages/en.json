@@ -4617,6 +4617,14 @@
     "waiting": "Waiting for you",
     "chatTab": "Chat",
     "acceptanceTab": "Acceptance",
+    "artifactsTab": "Artifact",
+    "artifacts": {
+      "plans": "Plans",
+      "pullRequests": "PRs",
+      "reports": "Reports",
+      "captures": "Screenshots and recordings",
+      "open": "Open {title}"
+    },
     "changesTab": "Changes",
     "changesFiles": "{count, plural, one {# file} other {# files}}",
     "changesFileList": "Files",

@@ -368,8 +368,6 @@ export function FramedTask(props: FramedTaskProps) {
     taskId={preview ? undefined : task.id}
     attachments={preview ? undefined : trigger => <TaskAttachments key={task.id} taskId={task.id} trigger={trigger} />}
     workspaceId={preview ? undefined : task.workspaceId}
-    factoryTaskId={presentation.data?.factoryTaskId}
-    factorySnapshot={props.agentActivity.work?.factory ?? null}
     rootRef={props.rootRef} onKeyDown={props.onKeyDown} label={props.label} busy={preview}
     origin={props.origin} identifier={task.identifier} title={props.title} saveLabel={props.saveLabel} saved={props.saved} saveHint={t('autosaveHint')}
     navigation={props.navigation} onClose={props.onClose}

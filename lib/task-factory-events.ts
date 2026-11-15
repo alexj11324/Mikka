@@ -88,6 +88,13 @@ export function readTaskEvidenceTarget(params: URLSearchParams) {
   return { issueId, factoryTaskId, receiptId }
 }
 
+/** An evidence link opens the thread of the run that produced the receipt, on its Artifact tab (Alex, 2026-11-15).
+ * Null while the task's read does not admit the receipt: the link then stays on the task page. */
+export function taskEvidenceThread(events: readonly TaskFactoryEvent[], target: { factoryTaskId: string; receiptId: string }): string | null {
+  const found = events.find(event => event.kind === 'evidence' && event.factoryTaskId === target.factoryTaskId && event.sourceId === target.receiptId)
+  return found?.runId ?? null
+}
+
 export function presentedFactoryEvents(value: unknown, factoryTaskId: string | undefined): TaskFactoryEvent[] {
   if (!factoryTaskId || !Array.isArray(value)) return []
   const textOrNull = (value: unknown) => value === null || typeof value === 'string'

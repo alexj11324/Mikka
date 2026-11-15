@@ -41,6 +41,8 @@ import { useResizableWidth } from '@/hooks/use-resizable-width'
 import { useViewState } from '@/lib/hooks/view-state'
 import { closeOnEscape, useFocusReturn } from '@/hooks/use-focus-return'
 import { TaskDetailFrame } from '@ui-slot/task-detail'
+import { useSearchParams } from 'next/navigation'
+import { presentedFactoryEvents, readTaskEvidenceTarget, taskEvidenceThread } from '@/lib/task-factory-events'
 
 type Issue = IssueView
 type IssueRead = IssueView & { readVersion?: string; taskWork?: IssueWorkSnapshot & { history: ActivityRead } }
@@ -253,6 +255,18 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
   // The open thread is the address's (?thread=), so back closes it and a link reopens it beside this task (R-82).
   const showThread = useCallback((runId: string | null) => { setOpenAcceptance(null); setThreadTab('chat'); navigate({ thread: runId }) }, [])
   const agentActivity = useTaskWork(saved.id, showThread, !preview, user.id, !preview && initial.taskWork ? { data: initial.taskWork, refresh: async () => (await refreshDetail())?.taskWork } : undefined)
+  // An evidence link (`?issue=…&factoryTask=…&evidence=…`, from iOS and older pages) opens the thread that produced the
+  // receipt on its Artifact tab (Alex, 2026-11-15); the task page has no evidence list. A receipt the read no longer admits stays here.
+  const evidenceTarget = readTaskEvidenceTarget(useSearchParams() ?? new URLSearchParams())
+  const factoryWork = agentActivity.work?.factory
+  const evidenceRun = !preview && evidenceTarget && evidenceTarget.issueId === saved.id && factoryWork?.task.id === evidenceTarget.factoryTaskId
+    ? taskEvidenceThread(presentedFactoryEvents(factoryWork.events, evidenceTarget.factoryTaskId), evidenceTarget) : null
+  const evidenceOpened = useRef<string | null>(null)
+  useEffect(() => {
+    if (!evidenceRun || !evidenceTarget || evidenceOpened.current === evidenceTarget.receiptId) return
+    evidenceOpened.current = evidenceTarget.receiptId
+    if (!openThread) navigate({ thread: evidenceRun }, 'replace')
+  }, [evidenceRun, evidenceTarget, openThread])
   const showAcceptance = useCallback((task: FactoryTask) => {
     if (task.candidateRunId) { setOpenAcceptance(null); setThreadTab('acceptance'); navigate({ thread: task.candidateRunId }) }
     else { navigate({ thread: null }); setOpenAcceptance(task) }

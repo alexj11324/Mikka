@@ -65,6 +65,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AcceptanceStateBadge, useAcceptanceTasks } from './factory-acceptance'
 import { FactoryAcceptancePane } from './factory-acceptance-pane'
 import { ChangesTabLabel, ThreadChangesPane } from './thread-changes'
+import { ThreadArtifactsPane, ThreadArtifactsReader, type ThreadArtifactsRead } from './thread-artifacts'
 
 import { ThreadFeedback } from './self-improvement'
 import { InlineLoadError } from '@/components/load-error'
@@ -122,7 +123,7 @@ function ThreadInstructions({ issueId, runId, mine }: { issueId: string | null; 
  * the state is the badge under it, so the header has no status icon. The byline names
  * the bot that dispatched it.
  */
-type ThreadTab = 'chat' | 'changes' | 'acceptance'
+type ThreadTab = 'chat' | 'changes' | 'acceptance' | 'artifacts'
 type IssueThreadPanelProps = { /** The task it works on; null for a thread with no task. */ issueId: string | null; runId: string; /** ← and Esc: back to the list it was opened from. */ onBack?: () => void; /** ✕, only where it closes more than ← does (全部线程 under it). */ onClose?: () => void; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void; /** Beside a chat: the task it works on, as a header link. */ onOpenTask?: () => void; /** The name its thread-list row shows (glossary: its task, else what it was asked); defaults to what it was asked. */ name?: string; /** Inside the Artifact window (P2): 要求修改 waits in the composer as a chip; sending it starts the fix run on the same PR. */ changeRequest?: ThreadChangeRequest; /** A task's earlier attempts, drawn above this one's transcript in the same scroll (the task-conversation slot). */ before?: ReactNode; /** With `before`: scroll to this run's section, an earlier one or this panel's own, once the conversation has loaded. */ focusRunId?: string; /** Only the transcript, for an earlier attempt inside another panel's `before`: no header, scroll, composer or acceptance. */ transcriptOnly?: boolean; /** Its place in its task's one conversation: the status line names the attempt, and the dispatch is not a person's bubble. */ attempt?: { n: number; first: boolean; taskTitle?: string; /** The Factory stage this part of the conversation starts, when it differs from the part before (2026-11-04-2200, as Warp marks a stage). */ stage?: string }; /** With a layer's thread screen: this run's rows as data, reported instead of drawn (an earlier attempt in a task's conversation). */ collect?: (runId: string, entries: ThreadEntry[]) => void; /** With a layer's thread screen: the earlier attempts' rows, above this run's own. */ beforeEntries?: ThreadEntry[]; /** Readable control-run evidence that follows the writable root, without acquiring its composer. */ afterEntries?: ThreadEntry[]; /** Child conversations (an independent review or verify) as their own task cards, each placed at the time it started. */ childEntries?: ThreadEntry[]; /** A child thread: its sender's name opens the parent thread, as Capy's. */ openSender?: () => void; after?: ReactNode }
 
 export type ThreadChangeRequest = ReviewChangeTarget & { onCancel: () => void }
@@ -185,7 +186,20 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const { data: changes } = useThreadChanges(issueId, bare ? null : runId, view?.status)
   const hasChanges = !readRejected && !!changes && changes.state !== 'none'
   const viewingChanges = hasChanges && tab === 'changes'
-  const transcript = useViewScroll<HTMLDivElement>(`thread:${runId}:chat`, !!data && !viewingChanges && !accepting)
+  // Artifact (Alex, 2026-11-15, as Warp's run page): what the thread's work produced, read only where the thread has its tabs.
+  const tabbed = !bare && !transcriptOnly && !collect
+  const [artifacts, setArtifacts] = useState<ThreadArtifactsRead | null>(null)
+  const hasArtifacts = tabbed && !readRejected && (artifacts?.count ?? 0) > 0
+  const viewingArtifacts = hasArtifacts && tab === 'artifacts'
+  // An evidence link opens its thread on Artifact, once; the person can move to another tab after.
+  const linked = useRef<string | null>(null)
+  const linkedFocus = artifacts?.focusId ?? null
+  useEffect(() => {
+    if (!linkedFocus || linked.current === linkedFocus) return
+    linked.current = linkedFocus
+    setTab('artifacts')
+  }, [linkedFocus, setTab])
+  const transcript = useViewScroll<HTMLDivElement>(`thread:${runId}:chat`, !!data && !viewingChanges && !accepting && !viewingArtifacts)
   const [draft, setDraft] = useViewState(`thread:${runId}:draft`, '')
   const feedback = useTranslations('Coordinator')
   const deliveryLabels = useTranslations('HostedThread')
@@ -593,30 +607,43 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive-foreground">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
     </div>}
     </>
+  // 对话 / 改动 / 验收 / Artifact: two share the header row; with 改动 or a third they take their own row.
+  const tabCount = 1 + Number(hasChanges) + Number(Boolean(acceptance)) + Number(hasArtifacts)
+  const tabsInHeader = tabCount === 2 && !hasChanges
+  const tabList = (inHeader: boolean) => <TabsList className={cn(inHeader && 'max-sm:w-full')}>
+    <TabsTrigger value="chat">{t('chatTab')}</TabsTrigger>
+    {hasChanges && <TabsTrigger value="changes" className="gap-1.5"><ChangesTabLabel changes={changes.state === 'ready' ? changes.changes : null} /></TabsTrigger>}
+    {acceptance && <TabsTrigger value="acceptance">{t('acceptanceTab')}</TabsTrigger>}
+    {hasArtifacts && <TabsTrigger value="artifacts">{t('artifactsTab')}</TabsTrigger>}
+  </TabsList>
   // Esc inside the thread is ←; in its composer or another field it only leaves the field (decision 0301). A window opened from it keeps its own Esc.
   // data-own-scroll: the messages scroll inside and the composer stays at the bottom, so a frame whose one scroller
   // holds this panel (the official work area) gives it the scroller's height instead of growing with it.
   return <section ref={rootRef} aria-label={title} data-own-scroll="" className="flex h-full min-h-0 flex-col" onKeyDown={bare || !onBack ? undefined : event => closeOnEscape(event, headingRef.current, onBack)}>
     {!bare && <ThreadHeader issueId={issueId} runId={runId} title={title} headingRef={headingRef} onBack={onBack} onClose={onClose}
-      onStop={canStop ? () => { void stop() } : null} onOpenTask={onOpenTask} wraps={!!acceptance}
+      onStop={canStop ? () => { void stop() } : null} onOpenTask={onOpenTask} wraps={!!acceptance || tabsInHeader}
       widen={widen ?? undefined} liveRunId={liveRunId} status={data?.thread.status ?? ''} acceptanceTaskId={acceptance?.id ?? null}
       place={detail ? <ThreadRunPlace issueId={issueId} runId={runId} status={view?.status ?? data?.thread.status ?? ''} harness={detail.harness} botName={detail.agentName} /> : null}
       acceptanceBadge={acceptance ? <AcceptanceStateBadge task={acceptance} /> : null}
       identity={data?.thread.ownedByCurrentUser ? <ThreadExecutionIdentity runId={liveRunId} /> : null}
-      artifact={!readRejected ? <ThreadArtifactButton runId={runId} status={data?.thread.status ?? ''} taskId={acceptance?.id} /> : null}
-      tabs={acceptance && !hasChanges ? <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="shrink-0 max-sm:order-last max-sm:w-full">
-        <TabsList className="max-sm:w-full"><TabsTrigger value="chat">{t('chatTab')}</TabsTrigger><TabsTrigger value="acceptance">{t('acceptanceTab')}</TabsTrigger></TabsList>
+      artifact={!readRejected ? <ThreadArtifactButton runId={runId} status={data?.thread.status ?? ''} taskId={acceptance?.id} onOpen={hasArtifacts ? () => setTab('artifacts') : undefined} /> : null}
+      tabs={tabsInHeader ? <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="shrink-0 max-sm:order-last max-sm:w-full">
+        {tabList(true)}
       </Tabs> : null} />}
-    {/* With 改动 the tabs get their own row: the side panel has no room for them beside the title. */}
-    {!bare && hasChanges && <div className="flex shrink-0 items-center px-3 pt-2">
+    {/* With 改动, or three tabs or more, the tabs get their own row: the side panel has no room for them beside the title. */}
+    {!bare && tabCount > 1 && !tabsInHeader && <div className="flex shrink-0 items-center px-3 pt-2">
       <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)}>
-        <TabsList><TabsTrigger value="chat">{t('chatTab')}</TabsTrigger><TabsTrigger value="changes" className="gap-1.5"><ChangesTabLabel changes={changes.state === 'ready' ? changes.changes : null} /></TabsTrigger>{acceptance && <TabsTrigger value="acceptance">{t('acceptanceTab')}</TabsTrigger>}</TabsList>
+        {tabList(false)}
       </Tabs>
     </div>}
+    {tabbed && data && !readRejected && <ThreadArtifactsReader issueId={issueId} runId={runId} runIds={[runId, ...(data.thread.attempts ?? []).map(attempt => attempt.runId)]}
+      conversation={isThreadRun(data.thread)} status={view?.status ?? data.thread.status} onRead={setArtifacts} />}
     {viewingChanges ? (changes.state === 'ready'
       ? <ThreadChangesPane stateKey={`thread:${runId}:changes`} changes={changes.changes} />
       : <p className="p-4 text-sm text-muted-foreground">{t('changesTooLarge')}</p>)
-    : accepting && acceptance ? <div className="flex min-h-0 flex-1 flex-col"><FactoryAcceptancePane task={acceptance} onOpenThread={onOpenThread} /></div> : conversation}
+    : accepting && acceptance ? <div className="flex min-h-0 flex-1 flex-col"><FactoryAcceptancePane task={acceptance} onOpenThread={onOpenThread} /></div>
+    : viewingArtifacts && artifacts ? <ThreadArtifactsPane groups={artifacts.groups} focusId={artifacts.focusId} mediaTaskId={artifacts.factoryTaskId ?? runId} />
+    : conversation}
     {detail && <SelectionQuote root={rootRef} onQuote={text => { setReplyQuote(text); inputRef.current?.focus() }} />}
   </section>
 }

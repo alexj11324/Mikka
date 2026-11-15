@@ -64,7 +64,8 @@ export function ArtifactReviewDot({ kind }: { kind: ArtifactReviewKind }) {
  * thread hands something over; then one Artifact opens in the window and
  * several open the list first. A dot on its corner says where the PR stands.
  */
-export function ThreadArtifactButton({ runId, status, taskId }: { runId: string; status: string; /** The acceptance task this thread produced, when the panel knows it. */ taskId?: string | null }) {
+export function ThreadArtifactButton({ runId, status, taskId, onOpen }: { runId: string; status: string; /** The acceptance task this thread produced, when the panel knows it. */ taskId?: string | null
+  /** Where the thread has its Artifact tab (Alex, 2026-11-15): the button opens it instead of a list of its own. */ onOpen?: () => void }) {
   const text = useArtifactReviewText()
   const { data } = useRunArtifacts(runId, status)
   const mine = data ?? []
@@ -74,6 +75,7 @@ export function ThreadArtifactButton({ runId, status, taskId }: { runId: string;
   const waiting = review.kind === 'review'
   const className = cn('relative shrink-0 text-muted-foreground', waiting && 'bg-muted text-foreground')
   const icon = <><ArtifactIcon data-icon="inline-start" /><ArtifactReviewDot kind={review.kind} /></>
+  if (onOpen) return <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" data-slot="thread-artifact" data-state={review.kind} aria-label={label} className={className} onClick={onOpen} />}>{icon}</TooltipTrigger><TooltipContent side="bottom">{label}</TooltipContent></Tooltip>
   if (mine.length > 1) return <DropdownMenu>
     <Tooltip><TooltipTrigger render={<DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" data-slot="thread-artifact" data-state={review.kind} aria-label={label} className={className} />} />}>{icon}</TooltipTrigger><TooltipContent side="bottom">{label}</TooltipContent></Tooltip>
     <DropdownMenuContent align="end" className="w-64">

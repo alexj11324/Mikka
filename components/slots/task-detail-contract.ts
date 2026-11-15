@@ -120,9 +120,6 @@ export type TaskDetailFrameProps = {
   /** The task-bound file dialog; the existing template supplies its toolbar trigger. */
   attachments?: (trigger: (label: string, open: () => void) => ReactNode) => ReactNode
   workspaceId?: string | null
-  /** The same authorized presentation that supplies the status row also identifies its Factory receipts. */
-  factoryTaskId?: string
-  factorySnapshot?: import('@/lib/factory/activity').FactoryActivityView | null
   rootRef: RefObject<HTMLDivElement | null>
   onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void
   /** The page's accessible name: the title, or the title field's label while it is empty. */

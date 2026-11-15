@@ -235,7 +235,15 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   conversation with its Factory stage (实现中, 交给你…) or run result, a PR with
   its title and live state, and + to link one. Stage changes and the Bot's one
   comment per stage are in 活动. A Factory run's steps are in its conversation,
-  and its acceptance report is an Artifact; there is no 工作 section.
+  and its acceptance report is an Artifact; there is no 工作 section and no
+  evidence list. What a thread's work produced is on the thread's **Artifact**
+  tab (as Warp's run page; Alex, 2026-11-15): 方案, PR, 报告, 截图和录屏, each
+  with its count, empty groups left out. A task's conversation shows the
+  task's Factory receipts; a review or verify thread shows its own runs'; a
+  thread with no Factory task shows its runs' evidence. An evidence link
+  (`?issue=…&factoryTask=…&evidence=…`) opens the producing run's thread on
+  that tab with the item focused; a receipt the reader can no longer see
+  leaves the link on the task page.
   活动 contains task changes, links and comments with the author or system actor visible.
   The conversation opens directly at its authorized root. Its composer follows
   the current run (R-10, R-81). The task properties
