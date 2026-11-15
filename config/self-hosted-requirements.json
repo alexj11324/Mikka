@@ -2376,5 +2376,12 @@
     "behavior": "List a thread's plans, pull requests, reports and captures from the owner's task work read or run evidence, rechecking task content and Artifact access.",
     "test": "tests/mobile-tasks.db.test.ts",
     "suite": "test:workspace-admin-db"
+  },
+  "lib/schedules/wall-time.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Wall-clock arithmetic and repeated daylight-saving times in an IANA zone with the runtime time zone data; no I/O.",
+    "test": "lib/schedules/time.test.ts",
+    "suite": "test:schedules"
   }
 }
