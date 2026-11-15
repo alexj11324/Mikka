@@ -2100,5 +2100,12 @@
     "behavior": "The separately deployed broker uses its configured PostgreSQL database for credential leases. The Vercel handler verifies caller identity, and the private Cloudflare transport requires an explicit runtime environment before validating the bounded lease request.",
     "test": "services/credential-broker/server.test.mjs",
     "suite": "test:self-hosted-broker"
+  },
+  "lib/governance/organizations.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read retained archived organization names for currently active owners from the existing workspace database. The active directory remains separate and no additional service or credential is required.",
+    "test": "lib/enterprise/governance.db.test.ts",
+    "suite": "test:enterprise-db"
   }
 }
