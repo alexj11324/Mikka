@@ -1315,6 +1315,13 @@
     "test": "lib/github/comment-mention.test.ts",
     "suite": "test:github"
   },
+  "lib/github/publication-webhook.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "Verified GitHub webhooks update the existing installation's PostgreSQL delivery and task when the repository changes capitalization. Unrelated pull requests do not match.",
+    "test": "lib/github/publication-webhook.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
   "lib/github/workflow-result-store.ts": {
     "mode": "optional-cloud",
     "environment": [],
