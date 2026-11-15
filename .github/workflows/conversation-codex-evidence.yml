@@ -1,4 +1,4 @@
-name: Integrated E real queue, steer, interrupt, replacement, edit and rerun
+name: Integrated E supported Claude Code queue and Factory interrupt with new real model attempt
 on:
   push:
     branches: [evidence/2254-sidebar-85dfc396]
@@ -43,9 +43,9 @@ jobs:
           cd ../harness/evidence/2257/local-provider
           npm ci --ignore-scripts --no-audit --no-fund
           mkdir -m 700 "$RUNNER_TEMP/model-fixture" "$RUNNER_TEMP/isolated-home" "$RUNNER_TEMP/receipt"
-          python prepare.py "$GITHUB_WORKSPACE/product" "$RUNNER_TEMP/model-fixture"
+          python prepare-claude.py "$GITHUB_WORKSPACE/product" "$RUNNER_TEMP/model-fixture"
           mkdir -p "$GITHUB_WORKSPACE/product/.cache/e-codex-actual"
-          cp delivery.mts handoff.mts observe-queue.mts "$GITHUB_WORKSPACE/product/.cache/e-codex-actual/"
+          cp claude-delivery.mts observe-queue.mts "$GITHUB_WORKSPACE/product/.cache/e-codex-actual/"
           if [ ! -x /usr/lib/postgresql/17/bin/initdb ]; then
             . /etc/os-release
             curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o "$RUNNER_TEMP/pgdg-signing.asc"
@@ -55,7 +55,7 @@ jobs:
             sudo apt-get update -qq
             sudo apt-get install -y --no-install-recommends postgresql-17
           fi
-      - name: Run the official Codex adapter and verified GGUF inside isolated loopback
+      - name: Run the official Claude Code adapter and verified GGUF inside isolated loopback
         shell: bash
         run: |
           set -euo pipefail
@@ -67,13 +67,13 @@ jobs:
             ip link set lo up
             test "$(ls /sys/class/net)" = lo || test "$(ip -o link show | wc -l)" = 1
             test -z "$(ip route show default)"
-            exec setpriv --reuid="$1" --regid="$2" --clear-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs env -i PATH="$3" HOME="$4" bash "$5/pg-verify.sh" "$5" "$6" "$7/receipt" "$7/model-fixture/codex" "$7/model-fixture/model.gguf"
+            exec setpriv --reuid="$1" --regid="$2" --clear-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs env -i PATH="$3" HOME="$4" bash "$5/pg-claude.sh" "$5" "$6" "$7/receipt" "$7/model-fixture/claude" "$7/model-fixture/model.gguf"
           ' isolated "$worker_uid" "$worker_gid" "$PATH" "$RUNNER_TEMP/isolated-home" "$harness" "$src" "$RUNNER_TEMP"
       - name: Retain only the sanitized source, model and event receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: integrated-9be0-native-node
+          name: integrated-9be0-claude-queue-interrupt
           path: |
             ${{ runner.temp }}/receipt/*-trial.json
             ${{ runner.temp }}/receipt/cleanup-*.jsonl
@@ -85,6 +85,10 @@ jobs:
             ${{ runner.temp }}/receipt/after-run-result.json
             ${{ runner.temp }}/receipt/handoff.json
             ${{ runner.temp }}/receipt/tools.jsonl
+            ${{ runner.temp }}/receipt/claude-first-token.jsonl
+            ${{ runner.temp }}/receipt/claude-requests.jsonl
+            ${{ runner.temp }}/receipt/claude-tools.jsonl
+            ${{ runner.temp }}/receipt/claude-results.jsonl
             ${{ runner.temp }}/receipt/decisions.jsonl
             ${{ runner.temp }}/receipt/requests.jsonl
             ${{ runner.temp }}/receipt/results.jsonl
