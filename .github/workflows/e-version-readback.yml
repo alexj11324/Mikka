@@ -34,6 +34,38 @@ jobs:
           git rev-parse HEAD > "$R/public"
           git rev-parse 'HEAD^{tree}' > "$R/tree"
           date -u +%FT%TZ > "$R/start"
+          set -e
+          umask 077
+          pg=/usr/lib/postgresql/17/bin
+          test -x "$pg/initdb"
+          fixture="$RUNNER_TEMP/version-postgres"
+          mkdir -m 700 "$fixture"
+          pw="$(openssl rand -hex 32)"
+          printf '%s\n' "$pw" > "$fixture/password"
+          "$pg/initdb" -D "$fixture/db" -A scram-sha-256 -U e2e --pwfile="$fixture/password" --encoding=UTF8 > "$fixture/init.log"
+          "$pg/pg_ctl" -D "$fixture/db" -o "-p 55437 -h 127.0.0.1 -c unix_socket_directories='' -c shared_buffers=64MB" -l "$fixture/server.log" -w start
+          trap '"$pg/pg_ctl" -D "$fixture/db" -w -m fast stop >/dev/null; rm -f "$fixture/password"' EXIT
+          export PGPASSWORD="$pw"
+          "$pg/createdb" -p 55437 -h 127.0.0.1 -U e2e versions_e2e
+          export E2E_DATABASE_URL="postgresql://e2e:$pw@127.0.0.1:55437/versions_e2e"
+          export DATABASE_URL="$E2E_DATABASE_URL" REQUIRE_DB=1
+          "$pg/psql" -At -h 127.0.0.1 -p 55437 -U e2e -d versions_e2e -c "show server_version_num" > "$R/postgres-version"
+          grep -Eq '^17[[:digit:]]{4} | tee "$R/named-checks.txt"
+          code=${PIPESTATUS[0]}
+          date -u +%FT%TZ > "$R/end"
+          printf '%s\n' "$code" > "$R/exit"
+          test "$code" -eq 0 || exit "$code"
+          if grep -E 'ℹ skipped [1-9]|# SKIP' "$R/named-checks.txt"; then exit 1; fi
+      - name: Archive the original test names and run status
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: version-readback-6d88ee3b
+          path: ${{ runner.temp }}/version-receipt/
+          if-no-files-found: error
+ "$R/postgres-version"
+          date -u +%FT%TZ > "$R/start"
+          set +e
           pnpm test:groups 2>&1 | tee "$R/named-checks.txt"
           code=${PIPESTATUS[0]}
           date -u +%FT%TZ > "$R/end"
