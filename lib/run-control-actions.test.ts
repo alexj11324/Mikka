@@ -270,7 +270,7 @@ before(async () => {
     },
   } })
   mock.module('@/lib/issue-access', { namedExports: {
-    requireIssueAccess: async (id: string) => {
+    requireIssueAccessWithoutBody: async (id: string) => {
       if (!viewer) throw new ActionFailureError('authRequired')
       if (id !== issueId || !current.members.has(viewer)) throw new ActionFailureError('issueNotFound')
       return { issue: { id: issueId, userId: 'owner', workspaceId }, user: { id: viewer } }

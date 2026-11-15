@@ -227,6 +227,10 @@ const thread = { id: RUN, status: 'running', outcome: null, stopping: false, cre
 const person = { id: OWNER, name: 'Ada', email: 'ada@example.invalid', image: null }
 const user = { id: OWNER, name: 'Ada', email: 'ada@example.invalid' }
 Object.assign(fixtures, {
+  'agents.pollTaskDetail': (id: unknown, known: unknown) => ({ ...(known === CHAT_VERSION ? { viewerId: OWNER, unchanged: true, version: CHAT_VERSION } : { viewerId: OWNER, issue: issue(String(id), 'Fix sign-in redirect'), version: CHAT_VERSION }), taskWork: {
+    viewerId: OWNER, threads: [thread], live: { workspaceId: WORKSPACE }, connections: [], work: null,
+    activity: { version: CHAT_VERSION, items: [], positions: [] },
+  } }),
   'issues.getIssue': (id: unknown) => ({ issue: issue(String(id), 'Fix sign-in redirect') }),
   'issues.pollIssue': (id: unknown, known: unknown) => known === CHAT_VERSION ? { viewerId: OWNER, unchanged: true, version: CHAT_VERSION } : { viewerId: OWNER, issue: issue(String(id), 'Fix sign-in redirect'), version: CHAT_VERSION },
   'issues.pollIssueVersionSummaries': () => ({ viewerId: OWNER, snapshot: { version: CHAT_VERSION, items: [], positions: [] } }),

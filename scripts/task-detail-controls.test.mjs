@@ -11,7 +11,7 @@ const browser = new Window({ url: 'https://mikka.example/mikka' })
 const noop = () => {}
 const translate = Object.assign(key => key, { has: () => true })
 const stub = (path, namedExports) => mock.module(new URL('../' + path, import.meta.url).href, { namedExports })
-let timeline, timelineHistory, teamId, response, issue, child, frame, teamWrites, favoriteDenied, saveMetadata, createChild, connectionsError, moves, reads, optionsRead
+let teamKeys, timeline, timelineHistory, teamId, response, issue, child, frame, teamWrites, favoriteDenied, saveMetadata, createChild, connectionsError, moves, reads, optionsRead
 const teams = ['existing', 'another'].map(id => ({ id, identifier: id, name: id }))
 mock.module('next-intl', { namedExports: { useTranslations: () => translate, useMessages: () => ({ IssueDetail: { work: { states: {} } }, GroupTask: { stage: {}, status: {} } }), useFormatter: () => ({ relativeTime: noop, dateTime: date => date.toISOString().slice(0, 10) }), useNow: () => new Date() } })
 mock.module('sonner', { namedExports: { toast: { error: noop, success: noop } } })
@@ -19,7 +19,7 @@ mock.module('swr', { defaultExport: key => {
   if (key?.[0] === 'issue-pull-request-timeline') return { data: timeline }
   if (key?.[0] === 'issue-property-options') return optionsRead
   if (key === 'teams') return { data: teams }
-  if (key?.[0] === 'issue-team') return { data: teamId, mutate: async value => { teamId = value } }
+  if (key?.[0] === 'issue-team') { teamKeys.push(key); return { data: teamId, mutate: async value => { teamId = value } } }
   if (key?.[0] === 'issue-connections') return { data: [issue, child], error: connectionsError, mutate: async () => reads.push('connections') }
   return {}
 }, namedExports: { unstable_serialize: JSON.stringify, useSWRConfig: () => ({ mutate: async key => {
@@ -82,7 +82,7 @@ beforeEach(() => {
     metadata: metadataSchema.parse({ delegate: { id: 'bot', name: 'Assigned bot', kind: 'bot', image: null } }) }
   child = { ...issue, id: 'child', title: 'Child', revision: 2, metadata: { ...issue.metadata, parentId: issue.id } }
   optionsRead = {}
-  teamId = 'existing'; response = null; favoriteDenied = false; saveMetadata = noop; createChild = noop; connectionsError = null; teamWrites = []; reads = []; moves = []
+  teamKeys = []; teamId = 'existing'; response = null; favoriteDenied = false; saveMetadata = noop; createChild = noop; connectionsError = null; teamWrites = []; reads = []; moves = []
 })
 after(() => browser.close())
 
@@ -177,6 +177,31 @@ test('properties link only admitted conversations and show the recorded Factory 
 })
 
 const pickTeam = id => act(async () => row('team').menu.find(item => item.id === id).onSelect())
+
+test('joined task team uses its authorized selection, refreshes writes and conflicts, and keeps the older read viewer scoped', async () => {
+  const refreshes = []
+  const joined = { teamId: null, refresh: async () => { refreshes.push('joined') } }
+  const done = await mount({ teamSnapshot: joined })
+  try {
+    assert.deepEqual(teamKeys, [], 'opening the joined frame must not start another task-scoped read')
+    assert.ok(row('team').menu.find(choice => choice.id === 'none').checked)
+    await pickTeam('another')
+    assert.deepEqual(teamWrites, [{ issueId: 'task', teamId: 'another', expectedTeamId: null }])
+    assert.deepEqual(refreshes, ['joined'])
+    response = { ok: false, code: 'teamIssueChanged', error: 'Concurrent team change' }
+    await pickTeam('existing')
+    assert.deepEqual(refreshes, ['joined', 'joined'])
+    assert.deepEqual(teamKeys, [])
+  } finally { await done() }
+  const old = await mount()
+  try {
+    assert.deepEqual(teamKeys, [['issue-team', 'task', 'owner']])
+    assert.ok(row('team').menu.find(choice => choice.id === 'existing').checked)
+  } finally { await old() }
+  teamKeys = []
+  const preview = await mount({ preview: true, locked: true })
+  try { assert.deepEqual(teamKeys, [], 'a cached preview cannot read team selection') } finally { await preview() }
+})
 
 test('confirmed deletion refreshes the viewer list without reading connections for the deleted task', async () => {
   let deleted = false

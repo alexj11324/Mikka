@@ -72,7 +72,7 @@ before(async () => {
   } }) }, workspacePool: pool })
   stub('../lib/workspace-access.ts', { loadWorkspaceContext: () => assert.fail('workspace selection outside task-bound wake fixture') })
   stub('../lib/deployment-switches.ts', { deploymentSwitch: () => factoryEnabled })
-  stub('../lib/issue-access.ts', { requireIssueAccess: async () => ({ issue: { id: ISSUE, userId: OWNER, workspaceId: WORKSPACE }, user: { id: viewer } }) })
+  stub('../lib/issue-access.ts', { requireIssueAccessWithoutBody: async () => ({ issue: { id: ISSUE, userId: OWNER, workspaceId: WORKSPACE }, user: { id: viewer } }) })
   stub('../lib/device-link.ts', { issueDeviceToken: () => assert.fail('no device token') })
   stub('../lib/device-presence.ts', { deviceOnlineStates: () => assert.fail('no device selection') })
   stub('../lib/device-removal.ts', {

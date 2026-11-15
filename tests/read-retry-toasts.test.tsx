@@ -34,6 +34,7 @@ stub('app/actions/artifacts.ts', {
   getArtifactText: () => read('text', 'Retained document body.'), listRunArtifacts: async () => [],
 })
 stub('app/actions/agents.ts', {
+  pollTaskDetail: async () => { throw Object.assign(new Error('older server'), { code: 'desktop_rpc_action_unknown', status: 404 }) },
   getThreadReplyVersions: async () => [],
   createThreadReplyVersion: async () => { throw new Error('This read test must not start a new version') },
   listAgents: async () => [],

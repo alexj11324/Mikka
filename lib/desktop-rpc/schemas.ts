@@ -135,6 +135,7 @@ export const desktopActionSchemas = {
   'agents.renameDevice': tuple(uuid, text(100).trim().min(1)),
   'agents.removeDevice': oneId,
   'agents.listAgents': none,
+  'agents.pollTaskDetail': tuple(uuid, version.optional(), object({ version: version.optional(), positions: listPositions(51).optional() }).optional()),
   'agents.pollIssueThreads': tuple(uuid, bool.optional(), object({ version: version.optional(), positions: listPositions(51).optional() }).optional()),
   'agents.findThreadIssue': oneId,
   'agents.getIssueThread': tuple(uuid.nullable(), uuid, object({ chain: text(4000), runId: uuid.nullable(), seq: count, runs: count, count }).nullish()),
