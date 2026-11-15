@@ -670,6 +670,13 @@
     "test": "tests/thread-title.db.test.ts",
     "suite": "test:run-publication-db"
   },
+  "drizzle/20261115054737_run_observed_model.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Store a claimed native session’s observed model in the installation PostgreSQL database. Replaying the migration preserves existing observations and earlier Skill reports.",
+    "test": "tests/thread-detail-bytes.db.test.ts",
+    "suite": "test:activity-actor-db"
+  },
   "lib/abuse/workers-ai.ts": {
     "mode": "optional-cloud",
     "environment": [
