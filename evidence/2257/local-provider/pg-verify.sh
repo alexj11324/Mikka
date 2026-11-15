@@ -61,7 +61,7 @@ run_trial() {
     rc="$exit_code"
   fi
 }
-if [ "$E_RUN_SOURCE" = "68e30e992b6cbb377603e26978d7314af4e1fa4c" ]; then
+if [ "$E_RUN_SOURCE" = "5c2d408d110a9a782ea6579a563787df9a2fc8f8" ]; then
   run_trial steer E_AFTER_RUN=0
   run_trial interrupt E_FACTORY_INTERRUPT=1
   run_trial after-run E_AFTER_RUN=1

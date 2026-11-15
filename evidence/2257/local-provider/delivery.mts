@@ -104,6 +104,8 @@ try {
  note('device reported real native thread',{thread:session.sessionId,reportedModel:session.runtimeModel})
  let changed=false,transcript='',terminal:any
  const chunks:any[]=[]
+ const replacementQuestion='What color is a ripe banana? Answer in one short sentence.'
+ let replacementAttempt:string|undefined
  for await(const event of session.events()){
   if(event.type==='exit'){terminal=event;continue}
   if(event.type!=='chunk')continue
@@ -118,15 +120,17 @@ try {
    assert.ok(current.modes.includes('interrupt'),JSON.stringify(current.modes))
    const active=async()=>(await independent.query(`SELECT t.id,t."attemptId",t."sourceEventId",t.status FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1 AND t."userId"=$2`,[runId,owner])).rows[0]
    const previous=await active();assert.equal(previous.status,'running')
-   const interruptId=randomUUID(),replacement='Replace the earlier list with a revised synthetic objective.'
+   const interruptId=randomUUID(),replacement=mark(replacementQuestion)
    const change=(cookie:string,rid:string)=>rpc(cookie,'sendIssueThreadReply',{text:replacement,requestId:rid,delivery:'interrupt'})
    const refused=await change(memberCookie,randomUUID());assert.ok(['runNotFound','workspaceAccessDenied','issueNotFound','notFound'].includes(refused.error),JSON.stringify(refused))
    assert.deepEqual(await active(),previous)
    const request=await change(ownerCookie,interruptId);assert.deepEqual(request,{sent:true,runId,continued:false})
    assert.deepEqual(await change(ownerCookie,interruptId),request)
-   const next=await active();assert.notEqual(next.sourceEventId,previous.sourceEventId);assert.notEqual(next.attemptId,previous.attemptId)
+   const next=await active();replacementAttempt=next.attemptId;assert.notEqual(next.sourceEventId,previous.sourceEventId);assert.notEqual(next.attemptId,previous.attemptId)
    const old=(await independent.query(`SELECT a.status,r."stopRequestedAt",a.output->>'supersededBy' AS superseded FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId" WHERE a.id=$1`,[previous.attemptId])).rows[0]
    assert.ok(old.stopRequestedAt);assert.equal(old.status,'cancelled');assert.equal(old.superseded,next.sourceEventId)
+   const heldBeforeStop=await queueRow(reqId);assert.equal(heldBeforeStop.status,'failed');assert.equal(heldBeforeStop.sentRunId,null)
+   note('explicit replacement atomically failed old pending input before device acknowledged',{heldBeforeStop})
    const commands=(await dcall(devicePath+'?wait=0')).commands;assert.ok(commands.some((v:any)=>v.kind==='stop'&&v.runId===runId))
    note('owner interrupt RPC committed new request epoch and bound stop; member denied, owner replay idempotent',{previous,next,old,denied:refused.error})
    await session.cancel()
@@ -168,15 +172,7 @@ try {
  assert.equal(stored.status,handin?'succeeded':interrupt?'cancelled':'stopped');assert.equal(stored.stopReason,completion.stopReason);assert.equal(stored.sessionId,session.sessionId);assert.equal(stored.summary,handin?terminal.report.summary:null);assert.ok(stored.finishedAt)
  const copies=(await independent.query('SELECT count(*)::int AS n FROM run_messages WHERE "runId"=$1 AND text=$2',[runId,text])).rows[0].n
  if(!handin)assert.equal(copies,interrupt?0:1)
- if(handin){
-  const queued=await queueRow(reqId);note('automatic queue receipt after actual parent completion',{queued,stored})
-  assert.equal(queued.status,'sent','terminal writer must automatically admit a follow-up')
-  assert.equal(queued.claimMode,'afterRun');assert.ok(queued.sentRunId&&queued.sentRunId!==runId)
-  const resultRun=queued.sentRunId
   const getRun=async(id:string)=>(await independent.query(`SELECT id,prompt,status,"sessionId","continuesRunId","issueId","workspaceId","stopReason","lastReply","agentDefinition"->>'model' AS model FROM agent_runs WHERE id=$1`,[id])).rows[0]
-  const accepted=await getRun(resultRun);assert.equal(accepted.continuesRunId,runId);assert.equal(accepted.issueId,issueId);assert.equal(accepted.workspaceId,ws.id);assert.equal(accepted.model,model);assert.ok(accepted.prompt.includes(text))
-  assert.equal((await independent.query('SELECT count(*)::int AS n FROM agent_runs WHERE "continuesRunId"=$1',[runId])).rows[0].n,1)
-  const offered=(await dcall(devicePath+'?wait=0')).queuedRuns??[];assert.ok(offered.includes(resultRun),JSON.stringify(offered))
   const execute=async(resultRun:string,accepted:any,question:string)=>{
   const realSession=await adapter.start({runId:resultRun,cwd,prompt:accepted.prompt,model:accepted.model,log:createLogger({level:'silent'}),env:buildChildEnv({host:{PATH:process.env.PATH,HOME:home,SSL_CERT_FILE:join(dir,'ephemeral-ca.pem'),LANG:'C.UTF-8'},runId:resultRun}),credential:{kind:'provider',protocol:'openai',baseUrl:'https://127.0.0.1:3857/v1',key:process.env.E_LOOPBACK_KEY!},toolApproval:new ToolApprovalGate(resultRun,{isLive:()=>true})})
   await dcall('runs/'+resultRun,'PATCH',{state:'running',sessionId:realSession.sessionId},204)
@@ -192,6 +188,16 @@ try {
   assert.equal(final.sessionId,realSession.sessionId)
   return {resultRun,thread:realSession.sessionId,answer:answer.result,tokens:answer.outputTokens,part:followChunks.find(c=>c.type==='text-delta')?.id,final}
   }
+
+ if(handin){
+  const queued=await queueRow(reqId);note('automatic queue receipt after actual parent completion',{queued,stored})
+  assert.equal(queued.status,'sent','terminal writer must automatically admit a follow-up')
+  assert.equal(queued.claimMode,'afterRun');assert.ok(queued.sentRunId&&queued.sentRunId!==runId)
+  const resultRun=queued.sentRunId
+
+  const accepted=await getRun(resultRun);assert.equal(accepted.continuesRunId,runId);assert.equal(accepted.issueId,issueId);assert.equal(accepted.workspaceId,ws.id);assert.equal(accepted.model,model);assert.ok(accepted.prompt.includes(text))
+  assert.equal((await independent.query('SELECT count(*)::int AS n FROM agent_runs WHERE "continuesRunId"=$1',[runId])).rows[0].n,1)
+  const offered=(await dcall(devicePath+'?wait=0')).queuedRuns??[];assert.ok(offered.includes(resultRun),JSON.stringify(offered))
   const actual=await execute(resultRun,accepted,steer)
   await dcall('runs/'+runId+'/complete','POST',completion,204)
   assert.deepEqual(await queueRow(reqId),queued)
@@ -221,21 +227,26 @@ try {
  }
  if(interrupt){
   const held=await queueRow(reqId)
-  if(held.status!=='failed'){
-   const {readRunChain}=await import('../../lib/run-chain')
-   const state=async()=>({queue:await queueRow(reqId),chain:await readRunChain(independent,owner,runId),attempts:(await independent.query('select a.id,a.status,t."sourceEventId" as "currentSourceEventId",a."runId" from factory_attempts a join factory_tasks t on t.id=a."taskId" where a."taskId"=(select "taskId" from factory_attempts where "runId"=$1) order by a."createdAt"',[runId])).rows})
-   note('unexpected unfinished automatic hold after committed receipt; diagnostic before replay',await state())
-   await wait(900)
-   note('delayed independent original row before any retry',{row:await queueRow(reqId)})
-   try{
-    const {deliverQueuedThreadReply}=await import('../../lib/thread-delivery-queue')
-    const retried=await deliverQueuedThreadReply(pool,owner,runId)
-    note('canonical postcommit worker explicit follow-up diagnostic',{retried,queue:await queueRow(reqId)})
-   }catch(e){
-    note('canonical postcommit worker explicit follow-up error',{name:e.name,code:e.code??null,message:String(e.message).slice(0,100),stack:String(e.stack).split('\n').slice(1,7).join('\n').slice(0,740)})
-   }
-  }
-  assert.equal(held.status,'failed');assert.equal(held.sentRunId,null);note('terminal cancelled attempt held the queued message and created no unauthorized continuation',{held})}
+  assert.equal(held.status,'failed');assert.equal(held.sentRunId,null);note('terminal cancelled attempt held the queued message and created no unauthorized continuation',{held})
+  assert.ok(replacementAttempt)
+  const query=async()=>(await independent.query('select a."runId" from factory_attempts a join factory_tasks t on t.id=a."taskId" where a.id=$1 and t."userId"=$2 and t."issueId"=$3 and t."workspaceId"=$4',[replacementAttempt,owner,issueId,ws.id])).rows[0]?.runId
+  let replacementId=await query()
+  for(let i=0;i<24&&!replacementId;i++){await wait(250);replacementId=await query()}
+  assert.ok(replacementId&&replacementId!==runId,'The authorized replacement should be attached to its actual Factory attempt')
+  const replacement=await getRun(replacementId)
+  assert.equal(replacement.continuesRunId,runId);assert.equal(replacement.issueId,issueId);assert.equal(replacement.workspaceId,ws.id)
+  assert.ok(replacement.prompt.includes(mark(replacementQuestion)));assert.ok(!replacement.prompt.includes(mark(steer)),'The held message must not enter the new model prompt')
+  const offered=(await dcall(devicePath+'?wait=0')).queuedRuns??[];assert.ok(offered.includes(replacementId))
+  const req=randomUUID(),forNew='New input for the replacement only.'
+  assert.deepEqual(await rpc(ownerCookie,'sendIssueThreadReply',{runId:replacementId,text:forNew,delivery:'queue',requestId:req}),{sent:true,continued:false,runId:replacementId})
+  assert.equal((await queueRow(req)).status,'queued')
+  const answer=await execute(replacementId,replacement,replacementQuestion)
+  assert.deepEqual(await queueRow(reqId),held)
+  assert.equal((await queueRow(req)).status,'failed','The replacement ended its own turn without a submitted handoff')
+  const visible=await threadDeliveryView(pool,owner,runId,replacementId)
+  assert.ok(visible.queued.some(v=>v.id===held.id&&v.text===text&&v.status==='failed'))
+  note('new authorized replacement ran its revised prompt and left earlier queued text visible without delivery',{replacementId,model:replacement.model,output:answer.answer,session:answer.thread,old:held,new:await queueRow(req)})
+ }
  note('actual CPU result and completion persisted; event replay deduplicated',{model:provider,mode:handin?'afterRun':interrupt?'interrupt':'steer',modelText:transcript,terminal,chunks:rows.length,durable:stored,ownerMessageCopies:copies,cancelledQueue:(await queueRow(cancelledId)).status})
  trace.success=true;persist()
  writeFileSync(join(dir,handin?'after-run-result.json':interrupt?'interrupt-result.json':'steer-result.json'),JSON.stringify(trace,null,2),{mode:0o600})

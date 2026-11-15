@@ -1,4 +1,4 @@
-name: Original PR runtime acceptance for queue, steer, interrupt, edit and rerun
+name: Verify original #2267 interrupt closes waiting inputs and executes the actual replacement
 on:
   push:
     branches: [evidence/2254-sidebar-85dfc396]
@@ -11,18 +11,8 @@ jobs:
     if: github.repository == 'alexj11324/Mikka'
     runs-on: ubuntu-latest
     timeout-minutes: 24
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - source: 68e30e992b6cbb377603e26978d7314af4e1fa4c
-            tree: bd12d4657877d83b3e417e18d67f8c41c629df10
-            artifact: original-2267-durable-delivery
-          - source: 7e7b0ed203a261434e6132b4cad5dbb466b17ba1
-            tree: 803eaecc34fb5af2de1598ef4d45df3f01937c2d
-            artifact: original-2275-durable-edit-rerun
     env:
-      SOURCE: ${{ matrix.source }}
+      SOURCE: 5c2d408d110a9a782ea6579a563787df9a2fc8f8
     steps:
       - name: Check out the public harness only
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -34,7 +24,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           path: product
-          ref: ${{ matrix.source }}
+          ref: 5c2d408d110a9a782ea6579a563787df9a2fc8f8
           persist-credentials: false
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
         with:
@@ -47,7 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git -C product rev-parse HEAD)" = "$SOURCE"
-          test "$(git -C product rev-parse 'HEAD^{tree}')" = "${{ matrix.tree }}"
+          test "$(git -C product rev-parse 'HEAD^{tree}')" = 943b6b7725724a985d0a38e7003fec5320f56ddd
           cd product
           pnpm install --frozen-lockfile
           cd ../harness/evidence/2257/local-provider
@@ -83,7 +73,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: ${{ matrix.artifact }}
+          name: original-2267-after-atomic-hold
           path: |
             ${{ runner.temp }}/receipt/*-trial.json
             ${{ runner.temp }}/receipt/delivery.json
@@ -104,5 +94,4 @@ jobs:
             ${{ runner.temp }}/receipt/exit
           if-no-files-found: warn
           retention-days: 7
-
 
