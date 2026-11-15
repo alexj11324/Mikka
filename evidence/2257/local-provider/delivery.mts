@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash,randomUUID } from 'node:crypto'
-import { mkdirSync,readFileSync,writeFileSync } from 'node:fs'
-import { createServer } from 'node:http'
+import { appendFileSync,mkdirSync,readFileSync,writeFileSync } from 'node:fs'
+import { serve } from 'srvx/node'
 import { join } from 'node:path'
 import { Pool } from 'pg'
 import { ACTIVE_TURN_STEER_HEADER,SOURCE_DAEMON_VERSION } from '@mikka/protocol/device'
@@ -35,16 +35,8 @@ try {
  const version=(await independent.query('show server_version_num')).rows[0].server_version_num
  assert.match(version,/^17/);note('isolated migrated PostgreSQL', {version})
  const {default:api}=await import('../../apps/api/src/index')
- http=createServer(async(req,res)=>{
-  try{
-   const chunks=[];for await(const chunk of req)chunks.push(chunk)
-   const request=new Request(origin+req.url,{method:req.method,headers:req.headers as Record<string,string>,...(chunks.length?{body:Buffer.concat(chunks)}:{})})
-   const result=await api.fetch(request);res.statusCode=result.status
-   for(const [k,v] of result.headers)res.setHeader(k,v)
-   res.end(Buffer.from(await result.arrayBuffer()))
-  }catch{res.writeHead(500);res.end()}
- })
- await new Promise<void>((resolve,reject)=>{http.once('error',reject);http.listen(3859,'127.0.0.1',resolve)})
+ http=serve({hostname:'127.0.0.1',port:3859,fetch:api.fetch,gracefulShutdown:false,silent:true})
+ await http.ready()
  const owner=await seedUser(independent,'e-owner'),member=await seedUser(independent,'e-member')
  const ws=await seedWorkspace(independent,owner,[{userId:owner,role:'admin'},{userId:member,role:'member'}])
  const issueId=await seedIssue(independent,owner,ws.id,{registered:true})
@@ -252,10 +244,19 @@ try {
  writeFileSync(join(dir,handin?'after-run-result.json':interrupt?'interrupt-result.json':'steer-result.json'),JSON.stringify(trace,null,2),{mode:0o600})
 }catch(e){
  trace.failure={name:e.name,message:String(e.message).replaceAll(process.env.E_LOOPBACK_KEY!,'[redacted]').slice(0,750),location:String(e.stack).split('\n').slice(1,5).join('\n').slice(0,800)};persist();process.exitCode=1
-}finally{
+ }finally{
+ const cleanup=(stage:string)=>appendFileSync(join(dir,'cleanup-'+(interrupt?'interrupt':handin?'after-run':'steer')+'.jsonl'),JSON.stringify({at:new Date().toISOString(),stage,resources:process.getActiveResourcesInfo().sort()})+'\n',{mode:0o600})
+ cleanup('application assertions settled')
  if(!trace.success&&session&&!trace.stages.some((s:any)=>s.stage==='authentic MCP handoff before completion writer'))await session.cancel().catch(()=>{})
+ if(http)await http.close()
+ cleanup('native HTTP transport closed and H3 disposal work drained')
  await independent.end()
- if(http)await new Promise<void>(resolve=>http.close(()=>resolve()))
- try{const {builtinGateway}=await import('../../lib/builtin-gateway/runtime');await builtinGateway()?.stop()}catch{}
- const [{pool},{workspacePool}]=await Promise.all([import('../../lib/db'),import('../../lib/workspace-db')]);await Promise.allSettled([pool.end(),workspacePool.end()])
+ const {builtinGateway}=await import('../../lib/builtin-gateway/runtime')
+ await builtinGateway()?.stop()
+ cleanup('test observer and builtin gateway stopped')
+ const [{pool},{workspacePool}]=await Promise.all([import('../../lib/db'),import('../../lib/workspace-db')])
+ await Promise.all([pool.end(),workspacePool.end()])
+ cleanup('product app and workspace database clients stopped')
+ const timer=setTimeout(()=>cleanup('independent twelve-second residual runtime observation'),12000)
+ timer.unref()
 }
