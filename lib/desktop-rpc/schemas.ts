@@ -182,6 +182,7 @@ export const desktopActionSchemas = {
   'automations.listAutomations': tuple(object({ cursor: text(100).optional() })),
   'automations.getAutomation': oneId,
   'automations.automationHistory': oneId,
+  'automations.automationUsage': tuple(object({ scheduleId: uuid, days: z.number().int().min(1).max(90).optional() })),
   'automations.createAutomation': tuple(object({ requestId: uuid, definition: scheduleDefinition })),
   'automations.updateAutomation': tuple(object({ scheduleId: uuid, version: positive, definition: scheduleDefinition })),
   'automations.pauseAutomation': tuple(object({ scheduleId: uuid, version: positive })),

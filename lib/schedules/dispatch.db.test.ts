@@ -131,7 +131,14 @@ test('dispatch_task automations run as their creator through the existing create
     await tick()
     assert.deepEqual(await occurrence(started.id).then(run => [run.status, run.error]), ['failed', 'scheduleBotUnavailable'])
     assert.equal(Number((await fixture.query(`SELECT count(*) FROM coordinator_events WHERE payload#>>'{schedule,occurrenceId}'=$1`, [started.id])).rows[0].count), 0, 'nothing was dispatched')
-    await assert.rejects(runNow(schedule), /scheduleBotUnavailable/, '立即运行 refuses at once')
+    const stopped = (await fixture.query<{ status: string; version: number; disabled_reason: string | null }>('SELECT status,version,disabled_reason FROM user_schedules WHERE id=$1', [schedule.id])).rows[0]!
+    assert.deepEqual([stopped.status, stopped.disabled_reason], ['paused', 'scheduleBotUnavailable'], 'the automation stops and says why')
+    await assert.rejects(page(owner, chat, { action: 'resume', scheduleId: schedule.id, version: stopped.version }), /scheduleBotUnavailable/, 'resuming checks again')
+    await fixture.query('UPDATE bots SET "archivedAt"=NULL WHERE id=$1', [lost])
+    const resumed = (await page<{ schedule: Schedule & { disabled_reason: string | null } }>(owner, chat, { action: 'resume', scheduleId: schedule.id, version: stopped.version })).schedule
+    assert.deepEqual([resumed.status, resumed.disabled_reason], ['active', null])
+    await fixture.query('UPDATE bots SET "archivedAt"=now() WHERE id=$1', [lost])
+    await assert.rejects(runNow(resumed), /scheduleBotUnavailable/, '立即运行 refuses at once')
 
     const repository = await seedBot(fixture, workspace.id, owner, 'Repository Bot')
     await fixture.query('UPDATE bots SET repository=$2 WHERE id=$1', [repository, 'acme/removed'])
@@ -143,6 +150,7 @@ test('dispatch_task automations run as their creator through the existing create
     try {
       await tick()
       assert.deepEqual(await occurrence(pending.occurrence.id).then(run => [run.status, run.error]), ['failed', 'scheduleWorkspaceAccessDenied'])
+      assert.equal((await fixture.query('SELECT disabled_reason FROM user_schedules WHERE id=$1', [second.schedule.id])).rows[0].disabled_reason, 'scheduleWorkspaceAccessDenied')
     } finally {
       await fixture.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspace.id, owner])
     }
@@ -245,5 +253,23 @@ test('dispatch_task automations run as their creator through the existing create
       const statuses = (await fixture.query<{ status: string }>(`SELECT status FROM schedule_occurrences WHERE schedule_id=$1 ORDER BY created_at`, [gated.id])).rows.map(row => row.status)
       assert.deepEqual(statuses, ['skipped', 'succeeded', 'succeeded'])
     } finally { runtime.automationSeams.runWhen = original }
+  })
+  await t.test('maxRunsPerDay skips timed and event runs and refuses 立即运行 past the cap; usage counts each day', async () => {
+    await fixture.query(`INSERT INTO github_repository_installations("userId","remoteKey","githubAccountId","installationId","repositoryId") VALUES($1,'v2/github.com/acme/capped','1',1,77) ON CONFLICT DO NOTHING`, [owner])
+    const capped = (await create({ ...definition(builder), maxConcurrent: 5, maxRunsPerDay: 2,
+      events: [{ source: 'github', event: 'pull_request_opened', repositories: ['v2/github.com/acme/capped'] }] })).schedule
+    await runNow(capped)
+    const pr = (number: number) => ({ action: 'opened', sender: { login: 'ada', type: 'User' }, repository: { full_name: 'acme/capped' }, pull_request: { number, title: `PR ${number}`, base: { ref: 'main' }, labels: [] } })
+    assert.equal(await runtime.fireGitHubAutomations('github:c1', 'pull_request', pr(1)), 1)
+    assert.equal(await runtime.fireGitHubAutomations('github:c2', 'pull_request', pr(2)), 0, 'the third run of the day is recorded as skipped')
+    await assert.rejects(runNow(capped), /scheduleDailyRunLimit/)
+    await tick()
+    const statuses = (await fixture.query<{ status: string; error: string | null }>('SELECT status,error FROM schedule_occurrences WHERE schedule_id=$1 ORDER BY created_at', [capped.id])).rows
+    assert.deepEqual(statuses.map(row => [row.status, row.error]), [['succeeded', null], ['succeeded', null], ['skipped', 'dailyRunLimit']])
+    const usage = await page<{ maxRunsPerDay: number; days: { runs: number; skipped: number; tasks: number; costMicroUsd: number | null }[] }>(owner, chat, { action: 'usage', scheduleId: capped.id })
+    assert.equal(usage.maxRunsPerDay, 2)
+    assert.deepEqual(usage.days.map(day => [day.runs, day.skipped, day.tasks, day.costMicroUsd]), [[2, 1, 2, 0]])
+    const seen = await page<{ days: { costMicroUsd: number | null }[] }>(member, memberChat, { action: 'usage', scheduleId: capped.id })
+    assert.equal(seen.days[0]!.costMicroUsd, null, 'another member sees runs, not spend')
   })
 })

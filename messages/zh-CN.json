@@ -1224,6 +1224,7 @@
     "scheduleNotPaused": "自动化没有暂停。",
     "scheduleNotActive": "自动化已暂停或已结束，恢复后才能运行。",
     "scheduleConcurrencyLimit": "已达到同时运行的上限，请等当前运行结束。",
+    "scheduleDailyRunLimit": "今天的运行次数已经到上限了。",
     "scheduleRunConflict": "运行未开始，请重试。",
     "scheduleTimeMustBeFuture": "开始时间必须晚于现在。",
     "invalidIanaTimezone": "时区无效。",

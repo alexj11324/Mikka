@@ -50,6 +50,8 @@ export const definitionSchema = z.object({
   title: z.string().trim().min(1).max(200), timezone: z.string().min(1).max(100), timing: timingSchema, task: taskSchema,
   misfire: z.enum(['skip', 'catch_up_once']), maxLatenessMinutes: z.number().int().min(1).max(10080),
   maxConcurrent: z.number().int().min(1).max(5).optional(),
+  /** Runs started on one day in the automation's time zone; past it, timed and event runs are skipped and 立即运行 refused. */
+  maxRunsPerDay: z.number().int().min(1).max(500).optional(),
   /** 满足任一条件就运行: event triggers beside the timing. Only an automation that hands a Bot a task has them. */
   events: z.array(eventTriggerSchema).min(1).max(20).optional(),
 }).strict().refine(value => !value.events || value.task.kind === 'dispatch_task', { message: 'eventTriggersNeedDispatchTask', path: ['events'] })
@@ -69,6 +71,8 @@ export const commandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.enum(['pause', 'resume', 'cancel']), scheduleId: z.uuid(), version: z.number().int().positive() }).strict(),
   // 立即运行: one occurrence due now. The same requestId never adds a second one.
   z.object({ action: z.literal('run_now'), scheduleId: z.uuid(), version: z.number().int().positive(), requestId: z.uuid() }).strict(),
+  // 用量: runs and cost per day in the automation's time zone, newest first.
+  z.object({ action: z.literal('usage'), scheduleId: z.uuid(), days: z.number().int().min(1).max(90).optional() }).strict(),
 ])
 export type Definition = z.infer<typeof definitionSchema>
 export type Command = z.infer<typeof commandSchema>

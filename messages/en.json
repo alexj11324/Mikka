@@ -1224,6 +1224,7 @@
     "scheduleNotPaused": "The automation isn't paused.",
     "scheduleNotActive": "The automation is paused or finished. Resume it to run it.",
     "scheduleConcurrencyLimit": "It's already running as many times as allowed. Please wait for a run to finish.",
+    "scheduleDailyRunLimit": "It has already run as many times as allowed today.",
     "scheduleRunConflict": "The run didn't start. Please try again.",
     "scheduleTimeMustBeFuture": "The start time must be in the future.",
     "invalidIanaTimezone": "The time zone is invalid.",

@@ -113,6 +113,7 @@ const functions = {
   'automations.listAutomations': automations.listAutomations,
   'automations.getAutomation': automations.getAutomation,
   'automations.automationHistory': automations.automationHistory,
+  'automations.automationUsage': automations.automationUsage,
   'automations.createAutomation': automations.createAutomation,
   'automations.updateAutomation': automations.updateAutomation,
   'automations.pauseAutomation': automations.pauseAutomation,
