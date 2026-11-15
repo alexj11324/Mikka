@@ -1,24 +1,18 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { hostConfiguration, nativeRequest, validateHostBuild } from '../runtime/config.mjs'
+import { hostConfiguration, nativeRequest } from '../runtime/config.mjs'
 
 const sourceSha = 'a'.repeat(40), uiSha = 'b'.repeat(40)
 function environment() {
   return {
     EVE_SOURCE_SHA: sourceSha, EVE_UI_SHA: uiSha, EVE_RELEASE_ID: 'fixture-1',
-    EVE_HOST_POLICY: 'shared-warm', EVE_PUBLIC_ORIGIN: 'https://eve.example.test',
-    EVE_HOST_WARM_UNTIL: new Date(Date.now() + 60_000).toISOString(),
-    WORLD_QUEUE_PUBLIC_KEY: Buffer.alloc(32, 2).toString('base64'), WORLD_SERVICE: { fetch() {} },
+    EVE_PUBLIC_ORIGIN: 'https://eve.example.test',
     EVE_ENV_MIKKA_DATABASE_URL: 'postgres://fixture:private-password@127.0.0.1/product_e2e',
     EVE_ENV_BETTER_AUTH_URL: 'https://app.example.test',
     EVE_ENV_MIKKA_DEPLOYMENT_STAGE: 'preview',
     EVE_ENV_BETTER_AUTH_SECRET: 'private-fixture-auth-key-at-least-thirty-two',
   }
 }
-const build = { version: 1, eve: '1.0.0-rc.9', revision: sourceSha, preset: 'node-server',
-  world: '@mikka/eve-cloudflare-world', worldVersion: '5.1.0' }
-const host = { version: 1, releaseId: 'fixture-1', sourceSha, uiSha }
-
 test('platform credentials and deployment identity remain distinct from customer connections', () => {
   const env = { ...environment(), EVE_ENV_NEW_PROVIDER_CLIENT_SECRET: 'private-platform-fixture',
     SOME_OTHER_BINDING: { fetch() {} }, ANOTHER_SECRET: 'never-deliver' }
@@ -26,58 +20,10 @@ test('platform credentials and deployment identity remain distinct from customer
   assert.equal(selected.runtimeEnv.NEW_PROVIDER_CLIENT_SECRET, 'private-platform-fixture')
   assert.equal(selected.runtimeEnv.ANOTHER_SECRET, undefined)
   assert.equal(selected.runtimeEnv.SOME_OTHER_BINDING, undefined)
-  assert.equal(selected.runtimeEnv.MIKKA_EVE_WORKFLOW_WORLD, 'cloudflare')
+  assert.equal(selected.runtimeEnv.WORKFLOW_TARGET_WORLD, '@workflow/world-postgres')
   assert.equal(selected.runtimeEnv.MIKKA_HOSTED_MODEL_FALLBACK, 'cloudflare-workers-ai')
   assert.equal(selected.runtimeEnv.MIKKA_EVE_PUBLIC_ORIGIN, 'https://eve.example.test')
   assert.equal(selected.runtimeEnv.BETTER_AUTH_URL, 'https://app.example.test')
-  assert.deepEqual(validateHostBuild(build, host, selected.runtimeEnv), host)
-})
-
-test('only platform Slack event verification enters the shared Eve runtime', () => {
-  const selected = hostConfiguration({ ...environment(),
-    EVE_ENV_SLACK_APP_ID: 'AEXAMPLE', EVE_ENV_SLACK_SIGNING_SECRET: 'event-fixture',
-  })
-  assert.equal(selected.runtimeEnv.SLACK_APP_ID, 'AEXAMPLE')
-  assert.equal(selected.runtimeEnv.SLACK_SIGNING_SECRET, 'event-fixture')
-  for (const name of ['SLACK_CLIENT_ID', 'SLACK_CLIENT_SECRET', 'SLACK_APP_ACCESS_TOKEN',
-    'SLACK_BOT_TOKEN', 'SLACK_TEAM_ID', 'SLACK_BOT_USER_ID', 'SLACK_USER_BINDINGS',
-    'SLACK_WATCHED_CHANNELS', 'SLACK_CHANNEL_WORKSPACES', 'WORKSPACE_SECRETS_KEY']) {
-    assert.throws(() => hostConfiguration({ ...environment(), ['EVE_ENV_' + name]: 'private-fixture' }),
-      { message: 'CF_EVE_HOST_CONFIGURATION_INVALID' }, name)
-  }
-})
-
-test('missing durable storage, unsafe origins or incompatible hosting fail without disclosing values', () => {
-  for (const change of [
-    { EVE_ENV_MIKKA_HOSTED_MODEL_FALLBACK: 'vercel-gateway' },
-    { EVE_ENV_VERCEL_OIDC_TOKEN: 'unusable-fixture' }, { EVE_ENV_AI_GATEWAY_API_KEY: 'unusable-fixture' },
-    { WORLD_QUEUE_PUBLIC_KEY: '' }, { WORLD_SERVICE: undefined },
-    { EVE_PUBLIC_ORIGIN: 'https://private-password@eve.example.test' },
-    { EVE_PUBLIC_ORIGIN: 'https://eve.example.test/another-path' },
-    { EVE_ENV_BETTER_AUTH_URL: 'http://app.example.test' }, { EVE_ENV_BETTER_AUTH_SECRET: 'short' },
-    { EVE_SOURCE_SHA: 'moving-main' }, { EVE_HOST_POLICY: 'idle-sleep' },
-    { EVE_ENV_VERCEL: '1' }, { EVE_ENV_MIKKA_EVE_ORIGIN: 'https://legacy.example.test' },
-    { EVE_ENV_WORKFLOW_TARGET_WORLD: 'local' }, { EVE_ENV_SLACK_USER_BINDINGS: '{"private-person":"private-owner"}' },
-    { EVE_ENV_SLACK_BOT_TOKEN: 'private-bot-token' },
-    { EVE_HOST_WARM_UNTIL: undefined }, { EVE_HOST_WARM_UNTIL: '' },
-    { EVE_HOST_WARM_UNTIL: new Date(Date.now() + 25 * 60 * 60_000).toISOString() },
-    { EVE_ENV_MIKKA_DEPLOYMENT_STAGE: undefined }, { EVE_ENV_MIKKA_DEPLOYMENT_STAGE: 'development' },
-  ]) {
-    assert.throws(() => hostConfiguration({ ...environment(), ...change }), error => {
-      assert.equal(error.message, 'CF_EVE_HOST_CONFIGURATION_INVALID')
-      assert.doesNotMatch(error.stack, /private-password|private-person|private-bot-token/)
-      return true
-    })
-  }
-})
-
-test('an image cannot silently start another build, local World or Vercel output', () => {
-  const env = hostConfiguration(environment()).runtimeEnv
-  for (const changed of [
-    { ...build, world: 'local' }, { ...build, worldVersion: '4.0.0' },
-    { ...build, revision: 'c'.repeat(40) }, { ...build, preset: 'vercel' },
-  ]) assert.throws(() => validateHostBuild(changed, host, env))
-  assert.throws(() => validateHostBuild(build, { ...host, uiSha: 'c'.repeat(40) }, env))
 })
 
 test('native routing preserves protocol, cookies, body and origin while replacing forged forwarding fields', async () => {

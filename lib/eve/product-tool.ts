@@ -10,6 +10,14 @@ type ApprovalReview = {status:'not-applicable'|'denied'|'user-approval'}
 /** Eve owns the pause and approved resumption. The product gateway retains the
  * exact business write plan and rechecks policy before provider dispatch. */
 export function createProductTool(scope:EveScope,binding:Binding,definition:ProductCatalogueEntry,rpc:typeof productRpc=productRpc) {
+  async function actionBinding(signal?: AbortSignal): Promise<Binding> {
+    signal?.throwIfAborted()
+    if (binding.executionId) return binding
+    const { beginProductAction } = await import('./product-definitions')
+    const executionId = await beginProductAction(scope, binding)
+    signal?.throwIfAborted()
+    return { ...binding, ...(executionId ? { executionId } : {}) }
+  }
   const approval:ApprovalConfiguration<unknown> = {
     async request(ctx) {
       if (ctx.session.id !== binding.sessionId || ctx.session.turn.id !== binding.turnId || !isEveApprovalResponder(scope,ctx.session.auth.current)) return 'denied'
@@ -18,7 +26,7 @@ export function createProductTool(scope:EveScope,binding:Binding,definition:Prod
         ctx.abortSignal?.throwIfAborted()
         return 'not-applicable'
       }
-      const review = await rpc<ApprovalReview>(scope,{...binding,operation:'approval',name:definition.name,input:ctx.toolInput,callId:ctx.callId},ctx.abortSignal)
+      const review = await rpc<ApprovalReview>(scope,{...await actionBinding(ctx.abortSignal),operation:'approval',name:definition.name,input:ctx.toolInput,callId:ctx.callId},ctx.abortSignal)
       return ['not-applicable','denied','user-approval'].includes(review.status) ? review.status : 'denied'
     },
     response(ctx) {
@@ -39,7 +47,7 @@ export function createProductTool(scope:EveScope,binding:Binding,definition:Prod
         authenticator:principal.authenticator,principalType:principal.principalType,principalId:principal.principalId,
         attributes:{botId:principal.attributes.botId,workspaceId:principal.attributes.workspaceId,surface:principal.attributes.surface},
       } : undefined
-      return (await rpc<{output:unknown}>(scope,{...binding,operation:'execute',name:definition.name,input,callId:ctx.callId,...approvalResponder ? {approvalResponder} : {}},ctx.abortSignal)).output
+      return (await rpc<{output:unknown}>(scope,{...await actionBinding(ctx.abortSignal),operation:'execute',name:definition.name,input,callId:ctx.callId,...approvalResponder ? {approvalResponder} : {}},ctx.abortSignal)).output
     },
   })
 }
