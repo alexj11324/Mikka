@@ -14,13 +14,13 @@ import { IssueDescriptionHistory } from './issue-description-history'
 import type { MetadataRequest } from './issue-metadata-controls'
 import { toast } from 'sonner'
 import { getDeletedIssue, setIssueDeleted } from '@/app/actions/issue-operations'
-import { pollIssue, pollIssueVersionSummaries, saveIssue, listIssueVersions, type IssueView } from '@/app/actions/issues'
+import { pollIssue, pollIssueVersionSummaries, loadEarlierIssueActivity, saveIssue, listIssueVersions, type IssueView } from '@/app/actions/issues'
 import { descriptionKey } from '@/lib/issue-relations'
 import { CacheReadError } from '@/lib/cache-read-error'
 import { readAccessFailure, waitForCacheHydration } from '@/lib/swr/persistent-cache'
 import { isTaskPresentationKey, issueKeys } from '@/lib/swr/keys'
 import { ListReadScopeError } from '@/lib/live/list-read'
-import { heldListPositions, mergeList, type ListSnapshot } from '@/lib/list-poll'
+import { mergeActivityEarlier, mergeActivityPoll, type ActivityPage } from '@/lib/activity-page-cache'
 import { IssueEditor, createDocumentSeed, type IssueDiscussions } from './issue-editor'
 import { DocumentSync } from '@/lib/document-sync'
 import { useActionError } from '@/lib/use-action-error'
@@ -43,7 +43,8 @@ import { TaskDetailFrame } from '@ui-slot/task-detail'
 
 type Issue = IssueView
 type IssueRead = IssueView & { readVersion?: string }
-type ActivityRead = ListSnapshot<Awaited<ReturnType<typeof listIssueVersions>>[number]>
+type ActivityRow = Awaited<ReturnType<typeof listIssueVersions>>[number]
+type ActivityRead = ActivityPage<ActivityRow>
 
 function savedChangesMatch(previous: Issue, submitted: Pick<Issue, 'title' | 'status' | 'priority' | 'content'>, latest: Issue) {
   return latest.id === previous.id && latest.workspaceId === previous.workspaceId && latest.canSteer !== false && latest.revision > previous.revision &&
@@ -256,20 +257,44 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   const restoration = useRef<{ resolve: (success: boolean) => void } | null>(null)
   const [replacement, setReplacement] = useState<{ content: JSONContent; version: number }>()
   const activityKey = issueKeys.activityVersions(saved.id)
-  const localActivity = useSWR<ActivityRead>(preview || agentActivity.history ? null : activityKey, async () => {
+  const [activityPageLoading, setActivityPageLoading] = useState(false)
+  const [activityPageError, setActivityPageError] = useState(false)
+  const activityPageFlight = useRef(false)
+  const localActivity = useSWR<ActivityRead>(preview ? null : activityKey, async () => {
     await waitForCacheHydration(cache)
     const previous = cache.get(unstable_serialize(activityKey))?.data as ActivityRead | undefined
-    const held = heldListPositions(previous)
-    const known = held && held.length === previous?.positions?.length ? previous?.version : undefined
-    const result = await pollIssueVersionSummaries(saved.id, known, held)
+    const result = await pollIssueVersionSummaries(saved.id, previous?.version)
     if (result.error) throw new CacheReadError(result.error)
     if (result.viewerId !== user.id) throw new ListReadScopeError('owner')
     const next = result.snapshot
-    return { version: next.version, items: mergeList(previous?.items ?? [], next), positions: 'positions' in next ? next.positions : previous?.positions }
+    if (next.unchanged) {
+      if (!previous) throw new Error('Activity cache missing for unchanged response')
+      return { ...previous, version: next.version }
+    }
+    return mergeActivityPoll(previous, next)
   })
-  const versions = agentActivity.history ? agentActivity.history.rows : localActivity.data?.items
-  const historyError = agentActivity.history ? agentActivity.history.error : localActivity.error
-  const refreshVersions = agentActivity.history?.refresh ?? localActivity.mutate
+  const activityRead = localActivity.data
+  const loadEarlierActivity = useCallback(async () => {
+    const before = activityRead?.items.at(-1)
+    if (!activityRead?.hasMore || !before || activityPageFlight.current) return
+    activityPageFlight.current = true
+    setActivityPageLoading(true)
+    setActivityPageError(false)
+    try {
+      const result = await loadEarlierIssueActivity(saved.id, before.revision, before.id)
+      if (result.error) throw new CacheReadError(result.error)
+      if (result.viewerId !== user.id) throw new ListReadScopeError('owner')
+      await localActivity.mutate(current => mergeActivityEarlier(current, before.id, result.page), { revalidate: false })
+    } catch {
+      setActivityPageError(true)
+    } finally {
+      activityPageFlight.current = false
+      setActivityPageLoading(false)
+    }
+  }, [activityRead, localActivity.mutate, saved.id, user.id])
+  const versions = activityRead?.items
+  const historyError = localActivity.error
+  const refreshVersions = localActivity.mutate
   const { data: historyVersions, error: historyBodyError, mutate: refreshHistoryVersions } = useSWR(history && !preview ? issueKeys.versions(saved.id) : null, () => listIssueVersions(saved.id))
   const applyRead = useCallback((fresh: Issue) => {
     const previous = savedRef.current
@@ -450,7 +475,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     titleField={{ value: title, label: t('titleLabel'), readOnly: locked, maxLength: 200, onChange: titleChange, onCompositionStart: () => { composing.current = true }, onCompositionEnd: () => { composing.current = false; setEditSequence(value => value + 1) }, onBlur: () => { if (title.trim() && title !== saved.title) void save() }, onKeyDown: titleKeyDown }}
     saveError={error ? { text: error, retry: t('retryAutosave'), onRetry: retryAutosave, busy: pending } : null} syncNotice={syncState.error ? t('syncRetryNotice') : null}
     editor={(afterDescription, renderActivity) => editorWith(afterDescription, renderActivity)} acceptance={acceptance}
-    versions={versions ?? []} historyFailed={historyError ? () => { void refreshVersions() } : null} agentActivity={agentActivity}
+    versions={versions ?? []} historyFailed={historyError ? () => { void refreshVersions() } : null} earlierActivity={{ hasMore: activityRead?.hasMore ?? false, loading: activityPageLoading, failed: activityPageError, load: loadEarlierActivity }} agentActivity={agentActivity}
     documentTools={documentTools} actionRequest={actionRequest} propertyRequest={propertyRequest} requestAction={requestAction} requestProperty={requestProperty} getCurrent={getCurrent} adopt={adopt} onMetadataBusy={setMetadataSaving}
     onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }}
     onHistory={() => { void openHistory() }} onMembers={() => setMembers(true)} onDocumentTools={() => setDocumentTools(value => !value)}

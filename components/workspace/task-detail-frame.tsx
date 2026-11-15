@@ -105,6 +105,7 @@ export type FramedTaskProps = {
   acceptance: ReactNode
   versions: ActivityVersion[]
   historyFailed: (() => void) | null
+  earlierActivity: { hasMore: boolean; loading: boolean; failed: boolean; load: () => void }
   agentActivity: ReturnType<typeof useTaskWork>
   documentTools: boolean
   actionRequest: IssueActionRequest | null
@@ -388,6 +389,7 @@ export function FramedTask(props: FramedTaskProps) {
     subtasks={preview ? null : { items: subtasks, done: subtasks.filter(item => item.done).length, total: subtasks.length, onCreate: connections.error ? async () => false : menu.createChild, disabled: locked || connections.pending || Boolean(connections.error), failed: connections.error ? { text: tRelations('readFailedRetry'), retry: () => { void connections.mutate() } } : null }}
     activity={preview ? null : {
       items: activityItems, timeline: (current, additional) => activityItems(current, true, additional),
+      earlier: { hasMore: props.earlierActivity.hasMore, loading: props.earlierActivity.loading, failed: props.earlierActivity.failed, load: props.earlierActivity.load },
       failed: [...props.historyFailed ? [{ text: tDetail('activityFailed'), retry: props.historyFailed }] : [], ...props.agentActivity.failed ? [{ text: props.agentActivity.failed.label, retry: props.agentActivity.failed.retry }] : [], ...pullRequestTimeline.data?.failed ? [{ text: tActivity('timelinePullFailed'), retry: () => { void pullRequestTimeline.mutate() } }] : []],
       drafts, subscribed: menu.subscribed, onSubscribe: menu.toggleSubscribed, subscribeLabel: menu.subscribed ? tFrame('unsubscribe') : tFrame('subscribe'),
     }}
