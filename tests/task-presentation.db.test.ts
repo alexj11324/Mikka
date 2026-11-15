@@ -202,7 +202,7 @@ test('Task presentation batches keep current tenant authority and one Factory pr
 
     await t.test('the conversation directory resolves only the current requester’s readable formal task links in both directions', async () => {
       const { conversationDirectory, conversationSidebar } = await import('../lib/conversation-directory')
-      const { delegateGroupTask, authorizeGroupFactoryActor } = await import('../lib/coordinator/group-factory')
+      const { delegateGroupTask, authorizeGroupFactoryActor, groupTaskReferences } = await import('../lib/coordinator/group-factory')
       const { withTaskWorkspace } = await import('../lib/task-workspace')
       const { createIssueFromRequest } = await import('../lib/coordinator/issue-create')
       const visible: string[] = []
@@ -269,8 +269,33 @@ test('Task presentation batches keep current tenant authority and one Factory pr
         for (const id of visible) assert.deepEqual(work.items[id].linkedChats, [{ id: chat, title: 'Bound chat' }])
         for (const id of [hidden, foreign, malformed, deleted, legacyDeleted]) assert.equal(work.items[id], undefined)
         assert.deepEqual(work.items[unrelated].linkedChats, [])
+        const decisions = (userId: string) => groupTaskReferences(client, { userId, workspaceId: shared, conversationId: chat })
+        await client.query(`INSERT INTO resource_access_grants("resourceKind","resourceId","subjectKind","subjectId",capabilities)
+          VALUES ('task',$1,'account',$2,ARRAY['canReadContent'])`, [hidden,owner])
+        assert.ok((await decisions(owner)).some(row => row.issueId === hidden))
+        await client.query(`DELETE FROM resource_access_grants WHERE "resourceKind"='task' AND "resourceId"=$1 AND "subjectId"=$2`, [hidden,owner])
+        assert.ok(!(await decisions(owner)).some(row => row.issueId === hidden), 'a revoked Task must disappear from the next model input')
+        assert.deepEqual((await decisions(owner)).map(row => row.issueId), expected.map(row => row.id))
+        assert.deepEqual(await decisions(peer), [], 'a stale member row never supplies the model with another owner’s named Chat tasks')
+        const beforeMore = await counted(() => decisions(owner))
+        for (let i=0; i<21; i++) {
+          const id = await makeTask()
+          await client.query(`INSERT INTO group_task_bindings("conversationId","issueId","userId","reporterId","reporterOwnerId","reporterType","executionBotId","sourceMessageId","sourceEventId")
+            VALUES($1,$2,$3,$4,$3,'bot',$4,$5,$6)`, [chat,id,owner,bot,mention,randomUUID()])
+        }
+        const capped = await counted(() => decisions(owner))
+        assert.equal(capped.result.length, 20)
+        assert.equal(new Set(capped.result.map(row => row.issueId)).size, 20)
+        assert.equal(capped.statements.length, beforeMore.statements.length, 'one APP read and one WS conflict check per active batch')
+        assert.deepEqual(capped.statements.filter(row => row.sql.includes('WITH recent AS')).map(row => row.database), [appName])
+        assert.deepEqual(capped.statements.filter(row => row.sql.includes('SELECT "issueId" FROM mikka_team_issues')).map(row => row.database), [workspaceName])
+        await workspace.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [shared,owner])
+        try { assert.deepEqual(await decisions(owner), []) }
+        finally { await workspace.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`, [shared,owner]) }
+
         await client.query('UPDATE conversation_members SET "leftAt"=now() WHERE "conversationId"=$1 AND "memberId"=$2', [chat,owner])
         assert.deepEqual(await directory(), [])
+        assert.deepEqual(await decisions(owner), [])
       } finally { client.release() }
     })
 

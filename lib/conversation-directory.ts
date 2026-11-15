@@ -3,9 +3,7 @@ import { withConversationWorkspace, type ConversationReader } from './conversati
 import { requireTaskWorkspaceLease, taskReaderScope } from './task-workspace'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
-import { issues } from './db/schema'
-import { issueVisibilityPredicate } from './issue-visibility-policy'
-import { workspacePool } from './workspace-db'
+import { linkedTasksForChats } from './group-task-links'
 import { directoryInput, type DirectoryInput, type DirectoryState, type DirectoryTaskLink, type ConversationDirectoryPage } from './conversation-directory-input'
 import { runAwaitingApproval, runDeviceOffline } from './task-state-query'
 import { threadUnread } from './thread-reads'
@@ -124,39 +122,6 @@ export async function effectiveConversationArchive(database: RunChainQueryable, 
   return result.rows[0] ? Boolean(result.rows[0].archived) : null
 }
 
-/** Hydrate only returned named Chats. A mention in a message is never a Task binding. */
-async function linkedTasksForChats(database: RunChainQueryable, owner: string, workspace: string, rows: Row[]) {
-  const byChat = new Map<string, DirectoryTaskLink[]>()
-  const chatIds = [...new Set(rows.filter(row => row.kind === 'chat').map(row => row.id))]
-  if (!chatIds.length) return byChat
-
-  const visibility = issueVisibilityPredicate(owner, { allowedIds: [], workspaceIds: [workspace] })
-  const statement = dialect.sqlToQuery(sql`
-    SELECT c.id AS "chatId", ${issues.id} AS id, ${issues.issuedIdentifier} AS identifier, ${issues.title} AS title
-    FROM group_task_bindings b JOIN conversations c ON c.id=b."conversationId"
-    JOIN conversation_members m ON m."conversationId"=c.id AND m."memberType"='user' AND m."memberId"=${owner} AND m."leftAt" IS NULL
-    JOIN ${issues} ON ${issues.id}=b."issueId"
-    WHERE c.id=ANY(${sql.param(chatIds)}::uuid[]) AND c."workspaceId"=${workspace}
-      AND c."creationPurpose"='conversation' AND c.kind='group' AND c."createdBy"=${owner} AND b."userId"=${owner}
-      AND ${visibility}
-      AND coalesce(nullif(${issues.content}->'attrs'->'mikka','null'::jsonb),${issues.content}->'attrs'->'orvilo')->>'deletedAt' IS NULL
-    ORDER BY c.id,b."createdAt" DESC,${issues.id}`)
-  const bindings = (await database.query(statement.sql, statement.params)).rows as (DirectoryTaskLink & { chatId: string })[]
-  if (!bindings.length) return byChat
-  // Team rows live in WS. As in Task detail, a stale cross-tenant link disqualifies the APP row.
-  const ids = [...new Set(bindings.map(row => row.id))]
-  const { rows: conflicts } = await workspacePool.query<{ issueId: string }>(
-    'SELECT "issueId" FROM mikka_team_issues WHERE "issueId"=ANY($1::uuid[]) AND "workspaceId"<>$2', [ids, workspace])
-  const hidden = new Set(conflicts.map(row => row.issueId))
-  for (const { chatId, id, identifier, title } of bindings) {
-    if (hidden.has(id)) continue
-    const links = byChat.get(chatId) ?? []
-    links.push({ id, identifier, title })
-    byChat.set(chatId, links)
-  }
-  return byChat
-}
-
 function item(row: Row, linkedTasks?: DirectoryTaskLink[]) {
   const first = linkedTasks?.[0]
   return {
@@ -198,7 +163,7 @@ async function directoryPage(database: RunChainQueryable, userId: string, worksp
   const rows = (await database.query(statement,[...facts.params,userId,workspaceId,RUN_CHAIN_MAX_DEPTH,input.archived === 'any' ? null : input.archived,input.botId ?? null,
     input.search,input.state,input.cursor?.id ?? null,input.cursor?.pinned ?? null,input.cursor?.at ?? null,input.pullState,input.cursor?.kind ?? null])).rows as Row[]
   const page = rows.slice(0,100), last = page.at(-1)
-  const linked = await linkedTasksForChats(database, userId, workspaceId, page)
+  const linked = await linkedTasksForChats(database, userId, workspaceId, page.filter(row => row.kind === 'chat').map(row => row.id))
   return { items: page.map(row => item(row, row.kind === 'chat' ? linked.get(row.id) : undefined)).filter(row=>!input.search || row.title.toLowerCase().includes(input.search.toLowerCase())),
     cursor: rows.length>page.length && last ? {id:last.id,at:last.at,pinned:last.pinned,kind:last.kind} : null }
 }
@@ -225,7 +190,7 @@ async function sidebarRows(database: RunChainQueryable, userId: string, workspac
     FROM bot_rows WHERE NOT archived AND "botId" IS NOT NULL AND source IS DISTINCT FROM 'mcp' ${botFilter}
   ) SELECT * FROM ranked WHERE position<=9 ORDER BY "botId",position`
   const rows = (await database.query(statement, values)).rows as (Row & { unreadCount: number })[]
-  const linked = await linkedTasksForChats(database, userId, workspaceId, rows.filter(row => row.position <= 8))
+  const linked = await linkedTasksForChats(database, userId, workspaceId, rows.filter(row => row.kind === 'chat' && row.position <= 8).map(row => row.id))
   const bots: Record<string,{ items: (ReturnType<typeof item> & {harness:string | null; status:string | null})[]; more:boolean; unreadCount:number }> = {}
   for (const row of rows) {
     const group = bots[row.botId!] ??= {items:[],more:false,unreadCount:row.unreadCount}

@@ -1404,6 +1404,13 @@
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "lib/group-task-links.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the current requester's Chat to Task bindings for the directory and decision context only after installation workspace, membership and Task authorization.",
+    "test": "tests/task-presentation.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
   "lib/group-messages.ts": {
     "mode": "built-in",
     "environment": [],
