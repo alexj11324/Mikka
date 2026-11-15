@@ -180,9 +180,36 @@ Capy 套餐里的「cloud machines」对应的是第三种：跑线程的云端 
 - **已经在跑、中途没钱**：线程里出提示卡。模型额度用完是「Your organization is out of credits」+「Add credits」+「Set up auto-reload so this doesn't happen again」；机器是「Not enough credits / Add credits to buy machine time」，机器状态行「Out of credits · Cloud machines need Capy credits, see Settings → Billing」；套餐不含该模型是「Not covered by the {plan} plan, upgrade or choose another model」。
 - Mikka 照抄：发送前同样检查，要花 Mikka 额度而工作区没套餐、没余额时，弹 affectUI / 设置里现有的套餐窗口「选择套餐」「套餐每月包含用量，随时可换」，成员看到「请管理员选择套餐或充值」；运行中没钱沿用现在 `Billing.refusal` 的卡，文案换成上面几句的中文。
 
-## 5. 待定
+## 5. 机器价格对比
 
-1. Cloudflare 编程机器的小时价和 Lite 的并发上限。照抄 Capy 的话：默认机器 $0.40/小时，Lite 并发内存合计 128 GB。
+Capy 的机器（包里的 `IE` 和价格表，按内存定价，每 GB 每小时 $0.025）：
+
+| Capy | vCPU | 内存 | 每小时 |
+| --- | --- | --- | --- |
+| Small | 1 | 4 GB | $0.10 |
+| Medium | 2 | 8 GB | $0.20 |
+| Large（默认） | 4 | 16 GB | $0.40 |
+| Ultra | 8 | 32 GB | $0.80 |
+| Hyper | 16 | 64 GB | $1.60 |
+| Big Guy | 16 | 128 GB | $3.20 |
+
+Capy 的机器跑在 E2B 上，而且像是自己部署的 E2B：预览域名 `capysandbox.net` 写明是「the API's E2B_DOMAIN」，管理开关里有「New cloud machines run on the cox cluster (E2B_COX_DOMAIN)」，镜像构建脚本里有 `/run/e2b/certs`。按 E2B 公开价（vCPU $0.0504/小时，内存 $0.0162/GiB·小时），Large 要 $0.46/小时，比 Capy 卖的 $0.40 还贵，所以它不是按 E2B 公开价在买。
+
+Mikka 的 Cloudflare 编程机器（Cloudflare Containers：内存 $0.009/GiB·小时、磁盘 $0.00025/GB·小时按开着的时间算；CPU $0.072/vCPU·小时只按实际在用的算；睡着不计费）。现在用的是 standard-1（`cloudflare/task-sandbox/machine.mjs:73`）。单台上限默认 4 vCPU / 12 GiB，可以申请提高。
+
+| Cloudflare 规格 | vCPU | 内存 | 磁盘 | 成本：CPU 闲着（约 20%） | 成本：CPU 跑满 |
+| --- | --- | --- | --- | --- | --- |
+| standard-1（现在用的） | 0.5 | 4 GiB | 8 GB | 约 $0.05 | $0.074 |
+| standard-2 | 1 | 6 GiB | 12 GB | 约 $0.07 | $0.13 |
+| standard-3 | 2 | 8 GiB | 16 GB | 约 $0.10 | $0.22 |
+| standard-4 | 4 | 12 GiB | 20 GB | 约 $0.17 | $0.40 |
+
+编程 Agent 大部分时间在等模型回复，CPU 不高，跑构建和测试时才满。所以按 Capy 的「每 GB 每小时 $0.025」定价：standard-1 卖 $0.10、standard-3 卖 $0.20、standard-4 卖 $0.30，CPU 正常时毛利约 40–50%，只有 standard-4 长时间跑满 CPU 时会亏（成本 $0.40，卖 $0.30）。
+
+## 5b. 待定
+
+1. 机器怎么定价：按 Capy 的每 GB 每小时 $0.025（同配置同价，方便对比），还是 standard-4 也卖 $0.40（不亏，但比 Capy 少 4 GB 内存）。
+2. 默认哪一档：Capy 默认 Large（4 vCPU / 16 GB）；我们现在是 standard-1。
 
 ## 6. 分几步做
 
