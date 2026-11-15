@@ -219,3 +219,24 @@ test('a missing revision window cannot reassign creation or skipped changes to a
   assert.deepEqual(deriveIssueActivity([sample(1, 'Created'), ...recent], []).map(event => event.id),
     ['created-v1', 'title-v81'])
 })
+
+test('activity removes only persisted Factory stage messages while preserving mixed discussions and reply targets', async () => {
+  const { taskActivityFacts, taskActivityThreads } = await import('./task-activity-timeline')
+  const at = '2026-11-15T00:00:00Z'
+  const later = '2026-11-15T00:01:00Z'
+  const stage = { id: 'stage', author: 'Bot', at, body: 'Review' }
+  const human = { id: 'reply', author: 'Alex', authorUserId: 'owner', at: later, body: 'Review' }
+  const bot = { ...stage, id: 'genuine-bot-comment' }
+  const mixed = { id: 'factory', author: 'Bot', createdAt: at, resolved: true, messages: [stage, human, bot] }
+  const other = { ...mixed, id: 'other', messages: [stage] }
+  const machine = { ...mixed, id: 'machine', messages: [stage] }
+  const refs = [{ threadId: 'factory', messageId: 'stage' }, { threadId: 'machine', messageId: 'stage' }]
+  const facts = taskActivityFacts([], [mixed, other, machine], refs)
+  assert.deepEqual(facts.map(fact => fact.id).sort(), [
+    'discussion:factory:reply', 'discussion:factory:genuine-bot-comment', 'discussion:other:stage',
+  ].sort())
+  const visible = taskActivityThreads([mixed, other, machine], refs)
+  assert.equal(visible[1], other)
+  assert.deepEqual(visible[0], { ...mixed, author: 'Alex', createdAt: later, messages: [human, bot] })
+  assert.equal(mixed.messages.length, 3)
+})

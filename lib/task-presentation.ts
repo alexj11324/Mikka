@@ -8,6 +8,8 @@ import { taskStateOf, type TaskStateContext, type TaskStateRun, type TaskStateVi
 
 export type TaskPresentation = TaskStateView & {
   linkedChats?: { id: string; title: string }[]
+  /** Identities already written to this Task's shared discussion document. */
+  factoryStageComments?: import('./task-activity-timeline').FactoryStageComment[]
   pullRequests?: IssuePullRequest[]
   version: 1
   /** Missing on cached snapshots from before the Inbox attention projection. */

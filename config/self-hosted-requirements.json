@@ -1918,6 +1918,13 @@
     "test": "tests/task-resource-registration.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "lib/task-stage-comments.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Task detail reads persisted Factory stage message IDs from the installation's PostgreSQL and includes only IDs already visible in the authorized Task document.",
+    "test": "tests/task-presentation.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
   "lib/task-state-query.ts": {
     "mode": "built-in",
     "environment": [],
@@ -2128,5 +2135,12 @@
     "behavior": "The separately deployed broker uses its configured PostgreSQL database for credential leases. The Vercel handler verifies caller identity, and the private Cloudflare transport requires an explicit runtime environment before validating the bounded lease request.",
     "test": "services/credential-broker/server.test.mjs",
     "suite": "test:self-hosted-broker"
+  },
+  "lib/governance/organizations.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read retained archived organization names for currently active owners from the existing workspace database. The active directory remains separate and no additional service or credential is required.",
+    "test": "lib/enterprise/governance.db.test.ts",
+    "suite": "test:enterprise-db"
   }
 }
