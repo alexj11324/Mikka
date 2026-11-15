@@ -77,7 +77,16 @@ jobs:
           test "$(git rev-parse 'HEAD^{tree}')" = ${{ matrix.tree }}
           test -z "${DB_TEST_SELECTED+x}" && test -z "${DB_TEST_SHARD+x}"
           mkdir -m 700 "$RUNNER_TEMP/baseline-db-receipt"
+          git rev-parse HEAD > "$RUNNER_TEMP/baseline-db-receipt/source"
       - uses: ./.github/actions/pnpm-install
+      - name: Generate ephemeral test-only auth secret
+        run: |
+          node --input-type=commonjs - <<'NODE'
+          const { appendFileSync, writeSync } = require('node:fs')
+          const secret = require('node:crypto').randomBytes(32).toString('hex')
+          writeSync(1, `::add-mask::${secret}\n`)
+          appendFileSync(process.env.GITHUB_ENV, `BETTER_AUTH_SECRET=${secret}\n`)
+          NODE
       - run: pnpm test:e2e:setup
       - name: Bind the disposable PostgreSQL and identities to the exact public commit
         run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
