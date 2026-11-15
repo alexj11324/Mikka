@@ -70,7 +70,7 @@ export class TaskMachine extends DurableObject {
   async startImage(run) {
     const container = this.ctx.container
     if (!container) throw new Error('Task container unavailable')
-    await startTaskImage(container, { image: container.images.task, instance: 'standard-1',
+    await startTaskImage(container, { image: container.images.task, instance: 'standard-3',
       enableInternet: this.env.NATIVE_TASK_EGRESS === 'direct',
       entrypoint: ['sleep', String(Math.max(1, Math.ceil(this.idleLimit(run) / 1000)))] }, this.idleLimit(run))
   }

@@ -849,10 +849,10 @@
   "lib/cloud-computer/sponsored-task.ts": {
     "mode": "optional-cloud",
     "environment": [
-      "MIKKA_CLOUDFLARE_TASK_WORKSPACES",
+      "MIKKA_CLOUDFLARE_TASKS_DISABLED",
       "MIKKA_TASK_MACHINE_BRIDGE_TOKEN"
     ],
-    "behavior": "A sponsored machine requires the workspace allowlist and a private bridge token. Unconfigured workspaces cannot acquire the machine grant.",
+    "behavior": "A Cloudflare task machine requires the private bridge token and is paid from Mikka credits before it opens; MIKKA_CLOUDFLARE_TASKS_DISABLED=1 turns it off.",
     "test": "lib/coding-workspace/review-authority.db.test.ts",
     "suite": "test:coding-workspace-db"
   },
@@ -890,7 +890,7 @@
   "lib/coding-workspace/cloudflare-review.ts": {
     "mode": "optional-cloud",
     "environment": [
-      "MIKKA_CLOUDFLARE_TASK_WORKSPACES",
+      "MIKKA_CLOUDFLARE_TASKS_DISABLED",
       "MIKKA_TASK_MACHINE_BRIDGE_TOKEN"
     ],
     "behavior": "A separately admitted sponsored checkout builds a bounded human lease. Local and owner-provided E2B review keep their existing transport.",

@@ -30,9 +30,14 @@ type BoundRun = ResourceRun & {
 export const hostedSnapshot = 'cloudflare-task-v1'
 const denied = () => new Error('Cloudflare task machine unavailable')
 
-export function hostedTaskEnabled(workspaceId: string) {
-  const cohort = (process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES ?? '').split(',').map((id) => id.trim())
-  return Boolean(process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN) && cohort.includes(workspaceId)
+/**
+ * Cloudflare task machines are open to every workspace; they are paid from
+ * Mikka 额度 (decision 2026-11-15-1900), so an unfunded workspace is refused when
+ * the machine would start, not here. MIKKA_CLOUDFLARE_TASKS_DISABLED=1 is the
+ * kill switch.
+ */
+export function hostedTaskEnabled(_workspaceId: string) {
+  return Boolean(process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN) && process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED !== '1'
 }
 
 export async function verifySponsoredChoice(query: Query, placement: SponsoredTaskPlacement) {
