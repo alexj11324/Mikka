@@ -62,12 +62,13 @@ export function extractActionErrorCodes(source) {
 
 /**
  * A bot never owns or runs a thread: an Agent runs it and the bot only
- * dispatches it (Alex, 2026-11-02). Copy says 「<Bot> 派出的线程」,
- * never 「<Bot> 的线程」 or 「所属 Bot」, nor "a bot's threads"; and an
- * Agent never dispatches, so 「{agent} 派出」 fails too.
+ * dispatches it (Alex, 2026-11-02). Copy says 「<Bot> 派出的对话」,
+ * never 「<Bot> 的对话」 or 「所属 Bot」, nor "a bot's threads"; and an
+ * Agent never dispatches, so 「{agent} 派出」 fails too. 「与 <Bot> 的对话」 is a
+ * Bot chat, not a thread, and passes.
  */
 const THREAD_OWNER = {
-  'zh-CN': [/所属\s*Bot/i, /(?:Bot|Coordinator|\{(?:agent|bot|botName)\})\s*的线程/i, /它们的线程/, /\{agent\}\s*派出/],
+  'zh-CN': [/所属\s*Bot/i, /(?<!与\s*)(?:Bot|Coordinator|\{(?:agent|bot|botName)\})\s*的(?:线程|对话)/i, /它们的(?:线程|对话)/, /\{agent\}\s*派出/],
   en: [/\bbots?(?:['’]s?)?\s+threads?\b/i, /\{(?:agent|bot|botName)\}(?:['’]s)?\s+threads?\b/, /\bbots?\b[^.]*\btheir threads\b/i, /\{agent\}\s+dispatched|dispatched by \{agent\}/i],
 }
 
@@ -75,8 +76,21 @@ export function findThreadOwnership(messages) {
   const problems = []
   for (const [locale, patterns] of Object.entries(THREAD_OWNER)) {
     for (const [key, value] of flattenMessages(messages[locale] ?? {})) {
-      if (typeof value === 'string' && patterns.some(pattern => pattern.test(value))) problems.push(`${locale}: "${key}" says a bot owns a thread ("${value}"); say 「<Bot> 派出的线程」 / "threads a bot dispatched"`)
+      if (typeof value === 'string' && patterns.some(pattern => pattern.test(value))) problems.push(`${locale}: "${key}" says a bot owns a thread ("${value}"); say 「<Bot> 派出的对话」 / "threads a bot dispatched"`)
     }
+  }
+  return problems
+}
+
+/**
+ * A thread is 对话 in Chinese (Alex, 2026-11-15; docs/design/glossary.md). 线程 has no
+ * other meaning in the UI, so it never appears; 会话 stays for sign-in sessions only and
+ * is reviewed by hand.
+ */
+export function findBannedThreadWords(messages) {
+  const problems = []
+  for (const [key, value] of flattenMessages(messages['zh-CN'] ?? {})) {
+    if (typeof value === 'string' && /线程/.test(value)) problems.push(`zh-CN: "${key}" says 线程 ("${value}"); a thread is 对话`)
   }
   return problems
 }
@@ -285,6 +299,7 @@ export function checkRepository() {
   if (problems.length) return problems
   problems.push(...compareMessages(messages))
   problems.push(...findThreadOwnership(messages))
+  problems.push(...findBannedThreadWords(messages))
   const codeFile = path.join(ROOT, 'lib/action-result.ts')
   if (fs.existsSync(codeFile)) {
     const codes = extractActionErrorCodes(fs.readFileSync(codeFile, 'utf8'))

@@ -61,7 +61,7 @@ test('runs that disappear only update the map', () => {
   assert.equal(update.next.size, 0)
 })
 
-test('a finished thread notifies the desktop when 线程完成 is on', () => {
+test('a finished thread notifies the desktop when 对话完成 is on', () => {
   const previous = new Map<string, DesktopRun['status']>([['a', 'running'], ['b', 'succeeded']])
   const update = desktopRunUpdate(previous, [
     run({ issueId: 'a', status: 'succeeded' }),
@@ -72,7 +72,7 @@ test('a finished thread notifies the desktop when 线程完成 is on', () => {
   ])
 })
 
-test('a finished thread stays silent on the desktop when 线程完成 is off', () => {
+test('a finished thread stays silent on the desktop when 对话完成 is off', () => {
   const previous = new Map<string, DesktopRun['status']>([['a', 'running']])
   assert.deepEqual(desktopRunUpdate(previous, [run({ issueId: 'a', status: 'succeeded' })], 2_000, false).notifications, [])
   assert.deepEqual(desktopRunUpdate(previous, [run({ issueId: 'a', status: 'succeeded' })], 2_000).notifications, [])

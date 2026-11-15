@@ -3,12 +3,12 @@ import { test } from 'node:test'
 import { codePushBody, pushAllowed, pushBody } from './mobile-push'
 import { DEFAULT_PREFERENCES } from './preferences'
 
-test('defaults push decisions and finished threads (线程完成 on by default)', () => {
+test('defaults push decisions and finished threads (对话完成 on by default)', () => {
   assert.equal(pushAllowed(DEFAULT_PREFERENCES, ['decide']), true)
   assert.equal(pushAllowed(DEFAULT_PREFERENCES, ['finished']), true)
 })
 
-test('a member who turns 线程完成 off gets no finished push', () => {
+test('a member who turns 对话完成 off gets no finished push', () => {
   assert.equal(pushAllowed({ ...DEFAULT_PREFERENCES, pushFinished: false }, ['finished']), false)
   assert.equal(pushAllowed({ ...DEFAULT_PREFERENCES, pushFinished: false }, ['decide']), true)
 })

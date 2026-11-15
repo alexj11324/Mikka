@@ -17,7 +17,7 @@ export function eventText(line: EventLine | undefined, sources: Record<string, C
   if (!line) return '有一条新动态'
   const run = line.runId ? sources[line.runId] : undefined
   // The thread by its task's title; the task's key (ALEX-45) is an internal id (#1386).
-  const thread = run?.kind === 'run' ? runName(run) : '一个线程'
+  const thread = run?.kind === 'run' ? runName(run) : '一个对话'
   const issue = line.issueId ? sources[line.issueId] : undefined
   const task = issue?.kind === 'issue' ? issue.title : line.title ? `「${line.title}」` : '一个任务'
   const schedule = line.title ? `定时任务「${line.title}」` : '一个定时任务'

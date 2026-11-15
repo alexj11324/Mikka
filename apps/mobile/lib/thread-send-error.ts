@@ -4,9 +4,9 @@
  * the app could not reach the server, and sending again is one tap.
  */
 const LINES: Record<string, string> = {
-  threadReplaced: '这个任务已经换到新的线程，请在那里发送。',
-  threadCannotContinue: '这个线程没有关联任务，无法再次运行。',
-  threadStopping: '线程正在停止',
+  threadReplaced: '这个任务已经换到新的对话，请在那里发送。',
+  threadCannotContinue: '这个对话没有关联任务，无法再次运行。',
+  threadStopping: '对话正在停止',
   agentRepoMissing: '这台设备上没有该仓库。',
   agentNoDevice: '所选 Agent 还没有可用电脑。',
   runNotFound: '运行不存在。',

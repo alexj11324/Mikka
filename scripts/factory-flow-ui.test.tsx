@@ -163,7 +163,7 @@ test('a refused approval names why with its own copy', async () => {
   await withFetch([json(409, { error: 'factoryEvidenceRequired' })], async () => {
     await act(async () => { button('批准方案')!.click() })
   })
-  assert.match(document.querySelector('[role="alert"]')?.textContent ?? '', /方案线程未提交结果/)
+  assert.match(document.querySelector('[role="alert"]')?.textContent ?? '', /方案对话未提交结果/)
   assert.ok(button('批准方案'))
 })
 
