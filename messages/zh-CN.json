@@ -7821,6 +7821,16 @@
     "loadError": "无法加载个人文件。"
   },
   "Automations": {
+    "usage": {
+      "title": "用量",
+      "empty": "最近 14 天没有运行",
+      "day": "日期",
+      "runs": "运行",
+      "skipped": "跳过",
+      "tasks": "任务",
+      "cost": "花费",
+      "ofCap": "{runs} / {cap}"
+    },
     "githubEvent": {
       "pull_request_opened": "PR 打开",
       "draft_opened": "草稿 PR 打开",
@@ -7847,6 +7857,7 @@
       "paused": "已暂停"
     },
     "status": {
+      "autoPaused": "已自动暂停",
       "active": "已启用",
       "paused": "已暂停",
       "completed": "已结束",
@@ -7879,6 +7890,9 @@
       "dispatch_task": "交给 Bot"
     },
     "editor": {
+      "perDay": "每天最多运行",
+      "unlimited": "不限",
+      "autoPaused": "已自动暂停：{reason}",
       "github": {
         "title": "GitHub 事件",
         "item": "GitHub 事件 {number}",
@@ -7974,6 +7988,7 @@
       "cancelled": "已取消"
     },
     "runErrors": {
+      "dailyRunLimit": "今天的运行次数已到上限，已跳过",
       "runWhenNotMet": "不满足运行条件，已跳过",
       "scheduleRunWhenUnavailable": "暂时无法判断运行条件，稍后重试",
       "misfireSkipped": "错过了时间，已跳过",

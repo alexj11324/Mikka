@@ -31,6 +31,7 @@ import { runTask, type AutomationRun, type AutomationView } from '@/lib/schedule
 import { definitionFrom, draftFrom, emptyDraft, foldNeeded, type AutomationDraft, type IntervalUnit, type ScheduleKind } from './automation-draft'
 import { useWorkspaceBotNames } from './automations-page'
 import { GitHubTriggers } from './github-triggers'
+import { AutomationUsagePanel } from './automation-usage'
 import { useNextRunLabel, useTimingSummary } from './automation-summary'
 
 const zones = (() => { try { return Intl.supportedValuesOf('timeZone') } catch { return ['UTC'] } })()
@@ -48,6 +49,8 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
   const tAll = useTranslations('Automations')
   const tCommon = useTranslations('Common')
   const actionError = useActionError()
+  const tErrors = useTranslations('Errors')
+  const errorText = (code: string) => tErrors.has(code as never) ? tErrors(code as never) : code
   const creating = id === 'new'
   const { automation, history } = useAutomation(workspaceId, creating ? null : id)
   const current = automation.data ?? null
@@ -153,6 +156,7 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         <span>{t('creator')} · {creator}</span>
         {current && <Badge variant={current.status === 'active' ? 'secondary' : 'outline'}>{tAll(`status.${current.status}`)}</Badge>}
+        {current?.status === 'paused' && current.disabled_reason && <span role="status" className="text-destructive-foreground">{t('autoPaused', { reason: errorText(current.disabled_reason) })}</span>}
       </div>
     </header>
 
@@ -237,7 +241,13 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
       {field(t('concurrent'), <NativeSelect aria-label={t('concurrent')} value={String(draft.concurrent)} onChange={event => set({ concurrent: Number(event.target.value) })}>
         {[1, 2, 3, 4, 5].map(count => <NativeSelectOption key={count} value={String(count)}>{count}</NativeSelectOption>)}
       </NativeSelect>)}
+      {field(t('perDay'), <NativeSelect aria-label={t('perDay')} value={String(draft.perDay)} onChange={event => set({ perDay: Number(event.target.value) })}>
+        <NativeSelectOption value="0">{t('unlimited')}</NativeSelectOption>
+        {[...new Set([1, 2, 3, 5, 10, 20, 50, 100, draft.perDay])].filter(count => count > 0).sort((a, b) => a - b).map(count => <NativeSelectOption key={count} value={String(count)}>{count}</NativeSelectOption>)}
+      </NativeSelect>)}
     </SettingsSection>
+
+    {!creating && current && <AutomationUsagePanel workspaceId={workspaceId} id={current.id} />}
 
     {!creating && <SettingsSection id="automation-history" title={t('history')}>
       {history.error && !history.data ? <div className="p-4"><InlineLoadError message={tAll('loadError')} retryLabel={tCommon('retry')} onRetry={() => { void history.mutate() }} /></div>

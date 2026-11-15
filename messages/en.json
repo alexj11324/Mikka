@@ -7821,6 +7821,16 @@
     "loadError": "Could not load personal files."
   },
   "Automations": {
+    "usage": {
+      "title": "Usage",
+      "empty": "No runs in the last 14 days",
+      "day": "Day",
+      "runs": "Runs",
+      "skipped": "Skipped",
+      "tasks": "Tasks",
+      "cost": "Spend",
+      "ofCap": "{runs} / {cap}"
+    },
     "githubEvent": {
       "pull_request_opened": "PR opened",
       "draft_opened": "Draft PR opened",
@@ -7847,6 +7857,7 @@
       "paused": "Paused"
     },
     "status": {
+      "autoPaused": "Paused automatically",
       "active": "On",
       "paused": "Paused",
       "completed": "Finished",
@@ -7879,6 +7890,9 @@
       "dispatch_task": "Hand to a Bot"
     },
     "editor": {
+      "perDay": "At most per day",
+      "unlimited": "No limit",
+      "autoPaused": "Paused automatically: {reason}",
       "github": {
         "title": "GitHub events",
         "item": "GitHub event {number}",
@@ -7974,6 +7988,7 @@
       "cancelled": "Cancelled"
     },
     "runErrors": {
+      "dailyRunLimit": "Daily run limit reached; skipped",
       "runWhenNotMet": "Condition not met; skipped",
       "scheduleRunWhenUnavailable": "Couldn't check the condition; will retry",
       "misfireSkipped": "Missed its time, skipped",

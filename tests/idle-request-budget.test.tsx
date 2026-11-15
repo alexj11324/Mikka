@@ -283,6 +283,7 @@ Object.assign(fixtures, {
   'automations.automationHistory': () => ({ occurrences: [{ id: 'c0000000-0000-4000-8000-000000000001', due_at: AT, started_at: AT, finished_at: AT, status: 'succeeded', attempts: 1, error: null, result: { id: ISSUE, title: 'Fix sign-in redirect', identifier: 'MIK-7' } }] }),
   'bots.listWorkspaceBots': () => ({ bots: [{ id: BOT, name: 'Scout', color: 'bleu', shape: 'galet' }] }),
   'bots.listBots': () => bots,
+  'automations.automationUsage': () => ({ timezone: 'America/New_York', maxRunsPerDay: 5, days: [{ day: '2026-11-05', runs: 2, skipped: 0, tasks: 2, costMicroUsd: 420000 }] }),
   'bots.getWorkspaceBotDefaults': () => ({ defaultModel: null, defaultRepository: null, models: [], repositories: ['v2/github.com/acme/web'] }),
 })
 // A bodyless native create prewarms the mapped session without starting a turn.
