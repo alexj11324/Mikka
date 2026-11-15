@@ -1,4 +1,4 @@
-name: Original conversation Codex turn with isolated local inference
+name: Original conversation authenticated delivery and real Codex inference
 on:
   push:
     branches: [evidence/2254-sidebar-85dfc396]
@@ -39,13 +39,14 @@ jobs:
           test "$(git -C product rev-parse HEAD)" = "$SOURCE"
           test "$(git -C product rev-parse 'HEAD^{tree}')" = 06f883f1daa48e91da983414af321de60fcc57c8
           cd product
-          pnpm install --frozen-lockfile --filter @mikka/daemon... --filter .
+          pnpm install --frozen-lockfile
           cd ../harness/evidence/2257/local-provider
           npm ci --ignore-scripts --no-audit --no-fund
           mkdir -m 700 "$RUNNER_TEMP/model-fixture" "$RUNNER_TEMP/isolated-home" "$RUNNER_TEMP/receipt"
           python prepare.py "$GITHUB_WORKSPACE/product" "$RUNNER_TEMP/model-fixture"
           mkdir -p "$GITHUB_WORKSPACE/product/.cache/e-codex-actual"
-          cp adapter.mts "$GITHUB_WORKSPACE/product/.cache/e-codex-actual/adapter.mts"
+          cp delivery.mts "$GITHUB_WORKSPACE/product/.cache/e-codex-actual/delivery.mts"
+          if [ ! -x /usr/lib/postgresql/17/bin/initdb ]; then sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends postgresql-17; fi
       - name: Run the official Codex adapter and verified GGUF inside isolated loopback
         shell: bash
         run: |
@@ -58,15 +59,16 @@ jobs:
             ip link set lo up
             test "$(ls /sys/class/net)" = lo || test "$(ip -o link show | wc -l)" = 1
             test -z "$(ip route show default)"
-            exec setpriv --reuid="$1" --regid="$2" --clear-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs env -i PATH="$3" HOME="$4" bash "$5/verify.sh" "$5" "$6" "$7/receipt" "$7/model-fixture/codex" "$7/model-fixture/model.gguf"
+            exec setpriv --reuid="$1" --regid="$2" --clear-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs env -i PATH="$3" HOME="$4" bash "$5/pg-verify.sh" "$5" "$6" "$7/receipt" "$7/model-fixture/codex" "$7/model-fixture/model.gguf"
           ' isolated "$worker_uid" "$worker_gid" "$PATH" "$RUNNER_TEMP/isolated-home" "$harness" "$src" "$RUNNER_TEMP"
       - name: Retain only the sanitized source, model and event receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: codex-turn-4b25eb64
+          name: codex-pg-delivery-4b25eb64
           path: |
-            ${{ runner.temp }}/receipt/receipt.json
+            ${{ runner.temp }}/receipt/delivery.json
+            ${{ runner.temp }}/receipt/setup-diagnostic.txt
             ${{ runner.temp }}/receipt/requests.jsonl
             ${{ runner.temp }}/receipt/results.jsonl
             ${{ runner.temp }}/receipt/provider-ends.jsonl

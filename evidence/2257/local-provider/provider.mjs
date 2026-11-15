@@ -40,6 +40,9 @@ const server=createServer({key:readFileSync(work+'/endpoint.key'),cert:readFileS
   const result=await session.prompt(prompt,{temperature:0,maxTokens:64,signal:abort.signal,onTextChunk:delta=>{
    if(!output)receipt('first-token.jsonl',{responseId,task:prompt,outputChunkSha:h(delta)})
    output+=delta
+   // Keep the first model response streaming long enough for the database and
+   // authenticated RPC round trip. Token text is always produced by the GGUF.
+   if(prompt.startsWith('List twenty vegetables')) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,125)
    emit('response.output_text.delta',{item_id:itemId,output_index:0,content_index:0,delta})
   }})
   if(result!==output)throw Error('Different streamed and final GGUF output')
