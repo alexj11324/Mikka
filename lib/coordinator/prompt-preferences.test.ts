@@ -121,10 +121,10 @@ stub('../telegram/client.ts', { postTelegramText: forbidden })
 stub('../../workflows/coordinator/tool-scope.ts', { assertNativeToolScope: forbidden })
 mock.module('next/server', { namedExports: { NextResponse: Response, after: () => {} } })
 
-let sdk: typeof import('../../workflows/coordinator/steps'), store: typeof import('./store'), personal: typeof import('./personal-instructions')
+let composer: typeof import('./product-instructions'), store: typeof import('./store'), personal: typeof import('./personal-instructions')
 before(async () => {
   overrideDeploymentSwitch('factoryRouting', false)
-  ;[sdk, store, personal] = await Promise.all([import('../../workflows/coordinator/steps'), import('./store'), import('./personal-instructions')])
+  ;[composer, store, personal] = await Promise.all([import('./product-instructions'), import('./store'), import('./personal-instructions')])
 })
 after(() => overrideDeploymentSwitch('factoryRouting', undefined))
 beforeEach(() => {
@@ -147,7 +147,7 @@ beforeEach(() => {
 })
 
 test('actual hosted preparation reads prompt preferences once without attention or a second instruction query', async () => {
-  const prompt = await sdk.prepareEveInstructions(owner, bot, snapshot)
+  const prompt = await composer.composeEveInstructions(owner, bot, snapshot)
   assert.equal(reads.filter(row => row.kind === 'preferences' || row.kind === 'attention').length, 1)
   assert.deepEqual(reads.filter(row => row.kind === 'preferences').map(row => row.selection), [['memoryEnabled', 'personalInstructions']])
   assert.equal(prompt, promptWithCachedContext(instructionsWithPersonal(withCoordinatorPresentation(executionInstructions(snapshot)), preferences[owner].personalInstructions), cachedContextLines('Synthetic authorized repositories', 'Synthetic allowed models'), sessions[owner].memory, '\n' + SCHEDULE_INSTRUCTIONS + '\nSynthetic current availability').instructions)
@@ -159,21 +159,21 @@ test('actual hosted preparation reads prompt preferences once without attention 
 test('approved facts use the native turn and one preference snapshot; disabled memory records no use', async () => {
   profileText = 'Synthetic approved profile fact'
   const nativeTurn = { sessionId: 'wrun_actual', turnId: 'turn_1' }
-  const first = await sdk.prepareEveInstructions(owner, bot, snapshot, nativeTurn)
+  const first = await composer.composeEveInstructions(owner, bot, snapshot, nativeTurn)
   assert.match(first, /Synthetic approved profile fact/)
   assert.match(first, /Synthetic saved memory/)
   assert.deepEqual(profileReads, [{ owner, bot, enabled: true, nativeTurn }])
   preferences[owner].memoryEnabled = false
-  const second = await sdk.prepareEveInstructions(owner, bot, snapshot, nativeTurn)
+  const second = await composer.composeEveInstructions(owner, bot, snapshot, nativeTurn)
   assert.doesNotMatch(second, /Synthetic approved profile fact|Synthetic saved memory/)
   assert.equal(profileReads.length, 1, 'disabled memory never queries or records facts')
   assert.equal(reads.filter(row => row.kind === 'preferences').length, 2)
 })
 
 test('next hosted prompt uses fresh changed and cleared values without changing stored memory', async () => {
-  const first = await sdk.prepareEveInstructions(owner, bot, snapshot)
+  const first = await composer.composeEveInstructions(owner, bot, snapshot)
   preferences[owner] = { memoryEnabled: false, personalInstructions: '' }
-  const second = await sdk.prepareEveInstructions(owner, bot, snapshot)
+  const second = await composer.composeEveInstructions(owner, bot, snapshot)
   assert.match(first, /Synthetic personal instruction/)
   assert.match(first, /Synthetic saved memory/)
   assert.doesNotMatch(second, /Synthetic personal instruction|Synthetic saved memory/)

@@ -12,9 +12,7 @@ test('native traces keep private capability request headers out of invocation lo
 const stateKey = 'mikka:eve-host:lifecycle:v1'
 const env = {
   EVE_SOURCE_SHA: 'a'.repeat(40), EVE_UI_SHA: 'b'.repeat(40), EVE_RELEASE_ID: 'fixture-1',
-  EVE_HOST_POLICY: 'shared-warm', EVE_PUBLIC_ORIGIN: 'https://eve.example.test',
-  EVE_HOST_WARM_UNTIL: new Date(Date.now() + 60_000).toISOString(),
-  WORLD_QUEUE_PUBLIC_KEY: Buffer.alloc(32, 2).toString('base64'), WORLD_SERVICE: { fetch() {} },
+  EVE_PUBLIC_ORIGIN: 'https://eve.example.test',
   EVE_ENV_MIKKA_DATABASE_URL: 'postgres://fixture:private-password@127.0.0.1/product_e2e',
   EVE_ENV_BETTER_AUTH_URL: 'https://app.example.test',
   EVE_ENV_MIKKA_DEPLOYMENT_STAGE: 'preview',
@@ -55,7 +53,7 @@ function fixture(map = new Map(), bindings = env) {
     async put(key, value) { map.set(key, structuredClone(value)) },
     async transaction(work) { return work(storage) },
   }
-  return { host: new EveRuntime({ storage, container: { async interceptOutboundHttps() {} }, exports: { EveWorldOutbound: x => x, EveProductOutbound: x => x } }, bindings), map }
+  return { host: new EveRuntime({ storage, container: { async interceptOutboundHttps() {} }, exports: { EveProductOutbound: x => x } }, bindings), map }
 }
 beforeEach(() => { calls = 0; forwarded = undefined; selected = new Response('native'); mock.restoreAll() })
 
@@ -75,71 +73,15 @@ test('native WebSocket upgrade responses are returned without reconstruction', a
   assert.equal(await ingress.fetch(new Request('https://app.example.test/mikka/api/agents/eve/v1/session/s/stream'), env), selected)
 })
 
-test('a failed restart callback schedules the next attempt while its own one-shot row still exists', async () => {
-  const errors = []
-  mock.method(console, 'error', value => { errors.push(value) })
-  const { host, map } = fixture()
-  await host.onStart()
-  await host.onStop()
-  const first = host.pending.find(row => row.callback === 'restartAfterExit')
-  host.failedStarts = 1
-  await host.restartAfterExit(first.payload)
-  host.pending = host.pending.filter(row => row !== first) // The SDK deletes it after the callback.
-  assert.equal(map.get(stateKey).attempt, 2)
-  assert.equal(host.pending.filter(row => row.callback === 'restartAfterExit').length, 1)
-  assert.equal(host.pending.find(row => row.callback === 'restartAfterExit').payload.attempt, 2)
-  assert.ok(errors.includes('CF_EVE_RESTART_FAILED'))
-  assert.ok(errors.every(value => !value.includes('private')))
-})
-
-test('duplicate stop callbacks preserve one durable restart instead of creating more instances', async () => {
-  const { host, map } = fixture()
-  await host.onStart(); await host.onStop(); await host.onStop()
-  assert.equal(host.pending.filter(row => row.callback === 'restartAfterExit').length, 1)
-  assert.equal(map.get(stateKey).attempt, 1)
-  await host.restartAfterExit({ releaseId: 'another-release', attempt: 1 })
-  assert.equal(host.started, false)
-})
-
-test('the trusted candidate lease stops the actual host and refuses future request or restart wakeups', async () => {
-  const { host, map } = fixture()
-  await host.onStart()
-  const expiry = host.pending.find(row => row.callback === 'expireWarmLease')
-  assert.ok(expiry, 'start must arm a durable expiry even when no request arrives again')
-  assert.equal(expiry.when.getTime(), Date.parse(env.EVE_HOST_WARM_UNTIL))
-  await host.onStop()
-  const restart = host.pending.find(row => row.callback === 'restartAfterExit')
-  mock.method(Date, 'now', () => Date.parse(env.EVE_HOST_WARM_UNTIL) + 1)
-  await host.expireWarmLease(expiry.payload)
-  assert.equal(host.stops, 1)
-  assert.equal(map.get(stateKey).stopped, true)
-  const restored = fixture(map).host
-  await restored.restartAfterExit(restart.payload)
-  await restored.onActivityExpired()
-  assert.equal(restored.started, false)
-  assert.equal(restored.renewed, undefined)
-  assert.equal((await restored.fetch(new Request('https://eve.example.test/eve/v1/health'))).status, 503)
-  assert.equal(restored.calls, undefined)
-})
-
-test('an expiry callback for an old lease cannot stop a different release', async () => {
-  const { host } = fixture()
-  await host.onStart()
-  mock.method(Date, 'now', () => Date.parse(env.EVE_HOST_WARM_UNTIL) + 1)
-  await host.expireWarmLease({ releaseId: 'another-release', warmUntil: Date.parse(env.EVE_HOST_WARM_UNTIL) })
-  assert.equal(host.stops, 0)
-})
-
 test('explicit owner cleanup persists across DO restoration and suppresses pending starts', async () => {
   const { host, map } = fixture()
   await host.onStart(); await host.onStop()
-  const pending = host.pending.find(row => row.callback === 'restartAfterExit').payload
   await assert.rejects(host.stopForOwner('another-release'), /CF_EVE_RELEASE_MISMATCH/)
   await host.stopForOwner('fixture-1')
   assert.equal(host.pending.length, 0)
   assert.equal(map.get(stateKey).stopped, true)
   const restored = fixture(map).host
-  await restored.restartAfterExit(pending)
+  await restored.onStop()
   assert.equal(restored.started, false)
   await restored.onStart()
   assert.equal(map.get(stateKey).stopped, true)
@@ -152,7 +94,7 @@ test('the shared-service idle hook does not destroy sessions when a Task settles
   const { host } = fixture()
   await host.onActivityExpired()
   assert.equal(host.stops, 0)
-  assert.equal(host.renewed, 1)
+  assert.equal(host.renewed, undefined)
 })
 
 test('SDK error bodies and thrown messages never become public configuration disclosures', async () => {
@@ -169,19 +111,4 @@ test('SDK error bodies and thrown messages never become public configuration dis
     assert.deepEqual(await response.json(), { ok: false, error: 'coordinatorUnavailable' })
   }
   assert.ok(errors.every(value => !value.includes('private-token')))
-})
-
-test('an idle on-demand release sleeps and the next request can wake the same immutable host', async () => {
-  const bindings = { ...env, EVE_HOST_POLICY: 'on-demand' }
-  delete bindings.EVE_HOST_WARM_UNTIL
-  const { host, map } = fixture(new Map(), bindings)
-  await host.onStart()
-  assert.equal(host.pending.length, 0)
-  await host.onActivityExpired()
-  assert.equal(host.stops, 1)
-  assert.equal(host.pending.length, 0)
-  assert.equal(map.get(stateKey).stopped, false)
-  await host.startAndWaitForPorts()
-  assert.equal(host.started, true)
-  assert.equal(host.pending.length, 0)
 })
