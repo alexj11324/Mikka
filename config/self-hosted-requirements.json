@@ -715,6 +715,13 @@
     "test": "lib/account/export-files.db.test.ts",
     "suite": "test:account-db"
   },
+  "lib/activity-page-cache.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Keep locally loaded task activity pages contiguous across refreshes and ignore stale page responses.",
+    "test": "lib/activity-page-cache.test.ts",
+    "suite": "test:activity-page-cache"
+  },
   "lib/activity-actor-view.ts": {
     "mode": "built-in",
     "environment": [],
