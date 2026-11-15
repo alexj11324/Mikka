@@ -60,7 +60,12 @@ async function native(account,workspace) {
     },JSON.stringify({version:1,action,args:encode(args)}))
     return {status:answer.status,ok:answer.ok,value:answer.ok?decode(answer.wire):answer.wire}
   }
-  const who=await c.rpc('desktop.bootstrap',workspace);assert.equal(who.status,200);assert.equal(who.value.user.id,account.id)
+  const initial=await c.rpc('desktop.bootstrap',workspace);assert.equal(initial.status,200);assert.equal(initial.value.user.id,account.id)
+  if(!initial.value.requestedWorkspaceSelected) {
+    assert.equal(ok(await c.rpc('workspace.switchWorkspace',workspace)).ok,true)
+  }
+  const selected=ok(await c.rpc('desktop.bootstrap',workspace))
+  assert.equal(selected.requestedWorkspaceSelected,true);assert.equal(selected.cacheWorkspace.workspaceId,workspace)
   return c
 }
 function ok(result) {assert.equal(result.status,200);assert.equal(result.ok,true);assert.equal(result.value?.error,undefined);return result.value}
