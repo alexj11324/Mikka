@@ -327,7 +327,7 @@ test('provider failure continues the same task through its authorized preferred 
     const { profileNativeSessionMatches } = await import('../lib/factory/profile-native-session')
     assert.equal(profileNativeSessionMatches(setup.original.agentDefinition, repaired.agentDefinition), true)
     const assignment = await claim(setup.p, repaired.id)
-    assert.equal(assignment.effort, 'low', 'first claim still admits the frozen native role')
+    assert.equal(assignment.effort, undefined, 'first claim still admits the frozen native role; a content-only Profile sets no effort')
   })
 
   await t.test('an untouched default order persists its source and subscription continuation with the same entry identities', async () => {
