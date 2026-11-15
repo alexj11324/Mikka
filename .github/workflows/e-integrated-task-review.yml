@@ -1,0 +1,120 @@
+name: Original E plus upstream Task and Thread contract regression on the merged source
+on:
+  push:
+    branches: [evidence/2254-sidebar-85dfc396]
+    paths: [.github/workflows/e-integrated-task-review.yml]
+permissions:
+  contents: read
+env:
+  # Existing accounting/admission suites exercise the hosted deployment.
+  # The self-hosted image workflow separately runs the default community mode.
+  MIKKA_EDITION: cloud
+  # A cache restore that fails (e.g. the account's cache egress limit) would
+  # otherwise hang for actions/cache's 10-minute default before falling back
+  # to a normal install, which outlasts the short jobs' own timeouts.
+  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+  # Ephemeral CI registration fixtures share one loopback IP. Keep finite
+  # limits while leaving the production defaults at 5 signups/IP/hour.
+  MIKKA_SIGNUP_IP_HOURLY: '1000'
+  MIKKA_SIGNUP_GLOBAL_HOURLY: '10000'
+  MIKKA_VERIFICATION_IP_HOURLY: '1000'
+  MIKKA_VERIFICATION_GLOBAL_HOURLY: '10000'
+
+jobs:
+  exact-branch:
+    if: github.repository == 'alexj11324/Mikka'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 24
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-local-only
+          POSTGRES_DB: mikka_e2e
+          # Parallel full-schema DROP CASCADE needs more than PG17's default
+          # cluster-wide lock table. This applies only to the disposable service.
+          POSTGRES_INITDB_ARGS: --set=max_locks_per_transaction=512
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d mikka_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: 'true'
+      REQUIRE_DB: '1'
+      MIKKA_TEST_DB_PORT: '5432'
+      E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      BETTER_AUTH_URL: http://localhost:3100
+      MIKKA_TEST_DEPLOYMENT_SHA: 5473ffc81b748c8ffd9a8a3bec3c6068e7cbd98c
+      MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 5473ffc81b748c8ffd9a8a3bec3c6068e7cbd98c
+          persist-credentials: false
+      - name: Verify the immutable original branch and source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MIKKA_TEST_DEPLOYMENT_SHA"
+          test "$(git rev-parse 'HEAD^{tree}')" = 4359ed55ae2384491a97a95b2fe4c08c4cb81e79
+          test -z "${DB_TEST_SELECTED+x}" && test -z "${DB_TEST_SHARD+x}"
+          mkdir -m 700 "$RUNNER_TEMP/baseline-db-receipt"
+          git rev-parse HEAD > "$RUNNER_TEMP/baseline-db-receipt/source"
+      - uses: ./.github/actions/pnpm-install
+      - name: Generate ephemeral test-only auth secret
+        run: |
+          node --input-type=commonjs - <<'NODE'
+          const { appendFileSync, writeSync } = require('node:fs')
+          const secret = require('node:crypto').randomBytes(32).toString('hex')
+          writeSync(1, `::add-mask::${secret}\n`)
+          appendFileSync(process.env.GITHUB_ENV, `BETTER_AUTH_SECRET=${secret}\n`)
+          NODE
+      - run: pnpm test:e2e:setup
+      - name: Bind the disposable PostgreSQL and identities to the exact public commit
+        run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
+      - name: Run the original product suites for Task Work and renamed title contracts
+        shell: bash
+        env:
+          RUN_DISPATCH_DB_TESTS: '1'
+          NODE_ENV: test
+          MIKKA_EDITION: cloud
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/baseline-db-receipt"
+          date -u +%FT%TZ > "$dir/start"
+          for suite in test:task-presentation-db test:run-publication-db test:workspace-admin-db test:issue-readonly-dom test:factory-activity test:i18n; do
+            name="${suite#test:}"
+            date -u +%FT%TZ > "$dir/$name-start"
+            set +e
+            pnpm "$suite" > "$RUNNER_TEMP/$name.log" 2>&1
+            rc=$?
+            set -e
+            echo "$rc" > "$dir/$name-exit"
+            date -u +%FT%TZ > "$dir/$name-end"
+            sed -nE '/^[[:space:]]*[✔✖▶ℹ]|^# (tests|pass|fail|skipped|cancelled|todo) |^[[:space:]]*(not )?ok [0-9]+/p' "$RUNNER_TEMP/$name.log" > "$dir/$name-results"
+            tail -14 "$dir/$name-results"
+            if [ "$rc" != 0 ]; then
+              sed -nE '/ERR_ASSERTION|Cannot find module|TimeoutError|not ok|ReferenceError|TypeError|test at |✖/p' "$RUNNER_TEMP/$name.log" | cut -c1-230 | head -60 || true
+            fi
+          done
+          date -u +%FT%TZ > "$dir/end"
+          python - "$dir" <<'PY'
+          from pathlib import Path
+          import sys
+          files=list(Path(sys.argv[1]).glob('*-exit'))
+          assert len(files)==6 and all(int(f.read_text())==0 for f in files)
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: e-5473-2555-source-regressions
+          path: ${{ runner.temp }}/baseline-db-receipt
+          retention-days: 7
+          if-no-files-found: error
