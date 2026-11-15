@@ -2,7 +2,7 @@
 
 - Date: 2026-11-15
 - Source: Alex, 2026-11-15, after the Capy comparison (`docs/research/2026-11-15-models-gateway-and-plan.md`): 「模型就不要用什么 Mikka 默认了，让他自己去选。绑到什么模型就可以用什么模型，绑到什么订阅也可以用什么订阅里面模型」; 「只要是上面有的模型，我们都可以用」; 图标识别和「用的是 subscription、credit 还是 API key」要讲清楚; 价格 $20/月; 「这两样问题……有答案的话，照抄他们的」; 机器价格和默认档位：「可以」.
-- Status: decided. Not yet implemented.
+- Status: decided. Implemented on branch `claude/sweet-lovelace-yjn2jy`: the Gateway catalogue and no 「Mikka 默认」 (rules 1, 2, 4); threads on Mikka 额度 through the model gateway (rule 3, decision 2026-11-15-2000); no trial (rule 5: no 20 free messages, card verification grants nothing, allowances granted before stay usable); Mikka Pro checkout grants 2000 plan points per paid period that expire with it, top-up from USD 5 (rule 6); Cloudflare task machines open to every workspace, prepaid from Mikka 额度 in 5-minute chunks at USD 0.025 per GiB-hour, default standard-3, `MIKKA_CLOUDFLARE_TASKS_DISABLED=1` as kill switch (rule 7); the send-time 选择套餐 dialog and 「Mikka 额度已用完」 in chats and threads (rule 8). Not yet: onboarding's four steps (rule 8's landing page).
 - Replaces: 「Mikka 默认」 as a selectable model and its trial (20 free messages, card-verification $1) from [decisions.md 2026-10-30](../decisions.md); the Coordinator default of `COORDINATOR_MODEL` for chats.
 
 ## 规则
