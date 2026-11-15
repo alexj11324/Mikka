@@ -169,10 +169,12 @@ try {
  const publicFacts=data.timeline.filter((fact:any)=>fact.kind!=='history')
  const stagedInHumanActivity=publicFacts.filter((fact:any)=>stageKeys.has(fact.threadId+':'+fact.messageId))
  note('persisted Factory stage receipts versus human Activity',{sourceStageCount:stageSources.length,stages:stageSources,publicFactCount:publicFacts.length,stagedInHumanActivity})
- assert.deepEqual(stagedInHumanActivity,[],'persisted Factory stages must stay out of the shared human Activity')
+ const expectedStages=[...stageKeys].sort()
+ assert.deepEqual(stagedInHumanActivity.map((f:any)=>f.threadId+':'+f.messageId).sort(),expectedStages,'Each persisted Bot progress comment appears exactly once in Activity')
+ for(const fact of stagedInHumanActivity){assert.equal(fact.kind,'comment');assert.equal(fact.actor,'bot');assert.ok(fact.author?.trim());assert.ok(fact.body?.trim())}
  const legacyDetail=await humanApi(ownerCookie,'mobile/tasks/'+issueId)
  assert.equal(legacyDetail.status,200)
- assert.deepEqual(legacyDetail.body.timeline.filter((fact:any)=>fact.threadId&&stageKeys.has(fact.threadId+':'+fact.messageId)),[])
+ assert.deepEqual(legacyDetail.body.timeline.filter((fact:any)=>fact.threadId&&stageKeys.has(fact.threadId+':'+fact.messageId)),stagedInHumanActivity)
  const memberDetail=await humanApi(memberCookie,'mobile/tasks/'+issueId+'?work=1')
  if(memberDetail.status===200){assert.equal(memberDetail.body.task.id,issueId);assert.ok(Array.isArray(memberDetail.body.work.conversations))}else assert.equal(memberDetail.status,404)
  const link='https://github.com/alexj11324/Mikka/pull/2364'

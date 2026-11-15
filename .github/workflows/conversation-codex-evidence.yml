@@ -1,4 +1,4 @@
-name: Original and integrated E Task Work human acceptance and persisted stage identities
+name: E Capy Task Work human acceptance and verified Bot comments
 on:
   push:
     branches: [evidence/2254-sidebar-85dfc396]
@@ -15,12 +15,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: original-2288-c18b6fb1
-            source: c18b6fb162aa54b5bc8c216b99942d25265fa9a0
-            tree: c3b2a9022c8cb519bc2d6e85d7fca32013f54988
-          - label: integrated-2364-81e57c8f
-            source: 81e57c8f05adeeee21ce36d14966f7a2c6a28fad
-            tree: 7e33f5dc8b9f4eb6cad6c1642ef1d4c7f3988095
+          - label: capy-author-bb3f2349
+            source: bb3f2349dde6bb48a43954d18ca8573be7927fbb
+            tree: 4359ed55ae2384491a97a95b2fe4c08c4cb81e79
+          - label: capy-progress-514738fa
+            source: 514738fa0c21dd11dd81ae66b52a89d327bb7c9f
+            tree: ddfe5a1de030bdb3e96a788c055f4438f09f5832
     env:
       SOURCE: ${{ matrix.source }}
       SOURCE_TREE: ${{ matrix.tree }}
