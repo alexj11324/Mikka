@@ -39,3 +39,8 @@ test('the setup checklist hides once dismissed or once everything it shows is do
   assert.equal(setupChecklistShown({ dismissed: false, team: false, done: { task: true, model: true, app: true } }, false), false)
   assert.equal(setupChecklistShown({ dismissed: false, team: false, done: { task: true, model: true, app: true } }, true), true)
 })
+
+test('a missing, failed or unexpected checklist read shows nothing instead of crashing 新建任务', () => {
+  for (const value of [null, {}, { ok: true }, { dismissed: false }, { dismissed: false, team: false }, { dismissed: false, team: false, done: null }, 'error'])
+    assert.equal(setupChecklistShown(value, true), false)
+})

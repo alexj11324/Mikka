@@ -163,7 +163,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
     const confirmAccess = confirmedFingerprint === fingerprint
     if (!text || pending.current || attachments.locked || (only && !workspaceId) || (!only && (!available || !profileAllowed || botPick && !handler))) return
     // A task on Mikka 额度 (its chat's model, or a Cloudflare machine) with nothing to pay opens 选择套餐 instead (decision 2026-11-15-1900).
-    if (!only && paywall.blocked({ model: true, machine: picked === 'cloudflare' })) return
+    if (!only && await paywall.blocked({ model: true, machine: picked === 'cloudflare' })) return
     pending.current = true
     setSending(true)
     setCoordinatorUnavailable(false)

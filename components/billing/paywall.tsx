@@ -20,6 +20,7 @@ const TopUpInPlace = lazy(() => import('@/components/billing/top-up-in-place').t
 
 /** What a send would spend from Mikka 额度: the chat's model, a Cloudflare machine, or nothing. */
 export type PaywallSpend = { model?: boolean; machine?: boolean }
+type HostedUsageRead = Exclude<Awaited<ReturnType<typeof getHostedUsage>>, { error: unknown }>
 
 /**
  * The send-time paywall (decision 2026-11-15-1900, as Capy): a message or task that
@@ -29,24 +30,26 @@ export type PaywallSpend = { model?: boolean; machine?: boolean }
  * never blocks a self-hosted server, whose own provider pays.
  */
 export function usePaywall(botId: string | null) {
+  // The composer already reads this menu (same key); the balance is read only when a send would spend Mikka 额度,
+  // so an idle page makes no billing read (no new polling, idle request budget).
   const menu = useSWR<BotModelMenu>(botModelMenuKey(botId), () => getBotModelMenu(botId))
-  const usage = useSWR(['hosted-usage'], () => getHostedUsage())
+  const [read, setRead] = useState<HostedUsageRead | null>(null)
   const [open, setOpen] = useState(false)
-  const blocked = useCallback((spend: PaywallSpend) => {
-    const read = usage.data && !usage.data.error ? usage.data : null
+  const blocked = useCallback(async (spend: PaywallSpend) => {
     const hosted = menu.data?.groups?.find(group => group.kind === 'hosted')
     if (hosted?.hostedSource) return false
     const spendsModel = Boolean(spend.model) && menu.data?.current?.kind === 'hosted'
     if (!spendsModel && !spend.machine) return false
-    // Unknown until read: let the server decide; it refuses with the same card.
-    if (!read) return false
-    const points = hosted?.points ?? balancePoints(read.balance)
-    if (points > 0 || balancePoints(read.balance) > 0) return false
+    if ((hosted?.points ?? 0) > 0) return false
+    // Unknown when the read fails: let the server decide; it refuses with the same card.
+    const usage = await getHostedUsage().catch(() => null)
+    if (!usage || 'error' in usage && usage.error) return false
+    if (balancePoints(usage.balance) > 0) return false
+    setRead(usage)
     setOpen(true)
     return true
-  }, [menu.data, usage.data])
-  const read = usage.data && !usage.data.error ? usage.data : null
-  const dialog = <PlanDialog open={open} onOpenChange={setOpen} botId={botId} admin={read?.admin ?? false} workspaceId={read?.workspaceId} onPaid={() => { setOpen(false); void usage.mutate(); void menu.mutate() }} />
+  }, [menu.data])
+  const dialog = <PlanDialog open={open} onOpenChange={setOpen} botId={botId} admin={read?.admin ?? false} workspaceId={read?.workspaceId} onPaid={() => { setOpen(false); setRead(null); void menu.mutate() }} />
   return { blocked, dialog }
 }
 

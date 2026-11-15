@@ -563,7 +563,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
   async function send(event?: FormEvent) {
     event?.preventDefault()
     const text = draft.trim()
-    if (text && paywall.blocked({ model: true })) return
+    if (text && await paywall.blocked({ model: true })) return
     const id = suggestion.current
     const result = text ? await deliver(withReplyQuote(text, replyQuote), true, undefined, undefined, () => {
       setDraft('')

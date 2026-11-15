@@ -11,8 +11,17 @@ export function visibleSetupItems(list: Pick<SetupChecklist, 'team'>, desktop: b
   return SETUP_ITEMS.filter(item => (item !== 'device' || desktop) && (item !== 'invite' || list.team))
 }
 
-/** Hidden once dismissed or once everything it shows is done. */
-export function setupChecklistShown(list: SetupChecklist | undefined, desktop: boolean): boolean {
+/** A checklist read as the server sent it; anything missing or malformed reads as nothing to show. */
+export function readSetupChecklist(value: unknown): SetupChecklist | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const list = value as Partial<SetupChecklist>
+  if (typeof list.dismissed !== 'boolean' || typeof list.team !== 'boolean' || !list.done || typeof list.done !== 'object') return undefined
+  return { dismissed: list.dismissed, team: list.team, done: list.done }
+}
+
+/** Hidden once dismissed or once everything it shows is done; an absent or malformed read shows nothing. */
+export function setupChecklistShown(value: unknown, desktop: boolean): boolean {
+  const list = readSetupChecklist(value)
   if (!list || list.dismissed) return false
   return visibleSetupItems(list, desktop).some(item => !list.done[item])
 }
