@@ -155,7 +155,7 @@ test('named conversations show canonical authored links and use their authorized
   } finally { membersError = undefined; hasMemberPage = true }
 })
 
-test('the named conversation mounts the existing picker only for its one eligible Bot in the current owner roster', async () => {
+test('the named conversation mounts the existing picker for the sole or explicitly addressed owned Bot', async () => {
   const bot: GroupMember = { memberType: 'bot', id: 'owned', name: 'Owned Bot' }
   const actor: GroupMember = { memberType: 'agent', id: 'agent', name: 'Agent' }
   const person: GroupMember = { memberType: 'user', id: 'owner', name: 'Owner' }
@@ -177,6 +177,29 @@ test('the named conversation mounts the existing picker only for its one eligibl
       await draw('conversation', [bot])
       assert.equal(chip(), null)
     }
+    const second: GroupMember = { memberType: 'bot', id: 'second', name: 'Second Bot' }
+    groupMembers = [person, bot, actor, second]
+    await draw('conversation', [bot, second])
+    const input = container.querySelector('textarea')!
+    const setValue = Object.getOwnPropertyDescriptor(browser.HTMLTextAreaElement.prototype, 'value')!.set!
+    const type = async (value: string) => {
+      setValue.call(input, value)
+      await act(async () => input.dispatchEvent(new browser.Event('input', { bubbles: true }) as never))
+    }
+    await type('@Owned Bot tell me what changed')
+    assert.equal(chip()?.textContent, 'owned next message')
+    await type('@sECOND Bot check this')
+    assert.equal(chip()?.textContent, 'second next message')
+    await draw('conversation', [bot])
+    assert.equal(chip(), null, 'the second Bot belongs to another user')
+    await draw('conversation', [bot, second])
+    for (const draft of ['@Owned Bot and @Second Bot', '@Agent', 'hello', '[[chat:' + runId + ']]']) {
+      await type(draft)
+      assert.equal(chip(), null)
+    }
+    await type('@Owned Bot hello')
+    await draw('group', [bot, second])
+    assert.equal(chip(), null, 'the ordinary group keeps its existing composer')
     groupMembers = [person, bot]
     membersError = new (await import('@/lib/group-messages')).GroupMessagesRequestError('not_found', 403)
     await draw('conversation', [bot])

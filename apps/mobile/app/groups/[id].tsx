@@ -170,7 +170,7 @@ export default function GroupChat() {
   const referenceWorkspace = summary?.creationPurpose === 'conversation' && readRevision !== undefined && canSend &&
     summary.workspaceId === home.data?.workspace.id ? summary.workspaceId : undefined
   const revoked = apiCache.denial(pagePath) || apiCache.denial(membersPath)
-  const modelBot = namedConversationModelBot(referenceWorkspace && !page.error && !members.error && !home.error && !revoked ? referenceWorkspace : undefined, bots, home.data?.bots)
+  const modelBot = namedConversationModelBot(referenceWorkspace && !page.error && !members.error && !home.error && !revoked ? referenceWorkspace : undefined, bots, home.data?.bots, text)
   const delivery = useConversationDelivery(canSend ? { kind: 'group', id } : null, messages.map(message => message.id), page.reload, revoked ? id : undefined)
   const send = (body: string) => {
     const queued = delivery.send(body, mentionsIn(body, bots))

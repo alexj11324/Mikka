@@ -146,10 +146,10 @@ test('the named chat composer keeps the group draft and inserts a canonical Task
 
 test('a named conversation with one owned Bot opens that Bot’s existing native model control and writes to that Bot only', async () => {
   const { namedConversationModelBot } = await import('../../../lib/named-conversation-model.ts')
-  const bot = { id: 'first', memberType: 'bot' as const }
-  const other = { id: 'second', memberType: 'bot' as const }
-  const agent = { id: 'worker', memberType: 'agent' as const }
-  const person = { id: 'owner', memberType: 'user' as const }
+  const bot = { id: 'first', name: 'First Bot', memberType: 'bot' as const }
+  const other = { id: 'second', name: 'Second Bot', memberType: 'bot' as const }
+  const agent = { id: 'worker', name: 'Agent', memberType: 'agent' as const }
+  const person = { id: 'owner', name: 'Owner', memberType: 'user' as const }
   const browser = new Window()
   Object.assign(globalThis, { window: browser, document: browser.document, IS_REACT_ACT_ENVIRONMENT: true })
   const { createRoot } = await import('react-dom/client')
@@ -163,6 +163,11 @@ test('a named conversation with one owned Bot opens that Bot’s existing native
     await act(async () => choose.click())
     assert.deepEqual(botWrites, [[bot.id, option.id]])
     assert.equal(namedConversationModelBot('workspace', [bot, other], [bot, other]), undefined)
+    const named = [bot, other, agent]
+    assert.equal(namedConversationModelBot('workspace', named, [bot, other], '@Second Bot reply'), other.id)
+    assert.equal(namedConversationModelBot('workspace', named, [bot, other], '@First Bot and @Second Bot'), undefined)
+    assert.equal(namedConversationModelBot('workspace', named, [bot, other], '@Agent'), undefined)
+    assert.equal(namedConversationModelBot('workspace', named, [bot], '@Second Bot'), undefined)
     assert.equal(namedConversationModelBot('workspace', [bot, agent], [bot]), undefined)
     assert.equal(namedConversationModelBot('workspace', [bot], [other]), undefined)
     assert.equal(namedConversationModelBot(undefined, [bot], [bot]), undefined)

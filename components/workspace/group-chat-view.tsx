@@ -167,7 +167,7 @@ export function GroupChatView({ group, userId, people, ownedBots, onLeft }: {
   const first = pages?.[0]
   const readRevision = first?.readRevision
   const referenceWorkspace = namedChat && readRevision !== undefined && !blockingCode && !accessRejected && !refused && !departed.current ? group.workspaceId : null
-  const modelBot = namedConversationModelBot(referenceWorkspace && !membersError && !error ? referenceWorkspace : null, members, ownedBots)
+  const modelBot = namedConversationModelBot(referenceWorkspace && !membersError && !error ? referenceWorkspace : null, members, ownedBots, draft)
   const referenceText = referenceWorkspace ? (text: string, index: number) => <PersonReferences key={index} text={text} /> : undefined
   const lastMessageId = messages.at(-1)?.id ?? null
   const sentRead = useRef<string | null>(null)
