@@ -2938,7 +2938,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "5aec93d4bb9ef97f8c105b983607993494fa06795592b8dcb1d3ca3b898cf873"
+      "sourceHash": "22f6430b0f4f1830e4eea02a5d8667eb707c39fc840a8fcc3b761e7619e15d57"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/runs/[runId]/computer-authority",
@@ -3003,7 +3003,7 @@
       "methods": [
         "PATCH"
       ],
-      "sourceHash": "ad1efc5fdfe71d2c19a5aed882af8b93c754a315addf67dd5e6611224fe8d11c"
+      "sourceHash": "ff8f4b4cef8e5a762d06792313b49b074c6cf8070863384fefbfb7dfcde54953"
     },
     {
       "path": "/mikka/v1/runs/[runId]/captures",
