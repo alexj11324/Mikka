@@ -2,6 +2,8 @@
 
 import { Fragment } from 'react'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { PersonAvatar } from '@/components/person-avatar'
 import { AgentSphere } from './issue-assignee-menu'
 import type { AgentActivityRow } from './issue-threads'
@@ -93,12 +95,15 @@ function ActorMark({ actor }: { actor: ActivityActorView | null }) {
   return actor.type === 'agent' ? <AgentSphere name={actor.name} /> : <PersonAvatar name={actor.name} image={actor.avatarUrl} />
 }
 
+/** A chip in a sentence reads as words: no padding or height of its own. */
+const LINK = 'h-auto p-0 font-medium text-foreground'
+
 function ActivitySentence({ parts }: { parts: ActivityPiece[] }) {
   const t = useTranslations('IssueDetail.frame')
   return <span className="min-w-0">{parts.map((part, index) => {
-    if (part.kind === 'thread') return <button key={`${part.runId}:${index}`} type="button" className="border-0 bg-transparent p-0 font-medium text-foreground hover:underline" aria-label={t('openThread', { name: part.text })} onClick={() => openThread(part.runId)}>{part.text}</button>
-    if (part.kind === 'task') return <button key={`${part.taskId}:${index}`} type="button" className="border-0 bg-transparent p-0 font-medium text-foreground hover:underline" onClick={() => openTask(part.taskId)}>{part.text}</button>
+    if (part.kind === 'thread') return <Button key={`${part.runId}:${index}`} type="button" variant="link" size="xs" className={LINK} aria-label={t('openThread', { name: part.text })} onClick={() => openThread(part.runId)}>{part.text}</Button>
+    if (part.kind === 'task') return <Button key={`${part.taskId}:${index}`} type="button" variant="link" size="xs" className={LINK} onClick={() => openTask(part.taskId)}>{part.text}</Button>
     if (part.kind === 'pull') return <a key={`${part.href}:${index}`} className="font-medium text-foreground underline-offset-2 hover:underline" href={part.href} target="_blank" rel="noreferrer">{part.text}</a>
-    return <span key={index} className={part.name ? 'font-medium text-foreground' : 'text-muted-foreground'}>{part.text}</span>
+    return <span key={index} className={cn(part.name ? 'font-medium text-foreground' : 'text-muted-foreground')}>{part.text}</span>
   })}</span>
 }

@@ -431,7 +431,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     if (attempt?.stage) {
       const stage = (messages.GroupTask.stage as Record<string, string>)[attempt.stage] ?? attempt.stage
       entries.push({ id: `${runId}:stage`, role: 'bot', at: at(data.thread.createdAt), event: true, parts: [{ kind: 'text', text: stage, node:
-        <p role="separator" aria-label={stage} data-event-line="" data-factory-stage={attempt.stage} className="flex items-center gap-2 text-xs text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">{stage}</p> }] })
+        <p role="separator" aria-label={stage} data-event-line="" data-factory-stage={attempt.stage} className="text-center text-xs text-muted-foreground">{stage}</p> }] })
     }
     // Who sent the run off: its Bot, or Mikka when no Bot did (a Factory review or verify; the read then falls back to the
     // Agent's own name). What it was asked is that sender's first message, as a chat shows it, not a muted line.
@@ -457,12 +457,11 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
         : [t('activityLine.worked', { duration }), ...status === 'failed' ? [t('activityLine.failed')] : status === 'stopped' || status === 'cancelled' ? [t('activityLine.stopped')] : []].join(' · ')
       const folds = !active && items.some(item => item.kind === 'steps')
       entries.push({ id: `${runId}:activity`, role: 'bot', at: at(data.thread.createdAt), event: true, parts: [{ kind: 'text', text: line, node:
-        <p data-event-line="" data-activity-line="" className="flex items-center gap-2 text-xs text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
-          {folds ? <button type="button" aria-expanded={stepsOpen} onClick={() => setStepsOpen(value => !value)}
-            className="inline-flex items-center gap-1 rounded-md outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
-            {line}<ChevronDown aria-hidden className={cn('size-3 transition-transform', stepsOpen && 'rotate-180')} />
-          </button> : <span role="status">{line}</span>}
-        </p> }] })
+        <div data-event-line="" data-activity-line="" className="flex justify-center text-xs text-muted-foreground">
+          {folds ? <Button type="button" variant="ghost" size="xs" aria-expanded={stepsOpen} onClick={() => setStepsOpen(value => !value)} className="text-muted-foreground">
+            {line}<ChevronDown data-icon="inline-end" aria-hidden className={cn('transition-transform', stepsOpen && 'rotate-180')} />
+          </Button> : <span role="status">{line}</span>}
+        </div> }] })
     }
     if (!attempt && asked && sender.id !== 'mikka') { open = null; entries.push({ id: `${runId}:prompt`, role: 'person', at: at(data.thread.createdAt), text: asked }) }
     if (!attempt && data.thread.hasInstructions) bot('instructions', [{ kind: 'text', text: '', node: <ThreadInstructions issueId={issueId} runId={runId} mine={data.thread.ownedByCurrentUser} /> }])
