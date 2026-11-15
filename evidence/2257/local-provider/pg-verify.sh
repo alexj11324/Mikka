@@ -66,6 +66,7 @@ if [ "$E_RUN_SOURCE" = "5c2d408d110a9a782ea6579a563787df9a2fc8f8" ]; then
   run_trial interrupt E_FACTORY_INTERRUPT=1
   run_trial after-run E_AFTER_RUN=1
 else
+  run_trial interrupt E_FACTORY_INTERRUPT=1
   run_trial version E_TEST_VERSIONS=1 E_AFTER_RUN=1
 fi
 kill -TERM "$observer" 2>/dev/null || true
