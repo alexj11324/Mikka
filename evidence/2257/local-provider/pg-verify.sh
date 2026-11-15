@@ -49,7 +49,25 @@ test "$(cat "$qa/health")" = ready
 date -u +%FT%TZ > "$qa/start"
 rc=0
 node --import tsx .cache/e-codex-actual/observe-queue.mts > "$qa/observer.log" 2>&1 & observer=$!
-E_TEST_VERSIONS=1 E_AFTER_RUN=1 timeout 250 node --import ./scripts/server-test.mjs --import tsx .cache/e-codex-actual/delivery.mts > "$qa/delivery.log" 2>&1 || rc=$?
+run_trial() {
+  local label="$1"
+  shift
+  rm -f "$qa/delivery.json"
+  if env "$@" timeout 250 node --import ./scripts/server-test.mjs --import tsx .cache/e-codex-actual/delivery.mts > "$qa/delivery.log" 2>&1; then
+    cp "$qa/delivery.json" "$qa/$label-trial.json"
+  else
+    local exit_code=$?
+    if [ -f "$qa/delivery.json" ]; then cp "$qa/delivery.json" "$qa/$label-trial.json"; fi
+    rc="$exit_code"
+  fi
+}
+if [ "$E_RUN_SOURCE" = "a463f0fcfd926b7acb2df5f2c9a4891bd0a20567" ]; then
+  run_trial steer E_AFTER_RUN=0
+  run_trial interrupt E_FACTORY_INTERRUPT=1
+  run_trial after-run E_AFTER_RUN=1
+else
+  run_trial version E_TEST_VERSIONS=1 E_AFTER_RUN=1
+fi
 kill -TERM "$observer" 2>/dev/null || true
 wait "$observer" || true
 date -u +%FT%TZ > "$qa/end"
