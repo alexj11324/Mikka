@@ -61,6 +61,9 @@ jobs:
           "$pg/psql" -At -h 127.0.0.1 -p 55437 -U e2e -d versions_e2e -c "show server_version_num" > "$R/postgres-version"
           grep -Eq '^17[[:digit:]]{4}$' "$R/postgres-version"
           date -u +%FT%TZ > "$R/start"
+          node --experimental-strip-types scripts/setup-e2e-db.mjs > "$fixture/migrations.log" 2>&1
+          "$pg/psql" -At -h 127.0.0.1 -p 55437 -U e2e -d versions_e2e -c "select to_regclass('public.chat_preferences')" | grep -Fx chat_preferences
+          date -u +%FT%TZ > "$R/start"
           set +e
           pnpm test:groups 2>&1 | tee "$R/named-checks.txt"
           code=${PIPESTATUS[0]}
