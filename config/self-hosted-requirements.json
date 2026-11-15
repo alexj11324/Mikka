@@ -2520,5 +2520,204 @@
     "behavior": "Add an automation's workspace folder and tags, and each person's own pins.",
     "test": "lib/schedules/dispatch.db.test.ts",
     "suite": "test:schedules-db"
+  },
+  "app/actions/model-api-keys.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The signed-in owner saves a custom endpoint's protocol and the request features it rejects on their own key in the installation PostgreSQL database.",
+    "test": "tests/model-api-keys.db.test.ts",
+    "suite": "test:workspace-admin-db"
+  },
+  "app/actions/onboarding.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The signed-in person reads and saves their own first-run step and setup-checklist dismissal in the installation PostgreSQL database.",
+    "test": "lib/onboarding.db.test.ts",
+    "suite": "test:onboarding-db"
+  },
+  "app/api/model-gateway/anthropic/v1/messages/count_tokens/route.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "Claude Code on a run counts tokens through the installation's model gateway with its run-bound token; unmetered.",
+    "test": "lib/model-gateway/gateway.test.ts",
+    "suite": "test:subscription-usability"
+  },
+  "app/api/model-gateway/anthropic/v1/messages/route.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "Claude Code on a run sends Anthropic messages to the installation's model gateway with its run-bound token; the gateway forwards to the person's own key, or to Mikka credits only where the operator configured a Gateway.",
+    "test": "lib/model-gateway/gateway.test.ts",
+    "suite": "test:subscription-usability"
+  },
+  "app/api/model-gateway/openai/v1/responses/route.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "Codex on a run sends Responses requests to the installation's model gateway with its run-bound token; same sources as the Anthropic route.",
+    "test": "lib/model-gateway/gateway.test.ts",
+    "suite": "test:subscription-usability"
+  },
+  "drizzle/20261115175552_bot_model_choices_credits_model.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Adds the nullable chosen credits model to bot_model_choices; existing rows read as no choice.",
+    "test": "tests/main-thread-model.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "drizzle/20261115204738_model_gateway_tokens.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Adds hashed run-bound model gateway tokens and model_api_keys.features in the installation database.",
+    "test": "tests/model-gateway-token.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "drizzle/20261115214951_onboarding_progress_and_setup_checklist.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Adds per-person first-run progress and setup-checklist dismissals in the installation database.",
+    "test": "lib/onboarding.db.test.ts",
+    "suite": "test:onboarding-db"
+  },
+  "lib/cloud-computer/machine-billing.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Prepays Cloudflare task machine time in chunks from the installation's credit ledger; a server without Cloudflare task machines never calls it.",
+    "test": "lib/cloud-computer/machine-billing.test.ts",
+    "suite": "test:cloud-limits"
+  },
+  "lib/cloud-computer/machine-pricing.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure machine size prices; no service or environment input.",
+    "test": "lib/cloud-computer/machine-billing.test.ts",
+    "suite": "test:cloud-limits"
+  },
+  "lib/credits-models.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Lists the models Mikka credits can run: on a self-hosted server only its own configured model, never the hosted catalogue.",
+    "test": "lib/bot-model-menu.db.test.ts",
+    "suite": "test:execution-settings-db"
+  },
+  "lib/factory/agent-profile-definition.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Agent profiles hold content only (instructions and skills), read from the installation database.",
+    "test": "lib/factory/agent-profile.test.ts",
+    "suite": "test:factory"
+  },
+  "lib/main-thread-model.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A dispatched task inherits its chat's model from the installation database.",
+    "test": "tests/main-thread-model.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "lib/model-api-keys.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Opens a person's own model key for one run through the model gateway or direct delivery, from the installation database.",
+    "test": "tests/model-api-keys.db.test.ts",
+    "suite": "test:workspace-admin-db"
+  },
+  "lib/model-catalog-server.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads the public model catalogue when reachable and otherwise uses the shipped snapshot; works offline.",
+    "test": "lib/model-catalog-server.test.ts",
+    "suite": "test:agent-kit-model"
+  },
+  "lib/model-catalog.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure catalogue ids, vendors and harness choice with a shipped snapshot; no service or environment input.",
+    "test": "lib/model-catalog.test.ts",
+    "suite": "test:issues"
+  },
+  "lib/model-gateway/config.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "MIKKA_LITELLM_URL",
+      "MIKKA_LITELLM_MASTER_KEY"
+    ],
+    "behavior": "Protocol conversion uses the operator's own LiteLLM when both variables are set; without them a key that speaks the client's protocol still works and conversion is refused.",
+    "test": "lib/model-gateway/gateway.test.ts",
+    "suite": "test:subscription-usability"
+  },
+  "lib/model-gateway/features.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure request-feature switches for custom endpoints.",
+    "test": "lib/model-gateway/gateway.test.ts",
+    "suite": "test:subscription-usability"
+  },
+  "lib/model-gateway/handler.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "Authenticates a run-bound token, picks the person's key or operator-configured credits, meters credits in the installation ledger and forwards the stream.",
+    "test": "lib/model-gateway/gateway.test.ts",
+    "suite": "test:subscription-usability"
+  },
+  "lib/model-gateway/token.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Mints, verifies and revokes run-bound gateway tokens stored only as hashes in the installation database.",
+    "test": "tests/model-gateway-token.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "lib/model-gateway/upstream.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "Chooses the provider endpoint for a person's key, the operator's LiteLLM for conversion, or the operator's Gateway for credits.",
+    "test": "lib/model-gateway/gateway.test.ts",
+    "suite": "test:subscription-usability"
+  },
+  "lib/model-gateway/usage.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure usage parsing and list-price cost.",
+    "test": "lib/model-gateway/gateway.test.ts",
+    "suite": "test:subscription-usability"
+  },
+  "lib/model-order-plan.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Plans dispatch order including credits entries from the installation database.",
+    "test": "lib/model-order-plan.test.ts",
+    "suite": "test:execution-rules"
+  },
+  "lib/onboarding-steps.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure first-run step order and stored-progress cleanup.",
+    "test": "lib/onboarding-steps.test.ts",
+    "suite": "test:onboarding"
+  },
+  "lib/onboarding.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads and saves first-run progress and checklist dismissal in the installation database.",
+    "test": "lib/onboarding.db.test.ts",
+    "suite": "test:onboarding-db"
+  },
+  "lib/platform/use-agent-logins.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Desktop only: reads this computer's Claude Code / Codex sign-in kind and plan through the desktop bridge; no server input.",
+    "test": "lib/platform/use-agent-logins.test.ts",
+    "suite": "test:platform"
+  },
+  "lib/run-credential-source.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Chooses a run's subscription, own key or credits source from the installation database.",
+    "test": "lib/run-credential-source.test.ts",
+    "suite": "test:subscription-usability"
+  },
+  "lib/setup-checklist.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Works out the setup checklist from the installation's own data.",
+    "test": "lib/onboarding.db.test.ts",
+    "suite": "test:onboarding-db"
   }
 }
