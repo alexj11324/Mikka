@@ -28,8 +28,8 @@ jobs:
       matrix:
         include:
           - label: pull-directory-2274
-            source: e52a959ea214f33e95ed724fc440fafe5fe59cc7
-            tree: b5dbe97e36949bb61116c2315eaebe40afe70453
+            source: 69f071e0b39bad61cb617f495e04e7328cdd749e
+            tree: d3fb07e89811cdeddb1754d46df549b5e84fc632
     if: github.repository == 'alexj11324/Mikka'
     runs-on: ubuntu-22.04
     timeout-minutes: 24
