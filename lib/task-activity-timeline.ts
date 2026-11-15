@@ -138,8 +138,8 @@ export function taskHistoryLabel(event: IssueActivityEvent, labels: ActivityLabe
 }
 
 /**
- * The last linked Agent stretch that had already started when this event happened.
- * A person's name, an unmatched Agent and a run with no conversation stay text.
+ * The uniquely matching Agent stretch at the event time. Issue versions store actor identity,
+ * not a run id; if time would have to choose among this Agent's runs, keep the name plain.
  */
 export function activityRunId(at: string, actor: { type?: string | null; id?: string | null } | null | undefined, stretches: readonly ActivityStretch[]): string | null {
   if (actor?.type !== 'agent' || !actor.id) return null
@@ -154,11 +154,13 @@ export function activityRunId(at: string, actor: { type?: string | null; id?: st
     else break
   }
   if (active < 0) return null
-  // Equal start times leave the originating conversation ambiguous; do not guess.
+  // Equal start times or multiple preceding stretches for the same actor leave the run ambiguous.
   if ((active > 0 && ordered[active - 1].time === ordered[active].time) ||
       (active + 1 < ordered.length && ordered[active + 1].time === ordered[active].time)) return null
   const candidate = ordered[active].stretch
-  return candidate.linked && candidate.agentId === actor.id ? candidate.runId : null
+  if (!candidate.linked || candidate.agentId !== actor.id) return null
+  const actorMatches = ordered.filter(item => item.time <= time && item.stretch.agentId === actor.id)
+  return actorMatches.length === 1 ? candidate.runId : null
 }
 
 /** One row: the name once, then each clause joined by the locale's separator. The name is a thread part only when a run matches. */
