@@ -1,6 +1,7 @@
 import 'server-only'
 import { pool } from '@/lib/db'
 import { botChatChanged } from '@/lib/live/chats'
+import { groupChatChanged } from '@/lib/live/groups'
 import { groupListReadChanged } from '@/lib/live/lists'
 
 /** The person's own state for one chat: 置顶, 通知, hidden from the home list, marked unread, and its drag order. */
@@ -72,6 +73,9 @@ export async function setGroupPreference(userId: string, conversationId: string,
   if (change.pinned && await pinFull(userId, conversationId)) return 'pinLimit'
   await writePreference(userId, conversationId, change, false, true)
   await groupListReadChanged(pool, conversationId, userId)
+  // An already open transcript must read the new personal revision before
+  // it can acknowledge the end. Other members' read positions did not move.
+  if (change.markedUnread) await groupChatChanged(pool, conversationId, userId)
   return 'ok'
 }
 

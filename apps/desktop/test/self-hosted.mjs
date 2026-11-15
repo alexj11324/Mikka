@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { decode, encode } from '../../../lib/desktop-rpc/wire.ts'
 import { launchElectron } from './electron-launch.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
+import { verifyConversationOrganization } from './self-hosted-conversations.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
 import { readNativeStartup } from './native-startup.mjs'
 
@@ -22,6 +23,13 @@ export function validateSelfHostedDesktopTarget(value, env) {
   assert.ok(typeof value.ownerId === 'string' && value.ownerId.length > 0 && value.ownerId.length <= 128)
   assert.match(value.email ?? '', /^selfhost-[a-f0-9-]{36}@selfhost\.example\.test$/i)
   assert.ok(typeof value.password === 'string' && value.password.length >= 24 && value.password.length <= 200)
+  if (env.MIKKA_UI_OVERLAY_SHA || value.member) {
+    const member = value.member
+    assert.ok(member && typeof member.id === 'string' && member.id.length > 0 && member.id.length <= 128)
+    assert.match(member.email ?? '', /^selfhost-[a-f0-9-]{36}@selfhost\.example\.test$/i)
+    assert.ok(typeof member.password === 'string' && member.password.length >= 24 && member.password.length <= 200)
+    assert.ok(member.id !== value.ownerId && member.email !== value.email && member.password !== value.password)
+  }
   assert.ok(env.RUNNER_TEMP && env.GITHUB_WORKSPACE && env.MIKKA_DESKTOP_EXECUTABLE)
 }
 
@@ -168,6 +176,10 @@ async function main() {
       const screenshot = await page.screenshot({ path: join(output, 'self-hosted-chat.png'), animations: 'disabled' })
       report.visibleChatScreenshotSha256 = createHash('sha256').update(screenshot).digest('hex')
     }
+    if (overlaySha) {
+      phase = 'conversation_owner_member'
+      await verifyConversationOrganization({ page, fixture, rpc, passed, setPhase: value => { phase = value } })
+    }
     phase = 'sign_out_and_return'
     await page.evaluate(() => window.mikka.bundled.signOut())
     assert.equal(await page.evaluate(() => window.mikka.bundled.session()), null)
@@ -210,7 +222,9 @@ async function main() {
     if (report.cleanup.electron && report.cleanup.daemon) await rm(profile, { recursive: true, force: true })
     report.finishedAt = new Date().toISOString()
     const json = JSON.stringify(report, null, 2)
-    if (fixture) for (const secret of [fixture.password, fixture.email]) assert.ok(!json.includes(secret))
+    if (fixture) for (const secret of [fixture.password, fixture.email, fixture.member?.password, fixture.member?.email]) {
+      if (secret) assert.ok(!json.includes(secret))
+    }
     await writeFile(join(output, 'report.json'), json + '\n')
   }
   console.log(JSON.stringify({ scope: report.scope, overlaySha: report.overlaySha, status: report.status, checks: report.checks, cleanup: report.cleanup, failure: report.failure }))
