@@ -20,6 +20,13 @@
     "test": "tests/thread-title.db.test.ts",
     "suite": "test:run-publication-db"
   },
+  "app/actions/thread-title-settings.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A member reads and saves their own thread title instructions and triggers, and an admin the workspace's, in the installation PostgreSQL database.",
+    "test": "tests/thread-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
   "app/api/conversations/read-state/route.ts": {
     "mode": "built-in",
     "environment": [],
@@ -635,6 +642,13 @@
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
+  "drizzle/20261114231056_thread_title_settings.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Create the per-workspace and per-member thread title settings table in the installation database.",
+    "test": "tests/thread-title.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
   "lib/abuse/workers-ai.ts": {
     "mode": "optional-cloud",
     "environment": [
@@ -912,6 +926,13 @@
     "behavior": "Compute Bot unread totals and retain per-workspace Coordinator positions using the installation database.",
     "test": "lib/conversation-reads-store.test.ts",
     "suite": "test:conversation-reads"
+  },
+  "lib/issue-activity.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Derive a task's activity events (status, priority, description, assignee, parent, relations and pull requests) from its local history.",
+    "test": "lib/issue-activity.test.ts",
+    "suite": "test:issues"
   },
   "lib/thread-title-schedule.ts": {
     "mode": "built-in",

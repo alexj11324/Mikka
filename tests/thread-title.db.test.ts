@@ -122,6 +122,20 @@ test('a thread\'s stored title: bounded by the schema, generated per trigger, sh
     assert.equal(await nameThread(pool, racing, 'owner', 'created', async () => { await renameThreadTitle(pool, racing, 'owner', '账单导出', workspaceId); return '模型晚到的名字' }), null)
     assert.deepEqual(await stored(racing), { title: '账单导出', titleSource: 'manual' })
 
+    // Thread title settings (Capy's): the workspace's then the person's instructions reach the model; a trigger the
+    // settings leave out names nothing; the person's choice wins over the workspace's; creation always names.
+    await pool.query(`INSERT INTO thread_title_settings ("workspaceId","userId",instructions,triggers) VALUES ($1,'','Use English','first_run_ended'),($1,'owner','Keep it short','pull_opened')`, [workspaceId])
+    await assert.rejects(pool.query(`INSERT INTO thread_title_settings ("workspaceId","userId",triggers) VALUES ($1,'other','sometimes')`, [workspaceId]), /thread_title_settings_triggers/)
+    let naming: readonly string[] | undefined
+    const capture = (answer: string) => async (_owner: string, _text: { title: string; body: string }, _scope: string, rules?: readonly string[]) => { naming = rules; return answer }
+    const settled = await run({ prompt: '导出订单 CSV', finished: true })
+    assert.equal(await nameThread(pool, settled, 'owner', 'created', capture('订单导出')), '订单导出')
+    assert.deepEqual(naming, ['Use English', 'Keep it short'])
+    assert.equal(await nameThread(pool, settled, 'owner', 'first_run_ended', capture('不该用到')), null, 'the person chose pull_opened only')
+    await pool.query(`UPDATE thread_title_settings SET triggers=NULL WHERE "userId"='owner'`)
+    assert.equal(await nameThread(pool, settled, 'owner', 'first_run_ended', capture('订单 CSV 导出')), '订单 CSV 导出', 'back to the workspace default')
+    await pool.query(`DELETE FROM thread_title_settings WHERE "workspaceId"=$1`, [workspaceId])
+
     const foreignWorkspace = randomUUID()
     assert.equal(await renameThreadTitle(pool, first, 'owner', 'different workspace', foreignWorkspace), null)
     const organize = (id: string, field: 'archived' | 'pinned', value: boolean) =>
