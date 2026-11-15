@@ -4885,7 +4885,6 @@
     },
     "newBot": {
       "title": "新建 Bot",
-      "description": "给 Bot 起名，选一个形状和颜色。",
       "name": "名字",
       "namePlaceholder": "名字",
       "color": "颜色",
@@ -4923,7 +4922,11 @@
         "ecran": "屏幕"
       },
       "create": "创建",
-      "creating": "正在创建…"
+      "creating": "正在创建…",
+      "model": "模型",
+      "repository": "仓库",
+      "noRepository": "不用仓库",
+      "loading": "正在加载…"
     },
     "createConversation": {
       "title": "新建对话",
@@ -5198,7 +5201,9 @@
       "botRow": "交给",
       "details": "详情",
       "expand": "放大窗口",
-      "collapse": "缩小窗口"
+      "collapse": "缩小窗口",
+      "createMore": "继续新建",
+      "created": "任务已创建"
     },
     "board": {
       "toolbar": "看板工具栏",

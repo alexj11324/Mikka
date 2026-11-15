@@ -730,7 +730,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
       workspaceId={creationWorkspace} open={creating} initialBotId={activeBot?.id}
       teamId={section.startsWith('team-') ? activeTeam?.id : undefined} projectId={selectedProject?.id} project={selectedProject?.name}
       initialIntent={['my-issues', 'all-issues', 'team-issues', 'projects', 'team-projects'].includes(section) ? 'create_only' : 'create_and_dispatch'}
-      onCreated={id => { refreshTaskPages(); open(id) }} initialText={typedAhead}
+      onCreated={id => { refreshTaskPages(); open(id) }} onAdded={() => { void refreshTaskPages() }} initialText={typedAhead}
 
       onOpenChange={open => { setCreating(open); if (!open) setTypedAhead('') }} />}
     {onboardingOpen && <Onboarding computer={onboarding?.computer} saveKey={saveOnboardingKey} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} onDone={bot => { setOnboardingOpen(false); if (bot) openChat({ kind: 'bot', botId: bot.id }, bot) }} />}

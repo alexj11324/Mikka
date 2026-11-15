@@ -23,6 +23,8 @@ export type NewTaskProfile = { value: string; label: string; detail?: string; di
 
 export type NewTaskProps = {
   intent?: 'create_only' | 'create_and_dispatch'
+  /** 创建方式, when the person may switch between 只创建 and 创建并派发 (a page that can open the created task). */
+  chooseIntent?: { onChange: (intent: 'create_only' | 'create_and_dispatch') => void; disabled: boolean }
   onClose: () => void
   /** The project page the request came from. */
   project?: string | null
@@ -63,6 +65,8 @@ export type NewTaskProps = {
   }
   /** Profile checks, 未开启任务创建 and Coordinator unavailable, as Mikka draws them; null when there are none. */
   notices: ReactNode
+  /** 继续新建 (Capy's Create more): on, a created task clears the window and leaves it open for the next one. */
+  more: { checked: boolean; onChange: (checked: boolean) => void }
   sending: boolean
   /** Whether 创建任务 can send now (a title or text, a usable profile, files done, creation available). */
   canSubmit: boolean

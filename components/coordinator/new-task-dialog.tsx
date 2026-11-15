@@ -15,8 +15,6 @@ import type { TaskDestination } from '@/lib/task-destination'
 import { TEXT_ATTACHMENT_ACCEPT, textAttachment } from '@/lib/text-attachment'
 import { AccessChangeDialog } from '@/components/workspace/issue-metadata-controls'
 import { Alert, AlertTitle } from '@/components/ui/alert'
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DeviceIcon } from '@/components/devices/device-icon'
 import { useComputer } from '@/hooks/use-computer'
 import { machineDot, type PickerMachine } from '@/lib/machine-picker'
@@ -59,11 +57,13 @@ function MachineIcon({ machine, cloudBotId }: { machine: Machine; cloudBotId: st
  * request goes into the Coordinator conversation, where its reply shows up. A UI layer's new-task slot draws the
  * window instead (docs/ui-overlay.md); the data, state and sending stay here.
  */
-export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, workspaceId, teamId, onCreated, initialIntent = 'create_and_dispatch', initialBotId, initialText = '' }: {
+export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, workspaceId, teamId, onCreated, onAdded, initialIntent = 'create_and_dispatch', initialBotId, initialText = '' }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSent?: () => void
   onCreated?: (taskId: string) => void
+  /** 继续新建: a task was created and the window stays; the page re-reads the task lists it shows (onCreated is not called). */
+  onAdded?: () => void
   initialIntent?: 'create_only' | 'create_and_dispatch'
   initialBotId?: string
   /** Project page the request came from. */
@@ -84,13 +84,14 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
   const [intent, setIntent] = useState(initialIntent)
   const only = intent === 'create_only'
   const dispatching = open && !only
-  const intentField = useRef<HTMLDivElement>(null)
   const pending = useRef(false)
   const createRequests = useRef(new Map<string, string>())
   const [draft, setDraft] = useState('')
   // 标题 (optional): written by the person, the task gets exactly it; empty, the Bot writes one.
   const [title, setTitle] = useState('')
   const [sending, setSending] = useState(false)
+  // 继续新建: after a create the window stays, cleared, with the same machine, Bot and profile, for the next task.
+  const [more, setMore] = useState(false)
   const [picked, setPicked] = useState<string | null>(null)
   const profiles = useAgentProfiles(workspaceId, dispatching, picked ? (picked === 'cloud' || picked === 'cloudflare') ? { location: 'cloud' } : { location: 'local', deviceId: picked } : undefined)
   const [profilePick, setProfilePick] = useState<{ workspaceId: string; id: string } | null>(null)
@@ -169,6 +170,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
         createRequests.current.delete(fingerprint)
         setDraft('')
         setTitle('')
+        if (more) { toast.success(t('created')); onAdded?.(); return }
         onOpenChange(false)
         onCreated?.(result.taskId)
         return
@@ -187,13 +189,14 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
       if (outcome.kind !== 'accepted') { const message = failureMessage(outcome); if (message) toast.error(message); return }
       setDraft('')
       setTitle('')
+      composed.current = null
+      void mutate('coordinator-chat')
+      if (more) { toast.success(t('created')); if (outcome.task) onAdded?.(); return }
       setPicked(null)
       setProfilePick(null)
-      composed.current = null
       onOpenChange(false)
       if (outcome.task && onCreated) onCreated(outcome.task.taskId)
       else onSent?.()
-      void mutate('coordinator-chat')
     } catch {
       toast.error(t('failed'))
     } finally {
@@ -204,25 +207,16 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
 
   const profileChoices = useTaskProfileChoices({ workspaceId, value: profileId ?? null, data: profiles.data })
   const keyDialogNode = keyDialog.value && <E2BKeyDialog open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={false} onClose={changed => { setAddingKey(false); if (changed) { void e2bKey.mutate(); setPicked(cloud.value) } }} />
-  const chooseIntent = onCreated && workspaceId ? <FieldGroup>
-    <Field ref={intentField}>
-      <FieldLabel htmlFor="new-task-intent">{t('intent')}</FieldLabel>
-      <Select value={intent} onValueChange={value => { if (value === 'create_only' || value === 'create_and_dispatch') setIntent(value) }}
-        disabled={sending || attachments.locked || attachments.files.length > 0} items={[
-          { value: 'create_only', label: t('createOnly') }, { value: 'create_and_dispatch', label: t('createAndDispatch') },
-        ]}>
-        <SelectTrigger id="new-task-intent" size="sm"><SelectValue /></SelectTrigger>
-        <SelectContent portalContainer={intentField}><SelectGroup><SelectItem value="create_only">{t('createOnly')}</SelectItem>
-          <SelectItem value="create_and_dispatch">{t('createAndDispatch')}</SelectItem></SelectGroup></SelectContent>
-      </Select>
-    </Field>
-  </FieldGroup> : null
+  // 创建方式: a page that can open the created task lets the person keep it in the backlog or dispatch it now.
+  const chooseIntent = onCreated && workspaceId ? {
+    onChange: (value: 'create_only' | 'create_and_dispatch') => setIntent(value),
+    disabled: sending || attachments.locked || attachments.files.length > 0,
+  } : undefined
   const TaskWindow = open ? NewTask : null
   if (open && !TaskWindow) throw new Error('Required product UI export missing: new-task.NewTask')
   const machineNote = (machine: Machine) => machine.cloud && !machine.usable ? t('addE2BKey') : !machine.cloud && !machine.usable ? machine.status : undefined
   const slotMachine = (machine: Machine, group: NewTaskMachine['group']): NewTaskMachine => ({ value: machine.value, label: machine.label, icon: <MachineIcon machine={machine} cloudBotId={cloudBotId} />, usable: machine.usable, note: machineNote(machine), group })
   const notices = <>
-    {chooseIntent}
     {!only && <TaskProfileNotice value={profileId ?? null} data={profiles.data} error={profiles.error} onRetry={() => { void profiles.mutate() }} />}
     {!only && !available && <p className="text-sm text-muted-foreground">{t('unavailable')}</p>}
     {!only && coordinatorUnavailable && <Alert variant="destructive"><AlertTitle>{tCoordinator('unavailable', { name: 'Coordinator' })}</AlertTitle></Alert>}
@@ -235,7 +229,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
       bots={!only && botChoices.length > 0 ? [{ id: null, name: 'Coordinator', avatar: <CoordinatorAvatar size="row" /> }, ...botChoices.map(bot => ({ id: bot.id, name: bot.name, avatar: <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="row" /> }))] : []}
       bot={handler?.id ?? null} onBot={setBotPick}
       profile={{ ...profileChoices, value: profileId ?? 'auto', onChange: id => setProfilePick(id !== 'auto' && workspaceId ? { workspaceId, id } : null), disabled: sending || !workspaceId }}
-      intent={only || chooseIntent ? intent : undefined} notices={notices} sending={sending} canSubmit={(only ? Boolean(workspaceId) : available && profileAllowed && (!botPick || !!handler)) && !!(draft.trim() || title.trim()) && !attachments.locked} onSubmit={() => { void submit() }} />}
+      intent={only || chooseIntent ? intent : undefined} chooseIntent={chooseIntent} more={{ checked: more, onChange: setMore }} notices={notices} sending={sending} canSubmit={(only ? Boolean(workspaceId) : available && profileAllowed && (!botPick || !!handler)) && !!(draft.trim() || title.trim()) && !attachments.locked} onSubmit={() => { void submit() }} />}
     {keyDialogNode}
     {accessChange && <AccessChangeDialog change={accessChange} pending={sending} onCancel={() => setAccessChange(null)} onConfirm={async () => {
       const current = accessChange
