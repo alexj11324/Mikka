@@ -4,7 +4,7 @@
 - **GitHub:** [#1284](https://github.com/alexj11324/Mikka/issues/1284)
 - **Layout precedent:** existing Settings › Models and subscriptions, New task, and the thread's execution identity dialog. No new accepted Figma frame is claimed.
 - **Product authority:** [Factory flow decision](decisions/2026-11-04-2200-factory-flow-like-warp.md).
-- **Being replaced:** [2026-11-15-1630](decisions/2026-11-15-1630-agent-profile-is-a-role.md) makes a Profile a role only, drops the automatic Profile Decision, the selectable Default and capability tags, and moves model choice to one inheritance chain. Until that lands, this page describes the shipped behaviour.
+- **Being replaced:** [2026-11-15-1630](decisions/2026-11-15-1630-agent-profile-is-a-role.md) makes a Profile only a role (name, instructions, Skills, optional model), removes automatic Profile selection and automatic model routing, and states model and machine choice in one sentence each. Until that lands, this page describes the shipped behaviour.
 
 ## What the person does
 
