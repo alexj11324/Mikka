@@ -59,7 +59,7 @@ async function loadIssue(id: string, viewerId: string, previous?: IssueRead, inc
   const held = previous?.taskWork?.viewerId === viewerId ? previous.taskWork.history : undefined
   const positions = heldListPositions(held)
   const version = positions && positions.length === held?.positions?.length ? held.version : undefined
-  let result
+  let result: Awaited<ReturnType<typeof pollIssue>> & { taskWork?: IssueWorkSnapshot }
   try {
     result = includeWork ? await pollTaskDetail(id, previous?.readVersion, { version, positions }) : await pollIssue(id, previous?.readVersion)
   } catch (error) {
@@ -70,7 +70,7 @@ async function loadIssue(id: string, viewerId: string, previous?: IssueRead, inc
   if (result.error) throw new CacheReadError(result.error)
   if (result.viewerId !== viewerId) throw new ListReadScopeError('owner')
   const document = result.unchanged ? previous! : result.issue
-  const work = 'taskWork' in result ? result.taskWork : undefined
+  const work = result.taskWork
   if (!work) return { ...document, readVersion: result.version, taskWork: undefined }
   if (work.viewerId !== viewerId) throw new ListReadScopeError('owner')
   const next = work.activity
