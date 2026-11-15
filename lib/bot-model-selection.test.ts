@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict'
 import { after, before, beforeEach, mock, test } from 'node:test'
-import { COORDINATOR_MODEL } from './coordinator/model'
 import type { SubscriptionService } from './subscription-service'
 import type { BotSubscriptionChoice } from './bot-model-choice'
 
+/** A chat's Mikka 额度 pick (decision 2026-11-15-1900). */
+const CREDITS_MODEL = 'anthropic/claude-sonnet-5.5'
+const CREDITS = `credits:${CREDITS_MODEL}`
+const NOT_CHOSEN = { code: 'executionModelUnknown' }
 const id = (n: number) => `10000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const scope = { ownerId: 'alice', botId: null, workspaceId: id(2) }
 const binding = { id: id(3), ownerId: 'alice', consumerId: id(1), workspaceId: id(2), connectionId: id(4), connectionRevision: 7, modelId: 'subscription-model', route: 'claude_cpa' }
@@ -116,52 +119,55 @@ test('A bot saved on an API key model freezes that key and resolves through it; 
   assert.equal(chatModels.length, 1)
   await assert.rejects(resolveFrozenHostedModel({ ...botScope, ownerId: 'mallory' }, frozen, noSubscription), { code: 'binding_mismatch' })
   await assert.rejects(resolveFrozenHostedModel({ ...botScope, botId: id(5) }, frozen, noSubscription), { code: 'binding_mismatch' })
-  // The key was withdrawn: the usual order, here Mikka 默认.
+  // The key was withdrawn: the usual order, which here has nothing, so the chat asks for a model.
   usableKeys = []
-  assert.deepEqual(await freezeBotModel(botScope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  await assert.rejects(freezeBotModel(botScope, noSubscription), NOT_CHOSEN)
   usableKeys = [{ id: id(9), provider: 'deepseek', baseUrl: null, protocol: 'anthropic', models: ['different-model'] }]
-  assert.deepEqual(await freezeBotModel(botScope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  await assert.rejects(freezeBotModel(botScope, noSubscription), NOT_CHOSEN)
   // An Anthropic-only custom provider cannot serve a bot chat.
   usableKeys = [{ id: id(9), provider: 'custom', baseUrl: 'https://llm.example/anthropic', protocol: 'anthropic', models: ['deepseek-chat'] }]
-  assert.deepEqual(await freezeBotModel(botScope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  await assert.rejects(freezeBotModel(botScope, noSubscription), NOT_CHOSEN)
 })
 
-test('Coordinator without a subscription freezes and resolves the configured hosted default', async () => {
+test('Coordinator on a Mikka 额度 model freezes and resolves that catalogue model; with nothing chosen it asks for one', async () => {
+  await assert.rejects(freezeBotModel({ ...scope, workspaceId: null }, noSubscription), NOT_CHOSEN)
+  selected = CREDITS
+  workspaceCalls = 0
   const frozen = await freezeBotModel({ ...scope, workspaceId: null }, noSubscription)
-  assert.deepEqual(frozen, { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  assert.deepEqual(frozen, { harness: 'ai_sdk', model: CREDITS_MODEL })
   assert.equal(workspaceCalls, 1)
   assert.equal(await resolveFrozenHostedModel(scope, frozen, noSubscription), hostedModel)
-  assert.deepEqual(hostedCalls, [[scope, COORDINATOR_MODEL]])
+  assert.deepEqual(hostedCalls, [[scope, CREDITS_MODEL]])
 })
 
-test('a saved choice whose account is gone, with no subscription bound, replies on Mikka 默认', async () => {
+test('a saved choice whose account is gone, with nothing bound, asks for a model instead of a silent default', async () => {
   // The Settings page showed 未连接账号 and these bots refused (binding_required) instead of replying.
   selected = id(9)
   available = []
-  for (const botId of [null, id(1)]) {
-    const frozen = await freezeBotModel({ ...scope, botId }, noSubscription)
-    assert.deepEqual(frozen, { harness: 'ai_sdk', model: COORDINATOR_MODEL })
-  }
+  for (const botId of [null, id(1)]) await assert.rejects(freezeBotModel({ ...scope, botId }, noSubscription), NOT_CHOSEN)
 })
 
-test('Mikka 默认 picked in the composer stays hosted while a subscription is bound', async () => {
-  selected = '00000000-0000-0000-0000-000000000000'
+test('a Mikka 额度 model picked in the composer stays on Mikka 额度 while a subscription is bound', async () => {
+  selected = CREDITS
   available = [{ bindingId: binding.id, provider: 'claude' }]
   savedBinding = { bindingId: binding.id }
   for (const botId of [null, id(1)]) {
     const frozen = await freezeBotModel({ ...scope, botId }, noSubscription)
-    assert.deepEqual(frozen, { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+    assert.deepEqual(frozen, { harness: 'ai_sdk', model: CREDITS_MODEL })
   }
+  // A Mikka 额度 pick never reads the subscription binding it replaced.
+  assert.equal(bindingReads.length, 0)
 })
 
-test('Bot without a subscription replies on the same hosted default as the Coordinator, in its own workspace', async () => {
+test('Bot on a Mikka 额度 model runs on the same hosted path as the Coordinator, in its own workspace', async () => {
   const bot = { ...scope, botId: id(1) }
+  selected = CREDITS
   const frozen = await freezeBotModel({ ...bot, workspaceId: null }, noSubscription)
-  assert.deepEqual(frozen, { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  assert.deepEqual(frozen, { harness: 'ai_sdk', model: CREDITS_MODEL })
   assert.deepEqual(workspaceBots, [bot.botId])
   // Same hosted path as the Coordinator: the hosted model applies admission and billing for this bot's workspace.
   assert.equal(await resolveFrozenHostedModel(bot, frozen, noSubscription), hostedModel)
-  assert.deepEqual(hostedCalls, [[bot, COORDINATOR_MODEL]])
+  assert.deepEqual(hostedCalls, [[bot, CREDITS_MODEL]])
 })
 
 test('a saved choice whose account is gone switches to a bound subscription, Claude first, not Mikka 默认', async () => {
@@ -291,11 +297,11 @@ test('an archived bot (its owner left the team) is refused before any model is c
   } finally { botActive = true }
 })
 
-test('Mikka 默认 with no points here runs on the next allowed model and says so; with none, it stays and is refused', async () => {
-  selected = '00000000-0000-0000-0000-000000000000'
+test('a Mikka 额度 model with no points here runs on the next allowed model and says so; with none, it stays and is refused', async () => {
+  selected = CREDITS
   pointsRefusal = 'verification_required'
-  // Nothing else can run: Mikka 默认 stays, and its refusal explains (decision 2026-11-02-1450).
-  assert.deepEqual(await freezeBotModel(scope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  // Nothing else can run: the Mikka 额度 model stays, and its refusal explains (decision 2026-11-02-1450).
+  assert.deepEqual(await freezeBotModel(scope, noSubscription), { harness: 'ai_sdk', model: CREDITS_MODEL })
   // The person's own key is next in 允许使用的模型: this turn runs on it, marked.
   fallback = { kind: 'api_key', keyId: id(9), model: 'deepseek-chat' }
   usableKeys = [{ id: id(9), provider: 'deepseek', baseUrl: null, protocol: 'anthropic', models: ['deepseek-chat'] }]
@@ -314,9 +320,10 @@ test('Mikka 默认 with no points here runs on the next allowed model and says s
   const frozen = await freezeBotModel(scope, dependencies)
   assert.equal(frozen.model, binding.modelId)
   assert.deepEqual([(frozen.modelSelection as { bindingId?: string }).bindingId, (frozen.modelSelection as { afterPoints?: true }).afterPoints], [binding.id, true])
-  // Points left: Mikka 默认, whatever else could run.
+  // Points left: the Mikka 额度 model, whatever else could run.
   pointsRefusal = null
-  assert.deepEqual(await freezeBotModel(scope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  savedBinding = undefined
+  assert.deepEqual(await freezeBotModel(scope, noSubscription), { harness: 'ai_sdk', model: CREDITS_MODEL })
 })
 
  test('a disabled hosted source never starts a new hosted turn', async () => {

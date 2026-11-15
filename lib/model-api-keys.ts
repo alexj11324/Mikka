@@ -316,7 +316,7 @@ export async function setBotApiKeyChoice(query: Query, scope: { ownerId: string;
   const key = (await usableApiKeys(query, scope.ownerId, scope.workspaceId)).find(item => item.id === keyId)
   if (!key || !apiKeyChatBaseUrl(key) || !key.models.includes(modelName)) throw new WorkspaceError('executionModelUnknown')
   await query.query(`INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId","apiKeyId","apiKeyModel") VALUES ($1,$2,$3,NULL,$4,$5)
-    ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=NULL,"apiKeyId"=EXCLUDED."apiKeyId","apiKeyModel"=EXCLUDED."apiKeyModel"`,
+    ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=NULL,"apiKeyId"=EXCLUDED."apiKeyId","apiKeyModel"=EXCLUDED."apiKeyModel","creditsModel"=NULL`,
   [scope.ownerId, scope.workspaceId, botId ?? 'coordinator', keyId, modelName])
   return { keyId, model: modelName, harnesses: apiKeyHarnesses(key) }
 }

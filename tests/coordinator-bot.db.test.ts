@@ -1096,12 +1096,21 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
   await t.test('model choice goes through the ordinary bot path', async () => {
     const p = await person('model-choice')
     const { ExecutionSettings } = await import('../lib/execution-settings')
-    const { HOSTED_CHOICE } = await import('../lib/bot-model-menu-view')
+    const { creditsOptionId } = await import('../lib/bot-model-menu-view')
+    const { COORDINATOR_MODEL } = await import('../lib/coordinator/model')
     const { botId, workspaceId } = await bots.coordinatorBot(p.id, null)
     const settings = new ExecutionSettings(appPool)
-    await settings.setBotModel({ ownerId: p.id, workspaceId }, botId, HOSTED_CHOICE)
-    assert.deepEqual((await pool.query('SELECT "botKey" FROM bot_model_choices WHERE "ownerId"=$1', [p.id])).rows, [{ botKey: botId }], 'saved under the bot row, never \'coordinator\'')
-    assert.equal(await settings.botModel({ ownerId: p.id, workspaceId }, botId), HOSTED_CHOICE)
+    // A self-hosted server's own provider is what Mikka 额度 offers here; the pick is saved like any other.
+    const names = ['MIKKA_EDITION', 'MIKKA_DEFAULT_MODEL_BASE_URL', 'MIKKA_DEFAULT_MODEL_API_KEY', 'MIKKA_DEFAULT_MODEL_ID'] as const
+    const before = Object.fromEntries(names.map(name => [name, process.env[name]]))
+    Object.assign(process.env, { MIKKA_EDITION: 'community', MIKKA_DEFAULT_MODEL_BASE_URL: 'https://provider.example.invalid/v1',
+      MIKKA_DEFAULT_MODEL_API_KEY: 'synthetic-fixture-only', MIKKA_DEFAULT_MODEL_ID: 'local-configured-model' })
+    try {
+      const credits = creditsOptionId(COORDINATOR_MODEL)
+      await settings.setBotModel({ ownerId: p.id, workspaceId }, botId, credits)
+      assert.deepEqual((await pool.query('SELECT "botKey","creditsModel" FROM bot_model_choices WHERE "ownerId"=$1', [p.id])).rows, [{ botKey: botId, creditsModel: COORDINATOR_MODEL }], 'saved under the bot row, never \'coordinator\'')
+      assert.equal(await settings.botModel({ ownerId: p.id, workspaceId }, botId), credits)
+    } finally { for (const name of names) if (before[name] === undefined) delete process.env[name]; else process.env[name] = before[name] }
   })
 
   await t.test('the Coordinator stays outside workspace app policy; an ordinary bot does not', async () => {

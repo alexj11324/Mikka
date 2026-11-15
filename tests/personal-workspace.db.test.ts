@@ -373,8 +373,10 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     assert.equal(await coordinatorEnabled(owner, bot), false, 'a known exhausted selected model remains unavailable')
     await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [connection, JSON.stringify(quota(0.2, 120_000))])
     assert.equal(await coordinatorEnabled(owner, bot), true, 'a stale official allowance can queue its normal authoritative execution check')
-    await settings.setBotModel({ ownerId: owner, workspaceId: workspace.id }, bot, HOSTED_CHOICE)
-    assert.equal(await coordinatorEnabled(owner, bot), false, 'explicit Mikka default does not silently spend an available subscription')
+    // 「Mikka 默认」 is gone (decision 2026-11-15-1900), and with no server model Mikka 额度 offers nothing here.
+    await assert.rejects(settings.setBotModel({ ownerId: owner, workspaceId: workspace.id }, bot, HOSTED_CHOICE), { code: 'executionModelUnknown' })
+    await assert.rejects(settings.setBotModel({ ownerId: owner, workspaceId: workspace.id }, bot, 'credits:deepseek/deepseek-v4.1-flash'), { code: 'executionModelUnknown' })
+    assert.equal(await coordinatorEnabled(owner, bot), true, 'the chosen subscription stays chosen')
     await settings.setBotModel({ ownerId: owner, workspaceId: workspace.id }, bot, binding)
     await pool.query('UPDATE bots SET "archivedAt"=now() WHERE id=$1', [bot])
     assert.equal(await coordinatorEnabled(owner, bot), false, 'an archived bot remains disabled')

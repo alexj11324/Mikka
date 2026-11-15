@@ -16,8 +16,8 @@ test('a new task inherits the dispatching chat\'s subscription or API-key model,
   process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 4 })
-  const [{ pool: appPool }, { workspacePool }, keys, { mainThreadModel }, { HOSTED_CHOICE }] = await Promise.all([
-    import('../lib/db'), import('../lib/workspace-db'), import('../lib/model-api-keys'), import('../lib/main-thread-model'), import('../lib/bot-model-menu-view'),
+  const [{ pool: appPool }, { workspacePool }, keys, { mainThreadModel }] = await Promise.all([
+    import('../lib/db'), import('../lib/workspace-db'), import('../lib/model-api-keys'), import('../lib/main-thread-model'),
   ])
   const users: string[] = [], workspaces: string[] = []
   t.after(async () => {
@@ -60,10 +60,10 @@ test('a new task inherits the dispatching chat\'s subscription or API-key model,
       VALUES ($1,$2,$3,'catalogue',$4,1,$5,$6)`, [bindingId, who.ownerId, who.workspaceId, connectionId, provider === 'claude' ? 'claude_cpa' : 'codex_cpa', bound])
     return { connectionId, bindingId }
   }
-  const choose = (who: { ownerId: string; workspaceId: string }, botKey: string, choice: { bindingId?: string | null; apiKeyId?: string; apiKeyModel?: string }) =>
-    pool.query(`INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId","apiKeyId","apiKeyModel") VALUES ($1,$2,$3,$4,$5,$6)
-      ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=EXCLUDED."bindingId","apiKeyId"=EXCLUDED."apiKeyId","apiKeyModel"=EXCLUDED."apiKeyModel"`,
-    [who.ownerId, who.workspaceId, botKey, choice.bindingId ?? null, choice.apiKeyId ?? null, choice.apiKeyModel ?? null])
+  const choose = (who: { ownerId: string; workspaceId: string }, botKey: string, choice: { bindingId?: string | null; apiKeyId?: string; apiKeyModel?: string; creditsModel?: string }) =>
+    pool.query(`INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId","apiKeyId","apiKeyModel","creditsModel") VALUES ($1,$2,$3,$4,$5,$6,$7)
+      ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=EXCLUDED."bindingId","apiKeyId"=EXCLUDED."apiKeyId","apiKeyModel"=EXCLUDED."apiKeyModel","creditsModel"=EXCLUDED."creditsModel"`,
+    [who.ownerId, who.workspaceId, botKey, choice.bindingId ?? null, choice.apiKeyId ?? null, choice.apiKeyModel ?? null, choice.creditsModel ?? null])
   const scopeOf = (who: { ownerId: string; workspaceId: string }) => ({ ownerId: who.ownerId, workspaceId: who.workspaceId })
 
   await t.test('a subscription model the Coordinator chats on is inherited with its Agent', async () => {
@@ -88,12 +88,13 @@ test('a new task inherits the dispatching chat\'s subscription or API-key model,
     assert.equal(await mainThreadModel(pool, scopeOf(who), null), null, 'a key model the key does not offer is not a task candidate')
   })
 
-  await t.test('「Mikka 默认」, no choice and a model that is not a task candidate inherit nothing', async () => {
+  await t.test('Mikka 额度, no choice and a model that is not a task candidate inherit nothing', async () => {
     const who = await person('main-thread-none')
     assert.equal(await mainThreadModel(pool, scopeOf(who), null), null, 'no saved choice')
     await choose(who, 'coordinator', { bindingId: null })
-    assert.equal(await mainThreadModel(pool, scopeOf(who), null), null, 'an explicit 「Mikka 默认」 row')
-    assert.ok(HOSTED_CHOICE)
+    assert.equal(await mainThreadModel(pool, scopeOf(who), null), null, 'a former 「Mikka 默认」 row reads as no choice')
+    await choose(who, 'coordinator', { creditsModel: 'anthropic/claude-sonnet-5.5' })
+    assert.equal(await mainThreadModel(pool, scopeOf(who), null), null, 'threads cannot run on Mikka 额度 yet')
     // The binding names a model its connection's catalogue no longer lists.
     const stale = await subscribe(who, 'claude', ['claude-opus-5-5'], 'claude-retired-model')
     await choose(who, 'coordinator', { bindingId: stale.bindingId })

@@ -3,7 +3,7 @@ import { hostedModelEnabled } from './enabled-models'
 import { ActionFailureError } from './action-error'
 import type { Pool } from 'pg'
 import type { ExecutionSettings, ExecutionSettingsScope } from './execution-settings'
-import { HOSTED_CHOICE, type BotModelQuota } from './bot-model-menu-view'
+import { creditsOptionId, parseCreditsOption, type BotModelQuota } from './bot-model-menu-view'
 import { apiKeyChatBaseUrl } from './model-api-key-providers'
 import { usableApiKeys, type UsableApiKey } from './model-api-keys'
 import { subscriptionAvailability } from './subscription-quota'
@@ -23,7 +23,10 @@ export interface BotSubscriptionChoice {
 type FallbackReason = 'preference' | 'points' | 'quota'
 interface ChoiceState { chosen: boolean; fallback?: FallbackReason }
 export type BotModelChoice = ChoiceState & (
-  | { kind: 'hosted' }
+  /** Mikka 额度, a catalogue model (`vendor/model`). */
+  | { kind: 'hosted'; model: string }
+  /** Nothing chosen and no subscription or key fills in (decision 2026-11-15-1900). */
+  | { kind: 'none' }
   | { kind: 'subscription'; binding: BotSubscriptionChoice; sharedOwnerId?: string; quota?: BotModelQuota }
   | { kind: 'apiKey'; key: UsableApiKey; model: string; quota?: BotModelQuota }
 )
@@ -34,14 +37,14 @@ export function apiKeyServesBotModel(key: UsableApiKey, model: string) {
 
 /** Reads the saved preference without creating a default or cloning a binding. */
 export async function botModelPreference(pool: Pick<Pool, 'query'>, scope: ExecutionSettingsScope, botId: string | null) {
-  const { rows: [row] } = await pool.query<{ bindingId: string | null; apiKeyId: string | null; apiKeyModel: string | null }>(
-    'SELECT "bindingId","apiKeyId","apiKeyModel" FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3',
+  const { rows: [row] } = await pool.query<{ bindingId: string | null; apiKeyId: string | null; apiKeyModel: string | null; creditsModel: string | null }>(
+    'SELECT "bindingId","apiKeyId","apiKeyModel","creditsModel" FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3',
     [scope.ownerId, scope.workspaceId, botId ?? 'coordinator'],
   )
-  // A saved key also has a null binding. Only a row without either explicitly
-  // selects Mikka default, which must stay selected even if subscriptions exist.
   if (row?.apiKeyId != null && row.apiKeyModel != null) return { key: { keyId: row.apiKeyId, model: row.apiKeyModel } }
-  return { selected: row ? row.bindingId ?? HOSTED_CHOICE : undefined }
+  if (row?.creditsModel) return { selected: creditsOptionId(row.creditsModel) }
+  // A row with none of the three was 「Mikka 默认」, now gone: it reads as no choice.
+  return { selected: row?.bindingId ?? undefined }
 }
 
 /**
@@ -66,7 +69,7 @@ export async function resolveBotModelChoice(
   // Only hosted choices consume this policy; both consumers share one read per invocation.
   let hostedPolicy: Promise<boolean> | undefined
   const hostedAllowed = () => hostedPolicy ??= hostedModelEnabled(pool, scope.ownerId)
-  const hosted = async (state: ChoiceState): Promise<BotModelChoice> => {
+  const hosted = async (state: ChoiceState, model: string): Promise<BotModelChoice> => {
     if (!await hostedAllowed()) {
       const next = await (await import('./points-fallback')).pointsFallback(pool as Pool, scope)
       if (next?.kind === 'api_key') {
@@ -81,7 +84,7 @@ export async function resolveBotModelChoice(
     }
     // Community defaults either spend their explicitly bound cloud workspace
     // or their own provider. Local hosted balances never redirect that choice.
-    if (!isCloudEdition()) return { kind: 'hosted', ...state }
+    if (!isCloudEdition()) return { kind: 'hosted', model, ...state }
     const { hostedPointsRefusal, pointsFallback } = await import('./points-fallback')
     const next = await hostedPointsRefusal(scope.workspaceId) ? await pointsFallback(pool as Pool, scope) : null
     if (next?.kind === 'api_key') {
@@ -92,12 +95,13 @@ export async function resolveBotModelChoice(
       const binding = await settings.chatBinding(scope, next.bindingId)
       if (binding) return { kind: 'subscription', binding, chosen: false, fallback: 'points' }
     }
-    return { kind: 'hosted', ...state }
+    return { kind: 'hosted', model, ...state }
   }
-  if (preference.selected === HOSTED_CHOICE && !preference.key && await hostedAllowed()) return hosted({ chosen: true })
+  const credits = !preference.key && preference.selected ? parseCreditsOption(preference.selected) : null
+  if (credits && await hostedAllowed()) return hosted({ chosen: true }, credits)
 
-  const selected = preference.selected && !preference.key ? await settings.chatBinding(scope, preference.selected) : undefined
-  const shared = !selected && botId && preference.selected && !preference.key && settings.sharedChatBinding
+  const selected = preference.selected && !preference.key && !credits ? await settings.chatBinding(scope, preference.selected) : undefined
+  const shared = !selected && botId && preference.selected && !preference.key && !credits && settings.sharedChatBinding
     ? await settings.sharedChatBinding(scope, botId, preference.selected) : undefined
   // A valid saved binding is already route-checked; only fallback needs the full catalogue.
   const rows = selected || shared ? [] : cached.rows ?? await settings.chatModels(scope)
@@ -135,5 +139,15 @@ export async function resolveBotModelChoice(
   // The default remains own subscriptions first, then the first shared one.
   const pooled = botId && settings.pooledBindings ? (cached.pooled ?? await settings.pooledBindings(scope))[0] : undefined
   if (pooled) return withQuota(pooled, pooled.ownerId)
-  return hosted(state)
+  // No silent default (decision 2026-11-15-1900): the person's own 优先使用的模型 may still name one; else they choose.
+  const next = await (await import('./points-fallback')).pointsFallback(pool as Pool, scope)
+  if (next?.kind === 'api_key') {
+    const key = keys.find(item => item.id === next.keyId && apiKeyServesBotModel(item, next.model))
+    if (key) return { kind: 'apiKey', key, model: next.model, chosen: false, fallback: 'preference' }
+  }
+  if (next?.kind === 'subscription') {
+    const nextBinding = await settings.chatBinding(scope, next.bindingId)
+    if (nextBinding) return { kind: 'subscription', binding: nextBinding, chosen: false, fallback: 'preference' }
+  }
+  return { kind: 'none', ...state }
 }

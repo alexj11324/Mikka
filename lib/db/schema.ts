@@ -174,6 +174,8 @@ export const botModelChoices = pgTable('bot_model_choices', {
   botKey:text('botKey').notNull(),bindingId:uuid('bindingId'),
   /** Or a model an API key / custom provider serves (C22); exactly one of the two. */
   apiKeyId:uuid('apiKeyId'),apiKeyModel:text('apiKeyModel'),
+  /** Or a catalogue model (`vendor/model`) run on Mikka 额度; a row with none of the three is no choice (decision 2026-11-15-1900). */
+  creditsModel:text('creditsModel'),
 }, table=>[primaryKey({columns:[table.ownerId,table.workspaceId,table.botKey]})])
 
 export const agentSessions = pgTable('agent_sessions', {

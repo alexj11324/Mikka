@@ -10,11 +10,12 @@ export interface MainThreadModel { harness: OrderHarness; model: string }
  * the model of the chat that dispatches it, the Coordinator's or a Bot's.
  *
  * Only a model a thread can run counts: a subscription or API-key model that is
- * one of the person's task candidates. 「Mikka 默认」 only answers in chats, so it
- * has none, and the task falls back to 优先使用的模型 until it can run threads.
+ * one of the person's task candidates. A chat on Mikka 额度 (`credits:<vendor/model>`)
+ * or with nothing chosen has none until threads can run on Mikka 额度 (decision
+ * 2026-11-15-1900, step 2), and the task falls back to 优先使用的模型.
  */
 export async function mainThreadModel(pool: Query, scope: { ownerId: string; workspaceId: string }, botId: string | null): Promise<MainThreadModel | null> {
-  const [{ botModelPreference }, { HOSTED_CHOICE }, { orderCandidates }] = await Promise.all([
+  const [{ botModelPreference }, { parseCreditsOption }, { orderCandidates }] = await Promise.all([
     import('./bot-model-choice'), import('./bot-model-menu-view'), import('./model-order'),
   ])
   const preference = await botModelPreference(pool, scope, botId)
@@ -23,7 +24,7 @@ export async function mainThreadModel(pool: Query, scope: { ownerId: string; wor
     const { keyId, model } = preference.key
     match = candidate => candidate.source.kind === 'api_key' && candidate.source.keyId === keyId && candidate.model === model
   } else {
-    if (!preference.selected || preference.selected === HOSTED_CHOICE) return null
+    if (!preference.selected || parseCreditsOption(preference.selected)) return null
     const { rows: [binding] } = await pool.query<{ connectionId: string; modelId: string }>(
       'SELECT "connectionId"::text AS "connectionId","modelId" FROM byos_bindings WHERE id=$1 AND "ownerId"=$2', [preference.selected, scope.ownerId])
     if (!binding) return null
