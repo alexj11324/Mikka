@@ -76,6 +76,39 @@ test('an open thread\'s later reads leave its prompt and report in the database 
     // A cursor the server cannot continue from reads everything again, prompt included.
     const stale = await as(() => getIssueThread(issue, run, { ...first.value.chunkCursor!, seq: 999 } as never))
     if (!stale.chunksAppend) assert.equal(stale.thread.prompt, prompt)
+    await t.test('only the claiming device and current native session can change a live Composer model', async () => {
+      const { issueDeviceToken, hashDeviceToken } = await import('../lib/device-link')
+      const { CLIENT_VERSION_HEADER } = await import('@mikka/protocol/version')
+      const { SOURCE_DAEMON_VERSION } = await import('@mikka/protocol/device')
+      const { PATCH } = await import('../app/v1/runs/[runId]/route')
+      const device = randomUUID()
+      const token = await issueDeviceToken(owner, 'Native model observation')
+      const other = await issueDeviceToken(owner, 'Other device credential')
+      const read = async () => (await as(() => getIssueThread(issue, run))).context?.composerModel
+      const patch = (credential: string, sessionId: string, observedModel: string) => PATCH(new Request(
+        'http://localhost/v1/runs/' + run, { method: 'PATCH', headers: { authorization: 'Bearer '+credential,
+          [CLIENT_VERSION_HEADER]: SOURCE_DAEMON_VERSION, 'content-type':'application/json' },
+          body: JSON.stringify({ state:'running', sessionId, observedModel }) }), { params: Promise.resolve({ runId: run }) })
+      try {
+        await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"deviceType") VALUES($1,$2,'QA','local','laptop')`,[device,owner])
+        await pool.query(`UPDATE agent_runs SET "deviceId"=$2, "deviceTokenId"=(SELECT id FROM device_tokens WHERE "tokenHash"=$3),
+          "sessionId"='native',status='waiting_input' WHERE id=$1`,[run,device,hashDeviceToken(token)])
+        assert.equal((await patch(other, 'native', 'wrong-device')).status, 204)
+        assert.equal((await patch(token, 'previous', 'wrong-session')).status, 204)
+        assert.equal((await read())?.served, 'observed-fixture')
+        assert.equal((await patch(token, 'native', 'daemon-model')).status, 204)
+        assert.deepEqual(await read(), { selected:'selected-fixture',served:'daemon-model' })
+        assert.equal((await patch(token, 'native', 'daemon-model')).status, 204)
+        assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1',[run])).rows[0].status,'waiting_input')
+        await pool.query("UPDATE agent_runs SET status='succeeded' WHERE id=$1",[run])
+        assert.equal((await patch(token, 'native', 'late')).status, 204)
+        assert.equal((await read())?.served,'daemon-model')
+      } finally {
+        await pool.query('UPDATE agent_runs SET "deviceTokenId"=NULL,"deviceId"=NULL WHERE id=$1',[run])
+        await pool.query('DELETE FROM device_tokens WHERE "userId"=$1',[owner])
+        await pool.query('DELETE FROM devices WHERE id=$1',[device])
+      }
+    })
     t.diagnostic(JSON.stringify({ promptChars: prompt.length, reportJsonBytes: JSON.stringify(report).length, firstReadJsonBytes: first.bytes, laterReadJsonBytes: later.bytes }))
   } finally {
     await pool.query('delete from run_chunks where "runId"=$1', [run])

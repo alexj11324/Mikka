@@ -17,7 +17,7 @@ import { cleanupTempDirs, makeRepo, tempDir, waitFor } from './helpers'
 
 afterEach(cleanupTempDirs)
 
-async function fixture(mode: 'valid' | 'missing' | 'tampered' | 'wrong-session' | 'wrong-receipt' | 'cached-handoff' | 'wrong-fixture' | 'delayed-handoff' = 'valid', resumed = false, benchmark = false, observedModel: string | null = 'observed-model', questionContinuation?: 'valid' | 'expired' | 'wrong-device' | 'missing-worktree', team?: 'approved' | 'withdrawn') {
+async function fixture(mode: 'valid' | 'missing' | 'tampered' | 'wrong-session' | 'wrong-receipt' | 'cached-handoff' | 'wrong-fixture' | 'delayed-handoff' | 'ordinary' | 'old-server' = 'valid', resumed = false, benchmark = false, observedModel: string | null = 'observed-model', questionContinuation?: 'valid' | 'expired' | 'wrong-device' | 'missing-worktree', team?: 'approved' | 'withdrawn') {
   const root = tempDir(), repo = await makeRepo(), runId = randomUUID(), worktree = join(root, 'worktree')
   execFileSync('git', ['worktree', 'add', '--detach', worktree, 'HEAD'], { cwd: repo, stdio: 'ignore' })
   const receipt: SkillAssignmentReceipt = { id: randomUUID(), runId, issueId: randomUUID(), agentId: randomUUID(), repoId: randomUUID(),
@@ -25,7 +25,8 @@ async function fixture(mode: 'valid' | 'missing' | 'tampered' | 'wrong-session' 
   const benchmarkPolicy = { ...defaultRunPolicy(), readOnly: true }
   const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: worktree, encoding: 'utf8' }).trim()
   const assignment = { runId, issueId: receipt.issueId, repoId: receipt.repoId, deviceId: receipt.deviceId,
-    baseBranch: 'main', harness: 'codex' as const, prompt: 'synthetic boundary test', skills: [BASELINE_SKILL], skillReceipt: receipt,
+    baseBranch: 'main', harness: 'codex' as const, prompt: 'synthetic boundary test', ...(mode === 'ordinary' ? { acceptsModelObservations: true as const } :
+      mode === 'old-server' ? {} : { skills: [BASELINE_SKILL], skillReceipt: receipt }),
     leaseExpiresAt: receipt.leaseExpiresAt,
     ...(benchmark ? { policy: benchmarkPolicy, model: 'requested-model', verifyCommand: 'node verify-report.mjs', benchmark: {
       sourceCommit,
@@ -65,7 +66,7 @@ async function fixture(mode: 'valid' | 'missing' | 'tampered' | 'wrong-session' 
   const open = async (options: SessionOptions) => {
     // The base was durably recorded before any adapter/model execution.
     expect(journal.get(runId)?.baseCommit).toMatch(/^[a-f0-9]{40}$/)
-    if (mode !== 'missing') {
+    if (mode !== 'missing' && mode !== 'ordinary' && mode !== 'old-server') {
       const context = new RunContext({ harness: 'codex', worktree, runDir: runPaths(adapterStateDir, runId).runDir,
         privateDir: root, skills: [BASELINE_SKILL], skillReceipt: receipt })
       if (mode === 'tampered') writeFileSync(join(context.skillsDir, 'run-report', 'SKILL.md'), 'changed')
@@ -78,6 +79,11 @@ async function fixture(mode: 'valid' | 'missing' | 'tampered' | 'wrong-session' 
     if (mode === 'cached-handoff' || replaying) return endedSession('actual-session', { type: 'exit', outcome: 'succeeded', stopReason: 'turn_ended', report: { summary: 'durable handoff' } })
     return { runtimeModel: mode === 'delayed-handoff' ? null : observedModel, sessionId: mode === 'wrong-session' ? 'other-session' : 'actual-session', cancel: async () => { cancelled = true }, send: async () => {},
       async *events() {
+        if ((mode === 'ordinary' || mode === 'old-server') && observedModel) {
+          options.onRuntimeModel?.('stale-session', 'other-session-model')
+          options.onRuntimeModel?.('actual-session', observedModel)
+          options.onRuntimeModel?.('actual-session', 'later-native-model')
+        }
         if (mode === 'delayed-handoff') {
           options.onRuntimeModel?.('actual-session', 'late-observed-model')
           writeFileSync(join(runPaths(adapterStateDir, runId).runDir, 'handoff.json'), JSON.stringify({ kind: 'submit', summary: 'durable handoff' }))
@@ -94,6 +100,7 @@ async function fixture(mode: 'valid' | 'missing' | 'tampered' | 'wrong-session' 
   const adapter: AgentAdapter = { harness: 'codex', capabilities: { supportsResume: true, supportsInterject: false }, envAllow: [],
     start: options => { startOptions = options; return open(options) }, resume: (_id, options) => open(options) }
   const completions: RunCompletion[] = []
+  const models: string[] = []
   const deps = { journal, adapterStateDir, adapters: new Map([['codex', adapter]]), log: createLogger(),
     repository: () => ({ repoId: receipt.repoId, name: 'test', path: repo }),
     prepareRepository: async () => {},
@@ -102,7 +109,10 @@ async function fixture(mode: 'valid' | 'missing' | 'tampered' | 'wrong-session' 
       return assignment.baseBranch
     },
     worktrees: { create: async () => worktree, continueFrom: async () => questionContinuation === 'missing-worktree' ? null : worktree, bootstrap: async () => 'test', pathFor: () => worktree, changedFiles: async () => [] },
-    outbox: { push: (_id: string, item: { kind: string; completion: RunCompletion }) => { if (item.kind === 'complete') completions.push(item.completion) },
+    outbox: { push: (_id: string, item: { kind: string; completion: RunCompletion; patch?: { observedModel?: string } }) => {
+      if (item.kind === 'complete') completions.push(item.completion)
+      if (item.kind === 'run' && item.patch?.observedModel) models.push(item.patch.observedModel)
+    },
       compact: async () => {}, lastChunkSeq: () => 0 },
     revalidateSkillAssignment: async () => {
       revalidations++
@@ -125,7 +135,7 @@ async function fixture(mode: 'valid' | 'missing' | 'tampered' | 'wrong-session' 
     await restarted.resumeAll()
     await restarted.idle()
   } else await supervisor.idle()
-  return { revalidations, report: completions.at(-1)?.report??emptyRunReport(), journal, cancelled, priorMount, priorExecution, runId, receipt, parentRunId, parentReceipt, startOptions, worktree, stopReason: completions.at(-1)?.stopReason }
+  return { models, revalidations, report: completions.at(-1)?.report??emptyRunReport(), journal, cancelled, priorMount, priorExecution, runId, receipt, parentRunId, parentReceipt, startOptions, worktree, stopReason: completions.at(-1)?.stopReason }
 }
 
 it('revalidates question continuation bytes and journals a fresh receipt in the original session', async () => {
@@ -261,4 +271,17 @@ it('a withdrawn Team Skill never reaches the adapter, including a saved resume',
     expect(result.stopReason).not.toBe('turn_ended')
     if(resumed)expect(result.journal.get(result.runId)?.error).toMatch(/Skill resume blocked/)
   }
+})
+
+
+it.each(['native-model', null])('reports only the ordinary root session model, independently of Skill evidence (%s)', async observed => {
+  const result = await fixture('ordinary', false, false, observed)
+  expect(result.models).toEqual(observed ? [observed, 'later-native-model'] : [])
+  expect(result.report.runtime).toBeUndefined()
+  expect(result.report.skillMount).toBeUndefined()
+  expect(result.report.execution).toBeUndefined()
+})
+
+it('keeps a previous server from treating an observation as a state transition', async () => {
+  expect((await fixture('old-server')).models).toEqual([])
 })

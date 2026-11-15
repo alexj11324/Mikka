@@ -242,6 +242,7 @@ interface ActiveRun {
   prewarmAbort?: AbortController
   preparedClosing?: Promise<void>
   session: AgentSession | null
+  observedModel?: string
   /** Event consumption ended; cancellation grace cannot cover host publication. */
   sessionEnded?: boolean
   /** An actual adapter exit, never an exhausted stream or forced detachment. */
@@ -1629,6 +1630,15 @@ export class RunSupervisor {
       (name, value) => this.addCredential(runId, name, value))
     run.secretBridge = await startTaskSecretBridge({ current: () => assignment.taskSecrets, signal: run.abort.signal })
     const traceContext = daemonTracer.capture()
+    // The opening protocol response can precede start() returning its session.
+    // Read it again after the running patch. Later observations use the same outbox.
+    const recordModel = (sessionId: string, model: string | null | undefined) => {
+      const observedModel = model?.trim()
+      if (!assignment.acceptsModelObservations || !observedModel || observedModel.length > 500 || !sessionId || run.session?.sessionId !== sessionId ||
+        run.sessionEnded || run.observedModel === observedModel) return
+      run.observedModel = observedModel
+      this.push(runId, { kind: "run", patch: { state: "running", sessionId, observedModel } })
+    }
     const baseOptions = {
       traceContext,
       // The owner's own GitHub credential reaches every run that was sent one (decision 2026-11-02-1600).
@@ -1657,7 +1667,9 @@ export class RunSupervisor {
       skillReceipt: assignment.skillReceipt,
       profileSkills: assignment.profileSkills,
       repositorySkills: assignment.repositorySkills,
-      onRuntimeModel: assignment.skillReceipt ? (sessionId: string, observedModel: string) => {
+      onRuntimeModel: (sessionId: string, observedModel: string) => {
+        recordModel(sessionId, observedModel)
+        if (!assignment.skillReceipt) return
         const current = this.deps.journal.get(runId)
         if (!current?.runtime || isTerminalRunState(current.state) || current.sessionId !== sessionId ||
           current.skillMount?.sessionId !== sessionId || current.skillMount.receiptId !== assignment.skillReceipt?.id) return
@@ -1665,7 +1677,7 @@ export class RunSupervisor {
         this.deps.journal.update(runId, { runtime: { ...current.runtime, observedModel },
           ...(current.execution ? { execution: { ...current.execution, observedModel } } : {}),
         })
-      } : undefined,
+      },
       fixture: assignment.fixture,
       model: assignment.model,
       effort: assignment.effort,
@@ -1952,6 +1964,7 @@ export class RunSupervisor {
         worktree,
       })
     }
+    recordModel(session.sessionId, session.runtimeModel)
     if (run.cancelRequested) await this.requestCancel(runId, run)
 
     const iterator = session.events()[Symbol.asyncIterator]()

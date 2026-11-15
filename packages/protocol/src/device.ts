@@ -396,6 +396,8 @@ export type RunKind = (typeof RUN_KINDS)[number]
 
 /** `POST /v1/devices/:deviceId/runs/:runId/claim`: what the daemon gets. */
 export const runAssignmentSchema = z.object({
+  /** The server handles native model observations without transitioning run state. */
+  acceptsModelObservations: z.literal(true).optional(),
   runId: id,
   /** Optional telemetry, never authorization. A malformed carrier cannot prevent a run. */
   traceContext: z.unknown().transform(sanitizeTraceContext).optional(),
@@ -599,9 +601,12 @@ export const runPatchSchema = z.object({
   sessionId: z.string().max(500).nullable().optional(),
   worktree: z.string().max(4_000).nullable().optional(),
   error: z.string().max(10_000).nullable().optional(),
+  /** An observation-only patch never transitions the run state. */
+  observedModel: z.string().trim().min(1).max(500).optional(),
   /** Set on every terminal state. */
   stopReason: runStopReason.optional(),
-})
+}).refine(patch => patch.observedModel === undefined || Boolean(patch.sessionId && patch.state === "running"),
+  { message: "A model observation requires the running session", path: ["observedModel"] })
 export type RunPatch = z.infer<typeof runPatchSchema>
 
 /**
