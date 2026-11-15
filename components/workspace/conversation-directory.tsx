@@ -15,7 +15,7 @@ import { SearchInput } from '@/components/ui/search-input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { useLiveKey } from '@/hooks/use-live-key'
-import { archiveIdleDays, directoryConversationKey, type DirectoryState } from '@/lib/conversation-directory-input'
+import { archiveIdleDays, directoryConversationKey, directoryTaskNumbers, type DirectoryState } from '@/lib/conversation-directory-input'
 import { PullRequestsBadge, pullRequestRef } from './pull-requests-badge'
 import { directoryPullRequests, directoryPullStates as pullStates } from '@/lib/directory-pulls'
 import { openGroupConversation, openTask, openThread } from './workspace-navigation'
@@ -111,7 +111,7 @@ export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 
         className="h-auto min-w-0 flex-1 flex-wrap justify-start gap-x-3 gap-y-1 py-3 text-start">
         <span className="min-w-0 flex-1 break-words font-medium">{row.title || t('untitled')}</span>
         {row.unread && <span className="size-2 rounded-full bg-primary" role="img" aria-label={t('unread')} />}
-        {row.identifier && <bdi>{row.identifier}</bdi>}
+        {directoryTaskNumbers(row).map(({ key, identifier }) => <bdi key={key}>{identifier}</bdi>)}
         <PullRequestsBadge pullRequests={row.pulls} />
         <span>{t(row.state)}</span><time dateTime={row.at}>{format.dateTime(new Date(row.at), { dateStyle: 'medium', timeStyle: 'short' })}</time>
       </Button>

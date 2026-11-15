@@ -17,7 +17,7 @@ import { colors, LIST_INSET } from '@/lib/theme'
 import { useLiveApi, useRefresh } from '@/lib/useApi'
 import { useTaskContinuation } from '../../../lib/hooks/use-task-continuation'
 import { directoryPullRequests, directoryPullStates, pullRequestsState } from '../../../lib/directory-pulls'
-import { directoryConversationKey, type ConversationDirectoryPage, type DirectoryInput } from '../../../lib/conversation-directory-input'
+import { directoryConversationKey, directoryTaskNumbers, type ConversationDirectoryPage, type DirectoryInput } from '../../../lib/conversation-directory-input'
 
 type Page = ConversationDirectoryPage & { workspaceId: string }
 const labels = mobileMessages.ConversationDirectory
@@ -104,7 +104,7 @@ export default function Conversations() {
         const prStatus = item.pulls?.length ? mobileMessages.Metadata.prState[pullRequestsState(item.pulls)] : null
         return <View>
           <Row label={item.title || labels.untitled} value={item.unread ? labels.unread : undefined}
-            detail={[labels[item.state], prStatus, item.identifier, new Date(item.at).toLocaleString(mobileLocale)].filter(Boolean).join(' · ')}
+            detail={[labels[item.state], prStatus, ...directoryTaskNumbers(item).map(task => task.identifier), new Date(item.at).toLocaleString(mobileLocale)].filter(Boolean).join(' · ')}
             onPress={() => open(item)} />
           {!item.unread && <View style={styles.action}><GlassButton label={labels.markUnread} disabled={writing} onPress={() => void mark(item.kind === 'chat' ? { action: 'unread', chatId: item.id } : { action: 'unread', runId: item.id })} /></View>}
         </View>

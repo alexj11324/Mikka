@@ -47,12 +47,14 @@ test('the active directory query follows the search input even before React can 
 test('a chat and run with the same UUID retain their own directory rows and navigation', async () => {
   const id = '00000000-0000-4000-8000-000000000001'
   const base = { id, pulls: [], taskTitle: null, issueId: null, identifier: null, state: 'idle' as const, at: '2026-11-14T00:00:00Z', pinned: false }
-  data = [{ items: [{ ...base, kind: 'run', title: 'Run entry' }, { ...base, kind: 'chat', title: 'Chat entry' }], cursor: null }]
+  data = [{ items: [{ ...base, kind: 'run', title: 'Run entry', identifier: 'LEGACY-1' }, { ...base, kind: 'chat', title: 'Chat entry',
+    linkedTasks: [{ id: 'a', identifier: 'WORK-2', title: 'First task' }, { id: 'b', identifier: 'WORK-3', title: 'Second task' }] }], cursor: null }]
   const root = createRoot(document.body)
   try {
     await act(async () => root.render(<ConversationDirectory ownerId="owner" workspaceId="workspace" botId={null} />))
     const links = [...document.querySelectorAll('li button:first-child')]
     assert.equal(links.length, 2)
+    assert.deepEqual(links.map(link => [...link.querySelectorAll('bdi')].map(label => label.textContent)), [['LEGACY-1'], ['WORK-2', 'WORK-3']])
     for (const link of links) await act(async () => (link as HTMLButtonElement).click())
     assert.deepEqual(opened, ['run:' + id, 'chat:' + id])
   } finally {

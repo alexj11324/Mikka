@@ -284,6 +284,7 @@ test('PG: production group Factory authorization uses typed Bot membership and r
     await pool.query(await readFile(new URL('../../drizzle/20261023213851_group_conversations.sql',import.meta.url),'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261029043634_group_turns.sql',import.meta.url),'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261031153511_group_bot_members.sql',import.meta.url),'utf8'))
+    await pool.query(await readFile(new URL('../../drizzle/20261113180454_standalone_bot_conversations.sql',import.meta.url),'utf8'))
     await pool.query(`CREATE TABLE bots(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"archivedAt" timestamptz);
       CREATE TABLE workspace_members("userId" text,"workspaceId" uuid,status text,PRIMARY KEY("userId","workspaceId"))`)
     const workspaceId=randomUUID(),otherWorkspaceId=randomUUID(),conversationId=randomUUID(),botId=randomUUID()

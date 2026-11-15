@@ -208,7 +208,8 @@ export async function authorizeGroupFactoryActor(client:Query,scope:Pick<Scope,'
     return (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId,workspaceId)
   }):Promise<void> {
   await authorizeWorkspace(scope.userId,scope.workspaceId)
-  const {rows:[member]}=await client.query(`SELECT b."ownerId" FROM conversations c JOIN conversation_members u ON u."conversationId"=c.id AND u."memberType"='user' AND u."memberId"=$2 AND u."leftAt" IS NULL JOIN conversation_members m ON m."conversationId"=c.id AND m."memberType"='bot' AND m."memberId"=$3 AND m."leftAt" IS NULL JOIN bots b ON b.id::text=m."memberId" AND b."workspaceId"=c."workspaceId" AND b."archivedAt" IS NULL WHERE c.id=$1 AND c."workspaceId"=$4`,[scope.conversationId,scope.userId,scope.reporter.id,scope.workspaceId])
+  const {rows:[member]}=await client.query(`SELECT b."ownerId" FROM conversations c JOIN conversation_members u ON u."conversationId"=c.id AND u."memberType"='user' AND u."memberId"=$2 AND u."leftAt" IS NULL JOIN conversation_members m ON m."conversationId"=c.id AND m."memberType"='bot' AND m."memberId"=$3 AND m."leftAt" IS NULL JOIN bots b ON b.id::text=m."memberId" AND b."workspaceId"=c."workspaceId" AND b."archivedAt" IS NULL WHERE c.id=$1 AND c."workspaceId"=$4
+    AND (c."creationPurpose"='group' OR c."createdBy"=$2)`,[scope.conversationId,scope.userId,scope.reporter.id,scope.workspaceId])
   if (!member?.ownerId) throw Error('group_task_not_authorized')
   await authorizeWorkspace(member.ownerId,scope.workspaceId)
 }
