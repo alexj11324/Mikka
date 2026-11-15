@@ -17,12 +17,12 @@ try{
  const adapter=new ClaudeAdapter({stateDir:state,binary:process.env.E_CLI_BINARY!})
  const session=await adapter.start({runId,cwd:join(qa,'fixture/work'),prompt:'E2262_QA_BEGIN '+prompt+' E2262_QA_END',model,log:createLogger({level:'silent'}),env:buildChildEnv({host:{PATH:process.env.PATH,HOME:join(qa,'fixture/home'),SSL_CERT_FILE:cert,NODE_EXTRA_CA_CERTS:cert,LANG:'C.UTF-8'},runId}),credential:{kind:'provider',protocol:'anthropic',baseUrl:'https://127.0.0.1:3857',key:process.env.E_LOOPBACK_KEY!},toolApproval:new ToolApprovalGate(runId,{isLive:()=>true})})
  r.session=session.sessionId;save()
- let text=''
- for await(const event of session.events()){if(event.type==='chunk'){const c=event.chunk;r.events.push(c.type);if(c.type==='text-delta')text+=c.delta}else if(event.type==='exit')r.terminal=event;save()}
- r.output=text;r.runtimeModel=session.runtimeModel;r.inference=journal('claude-results.jsonl').find(v=>v.prompt===prompt);r.requests=journal('claude-requests.jsonl')
+ let text='',selectedMessage:string|undefined
+ for await(const event of session.events()){if(event.type==='chunk'){const c=event.chunk;r.events.push(c.type);if(c.type==='text-delta'){text+=c.delta;selectedMessage=c.id.replace(/-\d+$/,'')}}else if(event.type==='exit')r.terminal=event;save()}
+ r.output=text;r.runtimeModel=session.runtimeModel;r.selectedMessage=selectedMessage;r.inference=journal('claude-results.jsonl').find(v=>v.id===selectedMessage&&v.prompt===prompt);r.requests=journal('claude-requests.jsonl')
  assert.ok(r.inference,'The pinned Claude Code must reach the isolated model')
  assert.equal(r.inference.output,text);assert.ok(r.inference.output_tokens>0)
- assert.ok(r.events.includes('text-delta'));assert.equal(r.terminal?.outcome,'succeeded')
+ assert.match(text,/\bParis\b/i,'Known factual control sentence should name Paris');assert.ok(r.events.includes('text-delta'));assert.equal(r.terminal?.outcome,'succeeded')
  assert.ok(r.requests.some((x:any)=>x.model===model&&x.marker&&x.route==='/v1/messages'))
  r.success=true
 }catch(e){r.error=String(e.message).replaceAll(process.env.E_LOOPBACK_KEY!,'[redacted]').slice(0,1000);process.exitCode=1}

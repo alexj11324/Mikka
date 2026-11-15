@@ -1,4 +1,4 @@
-name: Original PR runtime acceptance for queue, steer, interrupt, edit and rerun
+name: Original baseline and integration Claude Code reply identity and model inference
 on:
   push:
     branches: [evidence/2254-sidebar-85dfc396]
@@ -15,12 +15,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - source: a463f0fcfd926b7acb2df5f2c9a4891bd0a20567
-            tree: 46e265f6fba9032c87fb51291b9b612182ca54f4
-            artifact: original-2267-durable-delivery
-          - source: 67c82112f7694a805aba9b4e018a5188bf88f274
-            tree: a272485449672957f835b7571d15eb3fe0b8a84e
-            artifact: original-2275-durable-edit-rerun
+          - source: da2df5fd22f0d41182e629006275b00baba85d29
+            tree: 720517a532677cba6c043998c6bc13c2fe463473
+            artifact: integration-claude-provider
+          - source: 5c85ee16410fe5586ad6fef708e8630ef67fe1c3
+            tree: e0a1b294790ffda17cf089fa3b78571dbb70a40b
+            artifact: baseline-claude-provider
     env:
       SOURCE: ${{ matrix.source }}
     steps:
@@ -53,19 +53,10 @@ jobs:
           cd ../harness/evidence/2257/local-provider
           npm ci --ignore-scripts --no-audit --no-fund
           mkdir -m 700 "$RUNNER_TEMP/model-fixture" "$RUNNER_TEMP/isolated-home" "$RUNNER_TEMP/receipt"
-          python prepare.py "$GITHUB_WORKSPACE/product" "$RUNNER_TEMP/model-fixture"
+          python prepare-claude.py "$GITHUB_WORKSPACE/product" "$RUNNER_TEMP/model-fixture"
           mkdir -p "$GITHUB_WORKSPACE/product/.cache/e-codex-actual"
-          cp delivery.mts handoff.mts observe-queue.mts "$GITHUB_WORKSPACE/product/.cache/e-codex-actual/"
-          if [ ! -x /usr/lib/postgresql/17/bin/initdb ]; then
-            . /etc/os-release
-            curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o "$RUNNER_TEMP/pgdg-signing.asc"
-            test "$(gpg --show-keys --with-colons "$RUNNER_TEMP/pgdg-signing.asc" | awk -F: '/^fpr:/ {print $10;exit}')" = B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8
-            sudo install -m 0644 "$RUNNER_TEMP/pgdg-signing.asc" /usr/share/keyrings/pgdg-evidence.asc
-            echo "deb [signed-by=/usr/share/keyrings/pgdg-evidence.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg-evidence.list >/dev/null
-            sudo apt-get update -qq
-            sudo apt-get install -y --no-install-recommends postgresql-17
-          fi
-      - name: Run the official Codex adapter and verified GGUF inside isolated loopback
+          cp claude.mts "$GITHUB_WORKSPACE/product/.cache/e-codex-actual/"
+      - name: Run the official Claude Code adapter and verified GGUF inside isolated loopback
         shell: bash
         run: |
           set -euo pipefail
@@ -77,7 +68,7 @@ jobs:
             ip link set lo up
             test "$(ls /sys/class/net)" = lo || test "$(ip -o link show | wc -l)" = 1
             test -z "$(ip route show default)"
-            exec setpriv --reuid="$1" --regid="$2" --clear-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs env -i PATH="$3" HOME="$4" bash "$5/pg-verify.sh" "$5" "$6" "$7/receipt" "$7/model-fixture/codex" "$7/model-fixture/model.gguf"
+            exec setpriv --reuid="$1" --regid="$2" --clear-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs env -i PATH="$3" HOME="$4" bash "$5/verify-claude.sh" "$5" "$6" "$7/receipt" "$7/model-fixture/claude" "$7/model-fixture/model.gguf"
           ' isolated "$worker_uid" "$worker_gid" "$PATH" "$RUNNER_TEMP/isolated-home" "$harness" "$src" "$RUNNER_TEMP"
       - name: Retain only the sanitized source, model and event receipts
         if: always()
@@ -85,20 +76,11 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: |
-            ${{ runner.temp }}/receipt/*-trial.json
-            ${{ runner.temp }}/receipt/delivery.json
-            ${{ runner.temp }}/receipt/steer-result.json
-            ${{ runner.temp }}/receipt/interrupt-result.json
-            ${{ runner.temp }}/receipt/setup-diagnostic.txt
-            ${{ runner.temp }}/receipt/pg-waits.jsonl
-            ${{ runner.temp }}/receipt/after-run-result.json
-            ${{ runner.temp }}/receipt/handoff.json
-            ${{ runner.temp }}/receipt/tools.jsonl
-            ${{ runner.temp }}/receipt/decisions.jsonl
-            ${{ runner.temp }}/receipt/requests.jsonl
-            ${{ runner.temp }}/receipt/results.jsonl
-            ${{ runner.temp }}/receipt/provider-ends.jsonl
-            ${{ runner.temp }}/receipt/first-token.jsonl
+            ${{ runner.temp }}/receipt/claude.json
+            ${{ runner.temp }}/receipt/claude-requests.jsonl
+            ${{ runner.temp }}/receipt/claude-results.jsonl
+            ${{ runner.temp }}/receipt/claude-first-token.jsonl
+            ${{ runner.temp }}/receipt/claude-routes.jsonl
             ${{ runner.temp }}/receipt/start
             ${{ runner.temp }}/receipt/end
             ${{ runner.temp }}/receipt/exit

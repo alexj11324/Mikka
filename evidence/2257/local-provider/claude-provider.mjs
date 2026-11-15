@@ -7,8 +7,6 @@ const key=Buffer.from(process.env.E_LOOPBACK_KEY)
 const log=(name,value)=>appendFileSync(work+'/'+name,JSON.stringify({at:new Date().toISOString(),...value})+'\n',{mode:0o600})
 const llama=await getLlama({gpu:false,build:'never',skipDownload:true})
 const model=await llama.loadModel({modelPath:process.env.E_WEIGHT_FILE})
-const context=await model.createContext({contextSize:1024,threads:1})
-const sequence=context.getSequence()
 const tls={key:readFileSync(work+'/endpoint.key'),cert:readFileSync(work+'/endpoint.pem'),minVersion:'TLSv1.2'}
 createServer(tls,async(req,res)=>{
  const route=new URL(req.url,'https://127.0.0.1').pathname
@@ -37,9 +35,10 @@ createServer(tls,async(req,res)=>{
  }
  const abort=new AbortController()
  res.on('close',()=>{if(!res.writableEnded)abort.abort()})
- let text=''
+ let text='',context
  try{
-  await sequence.clearHistory()
+  context=await model.createContext({contextSize:1024,threads:1})
+  const sequence=context.getSequence()
   const session=new LlamaChatSession({contextSequence:sequence,systemPrompt:'Answer this harmless English test request in plain text. Do not call any tools.'})
   const actual=await session.prompt(prompt,{temperature:0,maxTokens:64,signal:abort.signal,onTextChunk:delta=>{if(!text)log('claude-first-token.jsonl',{id,prompt});text+=delta;if(stream)event('content_block_delta',{index:0,delta:{type:'text_delta',text:delta}})}})
   if(!actual||actual!==text)throw Error('Stream and result mismatch')
@@ -47,5 +46,5 @@ createServer(tls,async(req,res)=>{
   log('claude-results.jsonl',{id,model:modelId,prompt,output:actual,input_tokens,output_tokens})
   if(stream){event('content_block_stop',{index:0});event('message_delta',{delta:{stop_reason:'end_turn',stop_sequence:null},usage:{output_tokens}});event('message_stop',{});res.end()}
   else{res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify({...base,content:[{type:'text',text:actual}],stop_reason:'end_turn',usage:{input_tokens,output_tokens}}))}
- }catch(e){log('claude-routes.jsonl',{route,phase:'inference',name:e.name,aborted:abort.signal.aborted});if(!res.headersSent)return reject(500,'Inference failed');res.end()}
+ }catch(e){log('claude-routes.jsonl',{route,phase:'inference',name:e.name,aborted:abort.signal.aborted});if(!res.headersSent)return reject(500,'Inference failed');res.end()}finally{await context?.dispose()}
 }).listen(3857,'127.0.0.1')
