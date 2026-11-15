@@ -16,7 +16,7 @@ mock.module('swr/infinite', { defaultExport: (getKey: (index: number, previous: 
 }, namedExports: { unstable_serialize: () => 'directory' } })
 const stub = (file: string, namedExports: Record<string, unknown>) => mock.module(new URL(file, import.meta.url).href, { namedExports })
 stub('../../hooks/use-live-key.tsx', { useLiveKey: () => {} })
-stub('../../app/actions/preferences.ts', { getPreferences: () => ({}), updatePreferences: () => ({}) })
+stub('../../components/settings/use-preferences.ts', { usePreferences: () => ({}) })
 stub('../../app/actions/task-runs.ts', { listConversations: ({ search }: { search: string }) => { renderedQuery = search; return { items: [], cursor: null } } })
 const { ConversationDirectory } = await import('./conversation-directory')
 test('the active directory query follows the search input even before React can commit background work', async () => {
