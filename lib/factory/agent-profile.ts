@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { digest } from '@/lib/agent-kit/definition'
 import { bindAgentToConnection, resolveModelDispatch, type ModelDispatch } from '@/lib/model-dispatch'
 import { credentialStates, orderCandidates, selectedOrderCandidates, readOrder, poolDevices } from '@/lib/model-order'
-import { entryKey, planDispatch, type OrderEntry, type OrderHarness, type RunLocation } from '@/lib/model-order-plan'
+import { entryKey, planDispatch, sourceId as entrySourceId, type OrderEntry, type OrderHarness, type RunLocation } from '@/lib/model-order-plan'
 import { cloudModelSupport } from '@/lib/cloud-template-models'
 import { cloudReady } from '@/lib/rule-dispatch'
 import { BUILTIN_AGENT_PROFILE_ID, BUILTIN_AGENT_PROFILE_VERSION, builtinAgentProfileDefinition, builtinAgentProfileSelection, profileFixedModel, profileHarness, AgentProfileError, agentProfileDigest, agentProfileInstructions, agentProfileLegacyInstructions, parseAgentProfile, type AgentProfileScope, type AgentProfileSelection } from './agent-profile-definition'
@@ -131,9 +131,9 @@ export async function agentProfileCatalog(pool: Pool, scope: AgentProfileScope) 
   const models = entries.map((entry, index) => {
     const compatible = devices.filter(device => connectedAgents.rows.some(agent => agent.deviceId === device.id && agent.harness === entry.harness))
     const plan = planDispatch({ entries: [], explicit: entry, location: order.location, devices: compatible, credential: item => states.get(item.id)?.credential ?? { usable: false, reason: 'missing' }, cloudReady: entry.harness === 'codex' ? codexReady : claudeReady, cloudModel: item => cloudModelSupport(item) })
-    const sourceId = entry.source.kind === 'subscription' ? entry.source.connectionId : entry.source.keyId
+    const sourceId = entrySourceId(entry.source)
     const sourceLabel = labels.rows.find(label => label.id === sourceId)?.label || undefined
-    const sourceIds = [...new Set(entries.filter(item => item.source.kind === entry.source.kind).map(item => item.source.kind === 'subscription' ? item.source.connectionId : item.source.keyId))]
+    const sourceIds = [...new Set(entries.filter(item => item.source.kind === entry.source.kind).map(item => entrySourceId(item.source)))]
     const sourceOrdinal = sourceIds.indexOf(sourceId) + 1
     return { harness: entry.harness, model: entry.model, source: entry.source, provider: candidates[index].provider, ...(sourceLabel ? { sourceLabel } : {}), sourceOrdinal, available: plan.kind !== 'none', ...(plan.kind === 'none' ? { reason: plan.reason } : {}) }
   })
@@ -197,6 +197,12 @@ export async function assertFrozenModelTarget(query: ProfileQuery, scope: AgentP
 }
 
 async function assertFrozenModelCandidates(query: ProfileQuery, scope: AgentProfileScope, entry: OrderEntry, candidates: Awaited<ReturnType<typeof orderCandidates>>): Promise<void> {
+  // Mikka 额度 is no connected credential: any catalogue model may run, and the
+  // model gateway charges or refuses each request (decision 2026-11-15-2000).
+  if (entry.source.kind === 'credits') {
+    if (!(await import('@/lib/model-catalog')).isCatalogId(entry.model)) throw new AgentProfileError('agentProfileModelUnavailable')
+    return
+  }
   if (!candidates.some(candidate => entryKey(candidate) === entryKey(entry))) throw new AgentProfileError('agentProfileModelUnavailable')
   // Pin the source's current authorization row against a concurrent disconnect/delete.
   if (entry.source.kind === 'subscription') await query.query('SELECT id FROM byos_connections WHERE id=$1 FOR SHARE', [entry.source.connectionId])

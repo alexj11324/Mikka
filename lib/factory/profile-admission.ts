@@ -85,6 +85,9 @@ export async function admitProfileSelection(query: Query, input: {
     if (entry.harness !== input.harness || entry.model !== input.model) throw new AgentProfileAdmissionError({ detail: 'target_mismatch' })
     if (entry.source.kind === 'api_key') {
       if (input.apiKeyId !== entry.source.keyId || input.subscriptionBindingId) throw new AgentProfileAdmissionError({ detail: 'credential_mismatch' })
+    } else if (entry.source.kind === 'credits') {
+      // Mikka 额度 carries neither a key nor a subscription binding.
+      if (input.apiKeyId || input.subscriptionBindingId) throw new AgentProfileAdmissionError({ detail: 'credential_mismatch' })
     } else {
       if (!input.subscriptionBindingId || input.apiKeyId) throw new AgentProfileAdmissionError({ detail: 'credential_mismatch' })
       const bound = await query.query('SELECT 1 FROM byos_bindings WHERE id=$1 AND "connectionId"=$2 AND "modelId"=$3 AND "workspaceId"=$4',

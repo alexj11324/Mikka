@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { dbUrl, seedUser, seedWorkspace, seedIssue, seedBot, seedPersonalWorkspace, seedAgent } from '../../tests/support/workspace-admin-db'
-import type { OrderEntry, OrderHarness } from '@/lib/model-order-plan'
+import type { OrderEntry, OrderHarness, StoredEntry } from '@/lib/model-order-plan'
 import { normalizeRepository } from '@mikka/protocol/repository'
 process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
 process.env.MIKKA_BYOS_ENABLED = '1'
@@ -194,7 +194,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
         await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","workspaceId",status,"stopReason","agentDefinition",report,"startedAt","finishedAt")
           VALUES ($1,$2,$3,$4,'failed','provider_failure',$5,$6,now()-interval '1 second',now())`,
         [id, who.ownerId, healthAgentId, who.workspaceId, JSON.stringify({ harness: entry.harness, executionIdentity: { workspaceId: who.workspaceId },
-          ...(entry.source.kind === 'subscription' ? { subscription: { bindingId: binding.id, modelId: entry.model } } : { apiKey: { keyId: entry.source.keyId, model: entry.model } }) }),
+          ...(entry.source.kind === 'subscription' ? { subscription: { bindingId: binding.id, modelId: entry.model } } : entry.source.kind === 'api_key' ? { apiKey: { keyId: entry.source.keyId, model: entry.model } } : {}) }),
         JSON.stringify({ providerFailure: { kind: 'balance', retryable: false, status: 402, code: 'payment_required' } })])
         try { await compare(selection) } finally { await pool.query('DELETE FROM agent_runs WHERE id=$1', [id]) }
       })
@@ -288,7 +288,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
       { harness: 'codex', installed: true, models: ['gpt-6-luna'], subscriptionBroker: true },
     ])])
     for (const harness of ['claude_code', 'codex'] as const) await pool.query('INSERT INTO agents (id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,$4,$4)', [runtimeAgents[harness], who.ownerId, device, harness])
-    const wanted: Omit<OrderEntry, 'id'>[] = [
+    const wanted: Omit<StoredEntry, 'id'>[] = [
       { harness: 'claude_code', model: 'deepseek-flash', source: { kind: 'api_key', keyId: key.id } },
       // The preferred Codex Agent is healthy, but cannot replace a named Claude Code Agent.
       { harness: 'codex', model: 'gpt-6-luna', source: { kind: 'subscription', connectionId: codexSource } },

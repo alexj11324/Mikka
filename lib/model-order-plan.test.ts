@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { agentsByOffer, defaultOrder, deviceModel, dispatchOrder, latestDefaultCandidates, onPreferredAgent, pickDevice, placeStage, planDispatch, whyNoDevice, type CredentialState, type OrderEntry, type PoolDevice } from './model-order-plan'
+import { agentsByOffer, defaultOrder, deviceModel, dispatchOrder, latestDefaultCandidates, onPreferredAgent, pickDevice, placeStage, planDispatch, whyNoDevice, type CredentialState, type OrderEntry, type PoolDevice, type StoredEntry } from './model-order-plan'
 
 // Model names here are fixtures standing for what a CLI or provider reported.
-const sub = (id: string, harness: OrderEntry['harness'], model: string, connectionId = `conn-${harness}`): OrderEntry => ({ id, harness, model, source: { kind: 'subscription', connectionId } })
+const sub = (id: string, harness: OrderEntry['harness'], model: string, connectionId = `conn-${harness}`): StoredEntry => ({ id, harness, model, source: { kind: 'subscription', connectionId } })
 
 test('untouched defaults keep the newest release per account and family while retaining the full catalogue', () => {
   const models = ['claude-opus-5', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-sonnet-5', 'claude-haiku-5-5', 'claude-fable-5-1', 'claude-fable-5', 'claude-3-5-sonnet-20241022', 'gpt-6.1-sol', 'gpt-6-astra', 'gpt-6.1-terra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']

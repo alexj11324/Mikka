@@ -63,7 +63,8 @@ export type CloudModelPurpose = 'task' | 'desktop' | 'cloudflare_task'
 export function cloudModelSupport(entry: Pick<OrderEntry, 'harness' | 'model' | 'source'>, purpose: CloudModelPurpose = 'task', env: Record<string, string | undefined> = process.env): CloudModelState {
   // The protected task image release verifies both native binaries. Its
   // subscription catalogue and current allowance are authorized by dispatch.
-  if (purpose === 'cloudflare_task') return entry.source.kind === 'subscription' ? 'ready' : 'cloudModelNotReported'
+  // Mikka 额度 reaches any catalogue model through the model gateway, on either image.
+  if (purpose === 'cloudflare_task') return entry.source.kind === 'subscription' || entry.source.kind === 'credits' ? 'ready' : 'cloudModelNotReported'
   const catalogue = cloudTemplateModels(env)
   if (!catalogue) return 'cloudModelsUnknown'
   const kind = purpose === 'desktop' ? 'desktop' : entry.harness === 'claude_code' ? 'claude' : 'codex'

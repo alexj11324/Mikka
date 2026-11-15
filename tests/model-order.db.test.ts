@@ -702,4 +702,24 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     const run = await resolveModelDispatch(pool, { ...scope, botId: null })
     assert.deepEqual(run.kind === 'device' && [run.entry.model, run.entry.harness, run.entry.source], ['ds-a', 'codex', key])
   })
+
+  await t.test('a catalogue model no credential offers runs on Mikka 额度; a model a credential offers keeps that credential', async () => {
+    const scope = { ...await person('credits-dispatch'), botId: null }
+    await device(scope.ownerId, [{ harness: 'claude_code', installed: true }, { harness: 'codex', installed: true }], true, { name: 'both' })
+    // Nothing connected: a catalogue model still has somewhere to run, on Mikka 额度 (decision 2026-11-15-2000).
+    const run = await resolveModelDispatch(pool, scope, { harness: 'claude_code', model: 'deepseek/deepseek-v4-pro' }, 'local')
+    assert.equal(run.kind, 'device')
+    assert.deepEqual(run.kind === 'device' && [run.entry.harness, run.entry.model, run.entry.source], ['claude_code', 'deepseek/deepseek-v4-pro', { kind: 'credits' }])
+    assert.equal(run.kind === 'device' && run.subscriptionBindingId, undefined, 'Mikka 额度 binds no subscription')
+    const { modelNotAllowed } = await import('../lib/model-dispatch')
+    assert.equal(await modelNotAllowed(pool as never, scope, { harness: 'codex', model: 'openai/gpt-6-sol' }), null, 'any catalogue model is allowed')
+    // A bare model id is not a catalogue model: still only what a credential offers.
+    const bare = await resolveModelDispatch(pool, scope, { harness: 'claude_code', model: 'deepseek-v4-pro' }, 'local')
+    assert.deepEqual(bare.kind === 'none' && bare.reason, 'notOffered')
+    // A subscription that lists the same model id keeps that credential instead.
+    await subscribe(scope, 'claude', ['anthropic/claude-sonnet-5.5'])
+    const sub = await resolveModelDispatch(pool, scope, { harness: 'claude_code', model: 'anthropic/claude-sonnet-5.5' }, 'local')
+    assert.equal(sub.kind === 'device' && sub.entry.source.kind, 'subscription')
+  })
+
 })

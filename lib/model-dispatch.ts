@@ -37,6 +37,8 @@ export type ModelDispatch =
  */
 export async function modelNotAllowed(pool: Pool, scope: OrderScope, asked?: { harness: OrderEntry['harness']; model?: string } | null): Promise<{ error: 'modelNotAllowed'; asked: { harness: OrderEntry['harness']; model?: string }; allowed: { harness: OrderEntry['harness']; model: string }[] } | null> {
   if (!asked) return null
+  // Any catalogue model may run on Mikka 额度 (decision 2026-11-15-2000).
+  if (asked.model && (await import('./model-catalog')).isCatalogId(asked.model)) return null
   await new (await import('./execution-settings')).ExecutionSettings(pool).ensureCatalogues(scope)
   const { entries } = await readOrder(pool, scope)
   if (entries.some(entry => entry.harness === asked.harness && (!asked.model || entry.model === asked.model))) return null
@@ -87,10 +89,16 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   const picked = exact ?? (explicit ? order.entries.find(entry => entry.harness === explicit.harness && entry.model === explicit.model)
     ?? candidates.filter(candidate => allowedAgent(candidate) && candidate.harness === explicit.harness && candidate.model === explicit.model)
       .map(candidate => ({ id: `thread:${candidate.harness}:${candidate.model}`, harness: candidate.harness, model: candidate.model, source: candidate.source }))[0] : undefined)
+  // A catalogue model (`vendor/model`) no connected credential offers runs on
+  // Mikka 额度 through the model gateway (decision 2026-11-15-2000); the run's
+  // key, if one lists it, is still chosen at queue time.
+  const credits = explicit && !picked && !exact && (await import('./model-catalog')).isCatalogId(explicit.model)
+    ? { id: `credits:${explicit.harness}:${explicit.model}`, harness: explicit.harness, model: explicit.model, source: { kind: 'credits' as const } } : undefined
+  const chosen = picked ?? credits
   const named = explicit ? { agent: HARNESS_NAMES[explicit.harness], model: explicit.model } : null
   // The thread's model is the only one tried: no subscription or key offers it on that Agent, so nothing runs and the card says so.
-  if (named && !picked) return { kind: 'none', reason: 'notOffered', card: modelUnavailableCard('notOffered', named) }
-  const entries = picked ? [picked] : order.entries
+  if (named && !chosen) return { kind: 'none', reason: 'notOffered', card: modelUnavailableCard('notOffered', named) }
+  const entries = chosen ? [chosen] : order.entries
   const deferStaleQuota = dependencies.deferStaleQuota === true && dependencies.probeQuota === false
     && dependencies.bindSubscription === false && dependencies.skipCatalogueRefresh === true
   const states = await credentialStates(pool, scope, entries, candidates, undefined, { refresh: dependencies.refreshQuota, probe: dependencies.probeQuota, ...(deferStaleQuota ? { deferStaleQuota: true } : {}) })
@@ -100,13 +108,13 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   // later source. Keep the dispatch spending fence through that pending entry.
   const pendingAt = deferStaleQuota ? entries.findIndex(entry => states.get(entry.id)?.quotaCheckPending) : -1
   const plannedEntries = pendingAt < 0 ? entries : entries.slice(0, pendingAt + 1)
-  let plan = planDispatch({ entries: picked ? [] : plannedEntries, explicit: picked ?? null, location: order.location, devices, credential: entry => {
+  let plan = planDispatch({ entries: chosen ? [] : plannedEntries, explicit: chosen ?? null, location: order.location, devices, credential: entry => {
     const state = states.get(entry.id)
     return deferStaleQuota && state?.quotaCheckPending ? { usable: true } : state?.credential ?? { usable: false, reason: 'missing' }
   }, cloudReady: ready, cloudModel: entry => cloudModelSupport(entry, dependencies.cloudPurpose) })
   if (plan.kind === 'none' && deviceId && devices[0] && plan.reason === 'noDevice') {
     // What the named computer lacks for the model that would otherwise run (the thread's own model when it named one).
-    const wanted = picked ?? plan.skipped.find(item => item.block.reason === 'noDevice')?.entry ?? order.entries[0]
+    const wanted = chosen ?? plan.skipped.find(item => item.block.reason === 'noDevice')?.entry ?? order.entries[0]
     const installed = devices[0].harnesses.some(item => item.harness === wanted.harness && item.installed)
     const detail = wanted.source.kind === 'subscription' ? devices[0].harnesses.find(info => info.harness === wanted.harness)?.subscriptionPreflight : undefined
     return { kind: 'none', reason: 'namedDevice', card: modelUnavailableCard('namedDevice', { agent: HARNESS_NAMES[wanted.harness], model: wanted.model, installed, detail }) }
@@ -121,7 +129,7 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   }
   if (plan.kind === 'none' && named && plan.reason !== 'cloudNotConfigured' && plan.reason !== 'checking' && plan.reason !== 'cloudModelsUnknown' && plan.reason !== 'cloudModelNotReported') {
     const reason = plan.reason === 'noDevice' ? 'pickedNoDevice' : 'pickedUnavailable'
-    return { kind: 'none', reason, card: modelUnavailableCard(reason, { ...named, ...(plan.reason === 'noDevice' && picked ? { device: whyNoDevice(devices, picked) } : {}) }) }
+    return { kind: 'none', reason, card: modelUnavailableCard(reason, { ...named, ...(plan.reason === 'noDevice' && chosen ? { device: whyNoDevice(devices, chosen) } : {}) }) }
   }
   if (plan.kind === 'none') return { kind: 'none', reason: plan.reason, card: modelUnavailableCard(plan.reason), skipped: plan.skipped }
   const quotaCheckPending = deferStaleQuota && states.get(plan.entry.id)?.quotaCheckPending ? { quotaCheckPending: true as const } : {}

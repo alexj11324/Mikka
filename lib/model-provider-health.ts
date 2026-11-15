@@ -1,7 +1,7 @@
 import 'server-only'
 import type { Pool, PoolClient } from 'pg'
 import { providerFailureSchema } from '@mikka/protocol/provider-failure'
-import { entryKey, type EntrySource, type OrderCandidate, type OrderHarness } from './model-order-plan'
+import { entryKey, sourceId, type EntrySource, type OrderCandidate, type OrderHarness } from './model-order-plan'
 import { runMayUseCredentialSql } from './personal-policy'
 
 type Query = Pick<Pool | PoolClient, 'query'>
@@ -10,7 +10,7 @@ type Candidate = OrderCandidate & { credentialOwnerId?: string }
 export type ProviderHealthBlock = { usable: false; reason: 'balance' | 'keyRefused' | 'expired' | 'providerUnavailable'; resetsAt?: string }
 
 const UNAVAILABLE_RETRY_MS = 120_000
-export const providerSourceKey = (source: EntrySource) => `${source.kind}:${source.kind === 'api_key' ? source.keyId : source.connectionId}`
+export const providerSourceKey = (source: EntrySource) => `${source.kind}:${sourceId(source)}`
 
 /** Only the sanitized runtime contract is evidence of provider health. A
  * model-list response is not evidence that an account can pay for a run. */

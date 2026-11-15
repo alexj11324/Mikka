@@ -67,6 +67,8 @@ export async function chooseCloudRunModel(pool: Pool, scope: { ownerId: string; 
   const source = target.entry.source
   const modelDispatch: WorkerModelDispatch = { mode: asked ? 'picked' : 'preference', location: 'cloud', entry: target.entry }
   if (source.kind === 'api_key') return { model: target.model, apiKeyId: source.keyId, modelDispatch }
+  // Mikka 额度: no subscription or key; the run gets the model gateway at claim.
+  if (source.kind === 'credits') return { model: target.model, modelDispatch }
   return { model: target.model, subscriptionBindingId: await bindAgentToConnection(pool, { ownerId: scope.ownerId, workspaceId: scope.workspaceId }, agentId, harness, source.connectionId, target.model), modelDispatch }
 }
 

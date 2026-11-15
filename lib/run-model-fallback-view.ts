@@ -4,7 +4,7 @@ import { providerFailureSchema, type ProviderFailure } from '@mikka/protocol/pro
 const choiceSchema = z.strictObject({
   harness: z.enum(['claude_code', 'codex']),
   model: z.string().min(1).max(128),
-  source: z.enum(['api_key', 'subscription']),
+  source: z.enum(['api_key', 'subscription', 'credits']),
 })
 export type ModelFallbackChoice = z.infer<typeof choiceSchema>
 

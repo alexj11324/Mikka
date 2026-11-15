@@ -190,7 +190,7 @@ export function automaticFactoryDispatch(pool: Pool) {
       const entry = target.entry.source
       model = { model: target.model, agentProfile: profileChoice.agentProfile,
         modelDispatch: { mode: profileChoice.selectionMode ?? 'preference', location: 'cloud', entry: target.entry },
-        ...(entry.kind === 'api_key' ? { apiKeyId: entry.keyId } : { subscriptionBindingId: await (await import('@/lib/model-dispatch')).bindAgentToConnection(tx,
+        ...(entry.kind === 'api_key' ? { apiKeyId: entry.keyId } : entry.kind === 'credits' ? {} : { subscriptionBindingId: await (await import('@/lib/model-dispatch')).bindAgentToConnection(tx,
           { ownerId: task.userId, workspaceId: source.workspaceId }, runtime.agentId, target.harness, entry.connectionId, target.model) }) }
     } else if (selectStageProfile && !checkStart) model = await chooseCloudRunModel(pool, { ownerId: task.userId, workspaceId: source.workspaceId, botId: task.botId }, runtime.agentId, source.harness, undefined, source.remoteUrl ? 'task' : 'desktop')
     if ('error' in model || !('model' in model) || typeof model.model !== 'string') throw new FactoryError('factoryCheckHarnessUnavailable')
