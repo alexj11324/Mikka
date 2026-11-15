@@ -22,8 +22,8 @@ const conversations: ActivityStretch[] = [
   { at: '2026-11-14T14:00:00.000Z', runId: 'run-1', agentId: 'a1', linked: true, title: 'Refresh after retry', harness: 'claude_code', result: 'Done' },
   { at: '2026-11-14T15:00:00.000Z', runId: 'run-2', agentId: 'a2', linked: false, title: 'Hidden' },
 ]
-type Partial_ = Omit<IssueActivityEvent, 'id' | 'at'> & { at?: string }
-const event = (partial: Partial_): IssueActivityEvent => ({ id: 'e', at: '2026-11-14T15:30:00.000Z', ...partial })
+type EventInput = Omit<IssueActivityEvent, 'id' | 'at'> & Partial<Pick<IssueActivityEvent, 'id' | 'at'>>
+const event = (partial: EventInput): IssueActivityEvent => ({ id: 'e', at: '2026-11-14T15:30:00.000Z', ...partial })
 const words = (parts: ActivityPiece[]) => parts.map(part => part.text).join('')
 
 test('each sentence reads as Capy\'s English, actor first', () => {
