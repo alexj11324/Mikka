@@ -16,7 +16,7 @@ for (const development of [false,true]) test(`self-hosted ${development?'develop
   const directory=join(root,development?'apps/eve':'eve')
   await mkdir(join(directory, 'server'), { recursive: true })
   await writeFile(join(directory, 'server/index.mjs'), 'export default {}')
-  await writeFile(join(directory, 'mikka-eve-build.json'), JSON.stringify({ version: 1, eve: '1.0.0-rc.9', revision: 'a'.repeat(40) }))
+  await writeFile(join(directory, 'mikka-eve-build.json'), JSON.stringify({ version: 1, eve: '1.0.0-rc.9', revision: 'a'.repeat(40), ...(!development ? { world: '@workflow/world-postgres' } : {}) }))
   const data = join(root, 'data')
   const env = { MIKKA_DATA_DIR: data, WORKFLOW_TARGET_WORLD: 'local', WORKFLOW_LOCAL_DATA_DIR: '/data/workflow', WORKFLOW_LOCAL_BASE_URL: 'https://main.test',
     NITRO_SSL_CERT: 'installation-certificate', NITRO_SSL_KEY: 'installation-tls-key', NITRO_UNIX_SOCKET: '/run/mikka/frontend.sock' }
@@ -31,11 +31,12 @@ for (const development of [false,true]) test(`self-hosted ${development?'develop
     return child
   } })
   assert.equal(env.MIKKA_EVE_ORIGIN, 'http://127.0.0.1:43127')
-  assert.equal(spawned.env.WORKFLOW_LOCAL_BASE_URL, 'http://127.0.0.1:3000/mikka/api/agents')
+  assert.equal(spawned.env.WORKFLOW_TARGET_WORLD, development ? 'local' : '@workflow/world-postgres')
+  assert.equal(spawned.env.WORKFLOW_LOCAL_BASE_URL, development ? 'http://127.0.0.1:3000/mikka/api/agents' : service.origin)
   assert.equal(spawned.env.EVE_PUBLIC_ROUTE_PREFIX, '')
   assert.equal(spawned.env.MIKKA_RUNTIME_RESOURCE_ROOT, development ? root : directory)
-  assert.equal(spawned.env.WORKFLOW_LOCAL_DATA_DIR, join(data, 'eve-workflow'))
-  assert.equal(await realpath(join(directory, '.eve/.workflow-data')), join(data, 'eve-workflow'))
+  assert.equal(spawned.env.WORKFLOW_LOCAL_DATA_DIR, development ? join(data, 'eve-workflow') : undefined)
+  if (development) assert.equal(await realpath(join(directory, '.eve/.workflow-data')), join(data, 'eve-workflow'))
   assert.equal(env.WORKFLOW_LOCAL_DATA_DIR, '/data/workflow')
   for (const key of ['NITRO_SSL_CERT', 'NITRO_SSL_KEY', 'NITRO_UNIX_SOCKET']) {
     assert.equal(spawned.env[key], undefined, `the loopback HTTP peer inherited ${key}`)

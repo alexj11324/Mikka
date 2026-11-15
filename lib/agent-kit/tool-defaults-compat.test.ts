@@ -33,6 +33,28 @@ test('a new builtin execution retains every existing core tool from the real int
   assert.deepEqual(Object.keys(versioned).sort(), [...Object.keys(previous), 'load_skill', 'read_personal_skill'].sort())
 })
 
+test('native Bot policy exposes configured write and mailbox schemas without allocating an execution', async () => {
+  const definition = parseDefinition({ ...DEFAULT_AGENT_DEFINITION, tools: ['web_search', 'send_slack_message', 'mailbox_inbox'] })
+  const submitted: unknown[] = []
+  const tools = registry.coordinatorTools(owner, bot, undefined, {
+    policy: { definition, effectiveTools: definition.tools }, runtime: { harness: 'ai_sdk', model: 'openai/gpt-6-luna' },
+    writeEnabled: true, mailboxEnabled: true, mailboxTools: ['mailbox_inbox'],
+    writeTools: { catalog: registry.coordinatorWriteCatalogue, submit: async call => { submitted.push(call) } },
+  })
+  assert.deepEqual(Object.keys(tools).sort(), ['mailbox_inbox', 'send_slack_message', 'web_search'])
+  assert.equal(tools.read_gmail_message, undefined)
+  await invoke(tools, 'send_slack_message', { channel: 'C12345678', text: 'Fixture message' })
+  assert.deepEqual(submitted, [{ action: 'send_slack_message', input: { channel: 'C12345678', text: 'Fixture message' }, toolCallId: 'synthetic-call' }])
+})
+
+test('native scheduled discovery narrows Bot policy to the occurrence read tools', () => {
+  const definition = parseDefinition({ ...DEFAULT_AGENT_DEFINITION, tools: ['web_search', 'read_gmail_message', 'send_email'] })
+  const tools = registry.coordinatorTools(owner, bot, undefined, {
+    policy: { definition, effectiveTools: definition.tools }, readOnly: true, readToolIds: ['web_search'],
+  })
+  assert.deepEqual(Object.keys(tools), ['web_search'])
+})
+
 
 test('read_personal_skill is offered to a versioned round and calls its own step', async () => {
   // ALE-75: "read_personal_skill 注册且可调用". Registered means it reaches the
