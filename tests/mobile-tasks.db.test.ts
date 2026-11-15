@@ -329,7 +329,8 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.equal(response.headers.get('Cache-Control'), 'private, no-store')
     const body = await response.json()
     assert.deepEqual(Object.keys(body).sort(), ['activity', 'live', 'task', 'timeline'])
-    assert.equal(body.task.title, 'Short title')
+    // A task's own title, as a person or an Agent gave it; an old stored short title is not shown.
+    assert.equal(body.task.title, 'Full title')
     assert.equal(body.task.replyRunId, latest)
     assert.equal(body.task.description, 'Description')
     assert.equal(body.task.group, 'pending', 'PR metadata wins over idle')

@@ -42,6 +42,7 @@ import * as actions32 from '@/app/actions/user-secrets'
 import * as actions33 from '@/app/actions/workspace'
 import * as actions34 from '@/app/actions/workspace-secrets'
 import * as actions35 from '@/app/actions/workspace-settings'
+import * as actions36 from '@/app/actions/thread-title-settings'
 
 // This literal is the complete callable surface, independent of Next build IDs.
 const functions = {
@@ -139,6 +140,8 @@ const functions = {
   'issue-operations.setIssueDeleted': actions12.setIssueDeleted,
   'issue-prefix.getIssuePrefixState': actions13.getIssuePrefixState,
   'issue-prefix.saveIssuePrefix': actions13.saveIssuePrefix,
+  'thread-title-settings.getThreadTitleSettings': actions36.getThreadTitleSettings,
+  'thread-title-settings.saveThreadTitleSettings': actions36.saveThreadTitleSettings,
   'issues.listIssues': actions14.listIssues,
   'issues.pollIssues': actions14.pollIssues,
   'issues.syncIssueList': actions14.syncIssueList,

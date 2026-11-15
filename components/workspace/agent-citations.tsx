@@ -17,7 +17,7 @@ import { useTaskCards } from '@/hooks/use-task-cards'
 import { TaskPresentationsContext } from '@/hooks/use-task-collection'
 import { ISSUE_PRIORITIES } from '@/components/workspace/issue-properties'
 import { TaskRunMark, TaskStatusIcon, useRunIndicatorLabel, useTaskStatusLabel } from '@/components/workspace/task-state-icon'
-import { conversationIndicatorOf, runIndicatorOf } from '@/lib/task-state'
+import { threadIndicatorOf, runIndicatorOf } from '@/lib/task-state'
 import { ThreadStatus } from '@/components/workspace/thread-status-icon'
 import { openThread } from '@/components/workspace/workspace-navigation'
 
@@ -202,7 +202,7 @@ export function RunCitation({ run, paired = false }: { run: RunSource; paired?: 
   const HarnessIcon = run.harness === 'claude_code' ? Claude : OpenAI
   const harness = run.harness === 'claude_code' ? 'Claude Code' : 'Codex'
   const title = runTitle(run)
-  const activity = conversationIndicatorOf(run)
+  const activity = threadIndicatorOf(run)
   return <InlineCitation>
     <InlineCitationTrigger
       variant="object"

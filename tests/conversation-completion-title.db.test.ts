@@ -26,8 +26,8 @@ test('the daemon completion writer schedules a first-run title after commit and 
   }
 
   const received: { runId: string; ownerId: string; trigger: string; status: string; finished: boolean }[] = []
-  t.mock.module(new URL('../lib/conversation-title-server.ts', import.meta.url).href, { namedExports: {
-    writeConversationTitle: async (runId: string, ownerId: string, trigger: string) => {
+  t.mock.module(new URL('../lib/thread-title-server.ts', import.meta.url).href, { namedExports: {
+    writeThreadTitle: async (runId: string, ownerId: string, trigger: string) => {
       const result = await reader.query('SELECT status, "finishedAt" IS NOT NULL AS finished FROM agent_runs WHERE id=$1', [runId])
       received.push({ runId, ownerId, trigger, ...result.rows[0] })
     },

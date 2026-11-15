@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { JSONContent } from '@tiptap/core'
-import { activityTimeline, deriveIssueActivity, groupActivityByMinute, type ActivityVersion } from './issue-activity'
+import { activityTimeline, deriveIssueActivity, pullLabel, type ActivityVersion } from './issue-activity'
 
 function content(assignee: { id: string; name: string } | null): JSONContent {
   return {
@@ -14,7 +14,7 @@ function content(assignee: { id: string; name: string } | null): JSONContent {
   }
 }
 
-test('keeps creation and drops description-only autosaves', () => {
+test('without a body fingerprint a description autosave is not an event', () => {
   const changed = content({ id: 'u', name: 'Ada' })
   const events = deriveIssueActivity([
     { id: 'v1', revision: 1, title: 'A', status: 'todo', priority: 'normal', content: content(null), createdAt: '2026-10-22T10:00:00.000Z' },
@@ -41,55 +41,45 @@ test('always keeps the created row when later events exceed the limit', () => {
   assert.deepEqual(events.slice(1).map(event => event.title), ['T14', 'T15', 'T16'])
 })
 
-test('records label add and remove without a description-only row', () => {
-  const labeled = content(null)
-  labeled.attrs = { mikka: { assignee: null, labels: [{ name: 'QA-Bug', color: 'violet' }] } }
+const at = (minute: number) => `2026-10-22T10:${String(minute).padStart(2, '0')}:00.000Z`
+function withAttrs(mikka: Record<string, unknown>, body = 'b0'): JSONContent {
+  return { type: 'doc', attrs: { mikka: { assignee: null, ...mikka } }, bodyHash: body } as JSONContent
+}
+const version = (revision: number, mikka: Record<string, unknown>, body = 'b0', actor = 'user:u1'): ActivityVersion => {
+  const [actorType, actorId] = actor.split(':') as ['user' | 'agent', string]
+  return { id: 'v' + revision, revision, title: 'A', status: 'todo', priority: 'normal', content: withAttrs(mikka, body), createdAt: at(revision), actorType, actorId }
+}
+
+test('Capy events: description, parent, relations and pull requests; labels are not an event', () => {
+  const parent = '11111111-1111-4111-8111-111111111111'
+  const blocker = '22222222-2222-4222-8222-222222222222'
+  const pr = 'https://github.com/acme/app/pull/12'
   const events = deriveIssueActivity([
-    { id: 'v1', revision: 1, title: 'A', status: 'todo', priority: 'normal', content: content(null), createdAt: '2026-10-22T10:00:00.000Z' },
-    { id: 'v2', revision: 2, title: 'A', status: 'todo', priority: 'normal', content: labeled, createdAt: '2026-10-22T10:01:00.000Z' },
-    { id: 'v3', revision: 3, title: 'A', status: 'todo', priority: 'normal', content: content(null), createdAt: '2026-10-22T10:02:00.000Z' },
-  ], [])
-  assert.deepEqual(events.map(event => event.kind), ['created', 'labelAdded', 'labelRemoved'])
-  assert.equal(events.find(event => event.kind === 'labelAdded')?.title, 'QA-Bug')
-})
-
-
-test('records supported issue-attribute changes with the correct add/remove direction', () => {
-  const before = content(null)
-  const after = content(null)
-  after.attrs = { mikka: {
-    assignee: null, delegate: null, project: 'Launch', labels: [], pullRequests: [],
-    parentId: '00000000-0000-4000-8000-000000000001',
-    blockedByIds: ['00000000-0000-4000-8000-000000000002'],
-    relatedIds: ['00000000-0000-4000-8000-000000000003'],
-    dueDate: '2026-11-30', estimate: 5,
-  } }
-  const versions = [
-    { id: 'v1', revision: 1, title: 'A', status: 'todo', priority: 'normal', content: before, createdAt: '2026-10-22T10:00:00.000Z' },
-    { id: 'v2', revision: 2, title: 'A', status: 'todo', priority: 'normal', content: after, createdAt: '2026-10-22T10:01:00.000Z' },
-    { id: 'v3', revision: 3, title: 'A', status: 'todo', priority: 'normal', content: before, createdAt: '2026-10-22T10:02:00.000Z' },
-  ]
-  const events = deriveIssueActivity(versions, [])
-  assert.deepEqual(events.slice(1).map(event => event.kind), [
-    'blockerAdded', 'dueDateChanged', 'estimateChanged', 'parentChanged', 'projectChanged', 'relatedAdded',
-    'blockerRemoved', 'dueDateChanged', 'estimateChanged', 'parentChanged', 'projectChanged', 'relatedRemoved',
+    version(1, {}),
+    version(2, {}, 'b1'),
+    version(3, {}, 'b2'),
+    version(4, { parentId: parent, labels: [{ name: 'QA', color: 'violet' }] }, 'b2'),
+    version(5, { parentId: parent, blockedByIds: [blocker] }, 'b2'),
+    version(6, { parentId: parent, blockedByIds: [blocker], pullRequests: [{ url: pr, state: 'open', title: 'Fix it' }] }, 'b2'),
+    version(7, { parentId: parent, blockedByIds: [blocker], pullRequests: [{ url: pr, state: 'merged', title: 'Fix it' }] }, 'b2'),
+    version(8, { pullRequests: [] }, 'b2'),
+  ], [], Infinity)
+  assert.deepEqual(events.map(event => event.kind === 'pull' ? `pull:${event.pull?.action}` : event.kind === 'relation' ? `relation:${event.relation}${event.removed ? ':off' : ''}` : event.kind === 'parent' ? `parent${event.removed ? ':off' : ''}` : event.kind), [
+    'created', 'description', 'parent', 'relation:blockedBy', 'pull:linked', 'pull:merged', 'parent:off', 'pull:unlinked', 'relation:blockedBy:off',
   ])
-  assert.equal(events.find(event => event.kind === 'dueDateChanged')?.dueDate, '2026-11-30')
-  assert.equal(events.find(event => event.kind === 'projectChanged')?.title, 'Launch')
-  assert.equal(events.find(event => event.kind === 'estimateChanged')?.estimate, 5)
+  // Two autosaves by the same person with nothing between are one description event, at the last one.
+  assert.equal(events.find(event => event.kind === 'description')?.at, at(3))
+  assert.equal(events.find(event => event.kind === 'parent')?.targetId, parent)
+  assert.deepEqual(events.find(event => event.kind === 'pull')?.pull, { label: 'app#12', href: pr, title: 'Fix it', action: 'linked' })
+  assert.equal(pullLabel(pr), 'app#12')
 })
 
-test('older meaningful activity survives more than fifty metadata-only autosave revisions', () => {
-  const versions: ActivityVersion[] = [
-    { id: 'v1', revision: 1, title: 'A', status: 'todo', priority: 'normal', content: content(null), createdAt: '2026-10-22T10:00:00.000Z' },
-    { id: 'v2', revision: 2, title: 'A', status: 'doing', priority: 'normal', content: content(null), createdAt: '2026-10-22T10:01:00.000Z' },
-  ]
-  for (let revision = 3; revision <= 100; revision += 1) {
-    versions.push({ id: `v${revision}`, revision, title: 'A', status: 'doing', priority: 'normal', content: content(null), createdAt: `2026-10-22T10:${String(revision % 60).padStart(2, '0')}:00.000Z` })
-  }
-  const events = deriveIssueActivity(versions, [], Infinity)
-  assert.equal(events.some(event => event.kind === 'status' && event.source?.id === 'v2'), true)
-  assert.equal(events.filter(event => event.kind !== 'created').length, 1)
+test('description edits by another actor, or with an event between, stay separate', () => {
+  const events = deriveIssueActivity([
+    version(1, {}), version(2, {}, 'b1'), version(3, {}, 'b2', 'agent:a1'), version(4, { parentId: '11111111-1111-4111-8111-111111111111' }, 'b2'), version(5, {}, 'b3', 'agent:a1'),
+  ], [], Infinity)
+  // Events of one revision keep a stable order by id.
+  assert.deepEqual(events.map(event => event.kind), ['created', 'description', 'description', 'parent', 'description', 'parent'])
 })
 
 test('records clearing an assignee and ignores subtasks created before the parent', () => {
@@ -168,23 +158,13 @@ test('a subtask keeps its identifier so the activity line can name and open it',
   assert.equal(subtask?.title, 'Sub')
 })
 
-test('joins events in the same minute into one row', () => {
-  const groups = groupActivityByMinute([
-    { id: 'a', at: '2026-10-22T10:00:05.000Z', kind: 'created' },
-    { id: 'b', at: '2026-10-22T10:00:40.000Z', kind: 'assigned', assigneeName: 'Ada' },
-    { id: 'c', at: '2026-10-22T10:01:02.000Z', kind: 'status', status: 'doing' },
-    { id: 'd', at: '2026-10-22T11:01:02.000Z', kind: 'priority', priority: 'high' },
-  ])
-  assert.deepEqual(groups.map(group => group.map(event => event.id)), [['a', 'b'], ['c'], ['d']])
-})
-
-test('events by different people in the same minute stay on separate rows', () => {
-  const groups = groupActivityByMinute([
+test('every event is its own row, as Capy\'s log', () => {
+  const rows = activityTimeline([
     { id: 'a', at: '2026-10-22T10:00:05.000Z', kind: 'created', actorKey: 'user:u1' },
     { id: 'b', at: '2026-10-22T10:00:20.000Z', kind: 'assigned', assigneeName: 'Ada', actorKey: 'user:u1' },
     { id: 'c', at: '2026-10-22T10:00:40.000Z', kind: 'status', status: 'doing', actorKey: 'agent:a1' },
-  ])
-  assert.deepEqual(groups.map(group => group.map(event => event.id)), [['a', 'b'], ['c']])
+  ], [])
+  assert.deepEqual(rows.map(row => row.type === 'events' ? row.events.map(event => event.id) : []), [['a'], ['b'], ['c']])
 })
 
 test('derived events carry the version actor', () => {
@@ -195,7 +175,7 @@ test('derived events carry the version actor', () => {
   assert.deepEqual(events.map(event => event.actorKey), ['user:u1', 'agent:a1'])
 })
 
-test('derived events carry the resolved actor for the row to name (R-63)', () => {
+test('derived events carry the resolved actor the sentence starts with', () => {
   const ada = { type: 'user' as const, id: 'u1', name: 'Ada', avatarUrl: '/avatars/blue.webp' }
   const events = deriveIssueActivity([
     { id: 'v1', revision: 1, title: 'A', status: 'todo', priority: 'normal', content: content(null), createdAt: '2026-10-22T10:00:00.000Z', actorType: 'user', actorId: 'u1', actor: ada },
@@ -217,15 +197,14 @@ test('interleaves task events and dispatched threads by time (#1264)', () => {
   assert.deepEqual(rows.map(row => row.id), ['created-v1', 'thread-t1', 'thread-t2', 'status-v2', 'thread-t3'])
 })
 
-test('keeps same-time rows in a stable order and splits a minute group around a thread', () => {
+test('keeps same-time rows in a stable order and places threads between events', () => {
   const at = '2026-11-04T20:49:00.000Z'
   const event = (id: string, second: string) => ({ id, at: `2026-11-04T20:49:${second}.000Z`, kind: 'status' as const, actorKey: 'user:u' })
   const threads = [{ id: 'b', createdAt: at }, { id: 'a', createdAt: at }]
   const once = activityTimeline([event('e2', '00'), event('e1', '00')], threads)
   const again = activityTimeline([event('e1', '00'), event('e2', '00')], [...threads].reverse())
-  assert.deepEqual(once.map(row => row.id), ['e1', 'thread-a', 'thread-b'])
+  assert.deepEqual(once.map(row => row.id), ['e1', 'e2', 'thread-a', 'thread-b'])
   assert.deepEqual(once, again)
-  assert.deepEqual(once[0]?.type === 'events' && once[0].events.map(item => item.id), ['e1', 'e2'])
   const split = activityTimeline([event('e1', '10'), event('e2', '50')], [{ id: 't', createdAt: '2026-11-04T20:49:30.000Z' }])
   assert.deepEqual(split.map(row => row.id), ['e1', 'thread-t', 'e2'])
 })
@@ -260,30 +239,4 @@ test('activity removes only persisted Factory stage messages while preserving mi
   assert.equal(visible[1], other)
   assert.deepEqual(visible[0], { ...mixed, author: 'Alex', createdAt: later, messages: [human, bot] })
   assert.equal(mixed.messages.length, 3)
-})
-
-test('coalesces consecutive same-actor description saves without losing older narrated changes', () => {
-  const versions: ActivityVersion[] = [
-    { id: 'v1', revision: 1, title: 'A', status: 'todo', priority: 'normal', content: content(null), createdAt: '2026-10-22T10:00:00.000Z', actorType: 'user', actorId: 'u' },
-    { id: 'v2', revision: 2, title: 'A', status: 'doing', priority: 'normal', content: content(null), createdAt: '2026-10-22T10:01:00.000Z', actorType: 'user', actorId: 'u' },
-  ]
-  for (let revision = 3; revision <= 102; revision += 1) versions.push({
-    id: `v${revision}`, revision, title: 'A', status: 'doing', priority: 'normal', content: content(null),
-    createdAt: new Date(Date.UTC(2026, 9, 22, 10, revision)).toISOString(), actorType: 'user', actorId: 'u', descriptionChanged: true,
-  })
-  const events = deriveIssueActivity(versions, [], Infinity)
-  assert.deepEqual(events.map(event => event.kind), ['created', 'status', 'descriptionChanged'])
-  assert.equal(events.at(-1)?.id, 'description-v102', 'a save streak is represented by its latest edit')
-  const lastEvent = events.at(-1)
-  assert.equal(lastEvent?.source?.kind, 'revision')
-  if (lastEvent?.source?.kind === 'revision') assert.equal(lastEvent.source.revision, 102)
-
-  const unknownActor = deriveIssueActivity([
-    { id: 'u1', revision: 1, title: 'A', status: 'todo', priority: 'normal', content: content(null), createdAt: '2026-10-22T10:00:00.000Z' },
-    { id: 'u2', revision: 2, title: 'A', status: 'doing', priority: 'normal', content: content(null), createdAt: '2026-10-22T10:01:00.000Z' },
-    { id: 'u3', revision: 3, title: 'A', status: 'doing', priority: 'normal', content: content(null), createdAt: '2026-10-22T10:02:00.000Z', descriptionChanged: true },
-    { id: 'u4', revision: 4, title: 'A', status: 'doing', priority: 'normal', content: content(null), createdAt: '2026-10-22T10:03:00.000Z', descriptionChanged: true },
-  ], [], Infinity)
-  assert.deepEqual(unknownActor.map(event => event.kind), ['created', 'status', 'descriptionChanged'])
-  assert.equal(unknownActor.at(-1)?.id, 'description-u4', 'unknown actors may coalesce only across the same consecutive save streak')
 })

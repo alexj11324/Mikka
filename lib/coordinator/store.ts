@@ -299,10 +299,8 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
   }
   for (const row of runs) {
     const task = row.issueId ? tasks.get(row.issueId) ?? null : null
-    // The short title travels only when there is one, so a citation carries nothing new otherwise.
-    const shortTitle = task && task.shortTitleFrom === task.title ? task.shortTitle : null
     const review = task ? reviews.get(task.id) : undefined
-    const issue = task ? { id: task.id, title: task.title, ...(shortTitle ? { shortTitle } : {}), number: readIssueMetadata(task.content).number ?? null, identifier: identifiers.get(task.id) ?? null, status: task.status, run: task.latestRun, ...(review ? { review } : {}) } : null
+    const issue = task ? { id: task.id, title: task.title, number: readIssueMetadata(task.content).number ?? null, identifier: identifiers.get(task.id) ?? null, status: task.status, run: task.latestRun, ...(review ? { review } : {}) } : null
     const pullRequests = task ? readIssueMetadata(task.content).pullRequests : []
     const group = threadGroup({ id: row.id, status: row.status, issueId: task?.id ?? null, createdAt: row.createdAt.toISOString(), outcome: (row.outcome ?? null) as ThreadOutcome | null }, task ? { status: task.status, metadata: { pullRequests } } : undefined)
     sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, outcome: row.outcome ?? null, stopReason: row.stopReason ?? null, group, issue,

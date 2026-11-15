@@ -8,6 +8,7 @@ import {
   extractPlaceholders,
   findHardcodedText,
   findMissingTranslationKeys,
+  findBannedThreadWords,
   findThreadOwnership,
   flattenMessages,
 } from './check-i18n.mjs'
@@ -143,8 +144,13 @@ test('copy never says a bot owns or runs a thread', () => {
   }
   assert.equal(findThreadOwnership(bad).length, 9)
   const good = {
-    'zh-CN': { a: 'Coordinator 派出的线程', b: '{bot} 派出的线程', c: '{name} 的线程', d: '所属项目', e: '派出线程' },
+    'zh-CN': { a: 'Coordinator 派出的线程', b: '{bot} 派出的线程', c: '{name} 的线程', d: '所属项目', e: '派出线程', f: '与 Coordinator 的对话' },
     en: { a: 'Thread {bot} dispatched', b: "{name}'s thread", c: 'the threads they dispatched' },
   }
   assert.deepEqual(findThreadOwnership(good), [])
+})
+
+test('Chinese copy calls a thread 线程, never 执行线程 or 运行链', () => {
+  assert.equal(findBannedThreadWords({ 'zh-CN': { a: '打开执行线程', b: { c: '运行链已停止' } } }).length, 2)
+  assert.deepEqual(findBannedThreadWords({ 'zh-CN': { a: '打开线程', b: '登录会话已失效', c: 'Bot 对话' } }), [])
 })

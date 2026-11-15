@@ -79,7 +79,6 @@ export function nativeActivityLabel(item: TaskActivityFact | TaskFactoryEvent, s
   const { Workspace, Issue } = mobileMessages
   const lookup = (map: Record<string, string>, key: string) => map[key] ?? key
   const description = taskHistoryLabel(item.event, {
-    created: Workspace.detail.createdTask,
     activity: (key, values = {}) => Workspace.activity[key].replace(/\{(\w+)\}/g, (whole, name: string) => values[name] ?? whole),
     status: value => lookup(Issue.status, value),
     priority: value => lookup(Issue.priority, value),

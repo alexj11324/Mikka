@@ -14,12 +14,11 @@ const noop = () => {}
 const unexpected = () => { throw new Error('this read-only render must not call a server action') }
 const translate = Object.assign((key: string, values?: Record<string, unknown>) => `${key}${values ? ` ${Object.values(values).join(' ')}` : ''}`, { has: () => true })
 mock.module('next-intl', { namedExports: {
-  useTranslations: () => translate, useLocale: () => 'en',
+  useTranslations: () => translate, useLocale: () => 'en', useMessages: () => ({ IssueDetail: { work: { states: {} } }, GroupTask: { stage: {}, status: {} } }),
   useFormatter: () => ({ dateTime: () => '08:00', relativeTime: () => 'now' }), useNow: () => new Date('2026-11-10T08:00:00Z'),
 } })
 mock.module('swr', { defaultExport: () => ({ data: undefined, error: null, mutate: unexpected }), namedExports: { useSWRConfig: () => ({ mutate: unexpected }) } })
 mock.module(at('app/actions/issue-metadata.ts'), { namedExports: { getIssuePropertyOptions: unexpected } })
-mock.module(at('components/workspace/task-work-section.tsx'), { namedExports: { TaskWorkSection: () => null } })
 mock.module(at('components/workspace/task-attachments.tsx'), { namedExports: { TaskAttachments: () => null } })
 mock.module(at('components/teams/issue-team-control.tsx'), { namedExports: { useIssueTeam: () => ({ label: 'Team', currentLabel: 'None', choices: [], selected: '', unavailable: false, failed: '' }) } })
 mock.module(at('components/workspace/issue-detail-actions.tsx'), { namedExports: { useIssueDetailMenu: () => ({ items: [], favorite: { on: false, label: 'Favorite', toggle: noop, disabled: false }, disabled: false, dialogs: null, copyLink: noop, subscribed: false, toggleSubscribed: noop }) } })
