@@ -46,7 +46,15 @@ jobs:
           python prepare.py "$GITHUB_WORKSPACE/product" "$RUNNER_TEMP/model-fixture"
           mkdir -p "$GITHUB_WORKSPACE/product/.cache/e-codex-actual"
           cp delivery.mts "$GITHUB_WORKSPACE/product/.cache/e-codex-actual/delivery.mts"
-          if [ ! -x /usr/lib/postgresql/17/bin/initdb ]; then sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends postgresql-17; fi
+          if [ ! -x /usr/lib/postgresql/17/bin/initdb ]; then
+            . /etc/os-release
+            curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o "$RUNNER_TEMP/pgdg-signing.asc"
+            test "$(gpg --show-keys --with-colons "$RUNNER_TEMP/pgdg-signing.asc" | awk -F: '/^fpr:/ {print $10;exit}')" = B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8
+            sudo install -m 0644 "$RUNNER_TEMP/pgdg-signing.asc" /usr/share/keyrings/pgdg-evidence.asc
+            echo "deb [signed-by=/usr/share/keyrings/pgdg-evidence.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg-evidence.list >/dev/null
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends postgresql-17
+          fi
       - name: Run the official Codex adapter and verified GGUF inside isolated loopback
         shell: bash
         run: |
