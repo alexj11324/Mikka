@@ -99,7 +99,7 @@ export function activityEntries(activity: readonly TaskActivity[], facts: readon
     ...activity.filter(item => !(hasCreation && item.kind === 'created')).map(item => ({
       id: item.kind === 'attempt' ? `run:${item.runId}` : item.kind === 'replaced' ? `replaced:${item.runId}` : 'created', at: item.createdAt, item,
     })),
-    ...facts.map(item => ({ id: item.id, at: item.at, item })),
+    ...facts.filter(item => item.kind !== 'factory_gate').map(item => ({ id: item.id, at: item.at, item })),
   ]).map(row => row.item)
   const entries: ActivityEntry[] = []
   for (const item of oldestFirst) {

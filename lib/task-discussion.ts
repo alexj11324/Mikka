@@ -2,6 +2,8 @@ export interface ThreadMessage {
   id: string
   author: string
   authorUserId?: string
+  /** Identifies a specific comment when multiple Factory stages share the same thread. */
+  replyToMessageId?: string
   body: string
   at: string
 }

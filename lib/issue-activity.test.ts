@@ -220,23 +220,29 @@ test('a missing revision window cannot reassign creation or skipped changes to a
     ['created-v1', 'title-v81'])
 })
 
-test('activity removes only persisted Factory stage messages while preserving mixed discussions and reply targets', async () => {
+test('Activity assigns each canonical Bot update one card and keeps same-text discussion and replies under their real identities', async () => {
   const { taskActivityFacts, taskActivityThreads } = await import('./task-activity-timeline')
   const at = '2026-11-15T00:00:00Z'
-  const later = '2026-11-15T00:01:00Z'
   const stage = { id: 'stage', author: 'Bot', at, body: 'Review' }
-  const human = { id: 'reply', author: 'Alex', authorUserId: 'owner', at: later, body: 'Review' }
+  const human = { ...stage, id: 'reply', author: 'Alex', authorUserId: 'owner' }
   const bot = { ...stage, id: 'genuine-bot-comment' }
-  const mixed = { id: 'factory', author: 'Bot', createdAt: at, resolved: true, messages: [stage, human, bot] }
+  const accepted = { ...stage, id: 'accept', body: 'Accepted' }
+  const late = { ...human, id: 'late-reply-to-review', replyToMessageId: stage.id }
+  const mixed = { id: 'factory', author: 'Bot', createdAt: at, resolved: true, messages: [stage, human, bot, accepted, late] }
   const other = { ...mixed, id: 'other', messages: [stage] }
-  const machine = { ...mixed, id: 'machine', messages: [stage] }
-  const refs = [{ threadId: 'factory', messageId: 'stage' }, { threadId: 'machine', messageId: 'stage' }]
-  const facts = taskActivityFacts([], [mixed, other, machine], refs)
-  assert.deepEqual(facts.map(fact => fact.id).sort(), [
-    'discussion:factory:reply', 'discussion:factory:genuine-bot-comment', 'discussion:other:stage',
+  const refs = [{ threadId: 'factory', messageId: 'stage' }, { threadId: 'factory', messageId: 'accept' }]
+  const facts = taskActivityFacts([], [mixed, other], refs).filter(fact => fact.kind !== 'history')
+  assert.deepEqual(facts.filter(fact => fact.actor === 'bot').map(fact => [fact.id, fact.kind, fact.author, fact.body]), [
+    ['discussion:factory:accept', 'comment', 'Bot', 'Accepted'], ['discussion:factory:stage', 'comment', 'Bot', 'Review'],
+  ])
+  assert.deepEqual(facts.filter(fact => !fact.actor).map(fact => fact.id).sort(), [
+    'discussion:factory:reply', 'discussion:factory:late-reply-to-review', 'discussion:factory:genuine-bot-comment', 'discussion:other:stage',
   ].sort())
-  const visible = taskActivityThreads([mixed, other, machine], refs)
-  assert.equal(visible[1], other)
-  assert.deepEqual(visible[0], { ...mixed, author: 'Alex', createdAt: later, messages: [human, bot] })
-  assert.equal(mixed.messages.length, 3)
+  const groups = taskActivityThreads([mixed, other], refs)
+  assert.deepEqual(groups.map(group => group.thread.messages.map(message => message.id)), [
+    ['stage', 'reply', 'genuine-bot-comment', 'late-reply-to-review'], ['accept'], ['stage'],
+  ])
+  assert.equal(groups[2].thread, other)
+  assert.ok(groups.slice(0, 2).every(group => group.thread.id === mixed.id && group.thread.resolved))
+  assert.equal(mixed.messages.length, 5)
 })

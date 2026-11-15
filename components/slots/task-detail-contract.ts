@@ -112,7 +112,7 @@ export type TaskActivityItem =
   | { kind: 'event'; id: string; at: string; who: string | null; mark?: TaskMark; text: string; parts?: ActivityPiece[]; time: string; exact?: string; actor?: 'person' | 'agent' | null; glyph?: TaskActivityGlyph; onOpen?: () => void }
   /** An Agent's stretch of runs (R-62): opens the task's conversation at its first thread. */
   | { kind: 'agent'; id: string; at: string; who: string; mark: TaskMark; text: string; time: string; exact?: string; open: boolean; onOpen: (() => void) | null; openLabel: string }
-  | { kind: 'comment'; id: string; at: string; thread: IssueDiscussions['threads'][number]; message?: { record: IssueDiscussions['threads'][number]['messages'][number]; first: boolean; last: boolean }; excerpt: string | null; time: (at: string) => string; exact?: (at: string) => string }
+  | { kind: 'comment'; actor?: 'bot'; id: string; at: string; thread: IssueDiscussions['threads'][number]; message?: { record: IssueDiscussions['threads'][number]['messages'][number]; first: boolean; last: boolean }; excerpt: string | null; time: (at: string) => string; exact?: (at: string) => string }
 
 export type TaskDetailFrameProps = {
   /** The loaded task's identity, for task-specific navigation such as Review. Absent in older callers. */

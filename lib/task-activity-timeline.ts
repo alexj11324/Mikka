@@ -36,10 +36,12 @@ export function chronologicalActivity<T extends { id: string; at: string }>(item
 
 export type FactoryStageComment = { threadId: string; messageId: string }
 
-/** The stage writer shares its Yjs thread with genuine replies. Only its exact
- * message identities belong to Factory progress instead of Task discussion. */
-export function taskActivityThreads(threads: readonly ThreadRecord[], stageComments: readonly FactoryStageComment[]): readonly ThreadRecord[] {
-  if (!stageComments.length) return threads
+type ActivityDiscussion = { id: string; thread: ThreadRecord; actor?: 'bot' }
+
+/** A stage has one Bot-written comment. Older stages share a Yjs thread:
+ * retain the actual reply target; legacy replies follow document order.
+ * Only the recorded source pair identifies a Bot update. */
+export function taskActivityThreads(threads: readonly ThreadRecord[], stageComments: readonly FactoryStageComment[] = []): ActivityDiscussion[] {
   const byThread = new Map<string, Set<string>>()
   for (const { threadId, messageId } of stageComments) {
     const ids = byThread.get(threadId)
@@ -48,15 +50,31 @@ export function taskActivityThreads(threads: readonly ThreadRecord[], stageComme
   }
   return threads.flatMap(thread => {
     const ids = byThread.get(thread.id)
-    if (!ids) return [thread]
-    const messages = thread.messages.filter(message => !ids.has(message.id))
-    if (messages.length === thread.messages.length) return [thread]
-    const first = messages[0]
-    return first ? [{ ...thread, author: first.author, createdAt: first.at, messages }] : []
+    if (!ids || !thread.messages.some(message => ids.has(message.id))) return [{ id: thread.id, thread }]
+    const groups: ActivityDiscussion[] = []
+    const stages = new Map<string, ActivityDiscussion>()
+    for (const message of thread.messages) {
+      const isStage = ids.has(message.id)
+      const target = message.replyToMessageId ? stages.get(message.replyToMessageId) : undefined
+      const previous = target ?? groups.at(-1)
+      if (previous && !isStage) {
+        previous.thread.messages.push(message)
+        continue
+      }
+      const group: ActivityDiscussion = {
+        id: isStage ? `discussion:${thread.id}:${message.id}` : thread.id,
+        thread: { ...thread, author: message.author, createdAt: message.at, messages: [message] },
+        ...(isStage ? { actor: 'bot' } : {}),
+      }
+      groups.push(group)
+      if (isStage) stages.set(message.id, group)
+    }
+    return groups
   })
 }
 
 export type TaskDiscussionEvent = {
+  actor?: 'bot'
   kind: 'comment' | 'reply'
   id: string
   threadId: string
@@ -74,19 +92,22 @@ export type TaskActivityFact =
 
 /** Read each discussion from its Yjs identity. Reply/resolve still address
  * that thread; transcript and Factory commands never receive these ids. */
-export function taskDiscussionEvents(threads: readonly ThreadRecord[]): TaskDiscussionEvent[] {
-  return threads.flatMap(thread => thread.messages.map((message, i) => ({
+export function taskDiscussionEvents(discussion: ActivityDiscussion | readonly ThreadRecord[]): TaskDiscussionEvent[] {
+  if (!('thread' in discussion)) return discussion.flatMap(thread => taskDiscussionEvents({ id: thread.id, thread }))
+  const { thread } = discussion
+  return thread.messages.map((message, i) => ({
+    ...(i === 0 && discussion.actor ? { actor: discussion.actor } : {}),
     kind: i === 0 ? 'comment' as const : 'reply' as const,
     id: `discussion:${thread.id}:${message.id}`, threadId: thread.id, messageId: message.id,
     author: message.author, authorId: message.authorUserId ?? null,
     body: message.body, at: message.at, resolved: thread.resolved,
-  })))
+  }))
 }
 
 export function taskActivityFacts(history: readonly IssueActivityEvent[], threads: readonly ThreadRecord[], stageComments: readonly FactoryStageComment[] = []): TaskActivityFact[] {
   return chronologicalActivity<TaskActivityFact>([
     ...history.map(event => ({ kind: 'history' as const, id: `history:${event.id}`, at: event.at, event })),
-    ...taskDiscussionEvents(taskActivityThreads(threads, stageComments)),
+    ...taskActivityThreads(threads, stageComments).flatMap(taskDiscussionEvents),
   ])
 }
 
