@@ -37,7 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git -C product rev-parse HEAD)" = "$SOURCE"
-          test "$(git -C product rev-parse 'HEAD^{tree}')" = 53bd8c93af9a894665360a510a2211f337a7c054
+          test "$(git -C product rev-parse 'HEAD^{tree}')" = 703875cb1870999e3dad611d9bb9c9eaadcaf311
           cd product
           pnpm install --frozen-lockfile
           cd ../harness/evidence/2257/local-provider
