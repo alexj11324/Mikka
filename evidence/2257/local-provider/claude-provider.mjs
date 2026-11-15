@@ -35,21 +35,22 @@ createServer(tls,async(req,res)=>{
  const made=allBlocks.filter(x=>x.type==='tool_use').map(x=>x.name)
  const search=toolNames.find(n=>n==='ToolSearch'||n==='tool_search')
  log('claude-tools.jsonl',{model:body.model,tools:toolNames,referencedNames:refs,offeredSubmit:offered,priorTools:made,toolCount:toolNames.length})
- const handin=prompt.startsWith('The user wants the finished report delivered.')
+ const reviewing=prompt.startsWith('Review the producer report against the requirement')
+ const handin=reviewing||prompt.startsWith('The user wants the finished report delivered.')
  if(handin&&!made.includes(submit)&&(offered.length===1||(search&&!made.includes(search)))){
   const ctx=await model.createContext({contextSize:1024,threads:1})
   try {
    const needsSearch=offered.length===0
-   const fields=needsSearch?{action:{enum:['answer','search']},query:{type:'string',maxLength:60}}:{action:{enum:['answer','submit']},summary:{type:'string',maxLength:140}}
+   const fields=needsSearch?{action:{enum:['answer','search']},query:{type:'string',maxLength:60}}:{action:{enum:['answer','submit']},summary:{type:'string',maxLength:140},...(reviewing?{assessment:{enum:['observed','unverified']},observation:{type:'string',maxLength:135}}:{})}
    const grammar=await llama.createGrammarForJsonSchema({type:'object',properties:fields,required:Object.keys(fields),additionalProperties:false})
-   const instructions=needsSearch?'Pick the action for a requested final report. The submit tool is not currently exposed. To discover it, select search and put the tool name in the query. Do not report it as already submitted.':'Select one action for the human request. Your JSON has action and summary. To submit a final report, action is submit. To send a chat answer, action is answer.'
+   const instructions=needsSearch?'Pick the action for a requested final report. The submit tool is not currently exposed. To discover it, select search and put the tool name in the query. Do not report it as already submitted.':reviewing?'Inspect the quoted producer report for the requested daytime-sky colour. Use submit to return your independent review. State what you actually observed in observation. If the report supplies no colour, choose unverified.':'Select one action for the human request. Your JSON has action and summary. To submit a final report, action is submit. To send a chat answer, action is answer.'
    const session=new LlamaChatSession({contextSequence:ctx.getSequence(),systemPrompt:instructions})
    const question=needsSearch?'Find the tool named mcp__mikka__submit. Choose search with query select:mcp__mikka__submit.':prompt
-   const generated=await session.prompt(question,{temperature:0,maxTokens:90,grammar}),decision=JSON.parse(generated)
+   const generated=await session.prompt(question,{temperature:0,maxTokens:reviewing?180:90,grammar}),decision=JSON.parse(generated)
    const generatedTokens=model.tokenize(generated).length
    log('decisions.jsonl',{model:modelId,prompt,generated,generatedTokens,mode:needsSearch?'discovery':'handoff'})
    if((needsSearch&&decision.action==='search')||(!needsSearch&&decision.action==='submit')){
-    const useId='toolu_'+randomUUID().replaceAll('-',''),use={type:'tool_use',id:useId,name:needsSearch?search:submit,input:needsSearch?{query:decision.query}:{summary:decision.summary}}
+    const useId='toolu_'+randomUUID().replaceAll('-',''),use={type:'tool_use',id:useId,name:needsSearch?search:submit,input:needsSearch?{query:decision.query}:{summary:decision.summary,...(reviewing?{reviewVerdict:'needs_judgment',criteria:[decision.assessment==='observed'?{text:'The report identifies a clear daytime sky colour.',status:'passed',passed:true,evidence:decision.observation}:{text:'The report identifies a clear daytime sky colour.',status:'unverified',passed:false,reason:decision.observation}]}:{})}}
     if(body.stream===true){
      res.writeHead(200,{'content-type':'text/event-stream','cache-control':'no-cache'})
      event('message_start',{message:{...base,content:[],stop_reason:null,usage:{input_tokens,output_tokens:0}}})

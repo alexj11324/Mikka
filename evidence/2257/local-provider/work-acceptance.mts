@@ -1,0 +1,154 @@
+import assert from 'node:assert/strict'
+import {execFileSync} from 'node:child_process'
+import { createHash,randomUUID } from 'node:crypto'
+import { appendFileSync,mkdirSync,readFileSync,writeFileSync } from 'node:fs'
+import { serve } from 'srvx/node'
+import { join } from 'node:path'
+import { Pool } from 'pg'
+import { ACTIVE_TURN_STEER_HEADER,SOURCE_DAEMON_VERSION } from '@mikka/protocol/device'
+import { CLIENT_VERSION_HEADER } from '@mikka/protocol/version'
+import { normalizeRepository } from '@mikka/protocol/repository'
+import { seedUser,seedWorkspace,seedIssue,seedBot } from '../../tests/support/workspace-admin-db'
+import { ClaudeAdapter } from '../../packages/daemon/src/adapters/claude'
+import { ToolApprovalGate } from '../../packages/daemon/src/agents/tool-approval'
+import { buildChildEnv } from '../../packages/daemon/src/env'
+import { createLogger } from '../../packages/daemon/src/log'
+
+const dir=process.env.E_CODEX_QA!,origin=process.env.BETTER_AUTH_URL!
+const model='SmolLM2-135M-Instruct-Q4_K_M'
+const interrupt=false
+const runId=randomUUID(),deviceId=randomUUID(),agentId=randomUUID(),repoId=randomUUID()
+const handin=true
+const trace:any={evaluation:'Report-only Factory completion, independent checking, human acceptance and Work',source:process.env.E_RUN_SOURCE,runId,deviceId,cli:process.env.E_CODEX_VERSION,model,weightSha256:process.env.E_WEIGHT_SHA,cliSha256:process.env.E_CLI_BINARY_SHA,stages:[],scope:'Actual cookie-authenticated browser RPC and device REST over loopback HTTP. Only the bridge between returned device commands and the unmodified ClaudeAdapter is an explicit QA driver. Provider uses real GGUF inference and paced transport. No subscription or production release.'}
+const persist=()=>writeFileSync(join(dir,'delivery.json'),JSON.stringify(trace,null,2),{mode:0o600})
+const note=(stage:string,data:any={})=>{trace.stages.push({stage,at:new Date().toISOString(),...data});persist()}
+const wait=(ms:number)=>new Promise(r=>setTimeout(r,ms))
+const mark=(s:string)=>'E2262_QA_BEGIN '+s+' E2262_QA_END'
+const initial=true?'The user wants the finished report delivered. Choose submit, not answer. The report should say which color a clear daytime sky is.':'List twenty vegetables with a sentence about each.',steer='Name the capital of France in one short sentence.'
+const h=(s:string)=>createHash('sha256').update(s).digest('hex')
+const dbUrl=process.env.E2E_DATABASE_URL!
+assert.equal(new URL(dbUrl).hostname,'127.0.0.1');assert.equal(new URL(dbUrl).pathname,'/mikka_e2e')
+assert.equal(origin,'http://127.0.0.1:3859')
+const independent=new Pool({connectionString:dbUrl,max:2})
+let http:any,session:any
+try {
+ const version=(await independent.query('show server_version_num')).rows[0].server_version_num
+ assert.match(version,/^17/);note('isolated migrated PostgreSQL', {version})
+ const {default:api}=await import('../../apps/api/src/index')
+ http=serve({hostname:'127.0.0.1',port:3859,fetch:api.fetch,gracefulShutdown:false,silent:true})
+ await http.ready()
+ const owner=await seedUser(independent,'e-owner'),member=await seedUser(independent,'e-member')
+ const ws=await seedWorkspace(independent,owner,[{userId:owner,role:'admin'},{userId:member,role:'member'}])
+ const issueId=await seedIssue(independent,owner,ws.id,{registered:true})
+ await independent.query('UPDATE issues SET content=$2 WHERE id=$1',[issueId,{type:'doc',attrs:{mikka:{number:1}}}])
+ const bot=await seedBot(independent,ws.id,owner,'Report desk')
+ const brief='Assess the colour of a clear daytime sky for the team.'
+ await independent.query('UPDATE issues SET title=$2,content=$3 WHERE id=$1',[issueId,'Daytime sky observation',{type:'doc',attrs:{mikka:{number:1,delegateSelection:'dispatch'}},content:[{type:'paragraph',content:[{type:'text',text:brief}]}]}])
+ const remote='https://github.com/octo/fixture.git'
+ await independent.query(`insert into devices(id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) values($1,$2,'Synthetic CI Linux','local','laptop',true,now(),$3)`,[deviceId,owner,JSON.stringify([{harness:'claude_code',installed:true,toolApproval:true}])])
+ await independent.query(`insert into agents(id,"userId","deviceId",harness,name) values($1,$2,$3,'claude_code','Synthetic CPU model')`,[agentId,owner,deviceId])
+ await independent.query(`insert into device_repos(id,"deviceId","userId","repoPath","remoteUrl") values($1,$2,$3,$4,$5)`,[repoId,deviceId,owner,normalizeRepository(remote).key,remote])
+ const {acceptLocalRun}=await import('../../lib/run-admission-store')
+ const prompt=mark(initial)
+ const seedInput={id:runId,userId:owner,issueId,agentId,deviceId,deviceRepoId:repoId,botId:null,origin:'web',prompt,promptTaskStart:0,promptTaskLength:[...prompt].length,definition:{schemaVersion:1,kind:'worker',harness:'claude_code',instructions:'Use only the local model for this synthetic prompt.',definitionDigest:h('synthetic'),promptDigest:h(prompt),model,modelSource:'native-default',parent:null,readOnly:true} as never,dispatch:{issueId,agentId,deviceRepoId:repoId,requestKey:randomUUID()}}
+ const {pool}=await import('../../lib/db')
+ const {withProjectResourceLease}=await import('../../lib/project-resources/store')
+ const {queueFactoryTask}=await import('../../lib/factory/task-dispatch')
+ const admitted=await withProjectResourceLease(owner,ws.id,()=>queueFactoryTask(pool,owner,{issueId,botId:bot,ownerRequested:true,agentId,deviceRepoId:repoId,note:prompt,key:randomUUID(),queue:(tx,userId,req,botId,ctx)=>acceptLocalRun({...seedInput, userId,botId,factoryContext:ctx},tx)}))
+ assert.equal(admitted.runId,runId);note('canonical admission',{issueId,workspaceId:ws.id})
+ const {auth}=await import('../../lib/auth')
+ const signIn=async(user:string)=>{
+  const context=await auth.$context,password=randomUUID()+randomUUID()
+  await context.internalAdapter.createAccount({userId:user,accountId:user,providerId:'credential',password:await context.password.hash(password)})
+  const resp=await auth.api.signInEmail({body:{email:user+'@example.invalid',password},headers:new Headers({origin}),returnHeaders:true})
+  const jar=resp.headers.getSetCookie().map(v=>v.split(';')[0]).join('; ');assert.ok(jar);return jar+'; mikka-workspace='+ws.id
+ }
+ const ownerCookie=await signIn(owner),memberCookie=await signIn(member)
+ const {issueDeviceToken}=await import('../../lib/device-link')
+ const token=await issueDeviceToken(owner,'Synthetic acceptance')
+ const dcall=async(path:string,method='GET',payload?:unknown,expected=200)=>{
+  note('device REST request',{method,path:path.split('?')[0]})
+  const res=await fetch(origin+'/mikka/v1/'+path,{method,headers:{authorization:'Bearer '+token,[CLIENT_VERSION_HEADER]:SOURCE_DAEMON_VERSION,[ACTIVE_TURN_STEER_HEADER]:'1','content-type':'application/json'},...(payload===undefined?{}:{body:JSON.stringify(payload)})})
+  note('device REST response',{method,path:path.split('?')[0],status:res.status})
+  assert.equal(res.status,expected,method+' '+path+' '+res.status)
+  return expected===204?null:res.json()
+ }
+
+ const sourceDir=join(dir,'fixture','work'),work=join(dir,'fixture','report-execute'),reviewWork=join(dir,'fixture','report-review')
+ const git=(cwd:string,...args:string[])=>execFileSync('git',['-C',cwd,...args],{encoding:'utf8'}).trim()
+ const candidate=git(sourceDir,'rev-parse','HEAD')
+ git(sourceDir,'worktree','add','--detach',work,candidate);git(sourceDir,'worktree','add','--detach',reviewWork,candidate)
+ const {fixedCheckSnapshot}=await import('../../packages/daemon/src/runs/check')
+ const {factoryCheckAssignment}=await import('../../lib/factory/checks')
+ const {factoryBinding}=await import('../../lib/factory/dispatch')
+ const getTask=async()=>(await independent.query('SELECT t.id,t."issueId",t."userId",t."workspaceId",t.stage,t.status,t."attemptId",t.revision,t."candidateId",a."runId",a.output FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" AND a."taskId"=t.id WHERE t."issueId"=$1 AND t."userId"=$2',[issueId,owner])).rows[0]
+ const issue=async()=>(await independent.query(`SELECT i.status,i.content->'attrs'->'mikka'->'delegate' AS delegate FROM issues i WHERE i.id=$1 AND i."userId"=$2`,[issueId,owner])).rows[0]
+ const actor=await issue();assert.deepEqual(actor.delegate,{id:agentId,name:'Synthetic CPU model',kind:'agent',image:null});assert.notEqual(actor.status,'done')
+ const home=join(dir,'fixture','home'),stateDir=join(dir,'fixture','adapters');mkdirSync(stateDir,{recursive:true})
+ const adapter=new ClaudeAdapter({stateDir,binary:process.env.E_CLI_BINARY!})
+ const execute=async(id:string,cwd:string,marker:string,review=false)=>{
+  const offered=(await dcall('devices/'+deviceId+'/commands?wait=0')).queuedRuns??[];assert.ok(offered.includes(id),'Device work did not offer the expected run')
+  const {rows:[record]}=await independent.query('SELECT id,"userId","workspaceId","issueId","agentId","deviceId",prompt,"agentDefinition" AS def FROM agent_runs WHERE id=$1',[id]);assert.equal(record.issueId,issueId);assert.equal(record.workspaceId,ws.id)
+  const cmd=review?await factoryCheckAssignment(pool,owner,id):null
+  if(cmd){assert.equal(cmd.factoryCheck.stage,'review');assert.equal(cmd.baseBranch,candidate);assert.equal(cmd.policy.readOnly,true)}
+  const fixed=await fixedCheckSnapshot(sourceDir,cwd,candidate)
+  const actual=review ? record.prompt+'\n'+mark(marker) : record.prompt
+  const opts={runId:id,cwd,prompt:actual,model,kind:review?'acceptance':'implement',...(cmd?{policy:cmd.policy,factoryCheck:cmd.factoryCheck}:{}),log:createLogger({level:'silent'}),env:buildChildEnv({host:{PATH:process.env.PATH,HOME:home,SSL_CERT_FILE:join(dir,'ephemeral-ca.pem'),NODE_EXTRA_CA_CERTS:join(dir,'ephemeral-ca.pem'),LANG:'C.UTF-8'},runId:id}),credential:{kind:'provider',protocol:'anthropic',baseUrl:'https://127.0.0.1:3857',key:process.env.E_LOOPBACK_KEY!},toolApproval:new ToolApprovalGate(id,{isLive:()=>true})}
+  session=await adapter.start(opts as any)
+  await dcall('runs/'+id,'PATCH',{state:'running',sessionId:session.sessionId},204)
+  let terminal:any;const chunks:any[]=[]
+  for await(const e of session.events()){if(e.type==='exit')terminal=e;else if(e.type==='chunk')chunks.push(e.chunk)}
+  assert.equal(terminal?.outcome,'succeeded');assert.equal(terminal.stopReason,'submitted');assert.ok(terminal.report.summary)
+  assert.deepEqual(await fixedCheckSnapshot(sourceDir,cwd,candidate),fixed)
+  const observed=readFileSync(join(dir,'decisions.jsonl'),'utf8').trim().split('\n').map(line=>JSON.parse(line)).some(row=>row.prompt===marker&&JSON.parse(row.generated).summary===terminal.report.summary)
+  assert.ok(observed,'The real model summary must equal the MCP handoff')
+  const report={...terminal.report,sourceCommit:fixed.sha,filesChanged:[],verify:{status:'not_run'},...(review?{check:{sha:fixed.sha,readOnly:true}}:{})}
+  if(review){assert.ok(report.criteria?.length,'Reviewer tool must provide its own criterion and evidence')}
+  if(chunks.length)await dcall('runs/'+id+'/events','POST',{fromSeq:1,chunks})
+  await dcall('runs/'+id+'/complete','POST',{stopReason:terminal.stopReason,report},204)
+  const {rows:[saved]}=await independent.query('SELECT status,"stopReason",report,"sessionId" FROM agent_runs WHERE id=$1',[id])
+  assert.equal(saved.status,'succeeded');assert.equal(saved.report.summary,terminal.report.summary)
+  note('real native MCP report and clean fixed candidate persisted',{id,stage:review?'review':'execute',native:saved.sessionId,model,actualModelReport:saved.report.summary,criteria:saved.report.criteria??null,fixed,status:saved.status})
+  return saved
+ }
+ const humanApi=async(cookie:string,path:string,payload?:unknown)=>{const res=await fetch(origin+'/mikka/api/'+path,{method:payload?'POST':'GET',headers:{cookie,origin,'content-type':'application/json','sec-fetch-site':'same-origin'},...(payload?{body:JSON.stringify(payload)}:{})});let body:any;try{body=await res.json()}catch{body=null}return {status:res.status,body}}
+ const task=(await getTask());note('explicit owner dispatch initializes selected agent',{issueId,workspace:ws.id,bot,agentId,runId,taskId:task.id,delegate:actor.delegate,status:actor.status})
+ const producer=await execute(runId,work,initial)
+ let check=await getTask();note('canonical producer completion advanced its real Factory',{check,issue:await issue()})
+ for(let n=0;n<15&&check.stage==='review'&&!check.runId;n++){await wait(400);check=await getTask()}
+ assert.equal(check.stage,'review');assert.ok(check.runId&&check.runId!==runId,'An independently admitted review is required')
+ const reviewPrompt='Review the producer report against the requirement to identify the color of a clear daytime sky: '+producer.report.summary.slice(0,145)+'. Choose submit to report your own evidence.'
+ const reviewer=await execute(check.runId,reviewWork,reviewPrompt,true);assert.notEqual(reviewer.sessionId,producer.sessionId)
+ const ready=await getTask();note('independent review and state before human action',{ready,issue:await issue()});assert.equal(ready.stage,'approval');assert.notEqual((await issue()).status,'done')
+ const action={operation:'accept',input:{binding:factoryBinding(ready),eventId:randomUUID()}}
+ const path='factory/tasks/'+ready.id+'/approval'
+ const refused=await humanApi(memberCookie,path,action);assert.ok([403,404].includes(refused.status),JSON.stringify(refused))
+ assert.equal((await independent.query('select 1 from factory_deliverable_acceptances where "taskId"=$1',[ready.id])).rowCount,0)
+ const accepted=await humanApi(ownerCookie,path,action);assert.equal(accepted.status,200,JSON.stringify(accepted));assert.equal(accepted.body.status,'accepted')
+ assert.deepEqual(await humanApi(ownerCookie,path,action),accepted)
+ assert.equal((await issue()).status,'done')
+ const {rows:receipts}=await independent.query('select a.id,a."userId" AS owner,a."candidateId" AS candidate,s."userId" AS human from factory_deliverable_acceptances a JOIN session s ON s.id=a."sessionId" where a."taskId"=$1',[ready.id]);assert.equal(receipts.length,1);assert.equal(receipts[0].owner,owner);assert.equal(receipts[0].human,owner);assert.equal(receipts[0].candidate,ready.candidateId)
+ const detail=await humanApi(ownerCookie,'mobile/tasks/'+issueId+'?work=1');assert.equal(detail.status,200,JSON.stringify(detail));const data=detail.body
+ note('canonical authorized task detail',{task:data.task,work:data.work,timeline:data.timeline,activity:data.activity,receipts,memberDenial:refused})
+ assert.equal(data.task.workOwner.kind,'agent');assert.equal(data.task.workOwner.name,'Synthetic CPU model');assert.equal(data.task.status,'done');assert.equal(data.task.group,'resolved');assert.equal(data.task.description,brief)
+ assert.ok(data.work.conversations.some((c:any)=>c.id===runId||c.id===check.runId));assert.ok(Array.isArray(data.work.pullRequests));assert.equal(data.work.pullRequests.length,0,'Report-only candidate does not imply an external PR')
+ trace.success=true;persist()
+
+}catch(e){
+ trace.failure={name:e.name,message:String(e.message).replaceAll(process.env.E_LOOPBACK_KEY!,'[redacted]').slice(0,750),location:String(e.stack).split('\n').slice(1,5).join('\n').slice(0,800)};persist();process.exitCode=1
+ }finally{
+ const cleanup=(stage:string)=>appendFileSync(join(dir,'cleanup-'+(interrupt?'interrupt':handin?'after-run':'steer')+'.jsonl'),JSON.stringify({at:new Date().toISOString(),stage,resources:process.getActiveResourcesInfo().sort()})+'\n',{mode:0o600})
+ cleanup('application assertions settled')
+ if(!trace.success&&session&&!trace.stages.some((s:any)=>s.stage==='authentic MCP handoff before completion writer'))await session.cancel().catch(()=>{})
+ if(http)await http.close()
+ cleanup('native HTTP transport closed and H3 disposal work drained')
+ await independent.end()
+ const {builtinGateway}=await import('../../lib/builtin-gateway/runtime')
+ await builtinGateway()?.stop()
+ cleanup('test observer and builtin gateway stopped')
+ const [{pool},{workspacePool}]=await Promise.all([import('../../lib/db'),import('../../lib/workspace-db')])
+ await Promise.all([pool.end(),workspacePool.end()])
+ cleanup('product app and workspace database clients stopped')
+ const timer=setTimeout(()=>cleanup('independent twelve-second residual runtime observation'),12000)
+ timer.unref()
+}

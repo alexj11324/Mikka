@@ -1,4 +1,4 @@
-name: Integrated E native Claude Code edit and rerun with retained versions and too-late cancellation
+name: Integrated E canonical Bot task dispatch, real report, independent review and human acceptance
 on:
   push:
     branches: [evidence/2254-sidebar-85dfc396]
@@ -45,7 +45,7 @@ jobs:
           mkdir -m 700 "$RUNNER_TEMP/model-fixture" "$RUNNER_TEMP/isolated-home" "$RUNNER_TEMP/receipt"
           python prepare-claude.py "$GITHUB_WORKSPACE/product" "$RUNNER_TEMP/model-fixture"
           mkdir -p "$GITHUB_WORKSPACE/product/.cache/e-codex-actual"
-          cp claude-delivery.mts observe-queue.mts "$GITHUB_WORKSPACE/product/.cache/e-codex-actual/"
+          cp work-acceptance.mts observe-queue.mts "$GITHUB_WORKSPACE/product/.cache/e-codex-actual/"
           if [ ! -x /usr/lib/postgresql/17/bin/initdb ]; then
             . /etc/os-release
             curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o "$RUNNER_TEMP/pgdg-signing.asc"
@@ -67,13 +67,13 @@ jobs:
             ip link set lo up
             test "$(ls /sys/class/net)" = lo || test "$(ip -o link show | wc -l)" = 1
             test -z "$(ip route show default)"
-            exec setpriv --reuid="$1" --regid="$2" --clear-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs env -i PATH="$3" HOME="$4" bash "$5/pg-claude.sh" "$5" "$6" "$7/receipt" "$7/model-fixture/claude" "$7/model-fixture/model.gguf"
+            exec setpriv --reuid="$1" --regid="$2" --clear-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs env -i PATH="$3" HOME="$4" bash "$5/pg-work-acceptance.sh" "$5" "$6" "$7/receipt" "$7/model-fixture/claude" "$7/model-fixture/model.gguf"
           ' isolated "$worker_uid" "$worker_gid" "$PATH" "$RUNNER_TEMP/isolated-home" "$harness" "$src" "$RUNNER_TEMP"
       - name: Retain only the sanitized source, model and event receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: integrated-9be0-claude-version-persistence
+          name: integrated-9be0-factory-agent-completion
           path: |
             ${{ runner.temp }}/receipt/*-trial.json
             ${{ runner.temp }}/receipt/cleanup-*.jsonl
