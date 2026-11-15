@@ -50,20 +50,20 @@ jobs:
       MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       BETTER_AUTH_URL: http://localhost:3100
-      MIKKA_TEST_DEPLOYMENT_SHA: a6009e48494d308e627c7fe31be7fe7d97fb8017
+      MIKKA_TEST_DEPLOYMENT_SHA: 30629ee1f18fa70b3713836017b437c22af915ee
       MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
       NEXT_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: a6009e48494d308e627c7fe31be7fe7d97fb8017
+          ref: 30629ee1f18fa70b3713836017b437c22af915ee
           persist-credentials: false
       - name: Verify the immutable public baseline and unfiltered inventory
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$MIKKA_TEST_DEPLOYMENT_SHA"
-          test "$(git rev-parse 'HEAD^{tree}')" = a0cde31341a9950370ab435d8829c18ad0e3671d
+          test "$(git rev-parse 'HEAD^{tree}')" = e7c4c9fb3a72be9b06993a4ec244c5b25a1c3b26
           test -z "${DB_TEST_SELECTED+x}" && test -z "${DB_TEST_SHARD+x}"
           mkdir -m 700 "$RUNNER_TEMP/baseline-db-receipt"
       - name: Load the public receipt formatter
@@ -156,7 +156,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: postmerge-db-a6009e48
+          name: postmerge-db-30629ee1
           path: ${{ runner.temp }}/baseline-db-receipt
           retention-days: 7
           if-no-files-found: error
