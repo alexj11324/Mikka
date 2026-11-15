@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url'
 import { build } from 'vite'
 import { frontendConfig } from '../vite.config.mjs'
 import { frontend, repository } from './application-plugin.mjs'
+import { frontendErrorMetadata } from '../../../scripts/cloudflare-native-oci.mjs'
 
 async function assetFiles(directory) {
   const result = []
@@ -61,6 +62,13 @@ export async function buildFrontend({ target = 'web', outdir = resolve(frontend,
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const target = process.argv.includes('--desktop') ? 'desktop' : 'web'
-  const result = await buildFrontend({ target, serverPages: process.argv.includes('--server-pages'), publicTestFixture: process.argv.includes('--public-test-fixture') })
-  process.stdout.write(`${JSON.stringify({ target, rendererBuild: result.rendererBuild, actions: result.usedActions.length, exports: result.exports, serverModules: result.serverModules })}\n`)
+  try {
+    const result = await buildFrontend({ target, serverPages: process.argv.includes('--server-pages'), publicTestFixture: process.argv.includes('--public-test-fixture') })
+    process.stdout.write(`${JSON.stringify({ target, rendererBuild: result.rendererBuild, actions: result.usedActions.length, exports: result.exports, serverModules: result.serverModules })}\n`)
+  } catch (error) {
+    for (const failure of (Array.isArray(error?.errors) ? error.errors : [error]).slice(0, 10)) {
+      console.error('MIKKA_FRONTEND_ERROR=' + JSON.stringify(frontendErrorMetadata(failure, repository)))
+    }
+    throw error
+  }
 }

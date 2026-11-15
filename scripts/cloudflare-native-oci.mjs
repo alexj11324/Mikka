@@ -53,6 +53,23 @@ export function buildEnvironment(env, publicSha, privateSha, id) {
   }
 }
 
+export function frontendErrorMetadata(error, directory = process.cwd()) {
+  const code = ['MISSING_EXPORT', 'UNRESOLVED_IMPORT', 'UNRESOLVED_ENTRY', 'PARSE_ERROR', 'PLUGIN_ERROR', 'BUILD_ERROR'].includes(error?.code) ? error.code : 'UNKNOWN_BUILD_ERROR'
+  if (code === 'UNKNOWN_BUILD_ERROR') return { code }
+  const label = value => typeof value === 'string' && /^[A-Za-z0-9_$.:@-]{1,100}$/.test(value) ? value : undefined
+  const file = value => {
+    if (typeof value !== 'string') return undefined
+    const path = (value.startsWith(directory + '/') ? value.slice(directory.length + 1) : value).split('?')[0]
+    return path.length <= 300 && /^(?:[A-Za-z0-9_@.-]+\/)*[A-Za-z0-9_@.-]+\.(?:[cm]?[jt]sx?|css|json)$/.test(path)
+      && !path.split('/').some(part => part === '.' || part === '..') ? path : undefined
+  }
+  const location = error.loc ?? error.location
+  return { code, plugin: label(error.plugin), id: file(error.id), exporter: file(error.exporter), binding: label(error.binding),
+    location: location && { file: file(location.file),
+      line: Number.isSafeInteger(location.line) && location.line >= 0 ? location.line : undefined,
+      column: Number.isSafeInteger(location.column) && location.column >= 0 ? location.column : undefined } }
+}
+
 export function command(bin, args, options = {}) {
   const { cwd = root, env = process.env, stage, ...rest } = options
   if (!/^[A-Z][A-Z0-9_]*$/.test(stage ?? '')) fail('CF_OCI_STAGE_REQUIRED')
@@ -62,8 +79,15 @@ export function command(bin, args, options = {}) {
   try {
     output = execFileSync(bin, args, { cwd, env, timeout: 900000, maxBuffer: 16 * 1024 * 1024, ...rest, stdio: ['pipe', 'pipe', 'pipe'] })
   } catch (error) {
+    const diagnostics = []
+    if (stage === 'FRONTEND') {
+      for (const line of String(error.stderr ?? '').split('\n')) {
+        if (!line.startsWith('MIKKA_FRONTEND_ERROR=') || diagnostics.length >= 10) continue
+        try { diagnostics.push(frontendErrorMetadata(JSON.parse(line.slice('MIKKA_FRONTEND_ERROR='.length)), cwd)) } catch {}
+      }
+    }
     console.error('MIKKA_CF_OCI_STAGE=' + JSON.stringify({ stage, status: 'failed', elapsedMs: Date.now() - started, exit: error.status ?? null,
-      code: /^[A-Z0-9_]+$/.test(error.code ?? '') ? error.code : null }))
+      code: /^[A-Z0-9_]+$/.test(error.code ?? '') ? error.code : null, ...(diagnostics.length && { diagnostics }) }))
     fail('CF_OCI_STAGE_' + stage + '_FAILED')
   }
   console.log('MIKKA_CF_OCI_STAGE=' + JSON.stringify({ stage, status: 'passed', elapsedMs: Date.now() - started }))

@@ -7,7 +7,7 @@ import {join} from 'node:path'
 import {pathToFileURL} from 'node:url'
 import test from 'node:test'
 import { sourceContext } from './cloudflare-ci.mjs'
-import { buildEnvironment, digestFromRepoDigests, releaseDockerfile, releaseId, releaseSelection, validatePrepared, publicReceipt, verifyOverlayMain } from './cloudflare-native-oci.mjs'
+import { buildEnvironment, digestFromRepoDigests, frontendErrorMetadata, releaseDockerfile, releaseId, releaseSelection, validatePrepared, publicReceipt, verifyOverlayMain } from './cloudflare-native-oci.mjs'
 
 const publicSha = 'a'.repeat(40)
 const privateSha = 'b'.repeat(40)
@@ -133,6 +133,37 @@ test('private child output never reaches public logs while stage and failure met
     assert.deepEqual(Object.keys(failure).sort(), ['code', 'elapsedMs', 'exit', 'stage', 'status'])
     assert.ok(Number.isSafeInteger(failure.elapsedMs) && failure.elapsedMs >= 0)
   }
+})
+
+test('frontend failures relay bounded compiler metadata while private diagnostics stay hidden', () => {
+  const secret = 'PRIVATE_SOURCE_AND_CREDENTIAL_CANARY'
+  const error = { code: 'MISSING_EXPORT', plugin: 'vite:build', id: process.cwd() + '/.hosted-ui/slots/tasks.tsx',
+    exporter: process.cwd() + '/components/slots/tasks.tsx', binding: 'TasksPage', loc: { line: 4, column: 2 },
+    message: secret, frame: secret, stack: secret }
+  const metadata = frontendErrorMetadata(error)
+  assert.equal(metadata.id, '.hosted-ui/slots/tasks.tsx')
+  assert.equal(metadata.exporter, 'components/slots/tasks.tsx')
+  assert.deepEqual(metadata.location, { file: undefined, line: 4, column: 2 })
+  assert.deepEqual(frontendErrorMetadata({ ...error, code: secret }), { code: 'UNKNOWN_BUILD_ERROR' })
+  for (const path of ['/outside/private.tsx', '../private.tsx', 'components/../private.tsx', secret, 'x'.repeat(301) + '.tsx']) {
+    assert.equal(frontendErrorMetadata({ ...error, id: path }).id, undefined)
+  }
+  const module = new URL('./cloudflare-native-oci.mjs', import.meta.url).href
+  const messages = secret + '\nMIKKA_FRONTEND_ERROR=' + JSON.stringify({ ...metadata, message: secret, frame: secret, cause: { message: secret } })
+    + '\nMIKKA_FRONTEND_ERROR=invalid-' + secret + '\nMIKKA_FRONTEND_ERROR=' + JSON.stringify({ code: secret, id: secret }) + '\n'
+  const extra = ('MIKKA_FRONTEND_ERROR=' + JSON.stringify(metadata) + '\n').repeat(12)
+  const child = `process.stderr.write(${JSON.stringify(messages + extra)}); process.exit(1)`
+  const harness = `import { command } from ${JSON.stringify(module)};
+    try { command(process.execPath, ['-e', ${JSON.stringify(child)}], { stage: 'FRONTEND' }) } catch {}
+    try { command(process.execPath, ['-e', ${JSON.stringify(child)}], { stage: 'OTHER' }) } catch {}`
+  const result = spawnSync(process.execPath, ['--input-type=module', '-e', harness], { encoding: 'utf8' })
+  assert.equal(result.status, 0)
+  const output = result.stdout + result.stderr
+  assert.ok(!output.includes(secret))
+  const failures = output.trim().split(/\r?\n/).map(line => JSON.parse(line.slice('MIKKA_CF_OCI_STAGE='.length))).filter(event => event.status === 'failed')
+  const projected = JSON.parse(JSON.stringify(metadata))
+  assert.deepEqual(failures[0].diagnostics, [projected, { code: 'UNKNOWN_BUILD_ERROR' }, ...Array(8).fill(projected)])
+  assert.equal(failures[1].diagnostics, undefined)
 })
 
 test('API publication compiles in the public root once without runtime image coupling', async () => {
