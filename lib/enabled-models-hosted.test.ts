@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { after, before, beforeEach, mock, test } from 'node:test'
 import type { Pool } from 'pg'
-import { COORDINATOR_MODEL } from './coordinator/model'
+import { FEATURED_MODELS } from './model-catalog'
 let kind = 'self-hosted', targetReads = 0
 mock.module(new URL('./default-model.ts', import.meta.url).href, { namedExports: {
   defaultModelTarget: async () => { targetReads++; return { kind, serviceUrl: 'https://cloud.example.invalid' } },
@@ -92,10 +92,10 @@ test('hosted settings expose the actual default target when cloud supersedes a c
     const model = async () => (await readEnabledModels(query, scope)).sources.find(source => source.id === 'hosted')!.models[0].id
     assert.equal(await model(), 'local-configured-model')
     kind = 'cloud'
-    assert.equal(await model(), COORDINATOR_MODEL, 'the inactive local provider must not be shown as the cloud model')
+    assert.equal(await model(), FEATURED_MODELS[0], 'the inactive local provider must not be shown; Mikka 额度 lists the catalogue')
     assert.equal(targetReads, 2)
     process.env.MIKKA_EDITION = 'cloud'
-    assert.equal(await model(), COORDINATOR_MODEL)
+    assert.equal(await model(), FEATURED_MODELS[0])
     assert.equal(targetReads, 2, 'cloud edition does not read a self-hosted binding')
   } finally {
     for (const name of names) if (previous[name] === undefined) delete process.env[name]; else process.env[name] = previous[name]
