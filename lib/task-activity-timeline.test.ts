@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import en from '../messages/en.json' with { type: 'json' }
 import zh from '../messages/zh-CN.json' with { type: 'json' }
-import { activityLineParts, activityRunId, taskHistoryLabel, taskHistoryPieces, type ActivityLabels, type ActivityStretch, type IssueActivityEvent } from './task-activity-timeline'
+import { pullRequestActivityEvents, activityLineParts, activityRunId, taskHistoryLabel, taskHistoryPieces, type ActivityLabels, type ActivityStretch, type IssueActivityEvent } from './task-activity-timeline'
 
 const fill = (template: string, values: Record<string, string> = {}) => template.replace(/\{(\w+)\}/g, (whole, name: string) => values[name] ?? whole)
 
@@ -67,6 +67,14 @@ test('chinese clauses name the code, the previous person, and the subtask', () =
   ])
 })
 
+
+test('renders supported task-attribute changes in English and Chinese', () => {
+  assert.equal(taskHistoryLabel(event({ id: 'due', at: 't', kind: 'dueDateChanged', dueDate: '2026-11-30' }), labels(en)), 'set the due date to 2026-11-30')
+  assert.equal(taskHistoryLabel(event({ id: 'estimate', at: 't', kind: 'estimateChanged', estimate: 5 }), labels(en)), 'set the estimate to 5')
+  assert.equal(taskHistoryLabel(event({ id: 'parent', at: 't', kind: 'parentChanged' }), labels(zh)), '更改了父任务')
+  assert.equal(taskHistoryLabel(event({ id: 'blocker', at: 't', kind: 'blockerAdded' }), labels(zh)), '添加了一个阻塞任务')
+})
+
 test('a missing code or an unmatched Agent does not invent a link', () => {
   assert.deepEqual(taskHistoryPieces(event({ id: 'c', at: 't', kind: 'created' }), labels(en), null), [
     { kind: 'text', text: 'Created the task' },
@@ -87,5 +95,22 @@ test('a missing code or an unmatched Agent does not invent a link', () => {
   assert.deepEqual(title, [
     { kind: 'text', text: 'added subtask ' },
     { kind: 'task', text: 'Child', taskId: 'child' },
+  ])
+})
+
+test('pull request activity uses provider event timestamps and appears only when its source time exists', () => {
+  const rows = pullRequestActivityEvents([
+    { url: 'https://github.com/acme/app/pull/12', title: 'Better activity', state: 'merged', createdAt: '2026-10-26T09:30:00Z', mergedAt: '2026-10-27T11:00:00Z' },
+    { url: 'https://github.com/acme/app/pull/13', title: 'No clocks', state: 'merged', createdAt: null, mergedAt: null },
+    { url: 'https://github.com/acme/app/pull/14', title: null, state: 'open', createdAt: '2026-10-26T10:00:00Z', mergedAt: null },
+    { url: 'https://github.com/acme/app/pull/15', title: 'Bad clock', state: 'open', createdAt: 'not-a-date', mergedAt: null },
+  ], {
+    opened: (repo, number, title) => `Opened ${repo}#${number} ${title}`,
+    merged: (repo, number, title) => `Merged ${repo}#${number} ${title}`,
+    time: at => at,
+  })
+  assert.deepEqual(rows.map(({ id, at, text }) => [id, at, text]), [
+    ['pull:https://github.com/acme/app/pull/12:opened', '2026-10-26T09:30:00Z', 'Opened acme/app#12 Better activity'],
+    ['pull:https://github.com/acme/app/pull/12:merged', '2026-10-27T11:00:00Z', 'Merged acme/app#12 Better activity'],
   ])
 })

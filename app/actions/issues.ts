@@ -449,7 +449,7 @@ export async function listIssueVersions(id: string) {
 export async function pollIssueVersionSummaries(id: string, known?: string, previous?: readonly ListPosition[]) {
   return cacheReadAction(() => withDatabaseOperation('/actions/issues/activity', async () => {
     const { issue, user } = await requireIssueAccessWithoutBody(id)
-    const held = readListPositions(previous, 51)
+    const held = readListPositions(previous, 5000)
     const result = await db.transaction(async tx => {
       const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, content: issueAttrsContent }).from(issues).where(eq(issues.id, id)).for('share')
       requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)

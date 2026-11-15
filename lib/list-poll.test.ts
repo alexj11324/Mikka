@@ -28,6 +28,15 @@ test('invalid proofs fall back to full reads, and a local cache only claims rows
   assert.deepEqual(changedListIds([a, b], heldListPositions({ items: [{ id: b.id }], positions: [a, b] })), [a.id])
 })
 
+test('large activity cursors are accepted within their explicit bound', () => {
+  const rows = Array.from({ length: 80 }, (_, index) => ({
+    id: `10000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+    version: index.toString(16).padStart(32, '0'),
+  }))
+  assert.equal(readListPositions(rows, 5000)?.length, 80)
+  assert.equal(readListPositions(rows, 51), undefined)
+})
+
 test('flight proof keys distinguish full, empty and different held subsets without depending on their order', () => {
   const a = { id: '10000000-0000-4000-8000-000000000001', version: 'a'.repeat(32) }
   const b = { id: '10000000-0000-4000-8000-000000000002', version: 'b'.repeat(32) }

@@ -4,7 +4,7 @@ import type { ThreadRecord } from './task-discussion'
 export type IssueActivityEvent = {
   id: string
   at: string
-  kind: 'created' | 'status' | 'priority' | 'title' | 'assigned' | 'unassigned' | 'subtask' | 'labelAdded' | 'labelRemoved'
+  kind: 'created' | 'status' | 'priority' | 'title' | 'assigned' | 'unassigned' | 'subtask' | 'labelAdded' | 'labelRemoved' | 'parentChanged' | 'blockerAdded' | 'blockerRemoved' | 'relatedAdded' | 'relatedRemoved' | 'dueDateChanged' | 'projectChanged' | 'estimateChanged' | 'descriptionChanged'
   status?: string
   priority?: string
   title?: string
@@ -12,6 +12,8 @@ export type IssueActivityEvent = {
   targetId?: string
   /** That subtask's identifier, when the sentence shows a code instead of its title. */
   code?: string
+  dueDate?: string | null
+  estimate?: number | null
   assigneeName?: string
   /** Absent means the human assignee. Keep the existing event kinds for old
    * consumers, but never describe clearing a Delegate as clearing the person. */
@@ -63,6 +65,31 @@ export type TaskDiscussionEvent = {
   resolved: boolean
 }
 
+export type PullRequestActivitySource = { url: string; title: string | null; createdAt: string | null; mergedAt: string | null; state: 'open' | 'closed' | 'merged' }
+export type PullRequestTimelineEvent = { kind: 'event'; id: string; at: string; who: null; mark: { kind: 'icon'; icon: 'pullRequest' }; text: string; time: string }
+
+/** Build only events whose exact provider timestamps are available; updatedAt is deliberately not a fallback. */
+export function pullRequestActivityEvents(items: readonly PullRequestActivitySource[], labels: {
+  opened: (repo: string, number: string, title: string) => string
+  merged: (repo: string, number: string, title: string) => string
+  time: (at: string) => string
+}): PullRequestTimelineEvent[] {
+  const rows: PullRequestTimelineEvent[] = []
+  const seen = new Set<string>()
+  for (const item of items) {
+    const match = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/([1-9]\d*)\/?$/.exec(item.url)
+    if (!match || seen.has(item.url) || !item.title?.trim()) continue
+    seen.add(item.url)
+    const [, repo, number] = match
+    const validTime = (value: string | null) => value && Number.isFinite(Date.parse(value)) ? value : null
+    const createdAt = validTime(item.createdAt)
+    if (createdAt) rows.push({ kind: 'event', id: `pull:${item.url}:opened`, at: createdAt, who: null, mark: { kind: 'icon', icon: 'pullRequest' }, text: labels.opened(repo, number, item.title), time: labels.time(createdAt) })
+    const mergedAt = item.state === 'merged' ? validTime(item.mergedAt) : null
+    if (mergedAt) rows.push({ kind: 'event', id: `pull:${item.url}:merged`, at: mergedAt, who: null, mark: { kind: 'icon', icon: 'pullRequest' }, text: labels.merged(repo, number, item.title), time: labels.time(mergedAt) })
+  }
+  return rows
+}
+
 export type TaskActivityFact =
   | { kind: 'history'; id: string; at: string; event: IssueActivityEvent }
   | TaskDiscussionEvent
@@ -87,7 +114,7 @@ export function taskActivityFacts(history: readonly IssueActivityEvent[], thread
 
 type HistoryLabels = Pick<typeof import('../messages/en.json')['Workspace']['activity'],
   'unknownAssignee' | 'created' | 'changedStatus' | 'changedStatusCode' | 'changedPriority' | 'changedTitle' | 'assigned' | 'delegated' |
-  'unassigned' | 'unassignedNamed' | 'undelegated' | 'undelegatedNamed' | 'addedLabel' | 'removedLabel' | 'addedSubtask' | 'addedSubtaskCode'>
+  'unassigned' | 'unassignedNamed' | 'undelegated' | 'undelegatedNamed' | 'addedLabel' | 'removedLabel' | 'addedSubtask' | 'addedSubtaskCode' | 'parentChanged' | 'blockerAdded' | 'blockerRemoved' | 'relatedAdded' | 'relatedRemoved' | 'dueDateChanged' | 'dueDateRemoved' | 'projectChanged' | 'projectRemoved' | 'estimateChanged' | 'estimateRemoved' | 'descriptionChanged'>
 
 /** A clause is words plus the task, thread or pull a word opens. The row paints them; the name is one part at the front. */
 export type ActivityPiece =
@@ -151,6 +178,15 @@ export function taskHistoryPieces(event: IssueActivityEvent, labels: ActivityLab
       if (event.targetId && event.title) return withTask(t('addedSubtask', { title: CODE }), event.title, event.targetId)
       return words(t('addedSubtask', { title: event.title ?? '' }))
     }
+    case 'parentChanged': return words(t('parentChanged'))
+    case 'blockerAdded': return words(t('blockerAdded'))
+    case 'blockerRemoved': return words(t('blockerRemoved'))
+    case 'relatedAdded': return words(t('relatedAdded'))
+    case 'relatedRemoved': return words(t('relatedRemoved'))
+    case 'dueDateChanged': return words(event.dueDate ? t('dueDateChanged', { date: event.dueDate }) : t('dueDateRemoved'))
+    case 'projectChanged': return words(event.title ? t('projectChanged', { name: event.title }) : t('projectRemoved'))
+    case 'estimateChanged': return words(event.estimate !== null && event.estimate !== undefined ? t('estimateChanged', { estimate: String(event.estimate) }) : t('estimateRemoved'))
+    case 'descriptionChanged': return words(t('descriptionChanged'))
   }
 }
 
