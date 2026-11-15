@@ -105,6 +105,8 @@ export type ThreadScreenProps = {
   onMarkRead?: () => void
   /** The composer, as the chat-composer slot gets it: `useChatComposer` (hooks/use-chat-composer.ts) does what it does. */
   composer: Omit<ChatComposerProps, 'quote'>
+  /** A thread nobody replies to (a child thread: a review or verify) shows no composer (Alex, 2026-11-15). */
+  readOnly?: boolean
   /** Chips that go out with the next message (a quote, a browser note), each with Remove. */
   pending: { id: string; name: string; meta?: string; onRemove: () => void }[]
   /** Notices that wait above the composer (quota, sign in again, actions to approve). */

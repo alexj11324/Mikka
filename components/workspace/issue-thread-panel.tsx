@@ -23,7 +23,7 @@ import { ThreadReplyVersions } from './thread-reply-versions'
 import { ThreadSteps } from './thread-steps'
 import { ThreadExecutionIdentity } from './thread-execution-identity'
 import { ThreadRunPlace } from './thread-run-place'
-import { acceptedProducerOutcome, threadQuestionView } from '@/lib/issue-threads'
+import { acceptedProducerOutcome, isThreadRun, threadQuestionView } from '@/lib/issue-threads'
 import { threadComposerHarness } from '@/lib/run-model-fallback-view'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
 import { QuoteChip, QuoteLine } from '@/components/artifacts/artifact-quote'
@@ -518,7 +518,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const referenceWorkspace = liveRuns.find(run => run.id === liveRunId)?.workspaceId
   const references = referenceWorkspace && data?.thread.ownedByCurrentUser ? <ThreadReferencePicker draft={draft}
     workspaceId={referenceWorkspace} input={inputRef} onChange={setDraft} /> : null
-  const conversation = !bare && detail ? <ThreadScreen botId={null} name={title} mark={author?.mark ?? null} entries={data ? atTheirTime([...beforeEntries ?? [], ...entries, ...afterEntries ?? []], childEntries) : null}
+  const conversation = !bare && detail ? <ThreadScreen botId={null} name={title} mark={author?.mark ?? null} readOnly={Boolean(data?.thread.kind) && !isThreadRun(data!.thread)} entries={data ? atTheirTime([...beforeEntries ?? [], ...entries, ...afterEntries ?? []], childEntries) : null}
     working={working} onStop={working && canStop ? () => { void stop() } : undefined}
     composer={{ ref: inputRef, model: modelControl, label: replyBlocked ? t('checkEnded') : t('composer', { agent: harnessLabel(threadComposerHarness(detail.harness, liveRunId, modelFallback)) }), value: draft, onChange: setDraft, onSubmit: () => { void send() },
       attachmentScope: { kind: 'thread', id: liveRunId }, sending: sending || stopPending, editableWhileSending: true, submitDisabled: changeRequest ? false : replyBlocked || stopRequested || question === 'resuming',
