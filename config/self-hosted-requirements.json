@@ -1219,6 +1219,13 @@
     "test": "lib/eve/runtime.test.ts",
     "suite": "test:eve"
   },
+  "lib/named-conversation-model.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The conversation composer uses the existing model selector only for a single responding Bot present in the current owner’s authorized Bot list. It requires no external service.",
+    "test": "components/workspace/group-chat-view.test.tsx",
+    "suite": "test:groups"
+  },
   "workflows/coordinator/tools.ts": {
     "mode": "built-in",
     "environment": [],
