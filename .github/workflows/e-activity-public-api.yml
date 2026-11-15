@@ -12,15 +12,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      MIKKA_BUILD_REVISION: 3103e37a105caa4efa29f8fe71568a6486f3df5f
-      MIKKA_TEST_DEPLOYMENT_SHA: 3103e37a105caa4efa29f8fe71568a6486f3df5f
+      MIKKA_BUILD_REVISION: aea46b1c090ee3b02e86ec063cca6db2dc14ba56
+      MIKKA_TEST_DEPLOYMENT_SHA: aea46b1c090ee3b02e86ec063cca6db2dc14ba56
       NITRO_PRESET: node-server
       NODE_OPTIONS: --max-old-space-size=6144
     steps:
       - name: Check out the fixed public product revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: 3103e37a105caa4efa29f8fe71568a6486f3df5f
+          ref: aea46b1c090ee3b02e86ec063cca6db2dc14ba56
           persist-credentials: false
       - name: Verify source commit and tree
         run: |
@@ -65,7 +65,7 @@ jobs:
           sha256sum --check SHA256SUMS
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: public-api-2557-3103e37a105caa4efa29f8fe71568a6486f3df5f
+          name: public-api-2557-aea46b1c090ee3b02e86ec063cca6db2dc14ba56
           path: ${{ runner.temp }}/api-receipt/
           if-no-files-found: error
           retention-days: 2
