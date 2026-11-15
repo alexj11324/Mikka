@@ -9,6 +9,7 @@ import { decode, encode } from '../../../lib/desktop-rpc/wire.ts'
 import { launchElectron } from './electron-launch.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
+import { readNativeStartup } from './native-startup.mjs'
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
 export function validateSelfHostedDesktopTarget(value, env) {
@@ -116,15 +117,19 @@ async function main() {
       state.unsubscribe(); await window.mikka.bundled.live.close(state.id)
       delete window.__selfHostedAcceptance
     })
-    await page.goto(`mikka://app/mikka/en/?bot=${fixture.botId}`, { waitUntil: 'domcontentloaded' })
+    phase = 'open_bot_workspace'
+    assert.equal(bootstrap.onboarding, true, 'the new account still requires its ordinary first-run setup')
+    await page.goto(`mikka://app/mikka/en/?workspace=${fixture.workspaceId}&bot=${fixture.botId}`, { waitUntil: 'domcontentloaded' })
     // A newly registered community account still has the ordinary first-run
     // overlay. A DOM-visible chat underneath it is not screenshot evidence.
     // Complete the real Skip setup action; never hide or remove the overlay.
-    phase = 'first_run_and_visible_chat'
+    phase = 'first_run_skip_button_visible'
     const skipSetup = page.getByRole('button', { name: 'Skip setup', exact: true })
     await skipSetup.waitFor({ state: 'visible' })
+    phase = 'first_run_dismissal'
     await skipSetup.click()
     await skipSetup.waitFor({ state: 'hidden' })
+    phase = 'fixture_reply_visible'
     const reply = page.getByText('SELF_HOSTED_REPLY_32', { exact: false }).first()
     await reply.waitFor({ state: 'visible' })
     await reply.scrollIntoViewIfNeeded()
@@ -140,6 +145,25 @@ async function main() {
     report.status = 'passed'
   } catch (error) {
     failed = error; report.status = 'failed'; report.failure = { phase, name: error instanceof Error ? error.name : 'UnknownError' }
+    if (page && fixture && ['open_bot_workspace', 'first_run_skip_button_visible', 'first_run_dismissal', 'fixture_reply_visible'].includes(phase)) {
+      // Retain only observations about this generated fixture. Raw DOM, URLs,
+      // request bodies and exception messages can contain credentials.
+      report.failure.view = await page.evaluate(({ botId, workspaceId }) => {
+        const url = new URL(location.href)
+        return {
+          requestedWorkspace: url.searchParams.get('workspace') === workspaceId,
+          requestedBot: url.searchParams.get('bot') === botId,
+          english: document.documentElement.lang === 'en',
+          skipButtonPresent: [...document.querySelectorAll('button')].some(button => button.textContent.trim() === 'Skip setup'),
+          loading: Boolean(document.querySelector('[data-loading-placeholder]')),
+          offline: Boolean(document.querySelector('.desktop-offline')),
+          renderFailed: document.body.innerText.includes('This view could not open'),
+          composer: Boolean(document.querySelector('textarea[data-chat-composer]')),
+          expectedReply: document.body.innerText.includes('SELF_HOSTED_REPLY_32'),
+        }
+      }, { botId: fixture.botId, workspaceId: fixture.workspaceId }).catch(() => null)
+      report.failure.startup = await readNativeStartup(application, page).catch(() => null)
+    }
   } finally {
     if (page && !report.cleanup.session) {
       try { await page.evaluate(() => window.mikka?.bundled.signOut()); report.cleanup.session = true } catch { report.cleanup.session = false }
