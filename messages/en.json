@@ -5004,7 +5004,6 @@
         "activity": "Activity",
         "created": "Created the task",
         "createdBy": "{name} created the task",
-        "dispatchedTask": "{bot} dispatched this task · {time}",
         "openPage": "Open task page",
         "more": "More",
         "comment": "Comment",

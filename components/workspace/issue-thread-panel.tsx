@@ -45,6 +45,8 @@ import { ThreadScreen } from '@ui-slot/thread'
 import type { ThreadEntry, ThreadEntryPart } from '@/components/slots/thread-contract'
 import { atTheirTime } from '@/lib/thread-child-entries'
 import { HarnessMark, harnessName, ModelLabel } from '@/components/labels/entity-labels'
+import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
+import { MikkaMark } from '@/components/brand/mikka-mark'
 import { navigate } from './workspace-navigation'
 import { ThreadHeader, ThreadStatusLine } from './thread-header'
 import { PersonReferences, ThreadReferencePicker } from './thread-references'
@@ -428,10 +430,19 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       entries.push({ id: `${runId}:stage`, role: 'bot', at: at(data.thread.createdAt), event: true, parts: [{ kind: 'text', text: stage, node:
         <p role="separator" aria-label={stage} data-event-line="" data-factory-stage={attempt.stage} className="flex items-center gap-2 text-xs text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">{stage}</p> }] })
     }
+    // Who sent the run off: its Bot, or Mikka when no Bot did (a Factory review or verify; the read then falls back to the
+    // Agent's own name). What it was asked is that sender's first message, as a chat shows it, not a muted line.
+    const sender = detail?.agentName && detail.agentName !== harnessName(detail.harness) && detail.agentName !== detail.harness
+      ? { id: `bot:${detail.agentName}`, name: detail.agentName, mark: <BotAvatar {...(detail.bot ?? COORDINATOR_AVATAR)} size="message" still /> }
+      : { id: 'mikka', name: 'Mikka', mark: <MikkaMark /> }
+    const asked = data.thread.prompt.trim()
+    // Mikka's ask to a review or verify comes first too, before the run's own status line.
+    if ((attempt?.first || (!attempt && sender.id === 'mikka')) && asked) entries.push({ id: `${runId}:dispatch`, role: 'bot', at: at(data.thread.createdAt), author: sender,
+      parts: [{ kind: 'text', text: asked, node: <p className="whitespace-pre-wrap wrap-anywhere">{asked}</p> }] })
     // A later attempt's status line says nothing unless it is stopping (the thread-header slot): no empty row for it.
-    if (!attempt || attempt.first || stopRequested) bot('status', [{ kind: 'text', text: '', node: <ThreadStatusLine pauseReason={view?.pauseReason} status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} startedAt={new Date(data.thread.createdAt).toISOString()} dispatchedBy={detail?.agentName || null}
+    if (!attempt || stopRequested) bot('status', [{ kind: 'text', text: '', node: <ThreadStatusLine pauseReason={view?.pauseReason} status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} startedAt={new Date(data.thread.createdAt).toISOString()} dispatchedBy={detail?.agentName || null}
       issueId={issueId} runId={runId} harness={detail?.harness ?? null} {...(attempt ? { attempt: { ...attempt, harness: detail?.harness ?? null, prompt: data.thread.prompt.trim() || null } } : {})} /> }])
-    if (!attempt && data.thread.prompt.trim()) { open = null; entries.push({ id: `${runId}:prompt`, role: 'person', at: at(data.thread.createdAt), text: data.thread.prompt.trim() }) }
+    if (!attempt && asked && sender.id !== 'mikka') { open = null; entries.push({ id: `${runId}:prompt`, role: 'person', at: at(data.thread.createdAt), text: asked }) }
     if (!attempt && data.thread.hasInstructions) bot('instructions', [{ kind: 'text', text: '', node: <ThreadInstructions issueId={issueId} runId={runId} mine={data.thread.ownedByCurrentUser} /> }])
     for (const item of items) {
       if (item.kind === 'person') { open = null; entries.push({ id: `${runId}:${item.id}`, role: 'person', at: at(item.at), text: item.text, actions: versionControl(item) }); continue }

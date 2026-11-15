@@ -5004,7 +5004,6 @@
         "activity": "活动",
         "created": "创建了任务",
         "createdBy": "{name} 创建了任务",
-        "dispatchedTask": "{bot} 派出了这个任务 · {time}",
         "openPage": "打开任务页",
         "more": "更多",
         "comment": "评论",
