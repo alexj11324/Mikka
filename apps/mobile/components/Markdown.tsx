@@ -126,7 +126,7 @@ function inline(text: string, sources: Record<string, CitationSource>, onOpen: (
 export function MentionChip({ source, onPress }: { source: CitationSource; onPress?: () => void }) {
   const label = source.kind === 'issue' ? source.title : runName(source)
   return (
-    <Text accessibilityRole="link" accessibilityLabel={`${source.kind === 'issue' ? '任务' : '对话'}：${label}`} onPress={onPress} style={styles.mention}>
+    <Text accessibilityRole="link" accessibilityLabel={`${source.kind === 'issue' ? '任务' : '线程'}：${label}`} onPress={onPress} style={styles.mention}>
       <View style={styles.mentionIcon}>{source.kind === 'run' ? <StatusIcon status={runIcon(source)} size={12} /> : <CircleDot size={12} color={colors.accent} strokeWidth={2.2} />}</View>
       {`\u2009${label}`}
     </Text>

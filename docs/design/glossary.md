@@ -4,14 +4,14 @@ This file is the single definition of these words. Specs, designs, issues and
 code comments use them in this sense. Follow the source order in [the design entry point](README.md) when a
 newer accepted decision changes a definition here.
 
-The thread and task definitions follow Alex’s [November 13 decision](https://github.com/alexj11324/Mikka/issues/2262) and [task detail decision](https://github.com/alexj11324/Mikka/issues/2271). The execution vocabulary dates to October 24. Thread and run are the only two words for an Agent's work (Alex, 2026-11-15).
+The thread and task definitions follow Alex’s [November 13 decision](https://github.com/alexj11324/Mikka/issues/2262) and [task detail decision](https://github.com/alexj11324/Mikka/issues/2271). The execution vocabulary dates to October 24. Thread (线程) and run (运行) are the only two words for an Agent's work (Alex, 2026-11-15).
 
 ## Threads, tasks and execution
 
 | Word | 中文 | What it is | Where it shows | Its name |
 | --- | --- | --- | --- | --- |
 | **Bot** | Bot | Chats with people. Does web tasks itself through sub-agents (分身, R-72), each with its own browser, and dispatches real tasks such as coding to threads. The user creates it (Grok Bot style) and can put several bots in a group chat. The Coordinator is a bot too. Stored in its own `bots` table (name, colour, shape) and runs on Mikka's own AI SDK on Vercel; it is not a row in `agents`. | **Bot list** (left column), one row per bot or group chat. | The bot's own name, e.g. "Mikka Frontend". |
-| **Thread** | 对话 | What a person opens, names and replies to: an Agent's root run in `agent_runs` and the continuations and retries that keep its `rootRunId` (`lib/run-chain.ts`). It has its own title, per-user read position, pin and archive state, and can exist without a task. Code says `thread`. | The 对话 directory, the Bot sidebar and a task's thread list. | Its stored title or the existing fallback. |
+| **Thread** | 线程 | What a person opens, names and replies to: an Agent's root run in `agent_runs` and the continuations and retries that keep its `rootRunId` (`lib/run-chain.ts`). It has its own title, per-user read position, pin and archive state, and can exist without a task. Code says `thread`. | The 对话 directory, the Bot sidebar and a task's thread list. | Its stored title or the existing fallback. |
 | **Bot or group chat** | Bot 聊天 / 群聊 | The message history addressed to the selected Bot, Coordinator or group. A Bot can take part in other chats. Stored in the `conversations` table family. | The selected chat. | Its Bot or group name. |
 | **Task** | 任务 | A unit of work with its own ID, title, assignee and status. It can link to several threads and PRs. | Board, task list and task detail. | Its task title and issued identifier. |
 | **Run** | 运行 | One execution: one row in `agent_runs`. A thread's runs are its root run and its continuations and retries; there is no third word for the chain. | A thread opens through its root run ID, and its transcript keeps the run order. Existing run or thread deep links resolve through their original access checks. Run result (运行结果) and 重试 name one run. | The thread's title for the product entry; the run identity when inspecting execution. |
@@ -22,7 +22,7 @@ stays with the bot: one of its sub-agents (分身) does it in its own browser,
 it shows only as a card in the chat, outside the task lists, and the bot
 reports the result itself (R-72). A thread is run by an Agent (Claude Code,
 Codex). A bot never runs, owns or does a thread; it only dispatches it, and
-the UI says 「<Bot> 派出的对话」 or 「<Bot> 派出」, never 「<Bot> 的对话」 or
+the UI says 「<Bot> 派出的线程」 or 「<Bot> 派出」, never 「<Bot> 的线程」 or
 「所属 Bot」. A thread is never drawn with the bot's avatar. Task rows show the task's own
 state icon, and attempts show their result icon. The Agent's mark identifies
 the coding Agent where it is named (R-52, R-74, R-78). A bot does no coding
@@ -82,7 +82,7 @@ listed in 收件箱.
 受阻 is a board column for a task the person flagged or one blocked by an open
 task. It is not a status either.
 
-A **thread** (对话: a run and the runs that continue it) is named by
+A **thread** (线程: a run and the runs that continue it) is named by
 its own bounded short title, the same wherever it is named; a task keeps the
 title it was given, at any length.
 
@@ -129,8 +129,8 @@ Decided by Alex, 2026-10-28.
 ## Words to avoid
 
 - Use **Bot list** for the Bot navigation. The 对话 directory lists threads, Bot chats and group chats, so its English name stays **Conversations**.
-- Use **Thread / 对话 / `thread`** for what a person opens, names and replies to, **Run / 运行 / `run`** for one execution, and **Task / 任务** for the linked work item.
-- For a thread: 线程, 会话, 执行线程, 运行链 in Chinese; "Conversation", "session" or "run chain" in English UI; `conversation` or `session` in code. Code keeps `conversation` for the `conversations` table family (`conversations`, `conversation_members`, `conversation_messages`, `conversation_reads`, `conversation_links`, `telegram_conversations`) and the code about it. `session` stays for sign-in sessions and the harness's own `agent_runs.sessionId`. 会话 stays only for a sign-in session.
+- Use **Thread / 线程 / `thread`** for what a person opens, names and replies to, **Run / 运行 / `run`** for one execution, and **Task / 任务** for the linked work item.
+- For a thread: 对话, 会话, 执行线程, 运行链 in Chinese (对话 is for Bot chats, group chats and the 对话 directory that lists them with threads); "Conversation", "session" or "run chain" in English UI; `conversation` or `session` in code. Code keeps `conversation` for the `conversations` table family (`conversations`, `conversation_members`, `conversation_messages`, `conversation_reads`, `conversation_links`, `telegram_conversations`) and the code about it. `session` stays for sign-in sessions and the harness's own `agent_runs.sessionId`. 会话 stays only for a sign-in session.
 - A Chinese word for Artifact. Keep **Artifact**.
 - "浏览器" for a bot's cloud computer, or "电脑" for the local browser.
 - "Agent" when you mean the thing on the left. Say **bot**. **Agent** is the
@@ -139,9 +139,9 @@ Decided by Alex, 2026-10-28.
 - 「E2B」 as the cloud machine's name. It is **Mikka Cloud** in both languages,
   never translated; E2B names only the provider and its API key.
   Code identifiers may keep `harness`.
-- 「Bot 的对话」, 「所属 Bot」, "bot's threads", "a bot's thread" or "the thread
+- 「Bot 的线程」, 「所属 Bot」, "bot's threads", "a bot's thread" or "the thread
   belongs to a bot". A bot only dispatches threads; an Agent runs them. Say
-  「<Bot> 派出的对话」 / 「<Bot> 派出」, "threads a bot dispatched".
+  「<Bot> 派出的线程」 / 「<Bot> 派出」, "threads a bot dispatched".
 - 「Mikka Cloud」 for the hosted model, or 「Mikka 默认」 for the cloud machine.
   Mikka 默认 is a model, Mikka Cloud is a machine ([orchestration](orchestration.md) § 1).
 
@@ -212,11 +212,11 @@ Which Agent a person's bots use is the person's choice per workspace
 _Owner_: the account (Agent aggregate).
 _Avoid_: harness, 执行器, bot.
 
-**Thread (对话)**:
+**Thread (线程)**:
 As defined above: one piece of work a bot dispatched, run by an Agent. The
 bot only dispatches it; it does not own or run it.
 _Owner_: the workspace where it was dispatched (Thread aggregate).
-_Avoid_: 线程, 会话, conversation, session, 任务, run (a run is one turn of a thread).
+_Avoid_: 对话, 会话, 执行线程, 运行链, conversation, session, 任务, run (a run is one turn of a thread).
 
 **Task (任务)**:
 A unit of work with an immutable UUID and issued Mikka identifier, a status,

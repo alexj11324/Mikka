@@ -139,18 +139,18 @@ test('findMissingTranslationKeys skips dynamic and ambiguous keys', () => {
 
 test('copy never says a bot owns or runs a thread', () => {
   const bad = {
-    'zh-CN': { a: '所属 Bot', b: 'Coordinator 的对话', c: '{agent} 的对话', d: '3 个 Bot、它们的对话', e: '{agent} 派出的对话' },
+    'zh-CN': { a: '所属 Bot', b: 'Coordinator 的线程', c: '{agent} 的线程', d: '3 个 Bot、它们的线程', e: '{agent} 派出的线程' },
     en: { a: "the bot's threads", b: '{agent} thread', c: 'bots, their threads and computers', d: 'Thread {agent} dispatched' },
   }
   assert.equal(findThreadOwnership(bad).length, 9)
   const good = {
-    'zh-CN': { a: 'Coordinator 派出的对话', b: '{bot} 派出的对话', c: '{name} 的对话', d: '所属项目', e: '派出对话', f: '与 Coordinator 的对话' },
+    'zh-CN': { a: 'Coordinator 派出的线程', b: '{bot} 派出的线程', c: '{name} 的线程', d: '所属项目', e: '派出线程', f: '与 Coordinator 的对话' },
     en: { a: 'Thread {bot} dispatched', b: "{name}'s thread", c: 'the threads they dispatched' },
   }
   assert.deepEqual(findThreadOwnership(good), [])
 })
 
-test('Chinese copy calls a thread 对话, never 线程', () => {
-  assert.equal(findBannedThreadWords({ 'zh-CN': { a: '打开线程', b: { c: '全部线程' } } }).length, 2)
-  assert.deepEqual(findBannedThreadWords({ 'zh-CN': { a: '打开对话', b: '登录会话已失效' } }), [])
+test('Chinese copy calls a thread 线程, never 执行线程 or 运行链', () => {
+  assert.equal(findBannedThreadWords({ 'zh-CN': { a: '打开执行线程', b: { c: '运行链已停止' } } }).length, 2)
+  assert.deepEqual(findBannedThreadWords({ 'zh-CN': { a: '打开线程', b: '登录会话已失效', c: 'Bot 对话' } }), [])
 })

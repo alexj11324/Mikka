@@ -74,7 +74,7 @@ test('badge counts are bounded', () => {
   assert.throws(() => center.setBadge(10_000))
 })
 
-test('a finished thread (对话完成) is a desktop notification kind', () => {
+test('a finished thread (线程完成) is a desktop notification kind', () => {
   const recorder = recordingSink()
   const delivered: string[] = []
   const center = new NotificationCenter(recorder.sink, href => delivered.push(href), () => 0)

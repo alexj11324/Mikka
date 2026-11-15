@@ -44,7 +44,7 @@ test('notification read errors identify settings in the same device language as 
 test('legacy thread links, their read failures and the composer share the device language', () => {
   for (const [locale, input, readError, lastStatus] of [
     ['en-US', 'Message this thread', 'Unable to load Thread.', 'Last status: Done'],
-    ['zh-CN', '给这个对话发消息', '对话加载失败。', '上次状态：完成'],
+    ['zh-CN', '给这个线程发消息', '线程加载失败。', '上次状态：完成'],
   ]) {
     const copy = getMobileMessages(locale)
     assert.equal(copy.MobileCore.messageThread, input)

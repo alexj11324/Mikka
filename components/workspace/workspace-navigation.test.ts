@@ -100,7 +100,7 @@ test('a thread sits beside its centre: a new centre closes it unless the move na
   assert.equal(readLocation(new URLSearchParams('thread=nope')).thread, null)
 })
 
-test('全部对话 stays open as the centre changes; a thread opened over it closes with a new centre', () => {
+test('全部线程 stays open as the centre changes; a thread opened over it closes with a new centre', () => {
   const list = at(`/mikka?threads=all&thread=${RUN}`)
   assert.equal(workspaceHref(list, { section: 'all-issues' }), '/mikka?threads=all&section=all-issues')
   assert.equal(workspaceHref(list, { thread: null }), '/mikka?threads=all')

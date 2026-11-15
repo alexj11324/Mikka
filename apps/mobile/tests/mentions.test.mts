@@ -10,7 +10,7 @@ const sources = {
 } as never
 
 test('a reply citing a thread and its task draws one chip for that work', () => {
-  const text = `开了对话 [[run:${run}]]，处理 [[issue:${task}]]，另外 [[issue:${other}]]`
+  const text = `开了线程 [[run:${run}]]，处理 [[issue:${task}]]，另外 [[issue:${other}]]`
   assert.deepEqual([...tasksShownByThreads(text, sources)], [task])
   assert.equal(tasksShownByThreads(`只有任务 [[issue:${task}]]`, sources).size, 0)
   assert.deepEqual([...tasksShownByThreads(`[[run:${run.toUpperCase()}]]`, sources)], [task])
