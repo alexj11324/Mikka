@@ -1,4 +1,4 @@
-# 模型走网关，不再有「Mikka 默认」；$20 Lite 和机器价格对齐 Capy
+# 模型走网关，不再有「Mikka 默认」；$20 Pro 和机器价格对齐 Capy
 
 - Date: 2026-11-15
 - Source: Alex, 2026-11-15, after the Capy comparison (`docs/research/2026-11-15-models-gateway-and-plan.md`): 「模型就不要用什么 Mikka 默认了，让他自己去选。绑到什么模型就可以用什么模型，绑到什么订阅也可以用什么订阅里面模型」; 「只要是上面有的模型，我们都可以用」; 图标识别和「用的是 subscription、credit 还是 API key」要讲清楚; 价格 $20/月; 「这两样问题……有答案的话，照抄他们的」; 机器价格和默认档位：「可以」.
@@ -12,6 +12,11 @@
 3. **来源顺序：** 自己的连接 → 工作区共享的连接 → Mikka 额度。同一个模型换来源不换模型，换了在线程里写一句。
 4. **图标和来源：** 模型图标按 ID 的厂商前缀；来源小标：订阅显示订阅服务的标，Key 显示钥匙，额度不加标；文案写明「用你的 Claude 订阅」「用 DeepSeek API Key（尾号 …），不扣 Mikka 额度」「用 Mikka 额度，按厂商原价」。
 5. **没有免费试用。** 免费版用自己的电脑、自己的订阅和 Key。
-6. **Mikka Lite：$20/月**（年付 $16/月），每月 $20 Mikka 额度，当月有效不结转；额度付网关模型和 Cloudflare 编程机器。充值最低 $5。
+6. **Mikka Pro：$20/月**（年付 $16/月；套餐代号 `pro`，Alex 2026-11-15「用Pro」），每月 $20 Mikka 额度，当月有效不结转；额度付网关模型和 Cloudflare 编程机器。充值最低 $5。
 7. **机器按内存定价，每 GB 每小时 $0.025**（同 Capy）：standard-1 $0.10、standard-2 $0.15、standard-3 $0.20、standard-4 $0.30。默认 standard-3（2 vCPU / 8 GiB）。带屏幕的云电脑仍用用户自己的 E2B Key。
 8. **第一屏和没钱时（同 Capy）：** 引导结束落在新建任务页，不建 Bot。选择器不显示余额。点发送时，这次要花 Mikka 额度而工作区既没套餐也没余额，就不发，弹出套餐窗口「选择套餐 · 套餐每月包含用量，随时可换」，成员看到「请管理员选择套餐或充值」。运行中没钱，线程里出提示卡。
+
+## Stripe
+
+- 正式账户「Mikka」：产品 `prod_VdReNgEMinsHXM`（Mikka Pro），月付价格 `price_1UcAlnLiChExGYzi2iAArOam`（$20/月，元数据 `mikka_billing_model=resource_v1`、`mikka_plan=pro`、`mikka_monthly_points=2000`），已通过 `lib/billing/resource-plan.ts` 的校验。生产环境把它配为 `STRIPE_TEAM_RESOURCE_PRICE_ID`。
+- 年付 $192/年等代码支持 `interval: year` 后再建。
