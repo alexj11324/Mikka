@@ -120,7 +120,7 @@ jobs:
            await independent.query('UPDATE issues SET content=$2 WHERE id=$1',[issueId,{type:'doc',attrs:{mikka:{number:1}}}])
            const remote='https://github.com/octo/fixture.git'
            await independent.query(`insert into devices(id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) values($1,$2,'Synthetic CI Linux','local','laptop',true,now(),$3)`,[deviceId,owner,JSON.stringify([{harness:'claude_code',installed:true,version:process.env.E_CODEX_VERSION!,toolApproval:true,activeTurnSteer:true}])])
-           await independent.query(`insert into agents(id,"userId","deviceId",harness,name) values($1,$2,$3,'codex','Synthetic CPU model')`,[agentId,owner,deviceId])
+           await independent.query(`insert into agents(id,"userId","deviceId",harness,name) values($1,$2,$3,'claude_code','Synthetic CPU model')`,[agentId,owner,deviceId])
            await independent.query(`insert into device_repos(id,"deviceId","userId","repoPath","remoteUrl") values($1,$2,$3,$4,$5)`,[repoId,deviceId,owner,normalizeRepository(remote).key,remote])
            const {acceptLocalRun}=await import('../../lib/run-admission-store')
            const task='Prepare a clear daytime sky report.'
