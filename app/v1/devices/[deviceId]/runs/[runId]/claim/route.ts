@@ -211,8 +211,10 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
   if ((harness === 'codex' || harness === 'claude_code') && !device.harnesses.some(info => info.harness === harness && info.installed && info.toolApproval === true)) return NextResponse.json({ error: 'Run approval capability unavailable.' }, { status: 409 })
   // A run frozen on the person's API key goes only to a daemon that injects it; nothing is opened yet.
   const frozenKey = run.agentDefinition?.apiKey
-  if (frozenKey && (subscription || pinned)) return NextResponse.json({ error: 'Run credential unavailable.' }, { status: 409 })
-  if (frozenKey && request.headers.get(MODEL_CREDENTIAL_HEADER) !== '1') return NextResponse.json({ error: 'Upgrade the Mikka daemon before starting this thread.', code: 'daemonUpgradeRequired', protocolVersion: DAEMON_PROTOCOL_VERSION, daemonVersions: await daemonVersions() }, { status: 409 })
+  // Paid by Mikka 额度: the CLI reaches the model only through the Mikka model gateway (decision 2026-11-15-2000).
+  const frozenCredits = run.agentDefinition?.credits
+  if ((frozenKey || frozenCredits) && (subscription || pinned)) return NextResponse.json({ error: 'Run credential unavailable.' }, { status: 409 })
+  if ((frozenKey || frozenCredits) && request.headers.get(MODEL_CREDENTIAL_HEADER) !== '1') return NextResponse.json({ error: 'Upgrade the Mikka daemon before starting this thread.', code: 'daemonUpgradeRequired', protocolVersion: DAEMON_PROTOCOL_VERSION, daemonVersions: await daemonVersions() }, { status: 409 })
   let cliPolicy: Awaited<ReturnType<typeof readCliRunPolicy>>
   try {
     cliPolicy = await readCliRunPolicy(pool, runId, caller.userId)
@@ -256,17 +258,37 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
   // withdrawing the key stops it. A key that is gone ends the run; it never switches credential.
   let modelCredential: RunModelCredential | undefined
   const openRunKey = async (): Promise<NextResponse | null> => {
-    if (!frozenKey) return null
-    const [{ apiKeyForRun }, { WorkspaceError }] = await Promise.all([import('@/lib/model-api-keys'), import('@/lib/workspace-error')])
+    if (!frozenKey && !frozenCredits) return null
+    const [{ apiKeyForRun, validateRunApiKey }, { WorkspaceError }] = await Promise.all([import('@/lib/model-api-keys'), import('@/lib/workspace-error')])
     const refuse = async () => {
       const { persistRunCompletion } = await import('@/lib/run-publications')
       await persistRunCompletion(caller.userId, runId, { stopReason: 'blocked', report: { summary: 'API key unavailable.', filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null } }, caller.scopeDeviceId)
       afterJob('after:coordinator-wake', async () => { const { wakeCoordinator } = await import('@/lib/coordinator/wake'); await wakeCoordinator(caller.userId) })
       return NextResponse.json({ error: 'API key unavailable.', code: 'apiKeyUnavailable' }, { status: 409 })
     }
-    let opened: Awaited<ReturnType<typeof apiKeyForRun>>
-    // The run's Agent picks the key's endpoint; a key that does not serve it ends the run.
     if (harness !== 'claude_code' && harness !== 'codex') return refuse()
+    // The Mikka model gateway under this server's own HTTPS origin: the CLI holds only a run-bound token.
+    const { GATEWAY_PATHS } = await import('@/lib/model-gateway/config')
+    const gatewayUrl = new URL(withBasePath(harness === 'claude_code' ? GATEWAY_PATHS.anthropic : GATEWAY_PATHS.openai), request.url)
+    if (gatewayUrl.protocol === 'https:') {
+      if (frozenKey) {
+        try { await validateRunApiKey(pool, runId, frozenKey.keyId) }
+        catch (error) {
+          if (!(error instanceof WorkspaceError) || error.code !== 'apiKeyNotFound') return NextResponse.json({ error: 'API key unavailable.' }, { status: 409 })
+          return refuse()
+        }
+      }
+      const { mintGatewayToken } = await import('@/lib/model-gateway/token')
+      const { token } = await mintGatewayToken(pool, { runId, ownerId: caller.userId, workspaceId: run.workspaceId ?? null, harness,
+        model: frozenKey?.model ?? frozenCredits!.model, source: frozenKey ? { kind: 'api_key', keyId: frozenKey.keyId } : { kind: 'credits' } })
+      const parsed = runModelCredentialSchema.safeParse({ kind: 'provider', protocol: harness === 'claude_code' ? 'anthropic' : 'openai', baseUrl: gatewayUrl.toString(), key: token })
+      if (!parsed.success) return refuse()
+      modelCredential = parsed.data
+      return null
+    }
+    // Mikka 额度 has no other way to the model; a key falls back to direct delivery on a server without HTTPS.
+    if (!frozenKey) return refuse()
+    let opened: Awaited<ReturnType<typeof apiKeyForRun>>
     try { opened = await apiKeyForRun(pool, runId, frozenKey.keyId, harness) }
     catch (error) {
       // Secrets briefly unreadable: the run stays queued. A key that is gone, or no longer usable here: the run ends.
@@ -291,7 +313,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     || run.agentDefinition?.projectExecution?.workspaceId !== taskWorkspaceId)) return NextResponse.json({ error: 'Environment workspace unavailable.', code: 'projectEnvironmentUnavailable' }, { status: 409 })
   const cloudDesktop = device.kind === 'cloud' && device.harnesses.some(info => info.harness === harness && info.computerBroker)
   if (device.kind === 'cloud' && (!cloudComputerTasksEnabled() || !caller.scopeWorkspaceId || caller.scopeDeviceId !== deviceId
-    || !(subscription ? subscription.workspaceId === caller.scopeWorkspaceId : frozenKey) || !cloudDesktop && !repo.remoteUrl
+    || !(subscription ? subscription.workspaceId === caller.scopeWorkspaceId : frozenKey || frozenCredits) || !cloudDesktop && !repo.remoteUrl
     || taskWorkspaceId && taskWorkspaceId !== caller.scopeWorkspaceId)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
   let taskInjection: TaskSecretInjection
   try {

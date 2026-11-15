@@ -88,13 +88,18 @@ test('a new task inherits the dispatching chat\'s subscription or API-key model,
     assert.equal(await mainThreadModel(pool, scopeOf(who), null), null, 'a key model the key does not offer is not a task candidate')
   })
 
-  await t.test('Mikka 额度, no choice and a model that is not a task candidate inherit nothing', async () => {
+  await t.test('a Mikka 额度 model is inherited; no choice and a model that is not a task candidate inherit nothing', async () => {
     const who = await person('main-thread-none')
     assert.equal(await mainThreadModel(pool, scopeOf(who), null), null, 'no saved choice')
     await choose(who, 'coordinator', { bindingId: null })
     assert.equal(await mainThreadModel(pool, scopeOf(who), null), null, 'a former 「Mikka 默认」 row reads as no choice')
+    // A chat on Mikka 额度 hands its model to the task, on the CLI the model's vendor names (decision 2026-11-15-2000).
     await choose(who, 'coordinator', { creditsModel: 'anthropic/claude-sonnet-5.5' })
-    assert.equal(await mainThreadModel(pool, scopeOf(who), null), null, 'threads cannot run on Mikka 额度 yet')
+    assert.deepEqual(await mainThreadModel(pool, scopeOf(who), null), { harness: 'claude_code', model: 'anthropic/claude-sonnet-5.5' })
+    await choose(who, 'coordinator', { creditsModel: 'openai/gpt-5.5' })
+    assert.deepEqual(await mainThreadModel(pool, scopeOf(who), null), { harness: 'codex', model: 'openai/gpt-5.5' })
+    await choose(who, 'coordinator', { creditsModel: 'deepseek/deepseek-v4-pro' })
+    assert.deepEqual(await mainThreadModel(pool, scopeOf(who), null), { harness: 'claude_code', model: 'deepseek/deepseek-v4-pro' })
     // The binding names a model its connection's catalogue no longer lists.
     const stale = await subscribe(who, 'claude', ['claude-opus-5-5'], 'claude-retired-model')
     await choose(who, 'coordinator', { bindingId: stale.bindingId })

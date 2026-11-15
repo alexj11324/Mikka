@@ -102,6 +102,19 @@ for (const localLogin of [true, false]) {
 test('a missing explicit model cannot turn into a key’s first model', async () => {
   assert.deepEqual(await runCredentialSource(query, { ...scope, model: 'missing-fixture', subscription: null }), { subscription: null })
 })
+// Decision 2026-11-15-2000: a catalogue model runs on the person's key for that same model, else on Mikka 额度.
+test('a catalogue model runs on Mikka 额度 unless a key of its vendor offers the same model', async () => {
+  assert.deepEqual(await runCredentialSource(query, { ...scope, model: 'anthropic/claude-opus-5.5', subscription: null }), { subscription: null, credits: { model: 'anthropic/claude-opus-5.5' } })
+  assert.deepEqual(await runCredentialSource(query, { ...scope, harness: 'codex', model: 'openai/gpt-5.5', subscription: null }), { subscription: null, credits: { model: 'openai/gpt-5.5' } })
+  assert.deepEqual(await runCredentialSource(query, { ...scope, model: 'deepseek/deepseek-chat', subscription: null }), { subscription: null, apiKey: { keyId: id(3), model: 'deepseek-chat' } }, 'the DeepSeek key serves the same model')
+  keys = []
+  assert.deepEqual(await runCredentialSource(query, { ...scope, model: 'deepseek/deepseek-chat', subscription: null }), { subscription: null, credits: { model: 'deepseek/deepseek-chat' } }, 'with no key, Mikka 额度 pays')
+  assert.deepEqual(await runCredentialSource(query, { ...scope, model: 'claude-sonnet-fixture', subscription: null }), { subscription: null }, 'a provider id is never sent to Mikka 额度')
+})
+test('a named subscription keeps a catalogue-shaped model off Mikka 额度', async () => {
+  const pinned = { ...subscription, modelId: 'anthropic/claude-opus-5.5' }
+  assert.notDeepEqual((await runCredentialSource(query, { ...scope, model: 'anthropic/claude-opus-5.5', subscription: pinned })).credits, { model: 'anthropic/claude-opus-5.5' })
+})
 test('quota fallback keeps the frozen model and ignores the Bot chat preference', async () => {
   assert.deepEqual(await quotaFallbackApiKey(query, { ...scope, model: 'claude-sonnet-fixture' }), { keyId: id(4), model: 'claude-sonnet-fixture' })
   assert.equal(await quotaFallbackApiKey(query, { ...scope, model: 'missing-fixture' }), undefined)
