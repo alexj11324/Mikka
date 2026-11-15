@@ -7820,6 +7820,20 @@
     "loadError": "Could not load personal files."
   },
   "Automations": {
+    "githubEvent": {
+      "pull_request_opened": "PR opened",
+      "draft_opened": "Draft PR opened",
+      "pull_request_pushed": "New commits on a PR",
+      "pull_request_merged": "PR merged",
+      "pull_request_closed": "PR closed without merging",
+      "label_change": "Label changed",
+      "issue_opened": "Issue opened",
+      "comment": "New comment",
+      "review_submitted": "Review submitted",
+      "review_comment": "Review comment",
+      "checks_completed": "Checks finished",
+      "checks_failed": "Checks failed"
+    },
     "title": "Automations",
     "new": "New automation",
     "askBot": "Ask a Bot to set it up",
@@ -7845,6 +7859,7 @@
     "nextRun": "Next {time}",
     "coordinator": "Coordinator",
     "summary": {
+      "github": "GitHub: {event}{count, plural, =0 {} other { and # more}}",
       "manual": "Manual",
       "once": "Once · {time}",
       "intervalMinutes": "{count, plural, one {Every minute} other {Every # minutes}}",
@@ -7863,6 +7878,19 @@
       "dispatch_task": "Hand to a Bot"
     },
     "editor": {
+      "github": {
+        "title": "GitHub events",
+        "item": "GitHub event {number}",
+        "event": "Event",
+        "repository": "Repository",
+        "branches": "Branches (optional)",
+        "labels": "Labels (optional)",
+        "runWhen": "Condition",
+        "runWhenPlaceholder": "Optional: one sentence on when to run, like “the change touches billing”",
+        "remove": "Remove this event",
+        "add": "Add GitHub event",
+        "noRepositories": "No GitHub repository is installed in this workspace"
+      },
       "back": "Automations",
       "namePlaceholder": "Automation name",
       "name": "Name",
@@ -7926,6 +7954,7 @@
       "cancel": "Cancel",
       "notFound": "The automation doesn't exist or was deleted",
       "missing": {
+        "repository": "Choose a repository for each GitHub event",
         "title": "Add a name to save",
         "prompt": "Say what it should do to save",
         "time": "That time does not exist or is not valid",
@@ -7935,6 +7964,7 @@
       }
     },
     "run": {
+      "from": "Started by {event} · {what}",
       "pending": "Waiting",
       "running": "Running",
       "succeeded": "Done",
@@ -7943,6 +7973,8 @@
       "cancelled": "Cancelled"
     },
     "runErrors": {
+      "runWhenNotMet": "Condition not met; skipped",
+      "scheduleRunWhenUnavailable": "Couldn't check the condition; will retry",
       "misfireSkipped": "Missed its time, skipped",
       "concurrencyLimit": "At the concurrency limit",
       "scheduleChanged": "The automation changed",

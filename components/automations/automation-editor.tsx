@@ -6,7 +6,7 @@ import { useFormatter, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { ArrowLeft, Play } from 'lucide-react'
 import { listDevices } from '@/app/actions/agents'
-import { listBots } from '@/app/actions/bots'
+import { getWorkspaceBotDefaults, listBots } from '@/app/actions/bots'
 import { cancelAutomation, createAutomation, pauseAutomation, resumeAutomation, runAutomationNow, updateAutomation } from '@/app/actions/automations'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
@@ -30,6 +30,7 @@ import { TASK_TITLE_MAX } from '@/lib/task-title-input'
 import { runTask, type AutomationRun, type AutomationView } from '@/lib/schedules/automation-view'
 import { definitionFrom, draftFrom, emptyDraft, foldNeeded, type AutomationDraft, type IntervalUnit, type ScheduleKind } from './automation-draft'
 import { useWorkspaceBotNames } from './automations-page'
+import { GitHubTriggers } from './github-triggers'
 import { useNextRunLabel, useTimingSummary } from './automation-summary'
 
 const zones = (() => { try { return Intl.supportedValuesOf('timeZone') } catch { return ['UTC'] } })()
@@ -68,6 +69,11 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
   const { data: bots = [] } = useSWR('bots', listBots, { revalidateOnFocus: false })
   const { data: devices = [] } = useSWR('devices', listDevices, { revalidateOnFocus: false })
   const workspaceBots = useWorkspaceBotNames(workspaceId)
+  // The workspace's installed repositories, the ones a GitHub trigger may name (any member may read them).
+  const { data: repositories = [] } = useSWR(workspaceId ? ['automation-repositories', workspaceId] : null, async () => {
+    const result = await getWorkspaceBotDefaults()
+    return 'error' in result && result.error ? [] : (result as { repositories: string[] }).repositories
+  }, { revalidateOnFocus: false })
   const profiles = useAgentProfiles(workspaceId ?? undefined, true)
   const profileChoices = useTaskProfileChoices({ workspaceId: workspaceId ?? undefined, value: draft && draft.profileId !== 'auto' ? draft.profileId : null, data: profiles.data })
   const check = useMemo(() => draft ? definitionFrom(draft) : null, [draft])
@@ -205,6 +211,10 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
           </ToggleGroup>
         </div>}
       </div>}
+      {!draft.otherTask && <>
+        <SettingRow title={t('github.title')} />
+        <GitHubTriggers value={draft.github} repositories={repositories} disabled={busy !== null} onChange={github => set({ github })} />
+      </>}
       <SettingRow title={t('manual')}>
         {!creating && <Button size="sm" variant="secondary" disabled={!active || busy !== null} onClick={() => { void runNow() }}><Play data-icon="inline-start" />{t('runNow')}</Button>}
       </SettingRow>
@@ -268,6 +278,7 @@ function EditorFrame({ children, onBack, backLabel }: { children: React.ReactNod
 /** One run: when, how it ended (and why when it did not), and the task it made as a chip that opens it. */
 function RunRow({ run }: { run: AutomationRun }) {
   const t = useTranslations('Automations')
+  const tEvent = useTranslations('Automations.githubEvent')
   const tErrors = useTranslations('Errors')
   const format = useFormatter()
   const task = runTask(run)
@@ -276,6 +287,8 @@ function RunRow({ run }: { run: AutomationRun }) {
   return <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 text-sm">
     <time className="tabular-nums text-muted-foreground" dateTime={new Date(at).toISOString()}>{format.dateTime(new Date(at), { dateStyle: 'medium', timeStyle: 'short' })}</time>
     <Badge variant={runVariant[run.status]}>{t(`run.${run.status}`)}</Badge>
+    {run.trigger && <span className="min-w-0 text-muted-foreground">{t('run.from', { event: tEvent.has(run.trigger.event.event as never) ? tEvent(run.trigger.event.event as never) : run.trigger.event.event,
+      what: run.trigger.event.number !== null ? `${run.trigger.event.repository.replace(/^v2\/github\.com\//, '')}#${run.trigger.event.number}` : run.trigger.event.repository.replace(/^v2\/github\.com\//, '') })}</span>}
     {task && <Button size="xs" variant="secondary" title={task.title} onClick={() => openTask(task.id)}><bdi>{task.identifier ?? task.title}</bdi></Button>}
     {reason && <span className="min-w-0 text-muted-foreground">{reason}</span>}
   </div>

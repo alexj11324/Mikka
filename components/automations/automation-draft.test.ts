@@ -68,3 +68,14 @@ test('cronShape names every day, weekdays, one weekday and one day of the month;
   assert.equal(cronShape('0 9 32 * *'), null)
   assert.equal(cronShape('0 25 * * *'), null)
 })
+
+test('GitHub trigger rows round-trip; each needs a repository; lists split on either comma', () => {
+  const github = [{ event: 'pull_request_opened' as const, repositories: ['v2/github.com/acme/web'], branches: 'main，release', labels: ' bug , bug', runWhen: ' The PR touches billing. ' }]
+  const result = definitionFrom(filled({ scheduleOn: false, github }), now)
+  assert.ok('definition' in result)
+  assert.deepEqual(result.definition.events, [{ source: 'github', event: 'pull_request_opened', repositories: ['v2/github.com/acme/web'], branches: ['main', 'release'], labels: ['bug'], runWhen: 'The PR touches billing.' }])
+  assert.deepEqual(draftFrom(result.definition, now).github, [{ event: 'pull_request_opened', repositories: ['v2/github.com/acme/web'], branches: 'main, release', labels: 'bug', runWhen: 'The PR touches billing.' }])
+  assert.deepEqual(definitionFrom(filled({ github: [{ ...github[0]!, repositories: [] }] }), now), { missing: 'repository' })
+  const plain = definitionFrom(filled({ scheduleKind: 'daily', dailyTime: '09:00' }), now)
+  assert.ok('definition' in plain && !('events' in plain.definition), 'no rows, no events key')
+})
