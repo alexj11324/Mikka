@@ -1227,6 +1227,7 @@
     "scheduleDailyRunLimit": "It has already run as many times as allowed today.",
     "scheduleStandingTaskUnavailable": "The task it adds to no longer exists.",
     "scheduleStandingTaskNotStarted": "The task it adds to hasn't started yet. It will try again shortly.",
+    "scheduleWebhookOff": "Turn on Webhook and save first, then make the URL.",
     "scheduleRunConflict": "The run didn't start. Please try again.",
     "scheduleTimeMustBeFuture": "The start time must be in the future.",
     "invalidIanaTimezone": "The time zone is invalid.",
@@ -7883,7 +7884,8 @@
       "weekdays": "Weekdays at {time}",
       "weekly": "{weekday}s at {time}",
       "monthly": "Monthly on day {day} at {time}",
-      "cron": "cron {expression}"
+      "cron": "cron {expression}",
+      "webhook": "Webhook"
     },
     "kind": {
       "reminder": "Reminder",
@@ -7985,6 +7987,22 @@
         "fold": "Choose earlier or later to save",
         "interval": "The interval must be between 1 minute and 1 year",
         "cron": "A cron expression has 5 fields"
+      },
+      "webhook": {
+        "title": "Webhook",
+        "description": "A POST to this automation's own URL runs it. The body can be up to 64 KB.",
+        "batch": "Combine requests",
+        "batchNone": "Each request runs on its own",
+        "batchMinutes": "Requests within {minutes} min run together",
+        "url": "Webhook URL",
+        "copy": "Copy URL",
+        "copied": "Copied",
+        "copyFailed": "Could not copy",
+        "once": "The URL is shown only this once. If you lose it, make a new one; the old one stops working.",
+        "saveFirst": "Save to make the URL.",
+        "made": "A URL was made.",
+        "make": "Make URL",
+        "remake": "Make a new URL"
       }
     },
     "run": {
@@ -7994,7 +8012,8 @@
       "succeeded": "Done",
       "failed": "Failed",
       "skipped": "Skipped",
-      "cancelled": "Cancelled"
+      "cancelled": "Cancelled",
+      "fromWebhook": "From the webhook · {count, plural, one {# request} other {# requests}}"
     },
     "runErrors": {
       "scheduleStandingTaskNotStarted": "The task hasn't started yet; will retry",

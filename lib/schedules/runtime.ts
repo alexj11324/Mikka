@@ -49,10 +49,10 @@ export const automationSeams:AutomationSeams={
     }
   },
   /** The creator's 创建并派发, keyed by the occurrence: a retried run finds the same request and the same task. */
-  async dispatch({ownerId,workspaceId,scheduleId,occurrenceId,task,event,single}){
+  async dispatch({ownerId,workspaceId,scheduleId,occurrenceId,task,event,source,single}){
     const botId=await dispatchBot(ownerId,workspaceId,task)
     const [{db},{recordPersonalSubmission},{createIssueFromRequest}]=await Promise.all([import('@/lib/db'),import('@/lib/coordinator-submission'),import('@/lib/coordinator/issue-create')])
-    // An event-started run carries the event after the creator's request, marked as GitHub's data.
+    // An event-started run carries the event after the creator's request, marked as GitHub's data or the webhook's.
     const text=event?`${task.prompt}\n\n${event}`:task.prompt
     // 追加到同一个任务: after the first run made the task, a run is a follow-up in that task's thread, as the creator
     // would type it there. The occurrence ID is the request ID, so a retried run sends it once. The task is the one the
@@ -72,7 +72,7 @@ export const automationSeams:AutomationSeams={
       }
     }
     const {eventId}=await recordPersonalSubmission(db,ownerId,text,{botId,submissionId:occurrenceId,
-      taskCommand:{version:1,intent:'create_and_dispatch',description:text},schedule:{scheduleId,occurrenceId,...(event?{event:true as const}:{})},
+      taskCommand:{version:1,intent:'create_and_dispatch',description:text},schedule:{scheduleId,occurrenceId,...(event&&source==='webhook'?{webhook:true as const}:event?{event:true as const}:{})},
       ...(task.title?{taskTitle:task.title}:{}),...(task.destination?{taskDestination:task.destination}:{}),...(task.profileId?{profileId:task.profileId}:{})})
     const created=await createIssueFromRequest(ownerId,{sourceEventId:eventId,title:task.title??task.prompt.split(/\r?\n/,1)[0]!.slice(0,200)})
     const row=(await pool.query<{title:string;status:string;identifier:string|null}>(`SELECT i.title,i.status,r.identifier FROM issues i
@@ -134,5 +134,15 @@ export async function fireGitHubAutomations(deliveryKey:string,event:string,payl
   const queued=await schedules().fireEvents(deliveryKey,events)
   if(queued)armDueTimerSoon('schedules')
   return queued
+}
+/**
+ * A request to an automation's webhook URL, by its key. Throws ScheduleError 404 for an unknown or switched-off URL and
+ * 409 for a paused automation. A queued run arms the due timer; a batched one is already armed for its due time.
+ */
+export async function receiveAutomationWebhook(key:string,body:string,requestKey?:string){
+  const {webhookKeyHash}=await import('./webhook')
+  const received=await schedules().receiveWebhook(webhookKeyHash(key),body,requestKey)
+  if(received.status==='queued')armDueTimerSoon('schedules')
+  return received
 }
 export async function assertScheduledRead(owner:string,botId:string|null,scope:ScheduledRead){return schedules().assertRead(owner,botId,scope)}

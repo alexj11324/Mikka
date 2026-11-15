@@ -97,3 +97,14 @@ test('每次运行: 追加到同一个任务 round-trips; 新建任务 leaves th
   const fresh = definitionFrom(filled({ scheduleOn: false }), now)
   assert.ok('definition' in fresh && !('eachRun' in fresh.definition))
 })
+
+test('Webhook: off leaves the key out; 0 and a batch window round-trip', () => {
+  const off = definitionFrom(filled({ scheduleOn: false }), now)
+  assert.ok('definition' in off && !('webhook' in off.definition))
+  for (const minutes of [0, 15]) {
+    const on = definitionFrom(filled({ scheduleOn: false, webhook: minutes }), now)
+    assert.ok('definition' in on)
+    assert.deepEqual(on.definition.webhook, { batchMinutes: minutes })
+    assert.equal(draftFrom(on.definition, now).webhook, minutes)
+  }
+})

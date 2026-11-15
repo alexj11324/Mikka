@@ -1227,6 +1227,7 @@
     "scheduleDailyRunLimit": "今天的运行次数已经到上限了。",
     "scheduleStandingTaskUnavailable": "追加的那个任务已经不在了。",
     "scheduleStandingTaskNotStarted": "追加的那个任务还没开始，稍后再试。",
+    "scheduleWebhookOff": "先打开 Webhook 并保存，再生成地址。",
     "scheduleRunConflict": "运行未开始，请重试。",
     "scheduleTimeMustBeFuture": "开始时间必须晚于现在。",
     "invalidIanaTimezone": "时区无效。",
@@ -7883,7 +7884,8 @@
       "weekdays": "工作日 {time}",
       "weekly": "每{weekday} {time}",
       "monthly": "每月 {day} 日 {time}",
-      "cron": "cron {expression}"
+      "cron": "cron {expression}",
+      "webhook": "Webhook"
     },
     "kind": {
       "reminder": "提醒",
@@ -7985,6 +7987,22 @@
         "fold": "选较早或较晚后才能保存",
         "interval": "间隔要在 1 分钟到 1 年之间",
         "cron": "cron 表达式要有 5 段"
+      },
+      "webhook": {
+        "title": "Webhook",
+        "description": "向这个自动化自己的地址发 POST 请求就会运行，正文最多 64 KB。",
+        "batch": "合并请求",
+        "batchNone": "每个请求单独运行",
+        "batchMinutes": "{minutes} 分钟内的请求合成一次运行",
+        "url": "Webhook 地址",
+        "copy": "复制地址",
+        "copied": "已复制",
+        "copyFailed": "复制失败",
+        "once": "地址只显示这一次。忘了就重新生成，旧地址会失效。",
+        "saveFirst": "保存后可以生成地址。",
+        "made": "地址已生成。",
+        "make": "生成地址",
+        "remake": "重新生成地址"
       }
     },
     "run": {
@@ -7994,7 +8012,8 @@
       "succeeded": "完成",
       "failed": "失败",
       "skipped": "已跳过",
-      "cancelled": "已取消"
+      "cancelled": "已取消",
+      "fromWebhook": "由 Webhook 触发 · {count} 个请求"
     },
     "runErrors": {
       "scheduleStandingTaskNotStarted": "追加的任务还没开始，稍后重试",

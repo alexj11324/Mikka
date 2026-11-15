@@ -31,6 +31,7 @@ import { runTask, type AutomationRun, type AutomationView } from '@/lib/schedule
 import { definitionFrom, draftFrom, emptyDraft, foldNeeded, type AutomationDraft, type IntervalUnit, type ScheduleKind } from './automation-draft'
 import { useWorkspaceBotNames } from './automations-page'
 import { GitHubTriggers } from './github-triggers'
+import { WebhookTrigger } from './webhook-trigger'
 import { AutomationUsagePanel } from './automation-usage'
 import { useNextRunLabel, useTimingSummary } from './automation-summary'
 
@@ -236,6 +237,8 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
       {!draft.otherTask && <>
         <SettingRow title={t('github.title')} />
         <GitHubTriggers value={draft.github} repositories={repositories} disabled={busy !== null} onChange={github => set({ github })} />
+        <WebhookTrigger value={draft.webhook} onChange={webhook => set({ webhook })} automation={current ?? null} disabled={busy !== null}
+          onSaved={schedule => automation.mutate(schedule, { revalidate: false })} />
       </>}
       <SettingRow title={t('manual')}>
         {!creating && <Button size="sm" variant="secondary" disabled={!active || busy !== null} onClick={() => { void runNow() }}><Play data-icon="inline-start" />{t('runNow')}</Button>}
@@ -322,8 +325,9 @@ function RunRow({ run, timezone }: { run: AutomationRun; timezone: string }) {
   return <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 text-sm">
     <time className="tabular-nums text-muted-foreground" dateTime={new Date(at).toISOString()}>{when(at, timezone)}</time>
     <Badge variant={runVariant[run.status]}>{t(`run.${run.status}`)}</Badge>
-    {run.trigger && <span className="min-w-0 text-muted-foreground">{t('run.from', { event: tEvent.has(run.trigger.event.event as never) ? tEvent(run.trigger.event.event as never) : run.trigger.event.event,
+    {run.trigger && 'event' in run.trigger && <span className="min-w-0 text-muted-foreground">{t('run.from', { event: tEvent.has(run.trigger.event.event as never) ? tEvent(run.trigger.event.event as never) : run.trigger.event.event,
       what: run.trigger.event.number !== null ? `${run.trigger.event.repository.replace(/^v2\/github\.com\//, '')}#${run.trigger.event.number}` : run.trigger.event.repository.replace(/^v2\/github\.com\//, '') })}</span>}
+    {run.trigger && 'webhook' in run.trigger && <span className="min-w-0 text-muted-foreground">{t('run.fromWebhook', { count: run.trigger.webhook.requests.length })}</span>}
     {task && <Button size="xs" variant="secondary" title={task.title} onClick={() => openTask(task.id)}><bdi>{task.identifier ?? task.title}</bdi></Button>}
     {reason && <span className="min-w-0 text-muted-foreground">{reason}</span>}
   </div>

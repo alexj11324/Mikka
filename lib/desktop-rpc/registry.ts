@@ -118,6 +118,7 @@ const functions = {
   'automations.updateAutomation': automations.updateAutomation,
   'automations.pauseAutomation': automations.pauseAutomation,
   'automations.takeOverAutomation': automations.takeOverAutomation,
+  'automations.automationWebhookKey': automations.automationWebhookKey,
   'automations.resumeAutomation': automations.resumeAutomation,
   'automations.cancelAutomation': automations.cancelAutomation,
   'automations.runAutomationNow': automations.runAutomationNow,

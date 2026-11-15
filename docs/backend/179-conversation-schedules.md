@@ -244,3 +244,28 @@ Decision [2026-11-15-1840](../design/decisions/2026-11-15-1840-automation-take-o
 - `list` rows carry `can_take_over` (workspace row, someone else's, reader not a member).
 - `same_task`: the standing task is matched by `result.requestedBy`, so after 接手 the new
   creator's next run makes their own task.
+
+## Webhook (2026-11-15)
+
+Decision [2026-11-15-1830](../design/decisions/2026-11-15-1830-automation-webhook.md).
+
+- Definition `webhook: { batchMinutes: 0..60 }` (dispatch_task only). Command
+  `{ action: 'webhook_key', scheduleId, version }` (page only, `scheduleWebhookPageOnly`
+  from a chat; creator or owner/admin) returns `{ schedule, key }` once; `key` is
+  `mwh_` + 32 random bytes base64url, stored as `user_schedules.webhook_key_hash`
+  (SHA-256, unique). `list` rows carry `webhook_key_set`. Page action
+  `automationWebhookKey`, RPC `automations.automationWebhookKey`.
+- `POST /api/webhooks/automations/<key>` (`lib/schedules/webhook-route.ts`): body ≤ 64 KB
+  UTF-8 text, CRLF normalised; `Idempotency-Key` or `X-Request-Id` (printable, ≤ 200) is
+  the request ID. `ScheduleStore.receiveWebhook` under the schedule row lock:
+  - unknown, off, cancelled or completed: 404 `scheduleNotFound`; paused: 409 `scheduleNotActive`;
+  - a request ID already in this automation's runs: `duplicate`;
+  - `batchMinutes > 0` and a pending, unclaimed run of this version still gathering
+    (`next_retry_at` in the future) under 50 requests and 256 KB: appended (`batched`);
+  - otherwise a new occurrence due `now + batchMinutes` (`queued`), or `skipped` with
+    `concurrencyLimit` / `dailyRunLimit` and no chat report.
+- The occurrence's `trigger` is `{ webhook: { requests: [{ at, body, key? }] } }`; history
+  blanks it for members as it does GitHub triggers. The dispatch appends
+  `describeWebhook(requests)` and marks the submission `schedule.webhook: true`, which
+  eve's context names as data from whoever called the URL.
+- `scrubString` masks `mwh_…` in exported traces.

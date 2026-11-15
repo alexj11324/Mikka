@@ -39,6 +39,8 @@ export type AutomationDraft = {
   eachRun: 'new_task' | 'same_task'
   /** 满足任一条件就运行: GitHub event triggers beside the timing. */
   github: GitHubTriggerDraft[]
+  /** Webhook: its own URL starts a run; null is off, otherwise the minutes requests are gathered into one run. */
+  webhook: number | null
   /** A chat-made automation's own task (reminder, snapshot, read): kept as it is. */
   otherTask: Exclude<Definition['task'], DispatchTask> | null
 }
@@ -65,7 +67,7 @@ export function emptyDraft(timezone: string, now = new Date()): AutomationDraft 
     title: '', botId: null, machine: 'auto', profileId: 'auto', timezone,
     scheduleOn: true, scheduleKind: 'daily', onceAt: wallTime(soon, timezone), intervalStart: wallTime(soon, timezone),
     intervalValue: 1, intervalUnit: 'hours', dailyTime: '09:00', fold: null, cron: '0 9 * * 1-5',
-    prompt: '', taskTitle: '', misfire: 'skip', lateness: 30, concurrent: 1, perDay: 0, eachRun: 'new_task', github: [], otherTask: null,
+    prompt: '', taskTitle: '', misfire: 'skip', lateness: 30, concurrent: 1, perDay: 0, eachRun: 'new_task', github: [], webhook: null, otherTask: null,
   }
 }
 
@@ -95,6 +97,7 @@ export function draftFrom(definition: Definition, now = new Date()): AutomationD
     misfire: definition.misfire, lateness: definition.maxLatenessMinutes, concurrent: definition.maxConcurrent ?? 1, perDay: definition.maxRunsPerDay ?? 0, eachRun: definition.eachRun ?? 'new_task',
     github: (definition.events ?? []).map(trigger => ({ event: trigger.event, repositories: [...trigger.repositories],
       branches: (trigger.branches ?? []).join(', '), labels: (trigger.labels ?? []).join(', '), runWhen: trigger.runWhen ?? '' })),
+    webhook: definition.webhook?.batchMinutes ?? null,
     otherTask: task.kind === 'dispatch_task' ? null : task,
   }
 }
@@ -154,7 +157,7 @@ export function definitionFrom(draft: AutomationDraft, now = new Date()): { defi
     ...(draft.profileId !== 'auto' ? { profileId: draft.profileId } : {}),
   }
   const events = draft.otherTask ? [] : draft.github.map(eventTrigger)
-  return { definition: { title, timezone: draft.timezone, timing, task, misfire: draft.misfire, maxLatenessMinutes: Math.round(draft.lateness), maxConcurrent: Math.round(draft.concurrent), ...(draft.perDay > 0 ? { maxRunsPerDay: Math.round(draft.perDay) } : {}), ...(!draft.otherTask && draft.eachRun === 'same_task' ? { eachRun: 'same_task' as const } : {}), ...(events.length ? { events } : {}) } }
+  return { definition: { title, timezone: draft.timezone, timing, task, misfire: draft.misfire, maxLatenessMinutes: Math.round(draft.lateness), maxConcurrent: Math.round(draft.concurrent), ...(draft.perDay > 0 ? { maxRunsPerDay: Math.round(draft.perDay) } : {}), ...(!draft.otherTask && draft.eachRun === 'same_task' ? { eachRun: 'same_task' as const } : {}), ...(events.length ? { events } : {}), ...(!draft.otherTask && draft.webhook !== null ? { webhook: { batchMinutes: Math.round(draft.webhook) } } : {}) } }
 }
 
 /** 5-field cron forms the list can name: every day, weekdays, one weekday, one day of the month. Anything else shows the expression. */

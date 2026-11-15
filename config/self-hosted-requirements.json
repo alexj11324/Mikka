@@ -2401,7 +2401,7 @@
   "lib/schedules/runtime.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Run automations as their creator through the installation PostgreSQL database, including runs started by verified GitHub deliveries; a trigger condition uses the configured Decision model and fails retryably without one.",
+    "behavior": "Run automations as their creator through the installation PostgreSQL database, including runs started by verified GitHub deliveries and by requests to an automation's webhook URL; a trigger condition uses the configured Decision model and fails retryably without one.",
     "test": "lib/schedules/dispatch.db.test.ts",
     "suite": "test:schedules-db"
   },
@@ -2411,5 +2411,33 @@
     "behavior": "Record why the host paused an automation and index its runs by creation time for the daily cap and usage.",
     "test": "lib/schedules/dispatch.db.test.ts",
     "suite": "test:schedules-db"
+  },
+  "drizzle/20261115182500_schedule_webhook_key.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Keep the SHA-256 of an automation's webhook URL key, unique among automations.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
+  },
+  "lib/schedules/webhook.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Make and hash automation webhook URL keys, read the sender's request ID and mark request bodies as data; no I/O.",
+    "test": "lib/schedules/webhook.test.ts",
+    "suite": "test:schedules"
+  },
+  "lib/schedules/webhook-route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Take a request to an automation's webhook URL: refuse a malformed key, a body over 64 KB or not text, and hand the rest to the installation's schedule store.",
+    "test": "lib/schedules/webhook-route.test.ts",
+    "suite": "test:schedules"
+  },
+  "app/api/webhooks/automations/[key]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Serve automation webhook URLs on the installation; the key in the path is the only credential.",
+    "test": "lib/schedules/webhook-route.test.ts",
+    "suite": "test:schedules"
   }
 }
