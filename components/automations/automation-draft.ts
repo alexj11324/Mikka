@@ -45,6 +45,8 @@ export type AutomationDraft = {
   linear: LinearTriggerDraft[]
   /** 满足任一条件就运行: Slack event triggers, on channels of the workspace's Slack installation. */
   slack: SlackTriggerDraft[]
+  /** 运行后发到 Slack: the channel and the locale the posts are written in; null is off. */
+  notify: { channel: string; locale: 'zh-CN' | 'en' } | null
   /** Webhook: its own URL starts a run; null is off, otherwise the minutes requests are gathered into one run. */
   webhook: number | null
   /** A chat-made automation's own task (reminder, snapshot, read): kept as it is. */
@@ -73,7 +75,7 @@ export function emptyDraft(timezone: string, now = new Date()): AutomationDraft 
     title: '', botId: null, machine: 'auto', profileId: 'auto', timezone,
     scheduleOn: true, scheduleKind: 'daily', onceAt: wallTime(soon, timezone), intervalStart: wallTime(soon, timezone),
     intervalValue: 1, intervalUnit: 'hours', dailyTime: '09:00', fold: null, cron: '0 9 * * 1-5',
-    prompt: '', taskTitle: '', misfire: 'skip', lateness: 30, concurrent: 1, perDay: 0, eachRun: 'new_task', github: [], linear: [], slack: [], webhook: null, otherTask: null,
+    prompt: '', taskTitle: '', misfire: 'skip', lateness: 30, concurrent: 1, perDay: 0, eachRun: 'new_task', github: [], linear: [], slack: [], notify: null, webhook: null, otherTask: null,
   }
 }
 
@@ -107,6 +109,7 @@ export function draftFrom(definition: Definition, now = new Date()): AutomationD
       labels: (trigger.labels ?? []).join(', '), runWhen: trigger.runWhen ?? '' }] : []),
     slack: (definition.events ?? []).flatMap(trigger => trigger.source === 'slack' ? [{ event: trigger.event, channels: [...trigger.channels],
       reactions: (trigger.reactions ?? []).join(', '), runWhen: trigger.runWhen ?? '' }] : []),
+    notify: definition.notify?.slack ? { ...definition.notify.slack } : null,
     webhook: definition.webhook?.batchMinutes ?? null,
     otherTask: task.kind === 'dispatch_task' ? null : task,
   }
@@ -177,7 +180,7 @@ export function definitionFrom(draft: AutomationDraft, now = new Date()): { defi
     ...(draft.profileId !== 'auto' ? { profileId: draft.profileId } : {}),
   }
   const events = draft.otherTask ? [] : [...draft.github.map(eventTrigger), ...draft.linear.map(linearTrigger), ...draft.slack.map(slackTrigger)]
-  return { definition: { title, timezone: draft.timezone, timing, task, misfire: draft.misfire, maxLatenessMinutes: Math.round(draft.lateness), maxConcurrent: Math.round(draft.concurrent), ...(draft.perDay > 0 ? { maxRunsPerDay: Math.round(draft.perDay) } : {}), ...(!draft.otherTask && draft.eachRun === 'same_task' ? { eachRun: 'same_task' as const } : {}), ...(events.length ? { events } : {}), ...(!draft.otherTask && draft.webhook !== null ? { webhook: { batchMinutes: Math.round(draft.webhook) } } : {}) } }
+  return { definition: { title, timezone: draft.timezone, timing, task, misfire: draft.misfire, maxLatenessMinutes: Math.round(draft.lateness), maxConcurrent: Math.round(draft.concurrent), ...(draft.perDay > 0 ? { maxRunsPerDay: Math.round(draft.perDay) } : {}), ...(!draft.otherTask && draft.eachRun === 'same_task' ? { eachRun: 'same_task' as const } : {}), ...(events.length ? { events } : {}), ...(!draft.otherTask && draft.webhook !== null ? { webhook: { batchMinutes: Math.round(draft.webhook) } } : {}), ...(!draft.otherTask && draft.notify ? { notify: { slack: draft.notify } } : {}) } }
 }
 
 /** 5-field cron forms the list can name: every day, weekdays, one weekday, one day of the month. Anything else shows the expression. */

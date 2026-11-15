@@ -7827,6 +7827,12 @@
     "saveUnconfirmed": "The change could not be confirmed. Refresh the folder before trying again.",
     "loadError": "Could not load personal files."
   },
+  "AutomationSlack": {
+    "succeeded": "Automation \"{title}\" ran: {task}",
+    "succeededNoTask": "Automation \"{title}\" ran",
+    "failed": "Automation \"{title}\" did not run: {reason}",
+    "failedUnknown": "Something went wrong; see the run history in Mikka"
+  },
   "Automations": {
     "usage": {
       "title": "Usage",
@@ -7903,6 +7909,9 @@
       "eachRun": "Each run",
       "eachRunNew": "Makes a new task",
       "eachRunSame": "Adds to the same task",
+      "notify": "Post runs to Slack",
+      "notifyOff": "Don't post",
+      "notifyChoose": "Choose a channel",
       "perDay": "At most per day",
       "unlimited": "No limit",
       "autoPaused": "Paused automatically: {reason}",

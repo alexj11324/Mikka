@@ -307,3 +307,15 @@ Decision [2026-11-15-2010](../design/decisions/2026-11-15-2010-automation-slack-
 - Eve's Slack channel forwards signed `event_callback`s to `SLACK_AUTOMATIONS_FORWARD_URL` (Slack's body and
   `x-slack-*` headers, 1.5 s timeout, failures logged); `/api/webhooks/slack/automations` checks the signature and
   `api_app_id` again. The submission carries `schedule.slack: true`.
+
+## Posting runs to Slack (2026-11-15)
+
+Decision [2026-11-15-2040](../design/decisions/2026-11-15-2040-automation-slack-posts.md).
+
+- Definition `notify: { slack: { channel, locale: 'zh-CN' | 'en' } }` (dispatch_task only); `permission` checks the
+  channel with the `slackChannels` seam like a Slack trigger's.
+- After a run is recorded `succeeded`, or `failed` for good, `ScheduleStore.notice` claims it once
+  (`schedule_occurrences.notified_at`, migration `20261115203000_schedule_notified`) and calls the `notify` seam:
+  `postRunNotice` (`lib/slack/automation-notice.ts`) writes `AutomationSlack.*` in the saved locale (the task as a
+  link to `<app>/?issue=<id>`, a failure as its `Errors.*` copy) and `chat.postMessage`s with the installation's bot
+  token. A failed post is logged and not retried; the run is unchanged.
