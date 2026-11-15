@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState, type ComponentProps } from 'react'
 import { Pressable, View } from 'react-native'
 import { ModelMenu } from '@/components/ModelMenu'
+import { ModelNotice } from '@/components/ModelNotice'
+import { useModelMenu } from '@/lib/model-menu'
 import { Text } from '@/components/Text'
 import { api } from '@/lib/api'
 import { apiCache } from '@/lib/api-cache'
@@ -59,6 +61,12 @@ function ThreadInput({ detail, runId, workspaceId, onSend, ...props }: Props & {
       if (accepted) setChoice(null)
       return accepted
     }} />
+}
+
+/** The existing per-Bot menu and its save/retry notice for a known group responder. */
+export function NamedBotModel({ botId, running }: { botId: string; running: boolean }) {
+  const model = useModelMenu(botId)
+  return <View><ModelMenu model={model} running={running} /><ModelNotice model={model} /></View>
 }
 
 /** Keep the caller's draft, attachments and send action while sharing one authorized reference picker. */

@@ -6,10 +6,11 @@ import { Window } from 'happy-dom'
 import { Textarea } from '@/components/ui/textarea'
 import type { ChatComposerProps } from '@/components/slots/chat-composer-contract'
 import * as live from '@/hooks/use-live-key'
-import type { GroupMessage, GroupMessagePage } from '@/lib/group-messages'
+import type { GroupMember, GroupMessage, GroupMessagePage } from '@/lib/group-messages'
 
 let pages: GroupMessagePage[] = []
 let hasMemberPage = true
+let groupMembers: GroupMember[] = []
 let membersError: Error | undefined
 mock.module('next-intl', { namedExports: {
   useTranslations: () => (key: string) => key,
@@ -35,9 +36,10 @@ mock.module(new URL('../../lib/hooks/view-state.tsx', import.meta.url).href, { n
 } })
 mock.module(new URL('../../app/actions/task-runs.ts', import.meta.url).href, { namedExports: { findThreadReferences: async () => [{ kind: 'task', id: issueId, title: 'Authorized task' }] } })
 mock.module(new URL('./thread-header.tsx', import.meta.url).href, { namedExports: { ThreadHeader: () => null } })
-mock.module(new URL('../coordinator/chat-composer.tsx', import.meta.url).href, { namedExports: { ChatComposer: ({ ref, value, onChange }: ChatComposerProps) => <Textarea ref={ref} value={value} onChange={event => onChange(event.currentTarget.value)} /> } })
+mock.module(new URL('../coordinator/bot-model-picker.tsx', import.meta.url).href, { namedExports: { BotModelPicker: ({ botId, running }: { botId: string; running: boolean }) => <span aria-label="Fixture Bot model">{botId} {running ? 'next message' : 'current'}</span> } })
+mock.module(new URL('../coordinator/chat-composer.tsx', import.meta.url).href, { namedExports: { ChatComposer: ({ ref, value, onChange, model }: ChatComposerProps) => <>{model}<Textarea ref={ref} value={value} onChange={event => onChange(event.currentTarget.value)} /></> } })
 mock.module(new URL('../nav/conversation-pill.tsx', import.meta.url).href, { namedExports: { ConversationPill: () => null } })
-mock.module(new URL('../nav/group-avatar.tsx', import.meta.url).href, { namedExports: { GroupAvatar: () => null, groupMembersKey: (id: string) => ['group-members', id], memberAvatar: (member: { id: string }) => ({ id: member.id }), useGroupMembers: () => ({ data: hasMemberPage ? [] : undefined, error: membersError }) } })
+mock.module(new URL('../nav/group-avatar.tsx', import.meta.url).href, { namedExports: { GroupAvatar: () => null, groupMembersKey: (id: string) => ['group-members', id], memberAvatar: (member: { id: string }) => ({ id: member.id }), useGroupMembers: () => ({ data: hasMemberPage ? groupMembers : undefined, error: membersError }) } })
 mock.module(new URL('../nav/letter-avatar.tsx', import.meta.url).href, { namedExports: { LetterAvatar: () => null } })
 mock.module(new URL('../nav/bot-avatar.tsx', import.meta.url).href, { namedExports: { BotAvatar: () => null } })
 mock.module(new URL('./message-reactions.tsx', import.meta.url).href, { namedExports: { MessageReactions: () => null, useMessageReactions: () => ({}) } })
@@ -151,4 +153,33 @@ test('named conversations show canonical authored links and use their authorized
     await act(async () => draw('conversation'))
     assert.equal(container.querySelectorAll('[data-slot="user-message-text"] a').length, 2)
   } finally { membersError = undefined; hasMemberPage = true }
+})
+
+test('the named conversation mounts the existing picker only for its one eligible Bot in the current owner roster', async () => {
+  const bot: GroupMember = { memberType: 'bot', id: 'owned', name: 'Owned Bot' }
+  const actor: GroupMember = { memberType: 'agent', id: 'agent', name: 'Agent' }
+  const person: GroupMember = { memberType: 'user', id: 'owner', name: 'Owner' }
+  const group = { id: 'group', title: 'Chat', workspaceId: 'workspace' }
+  const draw = (purpose: 'group' | 'conversation', roster: {id: string}[]) =>
+    act(async () => root.render(<GroupChatView group={{ ...group, creationPurpose: purpose }} userId="owner" people={new Map()} ownedBots={roster} />))
+  const chip = () => container.querySelector('[aria-label="Fixture Bot model"]')
+  pages = [{ messages: [], nextBefore: null, readRevision: 0, agentStatus: { status: 'running' } }]
+  try {
+    groupMembers = [person, bot]
+    await draw('conversation', [bot])
+    assert.equal(chip()?.textContent, 'owned next message')
+    await draw('group', [bot])
+    assert.equal(chip(), null)
+    await draw('conversation', [])
+    assert.equal(chip(), null)
+    for (const others of [[bot, actor], [bot, { ...bot, id: 'second' }], [actor]]) {
+      groupMembers = [person, ...others]
+      await draw('conversation', [bot])
+      assert.equal(chip(), null)
+    }
+    groupMembers = [person, bot]
+    membersError = new (await import('@/lib/group-messages')).GroupMessagesRequestError('not_found', 403)
+    await draw('conversation', [bot])
+    assert.equal(chip(), null)
+  } finally { groupMembers = []; membersError = undefined }
 })
