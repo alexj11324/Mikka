@@ -1918,6 +1918,13 @@
     "test": "lib/task-work-pulls.test.ts",
     "suite": "test:lib-units"
   },
+  "lib/thread-child-entries.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Places a child conversation's task card in the conversation it checks, at the time it started.",
+    "test": "lib/thread-child-entries.test.ts",
+    "suite": "test:lib-units"
+  },
   "lib/task-work-read.ts": {
     "mode": "built-in",
     "environment": [],

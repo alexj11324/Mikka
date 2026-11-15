@@ -25,7 +25,7 @@ import type { useTaskWork } from './issue-threads'
 import { openGroupConversation } from './workspace-navigation'
 import { useActivityEvents, type ActivityEventItem } from './issue-activity-feed'
 import { useActivityDrafts, type DiscussionSave } from './issue-activity'
-import { threadQuestionView } from '@/lib/issue-threads'
+import { isConversationRun, threadQuestionView } from '@/lib/issue-threads'
 import { presentedFactoryEvents, taskFactoryProgress } from '@/lib/task-factory-events'
 import { runResult, useRunResultLabel } from '@/hooks/use-run-result'
 import { pullLabel } from '@/lib/issue-activity'
@@ -152,7 +152,8 @@ export function FramedTask(props: FramedTaskProps) {
     ...(presentation.data?.linkedChats ?? []).map(chat => ({
       id: 'chat:' + chat.id, text: chat.title || tDirectory('untitled'), detail: undefined as string | undefined, mark: undefined as ReactNode, open: () => openGroupConversation(chat.id),
     })),
-    ...(props.agentActivity.threads ?? []).flatMap(thread => {
+    // Only the task's own conversations: a review or verify runs on its own and is a child conversation inside the one it checks.
+    ...(props.agentActivity.threads ?? []).filter(isConversationRun).flatMap(thread => {
       if (!thread.detail) return []
       const view = threadQuestionView(thread)
       const run = { status: view.waiting ? 'waiting_input' : view.status, outcome: view.outcome }
