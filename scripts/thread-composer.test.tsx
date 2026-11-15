@@ -41,7 +41,10 @@ mock.module('sonner', { namedExports: { toast: {
   dismiss: (id: string) => { notices.delete(id) }, success: () => {},
 } } })
 mock.module('swr', {
-  defaultExport: (key: unknown, fetcher: never, options: never) => versionScenario || liveRead && Array.isArray(key) && (key[0] === 'issue-thread' || observeChanges && key[0] === 'thread-changes')
+  defaultExport: (key: unknown, fetcher: never, options: never) => (
+    versionScenario && (key === null || Array.isArray(key)) ||
+    liveRead && Array.isArray(key) && (key[0] === 'issue-thread' || observeChanges && key[0] === 'thread-changes')
+  )
     ? actualSWR.default(key, fetcher, options)
     : Array.isArray(key) && key[0] === 'issue-thread'
     ? { data: thread && { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: [] }, mutate: () => {} }
