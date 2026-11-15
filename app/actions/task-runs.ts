@@ -1,7 +1,7 @@
 'use server'
 
 import type { IssuePullRequest } from '@/lib/issue-metadata'
-import type { DirectoryInput } from '@/lib/conversation-directory-input'
+import type { ConversationTarget, DirectoryInput } from '@/lib/conversation-directory-input'
 import type { ConversationOrganizationChange } from '@/lib/conversation-organization'
 import { runAwaitingApproval, runHistoryWindow } from '@/lib/task-state-query'
 import { singleFlight } from '@/lib/single-flight'
@@ -239,22 +239,25 @@ async function conversationActor() {
  * bound, written on every run of the conversation, and never replaced by a generated one (decision 2026-11-13-1405).
  * Only the conversation's owner renames it.
  */
-export async function renameConversation(runId: string, title: string): Promise<ActionResult<{ title: string }, 'issueTitleInvalid' | 'runNotFound'>> {
+export async function renameConversation(target: ConversationTarget, title: string): Promise<ActionResult<{ title: string }, 'issueTitleInvalid' | 'runNotFound'>> {
   const { ownerId, workspaceId } = await conversationActor()
   const { manualConversationTitle } = await import('@/lib/conversation-title')
   const normalized = typeof title === 'string' && title.length <= 400 ? manualConversationTitle(title) : null
   if (!normalized) return { error: 'issueTitleInvalid' }
-  const { renameConversationTitle } = await import('@/lib/conversation-title-server')
   const { pool } = await import('@/lib/db')
-  const saved = await renameConversationTitle(pool, String(runId), ownerId, title, workspaceId)
-  if (!saved) {
-    const { renameStandalone } = await import('@/lib/standalone-chat-controls')
-    const renamed = await renameStandalone(pool, runId, ownerId, workspaceId, normalized)
+  const { resolveConversationTarget, renameStandalone } = await import('@/lib/standalone-chat-controls')
+  const resolved = await resolveConversationTarget(pool, target, ownerId, workspaceId)
+  if (!resolved) return { error: 'runNotFound' }
+  if (resolved.kind === 'chat') {
+    const renamed = await renameStandalone(pool, resolved.id, ownerId, workspaceId, normalized)
     if (!renamed) return { error: 'runNotFound' }
-    await (await import('@/lib/live/lists')).groupListChanged(pool, runId)
+    await (await import('@/lib/live/lists')).groupListChanged(pool, resolved.id)
     return { title: renamed }
   }
-  await (await import('@/lib/live/lists')).runListChanged(pool, String(runId))
+  const { renameConversationTitle } = await import('@/lib/conversation-title-server')
+  const saved = await renameConversationTitle(pool, resolved.id, ownerId, title, workspaceId)
+  if (!saved) return { error: 'runNotFound' }
+  await (await import('@/lib/live/lists')).runListChanged(pool, resolved.id)
   return { title: saved }
 }
 
@@ -262,27 +265,29 @@ export async function renameConversation(runId: string, title: string): Promise<
  * Asks the small model for a new title now, replacing even a manual one, because the person asked. `regenerated` is
  * false when the model was unavailable or gave nothing usable: the conversation keeps the title it had.
  */
-export async function regenerateConversationTitle(runId: string): Promise<ActionResult<{ title: string | null; regenerated: boolean }, 'runNotFound'>> {
+export async function regenerateConversationTitle(target: ConversationTarget): Promise<ActionResult<{ title: string | null; regenerated: boolean }, 'runNotFound'>> {
   const { reader, ownerId, workspaceId } = await conversationActor()
   const { pool } = await import('@/lib/db')
-  const { withConversationWorkspace } = await import('@/lib/conversation-workspace')
-  const read = () => withConversationWorkspace(reader, workspaceId, async () => {
-    const result = await pool.query('SELECT title FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "workspaceId"=$3', [String(runId), ownerId, workspaceId])
-    return result.rows[0] as { title: string | null } | undefined
-  })
-  const owned = await read()
-  if (!owned) {
-    const { regenerateStandalone } = await import('@/lib/standalone-chat-controls')
-    const response = await regenerateStandalone(pool, runId, ownerId, workspaceId, async (owner, content, workspace) => {
+  const { resolveConversationTarget, regenerateStandalone } = await import('@/lib/standalone-chat-controls')
+  const resolved = await resolveConversationTarget(pool, target, ownerId, workspaceId)
+  if (!resolved) return { error: 'runNotFound' }
+  if (resolved.kind === 'chat') {
+    const response = await regenerateStandalone(pool, resolved.id, ownerId, workspaceId, async (owner, content, workspace) => {
       const { defaultModelAvailable } = await import('@/lib/default-model')
       if (!await defaultModelAvailable(owner)) return null
       const { generateShortTitle } = await import('@/lib/short-title-server')
       try { return await generateShortTitle(owner, content, workspace) } catch { return null }
     })
     if (!response) return { error: 'runNotFound' }
-    if (response.regenerated) await (await import('@/lib/live/lists')).groupListChanged(pool, runId)
+    if (response.regenerated) await (await import('@/lib/live/lists')).groupListChanged(pool, resolved.id)
     return response
   }
+  const { withConversationWorkspace } = await import('@/lib/conversation-workspace')
+  const read = () => withConversationWorkspace(reader, workspaceId, async () => {
+    const result = await pool.query('SELECT title FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "workspaceId"=$3', [resolved.id, ownerId, workspaceId])
+    return result.rows[0] as { title: string | null } | undefined
+  })
+  if (!await read()) return { error: 'runNotFound' }
   const { defaultModelAvailable } = await import('@/lib/default-model')
   if (!await defaultModelAvailable(ownerId)) {
     const current = await read()
@@ -291,41 +296,41 @@ export async function regenerateConversationTitle(runId: string): Promise<Action
   const { nameConversation } = await import('@/lib/conversation-title-server')
   const { generateShortTitle } = await import('@/lib/short-title-server')
   let title: string | null = null
-  try { title = await nameConversation(pool, String(runId), ownerId, 'regenerate', generateShortTitle) } catch (error) {
+  try { title = await nameConversation(pool, resolved.id, ownerId, 'regenerate', generateShortTitle) } catch (error) {
     console.error('Conversation title regenerate failed', error instanceof Error ? error.name : 'unknown')
   }
-  if (title) await (await import('@/lib/live/lists')).runListChanged(pool, String(runId))
+  if (title) await (await import('@/lib/live/lists')).runListChanged(pool, resolved.id)
   const current = await read()
   if (!current) return { error: 'runNotFound' }
   return { title: current.title, regenerated: !!title }
 }
 
-export async function readConversationOrganization(runId: string) {
-  const { ownerId, workspaceId } = await conversationActor()
+async function organizeTarget(target: ConversationTarget, { ownerId, workspaceId }: Awaited<ReturnType<typeof conversationActor>>, change?: ConversationOrganizationChange) {
   const { pool } = await import('@/lib/db')
+  const { resolveConversationTarget, standaloneOrganization } = await import('@/lib/standalone-chat-controls')
+  const resolved = await resolveConversationTarget(pool, target, ownerId, workspaceId)
+  if (!resolved) return null
+  if (resolved.kind === 'chat') {
+    const state = await standaloneOrganization(pool, resolved.id, ownerId, workspaceId, change)
+    if (change && state) await (await import('@/lib/live/lists')).groupListChanged(pool, resolved.id)
+    return state
+  }
   const { conversationOrganization } = await import('@/lib/conversation-organization')
-  const state = await conversationOrganization(pool, ownerId, workspaceId, runId)
-  if (state) return state
-  const { standaloneOrganization } = await import('@/lib/standalone-chat-controls')
-  return standaloneOrganization(pool, runId, ownerId, workspaceId)
+  const state = await conversationOrganization(pool, ownerId, workspaceId, resolved.id, change)
+  if (change && state) await (await import('@/lib/live/lists')).runListChanged(pool, resolved.id)
+  return state
 }
 
-export async function setConversationOrganization(runId: string, change: ConversationOrganizationChange) {
-  const { ownerId, workspaceId } = await conversationActor()
+export async function readConversationOrganization(target: ConversationTarget) {
+  return organizeTarget(target, await conversationActor())
+}
+
+export async function setConversationOrganization(target: ConversationTarget, change: ConversationOrganizationChange) {
+  const actor = await conversationActor()
   if (!change || !['archived', 'pinned'].includes(change.field) || typeof change.value !== 'boolean') {
     throw new ActionFailureError('validationGeneric')
   }
-  const { pool } = await import('@/lib/db')
-  const { conversationOrganization } = await import('@/lib/conversation-organization')
-  const state = await conversationOrganization(pool, ownerId, workspaceId, runId, change)
-  if (state) {
-    await (await import('@/lib/live/lists')).runListChanged(pool, runId)
-    return state
-  }
-  const { standaloneOrganization } = await import('@/lib/standalone-chat-controls')
-  const chat = await standaloneOrganization(pool, runId, ownerId, workspaceId, change)
-  if (chat) await (await import('@/lib/live/lists')).groupListChanged(pool, runId)
-  return chat
+  return organizeTarget(target, actor, change)
 }
 
 export async function listConversations(input: DirectoryInput) {
