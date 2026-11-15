@@ -219,7 +219,23 @@ try {
    note('two real immutable version branches with retained original output, owner-only admission and redisplay without dispatch',{denied:denied.error,parentOutput:actual.answer,edit:{id:edited.runId,version:edited.versionId,output:editReceipt.answer,model:editRun.model,session:editReceipt.thread},rerun:{id:rerun.runId,version:rerun.versionId,output:replay.answer,model:retryRun.model,session:replay.thread},totalRuns:n,view:versions})
   }
  }
- if(interrupt){const held=await queueRow(reqId);assert.equal(held.status,'failed');assert.equal(held.sentRunId,null);note('terminal cancelled attempt held the queued message and created no unauthorized continuation',{held})}
+ if(interrupt){
+  const held=await queueRow(reqId)
+  if(held.status!=='failed'){
+   const {readRunChain}=await import('../../lib/run-chain')
+   const state=async()=>({queue:await queueRow(reqId),chain:await readRunChain(independent,owner,runId),attempts:(await independent.query('select id,status,"sourceEventId","runId" from factory_attempts where "taskId"=(select "taskId" from factory_attempts where "runId"=$1) order by "createdAt"',[runId])).rows})
+   note('unexpected unfinished automatic hold after committed receipt; diagnostic before replay',await state())
+   await wait(900)
+   note('delayed independent original row before any retry',{row:await queueRow(reqId)})
+   try{
+    const {deliverQueuedThreadReply}=await import('../../lib/thread-delivery-queue')
+    const retried=await deliverQueuedThreadReply(pool,owner,runId)
+    note('canonical postcommit worker explicit follow-up diagnostic',{retried,queue:await queueRow(reqId)})
+   }catch(e){
+    note('canonical postcommit worker explicit follow-up error',{name:e.name,code:e.code??null,message:String(e.message).slice(0,100),stack:String(e.stack).split('\n').slice(1,7).join('\n').slice(0,740)})
+   }
+  }
+  assert.equal(held.status,'failed');assert.equal(held.sentRunId,null);note('terminal cancelled attempt held the queued message and created no unauthorized continuation',{held})}
  note('actual CPU result and completion persisted; event replay deduplicated',{model:provider,mode:handin?'afterRun':interrupt?'interrupt':'steer',modelText:transcript,terminal,chunks:rows.length,durable:stored,ownerMessageCopies:copies,cancelledQueue:(await queueRow(cancelledId)).status})
  trace.success=true;persist()
  writeFileSync(join(dir,handin?'after-run-result.json':interrupt?'interrupt-result.json':'steer-result.json'),JSON.stringify(trace,null,2),{mode:0o600})

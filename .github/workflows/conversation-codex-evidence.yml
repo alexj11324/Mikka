@@ -1,4 +1,4 @@
-name: Original baseline real dispatch to native MCP handoff and persisted generated titles
+name: Original #2267 explain pending queue after authenticated Factory cancellation
 on:
   push:
     branches: [evidence/2254-sidebar-85dfc396]
@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 24
     env:
-      SOURCE: 5c85ee16410fe5586ad6fef708e8630ef67fe1c3
+      SOURCE: a463f0fcfd926b7acb2df5f2c9a4891bd0a20567
     steps:
       - name: Check out the public harness only
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           path: product
-          ref: 5c85ee16410fe5586ad6fef708e8630ef67fe1c3
+          ref: a463f0fcfd926b7acb2df5f2c9a4891bd0a20567
           persist-credentials: false
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
         with:
@@ -37,7 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git -C product rev-parse HEAD)" = "$SOURCE"
-          test "$(git -C product rev-parse 'HEAD^{tree}')" = e0a1b294790ffda17cf089fa3b78571dbb70a40b
+          test "$(git -C product rev-parse 'HEAD^{tree}')" = 46e265f6fba9032c87fb51291b9b612182ca54f4
           cd product
           pnpm install --frozen-lockfile
           cd ../harness/evidence/2257/local-provider
@@ -45,7 +45,7 @@ jobs:
           mkdir -m 700 "$RUNNER_TEMP/model-fixture" "$RUNNER_TEMP/isolated-home" "$RUNNER_TEMP/receipt"
           python prepare.py "$GITHUB_WORKSPACE/product" "$RUNNER_TEMP/model-fixture"
           mkdir -p "$GITHUB_WORKSPACE/product/.cache/e-codex-actual"
-          cp title-lifecycle.mts "$GITHUB_WORKSPACE/product/.cache/e-codex-actual/"
+          cp delivery.mts handoff.mts observe-queue.mts "$GITHUB_WORKSPACE/product/.cache/e-codex-actual/"
           if [ ! -x /usr/lib/postgresql/17/bin/initdb ]; then
             . /etc/os-release
             curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o "$RUNNER_TEMP/pgdg-signing.asc"
@@ -67,16 +67,15 @@ jobs:
             ip link set lo up
             test "$(ls /sys/class/net)" = lo || test "$(ip -o link show | wc -l)" = 1
             test -z "$(ip route show default)"
-            exec setpriv --reuid="$1" --regid="$2" --clear-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs env -i PATH="$3" HOME="$4" bash "$5/verify-title.sh" "$5" "$6" "$7/receipt" "$7/model-fixture/codex" "$7/model-fixture/model.gguf"
+            exec setpriv --reuid="$1" --regid="$2" --clear-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs env -i PATH="$3" HOME="$4" bash "$5/check-interrupt.sh" "$5" "$6" "$7/receipt" "$7/model-fixture/codex" "$7/model-fixture/model.gguf"
           ' isolated "$worker_uid" "$worker_gid" "$PATH" "$RUNNER_TEMP/isolated-home" "$harness" "$src" "$RUNNER_TEMP"
       - name: Retain only the sanitized source, model and event receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: codex-pg-native-title-5c85ee16
+          name: original-2267-interrupt-queue-diagnostic
           path: |
-            ${{ runner.temp }}/receipt/title-lifecycle.json
-            ${{ runner.temp }}/receipt/inference.jsonl
+            ${{ runner.temp }}/receipt/delivery.json
             ${{ runner.temp }}/receipt/steer-result.json
             ${{ runner.temp }}/receipt/interrupt-result.json
             ${{ runner.temp }}/receipt/setup-diagnostic.txt
