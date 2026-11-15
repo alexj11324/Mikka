@@ -4,7 +4,7 @@ import { existsSync,mkdirSync,readFileSync,writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { join } from 'node:path'
 import { Pool } from 'pg'
-import { ACTIVE_TURN_STEER_HEADER,SOURCE_DAEMON_VERSION } from '@mikka/protocol/device'
+import { SOURCE_DAEMON_VERSION } from '@mikka/protocol/device'
 import { CLIENT_VERSION_HEADER } from '@mikka/protocol/version'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { seedUser,seedWorkspace,seedIssue } from '../../tests/support/workspace-admin-db'
@@ -57,10 +57,7 @@ try {
  const task='Prepare a clear daytime sky report.'
  const prompt=task+'\n'+mark(initial)
  const seedInput={id:runId,userId:owner,issueId,agentId,deviceId,deviceRepoId:repoId,botId:null,origin:'web',prompt,promptTaskStart:0,promptTaskLength:[...task].length,definition:{schemaVersion:1,kind:'worker',harness:'codex',instructions:'Use only the local model for this synthetic prompt.',definitionDigest:h('synthetic'),promptDigest:h(prompt),model,modelSource:'native-default',parent:null,readOnly:true} as never,dispatch:{issueId,agentId,deviceRepoId:repoId,requestKey:randomUUID()}}
- const {pool}=await import('../../lib/db')
- const {withProjectResourceLease}=await import('../../lib/project-resources/store')
- const {queueFactoryTask}=await import('../../lib/factory/task-dispatch')
- const admitted=interrupt?await withProjectResourceLease(owner,ws.id,()=>queueFactoryTask(pool,owner,{issueId,botId:null,agentId,deviceRepoId:repoId,note:prompt,key:randomUUID(),queue:(tx,userId,req,botId,ctx)=>acceptLocalRun({...seedInput, userId,botId,factoryContext:ctx},tx)})):await acceptLocalRun(seedInput)
+ const admitted=await acceptLocalRun(seedInput)
  assert.equal(admitted.runId,runId);note('canonical admission',{issueId,workspaceId:ws.id})
  const {auth}=await import('../../lib/auth')
  const signIn=async(user:string)=>{
@@ -74,14 +71,10 @@ try {
  const token=await issueDeviceToken(owner,'Synthetic acceptance')
  const dcall=async(path:string,method='GET',payload?:unknown,expected=200)=>{
   note('device REST request',{method,path:path.split('?')[0]})
-  const res=await fetch(origin+'/mikka/v1/'+path,{method,headers:{authorization:'Bearer '+token,[CLIENT_VERSION_HEADER]:SOURCE_DAEMON_VERSION,[ACTIVE_TURN_STEER_HEADER]:'1','content-type':'application/json'},...(payload===undefined?{}:{body:JSON.stringify(payload)})})
+  const res=await fetch(origin+'/mikka/v1/'+path,{method,headers:{authorization:'Bearer '+token,[CLIENT_VERSION_HEADER]:SOURCE_DAEMON_VERSION,'content-type':'application/json'},...(payload===undefined?{}:{body:JSON.stringify(payload)})})
   note('device REST response',{method,path:path.split('?')[0],status:res.status})
   assert.equal(res.status,expected,method+' '+path+' '+res.status)
   return expected===204?null:res.json()
- }
- const rpc=async(cookie:string,name:string,args:any)=>{
-  const res=await fetch(origin+'/mikka/api/rpc',{method:'POST',headers:{origin,cookie,'content-type':'application/json','x-mikka-rpc':'1','sec-fetch-site':'same-origin'},body:JSON.stringify({version:1,action:'agents.'+name,args:[{issueId,runId,...args}]})})
-  const body=await res.json();assert.equal(res.status,200,JSON.stringify(body));assert.equal(body.ok,true,JSON.stringify(body));return body.result
  }
  const get=async()=> (await independent.query(`SELECT r.id,r."issueId",r."workspaceId",r."sessionId",r."finishedAt",r."updatedAt",r.status,r.title,r."titleSource",r.report->>'summary' AS summary, i.title AS "taskTitle" FROM agent_runs r JOIN issues i ON i.id=r."issueId" WHERE r.id=$1 AND r."userId"=$2`,[runId,owner])).rows[0]
  const file=join(dir,'inference.jsonl')
