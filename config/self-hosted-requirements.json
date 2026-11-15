@@ -2506,6 +2506,8 @@
   "lib/slack/automation-notice.ts": {
     "mode": "built-in",
     "environment": [
+      "BETTER_AUTH_URL",
+      "MIKKA_APP_ORIGIN",
       "SLACK_APP_ID"
     ],
     "behavior": "Post a finished automation run to its Slack channel with the workspace installation's bot token, in the saved locale.",
