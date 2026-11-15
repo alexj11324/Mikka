@@ -7450,6 +7450,12 @@
     }
   },
   "HostedOnboarding": {
+    "detected": {
+      "claude": "Detected: Claude Code is signed in on this computer",
+      "claudePlan": "Detected: Claude Code is signed in with {plan} on this computer",
+      "codex": "Detected: Codex is signed in with ChatGPT on this computer",
+      "codexPlan": "Detected: Codex is signed in with ChatGPT {plan} on this computer"
+    },
     "loading": "Getting the guide ready",
     "root": "Mikka",
     "page": "Getting started",

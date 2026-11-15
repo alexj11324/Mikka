@@ -29,7 +29,7 @@
 
 ## 4. 没做的
 
-- 桌面端探测本机已登录的 Claude Code / Codex 并标「已检测到」：桌面桥现在没有这个读取，没做。
+- 桌面端探测本机已登录的 Claude Code / Codex（同 Capy：`claude auth status --json`、`codex login status`，桌面桥 `device.agentLogins`），订阅行写「已检测到：这台电脑的 Claude Code 已登录 Max」。只读登录方式和套餐名，不读凭据。
 - 「只有我 / 我的团队」：没有改工作区类型的写入，第 1 步不问。
 - 导入 Claude Code / Codex 历史：Mikka 还没有这个功能，推荐里不列。
 - 新建任务里的「新建 Bot」入口：清单里不放，侧栏照旧可以新建。

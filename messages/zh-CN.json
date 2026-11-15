@@ -7450,6 +7450,12 @@
     }
   },
   "HostedOnboarding": {
+    "detected": {
+      "claude": "已检测到：这台电脑的 Claude Code 已登录",
+      "claudePlan": "已检测到：这台电脑的 Claude Code 已登录 {plan}",
+      "codex": "已检测到：这台电脑的 Codex 已用 ChatGPT 登录",
+      "codexPlan": "已检测到：这台电脑的 Codex 已用 ChatGPT {plan} 登录"
+    },
     "loading": "正在准备引导",
     "root": "Mikka",
     "page": "开始使用",
