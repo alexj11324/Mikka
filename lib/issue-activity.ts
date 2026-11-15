@@ -15,6 +15,8 @@ export type ActivityVersion = {
   actorType?: 'user' | 'agent' | 'system' | null
   actorId?: string | null
   actor?: ActivityActorView | null
+  /** Computed in SQL without sending document text or a digest to the client. */
+  descriptionChanged?: boolean
   createdAt: Date | string
 }
 
@@ -57,6 +59,7 @@ export function deriveIssueActivity(versions: ActivityVersion[], children: Activ
   const events: IssueActivityEvent[] = []
   const created = ordered.find(version => version.revision === 1)
   if (created) events.push({ source: { kind: 'revision', id: created.id, revision: 1 }, id: `created-${created.id}`, at: timestamp(created.createdAt), kind: 'created', actorKey: actorKeyOf(created), actor: created.actor ?? null })
+  let previousDescription: { revision: number; actorKey: string | null; eventIndex: number } | null = null
   for (let index = 1; index < ordered.length; index += 1) {
     const previous = ordered[index - 1]
     const current = ordered[index]
@@ -66,7 +69,8 @@ export function deriveIssueActivity(versions: ActivityVersion[], children: Activ
     const at = timestamp(current.createdAt)
     const actorKey = actorKeyOf(current)
     const actor = current.actor ?? null
-    const add = (event: IssueActivityEvent) => events.push({ ...event, source: { kind: 'revision', id: current.id, revision: current.revision } })
+    const versionEvents: IssueActivityEvent[] = []
+    const add = (event: IssueActivityEvent) => versionEvents.push({ ...event, source: { kind: 'revision', id: current.id, revision: current.revision } })
     if (current.status !== previous.status) add({ id: `status-${current.id}`, at, actorKey, actor, kind: 'status', status: current.status })
     if (current.priority !== previous.priority) add({ id: `priority-${current.id}`, at, actorKey, actor, kind: 'priority', priority: current.priority })
     if (current.title !== previous.title) add({ id: `title-${current.id}`, at, actorKey, actor, kind: 'title', title: current.title })
@@ -90,6 +94,32 @@ export function deriveIssueActivity(versions: ActivityVersion[], children: Activ
     for (const name of beforeLabels) {
       if (!afterLabels.has(name)) add({ id: `label-remove-${current.id}-${name}`, at, actorKey, actor, kind: 'labelRemoved', title: name })
     }
+    const relationEvents = (before: string[], after: string[], added: 'blockerAdded' | 'relatedAdded', removed: 'blockerRemoved' | 'relatedRemoved') => {
+      const beforeSet = new Set(before), afterSet = new Set(after)
+      for (const id of afterSet) if (!beforeSet.has(id)) add({ id: `${added}-${current.id}-${id}`, at, actorKey, actor, kind: added, targetId: id })
+      for (const id of beforeSet) if (!afterSet.has(id)) add({ id: `${removed}-${current.id}-${id}`, at, actorKey, actor, kind: removed, targetId: id })
+    }
+    relationEvents(beforeMetadata.blockedByIds, afterMetadata.blockedByIds, 'blockerAdded', 'blockerRemoved')
+    relationEvents(beforeMetadata.relatedIds, afterMetadata.relatedIds, 'relatedAdded', 'relatedRemoved')
+    if (beforeMetadata.parentId !== afterMetadata.parentId) add({ id: `parent-${current.id}`, at, actorKey, actor, kind: 'parentChanged', targetId: afterMetadata.parentId ?? beforeMetadata.parentId ?? undefined })
+    if (beforeMetadata.dueDate !== afterMetadata.dueDate) add({ id: `due-date-${current.id}`, at, actorKey, actor, kind: 'dueDateChanged', dueDate: afterMetadata.dueDate })
+    if (beforeMetadata.project !== afterMetadata.project) add({ id: `project-${current.id}`, at, actorKey, actor, kind: 'projectChanged', title: afterMetadata.project ?? undefined })
+    if (beforeMetadata.estimate !== afterMetadata.estimate) add({ id: `estimate-${current.id}`, at, actorKey, actor, kind: 'estimateChanged', estimate: afterMetadata.estimate })
+    let descriptionEventIndex: number | null = null
+    if (current.descriptionChanged) {
+      const descriptionEvent: IssueActivityEvent = { id: `description-${current.id}`, at, actorKey, actor, kind: 'descriptionChanged', source: { kind: 'revision', id: current.id, revision: current.revision } }
+      if (versionEvents.length === 0 && previousDescription?.revision === previous.revision && previousDescription.actorKey === actorKey) {
+        descriptionEventIndex = previousDescription.eventIndex
+        events[descriptionEventIndex] = descriptionEvent
+      } else {
+        versionEvents.push(descriptionEvent)
+      }
+    }
+    events.push(...versionEvents)
+    const descriptionOnly: boolean = descriptionEventIndex !== null || versionEvents.length === 1 && versionEvents[0].kind === 'descriptionChanged'
+    previousDescription = descriptionOnly
+      ? { revision: current.revision, actorKey, eventIndex: descriptionEventIndex ?? events.length - 1 }
+      : null
   }
   const createdAt = created ? Date.parse(timestamp(created.createdAt)) : Number.NEGATIVE_INFINITY
   for (const child of children) {

@@ -213,7 +213,7 @@ export const desktopActionSchemas = {
   'issues.moveIssue': tuple(object({ id: uuid, status: z.enum(ISSUE_STATUS_CODES), revision: positive, block: blockFlagSchema.strict().optional() })),
   'issues.changeIssuePriority': tuple(object({ id: uuid, priority: z.enum(ISSUE_PRIORITY_CODES), revision: positive })),
   'issues.listIssueVersions': oneId,
-  'issues.pollIssueVersionSummaries': tuple(uuid, version.optional(), listPositions(51).optional()),
+  'issues.pollIssueVersionSummaries': tuple(uuid, version.optional(), listPositions(5000).optional()),
   'issues.setIssueScope': tuple(object({ id: uuid, revision: positive, scope: z.enum(['personal', 'workspace']) })),
   'linear-sync.getLinearIntegrationState': none,
   'linear-sync.getLinearBoardSync': none,
