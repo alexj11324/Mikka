@@ -15,12 +15,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: capy-author-bb3f2349
-            source: bb3f2349dde6bb48a43954d18ca8573be7927fbb
-            tree: 4359ed55ae2384491a97a95b2fe4c08c4cb81e79
-          - label: capy-progress-514738fa
-            source: 514738fa0c21dd11dd81ae66b52a89d327bb7c9f
-            tree: ddfe5a1de030bdb3e96a788c055f4438f09f5832
+          - label: capy-public-main-bfac62db
+            source: bfac62db8db1eb11d17d1a022e71179e01d1a33f
+            tree: 0a965939b07568f6c79f0572c650078bc86fce50
     env:
       SOURCE: ${{ matrix.source }}
       SOURCE_TREE: ${{ matrix.tree }}
