@@ -442,6 +442,22 @@ test('dispatch_task automations run as their creator through the existing create
     }
   })
 
+  await t.test('置顶 is each person’s own; 文件夹和标签 are the workspace’s, set by the creator or an admin without changing the version', async () => {
+    const { schedule } = await create()
+    type Row = Schedule & { pinned: boolean; folder: string | null; tags: string[] }
+    const seen = (who: string, bot: string) => page<{ schedules: Row[] }>(who, bot, { action: 'list', scheduleId: schedule.id }).then(list => list.schedules[0]!)
+    assert.deepEqual(await page(member, memberChat, { action: 'pin', scheduleId: schedule.id, pinned: true }), { pinned: true })
+    assert.deepEqual([(await seen(member, memberChat)).pinned, (await seen(owner, chat)).pinned], [true, false], 'a member’s pin is theirs alone')
+    await page(member, memberChat, { action: 'pin', scheduleId: schedule.id, pinned: false })
+    assert.equal((await seen(member, memberChat)).pinned, false)
+    await assert.rejects(page(member, memberChat, { action: 'organize', scheduleId: schedule.id, folder: 'Ops', tags: ['ci'] }), /scheduleAdminRequired/)
+    const organized = (await page<{ schedule: Row }>(owner, chat, { action: 'organize', scheduleId: schedule.id, folder: 'Ops', tags: ['ci', 'ci', 'nightly'] })).schedule
+    assert.deepEqual([organized.folder, organized.tags, organized.version], ['Ops', ['ci', 'nightly'], schedule.version], 'tags once each; the version is unchanged')
+    assert.deepEqual([(await seen(member, memberChat)).folder, (await seen(member, memberChat)).tags], ['Ops', ['ci', 'nightly']], 'everyone sees the folder and tags')
+    await page(owner, chat, { action: 'organize', scheduleId: schedule.id, folder: null, tags: [] })
+    assert.deepEqual([(await seen(owner, chat)).folder, (await seen(owner, chat)).tags], [null, []])
+  })
+
   await t.test('追加到同一个任务: later runs add to the first run’s task; a deleted task pauses the automation', async () => {
     const standing = (await create({ ...definition(builder), maxConcurrent: 3, eachRun: 'same_task' })).schedule
     const first = await runNow(standing)

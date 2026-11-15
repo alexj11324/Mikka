@@ -32,6 +32,7 @@ import { definitionFrom, draftFrom, emptyDraft, foldNeeded, type AutomationDraft
 import { useWorkspaceBotNames } from './automations-page'
 import { GitHubTriggers } from './github-triggers'
 import { WebhookTrigger } from './webhook-trigger'
+import { templateDraft, type AutomationTemplate } from './automation-templates'
 import { LinearTriggers } from './linear-triggers'
 import { SlackTriggers } from './slack-triggers'
 import { AutomationUsagePanel } from './automation-usage'
@@ -47,7 +48,7 @@ const runVariant = { pending: 'outline', running: 'secondary', succeeded: 'secon
  * (`id` 'new') is created on 创建 and opens as itself. Saves go through the automation actions and the page reads again
  * only when the live channel says the schedule changed.
  */
-export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { workspaceId: string | null; userId: string; id: string | 'new'; onOpen: (id: string) => void; onBack: () => void }) {
+export function AutomationEditor({ workspaceId, userId, id, template, onOpen, onBack }: { workspaceId: string | null; userId: string; id: string | 'new'; template?: AutomationTemplate; onOpen: (id: string) => void; onBack: () => void }) {
   const t = useTranslations('Automations.editor')
   const locale = useLocale()
   const tAll = useTranslations('Automations')
@@ -58,7 +59,9 @@ export function AutomationEditor({ workspaceId, userId, id, onOpen, onBack }: { 
   const creating = id === 'new'
   const { automation, history } = useAutomation(workspaceId, creating ? null : id)
   const current = automation.data ?? null
-  const [draft, setDraft] = useState<AutomationDraft | null>(() => creating ? emptyDraft(localZone()) : null)
+  const tTemplates = useTranslations('Automations.templates')
+  const [draft, setDraft] = useState<AutomationDraft | null>(() => !creating ? null
+    : template ? templateDraft(template, emptyDraft(localZone()), { title: tTemplates(`${template}.title`), prompt: tTemplates(`${template}.prompt`) }) : emptyDraft(localZone()))
   const loaded = useRef<string | null>(null)
   // The fields start from the stored definition once per version; a later live read does not overwrite edits.
   useEffect(() => {

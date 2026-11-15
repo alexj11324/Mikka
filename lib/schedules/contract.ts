@@ -106,6 +106,10 @@ export const commandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('take_over'), scheduleId: z.uuid(), version: z.number().int().positive() }).strict(),
   // Webhook 地址: a new secret URL for the automation; the previous one stops working. Returned once.
   z.object({ action: z.literal('webhook_key'), scheduleId: z.uuid(), version: z.number().int().positive() }).strict(),
+  // 置顶: the reader's own pin.
+  z.object({ action: z.literal('pin'), scheduleId: z.uuid(), pinned: z.boolean() }).strict(),
+  // 文件夹和标签: the workspace's; set by the creator or an owner/admin, without changing the automation's version.
+  z.object({ action: z.literal('organize'), scheduleId: z.uuid(), folder: z.string().trim().min(1).max(60).nullable(), tags: z.array(z.string().trim().min(1).max(30)).max(10) }).strict(),
   // 立即运行: one occurrence due now. The same requestId never adds a second one.
   z.object({ action: z.literal('run_now'), scheduleId: z.uuid(), version: z.number().int().positive(), requestId: z.uuid() }).strict(),
   // 用量: runs and cost per day in the automation's time zone, newest first.

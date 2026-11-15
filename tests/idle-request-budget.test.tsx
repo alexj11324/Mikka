@@ -394,7 +394,7 @@ const pages: Record<string, () => Promise<ReactNode>> = {
   // 自动化: the list, and one automation with its history; both read again only on a schedule_list push.
   automations: async () => {
     const { AutomationsPage } = await import('../components/automations/automations-page')
-    return <AutomationsPage workspaceId={WORKSPACE} href={id => `?section=automations&automation=${id}`} onOpen={noop} onAskBot={noop} />
+    return <AutomationsPage userId="user-1" workspaceId={WORKSPACE} href={id => `?section=automations&automation=${id}`} onOpen={noop} onAskBot={noop} />
   },
   'automation-editor': async () => {
     const { AutomationEditor } = await import('../components/automations/automation-editor')

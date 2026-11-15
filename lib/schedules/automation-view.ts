@@ -21,6 +21,10 @@ export type AutomationView = {
   can_take_over?: boolean
   /** A webhook URL was made for it (the URL itself is shown only once). */
   webhook_key_set?: boolean
+  /** 文件夹 and 标签: the workspace's; 置顶: the reader's own. */
+  folder?: string | null
+  tags?: string[]
+  pinned?: boolean
 }
 export type AutomationList = { schedules: AutomationView[]; nextCursor: string | null }
 
