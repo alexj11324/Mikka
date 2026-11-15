@@ -1,4 +1,4 @@
-name: Original E interrupt and version QA with native Node HTTP lifecycle
+name: Integrated E real queue, steer, interrupt, replacement, edit and rerun
 on:
   push:
     branches: [evidence/2254-sidebar-85dfc396]
@@ -11,18 +11,8 @@ jobs:
     if: github.repository == 'alexj11324/Mikka'
     runs-on: ubuntu-latest
     timeout-minutes: 24
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - source: 5c2d408d110a9a782ea6579a563787df9a2fc8f8
-            tree: 943b6b7725724a985d0a38e7003fec5320f56ddd
-            artifact: original-2267-owned-node
-          - source: 5692b5736352c2ca2d5d672c652de6af4c659d94
-            tree: e89117ed429c954dbc0ec5f5df98b0fd4c0c4296
-            artifact: original-2275-owned-node
     env:
-      SOURCE: ${{ matrix.source }}
+      SOURCE: 9be0ca745eb894291bee53266d42462cd080ebf5
     steps:
       - name: Check out the public harness only
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -34,7 +24,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           path: product
-          ref: ${{ matrix.source }}
+          ref: 9be0ca745eb894291bee53266d42462cd080ebf5
           persist-credentials: false
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
         with:
@@ -47,7 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git -C product rev-parse HEAD)" = "$SOURCE"
-          test "$(git -C product rev-parse 'HEAD^{tree}')" = "${{ matrix.tree }}"
+          test "$(git -C product rev-parse 'HEAD^{tree}')" = 53bd8c93af9a894665360a510a2211f337a7c054
           cd product
           pnpm install --frozen-lockfile
           cd ../harness/evidence/2257/local-provider
@@ -83,7 +73,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: ${{ matrix.artifact }}
+          name: integrated-9be0-native-node
           path: |
             ${{ runner.temp }}/receipt/*-trial.json
             ${{ runner.temp }}/receipt/cleanup-*.jsonl
