@@ -63,6 +63,9 @@ test('reference search scopes tasks, conversation roots, and PRs to the active v
     assert.equal((await handleGroup(pool, membership, { ...request, userId: other, method: 'GET' })).status, 404)
 
     assert.deepEqual((await searchThreadReferences(owner, workspace, '#2259', 'pr')).map(item => item.id), [url])
+    const { tokenWorkspace } = await import('../lib/tokens/principal')
+    assert.deepEqual(await searchThreadReferences({ id: owner, [tokenWorkspace]: workspace }, workspace, 'checkout'), items)
+    await assert.rejects(searchThreadReferences({ id: owner, [tokenWorkspace]: foreign }, workspace, 'checkout'), { code: 'workspaceAccessDenied' })
     assert.deepEqual(await searchThreadReferences(other, foreign, 'checkout'), [])
     await assert.rejects(searchThreadReferences(other, workspace, 'checkout'))
     await pool.query(`UPDATE issues SET content=jsonb_set(content,'{attrs,mikka,deletedAt}',to_jsonb(now())) WHERE id=$1`, [issue])

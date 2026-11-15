@@ -1,3 +1,4 @@
+import { AVATAR_MAX_BYTES, isAvatarContentType } from '../account/avatar-file'
 import { threadModelChoice } from '@/lib/thread-model-choice'
 import { archiveIdleDays, conversationTargetInput, directoryInput } from '@/lib/conversation-directory-input'
 import { saveEnvironmentInput, projectDefaultEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
@@ -85,7 +86,7 @@ const avatar = z.instanceof(FormData).superRefine((form, context) => {
   const entries = [...form.entries()]
   const file = entries[0]?.[1]
   if (entries.length !== 1 || entries[0]?.[0] !== 'avatar' || !(file instanceof Blob)
-    || file.size > 200 * 1024 || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) context.addIssue({ code: 'custom' })
+    || file.size > AVATAR_MAX_BYTES || !isAvatarContentType(file.type)) context.addIssue({ code: 'custom' })
 })
 const readBatch: z.ZodType = tuple(z.array(object({ action: z.enum(READ_BATCH_ACTIONS), args: z.array(z.unknown()) }))
   .min(1).max(MAX_READ_BATCH)).superRefine((value, context) => {
@@ -224,7 +225,7 @@ export const desktopActionSchemas = {
   'issues.moveIssue': tuple(object({ id: uuid, status: z.enum(ISSUE_STATUS_CODES), revision: positive, block: blockFlagSchema.strict().optional() })),
   'issues.changeIssuePriority': tuple(object({ id: uuid, priority: z.enum(ISSUE_PRIORITY_CODES), revision: positive })),
   'issues.listIssueVersions': oneId,
-  'issues.pollIssueVersionSummaries': tuple(uuid, version.optional(), listPositions(51).optional()),
+  'issues.pollIssueVersionSummaries': tuple(uuid, version.optional(), listPositions(5000).optional()),
   'issues.setIssueScope': tuple(object({ id: uuid, revision: positive, scope: z.enum(['personal', 'workspace']) })),
   'linear-sync.getLinearIntegrationState': none,
   'linear-sync.getLinearBoardSync': none,

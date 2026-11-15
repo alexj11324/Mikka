@@ -361,6 +361,9 @@ test('a thread\'s stored title: bounded by the schema, generated per trigger, sh
     }), null)
     assert.equal(await renameThreadTitle(pool, revoked, 'owner', 'No access', workspaceId), null)
     assert.deepEqual(await stored(revoked), { title: null, titleSource: null })
+    assert.equal(await conversationOrganization(pool, 'owner', workspaceId, first), null)
+    assert.equal(await organize(first, 'pinned', true), null, 'a suspended owner cannot organize a conversation')
+    assert.equal((await pool.query('SELECT "conversationPinnedAt" FROM agent_runs WHERE id=$1', [first])).rows[0].conversationPinnedAt, null)
   } finally {
     for (const [key, value] of [['MIKKA_DATABASE_URL',before.app], ['DATABASE_URL',before.workspace]] as const) {
       if (value === undefined) delete process.env[key]

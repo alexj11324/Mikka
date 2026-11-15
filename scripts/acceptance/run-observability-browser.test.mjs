@@ -6,6 +6,7 @@ import { runInNewContext } from 'node:vm'
 import { runObservabilityWorkflow } from './run-observability-workflow.mjs'
 import { startObservabilityBrowser, ObservabilityBrowserError } from './run-observability-browser.mjs'
 import { CASES, fixtureTask, ORIGIN } from './run-observability.mjs'
+import { ACCEPTANCE_REPLAY_MARKER, acceptanceReplayOptIn } from '../../lib/replay-readiness.ts'
 
 const revision = 'a'.repeat(40), owner = 'synthetic-browser-owner'
 const workspaceId = '77777777-7777-4777-8777-777777777777'
@@ -35,7 +36,9 @@ function browserFixture(input, options = {}) {
   const calls = [], reports = [], emitter = new EventEmitter(), login = deferred(), navigation = deferred()
   const state = { url: HOME + '/sign-in', signedIn: false, selected: options.switchWorkspace ? otherWorkspace : workspaceId,
     pageClosed: false, contextClosed: false, browserClosed: false, submissionSent: 0, submitAttempts: 0,
-    signOuts: 0, versions: 0, pendingClick: null, navigationWaits: 0, replayHandlesDisposed: 0 }
+    signOuts: 0, versions: 0, pendingClick: null, navigationWaits: 0, replayHandlesDisposed: 0,
+    activeMenu: null, chosenBot: options.noBotPicker ? 'Coordinator' : 'Synthetic bot',
+    chosenMachine: 'Use workspace defaults', chosenProfile: 'Auto' }
   const response = (url, value, status = 200) => ({
     url: () => url, status: () => status, request: () => ({ method: () => 'POST', resourceType: () => 'fetch' }),
     body: async () => Buffer.from(JSON.stringify(value)), finished: async () => null, dispose: async () => {},
@@ -69,6 +72,8 @@ function browserFixture(input, options = {}) {
         if (options.switchWorkspace && !options.ambiguousWorkspace) choices.push({ id: otherWorkspace, name: 'Synthetic team' })
         return response(url, { workspace: { id: state.selected }, accounts: [
           { id: options.otherOwner ? 'different-owner' : owner, email: EMAIL, choices },
+          ...(options.otherAccountSameWorkspaceName ? [{ id: 'different-owner', email: 'other@example.invalid',
+            choices: [{ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'Synthetic personal' }] }] : []),
         ] })
       }
       if (path.endsWith('/api/workspace')) return response(url, { currentUserId: owner,
@@ -77,21 +82,61 @@ function browserFixture(input, options = {}) {
       throw new Error('unexpected API path')
     },
   }
+  const matchesName = (name, expected) => name instanceof RegExp ? name.test(expected) : name === expected
+  const hostedMachine = descriptor => descriptor?.role === 'button' && descriptor.name instanceof RegExp
+    && descriptor.name.test('Machine: ' + state.chosenMachine)
+  const hostedBot = descriptor => descriptor?.role === 'button' && descriptor.name instanceof RegExp
+    && descriptor.name.test('Bot to hand it to: ' + state.chosenBot)
+  const hostedProfile = descriptor => descriptor?.role === 'button' && descriptor.scope?.role === 'css'
+    && descriptor.scope.selector === '.ui-kb-create__row' && descriptor.scope.has?.name === 'Agent profile'
   const locator = descriptor => {
     const value = {
       descriptor,
+      locator: selector => locator({ role: 'css', selector, scope: descriptor }),
+      or: other => locator({ role: 'union', choices: [descriptor, other.descriptor] }),
       getByRole: (role, config = {}) => locator({ role, name: config.name, scope: descriptor }),
       getByText: (name, config = {}) => locator({ role: 'text', name, exact: config.exact, scope: descriptor }),
       getByLabel: (name, config = {}) => locator({ role: 'label', name, exact: config.exact, scope: descriptor }),
       filter: filter => locator({ ...descriptor, has: filter.has?.descriptor }),
       async count() {
-        if (descriptor.role === 'combobox' && descriptor.name === 'Bot to hand it to') return options.noBotPicker ? 0 : 1
+        if (descriptor.role === 'union') return (await Promise.all(descriptor.choices.map(choice => locator(choice).count()))).reduce((a, b) => a + b, 0)
+        if (descriptor.role === 'css') {
+          if (descriptor.selector === '.ui-as-ws-menu > button[aria-haspopup="menu"]:visible') return options.hostedShell ? 1 : 0
+          if (descriptor.selector === 'button.ui-as-side__search[aria-haspopup="dialog"]:visible') return options.hostedShell ? 1 : 0
+          if (descriptor.selector === '.ui-kb-create') return options.hostedTask ? 1 : 0
+          if (descriptor.selector === '.ui-kb-create__row') {
+            if (!options.hostedTask) return 0
+            if (descriptor.has?.name === 'Hand to') return options.noBotPicker ? 0 : 1
+            if (descriptor.has?.name === 'Agent profile') return options.missingHostedProfileRow ? 0 : options.ambiguousHostedProfileRow ? 2 : 1
+          }
+          assert.fail('unexpected CSS contract')
+        }
+        if (descriptor.role === 'button' && ['Workspace menu', 'Search everything'].includes(descriptor.name)) return options.hostedShell ? 0 : 1
+        if (descriptor.role === 'combobox' && descriptor.name === 'Machine') return options.hostedTask && !options.mixedTaskControls ? 0 : 1
+        if (descriptor.role === 'combobox' && descriptor.name === 'Agent profile') return options.hostedTask ? 0 : 1
+        if (descriptor.role === 'combobox' && descriptor.name === 'Bot to hand it to') return options.hostedTask || options.noBotPicker ? 0 : 1
+        if (hostedMachine(descriptor)) return options.hostedTask ? 1 : 0
+        if (hostedBot(descriptor)) return options.hostedTask && !options.noBotPicker && !options.missingHostedBot ? 1 : 0
+        if (hostedProfile(descriptor)) return options.hostedTask ? 1 : 0
+        if (descriptor.role === 'menuitemradio') {
+          if (!state.activeMenu) return 0
+          if (descriptor.has?.name === input.ready.marker && options.ambiguousProfile) return 2
+          if (options.missingHostedChoice === state.activeMenu) return 0
+          const expected = { workspace: 'Synthetic personal', bot: 'Coordinator', machine: 'Mikka Cloud', profile: input.ready.marker }[state.activeMenu]
+          return descriptor.has?.name === expected ? 1 : 0
+        }
+        if (options.hostedTask && descriptor.role === 'text') {
+          if (hostedMachine(descriptor.scope)) return descriptor.name === state.chosenMachine ? 1 : 0
+          if (hostedBot(descriptor.scope)) return descriptor.name === state.chosenBot ? 1 : 0
+          if (hostedProfile(descriptor.scope)) return descriptor.name === state.chosenProfile ? 1 : 0
+        }
         if (descriptor.role === 'option' && descriptor.has?.name === input.ready.marker && options.ambiguousProfile) return 2
         return 1
       },
       async waitFor(config) {
         calls.push({ type: 'wait', role: descriptor.role, name: descriptor.name, state: config.state })
         if (descriptor.role === 'dialog' && descriptor.name === 'New task' && config.state === 'hidden' && options.submitUnknown) throw new Error(CANARY)
+        if (descriptor.role === 'menu' && config.state === 'hidden') assert.equal(state.activeMenu, null)
       },
       async isEnabled() { return !options.disabledSubmit },
       async fill(text) {
@@ -105,22 +150,34 @@ function browserFixture(input, options = {}) {
         } else assert.fail('unexpected field')
       },
       async click() {
-        calls.push({ type: 'click', role: descriptor.role, name: descriptor.name, has: descriptor.has?.name, scope: descriptor.scope })
+        calls.push({ type: 'click', role: descriptor.role, name: descriptor.name, selector: descriptor.selector, has: descriptor.has?.name, scope: descriptor.scope })
         if (descriptor.name === 'Sign in to the workspace') {
           state.signedIn = !options.loginRefused
           state.url = HOME
           login.resolve(response(ORIGIN + '/mikka/api/auth/sign-in/email', null, options.loginRefused ? 401 : 200))
           if (options.foreignBusiness) emitter.emit('request', { url: () => 'https://synthetic-server.invalid/api/rpc' })
           if (!options.noCloudResponse) emitter.emit('response', response(ORIGIN + '/mikka/api/rpc', {}))
-        } else if (descriptor.role === 'menuitem') {
+        } else if (descriptor.selector === '.ui-as-ws-menu > button[aria-haspopup="menu"]:visible') state.activeMenu = 'workspace'
+        else if (hostedBot(descriptor)) state.activeMenu = 'bot'
+        else if (hostedMachine(descriptor)) state.activeMenu = 'machine'
+        else if (hostedProfile(descriptor)) state.activeMenu = 'profile'
+        else if (descriptor.role === 'menuitem' || descriptor.role === 'menuitemradio' && state.activeMenu === 'workspace') {
           const complete = () => {
             state.selected = workspaceId
             state.url = HOME
+            state.activeMenu = null
             navigation.resolve(response(HOME, null))
           }
           if (options.delayedNavigation) setImmediate(complete)
           else complete()
-        } else if (descriptor.name === 'Create task') {
+        } else if (descriptor.role === 'menuitemradio') {
+          if (options.hostedChoiceNotApplied !== state.activeMenu) {
+            if (state.activeMenu === 'bot') state.chosenBot = descriptor.has.name
+            if (state.activeMenu === 'machine') state.chosenMachine = descriptor.has.name
+            if (state.activeMenu === 'profile') state.chosenProfile = descriptor.has.name
+          }
+          state.activeMenu = null
+        } else if (matchesName(descriptor.name, options.hostedTask ? 'Create task ⌘↵' : 'Create task')) {
           state.submitAttempts++
           if (options.abortPendingClick) {
             const pending = deferred()
@@ -162,11 +219,13 @@ function browserFixture(input, options = {}) {
     async evaluate(fn) {
       calls.push({ type: 'replayEvaluate' })
       if (Object.hasOwn(options, 'finalReplayState')) replayState = options.finalReplayState
+      if (options.hostedChoiceChangesAtReplay) state.chosenProfile = 'Different profile'
       return replayCall(fn)
     },
     on: (event, handler) => emitter.on(event, handler),
     url: () => state.url,
     async goto(url) { calls.push({ type: 'goto', url }); state.url = options.foreignSignIn ? 'https://synthetic-server.invalid/sign-in' : url },
+    locator: selector => locator({ role: 'css', selector }),
     getByRole: (role, config = {}) => locator({ role, name: config.name }),
     getByText: (name, config = {}) => locator({ role: 'text', name, exact: config.exact }),
     getByLabel: (name, config = {}) => locator({ role: 'label', name, exact: config.exact }),
@@ -182,6 +241,10 @@ function browserFixture(input, options = {}) {
   }
   const context = {
     request: api,
+    async addInitScript(script, arg) {
+      calls.push({ type: 'addInitScript', script, arg })
+      if (options.initScriptFails) throw new Error(CANARY)
+    },
     async newPage() { calls.push({ type: 'newPage' }); return page },
     async close() { calls.push({ type: 'close', resource: 'context' }); state.contextClosed = true },
   }
@@ -469,5 +532,146 @@ for (const kind of ['abort', 'timeout']) {
     assert.equal(f.state.pageClosed && f.state.contextClosed && f.state.browserClosed, true)
     assert.equal(f.state.signOuts, 1)
     assert.equal(f.calls.find(call => call.type === 'api' && call.path.endsWith('/sign-out')).pageClosed, true)
+  })
+}
+
+test('acceptance marker is installed before the first document and stays on the official top-level app', async () => {
+  const input = inputs(), f = browserFixture(input)
+  const session = await startObservabilityBrowser(f.args)
+  const entry = f.calls.find(call => call.type === 'addInitScript')
+  assert.ok(entry)
+  assert.equal(f.calls.filter(call => call.type === 'addInitScript').length, 1)
+  assert.equal(f.calls.indexOf(entry) < f.calls.findIndex(call => call.type === 'newPage'), true)
+  assert.deepEqual(entry.arg, { marker: ACCEPTANCE_REPLAY_MARKER, origin: ORIGIN, deadline: Date.parse(input.ready.expiresAt) })
+  const execute = ({ url = HOME, child = false, now = input.now() } = {}) => {
+    const location = new URL(url), navigator = { webdriver: true, userAgent: 'HeadlessChrome', userAgentData: { brands: [{ brand: 'HeadlessChrome' }] } }
+    const window = { location, navigator }
+    window.top = child ? {} : window
+    Object.defineProperty(window, 'localStorage', { get() { throw new Error(CANARY) } })
+    Object.defineProperty(window, 'sessionStorage', { get() { throw new Error(CANARY) } })
+    runInNewContext('(' + entry.script.toString() + ')(arg)', { window, arg: entry.arg, Date: { now: () => now } })
+    assert.equal(navigator.webdriver, true)
+    assert.equal(navigator.userAgent, 'HeadlessChrome')
+    assert.equal(navigator.userAgentData.brands[0].brand, 'HeadlessChrome')
+    assert.equal(Object.hasOwn(window, '__mikkaReplayReadiness'), false)
+    assert.equal(Object.hasOwn(window, 'posthog'), false)
+    return window
+  }
+  for (const url of [ORIGIN + '/mikka', HOME + '/sign-in', HOME]) {
+    const target = execute({ url })
+    assert.equal(acceptanceReplayOptIn(target, input.now()), true)
+    const descriptor = Object.getOwnPropertyDescriptor(target, ACCEPTANCE_REPLAY_MARKER)
+    assert.equal(descriptor.enumerable, false)
+    assert.equal(descriptor.writable, false)
+    assert.equal(descriptor.configurable, false)
+  }
+  for (const options of [{ url: 'https://unrelated.example/mikka/en' }, { url: ORIGIN + '/' },
+    { url: ORIGIN + '/mikka-other' }, { child: true }, { now: entry.arg.deadline }, { now: entry.arg.deadline + 1 }]) {
+    const target = execute(options)
+    assert.equal(Object.hasOwn(target, ACCEPTANCE_REPLAY_MARKER), false)
+    assert.equal(acceptanceReplayOptIn(target, options.now ?? input.now()), false)
+  }
+  assert.equal(f.state.submitAttempts, 1)
+  await session.close()
+})
+
+test('an acceptance marker installation failure submits nothing and closes the allocated context', async () => {
+  const f = browserFixture(inputs(), { initScriptFails: true })
+  await assert.rejects(startObservabilityBrowser(f.args), error => { safeFailure(error, f.reports); return true })
+  assert.equal(f.calls.some(call => call.type === 'newPage' || call.type === 'goto'), false)
+  assert.equal(f.state.submitAttempts, 0)
+  assert.equal(f.state.contextClosed, true)
+  assert.equal(f.state.browserClosed, true)
+})
+
+test('hosted shell and create window select the exact Personal, Coordinator, Cloud and fixture Profile before one click', async () => {
+  const input = inputs()
+  const f = browserFixture(input, { hostedShell: true, hostedTask: true, switchWorkspace: true, delayedNavigation: true })
+  const session = await startObservabilityBrowser(f.args)
+  assert.equal(f.state.navigationWaits, 1)
+  assert.equal(f.state.selected, workspaceId)
+  assert.deepEqual(f.calls.filter(call => call.type === 'click' && call.role === 'menuitemradio').map(call => call.has),
+    ['Synthetic personal', 'Coordinator', 'Mikka Cloud', input.ready.marker])
+  assert.equal(f.state.chosenBot, 'Coordinator')
+  assert.equal(f.state.chosenMachine, 'Mikka Cloud')
+  assert.equal(f.state.chosenProfile, input.ready.marker)
+  assert.equal(f.calls.some(call => call.type === 'click' && call.selector === 'button.ui-as-side__search[aria-haspopup="dialog"]:visible'), true)
+  assert.equal(f.calls.some(call => call.type === 'click' && call.role === 'combobox'), false)
+  assert.equal(f.calls.some(call => call.type === 'click' && call.name instanceof RegExp && call.name.test('Create task ⌘↵')), true)
+  assert.equal(f.state.submitAttempts, 1)
+  assert.equal(f.state.submissionSent, 1)
+  assert.equal(f.reports[0].profileMatched && f.reports[0].cloudDestinationSelected && f.reports[0].coordinatorSelected, true)
+  await session.close()
+  assert.equal(f.state.signOuts, 1)
+  assert.equal(f.reports.at(-1).cleanup.status, 'closed')
+  assert.deepEqual(f.calls.filter(call => call.type === 'api' && call.method !== 'GET').map(call => call.path), ['/mikka/api/auth/sign-out'])
+})
+
+test('hosted create window omits Hand to only when the Coordinator is the sole handler', async () => {
+  const f = browserFixture(inputs(), { hostedShell: true, hostedTask: true, noBotPicker: true })
+  const session = await startObservabilityBrowser(f.args)
+  assert.equal(f.state.chosenBot, 'Coordinator')
+  assert.equal(f.calls.some(call => call.type === 'click' && call.role === 'menuitemradio' && call.has === 'Coordinator'), false)
+  assert.equal(f.state.submitAttempts, 1)
+  await session.close()
+})
+
+for (const [kind, options] of [
+  ['mixed picker surfaces', { mixedTaskControls: true }],
+  ['missing bot picker with a Hand to row', { missingHostedBot: true }],
+  ['missing Profile row', { missingHostedProfileRow: true }],
+  ['ambiguous Profile row', { ambiguousHostedProfileRow: true }],
+  ['ambiguous Profile choice', { ambiguousProfile: true }],
+  ['missing Cloud choice', { missingHostedChoice: 'machine' }],
+  ['missing fixture Profile choice', { missingHostedChoice: 'profile' }],
+  ['unapplied Coordinator choice', { hostedChoiceNotApplied: 'bot' }],
+  ['unapplied Cloud choice', { hostedChoiceNotApplied: 'machine' }],
+  ['unapplied Profile choice', { hostedChoiceNotApplied: 'profile' }],
+  ['Profile changes while Replay becomes ready', { hostedChoiceChangesAtReplay: true }],
+]) {
+  test('hosted ' + kind + ' fails before the paid click and closes owned resources', async () => {
+    const f = browserFixture(inputs(), { hostedShell: true, hostedTask: true, ...options })
+    await assert.rejects(startObservabilityBrowser(f.args), error => { safeFailure(error, f.reports); return true })
+    assert.equal(f.state.submitAttempts, 0)
+    assert.equal(f.state.submissionSent, 0)
+    assert.equal(f.reports.at(-1).submissionOutcome, 'not_attempted')
+    assert.equal(f.state.signOuts, 1)
+    assert.equal(f.state.pageClosed && f.state.contextClosed && f.state.browserClosed, true)
+  })
+}
+
+test('a flat hosted workspace label shared by another account is refused before opening its menu', async () => {
+  const f = browserFixture(inputs(), { hostedShell: true, hostedTask: true, switchWorkspace: true, otherAccountSameWorkspaceName: true })
+  await assert.rejects(startObservabilityBrowser(f.args), error => {
+    safeFailure(error, f.reports); assert.equal(error.code, 'browser_workspace_ambiguous'); return true
+  })
+  assert.equal(f.state.navigationWaits, 0)
+  assert.equal(f.calls.some(call => call.type === 'click' && call.selector === '.ui-as-ws-menu > button[aria-haspopup="menu"]:visible'), false)
+  assert.equal(f.state.submitAttempts, 0)
+  assert.equal(f.state.signOuts, 1)
+})
+
+for (const kind of ['submitThrows', 'submitUnknown']) {
+  test('the hosted Create task shortcut button is never retried after ' + kind, async () => {
+    const f = browserFixture(inputs(), { hostedShell: true, hostedTask: true, [kind]: true })
+    await assert.rejects(startObservabilityBrowser(f.args), error => { safeFailure(error, f.reports); return true })
+    assert.equal(f.state.submitAttempts, 1)
+    assert.equal(f.state.submissionSent, 1)
+    assert.equal(f.reports.at(-1).submitClicks, 1)
+    assert.equal(f.reports.at(-1).submissionOutcome, 'unknown')
+    assert.equal(f.state.signOuts, 1)
+    assert.equal(f.reports.at(-1).cleanup.status, 'closed')
+  })
+}
+
+for (const [name, layout] of [['hosted shell with the default task dialog', { hostedShell: true }],
+  ['default shell with the hosted task window', { hostedTask: true }]]) {
+  test(name + ' retains the independent slot fallbacks and one submission', async () => {
+    const f = browserFixture(inputs(), layout)
+    const session = await startObservabilityBrowser(f.args)
+    assert.equal(f.state.submitAttempts, 1)
+    assert.equal(f.state.submissionSent, 1)
+    await session.close()
+    assert.equal(f.reports.at(-1).cleanup.status, 'closed')
   })
 }

@@ -338,6 +338,13 @@
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "app/v1/runs/[runId]/complete/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Authenticate the submitting device and persist its terminal receipt before scheduling publication or waking the task.",
+    "test": "tests/run-completion-route.test.ts",
+    "suite": "test:run-publication"
+  },
   "apps/api/runtime/http-policy.mjs": {
     "mode": "built-in",
     "environment": [
@@ -410,6 +417,20 @@
     "behavior": "Invalidate existing leases for an actual replacement Task run after the Factory binding transaction finishes.",
     "test": "lib/coding-workspace/review-authority.db.test.ts",
     "suite": "test:coding-workspace-db"
+  },
+  "drizzle/20261110160000_thread_machine_snapshot.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Store the filesystem snapshot identifier and lifecycle operation state in installation PostgreSQL.",
+    "test": "lib/cloud-computer/thread-machine-snapshot.db.test.ts",
+    "suite": "test:cloud-backend-db"
+  },
+  "drizzle/20261110230000_capture_action_duration.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Store bounded action durations with their capture timestamps in PostgreSQL and preserve existing rows with no duration.",
+    "test": "lib/captures/video-evidence.db.test.ts",
+    "suite": "test:captures-db"
   },
   "drizzle/20261112030502_task_attachments.sql": {
     "mode": "built-in",
@@ -667,6 +688,13 @@
     "test": "lib/account-deletions-due.db.test.ts",
     "suite": "test:account-db"
   },
+  "lib/account/avatar-file.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The account settings upload validates the same image types and byte limit for Web and packaged desktop before storing an avatar.",
+    "test": "lib/account/account.test.ts",
+    "suite": "test:account"
+  },
   "lib/account/cloud-cleanup.ts": {
     "mode": "built-in",
     "environment": [],
@@ -679,6 +707,13 @@
     "environment": [],
     "behavior": "Replay the current account deletion journal only against the isolated restored databases and object target, with external post-commit work quarantined.",
     "test": "scripts/ops/recovery-drill.test.mjs"
+  },
+  "lib/account/export.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Recheck a signed-in user’s unexpired export grant in the installation database before streaming each file, and group the owner’s exported thread messages in memory.",
+    "test": "lib/account/export-files.db.test.ts",
+    "suite": "test:account-db"
   },
   "lib/activity-actor-view.ts": {
     "mode": "built-in",
@@ -740,6 +775,13 @@
     "test": "lib/audit/events.test.ts",
     "suite": "test:audit"
   },
+  "lib/auth-error.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Map OAuth account-linking and single sign-on refusals to the installation sign-in flow.",
+    "test": "lib/auth-error.test.ts",
+    "suite": "test:auth-composio"
+  },
   "lib/board-filters.ts": {
     "mode": "built-in",
     "environment": [],
@@ -761,6 +803,34 @@
     "test": "lib/bot-model-optimistic.test.ts",
     "suite": "test:execution-rules"
   },
+  "lib/captures/publication-contract.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validate the public metadata shape for reviewed capture evidence.",
+    "test": "lib/captures/publication.db.test.ts",
+    "suite": "test:captures-db"
+  },
+  "lib/captures/publication.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Create revocable capture shares only after the caller reviews and approves the evidence.",
+    "test": "lib/captures/publication.db.test.ts",
+    "suite": "test:captures-db"
+  },
+  "lib/captures/run-end.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Finish recordings belonging to the authenticated run before persisting its completion.",
+    "test": "tests/run-publications.db.test.ts",
+    "suite": "test:run-publication-db"
+  },
+  "lib/captures/store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Store capture records and enforce ownership and bounded recording durations.",
+    "test": "lib/captures/store.db.test.ts",
+    "suite": "test:captures-db"
+  },
   "lib/cloud-computer/sponsored-lifecycle.ts": {
     "mode": "optional-cloud",
     "environment": [
@@ -778,6 +848,23 @@
     "behavior": "A sponsored machine requires the workspace allowlist and a private bridge token. Unconfigured workspaces cannot acquire the machine grant.",
     "test": "lib/coding-workspace/review-authority.db.test.ts",
     "suite": "test:coding-workspace-db"
+  },
+  "lib/cloud-computer/thread-lifecycle-provider.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "HTTPS_PROXY",
+      "MIKKA_THREAD_SNAPSHOTS"
+    ],
+    "behavior": "Use the owner-configured E2B provider for thread machines and opt in to filesystem snapshots through the installation setting.",
+    "test": "lib/cloud-computer/thread-lifecycle-provider.test.ts",
+    "suite": "test:workflow-wakes"
+  },
+  "lib/cloud-computer/thread-lifecycle.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reconcile idle, paused and restored thread machines against their persisted lifecycle state.",
+    "test": "lib/cloud-computer/thread-lifecycle.test.ts",
+    "suite": "test:workflow-wakes"
   },
   "lib/cloud-computer/thread-machines.ts": {
     "mode": "built-in",
@@ -1115,6 +1202,20 @@
     "behavior": "The application stage is optional on local Compose. Explicit production, preview or development stages take precedence over a provider's stage and invalid values fail validation.",
     "test": "lib/deployment-stage.test.mjs"
   },
+  "lib/desktop-rpc/read-batch-context.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Limit reusable policy reads to the lifetime and identity of a read-only desktop batch.",
+    "test": "lib/desktop-rpc/read-batch-context.test.ts",
+    "suite": "test:desktop-auth"
+  },
+  "lib/desktop-rpc/read-batch-contract.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Admit bounded, read-only native workspace action batches through the existing desktop RPC.",
+    "test": "lib/desktop-rpc/read-batch.test.ts",
+    "suite": "test:desktop-auth"
+  },
   "lib/desktop-rpc/registry.ts": {
     "mode": "built-in",
     "environment": [],
@@ -1134,6 +1235,13 @@
     "environment": [],
     "behavior": "Expose the existing Desktop RPC wire version to native and Web callers without loading browser FormData encoders on native clients.",
     "test": "lib/desktop-rpc/wire.test.ts",
+    "suite": "test:desktop-auth"
+  },
+  "lib/desktop-rpc/workspace-choices.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Share pending workspace reads only across matching native identity, scope and executor.",
+    "test": "lib/desktop-rpc/read-batch-context.test.ts",
     "suite": "test:desktop-auth"
   },
   "lib/device-name.ts": {
@@ -1163,6 +1271,13 @@
     "behavior": "Initialize a delegate only on the authorized owner's first admitted dispatch, preserving human or cleared assignments.",
     "test": "lib/dispatch-delegate.db.test.ts",
     "suite": "test:run-publication-db"
+  },
+  "lib/dispatch-timing.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Record dispatch phase timings and repository resolution refusal reasons.",
+    "test": "lib/dispatch-timing.test.ts",
+    "suite": "test:agent-kit-model"
   },
   "lib/drive/client.ts": {
     "mode": "built-in",
@@ -1233,26 +1348,12 @@
     "test": "lib/eve/product-definitions.test.ts",
     "suite": "test:eve-product-tool"
   },
-  "lib/eve/runtime.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "The official Eve turn lifecycle persists the installation's selected model, Bot policy and original request. Definitions consume that business data while Eve owns turn execution.",
-    "test": "lib/eve/runtime.test.ts",
-    "suite": "test:eve"
-  },
   "lib/named-conversation-model.ts": {
     "mode": "built-in",
     "environment": [],
     "behavior": "The conversation composer uses the existing model selector only for a single responding Bot present in the current owner’s authorized Bot list. It requires no external service.",
     "test": "components/workspace/group-chat-view.test.tsx",
     "suite": "test:groups"
-  },
-  "workflows/coordinator/tools.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "The installation's existing tool definitions supply both native Eve discovery and application action execution, preserving the configured Bot capability selection.",
-    "test": "lib/agent-kit/tool-defaults-compat.test.ts",
-    "suite": "test:agent-kit-model"
   },
   "lib/eve/product-rpc.ts": {
     "mode": "operator-configured",
@@ -1266,6 +1367,13 @@
     "behavior": "Self-hosted Eve calls the configured application origin or local server with its signed scope. The private product capability is sent only to the paired Cloudflare service and that deployment refuses to call without it.",
     "test": "lib/eve/product-tool.test.ts",
     "suite": "test:eve-product-tool"
+  },
+  "lib/eve/runtime.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The official Eve turn lifecycle persists the installation's selected model, Bot policy and original request. Definitions consume that business data while Eve owns turn execution.",
+    "test": "lib/eve/runtime.test.ts",
+    "suite": "test:eve"
   },
   "lib/eve/session-control-delivery.mjs": {
     "mode": "built-in",
@@ -1286,6 +1394,13 @@
     "behavior": "Counts visible Factory evidence inside the existing PostgreSQL snapshot, scoped to the owner, workspace and visible Factory IDs.",
     "test": "tests/task-presentation.db.test.ts",
     "suite": "test:task-presentation-db"
+  },
+  "lib/factory/evidence.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validate Factory visual evidence against the handoff requirements.",
+    "test": "scripts/acceptance/factory-visual-evidence.test.mjs",
+    "suite": "test:factory-check-recovery"
   },
   "lib/factory/instructions.ts": {
     "mode": "built-in",
@@ -1403,6 +1518,13 @@
     "behavior": "Check the verified account and Organization policy for domain-based membership.",
     "test": "tests/organization-join-domains.db.test.ts",
     "suite": "test:organization-join-domains-db"
+  },
+  "lib/governance/organizations.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read retained archived organization names for currently active owners from the existing workspace database. The active directory remains separate and no additional service or credential is required.",
+    "test": "lib/enterprise/governance.db.test.ts",
+    "suite": "test:enterprise-db"
   },
   "lib/governance/policy.ts": {
     "mode": "built-in",
@@ -1560,6 +1682,20 @@
     "test": "lib/live/lists.db.test.ts",
     "suite": "test:live-db"
   },
+  "lib/live/panels.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Resolve bound, undeleted task IDs in the application database and their active recipients in the workspace database. Personal task notifications reach only the owner.",
+    "test": "lib/live/notify-workspace.db.test.ts",
+    "suite": "test:live-db"
+  },
+  "lib/live/preparation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Bind live channel preparation and cleanup to the active provider lifetime.",
+    "test": "lib/live/channels.test.ts",
+    "suite": "test:device-gateway"
+  },
   "lib/mobile-plugin-connections.ts": {
     "mode": "operator-configured",
     "environment": [],
@@ -1614,6 +1750,13 @@
     "environment": [],
     "behavior": "Read the published web action manifest for the selected deployment. When the legacy manifest returns HTTP 404, use the release action contract with the same deployment pin and validate its compiler inventory.",
     "test": "apps/api/scripts/cloudflare-web.test.mjs"
+  },
+  "lib/replay-readiness.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Expose the acceptance replay readiness signal for the explicitly opted-in document.",
+    "test": "tests/replay-readiness.test.mjs",
+    "suite": "test:analytics"
   },
   "lib/run-app-mcp.ts": {
     "mode": "built-in",
@@ -1758,12 +1901,33 @@
     "test": "tests/thread-title.db.test.ts",
     "suite": "test:run-publication-db"
   },
+  "lib/subscription-service-tier.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validate Codex subscription request policy independently of model and reasoning effort.",
+    "test": "lib/subscription-priority.test.ts",
+    "suite": "test:byos"
+  },
+  "lib/swr/cache-scope.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Derive installation read-cache scope from the authorized workspace membership.",
+    "test": "tests/read-cache-scope.db.test.ts",
+    "suite": "test:activity-actor-db"
+  },
   "lib/swr/keys.ts": {
     "mode": "built-in",
     "environment": [],
     "behavior": "A confirmed Task status change revalidates the current viewer’s mounted Task presentation reads in its workspace.",
     "test": "scripts/task-detail-live.test.tsx",
     "suite": "test:issue-readonly-dom"
+  },
+  "lib/swr/read-observer.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Observe committed, discarded and superseded fetches inside their scoped SWR snapshot.",
+    "test": "scripts/use-live-lists.live.test.tsx",
+    "suite": "test:live-lists"
   },
   "lib/task-activity-timeline.ts": {
     "mode": "built-in",
@@ -2136,11 +2300,11 @@
     "test": "services/credential-broker/server.test.mjs",
     "suite": "test:self-hosted-broker"
   },
-  "lib/governance/organizations.ts": {
+  "workflows/coordinator/tools.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Read retained archived organization names for currently active owners from the existing workspace database. The active directory remains separate and no additional service or credential is required.",
-    "test": "lib/enterprise/governance.db.test.ts",
-    "suite": "test:enterprise-db"
+    "behavior": "The installation's existing tool definitions supply both native Eve discovery and application action execution, preserving the configured Bot capability selection.",
+    "test": "lib/agent-kit/tool-defaults-compat.test.ts",
+    "suite": "test:agent-kit-model"
   }
 }

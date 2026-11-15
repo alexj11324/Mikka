@@ -18,6 +18,7 @@ export const PUBLICATION_ERRORS = {
   task_identifier_required: 'The task needs its team identifier and number before publication.',
   publication_missing: 'This thread has no server-issued publication assignment.',
   publication_mismatch: 'The reported push does not match the server-issued issue branch.',
+  factory_public_evidence_required: 'Record visual evidence, check it contains no private data, and mark it safe to share before handing over the pull request.',
   issue_unavailable: 'The task is no longer available to this thread.',
   pull_request_limit: 'The task already has the maximum number of pull request links.',
   pull_request_denied: 'Opening pull requests is set to deny in Plugins › GitHub. The pushed branch is preserved.',
@@ -39,6 +40,8 @@ export interface PublishedPullRequest {
   url: string
   state: 'open' | 'draft' | 'merged' | 'closed'
   /** Lines added and removed, when GitHub's reply carried them (a single PR does; a list of PRs does not). */
+  /** Host receipt: returned only after the PR description contains these exact capture links. */
+  evidenceDigest?: string
   additions?: number
   deletions?: number
   /** Review metadata synchronized during publication or a verified webhook. */

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import en from '../messages/en.json' with { type: 'json' }
 import zh from '../messages/zh-CN.json' with { type: 'json' }
-import { activityLineParts, activityRunId, taskHistoryLabel, type ActivityLabels, type ActivityPiece, type ActivityStretch, type IssueActivityEvent } from './task-activity-timeline'
+import { pullRequestActivityEvents, activityLineParts, activityRunId, taskHistoryLabel, type ActivityLabels, type ActivityPiece, type ActivityStretch, type IssueActivityEvent } from './task-activity-timeline'
 
 const fill = (template: string, values: Record<string, string> = {}) => template.replace(/\{(\w+)\}/g, (whole, name: string) => values[name] ?? whole)
 
@@ -19,8 +19,8 @@ const ada = { type: 'user' as const, id: 'u1', name: 'Ada', avatarUrl: null }
 const claude = { type: 'agent' as const, id: 'a1', name: 'Claude Code', avatarUrl: null }
 const subject = { taskId: 'task-1', code: 'CAP-12', title: 'Retry does not refresh', status: 'review', priority: 'high', refs: { 'task-2': { code: 'CAP-13', title: 'Child' } } }
 const conversations: ActivityStretch[] = [
-  { at: '2026-11-14T14:00:00.000Z', runId: 'run-1', linked: true, title: 'Refresh after retry', harness: 'claude_code', result: 'Done' },
-  { at: '2026-11-14T15:00:00.000Z', runId: 'run-2', linked: false, title: 'Hidden' },
+  { at: '2026-11-14T14:00:00.000Z', runId: 'run-1', agentId: 'a1', linked: true, title: 'Refresh after retry', harness: 'claude_code', result: 'Done' },
+  { at: '2026-11-14T15:00:00.000Z', runId: 'run-2', agentId: 'a2', linked: false, title: 'Hidden' },
 ]
 type Partial_ = Omit<IssueActivityEvent, 'id' | 'at'> & { at?: string }
 const event = (partial: Partial_): IssueActivityEvent => ({ id: 'e', at: '2026-11-14T15:30:00.000Z', ...partial })
@@ -45,7 +45,7 @@ test('each sentence reads as Capy\'s English, actor first', () => {
 })
 
 test('an Agent\'s change is said by its conversation, a chip that opens it', () => {
-  const parts = activityLineParts(event({ kind: 'status', status: 'review', actor: claude }), labels(en), subject, conversations)
+  const parts = activityLineParts(event({ kind: 'status', status: 'review', actor: claude, at: '2026-11-14T14:30:00.000Z' }), labels(en), subject, conversations)
   assert.deepEqual(parts[0], { kind: 'thread', text: 'Refresh after retry', runId: 'run-1', harness: 'claude_code', title: 'Refresh after retry', result: 'Done' })
   assert.equal(words(parts), 'Refresh after retry moved CAP-12 to In review')
   assert.ok(!words(parts).includes('Claude Code'), 'the Agent\'s name is never the actor')
@@ -83,7 +83,47 @@ test('a task this page cannot name is "a task", never a dead chip', () => {
 
 test('only an Agent with a conversation that had started matches a run', () => {
   assert.equal(activityRunId('2026-11-14T14:30:00.000Z', claude, conversations), 'run-1')
-  assert.equal(activityRunId('2026-11-14T15:30:00.000Z', claude, conversations), 'run-1')
+  assert.equal(activityRunId('2026-11-14T15:30:00.000Z', claude, conversations), null)
   assert.equal(activityRunId('2026-11-14T13:00:00.000Z', claude, conversations), null)
   assert.equal(activityRunId('2026-11-14T14:30:00.000Z', ada, conversations), null)
+})
+
+test('renders supported task-attribute changes in English and Chinese', () => {
+  assert.equal(taskHistoryLabel(event({ id: 'due', at: 't', kind: 'dueDateChanged', dueDate: '2026-11-30' }), labels(en)), 'set the due date to 2026-11-30')
+  assert.equal(taskHistoryLabel(event({ id: 'estimate', at: 't', kind: 'estimateChanged', estimate: 5 }), labels(en)), 'set the estimate to 5')
+  assert.equal(taskHistoryLabel(event({ kind: 'parent', removed: true }), labels(zh)), '移除了父任务')
+  assert.equal(taskHistoryLabel(event({ kind: 'relation', targetId: 'task-2', relation: 'blockedBy' }), labels(zh), subject), '把 CAP-12 标记为被 CAP-13 阻塞')
+})
+
+test('missing, stale and ambiguous Agent identities cannot open a conversation', () => {
+  const stretches = [...conversations, { at: '2026-11-14T16:00:00Z', runId: 'third', agentId: 'a1', linked: true }]
+  assert.equal(activityRunId('2026-11-14T13:00:00.000Z', claude, stretches), null)
+  assert.equal(activityRunId('2026-11-14T14:00:00.000Z', claude, [{ at: '2026-11-14T14:00:00Z', runId: 'run-1', agentId: 'a1', linked: true }]), 'run-1')
+  assert.equal(activityRunId('2026-11-14T15:30:00.000Z', claude, stretches), null)
+  assert.equal(activityRunId('2026-11-14T16:30:00.000Z', claude, stretches), null)
+  assert.equal(activityRunId('2026-11-14T14:30:00.000Z', claude, stretches), 'run-1')
+  assert.equal(activityRunId('2026-11-14T16:30:00.000Z', { ...claude, id: 'a2' }, stretches), null)
+  assert.equal(activityRunId('2026-11-14T16:30:00.000Z', { ...claude, id: null }, stretches), null)
+  assert.equal(activityRunId('2026-11-14T14:30:00.000Z', ada, stretches), null)
+  assert.equal(activityRunId('2026-11-14T14:30:00.000Z', claude, [
+    { at: '2026-11-14T14:00:00Z', runId: 'run-1', agentId: 'a1', linked: true },
+    { at: '2026-11-14T14:00:00Z', runId: 'run-2', agentId: 'a1', linked: true },
+  ]), null)
+})
+
+test('pull request activity uses provider event timestamps and appears only when its source time exists', () => {
+  const rows = pullRequestActivityEvents([
+    { url: 'https://github.com/acme/app/pull/12', title: 'Better activity', state: 'merged', createdAt: '2026-10-26T09:30:00Z', mergedAt: '2026-10-27T11:00:00Z' },
+    { url: 'https://github.com/acme/app/pull/13', title: 'No clocks', state: 'merged', createdAt: null, mergedAt: null },
+    { url: 'https://github.com/acme/app/pull/14', title: null, state: 'open', createdAt: '2026-10-26T10:00:00Z', mergedAt: null },
+    { url: 'https://github.com/acme/app/pull/15', title: 'Bad clock', state: 'open', createdAt: 'not-a-date', mergedAt: null },
+  ], {
+    opened: (repo, number, title) => `Opened ${repo}#${number} ${title}`,
+    merged: (repo, number, title) => `Merged ${repo}#${number} ${title}`,
+    time: at => at,
+  })
+  assert.deepEqual(rows.map(({ id, at, text }) => [id, at, text]), [
+    ['pull:https://github.com/acme/app/pull/12:opened', '2026-10-26T09:30:00Z', 'Opened acme/app#12 Better activity'],
+    ['pull:https://github.com/acme/app/pull/12:merged', '2026-10-27T11:00:00Z', 'Merged acme/app#12 Better activity'],
+  ])
 })

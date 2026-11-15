@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { captureRunFailure, RunFailureError } from "@mikka/protocol/run-failure"
 import type { AgentAdapter, AgentSession, ExitEvent } from "../adapters/types"
-import { RunSupervisor } from "./supervisor"
+import { RunSupervisor, type SupervisorDeps } from "./supervisor"
 import { RunJournal } from "./journal"
 import { WorktreeManager } from "../worktrees"
 import { Outbox } from "../outbox"
@@ -22,7 +22,7 @@ function deferred() {
   const promise = new Promise<void>(done => { resolve = done })
   return { promise, resolve }
 }
-async function fixture(exit: Omit<ExitEvent, "type">) {
+async function fixture(exit: Omit<ExitEvent, "type">, overrides: Partial<SupervisorDeps> = {}) {
   const root = tempDir(), repo = { repoId: "repo", name: "fixture", path: await makeRepo() }
   const server = new MemoryServer("device"), link = server.link(), log = createLogger({ level: "silent" })
   server.addRepo("device", repo)
@@ -32,7 +32,7 @@ async function fixture(exit: Omit<ExitEvent, "type">) {
   const adapter: AgentAdapter = { harness: "mock", capabilities: { supportsInterject: false, supportsResume: true }, envAllow: [], start: vi.fn(async () => session), resume: vi.fn(async () => session) }
   const journal = new RunJournal(join(root, "runs.json")), outboxDir = join(root, "outbox")
   const outbox = new Outbox(outboxDir, link, log, 60_000), worktrees = new WorktreeManager(join(root, "worktrees"))
-  const supervisor = new RunSupervisor({ journal, outbox, worktrees, adapters: new Map([["mock", adapter]]), repository: () => repo, prepareRepository: async () => {}, baseRef: async () => "main", log })
+  const supervisor = new RunSupervisor({ journal, outbox, worktrees, adapters: new Map([["mock", adapter]]), repository: () => repo, prepareRepository: async () => {}, baseRef: async () => "main", log, ...overrides })
   resources.push({ supervisor, outbox })
   return { root, server, link, log, runId, assignment, supervisor, adapter, journal, outbox, outboxDir, worktrees }
 }
@@ -59,6 +59,34 @@ it('persists measured tool durations before outbox batching and keeps task secre
 })
 
 describe("supervisor structured terminal failures", () => {
+  it("waits for execution ownership before repository/native work and retains it through finishing cleanup", async () => {
+    const entered = deferred(), acquired = deferred(), collecting = deferred(), finished = deferred(), released = deferred(), acknowledged = deferred()
+    const prepare = vi.fn(async () => {}), setWorktree = vi.fn()
+    const release = vi.fn(async () => { released.resolve(); await acknowledged.promise })
+    const f = await fixture({ outcome: "succeeded" }, {
+      prepareRepository: prepare,
+      acquireWorkspaceControl: async () => { entered.resolve(); await acquired.promise; return { setWorktree, release } },
+    })
+    vi.spyOn(f.worktrees, "changedFiles").mockImplementationOnce(async () => { collecting.resolve(); await finished.promise; return [] })
+    f.supervisor.start(f.assignment)
+    await entered.promise
+    expect(prepare).not.toHaveBeenCalled(); expect(f.adapter.start).not.toHaveBeenCalled()
+    acquired.resolve(); await collecting.promise
+    expect(prepare).toHaveBeenCalledOnce(); expect(f.adapter.start).toHaveBeenCalledOnce(); expect(setWorktree).toHaveBeenCalledOnce()
+    expect(release).not.toHaveBeenCalled()
+    let idle = false
+    const idlePromise = f.supervisor.idle().then(() => { idle = true })
+    finished.resolve(); await released.promise
+    expect(release).toHaveBeenCalledWith(true); expect(idle).toBe(false)
+    acknowledged.resolve(); await idlePromise
+  })
+  it("never hands a shell an idle receipt when native startup did not prove exit", async () => {
+    const release = vi.fn(async () => {})
+    const f = await fixture({ outcome: "succeeded" }, { acquireWorkspaceControl: async () => ({ setWorktree() {}, release }) })
+    vi.mocked(f.adapter.start).mockRejectedValueOnce(new Error("Synthetic startup failure without exit evidence"))
+    f.supervisor.start(f.assignment); await f.supervisor.idle()
+    expect(release).toHaveBeenCalledWith(false)
+  })
   it("carries adapter details through masking, disk persistence and a fresh outbox replay", async () => {
     const f = await fixture({ outcome: "failed", error: "Provider failed", failureDetails: failure })
     f.server.online = false
@@ -102,6 +130,21 @@ describe("supervisor structured terminal failures", () => {
     const completion = f.server.runs.get(f.runId)?.completion
     expect(completion?.failureDetails?.code).toBe("run_failed")
     expect(completion?.report).not.toHaveProperty("failureDetails")
+  })
+  it("retains only explicit inspected capture declarations in the completed report", async () => {
+    const visualEvidence = [{ captureId: "10000000-0000-4000-8000-000000000001", publicSafe: true as const }]
+    const f = await fixture({ outcome: "succeeded", stopReason: "submitted", report: { summary: "Recorded the running terminal", visualEvidence } })
+    f.supervisor.start(f.assignment)
+    await f.supervisor.idle(); await f.outbox.flushAll()
+    expect(f.server.runs.get(f.runId)?.completion?.report?.visualEvidence).toEqual(visualEvidence)
+  })
+  it("drops malformed sharing declarations without automatically marking them safe", async () => {
+    const f = await fixture({ outcome: "succeeded", stopReason: "submitted", report: {
+      summary: "A private recording", visualEvidence: [{ captureId: "10000000-0000-4000-8000-000000000001", publicSafe: false }],
+    } as unknown as ExitEvent["report"] })
+    f.supervisor.start(f.assignment)
+    await f.supervisor.idle(); await f.outbox.flushAll()
+    expect(f.server.runs.get(f.runId)?.completion?.report).not.toHaveProperty("visualEvidence")
   })
   it("gives a pre-launch refusal the registered error details", async () => {
     const f = await fixture({ outcome: "succeeded" })

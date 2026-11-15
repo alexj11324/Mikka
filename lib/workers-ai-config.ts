@@ -1,3 +1,5 @@
+export const workersAiModelId = '@cf/deepseek-ai/deepseek-v4.1-flash-1017'
+
 type Env = Record<string, string | undefined>
 
 export function workersAiFallback(env: Env = process.env): boolean {

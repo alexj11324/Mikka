@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
+import { measured } from '../../tests/helpers/read-metrics'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { taskStateOf } from '../task-state'
 import { InboxStore, readTaskAttention } from './store'
@@ -312,6 +313,38 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
     assert.equal(pushes.length, before + 1)
     assert.equal(arms.length, 4)
   })
+  await t.test('concurrent expiry commits both snooze tables before notifying once', async () => {
+    const unavailable = new Error('fixture checkout failed')
+    const closedPool = new Pool({ connectionString: target })
+    t.mock.method(closedPool, 'connect', async () => { throw unavailable })
+    try {
+      const failed = new InboxStore(closedPool, store.guard, async () => assert.fail('nothing committed'), store.arm)
+      await assert.rejects(failed.expire(), error => error === unavailable)
+    } finally { await closedPool.end() }
+    const user = stranger, due = now.toISOString()
+    for (const [table, type] of [['inbox_snoozes', 'task'], ['inbox_conversation_snoozes', 'conversation']]) {
+      await pool.query(`INSERT INTO ${table}("workspaceId","userId","itemType","itemId","snoozedUntil") VALUES($1,$2,$3,$4,$5)`,
+        [workspace, user, type, randomUUID(), due])
+    }
+    const count = async () => Number((await admin.query(`SELECT
+      (SELECT count(*) FROM ${schema}.inbox_snoozes WHERE "userId"=$1) +
+      (SELECT count(*) FROM ${schema}.inbox_conversation_snoozes WHERE "userId"=$1) AS n`, [user])).rows[0].n)
+    const seen: number[] = []
+    const expire = new InboxStore(pool, store.guard, async () => { seen.push(await count()) }, store.arm, () => now)
+    await pool.query(`CREATE FUNCTION refuse_expiry() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'expiry rejected'; END $$;
+      CREATE TRIGGER refuse_expiry BEFORE DELETE ON inbox_conversation_snoozes FOR EACH ROW EXECUTE FUNCTION refuse_expiry()`)
+    try {
+      await assert.rejects(expire.expire(), { code: 'P0001', message: 'expiry rejected' })
+      assert.equal(await count(), 2)
+      assert.deepEqual(seen, [])
+    } finally {
+      await pool.query('DROP TRIGGER refuse_expiry ON inbox_conversation_snoozes; DROP FUNCTION refuse_expiry()')
+    }
+    const sweep = await measured(() => Promise.all([expire.expire(), expire.expire()]))
+    assert.deepEqual(seen, [0], 'an independent connection sees both committed deletions before the sole notification')
+    assert.equal(sweep.statements, 3, 'two autonomous sweeps and the callback read')
+  })
+
   await t.test('manual reopen is idempotent; expired or malformed times are rejected', async () => {
     await store.command(owner, { workspaceId: workspace, type: 'task', id: issue, action: 'snooze', until: new Date(now.getTime() + 60_000).toISOString() })
     const reopen = { workspaceId: workspace, type: 'task' as const, id: issue, action: 'reopen' as const }

@@ -1,0 +1,217 @@
+{
+  "codeCommit": "40376665ac416ce2228c08b60d7ea8cee97a3de6",
+  "files": {
+    "01-postgresql-gates-result.png": {
+      "size": 327149,
+      "sha256": "f288566d9489a6f6f12db49931b17d5460e6d56a14f02fa7555d8de6d248e92a"
+    },
+    "01-postgresql-gates-running.png": {
+      "size": 496085,
+      "sha256": "f4118b470db617486db19a485e652f8b9c55b32454bf29a86b49aac66cbfe72b"
+    },
+    "01-postgresql-gates-start.png": {
+      "size": 179625,
+      "sha256": "09c18fd971113918faaf14f5483bffbbd5d1c1679c735914594edd58d4bee84d"
+    },
+    "01-postgresql-gates.json": {
+      "size": 1328,
+      "sha256": "0ef7852a4dffec649e2d19108b4403e5578d332f401d4c53b90313e4f2b6061f"
+    },
+    "01-postgresql-gates.mp4": {
+      "size": 3034543,
+      "sha256": "73adfd61b515213863cc0480e6914d21b6f8acffa0ac27f3d3aeacd14be4d381"
+    },
+    "01-postgresql-gates.recorder.txt": {
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "01-postgresql-gates.txt": {
+      "size": 35696,
+      "sha256": "5784f42f0e7d251d5fe03b970175c48f53499f25d49d3cf80f2aa44572c8d6a2"
+    },
+    "02-real-http-result.png": {
+      "size": 609102,
+      "sha256": "dc9fcd573e9188e2e224e5597335c4a1fd2aee5087d1b6ce702177267d2a15de"
+    },
+    "02-real-http-running.png": {
+      "size": 219454,
+      "sha256": "277e331e2f301e23a0ddc3cace6c199384994b7cf604a03e1367f9c903ee343a"
+    },
+    "02-real-http-start.png": {
+      "size": 211574,
+      "sha256": "7e3ea6fae1d2b6b158212c20ac5bd41b3de27aca3939c834bb6e5b0a160573d0"
+    },
+    "02-real-http.json": {
+      "size": 897,
+      "sha256": "b0c6521fdbfb1fe62496815ba105caa3fbf5b3553288fb7e5a4d4078ad578f0f"
+    },
+    "02-real-http.mp4": {
+      "size": 399219,
+      "sha256": "0ca7f46aa54e67d9ff607bb9b85012f80e15fdd7fb50c4d35578eb5ee96f3981"
+    },
+    "02-real-http.recorder.txt": {
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "02-real-http.txt": {
+      "size": 2211,
+      "sha256": "68524c2d83a81484df0028b85ebbe883d5bf8bef63cef051056c44f7993425ab"
+    },
+    "03-cli-daemon-ffmpeg-result.png": {
+      "size": 784213,
+      "sha256": "7b3092db7b2547186df3828f2bc6946a1e6e696eafa7712297dcd69a16bdee6a"
+    },
+    "03-cli-daemon-ffmpeg-running.png": {
+      "size": 604741,
+      "sha256": "8efc935e80b59b077710b532e3da4264dfb95ff7bed16da0faec9383b0e5579a"
+    },
+    "03-cli-daemon-ffmpeg-start.png": {
+      "size": 231990,
+      "sha256": "451e4cb395461538f087b5b502b802b57fb027f751754e67c4ea0b7a40feb9d3"
+    },
+    "03-cli-daemon-ffmpeg.json": {
+      "size": 1977,
+      "sha256": "eb4fecdd76c36f7fc2d3c435ee9b36aa186b35d89591aa44b425e5e5704626b4"
+    },
+    "03-cli-daemon-ffmpeg.mp4": {
+      "size": 1987184,
+      "sha256": "5327fb73cd3baa29e72ef798632702ba57523858009488aa856146f7029b48e7"
+    },
+    "03-cli-daemon-ffmpeg.recorder.txt": {
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "03-cli-daemon-ffmpeg.txt": {
+      "size": 15146,
+      "sha256": "350dea9e81e1b01024a7ff5bd1c04988b677412c4f297e3ae4eaf6615700c3a1"
+    },
+    "04-activity-registration-result.png": {
+      "size": 827975,
+      "sha256": "66257bb5fb6a7e54cfdb9eddbf77693b4550955eb1e0bf40c74b0ced34cb8b64"
+    },
+    "04-activity-registration-running.png": {
+      "size": 296339,
+      "sha256": "aecfa8841819599163bc98b012ffde2d0bb6b28c0e0da5b7504822d1044af283"
+    },
+    "04-activity-registration-start.png": {
+      "size": 270466,
+      "sha256": "0b3f73ed1b235c36f33532c7c564feb5dc63f266bb64834afd4c9d21838c924c"
+    },
+    "04-activity-registration.json": {
+      "size": 952,
+      "sha256": "20a90ea6a377eeacb0e743b2c3e220db03f37663e41babf498fd28070a6d22eb"
+    },
+    "04-activity-registration.mp4": {
+      "size": 583864,
+      "sha256": "8c05ca6a04b0c649f65332792dd7214d1f68670b4fdfb9dd6384fe10df1433bd"
+    },
+    "04-activity-registration.recorder.txt": {
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "04-activity-registration.txt": {
+      "size": 2885,
+      "sha256": "8361bc243b54deb0afaaf5e5efbcda3ffb5a2c50924a036764ff386d6073ddba"
+    },
+    "README.md": {
+      "size": 9783,
+      "sha256": "e6380646c277b8950359b1c154ffd295626a284bab8fb8bece4de997c5a26795"
+    },
+    "activity-readback/acceptance-63443314-2612-4d9e-85e9-89cc340fbd7d-v1.md": {
+      "size": 3595,
+      "sha256": "0f0976f79808f3b014b18a1fec8f165f806ecdc8186c22f1ba4d5dce899990a3"
+    },
+    "activity-readback/activity.json": {
+      "size": 14965,
+      "sha256": "877d4d1bc40851a4e8716b2862ff5c3040cfc42ba677681d3f03c78dc34fdf9e"
+    },
+    "activity-readback/document-3542371b-6215-4e20-b935-11d50e1986be-v1.md": {
+      "size": 2680,
+      "sha256": "dbeb0194fc3492899abd736b8ae30be59fb61e55b3cb7ff63a9fafb65ed47d4f"
+    },
+    "activity-readback/document-94681b89-7533-4500-bdf7-ac2248c7e397-v1.md": {
+      "size": 4419,
+      "sha256": "fd12fb427fd6ce15f396be206980fe17f48da7620f37e2c1fa759473f7b3eb47"
+    },
+    "activity-readback/document-94681b89-7533-4500-bdf7-ac2248c7e397-v2.md": {
+      "size": 4827,
+      "sha256": "54cf01ed24884ced67f4a7801e5dd734f7ed10b493ef302c658b9a0a20f92def"
+    },
+    "activity-readback/proof.json": {
+      "size": 24578,
+      "sha256": "2d14e8671389316e97ca84b26764844a74615b8e924175a4041e548e2da53d21"
+    },
+    "curation-precheck.json": {
+      "size": 618,
+      "sha256": "27b94bc387ff389d4581c434c2bc5bb6e242de6d4e55c3dc434996097afb23cf"
+    },
+    "ffmpeg-readback/copied-helper/capture-video.mjs": {
+      "size": 14696,
+      "sha256": "c2ab593e5a87ce0ddf3f9293cd20815e2632ac5d5e852bd5f7a9a98581bc8c51"
+    },
+    "ffmpeg-readback/copied-helper/steps.json": {
+      "size": 159,
+      "sha256": "a710a37ab0a4defa451ccb0a707ed5897031707e175aefc360442827ebb9b150"
+    },
+    "ffmpeg-readback/copied-helper.mp4": {
+      "size": 3780,
+      "sha256": "2b00d582dbcce67936cb465a913a9249a245072a1058fe0de66bd8a020c62ccb"
+    },
+    "ffmpeg-readback/final-action.png": {
+      "size": 449,
+      "sha256": "0c9b4e36d86a53338d579815c62ff1286523e5e0160e6b0e5c3381b4878f01eb"
+    },
+    "ffmpeg-readback/first-action.png": {
+      "size": 450,
+      "sha256": "08089193d15e90e2a45196bae889df0211330dfda8d8a160af993e87344558cd"
+    },
+    "ffmpeg-readback/processed.mp4": {
+      "size": 3780,
+      "sha256": "2b00d582dbcce67936cb465a913a9249a245072a1058fe0de66bd8a020c62ccb"
+    },
+    "ffmpeg-readback/readback.json": {
+      "size": 3648,
+      "sha256": "694dfb5999c3f660d6848d022b1ba3d7d7aa4ec0dbfbfb1269edd779fd31c808"
+    },
+    "harness/curate-evidence.mjs": {
+      "size": 4452,
+      "sha256": "4fe341eda2afa01603d5e71842b6ec84d3b37d374b0361bda9124bf26d883a80"
+    },
+    "harness/oversize-readback.mjs": {
+      "size": 6089,
+      "sha256": "9474ddd8c161e99a88a013e518fef6067e2e8ac73f7865ed342c0207dc2e7e60"
+    },
+    "harness/plan.mjs": {
+      "size": 2119,
+      "sha256": "51e532204d1dea029735f6b235aa0f35310a3bf0976d6a1049a70f68b01280e2"
+    },
+    "harness/register-readback.mjs": {
+      "size": 37425,
+      "sha256": "3ab0bd25c2aa0d0a007116b715dd98dafa9533af11525ad39c63733c64433f2a"
+    },
+    "harness/review.mjs": {
+      "size": 13279,
+      "sha256": "dca7eb55dc57d2bbac973eb096fa1f4ca6560692cbc91725226c836cf7b9937f"
+    },
+    "harness/run.mjs": {
+      "size": 8634,
+      "sha256": "8dd9bbc52492695d1e4192b736d9895f6fefa5ba17694e63c9a8827658b7dbae"
+    },
+    "harness/stage.mjs": {
+      "size": 4058,
+      "sha256": "530affa9dab449735a44a17f76178a8db0efdc6165766763854dfd7dfead1b2f"
+    },
+    "index.html": {
+      "size": 8964,
+      "sha256": "c99cf7b365a00479083d35a44b341cd86f808d8ae794c3ef8467a3d09a95bc87"
+    },
+    "receipt.json": {
+      "size": 14454,
+      "sha256": "33b14be50da871c9138c8b72231d8322b5930489fbdfa4ca837ff57d950b4b60"
+    },
+    "visual-review.json": {
+      "size": 6201,
+      "sha256": "1a064b59a4c985bf9b6ecd417d848564dbb9299ab465a06b32dd7984bece36f6"
+    }
+  }
+}

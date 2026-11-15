@@ -304,7 +304,7 @@ const boardIssue = (id: string, title: string, status: string) => ({ id, ownerId
   createdAt: new Date(AT), updatedAt: new Date(AT), identifier: `MIK-${id.slice(-1)}`, teamId: null, metadata: { ...issue(id, title).metadata, assignee: { kind: 'member' as const, id: OWNER, name: 'Ada', image: null } }, checklist: { total: 0, checked: 0, percentage: 0 } })
 const boardIssues = [boardIssue(ISSUE, 'Fix sign-in redirect', 'doing'), boardIssue('30000000-0000-4000-8000-000000000002', 'Write release notes', 'todo'), boardIssue('30000000-0000-4000-8000-000000000003', 'Rotate the preview key', 'done')]
 const bots = [{ id: '50000000-0000-4000-8000-000000000000', name: 'Coordinator', color: 'encre', shape: 'cercle', coordinator: true }, { id: BOT, name: 'Scout', color: 'bleu', shape: 'galet' }]
-const listedThread = { id: RUN, botId: BOT, source: null, agentName: 'Scout', issueId: ISSUE, prompt: 'Fix the sign-in redirect', status: 'running' as const, error: null, createdAt: AT, updatedAt: AT, lastReply: 'Looking at the redirect handler.', lastReplyAt: AT, outcome: null, harness: 'claude_code' }
+const listedThread = { id: RUN, botId: BOT, pullState: 'merged' as const, source: null, agentName: 'Scout', issueId: ISSUE, prompt: 'Fix the sign-in redirect', status: 'running' as const, error: null, createdAt: AT, updatedAt: AT, lastReply: 'Looking at the redirect handler.', lastReplyAt: AT, outcome: null, harness: 'claude_code' }
 
 /** Each page's top-level client component, as the app mounts it, with fixture props. */
 /** Words each page shows once loaded, so a crash or a skeleton cannot pass as an idle page. */

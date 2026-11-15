@@ -57,6 +57,6 @@ case "$action" in
     ;;
   discard)
     pkill -KILL -f "^ffmpeg .*/$id\.mp4$" || true
-    rm -f "$dir/$id.png" "$dir/$id.mp4" "$dir/$id.done"
+    rm -f "$dir/$id.png" "$dir/$id.mp4" "$dir/$id.processed.mp4" "$dir/$id.steps.json" "$dir/$id.done"
     ;;
 esac

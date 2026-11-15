@@ -84,7 +84,7 @@ export async function completeFactoryExecution(tx: PoolClient, store: Pick<Retur
       },
       tx,
     );
-    if (task.stage === 'spec' && factoryFlowVersion(task) === 2) return next.task;
+    if (next.task.status !== 'passed' || (task.stage === 'spec' && factoryFlowVersion(task) === 2)) return next.task;
     const stage = await factoryNextStage(tx, next.task);
     const advanced = await store.apply(
       userId,

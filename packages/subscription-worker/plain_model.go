@@ -137,6 +137,7 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 		converted, err = compat.OpenAIToClaude(request.Model, input, true)
 	} else if e.Provider == "codex" {
 		endpoint = "https://chatgpt.com/backend-api/codex/responses"
+		beginCodexServiceTier(ctx, original["service_tier"])
 		converted, err = compat.OpenAIToCodex(request.Model, request.Payload, true)
 	} else {
 		return nil, ErrUnsupported
@@ -152,7 +153,12 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 	}
 	allowed := " model messages system max_tokens stream tools tool_choice temperature top_p stop_sequences thinking output_config service_tier "
 	if e.Provider == "codex" {
-		allowed = " model input instructions stream store max_output_tokens tools tool_choice parallel_tool_calls reasoning text include "
+		allowed = " model input instructions stream store max_output_tokens tools tool_choice parallel_tool_calls reasoning text include service_tier "
+		// The pinned converter also accepts ultrafast. This path only enables
+		// the fixed priority tier; no arbitrary tier reaches native transport.
+		if tier, ok := body["service_tier"].(string); !ok || tier != "priority" {
+			delete(body, "service_tier")
+		}
 	}
 	for key := range body {
 		if !strings.Contains(allowed, " "+key+" ") {
@@ -214,6 +220,9 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 		req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
 	}
 	headersDone := timingSpan(ctx, timingHTTPHeaders)
+	if e.Provider == "codex" {
+		recordCodexRequestedTier(ctx, body["service_tier"])
+	}
 	response, err := client.Do(req)
 	headersDone()
 	if response != nil {
@@ -279,6 +288,9 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 			}
 			timingOnceSince(ctx, timingHTTPFirstEvent, httpStarted)
 			kind, _ := event["type"].(string)
+			if e.Provider == "codex" {
+				recordCodexResponseTier(ctx, kind, event)
+			}
 			if providerTextEvent(e.Provider, kind, event) {
 				timingOnceSince(ctx, timingHTTPFirstTextEvent, httpStarted)
 			}

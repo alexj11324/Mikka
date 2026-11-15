@@ -15,6 +15,8 @@ export type ActivityVersion = {
   actorType?: 'user' | 'agent' | 'system' | null
   actorId?: string | null
   actor?: ActivityActorView | null
+  /** Computed in SQL without sending document text or a digest to the client. */
+  descriptionChanged?: boolean
   createdAt: Date | string
 }
 
@@ -47,7 +49,7 @@ function sameDelegate(before: ReturnType<typeof readIssueMetadata>['delegate'], 
   return (legacyDelegate(previous) && after.kind === 'bot') || (legacyDelegate(current) && before.kind === 'bot')
 }
 
-/** The body's fingerprint the activity read adds beside the attrs (lib/task-activity-versions.ts); absent on older reads. */
+/** Older activity snapshots carried a fingerprint alongside the document attributes. */
 function bodyHash(content: JSONContent): string | null {
   const hash = (content as JSONContent & { bodyHash?: unknown }).bodyHash
   return typeof hash === 'string' ? hash : null
@@ -65,6 +67,7 @@ export function deriveIssueActivity(versions: ActivityVersion[], children: Activ
   const events: IssueActivityEvent[] = []
   const created = ordered.find(version => version.revision === 1)
   if (created) events.push({ source: { kind: 'revision', id: created.id, revision: 1 }, id: `created-${created.id}`, at: timestamp(created.createdAt), kind: 'created', actorKey: actorKeyOf(created), actor: created.actor ?? null })
+  let previousDescription: { revision: number; actorKey: string | null; eventIndex: number } | null = null
   for (let index = 1; index < ordered.length; index += 1) {
     const previous = ordered[index - 1]
     const current = ordered[index]
@@ -74,18 +77,11 @@ export function deriveIssueActivity(versions: ActivityVersion[], children: Activ
     const at = timestamp(current.createdAt)
     const actorKey = actorKeyOf(current)
     const actor = current.actor ?? null
-    const add = (event: IssueActivityEvent) => events.push({ ...event, source: { kind: 'revision', id: current.id, revision: current.revision } })
+    const versionEvents: IssueActivityEvent[] = []
+    const add = (event: IssueActivityEvent) => versionEvents.push({ ...event, source: { kind: 'revision', id: current.id, revision: current.revision } })
     if (current.status !== previous.status) add({ id: `status-${current.id}`, at, actorKey, actor, kind: 'status', status: current.status })
     if (current.priority !== previous.priority) add({ id: `priority-${current.id}`, at, actorKey, actor, kind: 'priority', priority: current.priority })
     if (current.title !== previous.title) add({ id: `title-${current.id}`, at, actorKey, actor, kind: 'title', title: current.title })
-    // Autosave writes many revisions: one person's run of description edits, with nothing else between, is one event.
-    const beforeBody = bodyHash(previous.content)
-    const afterBody = bodyHash(current.content)
-    if (beforeBody && afterBody && beforeBody !== afterBody) {
-      const last = events.at(-1)
-      if (last?.kind === 'description' && (last.actorKey ?? null) === actorKey) { last.at = at; last.id = `description-${current.id}` }
-      else add({ id: `description-${current.id}`, at, actorKey, actor, kind: 'description' })
-    }
     const beforeMetadata = readIssueMetadata(previous.content)
     const afterMetadata = readIssueMetadata(current.content)
     const before = beforeMetadata.assignee
@@ -106,8 +102,8 @@ export function deriveIssueActivity(versions: ActivityVersion[], children: Activ
     for (const [relation, field] of [['blockedBy', 'blockedByIds'], ['related', 'relatedIds']] as const) {
       const was = new Set(beforeMetadata[field])
       const now = new Set(afterMetadata[field])
-      for (const id of now) if (!was.has(id)) add({ id: `relation-${current.id}-${id}`, at, actorKey, actor, kind: 'relation', relation, targetId: id })
-      for (const id of was) if (!now.has(id)) add({ id: `relation-off-${current.id}-${id}`, at, actorKey, actor, kind: 'relation', relation, targetId: id, removed: true })
+      for (const id of now) if (!was.has(id)) add({ id: `relation-${current.id}-${relation}-${id}`, at, actorKey, actor, kind: 'relation', relation, targetId: id })
+      for (const id of was) if (!now.has(id)) add({ id: `relation-off-${current.id}-${relation}-${id}`, at, actorKey, actor, kind: 'relation', relation, targetId: id, removed: true })
     }
     const pullsBefore = new Map(beforeMetadata.pullRequests.map(pull => [pull.url.replace(/\/$/, ''), pull]))
     const pullsAfter = new Map(afterMetadata.pullRequests.map(pull => [pull.url.replace(/\/$/, ''), pull]))
@@ -118,6 +114,28 @@ export function deriveIssueActivity(versions: ActivityVersion[], children: Activ
       if (item.state === 'merged' && had?.state !== 'merged') add({ id: `pull-merged-${current.id}-${url}`, at, actorKey, actor, kind: 'pull', pull: pull(url, item.title, 'merged') })
     }
     for (const [url, item] of pullsBefore) if (!pullsAfter.has(url)) add({ id: `pull-off-${current.id}-${url}`, at, actorKey, actor, kind: 'pull', pull: pull(url, item.title, 'unlinked') })
+    if (beforeMetadata.dueDate !== afterMetadata.dueDate) add({ id: `due-date-${current.id}`, at, actorKey, actor, kind: 'dueDateChanged', dueDate: afterMetadata.dueDate })
+    if (beforeMetadata.project !== afterMetadata.project) add({ id: `project-${current.id}`, at, actorKey, actor, kind: 'projectChanged', title: afterMetadata.project ?? undefined })
+    if (beforeMetadata.estimate !== afterMetadata.estimate) add({ id: `estimate-${current.id}`, at, actorKey, actor, kind: 'estimateChanged', estimate: afterMetadata.estimate })
+    let descriptionEventIndex: number | null = null
+    // Older Activity snapshots contained fingerprints. New SQL projections expose only the change bit.
+    const beforeBody = bodyHash(previous.content)
+    const afterBody = bodyHash(current.content)
+    const changed = current.descriptionChanged ?? (beforeBody !== null && afterBody !== null && beforeBody !== afterBody)
+    if (changed) {
+      const descriptionEvent: IssueActivityEvent = { id: `description-${current.id}`, at, actorKey, actor, kind: 'description', source: { kind: 'revision', id: current.id, revision: current.revision } }
+      if (versionEvents.length === 0 && previousDescription?.revision === previous.revision && previousDescription.actorKey === actorKey) {
+        descriptionEventIndex = previousDescription.eventIndex
+        events[descriptionEventIndex] = descriptionEvent
+      } else {
+        versionEvents.push(descriptionEvent)
+      }
+    }
+    events.push(...versionEvents)
+    const descriptionOnly: boolean = descriptionEventIndex !== null || versionEvents.length === 1 && versionEvents[0].kind === 'description'
+    previousDescription = descriptionOnly
+      ? { revision: current.revision, actorKey, eventIndex: descriptionEventIndex ?? events.length - 1 }
+      : null
   }
   const createdAt = created ? Date.parse(timestamp(created.createdAt)) : Number.NEGATIVE_INFINITY
   for (const child of children) {

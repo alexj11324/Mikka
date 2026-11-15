@@ -219,6 +219,142 @@ function candidateFixture(runAcceptance, cleanupFailure, { failRestore = false, 
   } }
 }
 
+const startupTrace = '0123456789abcdef0123456789abcdef'
+const startupTraceScope = 'submission_http_only_workflow_may_use_another_trace'
+const startupWorkflow = 'wrun_01K4BZQ5T2J8HXFM6WD3PNAVCE'
+const preRunFailure = (harness, code, extra = {}) => ({
+  sourceCommit: COMMIT, harness, status: 'failed', error: code,
+  failure: { phase: 'coordinator_stream', code }, cleanup: { status: 'passed', errors: [] },
+  requestTraceId: startupTrace, requestTraceScope: startupTraceScope, workflowRunId: startupWorkflow,
+  ...extra,
+})
+
+/** Exercise the public failure-file seam without publishing a bootstrap for a run that never bound. */
+async function preRunFailureArtifact(sample, harness = 'claude_code') {
+  const root = await mkdtemp(join(tmpdir(), 'template-gate-correlation-'))
+  try {
+    const fixture = candidateFixture(async options => accepted(options.harness))
+    const run = fixture.options.runAcceptance, create = fixture.options.sandboxFactory
+    fixture.options.runAcceptance = async (options, dependencies) => {
+      assert.equal(options.timeoutMs, 240000)
+      if (options.harness !== harness) return run(options, dependencies)
+      return { mode: 'candidate', status: 'failed', cleanup: { errors: [] }, samples: [sample] }
+    }
+    fixture.options.sandboxFactory = async (template, options) => {
+      const sandbox = await create(template, options), read = sandbox.files.read
+      if (template.endsWith(harness === 'claude_code' ? 'claude' : 'codex')) sandbox.files.read = path => {
+        if (path.endsWith('bootstrap-proof.json')) throw Object.assign(new Error('private missing bootstrap path'), { code: 'ENOENT' })
+        return read(path)
+      }
+      return sandbox
+    }
+    const input = join(root, 'candidate.json'), output = join(root, 'accepted.json'), diagnostics = join(root, 'diagnostics.json')
+    await writeFile(input, JSON.stringify(report))
+    await assert.rejects(validateSubscriptionFiles(input, output, diagnostics, fixture.options), /template_gate_subscription_or_cleanup_failed/)
+    const raw = await readFile(diagnostics, 'utf8'), value = JSON.parse(raw)
+    const kind = harness === 'claude_code' ? 'claude' : 'codex'
+    const failed = value.candidates.find(row => row.kind === kind), passed = value.candidates.find(row => row.kind !== kind)
+    assert.equal(value.status, 'failed')
+    assert.equal(failed.code, 'template_gate_execution_failed')
+    assert.equal(failed.stage, 'acceptance')
+    assert.deepEqual(fixture.observations, { publications: 1, proofReads: 1 })
+    assert.equal(failed.runIdHash, null)
+    assert.equal(passed.passedReceipt.status, 'passed')
+    assert.ok(!Object.hasOwn(passed, 'startupCorrelation'))
+    assert.equal(fixture.events.filter(event => event === 'removed').length, 2)
+    assert.equal(fixture.events.filter(event => event.startsWith('killed-')).length, 2)
+    assert.ok(fixture.events.includes('restored-workspace') && fixture.events.includes('signed-out'))
+    await assert.rejects(stat(output), { code: 'ENOENT' })
+    assert.equal((await stat(diagnostics)).mode & 0o777, 0o600)
+    return { raw, failed }
+  } finally { await rm(root, { recursive: true, force: true }) }
+}
+
+for (const [harness, code, dispatchRefusal] of [
+  ['claude_code', 'startup_dispatch_refused', { code: 'githubNotConnected' }],
+  ['codex', 'startup_timeout', null],
+]) test(`startup correlation survives ${harness} failure before a run exists`, async () => {
+  const { failed } = await preRunFailureArtifact(preRunFailure(harness, code, { dispatchRefusal }), harness)
+  assert.deepEqual(failed.failure, { phase: 'coordinator_stream', code })
+  assert.deepEqual(failed.startupCorrelation, {
+    requestTraceId: startupTrace, requestTraceScope: startupTraceScope,
+    workflowRunId: startupWorkflow, dispatchRefusal,
+  })
+})
+
+test('startup correlation requires exact candidate binding and existing metadata', async () => {
+  for (const extra of [
+    { sourceCommit: 'f'.repeat(40) }, { sourceCommit: undefined }, { sourceCommit: { value: COMMIT } },
+    { harness: 'codex' }, { harness: undefined }, { harness: ['claude_code'] },
+    { requestTraceId: undefined, workflowRunId: undefined, dispatchRefusal: undefined },
+  ]) {
+    const { raw, failed } = await preRunFailureArtifact(preRunFailure('claude_code', 'startup_dispatch_refused', {
+      dispatchRefusal: { code: 'githubNotConnected' }, ...extra,
+    }))
+    assert.ok(!Object.hasOwn(failed, 'startupCorrelation'))
+    assert.ok(!raw.includes(startupTrace) && !raw.includes(startupWorkflow))
+    assert.equal(failed.sampleError, 'startup_dispatch_refused')
+  }
+})
+
+test('startup correlation rejects malformed identifiers and preserves independently valid fields', async () => {
+  let coercions = 0
+  const nonString = { toString() { coercions++; return startupTrace } }
+  for (const requestTraceId of [undefined, null, 1, true, [], nonString, '0'.repeat(32), 'f'.repeat(31),
+    'F'.repeat(32), `${startupTrace}\n`, 'private-canary@example.invalid']) {
+    const { failed } = await preRunFailureArtifact(preRunFailure('claude_code', 'startup_timeout', { requestTraceId }))
+    assert.deepEqual(failed.startupCorrelation, {
+      requestTraceId: null, requestTraceScope: null, workflowRunId: startupWorkflow, dispatchRefusal: null,
+    })
+  }
+  for (const workflowRunId of [undefined, null, 1, nonString, 'wrun_', `wrun_${'a'.repeat(129)}`,
+    `${startupWorkflow}\n`, `${startupWorkflow}/private`, 'wrun_private-canary@example.invalid']) {
+    const { failed } = await preRunFailureArtifact(preRunFailure('claude_code', 'startup_timeout', { workflowRunId }))
+    assert.equal(failed.startupCorrelation.workflowRunId, null)
+    assert.equal(failed.startupCorrelation.requestTraceId, startupTrace)
+  }
+  for (const workflowRunId of ['wrun_legacy1', `wrun_${'a'.repeat(128)}`]) {
+    const { failed } = await preRunFailureArtifact(preRunFailure('claude_code', 'startup_timeout', { workflowRunId }))
+    assert.equal(failed.startupCorrelation.workflowRunId, workflowRunId)
+  }
+  const { failed } = await preRunFailureArtifact(preRunFailure('claude_code', 'startup_timeout', {
+    requestTraceScope: 'private_scope_or_run_trace_claim',
+  }))
+  assert.equal(failed.startupCorrelation.requestTraceId, null)
+  assert.equal(failed.startupCorrelation.requestTraceScope, null)
+  assert.equal(coercions, 0)
+})
+
+test('startup correlation keeps only closed refusal codes and never emits prompts or other identities', async () => {
+  const secret = 'PRIVATE_PROMPT_RESPONSE_CREDENTIAL_CANARY', privateId = '90000000-0000-4000-8000-000000000009'
+  for (const code of ['githubNotConnected', 'deviceNotFound', 'machineUnavailable', 'agentProfilePinConflict', 'factorySourceMismatch',
+    'githubNotConnected_PRIVATE_CANARY', 'private-canary@example.invalid', '__proto__', 'constructor', 503, { private: secret }]) {
+    const expected = ['githubNotConnected', 'deviceNotFound', 'machineUnavailable', 'agentProfilePinConflict', 'factorySourceMismatch'].includes(code) ? code : 'unknown'
+    const { raw, failed } = await preRunFailureArtifact(preRunFailure('claude_code', 'startup_dispatch_refused', {
+      dispatchRefusal: { code, detail: secret, message: secret, raw: secret, userId: privateId },
+      prompt: secret, providerText: secret, issueId: privateId, botId: privateId,
+      dispatchCallId: privateId, stepId: privateId, cookie: secret,
+    }))
+    assert.deepEqual(failed.startupCorrelation, {
+      requestTraceId: startupTrace, requestTraceScope: startupTraceScope,
+      workflowRunId: startupWorkflow, dispatchRefusal: { code: expected },
+    })
+    for (const forbidden of [secret, privateId, 'private-canary@example.invalid', 'githubNotConnected_PRIVATE_CANARY']) assert.ok(!raw.includes(forbidden))
+  }
+})
+
+test('successful candidate diagnostics do not gain startup correlation metadata', async () => {
+  const diagnostics = [], fixture = candidateFixture(async options => {
+    const value = accepted(options.harness)
+    Object.assign(value.samples[0], { requestTraceId: startupTrace, requestTraceScope: startupTraceScope,
+      workflowRunId: startupWorkflow, dispatchRefusal: { code: 'githubNotConnected' } })
+    return value
+  })
+  await validateTemplateSubscriptions(report, { ...fixture.options, onDiagnostic: row => diagnostics.push(row) })
+  assert.equal(diagnostics.length, 2)
+  assert.ok(diagnostics.every(row => row.code === 'passed' && !Object.hasOwn(row, 'startupCorrelation')))
+})
+
 test('a pre-dispatch refusal keeps its phase without reading an unpublished proof and cleans both candidates', async () => {
   const root = await mkdtemp(join(tmpdir(), 'template-gate-dispatch-'))
   const failure = { phase: 'coordinator_stream', code: 'startup_dispatch_refused' }
@@ -399,6 +535,7 @@ test('a failure before a sample exists preserves the startup phase without inven
   assert.equal(failed.sampleError, null)
   assert.equal(failed.runIdHash, null)
   assert.ok(!Object.hasOwn(failed, 'observation'))
+  assert.ok(!Object.hasOwn(failed, 'startupCorrelation'))
   assert.ok(!Object.hasOwn(failed, 'passedReceipt'))
 })
 
