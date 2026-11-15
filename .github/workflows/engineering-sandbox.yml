@@ -21,7 +21,7 @@ on:
       workload:
         required: true
         type: choice
-        options: [factory-handoff, startup-timing, postgres-policy, eve-host-build]
+        options: [factory-handoff, startup-timing, postgres-policy]
 
 permissions:
   contents: read
