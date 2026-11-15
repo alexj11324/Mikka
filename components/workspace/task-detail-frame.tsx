@@ -125,8 +125,13 @@ export function FramedTask(props: FramedTaskProps) {
   // The human assignment picker and the execution delegate keep their independent write authority.
   const workOwner = taskWorkOwner(meta)
   const member = meta.assignee?.kind === 'member' ? meta.assignee : null
+  const ownerWithoutMember = member ? meta.delegate : workOwner
   const assigneeItems: TaskMenuItem[] = [
-    { id: 'none', label: tAssignee('unassigned'), mark: { kind: 'icon', icon: 'person' }, checked: !member, onSelect: () => { if (member) void metadata.persist({ assignee: null }) } },
+    {
+      id: 'none', label: ownerWithoutMember?.name ?? tAssignee('unassigned'),
+      mark: ownerWithoutMember ? { kind: 'node', node: <AgentSphere name={ownerWithoutMember.name} compact /> } : { kind: 'icon', icon: 'person' },
+      checked: !member, onSelect: member ? () => { void metadata.persist({ assignee: null }) } : undefined,
+    },
     ...options ? options.members.map(person => ({ id: person.id, label: person.name, mark: { kind: 'person', name: person.name } as const, checked: member?.id === person.id, onSelect: () => { if (member?.id !== person.id) void metadata.persist({ assignee: { kind: 'member', id: person.id } }) } })) : loading(tAssignee('loading')),
     ...options?.isOwner ? [{ id: 'invite', label: tAssignee('invite'), mark: { kind: 'icon', icon: 'mail' }, divider: true, onSelect: () => props.requestProperty('invite') } satisfies TaskMenuItem] : [],
   ]
