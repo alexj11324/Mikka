@@ -302,7 +302,7 @@ export function FramedTask(props: FramedTaskProps) {
 
   // 活动: the task's events, its Agent rows and its discussions in one log, oldest first.
   const subtaskRows = (connections.rows ?? []).filter(row => row.metadata.parentId === task.id).map(row => ({ id: row.id, title: row.title, identifier: row.identifier, createdAt: row.createdAt }))
-  // An Agent's change is said by its conversation (Capy: the thread's code or title), matched to the conversation that had started by then.
+  // A recorded source run can name an Agent's conversation; actor and time alone do not establish it.
   const runConversations = (props.agentActivity.threads ?? []).map(thread => ({
     at: new Date(thread.createdAt).toISOString(), runId: thread.id, agentId: thread.detail?.agentId ?? null, linked: Boolean(thread.detail),
     title: thread.detail?.name || tDirectory('untitled'), ...thread.detail?.harness ? { harness: thread.detail.harness } : {},

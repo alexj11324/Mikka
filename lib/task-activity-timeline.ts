@@ -23,7 +23,7 @@ export type IssueActivityEvent = {
   removed?: boolean
   /** `pull`: the pull request the clause names and what happened to it. */
   pull?: { label: string; href: string; title?: string; action: 'linked' | 'unlinked' | 'merged' }
-  source?: { kind: 'revision'; id: string; revision: number } | { kind: 'subtask'; id: string }
+  source?: { kind: 'revision'; id: string; revision: number; runId?: string | null } | { kind: 'subtask'; id: string }
   /** `type:id` of whoever made the change; null for rows from before MIK-17 and for subtasks. */
   actorKey?: string | null
   /** Who made the change, as the server resolved it; the sentence starts with them, as Capy's does. */
@@ -237,34 +237,16 @@ export function taskHistoryLabel(event: IssueActivityEvent, labels: ActivityLabe
   return taskHistoryPieces(event, labels, subject).map(piece => piece.text).join('')
 }
 
-/**
- * The uniquely matching Agent stretch at the event time. Issue versions store actor identity,
- * not a run id; if time would have to choose among this Agent's runs, keep the name plain.
- */
-export function activityStretch(at: string, actor: { type?: string | null; id?: string | null } | null | undefined, stretches: readonly ActivityStretch[]): ActivityStretch | null {
-  if (actor?.type !== 'agent' || !actor.id) return null
-  const time = Date.parse(at)
-  if (Number.isNaN(time)) return null
-  const ordered = stretches.map(stretch => ({ stretch, time: Date.parse(stretch.at) }))
-    .filter(item => Number.isFinite(item.time))
-    .sort((a, b) => a.time - b.time || a.stretch.runId.localeCompare(b.stretch.runId))
-  let active = -1
-  for (let index = 0; index < ordered.length; index += 1) {
-    if (ordered[index].time <= time) active = index
-    else break
-  }
-  if (active < 0) return null
-  // Equal start times or multiple preceding stretches for the same actor leave the run ambiguous.
-  if ((active > 0 && ordered[active - 1].time === ordered[active].time) ||
-      (active + 1 < ordered.length && ordered[active + 1].time === ordered[active].time)) return null
-  const candidate = ordered[active].stretch
-  if (!candidate.linked || candidate.agentId !== actor.id) return null
-  const actorMatches = ordered.filter(item => item.time <= time && item.stretch.agentId === actor.id)
-  return actorMatches.length === 1 ? candidate : null
+/** Only a run recorded on the source event can identify its conversation. A unique
+ * timestamp/actor match is still a guess: an Agent can write outside a run. */
+export function activityStretch(_at: string, actor: { type?: string | null; id?: string | null } | null | undefined, stretches: readonly ActivityStretch[], sourceRunId?: string | null): ActivityStretch | null {
+  if (actor?.type !== 'agent' || !actor.id || !sourceRunId) return null
+  const matches = stretches.filter(stretch => stretch.runId === sourceRunId && stretch.agentId === actor.id && stretch.linked)
+  return matches.length === 1 ? matches[0] : null
 }
 
-export function activityRunId(at: string, actor: { type?: string | null; id?: string | null } | null | undefined, stretches: readonly ActivityStretch[]): string | null {
-  return activityStretch(at, actor, stretches)?.runId ?? null
+export function activityRunId(at: string, actor: { type?: string | null; id?: string | null } | null | undefined, stretches: readonly ActivityStretch[], sourceRunId?: string | null): string | null {
+  return activityStretch(at, actor, stretches, sourceRunId)?.runId ?? null
 }
 
 /**
@@ -283,7 +265,7 @@ export function activityLineParts(
   const t = labels.activity
   let lead: ActivityPiece
   if (actor?.type === 'agent') {
-    const stretch = activityStretch(event.at, actor, stretches)
+    const stretch = activityStretch(event.at, actor, stretches, event.source?.kind === 'revision' ? event.source.runId : null)
     lead = stretch
       ? { kind: 'thread', text: stretch.title || t('untitledThread'), runId: stretch.runId, ...defined({ harness: stretch.harness, title: stretch.title, result: stretch.result, time: stretch.time }) }
       : { kind: 'text', text: t('untitledThread'), name: true }

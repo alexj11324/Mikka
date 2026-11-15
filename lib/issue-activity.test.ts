@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { JSONContent } from '@tiptap/core'
 import { activityTimeline, deriveIssueActivity, pullLabel, type ActivityVersion } from './issue-activity'
+import { mergeActivityEarlier } from './activity-page-cache'
 
 function content(assignee: { id: string; name: string } | null): JSONContent {
   return {
@@ -317,4 +318,32 @@ test('coalesces consecutive same-actor description saves without losing older na
   ], [], Infinity)
   assert.deepEqual(unknownActor.map(event => event.kind), ['created', 'status', 'description'])
   assert.equal(unknownActor.at(-1)?.id, 'description-u4', 'unknown actors may coalesce only across the same consecutive save streak')
+})
+
+
+test('older meaningful events survive a save streak spanning several revision pages', () => {
+  const versions: ActivityVersion[] = Array.from({ length: 305 }, (_, i) => {
+    const revision = i + 1
+    return {
+      id: `long-${revision}`, revision, title: revision === 1 ? 'Before' : 'Renamed',
+      status: 'todo', priority: 'normal', content: content(null),
+      actorType: 'user', actorId: 'u', descriptionChanged: revision >= 3,
+      createdAt: new Date(Date.UTC(2026, 9, 22, 10, 0, revision)).toISOString(),
+    }
+  })
+  const newestFirst = [...versions].reverse()
+  let page = { version: 'v305', items: newestFirst.slice(0, 101), hasMore: true }
+  let events = deriveIssueActivity(page.items, [], Infinity)
+  assert.deepEqual(events.map(event => event.id), ['description-long-305'])
+  for (let offset = 101; offset < newestFirst.length; offset += 101) {
+    const beforeId = page.items.at(-1)!.id
+    page = mergeActivityEarlier(page, beforeId, { items: newestFirst.slice(offset, offset + 101), hasMore: offset + 101 < newestFirst.length })!
+    assert.equal(new Set(page.items.map(item => item.id)).size, page.items.length)
+    events = deriveIssueActivity(page.items, [], Infinity)
+    assert.equal(events.filter(event => event.kind === 'description').length, 1)
+    assert.equal(events.at(-1)?.id, 'description-long-305')
+  }
+  assert.equal(page.items.length, 305)
+  assert.equal(page.hasMore, false)
+  assert.deepEqual(events.map(event => event.id), ['created-long-1', 'title-long-2', 'description-long-305'])
 })
