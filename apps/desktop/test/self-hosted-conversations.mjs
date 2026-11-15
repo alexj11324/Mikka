@@ -135,9 +135,16 @@ export async function verifyConversationOrganization({ page, fixture, rpc, passe
   await expect(viewport.locator('[data-slot="collapsible-message"]').filter({ hasText: 'Desktop inspection line 120' })).toHaveCount(1)
   await expect(viewport).toBeVisible()
   const distanceToEnd = () => viewport.evaluate(node => node.scrollHeight - node.scrollTop - node.clientHeight)
-  const contentHeight = await viewport.evaluate(node => node.scrollHeight)
+  // Expansion can lay out the long message before the initial follow-to-end
+  // scroll. Wait for that scroll so the upward wheel actually moves the view.
+  await page.evaluate(() => document.fonts.ready.then(() => undefined))
+  await expect.poll(() => viewport.evaluate(node => node.clientHeight > 0
+    && node.scrollHeight - node.clientHeight > 100
+    && node.scrollHeight - node.scrollTop - node.clientHeight <= 2)).toBe(true)
+  const bottom = await viewport.evaluate(node => node.scrollTop)
   await viewport.hover()
-  await page.mouse.wheel(0, -contentHeight)
+  await page.mouse.wheel(0, -bottom)
+  await expect.poll(() => viewport.evaluate(node => node.scrollTop)).toBeLessThan(bottom - 100)
   await expect.poll(distanceToEnd).toBeGreaterThan(100)
   const messagesPath = '/conversations/' + target.id + '/messages'
   const { data: previouslyRead } = await api(page, messagesPath.slice(1))
