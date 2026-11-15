@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { cp, mkdir, mkdtemp, readFile, readlink, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import test from 'node:test'
 import { packageCloudflareEveHost } from '../../../scripts/package-cf-eve-host.mjs'
 
@@ -11,6 +11,8 @@ async function fixture(t) {
   t.after(() => rm(root, { recursive: true, force: true }))
   await mkdir(join(root, '.output/eve/server'), { recursive: true })
   await writeFile(join(root, '.output/eve/server/index.mjs'), 'export default {}')
+  await mkdir(join(root, '.output/eve/packages/subscription-worker/bin'), { recursive: true })
+  await writeFile(join(root, '.output/eve/packages/subscription-worker/bin/mikka-subscription-worker'), 'subscription-worker-fixture')
   await writeFile(join(root, '.output/eve/mikka-eve-build.json'), JSON.stringify({
     version: 1, eve: '1.0.0-rc.9', revision: sourceSha, preset: 'node-server',
     world: '@workflow/world-postgres', worldVersion: '5.2.0',
@@ -29,6 +31,13 @@ test('a private runtime image contains the Eve artifact and public release metad
     version: 1, sourceSha, uiSha, releaseId: 'fixture-1', uiSource: 'official',
   })
   assert.equal(await readFile(join(result.output, 'eve/server/index.mjs'), 'utf8'), 'export default {}')
+  const dockerfile = await readFile(new URL('../Dockerfile', import.meta.url), 'utf8')
+  const copyDirectory = [...dockerfile.slice(0, dockerfile.indexOf('COPY ')).matchAll(/^WORKDIR (.+)$/gm)].at(-1)[1]
+  const workDirectory = [...dockerfile.matchAll(/^WORKDIR (.+)$/gm)].at(-1)[1]
+  const command = JSON.parse(dockerfile.match(/^CMD (.+)$/m)[1])
+  const runtimeDirectory = join(result.output, relative(copyDirectory, workDirectory))
+  assert.equal(await readFile(join(runtimeDirectory, command[1]), 'utf8'), 'export default {}')
+  assert.equal(await readFile(join(runtimeDirectory, 'packages/subscription-worker/bin/mikka-subscription-worker'), 'utf8'), 'subscription-worker-fixture')
   await assert.rejects(packageCloudflareEveHost(options), /CF_EVE_IMAGE_OUTPUT_NOT_EMPTY/)
 })
 
