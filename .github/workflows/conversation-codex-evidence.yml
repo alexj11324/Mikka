@@ -45,7 +45,7 @@ jobs:
           mkdir -m 700 "$RUNNER_TEMP/model-fixture" "$RUNNER_TEMP/isolated-home" "$RUNNER_TEMP/receipt"
           python prepare.py "$GITHUB_WORKSPACE/product" "$RUNNER_TEMP/model-fixture"
           mkdir -p "$GITHUB_WORKSPACE/product/.cache/e-codex-actual"
-          cp delivery.mts handoff.mts "$GITHUB_WORKSPACE/product/.cache/e-codex-actual/"
+          cp delivery.mts handoff.mts observe-queue.mts "$GITHUB_WORKSPACE/product/.cache/e-codex-actual/"
           if [ ! -x /usr/lib/postgresql/17/bin/initdb ]; then
             . /etc/os-release
             curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o "$RUNNER_TEMP/pgdg-signing.asc"
@@ -79,6 +79,7 @@ jobs:
             ${{ runner.temp }}/receipt/steer-result.json
             ${{ runner.temp }}/receipt/interrupt-result.json
             ${{ runner.temp }}/receipt/setup-diagnostic.txt
+            ${{ runner.temp }}/receipt/pg-waits.jsonl
             ${{ runner.temp }}/receipt/after-run-result.json
             ${{ runner.temp }}/receipt/handoff.json
             ${{ runner.temp }}/receipt/tools.jsonl

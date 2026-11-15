@@ -72,7 +72,9 @@ try {
  const {issueDeviceToken}=await import('../../lib/device-link')
  const token=await issueDeviceToken(owner,'Synthetic acceptance')
  const dcall=async(path:string,method='GET',payload?:unknown,expected=200)=>{
+  note('device REST request',{method,path:path.split('?')[0]})
   const res=await fetch(origin+'/mikka/v1/'+path,{method,headers:{authorization:'Bearer '+token,[CLIENT_VERSION_HEADER]:SOURCE_DAEMON_VERSION,[ACTIVE_TURN_STEER_HEADER]:'1','content-type':'application/json'},...(payload===undefined?{}:{body:JSON.stringify(payload)})})
+  note('device REST response',{method,path:path.split('?')[0],status:res.status})
   assert.equal(res.status,expected,method+' '+path+' '+res.status)
   return expected===204?null:res.json()
  }
@@ -106,7 +108,7 @@ try {
   if(event.type==='exit'){terminal=event;continue}
   if(event.type!=='chunk')continue
   const c=event.chunk;chunks.push(c)
-  if(handin)continue
+  if(handin){if(chunks.length<7)note('actual native parent chunk',{type:c.type});continue}
   if(c.type!=='text-delta')continue
   transcript+=c.delta
   if(changed)continue
@@ -174,23 +176,48 @@ try {
   const getRun=async(id:string)=>(await independent.query(`SELECT id,prompt,status,"sessionId","continuesRunId","issueId","workspaceId","stopReason","lastReply","agentDefinition"->>'model' AS model FROM agent_runs WHERE id=$1`,[id])).rows[0]
   const accepted=await getRun(resultRun);assert.equal(accepted.continuesRunId,runId);assert.equal(accepted.issueId,issueId);assert.equal(accepted.workspaceId,ws.id);assert.equal(accepted.model,model);assert.ok(accepted.prompt.includes(text))
   assert.equal((await independent.query('SELECT count(*)::int AS n FROM agent_runs WHERE "continuesRunId"=$1',[runId])).rows[0].n,1)
-  const offered=(await dcall(devicePath+'?wait=0')).queued??[];assert.ok(offered.includes(resultRun),JSON.stringify(offered))
+  const offered=(await dcall(devicePath+'?wait=0')).queuedRuns??[];assert.ok(offered.includes(resultRun),JSON.stringify(offered))
+  const execute=async(resultRun:string,accepted:any,question:string)=>{
   const realSession=await adapter.start({runId:resultRun,cwd,prompt:accepted.prompt,model:accepted.model,log:createLogger({level:'silent'}),env:buildChildEnv({host:{PATH:process.env.PATH,HOME:home,SSL_CERT_FILE:join(dir,'ephemeral-ca.pem'),LANG:'C.UTF-8'},runId:resultRun}),credential:{kind:'provider',protocol:'openai',baseUrl:'https://127.0.0.1:3857/v1',key:process.env.E_LOOPBACK_KEY!},toolApproval:new ToolApprovalGate(resultRun,{isLive:()=>true})})
   await dcall('runs/'+resultRun,'PATCH',{state:'running',sessionId:realSession.sessionId},204)
   const followChunks:any[]=[];let followExit:any
   for await(const e of realSession.events()){if(e.type==='chunk')followChunks.push(e.chunk);else if(e.type==='exit')followExit=e}
   assert.equal(followExit.outcome,'succeeded');assert.equal(followExit.stopReason,undefined)
-  const answer=readFileSync(join(dir,'results.jsonl'),'utf8').trim().split('\n').map(s=>JSON.parse(s)).find(s=>s.prompt===steer)
+  const answer=readFileSync(join(dir,'results.jsonl'),'utf8').trim().split('\n').map(s=>JSON.parse(s)).findLast(s=>s.prompt===question)
   assert.ok(answer&&answer.outputTokens>0)
   const body=followChunks.filter(c=>c.type==='text-delta').map(c=>c.delta).join('');assert.equal(body,answer.result)
   await dcall('runs/'+resultRun+'/events','POST',{fromSeq:1,chunks:followChunks})
   await dcall('runs/'+resultRun+'/complete','POST',{stopReason:'turn_ended'},204)
   const final=await getRun(resultRun);assert.equal(final.lastReply,answer.result);assert.equal(final.status,'stopped');assert.equal(final.stopReason,'turn_ended')
   assert.equal(final.sessionId,realSession.sessionId)
+  return {resultRun,thread:realSession.sessionId,answer:answer.result,tokens:answer.outputTokens,part:followChunks.find(c=>c.type==='text-delta')?.id,final}
+  }
+  const actual=await execute(resultRun,accepted,steer)
   await dcall('runs/'+runId+'/complete','POST',completion,204)
   assert.deepEqual(await queueRow(reqId),queued)
   const record=(await independent.query('SELECT id,"runId","deliveredAt" FROM run_messages WHERE "userId"=$1 AND text=$2',[owner,text])).rows;assert.equal(record.length,1);assert.equal(record[0].runId,resultRun)
-  note('automatic child executed actual queued request through native Codex, persistent independent read after completion and replay',{parent:runId,child:resultRun,model:final.model,childThread:final.sessionId,childOutcome:final.status,childText:final.lastReply,modelTokens:answer.outputTokens,ownerMessage:record[0]})
+  note('automatic child executed actual queued request through native Codex, persistent independent read after completion and replay',{parent:runId,child:resultRun,model:actual.final.model,childThread:actual.thread,childOutcome:actual.final.status,childText:actual.answer,modelTokens:actual.tokens,ownerMessage:record[0]})
+  if(process.env.E_TEST_VERSIONS==='1'){
+   const versioned=(cookie:string,change:any)=>rpc(cookie,'createThreadReplyVersion',{change})
+   const editQuestion='What color is a ripe banana? Answer in one short sentence.'
+   const edit={operation:'edit',anchorRunId:resultRun,anchorKey:record[0].id,requestId:randomUUID(),text:mark(editQuestion)}
+   const denied=await versioned(memberCookie,edit);assert.ok(['runNotFound','issueNotFound','workspaceAccessDenied'].includes(denied.error))
+   const edited=await versioned(ownerCookie,edit);assert.ok(edited.versionId&&edited.runId!==resultRun,JSON.stringify(edited))
+   assert.deepEqual(await versioned(ownerCookie,edit),edited)
+   const editRun=await getRun(edited.runId);assert.equal(editRun.continuesRunId,resultRun);assert.equal(editRun.model,model);assert.ok(editRun.prompt.includes(mark(editQuestion)))
+   const editReceipt=await execute(edited.runId,editRun,editQuestion);assert.notEqual(editReceipt.answer,actual.answer)
+   const input={operation:'rerun',anchorRunId:resultRun,anchorKey:actual.part,requestId:randomUUID()}
+   const rerun=await versioned(ownerCookie,input);assert.ok(rerun.versionId&&rerun.runId!==edited.runId,JSON.stringify(rerun))
+   assert.deepEqual(await versioned(ownerCookie,input),rerun)
+   const retryRun=await getRun(rerun.runId);assert.equal(retryRun.continuesRunId,edited.runId);assert.equal(retryRun.model,model)
+   const replay=await execute(rerun.runId,retryRun,steer)
+   const request=async()=>{const res=await fetch(origin+'/mikka/api/rpc',{method:'POST',headers:{origin,cookie:ownerCookie,'content-type':'application/json','x-mikka-rpc':'1'},body:JSON.stringify({version:1,action:'agents.getThreadReplyVersions',args:[issueId,runId]})});const b=await res.json();assert.equal(b.ok,true,JSON.stringify(b));return b.result}
+   const versions=await request();assert.deepEqual(versions.map(v=>v.resultRunId),[edited.runId,rerun.runId])
+   assert.equal(versions[0].originalText,text);assert.equal(versions[0].output,editReceipt.answer);assert.equal(versions[1].originalText,actual.answer);assert.equal(versions[1].output,replay.answer)
+   const count=async()=>(await independent.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1 AND "issueId"=$2',[owner,issueId])).rows[0].n
+   const n=await count();assert.deepEqual(await request(),versions);assert.equal(await count(),n);assert.equal((await getRun(resultRun)).lastReply,actual.answer)
+   note('two real immutable version branches with retained original output, owner-only admission and redisplay without dispatch',{denied:denied.error,parentOutput:actual.answer,edit:{id:edited.runId,version:edited.versionId,output:editReceipt.answer,model:editRun.model,session:editReceipt.thread},rerun:{id:rerun.runId,version:rerun.versionId,output:replay.answer,model:retryRun.model,session:replay.thread},totalRuns:n,view:versions})
+  }
  }
  if(interrupt){const held=await queueRow(reqId);assert.equal(held.status,'failed');assert.equal(held.sentRunId,null);note('terminal cancelled attempt held the queued message and created no unauthorized continuation',{held})}
  note('actual CPU result and completion persisted; event replay deduplicated',{model:provider,mode:handin?'afterRun':interrupt?'interrupt':'steer',modelText:transcript,terminal,chunks:rows.length,durable:stored,ownerMessageCopies:copies,cancelledQueue:(await queueRow(cancelledId)).status})
@@ -199,7 +226,7 @@ try {
 }catch(e){
  trace.failure={name:e.name,message:String(e.message).replaceAll(process.env.E_LOOPBACK_KEY!,'[redacted]').slice(0,750),location:String(e.stack).split('\n').slice(1,5).join('\n').slice(0,800)};persist();process.exitCode=1
 }finally{
- if(!trace.success&&session)await session.cancel().catch(()=>{})
+ if(!trace.success&&session&&!trace.stages.some((s:any)=>s.stage==='authentic MCP handoff before completion writer'))await session.cancel().catch(()=>{})
  await independent.end()
  if(http)await new Promise<void>(resolve=>http.close(()=>resolve()))
  try{const {builtinGateway}=await import('../../lib/builtin-gateway/runtime');await builtinGateway()?.stop()}catch{}

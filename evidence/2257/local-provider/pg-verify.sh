@@ -48,7 +48,10 @@ for ((n=0;n<90;n++));do curl -fsS --cacert "$qa/ephemeral-ca.pem" --noproxy '*' 
 test "$(cat "$qa/health")" = ready
 date -u +%FT%TZ > "$qa/start"
 rc=0
-E_AFTER_RUN=1 timeout 200 node --import ./scripts/server-test.mjs --import tsx .cache/e-codex-actual/delivery.mts > "$qa/delivery.log" 2>&1 || rc=$?
+node --import tsx .cache/e-codex-actual/observe-queue.mts > "$qa/observer.log" 2>&1 & observer=$!
+E_TEST_VERSIONS=1 E_AFTER_RUN=1 timeout 250 node --import ./scripts/server-test.mjs --import tsx .cache/e-codex-actual/delivery.mts > "$qa/delivery.log" 2>&1 || rc=$?
+kill -TERM "$observer" 2>/dev/null || true
+wait "$observer" || true
 date -u +%FT%TZ > "$qa/end"
 printf '%s\n' "$rc" > "$qa/exit"
 if [ "$rc" -ne 0 ] && [ ! -f "$qa/delivery.json" ];then sed -E 's/(postgres(ql)?|https?):\/\/[^ )]+/[endpoint]/g; s/([A-Za-z0-9_-]){40,}/[digest]/g' "$qa/delivery.log" | tail -18 > "$qa/setup-diagnostic.txt";fi
