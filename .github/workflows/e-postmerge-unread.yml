@@ -51,21 +51,21 @@ jobs:
       MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       BETTER_AUTH_URL: http://127.0.0.1:3100
-      MIKKA_TEST_DEPLOYMENT_SHA: e52a959ea214f33e95ed724fc440fafe5fe59cc7
+      MIKKA_TEST_DEPLOYMENT_SHA: 69f071e0b39bad61cb617f495e04e7328cdd749e
       MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
       NEXT_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 2
-          ref: e52a959ea214f33e95ed724fc440fafe5fe59cc7
+          ref: 69f071e0b39bad61cb617f495e04e7328cdd749e
           persist-credentials: false
       - name: Verify the immutable E integration candidate
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$MIKKA_TEST_DEPLOYMENT_SHA"
-          test "$(git rev-parse 'HEAD^{tree}')" = b5dbe97e36949bb61116c2315eaebe40afe70453
+          test "$(git rev-parse 'HEAD^{tree}')" = d3fb07e89811cdeddb1754d46df549b5e84fc632
           mkdir -m 700 "$RUNNER_TEMP/compat-qa-receipt"
       - name: Load isolated public permission checks
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -116,7 +116,7 @@ jobs:
           p = Path('qa-harness/evidence/2254/unread-1381/sessions.cjs')
           s = p.read_text()
           assert s.count('1381d115207c2f54512f6f7b79906b2ee0796da4') == s.count('c0a7ef86b6ab51dc588c6b86df76f2dc4e2b5bec') == 1
-          p.write_text(s.replace('1381d115207c2f54512f6f7b79906b2ee0796da4', 'e52a959ea214f33e95ed724fc440fafe5fe59cc7').replace('c0a7ef86b6ab51dc588c6b86df76f2dc4e2b5bec', 'b5dbe97e36949bb61116c2315eaebe40afe70453'))
+          p.write_text(s.replace('1381d115207c2f54512f6f7b79906b2ee0796da4', '69f071e0b39bad61cb617f495e04e7328cdd749e').replace('c0a7ef86b6ab51dc588c6b86df76f2dc4e2b5bec', 'd3fb07e89811cdeddb1754d46df549b5e84fc632'))
           PY
           node qa-harness/evidence/2254/unread-1381/sessions.cjs
       - name: Record original complete DB files
@@ -132,7 +132,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: main-unread-e52a959e
+          name: main-unread-69f071e0
           path: ${{ runner.temp }}/compat-qa-receipt
           retention-days: 7
           if-no-files-found: error
