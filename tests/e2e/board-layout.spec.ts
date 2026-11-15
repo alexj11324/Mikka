@@ -93,7 +93,7 @@ test('1024px：Coordinator 侧栏默认收起，展开时浮在看板上；无�
   await showCreatedByMe(page)
   await expect(card).toBeVisible()
   await expect(page.getByRole('complementary', { name: 'Coordinator', exact: true })).toBeHidden()
-  await page.getByRole('button', { name: '展开对话', exact: true }).click()
+  await page.getByRole('button', { name: '展开线程', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'Coordinator', exact: true })).toBeVisible()
   await page.keyboard.press('Escape')
 

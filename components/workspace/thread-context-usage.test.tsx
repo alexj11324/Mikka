@@ -41,7 +41,7 @@ test('the panel says the figures are an estimate and names what it cannot read',
 
 test('the measured segments appear with their counts, beside the total held', () => {
   const html = renderToStaticMarkup(<ThreadContextUsage usage={usage()} />)
-  assert.match(html, />对话</)
+  assert.match(html, />线程</)
   assert.match(html, />指令</)
   // `held` is the brief plus everything said since, never one of them alone.
   assert.match(html, /全部持有/)
@@ -54,7 +54,7 @@ test('a new thread with nothing said yet still shows the task it was given', () 
   // The brief alone is unchanged, so its share of the cap is too.
   assert.match(html, /data-value="40"/)
   // The issue task is the person's words, so it is conversation even before anyone replies.
-  assert.match(html, />对话</)
+  assert.match(html, />线程</)
   // And nothing is hidden behind a zero: the gaps are still named.
   assert.match(html, /未计入：系统、工具、技能、MCP、环境/)
 })

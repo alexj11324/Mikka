@@ -162,7 +162,7 @@ const FLOW_TEXT = {
     title: 'How a task moves through Mikka',
   },
   zh: {
-    request: ['新请求', '对话、Telegram、', 'Slack、MCP'], triage: ['Coordinator 分诊'],
+    request: ['新请求', '线程、Telegram、', 'Slack、MCP'], triage: ['Coordinator 分诊'],
     dispatch: ['派发运行'], agent: ['Agent 运行'],
     asks: ['Coordinator', '请求澄清'], answer: ['人工提供输入'],
     details: ['人工补充细节'], review: ['独立审查', '按需执行检查'],

@@ -42,7 +42,7 @@ async function mockChat(page: Page) {
 }
 
 const viewport = (page: Page) => page.locator('[data-slot="message-scroller-viewport"]')
-const conversation = (page: Page) => page.getByRole('region', { name: '与 Coordinator 的对话', exact: true })
+const conversation = (page: Page) => page.getByRole('region', { name: 'Coordinator 线程', exact: true })
 
 test('a failed hidden welcome does not enqueue another welcome on mount or poll', async ({ page }) => {
   const chat = await mockChat(page)

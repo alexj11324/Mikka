@@ -160,7 +160,7 @@ test('验收 on the thread: criteria with their evidence, independent results, t
   await shoot(page, 'list')
 
   // 对话 shows the thread itself; 验收 comes back with the same content.
-  await thread.getByRole('tab', { name: '对话' }).click()
+  await thread.getByRole('tab', { name: '线程' }).click()
   await expect(thread.getByText('首屏图片改成懒加载，字体做了子集。')).toBeVisible()
   await thread.getByRole('tab', { name: '验收' }).click()
 
@@ -322,7 +322,7 @@ test.describe('merge states', () => {
     merge = { ...merge!, id: randomUUID(), status: 'merged', code: null, createdAt: new Date().toISOString() }
     // Leave and come back to 验收 past SWR's dedupe window: the pane reads the ledger and the PR again.
     await page.waitForTimeout(2500)
-    await thread.getByRole('tab', { name: '对话' }).click()
+    await thread.getByRole('tab', { name: '线程' }).click()
     await thread.getByRole('tab', { name: '验收' }).click()
     await expect(thread.getByText('已合并', { exact: true }).first()).toBeVisible()
     await expect(thread.getByRole('region', { name: '验收标准' })).toBeVisible()

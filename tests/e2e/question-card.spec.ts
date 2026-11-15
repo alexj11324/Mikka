@@ -43,7 +43,7 @@ async function openBot(page: import('@playwright/test').Page, content: string) {
     }
   } finally { await pool.end() }
   await page.goto(app(`/?bot=${botId}`))
-  return page.getByRole('region', { name: '与 写作助手 的对话', exact: true })
+  return page.getByRole('region', { name: '写作助手 线程', exact: true })
 }
 
 test('one real question (the blank step dropped) answers on the first click', async ({ page }, testInfo) => {
