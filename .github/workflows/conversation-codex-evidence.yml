@@ -1,4 +1,4 @@
-name: Integrated E controlled segments for real device/Agent report and genuine human acceptance after a declared review fixture
+name: Original E Task Work human acceptance and persisted stage identities
 on:
   push:
     branches: [evidence/2254-sidebar-85dfc396]
@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 24
     env:
-      SOURCE: 9be0ca745eb894291bee53266d42462cd080ebf5
+      SOURCE: 582dfb234c2c0008844f3b032f06381e105a5368
     steps:
       - name: Check out the public harness only
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           path: product
-          ref: 9be0ca745eb894291bee53266d42462cd080ebf5
+          ref: 582dfb234c2c0008844f3b032f06381e105a5368
           persist-credentials: false
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
         with:
@@ -73,7 +73,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: integrated-9be0-human-acceptance-segments
+          name: original-2288-582d-human-acceptance-stage-provenance
           path: |
             ${{ runner.temp }}/receipt/*-trial.json
             ${{ runner.temp }}/receipt/cleanup-*.jsonl

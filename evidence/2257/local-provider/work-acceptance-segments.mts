@@ -162,6 +162,17 @@ try {
  const history=data.timeline.filter((fact:any)=>fact.kind==='history').map((fact:any)=>fact.event)
  assert.ok(history.length);assert.ok(history.some((e:any)=>e.kind==='assigned'&&e.assignmentTarget==='delegate'),'History must include the independently recorded agent assignment')
  assert.ok(!history.some((e:any)=>['stage','execute','review','verify','approval','monitor'].includes(e.kind)),'Persisted task history must not enumerate Factory stages')
+ const {rows:stageSources}=await independent.query(
+   'SELECT "taskId" AS "threadId","commentId" AS "messageId",stage FROM factory_stage_updates WHERE "taskId"=$1 ORDER BY stage',[ready.id])
+ assert.deepEqual(stageSources.map(s=>s.stage),['completed','handoff','implement','review'])
+ const stageKeys=new Set(stageSources.map(s=>s.threadId+':'+s.messageId))
+ const publicFacts=data.timeline.filter((fact:any)=>fact.kind!=='history')
+ const stagedInHumanActivity=publicFacts.filter((fact:any)=>stageKeys.has(fact.threadId+':'+fact.messageId))
+ note('persisted Factory stage receipts versus human Activity',{sourceStageCount:stageSources.length,stages:stageSources,publicFactCount:publicFacts.length,stagedInHumanActivity})
+ assert.deepEqual(stagedInHumanActivity,[],'persisted Factory stages must stay out of the shared human Activity')
+ const legacyDetail=await humanApi(ownerCookie,'mobile/tasks/'+issueId)
+ assert.equal(legacyDetail.status,200)
+ assert.deepEqual(legacyDetail.body.timeline.filter((fact:any)=>fact.threadId&&stageKeys.has(fact.threadId+':'+fact.messageId)),[])
  const memberDetail=await humanApi(memberCookie,'mobile/tasks/'+issueId+'?work=1')
  if(memberDetail.status===200){assert.equal(memberDetail.body.task.id,issueId);assert.ok(Array.isArray(memberDetail.body.work.conversations))}else assert.equal(memberDetail.status,404)
  const link='https://github.com/alexj11324/Mikka/pull/2364'
