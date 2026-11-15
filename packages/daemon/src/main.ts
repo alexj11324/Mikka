@@ -511,7 +511,7 @@ export class Daemon {
         : this.realAdapters()),
     ]))
     this.supervisor = new RunSupervisor({
-      acquireWorkspaceControl: this.options.taskRegistered
+      acquireWorkspaceControl: this.options.e2bContainerRuntime || this.options.taskRegistered
         ? (assignment, signal, onLost) => acquireCloudWorkspaceControl({ runId: assignment.runId, deviceId: assignment.deviceId, signal, onLost })
         : undefined,
       collectCliTiming: this.options.collectCliTiming,

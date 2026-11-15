@@ -10,6 +10,11 @@ on:
     branches: [main]
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      overlay_sha:
+        description: Exact merged private UI revision for full official Desktop acceptance on main
+        type: string
+        required: false
 permissions:
   contents: read
 concurrency:
@@ -77,7 +82,8 @@ jobs:
       - name: Set up Docker Buildx
         if: steps.existing.outputs.digest == ''
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
-      - name: Resolve exact image inputs
+      - &public_image_inputs
+        name: Resolve exact image inputs
         if: steps.existing.outputs.digest == ''
         id: image-inputs
         run: |
@@ -86,7 +92,7 @@ jobs:
       - name: Build the public standalone application
         if: steps.existing.outputs.digest == ''
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-        with:
+        with: &public_image_build
           context: .
           file: Dockerfile
           load: true
@@ -104,7 +110,8 @@ jobs:
         run: docker run --rm --network none --entrypoint node mikka-self-hosted:check scripts/self-hosted-subscriptions-smoke.mjs
       - name: Verify startup migration locks bypass transaction pooling
         run: docker run --rm --network none --entrypoint node mikka-self-hosted:check --test scripts/self-hosted-start.test.mjs
-      - name: Start with an empty database and no Mikka credentials
+      - &isolated_community_secrets
+        name: Start with an empty database and no Mikka credentials
         run: |
           node --input-type=module <<'JS'
           import { randomBytes } from 'node:crypto'
@@ -124,7 +131,8 @@ jobs:
         uses: ./.github/actions/pnpm-install
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-      - name: Initialize the official Postgres Workflow world in isolated PG17
+      - &initialize_postgres
+        name: Initialize the official Postgres Workflow world in isolated PG17
         if: env.PUBLISH_IMAGE != 'true'
         run: |
           docker compose up --detach --wait --wait-timeout 120 postgres
@@ -133,19 +141,33 @@ jobs:
             /source/apps/eve/node_modules/@workflow/world-postgres/bin/setup.js
       - name: Start an independent external Compose installation against isolated PG17
         run: bash scripts/acceptance/self-hosted-external-postgres.sh
-      - name: Build the pinned upstream MinIO fixture
+      - &build_minio
+        name: Build the pinned upstream MinIO fixture
         run: docker compose build minio
-      - name: Apply migrations and wait for health
+      - &start_community
+        name: Apply migrations and wait for health
         run: docker compose up --detach --wait --wait-timeout 240
-      - name: Verify runtime edition, sign-in document, API and compiled assets
+      - &check_community
+        name: Verify runtime edition, sign-in document, API and compiled assets
         run: node scripts/self-hosted-smoke.mjs
         env:
           MIKKA_EXPECTED_REVISION: ${{ github.sha }}
       - name: Exercise the host updater's post-activation API checks on this image
         run: docker compose exec -T -e "MIKKA_EXPECTED_REVISION=$GITHUB_SHA" app node scripts/self-hosted-update-smoke.mjs
-      - name: Exercise Mailpit, MinIO, two app replicas and 31 synthetic model replies
+      - &community_services
+        name: Exercise Mailpit, MinIO, two app replicas and 31 synthetic model replies
         timeout-minutes: 10
         run: docker compose exec -T -e MIKKA_DESKTOP_ACCEPTANCE=1 app node scripts/acceptance/self-hosted-services.mjs
+      - name: Ensure FFmpeg and ffprobe for community media regressions
+        timeout-minutes: 5
+        run: |
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
+            sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
+            sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y --no-install-recommends ffmpeg
+          fi
+          ffmpeg -version
+          ffprobe -version
       - name: Execute declared self-hosted compatibility tests in community mode
         env:
           MIKKA_EDITION: community
@@ -191,7 +213,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: |
+        run: &native_runtime |
           pnpm exec playwright install --with-deps chromium
           sudo apt-get install -y xvfb dbus-x11 gnome-keyring libsecret-1-0
           node apps/desktop/scripts/install-electron.mjs
@@ -199,16 +221,23 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
         run: |
           pnpm --filter @mikka/desktop build --public-test-fixture
-          pnpm --filter @mikka/desktop exec electron-builder --dir --linux --config electron-builder.acceptance.yml --config.linux.executableName=mikka-selfhost-acceptance --publish never
+        env:
+          MIKKA_DESKTOP_FLAVOR: dev
+          MIKKA_DESKTOP_APP_URL: http://localhost:3001/mikka
+      - name: Package the native acceptance executable
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+        run: &native_packaging |
+          umask 077
+          pnpm --filter @mikka/desktop exec electron-builder --dir --linux --config electron-builder.acceptance.yml --config.linux.executableName=mikka-selfhost-acceptance --publish never > "$RUNNER_TEMP/self-hosted-acceptance-packaging.log" 2>&1
           sudo chown root:root apps/desktop/release-acceptance/linux-unpacked/chrome-sandbox
           sudo chmod 4755 apps/desktop/release-acceptance/linux-unpacked/chrome-sandbox
         env:
           MIKKA_DESKTOP_FLAVOR: dev
           MIKKA_DESKTOP_APP_URL: http://localhost:3001/mikka
-      - name: Verify packaged desktop email login, chat and built-in live against the actual image
+      - name: ${{ github.event_name == 'workflow_dispatch' && 'Verify public Desktop fixture protocol against the actual community image' || 'Verify full packaged release Desktop against the actual community image' }}
         if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
         timeout-minutes: 5
-        run: |
+        run: &native_check |
           node --test apps/desktop/test/self-hosted.test.mjs
           umask 077
           mkdir -m 700 "$RUNNER_TEMP/mikka-selfhost-desktop"
@@ -217,11 +246,15 @@ jobs:
           docker compose exec -T app node -e 'require("node:fs").rmSync("/data/self-hosted-desktop-session.private.json", {force:true})'
           dbus-run-session -- bash -euc '
             printf "%s" "disposable-selfhost-test-keyring" | gnome-keyring-daemon --unlock --components=secrets
-            xvfb-run -a node apps/desktop/test/self-hosted.mjs
+            args=()
+            if [[ "$MIKKA_DESKTOP_PROTOCOL_ONLY" == true ]]; then args+=(--protocol-only); fi
+            xvfb-run -a node apps/desktop/test/self-hosted.mjs "${args[@]}"
           '
         env:
+          MIKKA_DESKTOP_PROTOCOL_ONLY: ${{ github.event_name == 'workflow_dispatch' }}
           MIKKA_DESKTOP_EXECUTABLE: ${{ github.workspace }}/apps/desktop/release-acceptance/linux-unpacked/mikka-selfhost-acceptance
-      - name: Remove private desktop fixture material
+      - &clean_desktop_fixture
+        name: Remove private desktop fixture material
         if: always()
         run: |
           rm -rf -- "$RUNNER_TEMP/mikka-selfhost-desktop"
@@ -273,6 +306,115 @@ jobs:
       - name: Retain startup diagnostics on failure
         if: failure()
         run: docker compose logs --no-color --tail=150
-      - name: Stop disposable services
+      - &stop_community
+        name: Stop disposable services
         if: always()
         run: docker compose --profile dependency-tests down --volumes --remove-orphans
+
+  official-desktop:
+    name: Official packaged Desktop against the self-hosted image
+    if: github.event_name == 'workflow_dispatch' && inputs.overlay_sha != '' && github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' && github.ref == 'refs/heads/main' && github.actor_id == '183887963' && github.triggering_actor == 'alexj11324'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    environment: cloudflare-runtime-release
+    env:
+      COMPOSE_FILE: docker-compose.yml:tests/self-hosted/compose.services.yml
+      COMPOSE_PROJECT_NAME: mikka-selfhost-ci
+      EXPECTED_OVERLAY_SHA: ${{ inputs.overlay_sha }}
+    steps:
+      - name: Verify the trusted workflow and fixed source pair
+        env:
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = alexj11324/Mikka
+          test "$GITHUB_REPOSITORY_ID" = 1427517699
+          test "$GITHUB_REF" = refs/heads/main
+          test "$GITHUB_ACTOR_ID" = 183887963
+          test "$GITHUB_ACTOR" = alexj11324
+          test "$TRIGGERING_ACTOR" = alexj11324
+          test "$GITHUB_WORKFLOW_REF" = alexj11324/Mikka/.github/workflows/self-hosted-image.yml@refs/heads/main
+          test "$GITHUB_WORKFLOW_SHA" = "$GITHUB_SHA"
+          [[ "$EXPECTED_OVERLAY_SHA" =~ ^[0-9a-f]{40}$ ]]
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c
+      - *public_image_inputs
+      - name: Build the exact community image without a private UI checkout
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
+        with: *public_image_build
+      - *isolated_community_secrets
+      - uses: ./.github/actions/pnpm-install
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - *initialize_postgres
+      - *build_minio
+      - *start_community
+      - *check_community
+      - *community_services
+      - name: Prepare Ubuntu package mirrors
+        run: sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
+      - name: Install the native desktop runtime dependencies
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: *native_runtime
+      - name: Check out the approved private main ancestor with read-only access
+        env:
+          HOSTED_UI_READ_KEY: ${{ secrets.HOSTED_UI_READ_KEY }}
+        run: |
+          node --input-type=module <<'JS'
+          import { execFileSync } from 'node:child_process'
+          import { withOverlayKey } from './scripts/cloudflare-ci.mjs'
+          import { verifyOverlayMain } from './scripts/cloudflare-native-oci.mjs'
+          const sha = process.env.EXPECTED_OVERLAY_SHA
+          execFileSync('git', ['init', '--quiet', '.hosted-ui'])
+          await withOverlayKey(process.env, async env => {
+            const options = { cwd: '.hosted-ui', env, stdio: 'pipe' }
+            execFileSync('git', ['fetch', '--quiet', '--no-tags', '--depth=1', 'git@github.com:alexj11324/mikka-hosted-ui.git', sha], options)
+            execFileSync('git', ['checkout', '--quiet', '--detach', 'FETCH_HEAD'], options)
+            verifyOverlayMain('.hosted-ui', sha, env)
+          }).catch(() => { throw new Error('OFFICIAL_UI_CHECKOUT_OR_MAIN_ANCESTRY_FAILED') })
+          JS
+      - name: Verify the fixed pair and build the official Desktop client
+        env:
+          MIKKA_UI_OVERLAY_SHA: ${{ inputs.overlay_sha }}
+          MIKKA_UI_OVERLAY_DIR: .hosted-ui
+          MIKKA_DESKTOP_FLAVOR: dev
+          MIKKA_DESKTOP_APP_URL: http://localhost:3001/mikka
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C .hosted-ui rev-parse HEAD)" = "$MIKKA_UI_OVERLAY_SHA"
+          node scripts/release/hosted-ui.mjs record .hosted-ui
+          umask 077
+          pnpm --dir .hosted-ui install --ignore-workspace --prod --ignore-scripts --frozen-lockfile > "$RUNNER_TEMP/official-ui-install.log" 2>&1
+          pnpm --filter @mikka/desktop build > "$RUNNER_TEMP/official-desktop-build.log" 2>&1
+      - name: Package the official Linux acceptance executable
+        env:
+          MIKKA_DESKTOP_FLAVOR: dev
+          MIKKA_DESKTOP_APP_URL: http://localhost:3001/mikka
+        run: *native_packaging
+      - name: Verify full official first-run, visible chat, live updates and sign-out
+        env:
+          MIKKA_UI_OVERLAY_SHA: ${{ inputs.overlay_sha }}
+          MIKKA_DESKTOP_PROTOCOL_ONLY: 'false'
+          MIKKA_DESKTOP_EXECUTABLE: ${{ github.workspace }}/apps/desktop/release-acceptance/linux-unpacked/mikka-selfhost-acceptance
+        run: *native_check
+        timeout-minutes: 5
+      - name: Retain the sanitized official Desktop qualification receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: official-self-hosted-desktop-${{ github.sha }}-${{ inputs.overlay_sha }}
+          path: .artifacts/self-hosted/desktop/report.json
+          if-no-files-found: error
+          retention-days: 14
+      - *clean_desktop_fixture
+      - *stop_community

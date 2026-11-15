@@ -30,8 +30,8 @@ const stub = (path: string, namedExports: Record<string, unknown>) => mock.modul
 mock.module('expo-router', { namedExports: { useRouter: () => ({ push: (path: string) => navigation.push(path) }), useLocalSearchParams: () => ({ view, ...linked }), useFocusEffect: (read: () => void) => useEffect(read, [read]) } })
 mock.module('react-native', { namedExports: {
   StyleSheet: { create: (styles: unknown) => styles }, View: 'div', RefreshControl: none, Linking: { openURL: (url: string) => navigation.push(url) },
-  FlatList: ({ data, renderItem, ListHeaderComponent, ListFooterComponent }: { data: { key: string; conversation?: Item; pull?: { title: string } }[]; renderItem: (props: { item: unknown }) => ReactNode; ListHeaderComponent: ReactNode; ListFooterComponent?: ReactNode }) =>
-    createElement(Fragment, null, ListHeaderComponent, ...data.map(item => createElement('section', { key: item.key, 'aria-label': item.conversation?.title ?? item.pull?.title }, renderItem({ item }))), ListFooterComponent),
+  FlatList: ({ data, renderItem, keyExtractor, ListHeaderComponent, ListFooterComponent }: { keyExtractor: (item: { key: string }) => string; data: { key: string; conversation?: Item; pull?: { title: string } }[]; renderItem: (props: { item: unknown }) => ReactNode; ListHeaderComponent: ReactNode; ListFooterComponent?: ReactNode }) =>
+    createElement(Fragment, null, ListHeaderComponent, ...data.map(item => createElement('section', { key: keyExtractor(item), 'aria-label': item.conversation?.title ?? item.pull?.title }, renderItem({ item }))), ListFooterComponent),
 } })
 stub('components/settings.tsx', {
   SettingsPage: ({ children }: { children: ReactNode }) => children,

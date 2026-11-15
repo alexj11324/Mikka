@@ -11,7 +11,7 @@ import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
 import { appOrigin } from '@/lib/mcp/resource'
 import { withBasePath } from '@/lib/base-path'
-import { checkAvatarFile } from '@/lib/account/avatar-file'
+import { AVATAR_MAX_BYTES, checkAvatarFile } from '@/lib/account/avatar-file'
 import { saveAvatar } from '@/lib/account/avatar'
 import { listSignedInDevices, sessionTokenFor, type SignedInDevice } from '@/lib/account/sessions'
 import { EXPORT_LINK_TTL_MS, releaseExport, reserveExport } from '@/lib/account/export'
@@ -66,7 +66,7 @@ export async function uploadAvatar(form: FormData): Promise<ActionResult<{ image
     const { user, headers: requestHeaders } = await requireSession()
     const file = form.get('avatar')
     if (!(file instanceof Blob)) throw new ActionFailureError('avatarInvalidType')
-    if (file.size > 200 * 1024) throw new ActionFailureError('avatarTooLarge')
+    if (file.size > AVATAR_MAX_BYTES) throw new ActionFailureError('avatarTooLarge')
     const checked = checkAvatarFile(file.type, new Uint8Array(await file.arrayBuffer()))
     if (!checked.ok) throw new ActionFailureError(checked.reason === 'size' ? 'avatarTooLarge' : 'avatarInvalidType')
     const image = await saveAvatar(user.id, checked.contentType, checked.bytes)

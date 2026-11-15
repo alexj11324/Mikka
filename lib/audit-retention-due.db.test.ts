@@ -21,7 +21,7 @@ test('audit retention due times match what the sweep deletes or delivers', { ski
   const admin = new Pool({ connectionString: target, max: 1 })
   await admin.query(`CREATE SCHEMA ${schema}`)
   for (const table of TABLES) await admin.query(`CREATE TABLE ${schema}.${table} (LIKE public.${table} INCLUDING DEFAULTS)`)
-  const pool = new Pool({ connectionString: target, options: `-c search_path=${schema},public`, max: 2 })
+  const pool = new Pool({ connectionString: target, options: `-c search_path=${schema},public -c timezone=America/New_York`, max: 2 })
   t.after(async () => { await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end() })
   // In this test both databases are the same isolated one; production may split them.
   const due = () => nextAuditRetentionDue(pool, pool)
@@ -33,12 +33,22 @@ test('audit retention due times match what the sweep deletes or delivers', { ski
     assert.equal(await due(), null)
   })
 
+  await t.test('an empty deleted workspace with a finite policy wakes at the grace deadline', async () => {
+    const ws = randomUUID(), deletedAt = new Date(Date.now() - 91 * DAY)
+    await policy(ws, 365)
+    await pool.query(`INSERT INTO ${schema}.workspace_deletions (id,"deletedAt") VALUES ($1,$2)`, [ws, deletedAt])
+    assert.equal(await due(), deletedAt.getTime() + 90 * DAY)
+    await pool.query(`UPDATE ${schema}.workspace_audit_retention SET "legalHold"=true WHERE "workspaceId"=$1`, [ws])
+    assert.equal(await due(), null)
+    await clear()
+  })
+
   await t.test('events under a retention period are due in the hour after the oldest passes it', async () => {
-    const ws = randomUUID(), oldest = new Date(Date.now() - 29 * DAY)
+    const ws = randomUUID(), oldest = new Date('2026-10-15T13:10:04.000Z')
     await policy(ws, 30)
     assert.equal(await due(), null, 'a period with no events has nothing to expire')
     await event(ws, oldest)
-    await event(ws, new Date())
+    await event(ws, new Date(oldest.getTime() + DAY))
     assert.equal(await due(), nextHour(oldest.getTime() + 30 * DAY))
     await pool.query(`UPDATE ${schema}.workspace_audit_retention SET "legalHold"=true`)
     assert.equal(await due(), null, 'a legal hold keeps everything')
@@ -46,10 +56,10 @@ test('audit retention due times match what the sweep deletes or delivers', { ski
   })
 
   await t.test('a deleted workspace is due when its 90-day grace ends, or later under a longer period', async () => {
-    const ws = randomUUID(), deletedAt = new Date(Date.now() - 10 * DAY)
+    const ws = randomUUID(), deletedAt = new Date('2026-10-15T13:10:04.000Z')
     await pool.query(`INSERT INTO ${schema}.workspace_deletions (id,"deletedAt") VALUES ($1,$2)`, [ws, deletedAt])
     assert.equal(await due(), deletedAt.getTime() + 90 * DAY)
-    const oldest = new Date(Date.now() - 20 * DAY)
+    const oldest = new Date(deletedAt.getTime() - 10 * DAY)
     await event(ws, oldest)
     await policy(ws, 365)
     assert.equal(await due(), nextHour(oldest.getTime() + 365 * DAY), 'the longer period wins')

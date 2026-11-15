@@ -9,18 +9,24 @@ Object.assign(globalThis, { window: browser, document: browser.document, HTMLEle
 const { createRoot } = await import('react-dom/client')
 const { flushSync } = await import('react-dom')
 let renderedQuery: unknown
+let requestedQuery: unknown
 let data: ConversationDirectoryPage[] | undefined
 const opened: string[] = []
 mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) => key, useFormatter: () => ({ dateTime: () => 'Today' }) } })
 mock.module('swr', { defaultExport: () => ({}), namedExports: { useSWRConfig: () => ({}) } })
-mock.module('swr/infinite', { defaultExport: (getKey: (index: number, previous: null) => unknown[]) => {
-  renderedQuery = getKey(0, null)[4]
+mock.module('swr/infinite', { defaultExport: (getKey: (index: number, previous: null) => unknown[], fetchPage: (key: unknown[]) => unknown) => {
+  const key = getKey(0, null)
+  renderedQuery = key[4]
+  fetchPage(key)
   return { data }
 }, namedExports: { unstable_serialize: () => 'directory' } })
 const stub = (file: string, namedExports: Record<string, unknown>) => mock.module(new URL(file, import.meta.url).href, { namedExports })
 stub('../../hooks/use-live-key.tsx', { useLiveKey: () => {} })
 stub('../../components/settings/use-preferences.ts', { usePreferences: () => ({}) })
-stub('../../app/actions/task-runs.ts', { listConversations: () => ({ items: [], cursor: null }) })
+stub('../../app/actions/task-runs.ts', { listConversations: ({ search }: { search: string }) => {
+  requestedQuery = search
+  return { items: [], cursor: null }
+} })
 stub('./workspace-navigation.ts', { openGroupConversation: (id: string) => opened.push('chat:' + id), openThread: (id: string) => opened.push('run:' + id), openTask: () => {} })
 stub('./pull-requests-badge.tsx', { pullRequestRef: () => ({}), PullRequestsBadge: () => null })
 const { ConversationDirectory } = await import('./conversation-directory')
@@ -30,6 +36,7 @@ test('the active directory query follows the search input even before React can 
   try {
     await act(async () => root.render(<ConversationDirectory ownerId="owner" workspaceId="workspace" botId={null} />))
     assert.equal(renderedQuery, '')
+    assert.equal(requestedQuery, '')
     const input = host.querySelector('input[type="search"]')
     assert.ok(input instanceof browser.HTMLInputElement)
     const setter = Object.getOwnPropertyDescriptor(browser.HTMLInputElement.prototype, 'value')?.set
@@ -40,6 +47,7 @@ test('the active directory query follows the search input even before React can 
         input.dispatchEvent(new browser.Event('input', { bubbles: true }))
       })
       assert.equal(renderedQuery, 'another conversation')
+      assert.equal(requestedQuery, 'another conversation')
     })
   } finally { await act(async () => root.unmount()); await browser.happyDOM.abort() }
 })

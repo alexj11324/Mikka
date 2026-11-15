@@ -64,6 +64,7 @@ import { PanelRight } from 'lucide-react'
 import { ISSUE_STATUSES, type IssueStatus, type IssueView } from './issue-properties'
 import type { listIssues } from '@/app/actions/issues'
 import { useLiveBotChatList, useLiveBotRoster, useLiveGroupList, useLiveIssueList, useLiveThreadList } from '@/hooks/use-live-lists'
+import { snapshotReadFetcher } from '@/lib/swr/read-observer'
 import { ListReadScopeError, ownerListWorkspace, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
 import { endSession } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
@@ -236,8 +237,8 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     void clearCache(['/api/workspace', user.email])
   }, [error, clearCache, user.email])
   const { data: projects = [], error: projectError, isLoading: projectsLoading, mutate: refreshProjects } = useSWR(['projects', user.id], listProjects, whileSettings)
-  const { data: teams = [], error: teamsError, isLoading: teamsLoading, mutate: refreshTeams } = useSWR('teams', listTeams, whileSettings)
-  const { data: projectTeams = [], error: projectTeamsError, isLoading: projectTeamsLoading, mutate: refreshProjectTeams } = useSWR('project-teams', listProjectTeams, whileSettings)
+  const { data: teams = [], error: teamsError, isLoading: teamsLoading, mutate: refreshTeams } = useSWR('teams', snapshotReadFetcher(listTeams), whileSettings)
+  const { data: projectTeams = [], error: projectTeamsError, isLoading: projectTeamsLoading, mutate: refreshProjectTeams } = useSWR('project-teams', snapshotReadFetcher(listProjectTeams), whileSettings)
   const { data: botList, error: botListError, mutate: refreshBotList } = useLiveBotRoster(user.id, listWorkspaceId, settingsShown)
   const bots = botList?.items ?? []
   const [onboardingOpen, setOnboardingOpen] = useState(Boolean(onboarding))

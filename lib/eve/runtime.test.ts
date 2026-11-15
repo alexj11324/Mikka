@@ -98,7 +98,7 @@ mock.module(new URL('../subscription-workflow-model.ts', import.meta.url).href, 
   modelId: string
   provider = 'fixture.subscription'
   supportedUrls = {}
-  constructor(selection: { modelId: string }) { this.modelId = selection.modelId; modelCalls.push(selection) }
+  constructor(selection: { modelId: string }, requestPolicy?: unknown) { this.modelId = selection.modelId; modelCalls.push({ selection, requestPolicy }) }
 } } })
 
 const { ContextContainer, contextStorage } = await import(new URL('./context/container.js', import.meta.resolve('eve')).href)
@@ -164,9 +164,15 @@ test('shared subscription references survive native state restoration and keep t
   for (const [key, value] of original.entries()) restored.set(key, structuredClone(value))
   await contextStorage.run(restored, async () => {
     assert.equal((await modelForSession(context())).modelId, 'shared-model')
-    assert.deepEqual(modelCalls, [selection])
+    assert.deepEqual(modelCalls, [{ selection, requestPolicy: { codexServiceTier: 'priority' } }])
+    await modelForSession(context({ parent: true }))
+    assert.deepEqual(modelCalls[1], { selection, requestPolicy: undefined })
+    scheduled = true
+    await started({ data: { turnId: 'turn_2' } }, context({ turnId: 'turn_2' }))
+    await modelForSession(context({ turnId: 'turn_2' }))
+    assert.deepEqual(modelCalls[2], { selection, requestPolicy: undefined })
     assert.deepEqual(turnModel.get()?.modelSelection, selection)
-    assert.equal(modelReads, 1)
+    assert.equal(modelReads, 2)
   })
 })
 

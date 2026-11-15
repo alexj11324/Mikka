@@ -36,7 +36,7 @@ async function handlePOST(request: Request) {
     // GitHub data is returned only to this viewer, never persisted in shared metadata. The task's live
     // channel (#1212) says when a webhook changed a delivered PR, so the badge asks again.
     const live = await liveWorkspace(input.data.issueId, session.user.id)
-    return NextResponse.json({ viewerId: session.user.id, url: pr.url, state: pr.state, updatedAt: pr.updatedAt, live: { workspaceId: live } }, { headers })
+    return NextResponse.json({ viewerId: session.user.id, url: pr.url, state: pr.state, updatedAt: pr.updatedAt, title: pr.title, createdAt: pr.createdAt, mergedAt: pr.mergedAt, live: { workspaceId: live } }, { headers })
   } catch (error) {
     return error instanceof GitHubAccessError ? fail(error.code, error.status) : fail('githubUnavailable', 502)
   }

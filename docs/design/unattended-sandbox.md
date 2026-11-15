@@ -48,15 +48,15 @@ add a permission-preflight request to the task runtime.
 The planner receives a current screenshot as an actual image input and chooses a
 structured mouse, keyboard, scroll or drag operation. DOM evidence may assist the
 model but button keywords do not grant business authority. Decisions supplies
-semantic evidence; the existing host policy determines allow, ask or deny.
+semantic evidence; the existing host policy determines allow or deny.
 
 Actions bind the owner, task, document, observation, policy revision and exact
 mutation. A durable gateway receipt makes retries return the original result rather
 than repeating a click. A stale observation requires a fresh observation. An unknown
 external outcome must not be reported as success or blindly retried.
 
-A saved account's explicit same-owner/site unattended-login grant can cover guarded
-fill and submission without two approval cards. Account ambiguity, revoked grants,
+A saved login in the person's vault covers guarded fill and submission without
+per-action approval cards. Account ambiguity, revoked grants,
 MFA and an unknown result remain explicit stops. The broker retains secret masking
 and origin, document and account checks.
 

@@ -115,13 +115,16 @@ export class ComputerStore {
     return rows[0]
   }
   async state(actor: Actor, botId: string): Promise<ComputerState> {
-    await this.bot(actor, botId)
-    const { rows } = await this.pool.query('SELECT m.state AS machine,m."sandboxId",m."provisionLeaseUntil",d.control,d."controlledBy",d."controlUntil",d."lastAction" FROM bot_desktops d JOIN cloud_machines m ON m."workspaceId"=d."workspaceId" AND m."ownerId"=d."ownerId" WHERE d."botId"=$1 AND d."ownerId"=$2', [botId, actor.userId])
-    const row = rows[0]
-    if (!row) {
-      const machine = (await this.pool.query('SELECT state,"provisionLeaseUntil" FROM cloud_machines WHERE "workspaceId"=$1 AND "ownerId"=$2', [actor.workspaceId, actor.userId])).rows[0]
-      return { machine: machine?.state === 'waking' ? 'waking' : 'sleeping', control: 'idle',
-        live: computerLiveState(actor.workspaceId, machine?.state === 'waking' ? [machine.provisionLeaseUntil] : []) }
+    const { rows: [row] } = await this.pool.query(`SELECT m.state AS machine, m."sandboxId", m."provisionLeaseUntil",
+      d.control, d."controlledBy", d."controlUntil", d."lastAction"
+      FROM bots b
+      LEFT JOIN cloud_machines m ON m."workspaceId" = b."workspaceId" AND m."ownerId" = b."ownerId"
+      LEFT JOIN bot_desktops d ON d."botId" = b.id AND d."workspaceId" = m."workspaceId" AND d."ownerId" = m."ownerId"
+      WHERE b.id = $1 AND b."workspaceId" = $2 AND b."ownerId" = $3`, [botId, actor.workspaceId, actor.userId])
+    if (!row) throw new ComputerError(404, 'Computer not found')
+    if (row.control === null) {
+      return { machine: row.machine === 'waking' ? 'waking' : 'sleeping', control: 'idle',
+        live: computerLiveState(actor.workspaceId, row.machine === 'waking' ? [row.provisionLeaseUntil] : []) }
     }
     const deadlines: (Date | null | undefined)[] = row.machine === 'waking' ? [row.provisionLeaseUntil] : []
     if (row.sandboxId && row.machine !== 'error' && row.machine !== 'waking') {

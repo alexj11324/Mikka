@@ -2,9 +2,9 @@ import 'server-only'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import { ModelAdmissionError } from '@/lib/model-admission/contract'
-import { workersAiTransport } from '../workers-ai-config'
+import { workersAiModelId, workersAiTransport } from '../workers-ai-config'
 
-export const workersAiModelId = '@cf/deepseek-ai/deepseek-v4.1-flash-1017'
+export { workersAiModelId }
 
 /** One physical model on the account selected by the operator. No caller can supply a URL or key. */
 export function workersAiConfig(modelId: string, env = process.env) {
@@ -20,7 +20,7 @@ export function workersAiModel(config: ReturnType<typeof workersAiConfig>) {
   }).chatModel(workersAiModelId)
 }
 
-/** https://developers.cloudflare.com/ai/models/@cf/deepseek-ai/deepseek-v4.1-flash-1017/
+/** https://developers.cloudflare.com/workers-ai/models/deepseek-v4.1-flash-1017/
  * List-price usage in microdollars, before any account-level Startup Credit. */
 export function workersAiCost(usage: { inputTokens: { total?: number; cacheRead?: number }; outputTokens: { total?: number }; raw?: unknown }): number | null {
   const raw = usage.raw as { prompt_tokens?: unknown; completion_tokens?: unknown; prompt_tokens_details?: { cached_tokens?: unknown } } | undefined

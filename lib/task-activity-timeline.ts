@@ -111,7 +111,7 @@ export type RunPreview = { harness?: string; title?: string; result?: string; ti
 export type ActivitySubject = { taskId: string; code: string | null; refs?: Readonly<Record<string, { code: string | null } & TaskPreview>> } & TaskPreview
 
 /** One conversation on this task. `linked` is false when it has no transcript to open. `title` is the conversation's own. */
-export type ActivityStretch = { at: string; runId: string; linked: boolean } & RunPreview
+export type ActivityStretch = { at: string; runId: string; /** The Agent that ran it, when the read carries it: an Agent's change matches only its own threads. */ agentId?: string | null; linked: boolean } & RunPreview
 
 export type ActivityLabels = {
   activity: (key: keyof HistoryLabels, values?: Record<string, string>) => string
@@ -190,17 +190,18 @@ export function taskHistoryLabel(event: IssueActivityEvent, labels: ActivityLabe
  * The conversation that had already started when this Agent change happened: the last one, as Capy names the thread
  * that made the change. A person's change, an unmatched Agent and a conversation with no transcript match nothing.
  */
-export function activityStretch(at: string, actor: { type?: string | null } | null | undefined, stretches: readonly ActivityStretch[]): ActivityStretch | null {
+export function activityStretch(at: string, actor: { type?: string | null; id?: string | null } | null | undefined, stretches: readonly ActivityStretch[]): ActivityStretch | null {
   if (actor?.type !== 'agent') return null
   const time = Date.parse(at)
   if (Number.isNaN(time)) return null
-  let match: ActivityStretch | null = null
-  const ordered = [...stretches].sort((a, b) => Date.parse(a.at) - Date.parse(b.at) || a.runId.localeCompare(b.runId))
-  for (const stretch of ordered) {
+  // Issue history stores who changed it, not which run: an Agent's change matches only its own threads that had
+  // started, and when more than one could have made it the thread is not guessed (fail closed, as main's #2538 rule).
+  const candidates = stretches.filter(stretch => {
     const started = Date.parse(stretch.at)
-    if (stretch.linked && !Number.isNaN(started) && started <= time) match = stretch
-  }
-  return match
+    return stretch.linked && !Number.isNaN(started) && started <= time
+      && (!actor.id || stretch.agentId === undefined || stretch.agentId === null || stretch.agentId === actor.id)
+  })
+  return candidates.length === 1 ? candidates[0] : null
 }
 
 export function activityRunId(at: string, actor: { type?: string | null } | null | undefined, stretches: readonly ActivityStretch[]): string | null {
@@ -226,6 +227,8 @@ export function activityLineParts(
     const stretch = activityStretch(event.at, actor, stretches)
     lead = stretch
       ? { kind: 'thread', text: stretch.title || t('untitledThread'), runId: stretch.runId, ...defined({ harness: stretch.harness, title: stretch.title, result: stretch.result, time: stretch.time }) }
+      // No thread to name, or more than one that could have made it: an untitled thread, never a guessed link
+      // and never the Agent's name as the actor (Alex: a change is said by its thread).
       : { kind: 'text', text: t('untitledThread'), name: true }
   } else if (actor?.type === 'user' && actor.name) lead = { kind: 'text', text: actor.name, name: true }
   else lead = { kind: 'text', text: t('system'), name: true }

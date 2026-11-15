@@ -81,3 +81,52 @@ test('failure of the optional main identity hint leaves the normal bootstrap and
   assert.equal(globalThis.__workspaceImported, 0)
   assert.equal(typeof (await module.loadWorkspace()).default, 'function')
 })
+
+test('bootstrap accepts an old server without the optional live routing hint and rejects malformed hints', async t => {
+  const valid = 'a0c73a42-d768-467c-a00a-dc3a03e98273'
+  for (const hint of [undefined, null, '', 'not-a-workspace', 42, {}, '00000000-0000-0000-0000-000000000000', valid]) {
+    await t.test(String(hint), async t => {
+      const { module } = await fixture(t)
+      globalThis.fetch = async () => Response.json({ version: 1, ok: true, result: {
+        user: { id: 'owner', name: 'Fixture', email: 'fixture@example.invalid' }, session: { id: 'session' },
+        cacheWorkspace: { workspaceId: valid, role: 'member' },
+        ...(hint === undefined ? {} : { liveHomeWorkspaceId: hint }),
+        googleEnabled: false, githubEnabled: false, emailEnabled: true, onboarding: false, computer: 'none',
+      } })
+      const value = await module.readBootstrap()
+      assert.equal(value.liveHomeWorkspaceId, hint === valid ? valid : null)
+      assert.deepEqual(value.cacheWorkspace, { workspaceId: valid, role: 'member' })
+    })
+  }
+})
+
+test('an invalid explicit selector clears both routing hints after the normal bootstrap response', async t => {
+  const { module } = await fixture(t)
+  const valid = 'a0c73a42-d768-467c-a00a-dc3a03e98273'
+  globalThis.fetch = async () => Response.json({ version: 1, ok: true, result: {
+    user: { id: 'owner', name: 'Fixture', email: 'fixture@example.invalid' }, session: { id: 'session' },
+    cacheWorkspace: { workspaceId: valid, role: 'member' }, liveHomeWorkspaceId: valid,
+    googleEnabled: false, githubEnabled: false, emailEnabled: true, onboarding: false, computer: 'none',
+  } })
+  const value = await module.readBootstrap('invalid-query')
+  assert.equal(value.cacheWorkspace, null)
+  assert.equal(value.liveHomeWorkspaceId, null)
+})
+
+test('an expired bootstrap returns public sign-in configuration with no live routing hint', async t => {
+  const { module } = await fixture(t)
+  const requests = []
+  globalThis.fetch = async path => {
+    requests.push(path)
+    return String(path).endsWith('/config')
+      ? Response.json({ googleEnabled: false, githubEnabled: false, emailEnabled: true })
+      : new Response('', { status: 401 })
+  }
+  const value = await module.readBootstrap()
+  assert.equal(value.user, null)
+  assert.equal(value.session, null)
+  assert.equal(value.cacheWorkspace, null)
+  assert.equal(value.liveHomeWorkspaceId, null)
+  assert.equal(value.emailEnabled, true)
+  assert.equal(requests.length, 2)
+})

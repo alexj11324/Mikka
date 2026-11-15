@@ -27,7 +27,7 @@ export interface IssueThread {
   /** Whose thread it is, shown on a teammate's thread instead of its content. */
   ownerName: string | null
   /** `bot`: the dispatching Bot's own bloub look, so every copy of it matches the bot list (R-36); null for the Coordinator's own runs. */
-  detail: { name: string; agentName: string; harness: string; observedModel?: string | null; summary: string | null; /** Only full owner reads carry the summary's persisted source. */ summarySource?: 'report' | 'error' | null; bot?: { color: string; shape: string } | null; /** A custom Agent Profile that did the run; absent for Default and runs before Profiles. */ profile?: ThreadProfile | null } | null
+  detail: { name: string; agentName: string; harness: string; agentId?: string; observedModel?: string | null; summary: string | null; /** Only full owner reads carry the summary's persisted source. */ summarySource?: 'report' | 'error' | null; bot?: { color: string; shape: string } | null; /** A custom Agent Profile that did the run; absent for Default and runs before Profiles. */ profile?: ThreadProfile | null } | null
   /**
    * BE-18 run chain (GitHub Actions run_id + run_attempt): a question continuation is a new
    * run in the same thread. `id` is the root run (attempt 1); stop, status and send act on
@@ -132,7 +132,7 @@ export const ISSUE_THREAD_LIMIT = 20
 export interface IssueThreadRow {
   id: string; issueId: string | null; userId: string; status: string; pauseReason?: RunAttempt['pauseReason']; prompt: string; title?: string | null
   report: unknown; error: string | null; failureDetails?: unknown; createdAt: Date; finishedAt: Date | null
-  agentName: string; harness: string; ownerName?: string | null
+  agentName: string; harness: string; agentId?: string; ownerName?: string | null
   stopRequestedAt?: Date | null
   outcome?: string | null
   /** agent_runs.kind: `implement` and `plan` are the conversation; `acceptance` is a Factory check. */
@@ -190,7 +190,7 @@ export function projectIssueThreads(rows: readonly (IssueThreadRow | IssueThread
       stopping: runIsActive(row.status) && !!row.stopRequestedAt,
       ownerName: row.userId === viewerId ? null : row.ownerName ?? null,
       detail: canReadThread(row.userId, viewerId, memberIds)
-        ? { name: 'prompt' in row ? row.title || threadName(row.prompt, row.agentName) : threadTitle({ name: row.name }) || row.agentName, agentName: row.agentName, harness: row.harness, ...('report' in row ? runSummaryView({ report: row.report, error: row.error }) : { summary: row.summary, ...('observedModel' in row ? { observedModel: row.observedModel } : {}) }), bot: row.botColor && row.botShape ? { color: row.botColor, shape: row.botShape } : null, ...(row.profile !== undefined ? { profile: threadProfile(row.profile) } : {}) }
+        ? { name: 'prompt' in row ? row.title || threadName(row.prompt, row.agentName) : threadTitle({ name: row.name }) || row.agentName, agentName: row.agentName, harness: row.harness, ...(row.agentId ? { agentId: row.agentId } : {}), ...('report' in row ? runSummaryView({ report: row.report, error: row.error }) : { summary: row.summary, ...('observedModel' in row ? { observedModel: row.observedModel } : {}) }), bot: row.botColor && row.botShape ? { color: row.botColor, shape: row.botShape } : null, ...(row.profile !== undefined ? { profile: threadProfile(row.profile) } : {}) }
         : null,
       rootRunId: row.id, latestRunId: row.id,
       attempts: [{ ...(row.pauseReason ? { pauseReason: row.pauseReason } : {}), runId: row.id, attempt: 1, status: row.status, outcome: row.outcome ?? null, stopping: runIsActive(row.status) && !!row.stopRequestedAt, createdAt: row.createdAt, finishedAt: row.finishedAt }],
@@ -242,15 +242,15 @@ export function taskThreadRoots<T extends Pick<IssueThread, 'id' | 'kind' | 'det
  * `profile` is the custom Profile's id, null for Default and runs before Profiles. Oldest first; a stretch opens at its first thread and reads as its last. A thread whose
  * detail the reader cannot see has no Agent and stands alone unless the one before is hidden too.
  */
-export function agentStretches<T extends { id: string; kind?: string; createdAt: Date | string; detail: { harness: string; profile?: { id: string } | null } | null }>(threads: readonly T[]): { agent: string | null; profile: string | null; first: T; last: T; ids: string[] }[] {
-  const out: { agent: string | null; profile: string | null; first: T; last: T; ids: string[] }[] = []
+export function agentStretches<T extends { id: string; kind?: string; createdAt: Date | string; detail: { harness: string; agentId?: string; profile?: { id: string } | null } | null }>(threads: readonly T[]): { agent: string | null; agentId: string | null; profile: string | null; first: T; last: T; ids: string[] }[] {
+  const out: { agent: string | null; agentId: string | null; profile: string | null; first: T; last: T; ids: string[] }[] = []
   // Only the conversation's own runs make stretches; a Factory check (review, verify) is its result card on the
   // task page (2026-11-04-2200), never a 「换 Codex」 row.
   for (const thread of [...threads].filter(isThreadRun).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())) {
-    const agent = thread.detail?.harness ?? null, profile = thread.detail?.profile?.id ?? null
+    const agent = thread.detail?.harness ?? null, agentId = thread.detail?.agentId ?? null, profile = thread.detail?.profile?.id ?? null
     const previous = out.at(-1)
-    if (previous && previous.agent === agent && previous.profile === profile) { previous.last = thread; previous.ids.push(thread.id) }
-    else out.push({ agent, profile, first: thread, last: thread, ids: [thread.id] })
+    if (previous && previous.agent === agent && previous.agentId === agentId && previous.profile === profile) { previous.last = thread; previous.ids.push(thread.id) }
+    else out.push({ agent, agentId, profile, first: thread, last: thread, ids: [thread.id] })
   }
   return out
 }

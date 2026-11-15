@@ -260,7 +260,7 @@ export function FramedTask(props: FramedTaskProps) {
   const subtaskRows = (connections.rows ?? []).filter(row => row.metadata.parentId === task.id).map(row => ({ id: row.id, title: row.title, identifier: row.identifier, createdAt: row.createdAt }))
   // An Agent's change is said by its conversation (Capy: the thread's code or title), matched to the conversation that had started by then.
   const runConversations = (props.agentActivity.threads ?? []).map(thread => ({
-    at: new Date(thread.createdAt).toISOString(), runId: thread.id, linked: Boolean(thread.detail),
+    at: new Date(thread.createdAt).toISOString(), runId: thread.id, agentId: thread.detail?.agentId ?? null, linked: Boolean(thread.detail),
     title: thread.detail?.name || tDirectory('untitled'), ...thread.detail?.harness ? { harness: thread.detail.harness } : {},
   }))
   const eventsFor = useActivityEvents(props.historyFailed ? [] : props.versions, props.historyFailed ? [] : subtaskRows, {

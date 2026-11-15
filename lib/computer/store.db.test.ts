@@ -26,7 +26,7 @@ import type * as provider from './e2b-provider'
 
 const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Computer database test URL required')
-test('real PostgreSQL: allocation, owner boundary, control generations and recovery', { skip: !databaseURL }, async () => {
+test('real PostgreSQL: allocation, owner boundary, control generations and recovery', { skip: !databaseURL }, async t => {
   const schema = `computer_${randomUUID().replaceAll('-', '')}`
   assert.ok(['127.0.0.1', 'localhost'].includes(new URL(databaseURL!).hostname))
   const admin = new Pool({ connectionString: databaseURL })
@@ -113,8 +113,13 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
       assert.equal(live?.workspaceId, actor.workspaceId, 'freshness metadata keeps the authorized workspace')
       return view
     }
-    assert.deepEqual(await stateView(), { machine: 'sleeping', control: 'idle' })
+    const initialStateQueries = t.mock.method(pool, 'query')
+    try {
+      assert.deepEqual(await stateView(), { machine: 'sleeping', control: 'idle' })
+      assert.equal(initialStateQueries.mock.callCount(), 1, 'one scoped snapshot before a desktop exists')
+    } finally { initialStateQueries.mock.restore() }
     await assert.rejects(store.state(bob, bot.id), { status: 404 })
+    await assert.rejects(store.state(otherWorkspace, bot.id), { status: 404 })
     await assert.rejects(store.operate(otherWorkspace, bot.id, 'wake'), { status: 404 })
     await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId",state,"provisionLeaseId","provisionLeaseUntil") VALUES ($1,$2,$3,'waking',$4,now()+interval '3 minutes')`, [actor.workspaceId, actor.userId, randomUUID(), randomUUID()])
     assert.deepEqual(await stateView(), { machine: 'waking', control: 'idle' }, 'provisioning is visible before the first desktop exists')
@@ -527,7 +532,11 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     // A run an earlier takeover paused (before this change) still resumes on handback.
     await pool.query(`UPDATE agent_runs SET "resumeStatus"=status,status='paused',"pauseReason"='human_control' WHERE id=$1`, [runId])
     const taken = epoch
-    assert.equal((await store.state(actor, bot.id)).control, 'user')
+    const heldStateQueries = t.mock.method(pool, 'query')
+    try {
+      assert.equal((await store.state(actor, bot.id)).control, 'user')
+      assert.equal(heldStateQueries.mock.callCount(), 2, 'one scoped snapshot and one current approval read')
+    } finally { heldStateQueries.mock.restore() }
     // Takeover pauses the bot: the desktop lease names the person, and the
     // trusted lease driver (scripts/e2b/lease-driver.py) refuses every bot
     // action while that hold lasts. Handback clears it under a new epoch.

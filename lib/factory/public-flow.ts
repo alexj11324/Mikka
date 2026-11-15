@@ -42,7 +42,12 @@ export interface FactoryFlowView {
   acceptance: { artifactId: string; version: number; runId: string; candidateId: string; counts: Record<string, number>; media: FactoryAcceptanceMedia[] } | null;
   pullRequest: { url: string; state: string } | null;
 }
-export interface FactoryAcceptanceMedia { captureId: string; kind: 'image' | 'video'; url: string; title: string; criterion: string | null; runId: string }
+/** Authenticated media references; public PR share URLs live only in the publication receipt. */
+export interface FactoryAcceptanceMedia {
+  captureId: string; kind: 'image' | 'video'; url: string; title: string; criterion: string | null; runId: string;
+  contentType?: string; size?: number; durationMs?: number | null;
+  candidateId?: string; appliesToCurrentCandidate?: boolean;
+}
 function isHandoffStage(stage: FactoryTask['stage']): stage is typeof FACTORY_HANDOFF_STAGES[number] {
   return FACTORY_HANDOFF_STAGES.some(value => value === stage)
 }

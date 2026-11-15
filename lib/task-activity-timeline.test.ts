@@ -87,3 +87,14 @@ test('only an Agent with a conversation that had started matches a run', () => {
   assert.equal(activityRunId('2026-11-14T13:00:00.000Z', claude, conversations), null)
   assert.equal(activityRunId('2026-11-14T14:30:00.000Z', ada, conversations), null)
 })
+
+test('an Agent\'s change matches only its own thread, and two that could have made it name none', () => {
+  const own = [
+    { at: '2026-11-14T14:00:00.000Z', runId: 'mine', agentId: 'a1', linked: true, title: 'Mine' },
+    { at: '2026-11-14T14:10:00.000Z', runId: 'other', agentId: 'a2', linked: true, title: 'Other agent' },
+  ]
+  assert.equal(activityRunId('2026-11-14T14:30:00.000Z', claude, own), 'mine')
+  const two = [...own, { at: '2026-11-14T14:20:00.000Z', runId: 'mine-again', agentId: 'a1', linked: true, title: 'Mine again' }]
+  assert.equal(activityRunId('2026-11-14T14:30:00.000Z', claude, two), null)
+  assert.equal(words(activityLineParts(event({ kind: 'created', actor: claude }), labels(en), subject, two)), 'Untitled thread created CAP-12')
+})

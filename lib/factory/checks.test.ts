@@ -2,6 +2,7 @@ import { bindFixtureWorkspaceDatabase } from '../../tests/helpers/workspace-data
 import { coordinatorWakeTransport } from '../coordinator/wake-after-commit';
 import { builtinGateway } from '../builtin-gateway/runtime';
 import { claimFixtureFactoryCheck, createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
+import { addFactoryPublicationEvidence, addFactoryVisualEvidence } from '../../tests/helpers/factory-visual-evidence';
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { reconcileFactoryCheck } from "./reconcile-check";
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
@@ -264,6 +265,8 @@ test(
             JSON.stringify(report),
           ],
         );
+        if (run.kind !== "acceptance" && !options.failed && !options.timeout)
+          await addFactoryVisualEvidence(pool, runId);
         return { report, sessionId };
       };
       const sha1 = "1".repeat(40),
@@ -364,6 +367,7 @@ test(
       state = await store.read("owner", state.task.id);
       assert.equal(state.task.stage, "review");
       assert.notEqual(state.task.candidateId, review.task.candidateId);
+      await addFactoryPublicationEvidence(pool, state.task.id);
       for (const stage of ["review", "verify"]) {
         assert.equal(state.task.stage, stage);
         const check = await dispatch(state.task);

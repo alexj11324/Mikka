@@ -127,7 +127,10 @@ test('both activity layouts preserve the genuine reply and its target in a mixed
 test('properties link only admitted conversations and show the recorded Factory branch', async () => {
   const opened = []
   const done = await mount({ agentActivity: {
-    items: [], threads: [{ id: 'run', createdAt: '2026-11-14T00:00:00.000Z', attempts: [], detail: { name: 'Worker review' } }, { id: 'hidden', createdAt: '2026-11-14T00:00:00.000Z', attempts: [], detail: null }],
+    threads: [
+      { id: 'run', createdAt: '2026-11-14T10:00:00Z', attempts: [], detail: { name: 'Worker review', harness: 'codex' } },
+      { id: 'hidden', createdAt: '2026-11-14T10:05:00Z', attempts: [], detail: null },
+    ],
     openThread: id => opened.push(id), work: {
       presentation: { linkedChats: [{ id: 'chat', title: 'Planning' }] },
       factory: { task: { review: { summary: { branch: 'feature/review' } } } },

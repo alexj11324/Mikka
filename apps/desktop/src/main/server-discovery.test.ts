@@ -34,9 +34,25 @@ test('discovery needs a name, version, edition, base path, protocol range and si
 
 test('a bare host finds the server under /mikka and keeps exactly the origin that answered', async () => {
   const seen: string[] = []
-  const result = await probeServer('mikka.example.com', options({ 'https://mikka.example.com/mikka/api/desktop/discovery': () => json(discovery) }, seen))
+  const result = await probeServer('mikka.example.com', options({
+    'https://mikka.example.com/api/version': () => json({ build: 'older', minDesktopVersion: null }),
+    'https://mikka.example.com/mikka/api/desktop/discovery': () => json(discovery),
+  }, seen))
   assert.deepEqual(result, { status: 'ok', server: { url: 'https://mikka.example.com/mikka', name: 'Acme Mikka', version: '2026.11.6', edition: 'community', signIn: { google: false, github: true, email: true } } })
-  assert.deepEqual(seen.filter(url => url.endsWith('/discovery')), ['https://mikka.example.com/api/desktop/discovery', 'https://mikka.example.com/mikka/api/desktop/discovery'])
+  assert.deepEqual(seen, ['https://mikka.example.com/api/desktop/discovery', 'https://mikka.example.com/mikka/api/desktop/discovery'])
+})
+
+test('legacy detection follows reachable discovery paths and preserves the old-server result', async () => {
+  const origin = 'https://older.example'
+  const seen: string[] = []
+  const old = { build: 'legacy', minDesktopVersion: null }
+  const routes = {
+    [`${origin}/api/desktop/discovery`]: () => { throw new TypeError('connection failed') },
+    [`${origin}/api/version`]: () => json(old),
+    [`${origin}/mikka/api/version`]: () => json(old),
+  }
+  assert.deepEqual(await probeServer(origin, options(routes, seen)), { status: 'server_update_required', version: null })
+  assert.deepEqual(seen, [`${origin}/api/desktop/discovery`, `${origin}/mikka/api/desktop/discovery`, `${origin}/mikka/api/version`])
 })
 
 test('unreachable, not Mikka and a redirect stay distinct; a redirect is never followed', async () => {

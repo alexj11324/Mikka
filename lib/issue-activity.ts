@@ -15,6 +15,8 @@ export type ActivityVersion = {
   actorType?: 'user' | 'agent' | 'system' | null
   actorId?: string | null
   actor?: ActivityActorView | null
+  /** Computed in SQL without sending document text or a digest to the client (lib/task-activity-versions.ts). */
+  descriptionChanged?: boolean
   createdAt: Date | string
 }
 
@@ -81,7 +83,8 @@ export function deriveIssueActivity(versions: ActivityVersion[], children: Activ
     // Autosave writes many revisions: one person's run of description edits, with nothing else between, is one event.
     const beforeBody = bodyHash(previous.content)
     const afterBody = bodyHash(current.content)
-    if (beforeBody && afterBody && beforeBody !== afterBody) {
+    // The read says whether the body changed, computed in SQL; an older read's fingerprints still count.
+    if (current.descriptionChanged === true || (beforeBody && afterBody && beforeBody !== afterBody)) {
       const last = events.at(-1)
       if (last?.kind === 'description' && (last.actorKey ?? null) === actorKey) { last.at = at; last.id = `description-${current.id}` }
       else add({ id: `description-${current.id}`, at, actorKey, actor, kind: 'description' })

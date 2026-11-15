@@ -1085,6 +1085,9 @@
       "subtitle": "更新与讨论",
       "threads": "{count, plural, =0 {暂无讨论} other {# 条讨论}}",
       "resolved": "已解决",
+      "timelinePullOpened": "已打开 {repo}#{number} {title}",
+      "timelinePullMerged": "已合并 {repo}#{number} {title}",
+      "timelinePullFailed": "无法加载关联的 Pull Request 动态。重试",
       "anchorRemoved": "原文已删除",
       "reply": "回复",
       "reopen": "重新打开",
@@ -4473,6 +4476,7 @@
       "starting": "启动中",
       "running": "运行中",
       "paused": "休眠",
+      "restore": "恢复中",
       "ended": "已停止",
       "error": "出错"
     },
@@ -6072,7 +6076,7 @@
     "evidence": "成果与验证证据",
     "artifact": "Artifact {number}",
     "approvalRequired": "独立审查和验证已交回 Factory；仍需在任务中完成所要求的人工验收。",
-    "repositoryRemedy": "请在 Bot 设置中选择你已授权的仓库后重试。",
+    "repositoryRemedy": "请在工作区设置中选择你已授权的仓库后重试。",
     "runtimeRemedy": "请连接你的本地 Agent 并保持在线，或在运行设置中配置你有权使用的云端电脑。",
     "toolRemedy": "请由 Bot 所有者在现有 Agent 设置中启用任务委派能力。",
     "authorizationRemedy": "请检查你自己的模型、订阅或 API Key 授权与运行位置设置后重试；其他成员的个人凭据不会被代用。",
@@ -6086,6 +6090,24 @@
     "chatUnavailable": "这个 Bot 的聊天模型使用其所有者的个人配置，当前消息无法代用该授权。请使用你自己的 Bot，或请其所有者发起这次聊天；任务委派会另行检查你自己的执行资源。"
   },
   "RunErrors": {
+    "review_auth_required": {"default":"请登录后审阅任务。"},
+    "review_not_found": {"default":"任务审阅不可用。"},
+    "not_owner_terminal": {"default":"只有任务负责人可以使用终端。"},
+    "review_machine_gone": {"default":"任务环境已不可用。"},
+    "review_binding_changed": {"default":"任务环境已变化，请重新打开审阅。"},
+    "review_checkout_unavailable": {"default":"任务暂无可用的工作目录。"},
+    "review_preview_unavailable": {"default":"预览不可用","configuration":"当前环境不支持安全预览","runtime":"预览服务暂时不可用","protocol":"预览响应无效","scope_changed":"任务环境或授权已变化","limit":"预览已达到使用上限"},
+    "terminal_unsupported": {"default":"当前环境尚未接入任务终端。","local_device":"此本地设备暂不支持远程终端。","runtime_version":"请更新任务运行环境后使用终端。"},
+    "terminal_already_controlled": {"default":"Agent 仍在使用任务环境，请结束其工作后打开终端。"},
+    "terminal_binding_changed": {"default":"终端环境或授权已变化。"},
+    "terminal_ended": {"default":"终端会话已结束。"},
+    "terminal_input_too_large": {"default":"终端输入超过 16 KiB。"},
+    "terminal_invalid_request": {"default":"终端请求无效。"},
+    "terminal_request_conflict": {"default":"此输入请求 ID 已用于其他内容。"},
+    "terminal_input_uncertain": {"default":"输入是否送达尚不确定，请查看终端后再决定是否重发。"},
+    "terminal_limit": {"default":"终端已达到使用上限。"},
+    "terminal_unavailable": {"default":"终端暂时不可用。","configuration":"安全终端尚未配置。","runtime":"终端运行环境暂时不可用。","protocol":"终端响应无效。","installation":"终端运行环境准备失败。","lease":"终端授权已过期或变化。"},
+    "terminal_control_unavailable": {"default":"暂时无法独占任务环境。","fence_unavailable":"任务环境控制锁不可用。","fence_lost":"任务环境控制锁已丢失。"},
     "review_scope_denied": {
       "default": "你没有权限查看此任务。",
       "sponsored_placement": "此任务的托管工作区已无法用于查看任务。"
@@ -6407,6 +6429,12 @@
     },
     "factory_spec_approval_required": {
       "default": "请先审阅并批准方案，再开始实现。"
+    },
+    "factory_visual_evidence_required": {
+      "default": "请先录下运行中的应用、测试或接口调用结果，或渲染后的文档页面，再交接这次实现。"
+    },
+    "factory_public_evidence_required": {
+      "default": "请检查可视证据不含私密信息，标记可公开分享，并将链接发布到 PR 描述后再交接。"
     },
     "cloud_not_connected": {
       "default": "尚未连接 Mikka 云服务。"
