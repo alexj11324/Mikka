@@ -32,6 +32,11 @@ import { taskProfileSelectable, useAgentProfiles } from '@/components/settings/f
 import { TaskProfileNotice, useTaskProfileChoices } from './task-profile-picker'
 import { NewTask } from '@ui-slot/new-task'
 import type { NewTaskMachine } from '@/components/slots/new-task-contract'
+import { DEFAULT_MACHINE_SIZE, machineHourlyUsd } from '@/lib/cloud-computer/machine-pricing'
+import { usePaywall } from '@/components/billing/paywall'
+
+/** Hourly price of the default Cloudflare task machine, as shown beside it (decision 2026-11-15-1900). */
+const DEFAULT_MACHINE_PRICE = machineHourlyUsd(DEFAULT_MACHINE_SIZE).toFixed(2)
 
 const MAX_LENGTH = 8000
 /** The task's short title column. */
@@ -46,7 +51,7 @@ function MachineIcon({ machine, cloudBotId }: { machine: Machine; cloudBotId: st
   const e2b = useTranslations('Settings.secrets.e2b')
   const { data: state } = useComputer(machine.cloud && machine.value!=='cloudflare' && machine.usable ? cloudBotId : null)
   const dot = machineDot(machine, state)
-  if (machine.value==='cloudflare') return <DeviceIcon kind="cloud" state="online" label={t('sponsoredCloud')} />
+  if (machine.value==='cloudflare') return <DeviceIcon kind="cloud" state="online" label={t('sponsoredCloud', { price: DEFAULT_MACHINE_PRICE })} />
   if (machine.cloud) return <DeviceIcon kind="cloud" state={dot} label={!machine.usable ? `E2B API Key ${e2b('missing')}` : state ? tStatus(state.machine === 'error' ? 'failed' : state.machine) : t('cloud')} />
   return <DeviceIcon kind="personal" state={dot} label={machine.status ?? (machine.usable ? t('online') : t('offline'))} />
 }
@@ -112,6 +117,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
   const [botPick, setBotPick] = useState<string | null>(initialBotId ?? null)
   const botChoices = newTaskBotChoices(bots)
   const handler = botChoices.find(bot => bot.id === botPick) ?? null
+  const paywall = usePaywall(botPick)
   // The task runs on Mikka Cloud on the computer of the bot it goes to.
   const cloudBotId = only ? undefined : handler?.id ?? (bots.find(bot => bot.coordinator) ?? bots[0])?.id
   const attachments = useChatFiles(draft, setDraft, cloudBotId ? { kind: 'bot', id: cloudBotId } : undefined, sending, tShell)
@@ -122,7 +128,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
   const quotaUnchecked = order?.entries.some(entry => entry.block?.reason === 'checking')
   const own: Machine[] = devices.map(item => ({ value: item.id, label: item.name, usable: taskMachineUsable(item, order?.readyDeviceIds ?? []),
     status: !item.enabled ? t('notParticipating') : !item.online ? item.lastSeenAt ? t('offline') : tDevices('neverOnline') : !order ? t('loadingPlacement') : !order.readyDeviceIds.includes(item.id) ? quotaUnchecked ? t('quotaUnchecked') : t('modelUnavailable') : t('online') }))
-  const sponsored: Machine[] = order?.sponsoredTasksAvailable ? [{value:'cloudflare',label:t('sponsoredCloud'),cloud:true,usable:true}] : []
+  const sponsored: Machine[] = order?.sponsoredTasksAvailable ? [{value:'cloudflare',label:t('sponsoredCloud', { price: DEFAULT_MACHINE_PRICE }),cloud:true,usable:true}] : []
   const machines: Machine[] = [cloud, ...sponsored, ...own]
   const inherited = defaultTaskMachine(machines, order)
   const defaults: Machine = { value: 'auto', label: order ? `${t('workspaceDefault')} · ${inherited?.label ?? locationT(order.location)}` : t('workspaceDefault'),
@@ -155,6 +161,8 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
     const fingerprint = JSON.stringify([workspaceId, teamId, projectId, name, text, intent, picked, botPick, profileId])
     const confirmAccess = confirmedFingerprint === fingerprint
     if (!text || pending.current || attachments.locked || (only && !workspaceId) || (!only && (!available || !profileAllowed || botPick && !handler))) return
+    // A task on Mikka 额度 (its chat's model, or a Cloudflare machine) with nothing to pay opens 选择套餐 instead (decision 2026-11-15-1900).
+    if (!only && paywall.blocked({ model: true, machine: picked === 'cloudflare' })) return
     pending.current = true
     setSending(true)
     setCoordinatorUnavailable(false)
@@ -222,6 +230,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
     {!only && coordinatorUnavailable && <Alert variant="destructive"><AlertTitle>{tCoordinator('unavailable', { name: 'Coordinator' })}</AlertTitle></Alert>}
   </>
   return <>
+    {paywall.dialog}
     {TaskWindow && <TaskWindow onClose={() => onOpenChange(false)} project={project} title={title} onTitle={setTitle} titleMax={TITLE_MAX} text={attachments.text} onText={attachments.edit} maxLength={MAX_LENGTH}
       files={attachments.files.length || attachments.pending.length ? <ChatFileCards files={attachments.files} pending={attachments.pending} onRemove={attachments.remove} onRetry={attachments.retry} /> : null}
       onAttach={files => { void attach(files) }} accept={cloudBotId ? CHAT_FILE_ACCEPT : TEXT_ATTACHMENT_ACCEPT}

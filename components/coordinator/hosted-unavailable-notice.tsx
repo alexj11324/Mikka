@@ -23,7 +23,7 @@ import { ConnectSubscriptionButton } from '@/components/billing/connect-subscrip
  * 2026-11-02-1450): said above the composer when the chat opens, not after a
  * send. 换模型 opens the model menu; in a team, 把我的点数用于这个团队 turns on
  * the member's own share where they are, then the menu is read again; in a
- * personal workspace, 验证银行卡 or 充值 opens 计费.
+ * personal workspace, 充值 opens 计费.
  */
 export function HostedUnavailableNotice({ botId }: { botId: string | null }) {
   const t = useTranslations('Coordinator.modelPicker')
@@ -33,7 +33,7 @@ export function HostedUnavailableNotice({ botId }: { botId: string | null }) {
   const current = menu.data?.current
   const unavailable = current?.kind === 'hosted' && !current.available
   const share = useSWR(unavailable ? ['credit-share'] : null, () => getCreditShare())
-  // The same read as the refusal line (hosted-refusal-notice): a personal workspace verifies a card or tops up.
+  // The same read as the refusal line (hosted-refusal-notice): a personal workspace tops up.
   const usage = useSWR(unavailable ? ['hosted-usage'] : null, () => getHostedUsage())
   const billing = useTranslations('Billing')
   const [pending, setPending] = useState(false)
@@ -55,7 +55,7 @@ export function HostedUnavailableNotice({ botId }: { botId: string | null }) {
     <span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">
       <Button type="button" size="sm" variant="outline" onClick={() => openModelPicker(botId)}>{t('changeModel')}</Button>
       {own && !own.subscribed && own.workspaceId && <ConnectSubscriptionButton workspaceId={own.workspaceId} botId={botId} label={billing('refusal.bindSubscription')} />}
-      {own && <Button size="sm" variant={own.subscribed ? 'default' : 'outline'} nativeButton={false} role="link" render={<Link href={settingsHref('billing')} />}>{own.balance.verified ? billing('balance.topUp') : billing('refusal.verifyCard')}</Button>}
+      {own && <Button size="sm" variant={own.subscribed ? 'default' : 'outline'} nativeButton={false} role="link" render={<Link href={settingsHref('billing')} />}>{billing('balance.topUp')}</Button>}
       {canShare && <Button type="button" size="sm" disabled={pending} onClick={() => void shareMyPoints()}>{t('useMyPoints')}</Button>}
     </span>
   </Alert>

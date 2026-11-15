@@ -92,11 +92,11 @@ test('a part that fails or is slow is left out, never claimed missing', async ()
 })
 
 test('a failure the person can act on becomes the words the web keeps under the message', () => {
-  assert.equal(failureLine('Error: points_exhausted'), 'Mikka 默认点数已用完')
-  assert.equal(failureLine('free_allowance_used'), 'Mikka 默认免费额度已用完')
-  assert.equal(failureLine('verification_required'), '使用 Mikka 默认模型前需要验证银行卡')
-  assert.equal(failureLine('usage_concurrency_limit'), 'Mikka 默认暂时不可用')
-  assert.equal(failureLine('points_exhausted', 'en'), 'Mikka Default: Points used up')
+  assert.equal(failureLine('Error: points_exhausted'), 'Mikka 额度已用完')
+  assert.equal(failureLine('free_allowance_used'), 'Mikka 额度已用完')
+  assert.equal(failureLine('verification_required'), 'Mikka 额度已用完')
+  assert.equal(failureLine('usage_concurrency_limit'), '暂时不可用')
+  assert.equal(failureLine('points_exhausted', 'en'), 'Out of Mikka credits')
   // The person's subscription refused the turn.
   assert.equal(failureLine('quota_exhausted'), '订阅额度已用完')
   assert.equal(failureLine('Step "model" failed after 3 retries: reconnect_required'), '订阅需要重新连接')
@@ -125,12 +125,12 @@ test('every failure kind has one message key, the one the web line reads', () =>
 test('the refusal reaches every Telegram chat and the phone; one failure does not stop the rest', async () => {
   const sent: string[] = []
   const pushed: unknown[] = []
-  const result = await deliverRefusalLine('Mikka 默认点数已用完', ['t1', 't2', 't3'], [{ kind: 'run_finished' }], {
+  const result = await deliverRefusalLine('Mikka 额度已用完', ['t1', 't2', 't3'], [{ kind: 'run_finished' }], {
     telegram: async (target, text) => { if (target === 't2') throw new Error('telegram down'); sent.push(`${target}:${text}`) },
     push: async (text, events) => { pushed.push([text, events]) },
   })
-  assert.deepEqual(sent, ['t1:Mikka 默认点数已用完', 't3:Mikka 默认点数已用完'])
-  assert.deepEqual(pushed, [['Mikka 默认点数已用完', [{ kind: 'run_finished' }]]])
+  assert.deepEqual(sent, ['t1:Mikka 额度已用完', 't3:Mikka 额度已用完'])
+  assert.deepEqual(pushed, [['Mikka 额度已用完', [{ kind: 'run_finished' }]]])
   assert.deepEqual(result.failed, ['telegram'])
   const quiet = await deliverRefusalLine('x', [], [], { telegram: async () => assert.fail('no target'), push: async () => assert.fail('no event') })
   assert.deepEqual(quiet.failed, [])

@@ -195,7 +195,7 @@ test('committed native outcomes deliver Telegram and existing phone Decisions on
    const f=await fixture({kind:'matter_handoff',payload:{assessment:{verificationCode:true}},text:'Your synthetic code is 123456'});await f.deliver(f.scope,f.input);assert.equal(telegram.length,0);assert.equal(decisions,1);assert.equal(pushes[0].text,null);assert.ok(!decisionInputs[0].includes('123456'));assert.match(decisionInputs[0],/text withheld/)
   })
   await t.test('actionable native failure uses existing refusal copy; raw diagnostics and generic failures never post',async()=>{
-   const f=await fixture({outcome:'failed',text:'Private partial answer'});await f.deliver(f.scope,f.input);assert.deepEqual(telegram,[{thread:f.thread,text:'Mikka 默认点数已用完'}]);assert.equal(pushes[0].text,'Mikka 默认点数已用完');assert.equal(decisions,1)
+   const f=await fixture({outcome:'failed',text:'Private partial answer'});await f.deliver(f.scope,f.input);assert.deepEqual(telegram,[{thread:f.thread,text:'Mikka 额度已用完'}]);assert.equal(pushes[0].text,'Mikka 额度已用完');assert.equal(decisions,1)
    const unknown=await fixture({outcome:'failed',error:'turn_failed'});await unknown.deliver(unknown.scope,unknown.input);assert.equal(telegram.length,0);assert.equal(decisions,0)
   })
   await t.test('scheduled reads and blank native outcomes remain silent',async()=>{
@@ -203,7 +203,7 @@ test('committed native outcomes deliver Telegram and existing phone Decisions on
    for(const options of [{text:''},{text:' \n '},{text:'',outcome:'failed' as const,error:'turn_failed'}]){const blank=await fixture(options);await blank.deliver(blank.scope,blank.input);assert.equal(telegram.length,0);assert.equal(decisions,0)}
   })
   await t.test('an actionable failure still delivers its valid refusal line when native text is blank',async()=>{
-   const f=await fixture({text:'',outcome:'failed',error:'points_exhausted'});await f.deliver(f.scope,f.input);assert.deepEqual(telegram,[{thread:f.thread,text:'Mikka 默认点数已用完'}]);assert.equal(decisions,1);assert.equal(pushes[0].text,'Mikka 默认点数已用完')
+   const f=await fixture({text:'',outcome:'failed',error:'points_exhausted'});await f.deliver(f.scope,f.input);assert.deepEqual(telegram,[{thread:f.thread,text:'Mikka 额度已用完'}]);assert.equal(decisions,1);assert.equal(pushes[0].text,'Mikka 额度已用完')
   })
  }finally{await app.end();await admin.query(`DROP SCHEMA ${schema} CASCADE`);await admin.end()}
 })

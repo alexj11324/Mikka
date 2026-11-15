@@ -23,6 +23,8 @@ export interface GatewayDependencies {
   settle(id: string, cost: number | null, usage: ReturnType<typeof readGatewayUsage>): Promise<void>
   /** The catalogue the cost is priced from. */
   catalogue(): Promise<readonly import('@/lib/model-catalog').CatalogModel[]>
+  /** Nothing can pay: the run stops with the refusal as its reason, so the thread shows 「Mikka 额度已用完」. */
+  refused?(grant: GatewayGrant, code: string): Promise<void>
 }
 
 /** A refusal the CLI reads as its provider's own error. */
@@ -97,7 +99,11 @@ export async function handleModelGateway(request: Request, protocol: GatewayProt
   if (metered) {
     try { await dependencies.reserve(grant, holdId) }
     catch (error) {
-      if (error instanceof PaidResourceError) return errorResponse(protocol, 402, error.code)
+      if (error instanceof PaidResourceError) {
+        await dependencies.refused?.(grant, error.code).catch((cause: unknown) =>
+          console.warn(JSON.stringify({ msg: 'model_gateway_refusal_unrecorded', runId: grant.runId, error: cause instanceof Error ? cause.name : 'unknown' })))
+        return errorResponse(protocol, 402, error.code)
+      }
       throw new Error('model_gateway_reserve_failed', { cause: error })
     }
   }
@@ -152,6 +158,11 @@ function defaultDependencies(): GatewayDependencies {
         usage ? { read: usage.cacheReadTokens, write: usage.cacheWriteTokens } : null)
     },
     catalogue: async () => (await import('@/lib/model-catalog-server')).modelCatalog(),
+    async refused(grant, code) {
+      const stopped = await pool.query(`UPDATE agent_runs SET "stopRequestedAt"=COALESCE("stopRequestedAt",now()),"stopReason"=COALESCE("stopReason",$2),
+          error=COALESCE(error,$2),"updatedAt"=now() WHERE id=$1 AND status NOT IN ('succeeded','failed','stopped','cancelled') RETURNING id`, [grant.runId, code])
+      if (stopped.rowCount) await (await import('@/lib/live/panels')).runChanged(pool, grant.runId)
+    },
   }
 }
 
