@@ -4642,7 +4642,7 @@
     "send": "Send",
     "retryStop": "Try stopping again",
     "waiting": "Waiting for you",
-    "chatTab": "Chat",
+    "chatTab": "Thread",
     "acceptanceTab": "Acceptance",
     "artifactsTab": "Artifact",
     "artifacts": {
