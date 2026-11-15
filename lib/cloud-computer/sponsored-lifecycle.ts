@@ -10,7 +10,7 @@ import { openOwnedCloudflareTaskMachine, releaseOwnedCloudflareTaskMachine } fro
 import { finishThreadRegistration, prepareThreadRegistration } from './thread-registration'
 import { hostedSnapshot, type TaskMachineActor } from './sponsored-task'
 import { PaidResourceError } from '../abuse/policy'
-import { DEFAULT_MACHINE_SIZE, isMachineSize, MACHINE_CHUNK_MS, MACHINE_RENEW_BEFORE_MS } from './machine-pricing'
+import { DEFAULT_MACHINE_SIZE, isMachineSize, MACHINE_CHUNK_MS, MACHINE_GRACE_MS, MACHINE_RENEW_BEFORE_MS } from './machine-pricing'
 
 const unavailable = () => new ComputerError(409, 'Cloudflare task machine unavailable')
 const fixedWorker =
@@ -320,7 +320,10 @@ export async function reconcileSponsoredTaskMachine(
   const fence = { epoch: row.epoch, sandboxId: row.sandboxId }
   const terminal = ['succeeded', 'failed', 'stopped', 'cancelled'].includes(row.status)
   const deadline = typeof row.lifecycle.sponsoredUntil === 'string' ? Date.parse(row.lifecycle.sponsoredUntil) : NaN
-  const expired = Number.isFinite(deadline) && deadline <= now
+  // A funded machine has a grace period past its paid time: a late renewal
+  // wake pays the missed chunks below instead of ending the thread.
+  const unfundedNow = row.lifecycle.sponsoredUnfunded === true
+  const expired = Number.isFinite(deadline) && deadline + (unfundedNow ? 0 : MACHINE_GRACE_MS) <= now
   if (row.stopRequestedAt || row.taskClosed || (expired && !terminal && row.state !== 'paused')) {
     const { threadMachineAction } = await import('./thread-machines')
     await threadMachineAction(pool, actor, runId, 'end', fence)
@@ -356,8 +359,13 @@ export async function reconcileSponsoredTaskMachine(
   // Prepaid machine time: just before the paid chunk ends, pay the next one from
   // Mikka 额度 and extend the lease, or stop the run when nothing can pay.
   let until = deadline, unfunded = row.lifecycle.sponsoredUnfunded === true
-  if (Number.isFinite(deadline) && row.operationId && !unfunded && now >= deadline - MACHINE_RENEW_BEFORE_MS)
-    ({ until, unfunded } = await renewSponsoredMachine(pool, actor, runId, row, deadline))
+  // A late wake pays every missed chunk in order until the paid time is ahead of now again.
+  while (Number.isFinite(until) && row.operationId && !unfunded && now >= until - MACHINE_RENEW_BEFORE_MS) {
+    const renewed = await renewSponsoredMachine(pool, actor, runId, row, until)
+    if (renewed.until === until && !renewed.unfunded) break
+    ;({ until, unfunded } = renewed)
+    row = { ...row, lifecycle: { ...row.lifecycle, sponsoredUntil: new Date(until).toISOString(), sponsoredChunks: (typeof row.lifecycle.sponsoredChunks === 'number' ? row.lifecycle.sponsoredChunks : 1) + 1 } }
+  }
   // Unfunded: wake at the paid deadline to end the machine. Otherwise wake to renew (never sooner than 5 s).
   const wake = !Number.isFinite(until) ? NaN : unfunded ? until : Math.max(now + 5_000, until - MACHINE_RENEW_BEFORE_MS)
   // The DO owns its immutable hard alarm. The existing application timer also
