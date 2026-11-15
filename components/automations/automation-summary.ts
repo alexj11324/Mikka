@@ -39,5 +39,6 @@ const viewerZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().
 /** The next run as the automation's own clock reads it, naming the zone when it is not the viewer's, so it agrees with the summary. */
 export function useNextRunLabel() {
   const format = useFormatter()
-  return (at: string | Date, timezone: string) => format.dateTime(new Date(at), { dateStyle: 'medium', timeStyle: 'short', timeZone: timezone, ...(timezone === viewerZone() ? {} : { timeZoneName: 'short' }) })
+  // Intl refuses timeZoneName beside dateStyle/timeStyle, so the fields are spelled out.
+  return (at: string | Date, timezone: string) => format.dateTime(new Date(at), { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: timezone, ...(timezone === viewerZone() ? {} : { timeZoneName: 'short' }) })
 }
