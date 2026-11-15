@@ -15,8 +15,8 @@ export type WorkspaceGuard = <T>(ownerId: string, workspaceId: string | null, wo
 export type MessageGuard = (tx: PoolClient, ownerId: string, value: unknown) => Promise<void>
 export type IssueReader = (tx: PoolClient, ownerId: string, issueId: string) => Promise<{ id: string; title: string; status: string } | null>
 /** What one dispatch_task run made: the task (as the chat's task line shows it) and the request event behind it. */
-export type DispatchResult = { id: string; title: string; status: string; identifier: string | null; eventId: string }
-export type DispatchInput = { ownerId: string; workspaceId: string; scheduleId: string; occurrenceId: string; task: DispatchTask; event?: string }
+export type DispatchResult = { id: string; title: string; status: string; identifier: string | null; eventId?: string; runId?: string; continued?: true }
+export type DispatchInput = { ownerId: string; workspaceId: string; scheduleId: string; occurrenceId: string; task: DispatchTask; event?: string; single?: true }
 /** The event a run started on and the indexes of the triggers that took it. */
 export type OccurrenceTrigger = { event: GitHubAutomationEvent; triggers: number[] }
 export type RunWhenInput = { ownerId: string; workspaceId: string; condition: string; event: string }
@@ -41,7 +41,7 @@ const MAX_ATTEMPTS = 3
 // The frozen request key is internal; keep the existing tool-response fields.
 const SCHEDULE_COLUMNS = 'id,owner_id,workspace_id,bot_id,visibility,source_event_id,request_id,definition,request_definition,status,version,next_at,disabled_reason,created_at,updated_at'
 /** A run that fails one of these lost its creator's authority: the automation is paused with the code as its reason. */
-const AUTHORITY_LOST = new Set(['scheduleWorkspaceAccessDenied','scheduleOwnerUnavailable','scheduleConversationUnavailable','scheduleBotUnavailable','scheduleRepositoryUnavailable','scheduleDeviceUnavailable','scheduleProfileUnavailable'])
+const AUTHORITY_LOST = new Set(['scheduleStandingTaskUnavailable','scheduleWorkspaceAccessDenied','scheduleOwnerUnavailable','scheduleConversationUnavailable','scheduleBotUnavailable','scheduleRepositoryUnavailable','scheduleDeviceUnavailable','scheduleProfileUnavailable'])
 /** Runs that count toward maxRunsPerDay: queued, running and finished, not skipped or cancelled. */
 const COUNTED = "status IN ('pending','running','succeeded','failed')"
 
@@ -164,12 +164,15 @@ export class ScheduleStore {
           count(*) FILTER (WHERE ${COUNTED})::int runs,count(*) FILTER (WHERE status='skipped')::int skipped,count(*) FILTER (WHERE result ? 'eventId')::int tasks
           FROM schedule_occurrences WHERE schedule_id=$1 AND created_at>=(date_trunc('day',now() AT TIME ZONE $2)-($3::int-1)*interval '1 day') AT TIME ZONE $2 GROUP BY 1 ORDER BY 1 DESC`,[row.id,zone,days])
         const privileged=row.owner_id===actor.ownerId||access.role!=='member'
-        const cost=privileged?(await tx.query<{day:string;cost:string}>(`SELECT to_char((o.created_at AT TIME ZONE $2)::date,'YYYY-MM-DD') AS day,COALESCE(sum(u."costMicroUsd"),0)::text cost
-          FROM schedule_occurrences o JOIN agent_runs r ON r."issueId"=(o.result->>'id')::uuid JOIN hosted_usage u ON u."usageRunId"=r.id
-          WHERE o.schedule_id=$1 AND o.definition#>>'{task,kind}'='dispatch_task' AND o.result ? 'eventId'
-            AND o.created_at>=(date_trunc('day',now() AT TIME ZONE $2)-($3::int-1)*interval '1 day') AT TIME ZONE $2 GROUP BY 1`,[row.id,zone,days])).rows:[]
+        // Each task the automation made counts once, whether a run made it or added to it ('single'), on the day it spent.
+        const cost=privileged?(await tx.query<{day:string;cost:string}>(`SELECT to_char((u."createdAt" AT TIME ZONE $2)::date,'YYYY-MM-DD') AS day,COALESCE(sum(u."costMicroUsd"),0)::text cost
+          FROM (SELECT DISTINCT (result->>'id')::uuid task FROM schedule_occurrences WHERE schedule_id=$1 AND definition#>>'{task,kind}'='dispatch_task' AND result ? 'id') t
+          JOIN agent_runs r ON r."issueId"=t.task JOIN hosted_usage u ON u."usageRunId"=r.id
+          WHERE u."createdAt">=(date_trunc('day',now() AT TIME ZONE $2)-($3::int-1)*interval '1 day') AT TIME ZONE $2 GROUP BY 1`,[row.id,zone,days])).rows:[]
         const spent=new Map(cost.map(item=>[item.day,Number(item.cost)]))
-        return {timezone:zone,maxRunsPerDay:row.definition.maxRunsPerDay??null,days:runs.rows.map(item=>({...item,costMicroUsd:privileged?spent.get(item.day)??0:null}))}
+        const byDay=new Map(runs.rows.map(item=>[item.day,item]))
+        for(const day of spent.keys())if(!byDay.has(day))byDay.set(day,{day,runs:0,skipped:0,tasks:0})
+        return {timezone:zone,maxRunsPerDay:row.definition.maxRunsPerDay??null,days:[...byDay.values()].sort((a,b)=>b.day.localeCompare(a.day)).map(item=>({...item,costMicroUsd:privileged?spent.get(item.day)??0:null}))}
       }
       await this.source(tx,actor,row.workspace_id)
       if(row.version!==cmd.version) throw new ScheduleError('scheduleVersionConflict')
@@ -295,7 +298,7 @@ export class ScheduleStore {
     if(!this.automation.dispatch||!row.workspace_id||o.definition.task.kind!=='dispatch_task')throw new ScheduleError('scheduleDispatchUnavailable',503)
     const event=o.trigger?describeGitHubEvent(o.trigger.event):undefined
     if(o.trigger&&event&&!await this.runWhenHolds(row,o,event))return this.skipQuietly(row,o,'runWhenNotMet')
-    const result=await this.automation.dispatch({ownerId:row.owner_id,workspaceId:row.workspace_id,scheduleId:row.id,occurrenceId:o.id,task:o.definition.task,...(event?{event}:{})})
+    const result=await this.automation.dispatch({ownerId:row.owner_id,workspaceId:row.workspace_id,scheduleId:row.id,occurrenceId:o.id,task:o.definition.task,...(event?{event}:{}),...(o.definition.threadMode==='single'?{single:true as const}:{})})
     const recorded=await this.workspace(row.owner_id,row.workspace_id,()=>this.transaction(async tx=>{
       await tx.query('SELECT id FROM user_schedules WHERE id=$1 FOR UPDATE',[row.id])
       // A lost lease means another worker owns this occurrence; it repeats the same idempotent dispatch.

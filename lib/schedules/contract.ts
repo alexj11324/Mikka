@@ -52,6 +52,8 @@ export const definitionSchema = z.object({
   maxConcurrent: z.number().int().min(1).max(5).optional(),
   /** Runs started on one day in the automation's time zone; past it, timed and event runs are skipped and 立即运行 refused. */
   maxRunsPerDay: z.number().int().min(1).max(500).optional(),
+  /** dispatch_task: 'new' makes a task at every run; 'single' makes one and sends each later run to it as a follow-up. */
+  threadMode: z.enum(['new', 'single']).optional(),
   /** 满足任一条件就运行: event triggers beside the timing. Only an automation that hands a Bot a task has them. */
   events: z.array(eventTriggerSchema).min(1).max(20).optional(),
 }).strict().refine(value => !value.events || value.task.kind === 'dispatch_task', { message: 'eventTriggersNeedDispatchTask', path: ['events'] })

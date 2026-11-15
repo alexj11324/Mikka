@@ -200,8 +200,9 @@ Decision [2026-11-15-1730](../design/decisions/2026-11-15-1730-automation-limits
 - **`usage`** command (`automationUsage` action): per local day, newest first, for up to
   90 days (default 14): `runs`, `skipped`, `tasks` (runs that created a task) and
   `costMicroUsd`, the sum of `hosted_usage."costMicroUsd"` whose `usageRunId` is a run of
-  a task the automation created, on the day the automation run started. Cost is null for
-  a member who is neither the creator nor an owner/admin.
+  a task the automation created or added to (each task once), on the day it was spent; a
+  day with spend and no runs is listed too. Cost is null for a member who is neither the
+  creator nor an owner/admin.
 - **Auto-pause.** When a run fails terminally with an authority code
   (`scheduleWorkspaceAccessDenied`, `scheduleOwnerUnavailable`,
   `scheduleConversationUnavailable`, `scheduleBotUnavailable`,
@@ -210,3 +211,18 @@ Decision [2026-11-15-1730](../design/decisions/2026-11-15-1730-automation-limits
   code in `user_schedules.disabled_reason`, bumps its version and cancels its other
   waiting runs without chat reports. `resume` re-checks authority and clears the reason;
   a person's own pause stores none.
+
+## Thread mode (2026-11-15)
+
+Decision [2026-11-15-1810](../design/decisions/2026-11-15-1810-automation-thread-mode.md).
+
+- `threadMode: 'new' | 'single'` (default `new`) on a `dispatch_task` definition. With
+  `single`, the first run that creates a task (its result has `eventId`) is the standing
+  task. Each later run sends the prompt (plus any event block) to that task's latest run
+  of the creator with `sendThreadMessage(owner, runId, text, 'user', occurrenceId)`: a
+  message if the thread is working, a continuation if it ended; the occurrence ID is the
+  request ID, so a retry sends once. Its result is
+  `{ id, title, status, identifier, runId, continued: true }` with no `eventId`.
+- No run of the creator on the task yet: `scheduleStandingTaskNotStarted` (503, retried).
+  The task gone from the workspace: `scheduleStandingTaskUnavailable` (403), which
+  auto-pauses like a lost authority.
