@@ -14,7 +14,7 @@ const noop = () => {}
 const unexpected = () => { throw new Error('this read-only render must not call a server action') }
 const translate = Object.assign((key: string, values?: Record<string, unknown>) => `${key}${values ? ` ${Object.values(values).join(' ')}` : ''}`, { has: () => true })
 mock.module('next-intl', { namedExports: {
-  useTranslations: () => translate, useMessages: () => ({ GroupTask: { stage: {}, status: {} }, IssueDetail: { work: { states: {} } } }), useLocale: () => 'en',
+  useTranslations: () => translate, useLocale: () => 'en', useMessages: () => ({ IssueDetail: { work: { states: {} } }, GroupTask: { stage: {}, status: {} } }),
   useFormatter: () => ({ dateTime: () => '08:00', relativeTime: () => 'now' }), useNow: () => new Date('2026-11-10T08:00:00Z'),
 } })
 mock.module('swr', { defaultExport: () => ({ data: undefined, error: null, mutate: unexpected }), namedExports: { useSWRConfig: () => ({ mutate: unexpected }) } })
