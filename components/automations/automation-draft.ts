@@ -1,4 +1,4 @@
-import { dailyTimeRepeats, resolveLocal } from '@/lib/schedules/time'
+import { dailyTimeRepeats, resolveLocal } from '@/lib/schedules/wall-time'
 import type { Definition, DispatchTask } from '@/lib/schedules/contract'
 import type { TaskDestination } from '@/lib/task-destination'
 
