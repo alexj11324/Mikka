@@ -96,3 +96,47 @@ test('a native reference menu with an authorized standalone Chat and Run sharing
     assert.equal(errors.mock.calls.filter(call => String(call.arguments[0]).includes('same key')).length, 0)
   } finally { await act(async () => root.unmount()); await browser.happyDOM.close() }
 })
+
+test('the named chat composer keeps the group draft and inserts a canonical Task only while the authorized workspace is available', async () => {
+  const { ReferenceComposer } = await import('../features/chat/components/thread-composer.tsx')
+  const browser = new Window()
+  Object.assign(globalThis, { window: browser, document: browser.document, IS_REACT_ACT_ENVIRONMENT: true })
+  const { createRoot } = await import('react-dom/client')
+  const { useState } = await import('react')
+  const host = document.createElement('div')
+  document.body.append(host)
+  const root = createRoot(host)
+  const sent: string[] = []
+  function Group({ workspaceId }: { workspaceId?: string }) {
+    const [value, setValue] = useState('')
+    return createElement(ReferenceComposer, {
+      value, workspaceId, onChangeText: setValue, placeholder: 'Group',
+      attachmentScope: { kind: 'group', id: runId },
+      onSend: text => { sent.push(text); return true },
+    })
+  }
+  try {
+    await act(async () => root.render(createElement(Group, { workspaceId: 'workspace' })))
+    const input = host.querySelector('input')!
+    const enter = async (text: string) => {
+      await act(async () => {
+        input.value = text
+        input.setSelectionRange(text.length, text.length)
+        input.dispatchEvent(new browser.Event('input', { bubbles: true }) as never)
+      })
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 230)) })
+    }
+    await enter('@Bot @task:sa')
+    const task = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('Saved task'))
+    assert.ok(task)
+    await act(async () => task.click())
+    assert.equal(input.value, `@Bot [[issue:${taskId}]] `)
+    await act(async () => host.querySelector<HTMLButtonElement>('#send')!.click())
+    assert.deepEqual(sent, [input.value])
+    await enter('@task:sa')
+    assert.ok(host.textContent?.includes('Saved task'))
+    await act(async () => root.render(createElement(Group, {})))
+    assert.equal(host.textContent?.includes('Saved task'), false)
+    assert.equal(host.querySelector('#choose'), null)
+  } finally { await act(async () => root.unmount()); await browser.happyDOM.close() }
+})

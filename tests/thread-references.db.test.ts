@@ -46,6 +46,22 @@ test('reference search scopes tasks, conversation roots, and PRs to the active v
     assert.deepEqual(await searchThreadReferences(owner, workspace, 'Named citation', 'thread'), [{ kind: 'thread', conversationKind: 'chat', id: chat, title: 'Named citation' }])
     const items = await searchThreadReferences(owner, workspace, 'checkout')
     assert.deepEqual(items.map(item => [item.kind, item.id]), [['task', issue], ['thread', run], ['pr', url]])
+    const { handleGroup } = await import('../lib/group-conversations-store')
+    const request = { resource: 'messages' as const, id: chat, origin: 'https://mikka.test', host: 'mikka.test' }
+    const membership = async (workspaceId: string, userId: string) => Boolean((await pool.query(
+      `SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status='active'`, [workspaceId, userId],
+    )).rowCount)
+    const body = items.map(referenceMarker).join(' ')
+    const posted = await handleGroup(pool, membership, { ...request, userId: owner, method: 'POST',
+      body: JSON.stringify({ body, mentions: [], expectedWorkspaceId: workspace, expectedOwnerId: owner }) })
+    assert.equal(posted.status, 201)
+    const read = await handleGroup(pool, membership, { ...request, userId: owner, method: 'GET' })
+    assert.equal(read.status, 200)
+    const first = (read.body as { messages: { body: string; mentions: unknown[] }[] }).messages[0]
+    assert.equal(first.body, body)
+    assert.deepEqual(first.mentions, [])
+    assert.equal((await handleGroup(pool, membership, { ...request, userId: other, method: 'GET' })).status, 404)
+
     assert.deepEqual((await searchThreadReferences(owner, workspace, '#2259', 'pr')).map(item => item.id), [url])
     assert.deepEqual(await searchThreadReferences(other, foreign, 'checkout'), [])
     await assert.rejects(searchThreadReferences(other, workspace, 'checkout'))
