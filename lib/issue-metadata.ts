@@ -40,6 +40,7 @@ export type IssuePullRequest = z.infer<typeof pullRequestSchema>
 export type IssueDelegate = z.infer<typeof delegateSchema>
 
 export const labelKey = (label: IssueLabel) => label.name.toLowerCase()
+export const githubPullRequestKey = (url: string) => url.toLowerCase().replace(/\/$/, '')
 export const pullRequestKey = (pr: IssuePullRequest) => pr.url.replace(/\/$/, '')
 
 /** Keep independent edits. A concurrent change to the same entry is shown as saved for review. */
