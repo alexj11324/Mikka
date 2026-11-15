@@ -28,7 +28,7 @@ import { TaskWorkSection } from './task-work-section'
 import { useActivityEvents } from './issue-activity-feed'
 import { useActivityDrafts, type DiscussionSave } from './issue-activity'
 import type { IssueDiscussions } from './issue-editor'
-import { chronologicalActivity, taskDiscussionEvents } from '@/lib/task-activity-timeline'
+import { chronologicalActivity, taskActivityThreads, taskDiscussionEvents } from '@/lib/task-activity-timeline'
 import type { ActivityVersion } from '@/lib/issue-activity'
 import { PullRequestStatus } from './issue-pull-request-link'
 
@@ -241,15 +241,16 @@ export function FramedTask(props: FramedTaskProps) {
   const time = (at: string) => format.dateTime(new Date(at), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   const activityItems = (current: IssueDiscussions, expandReplies = false, additional: readonly TaskActivityItem[] = []): TaskActivityItem[] => {
     const anchors = new Map(current.anchors.map(anchor => [anchor.id, anchor.excerpt]))
-    const byId = new Map(current.threads.map(thread => [thread.id, thread]))
+    const threads = taskActivityThreads(current.threads, presentation.data?.factoryStageComments ?? [])
+    const byId = new Map(threads.map(thread => [thread.id, thread]))
     const excerpt = (id: string) => id.startsWith('discussion-') ? null : anchors.get(id) ?? tActivity('anchorRemoved')
     const comments: TaskActivityItem[] = expandReplies
-      ? taskDiscussionEvents(current.threads).map(fact => {
+      ? taskDiscussionEvents(threads).map(fact => {
         const thread = byId.get(fact.threadId)!
         return { kind: 'comment', id: fact.id, at: fact.at, thread, time, excerpt: excerpt(thread.id),
           message: { record: { id: fact.messageId, body: fact.body, author: fact.author, at: fact.at }, first: fact.kind === 'comment', last: fact.messageId === thread.messages.at(-1)?.id } }
       })
-      : current.threads.map(thread => ({ kind: 'comment', id: thread.id, at: thread.createdAt, thread, time, excerpt: excerpt(thread.id) }))
+      : threads.map(thread => ({ kind: 'comment', id: thread.id, at: thread.createdAt, thread, time, excerpt: excerpt(thread.id) }))
     const history = eventsFor([...comments, ...additional])
     return chronologicalActivity<TaskActivityItem>([
       ...history.map((item): TaskActivityItem => ({ kind: 'event', id: `history:${item.id}`, at: item.at, who: item.actor?.name || (item.actor?.type === 'system' ? t('work.system') : item.actor?.type === 'agent' ? t('work.agent') : null), mark: item.actor?.name ? (item.actor.type === 'agent' ? { kind: 'node', node: <AgentSphere name={item.actor.name} compact /> } : { kind: 'person', name: item.actor.name }) : undefined, text: item.text, parts: item.parts, time: item.time })),

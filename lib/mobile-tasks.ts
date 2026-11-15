@@ -4,7 +4,7 @@ import { attemptStateOf, taskStateOf } from './task-state'
 import { taskStateRunColumns } from './task-state-query'
 import { readCompactRunFailure } from './run-failure-projection'
 import { and, desc, eq, inArray, sql } from 'drizzle-orm'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
 import { agents, agentRuns, bots, devices, issues, issueDocuments, users, runPublications, RUN_OUTCOMES } from '@/lib/db/schema'
 import { issueForUser } from '@/lib/issue-access'
 import { withIssueWorkspace } from '@/lib/issue-scope-authorization'
@@ -20,7 +20,8 @@ import { runBotId } from '@/lib/run-bot-name'
 import { taskSchedule, taskScheduleLabels, taskScheduleView } from '@/lib/task-block-runs'
 import { enrichActivityActors } from '@/lib/activity-actor-server'
 import { taskActivityVersions } from './task-activity-versions'
-import { taskActivityFacts } from './task-activity-timeline'
+import { taskActivityFacts, type FactoryStageComment } from './task-activity-timeline'
+import { readTaskStageComments } from './task-stage-comments'
 import { deriveIssueActivity } from './issue-activity'
 import { actAs } from './acting-user'
 import { threadQuestionView, latestConversationRun } from '@/lib/issue-threads'
@@ -38,7 +39,7 @@ export async function mobileTask(user: Exclude<IssueReader, string>, id: string,
     || (explicitWorkspaceId !== undefined && candidate.workspaceId !== explicitWorkspaceId)) return null
   const workspaceId = candidate.workspaceId
   const reader = { ...user, [tokenWorkspace]: workspaceId, [enterprisePrincipal]: user[enterprisePrincipal] }
-  const read = () => withIssueWorkspace(reader, workspaceId, { issueId: id, action: 'canReadContent' }, () => readMobileTask(reader, workspaceId, id))
+  const read = (stageComments?: FactoryStageComment[]) => withIssueWorkspace(reader, workspaceId, { issueId: id, action: 'canReadContent' }, () => readMobileTask(reader, workspaceId, id, stageComments))
   if (!includeWork) return read()
   const { withTaskWorkspace } = await import('./task-workspace')
   const { readTaskWork } = await import('./task-work-read')
@@ -69,7 +70,7 @@ export async function mobileTask(user: Exclude<IssueReader, string>, id: string,
       const source = sources.get(githubPullRequestKey(pull.url))
       return source ? { ...pull, sourceConversationId: source.id } : pull
     })
-    const detail = await read()
+    const detail = await read(presentation.factoryStageComments)
     if (!detail) return null
     return { ...detail, task: { ...detail.task, status: presentation.primaryStatus, group: presentation.group,
       state: presentation.state, reason: presentation.reason, blockedBy: presentation.blockedBy,
@@ -79,7 +80,7 @@ export async function mobileTask(user: Exclude<IssueReader, string>, id: string,
   })
 }
 
-async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: string, id: string) {
+async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: string, id: string, stageComments?: FactoryStageComment[]) {
   const issue = await issueForUser(user, id)
   if (!issue || issue.ownershipState !== 'bound' || issue.workspaceId !== workspaceId) return null
   const metadata = readIssueMetadata(issue.content)
@@ -117,7 +118,11 @@ async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: s
   const { loadIssueDocument, readIssueThreads } = await import('./linear-sync/document')
   const doc = document ? loadIssueDocument(document.state, issue.content) : null
   let timeline
-  try { timeline = taskActivityFacts(history, doc ? readIssueThreads(doc) : []) }
+  try {
+    const threads = doc ? readIssueThreads(doc) : []
+    const stages = stageComments ?? (threads.length ? (await readTaskStageComments(pool, workspaceId, [id])).get(id) : [])
+    timeline = taskActivityFacts(history, threads, stages)
+  }
   finally { doc?.destroy() }
   const task = { ...issue, metadata }
   const attempts = (await withTaskDevicePresence(runs)).map(run => ({ ...run, failureDetails: readCompactRunFailure(run.failureDetails) }))
