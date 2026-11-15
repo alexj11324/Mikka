@@ -1,4 +1,5 @@
 import {createServer} from 'node:https'
+import {createServer as createHttp} from 'node:http'
 import {randomUUID,timingSafeEqual,createHash} from 'node:crypto'
 import {appendFileSync,readFileSync} from 'node:fs'
 import {getLlama,LlamaChatSession} from 'node-llama-cpp'
@@ -7,6 +8,17 @@ const key=Buffer.from(process.env.E_LOOPBACK_KEY)
 const log=(name,value)=>appendFileSync(work+'/'+name,JSON.stringify({at:new Date().toISOString(),...value})+'\n',{mode:0o600})
 const llama=await getLlama({gpu:false,build:'never',skipDownload:true})
 const model=await llama.loadModel({modelPath:process.env.E_WEIGHT_FILE})
+if(process.env.E_FACTORY_CATALOG==='1'){
+ // The project explicitly permits loopback HTTP for its catalogue verification.
+ // The runtime HTTPS endpoint remains separate; each uses the same loaded GGUF and auth.
+ createHttp((req,res)=>{
+  const supplied=Buffer.from(String(req.headers['x-api-key']??''))
+  if(req.socket.remoteAddress!=='127.0.0.1'||req.method!=='GET'||req.url!=='/v1/models'||supplied.length!==key.length||!timingSafeEqual(supplied,key)){res.writeHead(403);return res.end()}
+  res.writeHead(200,{'content-type':'application/json'})
+  res.end(JSON.stringify({data:[{id:modelId,type:'model',display_name:modelId}],has_more:false}))
+  log('model-catalogue.jsonl',{model:modelId,method:'GET',path:'/v1/models'})
+ }).listen(3858,'127.0.0.1')
+}
 const tls={key:readFileSync(work+'/endpoint.key'),cert:readFileSync(work+'/endpoint.pem'),minVersion:'TLSv1.2'}
 createServer(tls,async(req,res)=>{
  const route=new URL(req.url,'https://127.0.0.1').pathname

@@ -6,6 +6,8 @@ import { serve } from 'srvx/node'
 import { join } from 'node:path'
 import { Pool } from 'pg'
 import { ACTIVE_TURN_STEER_HEADER,SOURCE_DAEMON_VERSION } from '@mikka/protocol/device'
+import {MODEL_CREDENTIAL_HEADER,REPO_ORIGIN_HEADER,RUN_CREDENTIALS_HEADER} from '@mikka/protocol/device'
+import {DAEMON_PROTOCOL_VERSION} from '@mikka/protocol/daemon'
 import { CLIENT_VERSION_HEADER } from '@mikka/protocol/version'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { seedUser,seedWorkspace,seedIssue,seedBot } from '../../tests/support/workspace-admin-db'
@@ -52,6 +54,10 @@ try {
  const prompt=mark(initial)
  const seedInput={id:runId,userId:owner,issueId,agentId,deviceId,deviceRepoId:repoId,botId:null,origin:'web',prompt,promptTaskStart:0,promptTaskLength:[...prompt].length,definition:{schemaVersion:1,kind:'worker',harness:'claude_code',instructions:'Use only the local model for this synthetic prompt.',definitionDigest:h('synthetic'),promptDigest:h(prompt),model,modelSource:'native-default',parent:null,readOnly:true} as never,dispatch:{issueId,agentId,deviceRepoId:repoId,requestKey:randomUUID()}}
  const {pool}=await import('../../lib/db')
+ const {addApiKey}=await import('../../lib/model-api-keys')
+ const savedKey=await addApiKey(pool,owner,{provider:'custom',name:'Isolated genuine CPU catalogue',baseUrl:'http://127.0.0.1:3858',protocol:'anthropic',apiKey:process.env.E_LOOPBACK_KEY!})
+ assert.ok(savedKey.models.includes(model))
+ note('repository-supported test catalogue verified the loaded model through authenticated local HTTP',{model,credentialType:'isolated synthetic',serverSaved:true})
  const {withProjectResourceLease}=await import('../../lib/project-resources/store')
  const {queueFactoryTask}=await import('../../lib/factory/task-dispatch')
  const admitted=await withProjectResourceLease(owner,ws.id,()=>queueFactoryTask(pool,owner,{issueId,botId:bot,ownerRequested:true,agentId,deviceRepoId:repoId,note:prompt,key:randomUUID(),queue:(tx,userId,req,botId,ctx)=>acceptLocalRun({...seedInput, userId,botId,factoryContext:ctx},tx)}))
@@ -68,12 +74,14 @@ try {
  const token=await issueDeviceToken(owner,'Synthetic acceptance')
  const dcall=async(path:string,method='GET',payload?:unknown,expected=200)=>{
   note('device REST request',{method,path:path.split('?')[0]})
-  const res=await fetch(origin+'/mikka/v1/'+path,{method,headers:{authorization:'Bearer '+token,[CLIENT_VERSION_HEADER]:SOURCE_DAEMON_VERSION,[ACTIVE_TURN_STEER_HEADER]:'1','content-type':'application/json'},...(payload===undefined?{}:{body:JSON.stringify(payload)})})
+  const res=await fetch(origin+'/mikka/v1/'+path,{method,headers:{authorization:'Bearer '+token,[CLIENT_VERSION_HEADER]:SOURCE_DAEMON_VERSION,[ACTIVE_TURN_STEER_HEADER]:'1',[MODEL_CREDENTIAL_HEADER]:'1',[REPO_ORIGIN_HEADER]:'1','content-type':'application/json'},...(payload===undefined?{}:{body:JSON.stringify(payload)})})
   note('device REST response',{method,path:path.split('?')[0],status:res.status})
-  assert.equal(res.status,expected,method+' '+path+' '+res.status)
+  if(res.status!==expected){const fail=await res.json().catch(()=>({}));throw Error(method+' '+path+' '+res.status+' '+String(fail.code??fail.error??''))}
   return expected===204?null:res.json()
  }
 
+ const registration=await dcall('devices/register','POST',{deviceId,workspaceId:ws.id,name:'Isolated Linux evaluator',platform:'linux',arch:'x64',daemonVersion:SOURCE_DAEMON_VERSION,protocolVersion:DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'claude_code',installed:true,models:[model],toolApproval:true}]})
+ assert.equal(registration.deviceId,deviceId)
  const sourceDir=join(dir,'fixture','work'),work=join(dir,'fixture','report-execute'),reviewWork=join(dir,'fixture','report-review')
  const git=(cwd:string,...args:string[])=>execFileSync('git',['-C',cwd,...args],{encoding:'utf8'}).trim()
  const candidate=git(sourceDir,'rev-parse','HEAD')
@@ -88,6 +96,9 @@ try {
  const adapter=new ClaudeAdapter({stateDir,binary:process.env.E_CLI_BINARY!})
  const execute=async(id:string,cwd:string,marker:string,review=false)=>{
   const offered=(await dcall('devices/'+deviceId+'/commands?wait=0')).queuedRuns??[];assert.ok(offered.includes(id),'Device work did not offer the expected run')
+  const claim=await dcall('devices/'+deviceId+'/runs/'+id+'/claim','POST')
+  assert.equal(claim.runId,id);assert.equal(claim.deviceId,deviceId);assert.equal(claim.issueId,issueId);assert.equal(claim.harness,'claude_code')
+  note('authenticated device claimed an exact admitted run',{runId:id,harness:claim.harness,stage:review?'review':'execute',serverModel:claim.model??null})
   const {rows:[record]}=await independent.query('SELECT id,"userId","workspaceId","issueId","agentId","deviceId",prompt,"agentDefinition" AS def FROM agent_runs WHERE id=$1',[id]);assert.equal(record.issueId,issueId);assert.equal(record.workspaceId,ws.id)
   const cmd=review?await factoryCheckAssignment(pool,owner,id):null
   if(cmd){assert.equal(cmd.factoryCheck.stage,'review');assert.equal(cmd.baseBranch,candidate);assert.equal(cmd.policy.readOnly,true)}
@@ -111,7 +122,7 @@ try {
   note('real native MCP report and clean fixed candidate persisted',{id,stage:review?'review':'execute',native:saved.sessionId,model,actualModelReport:saved.report.summary,criteria:saved.report.criteria??null,fixed,status:saved.status})
   return saved
  }
- const humanApi=async(cookie:string,path:string,payload?:unknown)=>{const res=await fetch(origin+'/mikka/api/'+path,{method:payload?'POST':'GET',headers:{cookie,origin,'content-type':'application/json','sec-fetch-site':'same-origin'},...(payload?{body:JSON.stringify(payload)}:{})});let body:any;try{body=await res.json()}catch{body=null}return {status:res.status,body}}
+ const humanApi=async(cookie:string,path:string,payload?:unknown)=>{const res=await fetch(origin+'/mikka/api/'+path,{method:payload?'POST':'GET',headers:{cookie,origin,'content-type':'application/json','x-mikka-rpc':'1','sec-fetch-site':'same-origin'},...(payload?{body:JSON.stringify(payload)}:{})});let body:any;try{body=await res.json()}catch{body=null}return {status:res.status,body}}
  const task=(await getTask());note('explicit owner dispatch initializes selected agent',{issueId,workspace:ws.id,bot,agentId,runId,taskId:task.id,delegate:actor.delegate,status:actor.status})
  const producer=await execute(runId,work,initial)
  let check=await getTask();note('canonical producer completion advanced its real Factory',{check,issue:await issue()})
@@ -130,8 +141,22 @@ try {
  const {rows:receipts}=await independent.query('select a.id,a."userId" AS owner,a."candidateId" AS candidate,s."userId" AS human from factory_deliverable_acceptances a JOIN session s ON s.id=a."sessionId" where a."taskId"=$1',[ready.id]);assert.equal(receipts.length,1);assert.equal(receipts[0].owner,owner);assert.equal(receipts[0].human,owner);assert.equal(receipts[0].candidate,ready.candidateId)
  const detail=await humanApi(ownerCookie,'mobile/tasks/'+issueId+'?work=1');assert.equal(detail.status,200,JSON.stringify(detail));const data=detail.body
  note('canonical authorized task detail',{task:data.task,work:data.work,timeline:data.timeline,activity:data.activity,receipts,memberDenial:refused})
- assert.equal(data.task.workOwner.kind,'agent');assert.equal(data.task.workOwner.name,'Synthetic CPU model');assert.equal(data.task.status,'done');assert.equal(data.task.group,'resolved');assert.equal(data.task.description,brief)
+ assert.equal(data.task.workOwner.kind,'agent');assert.equal(data.task.workOwner.name,'Synthetic CPU model');assert.equal(data.task.status,'done');assert.equal(data.task.group,'done');assert.equal(data.task.state,'done');assert.equal(data.task.description,brief)
  assert.ok(data.work.conversations.some((c:any)=>c.id===runId||c.id===check.runId));assert.ok(Array.isArray(data.work.pullRequests));assert.equal(data.work.pullRequests.length,0,'Report-only candidate does not imply an external PR')
+
+ const history=data.timeline.filter((fact:any)=>fact.kind==='history').map((fact:any)=>fact.event)
+ assert.ok(history.length);assert.ok(history.some((e:any)=>e.kind==='assigned'&&e.assignmentTarget==='delegate'),'History must include the independently recorded agent assignment')
+ assert.ok(!history.some((e:any)=>['stage','execute','review','verify','approval','monitor'].includes(e.kind)),'Persisted task history must not enumerate Factory stages')
+ const memberDetail=await humanApi(memberCookie,'mobile/tasks/'+issueId+'?work=1')
+ if(memberDetail.status===200){assert.equal(memberDetail.body.task.id,issueId);assert.ok(Array.isArray(memberDetail.body.work.conversations))}else assert.equal(memberDetail.status,404)
+ const link='https://github.com/alexj11324/Mikka/pull/2364'
+ const revision=(await independent.query('select revision from issues where id=$1',[issueId])).rows[0].revision
+ const manual=await humanApi(ownerCookie,'rpc',{version:1,action:'issue-metadata.updateIssueMetadata',args:[{id:issueId,revision,patch:{pullRequests:[{url:link,state:'open',title:'Existing E integration reference'}]}}]})
+ assert.equal(manual.status,200);assert.equal(manual.body.ok,true,JSON.stringify(manual.body?.error));assert.ok(manual.body.result?.issue?.id===issueId,manual.body.result?.error)
+ const checked=await humanApi(ownerCookie,'mobile/tasks/'+issueId+'?work=1');assert.equal(checked.status,200)
+ assert.ok(checked.body.work.pullRequests.some((pull:any)=>pull.url===link));assert.equal(checked.body.task.status,'done')
+ assert.equal(checked.body.task.workOwner.name,'Synthetic CPU model')
+ note('human history, authorized Work and an expressly attached existing PR, independent of report acceptance',{kinds:history.map((event:any)=>event.kind),memberDetailStatus:memberDetail.status,conversationIds:checked.body.work.conversations.map((c:any)=>c.id),manuallyLinked:link,producedPullRequest:false})
  trace.success=true;persist()
 
 }catch(e){

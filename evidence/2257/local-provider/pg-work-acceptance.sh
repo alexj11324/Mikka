@@ -12,6 +12,8 @@ test "$E_CLI_BINARY_SHA" = 4d704a8aecbe038affa3000f498ae17c1b4f753add8facb876412
 test "$E_WEIGHT_SHA" = 2e8040ceae7815abe0dcb3540b9995eaa1fa0d2ca9e797d0a635ae4433c68c2d
 pg=/usr/lib/postgresql/17/bin
 "$pg/postgres" --version | grep -E '^postgres \(PostgreSQL\) 17\.'
+export MIKKA_MODEL_KEY_LOOPBACK=1 E_FACTORY_CATALOG=1
+export WORKSPACE_SECRETS_KEY="$(openssl rand -hex 32)"
 export E_LOOPBACK_KEY="$(openssl rand -hex 24)"
 export BETTER_AUTH_SECRET="$(openssl rand -hex 32)" BETTER_AUTH_URL=http://127.0.0.1:3859 MIKKA_EDITION=community
 pw="$(openssl rand -hex 28)"
