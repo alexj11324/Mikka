@@ -211,7 +211,6 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
 
   await t.test('default dispatch survives a 21-second catalogue wait before final membership admission', { timeout: 45_000 }, async () => {
     const selected = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, location: 'local' }, {
-      modelDecision: async () => null,
       resolve: async (...args) => {
         await new Promise(resolve => setTimeout(resolve, 21_000))
         // The real daemon keeps reporting presence while catalogue work waits.
@@ -223,10 +222,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     assert.ok(selected.agentProfile)
     if (selected.target.kind !== 'device') assert.fail('the delayed default still selects its authorized local device')
     assert.equal(selected.target.agentId, agents[selected.target.entry.harness])
-    const { routing, ...target } = selected.target
-    assert.deepEqual(target, await resolveModelDispatch(pool, scope, undefined, 'local'))
-    assert.deepEqual(routing, { version: 2, required: 'unknown', model: 'claude-haiku-5-5',
-      harness: 'claude_code', tier: 'light', reason: 'decision_unavailable' })
+    assert.deepEqual(selected.target, await resolveModelDispatch(pool, scope, undefined, 'local'))
     assert.deepEqual(selected.agentProfile.targetEntry, selected.target.entry)
     const binding = (await pool.query('SELECT "consumerId","connectionId","modelId" FROM byos_bindings WHERE id=$1', [selected.target.subscriptionBindingId])).rows[0]
     assert.equal(binding.consumerId, selected.target.agentId)
@@ -236,23 +232,11 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
   })
 
   await t.test('zero configuration preserves the existing model resolver', async () => {
-    const decisionPurposes: string[] = []
-    const unavailableDecision = async (purpose: string) => { decisionPurposes.push(purpose); return null }
-    const actual = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, location: 'local' }, { modelDecision: unavailableDecision })
+    const actual = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, location: 'local' })
     const expected = await resolveModelDispatch(pool, scope, undefined, 'local')
     if (actual.target.kind !== 'device') assert.fail('local default must select the fixture device')
-    const { routing, ...target } = actual.target
-    assert.deepEqual(target, expected, 'an unavailable routing Decision preserves every original execution target field')
-    assert.deepEqual(routing, { version: 2, required: 'unknown', model: 'claude-haiku-5-5',
-      harness: 'claude_code', tier: 'light', reason: 'decision_unavailable' })
-    assert.deepEqual(decisionPurposes, ['task-model-routing'])
-    const { changeOrder } = await import('@/lib/model-order')
-    await changeOrder(pool, scope, { kind: 'autoRouting', enabled: false })
-    try {
-      const disabled = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, location: 'local' }, { modelDecision: unavailableDecision })
-      assert.deepEqual(disabled, { target: expected, agentProfile: actual.agentProfile, selectionMode: 'preference' }, 'routing off returns the complete legacy result without a routing snapshot')
-      assert.deepEqual(decisionPurposes, ['task-model-routing'], 'routing off never calls the judge')
-    } finally { await changeOrder(pool, scope, { kind: 'autoRouting', enabled: true }) }
+    assert.deepEqual(actual.target, expected, 'the default keeps every original execution target field, with no routing snapshot')
+    assert.equal(actual.selectionMode, 'preference')
     assert.equal(actual.agentProfile?.profileId, 'default'); assert.equal(actual.agentProfile?.source, 'default')
     assert.equal(actual.agentProfile?.version, 1); assert.equal(actual.agentProfile?.instructions, '')
     assert.deepEqual(actual.agentProfile?.skills, []); assert.deepEqual(actual.agentProfile?.definition.roles, [])
@@ -495,16 +479,12 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
       { asked: { harness: 'codex' as const }, defaultOnly: true },
       { asked: { harness: 'codex' as const, model: 'gpt-6-luna' } },
     ]) {
-      const purposes: string[] = []
-      const result = await profiles.resolveAgentProfileDispatch(pool, owner, { issueId, profileId, location: 'local', ...request }, {
-        modelDecision: async purpose => { purposes.push(purpose); return null },
-      })
+      const result = await profiles.resolveAgentProfileDispatch(pool, owner, { issueId, profileId, location: 'local', ...request })
       if (result.target.kind !== 'device') assert.fail('the explicit Default choice must retain its authorized local target')
       assert.equal(result.target.agentId, agents.codex)
       assert.equal(result.target.model, 'gpt-6-luna')
       assert.deepEqual(result.target.entry.source, { kind: 'subscription', connectionId: codex })
       assert.equal(result.selectionMode, request.asked.model ? 'picked' : 'preference')
-      assert.deepEqual(purposes, request.asked.model ? [] : ['task-model-routing'], 'the existing model routing path remains independent of Profile selection')
       const selection = result.agentProfile!
       assert.equal(selection.profileId, 'default'); assert.equal(selection.source, 'default'); assert.equal(selection.reason, 'default')
       assert.equal(selection.version, 1); assert.equal(selection.decision, undefined); assert.equal(selection.instructions, '')

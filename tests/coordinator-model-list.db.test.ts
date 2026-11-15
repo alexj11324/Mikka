@@ -170,13 +170,14 @@ test('an untouched list keeps each Agent\'s default order over connected models,
   }
   const promptList = async (scope: { ownerId: string; botId: string }) => (await executionContextParts(scope.ownerId, scope.botId)).models
 
-  await t.test('untouched: each Agent\'s default prefix and expanded models; the prompt and dispatch use the preferred Agent\'s list first', async () => {
+  await t.test('untouched: each Agent\'s default list, with no extra models; the prompt and dispatch use the preferred Agent\'s list first', async () => {
     const p = await person('default-list')
     await subscribe(p, 'claude', ['fx-sonnet', 'fx-opus'])
     await subscribe(p, 'codex', ['fx-codex-top', 'fx-codex-mini'])
     const prefix = defaultOrderByAgent(await order.orderCandidates(pool, p)).map(item => `${item.harness}:${item.model}`)
     assert.deepEqual(prefix, ['claude_code:fx-opus', 'codex:fx-codex-top'])
-    const expected = [...prefix, 'claude_code:fx-sonnet', 'codex:fx-codex-mini']
+    // Decision 2026-11-15-1630: no lighter models are added for automatic routing.
+    const expected = prefix
     const stored = await order.readOrder(pool, p)
     assert.equal(stored.customized, false)
     assert.deepEqual(stored.entries.map(entry => `${entry.harness}:${entry.model}`), expected)

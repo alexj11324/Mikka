@@ -285,9 +285,9 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     assert.equal(frozen.profileId, 'default'); assert.equal(frozen.source, 'default')
     assert.ok(!String(run.prompt).includes('PRIVATE_PROFILE_'), 'no custom Profile is chosen for Review automatically')
     if (withProfiles) assert.equal(sourceBefore.agentDefinition.agentProfile.profileId, explicitDefault ? 'default' : f.implement!.id)
-    assert.deepEqual(decisionCounts(), { profile: beforeReview.profile, model: beforeReview.model + (autoModelRouting ? 1 : 0) }, 'Review routes its model once only when automatic routing is enabled, and never selects a Profile')
-    if (autoModelRouting) assert.equal(run.agentDefinition.modelDispatch.routing.reason, 'decision_unavailable')
-    else assert.equal(run.agentDefinition.modelDispatch.routing, undefined, 'an older choice has no fabricated routing snapshot')
+    // Decision 2026-11-15-1630: no model routing and no Profile selection, whatever the old routing column says.
+    assert.deepEqual(decisionCounts(), beforeReview, 'Review asks no Decision to choose a model or a Profile')
+    assert.equal(run.agentDefinition.modelDispatch.routing, undefined, 'no routing snapshot is recorded')
     assert.deepEqual(handoffs.at(-1), { previous: source.runId, runId: run.id })
     assert.deepEqual((await pool.query('SELECT * FROM agent_runs WHERE id=$1', [source.runId])).rows[0], sourceBefore)
     const afterDecisions = decisionCounts()
@@ -862,7 +862,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rowCount, 2)
     assert.equal(f.blocked.attempts.filter(a => a.stage === 'execute').length, 1)
   })
-  for (const withRouting of [false, true]) await t.test(`Owner retry preserves the ${withRouting ? 'routed' : 'legacy without routing'} review source without a new execution or model selection`, async () => {
+  for (const withRouting of [false]) await t.test(`Owner retry preserves the ${withRouting ? 'routed' : 'legacy without routing'} review source without a new execution or model selection`, async () => {
     const f = await unclaimedReview(withRouting)
     assert.equal(f.blocked.task.route.flowVersion, 2)
     assert.equal(f.run.agentDefinition.modelDispatch.routing !== undefined, withRouting)
@@ -1256,7 +1256,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       title: 'Claim the frozen Profile', body: 'Synthetic freshness boundary', model: model.claude_code,
       ...(inherit ? { sourceEventId: f.sourceEventId } : {}),
       subscriptionBindingId, agentProfile: selected.agentProfile, readOnly: !inherit,
-      ...(inherit ? { modelDispatch: { mode: selected.selectionMode ?? 'preference', location: 'cloud', entry: selected.target.entry, ...(selected.target.routing ? { routing: selected.target.routing } : {}) } } : {}),
+      ...(inherit ? { modelDispatch: { mode: selected.selectionMode ?? 'preference', location: 'cloud', entry: selected.target.entry } } : {}),
     })
     // The same handoff as provisioning, with no provider or model call.
     const threadDevice = randomUUID()
@@ -1807,7 +1807,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     assert.ok(await claim(f))
     await unchangedRun(f, 'preparing')
     assert.deepEqual(usageCalls.slice(beforeUsage), [{ ownerId: f.ownerId, connectionId: f.connections.claude_code }])
-    assert.deepEqual(decisionCounts(), { profile: before.profile, model: before.model + 1 })
+    assert.deepEqual(decisionCounts(), before, 'no Decision chooses the model')
   })
   await t.test('task text and offered request fields cannot select a Profile or create check context', async () => {
     const f = await fixture(), before = decisionCounts()
