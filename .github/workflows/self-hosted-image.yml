@@ -93,6 +93,7 @@ jobs:
           push: false
           tags: mikka-self-hosted:check
           build-args: |
+            WORKFLOW_TARGET_WORLD=${{ env.PUBLISH_IMAGE != 'true' && '@workflow/world-postgres' || '' }}
             MIKKA_BUILD_REVISION=${{ github.sha }}
             MIKKA_BUILD_WORKER_SHA=${{ steps.image-inputs.outputs.worker-sha }}
           # A fork PR cannot borrow the owner's cache through its own ref.
@@ -114,6 +115,22 @@ jobs:
           }
           appendFileSync(process.env.GITHUB_ENV, 'MIKKA_IMAGE=mikka-self-hosted:check\n')
           JS
+      - name: Reclaim intermediate build cache before installing source dependencies
+        run: |
+          df -h /
+          docker builder prune --all --force
+          df -h /
+      - name: Install the same-revision source daemon dependencies
+        uses: ./.github/actions/pnpm-install
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Initialize the official Postgres Workflow world in isolated PG17
+        if: env.PUBLISH_IMAGE != 'true'
+        run: |
+          docker compose up --detach --wait --wait-timeout 120 postgres
+          docker compose run --rm --no-deps --entrypoint node \
+            --volume "$PWD:/source:ro" app \
+            /source/apps/eve/node_modules/@workflow/world-postgres/bin/setup.js
       - name: Start an independent external Compose installation against isolated PG17
         run: bash scripts/acceptance/self-hosted-external-postgres.sh
       - name: Build the pinned upstream MinIO fixture
@@ -129,15 +146,6 @@ jobs:
       - name: Exercise Mailpit, MinIO, two app replicas and 31 synthetic model replies
         timeout-minutes: 10
         run: docker compose exec -T -e MIKKA_DESKTOP_ACCEPTANCE=1 app node scripts/acceptance/self-hosted-services.mjs
-      - name: Reclaim intermediate build cache before installing source dependencies
-        run: |
-          df -h /
-          docker builder prune --all --force
-          df -h /
-      - name: Install the same-revision source daemon dependencies
-        uses: ./.github/actions/pnpm-install
-        env:
-          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       - name: Execute declared self-hosted compatibility tests in community mode
         env:
           MIKKA_EDITION: community

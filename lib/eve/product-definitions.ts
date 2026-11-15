@@ -1,6 +1,10 @@
 import 'server-only'
 import { asSchema, type ToolSet } from 'ai'
 import type { AgentExecution } from '../agent-kit/store'
+import type { DefinitionSnapshot } from '../agent-kit/definition'
+import type { HostedRuntimeSnapshot } from '../subscription-model-snapshot'
+import type { ScheduledRead } from '../schedules/contract'
+import { productRpc } from './product-rpc'
 import { requiresEveProductApproval } from './approval-bridge'
 import { snapshotMailboxTools } from '../personal-mailbox-capability'
 import type { EveScope } from './scope'
@@ -15,19 +19,6 @@ export async function asProductPrincipal<T>(scope: Scope, work: () => Promise<T>
   return actAs({ id: scope.ownerId, [tokenWorkspace]: scope.workspaceId }, work)
 }
 
-/** Eve's dynamic definitions run in Node and use the product's existing stores. */
-export async function prepareEveExecution(scope: Scope, sessionId: string, turnId: string) {
-  const { assertSessionScope } = await import('./scope')
-  await assertSessionScope(scope, sessionId)
-  return asProductPrincipal(scope, () => beginProductExecution(scope, sessionId, turnId))
-}
-
-export async function beginProductExecution(scope: Scope, sessionId: string, turnId: string) {
-  const kit = await import('../../workflows/coordinator/agent-kit-steps')
-  const execution = await kit.beginAgentExecution(scope.ownerId, scope.botId, `${sessionId}:${turnId}`, 0, { harness: 'ai_sdk' })
-  return { execution, runtime: execution?.snapshot.runtime ?? await kit.botRuntime(scope.ownerId, scope.botId) }
-}
-
 export const describeProductTools = (tools: ToolSet): Promise<ProductCatalogueEntry[]> => Promise.all(
   Object.entries(tools).map(async ([name, definition]) => ({
     name, description: typeof definition.description === 'string' ? definition.description : name, inputSchema: await asSchema(definition.inputSchema).jsonSchema,
@@ -35,19 +26,52 @@ export const describeProductTools = (tools: ToolSet): Promise<ProductCatalogueEn
   })),
 )
 
-/** Refresh discovery before each native model call. Execution rechecks every action. */
-export async function productCatalogue(scope: Scope, binding: ExecutionBinding, prepared?: AgentExecution | null): Promise<ProductCatalogueEntry[]> {
-  const { assertSessionScope } = await import('./scope')
-  await assertSessionScope(scope, binding.sessionId)
+/** Native discovery uses the Bot's business policy; actions resolve their own execution. */
+export async function productCatalogue(scope: Scope, binding: Pick<ExecutionBinding, 'sessionId' | 'turnId'>,
+  policy: Pick<DefinitionSnapshot, 'definition' | 'effectiveTools'> | null, runtime: HostedRuntimeSnapshot,
+  request: { sourceEventId?: string; scheduledRead: ScheduledRead | null }): Promise<ProductCatalogueEntry[]> {
   return asProductPrincipal(scope, async () => {
-    const { execution, sourceEventId, scheduledRead, taskEventId, entryOrigin } = await productContext(scope, binding, prepared)
-    const tools = await productTools(scope, execution, sourceEventId, scheduledRead, taskEventId, entryOrigin)
-    return describeProductTools(tools)
+    const steps = await import('../../workflows/coordinator/steps')
+    const { coordinatorTools, coordinatorWriteCatalogue, readCoordinatorSwitches } = await import('../../workflows/coordinator/tools')
+    const mailboxTools = snapshotMailboxTools(policy)
+    const { scheduledRead, sourceEventId } = request
+    const tools = coordinatorTools(scope.ownerId, scope.botId,
+      scheduledRead ? { scheduledRead: { botId: scope.botId, occurrence: scheduledRead } } : undefined, {
+        policy: policy ?? undefined, runtime, sourceEventId, switches: readCoordinatorSwitches(),
+        coordinator: await steps.isCoordinatorChat(scope.ownerId, scope.botId),
+        computerEnabled: !scheduledRead && await steps.computerToolsEnabled(),
+        writeEnabled: Boolean(policy) && !scheduledRead && await steps.personalWriteToolsEnabled(),
+        mailboxEnabled: !scheduledRead && mailboxTools.length > 0 && await steps.mailboxToolsEnabled(), mailboxTools,
+        writeTools: { catalog: coordinatorWriteCatalogue, submit: async call => (await productRpc<{ output: unknown }>(scope, {
+          ...binding, operation: 'execute', name: call.action, input: call.input, callId: call.toolCallId,
+        })).output },
+        ...(scheduledRead ? { readOnly: true, readToolIds: scheduledRead.allowedActions } : {}),
+      })
+    return describeProductTools(Object.fromEntries(Object.entries(tools).filter(([name]) =>
+      !['load_skill', 'read_personal_skill', 'list_personal_mcp_tools', 'call_personal_mcp_tool'].includes(name))))
   })
 }
 
-async function productExecution(scope: Scope, input: ExecutionBinding, prepared?: AgentExecution | null): Promise<AgentExecution | null> {
-  if (prepared !== undefined) return checkedPreparedEveExecution(scope, input, prepared)
+/** Actual native actions allocate the existing business execution before calling the app. */
+export async function beginProductAction(scope: Scope, input: Pick<ExecutionBinding, 'sessionId' | 'turnId'>): Promise<string | undefined> {
+  return asProductPrincipal(scope, async () => {
+    const { agentKitEnabled } = await import('../agent-kit/service')
+    if (!agentKitEnabled()) return undefined
+    const [{ pool }, { withDirectSession }] = await Promise.all([import('../db'), import('../db/direct-session')])
+    return withDirectSession(pool, async client => {
+      // Allocation and finish own the same turn, including a turn with no earlier action.
+      await client.query('SELECT pg_advisory_lock(hashtextextended($1,0))', [`eve-settlement:${input.sessionId}:${input.turnId}`])
+      const receipt = await client.query('SELECT 1 FROM eve_turn_settlements WHERE session_id=$1 AND turn_id=$2', [input.sessionId, input.turnId])
+      if (receipt.rowCount) throw new Error('agentExecutionClosed')
+      const { beginAgentExecution } = await import('../../workflows/coordinator/agent-kit-steps')
+      const execution = await beginAgentExecution(scope.ownerId, scope.botId, `${input.sessionId}:${input.turnId}`, 0, { harness: 'ai_sdk' })
+      if (!execution) throw new Error('agentExecutionClosed')
+      return execution.id
+    })
+  })
+}
+
+async function productExecution(scope: Scope, input: ExecutionBinding): Promise<AgentExecution | null> {
   const { agentKitEnabled, agentKitStore, agentScope } = await import('../agent-kit/service')
   if (!input.executionId) {
     if (agentKitEnabled()) throw new Error('agentExecutionClosed')
@@ -56,21 +80,8 @@ async function productExecution(scope: Scope, input: ExecutionBinding, prepared?
   return agentKitStore.readExecution(await agentScope(scope.ownerId, scope.botId), input.executionId, `${input.sessionId}:${input.turnId}:0`)
 }
 
-/** Reuse the immutable native grant while checking its current execution state. */
-export async function checkedPreparedEveExecution(scope: Scope, input: ExecutionBinding, prepared: AgentExecution | null): Promise<AgentExecution | null> {
-  const { agentKitEnabled, agentKitStore } = await import('../agent-kit/service')
-  if (!input.executionId) {
-    if (agentKitEnabled()) throw new Error('agentExecutionClosed')
-    return null
-  }
-  if (prepared?.id !== input.executionId) throw new Error('agentExecutionClosed')
-  const status = await agentKitStore.executionStatus({ ownerId: scope.ownerId, botId: scope.botId, workspaceId: scope.workspaceId }, prepared.id)
-  if (status !== 'running') throw new Error('agentExecutionClosed')
-  return prepared
-}
-
-export async function productContext(scope: Scope, binding: ExecutionBinding, prepared?: AgentExecution | null) {
-  const execution = await productExecution(scope, binding, prepared)
+export async function productContext(scope: Scope, binding: ExecutionBinding) {
+  const execution = await productExecution(scope, binding)
   const { pool } = await import('../db')
   const source = (await pool.query<{ source_event_id: string; id: string | null; payload: Record<string, unknown> }>(`SELECT t.source_event_id,e.id,e.payload FROM eve_turn_sources t
     LEFT JOIN coordinator_events e ON e.id=t.source_event_id AND e."userId"=$3 AND e."botId"=$4
