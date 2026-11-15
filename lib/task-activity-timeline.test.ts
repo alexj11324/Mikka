@@ -27,7 +27,7 @@ const event = (partial: EventInput): IssueActivityEvent => ({ id: 'e', at: '2026
 const words = (parts: ActivityPiece[]) => parts.map(part => part.text).join('')
 
 test('each sentence reads as Capy\'s English, actor first', () => {
-  const line = (partial: Partial_) => words(activityLineParts(event({ actor: ada, ...partial }), labels(en), subject))
+  const line = (partial: EventInput) => words(activityLineParts(event({ actor: ada, ...partial }), labels(en), subject))
   assert.equal(line({ kind: 'created' }), 'Ada created CAP-12')
   assert.equal(line({ kind: 'status', status: 'done' }), 'Ada moved CAP-12 to Done')
   assert.equal(line({ kind: 'priority', priority: 'high' }), 'Ada set priority to High')
@@ -67,7 +67,7 @@ test('a merged pull request is its own line with no actor, as Capy\'s PR rows', 
 })
 
 test('Chinese follows the same sentences', () => {
-  const line = (partial: Partial_) => words(activityLineParts(event({ actor: ada, ...partial }), labels(zh as unknown as typeof en), subject))
+  const line = (partial: EventInput) => words(activityLineParts(event({ actor: ada, ...partial }), labels(zh as unknown as typeof en), subject))
   assert.equal(line({ kind: 'created' }), 'Ada 创建了 CAP-12')
   assert.equal(line({ kind: 'status', status: 'done' }), 'Ada 把 CAP-12 移到了Done')
   assert.equal(line({ kind: 'relation', relation: 'blockedBy', targetId: 'task-2' }), 'Ada 把 CAP-12 标记为被 CAP-13 阻塞')
