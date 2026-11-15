@@ -29,21 +29,10 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
   let lifecycleStarts = 0
   const stageHandoffs: [{userId:string;workspaceId:string},string|null,string][] = []
   mock.module('workflow/api', { namedExports: { start: async (workflow: {name:string}, args: unknown[]) => { lifecycleStarts++; if (workflow.name === 'factoryCloudStageHandoff') stageHandoffs.push(args as typeof stageHandoffs[number]); return { runId: 'synthetic-workflow' } } } })
-  // Only the external Decision transport is synthetic. Profile eligibility,
-  // source authorization, transaction admission and frozen selections stay real.
-  const profileForStage: Record<string, string> = {}
-  const profileSelections: { stage: string; profileId: string }[] = []
+  // No Decision call selects a Profile any more (decision 2026-11-15-1630);
+  // an unexpected one fails loudly instead of reaching a real provider.
   mock.module(new URL('../lib/coordinator/decide.ts', import.meta.url).href, { namedExports: {
-    invokeDecision: async (purpose: string, raw: unknown) => {
-      if (purpose !== 'factory-agent-profile') return null
-      const input = typeof raw === 'string' ? JSON.parse(raw) : raw as { task: { stage: string }; candidates: { id: string }[] }
-      const stage = input.task.stage, profileId = profileForStage[stage]
-      assert.ok(profileId && input.candidates.some((candidate: { id: string }) => candidate.id === profileId), 'the current stage must select a real eligible fixture Profile')
-      profileSelections.push({ stage, profileId })
-      return { answers: new Map([['profile', { name: 'profile', type: 'choice', choice: `${profileId}:stage_fit`, confidence: .95 }]]),
-        execution: { executionId: randomUUID(), modelId: 'synthetic-profile-decision', providerGenerationId: 'isolated-cloud-spec-test',
-          startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' } }
-    },
+    invokeDecision: async (purpose: string) => { assert.fail(`unexpected Decision call: ${purpose}`) },
   } })
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
@@ -731,15 +720,9 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const who = await person(`cloud-spec-${entry}`, true, 1201 + index)
     const { rows: [taskIdentity] } = await pool.query('SELECT "issuedIdentifier" FROM issues WHERE id=$1', [who.issueId])
     assert.equal(taskIdentity.issuedIdentifier, `CLOU-${1201 + index}`)
+    // With custom Profiles present, nothing chooses one: both stages run with none.
     const { AgentProfileStore } = await import('../lib/factory/agent-profile')
-    const profiles = new AgentProfileStore(pool), profileScope = { ownerId: who.id, workspaceId: who.workspaceId }
-    const definition = (role: string) => ({ name: role, description: `${role} for an isolated cloud spec regression`, roles: [role], enabled: true,
-      harness: 'codex' as const, model: { mode: 'fixed' as const, harness: 'codex' as const, model: 'gpt-5', source: { kind: 'subscription' as const, connectionId: who.connection } },
-      instructions: `FIXTURE_ROLE_${role}`, skills: [] })
-    const planner = await profiles.create(profileScope, definition('spec'))
-    const executor = await profiles.create(profileScope, definition('execute'))
-    profileForStage.spec = planner.id; profileForStage.execute = executor.id
-    const decisionsBefore = profileSelections.length
+    await new AgentProfileStore(pool).create({ ownerId: who.id, workspaceId: who.workspaceId }, { name: 'spec', description: 'An unchosen role', instructions: 'FIXTURE_ROLE_spec', skills: [] })
     try {
       let result: { runId?: string; error?: string }
       let sourceEventId: string | undefined
@@ -767,14 +750,14 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
       assert.deepEqual([planned.run.id, planned.run.kind, planned.run.deviceKind, planned.run.machineState], [result.runId, 'plan', 'cloud', 'running'])
       assert.equal(planned.run.agentDefinition.readOnly, true)
       assert.equal(planned.run.agentDefinition.repositoryAdmission, undefined, 'a spec cannot acquire implementation publication authority')
-      assert.equal(planned.run.agentDefinition.agentProfile.profileId, planner.id)
+      assert.equal(planned.run.agentDefinition.agentProfile.profileId, 'default', 'no Profile is chosen automatically')
+      assert.doesNotMatch(planned.run.prompt, /FIXTURE_ROLE_/)
       assert.equal(planned.run.agentDefinition.model, 'gpt-5')
       assert.equal(planned.run.agentDefinition.apiKey, undefined)
       assert.equal(planned.run.agentDefinition.subscription.route, 'codex_cli')
       assert.equal(planned.run.agentDefinition.executionIdentity.requester, who.id)
       assert.equal(planned.run.agentDefinition.executionIdentity.billingAccount.model.kind, 'subscription')
       assert.equal(planned.run.agentDefinition.executionIdentity.billingAccount.model.ownerId, who.id)
-      assert.ok(profileSelections.slice(decisionsBefore).some(choice => choice.stage === 'spec' && choice.profileId === planner.id), 'normal profile selection receives the actual spec stage')
       if (entry !== 'coordinator') return
 
       const { rows: [plannerMachine] } = await pool.query(`SELECT m."sandboxId",m."deviceId",m."repoId",token.id AS "tokenId"
@@ -838,7 +821,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
       assert.notEqual(implementation.run.id, planned.run.id)
       assert.equal(implementation.run.kind, 'implement')
       assert.equal(implementation.run.agentDefinition.readOnly, undefined, 'real human approval removes the planner read-only grant for a fresh writable executor')
-      assert.equal(implementation.run.agentDefinition.agentProfile.profileId, executor.id, 'implementation selects its own current Profile')
+      assert.equal(implementation.run.agentDefinition.agentProfile.profileId, 'default', 'implementation is not given a Profile automatically')
       assert.equal(implementation.run.agentDefinition.profileOriginRunId, undefined)
       assert.equal(implementation.run.continuesRunId, null)
       assert.equal(implementation.run.sessionId, null, 'implementation cannot inherit the planner native session')
@@ -867,8 +850,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
       assert.match(implementation.run.prompt, /Factory implementation owns validation/)
       assert.match(implementation.run.prompt, /APPROVED_SPEC_CONTEXT_1276/, 'the fresh executor receives the actual approved plan content')
       assert.match(implementation.run.prompt, /OWNER_PLAN_CONTEXT_1276/, 'the fresh executor retains the Owner clarification consumed during planning')
-      assert.ok(profileSelections.slice(decisionsBefore).some(choice => choice.stage === 'execute' && choice.profileId === executor.id))
-    } finally { delete profileForStage.spec; delete profileForStage.execute }
+    } finally { /* nothing to restore */ }
   })
 
   await t.test('an intake-created pending cloud spec is dispatched in place, and a different source cannot replace it', async () => {
