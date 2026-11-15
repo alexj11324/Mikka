@@ -78,7 +78,7 @@ test('authenticated header actions keep same-UUID chat and run distinct across o
   assert.deepEqual(await session(() => regenerateConversationTitle(chat)), { title: 'Chat generated', regenerated: true })
   assert.deepEqual(await session(() => regenerateConversationTitle(run)), { title: 'Run generated', regenerated: true })
   assert.deepEqual(calls, ['Chat renamed', 'Run source'])
-  for (const [cookie, workspace] of [[memberCookie, space.id], [ownerCookie, second.id]]) {
+  for (const [cookie, workspace] of [[memberCookie, space.id], [ownerCookie, second.id]] as const) {
     for (const target of [run, chat]) {
       assert.deepEqual(await session(() => renameConversation(target, 'Wrong target'), cookie, workspace), missing)
       assert.deepEqual(await session(() => regenerateConversationTitle(target), cookie, workspace), missing)
