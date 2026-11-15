@@ -3,10 +3,14 @@ import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
 import { act, useRef, useState } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
+import { Textarea } from '@/components/ui/textarea'
+import type { ChatComposerProps } from '@/components/slots/chat-composer-contract'
 import * as live from '@/hooks/use-live-key'
 import type { GroupMessage, GroupMessagePage } from '@/lib/group-messages'
 
 let pages: GroupMessagePage[] = []
+let hasMemberPage = true
+let membersError: Error | undefined
 mock.module('next-intl', { namedExports: {
   useTranslations: () => (key: string) => key,
   useMessages: () => ({ AgentCopy: {} }),
@@ -29,9 +33,11 @@ mock.module(new URL('../../lib/hooks/view-state.tsx', import.meta.url).href, { n
   useViewState: <T,>(_key: string, initial: T) => useState(initial),
   useViewScroll: () => useRef(null),
 } })
-mock.module(new URL('../coordinator/chat-composer.tsx', import.meta.url).href, { namedExports: { ChatComposer: () => null } })
+mock.module(new URL('../../app/actions/task-runs.ts', import.meta.url).href, { namedExports: { findThreadReferences: async () => [{ kind: 'task', id: issueId, title: 'Authorized task' }] } })
+mock.module(new URL('./thread-header.tsx', import.meta.url).href, { namedExports: { ThreadHeader: () => null } })
+mock.module(new URL('../coordinator/chat-composer.tsx', import.meta.url).href, { namedExports: { ChatComposer: ({ ref, value, onChange }: ChatComposerProps) => <Textarea ref={ref} value={value} onChange={event => onChange(event.currentTarget.value)} /> } })
 mock.module(new URL('../nav/conversation-pill.tsx', import.meta.url).href, { namedExports: { ConversationPill: () => null } })
-mock.module(new URL('../nav/group-avatar.tsx', import.meta.url).href, { namedExports: { GroupAvatar: () => null, groupMembersKey: (id: string) => ['group-members', id], memberAvatar: (member: { id: string }) => ({ id: member.id }), useGroupMembers: () => ({ data: [] }) } })
+mock.module(new URL('../nav/group-avatar.tsx', import.meta.url).href, { namedExports: { GroupAvatar: () => null, groupMembersKey: (id: string) => ['group-members', id], memberAvatar: (member: { id: string }) => ({ id: member.id }), useGroupMembers: () => ({ data: hasMemberPage ? [] : undefined, error: membersError }) } })
 mock.module(new URL('../nav/letter-avatar.tsx', import.meta.url).href, { namedExports: { LetterAvatar: () => null } })
 mock.module(new URL('../nav/bot-avatar.tsx', import.meta.url).href, { namedExports: { BotAvatar: () => null } })
 mock.module(new URL('./message-reactions.tsx', import.meta.url).href, { namedExports: { MessageReactions: () => null, useMessageReactions: () => ({}) } })
@@ -55,7 +61,7 @@ before(async () => {
   Object.defineProperty(globalThis, 'window', { configurable: true, value: browser })
   Object.defineProperty(globalThis, 'document', { configurable: true, value: browser.document })
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: browser.navigator })
-  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, HTMLElement: browser.HTMLElement, Element: browser.Element, Node: browser.Node, IntersectionObserver: browser.IntersectionObserver, requestAnimationFrame: browser.requestAnimationFrame.bind(browser) })
   ;({ createRoot } = await import('react-dom/client'))
   ;({ GroupChatView } = await import('./group-chat-view'))
 })
@@ -102,4 +108,47 @@ test('the chat reads its newest page and members on the group key, never on a ti
   assert.equal(id, 'group')
   assert.deepEqual(keys, ['$inf$' + JSON.stringify(['group-messages', 'group', null]), JSON.stringify(['group-members', 'group'])])
   assert.equal(workspaceId, 'workspace', 'the key arrives on the group workspace channel')
+})
+
+test('named conversations show canonical authored links and use their authorized picker while ordinary groups retain plain task markers', async () => {
+  const body = 'See [[issue:' + issueId + ']] and [[chat:' + runId + ']]'
+  pages = [{ messages: [message('user', 1, body)], nextBefore: null, readRevision: 0 }]
+  const group = { id: 'group', title: 'Chat', workspaceId: 'workspace' }
+  const draw = (purpose: 'group' | 'conversation') => root.render(<GroupChatView group={{ ...group, creationPurpose: purpose }} userId="owner" people={new Map()} />)
+  await act(async () => draw('conversation'))
+  const links = [...container.querySelectorAll('[data-slot="user-message-text"] a')]
+  assert.equal(links.length, 2)
+  assert.ok(links[0].getAttribute('href')?.includes(issueId))
+  assert.ok(links[1].getAttribute('href')?.includes('group=' + runId))
+  const input = container.querySelector('textarea')!
+  const setValue = Object.getOwnPropertyDescriptor(browser.HTMLTextAreaElement.prototype, 'value')!.set!
+  setValue.call(input, '@task:authorized')
+  await act(async () => input.dispatchEvent(new browser.Event('input', { bubbles: true }) as never))
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 230)) })
+  const candidate = [...container.querySelectorAll('button')].find(button => button.textContent?.includes('Authorized task'))
+  assert.ok(candidate)
+  await act(async () => candidate.click())
+  assert.equal(input.value, '[[issue:' + issueId + ']] ')
+  await act(async () => draw('group'))
+  assert.equal(container.querySelector('[data-slot="user-message-text"]')?.textContent, body)
+  assert.equal(container.querySelector('[data-slot="user-message-text"] a'), null)
+  await act(async () => draw('conversation'))
+  membersError = Object.assign(new Error('membership removed'), { status: 403 })
+  try {
+    await act(async () => draw('conversation'))
+    assert.equal(container.querySelector('[data-slot="user-message-text"] a'), null)
+    assert.equal(container.querySelector('[role="group"][aria-label="references"]'), null)
+    assert.ok(container.querySelector('[role="alert"]')?.textContent?.includes('notFound'))
+    membersError = Object.assign(new Error('membership lookup unavailable'), { status: 503 })
+    await act(async () => draw('conversation'))
+    assert.equal(Boolean(container.querySelector('[data-slot="user-message-text"]')), false, 'a successful messages read cannot restore a refused membership read')
+    assert.equal(container.querySelector('[role="group"][aria-label="references"]'), null)
+    membersError = undefined
+    hasMemberPage = false
+    await act(async () => draw('conversation'))
+    assert.equal(Boolean(container.querySelector('[data-slot="user-message-text"]')), false, 'a pending membership read cannot restore access')
+    hasMemberPage = true
+    await act(async () => draw('conversation'))
+    assert.equal(container.querySelectorAll('[data-slot="user-message-text"] a').length, 2)
+  } finally { membersError = undefined; hasMemberPage = true }
 })

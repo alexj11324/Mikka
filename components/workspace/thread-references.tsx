@@ -1,19 +1,22 @@
 'use client'
 
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useContext, useEffect, useRef, useState, type RefObject } from 'react'
 import { useTranslations } from 'next-intl'
 import { findThreadReferences } from '@/app/actions/task-runs'
 import { Button } from '@/components/ui/button'
 import { withBasePath } from '@/lib/base-path'
+import { ConversationReferenceTitles } from './conversation-reference-titles'
 import { mentionAt, personReferenceParts, referenceMarker, referenceQueryReady, sourceMentionAt, type ThreadReference } from '@/lib/thread-references'
 import { openGroupConversation, openTask, openThread, workspaceSearch } from './workspace-navigation'
 
 export function PersonReferences({ text }: { text: string }) {
   const t = useTranslations('ThreadReferences')
+  const titles = useContext(ConversationReferenceTitles)
   return <>{personReferenceParts(text).map((part, index) => {
     if (part.kind === 'text') return part.text
     if (part.kind === 'pr') return <a key={index} href={part.id} target="_blank" rel="noreferrer" className="break-all underline">{part.id.replace('https://github.com/', '')}</a>
     const task = part.kind === 'task'
+    const title = task ? undefined : titles.get((part.kind === 'chat' ? 'chat:' : 'run:') + part.id)
     const href = withBasePath('/' + workspaceSearch(task ? { task: part.id } : part.kind === 'chat' ? { section: 'group', group: part.id } : { thread: part.id }))
     return <a key={index} href={href} className="underline" onClick={event => {
       if (event.button || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return
@@ -21,7 +24,7 @@ export function PersonReferences({ text }: { text: string }) {
       if (task) openTask(part.id)
       else if (part.kind === 'chat') openGroupConversation(part.id)
       else openThread(part.id)
-    }}>{t(part.kind === 'chat' ? 'thread' : part.kind)} {part.id.slice(0, 8)}</a>
+    }}>{title ?? `${t(part.kind === 'chat' ? 'thread' : part.kind)} ${part.id.slice(0, 8)}`}</a>
   })}</>
 }
 

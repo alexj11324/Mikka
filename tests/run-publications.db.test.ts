@@ -967,5 +967,8 @@ test('run result publication commits one owner-scoped result through retries and
     await pool.end()
     const workspacePool = (globalThis as { workspacePool?: { end(): Promise<void> } }).workspacePool
     if (workspacePool) await workspacePool.end()
+    // Community live notifications can open a dedicated LISTEN connection outside both pools.
+    const { builtinGateway } = await import('../lib/builtin-gateway/runtime')
+    await builtinGateway()?.stop()
   }
 })

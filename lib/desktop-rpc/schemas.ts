@@ -1,6 +1,6 @@
 import { AVATAR_MAX_BYTES, isAvatarContentType } from '../account/avatar-file'
 import { threadModelChoice } from '@/lib/thread-model-choice'
-import { archiveIdleDays, directoryInput } from '@/lib/conversation-directory-input'
+import { archiveIdleDays, conversationTargetInput, directoryInput } from '@/lib/conversation-directory-input'
 import { saveEnvironmentInput, projectDefaultEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
 import { createOnlyCommand, dispatchReceiptInput } from '@/lib/task-create-command'
 import { taskListPageInput } from '@/lib/task-list-page'
@@ -294,10 +294,10 @@ export const desktopActionSchemas = {
   'task-runs.findThreadReferences': z.union([tuple(uuid, text(120)), tuple(uuid, text(120), z.enum(['task', 'thread', 'pr']))]),
   'task-runs.listConversations': tuple(directoryInput),
   'task-runs.listConversationSidebar': none,
-  'task-runs.readConversationOrganization': tuple(uuid),
-  'task-runs.setConversationOrganization': tuple(uuid, object({ field: z.enum(['archived', 'pinned']), value: bool })),
-  'task-runs.renameConversation': tuple(uuid, text(400)),
-  'task-runs.regenerateConversationTitle': tuple(uuid),
+  'task-runs.readConversationOrganization': tuple(conversationTargetInput),
+  'task-runs.setConversationOrganization': tuple(conversationTargetInput, object({ field: z.enum(['archived', 'pinned']), value: bool })),
+  'task-runs.renameConversation': tuple(conversationTargetInput, text(400)),
+  'task-runs.regenerateConversationTitle': tuple(conversationTargetInput),
   'team-relations.getIssueTeam': oneId,
   'team-relations.setIssueTeam': tuple(object({ issueId: uuid, teamId: uuid.nullable(), expectedTeamId: uuid.nullable() })),
   'team-relations.listProjectTeams': none,

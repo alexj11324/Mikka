@@ -13,7 +13,7 @@ import { Markdown } from '@/components/Markdown'
 import { ListTopFade, NavBar } from '@/components/NavBar'
 import { useScrolledUnderBar } from '@/components/BarBackdrop'
 import { Text } from '@/components/Text'
-import { Composer } from '@/features/chat/components/chat-composer'
+import { ReferenceComposer as Composer } from '@/features/chat/components/thread-composer'
 import { GlassButton } from '@/components/GlassButton'
 import { ReadNotice } from '@/components/ReadNotice'
 import { OfflineBanner } from '@/components/OfflineBanner'
@@ -166,6 +166,8 @@ export default function GroupChat() {
   const bots = accessDenied ? [] : (members.data?.members ?? []).filter(item => item.memberType !== 'user')
 
   const canSend = Boolean(page.data && members.data && !accessDenied)
+  const referenceWorkspace = summary?.creationPurpose === 'conversation' && readRevision !== undefined && canSend &&
+    summary.workspaceId === home.data?.workspace.id ? summary.workspaceId : undefined
   const revoked = apiCache.denial(pagePath) || apiCache.denial(membersPath)
   const delivery = useConversationDelivery(canSend ? { kind: 'group', id } : null, messages.map(message => message.id), page.reload, revoked ? id : undefined)
   const send = (body: string) => {
@@ -210,7 +212,7 @@ export default function GroupChat() {
         <View>
           {separator}
           <MessageRow align="right" onSelect={() => select(message.body, message.id)}>
-            <MyBubble text={message.body} />{chips(message.id, 'right')}
+            <MyBubble text={message.body} threadReferences={!!referenceWorkspace} />{chips(message.id, 'right')}
           </MessageRow>
         </View>
       )
@@ -263,7 +265,7 @@ export default function GroupChat() {
       </View>
       <ChatScrollToLatest visible={!accessDenied && !atLatest} bottom={composerHeight + 12} onPress={() => list.current?.toLatest()} />
       <OfflineBanner top={insets.top + 66} />
-      {!accessDenied ? <Composer value={text} onChangeText={setText} placeholder={`发到 ${title || '群聊'}`} onSend={words => send(words)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'group', id }} overlay onHeight={setComposerHeight}
+      {!accessDenied ? <Composer value={text} key={identity} workspaceId={referenceWorkspace} onChangeText={setText} placeholder={`发到 ${title || '群聊'}`} onSend={words => send(words)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'group', id }} overlay onHeight={setComposerHeight}
         notice={reactionFailure ? <View accessibilityRole="alert" style={styles.reactionNotice}><Text style={styles.error}>回应没保存。</Text><GlassButton label="重试" onPress={() => void react(reactionFailure.id, reactionFailure.emoji)} /></View> : undefined}
         quote={quote} onClearQuote={() => setQuote(null)} onStop={working && !stopping ? () => void stop() : undefined} /> : null}
     </View>

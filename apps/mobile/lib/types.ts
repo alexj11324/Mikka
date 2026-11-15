@@ -104,6 +104,7 @@ export interface Reaction { emoji: string; count: number; mine: boolean }
 
 /** A group chat in 对话 (GET /api/conversations). */
 export interface GroupSummary {
+  creationPurpose?: 'group' | 'conversation'
   id: string
   title: string
   createdAt: string

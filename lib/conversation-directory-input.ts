@@ -3,6 +3,10 @@ import type { IssuePullRequest } from './issue-metadata'
 
 export const archiveIdleDays = [0, 3, 7, 14, 30, 90] as const
 
+// Released clients send only the UUID. New clients retain the object's kind.
+export const conversationTargetInput = z.union([z.uuid(), z.strictObject({ kind: z.enum(['run', 'chat']), id: z.uuid() })])
+export type ConversationTarget = z.infer<typeof conversationTargetInput>
+
 export const directoryInput = z.strictObject({
   search: z.string().trim().max(120).default(''),
   state: z.enum(['all', 'working', 'waiting', 'idle', 'failed']).default('all'),
