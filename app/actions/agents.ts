@@ -220,11 +220,11 @@ export async function listAgents(): Promise<AgentView[]> {
 
 /** Who currently collaborates on the issue (R-26): they see that its threads exist. */
 async function issueThreadAccess(issueId: string) {
-  const { issue, user } = await requireIssueAccessWithoutBody(issueId)
+  const { issue, user, teamId } = await requireIssueAccessWithoutBody(issueId)
   if (!issue.workspaceId) throw new ActionFailureError('issueNotFound')
   const members = await workspaceDb.select({ id: workspaceMembers.userId }).from(workspaceMembers)
     .where(and(eq(workspaceMembers.workspaceId, issue.workspaceId), eq(workspaceMembers.status, 'active')))
-  return { issue, user, memberIds: new Set(members.map(member => member.id)) }
+  return { issue, user, teamId, memberIds: new Set(members.map(member => member.id)) }
 }
 
 const threadColumns = {
@@ -258,7 +258,7 @@ export async function listIssueThreads(issueId: string): Promise<IssueThread[]> 
  * workspace, or the owner's home for a personal issue; null reads once a minute. */
 export async function pollIssueThreads(issueId: string, includeTaskWork = false, activityCursor?: { version?: string; positions?: import('@/lib/list-poll').ListPosition[] }) {
   return withDatabaseOperation('/actions/threads/issue-list', async () => {
-    const { threads, issue, user } = await readIssueThreads(issueId)
+    const { threads, issue, user, teamId } = await readIssueThreads(issueId)
     const [{ documentLiveWorkspace }, { workspacePool }] = await Promise.all([import('@/lib/live/panels'), import('@/lib/workspace-db')])
     const workspaceId = await documentLiveWorkspace(pool, workspacePool, issue.id, user.id)
     const work = includeTaskWork && issue.workspaceId
@@ -272,7 +272,7 @@ export async function pollIssueThreads(issueId: string, includeTaskWork = false,
     const activity = await pollIssueVersionSummaries(issue.id, activityCursor?.version, activityCursor?.positions)
     if (activity.error) throw new ActionFailureError(activity.error)
     if (activity.viewerId !== user.id) throw new ActionFailureError('issueNotFound')
-    return { ...snapshot, connections, activity: activity.snapshot, viewerId: user.id }
+    return { ...snapshot, teamId, connections, activity: activity.snapshot, viewerId: user.id }
   })
 }
 
@@ -292,8 +292,8 @@ export async function pollTaskDetail(issueId: string, known?: string, activityCu
 }
 
 async function readIssueThreads(issueId: string) {
-  const { issue, user, memberIds } = await issueThreadAccess(issueId)
-  const result = (threads: IssueThread[]) => ({ threads, issue, user })
+  const { issue, user, teamId, memberIds } = await issueThreadAccess(issueId)
+  const result = (threads: IssueThread[]) => ({ threads, issue, user, teamId })
   if (!memberIds.has(user.id)) return result([])
   // BE-18: fold continuation chains by root first, then take the newest ISSUE_THREAD_LIMIT
   // roots, so continuations never use up a slot (lib/run-chain.ts). Read-only, no locks.
