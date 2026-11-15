@@ -200,6 +200,105 @@ test('Task presentation batches keep current tenant authority and one Factory pr
       assert.deepEqual((await forUser(owner)).items[task].linkedChats, [first])
     })
 
+    await t.test('the conversation directory resolves only the current requester’s readable formal task links in both directions', async () => {
+      const { conversationDirectory, conversationSidebar } = await import('../lib/conversation-directory')
+      const { delegateGroupTask, authorizeGroupFactoryActor, groupTaskReferences } = await import('../lib/coordinator/group-factory')
+      const { withTaskWorkspace } = await import('../lib/task-workspace')
+      const { createIssueFromRequest } = await import('../lib/coordinator/issue-create')
+      const visible: string[] = []
+      const foreign = await makeTask(other), hidden = await makeTask(shared, {}, 'doing', peer)
+      const deleted = await makeTask(shared, { deletedAt: new Date().toISOString() })
+      const tombstone = { deletedAt: new Date().toISOString() }
+      const legacyDeleted = await makeTask(shared, {}, 'doing', owner, { type: 'doc', attrs: { mikka: tombstone, orvilo: tombstone } })
+      const malformed = await makeTask(), team = randomUUID(), unrelated = await makeTask()
+      await workspace.query(`INSERT INTO mikka_teams(id,"workspaceId","userId",name,identifier) VALUES($1,$2,$3,'Other team','MAL')`, [team,other,owner])
+      await workspace.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [malformed,team,other,owner])
+      await application.query("UPDATE resource_access_policies SET visibility='private' WHERE kind='task' AND id=$1", [hidden])
+      const chat = randomUUID(), bot = await makeBot(), client = await application.connect()
+      const scope = { userId: owner, workspaceId: shared, conversationId: chat, reporter: { id: bot, name: 'Chat Bot', description: '', memberType: 'bot' as const, executionAvailable: true } }
+      const authorize = (input: Parameters<typeof authorizeGroupFactoryActor>[1]) => authorizeGroupFactoryActor(client, input, (uid, ws) => withTaskWorkspace(uid, ws, async () => true))
+      try {
+        await client.query(`INSERT INTO conversations(id,"workspaceId",kind,title,"createdBy","creationPurpose")
+          VALUES($1,$2,'group','Bound chat',$3,'conversation')`, [chat,shared,owner])
+        await client.query(`INSERT INTO conversation_members("conversationId","memberType","memberId",role)
+          VALUES($1,'user',$2,'owner'),($1,'bot',$3,'member'),($1,'user',$4,'member')`, [chat,owner,bot,peer])
+        let position = 0
+        const message = async (body: string) => {
+          const id = randomUUID()
+          await client.query(`INSERT INTO conversation_messages(id,"conversationId",position,"authorType","authorId",body)
+            VALUES($1,$2,$3,'user',$4,$5)`, [id,chat,++position,owner,body])
+          return id
+        }
+        const directory = async (uid: string | { id: string; [tokenWorkspace]: string } = owner, space = shared) => (await conversationDirectory(application, uid, space, { search: 'Bound chat' })).items
+        const mention = await message('See [[issue:' + unrelated + ']]')
+        assert.equal((await directory())[0]?.issueId, null)
+        for (const title of ['First work item', 'Second work item']) {
+          const input = { ...scope, messageId: await message('Create a task'), text: title, delegation: { operation: 'create' as const, issueId: null } }
+          const noCall = async (): Promise<never> => { throw new Error('unexpected_operation') }
+          // Use the production Task and binding writers. A stopped provider leaves the Task linked
+          // without creating a Run or calling an external model.
+          const adapters = { authorize, executionBot: async () => ({ botId: bot, reporterOwnerId: owner, repository: null }),
+            create: async (userId: string, sourceEventId: string, title: string) => (await createIssueFromRequest(userId, { sourceEventId, title })).issueId, dispatch: async () => ({ error: 'noDevice' }), latest: noCall, continuation: noCall, stop: noCall }
+          const receipt = await delegateGroupTask(client, input, adapters)
+          assert.ok(receipt.taskReceipt?.issueId)
+          visible.push(receipt.taskReceipt.issueId)
+          assert.deepEqual(await delegateGroupTask(client, input, adapters), receipt)
+          for (const denied of [{ ...input, userId: peer }, { ...input, workspaceId: other }]) {
+            const unbound = { ...denied, messageId: await message('Attempt a new binding') }
+            await assert.rejects(delegateGroupTask(client, unbound, adapters), /group_task_not_authorized/)
+            assert.equal((await client.query('SELECT 1 FROM group_task_receipts WHERE "messageId"=$1', [unbound.messageId])).rowCount, 0)
+          }
+        }
+        assert.equal((await client.query('SELECT count(*)::int AS n FROM group_task_bindings WHERE "conversationId"=$1',[chat])).rows[0].n, 2)
+        for (const [id, requester] of [[foreign, owner], [hidden, owner], [deleted, owner], [legacyDeleted, owner], [malformed, owner], [unrelated, peer]]) {
+          await client.query(`INSERT INTO group_task_bindings("conversationId","issueId","userId","reporterId","reporterOwnerId","reporterType","executionBotId","sourceMessageId","sourceEventId")
+            VALUES($1,$2,$3,$4,$3,'bot',$4,$5,$6)`, [chat,id,requester,bot,mention,randomUUID()])
+        }
+        const expected = (await client.query('SELECT id,"issuedIdentifier" AS identifier,title FROM issues WHERE id=ANY($1::uuid[]) ORDER BY "createdAt" DESC,id', [visible])).rows
+        const [entry] = await directory()
+        assert.deepEqual(entry?.linkedTasks, expected)
+        assert.equal(entry.issueId, expected[0].id)
+        assert.equal(entry.identifier, expected[0].identifier)
+        assert.equal(entry.taskTitle, expected[0].title)
+        const sidebar = await conversationSidebar(application, owner, shared, bot)
+        assert.deepEqual(sidebar[bot].items.find(row => row.kind === 'chat' && row.id === chat)?.linkedTasks, expected)
+        assert.deepEqual(await directory({ id: owner, [tokenWorkspace]: other }), [])
+        assert.deepEqual(await directory(peer), [])
+        assert.deepEqual(await directory(owner, other), [])
+        const work = await as(owner, shared, () => getTaskPresentations({ workspaceId: shared, issueIds: [...visible, hidden, foreign, malformed, deleted, legacyDeleted, unrelated], includeLinkedChats: true }))
+        for (const id of visible) assert.deepEqual(work.items[id].linkedChats, [{ id: chat, title: 'Bound chat' }])
+        for (const id of [hidden, foreign, malformed, deleted, legacyDeleted]) assert.equal(work.items[id], undefined)
+        assert.deepEqual(work.items[unrelated].linkedChats, [])
+        const decisions = (userId: string) => groupTaskReferences(client, { userId, workspaceId: shared, conversationId: chat })
+        await client.query(`INSERT INTO resource_access_grants("resourceKind","resourceId","subjectKind","subjectId",capabilities)
+          VALUES ('task',$1,'account',$2,ARRAY['canReadContent'])`, [hidden,owner])
+        assert.ok((await decisions(owner)).some(row => row.issueId === hidden))
+        await client.query(`DELETE FROM resource_access_grants WHERE "resourceKind"='task' AND "resourceId"=$1 AND "subjectId"=$2`, [hidden,owner])
+        assert.ok(!(await decisions(owner)).some(row => row.issueId === hidden), 'a revoked Task must disappear from the next model input')
+        assert.deepEqual((await decisions(owner)).map(row => row.issueId), expected.map(row => row.id))
+        assert.deepEqual(await decisions(peer), [], 'a stale member row never supplies the model with another owner’s named Chat tasks')
+        const beforeMore = await counted(() => decisions(owner))
+        for (let i=0; i<21; i++) {
+          const id = await makeTask()
+          await client.query(`INSERT INTO group_task_bindings("conversationId","issueId","userId","reporterId","reporterOwnerId","reporterType","executionBotId","sourceMessageId","sourceEventId")
+            VALUES($1,$2,$3,$4,$3,'bot',$4,$5,$6)`, [chat,id,owner,bot,mention,randomUUID()])
+        }
+        const capped = await counted(() => decisions(owner))
+        assert.equal(capped.result.length, 20)
+        assert.equal(new Set(capped.result.map(row => row.issueId)).size, 20)
+        assert.equal(capped.statements.length, beforeMore.statements.length, 'one APP read and one WS conflict check per active batch')
+        assert.deepEqual(capped.statements.filter(row => row.sql.includes('WITH recent AS')).map(row => row.database), [appName])
+        assert.deepEqual(capped.statements.filter(row => row.sql.includes('SELECT "issueId" FROM mikka_team_issues')).map(row => row.database), [workspaceName])
+        await workspace.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [shared,owner])
+        try { assert.deepEqual(await decisions(owner), []) }
+        finally { await workspace.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`, [shared,owner]) }
+
+        await client.query('UPDATE conversation_members SET "leftAt"=now() WHERE "conversationId"=$1 AND "memberId"=$2', [chat,owner])
+        assert.deepEqual(await directory(), [])
+        assert.deepEqual(await decisions(owner), [])
+      } finally { client.release() }
+    })
+
     await t.test('formal task PR links backfill, stay ordered on edits and respect the task reader', async () => {
       const first = { url: 'https://github.com/example/project/pull/7', state: 'open' }
       const second = { url: 'https://github.com/example/project/pull/9', state: 'draft' }

@@ -3,7 +3,8 @@ import { withConversationWorkspace, type ConversationReader } from './conversati
 import { requireTaskWorkspaceLease, taskReaderScope } from './task-workspace'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
-import { directoryInput, type DirectoryInput, type DirectoryState, type ConversationDirectoryPage } from './conversation-directory-input'
+import { linkedTasksForChats } from './group-task-links'
+import { directoryInput, type DirectoryInput, type DirectoryState, type DirectoryTaskLink, type ConversationDirectoryPage } from './conversation-directory-input'
 import { runAwaitingApproval, runDeviceOffline } from './task-state-query'
 import { threadUnread } from './thread-reads'
 import { runBotId } from './run-bot-name'
@@ -121,9 +122,21 @@ export async function effectiveConversationArchive(database: RunChainQueryable, 
   return result.rows[0] ? Boolean(result.rows[0].archived) : null
 }
 
-function item(row: Row) {
-  return { pulls: row.pulls.flatMap((raw): IssuePullRequest[] => { const parsed = pullRequestSchema.safeParse(raw); return parsed.success ? [parsed.data] : [] }), taskTitle: row.taskTitle, kind: row.kind, id: row.id, issueId: row.issueId, identifier: row.identifier, title: row.kind === 'chat' ? row.title ?? '' : threadTitle({ title: row.title,
-    name: threadName(row.asked, ''), issue: { title: row.taskTitle || row.agentName } }), state: row.state, unread:row.unread, at: row.at, pinned: row.pinned }
+function item(row: Row, linkedTasks?: DirectoryTaskLink[]) {
+  const first = linkedTasks?.[0]
+  return {
+    ...(linkedTasks?.length ? { linkedTasks } : {}),
+    pulls: row.pulls.flatMap((raw): IssuePullRequest[] => {
+      const parsed = pullRequestSchema.safeParse(raw)
+      return parsed.success ? [parsed.data] : []
+    }),
+    kind: row.kind, id: row.id, issueId: first?.id ?? row.issueId,
+    identifier: first?.identifier ?? row.identifier, taskTitle: first?.title ?? row.taskTitle,
+    title: row.kind === 'chat' ? row.title ?? '' : threadTitle({
+      title: row.title, name: threadName(row.asked, ''), issue: { title: row.taskTitle || row.agentName },
+    }),
+    state: row.state, unread: row.unread, at: row.at, pinned: row.pinned,
+  }
 }
 
 export async function conversationDirectory(database: RunChainQueryable, reader: ConversationReader, workspaceId: string, raw: DirectoryInput): Promise<ConversationDirectoryPage> {
@@ -150,7 +163,8 @@ async function directoryPage(database: RunChainQueryable, userId: string, worksp
   const rows = (await database.query(statement,[...facts.params,userId,workspaceId,RUN_CHAIN_MAX_DEPTH,input.archived === 'any' ? null : input.archived,input.botId ?? null,
     input.search,input.state,input.cursor?.id ?? null,input.cursor?.pinned ?? null,input.cursor?.at ?? null,input.pullState,input.cursor?.kind ?? null])).rows as Row[]
   const page = rows.slice(0,100), last = page.at(-1)
-  return { items: page.map(item).filter(row=>!input.search || row.title.toLowerCase().includes(input.search.toLowerCase())),
+  const linked = await linkedTasksForChats(database, userId, workspaceId, page.filter(row => row.kind === 'chat').map(row => row.id))
+  return { items: page.map(row => item(row, row.kind === 'chat' ? linked.get(row.id) : undefined)).filter(row=>!input.search || row.title.toLowerCase().includes(input.search.toLowerCase())),
     cursor: rows.length>page.length && last ? {id:last.id,at:last.at,pinned:last.pinned,kind:last.kind} : null }
 }
 
@@ -176,11 +190,12 @@ async function sidebarRows(database: RunChainQueryable, userId: string, workspac
     FROM bot_rows WHERE NOT archived AND "botId" IS NOT NULL AND source IS DISTINCT FROM 'mcp' ${botFilter}
   ) SELECT * FROM ranked WHERE position<=9 ORDER BY "botId",position`
   const rows = (await database.query(statement, values)).rows as (Row & { unreadCount: number })[]
+  const linked = await linkedTasksForChats(database, userId, workspaceId, rows.filter(row => row.kind === 'chat' && row.position <= 8).map(row => row.id))
   const bots: Record<string,{ items: (ReturnType<typeof item> & {harness:string | null; status:string | null})[]; more:boolean; unreadCount:number }> = {}
   for (const row of rows) {
     const group = bots[row.botId!] ??= {items:[],more:false,unreadCount:row.unreadCount}
     if (row.position===9) group.more=true
-    else group.items.push({...item(row),harness:row.harness,status:row.status})
+    else group.items.push({...item(row, row.kind === 'chat' ? linked.get(row.id) : undefined),harness:row.harness,status:row.status})
   }
   return bots
 }

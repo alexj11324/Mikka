@@ -1,19 +1,22 @@
 'use client'
 
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useContext, useEffect, useRef, useState, type RefObject } from 'react'
 import { useTranslations } from 'next-intl'
 import { findThreadReferences } from '@/app/actions/task-runs'
 import { Button } from '@/components/ui/button'
 import { withBasePath } from '@/lib/base-path'
+import { ConversationReferenceTitles } from './conversation-reference-titles'
 import { mentionAt, personReferenceParts, referenceMarker, referenceQueryReady, sourceMentionAt, type ThreadReference } from '@/lib/thread-references'
 import { openGroupConversation, openTask, openThread, workspaceSearch } from './workspace-navigation'
 
 export function PersonReferences({ text }: { text: string }) {
   const t = useTranslations('ThreadReferences')
+  const titles = useContext(ConversationReferenceTitles)
   return <>{personReferenceParts(text).map((part, index) => {
     if (part.kind === 'text') return part.text
     if (part.kind === 'pr') return <a key={index} href={part.id} target="_blank" rel="noreferrer" className="break-all underline">{part.id.replace('https://github.com/', '')}</a>
     const task = part.kind === 'task'
+    const title = task ? undefined : titles.get((part.kind === 'chat' ? 'chat:' : 'run:') + part.id)
     const href = withBasePath('/' + workspaceSearch(task ? { task: part.id } : part.kind === 'chat' ? { section: 'group', group: part.id } : { thread: part.id }))
     return <a key={index} href={href} className="underline" onClick={event => {
       if (event.button || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return
@@ -21,7 +24,7 @@ export function PersonReferences({ text }: { text: string }) {
       if (task) openTask(part.id)
       else if (part.kind === 'chat') openGroupConversation(part.id)
       else openThread(part.id)
-    }}>{t(part.kind === 'chat' ? 'thread' : part.kind)} {part.id.slice(0, 8)}</a>
+    }}>{title ?? `${t(part.kind === 'chat' ? 'thread' : part.kind)} ${part.id.slice(0, 8)}`}</a>
   })}</>
 }
 
@@ -41,13 +44,15 @@ export function ThreadReferencePicker({ draft, workspaceId, input, onChange }: {
     if (!textarea) return
     const select = () => { if (textarea.ownerDocument.activeElement === textarea) update() }
     const update = () => setCaret(textarea.selectionStart)
+    // Let React commit the controlled draft before a caret render can restore its old value.
+    const edited = (event: Event) => { if (event.target === textarea) update() }
     update()
-    textarea.addEventListener('input', update)
+    textarea.ownerDocument.addEventListener('input', edited)
     textarea.ownerDocument.addEventListener('selectionchange', select)
     textarea.addEventListener('click', update)
     textarea.addEventListener('keyup', update)
     return () => {
-      textarea.removeEventListener('input', update)
+      textarea.ownerDocument.removeEventListener('input', edited)
       textarea.ownerDocument.removeEventListener('selectionchange', select)
       textarea.removeEventListener('click', update)
       textarea.removeEventListener('keyup', update)
@@ -99,7 +104,7 @@ export function ThreadReferencePicker({ draft, workspaceId, input, onChange }: {
   }}>
     {!current ? <span role="status">{t('searching')}</span> : current.failed ? <span role="alert">{t('error')}</span> :
       !current.items?.length ? <span role="status">{t('empty')}</span> : current.items.map(item =>
-        <Button key={`${item.kind}:${item.id}`} type="button" variant="ghost" size="sm" className="w-full justify-start"
+        <Button key={referenceMarker(item)} type="button" variant="ghost" size="sm" className="w-full justify-start"
           onClick={() => {
             const insert = referenceMarker(item) + ' '
             const next = draft.slice(0, mention.from) + insert + draft.slice(mention.end)

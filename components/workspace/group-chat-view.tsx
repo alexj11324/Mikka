@@ -6,6 +6,8 @@ import useSWR, { unstable_serialize } from 'swr'
 import { useTranslations } from 'next-intl'
 import { listAgents } from '@/app/actions/agents'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
+import { BotModelPicker } from '@/components/coordinator/bot-model-picker'
+import { namedConversationModelBot } from '@/lib/named-conversation-model'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { CHAT_SURFACE, ChatMessage } from '@ui-slot/chat-message'
 import { Button } from '@/components/ui/button'
@@ -13,6 +15,7 @@ import { GroupLeaveAction } from './group-leave-action'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { withBasePath } from '@/lib/base-path'
+import { PersonReferences, ThreadReferencePicker } from './thread-references'
 import { VisibleReadEnd } from './visible-read-end'
 import { ThreadHeader } from './thread-header'
 import { ConversationPill } from '@/components/nav/conversation-pill'
@@ -55,7 +58,8 @@ export type GroupChatRequest = { id: string; title: string; workspaceId: string;
  * timer reads it (#1212). Names and bot avatars come from the
  * group's member list, then the workspace's members and the person's agents.
  */
-export function GroupChatView({ group, userId, people, onLeft }: {
+export function GroupChatView({ group, userId, people, ownedBots, onLeft }: {
+  ownedBots?: readonly { id: string }[]
   group: GroupChatRequest
   onLeft?: (id: string) => void
   userId: string
@@ -63,18 +67,21 @@ export function GroupChatView({ group, userId, people, onLeft }: {
   people: Map<string, string>
 }) {
   const t = useTranslations('GroupChat')
+  const composerInput = useRef<HTMLTextAreaElement>(null)
   const titleHeading = useRef<HTMLHeadingElement>(null)
   const namedChat = group.creationPurpose === 'conversation'
   const feedback = useTranslations('Coordinator')
   const { data: agents = [] } = useSWR('agents', listAgents)
   // The pill's avatar is the members' bloubs (R-36); the right column's 详情 reads the same request.
-  const { data: members = [] } = useGroupMembers(group.id)
+  const { data: memberPage, error: membersError } = useGroupMembers(group.id)
+  const members = memberPage ?? []
   const member = (type: 'user' | 'agent' | 'bot', id: string) => members.find(item => item.memberType === type && item.id === id)
   const [draft, setDraft] = useViewState(`group:${group.id}:draft`, '')
   // Navigation keeps unsent text and the same in-flight promise's result; it never resends.
   const delivery = useChatDelivery<GroupSend>(`group:${userId}:${group.workspaceId}:${group.id}`, feedback('sendUncertain'))
   const submittedDraft = useRef<string | null>(null)
-  const [accessRejected, setAccessRejected] = useState(false)
+  const [messagesRejected, setMessagesRejected] = useState(false)
+  const [membersRejected, setMembersRejected] = useState(false)
   const departed = useRef(false)
   const shown = useRef<{ id: string; page: GroupMessagePage } | null>(null)
   const { data: pages, error, size, setSize, isValidating, mutate } = useSWRInfinite<GroupMessagePage>(
@@ -104,15 +111,23 @@ export function GroupChatView({ group, userId, people, onLeft }: {
   const older = pages?.at(-1)?.nextBefore ?? null
   const loadingOlder = isValidating && !!pages && size > pages.length
   const code = error instanceof GroupMessagesRequestError ? error.code : error ? 'unavailable' : null
-  const refused = !!readAccessFailure(error)
-  // A transport failure cannot restore access after a refusal. A successful
-  // deduplicated read clears SWR's error even if its original view unmounted.
+  const messageDenial = readAccessFailure(error)
+  const memberDenial = readAccessFailure(membersError)
+  const refused = !!(messageDenial || memberDenial)
+  // Each read must recover its own permission decision. An outage on either
+  // read keeps its previous refusal even when the other resource reads successfully.
   useEffect(() => {
-    if (refused) setAccessRejected(true)
-    else if (!error) setAccessRejected(false)
-  }, [refused, error])
+    if (messageDenial) setMessagesRejected(true)
+    else if (!error && pages) setMessagesRejected(false)
+  }, [messageDenial, error, pages])
+  useEffect(() => {
+    if (memberDenial) setMembersRejected(true)
+    else if (!membersError && memberPage) setMembersRejected(false)
+  }, [memberDenial, membersError, memberPage])
+  const accessRejected = messagesRejected || membersRejected
   const backgroundFailed = !!pages && code === 'unavailable' && !refused && !accessRejected
-  const blockingCode = backgroundFailed ? null : code
+  const accessCode = memberDenial || accessRejected ? 'not_found' : null
+  const blockingCode = code === 'unauthorized' ? code : accessCode ?? (backgroundFailed ? null : code)
   // A failed background read leaves the transcript and composer in place.
   // Keep its retry outside document flow so reading history does not jump.
   useEffect(() => {
@@ -151,6 +166,9 @@ export function GroupChatView({ group, userId, people, onLeft }: {
   }
   const first = pages?.[0]
   const readRevision = first?.readRevision
+  const referenceWorkspace = namedChat && readRevision !== undefined && !blockingCode && !accessRejected && !refused && !departed.current ? group.workspaceId : null
+  const modelBot = namedConversationModelBot(referenceWorkspace && !membersError && !error ? referenceWorkspace : null, members, ownedBots, draft)
+  const referenceText = referenceWorkspace ? (text: string, index: number) => <PersonReferences key={index} text={text} /> : undefined
   const lastMessageId = messages.at(-1)?.id ?? null
   const sentRead = useRef<string | null>(null)
   const acknowledge = useCallback(() => {
@@ -223,10 +241,10 @@ export function GroupChatView({ group, userId, people, onLeft }: {
                           {mine ? <span className="sr-only">{name}</span> : <span className="text-xs font-medium text-muted-foreground">{name}</span>}
                           {/* The person's own words are drawn by the chat-message slot, as in a 1:1 chat. */}
                           {run.messages.map(message => mine
-                            ? <ChatMessage key={message.id} from="person" speaker={speaker} body={<CollapsibleMessage><UserMessageText text={message.body} /></CollapsibleMessage>} after={<MessageReactions reactions={reactions[message.id]} align="end" />} />
+                            ? <ChatMessage key={message.id} from="person" speaker={speaker} body={<CollapsibleMessage><UserMessageText text={message.body} renderText={referenceText} /></CollapsibleMessage>} after={<MessageReactions reactions={reactions[message.id]} align="end" />} />
                             : <Fragment key={message.id}>
                               <Bubble variant="muted" align="start" className="max-w-full">
-                                <BubbleContent className="rounded-2xl px-4 py-3 whitespace-pre-wrap">{run.authorType === 'user' ? <CollapsibleMessage><UserMessageText text={message.body} /></CollapsibleMessage> : <AgentMarkdown text={message.body} />}</BubbleContent>
+                                <BubbleContent className="rounded-2xl px-4 py-3 whitespace-pre-wrap">{run.authorType === 'user' ? <CollapsibleMessage><UserMessageText text={message.body} renderText={referenceText} /></CollapsibleMessage> : <AgentMarkdown text={message.body} />}</BubbleContent>
                               </Bubble>
                               <MessageReactions reactions={reactions[message.id]} align="start" />
                             </Fragment>)}
@@ -234,7 +252,7 @@ export function GroupChatView({ group, userId, people, onLeft }: {
                       </li>
                     })}
                     {unsent.map(item => <li key={item.id} data-pending={item.phase} className={cn('flex flex-col items-end gap-1', item.phase === 'sending' && 'opacity-60')}>
-                      <ChatMessage from="person" speaker={speaker} body={<CollapsibleMessage><UserMessageText text={item.text} /></CollapsibleMessage>} />
+                      <ChatMessage from="person" speaker={speaker} body={<CollapsibleMessage><UserMessageText text={item.text} renderText={referenceText} /></CollapsibleMessage>} />
                       {item.phase === 'failed' && <span role="alert" className="flex items-center gap-2 text-xs text-destructive-foreground">{item.error}<Button variant="ghost" size="xs" onClick={() => { void deliver(item) }}>{t('retry')}</Button></span>}
                     </li>)}
                     {first?.agentStatus && <li aria-label={t('answering')} className="flex"><span className="rounded-2xl bg-muted px-4 py-3"><Spinner aria-hidden="true" /></span></li>}
@@ -246,7 +264,9 @@ export function GroupChatView({ group, userId, people, onLeft }: {
       </div>
     </div>
     <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
-      <ChatComposer ref={null} value={draft} onChange={value => { submittedDraft.current = null; setDraft(value) }} onSubmit={send} label={t('composer', { name: group.title || t('untitled') })} disabled={!!blockingCode} attachmentScope={{ kind: 'group', id: group.id }}
+      {referenceWorkspace && <ThreadReferencePicker key={group.id} draft={draft} workspaceId={referenceWorkspace} input={composerInput} onChange={setDraft} />}
+      <ChatComposer ref={composerInput} value={draft} onChange={value => { submittedDraft.current = null; setDraft(value) }} onSubmit={send} label={t('composer', { name: group.title || t('untitled') })} disabled={!!blockingCode} attachmentScope={{ kind: 'group', id: group.id }}
+        model={modelBot && <BotModelPicker key={modelBot} botId={modelBot} running={replying} />}
         sending={stopping} editableWhileSending={stopping} running={replying && !stopping} onStop={replying && !stopping ? () => { void stop() } : undefined} />
     </div>
   </section>

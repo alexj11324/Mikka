@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install --yes --no-install-recommends ca-certifica
 WORKDIR /app
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=8080 MIKKA_RUNTIME_RESOURCE_ROOT=/app/eve
 COPY --chown=node:node .output/cf-eve/ ./
+WORKDIR /app/eve
 USER node
 EXPOSE 8080
-CMD ["node", "eve/server/index.mjs"]
+CMD ["node", "server/index.mjs"]

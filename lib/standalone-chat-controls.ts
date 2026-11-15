@@ -1,4 +1,5 @@
 import { withConversationWorkspace } from './conversation-workspace'
+import { conversationTargetInput, type ConversationTarget } from './conversation-directory-input'
 import type { ConversationOrganizationChange } from './conversation-organization'
 import type { RunChainQueryable } from './run-chain'
 
@@ -6,6 +7,20 @@ const ownerScope = `c.id=$1 AND c."createdBy"=$2 AND c."workspaceId"=$3
   AND c.kind='group' AND c."creationPurpose"='conversation'
   AND EXISTS (SELECT 1 FROM conversation_members m WHERE m."conversationId"=c.id
     AND m."memberType"='user' AND m."memberId"=$2 AND m."leftAt" IS NULL)`
+
+/** Resolve released, untyped addresses in one statement against both owner-scoped identities. */
+export async function resolveConversationTarget(database: RunChainQueryable, target: ConversationTarget, owner: string, workspace: string) {
+  const parsed = conversationTargetInput.safeParse(target)
+  if (!parsed.success) return null
+  if (typeof parsed.data !== 'string') return parsed.data
+  const id = parsed.data
+  return withConversationWorkspace(owner, workspace, async () => {
+    const { rows } = await database.query(`SELECT 'run' AS kind FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "workspaceId"=$3
+      UNION ALL SELECT 'chat' AS kind FROM conversations c WHERE ` + ownerScope, [id, owner, workspace])
+    if (rows.length !== 1) return null
+    return { kind: rows[0].kind as 'run' | 'chat', id }
+  })
+}
 
 export async function standaloneOrganization(database: RunChainQueryable, id: string, owner: string, workspace: string, change?: ConversationOrganizationChange) {
   return withConversationWorkspace(owner, workspace, async () => {
