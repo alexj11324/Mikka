@@ -319,3 +319,17 @@ Decision [2026-11-15-2040](../design/decisions/2026-11-15-2040-automation-slack-
   `postRunNotice` (`lib/slack/automation-notice.ts`) writes `AutomationSlack.*` in the saved locale (the task as a
   link to `<app>/?issue=<id>`, a failure as its `Errors.*` copy) and `chat.postMessage`s with the installation's bot
   token. A failed post is logged and not retried; the run is unchanged.
+
+## Templates, pins, folders and tags (2026-11-15)
+
+Decision [2026-11-15-2100](../design/decisions/2026-11-15-2100-automation-templates-organize.md).
+
+- Templates are client-side drafts (`components/automations/automation-templates.ts`): `automation=new:<template>`
+  opens the editor with the template's timing or trigger and the localized `Automations.templates.<key>` title and
+  request. Nothing is stored until the person saves.
+- Migration `20261115204500_schedule_organize`: `user_schedules.folder`, `user_schedules.tags text[]`, and
+  `schedule_pins(user_id, schedule_id)`.
+- Commands `{ action: 'pin', scheduleId, pinned }` (any reader; their own row in `schedule_pins`) and
+  `{ action: 'organize', scheduleId, folder, tags }` (creator or owner/admin, `scheduleAdminRequired`; no version
+  bump). `list` rows carry `folder`, `tags` and the reader's `pinned`. Page actions `pinAutomation`,
+  `organizeAutomation`.

@@ -117,3 +117,12 @@ test('运行后发到 Slack: off leaves the key out; a channel round-trips with 
   assert.deepEqual(on.definition.notify, { slack: { channel: 'C0RUNS', locale: 'en' } })
   assert.deepEqual(draftFrom(on.definition, now).notify, { channel: 'C0RUNS', locale: 'en' })
 })
+
+test('从模板开始: each template opens a draft with its timing or trigger; one that needs a repository, team or channel says so', async () => {
+  const { AUTOMATION_TEMPLATES, templateDraft } = await import('./automation-templates')
+  const missing = Object.fromEntries(AUTOMATION_TEMPLATES.map(template => {
+    const result = definitionFrom(templateDraft(template, filled({}), { title: `T ${template}`, prompt: 'Do it' }), now)
+    return [template, 'missing' in result ? result.missing : result.definition.timing.kind === 'cron' ? result.definition.timing.expression : 'ok']
+  }))
+  assert.deepEqual(missing, { standup: '0 9 * * 1-5', weeklyDeps: '0 10 * * 1', prReview: 'repository', ciFix: 'repository', linearTriage: 'team', slackQuestion: 'channel' })
+})

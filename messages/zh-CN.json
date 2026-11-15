@@ -7834,6 +7834,49 @@
     "failedUnknown": "出了点问题，详情在 Mikka 的运行记录里"
   },
   "Automations": {
+    "fromTemplate": "从模板开始",
+    "pin": "置顶",
+    "unpin": "取消置顶",
+    "pinned": "已置顶",
+    "organize": "文件夹和标签",
+    "organizeTitle": "文件夹和标签",
+    "folder": "文件夹",
+    "folderPlaceholder": "不放进文件夹",
+    "tags": "标签",
+    "tagsPlaceholder": "用逗号分隔，最多 10 个",
+    "save": "保存",
+    "cancel": "取消",
+    "saved": "已保存",
+    "noFolder": "未分组",
+    "tagFilter": "标签：{tag}",
+    "clearTag": "清除标签筛选",
+    "rowMenu": "更多操作",
+    "templates": {
+      "standup": {
+        "title": "工作日站会小结",
+        "prompt": "整理昨天合并的 PR 和关闭的议题，写一段简短的站会更新：做了什么、今天做什么、有什么卡住。"
+      },
+      "prReview": {
+        "title": "新 PR 先审一遍",
+        "prompt": "审阅这个 PR：指出风险、遗漏的测试和可以简化的地方，在 PR 上留一条评论。"
+      },
+      "ciFix": {
+        "title": "CI 失败就修",
+        "prompt": "看看失败的检查，找到根本原因并修复；修不了就在 PR 上说明卡在哪里。"
+      },
+      "linearTriage": {
+        "title": "新议题分诊",
+        "prompt": "给这个新议题分诊：判断优先级，补充复现步骤，建议负责人，在议题上留一条评论。"
+      },
+      "slackQuestion": {
+        "title": "回答 Slack 里的提问",
+        "prompt": "回答这条 Slack 消息里的问题，必要时查代码和文档，答案要简短。"
+      },
+      "weeklyDeps": {
+        "title": "每周检查依赖更新",
+        "prompt": "检查依赖有没有安全更新或重要的新版本，开一个升级 PR，说明改了什么。"
+      }
+    },
     "usage": {
       "title": "用量",
       "empty": "最近 14 天没有运行",

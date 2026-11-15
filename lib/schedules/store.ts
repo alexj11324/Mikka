@@ -50,7 +50,7 @@ export type Occurrence = { id: string; schedule_id: string; operation_id: string
 export const SCHEDULE_LEASE_MS = 5 * 60_000
 const MAX_ATTEMPTS = 3
 // The frozen request key is internal; keep the existing tool-response fields.
-const SCHEDULE_COLUMNS = 'id,owner_id,workspace_id,bot_id,visibility,source_event_id,request_id,definition,request_definition,status,version,next_at,disabled_reason,webhook_key_hash IS NOT NULL AS webhook_key_set,created_at,updated_at'
+const SCHEDULE_COLUMNS = 'id,owner_id,workspace_id,bot_id,visibility,source_event_id,request_id,definition,request_definition,status,version,next_at,disabled_reason,webhook_key_hash IS NOT NULL AS webhook_key_set,folder,tags,created_at,updated_at'
 /** A run that fails one of these lost its creator's authority: the automation is paused with the code as its reason. */
 const AUTHORITY_LOST = new Set(['scheduleStandingTaskUnavailable','scheduleWorkspaceAccessDenied','scheduleOwnerUnavailable','scheduleConversationUnavailable','scheduleBotUnavailable','scheduleRepositoryUnavailable','scheduleLinearUnavailable','scheduleSlackUnavailable','scheduleDeviceUnavailable','scheduleProfileUnavailable'])
 /** Runs that count toward maxRunsPerDay: queued, running and finished, not skipped or cancelled. */
@@ -135,7 +135,7 @@ export class ScheduleStore {
         const limit = cmd.limit ?? SCHEDULE_PAGE_MAX
         const [at, id] = cmd.cursor?.split('/') ?? []
         const { rows } = await tx.query<Schedule & { page_cursor: string }>(`
-          SELECT ${SCHEDULE_COLUMNS}, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') || '/' || id AS page_cursor
+          SELECT ${SCHEDULE_COLUMNS}, EXISTS(SELECT 1 FROM schedule_pins p WHERE p.schedule_id=user_schedules.id AND p.user_id=$2) AS pinned, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') || '/' || id AS page_cursor
           FROM user_schedules
           WHERE workspace_id IS NOT DISTINCT FROM $1::uuid
             AND ((visibility = 'workspace' AND $1::uuid IS NOT NULL)
@@ -179,6 +179,19 @@ export class ScheduleStore {
         // roles runs as 'member'. Visibility is unchanged: an owner-only row is already 404 above.
         const privileged=row.owner_id===actor.ownerId||access.role!=='member'
         return {occurrences:privileged?seen.rows:seen.rows.map(o=>({...o,operation_id:null,event_id:null,result:null,error:null,trigger:null}))}
+      }
+      if(cmd.action==='pin'){
+        if(cmd.pinned)await tx.query('INSERT INTO schedule_pins(user_id,schedule_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[actor.ownerId,row.id])
+        else await tx.query('DELETE FROM schedule_pins WHERE user_id=$1 AND schedule_id=$2',[actor.ownerId,row.id])
+        await this.listChanged(tx,row.workspace_id)
+        return {pinned:cmd.pinned}
+      }
+      if(cmd.action==='organize'){
+        if(row.visibility==='workspace'&&row.owner_id!==actor.ownerId&&access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
+        const tags=[...new Set(cmd.tags.map(tag=>tag.normalize('NFC')))]
+        const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET folder=$2,tags=$3,updated_at=$4 WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,cmd.folder?.normalize('NFC')??null,tags,this.clock()])).rows[0]
+        await this.listChanged(tx,row.workspace_id)
+        return {schedule:updated}
       }
       if(cmd.action==='usage'){
         // Days in the automation's own time zone. Cost is what the tasks it made spent through hosted models, billed

@@ -2513,5 +2513,12 @@
     "behavior": "Post a finished automation run to its Slack channel with the workspace installation's bot token, in the saved locale.",
     "test": "lib/slack/automation-notice.test.ts",
     "suite": "test:schedules"
+  },
+  "drizzle/20261115204500_schedule_organize.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Add an automation's workspace folder and tags, and each person's own pins.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
   }
 }

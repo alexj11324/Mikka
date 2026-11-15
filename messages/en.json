@@ -7834,6 +7834,49 @@
     "failedUnknown": "Something went wrong; see the run history in Mikka"
   },
   "Automations": {
+    "fromTemplate": "Start from a template",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "pinned": "Pinned",
+    "organize": "Folder and tags",
+    "organizeTitle": "Folder and tags",
+    "folder": "Folder",
+    "folderPlaceholder": "No folder",
+    "tags": "Tags",
+    "tagsPlaceholder": "Comma-separated, up to 10",
+    "save": "Save",
+    "cancel": "Cancel",
+    "saved": "Saved",
+    "noFolder": "No folder",
+    "tagFilter": "Tag: {tag}",
+    "clearTag": "Clear tag filter",
+    "rowMenu": "More actions",
+    "templates": {
+      "standup": {
+        "title": "Weekday standup notes",
+        "prompt": "Gather the PRs merged and issues closed yesterday and write a short standup update: what was done, what is next, what is blocked."
+      },
+      "prReview": {
+        "title": "Review new PRs",
+        "prompt": "Review this PR: point out risks, missing tests and what could be simpler, and leave one comment on the PR."
+      },
+      "ciFix": {
+        "title": "Fix failing CI",
+        "prompt": "Look at the failed checks, find the root cause and fix it; if you cannot, say on the PR what blocks you."
+      },
+      "linearTriage": {
+        "title": "Triage new issues",
+        "prompt": "Triage this new issue: set a priority, add reproduction steps, suggest an owner, and leave one comment on the issue."
+      },
+      "slackQuestion": {
+        "title": "Answer questions in Slack",
+        "prompt": "Answer the question in this Slack message, checking the code and docs when needed; keep the answer short."
+      },
+      "weeklyDeps": {
+        "title": "Weekly dependency check",
+        "prompt": "Check dependencies for security updates or important new versions, open an upgrade PR, and say what changed."
+      }
+    },
     "usage": {
       "title": "Usage",
       "empty": "No runs in the last 14 days",

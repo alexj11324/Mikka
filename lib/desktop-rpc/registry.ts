@@ -121,6 +121,8 @@ const functions = {
   'automations.automationWebhookKey': automations.automationWebhookKey,
   'automations.automationLinearTeams': automations.automationLinearTeams,
   'automations.automationSlackChannels': automations.automationSlackChannels,
+  'automations.pinAutomation': automations.pinAutomation,
+  'automations.organizeAutomation': automations.organizeAutomation,
   'automations.resumeAutomation': automations.resumeAutomation,
   'automations.cancelAutomation': automations.cancelAutomation,
   'automations.runAutomationNow': automations.runAutomationNow,

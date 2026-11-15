@@ -143,6 +143,18 @@ export async function automationSlackChannels(): Promise<ActionResult<{ installe
   })
 }
 
+/** 置顶: the signed-in person's own pin. */
+export async function pinAutomation(input: { scheduleId: string; pinned: boolean }): Promise<ActionResult<{ pinned: boolean }>> {
+  const parsed = z.object({ scheduleId: z.uuid(), pinned: z.boolean() }).strict().safeParse(input)
+  return parsed.success ? command({ action: 'pin', ...parsed.data }) : { error: 'validationGeneric' }
+}
+
+/** 文件夹和标签: the workspace's folder and tags for an automation (its creator or an owner/admin). */
+export async function organizeAutomation(input: { scheduleId: string; folder: string | null; tags: string[] }): Promise<ActionResult<{ schedule: AutomationView }>> {
+  const parsed = z.object({ scheduleId: z.uuid(), folder: z.string().trim().min(1).max(60).nullable(), tags: z.array(z.string().trim().min(1).max(30)).max(10) }).strict().safeParse(input)
+  return parsed.success ? command({ action: 'organize', ...parsed.data }) : { error: 'validationGeneric' }
+}
+
 /** 删除: cancels every future run. Past runs and the tasks they made stay. */
 export async function cancelAutomation(input: { scheduleId: string; version: number }): Promise<ActionResult<{ schedule: AutomationView }>> {
   const parsed = versioned.safeParse(input)
