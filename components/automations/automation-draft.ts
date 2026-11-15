@@ -1,8 +1,10 @@
 import { dailyTimeRepeats, resolveLocal } from '@/lib/schedules/wall-time'
-import type { Definition, DispatchTask } from '@/lib/schedules/contract'
+import type { Definition, DispatchTask, EventTrigger, GitHubTriggerEvent } from '@/lib/schedules/contract'
 import type { TaskDestination } from '@/lib/task-destination'
 
 export type ScheduleKind = 'once' | 'interval' | 'daily' | 'cron'
+/** One GitHub event trigger as the editor holds it; lists are comma-separated text. */
+export type GitHubTriggerDraft = { event: GitHubTriggerEvent; repositories: string[]; branches: string; labels: string; runWhen: string }
 export type IntervalUnit = 'minutes' | 'hours' | 'days'
 const UNIT_MINUTES: Record<IntervalUnit, number> = { minutes: 1, hours: 60, days: 1440 }
 
@@ -31,6 +33,8 @@ export type AutomationDraft = {
   misfire: Definition['misfire']
   lateness: number
   concurrent: number
+  /** 满足任一条件就运行: GitHub event triggers beside the timing. */
+  github: GitHubTriggerDraft[]
   /** A chat-made automation's own task (reminder, snapshot, read): kept as it is. */
   otherTask: Exclude<Definition['task'], DispatchTask> | null
 }
@@ -57,7 +61,7 @@ export function emptyDraft(timezone: string, now = new Date()): AutomationDraft 
     title: '', botId: null, machine: 'auto', profileId: 'auto', timezone,
     scheduleOn: true, scheduleKind: 'daily', onceAt: wallTime(soon, timezone), intervalStart: wallTime(soon, timezone),
     intervalValue: 1, intervalUnit: 'hours', dailyTime: '09:00', fold: null, cron: '0 9 * * 1-5',
-    prompt: '', taskTitle: '', misfire: 'skip', lateness: 30, concurrent: 1, otherTask: null,
+    prompt: '', taskTitle: '', misfire: 'skip', lateness: 30, concurrent: 1, github: [], otherTask: null,
   }
 }
 
@@ -85,8 +89,17 @@ export function draftFrom(definition: Definition, now = new Date()): AutomationD
     prompt: task.kind === 'dispatch_task' ? task.prompt : '',
     taskTitle: task.kind === 'dispatch_task' ? task.title ?? '' : '',
     misfire: definition.misfire, lateness: definition.maxLatenessMinutes, concurrent: definition.maxConcurrent ?? 1,
+    github: (definition.events ?? []).map(trigger => ({ event: trigger.event, repositories: [...trigger.repositories],
+      branches: (trigger.branches ?? []).join(', '), labels: (trigger.labels ?? []).join(', '), runWhen: trigger.runWhen ?? '' })),
     otherTask: task.kind === 'dispatch_task' ? null : task,
   }
+}
+
+const list = (text: string) => [...new Set(text.split(/[,，]/).map(item => item.trim()).filter(Boolean))]
+function eventTrigger(draft: GitHubTriggerDraft): EventTrigger {
+  const branches = list(draft.branches), labels = list(draft.labels)
+  return { source: 'github', event: draft.event, repositories: draft.repositories,
+    ...(branches.length ? { branches } : {}), ...(labels.length ? { labels } : {}), ...(draft.runWhen.trim() ? { runWhen: draft.runWhen.trim() } : {}) }
 }
 
 function destinationOf(machine: string): TaskDestination | undefined {
@@ -103,10 +116,11 @@ export function foldNeeded(draft: Pick<AutomationDraft, 'scheduleOn' | 'schedule
 }
 
 /** The definition to save, or the first field that keeps it from saving. */
-export function definitionFrom(draft: AutomationDraft, now = new Date()): { definition: Definition } | { missing: 'title' | 'prompt' | 'time' | 'fold' | 'interval' | 'cron' } {
+export function definitionFrom(draft: AutomationDraft, now = new Date()): { definition: Definition } | { missing: 'title' | 'prompt' | 'time' | 'fold' | 'interval' | 'cron' | 'repository' } {
   const title = draft.title.trim()
   if (!title) return { missing: 'title' }
   if (!draft.otherTask && !draft.prompt.trim()) return { missing: 'prompt' }
+  if (draft.github.some(trigger => !trigger.repositories.length)) return { missing: 'repository' }
   let timing: Definition['timing']
   if (!draft.scheduleOn) timing = { kind: 'manual' }
   else if (draft.scheduleKind === 'once') {
@@ -135,7 +149,8 @@ export function definitionFrom(draft: AutomationDraft, now = new Date()): { defi
     ...(destination ? { destination } : {}),
     ...(draft.profileId !== 'auto' ? { profileId: draft.profileId } : {}),
   }
-  return { definition: { title, timezone: draft.timezone, timing, task, misfire: draft.misfire, maxLatenessMinutes: Math.round(draft.lateness), maxConcurrent: Math.round(draft.concurrent) } }
+  const events = draft.otherTask ? [] : draft.github.map(eventTrigger)
+  return { definition: { title, timezone: draft.timezone, timing, task, misfire: draft.misfire, maxLatenessMinutes: Math.round(draft.lateness), maxConcurrent: Math.round(draft.concurrent), ...(events.length ? { events } : {}) } }
 }
 
 /** 5-field cron forms the list can name: every day, weekdays, one weekday, one day of the month. Anything else shows the expression. */

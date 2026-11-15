@@ -28,6 +28,8 @@ export type AutomationRun = {
   attempts: number
   error: string | null
   result: unknown
+  /** The event a run started on (blank for a member who is neither its creator nor an owner or admin). */
+  trigger?: { event: { event: string; repository: string; number: number | null; title: string | null; url: string | null } } | null
 }
 export type AutomationHistory = { occurrences: AutomationRun[] }
 

@@ -7820,6 +7820,20 @@
     "loadError": "无法加载个人文件。"
   },
   "Automations": {
+    "githubEvent": {
+      "pull_request_opened": "PR 打开",
+      "draft_opened": "草稿 PR 打开",
+      "pull_request_pushed": "PR 有新提交",
+      "pull_request_merged": "PR 合并",
+      "pull_request_closed": "PR 关闭未合并",
+      "label_change": "标签变化",
+      "issue_opened": "Issue 打开",
+      "comment": "新评论",
+      "review_submitted": "提交 review",
+      "review_comment": "review 行内评论",
+      "checks_completed": "检查完成",
+      "checks_failed": "检查失败"
+    },
     "title": "自动化",
     "new": "新建自动化",
     "askBot": "让 Bot 帮你建",
@@ -7845,6 +7859,7 @@
     "nextRun": "下次 {time}",
     "coordinator": "Coordinator",
     "summary": {
+      "github": "GitHub：{event}{count, plural, =0 {} other { 等 # 项}}",
       "manual": "手动运行",
       "once": "一次 · {time}",
       "intervalMinutes": "每 {count} 分钟",
@@ -7863,6 +7878,19 @@
       "dispatch_task": "交给 Bot"
     },
     "editor": {
+      "github": {
+        "title": "GitHub 事件",
+        "item": "GitHub 事件 {number}",
+        "event": "事件",
+        "repository": "仓库",
+        "branches": "分支（可选）",
+        "labels": "标签（可选）",
+        "runWhen": "运行条件",
+        "runWhenPlaceholder": "可选：一句话说明什么时候才运行，比如「改动涉及计费」",
+        "remove": "删除这个事件",
+        "add": "添加 GitHub 事件",
+        "noRepositories": "工作区里还没有安装 GitHub 仓库"
+      },
       "back": "自动化",
       "namePlaceholder": "自动化名称",
       "name": "名称",
@@ -7926,6 +7954,7 @@
       "cancel": "取消",
       "notFound": "自动化不存在或已删除",
       "missing": {
+        "repository": "每个 GitHub 事件都要选仓库",
         "title": "写上名称才能保存",
         "prompt": "写上要它做什么才能保存",
         "time": "这个时间不存在或格式不对",
@@ -7935,6 +7964,7 @@
       }
     },
     "run": {
+      "from": "由「{event}」触发 · {what}",
       "pending": "等待中",
       "running": "运行中",
       "succeeded": "完成",
@@ -7943,6 +7973,8 @@
       "cancelled": "已取消"
     },
     "runErrors": {
+      "runWhenNotMet": "不满足运行条件，已跳过",
+      "scheduleRunWhenUnavailable": "暂时无法判断运行条件，稍后重试",
       "misfireSkipped": "错过了时间，已跳过",
       "concurrencyLimit": "达到同时运行上限",
       "scheduleChanged": "自动化已修改",
