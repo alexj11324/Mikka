@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 24
     env:
-      SOURCE: 362698c408e02582ce523df39debe7ea16320bb9
+      SOURCE: 4ae55457c0230cc1b0d4ab22ba0ac86662b8202d
     steps:
       - name: Check out the public harness only
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -32,7 +32,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           path: product
-          ref: 362698c408e02582ce523df39debe7ea16320bb9
+          ref: 4ae55457c0230cc1b0d4ab22ba0ac86662b8202d
           persist-credentials: false
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
         with:
@@ -45,7 +45,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git -C product rev-parse HEAD)" = "$SOURCE"
-          test "$(git -C product rev-parse 'HEAD^{tree}')" = f6908b3e196c35cf63a92bbeac2ee712733f71d3
+          test "$(git -C product rev-parse 'HEAD^{tree}')" = 01ab9f80d47c634b762534aa8bd2e739a7dedc88
           cd product
           pnpm install --frozen-lockfile
           cd ../harness/evidence/2257/local-provider
@@ -290,7 +290,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: claude-served-model-362698c4
+          name: claude-served-model-4ae55457
           path: |
             ${{ runner.temp }}/receipt/title-lifecycle.json
             ${{ runner.temp }}/receipt/inference.jsonl
