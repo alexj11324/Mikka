@@ -23,6 +23,37 @@ const server=createServer({key:readFileSync(work+'/endpoint.key'),cert:readFileS
  const prompts=texts.flatMap(v=>[...v.matchAll(/E2262_QA_BEGIN ([^\n]{1,340}?) E2262_QA_END/g)].map(m=>m[1]));const prompt=prompts.at(-1)
  receipt('requests.jsonl',{model:body.model,stream:body.stream,userPromptHashes:prompts.map(h),wireBodySha:h(input),toolsAdvertised:body.tools?.length??0,authenticated:true,tls:req.socket.getProtocol(),accepted:Boolean(prompt)})
  if(!prompt||body.model!==modelId||body.stream!==true)return reject(400)
+ const tools=(body.tools??[]).flatMap(entry=>entry.type==='namespace'?(entry.tools??[]).map(t=>({name:t.name,namespace:entry.name})):entry.name?[{name:entry.name}]:[])
+ const found=tools.filter(t=>t.name==='submit'||/mikka__submit$/.test(t.name))
+ if(prompt.startsWith('The user wants the finished report delivered.')){
+  const resultSeen=items.some(i=>i.type==='function_call_output'||i.type==='mcp_call')
+  receipt('tools.jsonl',{offered:tools.map(t=>[t.namespace??null,t.name]),selectedSubmit:found,toolResultPresent:resultSeen})
+  if(!resultSeen&&found.length===1){
+   try{
+    await seq.clearHistory()
+    const grammar=await llama.createGrammarForJsonSchema({type:'object',properties:{action:{enum:['answer','submit']},summary:{type:'string',maxLength:140}},required:['action','summary'],additionalProperties:false})
+    const session=new LlamaChatSession({contextSequence:seq,systemPrompt:'Select one action for the human request. Your JSON has action and summary. To submit a final report, action is submit. To send a chat answer, action is answer.'})
+    const generated=await session.prompt(prompt,{temperature:0,maxTokens:90,grammar})
+    const decision=JSON.parse(generated)
+    receipt('decisions.jsonl',{model:modelId,prompt,generated,generatedTokens:model.tokenize(generated).length})
+    if(decision.action==='submit'){
+     const t=found[0],rid='resp_'+randomUUID().replaceAll('-',''),cid='call_'+randomUUID().replaceAll('-',''),fid='fc_'+randomUUID().replaceAll('-','')
+     let n=0;const event=(type,fields)=>res.write('event: '+type+'\ndata: '+JSON.stringify({type,sequence_number:n++,...fields})+'\n\n')
+     const base={id:rid,object:'response',model:modelId,created_at:Math.floor(Date.now()/1000)}
+     const start={type:'function_call',id:fid,call_id:cid,name:t.name,...(t.namespace?{namespace:t.namespace}:{}),arguments:'',status:'in_progress'}
+     const args=JSON.stringify({summary:decision.summary}),done={...start,arguments:args,status:'completed'}
+     res.writeHead(200,{'content-type':'text/event-stream','cache-control':'no-cache'})
+     event('response.created',{response:{...base,status:'in_progress',output:[]}})
+     event('response.output_item.added',{output_index:0,item:start})
+     event('response.function_call_arguments.delta',{output_index:0,item_id:fid,delta:args})
+     event('response.function_call_arguments.done',{output_index:0,item_id:fid,name:t.name,arguments:args})
+     event('response.output_item.done',{output_index:0,item:done})
+     event('response.completed',{response:{...base,status:'completed',output:[done],usage:{input_tokens:model.tokenize(prompt).length,output_tokens:model.tokenize(generated).length}}})
+     res.end();return
+    }
+   }catch(error){receipt('provider-ends.jsonl',{stage:'structured decision',error:error.name});return reject(500)}
+  }
+ }
  const responseId='resp_'+randomUUID().replaceAll('-',''),itemId='msg_'+randomUUID().replaceAll('-',''),base={id:responseId,created_at:Math.floor(Date.now()/1000),model:modelId,object:'response'}
  let n=0,output=''
  const emit=(type,props)=>{if(!res.destroyed&&!res.writableEnded)res.write('event: '+type+'\ndata: '+JSON.stringify({type,sequence_number:n++,...props})+'\n\n')}
