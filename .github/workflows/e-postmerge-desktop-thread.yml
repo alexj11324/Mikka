@@ -24,8 +24,8 @@ jobs:
       E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       BETTER_AUTH_URL: http://localhost:3000
       AUTH_TRUSTED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
-      MIKKA_BUILD_REVISION: 'e52a959ea214f33e95ed724fc440fafe5fe59cc7'
-      MIKKA_TEST_DEPLOYMENT_SHA: 'e52a959ea214f33e95ed724fc440fafe5fe59cc7'
+      MIKKA_BUILD_REVISION: 'a6009e48494d308e627c7fe31be7fe7d97fb8017'
+      MIKKA_TEST_DEPLOYMENT_SHA: 'a6009e48494d308e627c7fe31be7fe7d97fb8017'
       NEXT_TELEMETRY_DISABLED: '1'
     defaults:
       run:
@@ -43,7 +43,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           path: product
-          ref: 'e52a959ea214f33e95ed724fc440fafe5fe59cc7'
+          ref: 'a6009e48494d308e627c7fe31be7fe7d97fb8017'
           persist-credentials: false
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
         with:
@@ -57,7 +57,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$MIKKA_BUILD_REVISION"
-          test "$(git rev-parse 'HEAD^{tree}')" = b5dbe97e36949bb61116c2315eaebe40afe70453
+          test "$(git rev-parse 'HEAD^{tree}')" = a0cde31341a9950370ab435d8829c18ad0e3671d
           test ! -e .hosted-ui
           pnpm install --frozen-lockfile
       - name: Install pinned Linux Electron with OS keyring, display and setuid sandbox
@@ -104,7 +104,7 @@ jobs:
           old="const sha = '6717676486671cc827b134eccc1695e55fe05c72'"
           text=p.read_text()
           assert text.count(old)==1
-          p.write_text(text.replace(old,"const sha = 'e52a959ea214f33e95ed724fc440fafe5fe59cc7'",1))
+          p.write_text(text.replace(old,"const sha = 'a6009e48494d308e627c7fe31be7fe7d97fb8017'",1))
           PY
           dbus-run-session -- bash -euc '
             printf "%s" "disposable-desktop-test-keyring" | gnome-keyring-daemon --unlock --components=secrets
@@ -114,7 +114,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: e52a959e-public-native-queue-and-history
+          name: a6009e48-public-native-queue-and-history
           path: ${{ runner.temp }}/native-controls.json
           if-no-files-found: warn
           retention-days: 14
