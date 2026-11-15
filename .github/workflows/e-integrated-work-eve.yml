@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      MIKKA_BUILD_REVISION: fa68ad211142441a7c32873a48cfd06f700c841a
+      MIKKA_BUILD_REVISION: 81e57c8f05adeeee21ce36d14966f7a2c6a28fad
       WORKFLOW_TARGET_WORLD: '@workflow/world-postgres'
       NITRO_PRESET: node-server
       NODE_OPTIONS: --max-old-space-size=6144
@@ -20,7 +20,7 @@ jobs:
       - name: Check out the fixed public product revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: fa68ad211142441a7c32873a48cfd06f700c841a
+          ref: 81e57c8f05adeeee21ce36d14966f7a2c6a28fad
           persist-credentials: false
       - name: Verify source commit and tree
         run: |
@@ -60,7 +60,7 @@ jobs:
           sha256sum --check SHA256SUMS
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: eve-2364-fa68ad211142441a7c32873a48cfd06f700c841a
+          name: eve-2364-81e57c8f05adeeee21ce36d14966f7a2c6a28fad
           path: ${{ runner.temp }}/eve-receipt/
           if-no-files-found: error
           retention-days: 2
