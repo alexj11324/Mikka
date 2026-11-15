@@ -1,0 +1,313 @@
+name: Native Desktop actual CPU model title on a merged public source
+on:
+  push:
+    branches: [evidence/2254-sidebar-85dfc396]
+    paths: [.github/workflows/e-native-desktop-title-model.yml]
+permissions:
+  contents: read
+jobs:
+  native-thread-controls:
+    if: github.repository == 'alexj11324/Mikka'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:17
+        env: { POSTGRES_USER: e2e, POSTGRES_PASSWORD: e2e-local-only, POSTGRES_DB: mikka_e2e }
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U e2e -d mikka_e2e" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      MIKKA_EDITION: cloud
+      CI: 'true'
+      MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      BETTER_AUTH_URL: http://localhost:3000
+      AUTH_TRUSTED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      MIKKA_BUILD_REVISION: '4f4229b67ae025fd9c3a581656a6ddcdd7ecb4a8'
+      MIKKA_TEST_DEPLOYMENT_SHA: '4f4229b67ae025fd9c3a581656a6ddcdd7ecb4a8'
+      NEXT_TELEMETRY_DISABLED: '1'
+    defaults:
+      run:
+        working-directory: product
+        shell: bash
+    steps:
+      - name: Read the isolated evidence driver
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: qa
+          ref: 6afc60f22b022b1aa0a93d5f4bc45070bea54267
+          persist-credentials: false
+          sparse-checkout: evidence/2262/native-thread-controls
+      - name: Read the source-pinned synthetic title provider
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: local-model
+          ref: e3240ae4583a31bd0d6bd7ba0b321455b1e84fa5
+          persist-credentials: false
+          sparse-checkout: evidence/2257/local-provider
+      - name: Read immutable public sources
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: product
+          ref: '4f4229b67ae025fd9c3a581656a6ddcdd7ecb4a8'
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.22.1
+      - name: Verify exact tree, install public source dependencies
+        env:
+          FFMPEG_GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MIKKA_BUILD_REVISION"
+          test "$(git rev-parse 'HEAD^{tree}')" = 81e95f515d93a9a7a19bdb4faef68633a2aa90e9
+          test ! -e .hosted-ui
+          pnpm install --frozen-lockfile
+      - name: Install pinned Linux Electron with OS keyring, display and setuid sandbox
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
+          pnpm exec playwright install-deps chromium
+          sudo apt-get install -y xvfb dbus-x11 gnome-keyring libsecret-1-0
+          node apps/desktop/scripts/install-electron.mjs
+          cd apps/desktop
+          sandbox="$(node -p "require('node:path').join(require('node:path').dirname(require('electron')),'chrome-sandbox')")"
+          sudo chown root:root "$sandbox"
+          sudo chmod 4755 "$sandbox"
+      - name: Bootstrap ephemeral local signing, PostgreSQL 17 migrations and unmodified public build
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: |
+          set -euo pipefail
+          node --input-type=commonjs - <<'NODE'
+          const secret=require('node:crypto').randomBytes(32).toString('hex');
+          require('node:fs').writeSync(1,'::add-mask::'+secret+'\n');
+          require('node:fs').appendFileSync(process.env.GITHUB_ENV,'BETTER_AUTH_SECRET='+secret+'\n');
+          NODE
+      - name: Migrate the isolated database and compile public API and Desktop
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: |
+          set -euo pipefail
+          MIGRATE=1 pnpm migrate
+          pnpm test:e2e:setup
+          pnpm generate:agent-ui
+          pnpm build:app --public-test-fixture
+          MIKKA_DESKTOP_FLAVOR=dev pnpm --filter @mikka/desktop build --public-test-fixture
+      - name: Install the existing source-pinned offline model for actual native title regeneration
+        run: |
+          set -euo pipefail
+          fixture="$GITHUB_WORKSPACE/local-model/evidence/2257/local-provider"
+          weight="$RUNNER_TEMP/desktop-title-weight"
+          mkdir -m 700 "$weight" "$RUNNER_TEMP/desktop-title-model"
+          (cd "$fixture" && npm ci --ignore-scripts --no-audit --no-fund)
+          python "$fixture/prepare.py" "$PWD" "$weight"
+      - name: Two protected native sessions through the public Electron main and server
+        run: |
+          set -euo pipefail
+          mkdir -p .cache/e-native-qa
+          cat > .cache/e-native-qa/controls.mjs <<'E_DESKTOP_PROOF'
+          import assert from 'node:assert/strict'
+          import { randomBytes, randomUUID } from 'node:crypto'
+          import { execFileSync } from 'node:child_process'
+          import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+          import { join, resolve } from 'node:path'
+          import { request } from '@playwright/test'
+          import { Pool } from 'pg'
+          import { encode, decode } from '../../lib/desktop-rpc/wire.ts'
+          import { launchElectron } from '../../apps/desktop/test/electron-launch.mjs'
+          import { closeElectron, stopLocalDaemons } from '../../apps/desktop/test/native-cleanup.mjs'
+          import { waitForBundledSession } from '../../apps/desktop/test/bundled-session.mjs'
+          
+          const sha = '4f4229b67ae025fd9c3a581656a6ddcdd7ecb4a8'
+          const origin = 'http://localhost:3000'
+          assert.equal(process.env.BETTER_AUTH_URL,origin)
+          assert.equal(new URL(process.env.DATABASE_URL).hostname,'127.0.0.1')
+          assert.equal(new URL(process.env.DATABASE_URL).pathname,'/mikka_e2e')
+          assert.equal(process.env.GITHUB_REPOSITORY,'alexj11324/Mikka')
+          assert.equal(execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sha)
+          assert.equal(process.env.MIKKA_TEST_DEPLOYMENT_SHA,sha)
+          const manifest=JSON.parse(await readFile('apps/desktop/dist/renderer/renderer-manifest.json'))
+          assert.equal(manifest.publicTestFixture,true)
+          const archived=JSON.parse(await readFile('.output/mikka-build.json'))
+          assert.equal(archived.revision,sha)
+          assert.ok(!archived.overlaySha)
+          const db = new Pool({connectionString:process.env.DATABASE_URL,max:2})
+          const report={public:sha,private:null,scope:'Nonproduction Linux Xvfb; public Electron foreground process and protected renderer-to-main-to-server RPC. Real CPU GGUF model at localhost, synthetic accounts and history, no private components or subscriptions.',renderer:manifest.rendererBuild,started:new Date().toISOString(),steps:[],cleanup:{}}
+          let stage='register'
+          const check=(name,details={})=>{report.steps.push({name,...details,at:new Date().toISOString()});console.log('PASS',name)}
+          const http=[],clients=[],profiles=[]
+          async function register(role) {
+            const info={name:'E Desktop '+role,email:'e-'+role+'-'+randomUUID()+'@example.invalid',password:randomBytes(32).toString('hex')}
+            const ctx=await request.newContext({baseURL:origin,extraHTTPHeaders:{origin,'sec-fetch-site':'same-origin','x-mikka-rpc':'1'}})
+            http.push(ctx)
+            assert.equal((await ctx.post('/mikka/api/auth/sign-up/email',{data:info})).status(),200,role+' registered')
+            const session=await (await ctx.get('/mikka/api/auth/get-session?disableCookieCache=true')).json()
+            assert.ok(session.user.id);assert.equal((await ctx.get('/mikka/api/workspace')).status(),200)
+            return {info,id:session.user.id,async rpc(action,...args){
+              const r=await ctx.post('/mikka/api/rpc',{data:{version:1,action,args}})
+              assert.equal(r.status(),200,action);const body=await r.json();assert.equal(body.ok,true,action)
+              return body.result
+            }}
+          }
+          async function native(account,workspace) {
+            const profile=await mkdtemp(join(process.env.RUNNER_TEMP,'e-desktop-profile-'))
+            profiles.push(profile)
+            const app=await launchElectron({args:[resolve('apps/desktop')],cwd:process.cwd(),env:{...process.env,MIKKA_USER_DATA_DIR:profile,MIKKA_DESKTOP_RENDERER:'bundled'},timeout:90000})
+            const c={app};clients.push(c)
+            const page=c.page=await app.firstWindow({timeout:90000})
+            await page.waitForFunction(()=>Boolean(window.mikka?.bundled))
+            assert.equal(new URL(page.url()).protocol,'mikka:')
+            assert.equal(new URL(page.url()).hostname,'app')
+            assert.deepEqual(await page.evaluate(()=>[typeof window.process,typeof window.require,document.cookie,window.mikka.app.flavor]),['undefined','undefined','','dev'])
+            assert.equal(await page.evaluate(info=>window.mikka.bundled.signInEmail(info),{email:account.info.email,password:account.info.password}),null)
+            assert.equal((await waitForBundledSession(page,account.id)).user.id,account.id)
+            c.rpc=async(action,...args)=>{
+              const answer=await page.evaluate(async body=>{
+                const response=await fetch('/mikka/api/desktop/rpc',{method:'POST',credentials:'omit',headers:{'content-type':'application/json','x-mikka-desktop-protocol':'1'},body})
+                const wire=await response.json();return {ok:wire.ok,status:response.status,wire:wire.ok?wire.result:wire.error.code}
+              },JSON.stringify({version:1,action,args:encode(args)}))
+              return {status:answer.status,ok:answer.ok,value:answer.ok?decode(answer.wire):answer.wire}
+            }
+            const initial=await c.rpc('desktop.bootstrap',workspace);assert.equal(initial.status,200);assert.equal(initial.value.user.id,account.id)
+            if(!initial.value.requestedWorkspaceSelected) {
+              assert.equal(ok(await c.rpc('workspace.switchWorkspace',workspace)).ok,true)
+            }
+            const selected=ok(await c.rpc('desktop.bootstrap',workspace))
+            assert.equal(selected.requestedWorkspaceSelected,true);assert.equal(selected.cacheWorkspace.workspaceId,workspace)
+            return c
+          }
+          function ok(result) {assert.equal(result.status,200);assert.equal(result.ok,true);assert.equal(result.value?.error,undefined);return result.value}
+          function denied(result) {
+            const code=result.ok?result.value?.error:result.value
+            assert.ok(['runNotFound','workspaceAccessDenied'].includes(code),'expected scoped denial; '+result.status+' '+String(code))
+            return {status:result.status,code}
+          }
+          try {
+            const pg=(await db.query('show server_version_num')).rows[0].server_version_num;assert.match(pg,/^17/)
+            const owner=await register('owner'),member=await register('member');assert.notEqual(owner.id,member.id)
+            const workspace=(await owner.rpc('workspace.createWorkspace',{name:'E native qualification',slug:'e-native-'+randomUUID().slice(0,8)})).data.workspaceId
+            const invitation=await owner.rpc('workspace.createWorkspaceInvitation',{workspaceId:workspace,emails:[member.info.email],role:'member'})
+            const invite=/^\/invite\/([a-f0-9]{64})$/.exec(invitation.data[0].path)
+            assert.ok(invite);assert.equal((await member.rpc('workspace.acceptWorkspaceInvitation',invite[1])).ok,true)
+            for(const person of [owner,member])assert.equal((await person.rpc('workspace.switchWorkspace',workspace)).ok,true)
+            assert.equal((await db.query('SELECT "userId" FROM mikka_workspaces WHERE id=$1',[workspace])).rows[0].userId,owner.id)
+            const task=(await owner.rpc('issues.saveIssue',{title:'E disposable native Task',status:'todo',priority:'normal',content:{type:'doc',content:[]}})).issue.id
+            check('Fresh Better Auth Owner and Member joined the same workspace; Task created through normal writer',{postgres:pg,workspace,task})
+            stage='native-logins'
+            const o=await native(owner,workspace),m=await native(member,workspace)
+            check('Two separate sandboxed Electron profiles authenticated with normal email and verified their own identity over native RPC')
+            stage='seed-declared-history'
+            const [agent,device,repo,run,history,result,anchor,version]=Array.from({length:8},()=>randomUUID())
+            const pr='https://github.com/example/native-qa/pull/18'
+            await db.query('INSERT INTO devices(id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,\'E native fixture\',\'local\',true,now(),$3)',[device,owner.id,JSON.stringify([{harness:'codex',installed:true,activeTurnSteer:true}])])
+            await db.query('INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,\'e-qa\',\'https://github.com/example/native-qa\')',[repo,device,owner.id])
+            await db.query('INSERT INTO agents(id,"userId",name,harness) VALUES ($1,$2,\'E native agent\',\'codex\')',[agent,owner.id])
+            for(const [id,status,answer] of [[run,'running',null],[history,'succeeded','Native original output'],[result,'succeeded','Native edited output']]){
+              await db.query('INSERT INTO agent_runs(id,"userId","workspaceId","issueId","agentId","deviceId","deviceRepoId",title,"titleSource",status,"startedAt","finishedAt","lastReply") VALUES ($1,$2,$3,$4,$5,$6,$7,\'E native fixture\',\'manual\',$8,now()-interval \'5 minutes\',CASE WHEN $8=\'succeeded\' THEN now() ELSE NULL END,$9)',[id,owner.id,workspace,task,agent,device,repo,status,answer])
+            }
+            await db.query('INSERT INTO run_messages(id,"runId","userId",text,origin,"deliveredAt","createdAt") VALUES($1,$2,$3,\'Native original instructions\',\'owner\',now()-interval \'4 minutes\',now()-interval \'4 minutes\')',[anchor,history,owner.id])
+            await db.query('INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,1,$3,now()-interval \'3 minutes\')',[randomUUID(),history,JSON.stringify({type:'text-delta',id:'native-qa',delta:'Native original output'})])
+            await db.query('INSERT INTO run_publications("runId","userId","issueId","remoteUrl","remoteKey",status,"pullRequest") VALUES ($1,$2,$3,\'https://github.com/example/native-qa\',\'example/native-qa\',\'published\',$4)',[history,owner.id,task,JSON.stringify({url:pr})])
+            await db.query('INSERT INTO thread_reply_versions(id,"userId","workspaceId","rootRunId","anchorRunId","admissionRunId","anchorKey",operation,"originalText",text,"executionNote","sourceEventId","resultRunId") VALUES ($1,$2,$3,$4,$4,$4,$5,\'edit\',\'Native original instructions\',\'Native edited instructions\',\'Native edited instructions\',$6,$7)',[version,owner.id,workspace,history,anchor,randomUUID(),result])
+            stage='organization'
+            const desktopRead=async (client,target)=>ok(await client.rpc('task-runs.readConversationOrganization',target))
+            const title='Native sky notes'
+            assert.deepEqual(ok(await o.rpc('task-runs.renameConversation',run,title)),{title})
+            assert.equal((await db.query('SELECT title FROM agent_runs WHERE id=$1',[run])).rows[0].title,title)
+            denied(await m.rpc('task-runs.renameConversation',run,'Member rejected'))
+            check('Native Owner renamed the conversation, independent PG read matched, Member denied')
+            for (const [field,value] of [['pinned',true],['archived',true],['archived',false],['pinned',false]]) {
+              const previous=await desktopRead(o,run)
+              const written=ok(await o.rpc('task-runs.setConversationOrganization',run,{field,value}))
+              assert.deepEqual(written,{...previous,[field]:value})
+              assert.deepEqual(await desktopRead(o,run),written)
+              const sql=(await db.query('SELECT "conversationArchivedAt" IS NOT NULL AS archived,"conversationPinnedAt" IS NOT NULL AS pinned FROM agent_runs WHERE id=$1',[run])).rows[0]
+              assert.deepEqual(sql,written)
+              assert.equal(ok(await m.rpc('task-runs.setConversationOrganization',run,{field,value:!value})),null)
+              assert.deepEqual(await desktopRead(o,run),written)
+              check('Protected native organization persisted and refused non-owner',{field,value,run})
+            }
+            const prompt='Prepare a clear daytime sky report.'
+            await db.query('UPDATE agent_runs SET prompt=$2,"promptTaskStart"=0,"promptTaskLength"=$3 WHERE id=$1',[run,prompt,[...prompt].length])
+            const records=async()=>{try{return (await readFile(join(process.env.E_LOCAL_MODEL_QA_DIR,'inference.jsonl'),'utf8')).split('\n').filter(Boolean).map(line=>JSON.parse(line))}catch(e){if(e.code==='ENOENT')return [];throw e}}
+            const prior=await records()
+            const rejected=denied(await m.rpc('task-runs.regenerateConversationTitle',run))
+            assert.equal((await records()).length,prior.length)
+            const fresh=ok(await o.rpc('task-runs.regenerateConversationTitle',run))
+            assert.equal(fresh.regenerated,true);assert.ok(fresh.title)
+            const recorded=await records()
+            const inference=recorded.find((r,i)=>i>=prior.length&&r.syntheticTask.title===prompt)
+            assert.ok(inference&&inference.outputTokens>0)
+            const {parseShortTitle}=await import('../../lib/short-title.ts')
+            assert.equal(parseShortTitle(inference.output,false),fresh.title)
+            const row=(await db.query('SELECT title,"titleSource" FROM agent_runs WHERE id=$1',[run])).rows[0]
+            assert.deepEqual(row,{title:fresh.title,titleSource:'generated'})
+            check('Owner regenerated via the protected native renderer and actual CPU inference, confirmed independently in PostgreSQL',{run,row,inference})
+            check('Protected native title regeneration refused the Member',rejected)
+            stage='queue'
+            const payload={issueId:task,runId:run,delivery:'queue',text:'Native queued reply',requestId:randomUUID(),expectedOwnerId:owner.id,expectedWorkspaceId:workspace}
+            assert.equal(ok(await o.rpc('agents.sendIssueThreadReply',payload)).sent,true)
+            const queued=async()=>(await db.query('SELECT id,status FROM thread_queued_messages WHERE "runId"=$1 AND "userId"=$2 AND text=$3',[run,owner.id,payload.text])).rows
+            let rows=await queued();assert.equal(rows.length,1);assert.equal(rows[0].status,'queued')
+            const message={issueId:task,runId:run,messageId:rows[0].id,action:'cancel'}
+            check('Owner native send created one queued PG17 row',{run,queue:rows[0].id})
+            const rejection=denied(await m.rpc('agents.changeQueuedThreadReply',message))
+            assert.equal((await queued())[0].status,'queued');check('Member native cancellation denied; unchanged durable queue',rejection)
+            assert.equal(ok(await o.rpc('agents.changeQueuedThreadReply',message)).status,'cancelled')
+            assert.equal((await queued())[0].status,'cancelled');check('Owner native cancellation persisted in PG17')
+            stage='history'
+            const inventory=async()=>(await db.query('SELECT (SELECT count(*)::int FROM agent_runs WHERE "issueId"=$1) AS runs,(SELECT count(*)::int FROM thread_reply_versions WHERE "rootRunId"=$2) AS versions',[task,history])).rows[0]
+            const before=await inventory();assert.deepEqual(before,{runs:3,versions:1})
+            for(let i=0;i<2;i++){const versions=ok(await o.rpc('agents.getThreadReplyVersions',task,history));assert.equal(versions.length,1)
+              const v=versions[0];assert.equal(v.id,version);assert.equal(v.originalOutput,'Native original output');assert.equal(v.output,'Native edited output');assert.equal(v.originalPullRequest,pr);assert.equal(v.resultRunId,result)}
+            check('Owner native history reader twice returned the immutable original output, original PR and distinct edited output',{history,version,result})
+            const hidden=denied(await m.rpc('agents.getThreadReplyVersions',task,history));assert.deepEqual(await inventory(),before)
+            check('Member native history refused; repeated reads created no run or version',{...hidden,...before})
+          } catch(error) {
+            report.failure={stage,error:error.name,message:String(error.message||error).replace(/(?:[\w.%-]+)@[^\s]+/g,'[redacted email]').slice(0,240)}
+            process.exitCode=1
+          } finally {
+            let cleared=0,closed=0
+            for(const c of clients.reverse()){
+              try{if(c.page){await c.page.evaluate(()=>window.mikka.bundled.signOut());assert.equal(await c.page.evaluate(()=>window.mikka.bundled.session()),null);cleared++}}catch{process.exitCode=1}
+              try{await closeElectron(c.app);closed++}catch{process.exitCode=1}
+            }
+            try{if(profiles.length){await stopLocalDaemons(profiles);for(const dir of profiles)await rm(dir,{recursive:true,force:true})}}catch{process.exitCode=1}
+            for(const ctx of http)await ctx.dispose();await db.end()
+            report.cleanup={signedOut:cleared,electronClosed:closed};report.finished=new Date().toISOString()
+            report.result=process.exitCode?'failed':'passed'
+            await writeFile(join(process.env.RUNNER_TEMP,'native-controls.json'),JSON.stringify(report,null,2)+'\n',{mode:0o600})
+            console.log(JSON.stringify({result:report.result,failure:report.failure,cleanup:report.cleanup}))
+          }
+          
+          E_DESKTOP_PROOF
+          export E_LOCAL_MODEL_QA_DIR="$RUNNER_TEMP/desktop-title-model"
+          export E_WEIGHT_FILE="$RUNNER_TEMP/desktop-title-weight/model.gguf"
+          export E_LOCAL_MODEL_TEST_KEY="$(openssl rand -hex 24)"
+          echo "::add-mask::$E_LOCAL_MODEL_TEST_KEY"
+          export MIKKA_DEFAULT_MODEL_API_KEY="$E_LOCAL_MODEL_TEST_KEY"
+          export MIKKA_DEFAULT_MODEL_BASE_URL=http://127.0.0.1:3837/v1
+          export MIKKA_DEFAULT_MODEL_ID=SmolLM2-135M-Instruct-Q4_K_M
+          node "$GITHUB_WORKSPACE/local-model/evidence/2257/local-provider/title-provider.mjs" > "$RUNNER_TEMP/desktop-title-model/provider.log" 2>&1 & titlepid=$!
+          trap 'kill "$titlepid" 2>/dev/null || true' EXIT
+          for i in {1..40}; do curl -fsS 'http://127.0.0.1:3837/health' >/dev/null 2>&1 && break; kill -0 "$titlepid"; sleep 1; done
+          curl -fsS 'http://127.0.0.1:3837/health' >/dev/null
+          dbus-run-session -- bash -euc '
+            printf "%s" "disposable-desktop-test-keyring" | gnome-keyring-daemon --unlock --components=secrets
+            xvfb-run -a node apps/desktop/test/environment.mjs -- node --experimental-strip-types .cache/e-native-qa/controls.mjs
+          '
+      - name: Retain only sanitized source, operation and cleanup receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: 4f4229b6-public-native-model-title
+          path: ${{ runner.temp }}/native-controls.json
+          if-no-files-found: warn
+          retention-days: 14
