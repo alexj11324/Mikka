@@ -5,6 +5,7 @@ import test from 'node:test'
 import type { Pool } from 'pg'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { measured, readMetrics } from './helpers/read-metrics'
+import { mergeList } from '../lib/list-poll'
 import { mergeChat } from '../lib/coordinator/chat-poll'
 import { withActivitySession } from './fixtures/activity-runtime.mjs'
 import type { ActionResult } from '../lib/action-result'
@@ -48,7 +49,7 @@ test('detail and activity revalidate current access while returning only changed
   const { db, pool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
   const { actAs } = await import('../lib/acting-user')
-  const { getIssue, saveIssue, listIssueVersions, pollIssue, pollIssueVersionSummaries, loadEarlierIssueActivity, promoteIssueToTeam } = await import('../app/actions/issues')
+  const { getIssue, saveIssue, listIssueVersions, pollIssue, pollIssueVersionSummaries, pollIssueActivityPage, loadEarlierIssueActivity, promoteIssueToTeam } = await import('../app/actions/issues')
   const { syncCoordinatorChat } = await import('../app/actions/coordinator')
   const { getIssueTeam, setIssueTeam } = await import('../app/actions/team-relations')
   const owner = `detail-cache-${randomUUID()}`, stranger = `detail-stranger-${randomUUID()}`
@@ -81,7 +82,7 @@ test('detail and activity revalidate current access while returning only changed
     assert.equal(detail.issue.content.content?.[0].content?.[0].text, content.content[0].content[0].text)
     assert.ok(cold.resultBytes * 5 < legacy.resultBytes, `cold summary path ${cold.resultBytes} JSON bytes vs legacy ${legacy.resultBytes}`)
 
-    const conditional = () => read(async () => ({ detail: successful(await pollIssue(id, detail.version)), history: successful(await pollIssueVersionSummaries(id, snapshot.version)) }))
+    const conditional = () => read(async () => ({ detail: successful(await pollIssue(id, detail.version)), history: successful(await pollIssueVersionSummaries(id, snapshot.version, snapshot.positions)) }))
     const warm = await measured(conditional)
     assert.equal(warm.value.detail.unchanged, true)
     assert.ok('unchanged' in warm.value.history.snapshot)
@@ -107,13 +108,13 @@ test('detail and activity revalidate current access while returning only changed
     await pool.query('insert into issue_versions(id,"issueId","userId",revision,title,content,status,priority,actor_type,actor_id) values($1,$2,$3,51,$4,$5,$6,$7,$8,$3)',
       [newVersion, id, owner, 'Newest activity', JSON.stringify(changedBody), 'done', 'normal', 'user'])
     await pool.query('update issues set revision=51 where id=$1', [id])
-    const delta = await measured(() => read(async () => successful(await pollIssueVersionSummaries(id, snapshot.version))))
+    const delta = await measured(() => read(async () => successful(await pollIssueVersionSummaries(id, snapshot.version, snapshot.positions))))
     assert.ok(delta.value.snapshot && !('unchanged' in delta.value.snapshot))
     const changedHistory = delta.value.snapshot
-    assert.equal(changedHistory.items.length, 51)
-    assert.equal(changedHistory.items[0].id, newVersion)
+    assert.equal(changedHistory.delta, true)
+    assert.deepEqual(changedHistory.items.map(row => row.id), [newVersion])
     assert.equal(changedHistory.items[0].descriptionChanged, true, 'body change is detected without returning the body')
-    const combined = changedHistory.items
+    const combined = mergeList(snapshot.items, changedHistory)
     assert.equal(combined.length, 51, 'the creation stays beside the fifty-version window')
     assert.ok(combined.some(version => version.revision === 1))
     assert.equal(combined[0].id, newVersion)
@@ -122,45 +123,66 @@ test('detail and activity revalidate current access while returning only changed
     assert.deepEqual(combined, fullSummary.snapshot.items)
 
     await pool.query('update "user" set name=$2 where id=$1', [owner, 'Renamed activity actor'])
-    const actorChanged = successful(await read(() => pollIssueVersionSummaries(id, changedHistory.version)))
+    const actorChanged = successful(await read(() => pollIssueVersionSummaries(id, changedHistory.version, changedHistory.positions)))
     assert.ok(actorChanged.snapshot && !('unchanged' in actorChanged.snapshot))
     assert.equal(actorChanged.snapshot.items[0].actor?.name, 'Renamed activity actor', 'profile-dependent summaries invalidate without a new version')
 
     await pool.query('insert into issue_versions(id,"issueId","userId",revision,title,content,status,priority) values($1,$2,$3,52,$4,$5,$6,$7)',
       [randomUUID(), id, owner, 'Another change', JSON.stringify(changedBody), 'done', 'normal'])
-    const paged = successful(await read(() => pollIssueVersionSummaries(id, changedHistory.version)))
+    const paged = successful(await read(() => pollIssueVersionSummaries(id, changedHistory.version, changedHistory.positions)))
     assert.ok(paged.snapshot && !('unchanged' in paged.snapshot))
-    const window = paged.snapshot.items
+    const window = mergeList(combined, paged.snapshot)
     assert.equal(window.length, 52, 'older activity is retained instead of being displaced by new revisions')
     assert.equal(window.at(-1)?.revision, 1)
     assert.ok(window.some(row => row.revision === 2))
 
     assert.equal((await actAs(stranger, () => pollIssue(id, bodyChanged.version))).error, 'issueNotFound')
-    assert.equal((await actAs(stranger, () => pollIssueVersionSummaries(id, snapshot.version))).error, 'issueNotFound')
+    assert.equal((await actAs(stranger, () => pollIssueVersionSummaries(id, snapshot.version, snapshot.positions))).error, 'issueNotFound')
     assert.equal((await actAs(stranger, () => loadEarlierIssueActivity(id, 2, snapshot.items[0].id))).error, 'issueNotFound')
-    // The oldest returned row compares against a look-ahead at the page boundary.
-    for (let revision = 53; revision <= 202; revision++) await pool.query('insert into issue_versions(id,"issueId","userId",revision,title,content,status,priority,actor_type,actor_id) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$3)',
-      [randomUUID(), id, owner, revision, `Revision ${revision}`, JSON.stringify(revision < 103 ? content : changedBody), 'todo', 'normal', 'user'])
+    assert.equal((await actAs(stranger, () => pollIssueActivityPage(id))).error, 'issueNotFound')
+    // 100 displayed transitions need their 101st predecessor; the 102nd
+    // row establishes whether an older page exists, without skipping it.
+    for (let revision = 53; revision <= 202; revision++) {
+      await pool.query('insert into issue_versions(id,"issueId","userId",revision,title,content,status,priority,actor_type,actor_id) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$3)',
+        [randomUUID(), id, owner, revision, `Revision ${revision}`, JSON.stringify(revision < 103 ? content : changedBody), 'todo', 'normal', 'user'])
+      if (revision === 100 || revision === 101 || revision === 102) {
+        await pool.query('update issues set revision=$2 where id=$1', [id, revision])
+        const boundary = successful(await read(() => pollIssueActivityPage(id)))
+        assert.ok(!boundary.snapshot.unchanged)
+        assert.equal(boundary.snapshot.items.length, Math.min(revision, 100))
+        assert.equal(boundary.snapshot.predecessor?.revision ?? null, revision > 100 ? revision - 100 : null)
+        assert.equal(boundary.snapshot.hasMore, revision > 100, 'a hidden predecessor must remain reachable through Show earlier')
+      }
+    }
     await pool.query('update issues set revision=202 where id=$1', [id])
-    const first = successful(await read(() => pollIssueVersionSummaries(id)))
+    const first = successful(await read(() => pollIssueActivityPage(id)))
     assert.ok(!first.snapshot.unchanged)
-    assert.equal(first.snapshot.items.length, 101)
+    assert.equal(first.snapshot.items.length, 100)
     assert.equal(first.snapshot.hasMore, true)
     assert.equal(first.snapshot.items[0].revision, 202)
-    const edge = first.snapshot.items[99]
+    assert.equal(first.snapshot.items.length, 100, 'the response never exposes a 101st visible row')
+    const edge = first.snapshot.items.at(-1)!
     assert.equal(edge.revision, 103)
-    assert.equal(edge.descriptionChanged, true, 'look-ahead detects a description change at the page boundary')
+    assert.equal(first.snapshot.predecessor?.revision, 102, 'private predecessor is the actual adjacent prior revision')
+    assert.equal(edge.descriptionChanged, true, 'SQL derives the page-boundary change against its predecessor')
     const { deriveIssueActivity } = await import('../lib/issue-activity')
-    assert.ok(deriveIssueActivity(first.snapshot.items, [], Infinity).some(event => event.source?.kind === 'revision' && event.source.revision === 103), 'oldest page event has its predecessor immediately')
+    assert.ok(deriveIssueActivity(first.snapshot.items, [], Infinity, first.snapshot.predecessor).some(event => event.source?.kind === 'revision' && event.source.revision === 103), 'oldest page event can be derived using its predecessor')
     const sentinel = first.snapshot.items.at(-1)!
-    assert.equal(sentinel.revision, 102)
+    assert.equal(sentinel.revision, 103)
     const second = successful(await read(() => loadEarlierIssueActivity(id, sentinel.revision, sentinel.id)))
     assert.ok(second.page)
-    assert.equal(second.page.items.length, 101)
-    assert.equal(second.page.items[0].revision, 101)
-    assert.equal(second.page.hasMore, false)
-    assert.equal(second.page.cursor, null)
-    const all = [...first.snapshot.items, ...second.page.items]
+    assert.equal(second.page.items.length, 100)
+    assert.equal(second.page.items[0].revision, 102)
+    assert.equal(second.page.hasMore, true)
+    assert.equal(second.page.items.length, 100, 'older response never exposes a 101st visible row')
+    assert.equal(second.page.predecessor?.revision, 2)
+    assert.deepEqual(second.page.cursor, { revision: 3, id: second.page.items.at(-1)!.id })
+    const third = successful(await read(() => loadEarlierIssueActivity(id, second.page.cursor!.revision, second.page.cursor!.id)))
+    assert.ok(third.page)
+    assert.equal(third.page.items.length, 2)
+    assert.equal(third.page.hasMore, false)
+    assert.equal(third.page.cursor, null)
+    const all = [...first.snapshot.items, ...second.page.items, ...third.page.items]
     assert.equal(new Set(all.map(row => row.id)).size, 202, 'pages do not overlap')
     assert.ok(all.every(row => !row.content.content), 'historical bodies do not leave the database')
     assert.equal(all.at(-1)?.revision, 1)
@@ -224,7 +246,8 @@ test('detail and activity revalidate current access while returning only changed
     await pool.query('update issues set content=$2 where id=$1', [sharedId, JSON.stringify(createdShared.issue.content)])
     await pool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2', [workspaceId, stranger])
     assert.equal((await readShared(() => pollIssue(sharedId, shared.version))).error, 'issueNotFound')
-    assert.equal((await readShared(() => pollIssueVersionSummaries(sharedId, sharedSnapshot.version))).error, 'issueNotFound')
+    assert.equal((await readShared(() => pollIssueVersionSummaries(sharedId, sharedSnapshot.version, sharedSnapshot.positions))).error, 'issueNotFound')
+    assert.equal((await readShared(() => pollIssueActivityPage(sharedId))).error, 'issueNotFound')
     assert.equal((await readShared(() => loadEarlierIssueActivity(sharedId, 2, sharedSnapshot.items[0].id))).error, 'issueNotFound')
     assert.equal((await readChat(botId, previousChat.version, continuation)).error, 'botNotFound', 'revoked workspace membership denies the chat and its cached citations')
     assert.equal((await syncCoordinatorChat(botId)).error, 'authRequired', 'expected auth failures survive the Server Action boundary')
@@ -559,7 +582,7 @@ test('detail and activity revalidate current access while returning only changed
     })
 
     await pool.query('update issues set content=jsonb_set(content,\'{attrs}\',$2::jsonb) where id=$1', [id, JSON.stringify({ mikka: { deletedAt: new Date().toISOString() } })])
-    const deletion = await measured(() => read(async () => ({ detail: await pollIssue(id, bodyChanged.version), history: await pollIssueVersionSummaries(id, snapshot.version) })))
+    const deletion = await measured(() => read(async () => ({ detail: await pollIssue(id, bodyChanged.version), history: await pollIssueVersionSummaries(id, snapshot.version, snapshot.positions) })))
     assert.equal(deletion.value.detail.error, 'issueNotFound')
     assert.equal(deletion.value.history.error, 'issueNotFound')
     t.diagnostic(JSON.stringify({ event: 'read_cache_measurement', surface: 'task-detail-and-activity', scope: 'data-read-path_not_page_http', historyRows: 50,

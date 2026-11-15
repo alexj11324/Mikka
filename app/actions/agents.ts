@@ -268,7 +268,7 @@ export async function pollIssueThreads(issueId: string, includeTaskWork = false,
     const { listIssueConnections } = await import('@/app/actions/issue-operations')
     const connections = await listIssueConnections(issue.id)
     const { pollIssueVersionSummaries } = await import('@/app/actions/issues')
-    const activity = await pollIssueVersionSummaries(issue.id, activityCursor?.version)
+    const activity = await pollIssueVersionSummaries(issue.id, activityCursor?.version, activityCursor?.positions)
     if (activity.error) throw new ActionFailureError(activity.error)
     if (activity.viewerId !== user.id) throw new ActionFailureError('issueNotFound')
     return { ...snapshot, connections, activity: activity.snapshot, viewerId: user.id }

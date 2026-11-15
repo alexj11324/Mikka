@@ -157,6 +157,7 @@ const functions = {
   'issues.changeIssuePriority': actions14.changeIssuePriority,
   'issues.listIssueVersions': actions14.listIssueVersions,
   'issues.pollIssueVersionSummaries': actions14.pollIssueVersionSummaries,
+  'issues.pollIssueActivityPage': actions14.pollIssueActivityPage,
   'issues.loadEarlierIssueActivity': actions14.loadEarlierIssueActivity,
   'issues.setIssueScope': actions14.setIssueScope,
   'linear-sync.getLinearIntegrationState': actions15.getLinearIntegrationState,

@@ -19,7 +19,7 @@ import type { ThreadRecord } from '@/components/blocks/rich-text-editor-4/compon
 import { issueVisibilityPredicate } from '@/lib/issue-visibility-policy'
 import { issueTeamScope } from '@/lib/issue-team-access'
 import { db } from '@/lib/db'
-import { issues, issueDocuments, issueVersions, issueMembers, users } from '@/lib/db/schema'
+import { agents, issues, issueDocuments, issueVersions, issueMembers, users } from '@/lib/db/schema'
 import { requireIssueAccess, requireIssueAccessWithoutBody, requireUser } from '@/lib/issue-access'
 import { checklistView, issueAttrsContent, issueChecklistChecked, issueChecklistTotal } from '@/lib/issue-summary-columns'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
@@ -443,8 +443,41 @@ export async function listIssueVersions(id: string) {
   return enrichActivityActors(versions, userId)
 }
 
+/** Activity reads metadata only. Complete historical bodies are loaded by
+ * listIssueVersions when the person opens the description-history dialog. */
+export async function pollIssueVersionSummaries(id: string, known?: string, previous?: readonly ListPosition[]) {
+  return cacheReadAction(() => withDatabaseOperation('/actions/issues/activity', async () => {
+    const { issue, user } = await requireIssueAccessWithoutBody(id)
+    const held = readListPositions(previous, 5000)
+    const result = await db.transaction(async tx => {
+      const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, content: issueAttrsContent }).from(issues).where(eq(issues.id, id)).for('share')
+      requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
+      await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
+      // The same deleted-task refusal as pollIssue, after taking the shared lock.
+      if (readIssueMetadata(locked.content).deletedAt) throw new ActionFailureError('issueNotFound')
+      const summaries = taskActivityVersions(tx, id, issue.userId)
+      const signatures = tx.select({ id: summaries.id, revision: summaries.revision, item: sql`to_jsonb(activity_versions)`.as('item'), actor: sql`jsonb_build_array(
+        (select jsonb_build_array(${users.name}, ${users.image}) from ${users} where ${users.id}=${summaries.actorId} and ${summaries.actorType}='user'),
+        (select ${agents.harness} from ${agents} where ${agents.id}::text=${summaries.actorId} and ${agents.userId}=${issue.userId} and ${summaries.actorType}='agent')
+      )`.as('actor') }).from(summaries)
+      const signature = await queryVersion(signatures, tx)
+      const version = createHash('sha256').update(JSON.stringify([user.id, id, issue.scopeVersion, signature])).digest('hex').slice(0, 32)
+      if ((previous === undefined || held !== undefined) && known === version) return { version, unchanged: true as const }
+      const signed = signatures.as('activity_signatures')
+      const positions = await tx.select({ id: signed.id, version: sql<string>`md5(to_jsonb(activity_signatures)::text)` }).from(signed).orderBy(desc(signed.revision), desc(signed.id))
+      const ids = changedListIds(positions, held)
+      const rows = ids.length ? await tx.select().from(summaries).where(inArray(summaries.id, ids)).orderBy(desc(summaries.revision), desc(summaries.id)) : []
+      return { version, positions, rows, ...(held ? { delta: true as const } : {}) }
+    })
+    if (result.unchanged === true) return { viewerId: user.id, snapshot: result }
+    const { rows, ...snapshot } = result
+    return { viewerId: user.id, snapshot: { ...snapshot, items: await enrichActivityActors(rows, issue.userId) } }
+  }))
+}
+
+
 /** Activity reads a bounded metadata page. Complete historical bodies are loaded separately. */
-export async function pollIssueVersionSummaries(id: string, known?: string) {
+export async function pollIssueActivityPage(id: string, known?: string) {
   return cacheReadAction(() => withDatabaseOperation('/actions/issues/activity', async () => {
     const { issue, user } = await requireIssueAccessWithoutBody(id)
     const result = await db.transaction(async tx => {
@@ -455,16 +488,18 @@ export async function pollIssueVersionSummaries(id: string, known?: string) {
       // Keep polling bounded: the issue revision is the change sequence, while actor
       // details in the visible page keep profile renames from leaving stale labels.
       const baseVersion = [user.id, id, issue.scopeVersion, locked.revision]
-      // Include one predecessor so the oldest displayed revision can be diffed.
+      // Keep 100 visible rows, a private predecessor for the oldest row's
+      // transition, and one further row to decide whether another page exists.
       const windowed = taskActivityVersions(tx, id, issue.userId, { limit: ISSUE_ACTIVITY_PAGE_SIZE + 1 })
       const rows = await tx.select().from(windowed).orderBy(desc(windowed.revision), desc(windowed.id))
-      const hasMore = rows.length > ISSUE_ACTIVITY_PAGE_SIZE + 1
-      return { baseVersion, hasMore, rows: rows.slice(0, ISSUE_ACTIVITY_PAGE_SIZE + 1) }
+      const hasMore = rows.length > ISSUE_ACTIVITY_PAGE_SIZE
+      return { baseVersion, hasMore, rows: rows.slice(0, ISSUE_ACTIVITY_PAGE_SIZE), predecessor: rows[ISSUE_ACTIVITY_PAGE_SIZE] ?? null }
     })
     const items = await enrichActivityActors(result.rows, issue.userId)
     const version = createHash('sha256').update(JSON.stringify([result.baseVersion, items.map(row => [row.id, row.actor])])).digest('hex').slice(0, 32)
     if (known === version) return { viewerId: user.id, snapshot: { version, unchanged: true as const } }
-    return { viewerId: user.id, snapshot: { version, hasMore: result.hasMore, items } }
+    const predecessor = result.predecessor ? (await enrichActivityActors([result.predecessor], issue.userId))[0] : null
+    return { viewerId: user.id, snapshot: { version, hasMore: result.hasMore, items, predecessor } }
   }))
 }
 
@@ -480,12 +515,15 @@ export async function loadEarlierIssueActivity(id: string, beforeRevision: numbe
       requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
       await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
       if (readIssueMetadata(locked.content).deletedAt) throw new ActionFailureError('issueNotFound')
+      // Keep the same visible-page + predecessor + look-ahead contract.
       const windowed = taskActivityVersions(tx, parsed.data.id, issue.userId, { before: { revision: parsed.data.beforeRevision, id: parsed.data.beforeId }, limit: ISSUE_ACTIVITY_PAGE_SIZE + 1 })
       const rows = await tx.select().from(windowed).orderBy(desc(windowed.revision), desc(windowed.id))
-      const hasMore = rows.length > ISSUE_ACTIVITY_PAGE_SIZE + 1
-      const items = await enrichActivityActors(rows.slice(0, ISSUE_ACTIVITY_PAGE_SIZE + 1), issue.userId)
+      const hasMore = rows.length > ISSUE_ACTIVITY_PAGE_SIZE
+      const items = await enrichActivityActors(rows.slice(0, ISSUE_ACTIVITY_PAGE_SIZE), issue.userId)
+      const predecessorRow = rows[ISSUE_ACTIVITY_PAGE_SIZE]
+      const predecessor = predecessorRow ? (await enrichActivityActors([predecessorRow], issue.userId))[0] : null
       const last = items.at(-1)
-      return { items, hasMore, cursor: hasMore && last ? { revision: last.revision, id: last.id } : null }
+      return { items, hasMore, predecessor, cursor: hasMore && last ? { revision: last.revision, id: last.id } : null }
     })
     return { viewerId: user.id, page }
   }))

@@ -74,6 +74,14 @@ mock.module(at('app/actions/issues.ts'), { namedExports: {
     assert.equal(id, issueId); versionReads++
     return { viewerId: readViewerId, snapshot: { version: String(versions.length).padStart(32, '0'), items: structuredClone(versions) } }
   },
+  pollIssueActivityPage: async (id: string) => {
+    assert.equal(id, issueId); versionReads++
+    return { viewerId: readViewerId, snapshot: { version: String(versions.length).padStart(32, '0'), items: structuredClone(versions), hasMore: false } }
+  },
+  loadEarlierIssueActivity: async (id: string, _beforeRevision: number, _beforeId: string) => {
+    assert.equal(id, issueId)
+    return { viewerId: readViewerId, page: { items: [], hasMore: false, cursor: null } }
+  },
   listIssueVersions: async (id: string) => { assert.equal(id, issueId); fullVersionReads++; return structuredClone(versions) },
   saveIssue: async (input: Parameters<typeof import('../app/actions/issues')['saveIssue']>[0]) => {
     writes.push(structuredClone(input))

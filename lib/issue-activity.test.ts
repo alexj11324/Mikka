@@ -51,6 +51,15 @@ const version = (revision: number, mikka: Record<string, unknown>, body = 'b0', 
   return { id: 'v' + revision, revision, title: 'A', status: 'todo', priority: 'normal', content: withAttrs(mikka, body), createdAt: at(revision), actorType, actorId }
 }
 
+test('a hidden creation predecessor derives the boundary without displaying creation early', () => {
+  const first = version(1, {})
+  const second = { ...version(2, {}), title: 'Changed' }
+  const initial = deriveIssueActivity([second], [], Infinity, first)
+  assert.deepEqual(initial.map(event => event.kind), ['title'])
+  assert.equal(initial[0].source?.id, second.id)
+  assert.deepEqual(deriveIssueActivity([second, first], [], Infinity).map(event => event.kind), ['created', 'title'])
+})
+
 test('Capy events: description, parent, relations and pull requests; labels are not an event', () => {
   const parent = '11111111-1111-4111-8111-111111111111'
   const blocker = '22222222-2222-4222-8222-222222222222'

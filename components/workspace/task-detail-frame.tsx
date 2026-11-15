@@ -104,6 +104,7 @@ export type FramedTaskProps = {
   editor: (afterDescription: ReactNode, renderActivity: (discussions: IssueDiscussions) => ReactNode) => ReactNode
   acceptance: ReactNode
   versions: ActivityVersion[]
+  activityPredecessor?: ActivityVersion | null
   historyFailed: (() => void) | null
   earlierActivity: { hasMore: boolean; loading: boolean; failed: boolean; load: () => void }
   agentActivity: ReturnType<typeof useTaskWork>
@@ -308,6 +309,7 @@ export function FramedTask(props: FramedTaskProps) {
     title: thread.detail?.name || tDirectory('untitled'), ...thread.detail?.harness ? { harness: thread.detail.harness } : {},
   }))
   const eventsFor = useActivityEvents(props.historyFailed ? [] : props.versions, props.historyFailed ? [] : subtaskRows, {
+    predecessor: props.historyFailed ? null : props.activityPredecessor,
     task: {
       taskId: task.id, code: task.identifier, title: props.title, status: props.status, priority: props.priority, assignee: member?.name,
       // Parent, sub-tasks and related tasks this page already reads, so a sentence names them by code, as Capy's does.

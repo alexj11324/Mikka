@@ -62,10 +62,11 @@ export function pullLabel(url: string) {
 }
 
 /** Turns stored versions and current subtasks into Capy's issue events, one per change. */
-export function deriveIssueActivity(versions: ActivityVersion[], children: ActivityChild[], limit = 12): IssueActivityEvent[] {
-  const ordered = [...versions].sort((a, b) => a.revision - b.revision)
+export function deriveIssueActivity(versions: ActivityVersion[], children: ActivityChild[], limit = 12, predecessor?: ActivityVersion | null): IssueActivityEvent[] {
+  const ordered = [...versions, ...(predecessor ? [predecessor] : [])].sort((a, b) => a.revision - b.revision)
   const events: IssueActivityEvent[] = []
-  const created = ordered.find(version => version.revision === 1)
+  // A predecessor supplies comparison context, not a visible activity row.
+  const created = versions.find(version => version.revision === 1)
   if (created) events.push({ source: { kind: 'revision', id: created.id, revision: 1 }, id: `created-${created.id}`, at: timestamp(created.createdAt), kind: 'created', actorKey: actorKeyOf(created), actor: created.actor ?? null })
   let previousDescription: { revision: number; actorKey: string | null; eventIndex: number } | null = null
   for (let index = 1; index < ordered.length; index += 1) {

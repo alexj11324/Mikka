@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
-import type { ListSnapshot } from '@/lib/list-poll'
+import { heldListPositions, mergeList, type ListSnapshot } from '@/lib/list-poll'
 import { waitForCacheHydration } from '@/lib/swr/persistent-cache'
 import type { listIssueVersions } from '@/app/actions/issues'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
@@ -37,11 +37,14 @@ export function useIssueThreads(issueId: string, enabled = true, viewerId?: stri
     await waitForCacheHydration(cache)
     const cached = cache.get(unstable_serialize(key))?.data as { viewerId?: string; history?: History } | undefined
     const previous = viewerId && cached?.viewerId === viewerId ? cached.history : undefined
-    const incoming = await pollIssueThreads(issueId, true, { version: previous?.version })
+    const positions = heldListPositions(previous)
+    const version = positions && positions.length === previous?.positions?.length ? previous.version : undefined
+    const incoming = await pollIssueThreads(issueId, true, { version, positions })
     if (!('activity' in incoming)) return { ...incoming, history: undefined }
     if (viewerId && incoming.viewerId !== viewerId) throw new ListReadScopeError('owner')
     const next = incoming.activity
-    const history: History = { version: next.version, items: next.unchanged ? previous?.items ?? [] : next.items }
+    const history: History = { version: next.version, items: mergeList(previous?.items ?? [], next),
+      positions: 'positions' in next ? next.positions : previous?.positions }
     return { ...incoming, history }
   }, { revalidateOnReconnect: true })
   const scope = enabled ? result.data?.live.workspaceId ?? null : null

@@ -14,7 +14,7 @@ import { IssueDescriptionHistory } from './issue-description-history'
 import type { MetadataRequest } from './issue-metadata-controls'
 import { toast } from 'sonner'
 import { getDeletedIssue, setIssueDeleted } from '@/app/actions/issue-operations'
-import { pollIssue, pollIssueVersionSummaries, loadEarlierIssueActivity, saveIssue, listIssueVersions, type IssueView } from '@/app/actions/issues'
+import { pollIssue, pollIssueActivityPage, loadEarlierIssueActivity, saveIssue, listIssueVersions, type IssueView } from '@/app/actions/issues'
 import { descriptionKey } from '@/lib/issue-relations'
 import { CacheReadError } from '@/lib/cache-read-error'
 import { readAccessFailure, waitForCacheHydration } from '@/lib/swr/persistent-cache'
@@ -263,7 +263,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   const localActivity = useSWR<ActivityRead>(preview ? null : activityKey, async () => {
     await waitForCacheHydration(cache)
     const previous = cache.get(unstable_serialize(activityKey))?.data as ActivityRead | undefined
-    const result = await pollIssueVersionSummaries(saved.id, previous?.version)
+    const result = await pollIssueActivityPage(saved.id, previous?.version)
     if (result.error) throw new CacheReadError(result.error)
     if (result.viewerId !== user.id) throw new ListReadScopeError('owner')
     const next = result.snapshot
@@ -475,7 +475,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     titleField={{ value: title, label: t('titleLabel'), readOnly: locked, maxLength: 200, onChange: titleChange, onCompositionStart: () => { composing.current = true }, onCompositionEnd: () => { composing.current = false; setEditSequence(value => value + 1) }, onBlur: () => { if (title.trim() && title !== saved.title) void save() }, onKeyDown: titleKeyDown }}
     saveError={error ? { text: error, retry: t('retryAutosave'), onRetry: retryAutosave, busy: pending } : null} syncNotice={syncState.error ? t('syncRetryNotice') : null}
     editor={(afterDescription, renderActivity) => editorWith(afterDescription, renderActivity)} acceptance={acceptance}
-    versions={versions ?? []} historyFailed={historyError ? () => { void refreshVersions() } : null} earlierActivity={{ hasMore: activityRead?.hasMore ?? false, loading: activityPageLoading, failed: activityPageError, load: loadEarlierActivity }} agentActivity={agentActivity}
+    versions={versions ?? []} activityPredecessor={activityRead?.predecessor ?? null} historyFailed={historyError ? () => { void refreshVersions() } : null} earlierActivity={{ hasMore: activityRead?.hasMore ?? false, loading: activityPageLoading, failed: activityPageError, load: loadEarlierActivity }} agentActivity={agentActivity}
     documentTools={documentTools} actionRequest={actionRequest} propertyRequest={propertyRequest} requestAction={requestAction} requestProperty={requestProperty} getCurrent={getCurrent} adopt={adopt} onMetadataBusy={setMetadataSaving}
     onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }}
     onHistory={() => { void openHistory() }} onMembers={() => setMembers(true)} onDocumentTools={() => setDocumentTools(value => !value)}
