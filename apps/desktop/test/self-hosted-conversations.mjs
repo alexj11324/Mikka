@@ -131,7 +131,8 @@ export async function verifyConversationOrganization({ page, fixture, rpc, passe
   const transcript = page.getByTestId('group-chat')
   const body = transcript.locator('[data-slot="collapsible-message"]').filter({ hasText: 'Desktop inspection line 120' })
   await body.getByRole('button', { name: english.Common.showMore, exact: true }).click()
-  const viewport = transcript.locator('div.overflow-y-auto').filter({ has: body }).last()
+  const viewport = transcript.locator(':scope > div.overflow-y-auto')
+  await expect(viewport.locator('[data-slot="collapsible-message"]').filter({ hasText: 'Desktop inspection line 120' })).toHaveCount(1)
   await expect(viewport).toBeVisible()
   const scroll = edge => viewport.evaluate((node, destination) => {
     node.scrollTop = destination === 'top' ? 0 : node.scrollHeight
