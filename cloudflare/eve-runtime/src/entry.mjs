@@ -1,8 +1,7 @@
 import { workersAiRequest } from '../../workers-ai/binding.mjs'
 import { WorkerEntrypoint } from 'cloudflare:workers'
-import { getContainer } from '@cloudflare/containers'
 import { productRequest } from '../runtime/product.mjs'
-import { hostConfiguration } from '../runtime/config.mjs'
+import { singletonContainerName } from '../runtime/config.mjs'
 export { EveRuntime } from './index.mjs'
 export { ContainerProxy } from '@cloudflare/containers'
 
@@ -19,9 +18,8 @@ export class EveProductOutbound extends WorkerEntrypoint {
 }
 
 function forward(request, env, headers) {
-  const config = hostConfiguration(env)
   const source = new URL(request.url)
-  const target = new URL(config.publicOrigin)
+  const target = new URL(env.EVE_PUBLIC_ORIGIN)
   target.pathname = source.pathname
   target.search = source.search
   headers.set('x-forwarded-host', target.host)
@@ -30,7 +28,8 @@ function forward(request, env, headers) {
     method: request.method, headers, signal: request.signal, redirect: 'manual',
     ...(request.body ? { body: request.body, duplex: 'half' } : {}),
   })
-  return getContainer(env.EVE_RUNTIME, config.releaseId).fetch(forwarded)
+  const { EVE_RELEASE_ID: name = singletonContainerName } = env
+  return env.EVE_RUNTIME.getByName(name).fetch(forwarded)
 }
 
 export class EveService extends WorkerEntrypoint {
