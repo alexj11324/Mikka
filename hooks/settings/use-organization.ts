@@ -22,7 +22,7 @@ export type OrganizationRole = 'owner' | 'admin' | 'member'
 export type OrganizationListItem = { id: string; name: string; role: OrganizationRole }
 export type JoinableOrganization = Pick<OrganizationListItem, 'id' | 'name'>
 export type OrganizationDomain = { id: string; domain: string }
-export type OrganizationMember = { organizationId: string; userId: string; role: OrganizationRole; status: 'active' | 'suspended'; name: string; email: string; createdAt: string; updatedAt: string }
+export type OrganizationMember = { organizationId: string; userId: string; role: OrganizationRole; status: 'active' | 'suspended'; name: string; email: string; image?: string | null; createdAt: string; updatedAt: string }
 /** Organization membership only; invitations never confer Workspace/Project access. */
 export type OrganizationInvitation = {
   id: string; email: string; createdBy: string; status: 'pending' | 'accepted' | 'revoked'

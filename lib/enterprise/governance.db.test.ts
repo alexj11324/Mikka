@@ -47,9 +47,12 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
     const directory = (userId: string, includeDisabled: boolean) => org.listOrganizationMembers(organizationId, userId, includeDisabled)
     for (const actor of [member, outsider]) await assert.rejects(directory(actor.id, true), /access_denied/)
     await pool.query("update mikka_organization_members set status='suspended' where \"organizationId\"=$1 and \"userId\"=$2", [organizationId, member.id])
+    await pool.query('update "user" set image=$2 where id=$1', [owner.id, '/avatars/green.webp'])
     try {
       const active = await directory(admin.id, false)
       assert.deepEqual(active.members.map(row => row.userId).sort(), [owner.id, admin.id].sort())
+      assert.equal(active.members.find(row => row.userId === owner.id)?.image, '/avatars/green.webp')
+      assert.equal(active.members.find(row => row.userId === admin.id)?.image, null)
       const all = await directory(owner.id, true)
       assert.equal(all.members.find(row => row.userId === member.id)?.status, 'suspended')
       assert.deepEqual(all.members, (await org.organizationSummary(organizationId, owner.id)).members)
