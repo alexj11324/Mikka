@@ -182,6 +182,8 @@ stub('../lib/run-leases.ts', { failUnclaimedCloudStart: async (actor: unknown, i
 } })
 mock.module('workflow/api', { namedExports: { start: async () => { calls.push('lifecycle'); if (failure === 'lifecycle') throw new Error('Synthetic workflow launch failure'); return { runId: 'workflow' } } } })
 stub('../workflows/thread-machine/workflow.ts', { threadMachineLifecycle: async () => {} })
+let followedModel: { harness: 'codex' | 'claude_code'; model: string } | null = null
+stub('../lib/main-thread-model.ts', { mainThreadModel: async () => followedModel })
 let dispatch: typeof import('../workflows/coordinator/steps')['dispatchComputerTask']
 let dispatchThread: typeof import('../workflows/coordinator/steps')['dispatchComputerThread']
 let dispatchRun: typeof import('../workflows/coordinator/steps')['dispatchRun']
@@ -190,7 +192,7 @@ beforeEach(() => {
   calls.length = 0; failure = null; queueFailure = null; settledStartup = true; present = workspaceAllowed = issueAllowed = suggestionAllowed = true
   permission = undefined; awake = credentialAvailable = true; switchedCredential = moveDevice = replaceAgent = revokeDuringWake = revokeWorkspaceDuringWake = false
   selectedSource = 'subscription'; selectedHarness = 'codex'; selectedModel = model; deviceId = 'device'; repoId = 'repo'
-  previous = null; pendingSpec = false; requestSource = null; preferLocal = false
+  previous = null; pendingSpec = false; requestSource = null; preferLocal = false; followedModel = null
   selectedStages.length = selectedProfiles.length = selectedLocations.length = hostSourceQueries.length = profileSourceQueries.length = 0; modelResolutions = bindingSelections = credentialReads = factoryReadCalls = 0; queued.clear()
 })
 
@@ -246,6 +248,17 @@ test('ordinary existing-issue chat retains automatic placement and its selected 
   const input = queued.get('coordinator:rule:cloud-form-call')
   assert.equal((input?.modelDispatch as { location?: string })?.location, undefined)
   assert.equal(input?.allowLocalRecovery, true)
+})
+
+test('a new thread that follows its chat model records that it followed; a named model does not', async () => {
+  // Decision 2026-11-15-1630: the thread shows 「跟随主线程」, not the person's pick.
+  requestSource = { ...cloudTaskSource(), issueId: null, payload: {} }
+  followedModel = { harness: 'codex', model }
+  assert.ok('runId' in await dispatchRepository())
+  assert.equal((queued.get('coordinator:rule:cloud-form-call')?.modelDispatch as { followed?: true })?.followed, true)
+  queued.clear()
+  assert.ok('runId' in await dispatchRun(owner, { issueId, repo: 'owner/repository', requestKey: 'cloud-form-call', model: { harness: 'codex', model } }, undefined, botId, undefined, sourceEventId))
+  assert.equal((queued.get('coordinator:rule:cloud-form-call')?.modelDispatch as { followed?: true })?.followed, undefined)
 })
 
 test('a cloud task-form choice overrides local preferences before selection when the model omits target', async () => {
