@@ -145,8 +145,8 @@ test('a failed remote issue with pending durable cleanup fails closed and leaves
   assert.equal(state.events.filter(event => event === 'durable-revoke').length, 1)
 })
 
-test('arbitrary destinations and duplicate ports are rejected before a lease is created', async () => {
-  for (const query of ['?url=http://169.254.169.254/', '?port=3000&port=3001']) {
+test('invalid, duplicate and arbitrary port requests never create a lease or resume the machine', async () => {
+  for (const query of ['?url=http://169.254.169.254/', '?port=3000&port=3001', '?port=80', '?port=65536', '?port=3000.5', '?port=', '?port=abc']) {
     state.events = []
     const response = await reviewPreviewRoute(request(query), authority.taskId)
     assert.equal(response.status, 400)

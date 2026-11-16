@@ -1,5 +1,6 @@
 import 'server-only'
 import { taskReviewAuthority, withTaskReviewAuthority, ReviewAuthorityError } from '../review-authority'
+import { isPreviewPort } from './port'
 import { beginReviewSession, readReviewSession, revokeReviewSession } from '../review-sessions'
 import { resumeReviewMachine } from '../review-machine'
 import { issueRunPreview, prepareRunPreview, previewParentOrigin, PreviewRuntimeError } from './runtime'
@@ -17,7 +18,8 @@ export async function reviewPreviewRoute(request: Request, taskId: string): Prom
     const parentOrigin = previewParentOrigin(request)
     const query = new URL(request.url).searchParams
     const port = query.has('port') ? Number(query.get('port')) : undefined
-    if ([...query.keys()].some(key => key !== 'port') || query.getAll('port').length > 1)
+    if ([...query.keys()].some(key => key !== 'port') || query.getAll('port').length > 1
+      || (port !== undefined && !isPreviewPort(port)))
       throw new PreviewRuntimeError('configuration', 400)
     const lease = await withTaskReviewAuthority(request, taskId, async (current, client) => {
       authority = current
