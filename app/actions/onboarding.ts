@@ -4,7 +4,7 @@ import { headers } from 'next/headers'
 import { ActionFailureError } from '@/lib/action-error'
 import { auth } from '@/lib/auth'
 import {
-  dismissSetupChecklist as dismissChecklist, finishOnboarding, readOnboardingProgress, resetOnboardingForUser,
+  dismissSetupChecklist as dismissChecklist, restoreSetupChecklist as restoreChecklist, finishOnboarding, readOnboardingProgress, resetOnboardingForUser,
   saveOnboardingProgress, setupChecklistDismissed,
 } from '@/lib/onboarding'
 import { startingProgress, type OnboardingProgress } from '@/lib/onboarding-steps'
@@ -78,6 +78,13 @@ export async function setupChecklist(workspaceId: string): Promise<SetupChecklis
 export async function dismissSetupChecklist(workspaceId: string) {
   const user = await sessionUser()
   const { loadWorkspaceContext } = await import('@/lib/workspace-access')
-  const context = await loadWorkspaceContext(workspaceId)
+  const context = await loadWorkspaceContext(workspaceId, user)
   await dismissChecklist(user.id, context.workspace.id)
+}
+
+export async function restoreSetupChecklist(workspaceId: string) {
+  const user = await sessionUser()
+  const { loadWorkspaceContext } = await import('@/lib/workspace-access')
+  const context = await loadWorkspaceContext(workspaceId, user)
+  await restoreChecklist(user.id, context.workspace.id)
 }

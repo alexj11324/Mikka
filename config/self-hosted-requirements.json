@@ -2573,7 +2573,7 @@
   "app/actions/onboarding.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "The signed-in person reads and saves their own first-run step and setup-checklist dismissal in the installation PostgreSQL database.",
+    "behavior": "The signed-in person reads and saves their first-run step and can hide or restore their own workspace checklist in the installation PostgreSQL database.",
     "test": "lib/onboarding.db.test.ts",
     "suite": "test:onboarding-db"
   },
@@ -2737,7 +2737,7 @@
   "lib/onboarding.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Reads and saves first-run progress and checklist dismissal in the installation database.",
+    "behavior": "Reads and saves first-run progress, and hides or restores one person’s checklist in one workspace in the installation database.",
     "test": "lib/onboarding.db.test.ts",
     "suite": "test:onboarding-db"
   },

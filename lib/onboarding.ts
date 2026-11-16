@@ -47,3 +47,9 @@ export async function setupChecklistDismissed(userId: string, workspaceId: strin
 export async function dismissSetupChecklist(userId: string, workspaceId: string) {
   await db.insert(setupChecklistDismissals).values({ userId, workspaceId }).onConflictDoNothing()
 }
+
+/** Reveals this person's checklist again in just this workspace. Item completion is derived by the next read. */
+export async function restoreSetupChecklist(userId: string, workspaceId: string) {
+  await db.delete(setupChecklistDismissals)
+    .where(and(eq(setupChecklistDismissals.userId, userId), eq(setupChecklistDismissals.workspaceId, workspaceId)))
+}

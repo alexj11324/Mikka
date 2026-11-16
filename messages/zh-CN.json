@@ -8211,6 +8211,7 @@
     }
   },
   "SetupChecklist": {
+    "show": "显示清单",
     "title": "设置清单",
     "left": "还剩 {count} 项",
     "hide": "隐藏设置清单",

@@ -296,6 +296,7 @@ export const desktopActionSchemas = {
   'onboarding.saveOnboardingStep': tuple(object({ step: z.number().int().min(0).max(4), status: z.record(z.string().regex(/^[0-3]$/), z.enum(['done', 'skipped'])) })),
   'onboarding.setupChecklist': tuple(uuid),
   'onboarding.dismissSetupChecklist': tuple(uuid),
+  'onboarding.restoreSetupChecklist': tuple(uuid),
   'pending-actions.decidePendingAction': tuple(uuid, bool),
   'personal-policy.getSharePolicy': inWorkspace,
   'personal-policy.updateSharePolicy': tuple(bool, workspace),
