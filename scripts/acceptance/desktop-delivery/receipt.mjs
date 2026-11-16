@@ -24,10 +24,19 @@ const windowPhases = log?.split('\n').flatMap(line => {
   const match = /^Desktop delivery qualification: ([a-z-]{1,60})$/.exec(line)
   return match ? [match[1]] : []
 }) ?? []
+// Keep diagnostics from the worker's credential-bearing stderr to a fixed
+// vocabulary. The raw journal, argv, certificates and endpoints stay private.
+const daemon = await optional('run/case/daemon.log')
+const workerErrors = !daemon ? null : [
+  'EACCES', 'EPERM', 'ENOENT', 'ERR_MODULE_NOT_FOUND', 'ERR_INVALID_PACKAGE_CONFIG', 'ECONNREFUSED', 'EHOSTUNREACH',
+  'ERR_TLS_CERT_ALTNAME_INVALID', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'SELF_SIGNED_CERT_IN_CHAIN',
+  'Device registration token expired or already used', 'Invalid registration token',
+  'sudo: a password is required', 'Cannot find package', 'Cannot find module', 'fetch failed',
+].filter(reason => daemon.includes(reason))
 const result = {
   ...report, source, overlay, run: process.env.GITHUB_RUN_ID, attempt: process.env.GITHUB_RUN_ATTEMPT,
   driverRevision: await optional('driver.revision'), imageId: await optional('image.id'),
-  stage: await optional('stage'), windowPhases, postgres: await optional('run/case/pg.version'),
+  stage: await optional('stage'), windowPhases, workerErrors, postgres: await optional('run/case/pg.version'),
   model: expectedModel, weightSha256: '2e8040ceae7815abe0dcb3540b9995eaa1fa0d2ca9e797d0a635ae4433c68c2d',
   paidSubscription: false,
 }
