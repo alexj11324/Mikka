@@ -18,7 +18,7 @@ import re,sys
 p=Path(sys.argv[1])
 raw=(p/'run/case/daemon.log').read_text()
 passed='Invalid registration token' in raw
-candidates=set(r.strip("':.,") for r in re.findall(r"[/][^\s,'"]+?package[.]json",raw))
+candidates={v.rstrip("':.,") for v in re.findall(r'[/][^\s]+?package[.]json',raw)}
 for v in sorted(candidates):
  f=Path(v)
  if f.is_relative_to(p/'product') and f.is_file():
