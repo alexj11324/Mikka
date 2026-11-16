@@ -224,7 +224,9 @@
   },
   "app/api/mobile/settings/route.ts": {
     "mode": "built-in",
-    "environment": ["MIKKA_UI_OVERLAY_SHA"],
+    "environment": [
+      "MIKKA_UI_OVERLAY_SHA"
+    ],
     "behavior": "Community installations keep their usual account and workspace settings. Only a human session on a cloud deployment serving a pinned official UI receives the personal Files entry.",
     "test": "tests/mobile-service-members.db.test.ts",
     "suite": "test:web-auth-db"
@@ -2941,6 +2943,20 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Validates the existing repository selector for signed GitHub repository reads and verification settings.",
+    "test": "lib/github/user-access.test.ts",
+    "suite": "test:github"
+  },
+  "app/api/integrations/github/repositories/tree/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Verifies the installation's existing GitHub authority for the selected repository before returning visible metadata for an immutable revision. Missing GitHub configuration or a denied repository cannot return a tree.",
+    "test": "lib/github/user-access.test.ts",
+    "suite": "test:github"
+  },
+  "lib/coding-workspace/diff/github-manifest.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validates Git tree structure and revision identity locally for repository browsing and existing coding workspace comparisons. It has no independent network or credential requirement.",
     "test": "lib/github/user-access.test.ts",
     "suite": "test:github"
   }

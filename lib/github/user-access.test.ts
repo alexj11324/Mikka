@@ -504,3 +504,24 @@ test('settings errors carry the cookie viewer so another displayed account canno
   assert.deepEqual(await response.json(), { viewerId: 'person-2', error: 'githubReconnectRequired' })
   assert.equal(response.headers.get('cache-control'), 'private, no-store')
 })
+
+test('repository tree resolves the admitted numeric repository and checks its immutable tree before returning visible paths', async () => {
+  const previous = answer, commitSha = '1'.repeat(40), treeSha = '2'.repeat(40)
+  let truncated = false
+  answer = url => {
+    if (url.pathname === `/repositories/${repository.id}/commits/feature%2Fqa`) return json({ sha: commitSha, commit: { tree: { sha: treeSha } } })
+    if (url.pathname === `/repositories/${repository.id}/git/trees/${treeSha}`) {
+      assert.equal(url.searchParams.get('recursive'), '1')
+      return json({ sha: treeSha, truncated, tree: [
+        { path: 'src', mode: '040000', type: 'tree', sha: '3'.repeat(40) },
+        { path: '.env', mode: '100644', type: 'blob', sha: '4'.repeat(40), size: 0 },
+      ] })
+    }
+    return previous(url)
+  }
+  const read = () => access.readRepositoryTree('person-1', 'owner/project', 'feature/qa', { deadline: Date.now() + 25_000 })
+  assert.deepEqual(await read(), { repository: repository.full_name, commitSha, treeSha,
+    entries: [{ path: 'src', mode: '040000', type: 'tree', sha: '3'.repeat(40) }] })
+  truncated = true
+  await assert.rejects(read, /workspace_snapshot_unavailable/)
+})
