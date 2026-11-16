@@ -3514,6 +3514,14 @@
       "pushReminder": "Reminder only"
     },
     "environments": {
+      "history": "Setup history",
+      "historyFor": "Setup history for {name}",
+      "restoreSetup": "Restore setup",
+      "emptySetup": "No setup command or files",
+      "newer": "Newer versions",
+      "older": "Older versions",
+      "confirmSetup": "Restore version {revision} in {name}?",
+      "setupImpact": "This changes setup for {count, plural, one {# project} other {# projects}} using this environment. Review and approve the restored setup before it can run.",
       "archive": "Archive",
       "title": "Run environments",
       "add": "Add environment",
