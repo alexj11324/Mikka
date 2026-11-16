@@ -2959,5 +2959,12 @@
     "behavior": "Validates Git tree structure and revision identity locally for repository browsing and existing coding workspace comparisons. It has no independent network or credential requirement.",
     "test": "lib/github/user-access.test.ts",
     "suite": "test:github"
+  },
+  "app/api/integrations/mcp/refresh/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A fresh owner session lists only tool names for one of their enabled HTTP or SSE installations through the existing MCP connection and credential policy.",
+    "test": "lib/plugins/routes.test.ts",
+    "suite": "test:plugins"
   }
 }

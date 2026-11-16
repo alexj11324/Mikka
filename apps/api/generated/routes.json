@@ -1394,6 +1394,15 @@
       "sourceHash": "79cb7d4c89453d123f2ed724ca8e3d3688c03c5534d6545f6319bd230ab71537"
     },
     {
+      "path": "/mikka/api/integrations/mcp/refresh",
+      "template": "/api/integrations/mcp/refresh",
+      "source": "app/api/integrations/mcp/refresh/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "011ca580d14d1729082cb397c44cc40d02e85816f3b1603d31bbf77b2ba7a433"
+    },
+    {
       "path": "/mikka/api/integrations/mcp/shares",
       "template": "/api/integrations/mcp/shares",
       "source": "app/api/integrations/mcp/shares/route.ts",

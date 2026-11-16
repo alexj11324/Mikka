@@ -3099,6 +3099,13 @@
     },
     "searchEmpty": "No matching settings",
     "mcpConnections": {
+      "viewTools": "View tools",
+      "serverTools": "Tools on {name}",
+      "loadingTools": "Loading tools",
+      "toolsFailed": "Could not load tools",
+      "emptyTools": "No tools available",
+      "refreshTools": "Refresh tools",
+      "nextTools": "Next page",
       "title": "Custom MCP",
       "loading": "Loading custom MCP connections",
       "share": "Share with workspace members",

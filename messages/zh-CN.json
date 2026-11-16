@@ -3099,6 +3099,13 @@
     },
     "searchEmpty": "没有匹配的设置",
     "mcpConnections": {
+      "viewTools": "查看工具",
+      "serverTools": "{name} 的工具",
+      "loadingTools": "正在读取工具",
+      "toolsFailed": "无法读取工具",
+      "emptyTools": "暂无可用工具",
+      "refreshTools": "刷新工具",
+      "nextTools": "下一页",
       "title": "自定义 MCP",
       "loading": "正在读取自定义 MCP 连接",
       "share": "分享给工作区成员",
