@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { View } from 'react-native'
 import { Row, SettingsPage, ToggleRow } from '@/components/settings'
 import { Group } from '@/components/ui'
@@ -7,19 +7,40 @@ import { ReadNotice } from '@/components/ReadNotice'
 import { PushRow } from '@/components/PushRow'
 import { PreferenceSaveNotice } from '@/components/PreferenceSaveNotice'
 import { mobileLocale, mobileMessages as messages } from '@/lib/messages'
-import { ApiError } from '@/lib/api'
+import { api, apiConnection, ApiError } from '@/lib/api'
+import { apiCache } from '@/lib/api-cache'
 import { useApi } from '@/lib/useApi'
 import { askForPush, usePushState } from '@/lib/push-state'
 import { useSettings } from '@/lib/settings'
 import type { Preferences } from '@/lib/types'
 
-type PushInstallation = { id: string; platform: 'ios' | 'android'; deviceName: string | null; currentSession: boolean; updatedAt: string }
+type PushInstallation = { id: string; platform: 'ios' | 'android'; deviceName: string | null; currentSession: boolean; canTest?: boolean; updatedAt: string }
 
 function PushDevices() {
   const copy = messages.MobileCore.notifications
   const { data, error, loading, reload, reloadAfterWrite } = useApi<{ installations: PushInstallation[] }>('/api/mobile/push-tokens')
   const registration = usePushState()
   const previous = useRef(registration)
+  const pending = useRef<number | null>(null)
+  const [attempt, setAttempt] = useState<{ id: string; context: number; state: 'sending' | 'accepted' | 'failed' | 'limited' } | null>(null)
+  const context = apiCache.context()
+  const current = attempt?.context === context ? attempt : null
+  async function testDevice(id: string) {
+    if (apiCache.context() !== context || pending.current === context) return
+    const connection = apiConnection()
+    pending.current = context
+    setAttempt({ id, context, state: 'sending' })
+    try {
+      const result = await api<{ accepted: boolean }>('/api/mobile/push-tokens/' + encodeURIComponent(id) + '/test',
+        { method: 'POST', timeoutMs: 75_000 }, connection)
+      apiCache.commit(context, () => setAttempt({ id, context, state: result?.accepted === true ? 'accepted' : 'failed' }))
+    } catch (error) {
+      apiCache.commit(context, () => {
+        setAttempt({ id, context, state: error instanceof ApiError && error.status === 429 ? 'limited' : 'failed' })
+        if (error instanceof ApiError && (error.status === 404 || error.status === 410)) void reloadAfterWrite()
+      })
+    } finally { if (pending.current === context) pending.current = null }
+  }
   useEffect(() => {
     if (registration === 'registered' && previous.current !== registration) void reloadAfterWrite()
     previous.current = registration
@@ -34,8 +55,15 @@ function PushDevices() {
     {data?.installations.map(device => {
       const platform = device.platform === 'ios' ? 'iOS' : 'Android'
       const date = new Date(device.updatedAt).toLocaleDateString(mobileLocale)
-      return <Row key={device.id} label={device.deviceName || platform} detail={device.deviceName ? `${platform} · ${date}` : date}
-        value={device.currentSession ? messages.Settings.profile.currentSession : undefined} />
+      const status = current?.id === device.id ? current.state : null
+      const feedback = status === 'accepted' ? copy.testAccepted : status === 'failed' ? copy.testFailed
+        : status === 'limited' ? copy.testLimited : status === 'sending' ? copy.testSending : undefined
+      return <View key={device.id}>
+        <Row label={device.deviceName || platform} detail={device.deviceName ? `${platform} · ${date}` : date}
+          value={device.currentSession ? messages.Settings.profile.currentSession : undefined} />
+        {device.currentSession && device.canTest === true ? <Row label={copy.testDevice} detail={feedback}
+          disabled={current?.state === 'sending'} onPress={() => void testDevice(device.id)} /> : null}
+      </View>
     })}
   </Group>
 }

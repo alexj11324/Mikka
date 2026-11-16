@@ -5553,6 +5553,8 @@
     "removeNote": "移除备注 {n}"
   },
   "MobilePush": {
+    "genericNotification": "新消息",
+    "testNotification": "测试通知",
     "verificationCode": "收到一条验证码"
   },
   "MobileHandoff": {
@@ -7763,6 +7765,11 @@
       "on": "开",
       "off": "关",
       "registeredDevices": "已注册的推送设备",
+      "testDevice": "发送测试通知",
+      "testSending": "正在发送…",
+      "testAccepted": "通知服务已接收",
+      "testFailed": "未能确认测试通知",
+      "testLimited": "请在一分钟后重试",
       "noRegisteredDevices": "暂无已注册的设备",
       "pushTypes": "推送这些事",
       "unavailable": "推送无法送达",

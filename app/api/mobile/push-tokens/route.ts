@@ -1,46 +1,14 @@
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
-import { db, pool, withDatabaseClient } from '@/lib/db'
+import { db, pool } from '@/lib/db'
 import { mobilePushTokens } from '@/lib/db/schema'
-import { getApiSession } from '@/lib/api-auth'
-import { enterprisePrincipal } from '@/lib/enterprise/principal'
+import { pushSession, withPushSession } from '@/lib/mobile-push-session'
 import { forbiddenOrigin, json, unauthorized, writeAllowed } from '@/lib/mobile-api'
 
 export const dynamic = 'force-dynamic'
 
 const EXPO_TOKEN = z.string().regex(/^(?:Exponent|Expo)PushToken\[[A-Za-z0-9_-]{10,200}\]$/)
-type PushSession = { userId: string; sessionId: string }
-
-async function pushSession(request: Request): Promise<PushSession | null> {
-  const session = await getApiSession({ headers: request.headers, query: { disableCookieCache: true } })
-  const principal = session?.user[enterprisePrincipal]
-  if (!session || principal?.kind !== 'session' || principal.sessionId !== session.session.id) return null
-  return { userId: session.user.id, sessionId: principal.sessionId }
-}
-
-/** Authentication and mutation share a fresh session row lock. A logout or
- * reassignment cannot commit between the check and the token write. */
-async function withPushSession(session: PushSession, action: () => Promise<Response>): Promise<Response> {
-  const client = await pool.connect()
-  try {
-    await client.query('BEGIN')
-    try {
-      const response = await withDatabaseClient(client, async () => {
-        const active = await client.query(
-          'SELECT id FROM "session" WHERE id=$1 AND "userId"=$2 AND "expiresAt">clock_timestamp() FOR SHARE',
-          [session.sessionId, session.userId])
-        return active.rowCount ? action() : unauthorized()
-      })
-      await client.query('COMMIT')
-      return response
-    } catch (error) {
-      await client.query('ROLLBACK')
-      throw error
-    }
-  } finally { client.release() }
-}
-
 /** List only this person's bindings that are still eligible for native delivery. */
 async function handleGET(request: Request) {
   const session = await pushSession(request)
@@ -49,7 +17,7 @@ async function handleGET(request: Request) {
   return withPushSession(session, async () => {
     const { rows } = await pool.query(
       `SELECT binding.id, binding.platform, binding."deviceName", binding."updatedAt",
-              binding."sessionId" = $2 AS "currentSession"
+              binding."sessionId" = $2 AS "currentSession", binding."sessionId" = $2 AS "canTest"
          FROM mobile_push_tokens AS binding
          JOIN "session" AS active ON active.id = binding."sessionId" AND active."userId" = binding."userId"
         WHERE binding."userId" = $1 AND active."expiresAt" > clock_timestamp()
