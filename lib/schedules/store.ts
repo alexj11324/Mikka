@@ -236,17 +236,24 @@ export class ScheduleStore {
       }
       if(row.status_before_delete && (cmd.action==='pin'||cmd.action==='organize')) throw new ScheduleError('scheduleCancelled')
       if(cmd.action==='pin'){
-        if(cmd.pinned)await tx.query('INSERT INTO schedule_pins(user_id,schedule_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[actor.ownerId,row.id])
-        else await tx.query('DELETE FROM schedule_pins WHERE user_id=$1 AND schedule_id=$2',[actor.ownerId,row.id])
-        await this.listChanged(tx,row.workspace_id)
+        const result = cmd.pinned
+          ? await tx.query('INSERT INTO schedule_pins(user_id,schedule_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[actor.ownerId,row.id])
+          : await tx.query('DELETE FROM schedule_pins WHERE user_id=$1 AND schedule_id=$2',[actor.ownerId,row.id])
+        if (result.rowCount) await this.listChanged(tx,row.workspace_id)
         return {pinned:cmd.pinned}
       }
       if(cmd.action==='organize'){
         if(row.visibility==='workspace'&&row.owner_id!==actor.ownerId&&access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
         const tags=[...new Set(cmd.tags.map(tag=>tag.normalize('NFC')))]
-        const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET folder=$2,tags=$3,updated_at=$4 WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,cmd.folder?.normalize('NFC')??null,tags,this.clock()])).rows[0]
-        await this.listChanged(tx,row.workspace_id)
-        return {schedule:updated}
+        const folder = cmd.folder?.normalize('NFC') ?? null
+        const updated = (await tx.query<Schedule>(`UPDATE user_schedules SET folder=$2,tags=$3,updated_at=$4
+          WHERE id=$1 AND (folder IS DISTINCT FROM $2 OR tags IS DISTINCT FROM $3) RETURNING ${SCHEDULE_COLUMNS}`,
+          [row.id,folder,tags,this.clock()])).rows[0]
+        if (updated) {
+          await this.listChanged(tx,row.workspace_id)
+          return {schedule:updated}
+        }
+        return {schedule:(await tx.query<Schedule>(`SELECT ${SCHEDULE_COLUMNS} FROM user_schedules WHERE id=$1`,[row.id])).rows[0]}
       }
       if(cmd.action==='usage'){
         // Days in the automation's own time zone. Cost is what the tasks it made spent through hosted models, billed

@@ -577,6 +577,30 @@ test('dispatch_task automations run as their creator through the existing create
     assert.deepEqual([(await seen(owner, chat)).folder, (await seen(owner, chat)).tags], [null, []])
   })
 
+  await t.test('repeating a personal pin or shared folder and tags leaves the schedule list quiet', async t => {
+    const { schedule } = await create()
+    const changed = t.mock.method(runtime.automationSeams, 'changed', async () => {})
+    const pin = (pinned: boolean) => page(member, memberChat, { action: 'pin', scheduleId: schedule.id, pinned })
+    await pin(true)
+    await Promise.all([pin(true), pin(true)])
+    assert.equal(changed.mock.callCount(), 1)
+    await pin(false)
+    await Promise.all([pin(false), pin(false)])
+    assert.equal(changed.mock.callCount(), 2)
+
+    const organize = (folder: string, tags: string[]) => page<{ schedule: Row }>(owner, chat, { action: 'organize', scheduleId: schedule.id, folder, tags })
+    type Row = Schedule & { folder: string; tags: string[] }
+    const first = await organize('Releases', ['Café', 'QA'])
+    const tuple = async () => (await fixture.query('SELECT xmin::text AS version, updated_at FROM user_schedules WHERE id=$1', [schedule.id])).rows[0]
+    const before = await tuple()
+    const matches = await Promise.all([organize('Releases', ['Cafe\u0301', 'QA', 'QA']), organize('Releases', ['Café', 'QA'])])
+    assert.deepEqual(matches, [first, first])
+    assert.deepEqual(await tuple(), before)
+    assert.equal(changed.mock.callCount(), 3)
+    assert.deepEqual((await organize('Releases', ['QA', 'Café'])).schedule.tags, ['QA', 'Café'])
+    assert.equal(changed.mock.callCount(), 4)
+  })
+
   await t.test('追加到同一个任务: later runs add to the first run’s task; a deleted task pauses the automation', async () => {
     const standing = (await create({ ...definition(builder), maxConcurrent: 3, eachRun: 'same_task' })).schedule
     const first = await runNow(standing)
