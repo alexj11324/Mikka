@@ -1229,8 +1229,8 @@
   "lib/project-resources/store.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Project resource transactions use the installation PostgreSQL database and workspace locks. The installation PostgreSQL database stores versioned recipes. A restore checks the shared binding snapshot, clears approval and preserves current settings.",
-    "test": "tests/project-dependency-repositories.db.test.ts",
+    "behavior": "Project resource transactions use the installation PostgreSQL database and workspace locks. The installation PostgreSQL database stores versioned recipes. A restore checks the shared binding snapshot, clears approval and preserves current settings. Project-specific bindings require content access for reads and steering plus an active Workspace admin for writes.",
+    "test": "tests/environment-settings.db.test.ts",
     "suite": "test:project-resources-db"
   },
   "lib/thread-artifacts.ts": {
