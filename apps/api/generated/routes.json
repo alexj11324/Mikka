@@ -1318,6 +1318,15 @@
       "sourceHash": "7eaa7d4da7df0917328fb6ee3f352eb121ea21f357885d83db46fccec2d9c623"
     },
     {
+      "path": "/mikka/api/integrations/github/repositories/branches",
+      "template": "/api/integrations/github/repositories/branches",
+      "source": "app/api/integrations/github/repositories/branches/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "8b33a238386db8af61da018f821b650c340e40244ea341180744b9b6b8d57643"
+    },
+    {
       "path": "/mikka/api/integrations/github/repositories/verification",
       "template": "/api/integrations/github/repositories/verification",
       "source": "app/api/integrations/github/repositories/verification/route.ts",
@@ -1325,7 +1334,7 @@
         "GET",
         "PATCH"
       ],
-      "sourceHash": "bf17c03c602bb0f5e4a8084e4f2b39def81f3d2212de22d8b5c79b577b380205"
+      "sourceHash": "0eab86e939f6215b0c361e16b9769129208338ba55a7a4b71a2175ca26a77875"
     },
     {
       "path": "/mikka/api/integrations/google/callback",
