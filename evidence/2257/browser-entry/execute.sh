@@ -43,10 +43,9 @@ step() {
 # Build-time installation links additional generated artifacts in another public
 # source tree and returns only the immutable compiled app for this source.
 cd "$GITHUB_WORKSPACE/product"
+step build_eve node scripts/build-eve.mjs
 step build_frontend node apps/frontend/scripts/build.mjs --server-pages
 step build_api node apps/api/scripts/build.mjs
-mkdir -p apps/eve
-cp -a "$base/product/apps/eve/.output" apps/eve/.output
 step package_eve node scripts/package-eve.mjs
 cp -a .output "$base/product/.output"
 cd "$base/product"

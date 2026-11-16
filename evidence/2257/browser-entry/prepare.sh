@@ -9,14 +9,6 @@ git init -q "$base/product"
 git -C "$base/product" fetch -q --depth 1 "file://$project" "$PUBLIC_SOURCE"
 git -C "$base/product" checkout -q --detach FETCH_HEAD
 test "$(git -C "$base/product" rev-parse HEAD)" = "$PUBLIC_SOURCE"
-image="ghcr.io/alexj11324/mikka:$PUBLIC_SOURCE"
-docker pull "$image" > "$base/image.log"
-test "$(docker inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")" = "$PUBLIC_SOURCE"
-container=$(docker create "$image")
-trap 'docker rm -v "$container" >/dev/null' EXIT
-docker cp "$container:/app/eve" "$base/product/apps/eve/.output"
-test "$(jq -r .revision "$base/product/apps/eve/.output/mikka-eve-build.json")" = "$PUBLIC_SOURCE"
-docker image inspect -f '{{.Id}}' "$image" > "$base/image.id"
 (cd "$project" && ELECTRON_SKIP_BINARY_DOWNLOAD=1 pnpm install --frozen-lockfile >"$base/build-install.log" 2>&1)
 harness="$1/original/evidence/2257/local-provider"
 cp "$harness"/{package.json,package-lock.json,provider.mjs} "$base/harness/"
