@@ -34,7 +34,7 @@ export function WebhookTrigger({ value, onChange, automation, onSaved, disabled 
     if (!automation || busy) return
     setBusy(true)
     try {
-      const result = await automationWebhookKey({ scheduleId: automation.id, version: automation.version })
+      const result = await automationWebhookKey({ scheduleId: automation.id, version: automation.version }, automation.workspace_id ?? undefined)
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
       const { schedule, key } = result as { schedule: AutomationView; key: string }
       setUrl(publicServiceLink(`/api/webhooks/automations/${key}`))

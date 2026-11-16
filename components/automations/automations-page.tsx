@@ -88,14 +88,14 @@ export function AutomationsPage({ workspaceId, userId, href, onOpen, onAskBot }:
     if (restoring) return
     setRestoring(row.id)
     try {
-      const result = await restoreAutomation({ scheduleId: row.id, version: row.version })
+      const result = await restoreAutomation({ scheduleId: row.id, version: row.version }, workspaceId ?? undefined)
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
       await mutate()
     } catch { toast.error(actionError('generic')) }
     finally { setRestoring(null) }
   }
   async function pin(row: AutomationView) {
-    const result = await pinAutomation({ scheduleId: row.id, pinned: !row.pinned })
+    const result = await pinAutomation({ scheduleId: row.id, pinned: !row.pinned }, workspaceId ?? undefined)
     if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
     await mutate()
   }
@@ -185,7 +185,7 @@ function OrganizeDialog({ automation, folders, onClose, onSaved }: { automation:
     setBusy(true)
     try {
       const list = [...new Set(tags.split(/[,，]/).map(item => item.trim()).filter(Boolean))].slice(0, 10)
-      const result = await organizeAutomation({ scheduleId: automation.id, folder: folder.trim() || null, tags: list })
+      const result = await organizeAutomation({ scheduleId: automation.id, folder: folder.trim() || null, tags: list }, automation.workspace_id ?? undefined)
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
       toast.success(t('saved'))
       onSaved()
