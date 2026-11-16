@@ -6,7 +6,6 @@ import { db } from '@/lib/db'
 import { projectDb, projects, projectTasks, projectMembers } from '@/lib/db/projects'
 import { workspaces, workspaceMembers } from '@/lib/db/workspace-schema'
 import { activeTaskWorkspaces, taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
-import { withResourceAccess } from '@/lib/resource-access/store'
 import type { ResourceReference } from '@/lib/resource-access/contract'
 
 export type ProjectTransaction = Parameters<Parameters<typeof projectDb.transaction>[0]>[0]
@@ -89,6 +88,7 @@ export async function withReadableProject<T>(reader: ProjectReader, workspaceId:
   return withTaskWorkspace(reader, workspaceId, async (_workspace, tx) => {
     const project = await lockProjectRow(tx, reader, projectId, workspaceId, 'share')
     if (project.archivedAt) throw new ActionFailureError('projectNotFound')
+    const { withResourceAccess } = await import('@/lib/resource-access/store')
     return withResourceAccess(reader, { kind: 'project', id: projectId, workspaceId }, 'canReadContent', read)
   })
 }
