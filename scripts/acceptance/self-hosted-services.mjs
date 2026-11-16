@@ -408,7 +408,7 @@ export async function runAcceptance(env = process.env) {
       ownerId: session.user.id, workspaceId: workspace.workspace.id,
       cookie: [...cookies].map(([name, value]) => `${name}=${value}`).join('; ') }), { flag: 'wx', mode: 0o600 })
     if (process.env.MIKKA_DESKTOP_ACCEPTANCE === '1') {
-      let member
+      let member, versionHistory
       if (env.MIKKA_DESKTOP_MEMBER_FIXTURE === '1') {
         // This fixture goes to the one-run mode-0600 handoff. The packaged client
         // must authenticate this second account independently through native IPC.
@@ -422,10 +422,24 @@ export async function runAcceptance(env = process.env) {
         const memberVerified = await request(memberLink.pathname + memberLink.search, { expected: [302], useCookies: false })
         check(memberVerified.headers.get('location') === `${origin}/mikka/sign-in`, 'DESKTOP_MEMBER_VERIFIED')
         member = { ...account, id: registered.user.id }
+        const { prepareDesktopVersionHistory } = await import('./self-hosted-version-history.mjs')
+        const db = new Pool({ connectionString: env.MIKKA_DATABASE_URL, max: 1 })
+        try {
+          versionHistory = await prepareDesktopVersionHistory(db, session.user.id, workspace.workspace.id, async operation => {
+            const result = await (await request('/mikka/api/rpc', { method: 'POST',
+              headers: { 'x-mikka-rpc': '1', 'sec-fetch-site': 'same-origin' },
+              body: { version: 1, action: 'issues.createTaskOnly', args: [{ version: 1, intent: 'create_only',
+                requestId: randomUUID(), workspaceId: workspace.workspace.id, title: 'Desktop ' + operation + ' history',
+                content: { type: 'doc', content: [] }, status: 'todo', priority: 'normal' }] },
+            })).json()
+            check(result.ok && typeof result.result?.taskId === 'string', 'DESKTOP_HISTORY_TASK')
+            return result.result.taskId
+          })
+        } finally { await db.end() }
       }
       await writeFile('/data/self-hosted-desktop-session.private.json', JSON.stringify({ revision: version.build, origin,
         ownerId: session.user.id, workspaceId: workspace.workspace.id, botId: bot.id, email, password: replacement,
-        ...(member && { member }) }),
+        ...(member && { member, versionHistory }) }),
       { flag: 'wx', mode: 0o600 })
     }
     report.status = 'passed'; report.stage = 'complete'
