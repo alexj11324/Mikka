@@ -56,7 +56,12 @@ export class PersonalPluginStore {
         const value = input.headers ? JSON.stringify(input.headers) : input.auth?.value
         sealed = value === undefined ? null : sealSecret(value, aad(userId,row.id,row.url,header!),this.env)
       }
-      const { rows } = await client.query<McpRow>(`UPDATE personal_mcp_servers SET name=$3,enabled=$4,auth_header=$5,ciphertext=$6,iv=$7,key_version=$8,revision=revision+1 WHERE id=$1 AND user_id=$2 RETURNING ${mcpColumns}`, [row.id, userId, input.name ?? row.name, input.enabled ?? row.enabled, header, sealed?.ciphertext ?? null, sealed?.iv ?? null, sealed?.keyVersion ?? null])
+      const name = input.name ?? row.name
+      const enabled = input.enabled ?? row.enabled
+      // Keep already-admitted credential-free references valid when disconnect is retried.
+      if ((input.auth === null || input.headers === null) && row.auth_header === null
+        && name === row.name && enabled === row.enabled) return mcpView(row)
+      const { rows } = await client.query<McpRow>(`UPDATE personal_mcp_servers SET name=$3,enabled=$4,auth_header=$5,ciphertext=$6,iv=$7,key_version=$8,revision=revision+1 WHERE id=$1 AND user_id=$2 RETURNING ${mcpColumns}`, [row.id, userId, name, enabled, header, sealed?.ciphertext ?? null, sealed?.iv ?? null, sealed?.keyVersion ?? null])
       return mcpView(rows[0])
     })
   }
