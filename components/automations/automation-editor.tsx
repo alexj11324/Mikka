@@ -122,7 +122,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
     try {
       const result = creating
         ? await createAutomation({ requestId: requestId.current, definition: check.definition }, workspaceId)
-        : await updateAutomation({ scheduleId: current!.id, version: current!.version, definition: check.definition })
+        : await updateAutomation({ scheduleId: current!.id, version: current!.version, definition: check.definition }, workspaceId ?? undefined)
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
       const saved = (result as { schedule: AutomationView }).schedule
       toast.success(t('saved'))
@@ -134,7 +134,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
     if (!current || busy) return
     setBusy('toggle')
     try {
-      const result = await (on ? resumeAutomation : pauseAutomation)({ scheduleId: current.id, version: current.version })
+      const result = await (on ? resumeAutomation : pauseAutomation)({ scheduleId: current.id, version: current.version }, workspaceId ?? undefined)
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
       loaded.current = null
       await automation.mutate((result as { schedule: AutomationView }).schedule, { revalidate: false })
@@ -144,7 +144,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
     if (!current || busy) return
     setBusy('run')
     try {
-      const result = await runAutomationNow({ scheduleId: current.id, version: current.version, requestId: crypto.randomUUID() })
+      const result = await runAutomationNow({ scheduleId: current.id, version: current.version, requestId: crypto.randomUUID() }, workspaceId ?? undefined)
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
       toast.success(t('started'))
       await history.mutate()
@@ -154,7 +154,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
     if (!current || cancellingRun) return
     setCancellingRun(runId)
     try {
-      const result = await cancelAutomationRun({ scheduleId: current.id, version: current.version, runId })
+      const result = await cancelAutomationRun({ scheduleId: current.id, version: current.version, runId }, workspaceId ?? undefined)
       if ('error' in result && result.error) toast.error(actionError(result.error))
       await history.mutate()
     } catch { toast.error(actionError('generic')) }
@@ -164,7 +164,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
     if (!current || busy) return
     setBusy('takeOver')
     try {
-      const result = await takeOverAutomation({ scheduleId: current.id, version: current.version })
+      const result = await takeOverAutomation({ scheduleId: current.id, version: current.version }, workspaceId ?? undefined)
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
       setConfirmTakeOver(false)
       toast.success(t('tookOver'))
@@ -176,7 +176,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
     if (!current || busy) return
     setBusy('delete')
     try {
-      const result = await deleteAutomation({ scheduleId: current.id, version: current.version })
+      const result = await deleteAutomation({ scheduleId: current.id, version: current.version }, workspaceId ?? undefined)
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
       setConfirmDelete(false)
       onBack()

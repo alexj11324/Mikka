@@ -38,7 +38,7 @@ export function useAutomation(workspaceId: string | null, id: string | null) {
   const historyKey = workspaceId && id ? automationHistoryKey(workspaceId, id) : null
   const automation = useSWR<AutomationView | null>(key, () => getAutomation(id!, workspaceId!).then(unwrap<{ automation: AutomationView | null }>).then(value => value.automation),
     { revalidateOnFocus: false, shouldRetryOnError: false })
-  const history = useSWR<AutomationHistory>(historyKey, () => automationHistory(id!).then(unwrap<AutomationHistory>),
+  const history = useSWR<AutomationHistory>(historyKey, () => automationHistory(id!, workspaceId!).then(unwrap<AutomationHistory>),
     { revalidateOnFocus: false, shouldRetryOnError: false })
   useLiveKey('schedule_list', workspaceId, key && historyKey ? [serialize(key), serialize(historyKey)] : [], workspaceId)
   return { automation, history }
@@ -47,8 +47,8 @@ export function useAutomation(workspaceId: string | null, id: string | null) {
 export function useWebhookBatches(workspaceId: string, scheduleId: string) {
   const getKey = (index: number, previous: WebhookBatchPage | null) =>
     index > 0 && !previous?.nextCursor ? null : ['automation-batches', workspaceId, scheduleId, previous?.nextCursor ?? null] as const
-  const pages = useSWRInfinite<WebhookBatchPage>(getKey, ([, , id, cursor]: readonly [string, string, string, string | null]) =>
-    automationBatches({ scheduleId: id, ...(cursor ? { cursor } : {}) }).then(unwrap<WebhookBatchPage>),
+  const pages = useSWRInfinite<WebhookBatchPage>(getKey, ([, selectedWorkspace, id, cursor]: readonly [string, string, string, string | null]) =>
+    automationBatches({ scheduleId: id, ...(cursor ? { cursor } : {}) }, selectedWorkspace).then(unwrap<WebhookBatchPage>),
     { revalidateOnFocus: false, shouldRetryOnError: false, revalidateFirstPage: false })
   useLiveKey('schedule_list', workspaceId, [unstable_serialize(getKey)], workspaceId)
   return pages
@@ -57,7 +57,7 @@ export function useWebhookBatches(workspaceId: string, scheduleId: string) {
 /** 用量 per day, read on open and again when the live channel says a schedule changed. */
 export function useAutomationUsage(workspaceId: string | null, id: string | null) {
   const key = workspaceId && id ? ['automation-usage', workspaceId, id] as const : null
-  const usage = useSWR<AutomationUsage>(key, () => automationUsage({ scheduleId: id! }).then(unwrap<AutomationUsage>), { revalidateOnFocus: false, shouldRetryOnError: false })
+  const usage = useSWR<AutomationUsage>(key, () => automationUsage({ scheduleId: id! }, workspaceId!).then(unwrap<AutomationUsage>), { revalidateOnFocus: false, shouldRetryOnError: false })
   useLiveKey('schedule_list', workspaceId, key ? [serialize(key)] : [], workspaceId)
   return usage
 }

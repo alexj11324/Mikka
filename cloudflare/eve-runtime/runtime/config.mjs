@@ -18,6 +18,9 @@ export function hostConfiguration(env) {
   }
 }
 
+// Preserve the name previously supplied by @cloudflare/containers 0.3.7 when no release was configured.
+export const singletonContainerName = 'cf-singleton-container'
+
 /** Keep the existing namespaced native protocol; do not capture business API routes. */
 export function nativeRequest(request) {
   const url = new URL(request.url)
