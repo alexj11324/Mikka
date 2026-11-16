@@ -320,6 +320,15 @@ Decision [2026-11-15-2040](../design/decisions/2026-11-15-2040-automation-slack-
   link to `<app>/?issue=<id>`, a failure as its `Errors.*` copy) and `chat.postMessage`s with the installation's bot
   token. A failed post is logged and not retried; the run is unchanged.
 
+## Cancel one queued run (#2060)
+
+A creator or workspace owner/admin can cancel an individual queued run from its history row. The signed-in
+`cancelAutomationRun` action names the schedule, its current version, and the occurrence. It locks the same
+occurrence as the worker claim. Once claimed, an occurrence may already have dispatched a task, even if its
+status subsequently returns to pending for a retry. Cancellation therefore accepts only pending runs with
+zero attempts. Webhook collection windows use their batch action. The original chat receives one cancellation record. The schedule and other occurrences keep
+their current state.
+
 ## Templates, pins, folders and tags (2026-11-15)
 
 Decision [2026-11-15-2100](../design/decisions/2026-11-15-2100-automation-templates-organize.md).

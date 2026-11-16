@@ -47,6 +47,9 @@ export type AutomationSeams = {
 }
 export type Schedule = { id: string; owner_id: string; workspace_id: string | null; bot_id: string | null; visibility: 'owner' | 'workspace'; source_event_id: string; definition: Definition; request_definition: Definition; status: string; version: number; next_at: Date | null; disabled_reason?: string | null }
 export type Occurrence = { id: string; schedule_id: string; operation_id: string; event_id: string | null; definition: Definition; version: number; due_at: Date; status: string; attempts: number; lease_token: string | null; lease_until: Date; error: string | null; execution_decision: 'execute' | 'skip'; trigger: OccurrenceTrigger | null; report_next_at: Date; report_attempts: number; started_at: Date | null; created_at: Date }
+// A pending retry may already have dispatched. Collection windows have a separate batch lifecycle.
+const cancellableRun = `status='pending' AND attempts=0 AND lease_token IS NULL AND event_id IS NULL
+  AND NOT (COALESCE(trigger ? 'webhook', false) AND COALESCE((definition#>>'{webhook,batchMinutes}')::int,0)>0)`
 export const SCHEDULE_LEASE_MS = 5 * 60_000
 const MAX_ATTEMPTS = 3
 // The frozen request key is internal; keep the existing tool-response fields.
@@ -172,13 +175,30 @@ export class ScheduleStore {
       if(row.visibility==='workspace'&&!actor.workspaceId) throw new ScheduleError('scheduleNotFound',404)
       if((cmd.action==='update'||cmd.action==='resume'||cmd.action==='run_now')&&row.visibility==='workspace'&&row.owner_id!==actor.ownerId&&access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
       if(cmd.action==='history'){
-        const seen=await tx.query('SELECT id,schedule_id,operation_id,event_id,version,due_at,status,attempts,result,error,trigger,started_at,finished_at,reported_at FROM schedule_occurrences WHERE schedule_id=$1 ORDER BY due_at DESC LIMIT 100',[row.id])
+        const seen=await tx.query(`SELECT id,schedule_id,operation_id,event_id,version,due_at,status,attempts,result,error,trigger,started_at,finished_at,reported_at,
+          (${cancellableRun} AND version=$2) AS can_cancel
+          FROM schedule_occurrences WHERE schedule_id=$1 ORDER BY due_at DESC LIMIT 100`,[row.id,row.version])
         // Seeing that a workspace schedule ran is collaboration; reading what it returned is not. Only the
         // creator, and an owner/admin, get result, error and the operation identity; any other active member
         // sees the run's status and timestamps with those fields blank. A member of a workspace that has no
         // roles runs as 'member'. Visibility is unchanged: an owner-only row is already 404 above.
         const privileged=row.owner_id===actor.ownerId||access.role!=='member'
-        return {occurrences:privileged?seen.rows:seen.rows.map(o=>({...o,operation_id:null,event_id:null,result:null,error:null,trigger:null}))}
+        return {occurrences:privileged?seen.rows:seen.rows.map(o=>({...o,operation_id:null,event_id:null,result:null,error:null,trigger:null,can_cancel:false}))}
+      }
+      if(cmd.action==='cancel_run'){
+        if(row.owner_id!==actor.ownerId && access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
+        await this.source(tx,actor,row.workspace_id)
+        if(row.version!==cmd.version) throw new ScheduleError('scheduleVersionConflict')
+        const run=(await tx.query<Occurrence & {can_cancel:boolean}>(`SELECT *,${cancellableRun} AS can_cancel
+          FROM schedule_occurrences WHERE id=$1 AND schedule_id=$2 FOR UPDATE`,[cmd.runId,row.id])).rows[0]
+        if(!run) throw new ScheduleError('scheduleRunNotFound',404)
+        if(run.version!==row.version) throw new ScheduleError('scheduleVersionConflict')
+        if(run.status==='cancelled' && run.error==='scheduleRunCancelled') return {runId:run.id,status:'cancelled' as const}
+        if(!run.can_cancel) throw new ScheduleError('scheduleRunNotQueued')
+        await tx.query(`UPDATE schedule_occurrences SET status='cancelled',error='scheduleRunCancelled',finished_at=$2 WHERE id=$1`,[run.id,this.clock()])
+        await this.lockChat(tx,row)
+        await this.report(tx,row,run,'cancelled',null,'scheduleRunCancelled')
+        return {runId:run.id,status:'cancelled' as const}
       }
       if(cmd.action==='pin'){
         if(cmd.pinned)await tx.query('INSERT INTO schedule_pins(user_id,schedule_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[actor.ownerId,row.id])

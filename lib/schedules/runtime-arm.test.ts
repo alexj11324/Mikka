@@ -31,3 +31,8 @@ test('a failed scheduled read is retried 30 s later, earlier than the lease the 
   assert.equal(failed, 1)
   assert.equal(armed, 1)
 })
+
+test('cancelling one queued run adds no due work', async () => {
+  await runtime.executeScheduleCommand('owner', null, 'event', { action: 'cancel_run' } as never)
+  assert.equal(armed, 0)
+})

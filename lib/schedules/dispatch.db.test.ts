@@ -77,6 +77,52 @@ test('dispatch_task automations run as their creator through the existing create
       VALUES($1,$2,$3,$4::uuid,'workspace',NULL,'x','bot:'||$4::uuid::text,$5,$5,'paused')`, [randomUUID(), owner, workspace.id, chat, definition()]), { code: '23514' })
   })
 
+  await t.test('cancel one never-claimed run once without cancelling another run, dispatching a task, or changing the schedule', async () => {
+    const {schedule} = await create({...definition(),maxConcurrent:2})
+    const one = (await runNow(schedule)).occurrence
+    const two = (await runNow(schedule)).occurrence
+    const cancel = (runId:string, who=owner, bot=chat) => page<{runId:string;status:string}>(who,bot,{
+      action:'cancel_run',scheduleId:schedule.id,version:schedule.version,runId,
+    })
+    const history = (who:string,bot:string) => page<{occurrences:{id:string;can_cancel:boolean}[]}>(who,bot,{action:'history',scheduleId:schedule.id})
+    assert.equal((await history(owner,chat)).occurrences.find(r=>r.id===one.id)?.can_cancel,true)
+    assert.equal((await history(member,memberChat)).occurrences.find(r=>r.id===one.id)?.can_cancel,false)
+    await assert.rejects(cancel(one.id,member,memberChat),/scheduleAdminRequired/)
+    await assert.rejects(cancel(randomUUID()),/scheduleRunNotFound/)
+    const foreign = await create()
+    await assert.rejects(page(owner,chat,{action:'cancel_run',scheduleId:foreign.schedule.id,version:foreign.schedule.version,runId:one.id}),/scheduleRunNotFound/)
+    const [first,duplicate]=await Promise.all([cancel(one.id),cancel(one.id)])
+    assert.deepEqual(first,{runId:one.id,status:'cancelled'}); assert.deepEqual(duplicate,first)
+    assert.equal((await history(owner,chat)).occurrences.find(r=>r.id===one.id)?.can_cancel,false)
+    assert.equal((await occurrence(two.id)).status,'pending')
+    await tick()
+    assert.equal((await occurrence(two.id)).status,'succeeded')
+    await assert.rejects(cancel(two.id),/scheduleRunNotQueued/)
+    assert.equal((await fixture.query('SELECT 1 FROM task_creation_receipts WHERE "userId"=$1 AND "requestId"=$2',[owner,one.id])).rowCount,0)
+    assert.equal((await fixture.query('SELECT 1 FROM coordinator_events WHERE "dedupeKey"=$1',[`schedule_result:${one.id}`])).rowCount,1)
+    assert.deepEqual((await fixture.query('SELECT status,version FROM user_schedules WHERE id=$1',[schedule.id])).rows[0],{status:'active',version:schedule.version})
+  })
+  await t.test('a worker claim fences run cancellation, including pending retries with uncertain external dispatch', async () => {
+    const {schedule}=await create()
+    const run=(await runNow(schedule)).occurrence
+    const cancel=()=>page(owner,chat,{action:'cancel_run',scheduleId:schedule.id,version:schedule.version,runId:run.id})
+    // A collection window has its own payload lifecycle; history and the writer agree it is not an ordinary run.
+    await fixture.query(`UPDATE schedule_occurrences SET definition=jsonb_set(definition,'{webhook}','{"batchMinutes":5}'),
+      trigger='{"webhook":{"requests":[]}}' WHERE id=$1`,[run.id])
+    assert.equal((await page<{occurrences:{id:string;can_cancel:boolean}[]}>(owner,chat,{action:'history',scheduleId:schedule.id})).occurrences[0].can_cancel,false)
+    await assert.rejects(cancel(),/scheduleRunNotQueued/)
+    await fixture.query(`UPDATE schedule_occurrences SET definition=definition-'webhook',trigger=NULL WHERE id=$1`,[run.id])
+    const claim=await runtime.schedules().claim()
+    assert.equal(claim?.id,run.id)
+    await assert.rejects(cancel(),/scheduleRunNotQueued/)
+    await runtime.schedules().fail(claim!,new Error('transient dispatch response unavailable'))
+    assert.equal((await occurrence(run.id)).status,'pending')
+    await assert.rejects(cancel(),/scheduleRunNotQueued/)
+    await fixture.query(`UPDATE schedule_occurrences SET next_retry_at=now() WHERE id=$1`,[run.id])
+    await tick()
+    assert.equal((await occurrence(run.id)).status,'succeeded')
+    assert.equal((await fixture.query('SELECT 1 FROM task_creation_receipts WHERE "userId"=$1 AND "requestId"=$2',[owner,run.id])).rowCount,1)
+  })
   await t.test('立即运行 creates the task and hands it to the Bot once, keyed by the run', async () => {
     const { schedule } = await create()
     const requestId = randomUUID()

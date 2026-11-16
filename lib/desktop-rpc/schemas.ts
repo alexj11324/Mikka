@@ -195,6 +195,7 @@ export const desktopActionSchemas = {
   'automations.organizeAutomation': tuple(object({ scheduleId: uuid, folder: z.string().trim().min(1).max(60).nullable(), tags: z.array(z.string().trim().min(1).max(30)).max(10) })),
   'automations.resumeAutomation': tuple(object({ scheduleId: uuid, version: positive })),
   'automations.cancelAutomation': tuple(object({ scheduleId: uuid, version: positive })),
+  'automations.cancelAutomationRun': tuple(object({ scheduleId: uuid, version: positive, runId: uuid })),
   'automations.runAutomationNow': tuple(object({ scheduleId: uuid, version: positive, requestId: uuid })),
   'bots.listBotsForWorkspace': oneId,
   'collaboration.exchangeDocument': tuple(object({ id: uuid, vector: text(1_400_000).regex(/^[A-Za-z0-9+/]*={0,2}$/).optional(), update: text(1_400_000).regex(/^[A-Za-z0-9+/]*={0,2}$/).optional(), seed: text(1_400_000).regex(/^[A-Za-z0-9+/]*={0,2}$/).optional(), known: version.optional() })),

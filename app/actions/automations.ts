@@ -161,6 +161,11 @@ export async function cancelAutomation(input: { scheduleId: string; version: num
   return parsed.success ? command({ action: 'cancel', ...parsed.data }) : { error: 'validationGeneric' }
 }
 
+export async function cancelAutomationRun(input: { scheduleId: string; version: number; runId: string }): Promise<ActionResult<{ runId: string; status: 'cancelled' }>> {
+  const parsed = versioned.extend({ runId: z.uuid() }).safeParse(input)
+  return parsed.success ? command({ action: 'cancel_run', ...parsed.data }) : { error: 'validationGeneric' }
+}
+
 /** 立即运行: one run now. The same `requestId` never starts a second one. */
 export async function runAutomationNow(input: { scheduleId: string; version: number; requestId: string }): Promise<ActionResult<{ schedule: AutomationView; replayed: boolean }>> {
   const parsed = versioned.extend({ requestId: z.uuid() }).safeParse(input)

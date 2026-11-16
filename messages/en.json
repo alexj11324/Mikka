@@ -1232,6 +1232,9 @@
     "scheduleLinearUnreachable": "Linear could not be reached. It will try again shortly.",
     "scheduleSlackUnavailable": "Mikka's Slack app cannot see a channel this Slack trigger uses, or you are not in this workspace's Slack.",
     "scheduleSlackUnreachable": "Slack could not be reached. It will try again shortly.",
+    "scheduleRunNotFound": "Run not found.",
+    "scheduleRunNotQueued": "Only a run that has not started can be cancelled.",
+    "scheduleRunCancelled": "Cancelled before the run started.",
     "scheduleRunConflict": "The run didn't start. Please try again.",
     "scheduleTimeMustBeFuture": "The start time must be in the future.",
     "invalidIanaTimezone": "The time zone is invalid.",
@@ -7881,6 +7884,7 @@
     "failedUnknown": "Something went wrong; see the run history in Mikka"
   },
   "Automations": {
+    "cancelRun": "Cancel run",
     "fromTemplate": "Start from a template",
     "pin": "Pin",
     "unpin": "Unpin",

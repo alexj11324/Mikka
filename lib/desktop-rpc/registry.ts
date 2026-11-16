@@ -125,6 +125,7 @@ const functions = {
   'automations.organizeAutomation': automations.organizeAutomation,
   'automations.resumeAutomation': automations.resumeAutomation,
   'automations.cancelAutomation': automations.cancelAutomation,
+  'automations.cancelAutomationRun': automations.cancelAutomationRun,
   'automations.runAutomationNow': automations.runAutomationNow,
   'bots.listBotsForWorkspace': actions6.listBotsForWorkspace,
   'collaboration.exchangeDocument': actions7.exchangeDocument,
