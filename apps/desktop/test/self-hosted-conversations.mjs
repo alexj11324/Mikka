@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { expect } from '@playwright/test'
 import { acceptReceivedOrganizationInvitation } from './self-hosted-organization.mjs'
+import { enableOrganizationDomain, joinDiscoveredOrganization, removeOrganizationDomain } from './self-hosted-organization-domain.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
 
 const english = JSON.parse(await readFile(new URL('../../../messages/en.json', import.meta.url), 'utf8'))
@@ -180,11 +181,16 @@ export async function verifyConversationOrganization({ page, fixture, rpc, passe
   await page.reload()
   await expect(row.getByRole('img', { name: words.unread })).toBeVisible()
   passed('owner_manual_unread_persisted_in_directory_across_reload')
+  setPhase('organization_owner_configures_verified_domain')
+  const joinDomain = fixture.member.invitation ? await enableOrganizationDomain(page, fixture.email) : null
   setPhase('conversation_member_authorization')
   await signInAs(fixture.member, fixture.member.id)
   if (fixture.member.invitation) {
     setPhase('organization_verified_recipient_accepts_received_invitation')
     await acceptReceivedOrganizationInvitation(page, fixture.member.invitation, passed)
+    setPhase('organization_member_discovers_and_joins_matching_domain')
+    await joinDiscoveredOrganization(page, joinDomain)
+    passed('packaged_verified_member_discovers_and_joins_organization_by_domain')
     setPhase('conversation_member_authorization')
   }
   assert.ok((await rpc('workspace.acceptWorkspaceInvitation', [invitation])).ok)
@@ -197,6 +203,12 @@ export async function verifyConversationOrganization({ page, fixture, rpc, passe
   passed('independently_signed_in_same_workspace_member_cannot_discover_read_or_organize_owner_chat')
   setPhase('conversation_owner_readback')
   await signInAs(fixture, fixture.ownerId)
+  if (joinDomain) {
+    setPhase('organization_owner_removes_domain_and_retains_member')
+    await removeOrganizationDomain(page, joinDomain, fixture.member.id)
+    passed('packaged_owner_removes_join_domain_and_preserves_existing_member')
+    setPhase('conversation_owner_readback')
+  }
   await selectWorkspace(page, rpc, workspaceId, fixture.ownerId, 'admin')
   assert.deepEqual(await flags(), { archived: false, pinned: false })
   assert.equal((await directory(title))?.unread, true)
