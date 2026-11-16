@@ -5599,6 +5599,8 @@
     "denied": "Denied",
     "returnToTerminal": "Return to your terminal to start the daemon",
     "done": "Done",
+    "expires": "Expires",
+    "expired": "This code has expired. Start device login again in your terminal.",
     "invalid": "This code is invalid or expired",
     "rateLimited": "Too many lookups. Try again in 30 minutes",
     "failed": "Connection failed",

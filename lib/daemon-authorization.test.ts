@@ -127,7 +127,9 @@ test('the machine asking to connect is shown only to the person who claimed its 
   const seen = await (await f.review(user_code, owner)).json()
   // Control and bidi characters are dropped, so the name cannot be made to read as another one.
   assert.deepEqual({ name: seen.device_name, platform: seen.device_platform, version: seen.client_version }, { name: 'build-box', platform: 'linux', version: '0.9.1' })
+  assert.equal(seen.expires_at, f.memory.deviceCode.find(row => row.userCode === user_code)!.expiresAt.toISOString())
   const stranger = await (await f.review(user_code, other)).json()
+  assert.equal(stranger.expires_at, undefined)
   assert.equal(stranger.device_name, undefined)
   assert.equal(stranger.client_id, undefined)
   // An older daemon reports nothing; its code still works and the page says so.

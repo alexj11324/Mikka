@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { DAEMON_CLIENT_ID } from '@mikka/protocol/auth'
 
 /** What the machine asking to connect says about itself: shown on /device before 允许 (RFC 8628 §5.4). */
-export type DeviceClientInfo = { device_name: string | null; device_platform: string | null; client_version: string | null }
+export type DeviceClientInfo = { device_name: string | null; device_platform: string | null; client_version: string | null; expires_at: string | null }
 
 // Shown as plain text: no control characters, bounded. The machine reports these itself, so they identify, not prove;
 // the code the person checks against the terminal is what binds the approval to it.
@@ -29,6 +29,7 @@ const daemonDeviceGrant = {
     device_name: typeof record.deviceName === 'string' ? record.deviceName : null,
     device_platform: typeof record.devicePlatform === 'string' ? record.devicePlatform : null,
     client_version: typeof record.clientVersion === 'string' ? record.clientVersion : null,
+    expires_at: record.expiresAt instanceof Date ? record.expiresAt.toISOString() : null,
   }),
 } as const
 
