@@ -48,6 +48,13 @@
     "test": "lib/device-heartbeat.db.test.ts",
     "suite": "test:device-revocation-db"
   },
+  "app/api/drive/scopes/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List the current user's personal Files location and readable active project-personal locations within the selected workspace.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "app/api/drive/volumes/[volumeId]/archive/route.ts": {
     "mode": "built-in",
     "environment": [],
@@ -1104,6 +1111,13 @@
     "behavior": "Derive a task's activity events (status, priority, description, assignee, parent, relations and pull requests) from its local history.",
     "test": "lib/issue-activity.test.ts",
     "suite": "test:issues"
+  },
+  "lib/project-access.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Return active project names for a selected-workspace personal Files picker after the existing project content permission check.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
   },
   "lib/project-resources/contracts.ts": {
     "mode": "built-in",

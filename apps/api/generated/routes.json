@@ -883,6 +883,15 @@
       "sourceHash": "89c93bc677ba5938dbc399382cc4e2a50817f09da593a0e135b52d9e9a09923f"
     },
     {
+      "path": "/mikka/api/drive/scopes",
+      "template": "/api/drive/scopes",
+      "source": "app/api/drive/scopes/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "36302ad4969163e91ffff079b62aedd6b2aabf14f080083a4cf4dd72dbd2c531"
+    },
+    {
       "path": "/mikka/api/drive/volumes",
       "template": "/api/drive/volumes",
       "source": "app/api/drive/volumes/route.ts",

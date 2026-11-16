@@ -34,7 +34,7 @@ async function contents(tx: ProjectTransaction, project: Project, workspaceId: s
     (select count(*)::int from workspace_resource_events where "workspaceId"=${workspaceId} and "resourceId"=${project.id}) as "resourceEvents",
     (select count(*)::int from workspace_projects where "workspaceId"=${workspaceId} and id<>${project.id} and properties->'dependencyIds' @> ${JSON.stringify([project.id])}::jsonb) as "incomingDependencies"`)
   const { issueIds, ...workspaceCounts } = linked.rows[0]
-  const history = await db.execute<HistoryCounts>(sql`with scoped_tasks as (
+  const history = await db.execute<HistoryCounts & { hasProjectFiles: boolean }>(sql`with scoped_tasks as (
       select id from issues where id=any(${sql.param(issueIds)}::uuid[]) and "workspaceId"=${workspaceId} and "ownershipState"='bound'
     ), historical_runs as (
       select id,status from agent_runs where
@@ -46,13 +46,15 @@ async function contents(tx: ProjectTransaction, project: Project, workspaceId: s
       (select count(*)::int from factory_tasks f where (f."workspaceId"=${workspaceId} or f."workspaceId" is null)
         and (f."issueId" in (select id from scoped_tasks) or exists (
           select 1 from factory_attempts a where a."taskId"=f.id and a."runId" in (select id from historical_runs)))) as "factoryTasks",
-      (select count(*)::int from project_decisions where "workspaceId"=${workspaceId} and "projectId"=${project.id}) as decisions`)
-  const counts = { ...workspaceCounts, ...history.rows[0], tasks: issueIds.length,
+      (select count(*)::int from project_decisions where "workspaceId"=${workspaceId} and "projectId"=${project.id}) as decisions,
+      exists(select 1 from drive_volumes where "workspaceId"=${workspaceId} and "scopeId"=${project.id} and "driveScope" in ('project','project-user')) as "hasProjectFiles"`)
+  const { hasProjectFiles, ...historyCounts } = history.rows[0]
+  const counts = { ...workspaceCounts, ...historyCounts, tasks: issueIds.length,
     dependencies: project.properties.dependencyIds?.length ?? 0, milestones: project.properties.milestones?.length ?? 0,
     legacyTaskReferences: project.issueIds?.length ?? 0 }
   return { projectId: project.id, workspaceId, name: project.name, revision: project.revision,
     archivedAt: project.archivedAt?.toISOString() ?? null, counts,
-    canDelete: Object.values(counts).every(count => count === 0), recovery: 'restore_archive' }
+    canDelete: !hasProjectFiles && Object.values(counts).every(count => count === 0), recovery: 'restore_archive' }
 }
 
 async function lockedProject<T>(reader: ProjectReader, workspaceId: string, id: string,
