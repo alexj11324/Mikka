@@ -84,12 +84,12 @@ export async function requireProjectWrite(tx: ProjectTransaction, reader: Projec
 /** Hold the canonical source row and content authorization while serving private
  * files. A shared source-row lock orders archive/deletion with this operation
  * without serializing unrelated Projects, teams or other readers. */
-export async function withReadableProject<T>(reader: ProjectReader, workspaceId: string, projectId: string, read: () => Promise<T>) {
+export async function withReadableProject<T>(reader: ProjectReader, workspaceId: string, projectId: string, read: () => Promise<T>, permission: 'canReadContent' | 'canSteer' = 'canReadContent') {
   return withTaskWorkspace(reader, workspaceId, async (_workspace, tx) => {
     const project = await lockProjectRow(tx, reader, projectId, workspaceId, 'share')
     if (project.archivedAt) throw new ActionFailureError('projectNotFound')
     const { withResourceAccess } = await import('@/lib/resource-access/store')
-    return withResourceAccess(reader, { kind: 'project', id: projectId, workspaceId }, 'canReadContent', read)
+    return withResourceAccess(reader, { kind: 'project', id: projectId, workspaceId }, permission, read)
   })
 }
 

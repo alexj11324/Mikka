@@ -1493,13 +1493,15 @@ export const driveVolumes = pgTable('drive_volumes', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [
-  uniqueIndex('drive_volumes_scope_name_key').on(table.driveScope, table.scopeId, sql`coalesce(${table.scopeUserId}, '')`, table.name),
+  // The SQL migration owns the NULLS NOT DISTINCT name index across tenant and storage scopes.
   index('drive_volumes_owner_idx').on(table.ownerId, table.updatedAt.desc()),
   index('drive_volumes_scope_idx').on(table.driveScope, table.scopeId, table.updatedAt.desc()),
 ])
 
 /** Content by digest, deduplicated within one owner and never across owners (lib/drive/blobs.ts). */
 export const driveBlobs = pgTable('drive_blobs', {
+  workspaceId: uuid('workspaceId'),
+  projectId: uuid('projectId'),
   ownerId: text('ownerId').notNull(),
   sha256: text('sha256').notNull(),
   sizeBytes: integer('sizeBytes').notNull(),
