@@ -56,6 +56,27 @@ function mount(content) {
   }
 }
 
+test('Task mentions use the supplied people only on lookup and match names with the original picker', async () => {
+  const people = [
+    { id: 'teammate', label: 'Lin May', initials: 'L' },
+    { id: 'task-owner', label: 'Task Owner', initials: 'T' },
+  ]
+  const signal = new AbortController().signal
+  let reads = 0
+  const extensions = createEditorExtensions(() => false, 'QA', true, false, '', async currentSignal => {
+    reads++
+    assert.equal(currentSignal, signal)
+    return people
+  })
+  const lookup = extensions.find(extension => extension.name === 'mention').options.suggestion.items
+  assert.equal(reads, 0)
+  assert.deepEqual(await lookup({ query: 'ma', signal }), [people[0]])
+  assert.deepEqual(await lookup({ query: 'nobody', signal }), [])
+  assert.equal(reads, 2)
+  const seed = createEditorExtensions(() => false, 'seed', true).find(extension => extension.name === 'mention')
+  assert.deepEqual(seed.options.suggestion.items({ query: '', signal }), [])
+})
+
 test('description edits do not repaint from every Yjs update', () => {
   const source = readFileSync(new URL('../components/workspace/issue-editor.tsx', import.meta.url), 'utf8')
   const sync = readFileSync(new URL('../lib/document-sync.ts', import.meta.url), 'utf8')

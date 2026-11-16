@@ -25,6 +25,8 @@ export interface RichTextMentionCandidate {
   avatar?: string
 }
 
+export type RichTextMentionPeople = readonly RichTextMentionCandidate[] | ((signal: AbortSignal) => Promise<readonly RichTextMentionCandidate[]>)
+
 /** The chip a mention renders as, scoped to .tiptap like the rest of the prose.
  * ProseMirror's unlayered sheet resets atoms to wrap, so nowrap needs the !. */
 export const RICH_TEXT_MENTION_PROSE = cn(
@@ -107,7 +109,7 @@ export const RICH_TEXT_MENTION_KEY = new PluginKey("richTextMention")
 
 /** "@" mentions of the given people; call it at module scope. */
 export function createRichTextMention(
-  candidates: readonly RichTextMentionCandidate[]
+  candidates: RichTextMentionPeople
 ) {
   return Mention.configure({
     // Backspace removes the whole chip instead of reopening the picker.
@@ -117,7 +119,10 @@ export function createRichTextMention(
       pluginKey: RICH_TEXT_MENTION_KEY,
       // The placeholder already paints .is-empty lines.
       decorationEmptyClass: "is-query-empty",
-      items: ({ query }) => matchCandidates(candidates, query),
+      debounce: typeof candidates === "function" ? 150 : 0,
+      items: ({ query, signal }) => typeof candidates === "function"
+        ? candidates(signal).then(people => matchCandidates(people, query))
+        : matchCandidates(candidates, query),
       render: createRichTextSuggestionRender(MentionMenu),
     },
   })
