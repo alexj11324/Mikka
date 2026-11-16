@@ -2,18 +2,18 @@ import { mobileMessages } from '../lib/messages.ts'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { TOKENS } from '../lib/tokens.ts'
-import { dragSlot, moveTo, moveWorkspace, orderWorkspaces, parseWorkspaceOrder } from '../features/workspace/model/workspace-order.ts'
+import { dragSlot, moveTo, orderWorkspaces, parseWorkspaceOrder } from '../features/workspace/model/workspace-order.ts'
 
 test('workspaces keep the order the person gave them; new ones follow, gone ones drop', () => {
   const list = [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
   assert.deepEqual(orderWorkspaces(list, ['c', 'gone', 'a']).map(w => w.id), ['c', 'a', 'b'])
   assert.deepEqual(orderWorkspaces(list, []).map(w => w.id), ['a', 'b', 'c'])
-  assert.deepEqual(moveWorkspace(['a', 'b', 'c'], 'b', -1), ['b', 'a', 'c'])
-  assert.deepEqual(moveWorkspace(['a', 'b', 'c'], 'c', 1), ['a', 'b', 'c'])
   assert.deepEqual(parseWorkspaceOrder('["a",3,"b"]'), ['a', 'b'])
   assert.deepEqual(parseWorkspaceOrder('{oops'), [])
   assert.deepEqual(moveTo(['a', 'b', 'c'], 0, 2), ['b', 'c', 'a'])
   assert.deepEqual(moveTo(['a', 'b', 'c'], 2, 0), ['c', 'a', 'b'])
+  assert.deepEqual(moveTo(['a', 'b', 'c'], 2, 3), ['a', 'b', 'c'])
+  assert.deepEqual(moveTo(['a', 'b', 'c'], -1, 0), ['a', 'b', 'c'])
   assert.equal(dragSlot(0, 80, 52, 3), 2)
   assert.equal(dragSlot(1, -200, 52, 3), 0)
   assert.equal(dragSlot(1, 20, 52, 3), 1)
