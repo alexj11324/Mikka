@@ -8,6 +8,7 @@ import type { UsableApiKey } from '../model-api-keys'
 const botId = '10000000-0000-4000-8000-000000000001', workspaceId = '10000000-0000-4000-8000-000000000002'
 let selected: string | null | undefined, rows: BotSubscriptionChoice[] = [], keys: UsableApiKey[] = []
 let key: { keyId: string; model: string } | undefined
+let credits: string | undefined
 let fallback: { key: UsableApiKey; model: string } | null = null
 const scopes: Array<{ ownerId: string; workspaceId: string }> = []
 mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { pool: { query: async (sql: string, args: unknown[]) => {
@@ -20,6 +21,7 @@ mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { p
   }
   assert.deepEqual(args, ['alice', workspaceId, botId])
   if (key) return { rows: [{ bindingId: null, apiKeyId: key.keyId, apiKeyModel: key.model }] }
+  if (credits) return { rows: [{ bindingId: null, apiKeyId: null, apiKeyModel: null, creditsModel: credits }] }
   return { rows: selected === undefined ? [] : [{ bindingId: selected, apiKeyId: null, apiKeyModel: null }] }
 } } } })
 mock.module(new URL('../execution-settings.ts', import.meta.url).href, { namedExports: {
@@ -44,7 +46,7 @@ mock.module(new URL('../points-fallback.ts', import.meta.url).href, { namedExpor
 } })
 let botModelReady: typeof import('./model-ready')['botModelReady']
 before(async () => { process.env.MIKKA_EDITION = 'community'; ({ botModelReady } = await import('./model-ready')) })
-beforeEach(() => { selected = undefined; rows = []; keys = []; key = undefined; fallback = null; scopes.length = 0 })
+beforeEach(() => { selected = undefined; rows = []; keys = []; key = undefined; credits = undefined; fallback = null; scopes.length = 0 })
 function subscription(provider = 'claude', used = 0.2, age = 0): BotSubscriptionChoice {
   return { bindingId: 'fixture-binding', connectionId: 'fixture-connection', ownerId: 'alice', provider,
     modelId: 'fixture-model', quota: { vendor: provider === 'codex' ? 'codex' : 'claude_code', source: 'official', status: 'ok', plan: null,
@@ -89,4 +91,12 @@ test('a selected usable API key works; an inaccessible or unsupported key does n
   assert.equal(await botModelReady('alice', botId), false)
   keys = [{ ...savedKey, models: ['another-model'] }]
   assert.equal(await botModelReady('alice', botId), false)
+})
+
+test('a chat on a Mikka 额度 model wakes like one on a subscription or key', async () => {
+  // Alex, 2026-11-16: background wakes treat every model source alike.
+  credits = 'deepseek/deepseek-v4-pro'
+  assert.equal(await botModelReady('alice', botId), true)
+  credits = undefined
+  assert.equal(await botModelReady('alice', botId), false, 'still no model when nothing is chosen and nothing is connected')
 })
