@@ -15,6 +15,7 @@ mock.module(new URL('../slots/bot-avatar.tsx', import.meta.url).href, { namedExp
 mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => Object.assign((key: string) => `${namespace}.${key}`, { has: () => false }) } })
 mock.module('sonner', { namedExports: { toast: { error: (text: string) => { toasts.push(text) }, success: () => {} } } })
 
+const selectedScopes: (string | undefined)[] = []
 const calls: string[] = []
 const toasts: string[] = []
 const created: Record<string, unknown>[] = []
@@ -23,11 +24,11 @@ let defaultsResult: { error?: string; defaultModel?: null; defaultRepository?: s
 let menu: BotModelMenu
 let failChoose = false
 mock.module(new URL('../../app/actions/bots.ts', import.meta.url).href, { namedExports: {
-  getWorkspaceBotDefaults: async () => { calls.push('defaults'); return defaultsResult },
-  createBot: async (input: Record<string, unknown>) => { created.push(input); return { id: 'new-bot', name: input.name, color: input.color, shape: input.shape } },
+  getWorkspaceBotDefaults: async (workspaceId?: string) => { selectedScopes.push(workspaceId); calls.push('defaults'); return defaultsResult },
+  createBot: async (input: Record<string, unknown>, workspaceId?: string) => { selectedScopes.push(workspaceId); created.push(input); return { id: 'new-bot', name: input.name, color: input.color, shape: input.shape } },
 } })
 mock.module(new URL('../../app/actions/execution-settings.ts', import.meta.url).href, { namedExports: {
-  getBotModelMenu: async (bot: string | null) => { calls.push(`menu:${bot}`); return menu },
+  getBotModelMenu: async (bot: string | null, workspaceId?: string) => { selectedScopes.push(workspaceId); calls.push(`menu:${bot}`); return menu },
   refreshBotModelMenuAction: async () => menu,
   chooseBotModel: async (bot: string | null, id: string) => { chosen.push([bot, id]); return failChoose ? { error: 'botNotFound' } : menu },
 } })
@@ -45,7 +46,7 @@ before(async () => {
   ;({ NewBotDialog } = await import('./new-bot-dialog'))
 })
 beforeEach(() => {
-  props = null; failChoose = false; calls.length = 0; toasts.length = 0; created.length = 0; chosen.length = 0
+  props = null; failChoose = false; selectedScopes.length = 0; calls.length = 0; toasts.length = 0; created.length = 0; chosen.length = 0
   defaultsResult = { defaultModel: null, defaultRepository: 'acme/app', models: [], repositories: ['acme/app', 'acme/web'] }
   menu = {
     groups: [{ kind: 'subscription', provider: 'claude', credentialLabel: 'Work', options: [
@@ -62,7 +63,7 @@ after(() => browser.happyDOM.close())
 // A fresh cache per test, as a newly opened window has.
 const render = async (node: ReactNode) => { await act(async () => root.render(<SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>{node}</SWRConfig>)) }
 const settle = () => act(async () => { await new Promise(resolve => setTimeout(resolve, 0)) })
-const dialog = (open: boolean, onCreated: () => void = () => {}) => <NewBotDialog open={open} onOpenChange={() => {}} onCreated={onCreated} />
+const dialog = (open: boolean, onCreated: () => void = () => {}, workspaceId?: string) => <NewBotDialog open={open} workspaceId={workspaceId} onOpenChange={() => {}} onCreated={onCreated} />
 
 test('a closed window sends no request', async () => {
   await render(dialog(false))
@@ -96,13 +97,14 @@ test('a failed defaults read leaves the 仓库 row usable as text and the Bot on
 
 test('a picked model and repository are saved on the new Bot', async () => {
   let opened = ''
-  await render(dialog(true, () => { opened = 'new-bot' }))
+  await render(dialog(true, () => { opened = 'new-bot' }, 'shown-team'))
   await settle()
   await act(async () => { props!.onName('Builder'); props!.model.onChange('binding-sonnet'); props!.repository.onChange('') })
   await act(async () => props!.onSubmit())
   assert.deepEqual(created[0], { name: 'Builder', color: created[0].color, shape: created[0].shape, repository: null })
   assert.deepEqual(chosen, [['new-bot', 'binding-sonnet']])
   assert.equal(opened, 'new-bot')
+  assert.deepEqual(selectedScopes, ['shown-team', 'shown-team', 'shown-team'])
 })
 
 test('without a pick, only a model the Coordinator chose is pinned; an unchosen default is left to the resolver', async () => {

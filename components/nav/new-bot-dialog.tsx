@@ -22,7 +22,7 @@ const NAME_LENGTH = 60
  * The model menu is the one the Coordinator's chip reads (the same person, the same choices); a pick is saved on the
  * new Bot after it exists. The repository starts at the workspace's default and is checked again by createBot.
  */
-export function NewBotDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (open: boolean) => void; onCreated: (bot: BotView) => void }) {
+export function NewBotDialog({ open, onOpenChange, onCreated, workspaceId }: { open: boolean; workspaceId?: string; onOpenChange: (open: boolean) => void; onCreated: (bot: BotView) => void }) {
   const actionError = useActionError()
   const t = useTranslations('Shell.newBot')
   const tModel = useTranslations('Coordinator.modelPicker')
@@ -37,9 +37,9 @@ export function NewBotDialog({ open, onOpenChange, onCreated }: { open: boolean;
   useEffect(() => { if (!open) { setName(''); setColor(DEFAULT_BOT_COLOR); setShape(DEFAULT_BOT_SHAPE); setModel(undefined); setRepository(undefined) } }, [open])
 
   // Read once when the window opens; nothing here refreshes on its own.
-  const menu = useSWR<BotModelMenu | null>(open ? botModelMenuKey(null) : null, () => getBotModelMenu(null), { shouldRetryOnError: false, revalidateOnFocus: false })
-  const defaults = useSWR(open ? ['new-bot-defaults'] : null, async () => {
-    const result = await getWorkspaceBotDefaults()
+  const menu = useSWR<BotModelMenu | null>(open ? [...botModelMenuKey(null), workspaceId] : null, () => getBotModelMenu(null, workspaceId), { shouldRetryOnError: false, revalidateOnFocus: false })
+  const defaults = useSWR(open ? ['new-bot-defaults', workspaceId] : null, async () => {
+    const result = await getWorkspaceBotDefaults(workspaceId)
     if (result.error) throw new Error(result.error)
     return result
   }, { shouldRetryOnError: false, revalidateOnFocus: false })
@@ -76,7 +76,7 @@ export function NewBotDialog({ open, onOpenChange, onCreated }: { open: boolean;
     if (!trimmed || saving) return
     setSaving(true)
     try {
-      const bot = await createBot({ name: trimmed, color, shape, ...(repository === undefined ? {} : { repository: repository === NO_REPOSITORY ? null : repository }) })
+      const bot = await createBot({ name: trimmed, color, shape, ...(repository === undefined ? {} : { repository: repository === NO_REPOSITORY ? null : repository }) }, workspaceId)
       // The menu is the Coordinator's: its row shows the Coordinator's model. A new Bot has no saved choice and would
       // follow the default instead, so save what the row shows whenever it is a pick (the person's, or the Coordinator's
       // own choice); an unchosen default is what the new Bot resolves to anyway.
