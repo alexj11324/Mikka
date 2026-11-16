@@ -8167,6 +8167,7 @@
       "cancel": "Cancel",
       "notFound": "The automation doesn't exist or was deleted",
       "missing": {
+        "slackAuthors": "Use up to 20 valid Slack member IDs for each event",
         "repository": "Choose a repository for each GitHub event",
         "title": "Add a name to save",
         "prompt": "Say what it should do to save",
@@ -8216,6 +8217,9 @@
         "event": "Event",
         "channel": "Channel",
         "remove": "Remove",
+        "authors": "Authors (optional, comma-separated Slack IDs)",
+        "authorsError": "Could not load Slack members.",
+        "moreAuthors": "More members",
         "emojisError": "Could not load custom Slack emoji.",
         "reactions": "Emoji (optional, comma-separated, e.g. eyes, white_check_mark)",
         "runWhen": "Condition",

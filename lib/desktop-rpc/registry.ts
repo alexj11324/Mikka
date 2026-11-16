@@ -127,6 +127,7 @@ const functions = {
   'automations.automationLinearTeams': automations.automationLinearTeams,
   'automations.automationSlackChannels': automations.automationSlackChannels,
   'automations.automationSlackEmojis': automations.automationSlackEmojis,
+  'automations.automationSlackAuthors': automations.automationSlackAuthors,
   'automations.pinAutomation': automations.pinAutomation,
   'automations.organizeAutomation': automations.organizeAutomation,
   'automations.resumeAutomation': automations.resumeAutomation,
