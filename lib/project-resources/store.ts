@@ -7,7 +7,6 @@ import { db } from '@/lib/db'
 import { workspaceListChanged } from '@/lib/live/lists'
 import { inDatabaseTransaction } from '@/lib/db/request-scope'
 import { currentTransactionBoundary } from '@/lib/db/transaction-boundary'
-import { withResourceAccess } from '@/lib/resource-access/store'
 import { workspaceSecrets } from '@/lib/db/secrets-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
@@ -171,6 +170,7 @@ export async function saveEnvironment(reader: Reader, raw: z.input<typeof saveEn
 
 type SetupScope = z.infer<typeof projectSetupScope>
 async function withProjectSetup<T>(reader: Reader, scope: SetupScope, write: boolean, work: (tx: WorkspaceTransaction, environment: EnvironmentRow, projects: string[], bindingSnapshot: string) => Promise<T>) {
+  const { withResourceAccess } = await import('@/lib/resource-access/store')
   const { workspaceId, projectId, environmentId } = scope
   return withTaskWorkspace(reader, workspaceId, async (_workspace, tx) => {
     if (write) {
