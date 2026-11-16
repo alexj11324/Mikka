@@ -92,7 +92,7 @@ jobs:
       - name: Build the public standalone application
         if: steps.existing.outputs.digest == ''
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-        with: &public_image_build
+        with:
           context: .
           file: Dockerfile
           load: true
@@ -315,7 +315,7 @@ jobs:
     name: Official packaged Desktop against the self-hosted image
     if: github.event_name == 'workflow_dispatch' && inputs.overlay_sha != '' && github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' && github.ref == 'refs/heads/main' && github.actor_id == '183887963' && github.triggering_actor == 'alexj11324'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 65
     permissions:
       contents: read
     environment: cloudflare-runtime-release
@@ -350,7 +350,18 @@ jobs:
       - *public_image_inputs
       - name: Build the exact community image without a private UI checkout
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
-        with: *public_image_build
+        with:
+          context: .
+          file: Dockerfile
+          load: true
+          push: false
+          tags: mikka-self-hosted:check
+          cache-from: type=gha,scope=mikka-selfhost-public
+          build-args: |
+            WORKFLOW_TARGET_WORLD=@workflow/world-postgres
+            MIKKA_BUILD_REVISION=${{ github.sha }}
+            MIKKA_BUILD_WORKER_SHA=${{ steps.image-inputs.outputs.worker-sha }}
+            MIKKA_TEST_DEPLOYMENT_SHA=${{ github.sha }}
       - *isolated_community_secrets
       - uses: ./.github/actions/pnpm-install
         env:
@@ -419,5 +430,27 @@ jobs:
           path: .artifacts/self-hosted/desktop/report.json
           if-no-files-found: error
           retention-days: 14
+      - name: Prepare isolated public runtime for active Desktop delivery
+        timeout-minutes: 12
+        run: scripts/acceptance/desktop-delivery/prepare.sh
+      - name: Qualify active delivery in the same official packaged Desktop
+        timeout-minutes: 18
+        env:
+          MIKKA_UI_OVERLAY_SHA: ${{ inputs.overlay_sha }}
+        run: scripts/acceptance/desktop-delivery/qualify.sh
+      - name: Collect only the version-bound live-delivery receipt
+        if: always() && env.E_DESKTOP_BASE != ''
+        run: node scripts/acceptance/desktop-delivery/receipt.mjs "$E_DESKTOP_BASE"
+      - name: Retain the isolated installed Desktop delivery result
+        if: always() && env.E_DESKTOP_BASE != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: official-desktop-delivery-${{ github.sha }}-${{ inputs.overlay_sha }}
+          path: ${{ env.E_DESKTOP_BASE }}/public-receipt.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove the dedicated local delivery identities and test installation
+        if: always()
+        run: scripts/acceptance/desktop-delivery/cleanup.sh
       - *clean_desktop_fixture
       - *stop_community

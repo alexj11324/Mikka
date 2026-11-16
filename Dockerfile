@@ -17,6 +17,7 @@ RUN --mount=type=cache,id=mikka-pnpm,target=/pnpm/store \
     --mount=type=secret,id=ffmpeg_github_token,env=FFMPEG_GITHUB_TOKEN,required=false \
     pnpm install --frozen-lockfile --store-dir /pnpm/store
 ARG MIKKA_BUILD_REVISION
+ARG MIKKA_TEST_DEPLOYMENT_SHA
 ARG WORKFLOW_TARGET_WORLD
 ENV MIKKA_BUILD_REVISION=${MIKKA_BUILD_REVISION}
 RUN pnpm generate:agent-ui && WORKFLOW_TARGET_WORLD="$WORKFLOW_TARGET_WORLD" pnpm build:server
