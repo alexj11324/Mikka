@@ -1500,6 +1500,13 @@
     "test": "app/api/webhooks/github/route.test.ts",
     "suite": "test:suggestions"
   },
+  "lib/governance/audit-export.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Organization administrators can filter and page live audit events in the installation PostgreSQL database with the same enterprise access check as audit exports.",
+    "test": "lib/enterprise/http.db.test.ts",
+    "suite": "test:enterprise-db"
+  },
   "lib/governance/http.ts": {
     "mode": "built-in",
     "environment": [],

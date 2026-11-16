@@ -245,6 +245,12 @@ export const organizationApi = {
   setPolicy: (id: string, policy: Omit<ResourcePolicy, 'revision'>) => send<ResourcePolicyState>(org(id, '/policy'), 'PATCH', policy),
   decide: (id: string, approvalId: string, status: 'approved' | 'denied') => send<{ decided: true }>(org(id, '/approvals'), 'PATCH', { id: approvalId, status }),
 
+  listAuditEvents: (id: string, filters: { cursor?: string; order?: 'asc' | 'desc'; actor?: string; userId?: string; family?: string; from?: string; to?: string; q?: string; limit?: number } = {}) => {
+    const query = new URLSearchParams({ view: 'events' })
+    for (const [name, value] of Object.entries(filters)) if (value !== undefined) query.set(name, String(value))
+    return request<{ events: OrganizationAuditEvent[]; nextCursor: string | null }>(`${org(id, '/audit-log')}?${query}`)
+  },
+
   /** Freezes the events in range for fifteen minutes; each page rechecks admin access and integrity. */
   createAuditExport: (id: string, range: { from?: string; until?: string }) => send<{ manifest: AuditManifest; events: OrganizationAuditEvent[] }>(org(id, '/audit-log'), 'POST', range),
   readAuditExport: (id: string, exportId: string, offset: number, limit = 100) =>
