@@ -43,6 +43,22 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
     await pool.query('insert into mikka_workspaces (id,"userId",name,kind) values ($1,$2,\'Workspace ACL fixture\',\'team\')', [id, owner.id])
     for (const [user, role] of [[owner, 'admin'], [member, 'member']] as const) await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role) values ($1,$2,$3,$4,$5)', [id, user.id, user.name, user.email, role])
   }
+  await t.test('Organization administrators can set and clear a bounded icon without changing Workspace identity or adding duplicate audits', async () => {
+    const icon = 'data:image/png;base64,iVBORw0KGgo='
+    const profile = (actor: string, input: unknown) => org.updateOrganizationProfile(organizationId, actor, input)
+    assert.equal((await org.organizationSummary(organizationId, owner.id)).organization.icon, null)
+    for (const denied of [member, outsider]) await assert.rejects(profile(denied.id, { icon }), /access_denied/)
+    await assert.rejects(profile(owner.id, { icon: 'https://example.invalid/image.png' }), /invalid_request/)
+    await assert.rejects(profile(owner.id, { icon: 'data:image/png;base64,AA==' }), /invalid_request/)
+    assert.equal((await profile(admin.id, { icon })).organization.icon, icon)
+    assert.equal((await profile(owner.id, { icon })).organization.icon, icon)
+    assert.equal((await org.organizationSummary(organizationId, admin.id)).organization.icon, icon)
+    assert.equal((await profile(owner.id, { icon: null })).organization.icon, null)
+    assert.equal((await profile(owner.id, { icon: null })).organization.icon, null)
+    const audits = await pool.query('SELECT metadata FROM mikka_organization_audit_events WHERE "organizationId"=$1 AND action=$2', [organizationId, 'organization.icon_changed'])
+    assert.deepEqual(audits.rows, [{ metadata: {} }, { metadata: {} }])
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM mikka_workspaces WHERE id=ANY($1::uuid[]) AND icon IS NOT NULL', [[wsA,wsB,unrelated]])).rows[0].n, 0)
+  })
   await t.test('Org roles cannot grant Workspace access or elevate other owners', async () => {
     await assert.rejects(org.renameOrganization(organizationId, member.id, { name: 'Unauthorized' }))
     await assert.rejects(org.addOrganizationMember(organizationId, admin.id, { userId: outsider.id, role: 'owner' }))
@@ -60,6 +76,12 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
     await assert.rejects(org.archiveOrganization(organizationId, owner.id), error => (error as { detail?: string }).detail === 'workspace_attached')
   })
   const policy = { modelCredentialSharing: 'approval_required', mcpSharing: 'approval_required', allowedModelProviders: null, auditRetentionDays: null, legalHold: false } as const
+  await t.test('the organization machine catalog membership filter admits active members only for a named live organization', async () => {
+    assert.deepEqual((await org.listOrganizations(member.id, organizationId)).map(row => row.id), [organizationId])
+    assert.deepEqual(await org.listOrganizations(outsider.id, organizationId), [])
+    assert.deepEqual(await org.listOrganizations(member.id, randomUUID()), [])
+  })
+
   await t.test('operator Enterprise grants serialize expected-plan changes and preserve historical seat metadata without payments', async () => {
     const grant = { organizationId, expectedPlan: 'free', plan: 'enterprise', source: 'cloud', seatLimit: 2,
       expiresAt: new Date(Date.now() + 3600_000).toISOString(), reason: 'evaluation', operator: 'enterprise-fixture' }

@@ -11,6 +11,7 @@ export type OrganizationRole = 'owner' | 'admin' | 'member'
 export const organizations = pgTable('mikka_organizations', {
   id: uuid('id').primaryKey(),
   name: varchar('name', { length: 120 }).notNull(),
+  icon: text('icon'),
   createdBy: text('createdBy').notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),

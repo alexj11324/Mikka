@@ -36,7 +36,10 @@ sudo install -m 400 -o mikka-e-model -g mikka-e-model "$qa/model.key" "$model/en
 rm "$qa/model.key"
 chmod 444 "$model/endpoint.pem"
 for file in results.jsonl claude-results.jsonl; do
-  install -m 660 /dev/null "$model/$file"
+  sudo install -m 640 -o mikka-e-model -g "$(id -gn)" /dev/null "$model/$file"
+  sudo -n -u mikka-e-model -- test -w "$model/$file"
+  test -r "$model/$file"
+  test ! -w "$model/$file"
 done
 sudo -n -u mikka-e-device -- env -i PATH="$PATH" HOME="$base/device/home" \
   bash -euc '

@@ -41,6 +41,13 @@
     "test": "lib/thread-reads.db.test.ts",
     "suite": "test:conversation-reads"
   },
+  "app/api/devices/[deviceId]/active-threads/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A signed-in owner can page through visible active thread roots on their local device in the current workspace, using the installation PostgreSQL database.",
+    "test": "lib/device-heartbeat.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
   "app/api/drive/scopes/route.ts": {
     "mode": "built-in",
     "environment": [],
@@ -270,6 +277,13 @@
     "behavior": "Check the verified account and Organization policy for domain-based membership.",
     "test": "tests/organization-join-domains.db.test.ts",
     "suite": "test:organization-join-domains-db"
+  },
+  "app/api/organizations/[organizationId]/machine-sizes/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the four task machine sizes and their list prices from the current pricing model for a signed-in active member of the requested organization. Reading the catalog makes no provider or billing call.",
+    "test": "lib/enterprise/governance.db.test.ts",
+    "suite": "test:enterprise-db"
   },
   "app/api/service-identity/projects/[projectId]/route.ts": {
     "mode": "built-in",
@@ -718,6 +732,13 @@
     "behavior": "Adds Project-scoped references to immutable GitHub IDs in the installation PostgreSQL database.",
     "test": "tests/project-dependency-repositories.db.test.ts",
     "suite": "test:project-resources-db"
+  },
+  "drizzle/20261116103048_organization_icon.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Stores an optional raster icon on its administrative Organization in the installation workspace database.",
+    "test": "lib/enterprise/governance.db.test.ts",
+    "suite": "test:enterprise-db"
   },
   "lib/abuse/workers-ai.ts": {
     "mode": "optional-cloud",

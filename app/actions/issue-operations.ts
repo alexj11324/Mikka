@@ -248,9 +248,9 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
   })
 }
 
-export async function toggleIssuePreference(input: { id: string; kind: 'favorite' | 'subscribe' }) {
+export async function toggleIssuePreference(input: { id: string; kind: 'favorite' | 'subscribe'; enabled?: boolean }) {
   return runAction(async () => {
-    const parsed = z.object({ id: z.uuid(), kind: z.enum(['favorite', 'subscribe']) }).safeParse(input)
+    const parsed = z.object({ id: z.uuid(), kind: z.enum(['favorite', 'subscribe']), enabled: z.boolean().optional() }).safeParse(input)
     if (!parsed.success) return { error: 'issueOperationInvalid' }
     const { issue, user } = await requireIssueAccess(input.id)
     try {
@@ -261,7 +261,10 @@ export async function toggleIssuePreference(input: { id: string; kind: 'favorite
         const metadata = readIssueMetadata(latest.content)
         const key = input.kind === 'favorite' ? 'favoriteUserIds' : 'subscriberUserIds'
         const ids = metadata[key]
-        metadata[key] = ids.includes(user.id) ? ids.filter(id => id !== user.id) : [...ids, user.id]
+        const current = ids.includes(user.id)
+        const enabled = parsed.data.enabled ?? !current
+        if (current === enabled) return { issue: await issueView(latest, tx) }
+        metadata[key] = enabled ? [...ids, user.id] : ids.filter(id => id !== user.id)
         if (metadata[key].length > 200) return { error: 'issuePreferenceLimit' }
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, metadata), revision: latest.revision + 1 }).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).returning()
         await issueListChanged(tx, saved.id)
