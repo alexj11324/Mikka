@@ -28,6 +28,8 @@ const applicationBindings = [
   'ZEROCAT_BASE_URL', 'ZEROCAT_API_KEY', 'MIKKA_HOSTED_MODEL_FALLBACK',
   'CLOUDFLARE_WORKERS_AI_ACCOUNT_ID', 'CLOUDFLARE_WORKERS_AI_TOKEN',
   'DECISIONS_URL', 'DECISIONS_BILLING_PROFILE', 'DECISIONS_API_KEY', 'OPENAI_DECISIONS_API_KEY',
+  // The model gateway (decision 2026-11-15-2000): Mikka 额度 through Vercel AI Gateway, and the operator's LiteLLM converter.
+  'AI_GATEWAY_API_KEY', 'MIKKA_LITELLM_URL', 'MIKKA_LITELLM_MASTER_KEY',
 ]
 
 export function applicationEnvironment(bindings) {
