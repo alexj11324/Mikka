@@ -4,10 +4,10 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 
 | Code path status | Count at this ledger revision |
 |---|---:|
-| complete | 162 |
+| complete | 176 |
 | partial | 30 |
 | prior-partial | 36 |
-| unreviewed | 6328 |
+| unreviewed | 6314 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -32,3 +32,5 @@ Full name/mode/blob difference inventory refreshed through 295f53ba18177329d162b
 Fourteen fixed source paths cover gateway admission, DO wiring, native WebSocket presence, Eve image configuration, the retired restart machine, and the actual G-048 and G-015 consumers. Both native 90-second expiry and recovery paths were run in isolated workerd, with supporting route and Eve scopes recorded per path.
 
 15 additional settings and workspace sources identify each route, writer, authoritative read and the historical one-step drawer mover. Thirteen meet the fixed-source semantic criteria; the legacy singular picker and same-key order hydration remain partial. Source, tests and current consumer are recorded for G-052 #2627.
+
+14 fixed API paths trace server-only aliases, request/header/cookie scopes, Next adaptation, deferred response disposal, and matching original regressions. Each path now records its concrete consumer and the runtime evidence. Locale fallback used to parse the entire request cookie jar twice; G-057 tracks the verified consumer correction.
