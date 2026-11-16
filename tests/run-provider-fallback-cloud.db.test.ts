@@ -145,6 +145,7 @@ test('cloud provider recovery preserves scope and uses fresh task machines witho
       const projectId = randomUUID()
       await pool.query(`INSERT INTO workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)
         VALUES($1,$2,$3,'Cloud fallback resource','','','planned','none','','','','','[]',1)`, [projectId, userId, workspace.id])
+      await (await import('../lib/resource-access/projects')).registerProjectAccess(userId, projectId, workspace.id)
       await seedProjectTasks(pool, projectId, [issueId])
       await resources.saveProjectResources(userId, { workspaceId: workspace.id, projectId, revision: 1,
         repositories: [{ repositoryKey: normalizeRepository(remote).key, environmentId: environment.id, isPrimary: true }],

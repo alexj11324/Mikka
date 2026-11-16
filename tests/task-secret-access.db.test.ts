@@ -77,6 +77,7 @@ test('protected task Secret claims and renewals against PostgreSQL', { skip: !db
       const projectId = randomUUID()
       await pool.query(`insert into workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)
         values($1,$2,$3,'Secret access Project','','','planned','none','','','','','[]',1)`, [projectId, owner, ws.id])
+      await (await import('../lib/resource-access/projects')).registerProjectAccess(owner, projectId, ws.id)
       await seedProjectTasks(pool, projectId, [issueId])
       await resources.saveProjectResources(owner, { workspaceId: ws.id, projectId, revision: 1,
         repositories: [{ repositoryKey, baseBranch: null, environmentId: environment.id, isPrimary: true }], environmentIds: [environment.id], defaultEnvironmentId: environment.id })
