@@ -15,6 +15,7 @@ import { applyDriveWrite, DriveError, readDriveFileHistory, readDriveHistory, re
 import { createDriveVolume, listDriveVolumes, readDriveVolume, setPersonalDriveArchive } from './volumes'
 import { driveErrorResponse } from './http'
 import { listDriveSkills } from './skills'
+import { createDriveFileLink, readLinkedDriveFile, readOwnDriveFileLink, revokeDriveFileLink, updateDriveFileLink, type DriveFileBytes } from './file-links'
 
 const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }
 const digest = z.string().regex(/^[a-f0-9]{64}$/)
@@ -25,8 +26,8 @@ const write = z.object({ expectedDigest: digest, mutationId, changes: z.array(z.
   z.object({ op: z.literal('delete'), path: z.string().refine(isDrivePath) }).strict(),
 ])).min(1).max(DRIVE_MAX_CHANGES) }).strict()
 const restore = z.object({ versionId, expectedDigest: digest, mutationId }).strict()
-type Operation = 'scopes' | 'volumes' | 'volume' | 'write' | 'upload' | 'file' | 'history' | 'version' | 'restore' | 'archive' | 'unarchive'
-type Params = { volumeId?: string; versionId?: string }
+type Operation = 'scopes' | 'volumes' | 'volume' | 'write' | 'upload' | 'file' | 'history' | 'version' | 'restore' | 'archive' | 'unarchive' | 'links' | 'link'
+type Params = { volumeId?: string; versionId?: string; shareId?: string }
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers })
 
 async function body(request: Request) {
@@ -108,6 +109,24 @@ export async function driveResponse(request: Request, operation: Operation, para
         return json({ archived })
       }
       const volume = await readDriveVolume(pool, actor, params.volumeId)
+      if (operation === 'links') {
+        if (request.method === 'POST') {
+          const { path } = z.object({ path: z.string().refine(isDrivePath) }).strict().parse(await body(request))
+          return json({ link: await createDriveFileLink(pool, volume.id, path, session.user.id) })
+        }
+        const path = z.string().refine(isDrivePath).parse(search.get('path'))
+        return json({ link: await readOwnDriveFileLink(pool, volume.id, path, session.user.id) })
+      }
+      const linkId = operation === 'link' ? z.uuid().parse(params.shareId) : null
+      if (linkId && request.method === 'PATCH') {
+        const { visibility } = z.object({ visibility: z.enum(['private', 'org']) }).strict().parse(await body(request))
+        if (visibility === 'org' && !sharedProject && !teamFiles) throw new DriveError('drive_scope_invalid', 422)
+        return json({ link: await updateDriveFileLink(pool, volume.id, linkId, session.user.id, visibility) })
+      }
+      if (linkId && request.method === 'DELETE') {
+        await revokeDriveFileLink(pool, volume.id, linkId, session.user.id)
+        return json({ revoked: true })
+      }
       if (operation === 'volume') {
         // Read an immutable manifest named by the head receipt, so a concurrent
         // write cannot mix an old digest with a newer mutable entry tree.
@@ -150,24 +169,28 @@ export async function driveResponse(request: Request, operation: Operation, para
           ON CONFLICT("ownerId",sha256,"workspaceId") DO NOTHING`, [actor.ownerId, blob.sha256, workspaceId])
         return json({ sha256: blob.sha256, sizeBytes: blob.sizeBytes }, 201)
       }
-      const path = z.string().refine(isDrivePath).parse(search.get('path'))
+      // A link always follows the current live path. Resolve its visibility, path and
+      // content in the same snapshot, still under the original Workspace/Project ACL.
+      if (linkId && (search.has('path') || search.has('versionId'))) throw new DriveError('drive_write_invalid', 400)
+      const path = linkId ? null : z.string().refine(isDrivePath).parse(search.get('path'))
       const selectedVersion = search.has('versionId') ? versionId.parse(search.get('versionId')) : volume.headVersionId
-      const { rows: [blob] } = await pool.query<{ sha256: string; inlineContent: Buffer | null; sizeBytes: number }>(
-        `SELECT b.sha256, b."inlineContent", b."sizeBytes"
-         FROM drive_volume_versions v JOIN drive_volumes d ON d.id = v."volumeId"
-         CROSS JOIN LATERAL jsonb_array_elements(v.manifest) AS entry
-         JOIN drive_blobs b ON b.sha256 = entry->>'sha256' AND d."ownerId" = b."ownerId"
-         WHERE v.id = $1 AND v."volumeId" = $2 AND d."ownerId" = $3 AND d."archivedAt" IS NULL
-           AND entry->>'path' = $4 AND entry->'sizeBytes' = to_jsonb(b."sizeBytes")
-         LIMIT 1`, [selectedVersion, volume.id, actor.ownerId, path])
+      const { rows: [blob] } = linkId ? await readLinkedDriveFile(pool, volume.id, linkId, session.user.id, actor.ownerId)
+        : await pool.query<DriveFileBytes>(
+          `SELECT $4::text AS path,b.sha256,b."inlineContent",b."sizeBytes"
+           FROM drive_volume_versions v JOIN drive_volumes d ON d.id = v."volumeId"
+           CROSS JOIN LATERAL jsonb_array_elements(v.manifest) AS entry
+           JOIN drive_blobs b ON b.sha256 = entry->>'sha256' AND d."ownerId" = b."ownerId"
+           WHERE v.id = $1 AND v."volumeId" = $2 AND d."ownerId" = $3 AND d."archivedAt" IS NULL
+             AND entry->>'path' = $4 AND entry->'sizeBytes' = to_jsonb(b."sizeBytes")
+           LIMIT 1`, [selectedVersion, volume.id, actor.ownerId, path])
       if (!blob) throw new DriveError('drive_not_found', 404)
       if (blob.inlineContent && driveSha256(driveBytes(blob.inlineContent)) !== blob.sha256) throw new DriveError('drive_blob_size_mismatch', 422)
       const content = blob.inlineContent ? driveBytes(blob.inlineContent) : await readDriveBlobObject(actor.ownerId, blob.sha256, request.signal)
       return new Response(content, { headers: { ...headers, 'Content-Type': 'application/octet-stream', 'Content-Length': String(blob.sizeBytes),
-        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(path.split('/').at(-1)!)}` } })
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(blob.path.split('/').at(-1)!)}` } })
     }
     const response = projectId
-      ? await withReadableProject(session.user, workspaceId, projectId, serve, sharedProject && request.method !== 'GET' ? 'canSteer' : 'canReadContent')
+      ? await withReadableProject(session.user, workspaceId, projectId, serve, sharedProject && request.method !== 'GET' && !['links', 'link'].includes(operation) ? 'canSteer' : 'canReadContent')
       : await withTaskWorkspace(session.user, workspaceId, async workspace => {
         if (teamFiles && workspace.kind !== 'team') return json({ error: 'drive_not_found' }, 404)
         return serve()

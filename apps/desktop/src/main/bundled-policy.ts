@@ -17,17 +17,19 @@ const BILLING_MANAGEMENT = /^\/api\/(?:workspaces|organizations)\/[0-9a-f]{8}-[0
 const DRIVE_VOLUME_ID = 'vol_[0-9A-HJKMNP-TV-Z]{26}'
 const DRIVE_VERSION_ID = 'vver_[0-9A-HJKMNP-TV-Z]{26}'
 export const DRIVE_BLOB_UPLOAD = new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/blobs$`)
+const UUID = '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89aAbB][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}'
 const DRIVE_ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   [/^\/api\/drive\/scopes$/, ['GET']],
   [/^\/api\/drive\/volumes$/, ['GET', 'POST']],
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}$`), ['GET']],
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/(?:files|versions)$`), ['GET']],
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/versions/${DRIVE_VERSION_ID}$`), ['GET']],
+  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/shares$`), ['GET', 'POST']],
+  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/shares/${UUID}$`), ['GET', 'PATCH', 'DELETE']],
   [DRIVE_BLOB_UPLOAD, ['POST']],
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/entries$`), ['PATCH']],
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/(?:restore|archive|unarchive)$`), ['POST']],
 ]
-const UUID = '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89aAbB][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}'
 const ORGANIZATION_OVERVIEW = new RegExp(`^/api/organizations/${UUID}$`)
 const ORGANIZATION_KEYS = new RegExp(`^/api/organizations/${UUID}/api-keys$`)
 const ORGANIZATION_WORKSPACES = new RegExp(`^/api/organizations/${UUID}/workspaces$`)

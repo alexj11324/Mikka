@@ -302,3 +302,7 @@ export function driveScopeProblem(driveScope: unknown, scopeId: unknown, scopeUs
 export interface DriveSkillCursor { volumeId: string; path: string }
 export interface DriveSkillMetadata extends DriveSkillCursor { versionId: string; name: string; description: string }
 export interface DriveSkillPage { skills: DriveSkillMetadata[]; nextCursor: DriveSkillCursor | null }
+
+/** A signed-in link may narrow its underlying Drive audience, never expand it. */
+export type DriveFileLinkVisibility = 'private' | 'org'
+export type DriveFileLink = { id: string; path: string; visibility: DriveFileLinkVisibility }
