@@ -4,10 +4,10 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 
 | Code path status | Count at this ledger revision |
 |---|---:|
-| complete | 149 |
-| partial | 28 |
+| complete | 162 |
+| partial | 30 |
 | prior-partial | 36 |
-| unreviewed | 6343 |
+| unreviewed | 6328 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -30,3 +30,5 @@ Sixteen Expo route entries now have independent records for the exact reachable 
 Full name/mode/blob difference inventory refreshed through 295f53ba18177329d162bb62da44d7e66bb46ac6 (8344 paths): 1364 changed names vs fixed baseline, {'modified': 986, 'added': 363, 'deleted': 15}. Relative to a1e31323a381b97d8e0a7b7d098fadb3c4b767e3, 40 names changed in eight ordinary main merges. 15 G-affected names link the exact tested change to its merge and receipt. The remaining names and earlier changes to these files stay in scope; owner B/E merges remain attributed to their PRs.
 
 Fourteen fixed source paths cover gateway admission, DO wiring, native WebSocket presence, Eve image configuration, the retired restart machine, and the actual G-048 and G-015 consumers. Both native 90-second expiry and recovery paths were run in isolated workerd, with supporting route and Eve scopes recorded per path.
+
+15 additional settings and workspace sources identify each route, writer, authoritative read and the historical one-step drawer mover. Thirteen meet the fixed-source semantic criteria; the legacy singular picker and same-key order hydration remain partial. Source, tests and current consumer are recorded for G-052 #2627.
