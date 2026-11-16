@@ -239,8 +239,10 @@ The official CLI packages, Node/npm, system files and their layout remain
 intact: adding files is allowed; deleting or overwriting originals is not
 ([Alex's #1505 clarification](design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md)).
 
-A worker change on `main` runs `e2b-official-runtime.yml`, using the reusable
-`e2b-template.yml` candidate builder. The build checks every protected original
+A worker change on `main` is reported by `e2b-official-runtime.yml`. After
+Cloudflare serves that commit, a dispatch with the promotion's
+`cloudflare_receipt` runs the release through the reusable `e2b-template.yml`
+candidate builder. The build checks every protected original
 file's hash, type, mode, owner and link before and after installation. Both
 Claude Code and Codex must complete real subscription executions on those
 candidates before public publication and production selection. Credentials

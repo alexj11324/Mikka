@@ -75,7 +75,7 @@ jobs:
     # Replace stale waits for the same release path. A receiptless push cannot
     # cancel the protected Cloudflare preflight while it verifies promotion.
     concurrency:
-      group: desktop-release-preflight-${{ github.ref }}-${{ inputs.cloudflare_receipt && 'promoted' || 'legacy' }}
+      group: desktop-release-preflight-${{ github.ref }}-${{ inputs.cloudflare_receipt && 'promoted' || 'push' }}
       cancel-in-progress: true
     permissions:
       contents: read
@@ -85,7 +85,8 @@ jobs:
       EXPECTED_UI_OVERLAY_SHA: ${{ inputs.overlay-sha }}
     outputs:
       version: ${{ steps.version.outputs.version }}
-      overlay-sha: ${{ steps.promoted.outputs.overlay-sha || steps.overlay.outputs.overlay-sha }}
+      overlay-sha: ${{ steps.promoted.outputs.overlay-sha }}
+      release: ${{ steps.promoted.outcome == 'success' }}
     steps:
       - name: Require main
         run: |
@@ -99,22 +100,26 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
+      # The Cloudflare deployment workflow promotes production Web after a push.
+      # The installer is built from the dispatch that carries that promotion's
+      # receipt, so it never ships ahead of the Web it talks to.
+      - name: Leave the installer to the Cloudflare promotion
+        if: github.event_name == 'push'
+        run: |
+          echo "::notice title=Desktop waits for Cloudflare::Build after Cloudflare serves this commit: dispatch this workflow on main with cloudflare_receipt."
+          printf '### No installer from this push\n\nAfter Cloudflare serves this commit, dispatch Desktop release on main with `cloudflare_receipt` (docs/operations/web-deploy.md).\n' >> "$GITHUB_STEP_SUMMARY"
+      - name: Require the Cloudflare promotion receipt
+        if: github.event_name != 'push' && github.event.inputs.cloudflare_receipt == ''
+        run: |
+          echo "::error title=cloudflare_receipt required::Production Web is promoted by the Cloudflare deployment workflow. Dispatch again with that promotion's cloudflare_receipt."
+          exit 1
       - name: Verify the promoted Cloudflare Web before allocating macOS
         id: promoted
-        if: github.event.inputs.cloudflare_receipt != ''
+        if: github.event_name != 'push'
         env:
           GITHUB_TOKEN: ${{ github.token }}
           CLOUDFLARE_RECEIPT: ${{ github.event.inputs.cloudflare_receipt }}
         run: node scripts/release/cloudflare-promoted-web.mjs desktop
-      - name: Require the matching production Web deployment
-        if: github.event.inputs.cloudflare_receipt == ''
-        run: node scripts/release/web-deploy.mjs await-desktop-web
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-      - name: Select the legacy production Web overlay
-        id: overlay
-        if: github.event.inputs.cloudflare_receipt == ''
-        run: node scripts/release/hosted-ui.mjs production
       - name: Version from workflow run
         id: version
         run: |
@@ -125,6 +130,7 @@ jobs:
 
   macos:
     needs: preflight
+    if: needs.preflight.outputs.release == 'true'
     runs-on: macos-26  # macos-15's Xcode 26.3 crashes compiling the glass layers of build/icon.icon
     timeout-minutes: 90
     # Finish the active signed candidate; GitHub keeps only the latest pending job.
@@ -148,7 +154,6 @@ jobs:
       - name: Verify production credential delivery boundaries
         run: node --test scripts/mobile-ota-credentials.test.mjs scripts/release/apple-credentials.test.mjs
       - name: Recheck the promoted Web before loading private credentials
-        if: github.event.inputs.cloudflare_receipt != ''
         env:
           GITHUB_TOKEN: ${{ github.token }}
           CLOUDFLARE_RECEIPT: ${{ github.event.inputs.cloudflare_receipt }}
@@ -358,17 +363,7 @@ jobs:
         env:
           RELEASE_MANIFEST_SHA256: ${{ steps.seal.outputs.manifest-sha256 }}
         run: node scripts/release/evidence.mjs verify "$RUNNER_TEMP/mikka-desktop-release-candidate"
-      - name: Reject a changed legacy overlay before waiting for its Web build
-        if: github.event.inputs.cloudflare_receipt == ''
-        run: node scripts/release/hosted-ui.mjs production
-      - name: Require the matching production Web deployment
-        if: github.event.inputs.cloudflare_receipt == ''
-        # The deployed Web source must contain the installed UI's source before publication.
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/release/web-deploy.mjs await-desktop-web
       - name: Recheck the promoted Web before publishing the signed installers
-        if: github.event.inputs.cloudflare_receipt != ''
         env:
           GITHUB_TOKEN: ${{ github.token }}
           CLOUDFLARE_RECEIPT: ${{ github.event.inputs.cloudflare_receipt }}

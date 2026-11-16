@@ -141,7 +141,7 @@ test('Desktop binds its own original attempt, installer ancestry, overlay and se
   await assert.rejects(fixture({ run: { path: '.github/workflows/desktop-release.yml' } }).verify(), /runIdentity/)
 })
 
-test('both publication modes share the paid builder and subscriptions, while Cloudflare omits the legacy publisher', () => {
+test('the paid builder and subscriptions run only behind the Cloudflare receipt, with no Vercel publisher', () => {
   const read = name => readFileSync(new URL('../../.github/workflows/' + name, import.meta.url), 'utf8')
   const parent = read('e2b-official-runtime.yml'), child = read('e2b-runtime-release.yml')
   const gate = 'run: node scripts/release/cloudflare-promoted-web.mjs'
@@ -151,8 +151,11 @@ test('both publication modes share the paid builder and subscriptions, while Clo
   const first = child.indexOf(gate), second = child.indexOf(gate, first + 1), third = child.indexOf(gate, second + 1)
   assert.ok(first >= 0 && first < paid && paid < second && second < proof && proof < third && third < child.indexOf('--publish-verified'))
   assert.match(child, /id: release[\s\S]*node scripts\/e2b\/runtime-report\.mjs reference\n          node scripts\/release\/cloudflare-promoted-web\.mjs/)
-  assert.match(child, /  publish:\n    needs: \[validate, await-web, subscriptions\]\n    if: github\.event\.inputs\.cloudflare_receipt == ''/)
-  for (const source of [parent, child]) assert.match(source, /if: github\.event\.inputs\.cloudflare_receipt == ''\n        run: node scripts\/release\/web-deploy\.mjs await-web/)
+  for (const source of [parent, child]) {
+    assert.doesNotMatch(source, /web-deploy\.mjs await-|workflows\/web-deploy\.yml|\n  publish:/)
+    // Every receipt gate runs unconditionally; an empty receipt fails closed.
+    assert.doesNotMatch(source, /if: github\.event\.inputs\.cloudflare_receipt != ''/)
+  }
 })
 
 test('read-only monitor witness rechecks an older actual promotion without authorizing publication', async () => {
