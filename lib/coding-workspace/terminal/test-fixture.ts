@@ -9,7 +9,7 @@ export function terminalFixture() {
     workspaceId: randomUUID(), deviceId: randomUUID(), repoId: randomUUID(), deviceTokenId: randomUUID(),
     remoteKey: 'v2/github/fixture/project', repoPath: 'v2/github/fixture/project', worktreePath: '/workspace/fixture',
     machineKind: 'cloud', sandboxId: 'sandbox-synthetic', machineEpoch: 2, machineOperationId: randomUUID(),
-    machineStatus: 'running', runStatus: 'succeeded', pauseReason: null, leaseExpiresAt: null,
+    machineStatus: 'running', runStatus: 'succeeded', runStartedAt: null, pauseReason: null, leaseExpiresAt: null,
     nativeExitedProof: true, bindingId: 'a'.repeat(64), deviceTokenActive: false,
     credential: { kind: 'session', id: 'browser-session-synthetic' }, credentialExpiresAt: null,
   }

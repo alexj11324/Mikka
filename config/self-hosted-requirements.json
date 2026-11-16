@@ -48,6 +48,13 @@
     "test": "lib/device-heartbeat.db.test.ts",
     "suite": "test:device-revocation-db"
   },
+  "app/api/drive/scopes/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List the current user's personal Files location and readable active project-personal locations within the selected workspace.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "app/api/drive/volumes/[volumeId]/archive/route.ts": {
     "mode": "built-in",
     "environment": [],
@@ -307,6 +314,20 @@
     "behavior": "List, upload, download and delete task files under the task ACL using the installation database and configured attachment storage.",
     "test": "tests/team-issue-create.db.test.ts",
     "suite": "test:scope-detachment-db"
+  },
+  "app/api/tasks/[taskId]/review/machine-metrics/route.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "Reads a recent measurement from a Task owner's configured E2B machine. Returns unavailable for unsupported machine providers and for missing owner configuration.",
+    "test": "lib/coding-workspace/machine-metrics.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/computer/e2b-provider.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "Reads a recent measurement from a Task owner's configured E2B machine. Returns unavailable for unsupported machine providers and for missing owner configuration.",
+    "test": "lib/coding-workspace/machine-metrics.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
   },
   "app/api/tasks/[taskId]/review/preview/route.ts": {
     "mode": "operator-configured",
@@ -978,6 +999,13 @@
     "test": "lib/coding-workspace/preview/route.test.ts",
     "suite": "test:coding-workspace-review-runtime"
   },
+  "lib/coding-workspace/preview/port.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validates the numeric port before requesting a Task machine lease or resume.",
+    "test": "lib/coding-workspace/preview/route.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
   "lib/coding-workspace/preview/runtime.ts": {
     "mode": "operator-configured",
     "environment": [
@@ -1099,6 +1127,13 @@
     "behavior": "Derive a task's activity events (status, priority, description, assignee, parent, relations and pull requests) from its local history.",
     "test": "lib/issue-activity.test.ts",
     "suite": "test:issues"
+  },
+  "lib/project-access.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Return active project names for a selected-workspace personal Files picker after the existing project content permission check.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
   },
   "lib/project-resources/contracts.ts": {
     "mode": "built-in",
@@ -2840,6 +2875,34 @@
     "behavior": "Works out the setup checklist from the installation's own data.",
     "test": "lib/onboarding.db.test.ts",
     "suite": "test:onboarding-db"
+  },
+  "app/api/integrations/github/repositories/branches/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads a branch page through the installation's existing GitHub repository authorization. Without the configured GitHub App or an authorized repository, the read is refused.",
+    "test": "lib/github/user-access.test.ts",
+    "suite": "test:github"
+  },
+  "lib/github/user-access.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads a branch page through the installation's existing GitHub repository authorization. Without the configured GitHub App or an authorized repository, the read is refused.",
+    "test": "lib/github/user-access.test.ts",
+    "suite": "test:github"
+  },
+  "lib/github/repository-input.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validates the existing repository selector for signed GitHub repository reads and verification settings.",
+    "test": "lib/github/user-access.test.ts",
+    "suite": "test:github"
+  },
+  "app/api/integrations/github/repositories/verification/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validates the existing repository selector for signed GitHub repository reads and verification settings.",
+    "test": "lib/github/user-access.test.ts",
+    "suite": "test:github"
   },
   "app/api/integrations/github/repositories/tree/route.ts": {
     "mode": "built-in",

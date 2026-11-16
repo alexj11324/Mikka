@@ -35,8 +35,16 @@ test('real Postgres: personal ownership, encrypted auth, revocation, installatio
     await assert.rejects(store.mcpConnection('owner', server.id), /mcpUnavailable/)
     await store.updateMcp('owner', { id: server.id, enabled: true, name: 'Renamed' })
     await assert.rejects(store.mcpConnection('owner', server.id, server.revision), /mcpUnavailable/)
-    await store.updateMcp('owner', { id: server.id, auth: null })
-    assert.deepEqual((await store.mcpConnection('owner', server.id)).headers, {})
+    const cleared = await store.updateMcp('owner', { id: server.id, auth: null })
+    const replays = await Promise.all([
+      store.updateMcp('owner', { id: server.id, auth: null }),
+      store.updateMcp('owner', { id: server.id, headers: null }),
+    ])
+    assert.deepEqual(replays.map(connection => connection.revision), [cleared.revision, cleared.revision])
+    assert.deepEqual((await store.mcpConnection('owner', server.id, cleared.revision)).headers, {})
+    const renamed = await store.updateMcp('owner', { id: server.id, name: 'Without credential', auth: null })
+    assert.equal(renamed.name, 'Without credential')
+    assert.equal(renamed.revision, cleared.revision + 1)
     assert.equal((await pool.query('SELECT ciphertext FROM personal_mcp_servers WHERE id=$1', [server.id])).rows[0].ciphertext, null)
     const skill: SkillContent = { name: 'Example', source: 'owner/skills', slug: 'example', sourceKind: 'skills.sh', sourceRevision: 'a'.repeat(40), sourcePath: 'skills/example/SKILL.md', body: '# Fixed skill', sha256: 'b'.repeat(64) }
     const installed = await store.installSkill('owner', skill)

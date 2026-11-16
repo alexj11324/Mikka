@@ -883,6 +883,15 @@
       "sourceHash": "89c93bc677ba5938dbc399382cc4e2a50817f09da593a0e135b52d9e9a09923f"
     },
     {
+      "path": "/mikka/api/drive/scopes",
+      "template": "/api/drive/scopes",
+      "source": "app/api/drive/scopes/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "36302ad4969163e91ffff079b62aedd6b2aabf14f080083a4cf4dd72dbd2c531"
+    },
+    {
       "path": "/mikka/api/drive/volumes",
       "template": "/api/drive/volumes",
       "source": "app/api/drive/volumes/route.ts",
@@ -1318,6 +1327,15 @@
       "sourceHash": "7eaa7d4da7df0917328fb6ee3f352eb121ea21f357885d83db46fccec2d9c623"
     },
     {
+      "path": "/mikka/api/integrations/github/repositories/branches",
+      "template": "/api/integrations/github/repositories/branches",
+      "source": "app/api/integrations/github/repositories/branches/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "8b33a238386db8af61da018f821b650c340e40244ea341180744b9b6b8d57643"
+    },
+    {
       "path": "/mikka/api/integrations/github/repositories/tree",
       "template": "/api/integrations/github/repositories/tree",
       "source": "app/api/integrations/github/repositories/tree/route.ts",
@@ -1334,7 +1352,7 @@
         "GET",
         "PATCH"
       ],
-      "sourceHash": "bf17c03c602bb0f5e4a8084e4f2b39def81f3d2212de22d8b5c79b577b380205"
+      "sourceHash": "0eab86e939f6215b0c361e16b9769129208338ba55a7a4b71a2175ca26a77875"
     },
     {
       "path": "/mikka/api/integrations/google/callback",
@@ -2468,6 +2486,16 @@
       ],
       "maxDuration": 30,
       "sourceHash": "bef2abdcd8118223cbf11d270afdacd60b1b67918ea04839657dcdecaf3b9b9c"
+    },
+    {
+      "path": "/mikka/api/tasks/[taskId]/review/machine-metrics",
+      "template": "/api/tasks/[taskId]/review/machine-metrics",
+      "source": "app/api/tasks/[taskId]/review/machine-metrics/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "c12fc4b721f87d76416e0e2ab4c66f717110c855dc39909f1013a08d09d95bdf"
     },
     {
       "path": "/mikka/api/tasks/[taskId]/review/merge",

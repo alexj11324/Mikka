@@ -10,6 +10,16 @@ const {
 if (previousBase === undefined) delete process.env.MIKKA_BASE_PATH
 else process.env.MIKKA_BASE_PATH = previousBase
 
+test('Project personal Files keep a separate address and cache for each Project and reader', () => {
+  const location = { workspaceId: 'workspace-a', projectId: 'project-a' }
+  const url = new URL(driveFileURL(location, 'volume', 'notes.txt'), 'https://example.invalid')
+  assert.equal(url.searchParams.get('workspaceId'), location.workspaceId)
+  assert.equal(url.searchParams.get('projectId'), location.projectId)
+  assert.notDeepEqual(driveVolumesKey(location, 'member'), driveVolumesKey('workspace-a', 'member'))
+  assert.notDeepEqual(driveHeadKey(location, 'member', 'volume'), driveHeadKey({ ...location, projectId: 'project-b' }, 'member', 'volume'))
+  assert.notDeepEqual(driveHistoryKey(location, 'member', 'volume'), driveHistoryKey(location, 'owner', 'volume'))
+})
+
 test('file links and caches distinguish the selected tenant, account and immutable version', () => {
   const url = new URL(driveFileURL('workspace-a', 'volume', 'a b/#notes.md', 'version-1'), 'https://example.invalid')
   assert.equal(url.pathname, '/mikka/api/drive/volumes/volume/files')

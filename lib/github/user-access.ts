@@ -27,10 +27,13 @@ function githubId(value: unknown): string {
 
 async function githubGet(token: string, path: string, budget?: RequestBudget): Promise<{ data: Json; next: boolean }> {
   const started = Date.now()
-  try { return await githubRequest(token, path, budget) } finally { noteGitHubRequest(Date.now() - started) }
+  try {
+    const { data, next } = await githubRequest(token, path, budget)
+    return { data: object(data), next }
+  } finally { noteGitHubRequest(Date.now() - started) }
 }
 
-async function githubRequest(token: string, path: string, budget?: RequestBudget): Promise<{ data: Json; next: boolean }> {
+async function githubRequest(token: string, path: string, budget?: RequestBudget): Promise<{ data: unknown; next: boolean }> {
   let response: Response
   try {
     response = await fetch(`${API}${path}`, {
@@ -57,7 +60,7 @@ async function githubRequest(token: string, path: string, budget?: RequestBudget
       if (bytes > 4 * 1024 * 1024) throw new GitHubAccessError('githubUnavailable', 502)
       chunks.push(part.value)
     }
-    return { data: object(JSON.parse(Buffer.concat(chunks).toString('utf8'))), next: /rel="next"/.test(response.headers.get('link') ?? '') }
+    return { data: JSON.parse(Buffer.concat(chunks).toString('utf8')), next: /rel="next"/.test(response.headers.get('link') ?? '') }
   // error-cause: JSON and stream errors can quote private repository or account response bodies.
   } catch { await reader.cancel().catch(() => {}); throw new GitHubAccessError('githubUnavailable', 502) }
   finally { reader.releaseLock() }
@@ -214,6 +217,24 @@ export async function githubRepositoryReadCredential(userId: string, remoteKey: 
     || typeof current.private !== 'boolean' || (expectedId !== undefined && expectedId !== id)) throw new GitHubAccessError('githubRepositoryForbidden', 403)
   return { token, repository: { id, installationId, fullName: current.full_name, htmlUrl: `https://github.com/${current.full_name}`, private: current.private },
     kind: fromCloud ? 'installation' : 'user', githubAccountId }
+}
+
+/** Read one branch page by the repository's verified immutable GitHub ID.
+ * Keep branch names and exact commit IDs; GitHub response URLs and tokens stay private. */
+export async function readRepositoryBranches(userId: string, fullName: string, page: number, budget: RequestBudget) {
+  const { repository, token } = await githubRepositoryReadCredential(userId, 'v2/github.com/' + fullName.toLowerCase(), budget)
+  const started = Date.now()
+  try {
+    const { data, next } = await githubRequest(token, `/repositories/${repository.id}/branches?per_page=100&page=${page}`, budget)
+    if (!Array.isArray(data) || data.length > 100) throw new GitHubAccessError('githubUnavailable', 502)
+    const branches = data.map(value => {
+      const row = object(value), { sha } = object(row.commit)
+      if (typeof row.name !== 'string' || !row.name.length || row.name.length > 1024
+        || typeof sha !== 'string' || !/^[0-9a-f]{40}$/.test(sha)) throw new GitHubAccessError('githubUnavailable', 502)
+      return { name: row.name, sha }
+    })
+    return { repository: repository.fullName, branches, nextPage: next ? page + 1 : null }
+  } finally { noteGitHubRequest(Date.now() - started) }
 }
 
 /** Resolve the selected Git ref inside the admitted repository and return visible metadata only. */

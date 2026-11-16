@@ -94,7 +94,13 @@ export async function verifyWorkspaceAutomation({ page, workspaceId, fixture, rp
   await expect(name).toHaveValue(title)
   await expect(status).not.toBeChecked()
   assert.equal((await read(scheduleId)).automation.owner_id, fixture.ownerId)
+  await expect(name).not.toBeEditable()
+  await expect(status).toBeDisabled()
+  await expect(page.getByRole('button', { name: words.editor.resume, exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: words.editor.save, exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: words.editor.delete, exact: true })).toBeEnabled()
   passed('packaged_same_workspace_member_reads_the_restored_owner_automation')
+  passed('packaged_member_retains_delete_without_edit_or_resume_on_a_different_creator_schedule')
   await signInAs(fixture, fixture.ownerId)
   assert.ok((await rpc('workspace.switchWorkspace', [workspaceId])).ok)
 }

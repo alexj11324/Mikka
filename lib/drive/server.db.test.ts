@@ -6,7 +6,7 @@ import { readFile } from 'node:fs/promises'
 import { mock, test } from 'node:test'
 import { Pool } from 'pg'
 import { measured } from '../../tests/helpers/read-metrics'
-import { dbUrl, seedPersonalWorkspace, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
+import { dbUrl, seedPersonalWorkspace, seedProject, seedTeam, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 
 test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and versioned bytes', { skip: !dbUrl, timeout: 60_000 }, async t => {
   // Browser authentication is absent; every successful HTTP request must verify
@@ -20,6 +20,7 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
   const tokens = await import('../tokens/store')
   const { artifactStorage } = await import('../artifacts/storage')
   assert.equal(artifactStorage(), 'inline', 'this test must not use any external object storage')
+  const scopes = await import('../../app/api/drive/scopes/route')
   const collection = await import('../../app/api/drive/volumes/route')
   const detail = await import('../../app/api/drive/volumes/[volumeId]/route')
   const upload = await import('../../app/api/drive/volumes/[volumeId]/blobs/route')
@@ -39,7 +40,7 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
         headers: incoming.headers as Record<string, string>, ...(chunks.length ? { body: Buffer.concat(chunks) } : {}) })
       const segments = new URL(request.url).pathname.split('/').filter(Boolean).slice(3)
       const params = Promise.resolve({ volumeId: segments[0], versionId: segments[2] })
-      const response = !segments.length
+      const response = new URL(request.url).pathname === '/api/drive/scopes' ? await scopes.GET(request) : !segments.length
         ? await (request.method === 'POST' ? collection.POST : collection.GET)(request)
         : segments.length === 1 ? await detail.GET(request, { params })
           : segments.length === 3 ? await version.GET(request, { params })
@@ -62,14 +63,46 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
   const ownerToken = (await tokens.createLegacyPersonalAccessToken(owner, personal, { name: 'Drive HTTP personal' })).token
   const sharedToken = (await tokens.createLegacyPersonalAccessToken(owner, team.id, { name: 'Drive HTTP other tenant' })).token
   const peerToken = (await tokens.createLegacyPersonalAccessToken(peer, team.id, { name: 'Drive HTTP peer' })).token
-  const call = (suffix = '', options: { token?: string | null; workspaceId?: string; method?: string; body?: unknown; raw?: string; origin?: string } = {}) => {
+  const call = (suffix = '', options: { token?: string | null; workspaceId?: string; projectId?: string; method?: string; body?: unknown; raw?: string; origin?: string } = {}) => {
     const url = new URL(`/api/drive/volumes${suffix}`, origin)
     url.searchParams.set('workspaceId', options.workspaceId ?? personal)
+    if (options.projectId) url.searchParams.set('projectId', options.projectId)
     const bearer = options.token === undefined ? ownerToken : options.token
     return fetch(url, { method: options.method ?? 'GET', headers: { ...(bearer ? { authorization: `Bearer ${bearer}` } : {}),
       ...(options.method ? { origin: options.origin ?? origin } : {}), ...(options.body ? { 'content-type': 'application/json' } : {}) },
       body: options.raw ?? (options.body ? JSON.stringify(options.body) : undefined) })
   }
+  await t.test('personal Project folders keep their author and require present access to the selected Project', async () => {
+    const group = await seedTeam(fixture, team.id, owner)
+    const projectId = await seedProject(fixture, owner, [{ teamId: group.id, workspaceId: team.id }])
+    const target = { workspaceId: team.id, projectId }
+    const own = { ...target, token: sharedToken }
+    const colleague = { ...target, token: peerToken }
+    const directory = async (token: string) => {
+      const res = await fetch(`${origin}/api/drive/scopes?workspaceId=${team.id}`, { headers: { authorization: `Bearer ${token}` } })
+      assert.equal(res.status, 200)
+      return (await res.json()).scopes as { driveScope: string; projectId?: string }[]
+    }
+    assert.ok((await directory(peerToken)).some(scope => scope.driveScope === 'project-user' && scope.projectId === projectId))
+    const name = 'Project notes'
+    const created = await call('', { ...own, method: 'POST', body: { name } })
+    assert.equal(created.status, 201)
+    const { volume } = await created.json()
+    assert.equal(volume.driveScope, 'project-user')
+    assert.equal(volume.scopeId, projectId)
+    assert.equal(volume.scopeUserId, owner)
+    assert.equal((await call('', { ...colleague, method: 'POST', body: { name } })).status, 201)
+    assert.equal((await call('/' + volume.id, colleague)).status, 404)
+    assert.equal((await call('/' + volume.id, { workspaceId: team.id, token: sharedToken })).status, 404)
+    assert.deepEqual((await (await call('', own)).json()).volumes.map((row: { id: string }) => row.id), [volume.id])
+    await fixture.query("update resource_access_policies set visibility='private' where kind='project' and id=$1", [projectId])
+    assert.deepEqual(await directory(peerToken), [{ driveScope: 'user', workspaceId: team.id }])
+    assert.equal((await call('', colleague)).status, 404)
+    assert.equal((await call('/' + volume.id + '/versions', own)).status, 200)
+    await fixture.query('update workspace_projects set "archivedAt"=now() where id=$1', [projectId])
+    assert.deepEqual(await directory(sharedToken), [{ driveScope: 'user', workspaceId: team.id }])
+    assert.equal((await call('/' + volume.id + '/versions', own)).status, 404)
+  })
   const created = await call('', { method: 'POST', body: { name: `Drive ${randomUUID()}` } })
   assert.equal(created.status, 201)
   const volume = (await created.json()).volume
