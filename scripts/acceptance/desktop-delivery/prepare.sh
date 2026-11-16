@@ -56,10 +56,10 @@ stage exact-compiled-community-image
   MIKKA_TEST_DEPLOYMENT_SHA="$GITHUB_SHA" node --input-type=module \
     -e "await (await import('./scripts/start-app.mjs')).readCompiledBuild(process.cwd())"
   stage public-source-dependencies
-  # The shared store may reuse public packages. Only dependencies in this clean
-  # lockfile are linked into the worker-readable tree. Private build caches stay in the official checkout.
+  # A warm pnpm store can contain runner-only files. Copy this public lock's
+  # packages before changing permissions so no shared cache inode is touched.
   umask 022
-  ELECTRON_SKIP_BINARY_DOWNLOAD=1 pnpm install --prefer-offline --frozen-lockfile --ignore-scripts > "$base/product-install.log" 2>&1
+  ELECTRON_SKIP_BINARY_DOWNLOAD=1 pnpm install --package-import-method=copy --prefer-offline --frozen-lockfile --ignore-scripts > "$base/product-install.log" 2>&1
 )
 
 stage worker-identities
@@ -90,10 +90,9 @@ sudo chown "$(id -un):mikka-e-model" "$base/model-state"
 chmod 2770 "$base/model-state"
 # Only these public copies and pinned model materials are readable by workers.
 chmod 700 "$base/run" "$base/accounts"
-# Do not alter a shared pnpm store inode's mode. The installation was created
-# with a public-readable umask; source/fixtures outside node_modules were cloned privately.
-find "$product" -type d -name node_modules -prune -o -type d -exec chmod a+rx {} +
-find "$product" -type d -name node_modules -prune -o -type f -exec chmod a+r {} +
+# Grant read and traverse access to this disposable copy only. chmod does not
+# dereference symlinks during traversal; deployed product and private assets have separate roots.
+chmod -R a+rX "$product"
 chmod -R a+rX "$base/harness" "$base/material"
 for file in device-launch model-launch runtime-prepare; do
   install -m 755 "$product/scripts/acceptance/desktop-delivery/$file.sh" "$base/bin/$file"

@@ -54,3 +54,9 @@ for worker in mikka-e-device mikka-e-model; do
   sudo -n -u "$worker" -- test ! -x "$GITHUB_WORKSPACE"
   sudo -n -u "$worker" -- test ! -x "$RUNNER_TEMP"
 done
+
+# Load the same CLI from the service UID before a one-use enrollment is issued.
+echo device-cli-loader > "$base/stage"
+"$base/bin/device-launch" "$(command -v node)" --import tsx packages/daemon/bin/mikka.ts daemon --help > "$qa/device-help" 2>"$qa/daemon.log"
+grep -q 'mikka daemon' "$qa/device-help"
+echo offline-installed-window > "$base/stage"
