@@ -1,0 +1,39 @@
+{
+  "productRevision": "efcccbd42cb8ef9d34be3d75c87c8d060b2ce527",
+  "location": "node_modules/tsx/package.json",
+  "old": {
+    "run": 43831790802,
+    "job": 133178614173,
+    "artifact": 14209671466,
+    "zipSha256": "11be907605e98876e90638f6568b40fca8199bca693558743e73d06020171fe5",
+    "observed": "The actual one-use enrollment path ended before registration: ERR_INVALID_PACKAGE_CONFIG, file permission denied."
+  },
+  "frame": {
+    "run": 43832575435,
+    "job": 133181182466,
+    "artifact": 14209556861,
+    "zipSha256": "d1a81fa535e5645ef9d6809872901424c7ba88835681bf6beb718f822355b3f6",
+    "time": "2026-11-16T08:38:00.1194507Z",
+    "fileMode": "0600",
+    "hardLinks": 3
+  },
+  "repaired": {
+    "run": 43833429526,
+    "job": 133184054301,
+    "artifact": 14210116857,
+    "zipSha256": "bd596ccfcba962b8d972f0007ef035b5db8538bc60bf0e6b8dcc0e6d5f381810",
+    "workerReceipt": "2026-11-16T08:47:00.3378760Z",
+    "workbench": "7b470e2cbcd884b88c0c22c23f84f63a8574cf12",
+    "mode": "0644",
+    "hardLinks": 1,
+    "status": "success",
+    "enrolledNativeDiscovery": {
+      "codex": "0.163.0",
+      "claude_code": "2.1.309"
+    },
+    "rootCanary": "previously seeded restrictive public pnpm content store",
+    "transport": "Separate low-privileged Linux device UID, same loopback-only netns and per-UID port restrictions. Real trusted HTTPS version 200 and credential-free enrollment 401 before one-use stdin exchange. No change to any shared-store inode or private-directory access."
+  },
+  "scope": "Isolated PostgreSQL 17 and two leased identities. Only enroll, authenticate, verify actual native discovery, revoke, and release. No packaged window, provider subscription or four-mode rerun.",
+  "diagnosticNote": "The original artifact classifier marked sudoDenied for every sudo: line; both the failed and the passing runs include a nonfatal temporary hostname-lookup warning in the deliberately offline namespace. It does not indicate a privilege denial."
+}

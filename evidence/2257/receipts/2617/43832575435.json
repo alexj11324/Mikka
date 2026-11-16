@@ -1,0 +1,25 @@
+{
+  "source": "efcccbd42cb8ef9d34be3d75c87c8d060b2ce527",
+  "stage": null,
+  "phases": [],
+  "success": null,
+  "workbenchStage": null,
+  "buildClasses": [],
+  "buildIndicators": [],
+  "image": "sha256:a32e59d500c0ea0141293638542b2c3e5ee7c67e1a7e2d6aba058fd2385adf6c",
+  "nativeLogBytes": 1084,
+  "knownMarkers": {
+    "filePermission": true,
+    "sudoDenied": true,
+    "tsx": true,
+    "readPackageJson": true
+  },
+  "permittedTransportResult": null,
+  "before": {
+    "permissionRejected": false,
+    "readableAfterDedicatedCopy": false
+  },
+  "nonSecretClasses": [
+    "ERR_INVALID_PACKAGE_CONFIG"
+  ]
+}
