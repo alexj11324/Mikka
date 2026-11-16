@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
+import { after, before, mock, test } from 'node:test'
 import { act } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
@@ -16,7 +16,6 @@ mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) 
 
 const page = new Window({ url: 'https://example.invalid/mikka' })
 let root: Root
-let host: HTMLDivElement
 let createRoot: typeof import('react-dom/client')['createRoot']
 let ThreadContextUsage: typeof import('./thread-context-usage')['ThreadContextUsage']
 
@@ -27,13 +26,12 @@ before(async () => {
   }
   ;({ createRoot } = await import('react-dom/client'))
   ;({ ThreadContextUsage } = await import('./thread-context-usage'))
+  root = createRoot(document.body)
 })
-beforeEach(() => {
-  host = document.body.appendChild(document.createElement('div'))
-  root = createRoot(host)
+after(async () => {
+  await act(async () => root.unmount())
+  await page.happyDOM.close()
 })
-afterEach(async () => { await act(async () => root.unmount()); host.remove() })
-after(() => page.happyDOM.close())
 
 const usage = (over: Partial<ContextCharSources> = {}) => contextUsageFromCounts({
   // 40k ASCII characters is 10k estimated tokens: 40% of the brief's 25k cap.
@@ -43,7 +41,7 @@ const usage = (over: Partial<ContextCharSources> = {}) => contextUsageFromCounts
 
 test('the status line shows the brief estimate and opens its measured and unmeasured segments', async () => {
   await act(async () => root.render(<ThreadContextUsage usage={usage()} />))
-  const trigger = host.querySelector('button')!
+  const trigger = document.querySelector('button')!
   assert.equal(trigger.textContent, '上下文 10K/25K')
   assert.equal(trigger.getAttribute('aria-label'), '上下文，提纲已用 10K，上限 25K')
   assert.equal(trigger.getAttribute('aria-expanded'), 'false')
