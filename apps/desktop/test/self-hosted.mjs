@@ -9,6 +9,7 @@ import { decode, encode } from '../../../lib/desktop-rpc/wire.ts'
 import { launchElectron } from './electron-launch.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { verifyDesktopVersionHistory } from './self-hosted-version-history.mjs'
+import { verifyPersonalDriveUploads } from './self-hosted-drive.mjs'
 import { verifyConversationOrganization } from './self-hosted-conversations.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
 import { readNativeStartup } from './native-startup.mjs'
@@ -77,15 +78,18 @@ async function main() {
       env: { ...process.env, MIKKA_USER_DATA_DIR: profile, MIKKA_DESKTOP_RENDERER: 'bundled' }, timeout: 90_000 })
     if (overlaySha) {
       phase = 'packaged_official_overlay'
-      const matches = await application.evaluate(async ({ app }, expected) => {
+      const runtime = await application.evaluate(async ({ app }, expected) => {
         const path = process.getBuiltinModule('node:path')
         const fs = process.getBuiltinModule('node:fs')
         const archive = app.getAppPath()
-        if (!app.isPackaged || archive !== path.join(process.resourcesPath, 'app.asar')) return false
+        if (!app.isPackaged || archive !== path.join(process.resourcesPath, 'app.asar')) return null
         const manifest = JSON.parse(fs.readFileSync(path.join(archive, 'dist', 'mikka-ui-overlay.json'), 'utf8'))
-        return manifest.overlaySha === expected
+        if (manifest.overlaySha !== expected) return null
+        return { app: app.getVersion(), electron: process.versions.electron, chromium: process.versions.chrome,
+          platform: process.platform, architecture: process.arch }
       }, overlaySha)
-      assert.equal(matches, true, 'the launched official application must contain the selected UI revision')
+      assert.ok(runtime?.app && runtime.electron && runtime.chromium, 'the launched official application must contain the selected UI revision')
+      report.runtime = runtime
       passed('packaged_official_overlay_matches_selected_revision')
     }
     page = await application.firstWindow({ timeout: 90_000 })
@@ -180,7 +184,8 @@ async function main() {
     if (overlaySha) {
       phase = 'conversation_owner_member'
       const controls = { page, fixture, rpc, passed, setPhase: value => { phase = value } }
-      await verifyConversationOrganization(controls)
+      const sharedWorkspace = await verifyConversationOrganization(controls)
+      report.driveUploads = await verifyPersonalDriveUploads({ ...controls, application, workspaceId: sharedWorkspace, directory })
       report.versionAdmissions = await verifyDesktopVersionHistory(controls)
     }
     phase = 'sign_out_and_return'

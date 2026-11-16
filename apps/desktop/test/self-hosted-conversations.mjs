@@ -18,10 +18,10 @@ async function api(page, path, body) {
   }, { path, body })
 }
 
-async function signIn(page, email, password, id) {
+export async function signInDesktopAccount(page, account, id) {
   await page.evaluate(() => window.mikka.bundled.signOut())
   assert.equal(await page.evaluate(() => window.mikka.bundled.session()), null)
-  assert.equal(await page.evaluate(account => window.mikka.bundled.signInEmail(account), { email, password }), null)
+  assert.equal(await page.evaluate(credentials => window.mikka.bundled.signInEmail(credentials), { email: account.email, password: account.password }), null)
   await waitForBundledSession(page, id)
 }
 
@@ -36,7 +36,7 @@ async function selectWorkspace(page, rpc, workspaceId, userId, role) {
 }
 
 export async function verifyConversationOrganization({ page, fixture, rpc, passed, setPhase,
-  baseUrl = 'mikka://app/mikka/en/', signInAs = (account, id) => signIn(page, account.email, account.password, id) }) {
+  baseUrl = 'mikka://app/mikka/en/', signInAs = (account, id) => signInDesktopAccount(page, account, id) }) {
   setPhase('conversation_owner_setup')
   const suffix = randomUUID()
   const created = await rpc('workspace.createWorkspace', [{ name: 'Desktop conversation QA', slug: 'desktop-' + suffix }])
@@ -200,4 +200,5 @@ export async function verifyConversationOrganization({ page, fixture, rpc, passe
   await page.reload()
   await expect(row.getByRole('button', { name: words.markUnread, exact: true })).toBeVisible()
   passed('returned_owner_preserves_title_and_clears_unread_with_durable_readback')
+  return workspaceId
 }
