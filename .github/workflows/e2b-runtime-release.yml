@@ -9,8 +9,14 @@ on:
         description: The caller's verified Cloudflare promotion receipt
         type: string
         required: true
+      source_sha:
+        description: The commit that receipt shows Cloudflare serving; its worker is built and published
+        type: string
+        required: true
 permissions:
   contents: read
+env:
+  MIKKA_RUNTIME_SOURCE: ${{ inputs.source_sha }}
 jobs:
   recheck:
     runs-on: ubuntu-latest
@@ -51,6 +57,8 @@ jobs:
       contents: read
       id-token: write
     uses: ./.github/workflows/e2b-template.yml
+    with:
+      source_sha: ${{ inputs.source_sha }}
   # Cloudflare must still serve this exact commit after the paid candidate build.
   await-web:
     needs: validate
@@ -183,7 +191,7 @@ jobs:
           import { assertCandidatePreserved, assertReportIdentity, readRuntimeReport, reportStep, templateModelsDigest } from './scripts/e2b/runtime-report.mjs'
           reportStep(() => {
             const report = JSON.parse(readFileSync(process.argv[2]))
-            const expected = { sourceCommit: process.env.GITHUB_SHA, workerSha: process.env.SOURCE_SHA,
+            const expected = { sourceCommit: process.env.MIKKA_RUNTIME_SOURCE, workerSha: process.env.SOURCE_SHA,
               runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT }
             assertReportIdentity(report, expected)
             const candidate = readRuntimeReport(join(process.env.RUNNER_TEMP, 'e2b-candidates/candidates.json'), {
@@ -200,7 +208,7 @@ jobs:
           import { assertCandidatePreserved, assertReportIdentity, readRuntimeReport, reportDigest, reportStep, TEMPLATE_KINDS } from './scripts/e2b/runtime-report.mjs'
           reportStep(() => {
             const bytes = readFileSync(process.argv[2]), report = JSON.parse(bytes)
-            const expected = { sourceCommit: process.env.GITHUB_SHA, workerSha: process.env.SOURCE_SHA,
+            const expected = { sourceCommit: process.env.MIKKA_RUNTIME_SOURCE, workerSha: process.env.SOURCE_SHA,
               runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT }
             assertReportIdentity(report, expected)
             const candidate = readRuntimeReport(join(process.env.RUNNER_TEMP, 'e2b-candidates/candidates.json'), {

@@ -293,7 +293,8 @@ export function candidateReceipt(report, kind, proof, acceptance, expectedScope)
 export async function validateTemplateSubscriptions(report, { env = process.env, fetchImpl = fetch,
   sandboxFactory, runAcceptance = runCloudStartup, onDiagnostic = () => {} } = {}) {
   check(/^[a-f0-9]{40}$/.test(report.sourceCommit ?? '') && /^[a-f0-9]{40}$/.test(report.workerSha ?? ''), 'source_invalid')
-  check(!env.GITHUB_SHA || env.GITHUB_SHA === report.sourceCommit, 'source_mismatch')
+  const source = env.MIKKA_RUNTIME_SOURCE || env.GITHUB_SHA
+  check(!source || source === report.sourceCommit, 'source_mismatch')
   let account
   try { account = smokeAcceptanceAccount(env) } catch { fail('account_required') }
   check((!env.MIKKA_ACCEPTANCE_WORKSPACE_ID || UUID.test(env.MIKKA_ACCEPTANCE_WORKSPACE_ID))
