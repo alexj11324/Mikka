@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { expect } from '@playwright/test'
 import { signInDesktopAccount } from './self-hosted-conversations.mjs'
 
-const { Automations: words } = JSON.parse(await readFile(new URL('../../../messages/en.json', import.meta.url), 'utf8'))
+const { Automations: words, Onboarding: onboarding } = JSON.parse(await readFile(new URL('../../../messages/en.json', import.meta.url), 'utf8'))
 
 /** Exercise the installed renderer's normal Automations controls with a manual-only schedule. */
 export async function verifyWorkspaceAutomation({ page, workspaceId, fixture, rpc, passed, setPhase,
@@ -94,14 +94,33 @@ export async function verifyWorkspaceAutomation({ page, workspaceId, fixture, rp
   assert.deepEqual(history.occurrences, [])
   passed('packaged_paused_automation_deleted_restored_and_reopened_without_a_run')
 
-  setPhase('automation_same_workspace_member')
+  setPhase('automation_sign_in_independent_member')
   await signInAs(fixture.member, fixture.member.id)
+  setPhase('automation_select_member_workspace')
   assert.ok((await rpc('workspace.switchWorkspace', [workspaceId])).ok)
+  const memberBootstrap = await rpc('desktop.bootstrap', [workspaceId])
+  assert.equal(memberBootstrap.user.id, fixture.member.id)
+  assert.deepEqual(memberBootstrap.cacheWorkspace, { workspaceId, role: 'member' })
   await page.goto(location.href, { waitUntil: 'domcontentloaded' })
+  if (memberBootstrap.onboarding) {
+    // Previous checks for this account read through the broker without opening its first-run screen.
+    setPhase('automation_member_first_run_skip')
+    const skip = page.getByRole('button', { name: onboarding.skip, exact: true })
+    await skip.click()
+    await expect(skip).toBeHidden()
+    assert.equal((await rpc('desktop.bootstrap', [workspaceId])).onboarding, false)
+    await page.goto(location.href, { waitUntil: 'domcontentloaded' })
+  }
+  setPhase('automation_member_find_restored_row')
+  assert.equal((await read(scheduleId)).automation.owner_id, fixture.ownerId)
+  await expect(row).toHaveCount(1)
+  setPhase('automation_member_open_restored_row')
   await row.getByText(title, { exact: true }).click()
+  await page.waitForURL(url => url.searchParams.get('automation') === scheduleId)
+  setPhase('automation_member_read_restored_detail')
   await expect(name).toHaveValue(title)
   await expect(status).not.toBeChecked()
-  assert.equal((await read(scheduleId)).automation.owner_id, fixture.ownerId)
+  setPhase('automation_member_role_controls')
   await expect(name).not.toBeEditable()
   await expect(status).toBeDisabled()
   await expect(page.getByRole('button', { name: words.editor.resume, exact: true })).toBeDisabled()
