@@ -16,6 +16,16 @@ ALTER TABLE drive_blobs ADD CONSTRAINT drive_blob_project_owner CHECK (
         "projectId"::text || '/' || left(sha256,2) || '/' || sha256)));
 CREATE INDEX drive_blobs_project_workspace ON drive_blobs ("workspaceId") WHERE "workspaceId" IS NOT NULL;
 
+-- Older storage callers could create a project-scoped volume owned by one
+-- account. Its private name must not collide with the new shared namespace.
+-- For all non-project scopes ownerId is already determined by the scope.
+CREATE UNIQUE INDEX drive_volumes_storage_scope_name_key ON drive_volumes (
+  "driveScope", "scopeId", COALESCE("scopeUserId",''),
+  (CASE WHEN "driveScope"='user' THEN "workspaceId" END),
+  (CASE WHEN "driveScope"='project' THEN "ownerId" END), name
+) NULLS NOT DISTINCT;
+DROP INDEX drive_volumes_tenant_scope_name_key;
+
 -- The same durable worker already retires chat and task objects. The tenant
 -- sweep removes project-owned blobs, including staged uploads and old versions.
 ALTER TABLE chat_attachment_retirements ADD COLUMN "projectDriveId" uuid,

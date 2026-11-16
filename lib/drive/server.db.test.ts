@@ -116,7 +116,14 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
       assert.equal(result.status, 201)
       return (await result.json()).volume as { id: string; headDigest: string; driveScope: string }
     }
+    const { createDriveVolume } = await import('./volumes')
+    const legacy = await createDriveVolume(fixture, { ownerId: owner, authorName: 'Historical owner' },
+      { driveScope: 'project', workspaceId: team.id, scopeId: projectId, name: 'Shared test' },
+      text => createHash('sha256').update(text).digest('hex'))
     const volume = await folder(shared), foreign = await folder(other), privateVolume = await folder(privateFiles)
+    assert.equal((await call('/' + legacy.id, shared)).status, 404)
+    assert.deepEqual((await (await call('', shared)).json()).volumes.map((row: { id: string }) => row.id), [volume.id])
+    assert.equal((await call('', { ...recipient, method: 'POST', body: { name: 'Shared test' } })).status, 409)
     assert.equal(volume.driveScope, 'project')
     assert.equal((await call('/' + volume.id, { ...shared, workspaceId: team.id.toUpperCase(), projectId: projectId.toUpperCase() })).status, 200)
     assert.equal(privateVolume.driveScope, 'project-user')
