@@ -16,6 +16,8 @@ const run = (workflow, extra = {}) => ({ id: 1, head_sha: sourceSha, event: 'pus
 test('release identity and exact-SHA checks reject fork/PR/old checks and a newer failed run', async () => {
   const env = { GITHUB_REPOSITORY: repository, GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'push', GITHUB_SHA: sourceSha, GITHUB_RUN_ID: '42' }
   assert.deepEqual(releaseIdentity(env), identity)
+  // A release started by the Cloudflare gateway observation keeps the same main-commit identity.
+  assert.deepEqual(releaseIdentity({ ...env, GITHUB_EVENT_NAME: 'workflow_run' }), identity)
   for (const changed of [{ GITHUB_REF: 'refs/pull/1/merge' }, { GITHUB_REPOSITORY: 'fixture/fork' }, { GITHUB_EVENT_NAME: 'pull_request' }])
     assert.throws(() => releaseIdentity({ ...env, ...changed }), /releaseMainIdentityRequired/)
   assert.equal(checkWorkflowRuns(identity, RELEASE_WORKFLOWS[0], [run(RELEASE_WORKFLOWS[0], { head_sha: 'b'.repeat(40) })]).state, 'pending')
