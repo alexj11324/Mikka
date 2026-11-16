@@ -8157,6 +8157,7 @@
       },
       "save": "Save",
       "create": "Create",
+      "loadSavedVersion": "Discard edits and load saved version",
       "saving": "Saving…",
       "saved": "Saved",
       "started": "Run started",

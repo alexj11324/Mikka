@@ -66,15 +66,18 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
   const tTemplates = useTranslations('Automations.templates')
   const [draft, setDraft] = useState<AutomationDraft | null>(() => !creating ? null
     : template ? templateDraft(template, emptyDraft(localZone()), { title: tTemplates(`${template}.title`), prompt: tTemplates(`${template}.prompt`) }) : emptyDraft(localZone()))
-  const loaded = useRef<string | null>(null)
-  // The fields start from the stored definition once per version; a later live read does not overwrite edits.
+  const [baseline, setBaseline] = useState<{ version: number; draft: AutomationDraft } | null>(null)
+  const dirty = Boolean(baseline && draft && JSON.stringify(draft) !== JSON.stringify(baseline.draft))
+  // Keep editing the version the person actually opened until they save or choose the latest one.
+  function loadDefinition(schedule: AutomationView) {
+    const next = draftFrom(schedule.definition)
+    setBaseline({ version: schedule.version, draft: next })
+    setDraft(next)
+  }
   useEffect(() => {
-    if (!current) return
-    const version = `${current.id}:${current.version}`
-    if (loaded.current === version) return
-    loaded.current = version
-    setDraft(draftFrom(current.definition))
-  }, [current])
+    if (current && !dirty && current.version !== baseline?.version) loadDefinition(current)
+  }, [current, dirty, baseline?.version])
+  const stale = Boolean(current && baseline && dirty && current.version !== baseline.version)
   const requestId = useRef(crypto.randomUUID())
   const [busy, setBusy] = useState<null | 'save' | 'toggle' | 'run' | 'delete' | 'takeOver'>(null)
   const [cancellingRun, setCancellingRun] = useState<string | null>(null)
@@ -133,18 +136,22 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
   }
 
   async function save() {
-    if (!canManage || !workspaceId || !check || !('definition' in check) || busy) return
+    if ((!creating && (!current || !baseline)) || !canManage || !workspaceId || !check || !('definition' in check) || busy || stale) return
     setBusy('save')
     try {
       const result = creating
         ? await createAutomation({ requestId: requestId.current, definition: check.definition }, workspaceId)
-        : await updateAutomation({ scheduleId: current!.id, version: current!.version, definition: check.definition }, workspaceId ?? undefined)
-      if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
+        : await updateAutomation({ scheduleId: current!.id, version: baseline!.version, definition: check.definition }, workspaceId ?? undefined)
+      if ('error' in result && result.error) {
+        toast.error(actionError(result.error))
+        if (result.error === 'scheduleVersionConflict') await automation.mutate()
+        return
+      }
       const saved = (result as { schedule: AutomationView }).schedule
       toast.success(t('saved'))
       await invalidateAutomationList(mutateCache, workspaceId, false)
       if (creating) onOpen(saved.id)
-      else { loaded.current = null; await readAfterChange(saved) }
+      else { loadDefinition(saved); await readAfterChange(saved) }
     } finally { setBusy(null) }
   }
   async function toggle(on: boolean) {
@@ -153,7 +160,6 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
     try {
       const result = await (on ? resumeAutomation : pauseAutomation)({ scheduleId: current.id, version: current.version }, workspaceId ?? undefined)
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
-      loaded.current = null
       await readAfterChange((result as { schedule: AutomationView }).schedule)
       await invalidateAutomationList(mutateCache, workspaceId, false)
     } finally { setBusy(null) }
@@ -186,7 +192,6 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
       setConfirmTakeOver(false)
       toast.success(t('tookOver'))
-      loaded.current = null
       await automation.mutate({ ...(result as { schedule: AutomationView }).schedule, owner_name: null, can_take_over: false }, { revalidate: false })
     } finally { setBusy(null) }
   }
@@ -207,7 +212,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
   const localDevices = devices.filter(device => device.enabled || device.id === draft.machine)
   const active = current?.status === 'active'
   const canToggle = current?.status !== 'completed' && (active || canManage)
-  const canSave = canManage && Boolean(workspaceId && check && 'definition' in check) && !busy
+  const canSave = canManage && !stale && Boolean(workspaceId && check && 'definition' in check) && !busy
   const creator = !current || current.owner_id === userId ? t('you') : current.owner_name ?? ''
   const field = (label: string, control: React.ReactNode) => <SettingRow title={label}><div className="flex flex-wrap items-center justify-end gap-2">{control}</div></SettingRow>
 
@@ -362,6 +367,8 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
               cancelling={cancellingRun !== null} />)}
     </SettingsSection>}
 
+    {stale && current && <InlineLoadError message={actionError('scheduleVersionConflict')} retryLabel={t('loadSavedVersion')}
+      onRetry={() => loadDefinition(current)} />}
     <footer className="flex flex-wrap items-center justify-between gap-2 pb-8">
       <div className="flex items-center gap-2">
         {current && current.status !== 'completed' && <Button variant="outline" disabled={busy !== null || !canToggle} onClick={() => { void toggle(!active) }}>{active ? t('pause') : t('resume')}</Button>}
