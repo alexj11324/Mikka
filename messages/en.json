@@ -8211,6 +8211,7 @@
     }
   },
   "SetupChecklist": {
+    "show": "Show checklist",
     "title": "Setup checklist",
     "left": "{count, plural, one {# left} other {# left}}",
     "hide": "Hide setup checklist",

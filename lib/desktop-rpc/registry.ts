@@ -225,6 +225,7 @@ const functions = {
   'onboarding.saveOnboardingStep': actions20.saveOnboardingStep,
   'onboarding.setupChecklist': actions20.setupChecklist,
   'onboarding.dismissSetupChecklist': actions20.dismissSetupChecklist,
+  'onboarding.restoreSetupChecklist': actions20.restoreSetupChecklist,
   'pending-actions.decidePendingAction': actions21.decidePendingAction,
   'personal-policy.getSharePolicy': actions22.getSharePolicy,
   'personal-policy.updateSharePolicy': actions22.updateSharePolicy,
