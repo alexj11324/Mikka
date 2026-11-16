@@ -21,8 +21,8 @@ export async function listDriveSkills(database: Pick<PoolClient, 'query'>, actor
     WHERE v."ownerId"=$1 AND v."workspaceId"=$2 AND v."driveScope"=$3 AND v."scopeId"=$4
       AND v."scopeUserId" IS NOT DISTINCT FROM $5::text AND v."archivedAt" IS NULL
       AND (e.path='SKILL.md' OR e.path LIKE '%/SKILL.md') AND e."sizeBytes" BETWEEN 1 AND $8
-      AND ($6::text IS NULL OR (v.id,e.path) > ($6::text,$7::text))
-    ORDER BY v.id,e.path LIMIT $9`,
+      AND ($6::text IS NULL OR (v.id COLLATE "C",e.path COLLATE "C") > ($6::text,$7::text))
+    ORDER BY v.id COLLATE "C",e.path COLLATE "C" LIMIT $9`,
     [actor.ownerId, scope.workspaceId, scope.driveScope, scope.scopeId, scope.scopeUserId ?? null,
       page.after?.volumeId ?? null, page.after?.path ?? null, MAX_SKILL_INSTRUCTIONS_LENGTH, page.limit + 1])
   const entries = rows.slice(0, page.limit)
