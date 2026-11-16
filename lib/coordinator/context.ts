@@ -406,7 +406,8 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
   }
   for (const { id, position, message: storedMessage, createdAt, pending } of rows) {
     const display = messageDisplay(storedMessage)
-    const message = display?.kind === 'reply' ? { ...storedMessage, role: 'assistant' as const, content: display.text }
+    const message = display?.kind === 'reply' ? { ...storedMessage, role: 'assistant' as const, content: storedMessage.role === 'assistant' && (storedMessage as { mikkaStopped?: unknown }).mikkaStopped === true && Array.isArray(storedMessage.content)
+      ? [...storedMessage.content.filter(part => part.type !== 'text'), { type: 'text' as const, text: display.text }] : display.text }
       : display?.kind === 'person' ? { ...storedMessage, role: 'user' as const, content: Array.isArray(storedMessage.content) ? [{ type: 'text' as const, text: display.text }, ...storedMessage.content.filter(part => part.type === 'file')] : display.text } : storedMessage
     if (display?.kind === 'hidden') {
       briefingBoundary = true
