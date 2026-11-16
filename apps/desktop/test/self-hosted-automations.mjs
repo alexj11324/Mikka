@@ -1,10 +1,102 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
-import { expect } from '@playwright/test'
+import { expect, request } from '@playwright/test'
+import { decode } from '../../../lib/desktop-rpc/wire.ts'
 import { signInDesktopAccount } from './self-hosted-conversations.mjs'
 
 const { Automations: words, Onboarding: onboarding } = JSON.parse(await readFile(new URL('../../../messages/en.json', import.meta.url), 'utf8'))
+
+// Keep the member's packaged editor open while the existing workspace admin writes from a separate web session.
+async function verifyConcurrentDraft({ page, workspaceId, fixture, rpc, passed, setPhase, location }) {
+  const view = id => rpc('automations.getAutomation', [id, workspaceId]).then(result => result.automation)
+  const editor = words.editor
+  const title = 'Concurrent schedule ' + randomUUID()
+  const name = page.getByRole('textbox', { name: editor.name, exact: true })
+  const save = page.getByRole('button', { name: editor.save, exact: true })
+  const discard = page.getByRole('button', { name: editor.loadSavedVersion, exact: true })
+
+  setPhase('automation_member_creates_independent_draft')
+  const created = await rpc('automations.createAutomation', [{
+    requestId: randomUUID(),
+    definition: { title, timezone: 'UTC', timing: { kind: 'manual' }, misfire: 'skip', maxLatenessMinutes: 30,
+      task: { kind: 'dispatch_task', botId: null, prompt: 'Disposable concurrent edit' } },
+  }, workspaceId])
+  assert.ok(created.schedule?.id)
+  const id = created.schedule.id
+  const url = new URL(location)
+  url.searchParams.set('automation', id)
+  await page.goto(url.href, { waitUntil: 'domcontentloaded' })
+  await expect(name).toHaveValue(title)
+  await expect(name).toBeEditable()
+  assert.equal((await view(id)).owner_id, fixture.member.id)
+
+  // validateSelfHostedDesktopTarget has already pinned this origin and both disposable identities.
+  const admin = await request.newContext({ baseURL: fixture.origin, maxRedirects: 0,
+    extraHTTPHeaders: { origin: fixture.origin, 'x-mikka-rpc': '1' } })
+  let signedIn = false
+  async function adminAction(action, args) {
+    const response = await admin.post('/mikka/api/rpc', { data: { version: 1, action, args } })
+    assert.equal(response.status(), 200)
+    const body = await response.json()
+    assert.equal(body.ok, true)
+    return decode(body.result)
+  }
+  async function rename(automation, nextTitle) {
+    const result = await adminAction('automations.updateAutomation', [{ scheduleId: id, version: automation.version,
+      definition: { ...automation.definition, title: nextTitle } }, workspaceId])
+    assert.equal(result.schedule?.version, automation.version + 1)
+    return result.schedule
+  }
+  try {
+    setPhase('automation_concurrent_admin_sign_in')
+    const login = await admin.post('/mikka/api/auth/sign-in/email', { data: {
+      email: fixture.email, password: fixture.password, rememberMe: false,
+    } })
+    assert.equal(login.status(), 200)
+    signedIn = true
+    assert.ok((await adminAction('workspace.switchWorkspace', [workspaceId])).ok)
+    const session = await adminAction('desktop.bootstrap', [workspaceId])
+    assert.equal(session.user.id, fixture.ownerId)
+    assert.deepEqual(session.cacheWorkspace, { workspaceId, role: 'admin' })
+
+    setPhase('automation_hold_member_draft_on_admin_save')
+    const local = title + ' unsaved'
+    const remote = title + ' admin update'
+    await name.fill(local)
+    await expect(name).toHaveValue(local)
+    const original = await view(id)
+    await rename(original, remote)
+    await expect(discard).toBeVisible()
+    await expect(name).toHaveValue(local)
+    await expect(save).toBeDisabled()
+    assert.equal((await view(id)).definition.title, remote)
+    passed('packaged_member_automation_draft_survives_an_independent_admin_save')
+
+    setPhase('automation_discard_and_save_current_revision')
+    await discard.click()
+    await expect(discard).toHaveCount(0)
+    await expect(name).toHaveValue(remote)
+    const revised = title + ' member revision'
+    await name.fill(revised)
+    await save.click()
+    await expect(page.getByText(editor.saved, { exact: true })).toBeVisible()
+    const saved = await view(id)
+    assert.equal(saved.definition.title, revised)
+    assert.equal(saved.version, original.version + 2)
+    const finalTitle = title + ' clean update'
+    await rename(saved, finalTitle)
+    await expect(name).toHaveValue(finalTitle)
+    await expect(discard).toHaveCount(0)
+    assert.equal((await view(id)).next_at, null)
+    assert.deepEqual((await rpc('automations.automationHistory', [id, workspaceId])).occurrences, [])
+    passed('packaged_member_loads_saved_revision_edits_and_follows_the_next_clean_update')
+  } finally {
+    try {
+      if (signedIn) assert.equal((await admin.post('/mikka/api/auth/sign-out', { data: {} })).status(), 200)
+    } finally { await admin.dispose() }
+  }
+}
 
 /** Exercise the installed renderer's normal Automations controls with a manual-only schedule. */
 export async function verifyWorkspaceAutomation({ page, workspaceId, fixture, rpc, passed, setPhase,
@@ -128,6 +220,7 @@ export async function verifyWorkspaceAutomation({ page, workspaceId, fixture, rp
   await expect(page.getByRole('button', { name: words.editor.delete, exact: true })).toBeEnabled()
   passed('packaged_same_workspace_member_reads_the_restored_owner_automation')
   passed('packaged_member_retains_delete_without_edit_or_resume_on_a_different_creator_schedule')
+  await verifyConcurrentDraft({ page, workspaceId, fixture, rpc, passed, setPhase, location })
   await signInAs(fixture, fixture.ownerId)
   assert.ok((await rpc('workspace.switchWorkspace', [workspaceId])).ok)
 }
