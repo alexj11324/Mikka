@@ -2124,6 +2124,13 @@
     "test": "lib/slack/install-provider.test.ts",
     "suite": "test:slack"
   },
+  "lib/slack/user-id.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validate Slack member IDs consistently for installations and automation author filters.",
+    "test": "lib/schedules/slack-events.test.ts",
+    "suite": "test:schedules"
+  },
   "lib/standalone-chat-controls.ts": {
     "mode": "built-in",
     "environment": [],
