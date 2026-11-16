@@ -9,6 +9,7 @@ export type AutomationView = {
   visibility: 'owner' | 'workspace'
   definition: Definition
   status: 'active' | 'paused' | 'cancelled' | 'completed'
+  deleted?: boolean
   version: number
   next_at: string | Date | null
   created_at?: string | Date

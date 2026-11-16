@@ -124,6 +124,8 @@ const functions = {
   'automations.pinAutomation': automations.pinAutomation,
   'automations.organizeAutomation': automations.organizeAutomation,
   'automations.resumeAutomation': automations.resumeAutomation,
+  'automations.deleteAutomation': automations.deleteAutomation,
+  'automations.restoreAutomation': automations.restoreAutomation,
   'automations.cancelAutomation': automations.cancelAutomation,
   'automations.runAutomationNow': automations.runAutomationNow,
   'bots.listBotsForWorkspace': actions6.listBotsForWorkspace,

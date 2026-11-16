@@ -13,7 +13,7 @@ import { coordinatorSessionChanged } from '../live/coordinator-session'
 import { wakeCoordinatorAfterCommit } from '../coordinator/wake-after-commit'
 import { scheduleChatMessage } from './chat-result'
 
-export type WorkspaceAccess = { role: 'owner' | 'admin' | 'member' }
+export type WorkspaceAccess = { role: 'owner' | 'admin' | 'member'; requireActiveMember?: (userId: string) => Promise<void> }
 export type WorkspaceGuard = <T>(ownerId: string, workspaceId: string | null, work: (access: WorkspaceAccess) => Promise<T>) => Promise<T>
 export type MessageGuard = (tx: PoolClient, ownerId: string, value: unknown) => Promise<void>
 export type IssueReader = (tx: PoolClient, ownerId: string, issueId: string) => Promise<{ id: string; title: string; status: string } | null>
@@ -45,12 +45,12 @@ export type AutomationSeams = {
   /** A trigger's one-sentence condition against the event: true, false, or null when no answer could be had. */
   runWhen?: (input: RunWhenInput) => Promise<boolean | null>
 }
-export type Schedule = { id: string; owner_id: string; workspace_id: string | null; bot_id: string | null; visibility: 'owner' | 'workspace'; source_event_id: string; definition: Definition; request_definition: Definition; status: string; version: number; next_at: Date | null; disabled_reason?: string | null }
+export type Schedule = { id: string; owner_id: string; workspace_id: string | null; bot_id: string | null; visibility: 'owner' | 'workspace'; source_event_id: string; definition: Definition; request_definition: Definition; status: string; deleted?: boolean; status_before_delete?: 'active' | 'paused' | 'completed' | null; version: number; next_at: Date | null; disabled_reason?: string | null }
 export type Occurrence = { id: string; schedule_id: string; operation_id: string; event_id: string | null; definition: Definition; version: number; due_at: Date; status: string; attempts: number; lease_token: string | null; lease_until: Date; error: string | null; execution_decision: 'execute' | 'skip'; trigger: OccurrenceTrigger | null; report_next_at: Date; report_attempts: number; started_at: Date | null; created_at: Date }
 export const SCHEDULE_LEASE_MS = 5 * 60_000
 const MAX_ATTEMPTS = 3
 // The frozen request key is internal; keep the existing tool-response fields.
-const SCHEDULE_COLUMNS = 'id,owner_id,workspace_id,bot_id,visibility,source_event_id,request_id,definition,request_definition,status,version,next_at,disabled_reason,webhook_key_hash IS NOT NULL AS webhook_key_set,folder,tags,created_at,updated_at'
+const SCHEDULE_COLUMNS = 'id,owner_id,workspace_id,bot_id,visibility,source_event_id,request_id,definition,request_definition,status,status_before_delete IS NOT NULL AS deleted,version,next_at,disabled_reason,webhook_key_hash IS NOT NULL AS webhook_key_set,folder,tags,created_at,updated_at'
 /** A run that fails one of these lost its creator's authority: the automation is paused with the code as its reason. */
 const AUTHORITY_LOST = new Set(['scheduleStandingTaskUnavailable','scheduleWorkspaceAccessDenied','scheduleOwnerUnavailable','scheduleConversationUnavailable','scheduleBotUnavailable','scheduleRepositoryUnavailable','scheduleLinearUnavailable','scheduleSlackUnavailable','scheduleDeviceUnavailable','scheduleProfileUnavailable'])
 /** Runs that count toward maxRunsPerDay: queued, running and finished, not skipped or cancelled. */
@@ -141,9 +141,10 @@ export class ScheduleStore {
             AND ((visibility = 'workspace' AND $1::uuid IS NOT NULL)
               OR (visibility = 'owner' AND owner_id = $2 AND bot_id IS NOT DISTINCT FROM $3::uuid))
             AND ($7::uuid IS NULL OR id = $7::uuid)
+            AND (status_before_delete IS NOT NULL)=$8::boolean
             AND ($4::timestamptz IS NULL OR (created_at, id) < ($4::timestamptz, $5::uuid))
           ORDER BY created_at DESC, id DESC
-          LIMIT $6`, [actor.workspaceId, actor.ownerId, actor.botId, at ?? null, id ?? null, limit + 1, cmd.scheduleId ?? null])
+          LIMIT $6`, [actor.workspaceId, actor.ownerId, actor.botId, at ?? null, id ?? null, limit + 1, cmd.scheduleId ?? null, cmd.deleted ?? false])
         const page = rows.slice(0, limit)
         return {
           // 接手 is offered to an owner or admin on another person's workspace automation.
@@ -170,7 +171,7 @@ export class ScheduleStore {
       if(!row) throw new ScheduleError('scheduleNotFound',404)
       if(row.visibility==='owner'&&(row.owner_id!==actor.ownerId||row.bot_id!==actor.botId)) throw new ScheduleError('scheduleNotFound',404)
       if(row.visibility==='workspace'&&!actor.workspaceId) throw new ScheduleError('scheduleNotFound',404)
-      if((cmd.action==='update'||cmd.action==='resume'||cmd.action==='run_now')&&row.visibility==='workspace'&&row.owner_id!==actor.ownerId&&access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
+      if((cmd.action==='update'||cmd.action==='restore'||cmd.action==='resume'||cmd.action==='run_now')&&row.visibility==='workspace'&&row.owner_id!==actor.ownerId&&access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
       if(cmd.action==='history'){
         const seen=await tx.query('SELECT id,schedule_id,operation_id,event_id,version,due_at,status,attempts,result,error,trigger,started_at,finished_at,reported_at FROM schedule_occurrences WHERE schedule_id=$1 ORDER BY due_at DESC LIMIT 100',[row.id])
         // Seeing that a workspace schedule ran is collaboration; reading what it returned is not. Only the
@@ -180,6 +181,7 @@ export class ScheduleStore {
         const privileged=row.owner_id===actor.ownerId||access.role!=='member'
         return {occurrences:privileged?seen.rows:seen.rows.map(o=>({...o,operation_id:null,event_id:null,result:null,error:null,trigger:null}))}
       }
+      if(row.status_before_delete && (cmd.action==='pin'||cmd.action==='organize')) throw new ScheduleError('scheduleCancelled')
       if(cmd.action==='pin'){
         if(cmd.pinned)await tx.query('INSERT INTO schedule_pins(user_id,schedule_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[actor.ownerId,row.id])
         else await tx.query('DELETE FROM schedule_pins WHERE user_id=$1 AND schedule_id=$2',[actor.ownerId,row.id])
@@ -213,6 +215,25 @@ export class ScheduleStore {
       }
       await this.source(tx,actor,row.workspace_id)
       if(row.version!==cmd.version) throw new ScheduleError('scheduleVersionConflict')
+      if(cmd.action==='restore'){
+        if(!row.status_before_delete) throw new ScheduleError('scheduleNotDeleted')
+        let status = row.status_before_delete
+        let next: Date | null = null
+        if(status==='active'){
+          if(row.owner_id!==actor.ownerId){
+            if(!access.requireActiveMember) throw new ScheduleError('scheduleWorkspaceAccessDenied',403)
+            await access.requireActiveMember(row.owner_id)
+          }
+          await this.conversation(tx,{ownerId:row.owner_id,workspaceId:row.workspace_id,botId:row.bot_id})
+          await this.permission(tx,row.owner_id,row.bot_id,row.workspace_id,row.definition)
+          next=nextTime(row.definition,this.clock())
+          if(!next && runsOnSchedule(row.definition)) status='completed'
+        }
+        const updated=await tx.query<Schedule>(`UPDATE user_schedules SET status=$2,status_before_delete=NULL,next_at=$3,
+          version=version+1,updated_at=$4 WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,status,next,this.clock()])
+        await this.listChanged(tx,row.workspace_id)
+        return {schedule:updated.rows[0]}
+      }
       if(row.status==='cancelled') throw new ScheduleError('scheduleCancelled')
       if(cmd.action==='run_now') return this.runNow(tx,row,cmd.requestId)
       if(cmd.action==='take_over') return this.takeOver(tx,actor,access,row)
@@ -229,7 +250,7 @@ export class ScheduleStore {
       let def=row.definition, status=row.status, next=row.next_at
       if(cmd.action==='update'){def=cmd.definition;def.timezone=timezone(def.timezone);await this.permission(tx,row.owner_id,row.bot_id,row.workspace_id,def);next=nextTime(def,this.clock(),true);if(status==='completed')status='active'}
       else if(cmd.action==='pause'){status='paused';next=null}
-      else if(cmd.action==='cancel'){status='cancelled';next=null}
+      else if(cmd.action==='cancel'||cmd.action==='delete'){status='cancelled';next=null}
       else {if(status!=='paused')throw new ScheduleError('scheduleNotPaused');await this.permission(tx,row.owner_id,row.bot_id,row.workspace_id,def);next=nextTime(def,this.clock());status=next||!runsOnSchedule(def)?'active':'completed'}
       const stale=await tx.query<Occurrence>(`UPDATE schedule_occurrences SET status='cancelled',error='scheduleChanged',lease_token=NULL,lease_until=NULL,finished_at=$2 WHERE schedule_id=$1 AND status IN ('pending','running') RETURNING *`,[row.id,this.clock()])
       if (stale.rows.length) {
@@ -239,7 +260,7 @@ export class ScheduleStore {
           await this.report(tx,row,item,'cancelled',null,'scheduleChanged')
         }
       }
-      const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET definition=$2,status=$3,next_at=$4,version=version+1,updated_at=$5,disabled_reason=CASE WHEN $3='paused' THEN disabled_reason END WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,def,status,next,this.clock()])).rows[0]
+      const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET definition=$2,status=$3,next_at=$4,version=version+1,updated_at=$5,status_before_delete=CASE WHEN $6 THEN status END,disabled_reason=CASE WHEN $3='paused' OR $6 THEN disabled_reason END WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,def,status,next,this.clock(),cmd.action==='delete'])).rows[0]
       await this.listChanged(tx,row.workspace_id)
       return {schedule:updated}
     }))

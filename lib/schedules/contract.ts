@@ -92,6 +92,7 @@ export const SCHEDULE_PAGE_MAX = 100
 const scheduleCursor = z.templateLiteral([z.iso.datetime({ precision: 6 }), '/', z.uuid()])
 export const scheduleListInput = z.object({
   scheduleId: z.uuid().optional(),
+  deleted: z.boolean().optional(),
   limit: z.number().int().min(1).max(SCHEDULE_PAGE_MAX).optional(),
   cursor: scheduleCursor.optional(),
 }).strict()
@@ -101,7 +102,7 @@ export const commandSchema = z.discriminatedUnion('action', [
   scheduleListInput.extend({ action: z.literal('list') }),
   z.object({ action: z.literal('history'), scheduleId: z.uuid() }).strict(),
   z.object({ action: z.literal('update'), scheduleId: z.uuid(), version: z.number().int().positive(), definition: definitionSchema }).strict(),
-  z.object({ action: z.enum(['pause', 'resume', 'cancel']), scheduleId: z.uuid(), version: z.number().int().positive() }).strict(),
+  z.object({ action: z.enum(['pause', 'resume', 'cancel', 'delete', 'restore']), scheduleId: z.uuid(), version: z.number().int().positive() }).strict(),
   // 接手: an owner or admin makes a workspace automation theirs; from then on it runs as them (decision 2026-11-15-1840).
   z.object({ action: z.literal('take_over'), scheduleId: z.uuid(), version: z.number().int().positive() }).strict(),
   // Webhook 地址: a new secret URL for the automation; the previous one stops working. Returned once.
