@@ -7,8 +7,8 @@ import { actingContext } from '@/lib/activity-actor'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 import { isActionErrorCode } from '@/lib/workspace-admin/action'
 import { WorkspaceError } from '@/lib/workspace-access'
-import { definitionSchema, ScheduleError, scheduleListInput, type Command, type Definition } from '@/lib/schedules/contract'
-import type { AutomationHistory, AutomationList, AutomationUsage, AutomationView } from '@/lib/schedules/automation-view'
+import { definitionSchema, ScheduleError, scheduleListInput, webhookBatchListInput, webhookBatchInput, type Command, type Definition } from '@/lib/schedules/contract'
+import type { AutomationHistory, AutomationList, AutomationUsage, AutomationView, WebhookBatchPage } from '@/lib/schedules/automation-view'
 
 /**
  * 自动化: the page's commands. Every one goes through the schedules' one writer, `executeScheduleCommand`, as the
@@ -67,6 +67,24 @@ export async function getAutomation(scheduleId: string): Promise<ActionResult<{ 
 export async function automationHistory(scheduleId: string): Promise<ActionResult<AutomationHistory>> {
   if (!id.safeParse(scheduleId).success) return { error: 'validationGeneric' }
   return command({ action: 'history', scheduleId })
+}
+
+export async function automationBatches(input: { scheduleId: string; cursor?: string }): Promise<ActionResult<WebhookBatchPage>> {
+  const parsed = webhookBatchListInput.safeParse(input)
+  if (!parsed.success) return { error: 'validationGeneric' }
+  return command({ action: 'history', scheduleId: parsed.data.scheduleId, batches: { cursor: parsed.data.cursor, limit: 20 } })
+}
+
+type BatchResult = {batchId: string; status: 'queued' | 'cancelled'; replayed: boolean}
+
+export async function flushAutomationBatch(input: z.infer<typeof webhookBatchInput>): Promise<ActionResult<BatchResult>> {
+  const parsed = webhookBatchInput.safeParse(input)
+  return parsed.success ? command({action:'flush_batch', ...parsed.data}) : {error:'validationGeneric'}
+}
+
+export async function cancelAutomationBatch(input: z.infer<typeof webhookBatchInput>): Promise<ActionResult<BatchResult>> {
+  const parsed = webhookBatchInput.safeParse(input)
+  return parsed.success ? command({action:'cancel_batch', ...parsed.data}) : {error:'validationGeneric'}
 }
 
 /** 用量: runs and, for the creator and owners/admins, what the tasks it made spent, per day in its own time zone. */
