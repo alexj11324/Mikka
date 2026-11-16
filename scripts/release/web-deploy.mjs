@@ -94,19 +94,14 @@ export async function assertCurrentMain({ expectedBuild, token, fetchImpl = fetc
   if (ref.object.sha !== expectedBuild) throw Error(`webDeploy:mainChanged:expected=${expectedBuild}:actual=${ref.object.sha}`)
 }
 
-async function publicBuild(fetchImpl, timeoutMs, expectedOverlay, requireLegacyDesktop = false) {
+async function publicBuild(fetchImpl, timeoutMs, expectedOverlay) {
   try {
     const response = await fetchImpl(PRODUCTION_VERSION_URL, { cache: 'no-store', headers: { 'cache-control': 'no-cache' },
       signal: AbortSignal.timeout(Math.max(1, Math.ceil(timeoutMs))), redirect: 'error' })
     if (!response.ok) { await response.body?.cancel(); return null }
-    if (requireLegacyDesktop && (!response.headers.get('x-vercel-id') || response.headers.has('x-mikka-gateway-version-sha256'))) {
-      await response.body?.cancel()
-      throw Error('webDeploy:desktopProviderRequiresReceipt')
-    }
     const value = await response.json()
     return SHA.test(value?.build ?? '') && (!expectedOverlay || value.overlaySha === expectedOverlay) ? value.build : null
-  } catch (error) {
-    if (error?.message === 'webDeploy:desktopProviderRequiresReceipt') throw error
+  } catch {
     return null
   }
 }
@@ -138,18 +133,10 @@ export async function containsDesktopSource({ expectedBuild, publicCommit, token
     && comparison.merge_base_commit.sha === expectedBuild
 }
 
-/** Keep the runtime's queued Web wait separate from Desktop and direct callers. */
-export function webDeploymentWaitOptions(command) {
-  return {
-    allowDescendant: command === 'await-desktop-web',
-    maxWaitMs: (command === 'await-web' ? 90 : 40) * 60_000,
-  }
-}
-
 /** This read-only wait runs OUTSIDE web-deploy-production: GitHub can still be
  * building while Vercel only knows the previous READY deployment. A successful
  * docs-only workflow is not a successful application build. */
-export async function waitForWebDeployment({ expectedBuild, allowDescendant = false, expectedOverlay, token, fetchImpl = fetch, maxWaitMs = 40 * 60_000,
+export async function waitForWebDeployment({ expectedBuild, expectedOverlay, token, fetchImpl = fetch, maxWaitMs = 40 * 60_000,
   intervalMs = 10_000, now = () => performance.now(), wait = sleep }) {
   if (!SHA.test(expectedBuild ?? '')) throw Error('webDeploy:commitShaRequired')
   if (!Number.isFinite(maxWaitMs) || maxWaitMs <= 0 || !Number.isFinite(intervalMs) || intervalMs <= 0) throw Error('webDeploy:invalidVerificationWait')
@@ -158,21 +145,8 @@ export async function waitForWebDeployment({ expectedBuild, allowDescendant = fa
   const started = now(), remaining = () => maxWaitMs - (now() - started)
   let checkedPublisher = false
   while (remaining() > 0) {
-    let webBuild = expectedBuild
-    if (allowDescendant === true) {
-      // The live public build is the candidate, not whichever main head happens
-      // to exist while signing. A newer docs-only main does not need a Web build.
-      webBuild = await publicBuild(fetchImpl, Math.min(10_000, remaining()), expectedOverlay, allowDescendant)
-      if (remaining() <= 0) break
-      if (!webBuild || !await containsDesktopSource({ expectedBuild, publicCommit: webBuild,
-        token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })) {
-        if (remaining() > 0) await wait(Math.min(intervalMs, remaining()))
-        continue
-      }
-    } else {
-      // Web/runtime mutation callers retain the original exact-main fence.
-      await assertCurrentMain({ expectedBuild, token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })
-    }
+    const webBuild = expectedBuild
+    await assertCurrentMain({ expectedBuild, token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })
     if (remaining() <= 0) break
     const data = await githubRead(`/actions/workflows/web-deploy.yml/runs?head_sha=${webBuild}&branch=main&per_page=100`,
       { token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })
@@ -180,7 +154,7 @@ export async function waitForWebDeployment({ expectedBuild, allowDescendant = fa
       && run.path === WEB_WORKFLOW && run.repository?.full_name === REPOSITORY && run.head_repository?.full_name === REPOSITORY
       && ['push', 'workflow_dispatch'].includes(run.event)).sort((a, b) => b.id - a.id)
     const run = runs[0]
-    if (!run && !allowDescendant && !checkedPublisher) {
+    if (!run && !checkedPublisher) {
       const publisher = await githubRead('/actions/workflows/web-deploy.yml', {
         token, fetchImpl, timeoutMs: Math.min(20_000, remaining()),
       })
@@ -215,8 +189,8 @@ export async function waitForWebDeployment({ expectedBuild, allowDescendant = fa
         continue
       }
       if (remaining() <= 0) break
-      if (await publicBuild(fetchImpl, Math.min(10_000, remaining()), expectedOverlay, allowDescendant) === webBuild && remaining() > 0) {
-        if (allowDescendant !== true) await assertCurrentMain({ expectedBuild, token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })
+      if (await publicBuild(fetchImpl, Math.min(10_000, remaining()), expectedOverlay) === webBuild && remaining() > 0) {
+        await assertCurrentMain({ expectedBuild, token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })
         if (remaining() > 0) return { sourceCommit: expectedBuild, webRunId: run.id, webAttempt: run.run_attempt,
           publicBuild: webBuild, verifiedAt: new Date().toISOString() }
       }
@@ -286,15 +260,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   } else if (command === 'main') {
     await assertCurrentMain({ expectedBuild: process.env.GITHUB_SHA, token: process.env.GITHUB_TOKEN })
     console.log('Current main matches this release')
-  } else if (command === 'await-web' || command === 'await-desktop-web') {
-    const result = await waitForWebDeployment({ expectedBuild: process.env.GITHUB_SHA,
-      ...webDeploymentWaitOptions(command),
-      expectedOverlay: process.env.EXPECTED_UI_OVERLAY_SHA || (command === 'await-desktop-web' ? process.env.MIKKA_UI_OVERLAY_SHA : undefined), token: process.env.GITHUB_TOKEN })
-    console.log(JSON.stringify({ event: 'matching_web_deployment_verified', ...result }))
   } else if (command === 'verify') {
     const result = await verifyProductionBuild({ expectedBuild: process.env.GITHUB_SHA })
     console.log(JSON.stringify({ event: 'production_version_verified', ...result }))
     if (process.env.GITHUB_STEP_SUMMARY) writeFileSync(process.env.GITHUB_STEP_SUMMARY,
       `\n### Public production version verified\n${result.url}\n\nBuild: \`${result.build}\`\n\nUTC: ${result.verifiedAt}\n`, { flag: 'a' })
-  } else throw Error('usage: web-deploy.mjs env <file> | skip | main | await-web | await-desktop-web | verify')
+  } else throw Error('usage: web-deploy.mjs env <file> | skip | main | verify')
 }
