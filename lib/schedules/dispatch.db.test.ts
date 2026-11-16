@@ -349,6 +349,11 @@ test('dispatch_task automations run as their creator through the existing create
     const waiting = (await fixture.query<{ status: string; bodies: string[] }>(`SELECT status,ARRAY(SELECT r->>'body' FROM jsonb_array_elements(trigger->'webhook'->'requests') r) bodies FROM schedule_occurrences WHERE schedule_id=$1`, [batched.id])).rows
     assert.deepEqual(waiting, [{ status: 'pending', bodies: ['one', 'two'] }], 'one run gathers both and waits for the window')
     assert.equal((await runtime.receiveAutomationWebhook(key, 'three')).status, 'batched')
+    const windows = await page<{batches: {requestCount: number; status: string; runStatus: string}[]; nextCursor: string | null}>(
+      owner, chat, {action:'history', scheduleId:batched.id, batches:{status:'collecting'}},
+    )
+    assert.deepEqual(windows.batches.map(b => [b.requestCount, b.status, b.runStatus]), [[3, 'collecting', 'pending']])
+    assert.equal(windows.nextCursor, null)
     await assert.rejects(runtime.receiveAutomationWebhook('mwh_' + 'A'.repeat(43), 'x'), /scheduleNotFound/)
   })
 

@@ -96,10 +96,18 @@ export const scheduleListInput = z.object({
   cursor: scheduleCursor.optional(),
 }).strict()
 
+/** With batches, read only webhook windows and return their metadata without request bodies. */
+export const scheduleHistoryInput = z.object({
+  scheduleId: z.uuid(),
+  batches: scheduleListInput.pick({ limit: true, cursor: true }).extend({
+    status: z.enum(['collecting', 'queued', 'cancelled']).optional(),
+  }).optional(),
+}).strict()
+
 export const commandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('create'), requestId: z.string().min(1).max(200), definition: definitionSchema }).strict(),
   scheduleListInput.extend({ action: z.literal('list') }),
-  z.object({ action: z.literal('history'), scheduleId: z.uuid() }).strict(),
+  scheduleHistoryInput.extend({ action: z.literal('history') }),
   z.object({ action: z.literal('update'), scheduleId: z.uuid(), version: z.number().int().positive(), definition: definitionSchema }).strict(),
   z.object({ action: z.enum(['pause', 'resume', 'cancel']), scheduleId: z.uuid(), version: z.number().int().positive() }).strict(),
   // 接手: an owner or admin makes a workspace automation theirs; from then on it runs as them (decision 2026-11-15-1840).
