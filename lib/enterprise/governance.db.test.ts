@@ -43,6 +43,27 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
     await pool.query('insert into mikka_workspaces (id,"userId",name,kind) values ($1,$2,\'Workspace ACL fixture\',\'team\')', [id, owner.id])
     for (const [user, role] of [[owner, 'admin'], [member, 'member']] as const) await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role) values ($1,$2,$3,$4,$5)', [id, user.id, user.name, user.email, role])
   }
+  await t.test('concurrent and repeated role saves only audit effective changes after checking authority', async () => {
+    const setRole = (actorId: string, role: 'admin' | 'member') =>
+      org.updateOrganizationMember(organizationId, actorId, { userId: member.id, role })
+    const read = async () => {
+      const { rows } = await pool.query<{ role: string; stamp: string; changes: number }>(
+        `select m.role, m."updatedAt"::text as stamp,
+            (select count(*)::int from mikka_organization_audit_events a where a."organizationId"=m."organizationId"
+              and a."targetId"=m."userId" and a.action='organization.member_changed') as changes
+          from mikka_organization_members m where m."organizationId"=$1 and m."userId"=$2`, [organizationId, member.id])
+      return rows[0]!
+    }
+    const before = await read()
+    await assert.rejects(setRole(member.id, 'member'), /access_denied/)
+    await Promise.all([setRole(owner.id, 'admin'), setRole(owner.id, 'admin')])
+    const changed = await read()
+    assert.equal(changed.role, 'admin')
+    assert.equal(changed.changes, before.changes + 1)
+    await setRole(owner.id, 'admin')
+    assert.deepEqual(await read(), changed)
+    await setRole(owner.id, 'member')
+  })
   await t.test('Organization administrators can set and clear a bounded icon without changing Workspace identity or adding duplicate audits', async () => {
     const icon = 'data:image/png;base64,iVBORw0KGgo='
     const profile = (actor: string, input: unknown) => org.updateOrganizationProfile(organizationId, actor, input)
