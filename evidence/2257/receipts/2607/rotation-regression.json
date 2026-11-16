@@ -1,0 +1,50 @@
+{
+  "initialCandidate": "ca6c1b17caf92d4a8f4dd56c5c9aad1670022eb0",
+  "finalCandidate": "d8c0925622b6baf830704aeae645d68aecada531",
+  "testedFileBlobs": {
+    "lib/run-publications.ts": "53e6f5abffb75a4416930c719d729caff2cec673",
+    "lib/factory/continuity.db.test.ts": "8aa48ab185d8d944a09bbfff3a133c8092b62715"
+  },
+  "environment": "Dedicated loopback PG17; independent databases for failing and passing revisions. Local test base 1611e49bc54e01bcb051a308117b76a7a631ed79, both final tested file blobs verified identical to finalCandidate. All 39 tests were then rerun after migrating a fresh PG17 database on a clean detached checkout of finalCandidate with its full product tree.",
+  "namedRegression": "recorded rotated claim credential still reports device loss",
+  "initialCandidateObserved": [
+    "cancelled",
+    "cancelled"
+  ],
+  "finalCandidateObserved": [
+    "failed",
+    "device_lost"
+  ],
+  "beforeTapSha256": "578a2bde41aaa2200c4a1efad502e74b3ffd4839913178a932e2d656a1749095",
+  "afterTapSha256": "c13f5811e997f675705edbe11d0de27a1f67bdde2940c656078c0c3930b81a6c",
+  "finalTotals": {
+    "total": 39,
+    "pass": 39,
+    "fail": 0,
+    "skipped": 0
+  },
+  "deviceCredentialCases": [
+    "authenticated owner supersession with live or unattributed legacy credential",
+    "ordinary stop without a request-epoch receipt",
+    "audited explicit revocation",
+    "direct non-audited revocation of the exact bound credential during rotation/release",
+    "foreign device refused",
+    "first terminal receipt immutable under replay"
+  ],
+  "initialFullDaemonReceipt": {
+    "run": 43822764936,
+    "job": 133149442734,
+    "artifact": 14204784837,
+    "zipSha256": "2de0a750ab4086e8a38bd74aa0941c63e6d33c72b6c2e247966186ad293c17db"
+  },
+  "risk": {
+    "initiallyObservedInIsolatedDb": "1/1 on forced direct rotation and owner supersession coincidence",
+    "actualProductionRate": "unmeasured",
+    "likelihood": 2,
+    "impact": 6,
+    "product": 12,
+    "impactText": "The historical run could report owner cancellation after credential rotation. The device gateway continued to deny its former credential; the fix preserves the revocation diagnosis."
+  },
+  "exactFinalCheckout": "d8c0925622b6baf830704aeae645d68aecada531",
+  "exactAfterTapSha256": "7b042dff77553fb9f5042af2bd57e737671a1494ce6ca50bd61590ff59b40125"
+}

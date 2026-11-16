@@ -12,16 +12,17 @@ test -x "${E_DEVICE_DATA_DIR:-$qa/daemon}/harness/codex/0.163.0/bin/codex"
 test -x "${E_DEVICE_DATA_DIR:-$qa/daemon}/harness/claude_code/2.1.309/bin/claude"
 pgroot=/usr
 pg="$pgroot/lib/postgresql/17/bin"
-"$pg/postgres" --version > "$qa/pg.version"
 export MIKKA_MODEL_KEY_LOOPBACK=1 E_FACTORY_CATALOG=1 MIKKA_TEST_MODE=1 CI=true
 export WORKSPACE_SECRETS_KEY="$(openssl rand -hex 32)" E_LOOPBACK_KEY="$(openssl rand -hex 24)"
 export BETTER_AUTH_SECRET="$(openssl rand -hex 32)" BETTER_AUTH_URL=https://127.0.0.1:3859 MIKKA_EDITION=community
 if [ -n "${E_EXISTING_PG_PASSWORD_FILE:-}" ]; then
+  test -s "$qa/pg.version"
   test -f "$E_EXISTING_PG_PASSWORD_FILE" && test ! -L "$E_EXISTING_PG_PASSWORD_FILE"
   test "$(stat -c '%a:%u' "$E_EXISTING_PG_PASSWORD_FILE")" = "600:$(id -u)"
   IFS= read -r pw < "$E_EXISTING_PG_PASSWORD_FILE"
   [[ "$pw" =~ ^[a-f0-9]{48,96}$ ]]
 else
+  "$pg/postgres" --version > "$qa/pg.version"
   pw="$(openssl rand -hex 28)"
 fi
 export E2E_DATABASE_URL="postgresql://e2e:$pw@127.0.0.1:15471/mikka_e2e"
