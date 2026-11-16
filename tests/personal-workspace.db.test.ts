@@ -173,12 +173,52 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     assert.equal((await pool.query('SELECT "archivedAt" FROM bots WHERE id=$1', [elsewhere])).rows[0].archivedAt, null)
     await assert.rejects(executionWorkspace(leaver, bot), { code: 'botNotFound' }, 'a paused bot runs nothing')
     assert.deepEqual((await members.archivedBots(admin, team.id)).map(row => row.id), [bot])
-    await assert.rejects(members.archivedBots(leaver, team.id))
+    await assert.rejects(members.archivedBots(leaver, team.id), { code: 'workspaceAccessDenied' })
+    await assert.rejects(members.takeOverBot(leaver, team.id, bot), { code: 'workspaceAccessDenied' })
+    const takeoverAudits = async () => (await pool.query(`SELECT count(*)::int AS n FROM workspace_audit_outbox WHERE "workspaceId"=$1 AND payload->>'action'='bot.taken_over' AND payload->>'targetId'=$2`, [team.id, bot])).rows[0].n
+    const conflicting = randomUUID()
+    await pool.query('INSERT INTO bots (id,"ownerId","workspaceId",name) VALUES ($1,$2,$3,$4)', [conflicting, admin, team.id, 'Helper'])
+    await assert.rejects(members.takeOverBot(admin, team.id, bot), { code: 'botTransferNameConflict' })
+    assert.equal(await takeoverAudits(), 0, 'a failed transfer rolls back its audit')
+    await pool.query('DELETE FROM bots WHERE id=$1', [conflicting])
     assert.deepEqual(await members.takeOverBot(admin, team.id, bot), { bots: 1 })
-    assert.equal(Number((await pool.query(`SELECT count(*) FROM workspace_audit_outbox WHERE "workspaceId"=$1 AND payload->>'action'='bot.taken_over' AND payload->>'targetId'=$2`, [team.id, bot])).rows[0].count), 1, '接管 is in the activity log')
     assert.deepEqual((await pool.query('SELECT "ownerId","archivedAt" FROM bots WHERE id=$1', [bot])).rows[0], { ownerId: admin, archivedAt: null }, 'it now runs on the admin\'s own resources')
     assert.equal(await executionWorkspace(admin, bot), team.id)
-    await assert.rejects(members.takeOverBot(admin, team.id, bot), (error: unknown) => (error as { code?: string }).code === 'botNotFound', 'only a paused bot can be taken over')
+    await assert.rejects(members.takeOverBot(admin, team.id, bot), { code: 'botNotFound' }, 'only a paused bot can be taken over')
+    assert.equal(await takeoverAudits(), 1, 'one audit for the completed transfer, including after a retry')
+  })
+
+  await t.test('the archived bot directory and takeover keep the administrator transaction through the APP read and commit', async t => {
+    const { archivedBots, takeOverBot } = await import('../lib/workspace-admin/members')
+    const { withDatabaseClient } = await import('../lib/db')
+    const { workspaceTransactionKey } = await import('../lib/workspace-db')
+    const admin = await seedUser(pool, 'archive-admin')
+    const team = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+    const bot = randomUUID()
+    await pool.query('INSERT INTO bots (id,"ownerId","workspaceId",name,"archivedAt") VALUES ($1,$2,$3,$4,now())', [bot, admin, team.id, 'Archived'])
+    const client = await appPool.connect()
+    const query = client.query
+    const reads: Array<object | null> = []
+    const commits: Array<object | null> = []
+    const observed = t.mock.method(client, 'query', (...args: unknown[]) => {
+      const statement = typeof args[0] === 'string' ? args[0] : (args[0] as { text: string }).text
+      if (/from "bots"/i.test(statement)) reads.push(workspaceTransactionKey())
+      if (/^commit$/i.test(statement)) commits.push(workspaceTransactionKey())
+      return Reflect.apply(query, client, args)
+    })
+    try {
+      assert.deepEqual((await withDatabaseClient(client, () => archivedBots(admin, team.id))).map(row => row.id), [bot])
+      assert.equal(reads.length, 1)
+      assert.ok(reads[0], 'the directory reads under its active Workspace transaction')
+      reads.length = 0
+      assert.deepEqual(await withDatabaseClient(client, () => takeOverBot(admin, team.id, bot)), { bots: 1 })
+      assert.ok(reads[0], 'the takeover reads the archived bot under the administrator lock')
+      assert.equal(commits.length, 1)
+      assert.equal(commits[0], reads[0], 'the same Workspace transaction stays active through APP commit')
+    } finally {
+      observed.mock.restore()
+      client.release()
+    }
   })
 
   await t.test('withdrawing a credential stops the runs using it at once; credential access then refuses them', async () => {
