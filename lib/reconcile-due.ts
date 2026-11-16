@@ -1,5 +1,5 @@
 import type { Pool } from 'pg'
-import { MAX_WAKE_ATTEMPTS } from './coordinator/wake-recovery'
+import { COORDINATOR_WAKE_DUE_SQL } from './coordinator/wake-recovery'
 import { SCHEDULE_DUE_SQL } from './schedules/store'
 import { RUN_RECOVERY_DUE_SQL, runRecoveryDueParams } from './run-recovery-due'
 import { ACCOUNT_DELETIONS_DUE_SQL } from './account-deletions-due'
@@ -25,8 +25,7 @@ export type ReconcileDue = { wakes: boolean; schedules: boolean; recovery: boole
  */
 export async function reconcileDue(pool: Pick<Pool, 'query'>, options: { factoryLifecycle: boolean; workspace?: Pick<Pool, 'query'> }): Promise<ReconcileDue> {
   const { rows } = await pool.query<ReconcileDue>(`SELECT
-    EXISTS (SELECT 1 FROM coordinator_events WHERE "deliveredAt" IS NULL AND "wakeAttempts" < ${MAX_WAKE_ATTEMPTS}
-        AND (tier IS NULL OR tier <> 'background') AND "nextWakeAt" <= now() AND ("wakeLeaseUntil" IS NULL OR "wakeLeaseUntil" <= now()))
+    EXISTS (SELECT 1 FROM coordinator_events WHERE ${COORDINATOR_WAKE_DUE_SQL})
       OR EXISTS (SELECT 1 FROM coordinator_sessions WHERE "leaseHolder" LIKE 'wrun\\_%' AND "leaseUntil" > now()) AS wakes,
     coalesce((SELECT min(at) FROM (${SCHEDULE_DUE_SQL}) s) <= now(), false) AS schedules,
     coalesce((SELECT min(at) FROM (${RUN_RECOVERY_DUE_SQL}) r) <= now() + interval '1 minute', false) AS recovery,
