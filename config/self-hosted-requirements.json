@@ -2594,9 +2594,9 @@
   "lib/credits-models.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Lists the models Mikka credits can run: on a self-hosted server only its own configured model, never the hosted catalogue.",
-    "test": "lib/bot-model-menu.db.test.ts",
-    "suite": "test:execution-settings-db"
+    "behavior": "Lists the models Mikka credits can run: on a self-hosted server only its own configured model, never the hosted catalogue; a chat with nothing chosen uses that one model.",
+    "test": "lib/enabled-models-hosted.test.ts",
+    "suite": "test:execution-rules"
   },
   "lib/factory/agent-profile-definition.ts": {
     "mode": "built-in",
