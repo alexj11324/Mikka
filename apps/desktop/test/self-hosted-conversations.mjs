@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { expect } from '@playwright/test'
+import { acceptReceivedOrganizationInvitation } from './self-hosted-organization.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
 
 const english = JSON.parse(await readFile(new URL('../../../messages/en.json', import.meta.url), 'utf8'))
@@ -181,6 +182,11 @@ export async function verifyConversationOrganization({ page, fixture, rpc, passe
   passed('owner_manual_unread_persisted_in_directory_across_reload')
   setPhase('conversation_member_authorization')
   await signInAs(fixture.member, fixture.member.id)
+  if (fixture.member.invitation) {
+    setPhase('organization_verified_recipient_accepts_received_invitation')
+    await acceptReceivedOrganizationInvitation(page, fixture.member.invitation, passed)
+    setPhase('conversation_member_authorization')
+  }
   assert.ok((await rpc('workspace.acceptWorkspaceInvitation', [invitation])).ok)
   await selectWorkspace(page, rpc, workspaceId, fixture.member.id, 'member')
   assert.equal(await directory(title), undefined)

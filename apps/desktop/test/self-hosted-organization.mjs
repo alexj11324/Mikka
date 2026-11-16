@@ -48,3 +48,21 @@ export async function verifyOrganizationLifecycle({ page, workspaceId, passed, s
   assert.ok(archived.data.organizations.some(row => row.id === created.data.id))
   passed('packaged_owner_detaches_archives_and_reads_archived_organization')
 }
+
+/** Run this while the independently authenticated recipient is using the installed client. */
+export async function acceptReceivedOrganizationInvitation(page, invitation, passed) {
+  const result = await page.evaluate(async ({ id }) => {
+    const inbox = await fetch('/mikka/api/me/invitations')
+    const visible = (await inbox.json()).invitations.some(row => row.id === id)
+    if (!visible) return { visible: false }
+    const response = await fetch('/mikka/api/organization-invitations/accept', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ invitationId: id }),
+    })
+    const accepted = await response.json()
+    const after = await fetch('/mikka/api/me/invitations')
+    return { visible, status: response.status, organizationId: accepted.organizationId, joined: accepted.joined,
+      role: accepted.role, removed: !(await after.json()).invitations.some(row => row.id === id) }
+  }, invitation)
+  assert.deepEqual(result, { visible: true, status: 200, organizationId: invitation.organizationId, joined: true, role: 'member', removed: true })
+  passed('packaged_verified_recipient_accepts_received_organization_mail_invitation_as_member')
+}
