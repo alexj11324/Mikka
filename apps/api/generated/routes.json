@@ -2470,6 +2470,16 @@
       "sourceHash": "bef2abdcd8118223cbf11d270afdacd60b1b67918ea04839657dcdecaf3b9b9c"
     },
     {
+      "path": "/mikka/api/tasks/[taskId]/review/machine-metrics",
+      "template": "/api/tasks/[taskId]/review/machine-metrics",
+      "source": "app/api/tasks/[taskId]/review/machine-metrics/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "c12fc4b721f87d76416e0e2ab4c66f717110c855dc39909f1013a08d09d95bdf"
+    },
+    {
       "path": "/mikka/api/tasks/[taskId]/review/merge",
       "template": "/api/tasks/[taskId]/review/merge",
       "source": "app/api/tasks/[taskId]/review/merge/route.ts",
