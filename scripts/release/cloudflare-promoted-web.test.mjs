@@ -117,7 +117,7 @@ test('a later main dispatch publishes the served product only when it is already
     [{ served: { status: 'diverged' } }, 'servedOnMain'],
     [{ served: { merge_base_commit: { sha: 'f'.repeat(40) } } }, 'servedOnMain'],
     [{ env: { ...env, MIKKA_RUNTIME_SOURCE: head } }, 'dispatchSource'],
-  ]) await assert.rejects(fixture({ env, run, main: head, ...change, env: { ...env, ...change.env } }).verify(), new RegExp(code), code)
+  ]) await assert.rejects(fixture({ run, main: head, ...change, env: { ...env, ...change.env } }).verify(), new RegExp(code), code)
 })
 test('rejects stale DNS, rollback, a legacy gateway serving the same SHA, and client skew', async () => {
   for (const [change, code] of [
