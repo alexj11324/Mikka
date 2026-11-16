@@ -41,6 +41,13 @@
     "test": "lib/thread-reads.db.test.ts",
     "suite": "test:conversation-reads"
   },
+  "app/api/devices/[deviceId]/active-threads/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A signed-in owner can page through visible active thread roots on their local device in the current workspace, using the installation PostgreSQL database.",
+    "test": "lib/device-heartbeat.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
   "app/api/drive/volumes/[volumeId]/archive/route.ts": {
     "mode": "built-in",
     "environment": [],
