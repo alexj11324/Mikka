@@ -3,6 +3,7 @@ import { writeFile } from 'node:fs/promises'
 import { request as httpRequest } from 'node:http'
 import { Readable } from 'node:stream'
 import { pathToFileURL } from 'node:url'
+import { prepareOrganizationInvitation } from './self-hosted-organization-invitation.mjs'
 
 const origin = 'http://localhost:3000'
 const second = 'http://app-replica:3000'
@@ -208,7 +209,8 @@ export async function runAcceptance(env = process.env) {
       try { event = await mailbox.next(value => value.Type === 'new' && value.Data?.Subject === subject && value.Data?.To?.some(to => to.Address === recipient)) }
       catch (error) {
         if (error?.message === 'SELF_HOSTED_EVENT_TIMEOUT') {
-          report.mailObservation = { kind: subject === 'Verify your Mikka email address' ? 'verification' : 'password-reset',
+          report.mailObservation = { kind: subject === 'Verify your Mikka email address' ? 'verification'
+              : subject === 'Invitation to join a Mikka organization' ? 'organization-invitation' : 'password-reset',
             eventsReceived: mailbox.receivedCount, read: 'unavailable' }
           // One bounded diagnostic snapshot after failure, never a retry or a
           // substitute for receiving the required WebSocket event.
@@ -408,7 +410,7 @@ export async function runAcceptance(env = process.env) {
       ownerId: session.user.id, workspaceId: workspace.workspace.id,
       cookie: [...cookies].map(([name, value]) => `${name}=${value}`).join('; ') }), { flag: 'wx', mode: 0o600 })
     if (process.env.MIKKA_DESKTOP_ACCEPTANCE === '1') {
-      let member
+      let member, versionHistory
       if (env.MIKKA_DESKTOP_MEMBER_FIXTURE === '1') {
         // This fixture goes to the one-run mode-0600 handoff. The packaged client
         // must authenticate this second account independently through native IPC.
@@ -421,11 +423,28 @@ export async function runAcceptance(env = process.env) {
         check(memberLink.origin === origin && memberLink.pathname === '/mikka/api/auth/verify-email', 'DESKTOP_MEMBER_LINK')
         const memberVerified = await request(memberLink.pathname + memberLink.search, { expected: [302], useCookies: false })
         check(memberVerified.headers.get('location') === `${origin}/mikka/sign-in`, 'DESKTOP_MEMBER_VERIFIED')
-        member = { ...account, id: registered.user.id }
+        report.stage = 'organization-invitation-via-smtp'
+        const invitation = await prepareOrganizationInvitation(request, nextMail, account.email, origin)
+        report.checks.organizationInvitationMail = { recipientVerified: true, receivedMatchingLink: true, repeatedIssuePending: true }
+        member = { ...account, id: registered.user.id, invitation }
+        const { prepareDesktopVersionHistory } = await import('./self-hosted-version-history.mjs')
+        const db = new Pool({ connectionString: env.MIKKA_DATABASE_URL, max: 1 })
+        try {
+          versionHistory = await prepareDesktopVersionHistory(db, session.user.id, workspace.workspace.id, async operation => {
+            const result = await (await request('/mikka/api/rpc', { method: 'POST',
+              headers: { 'x-mikka-rpc': '1', 'sec-fetch-site': 'same-origin' },
+              body: { version: 1, action: 'issues.createTaskOnly', args: [{ version: 1, intent: 'create_only',
+                requestId: randomUUID(), workspaceId: workspace.workspace.id, title: 'Desktop ' + operation + ' history',
+                content: { type: 'doc', content: [] }, status: 'todo', priority: 'normal' }] },
+            })).json()
+            check(result.ok && typeof result.result?.taskId === 'string', 'DESKTOP_HISTORY_TASK')
+            return result.result.taskId
+          })
+        } finally { await db.end() }
       }
       await writeFile('/data/self-hosted-desktop-session.private.json', JSON.stringify({ revision: version.build, origin,
         ownerId: session.user.id, workspaceId: workspace.workspace.id, botId: bot.id, email, password: replacement,
-        ...(member && { member }) }),
+        ...(member && { member, versionHistory }) }),
       { flag: 'wx', mode: 0o600 })
     }
     report.status = 'passed'; report.stage = 'complete'

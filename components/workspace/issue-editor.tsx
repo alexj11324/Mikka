@@ -1,8 +1,10 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
 import type { EditorView } from "@tiptap/pm/view"
 import { useTranslations } from "next-intl"
+import { toast } from 'sonner'
+import { avatarImageSrc } from '@/lib/default-avatar'
 import { isLegacyTaskInstruction } from '@/lib/task-description'
 import { issueContentToMarkdown } from '@/lib/linear-sync/markdown'
 import { IssueActivity } from './issue-activity'
@@ -91,10 +93,30 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
   changeRef.current = onChange
   const replacementCallback = useRef(onReplacementApplied)
   replacementCallback.current = onReplacementApplied
+  const tMembers = useTranslations('Members')
+  // The editor retains its extensions. Always resolve the Task and its editability at the time of the keystroke.
+  const mentionScope = useRef(issueId)
+  mentionScope.current = disabled || unreadable || mode === 'viewing' || markup !== 'all' ? undefined : issueId
+  const loadMentionPeople = useCallback(async (signal: AbortSignal) => {
+    const id = mentionScope.current
+    if (!id || signal.aborted) return []
+    try {
+      const { listMembers } = await import('@/app/actions/collaboration')
+      const { owner, members } = await listMembers(id)
+      if (signal.aborted || id !== mentionScope.current) return []
+      return [owner, ...members].map(person => {
+        const label = person.name.trim() || tMembers('role.member')
+        return { id: person.id, label, initials: Array.from(label)[0].toUpperCase(), avatar: avatarImageSrc(person.image) }
+      })
+    } catch {
+      if (!signal.aborted && id === mentionScope.current) toast.error(tMembers('readFailed'))
+      return []
+    }
+  }, [tMembers])
   const extensions = useMemo(() => [
-    ...createEditorExtensions(threadStore.isOpen, author, !!sharedDoc, compact, placeholder),
+    ...createEditorExtensions(threadStore.isOpen, author, !!sharedDoc, compact, placeholder, loadMentionPeople),
     ...(sharedDoc ? [Collaboration.configure({ document: sharedDoc })] : []),
-  ], [threadStore, author, sharedDoc, compact, placeholder])
+  ], [threadStore, author, sharedDoc, compact, placeholder, loadMentionPeople])
   // useEditor calls setOptions whenever editorProps is a new object. setOptions
   // re-runs the Yjs binding, so a fresh object on every parent render loops.
   const editorProps = useMemo(() => ({

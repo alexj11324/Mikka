@@ -213,6 +213,10 @@ python3 packages/daemon/scripts/workspace-control-install.py
 # The final prebuilt start owns its kernel/boot receipt. An official-instance
 # fallback prepares the same policy now, before returning to any credential
 # publication or worker launch. Staging exits above and cannot mint this proof.
+# The guard needs nftables >= 1.0.6. The desktop base (Ubuntu 22.04) ships
+# 1.0.2 and no newer package, and an apt change would alter official files,
+# so it gets the pinned private build the guard's tool path looks up first.
+if [[ "$mikka_kind" = desktop ]]; then bash packages/daemon/scripts/build-netfilter.sh /opt/mikka/runtime/netfilter; fi
 mikka_ingress=/opt/mikka/runtime/ingress-v1
 [[ ! -e "$mikka_ingress" && ! -L "$mikka_ingress" ]] || exit 3
 install -d -m 755 -o root -g root "$mikka_ingress"

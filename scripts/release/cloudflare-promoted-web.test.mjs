@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import { verifyPromotedWeb, verifyDesktopPromotedWeb, readServingPromotion } from './cloudflare-promoted-web.mjs'
+import { verifyPromotedWeb, verifyDesktopPromotedWeb, readServingPromotion, promotionTrigger } from './cloudflare-promoted-web.mjs'
 
 const digest = value => createHash('sha256').update(value).digest('hex')
 const product = 'abc1234'.padEnd(40, '5'), overlay = 'c'.repeat(40), releasePin = 'abc1234-902-1'
@@ -36,6 +36,9 @@ function fixture(change = {}) {
     if (u.origin === 'https://api.github.com') {
       if (change.observation && u.pathname.includes('/actions/runs/99/attempts/1')) return Response.json(u.pathname.endsWith('/jobs') ? change.observation.jobs : change.observation.run)
       assert.equal(options.headers.authorization, 'Bearer test')
+      if (u.pathname === '/repos/' + repo + '/compare/' + product + '...main') {
+        return Response.json({ status: (change.main ?? product) === product ? 'identical' : 'ahead', merge_base_commit: { sha: product }, ...change.served })
+      }
       if (u.pathname.includes('/compare/')) {
         const path = '/repos/' + repo + '/compare/' + env.GITHUB_SHA + '...' + product
         assert.equal(u.pathname, path)
@@ -45,7 +48,8 @@ function fixture(change = {}) {
       }
       const body = { ['/repos/' + repo + '/issues/comments/81']: post, ['/repos/' + repo + '/issues/comments/80']: prior,
         ['/repos/' + repo + '/actions/runs/55/attempts/2']: started,
-        ['/repos/' + repo + '/git/ref/heads/main']: { object: { type: 'commit', sha: change.main ?? product } } }[u.pathname]
+        ['/repos/' + repo + '/git/ref/heads/main']: { object: { type: 'commit', sha: change.main ?? product } },
+        ['/repos/' + repo + '/releases/latest']: change.latestRelease ?? { target_commitish: 'f'.repeat(40) } }[u.pathname]
       assert.ok(body, u.pathname)
       return Response.json(body)
     }
@@ -61,8 +65,9 @@ function fixture(change = {}) {
     assert.equal(u.pathname, '/mikka/en/sign-in')
     return new Response(change.shell ?? '<script type="module" src="/mikka/assets/entry-123.js?dpl=' + releasePin + '"></script>')
   }
-  const options = { env, fetchImpl, now: () => verified + (change.elapsed ?? 3600000) }
+  const options = { env, event: change.event, fetchImpl, now: () => verified + (change.elapsed ?? 3600000) }
   return { verify: () => verifyPromotedWeb(options), desktop: () => verifyDesktopPromotedWeb(options),
+    trigger: consumer => promotionTrigger(consumer, { env, event: change.event, fetchImpl }),
     observe: () => readServingPromotion(env.CLOUDFLARE_RECEIPT,{token:env.GITHUB_TOKEN,fetchImpl,now:options.now()}),calls }
 }
 
@@ -71,7 +76,7 @@ test('revalidates the live promoted Web on the original dispatch after 3976 seco
     const f = fixture({ elapsed })
     assert.deepEqual(await f.verify(), { product, releasePin })
     assert.equal(f.calls.length, 7)
-    assert.equal(f.calls.at(-1), '/repos/' + repo + '/git/ref/heads/main')
+    assert.equal(f.calls.at(-1), '/repos/' + repo + '/compare/' + product + '...main')
   }
 })
 test('rejects dispatch, owner, hash, inventory, timing and current-main changes', async () => {
@@ -82,7 +87,7 @@ test('rejects dispatch, owner, hash, inventory, timing and current-main changes'
     [{ prior: { author_association: 'MEMBER' } }, 'ownerComment'],
     [{ post: { user: { id: 1, login: 'alexj11324' } } }, 'ownerComment'],
     [{ record: { approvalSha256: 'f'.repeat(64) } }, 'commentChanged'],
-    [{ record: { product: 'b'.repeat(40), releasePin: 'bbbbbbb-902-1' } }, 'dispatchSource'],
+    [{ env: { MIKKA_RUNTIME_SOURCE: 'b'.repeat(40) } }, 'dispatchSource'],
     [{ record: { releasePin: 'abc1234-x-1' } }, 'clientPin'],
     [{ raw: record => JSON.stringify(record, null, 2) }, 'receiptShape'],
     [{ raw: record => JSON.stringify({ ...record, privateMapping: 'extra' }) }, 'receiptShape'],
@@ -97,8 +102,22 @@ test('rejects dispatch, owner, hash, inventory, timing and current-main changes'
     [{ run: { run_started_at: iso(600001) } }, 'staleDispatch'],
     [{ run: { run_started_at: iso(-30000) } }, 'staleDispatch'],
     [{ elapsed: 3 * 3600_000 }, 'approvalWindow'],
-    [{ main: 'f'.repeat(40) }, 'mainChanged'],
+    [{ served: { status: 'diverged' } }, 'servedOnMain'],
   ]) await assert.rejects(fixture(change).verify(), new RegExp(code), code)
+})
+test('a later main dispatch publishes the served product only when it is already part of main', async () => {
+  const head = '7'.repeat(40), env = { GITHUB_SHA: head }, run = { head_sha: head }
+  const later = fixture({ env, run, main: head })
+  assert.deepEqual(await later.verify(), { product, releasePin })
+  assert.ok(later.calls.includes('/repos/' + repo + '/compare/' + product + '...main'))
+  // A merge to main during the release does not block publishing the served commit.
+  assert.deepEqual(await fixture({ env, run, main: 'e'.repeat(40) }).verify(), { product, releasePin })
+  assert.deepEqual(await fixture({ env: { ...env, MIKKA_RUNTIME_SOURCE: product }, run, main: head }).verify(), { product, releasePin })
+  for (const [change, code] of [
+    [{ served: { status: 'diverged' } }, 'servedOnMain'],
+    [{ served: { merge_base_commit: { sha: 'f'.repeat(40) } } }, 'servedOnMain'],
+    [{ env: { ...env, MIKKA_RUNTIME_SOURCE: head } }, 'dispatchSource'],
+  ]) await assert.rejects(fixture({ run, main: head, ...change, env: { ...env, ...change.env } }).verify(), new RegExp(code), code)
 })
 test('rejects stale DNS, rollback, a legacy gateway serving the same SHA, and client skew', async () => {
   for (const [change, code] of [
@@ -121,7 +140,7 @@ test('Desktop binds its own original attempt, installer ancestry, overlay and se
   const good = fixture({ env, run, elapsed: 5400000 })
   assert.deepEqual(await good.desktop(), { product, releasePin, overlay })
   assert.ok(good.calls.some(path => path.includes('/compare/')))
-  await assert.rejects(good.verify(), /dispatchSource/)
+  await assert.rejects(good.verify(), /runIdentity/)
   const exact = fixture({ run: { ...run, head_sha: product } })
   assert.deepEqual(await exact.desktop(), { product, releasePin, overlay })
   assert.ok(!exact.calls.some(path => path.includes('/compare/')))
@@ -145,7 +164,9 @@ test('the paid builder and subscriptions run only behind the Cloudflare receipt,
   const read = name => readFileSync(new URL('../../.github/workflows/' + name, import.meta.url), 'utf8')
   const parent = read('e2b-official-runtime.yml'), child = read('e2b-runtime-release.yml')
   const gate = 'run: node scripts/release/cloudflare-promoted-web.mjs'
-  assert.ok(parent.indexOf(gate) > parent.indexOf('  web-ready:') && parent.indexOf(gate) < parent.indexOf('  release:'))
+  const verify = parent.indexOf(gate + '\n'), trigger = parent.indexOf(gate + ' trigger runtime')
+  assert.ok(verify > parent.indexOf('  web-ready:') && verify < parent.indexOf('  release:'))
+  assert.ok(trigger > parent.indexOf('  check:') && trigger < parent.indexOf('  web-ready:'))
   const paid = child.indexOf('    uses: ./.github/workflows/e2b-template.yml')
   const proof = child.indexOf('run: node scripts/e2b/validate-template-subscriptions.mjs')
   const first = child.indexOf(gate), second = child.indexOf(gate, first + 1), third = child.indexOf(gate, second + 1)
@@ -189,7 +210,53 @@ test('Desktop and E2B accept only an original successful protected serving obser
     {observation:{...observation,jobs:{total_count:2,jobs:[jobs.jobs[0],{...jobs.jobs[1],name:'Prepared release'}]}}},
     {observation:{...observation,jobs:{total_count:1,jobs:[jobs.jobs[1]]}}},
     {headers:{'x-mikka-gateway-version-sha256':'1'.repeat(64)}}, {version:{overlaySha:'1'.repeat(40)}},
-    {run:{...consumer,actor:{id:1}}}, {main:'a'.repeat(40)}]) {
+    {run:{...consumer,actor:{id:1}}}, {served:{status:'diverged'}}]) {
     await assert.rejects(fixture({observation,env,run:consumer,...change}).verify())
   }
+})
+
+test('a successful gateway observation that serves current main starts both releases by itself', async () => {
+  const repository = { id:1427517699, full_name:repo, fork:false }
+  const actor = { id:183887963 }
+  const run = { repository, head_repository:repository, path:'.github/workflows/cloudflare-app-deploy.yml', head_branch:'main',
+    head_sha:product, id:99, run_attempt:1, event:'workflow_dispatch', status:'completed', conclusion:'success', actor, triggering_actor:actor }
+  const gate = { status:'completed', conclusion:'success', head_sha:product, run_id:99, run_attempt:1, completed_at:iso(0) }
+  const jobs = { total_count:2, jobs:[{...gate,name:'deploy-application'}, {...gate,name:'Serving release '+[product,overlay,releasePin,'e'.repeat(64)].join(' ')}] }
+  const observation = { run, jobs }, event = { workflow_run: run }
+  const env = { GITHUB_EVENT_NAME:'workflow_run', CLOUDFLARE_RECEIPT:'' }
+  const desktop = '.github/workflows/desktop-release.yml'
+
+  const started = fixture({ observation, event, env })
+  assert.deepEqual(await started.trigger(workflow), { ready:true, receipt:'actions:99:1', product,
+    reason:'Cloudflare serves current main ' + product })
+  assert.equal((await fixture({ observation, event, env }).trigger(desktop)).ready, true)
+
+  // The started consumer verifies exactly that observation, under its own workflow_run identity.
+  const chainedEnv = { ...env, CLOUDFLARE_RECEIPT:'actions:99:1' }, consumer = { actor, triggering_actor:actor, event:'workflow_run' }
+  assert.deepEqual(await fixture({ observation, event, env:chainedEnv, run:consumer }).verify(), { product, releasePin })
+  assert.deepEqual(await fixture({ observation, event, env:chainedEnv, run:{ ...consumer, path:desktop } }).desktop(), { product, overlay, releasePin })
+  for (const change of [{ event:{ workflow_run:{ ...run, id:98 } } }, { event:{ workflow_run:{ ...run, run_attempt:2 } } },
+    { run:{ ...consumer, event:'workflow_dispatch' } }, { env:{ ...chainedEnv, CLOUDFLARE_RECEIPT:'81-' + 'f'.repeat(64) } }]) {
+    await assert.rejects(fixture({ observation, event, env:chainedEnv, run:consumer, ...change }).verify(), /dispatch|runIdentity/)
+  }
+
+  // Anything else is a quiet no-op, not a failure.
+  for (const [change, reason] of [
+    [{ event:{ workflow_run:{ ...run, conclusion:'failure' } } }, /not a successful Cloudflare deployment/],
+    [{ event:{ workflow_run:{ ...run, head_branch:'other' } } }, /not a successful Cloudflare deployment/],
+    [{ event:{ workflow_run:{ ...run, path:'.github/workflows/other.yml' } } }, /not a successful Cloudflare deployment/],
+    [{ env:{ ...env, GITHUB_EVENT_NAME:'push' } }, /not a successful Cloudflare deployment/],
+    [{ observation:{ run, jobs:{ total_count:1, jobs:[jobs.jobs[0]] } } }, /does not change what is served/],
+    [{ main:'a'.repeat(40) }, /but main is a{40}/],
+    [{ env:{ ...env, GITHUB_SHA:'a'.repeat(40) } }, /but main is/],
+  ]) {
+    const result = await fixture({ observation, event, env, ...change }).trigger(workflow)
+    assert.equal(result.ready, false)
+    assert.match(result.reason, reason)
+  }
+  const released = await fixture({ observation, event, env, latestRelease:{ target_commitish:product } }).trigger(desktop)
+  assert.deepEqual(released, { ready:false, reason:'Desktop for ' + product + ' is already released' })
+  assert.equal((await fixture({ observation, event, env, latestRelease:{ target_commitish:product } }).trigger(workflow)).ready, true)
+  // A gateway that no longer serves the observed pins fails loudly.
+  await assert.rejects(fixture({ observation, event, env, headers:{ 'x-mikka-gateway-version-sha256':'1'.repeat(64) } }).trigger(workflow))
 })

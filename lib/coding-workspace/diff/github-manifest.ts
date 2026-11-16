@@ -19,9 +19,8 @@ export type GitHubNativeFile = {
   sha: string; additions: number; deletions: number; patchSha256: string | null; page: number;
 }
 
-/** A truncated tree cannot establish a complete comparison. Directories are
- * validated but excluded from the file manifest; gitlinks retain their OIDs. */
-export function parseGitHubTree(value: unknown, expectedSha: string): Map<string, GitHubTreeEntry> {
+/** Check the entire Git tree before exposing paths or using it for a comparison. */
+export function verifiedGitHubTree(value: unknown, expectedSha: string) {
   const parsed = treeResult.safeParse(value)
   if (!parsed.success || parsed.data.sha !== expectedSha) throw unavailable()
   const nodes = new Map<string, z.infer<typeof treeEntry>>()
@@ -30,13 +29,20 @@ export function parseGitHubTree(value: unknown, expectedSha: string): Map<string
       || (entry.type === 'blob' && entry.size === undefined)) throw unavailable()
     nodes.set(entry.path, entry)
   }
-  const files = new Map<string, GitHubTreeEntry>()
   for (const entry of nodes.values()) {
     const components = entry.path.split('/')
     for (let length = 1; length < components.length; length++) {
       const parent = nodes.get(components.slice(0, length).join('/'))
       if (parent && parent.type !== 'tree') throw unavailable()
     }
+  }
+  return { sha: parsed.data.sha, nodes }
+}
+
+export function parseGitHubTree(value: unknown, expectedSha: string): Map<string, GitHubTreeEntry> {
+  const { nodes } = verifiedGitHubTree(value, expectedSha)
+  const files = new Map<string, GitHubTreeEntry>()
+  for (const entry of nodes.values()) {
     if (entry.type !== 'tree') files.set(entry.path, { sha: entry.sha, mode: entry.mode, size: entry.size ?? null })
   }
   return files

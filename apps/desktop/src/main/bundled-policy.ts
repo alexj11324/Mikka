@@ -16,22 +16,32 @@ const FACTORY_FLOW = /^\/api\/factory\/tasks\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a
 const BILLING_MANAGEMENT = /^\/api\/(?:workspaces|organizations)\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/billing$/i
 const DRIVE_VOLUME_ID = 'vol_[0-9A-HJKMNP-TV-Z]{26}'
 const DRIVE_VERSION_ID = 'vver_[0-9A-HJKMNP-TV-Z]{26}'
+export const DRIVE_BLOB_UPLOAD = new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/blobs$`)
+const UUID = '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89aAbB][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}'
 const DRIVE_ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
+  [/^\/api\/drive\/scopes$/, ['GET']],
   [/^\/api\/drive\/volumes$/, ['GET', 'POST']],
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}$`), ['GET']],
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/(?:files|versions)$`), ['GET']],
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/versions/${DRIVE_VERSION_ID}$`), ['GET']],
-  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/blobs$`), ['POST']],
+  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/shares$`), ['GET', 'POST']],
+  [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/shares/${UUID}$`), ['GET', 'PATCH', 'DELETE']],
+  [DRIVE_BLOB_UPLOAD, ['POST']],
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/entries$`), ['PATCH']],
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/(?:restore|archive|unarchive)$`), ['POST']],
 ]
-const UUID = '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89aAbB][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}'
-const ORGANIZATION_OVERVIEW_OR_KEYS = new RegExp(`^/api/organizations/${UUID}(?:/api-keys)?$`)
+const ORGANIZATION_OVERVIEW = new RegExp(`^/api/organizations/${UUID}$`)
+const ORGANIZATION_KEYS = new RegExp(`^/api/organizations/${UUID}/api-keys$`)
+const ORGANIZATION_WORKSPACES = new RegExp(`^/api/organizations/${UUID}/workspaces$`)
+const ORGANIZATION_POLICY = new RegExp(`^/api/organizations/${UUID}/policy$`)
+const ORGANIZATION_APPROVALS = new RegExp(`^/api/organizations/${UUID}/approvals$`)
+const ORGANIZATION_AUDIT = new RegExp(`^/api/organizations/${UUID}/audit-log$`)
 const ORGANIZATION_DOMAINS = new RegExp(`^/api/organizations/${UUID}/allowed-domains$`)
 const ORGANIZATION_DOMAIN = new RegExp(`^/api/organizations/${UUID}/allowed-domains/${UUID}$`)
 const ORGANIZATION_JOIN = new RegExp(`^/api/organizations/${UUID}/join-by-domain$`)
 const ORGANIZATION_KEY = new RegExp(`^/api/organizations/${UUID}/api-keys/${UUID}$`)
 const WORKSPACE_GOVERNANCE = new RegExp(`^/api/workspaces/${UUID}/governance$`)
+const ORGANIZATION_MEMBERS = new RegExp(`^/api/organizations/${UUID}/members$`)
 const ORGANIZATION_INVITATIONS = new RegExp(`^/api/organizations/${UUID}/invitations$`)
 const SERVICE_IDENTITY_DIRECTORY = `/api/workspaces/${UUID}/service-identities`
 const SERVICE_IDENTITY_ROUTES: ReadonlyArray<readonly [RegExp, string]> = [
@@ -95,12 +105,19 @@ export function allowedApiPath(path: string, method: string): boolean {
   if (path.startsWith('/api/workspaces/') && path.includes('/service-identities')) {
     return SERVICE_IDENTITY_ROUTES.some(([route, mutation]) => route.test(path) && (method === 'GET' || method === mutation))
   }
-  if (WORKSPACE_GOVERNANCE.test(path) || path === '/api/organizations' || ORGANIZATION_OVERVIEW_OR_KEYS.test(path)) return method === 'GET'
+  if (WORKSPACE_GOVERNANCE.test(path) || ORGANIZATION_KEYS.test(path)) return method === 'GET'
+  if (path === '/api/organizations') return method === 'GET' || method === 'POST'
+  if (ORGANIZATION_OVERVIEW.test(path)) return method === 'GET' || method === 'PATCH' || method === 'DELETE'
+  if (ORGANIZATION_WORKSPACES.test(path)) return method === 'POST' || method === 'DELETE'
   if (path === '/api/me/joinable-organizations' || path === '/api/me/invitations') return method === 'GET'
+  if (ORGANIZATION_POLICY.test(path)) return method === 'GET' || method === 'PATCH'
+  if (ORGANIZATION_APPROVALS.test(path)) return method === 'POST' || method === 'PATCH'
+  if (ORGANIZATION_AUDIT.test(path)) return method === 'GET' || method === 'POST'
   if (ORGANIZATION_DOMAINS.test(path)) return method === 'GET' || method === 'POST'
   if (ORGANIZATION_DOMAIN.test(path)) return method === 'DELETE'
   if (ORGANIZATION_JOIN.test(path)) return method === 'POST'
   if (ORGANIZATION_KEY.test(path)) return method === 'PATCH'
+  if (ORGANIZATION_MEMBERS.test(path)) return method === 'GET' || method === 'POST' || method === 'PATCH' || method === 'DELETE'
   if (ORGANIZATION_INVITATIONS.test(path)) return method === 'GET' || method === 'POST' || method === 'DELETE'
   if (path === '/api/organization-invitations/accept') return method === 'POST'
   // Viewer grants are capabilities and must be obtained through owner-bound IPC.

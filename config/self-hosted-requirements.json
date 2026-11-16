@@ -13,6 +13,13 @@
     "test": "tests/task-create-only.db.test.ts",
     "suite": "test:coordinator-issue-create-db"
   },
+  "app/actions/project-resources.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Signed-in members read and administrators update Project repository references with current user access. Signed-in members can read setup history for an accessible Project. Restoring a recipe also requires project steering and active workspace administration.",
+    "test": "tests/project-dependency-repositories.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
   "app/actions/task-runs.ts": {
     "mode": "built-in",
     "environment": [],
@@ -33,6 +40,20 @@
     "behavior": "Record the personal read position or manual unread flag for visible runs in the selected workspace using the installation database.",
     "test": "lib/thread-reads.db.test.ts",
     "suite": "test:conversation-reads"
+  },
+  "app/api/devices/[deviceId]/active-threads/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A signed-in owner can page through visible active thread roots on their local device in the current workspace, using the installation PostgreSQL database.",
+    "test": "lib/device-heartbeat.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
+  "app/api/drive/scopes/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List the current user's personal Files location and readable active project-personal locations within the selected workspace.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
   },
   "app/api/drive/volumes/[volumeId]/archive/route.ts": {
     "mode": "built-in",
@@ -59,6 +80,34 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Read bytes from the selected head or immutable version after workspace and owner authorization, and return them as an attachment.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "app/api/drive/volumes/[volumeId]/shares/[shareId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "An authenticated file link points to one existing Drive path. Its creator manages private or already-authorized member access while each opening rechecks the original Drive.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "app/api/drive/volumes/[volumeId]/shares/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "An authenticated file link points to one existing Drive path. Its creator manages private or already-authorized member access while each opening rechecks the original Drive.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "drizzle/20261116190048_drive_file_links.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "An authenticated file link points to one existing Drive path. Its creator manages private or already-authorized member access while each opening rechecks the original Drive.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "lib/drive/file-links.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "An authenticated file link points to one existing Drive path. Its creator manages private or already-authorized member access while each opening rechecks the original Drive.",
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
@@ -100,7 +149,7 @@
   "app/api/drive/volumes/route.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "List and create the current owner's private volumes within an authorized workspace.",
+    "behavior": "List and create authorized Drive volumes, or explicitly list bounded SKILL.md metadata from active folders in the selected personal or Project scope.",
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
@@ -195,11 +244,42 @@
     "mode": "operator-configured",
     "environment": [
       "MIKKA_OFFICIAL_WEB_URL",
-      "MIKKA_OFFICIAL_WEB_ENABLED"
+      "MIKKA_OFFICIAL_WEB_ENABLED",
+      "MIKKA_UI_OVERLAY_SHA"
     ],
-    "behavior": "Confirm the signed-in native account on its issuing origin. Self-hosted Task destinations use the configured official client, an expiring single-use record in the existing auth database, and a fresh Task access check.",
+    "behavior": "Confirm the signed-in native account on its issuing origin. Self-hosted Task destinations use the configured official client, an expiring single-use record in the existing auth database, and a fresh Task access check. Organization settings requires account confirmation for an authorized workspace on a paired cloud deployment.",
     "test": "tests/mobile-handoff.test.ts",
     "suite": "test:desktop-auth"
+  },
+  "app/api/mobile/settings/route.ts": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_UI_OVERLAY_SHA"
+    ],
+    "behavior": "Community installations keep their usual account and workspace settings. Only a human session on a cloud deployment serving a pinned official UI receives the personal Files and Organization settings entries.",
+    "test": "tests/mobile-service-members.db.test.ts",
+    "suite": "test:web-auth-db"
+  },
+  "app/api/mobile/push-tokens/[id]/test/route.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "Uses the installation's existing push relay for an explicit test of the current authenticated session's registered installation. A disconnected relay returns unavailable.",
+    "test": "tests/mobile-push-workspace.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "lib/mobile-push-session.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "Uses the installation's existing push relay for an explicit test of the current authenticated session's registered installation. A disconnected relay returns unavailable.",
+    "test": "tests/mobile-push-workspace.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "app/api/mobile/push-tokens/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the installation PostgreSQL database and the current authenticated session to list the person's active native push registrations, register a device or remove its current session binding.",
+    "test": "tests/mobile-push-workspace.db.test.ts",
+    "suite": "test:visibility-db"
   },
   "app/api/organization-invitations/accept/route.ts": {
     "mode": "built-in",
@@ -243,12 +323,26 @@
     "test": "tests/organization-invitations.db.test.ts",
     "suite": "test:organization-invitations-db"
   },
+  "app/api/organizations/[organizationId]/members/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Return current active Organization members to a current owner or administrator. An explicit includeDisabled also returns suspended memberships. Existing membership changes use the same PostgreSQL authority.",
+    "test": "lib/enterprise/governance.db.test.ts",
+    "suite": "test:enterprise-db"
+  },
   "app/api/organizations/[organizationId]/join-by-domain/route.ts": {
     "mode": "built-in",
     "environment": [],
     "behavior": "Check the verified account and Organization policy for domain-based membership.",
     "test": "tests/organization-join-domains.db.test.ts",
     "suite": "test:organization-join-domains-db"
+  },
+  "app/api/organizations/[organizationId]/machine-sizes/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the four task machine sizes and their list prices from the current pricing model for a signed-in active member of the requested organization. Reading the catalog makes no provider or billing call.",
+    "test": "lib/enterprise/governance.db.test.ts",
+    "suite": "test:enterprise-db"
   },
   "app/api/service-identity/projects/[projectId]/route.ts": {
     "mode": "built-in",
@@ -270,6 +364,27 @@
     "behavior": "List, upload, download and delete task files under the task ACL using the installation database and configured attachment storage.",
     "test": "tests/team-issue-create.db.test.ts",
     "suite": "test:scope-detachment-db"
+  },
+  "app/api/tasks/[taskId]/review/machine-sessions/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read current terminal and preview lease kinds and expiration times for the authenticated owner's Task Run and credential.",
+    "test": "lib/coding-workspace/machine-sessions.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "app/api/tasks/[taskId]/review/machine-metrics/route.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "Reads a recent measurement from a Task owner's configured E2B machine. Returns unavailable for unsupported machine providers and for missing owner configuration.",
+    "test": "lib/coding-workspace/machine-metrics.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/computer/e2b-provider.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "Reads a recent measurement from a Task owner's configured E2B machine. Returns unavailable for unsupported machine providers and for missing owner configuration.",
+    "test": "lib/coding-workspace/machine-metrics.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
   },
   "app/api/tasks/[taskId]/review/preview/route.ts": {
     "mode": "operator-configured",
@@ -530,6 +645,13 @@
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "drizzle/20261116070600_organization_invitation_email_preference.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Store the recipient’s organization invitation email preference before the installation sends an invitation.",
+    "test": "tests/organization-invitations.db.test.ts",
+    "suite": "test:organization-invitations-db"
+  },
   "drizzle/20261112061146_organization_member_invitations.sql": {
     "mode": "built-in",
     "environment": [
@@ -654,6 +776,24 @@
     "test": "tests/organization-join-domains.db.test.ts",
     "suite": "test:organization-join-domains-db"
   },
+  "drizzle/20261116170813_workspace_shared_drive.sql": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "Keep shared Workspace Files in tenant-owned storage across member departure and retire their blobs on Workspace deletion.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "drizzle/20261116145316_isolate_shared_project_drive_storage.sql": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "Keep explicitly shared Project file bytes in their own tenant and Project namespace, retiring storage using the existing installation object cleanup worker when the Workspace is deleted.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "drizzle/20261114152243_archive_personal_drive_volumes.sql": {
     "mode": "built-in",
     "environment": [
@@ -676,6 +816,83 @@
     "behavior": "Store a claimed native session’s observed model in the installation PostgreSQL database. Replaying the migration preserves existing observations and earlier Skill reports.",
     "test": "tests/thread-detail-bytes.db.test.ts",
     "suite": "test:activity-actor-db"
+  },
+  "drizzle/20261116075300_environment_setup_history.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Adds a workspace-scoped PostgreSQL recipe history and records the currently available recipe for existing environments.",
+    "test": "tests/project-setup-history.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "drizzle/20261116082600_project_dependency_repositories.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Adds Project-scoped references to immutable GitHub IDs in the installation PostgreSQL database.",
+    "test": "tests/project-dependency-repositories.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "drizzle/20261116103048_organization_icon.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Stores an optional raster icon on its administrative Organization in the installation workspace database.",
+    "test": "lib/enterprise/governance.db.test.ts",
+    "suite": "test:enterprise-db"
+  },
+  "drizzle/20261116111059_personal_organization_project_visibility.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Store the personal Project default in the Workspace database under the existing composite Organization membership foreign key.",
+    "test": "tests/resource-access.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "app/api/workspaces/[workspaceId]/project-visibility-default/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads or updates the current Organization member’s new Project sharing default using the installation Workspace database.",
+    "test": "tests/resource-access.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "app/api/workspaces/[workspaceId]/personal-default-project/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Stores a personal Organization Project choice in the Workspace database and reads it through existing Project access.",
+    "test": "tests/resource-access.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "lib/plugins/skill-metadata.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Parse names and descriptions from local Markdown bytes without executing content or contacting a provider.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "lib/resource-access/personal-project-selection.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Stores a personal Organization Project choice in the Workspace database and reads it through existing Project access.",
+    "test": "tests/resource-access.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "drizzle/20261116150500_personal_organization_default_project.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Stores a personal Organization Project choice in the Workspace database and reads it through existing Project access.",
+    "test": "tests/resource-access.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "lib/project-input.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validates the Project draft and optional observed Organization sharing default without external services.",
+    "test": "tests/resource-access.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "lib/resource-access/project-creation-default.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Resolves the member’s default and compares the observed Organization binding before registering a new Project in this installation.",
+    "test": "tests/resource-access.db.test.ts",
+    "suite": "test:visibility-db"
   },
   "lib/abuse/workers-ai.ts": {
     "mode": "optional-cloud",
@@ -810,6 +1027,13 @@
     "test": "lib/bot-model-optimistic.test.ts",
     "suite": "test:execution-rules"
   },
+  "lib/browser-rpc/session.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "After the signed-in browser changes its profile, return the session cache issued by this installation for the updated name or image.",
+    "test": "tests/account-actions.test.ts",
+    "suite": "test:account"
+  },
   "lib/captures/publication-contract.ts": {
     "mode": "built-in",
     "environment": [],
@@ -903,6 +1127,13 @@
       "BETTER_AUTH_URL"
     ],
     "behavior": "Issue a one-use link only after checking the installation origin and current checkout. A missing local dev server returns unavailable.",
+    "test": "lib/coding-workspace/preview/route.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/coding-workspace/preview/port.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validates the numeric port before requesting a Task machine lease or resume.",
     "test": "lib/coding-workspace/preview/route.test.ts",
     "suite": "test:coding-workspace-review-runtime"
   },
@@ -1028,6 +1259,41 @@
     "test": "lib/issue-activity.test.ts",
     "suite": "test:issues"
   },
+  "lib/project-access.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Return active project names for a selected-workspace personal Files picker after the existing project content permission check.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "lib/project-resources/contracts.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Dependency repository reads and replacements validate Project scope, revision and stable GitHub IDs. Project setup history and restore validate the current workspace, project, environment and acknowledged binding snapshot.",
+    "test": "tests/project-dependency-repositories.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "lib/project-resources/dependency-repositories.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "The installation stores Project references and intersects the current operator-configured GitHub App directory, active workspace policy and Project ACL. No credentials are persisted.",
+    "test": "tests/project-dependency-repositories.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "lib/project-resources/pull-authors.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "Project PR author suggestions require the signed account's configured GitHub App, the exact bound repository and current Project access.",
+    "test": "tests/project-dependency-repositories.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "lib/project-resources/store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Project resource transactions use the installation PostgreSQL database and workspace locks. The installation PostgreSQL database stores versioned recipes. A restore checks the shared binding snapshot, clears approval and preserves current settings. Project-specific bindings require content access for reads and steering plus an active Workspace admin for writes.",
+    "test": "tests/environment-settings.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
   "lib/thread-artifacts.ts": {
     "mode": "built-in",
     "environment": [],
@@ -1125,6 +1391,13 @@
     "behavior": "The instruction context reads the current owner and Bot memory alongside the existing current prompt preferences without loading chat history.",
     "test": "lib/coordinator/prompt-preferences.test.ts",
     "suite": "test:agent-kit-model"
+  },
+  "lib/coordinator/wake-recovery.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The installed database decides which coordinator wakes are due; the reconcile check and its wake sweep read the same predicate and need no service or configuration.",
+    "test": "lib/reconcile-due.db.test.ts",
+    "suite": "test:run-recovery-db"
   },
   "lib/credentials/runtime-identity.ts": {
     "mode": "optional-cloud",
@@ -1293,6 +1566,13 @@
     "test": "lib/dispatch-timing.test.ts",
     "suite": "test:agent-kit-model"
   },
+  "lib/drive/blobs.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the existing local database or configured object store, and stop reading bytes at the requested file limit.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "lib/drive/client.ts": {
     "mode": "built-in",
     "environment": [],
@@ -1304,6 +1584,13 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Authorize workspace-scoped Drive requests and update versioned manifests in PostgreSQL. File bytes use the installation's existing artifact storage configuration, with inline database storage when no bucket is configured.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "lib/drive/skills.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read bounded names and descriptions from current SKILL.md entries in the authorized Drive location using the existing installation storage.",
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
@@ -1381,6 +1668,13 @@
     "behavior": "Self-hosted Eve calls the configured application origin or local server with its signed scope. The private product capability is sent only to the paired Cloudflare service and that deployment refuses to call without it.",
     "test": "lib/eve/product-tool.test.ts",
     "suite": "test:eve-product-tool"
+  },
+  "lib/eve/projection.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The existing Eve workflow store supplies committed text when a person stops a reply. Chat keeps interrupted text in its display history and records Stop if that store cannot be read.",
+    "test": "lib/eve/projection.test.ts",
+    "suite": "test:eve"
   },
   "lib/eve/runtime.ts": {
     "mode": "built-in",
@@ -1492,6 +1786,13 @@
     "behavior": "Community installations return HTTP 404 for the internal CI receipt route. Hosted receipts require a valid domain-separated HMAC, a fresh timestamp and a bounded payload.",
     "test": "app/api/webhooks/github/route.test.ts",
     "suite": "test:suggestions"
+  },
+  "lib/governance/audit-export.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Organization administrators can filter and page live audit events in the installation PostgreSQL database with the same enterprise access check as audit exports.",
+    "test": "lib/enterprise/http.db.test.ts",
+    "suite": "test:enterprise-db"
   },
   "lib/governance/http.ts": {
     "mode": "built-in",
@@ -1675,6 +1976,17 @@
     "test": "lib/issue-threads.test.ts",
     "suite": "test:issues"
   },
+  "lib/linear-sync/client.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "LINEAR_CLIENT_ID",
+      "LINEAR_CLIENT_SECRET",
+      "LINEAR_TOKEN_ENCRYPTION_KEY"
+    ],
+    "behavior": "The existing Linear client reads issue labels in pages through the signed-in person's authorized Linear connection. Selecting an automation label does not require an active two-way sync.",
+    "test": "lib/linear-sync/label-options.test.ts",
+    "suite": "test:linear-sync"
+  },
   "lib/linear-sync/markdown.ts": {
     "mode": "built-in",
     "environment": [],
@@ -1723,6 +2035,15 @@
     "behavior": "Accept only a validated Task or immutable receipt and an opaque rendezvous on the configured HTTPS server.",
     "test": "lib/mobile-web-target.test.ts",
     "suite": "test:mobile"
+  },
+  "lib/mobile-web-scope.ts": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_UI_OVERLAY_SHA"
+    ],
+    "behavior": "Verify the signed-in account can open its selected workspace. The Organization destination also requires a cloud installation paired to its official UI. Community keeps existing destinations.",
+    "test": "tests/mobile-service-members.db.test.ts",
+    "suite": "test:web-auth-db"
   },
   "lib/mobile-web-target.ts": {
     "mode": "built-in",
@@ -1907,6 +2228,13 @@
     "behavior": "Read coordinates only from the platform-signed Slack app/team envelope, bound sender and validated revocation events.",
     "test": "lib/slack/install-provider.test.ts",
     "suite": "test:slack"
+  },
+  "lib/slack/user-id.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validate Slack member IDs consistently for installations and automation author filters.",
+    "test": "lib/schedules/slack-events.test.ts",
+    "suite": "test:schedules"
   },
   "lib/standalone-chat-controls.ts": {
     "mode": "built-in",
@@ -2330,6 +2658,13 @@
     "test": "lib/schedules/dispatch.db.test.ts",
     "suite": "test:schedules-db"
   },
+  "drizzle/20261116063804_add_device_description.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Store an optional owner-managed description on a local device in the installation database.",
+    "test": "lib/live/devices.db.test.ts",
+    "suite": "test:live-db"
+  },
   "drizzle/20261115132401_schedule_page_requests.sql": {
     "mode": "built-in",
     "environment": [],
@@ -2513,6 +2848,13 @@
     "behavior": "Post a finished automation run to its Slack channel with the workspace installation's bot token, in the saved locale.",
     "test": "lib/slack/automation-notice.test.ts",
     "suite": "test:schedules"
+  },
+  "drizzle/20261116063000_schedule_restore.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Save the previous automation state when a person deletes it so that an authorized restore preserves its identity and history.",
+    "test": "lib/schedules/store.db.test.ts",
+    "suite": "test:schedules-db"
   },
   "drizzle/20261115204500_schedule_organize.sql": {
     "mode": "built-in",
@@ -2719,5 +3061,54 @@
     "behavior": "Works out the setup checklist from the installation's own data.",
     "test": "lib/onboarding.db.test.ts",
     "suite": "test:onboarding-db"
+  },
+  "app/api/integrations/github/repositories/branches/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads a branch page through the installation's existing GitHub repository authorization. Without the configured GitHub App or an authorized repository, the read is refused.",
+    "test": "lib/github/user-access.test.ts",
+    "suite": "test:github"
+  },
+  "lib/github/user-access.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads a branch page through the installation's existing GitHub repository authorization. Without the configured GitHub App or an authorized repository, the read is refused.",
+    "test": "lib/github/user-access.test.ts",
+    "suite": "test:github"
+  },
+  "lib/github/repository-input.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validates the existing repository selector for signed GitHub repository reads and verification settings.",
+    "test": "lib/github/user-access.test.ts",
+    "suite": "test:github"
+  },
+  "app/api/integrations/github/repositories/verification/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validates the existing repository selector for signed GitHub repository reads and verification settings.",
+    "test": "lib/github/user-access.test.ts",
+    "suite": "test:github"
+  },
+  "app/api/integrations/github/repositories/tree/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Verifies the installation's existing GitHub authority for the selected repository before returning visible metadata for an immutable revision. Missing GitHub configuration or a denied repository cannot return a tree.",
+    "test": "lib/github/user-access.test.ts",
+    "suite": "test:github"
+  },
+  "lib/coding-workspace/diff/github-manifest.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validates Git tree structure and revision identity locally for repository browsing and existing coding workspace comparisons. It has no independent network or credential requirement.",
+    "test": "lib/github/user-access.test.ts",
+    "suite": "test:github"
+  },
+  "app/api/integrations/mcp/refresh/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A fresh owner session lists only tool names for one of their enabled HTTP or SSE installations through the existing MCP connection and credential policy.",
+    "test": "lib/plugins/routes.test.ts",
+    "suite": "test:plugins"
   }
 }

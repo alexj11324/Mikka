@@ -77,6 +77,52 @@ test('dispatch_task automations run as their creator through the existing create
       VALUES($1,$2,$3,$4::uuid,'workspace',NULL,'x','bot:'||$4::uuid::text,$5,$5,'paused')`, [randomUUID(), owner, workspace.id, chat, definition()]), { code: '23514' })
   })
 
+  await t.test('cancel one never-claimed run once without cancelling another run, dispatching a task, or changing the schedule', async () => {
+    const {schedule} = await create({...definition(),maxConcurrent:2})
+    const one = (await runNow(schedule)).occurrence
+    const two = (await runNow(schedule)).occurrence
+    const cancel = (runId:string, who=owner, bot=chat) => page<{runId:string;status:string}>(who,bot,{
+      action:'cancel_run',scheduleId:schedule.id,version:schedule.version,runId,
+    })
+    const history = (who:string,bot:string) => page<{occurrences:{id:string;can_cancel:boolean}[]}>(who,bot,{action:'history',scheduleId:schedule.id})
+    assert.equal((await history(owner,chat)).occurrences.find(r=>r.id===one.id)?.can_cancel,true)
+    assert.equal((await history(member,memberChat)).occurrences.find(r=>r.id===one.id)?.can_cancel,false)
+    await assert.rejects(cancel(one.id,member,memberChat),/scheduleAdminRequired/)
+    await assert.rejects(cancel(randomUUID()),/scheduleRunNotFound/)
+    const foreign = await create()
+    await assert.rejects(page(owner,chat,{action:'cancel_run',scheduleId:foreign.schedule.id,version:foreign.schedule.version,runId:one.id}),/scheduleRunNotFound/)
+    const [first,duplicate]=await Promise.all([cancel(one.id),cancel(one.id)])
+    assert.deepEqual(first,{runId:one.id,status:'cancelled'}); assert.deepEqual(duplicate,first)
+    assert.equal((await history(owner,chat)).occurrences.find(r=>r.id===one.id)?.can_cancel,false)
+    assert.equal((await occurrence(two.id)).status,'pending')
+    await tick()
+    assert.equal((await occurrence(two.id)).status,'succeeded')
+    await assert.rejects(cancel(two.id),/scheduleRunNotQueued/)
+    assert.equal((await fixture.query('SELECT 1 FROM task_creation_receipts WHERE "userId"=$1 AND "requestId"=$2',[owner,one.id])).rowCount,0)
+    assert.equal((await fixture.query('SELECT 1 FROM coordinator_events WHERE "dedupeKey"=$1',[`schedule_result:${one.id}`])).rowCount,1)
+    assert.deepEqual((await fixture.query('SELECT status,version FROM user_schedules WHERE id=$1',[schedule.id])).rows[0],{status:'active',version:schedule.version})
+  })
+  await t.test('a worker claim fences run cancellation, including pending retries with uncertain external dispatch', async () => {
+    const {schedule}=await create()
+    const run=(await runNow(schedule)).occurrence
+    const cancel=()=>page(owner,chat,{action:'cancel_run',scheduleId:schedule.id,version:schedule.version,runId:run.id})
+    // A collection window has its own payload lifecycle; history and the writer agree it is not an ordinary run.
+    await fixture.query(`UPDATE schedule_occurrences SET definition=jsonb_set(definition,'{webhook}','{"batchMinutes":5}'),
+      trigger='{"webhook":{"requests":[]}}' WHERE id=$1`,[run.id])
+    assert.equal((await page<{occurrences:{id:string;can_cancel:boolean}[]}>(owner,chat,{action:'history',scheduleId:schedule.id})).occurrences[0].can_cancel,false)
+    await assert.rejects(cancel(),/scheduleRunNotQueued/)
+    await fixture.query(`UPDATE schedule_occurrences SET definition=definition-'webhook',trigger=NULL WHERE id=$1`,[run.id])
+    const claim=await runtime.schedules().claim()
+    assert.equal(claim?.id,run.id)
+    await assert.rejects(cancel(),/scheduleRunNotQueued/)
+    await runtime.schedules().fail(claim!,new Error('transient dispatch response unavailable'))
+    assert.equal((await occurrence(run.id)).status,'pending')
+    await assert.rejects(cancel(),/scheduleRunNotQueued/)
+    await fixture.query(`UPDATE schedule_occurrences SET next_retry_at=now() WHERE id=$1`,[run.id])
+    await tick()
+    assert.equal((await occurrence(run.id)).status,'succeeded')
+    assert.equal((await fixture.query('SELECT 1 FROM task_creation_receipts WHERE "userId"=$1 AND "requestId"=$2',[owner,run.id])).rowCount,1)
+  })
   await t.test('立即运行 creates the task and hands it to the Bot once, keyed by the run', async () => {
     const { schedule } = await create()
     const requestId = randomUUID()
@@ -349,7 +395,80 @@ test('dispatch_task automations run as their creator through the existing create
     const waiting = (await fixture.query<{ status: string; bodies: string[] }>(`SELECT status,ARRAY(SELECT r->>'body' FROM jsonb_array_elements(trigger->'webhook'->'requests') r) bodies FROM schedule_occurrences WHERE schedule_id=$1`, [batched.id])).rows
     assert.deepEqual(waiting, [{ status: 'pending', bodies: ['one', 'two'] }], 'one run gathers both and waits for the window')
     assert.equal((await runtime.receiveAutomationWebhook(key, 'three')).status, 'batched')
+    const windows = await page<{batches: {requestCount: number; status: string; runStatus: string}[]; nextCursor: string | null}>(
+      owner, chat, {action:'history', scheduleId:batched.id, batches:{status:'collecting'}},
+    )
+    assert.deepEqual(windows.batches.map(b => [b.requestCount, b.status, b.runStatus]), [[3, 'collecting', 'pending']])
+    assert.equal(windows.nextCursor, null)
     await assert.rejects(runtime.receiveAutomationWebhook('mwh_' + 'A'.repeat(43), 'x'), /scheduleNotFound/)
+  })
+
+  await t.test('webhook flush and cancel close one collecting batch and retain the ordinary dispatch boundary', async () => {
+    const schedule = (await create({ ...definition(null), maxConcurrent: 3, webhook: { batchMinutes: 5 } })).schedule
+    const {key} = await page<{key: string}>(owner, chat, {action:'webhook_key', scheduleId:schedule.id, version:schedule.version})
+    const openBatch = async (body: string, requestKey?: string) => {
+      assert.equal((await runtime.receiveAutomationWebhook(key, body, requestKey)).status, 'queued')
+      const {batches} = await page<{batches:{id:string}[]}>(owner, chat, {action:'history',scheduleId:schedule.id,batches:{status:'collecting'}})
+      assert.equal(batches.length, 1)
+      return batches[0]!.id
+    }
+    const close = (action: 'flush_batch' | 'cancel_batch', batchId: string, who = owner, bot = chat) =>
+      page<{status:string; replayed:boolean}>(who, bot, {action, scheduleId:schedule.id, version:schedule.version, batchId})
+    const flushId = await openBatch('first alert', 'flush-1')
+    await assert.rejects(close('flush_batch', flushId, member, memberChat), /scheduleAdminRequired/)
+    const flushed = await Promise.all([close('flush_batch',flushId),close('flush_batch',flushId)])
+    assert.deepEqual(flushed.map(b => b.replayed).sort(), [false,true])
+    await assert.rejects(close('cancel_batch',flushId), /scheduleBatchClosed/)
+    assert.equal((await occurrence(flushId)).status, 'pending')
+    await tick()
+    const dispatched = await occurrence(flushId)
+    assert.equal(dispatched.status, 'succeeded')
+    assert.ok(dispatched.result?.eventId)
+    assert.equal((await close('flush_batch',flushId)).replayed, true)
+    const count = await fixture.query<{n:number}>(`SELECT count(*)::int n FROM coordinator_events WHERE payload#>>'{schedule,occurrenceId}'=$1`, [flushId])
+    assert.equal(count.rows[0]!.n,1)
+
+    const cancelId = await openBatch('private event body', 'cancel-1')
+    assert.equal((await runtime.receiveAutomationWebhook(key, 'second private body', 'cancel-2')).status, 'batched')
+    await assert.rejects(close('cancel_batch',cancelId,member,memberChat), /scheduleAdminRequired/)
+    await assert.rejects(page(owner, chat, {action:'cancel_batch',scheduleId:schedule.id,version:schedule.version+1,batchId:cancelId}),/scheduleVersionConflict/)
+    await assert.rejects(page(owner, chat, {action:'cancel_batch',scheduleId:(await create()).schedule.id,version:1,batchId:cancelId}),/scheduleBatchNotFound/)
+    assert.equal((await close('cancel_batch',cancelId)).status, 'cancelled')
+    assert.equal((await close('cancel_batch',cancelId)).replayed, true)
+    await assert.rejects(close('flush_batch',cancelId), /scheduleBatchClosed/)
+    const {rows:[cancelled]} = await fixture.query(`SELECT status,trigger,reported_at,result FROM schedule_occurrences WHERE id=$1`,[cancelId])
+    assert.equal(cancelled.status, 'cancelled')
+    assert.equal(cancelled.result, null)
+    assert.ok(cancelled.reported_at)
+    assert.ok(!/private|cancel-[12]/.test(JSON.stringify(cancelled.trigger)), 'bodies and sender request IDs are scrubbed')
+    assert.equal(cancelled.trigger.webhook.requests.length, 2)
+    assert.equal((await runtime.receiveAutomationWebhook(key, 'retry', 'cancel-2')).status, 'duplicate')
+    await assert.rejects(close('flush_batch',randomUUID()), /scheduleBatchNotFound/)
+
+    const racing = await openBatch('race')
+    const settled = await Promise.allSettled([close('cancel_batch',racing), close('flush_batch',racing)])
+    assert.equal(settled.filter(v => v.status === 'fulfilled').length, 1)
+    const denied = settled.find(v => v.status === 'rejected')
+    assert.match(String(denied?.reason), /scheduleBatchClosed/)
+  })
+
+  await t.test('closing a later webhook window cannot reopen an older one or bypass the daily cap', async () => {
+    const {schedule} = await create({ ...definition(null), maxConcurrent: 3, maxRunsPerDay: 2, webhook: {batchMinutes:5} })
+    const {key} = await page<{key:string}>(owner,chat,{action:'webhook_key',scheduleId:schedule.id,version:schedule.version})
+    const batchIds = async () => (await page<{batches:{id:string}[]}>(owner,chat,{
+      action:'history',scheduleId:schedule.id,batches:{status:'collecting'},
+    })).batches.map(b => b.id)
+    assert.equal((await runtime.receiveAutomationWebhook(key,'a'.repeat(65536))).status, 'queued')
+    const [older] = await batchIds()
+    assert.ok(older)
+    for (const char of ['b','c']) assert.equal((await runtime.receiveAutomationWebhook(key,char.repeat(65536))).status,'batched')
+    assert.equal((await runtime.receiveAutomationWebhook(key,'d'.repeat(65536))).status,'queued')
+    const [latest] = await batchIds()
+    assert.ok(latest && latest !== older)
+    await assert.rejects(page(owner,chat,{action:'cancel_batch',scheduleId:schedule.id,version:schedule.version,batchId:older}),/scheduleBatchClosed/)
+    await page(owner,chat,{action:'flush_batch',scheduleId:schedule.id,version:schedule.version,batchId:latest})
+    assert.deepEqual(await batchIds(), [])
+    assert.deepEqual(await runtime.receiveAutomationWebhook(key,'small arrival'), {status:'skipped',reason:'dailyRunLimit'})
   })
 
   await t.test('Linear: an event on a team of the creator’s own Linear runs each automation that takes it once, while the connection lasts', async () => {
@@ -456,6 +575,33 @@ test('dispatch_task automations run as their creator through the existing create
     assert.deepEqual([(await seen(member, memberChat)).folder, (await seen(member, memberChat)).tags], ['Ops', ['ci', 'nightly']], 'everyone sees the folder and tags')
     await page(owner, chat, { action: 'organize', scheduleId: schedule.id, folder: null, tags: [] })
     assert.deepEqual([(await seen(owner, chat)).folder, (await seen(owner, chat)).tags], [null, []])
+  })
+
+  await t.test('repeating a personal pin or shared folder and tags leaves the schedule list quiet', async t => {
+    const { schedule } = await create()
+    const originalChanged = runtime.automationSeams.changed
+    let changes = 0
+    runtime.automationSeams.changed = async () => { changes++ }
+    t.after(() => { runtime.automationSeams.changed = originalChanged })
+    const pin = (pinned: boolean) => page(member, memberChat, { action: 'pin', scheduleId: schedule.id, pinned })
+    await pin(true)
+    await Promise.all([pin(true), pin(true)])
+    assert.equal(changes, 1)
+    await pin(false)
+    await Promise.all([pin(false), pin(false)])
+    assert.equal(changes, 2)
+
+    const organize = (folder: string, tags: string[]) => page<{ schedule: Row }>(owner, chat, { action: 'organize', scheduleId: schedule.id, folder, tags })
+    type Row = Schedule & { folder: string; tags: string[] }
+    const first = await organize('Releases', ['Café', 'QA'])
+    const tuple = async () => (await fixture.query('SELECT xmin::text AS version, updated_at FROM user_schedules WHERE id=$1', [schedule.id])).rows[0]
+    const before = await tuple()
+    const matches = await Promise.all([organize('Releases', ['Cafe\u0301', 'QA', 'QA']), organize('Releases', ['Café', 'QA'])])
+    assert.deepEqual(matches, [first, first])
+    assert.deepEqual(await tuple(), before)
+    assert.equal(changes, 3)
+    assert.deepEqual((await organize('Releases', ['QA', 'Café'])).schedule.tags, ['QA', 'Café'])
+    assert.equal(changes, 4)
   })
 
   await t.test('追加到同一个任务: later runs add to the first run’s task; a deleted task pauses the automation', async () => {

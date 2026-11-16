@@ -17,6 +17,6 @@ export function templateDraft(template: AutomationTemplate, base: AutomationDraf
     case 'prReview': return { ...draft, ...trigger, github: [{ event: 'pull_request_opened', repositories: [], branches: '', labels: '', runWhen: '' }] }
     case 'ciFix': return { ...draft, ...trigger, github: [{ event: 'checks_failed', repositories: [], branches: '', labels: '', runWhen: '' }] }
     case 'linearTriage': return { ...draft, ...trigger, linear: [{ event: 'issue_created', teams: [], labels: '', runWhen: '' }] }
-    case 'slackQuestion': return { ...draft, ...trigger, slack: [{ event: 'mention', channels: [], reactions: '', runWhen: '' }] }
+    case 'slackQuestion': return { ...draft, ...trigger, slack: [{ event: 'mention', channels: [], authors: '', reactions: '', runWhen: '' }] }
   }
 }

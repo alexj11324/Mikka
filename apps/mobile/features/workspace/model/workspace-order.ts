@@ -10,16 +10,6 @@ export function orderWorkspaces<W extends { id: string }>(workspaces: readonly W
   return [...known, ...workspaces.filter(w => !placed.has(w.id))]
 }
 
-/** The ids after moving one workspace a step up (-1) or down (1); a move past either end changes nothing. */
-export function moveWorkspace(ids: readonly string[], id: string, step: -1 | 1): string[] {
-  const from = ids.indexOf(id), to = from + step
-  if (from < 0 || to < 0 || to >= ids.length) return [...ids]
-  const next = [...ids]
-  next.splice(from, 1)
-  next.splice(to, 0, id)
-  return next
-}
-
 /** A saved arrangement read back: a list of ids, or nothing when it is missing or unreadable. */
 export function parseWorkspaceOrder(raw: string | null): string[] {
   if (!raw) return []

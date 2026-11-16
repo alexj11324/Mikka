@@ -78,6 +78,7 @@ before(async () => {
   stub('../lib/device-removal.ts', {
     removeOwnedDevice: () => assert.fail('no device removal'),
     renameOwnedDevice: () => assert.fail('no rename'),
+    setOwnedDeviceDescription: () => assert.fail('no device description change'),
     setOwnedDeviceEnabled: () => assert.fail('no device scheduling change'),
   })
   stub('../lib/device-management.ts', { enqueueDeviceCommand: () => assert.fail('no device command') })

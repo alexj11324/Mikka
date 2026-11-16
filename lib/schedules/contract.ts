@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { SCHEDULE_READ_TOOL_IDS } from '@/lib/coordinator/scheduled-read-tools'
 import { taskDestinationSchema } from '@/lib/task-destination'
+import { slackUserId } from '@/lib/slack/user-id'
 import { taskTitleInputSchema } from '@/lib/task-title-input'
 import { agentProfileReferenceSchema } from '@/lib/factory/agent-profile-reference'
 
@@ -33,11 +34,18 @@ export const GITHUB_TRIGGER_EVENTS = [
   'issue_opened', 'comment', 'review_submitted', 'review_comment', 'checks_completed', 'checks_failed',
 ] as const
 export type GitHubTriggerEvent = typeof GITHUB_TRIGGER_EVENTS[number]
+/** These deliveries include the PR itself, independently of the sender, commenter or reviewer. */
+export function supportsPullAuthors(event: GitHubTriggerEvent) {
+  return event.startsWith('pull_request_') || event === 'draft_opened' || event === 'review_submitted' || event === 'review_comment'
+}
+export const githubLogin = z.string().trim().min(1).max(39).regex(/^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/)
 /** A repository as the workspace names it, `v2/github.com/<owner>/<name>` in lower case. */
 export const githubRepositoryKey = z.string().regex(/^v2\/github\.com\/[a-z0-9-]{1,39}\/[a-z0-9._-]{1,100}$/)
 /** Linear events an automation can run on (decision 2026-11-15-1930): those the Linear app's webhook already sends. */
 export const LINEAR_TRIGGER_EVENTS = ['issue_created', 'issue_status_changed', 'issue_label_added', 'issue_assigned', 'comment_created'] as const
 export type LinearTriggerEvent = typeof LINEAR_TRIGGER_EVENTS[number]
+export const slackReactionName = z.string().trim().regex(/^[a-z0-9_+'-]{1,100}$/)
+
 /** Slack events an automation can run on (decision 2026-11-15-2010); reaction_added needs the app's reactions subscription. */
 export const SLACK_TRIGGER_EVENTS = ['message', 'mention', 'reaction_added'] as const
 export type SlackTriggerEvent = typeof SLACK_TRIGGER_EVENTS[number]
@@ -45,6 +53,7 @@ export const eventTriggerSchema = z.discriminatedUnion('source', [
   z.object({
     source: z.literal('github'), event: z.enum(GITHUB_TRIGGER_EVENTS),
     repositories: z.array(githubRepositoryKey).min(1).max(20),
+    pullAuthors: z.array(githubLogin).min(1).max(20).optional(),
     branches: z.array(z.string().trim().min(1).max(250)).max(20).optional(),
     labels: z.array(z.string().trim().min(1).max(100)).max(20).optional(),
     /** One sentence checked against each event before a run starts; an event that does not match is skipped. */
@@ -61,11 +70,12 @@ export const eventTriggerSchema = z.discriminatedUnion('source', [
     source: z.literal('slack'), event: z.enum(SLACK_TRIGGER_EVENTS),
     /** Channel IDs of the workspace's Slack installation the Bot can see. */
     channels: z.array(z.string().regex(/^[CG][A-Z0-9]{2,30}$/)).min(1).max(20),
+    authors: z.array(z.string().refine(slackUserId)).max(20).optional(),
     /** reaction_added: the emoji names that count (without colons); empty or absent is any. */
-    reactions: z.array(z.string().trim().regex(/^[a-z0-9_+'-]{1,100}$/)).max(20).optional(),
+    reactions: z.array(slackReactionName).max(20).optional(),
     runWhen: z.string().trim().min(1).max(500).optional(),
   }).strict(),
-])
+]).refine(value => value.source !== 'github' || !value.pullAuthors?.length || supportsPullAuthors(value.event))
 export type EventTrigger = z.infer<typeof eventTriggerSchema>
 export type GitHubEventTrigger = Extract<EventTrigger, { source: 'github' }>
 export type LinearEventTrigger = Extract<EventTrigger, { source: 'linear' }>
@@ -92,16 +102,29 @@ export const SCHEDULE_PAGE_MAX = 100
 const scheduleCursor = z.templateLiteral([z.iso.datetime({ precision: 6 }), '/', z.uuid()])
 export const scheduleListInput = z.object({
   scheduleId: z.uuid().optional(),
+  deleted: z.boolean().optional(),
   limit: z.number().int().min(1).max(SCHEDULE_PAGE_MAX).optional(),
   cursor: scheduleCursor.optional(),
 }).strict()
 
+/** With batches, read only webhook windows and return their metadata without request bodies. */
+export const scheduleHistoryInput = z.object({
+  scheduleId: z.uuid(),
+  batches: scheduleListInput.pick({ limit: true, cursor: true }).extend({
+    status: z.enum(['collecting', 'queued', 'cancelled']).optional(),
+  }).optional(),
+}).strict()
+
+export const webhookBatchListInput = scheduleListInput.pick({ scheduleId: true, cursor: true }).required({ scheduleId: true })
+export const webhookBatchInput = z.object({ scheduleId: z.uuid(), batchId: z.uuid(), version: z.number().int().positive() }).strict()
+
 export const commandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('create'), requestId: z.string().min(1).max(200), definition: definitionSchema }).strict(),
   scheduleListInput.extend({ action: z.literal('list') }),
-  z.object({ action: z.literal('history'), scheduleId: z.uuid() }).strict(),
+  scheduleHistoryInput.extend({ action: z.literal('history') }),
+  webhookBatchInput.extend({ action: z.enum(['flush_batch', 'cancel_batch']) }),
   z.object({ action: z.literal('update'), scheduleId: z.uuid(), version: z.number().int().positive(), definition: definitionSchema }).strict(),
-  z.object({ action: z.enum(['pause', 'resume', 'cancel']), scheduleId: z.uuid(), version: z.number().int().positive() }).strict(),
+  z.object({ action: z.enum(['pause', 'resume', 'cancel', 'delete', 'restore']), scheduleId: z.uuid(), version: z.number().int().positive() }).strict(),
   // 接手: an owner or admin makes a workspace automation theirs; from then on it runs as them (decision 2026-11-15-1840).
   z.object({ action: z.literal('take_over'), scheduleId: z.uuid(), version: z.number().int().positive() }).strict(),
   // Webhook 地址: a new secret URL for the automation; the previous one stops working. Returned once.
@@ -112,6 +135,7 @@ export const commandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('organize'), scheduleId: z.uuid(), folder: z.string().trim().min(1).max(60).nullable(), tags: z.array(z.string().trim().min(1).max(30)).max(10) }).strict(),
   // 立即运行: one occurrence due now. The same requestId never adds a second one.
   z.object({ action: z.literal('run_now'), scheduleId: z.uuid(), version: z.number().int().positive(), requestId: z.uuid() }).strict(),
+  z.object({ action: z.literal('cancel_run'), scheduleId: z.uuid(), runId: z.uuid(), version: z.number().int().positive() }).strict(),
   // 用量: runs and cost per day in the automation's time zone, newest first.
   z.object({ action: z.literal('usage'), scheduleId: z.uuid(), days: z.number().int().min(1).max(90).optional() }).strict(),
 ])

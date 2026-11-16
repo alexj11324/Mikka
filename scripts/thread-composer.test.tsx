@@ -19,6 +19,9 @@ const messages = JSON.parse(readFileSync(new URL('../messages/en.json', import.m
 const at = (path: string) => new URL(`../${path}`, import.meta.url).href
 let thread: Record<string, unknown> | null
 let draftText = ''
+let draftQuote: string | null = null
+let storedMessages: { id: string; text: string; at: Date }[] = []
+let shownThread: import('../components/slots/thread-contract').ThreadScreenProps | undefined
 let pageChecks = 0
 let buildGate: Promise<boolean> | undefined
 let postReply = async (_request: { requestId: string; text: string }) => ({ sent: true })
@@ -47,7 +50,7 @@ mock.module('swr', {
   )
     ? actualSWR.default(key, fetcher, options)
     : Array.isArray(key) && key[0] === 'issue-thread'
-    ? { data: thread && { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: [] }, mutate: () => {} }
+    ? { data: thread && { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: storedMessages }, mutate: () => {} }
     // Where the thread runs is its own read (thread-run-place.tsx); none here.
     : Array.isArray(key) && key[0] === 'thread-machine' ? { data: null, mutate: () => {} }
     : Array.isArray(key) && key[0] === 'thread-changes' ? { data: changesRead, mutate: () => {} }
@@ -59,7 +62,7 @@ mock.module('swr', {
 mock.module('next/dynamic', { defaultExport: () => () => null })
 mock.module(at('lib/hooks/view-state.tsx'), { namedExports: {
   ...actualViewState,
-  useViewState: <T,>(key: string, initial: T) => actualViewState.useViewState(key, key.endsWith(':draft') ? draftText as T : initial),
+  useViewState: <T,>(key: string, initial: T) => actualViewState.useViewState(key, key.endsWith(':draft') ? draftText as T : key.endsWith(':quote') && draftQuote ? draftQuote as T : initial),
 } })
 mock.module(at('lib/app-build.ts'), { namedExports: { ...actualAppBuild, checkPageBuildBeforeAction: async () => { pageChecks++; return buildGate ?? true } } })
 mock.module(at('app/actions/agents.ts'), { namedExports: {
@@ -94,8 +97,10 @@ mock.module(at('components/coordinator/chat-composer.tsx'), { namedExports: { Ch
 // The bare pane mounted below is the shared Artifact/Review transcript and composer.
 const { ChatComposer } = await import('../components/coordinator/chat-composer')
 mock.module(at('components/slots/thread.tsx'), { namedExports: {
-  ThreadScreen: (props: import('../components/slots/thread-contract').ThreadScreenProps) =>
-    <section data-required-thread-screen=""><ChatComposer {...props.composer} />{props.notices}</section>,
+  ThreadScreen: (props: import('../components/slots/thread-contract').ThreadScreenProps) => {
+    shownThread = props
+    return <section data-required-thread-screen=""><ChatComposer {...props.composer} />{props.notices}</section>
+  },
 } })
 let IssueThreadPanel: typeof import('../components/workspace/issue-thread-panel')['IssueThreadPanel']
 let createRoot: typeof import('react-dom/client')['createRoot']
@@ -106,7 +111,7 @@ before(async () => { ({ createRoot } = await import('react-dom/client')); ({ Iss
 const base = { id: 'run-1', issueId: 'issue-1', status: 'succeeded', outcome: null, question: null, continuation: null, stopping: false, ownedByCurrentUser: true,
   createdAt: new Date(0), finishedAt: new Date(0), latestRunId: 'run-1', prompt: 'Fix it', stopRequestedAt: null, replyAvailable: true, retryAvailable: true, quota: null, feedbackEligible: false,
   detail: { name: 'ZHIX-2 Fix it', agentName: 'Claude Code', harness: 'claude_code', summary: null } }
-beforeEach(() => { versionScenario = null; buildGate = undefined; postReply = async () => ({ sent: true }); thread = { ...base }; acceptance = null; composer = null; replyCalls = 0; draftText = ''; pageChecks = 0; liveRead = false; observeChanges = false; changesReads = 0; readFailure = null; readHold = null; changesRead = null; issueReads = 0; notices.clear(); browser.sessionStorage.clear() })
+beforeEach(() => { draftQuote = null; storedMessages = []; shownThread = undefined; versionScenario = null; buildGate = undefined; postReply = async () => ({ sent: true }); thread = { ...base }; acceptance = null; composer = null; replyCalls = 0; draftText = ''; pageChecks = 0; liveRead = false; observeChanges = false; changesReads = 0; readFailure = null; readHold = null; changesRead = null; issueReads = 0; notices.clear(); browser.sessionStorage.clear() })
 afterEach(async () => { if (root) { await act(async () => root!.unmount()); root = null; container.remove() } })
 after(() => browser.close())
 const render = (props: Partial<Parameters<typeof IssueThreadPanel>[0]> = {}) => renderToStaticMarkup(<IntlProvider locale="en" timeZone="UTC" messages={messages}>
@@ -284,6 +289,16 @@ test('an open thread lets the agent’s words be quoted and every message be cop
   assert.match(html, /data-slot="reply-quote"[^>]*aria-label="[^"]*Done\.[^"]*"/)
   assert.doesNotMatch(html, /&gt; Done\./)
   assert.equal(html.match(/data-copy-state="idle"/g)?.length, 2)
+})
+
+test('the full thread labels a selected quote and restores its words separately from the saved follow-up', () => {
+  draftQuote = 'Selected words'
+  storedMessages = [{ id: 'follow-up', text: '> Selected words\n\nContinue here.', at: new Date(1) }]
+  render({ bare: false })
+  assert.equal(shownThread?.pending.find(item => item.id === 'reply-quote')?.meta, messages.AiElements.message.quote)
+  const followUp = shownThread?.entries?.find(item => item.role === 'person' && item.text === 'Continue here.')
+  assert.ok(followUp?.role === 'person')
+  assert.deepEqual(followUp.attachments, [{ id: 'reply-quote', name: 'Selected words', meta: messages.AiElements.message.quote }])
 })
 
 test('the original thread shows the latest failed continuation and its existing Retry control', () => {

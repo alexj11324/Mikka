@@ -1,7 +1,8 @@
 import {evaluationBindingId} from '../../../../lib/eve/evaluation-context'
 import { defineHook } from 'eve/hooks'
+import { sessions } from 'eve/server'
 import { scopeFromAuth, registerSession } from '../../../../lib/eve/scope'
-import { projectEveTurn, projectTurnState } from '../../../../lib/eve/projection'
+import { projectEveTurn, projectTurnState, stoppedTurnDisplay } from '../../../../lib/eve/projection'
 import { productRpc } from '../../../../lib/eve/product-rpc'
 import { turnModel, turnPolicy, turnRequest } from '../../../../lib/eve/runtime'
 
@@ -19,7 +20,7 @@ export default defineHook({events:{
       ? (await pool.query<{source_event_id:string}>('SELECT source_event_id FROM eve_turn_sources WHERE session_id=$1 AND turn_id=$2',[ctx.session.parent.sessionId,ctx.session.parent.turn.id])).rows[0]?.source_event_id : undefined
     if (originalSource) await pool.query(`INSERT INTO eve_turn_sources(session_id,turn_id,source_event_id) SELECT $1,$2,e.id FROM coordinator_events e WHERE e.id=$3 AND e."userId"=$4 AND e."botId"=$5 ON CONFLICT DO NOTHING`,[ctx.session.id,event.data.turnId,originalSource,scope.ownerId,scope.botId])
     const scheduled = originalSource ? await (await import('../../../../lib/eve/scheduled-read')).loadScheduledRead(scope,originalSource) : null
-    turnRequest.update(() => ({ sourceEventId: originalSource, scheduledRead: scheduled }))
+    turnRequest.update(() => ({ sourceEventId: originalSource, scheduledRead: scheduled, startIndex: ctx.position?.line }))
     const { asProductPrincipal } = await import('../../../../lib/eve/product-definitions')
     await asProductPrincipal(scope, async () => {
       const [{ botRuntime }, { agentKitEnabled, agentKitStore, agentKitDefaults }] = await Promise.all([
@@ -46,12 +47,15 @@ export default defineHook({events:{
   async 'turn.settled'(event,ctx) {
     if(evaluationBindingId(ctx.session.auth.current))return
     const scope = scopeFromAuth(ctx.session.auth.current)
+    const stoppedText = !ctx.session.parent && scope.surface === 'web' && event.data.outcome === 'cancelled'
+      ? await stoppedTurnDisplay(sessions.attach(ctx.session.id),event.data.turnId,turnRequest.get().startIndex ?? 0)
+      : undefined
     // Product retry timers and task workflows belong to the Mikka app host.
     // Children retain their read authority but never publish or settle the
     // root occurrence; only root requests carry compatibility messages.
     await productRpc(scope,{
       operation:'finish',sessionId:ctx.session.id,turnId:event.data.turnId,outcome:event.data.outcome,
-      ...ctx.session.parent ? {} : {messages:projectEveTurn(ctx.view,ctx.session.id,event.data.turnId,event.data.outcome)},
+      ...ctx.session.parent ? {} : {messages:projectEveTurn(ctx.view,ctx.session.id,event.data.turnId,event.data.outcome,stoppedText)},
     })
   },
 }})

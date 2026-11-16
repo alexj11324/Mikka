@@ -26,8 +26,10 @@ async function handleGET(request: Request) {
   const url = new URL(request.url)
   const target = mobileWebTarget(url.searchParams.get('to'))
   const token = url.searchParams.get('token')
-  const members = target.startsWith(mobileMembersPage + '?')
-  if (members && !token) return new NextResponse(null, { status: 403, headers: safeHeaders })
+  const page = new URL(target, url.origin)
+  const section = page.searchParams.get('section')
+  const requiresConfirmation = page.pathname === mobileMembersPage || section === 'artifacts' || section === 'organization'
+  if (requiresConfirmation && !token) return new NextResponse(null, { status: 403, headers: safeHeaders })
   if (!token) return NextResponse.redirect(new URL(withBasePath(target), url.origin), { status: 303, headers: safeHeaders })
   try {
     // HTTP router mode prevents nextCookies() from mutating the ambient Next
@@ -50,7 +52,7 @@ async function handleGET(request: Request) {
     result.cookies.set(pendingCookie, state, cookieOptions(request))
     return result
   } catch (error) {
-    if (members || error instanceof MobileWebScopeError) return new NextResponse(null, { status: 403, headers: safeHeaders })
+    if (requiresConfirmation || error instanceof MobileWebScopeError) return new NextResponse(null, { status: 403, headers: safeHeaders })
     return NextResponse.redirect(new URL(withBasePath(target), url.origin), { status: 303, headers: safeHeaders })
   }
 }

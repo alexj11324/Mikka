@@ -37,7 +37,7 @@ for (const [name, member] of [
 slot('settings-organization', { OrganizationSettings: none, ORGANIZATION_SETTINGS: false })
 slot('settings-content', { SettingsContentFrame: identity })
 slot('settings-governance', { GovernancePlan: none, GovernanceUsage: none, GovernanceTemplates: none })
-mock.module('../nav/use-save-bot', { namedExports: { useSaveBot: () => async (id: string, patch: unknown) => { writes.push({ id, patch }) } } })
+mock.module('../nav/use-save-bot', { namedExports: { useSaveBot: (workspaceId: string | undefined) => async (id: string, patch: unknown) => { writes.push({ workspaceId, id, patch }) } } })
 mock.module('./settings-sidebar', { namedExports: { SettingsSidebar: none } })
 mock.module('@/hooks/use-workspace', { namedExports: { useWorkspace: () => ({ data: workspace, error: readError }) } })
 mock.module('@/i18n/navigation', { namedExports: { Link: identity, usePathname: () => '/settings', useRouter: () => ({}) } })
@@ -88,7 +88,7 @@ test('frame tab, standalone column and sheet expose the same Bot identity and ed
     assert.equal(overview.conversation.id, bot.id)
     assert.equal(await overview.edit.rename(' New name '), null)
   }
-  assert.deepEqual(writes, Array.from({ length: 3 }, () => ({ id: bot.id, patch: { name: 'New name' } })))
+  assert.deepEqual(writes, Array.from({ length: 3 }, () => ({ workspaceId: team.workspace.id, id: bot.id, patch: { name: 'New name' } })))
   render(<ContextPanel {...props} conversation={{ ...bot, kind: 'coordinator' }} />)
   assert.equal(overview?.edit, null)
 })

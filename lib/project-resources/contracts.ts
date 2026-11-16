@@ -40,10 +40,32 @@ export const projectResourcesInput = z.object({
   .refine(value => new Set(value.repositories.map(item => item.repositoryKey)).size === value.repositories.length)
   .refine(value => !value.defaultEnvironmentId || value.environmentIds.includes(value.defaultEnvironmentId))
   .refine(value => value.repositories.every(item => !item.environmentId || value.environmentIds.includes(item.environmentId)))
+export const listDependencyRepositoriesInput = z.object({ workspaceId: z.uuid(), projectId: z.uuid() }).strict()
+export const projectPullAuthorInput = listDependencyRepositoriesInput.extend({
+  readerId: z.string().min(1).max(128), repository: projectRepositoryKey, query: z.string().trim().min(1).max(39).regex(/^[A-Za-z0-9-]+$/),
+})
+export const replaceDependencyRepositoriesInput = listDependencyRepositoriesInput.extend({
+  revision: z.number().int().positive(), repos: z.array(z.string().regex(/^[1-9][0-9]{0,29}$/)).max(100),
+}).refine(input => new Set(input.repos).size === input.repos.length)
 export const projectDefaultEnvironmentInput = z.object({
   workspaceId: z.uuid(), projectId: z.uuid(), revision: z.number().int().positive(),
   environmentId: z.uuid().nullable(),
 }).strict()
+export const projectSetupScope = z.object({
+  workspaceId: z.uuid(), projectId: z.uuid(), environmentId: z.uuid(),
+}).strict()
+export const listProjectSetupVersionsInput = projectSetupScope.extend({ before: z.number().int().positive().optional() })
+export const rollbackProjectSetupInput = projectSetupScope.extend({
+  revision: z.number().int().positive(), version: z.number().int().positive(),
+  bindingSnapshot: z.string().regex(/^[a-f0-9]{64}$/),
+})
+export type ProjectSetupRecipe = Omit<NonNullable<EnvironmentConfiguration['setup']>, 'approved'>
+export type ProjectSetupHistory = {
+  revision: number; totalProjects: number; bindingSnapshot: string
+  versions: { revision: number; recordedAt: string; recipe: ProjectSetupRecipe | null }[]
+  before: number | null
+}
+
 export const workspaceRepositoryPolicyInput = z.object({
   workspaceId: z.uuid(), revision: z.number().int().nonnegative(),
   mode: z.enum(['inherit', 'restricted']), repositoryKeys: z.array(projectRepositoryKey).max(500),

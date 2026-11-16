@@ -1,11 +1,11 @@
 'use client'
 
 import { Fragment, useState, type MouseEvent } from 'react'
-import useSWR from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
 import { ChevronDown, Ellipsis, Pin, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { organizeAutomation, pinAutomation } from '@/app/actions/automations'
+import { organizeAutomation, pinAutomation, restoreAutomation } from '@/app/actions/automations'
 import { listWorkspaceBots } from '@/app/actions/bots'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -22,19 +22,19 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { InlineLoadError } from '@/components/load-error'
 import { BotAvatar, CoordinatorAvatar } from '@/components/nav/bot-avatar'
 import { useLiveKey } from '@/hooks/use-live-key'
-import { useAutomations } from '@/hooks/use-automations'
+import { invalidateAutomationList, useAutomations } from '@/hooks/use-automations'
 import type { AutomationView } from '@/lib/schedules/automation-view'
 import { useNextRunLabel, useTimingSummary } from './automation-summary'
 import { AUTOMATION_TEMPLATES } from './automation-templates'
 
-type Filter = 'all' | 'active' | 'paused'
+type Filter = 'all' | 'active' | 'paused' | 'deleted'
 export type WorkspaceBotRow = { id: string; name: string; color: string; shape: string }
 
 /** The workspace's Bots by ID, for 交给 (any member may read them; the list follows `bot_list`). */
 export function useWorkspaceBotNames(workspaceId: string | null) {
   const key = workspaceId ? ['automations-workspace-bots', workspaceId] as const : null
-  const read = useSWR(key, async () => {
-    const result = await listWorkspaceBots()
+  const read = useSWR(key, async ([, shown]) => {
+    const result = await listWorkspaceBots(shown)
     if ('error' in result && result.error) throw new Error(result.error)
     return (result as { bots: WorkspaceBotRow[] }).bots
   }, { revalidateOnFocus: false, shouldRetryOnError: false })
@@ -66,15 +66,16 @@ export function AutomationsPage({ workspaceId, userId, href, onOpen, onAskBot }:
   const tCommon = useTranslations('Common')
   const summary = useTimingSummary()
   const nextRun = useNextRunLabel()
-  const { automations, error, data, mutate, setSize, size, more, isValidating } = useAutomations(workspaceId)
+  const [filter, setFilter] = useState<Filter>('all')
+  const [restoring, setRestoring] = useState<string | null>(null)
+  const { automations, error, data, mutate, setSize, size, more, isValidating } = useAutomations(workspaceId, filter === 'deleted')
+  const { mutate: mutateCache } = useSWRConfig()
   const bots = useWorkspaceBotNames(workspaceId)
   const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<Filter>('all')
   const [tag, setTag] = useState<string | null>(null)
   const [organizing, setOrganizing] = useState<AutomationView | null>(null)
   const actionError = useActionError()
-  const visible = automations.filter(row => row.status !== 'cancelled')
-    .filter(row => filter === 'all' || (filter === 'active' ? row.status === 'active' : row.status === 'paused'))
+  const visible = automations.filter(row => filter === 'deleted' ? row.deleted : row.status !== 'cancelled' && (filter === 'all' || row.status === filter))
     .filter(row => !query.trim() || row.definition.title.toLowerCase().includes(query.trim().toLowerCase()))
     .filter(row => !tag || (row.tags ?? []).includes(tag))
   // 已置顶 first, then each 文件夹 by name, then those in none; within each, the list's own order (newest first).
@@ -84,8 +85,19 @@ export function AutomationsPage({ workspaceId, userId, href, onOpen, onAskBot }:
     ...folders.map(folder => ({ key: `folder:${folder}`, label: folder, rows: visible.filter(row => !row.pinned && row.folder === folder) })),
     { key: 'rest', label: folders.length ? t('noFolder') : null, rows: visible.filter(row => !row.pinned && !row.folder) },
   ].filter(group => group.rows.length)
+  async function restore(row: AutomationView) {
+    if (restoring || !workspaceId) return
+    setRestoring(row.id)
+    try {
+      const result = await restoreAutomation({ scheduleId: row.id, version: row.version }, workspaceId)
+      if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
+      await invalidateAutomationList(mutateCache, workspaceId, false)
+      await mutate()
+    } catch { toast.error(actionError('generic')) }
+    finally { setRestoring(null) }
+  }
   async function pin(row: AutomationView) {
-    const result = await pinAutomation({ scheduleId: row.id, pinned: !row.pinned })
+    const result = await pinAutomation({ scheduleId: row.id, pinned: !row.pinned }, workspaceId ?? undefined)
     if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
     await mutate()
   }
@@ -118,21 +130,21 @@ export function AutomationsPage({ workspaceId, userId, href, onOpen, onAskBot }:
       </header>
       <div className="flex flex-wrap items-center gap-2">
         <SearchInput className="min-w-0 flex-1 sm:max-w-64" type="search" value={query} maxLength={120} aria-label={t('search')} placeholder={t('search')} onChange={event => setQuery(event.target.value)} />
-        <ToggleGroup aria-label={t('filter.all')} size="sm" variant="segment" spacing={0.5} value={[filter]} onValueChange={values => { const next = values[0]; if (next === 'all' || next === 'active' || next === 'paused') setFilter(next) }}>
-          {(['all', 'active', 'paused'] as const).map(value => <ToggleGroupItem key={value} value={value}>{t(`filter.${value}`)}</ToggleGroupItem>)}
+        <ToggleGroup aria-label={t('filter.all')} size="sm" variant="segment" spacing={0.5} value={[filter]} onValueChange={values => { const next = values[0]; if (next === 'all' || next === 'active' || next === 'paused' || next === 'deleted') setFilter(next) }}>
+          {(['all', 'active', 'paused', 'deleted'] as const).map(value => <ToggleGroupItem key={value} value={value}>{t(`filter.${value}`)}</ToggleGroupItem>)}
         </ToggleGroup>
         {tag && <Badge variant="secondary" className="gap-1">{t('tagFilter', { tag })}<Button size="icon-xs" variant="ghost" aria-label={t('clearTag')} onClick={() => setTag(null)}><X /></Button></Badge>}
       </div>
       {error && !data ? <InlineLoadError message={t('loadError')} retryLabel={tCommon('retry')} onRetry={() => { void mutate() }} />
         : !data ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-2">{[0, 1, 2].map(index => <Skeleton key={index} className="h-16 w-full rounded-xl" />)}</div>
           : !visible.length ? <Empty className="border">
-            <EmptyHeader><EmptyTitle>{automations.length ? t('emptyFiltered') : t('empty')}</EmptyTitle></EmptyHeader>
-            {!automations.length && <EmptyContent>{create}</EmptyContent>}
+            <EmptyHeader><EmptyTitle>{filter === 'deleted' ? t('emptyDeleted') : automations.length ? t('emptyFiltered') : t('empty')}</EmptyTitle></EmptyHeader>
+            {filter !== 'deleted' && !automations.length && <EmptyContent>{create}</EmptyContent>}
           </Empty>
             : <div className="flex flex-col gap-4">{groups.map(group => <section key={group.key} aria-label={group.label ?? undefined} className="flex flex-col gap-2">
               {group.label && <h2 className="flex items-center gap-1.5 px-1 text-sm font-medium text-muted-foreground">{group.key === 'pinned' && <Pin className="size-3.5" />}{group.label}</h2>}
               <ItemGroup role="list" className="gap-0! overflow-hidden rounded-2xl border bg-card">
-              {group.rows.map((row, index) => <Fragment key={row.id}>{index > 0 && <ItemSeparator className="my-0" />}<Item role="listitem" className="rounded-none hover:bg-accent/50" render={<a href={href(row.id)} />} onClick={(event: MouseEvent) => follow(event, row.id)}>
+              {group.rows.map((row, index) => <Fragment key={row.id}>{index > 0 && <ItemSeparator className="my-0" />}<Item role="listitem" className="rounded-none hover:bg-accent/50" render={row.deleted ? undefined : <a href={href(row.id)} />} onClick={row.deleted ? undefined : (event: MouseEvent) => follow(event, row.id)}>
                 <ItemContent className="min-w-0">
                   <ItemTitle className="w-full truncate">{row.definition.title}</ItemTitle>
                   <ItemDescription className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -145,7 +157,7 @@ export function AutomationsPage({ workspaceId, userId, href, onOpen, onAskBot }:
                 <ItemMedia className="hidden max-w-40 text-sm sm:flex"><AutomationBot automation={row} bots={bots} /></ItemMedia>
                 <ItemActions>
                   <Badge variant={statusVariant[row.status]}>{row.status === 'paused' && row.disabled_reason ? t('status.autoPaused') : t(`status.${row.status}`)}</Badge>
-                  <DropdownMenu>
+                  {row.deleted ? (row.owner_id === userId || row.can_take_over) && <Button size="sm" variant="outline" disabled={restoring !== null} aria-busy={restoring === row.id} onClick={() => { void restore(row) }}>{t('restore')}</Button> : <DropdownMenu>
                     <DropdownMenuTrigger render={<Button size="icon-sm" variant="ghost" aria-label={t('rowMenu')} onClick={event => { event.preventDefault(); event.stopPropagation() }} />}><Ellipsis /></DropdownMenuTrigger>
                     <DropdownMenuContent align="end" onClick={event => event.stopPropagation()}>
                       <DropdownMenuGroup>
@@ -153,7 +165,7 @@ export function AutomationsPage({ workspaceId, userId, href, onOpen, onAskBot }:
                         {(row.owner_id === userId || row.can_take_over) && <DropdownMenuItem onClick={() => setOrganizing(row)}>{t('organize')}</DropdownMenuItem>}
                       </DropdownMenuGroup>
                     </DropdownMenuContent>
-                  </DropdownMenu>
+                  </DropdownMenu>}
                 </ItemActions>
               </Item></Fragment>)}
               </ItemGroup>
@@ -175,7 +187,7 @@ function OrganizeDialog({ automation, folders, onClose, onSaved }: { automation:
     setBusy(true)
     try {
       const list = [...new Set(tags.split(/[,，]/).map(item => item.trim()).filter(Boolean))].slice(0, 10)
-      const result = await organizeAutomation({ scheduleId: automation.id, folder: folder.trim() || null, tags: list })
+      const result = await organizeAutomation({ scheduleId: automation.id, folder: folder.trim() || null, tags: list }, automation.workspace_id ?? undefined)
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
       toast.success(t('saved'))
       onSaved()

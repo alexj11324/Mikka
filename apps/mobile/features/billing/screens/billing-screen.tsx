@@ -41,7 +41,9 @@ export default function BillingScreen() {
 
 function BillingContext({ initial }: { initial: BillingScope }) {
   const [scope, setScope] = useState(initial), [workspace, setWorkspace] = useState<string | null>(null)
-  const read = useApi<BillingManagementView>(billingManagementPath(scope, workspace))
+  const [usageMember, setUsageMember] = useState<string | null>(null)
+  const read = useApi<BillingManagementView>(billingManagementPath(scope, workspace, usageMember))
+  const [showDaily, setShowDaily] = useState(false)
   const [pending, setPending] = useState<BillingManagementOperation['action'] | null>(null), [failure, setFailure] = useState<string | null>(null)
   const alive = useRef(true), writing = useRef(false)
   const currentScope = useRef(scope)
@@ -73,7 +75,7 @@ function BillingContext({ initial }: { initial: BillingScope }) {
       <FieldGroup.Section title={copy.scope}>
         <ListItem trailing={<Picker selectedValue={`${scope.kind}:${scope.id}`} enabled={!busy} onValueChange={value => {
           if (writing.current) return
-          const [kind, id] = value.split(':'); if (kind === 'workspace' || kind === 'organization') { setScope({ kind, id }); setWorkspace(null); setFailure(null) }
+          const [kind, id] = value.split(':'); if (kind === 'workspace' || kind === 'organization') { setScope({ kind, id }); setWorkspace(null); setUsageMember(null); setFailure(null) }
         }}>
           {data.organizations.map(org => <Picker.Item key={org.id} value={`organization:${org.id}`} label={`${copy.organizationScope} · ${org.name}`} />)}
           {workspaceChoices.map(row => <Picker.Item key={row.id} value={`workspace:${row.id}`} label={`${copy.workspaceScope} · ${row.name}`} />)}
@@ -105,9 +107,25 @@ function BillingContext({ initial }: { initial: BillingScope }) {
         <Metric label={copy.externalUnknown} value={`${copy.unknown} · ${number(data.usage.externalUnknownRuns)}`} />
         <FieldGroup.SectionFooter><NativeText>{copy.unknownHelp}</NativeText></FieldGroup.SectionFooter>
       </FieldGroup.Section>
+      {data.usage.daily && <FieldGroup.Section title={copy.dailyUsage}>
+        <Button label={showDaily ? copy.hideDays : copy.showDays} variant="text" onPress={() => setShowDaily(value => !value)} />
+        {showDaily && data.usage.daily.map(day => <ListItem key={day.date}
+          supportingText={`${copy.platformReserved} · ${money(day.reservedMicroUsd)} · ${copy.platformUnknown} · ${number(day.unknownCalls)}`}
+          trailing={<NativeText>{money(day.costMicroUsd)}</NativeText>}>
+          <NativeText>{day.date}</NativeText>
+        </ListItem>)}
+      </FieldGroup.Section>}
       <FieldGroup.Section title={copy.memberUsage}>
-        {data.usage.members.length ? data.usage.members.map((row, index) => <ListItem key={row.id ?? index} supportingText={row.unknownCalls ? `${copy.unknown} · ${number(row.unknownCalls)}` : undefined} trailing={<NativeText>{money(row.costMicroUsd)}</NativeText>}><NativeText>{row.name ?? row.id ?? copy.unattributed}</NativeText></ListItem>) : <NativeText>{copy.noMemberUsage}</NativeText>}
+        {data.usage.members.length ? data.usage.members.map((row, index) => <ListItem key={row.id ?? index}
+          onPress={row.id && data.usage.daily ? () => setUsageMember(current => current === row.id ? null : row.id) : undefined}
+          supportingText={row.unknownCalls ? `${copy.unknown} · ${number(row.unknownCalls)}` : undefined} trailing={<NativeText>{money(row.costMicroUsd)}</NativeText>}><NativeText>{row.name ?? row.id ?? copy.unattributed}</NativeText></ListItem>) : <NativeText>{copy.noMemberUsage}</NativeText>}
       </FieldGroup.Section>
+      {usageMember && data.usage.memberDetail?.id === usageMember && <FieldGroup.Section title={copy.memberModels.replace('{name}', data.usage.members.find(row => row.id === usageMember)?.name ?? usageMember)}>
+        {data.usage.memberDetail.models.map(row => <ListItem key={row.model}
+          supportingText={`${copy.memberTokens.replace('{input}', row.inputTokens).replace('{output}', row.outputTokens)} · ${copy.unknown} · ${row.unknownCalls}`}
+          trailing={<NativeText>{money(row.costMicroUsd)}</NativeText>}><NativeText>{row.model}</NativeText></ListItem>)}
+        {!data.usage.memberDetail.models.length && <NativeText>{copy.noMemberModels}</NativeText>}
+      </FieldGroup.Section>}
       <Budgets key={`${scope.kind}:${scope.id}:${data.budgetWorkspaceId}`} state={state} chooseWorkspace={setWorkspace} />
       {plan?.autoRecharge ? <Recharge key={`${data.account?.workspaceId}:${plan.autoRecharge.revision}`} state={state} /> : null}
       {data.credits && <FieldGroup.Section title={messages.Billing.balance.history}>

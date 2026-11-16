@@ -9,6 +9,7 @@ export type AutomationView = {
   visibility: 'owner' | 'workspace'
   definition: Definition
   status: 'active' | 'paused' | 'cancelled' | 'completed'
+  deleted?: boolean
   version: number
   next_at: string | Date | null
   created_at?: string | Date
@@ -35,6 +36,7 @@ export type AutomationRun = {
   started_at: string | Date | null
   finished_at: string | Date | null
   status: 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped' | 'cancelled'
+  can_cancel?: boolean
   attempts: number
   error: string | null
   result: unknown
@@ -42,6 +44,17 @@ export type AutomationRun = {
   trigger?: { event: { source?: 'github'; event: string; repository: string; number: number | null; title: string | null; url: string | null } }
     | { event: { source: 'linear'; event: string; identifier: string | null; title: string | null; url: string | null } }
     | { event: { source: 'slack'; event: string; channel: string; reaction: string | null } } | { webhook: { requests: { at: string }[] } } | null
+}
+export type WebhookBatchPage = {
+  batches: {
+    id: string
+    status: 'collecting' | 'queued' | 'cancelled'
+    runStatus: AutomationRun['status']
+    created_at: string | Date
+    due_at: string | Date
+    requestCount: number
+  }[]
+  nextCursor: string | null
 }
 export type AutomationHistory = { occurrences: AutomationRun[] }
 export type AutomationUsageDay = { day: string; runs: number; skipped: number; tasks: number; costMicroUsd: number | null }

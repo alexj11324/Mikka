@@ -22,6 +22,7 @@ export interface Preferences {
   pushReview: boolean
   pushFinished: boolean
   pushBriefing: boolean
+  organizationInvitationEmails: boolean
   pushWhen: (typeof PUSH_WHEN)[number]
   memoryEnabled: boolean
   sendKey: (typeof SEND_KEYS)[number]
@@ -32,7 +33,7 @@ export interface Preferences {
 
 export const DEFAULT_PREFERENCES: Preferences = {
   archiveIdleAfterDays: 30, proactive: true, pushDecide: true, pushReview: true, pushFinished: true, pushBriefing: true, pushWhen: 'always', memoryEnabled: true,
-  sendKey: 'enter', personalInstructions: '', dailySuggestions: true,
+  organizationInvitationEmails: true, sendKey: 'enter', personalInstructions: '', dailySuggestions: true,
 }
 
 /** Longest the personal instructions may be, in characters (code points). */
@@ -44,7 +45,7 @@ export const personalInstructionsSchema = z.string().transform(text => text.trim
 export const preferencesPatch = z.object({
   archiveIdleAfterDays: z.literal(archiveIdleDays),
   proactive: z.boolean(), pushDecide: z.boolean(), pushReview: z.boolean(), pushFinished: z.boolean(), pushBriefing: z.boolean(),
-  pushWhen: z.enum(PUSH_WHEN), memoryEnabled: z.boolean(),
+  organizationInvitationEmails: z.boolean(), pushWhen: z.enum(PUSH_WHEN), memoryEnabled: z.boolean(),
   sendKey: z.enum(SEND_KEYS), personalInstructions: personalInstructionsSchema, dailySuggestions: z.boolean(),
 }).partial().strict()
 

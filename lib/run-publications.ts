@@ -209,6 +209,21 @@ async function completionTransaction(userId: string, runId: string, completion: 
     const [publication] = await tx.select().from(runPublications).where(and(eq(runPublications.runId, runId), eq(runPublications.userId, userId))).for('update')
     let quotaCloud: { run: Run; plan: QuotaPlan; resetsAt: string | null } | undefined
     if (firstCompletion) {
+      // A replacement fences the old lease and sends Stop in the same epoch.
+      // The daemon can receive the heartbeat revocation first. Only an actual
+      // owner-epoch receipt for this cancelled attempt explains that loss.
+      if (factoryBound && run.stopRequestedAt && completion.stopReason === 'device_lost') {
+        const superseded = await client.query(`SELECT 1 FROM factory_attempts a
+          JOIN factory_tasks t ON t.id=a."taskId"
+          JOIN factory_events e ON e."taskId"=t.id AND e.request->>'kind'='request_epoch'
+            AND e.request->>'sourceEventId'=a.output->>'supersededBy'
+          WHERE a."runId"=$1 AND a.status='cancelled' AND t."userId"=$2 AND t."workspaceId"=$3 AND t."issueId"=$4
+            AND e.request->'supersededRunIds' ? $1::text
+            AND ($5::uuid IS NULL OR EXISTS (SELECT 1 FROM device_tokens d WHERE d.id=$5 AND d."userId"=$2 AND d."revokedAt" IS NULL))
+            AND NOT EXISTS (SELECT 1 FROM device_credential_revocations v WHERE v."tokenId"=$5 AND v."ownerId"=$2)
+          LIMIT 1`, [run.id, run.userId, run.workspaceId, run.issueId, run.deviceTokenId])
+        if (superseded.rowCount) completion = { ...completion, stopReason: 'cancelled' }
+      }
       completion = providerCompletion(run, completion)
       // A used-up subscription quota goes on with the person's key or pauses (lib/run-quota.ts);
       // a run that was not on a subscription has no quota to switch from, so it is an error.

@@ -29,7 +29,7 @@ import { withDevicePresence } from '@/lib/live/presence-read'
 import type { PresenceDevice } from '@/lib/live/presence'
 import { devicePresenceView, type PresenceReason } from '@/lib/device-scheduling'
 import { DEVICE_ONLINE_WINDOW_MS, isDeviceOnline } from '@mikka/protocol/device'
-import { removeOwnedDevice, renameOwnedDevice, setOwnedDeviceEnabled } from '@/lib/device-removal'
+import { removeOwnedDevice, renameOwnedDevice, setOwnedDeviceDescription, setOwnedDeviceEnabled } from '@/lib/device-removal'
 import { enqueueDeviceCommand, type DeviceCommandKind } from '@/lib/device-management'
 import { listSshHosts } from '@/lib/ssh'
 import { citationSources } from '@/lib/coordinator/store'
@@ -86,6 +86,7 @@ export interface DeviceRepoView {
 export interface DeviceView {
   id: string
   name: string
+  description?: string | null
   deviceType: 'laptop' | 'server'
   hostname: string | null
   platform: string | null
@@ -131,7 +132,7 @@ export async function pollDevices() {
 
 async function readDevices(userId: string) {
   const rows = await db.select({
-    id: devices.id, name: devices.name, deviceType: devices.deviceType, hostname: devices.hostname, platform: devices.platform, arch: devices.arch,
+    id: devices.id, name: devices.name, description: devices.description, deviceType: devices.deviceType, hostname: devices.hostname, platform: devices.platform, arch: devices.arch,
     harnesses: devices.harnesses, lastSeenAt: devices.lastSeenAt, enabled: devices.enabled,
   }).from(devices).where(and(eq(devices.ownerId, userId), eq(devices.kind, 'local'), isNull(devices.removedAt))).orderBy(desc(devices.lastSeenAt))
   const repos = rows.length
@@ -145,7 +146,7 @@ async function readDevices(userId: string) {
   const expiries = rows.flatMap(device => device.lastSeenAt && heartbeat(device) ? [device.lastSeenAt.getTime() + DEVICE_ONLINE_WINDOW_MS] : [])
   const gatewayOnline = rows.some(device => presence.get(device.id) && !heartbeat(device))
   const views: DeviceView[] = rows.map(device => ({
-    id: device.id, name: device.name, deviceType: device.deviceType, hostname: device.hostname, platform: device.platform, arch: device.arch,
+    id: device.id, name: device.name, description: device.description, deviceType: device.deviceType, hostname: device.hostname, platform: device.platform, arch: device.arch,
     harnesses: device.harnesses, lastSeenAt: device.lastSeenAt, enabled: device.enabled,
     online: presence.get(device.id) ?? false,
     ...devicePresenceView(device.lastSeenAt, presence.get(device.id) ?? false, observedAt),
@@ -191,6 +192,11 @@ export async function setDeviceEnabled(input: { deviceId: string; enabled: boole
 /** Renames one of the person's devices (1–60 characters); the daemon keeps the new name. */
 export async function renameDevice(id: string, name: string): Promise<ActionResult<{ id: string; name: string }>> {
   return runAction(async () => renameOwnedDevice(await getUserId(), id, name))
+}
+
+/** Saves or clears the signed-in owner's device description. */
+export async function setDeviceDescription(id: string, description: string): Promise<ActionResult<{ id: string; description: string | null }>> {
+  return runAction(async () => setOwnedDeviceDescription(await getUserId(), id, description))
 }
 
 /**

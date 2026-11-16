@@ -371,14 +371,18 @@ def assert_new_template(name, api_key):
         raise
     raise ValueError('template_name_already_exists')
 
+def runtime_source(environ=os.environ):
+    """The commit being published: the Cloudflare-served product, or this run's own commit."""
+    return environ.get('MIKKA_RUNTIME_SOURCE') or environ.get('GITHUB_SHA', '')
+
 def release_metadata(environ=os.environ):
     """Attach only public workflow identity so a cancelled job is recoverable."""
     identity = {'application': 'mikka-template-release'}
     if (environ.get('GITHUB_REPOSITORY') == 'alexj11324/Mikka'
-            and re.fullmatch(r'[a-f0-9]{40}', environ.get('GITHUB_SHA', ''))
+            and re.fullmatch(r'[a-f0-9]{40}', runtime_source(environ))
             and re.fullmatch(r'[1-9][0-9]*', environ.get('GITHUB_RUN_ID', ''))
             and re.fullmatch(r'[1-9][0-9]*', environ.get('GITHUB_RUN_ATTEMPT', ''))):
-        identity.update(sourceCommit=environ['GITHUB_SHA'], runId=environ['GITHUB_RUN_ID'], runAttempt=environ['GITHUB_RUN_ATTEMPT'])
+        identity.update(sourceCommit=runtime_source(environ), runId=environ['GITHUB_RUN_ID'], runAttempt=environ['GITHUB_RUN_ATTEMPT'])
     return identity
 
 

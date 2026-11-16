@@ -16,12 +16,12 @@ let runtime: typeof import('./runtime')
 before(async () => { runtime = await import('./runtime') })
 beforeEach(() => { armed = 0; failed = 0 })
 
-for (const action of ['create', 'update', 'resume'] as const) test(`${action} can move the next due time earlier, so it arms the timer after it commits`, async () => {
+for (const action of ['create', 'update', 'resume', 'restore', 'flush_batch'] as const) test(`${action} can move the next due time earlier, so it arms the timer after it commits`, async () => {
   await runtime.executeScheduleCommand('owner', null, 'event', { action } as never)
   assert.equal(armed, 1)
 })
 
-for (const action of ['list', 'history', 'pause', 'cancel'] as const) test(`${action} adds no due work and arms nothing`, async () => {
+for (const action of ['list', 'history', 'pause', 'cancel', 'delete', 'cancel_batch'] as const) test(`${action} adds no due work and arms nothing`, async () => {
   await runtime.executeScheduleCommand('owner', null, 'event', { action } as never)
   assert.equal(armed, 0)
 })
@@ -30,4 +30,9 @@ test('a failed scheduled read is retried 30 s later, earlier than the lease the 
   await runtime.failScheduledRead({ id: 'o', lease_token: 't' }, new Error('scheduledReadFailed'))
   assert.equal(failed, 1)
   assert.equal(armed, 1)
+})
+
+test('cancelling one queued run adds no due work', async () => {
+  await runtime.executeScheduleCommand('owner', null, 'event', { action: 'cancel_run' } as never)
+  assert.equal(armed, 0)
 })

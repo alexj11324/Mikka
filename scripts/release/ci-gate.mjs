@@ -10,7 +10,7 @@ const REPOSITORY = 'alexj11324/Mikka'
 /** A merge to main is the existing release authority. A PR run is never a release credential. */
 export function releaseIdentity(env) {
   if (env.GITHUB_REPOSITORY !== REPOSITORY || env.GITHUB_REF !== 'refs/heads/main' ||
-      !['push', 'workflow_dispatch'].includes(env.GITHUB_EVENT_NAME) || !SHA.test(env.GITHUB_SHA ?? '') ||
+      !['push', 'workflow_dispatch', 'workflow_run'].includes(env.GITHUB_EVENT_NAME) || !SHA.test(env.GITHUB_SHA ?? '') ||
       !/^\d+$/.test(env.GITHUB_RUN_ID ?? '')) throw Error('releaseMainIdentityRequired')
   return { repository: REPOSITORY, sha: env.GITHUB_SHA, runId: env.GITHUB_RUN_ID, kind: 'github-actions-main' }
 }

@@ -24,6 +24,15 @@ and the result falls back to the creator's Coordinator chat.
 creation time and schedule ID, newest first. Each read checks the current
 workspace membership and conversation visibility.
 
+`schedule_history` accepts `batches: {}` to list webhook windows for a single
+schedule. The creator and workspace owners or administrators can read batch IDs,
+request counts, creation and due times. A batch can be collecting requests,
+queued for a run, or cancelled. Its occurrence status is reported separately. Optional `batches.status`,
+`batches.limit` and `batches.cursor` filter and page these windows. Pass
+`nextCursor` back unchanged for the next page. Individual webhook requests
+with batching off do not have a window. This view omits bodies and request
+keys. Omit `batches` to read ordinary occurrence history.
+
 Request deduplication uses a frozen internal `request_origin` rather than the
 mutable `bot_id`. Two Bots can use the same SDK tool-call ID; removing either
 Bot preserves its schedule without merging their request keys. The internal
@@ -158,6 +167,8 @@ migration/Worker deployment, real external write or final issue closure is claim
 
 ## Event triggers (2026-11-15)
 
+For GitHub PR and review deliveries the editor can restrict `events[].pullAuthors` to up to 20 PR openers. The webhook matches the PR's own author independently of the sender or reviewer. The optional Project selector searches matching logins on the most recently updated 50 pull requests in the event's single selected repository. Suggestions require current Project access, the workspace's repository policy, and the person's authorized GitHub repository. The Project choice applies only to suggestions.
+
 Decision [2026-11-15-1704](../design/decisions/2026-11-15-1704-automation-github-triggers.md).
 
 - **Definition.** A `dispatch_task` definition may carry `events`: 1–20 GitHub
@@ -264,6 +275,14 @@ Decision [2026-11-15-1830](../design/decisions/2026-11-15-1830-automation-webhoo
     (`next_retry_at` in the future) under 50 requests and 256 KB: appended (`batched`);
   - otherwise a new occurrence due `now + batchMinutes` (`queued`), or `skipped` with
     `concurrencyLimit` / `dailyRunLimit` and no chat report.
+- The signed-in automation actions `flushAutomationBatch` and `cancelAutomationBatch`
+  (also available through Desktop RPC) take `scheduleId`, `batchId` and the schedule
+  `version`. The creator or a workspace owner/admin can close the collecting window.
+  Flush makes its existing occurrence due and wakes the scheduler. Dispatch still
+  checks the creator's authority and run limits. Cancel keeps its count and times,
+  removes the request bodies and hashes sender request IDs for redelivery checks.
+  A repeat of the same action on that batch returns its prior result. An opposing
+  action or a window already closed by time or capacity returns a conflict.
 - The occurrence's `trigger` is `{ webhook: { requests: [{ at, body, key? }] } }`; history
   blanks it for members as it does GitHub triggers. The dispatch appends
   `describeWebhook(requests)` and marks the submission `schedule.webhook: true`, which
@@ -281,7 +300,7 @@ Decision [2026-11-15-1930](../design/decisions/2026-11-15-1930-automation-linear
   `user` yields no event (`lib/schedules/linear-events.ts`).
 - `permission` asks the `linearTeams(owner)` seam (the person's own Linear connection's teams;
   null without one → `scheduleLinearUnavailable` 403, an authority loss; Linear unreachable →
-  `scheduleLinearUnreachable` 503, retried). Page action `automationLinearTeams`.
+  `scheduleLinearUnreachable` 503, retried). Page action `automationLinearTeams`. On focus, the label filter reads `automationLinearLabels` with the shown workspace and the signed-in person’s own Linear connection. Suggestions include workspace-wide labels and labels for the selected teams. Comma-separated names can also be typed when suggestions are unavailable.
 - `fireLinearAutomations(deliveryId, payload)` → `ScheduleStore.fireLinearEvents`: candidates are
   active automations with a matching Linear trigger whose creator has an unrevoked
   `linear_connections` row for the event's organization; then the shared `queueEvent`
@@ -295,9 +314,10 @@ Decision [2026-11-15-1930](../design/decisions/2026-11-15-1930-automation-linear
 
 Decision [2026-11-15-2010](../design/decisions/2026-11-15-2010-automation-slack-triggers.md).
 
-- `events[]` may hold `{ source: 'slack', event: 'message' | 'mention' | 'reaction_added', channels (1–20 IDs), reactions?, runWhen? }`.
+- `events[]` may hold `{ source: 'slack', event: 'message' | 'mention' | 'reaction_added', channels (1–20 IDs), authors?, reactions?, runWhen? }`.
   A message or `app_mention` with no `bot_id`/`bot_profile` and no subtype (or `thread_broadcast`), or a
   `reaction_added` on a message, by a user (`lib/schedules/slack-events.ts`).
+- An optional list of up to 20 member IDs filters events by the Slack author as well as the channel. The editor accepts IDs directly and reads a page of active human members when the current installation already has `users:read`.
 - `permission` asks the `slackChannels(owner, workspace)` seam: the workspace's installation of `SLACK_APP_ID` the
   creator is a member of, its bot token's `conversations.list` (`lib/slack/automation-channels.ts`); null →
   `scheduleSlackUnavailable` 403 (authority loss), Slack unreachable → `scheduleSlackUnreachable` 503. Page action
@@ -320,6 +340,15 @@ Decision [2026-11-15-2040](../design/decisions/2026-11-15-2040-automation-slack-
   link to `<app>/?issue=<id>`, a failure as its `Errors.*` copy) and `chat.postMessage`s with the installation's bot
   token. A failed post is logged and not retried; the run is unchanged.
 
+## Cancel one queued run (#2060)
+
+A creator or workspace owner/admin can cancel an individual queued run from its history row. The signed-in
+`cancelAutomationRun` action names the schedule, its current version, and the occurrence. It locks the same
+occurrence as the worker claim. Once claimed, an occurrence may already have dispatched a task, even if its
+status subsequently returns to pending for a retry. Cancellation therefore accepts only pending runs with
+zero attempts. Webhook collection windows use their batch action. The original chat receives one cancellation record. The schedule and other occurrences keep
+their current state.
+
 ## Templates, pins, folders and tags (2026-11-15)
 
 Decision [2026-11-15-2100](../design/decisions/2026-11-15-2100-automation-templates-organize.md).
@@ -333,3 +362,14 @@ Decision [2026-11-15-2100](../design/decisions/2026-11-15-2100-automation-templa
   `{ action: 'organize', scheduleId, folder, tags }` (creator or owner/admin, `scheduleAdminRequired`; no version
   bump). `list` rows carry `folder`, `tags` and the reader's `pinned`. Page actions `pinAutomation`,
   `organizeAutomation`.
+
+
+## Deleted automations (#2060)
+
+The signed-in editor uses `deleteAutomation`. Deletion cancels pending and running occurrences, clears the next due time
+and saves the prior active, paused or completed state in `user_schedules.status_before_delete`. The Deleted filter
+uses the same paginated list with `deleted: true`. A creator or workspace admin/owner can use `restoreAutomation`
+there. Both mutations require the displayed version and publish on `schedule_list`. Restoring an active automation
+checks the creator's membership and execution permissions, then computes its next future slot. An elapsed one-time
+schedule stays completed. Previously cancelled occurrences stay cancelled. The original `schedule_cancel` command
+is terminal, including for rows created before this migration.

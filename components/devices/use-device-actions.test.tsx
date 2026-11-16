@@ -24,6 +24,7 @@ mock.module(new URL('../../app/actions/agents.ts', import.meta.url).href, { name
   removeDevice: async (id: string) => { writes.push(id); return { id, uninstall: receipt } },
   setDeviceEnabled: async (value: unknown) => { writes.push(value); return denied ? { error: 'deviceNotFound' } : { success: true } },
   renameDevice: async (id: string, name: string) => { writes.push({ id, name }); return { id, name } },
+  setDeviceDescription: async (id: string, description: string) => { writes.push({ id, description }); return { id, description: description || null } },
   sendDeviceCommand: async (value: unknown) => { writes.push(value); return { id: 'command' } },
 } })
 mock.module('sonner', { namedExports: { toast: { success: (v: string) => successes.push(v), error: (v: string) => errors.push(v) } } })
@@ -70,12 +71,15 @@ test('device commands use the selected id and the removal receipt, and refresh o
       await actions.remove()
       await actions.command('redetect')
       await actions.rename('  Kitchen  ')
+      await actions.setDescription('  Work laptop  ')
+      await actions.setDescription(' ')
       await actions.setEnabled(false)
       denied = true
       assert.equal(await actions.setEnabled(true), false)
     })
-    assert.equal(changed, 5)
+    assert.equal(changed, 7)
     assert.deepEqual(writes, ['desktop', 'desktop', { deviceId: 'desktop', kind: 'redetect' }, { id: 'desktop', name: 'Kitchen' },
+      { id: 'desktop', description: 'Work laptop' }, { id: 'desktop', description: '' },
       { deviceId: 'desktop', enabled: false }, { deviceId: 'desktop', enabled: true }])
     assert.deepEqual(successes, ['remove.uninstalling', 'commands.queued'])
     assert.deepEqual(errors, ['deviceNotFound'])

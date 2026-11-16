@@ -268,6 +268,7 @@ export interface Preferences {
   pushReview: boolean
   pushFinished: boolean
   pushBriefing: boolean
+  organizationInvitationEmails?: boolean
   pushWhen: 'always' | 'away'
   memoryEnabled: boolean
   /** The web composer's send key; mobile keeps its own keyboard behaviour. */
@@ -279,6 +280,9 @@ export interface Preferences {
 }
 
 export interface Settings {
+  /** Older and community servers do not advertise the official personal Files page. */
+  organizationSettingsAvailable?: boolean
+  personalFilesAvailable?: boolean
   /** Fresh finance entry scope; absent on older servers. */
   billingScope?: { kind: 'workspace' | 'organization'; id: string } | null
   user: Person

@@ -1,16 +1,17 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import useSWR from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { ArrowLeft, Play } from 'lucide-react'
 import { listDevices } from '@/app/actions/agents'
-import { getWorkspaceBotDefaults, listBots } from '@/app/actions/bots'
-import { automationLinearTeams, automationSlackChannels, cancelAutomation, createAutomation, pauseAutomation, resumeAutomation, runAutomationNow, takeOverAutomation, updateAutomation } from '@/app/actions/automations'
+import { getWorkspaceBotDefaults, listBotsForWorkspace } from '@/app/actions/bots'
+import { automationLinearLabels, automationLinearTeams, automationSlackChannels, deleteAutomation, createAutomation, pauseAutomation, resumeAutomation, runAutomationNow, takeOverAutomation, updateAutomation } from '@/app/actions/automations'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { FieldSet } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
@@ -23,7 +24,8 @@ import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { useAgentProfiles } from '@/components/settings/factory-profiles-data'
 import { useTaskProfileChoices } from '@/components/coordinator/task-profile-picker'
 import { openTask } from '@/components/workspace/workspace-navigation'
-import { useAutomation } from '@/hooks/use-automations'
+import { invalidateAutomationList, useAutomation } from '@/hooks/use-automations'
+import { cancelAutomationRun } from '@/app/actions/automations'
 import { useActionError } from '@/lib/use-action-error'
 import { newTaskBotChoices } from '@/lib/new-task-bot'
 import { TASK_TITLE_MAX } from '@/lib/task-title-input'
@@ -31,6 +33,7 @@ import { runTask, type AutomationRun, type AutomationView } from '@/lib/schedule
 import { definitionFrom, draftFrom, emptyDraft, foldNeeded, type AutomationDraft, type IntervalUnit, type ScheduleKind } from './automation-draft'
 import { useWorkspaceBotNames } from './automations-page'
 import { GitHubTriggers } from './github-triggers'
+import { WebhookBatches } from './webhook-batches'
 import { WebhookTrigger } from './webhook-trigger'
 import { templateDraft, type AutomationTemplate } from './automation-templates'
 import { LinearTriggers } from './linear-triggers'
@@ -57,45 +60,57 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
   const tErrors = useTranslations('Errors')
   const errorText = (code: string) => tErrors.has(code as never) ? tErrors(code as never) : code
   const creating = id === 'new'
+  const { mutate: mutateCache } = useSWRConfig()
   const { automation, history } = useAutomation(workspaceId, creating ? null : id)
   const current = automation.data ?? null
   const tTemplates = useTranslations('Automations.templates')
   const [draft, setDraft] = useState<AutomationDraft | null>(() => !creating ? null
     : template ? templateDraft(template, emptyDraft(localZone()), { title: tTemplates(`${template}.title`), prompt: tTemplates(`${template}.prompt`) }) : emptyDraft(localZone()))
-  const loaded = useRef<string | null>(null)
-  // The fields start from the stored definition once per version; a later live read does not overwrite edits.
+  const [baseline, setBaseline] = useState<{ version: number; draft: AutomationDraft } | null>(null)
+  const dirty = Boolean(baseline && draft && JSON.stringify(draft) !== JSON.stringify(baseline.draft))
+  // Keep editing the version the person actually opened until they save or choose the latest one.
+  function loadDefinition(schedule: AutomationView) {
+    const next = draftFrom(schedule.definition)
+    setBaseline({ version: schedule.version, draft: next })
+    setDraft(next)
+  }
   useEffect(() => {
-    if (!current) return
-    const version = `${current.id}:${current.version}`
-    if (loaded.current === version) return
-    loaded.current = version
-    setDraft(draftFrom(current.definition))
-  }, [current])
+    if (current && !dirty && current.version !== baseline?.version) loadDefinition(current)
+  }, [current, dirty, baseline?.version])
+  const stale = Boolean(current && baseline && dirty && current.version !== baseline.version)
   const requestId = useRef(crypto.randomUUID())
   const [busy, setBusy] = useState<null | 'save' | 'toggle' | 'run' | 'delete' | 'takeOver'>(null)
+  const [cancellingRun, setCancellingRun] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmTakeOver, setConfirmTakeOver] = useState(false)
   const set = (patch: Partial<AutomationDraft>) => setDraft(value => value ? { ...value, ...patch } : value)
 
-  const { data: bots = [] } = useSWR('bots', listBots, { revalidateOnFocus: false })
+  const { data: bots = [] } = useSWR(workspaceId ? ['bots', 'workspace', workspaceId] as const : null,
+    ([, , shown]) => listBotsForWorkspace(shown), { revalidateOnFocus: false })
   const { data: devices = [] } = useSWR('devices', listDevices, { revalidateOnFocus: false })
   const workspaceBots = useWorkspaceBotNames(workspaceId)
   // The workspace's installed repositories, the ones a GitHub trigger may name (any member may read them).
-  const { data: repositories = [] } = useSWR(workspaceId ? ['automation-repositories', workspaceId] : null, async () => {
-    const result = await getWorkspaceBotDefaults()
+  const { data: repositories = [] } = useSWR(workspaceId ? ['automation-repositories', workspaceId] as const : null, async ([, shown]) => {
+    const result = await getWorkspaceBotDefaults(shown)
     return 'error' in result && result.error ? [] : (result as { repositories: string[] }).repositories
   }, { revalidateOnFocus: false })
   // Linear triggers' teams, read only once the person adds a Linear event or the automation has one.
   const [linearWanted, setLinearWanted] = useState(false)
-  const linearTeams = useSWR(linearWanted || Boolean(draft?.linear.length) ? 'automation-linear-teams' : null, async () => {
+  const linearTeams = useSWR(linearWanted || Boolean(draft?.linear.length) ? ['automation-linear-teams', userId] : null, async () => {
     const result = await automationLinearTeams()
     if ('error' in result && result.error) throw new Error(result.error)
     return result as { connected: boolean; teams: { id: string; key: string; name: string }[] }
   }, { revalidateOnFocus: false })
+  const [labelsWanted, setLabelsWanted] = useState(false)
+  const linearLabels = useSWR(labelsWanted && workspaceId && linearTeams.data?.connected ? ['automation-linear-labels', userId, workspaceId] as const : null, async ([, , shown]) => {
+    const result = await automationLinearLabels(shown)
+    if (result.error) throw new Error(result.error)
+    return result.labels
+  }, { revalidateOnFocus: false, shouldRetryOnError: false })
   // Slack triggers' channels, read only once the person adds a Slack event or the automation has one.
   const [slackWanted, setSlackWanted] = useState(false)
-  const slackChannels = useSWR(slackWanted || Boolean(draft?.slack.length) || Boolean(draft?.notify) ? ['automation-slack-channels', workspaceId] : null, async () => {
-    const result = await automationSlackChannels()
+  const slackChannels = useSWR(workspaceId && (slackWanted || Boolean(draft?.slack.length) || Boolean(draft?.notify)) ? ['automation-slack-channels', workspaceId] as const : null, async ([, shown]) => {
+    const result = await automationSlackChannels(shown)
     if ('error' in result && result.error) throw new Error(result.error)
     return result as { installed: boolean; channels: { id: string; name: string; private: boolean }[] }
   }, { revalidateOnFocus: false })
@@ -112,58 +127,81 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
   if (!creating && automation.data === null) return <EditorFrame onBack={onBack} backLabel={t('back')}><p role="status" className="text-sm text-muted-foreground">{t('notFound')}</p></EditorFrame>
   if (!draft) return <EditorFrame onBack={onBack} backLabel={t('back')}><div role="status" aria-label={tAll('loading')} className="flex flex-col gap-3">{[0, 1, 2].map(index => <Skeleton key={index} className="h-24 w-full rounded-2xl" />)}</div></EditorFrame>
 
+  const canManage = creating || current?.owner_id === userId || current?.can_take_over === true
+
+  async function readAfterChange(schedule: AutomationView) {
+    // The writer returns the schedule. A different creator's name and the reader's role come from the authorized view.
+    if (schedule.owner_id !== userId) await automation.mutate()
+    else await automation.mutate(schedule, { revalidate: false })
+  }
+
   async function save() {
-    if (!check || !('definition' in check) || busy) return
+    if ((!creating && (!current || !baseline)) || !canManage || !workspaceId || !check || !('definition' in check) || busy || stale) return
     setBusy('save')
     try {
       const result = creating
-        ? await createAutomation({ requestId: requestId.current, definition: check.definition })
-        : await updateAutomation({ scheduleId: current!.id, version: current!.version, definition: check.definition })
-      if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
+        ? await createAutomation({ requestId: requestId.current, definition: check.definition }, workspaceId)
+        : await updateAutomation({ scheduleId: current!.id, version: baseline!.version, definition: check.definition }, workspaceId ?? undefined)
+      if ('error' in result && result.error) {
+        toast.error(actionError(result.error))
+        if (result.error === 'scheduleVersionConflict') await automation.mutate()
+        return
+      }
       const saved = (result as { schedule: AutomationView }).schedule
       toast.success(t('saved'))
+      await invalidateAutomationList(mutateCache, workspaceId, false)
       if (creating) onOpen(saved.id)
-      else { loaded.current = null; await automation.mutate(saved, { revalidate: false }) }
+      else { loadDefinition(saved); await readAfterChange(saved) }
     } finally { setBusy(null) }
   }
   async function toggle(on: boolean) {
-    if (!current || busy) return
+    if (!current || !workspaceId || busy || (on && !canManage)) return
     setBusy('toggle')
     try {
-      const result = await (on ? resumeAutomation : pauseAutomation)({ scheduleId: current.id, version: current.version })
+      const result = await (on ? resumeAutomation : pauseAutomation)({ scheduleId: current.id, version: current.version }, workspaceId ?? undefined)
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
-      loaded.current = null
-      await automation.mutate((result as { schedule: AutomationView }).schedule, { revalidate: false })
+      await readAfterChange((result as { schedule: AutomationView }).schedule)
+      await invalidateAutomationList(mutateCache, workspaceId, false)
     } finally { setBusy(null) }
   }
   async function runNow() {
-    if (!current || busy) return
+    if (!current || !canManage || busy) return
     setBusy('run')
     try {
-      const result = await runAutomationNow({ scheduleId: current.id, version: current.version, requestId: crypto.randomUUID() })
+      const result = await runAutomationNow({ scheduleId: current.id, version: current.version, requestId: crypto.randomUUID() }, workspaceId ?? undefined)
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
       toast.success(t('started'))
       await history.mutate()
     } finally { setBusy(null) }
   }
+  async function cancelRun(runId: string) {
+    if (!current || cancellingRun) return
+    setCancellingRun(runId)
+    try {
+      const result = await cancelAutomationRun({ scheduleId: current.id, version: current.version, runId }, workspaceId ?? undefined)
+      if ('error' in result && result.error) toast.error(actionError(result.error))
+      await history.mutate()
+    } catch { toast.error(actionError('generic')) }
+    finally { setCancellingRun(null) }
+  }
   async function takeOver() {
     if (!current || busy) return
     setBusy('takeOver')
     try {
-      const result = await takeOverAutomation({ scheduleId: current.id, version: current.version })
+      const result = await takeOverAutomation({ scheduleId: current.id, version: current.version }, workspaceId ?? undefined)
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
       setConfirmTakeOver(false)
       toast.success(t('tookOver'))
-      loaded.current = null
       await automation.mutate({ ...(result as { schedule: AutomationView }).schedule, owner_name: null, can_take_over: false }, { revalidate: false })
     } finally { setBusy(null) }
   }
   async function remove() {
-    if (!current || busy) return
+    if (!current || !workspaceId || busy) return
     setBusy('delete')
     try {
-      const result = await cancelAutomation({ scheduleId: current.id, version: current.version })
+      const result = await deleteAutomation({ scheduleId: current.id, version: current.version }, workspaceId)
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
+      await Promise.all([invalidateAutomationList(mutateCache, workspaceId, false), invalidateAutomationList(mutateCache, workspaceId, true)])
       setConfirmDelete(false)
       onBack()
     } finally { setBusy(null) }
@@ -173,18 +211,19 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
   const otherBot = draft.botId && !ownBots.some(bot => bot.id === draft.botId) ? workspaceBots.get(draft.botId) : null
   const localDevices = devices.filter(device => device.enabled || device.id === draft.machine)
   const active = current?.status === 'active'
-  const canSave = Boolean(check && 'definition' in check) && !busy
+  const canToggle = current?.status !== 'completed' && (active || canManage)
+  const canSave = canManage && !stale && Boolean(workspaceId && check && 'definition' in check) && !busy
   const creator = !current || current.owner_id === userId ? t('you') : current.owner_name ?? ''
   const field = (label: string, control: React.ReactNode) => <SettingRow title={label}><div className="flex flex-wrap items-center justify-end gap-2">{control}</div></SettingRow>
 
   return <EditorFrame onBack={onBack} backLabel={t('back')}>
     <header className="flex flex-col gap-3">
       <div className="flex items-start gap-3">
-        <Input aria-label={t('name')} value={draft.title} maxLength={200} placeholder={t('namePlaceholder')} onChange={event => set({ title: event.target.value })}
+        <Input aria-label={t('name')} value={draft.title} readOnly={!canManage} maxLength={200} placeholder={t('namePlaceholder')} onChange={event => set({ title: event.target.value })}
           className="h-auto min-w-0 flex-1 border-0 bg-transparent px-0 text-xl font-semibold shadow-none focus-visible:ring-0 md:text-xl dark:bg-transparent" />
         {!creating && <div className="flex shrink-0 items-center gap-2 pt-1.5">
           <Label htmlFor="automation-enabled">{t('enabled')}</Label>
-          <Switch id="automation-enabled" checked={active} disabled={busy !== null || current?.status === 'completed'} onCheckedChange={on => { void toggle(on) }} />
+          <Switch id="automation-enabled" checked={active} disabled={busy !== null || !canToggle} onCheckedChange={on => { void toggle(on) }} />
         </div>}
       </div>
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -195,6 +234,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
       </div>
     </header>
 
+    <FieldSet disabled={!canManage} className="contents">
     {!draft.otherTask && <SettingsSection id="automation-settings" title={t('settings')}>
       {field(t('bot'), <NativeSelect aria-label={t('bot')} value={draft.botId ?? ''} onChange={event => set({ botId: event.target.value || null })}>
         <NativeSelectOption value="">{tAll('coordinator')}</NativeSelectOption>
@@ -264,23 +304,24 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
       </div>}
       {!draft.otherTask && <>
         <SettingRow title={t('github.title')} />
-        <GitHubTriggers value={draft.github} repositories={repositories} disabled={busy !== null} onChange={github => set({ github })} />
+        <GitHubTriggers workspaceId={workspaceId} userId={userId} value={draft.github} repositories={repositories} disabled={busy !== null} onChange={github => set({ github })} />
         <SettingRow title={t('linear.title')}>
           {!linearWanted && !draft.linear.length && <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => setLinearWanted(true)}>{t('linear.show')}</Button>}
         </SettingRow>
         {(linearWanted || draft.linear.length > 0) && <>
           {linearTeams.error && <div className="px-5 pb-2"><InlineLoadError message={t('linear.teamsError')} retryLabel={tCommon('retry')} onRetry={() => { void linearTeams.mutate() }} /></div>}
-          <LinearTriggers value={draft.linear} teams={linearTeams.data?.teams ?? []} connected={linearTeams.data?.connected ?? true} disabled={busy !== null || (!linearTeams.data && !linearTeams.error)} onChange={linear => set({ linear })} />
+          {linearLabels.error && <div className="px-5 pb-2"><InlineLoadError message={t('linear.labelsError')} retryLabel={tCommon('retry')} onRetry={() => { void linearLabels.mutate() }} /></div>}
+          <LinearTriggers labels={linearLabels.data ?? []} onEditLabels={() => setLabelsWanted(true)} value={draft.linear} teams={linearTeams.data?.teams ?? []} connected={linearTeams.data?.connected ?? true} disabled={busy !== null || (!linearTeams.data && !linearTeams.error)} onChange={linear => set({ linear })} />
         </>}
         <SettingRow title={t('slack.title')}>
           {!slackWanted && !draft.slack.length && <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => setSlackWanted(true)}>{t('slack.show')}</Button>}
         </SettingRow>
         {(slackWanted || draft.slack.length > 0) && <>
           {slackChannels.error && <div className="px-5 pb-2"><InlineLoadError message={t('slack.channelsError')} retryLabel={tCommon('retry')} onRetry={() => { void slackChannels.mutate() }} /></div>}
-          <SlackTriggers value={draft.slack} channels={slackChannels.data?.channels ?? []} installed={slackChannels.data?.installed ?? true} disabled={busy !== null || (!slackChannels.data && !slackChannels.error)} onChange={slack => set({ slack })} />
+          <SlackTriggers workspaceId={workspaceId} userId={userId} value={draft.slack} channels={slackChannels.data?.channels ?? []} installed={slackChannels.data?.installed ?? true} disabled={busy !== null || (!slackChannels.data && !slackChannels.error)} onChange={slack => set({ slack })} />
         </>}
         <WebhookTrigger value={draft.webhook} onChange={webhook => set({ webhook })} automation={current ?? null} disabled={busy !== null}
-          onSaved={schedule => automation.mutate(schedule, { revalidate: false })} />
+          onSaved={readAfterChange} />
       </>}
       <SettingRow title={t('manual')}>
         {!creating && <Button size="sm" variant="secondary" disabled={!active || busy !== null} onClick={() => { void runNow() }}><Play data-icon="inline-start" />{t('runNow')}</Button>}
@@ -310,18 +351,27 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
       </NativeSelect>)}
     </SettingsSection>
 
+    </FieldSet>
+
     {!creating && current && <AutomationUsagePanel workspaceId={workspaceId} id={current.id} />}
+
+    {workspaceId && current && (current.definition.webhook || current.webhook_key_set) && (current.owner_id === userId || current.can_take_over) &&
+      <WebhookBatches key={current.id} workspaceId={workspaceId} automation={current} />}
 
     {!creating && <SettingsSection id="automation-history" title={t('history')}>
       {history.error && !history.data ? <div className="p-4"><InlineLoadError message={tAll('loadError')} retryLabel={tCommon('retry')} onRetry={() => { void history.mutate() }} /></div>
         : !history.data ? <div className="p-4"><Skeleton className="h-10 w-full" /></div>
           : !history.data.occurrences.length ? <p className="px-5 py-4 text-sm text-muted-foreground">{t('historyEmpty')}</p>
-            : history.data.occurrences.map(run => <RunRow key={run.id} run={run} timezone={current?.definition.timezone ?? draft.timezone} />)}
+            : history.data.occurrences.map(run => <RunRow key={run.id} run={run} timezone={current?.definition.timezone ?? draft.timezone}
+              onCancel={current && run.can_cancel ? () => { void cancelRun(run.id) } : undefined}
+              cancelling={cancellingRun !== null} />)}
     </SettingsSection>}
 
+    {stale && current && <InlineLoadError message={actionError('scheduleVersionConflict')} retryLabel={t('loadSavedVersion')}
+      onRetry={() => loadDefinition(current)} />}
     <footer className="flex flex-wrap items-center justify-between gap-2 pb-8">
       <div className="flex items-center gap-2">
-        {current && current.status !== 'completed' && <Button variant="outline" disabled={busy !== null} onClick={() => { void toggle(!active) }}>{active ? t('pause') : t('resume')}</Button>}
+        {current && current.status !== 'completed' && <Button variant="outline" disabled={busy !== null || !canToggle} onClick={() => { void toggle(!active) }}>{active ? t('pause') : t('resume')}</Button>}
         {current && <Button variant="ghost" className="text-destructive-foreground" disabled={busy !== null} onClick={() => setConfirmDelete(true)}>{t('delete')}</Button>}
       </div>
       <div className="flex items-center gap-3">
@@ -355,7 +405,7 @@ function EditorFrame({ children, onBack, backLabel }: { children: React.ReactNod
 }
 
 /** One run: when, how it ended (and why when it did not), and the task it made as a chip that opens it. */
-function RunRow({ run, timezone }: { run: AutomationRun; timezone: string }) {
+function RunRow({ run, timezone, onCancel, cancelling }: { run: AutomationRun; timezone: string; onCancel?: () => void; cancelling: boolean }) {
   const t = useTranslations('Automations')
   const tEvent = useTranslations('Automations.githubEvent')
   const tLinear = useTranslations('Automations.linearEvent')
@@ -369,6 +419,7 @@ function RunRow({ run, timezone }: { run: AutomationRun; timezone: string }) {
   return <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 text-sm">
     <time className="tabular-nums text-muted-foreground" dateTime={new Date(at).toISOString()}>{when(at, timezone)}</time>
     <Badge variant={runVariant[run.status]}>{t(`run.${run.status}`)}</Badge>
+    {onCancel && <Button size="sm" variant="outline" disabled={cancelling} onClick={onCancel}>{t('cancelRun')}</Button>}
     {run.trigger && 'event' in run.trigger && run.trigger.event.source === 'linear' && <span className="min-w-0 text-muted-foreground">{t('run.from', { event: tLinear.has(run.trigger.event.event as never) ? tLinear(run.trigger.event.event as never) : run.trigger.event.event,
       what: run.trigger.event.identifier ?? run.trigger.event.title ?? '' })}</span>}
     {run.trigger && 'event' in run.trigger && run.trigger.event.source === 'slack' && <span className="min-w-0 text-muted-foreground">{t('run.from', { event: tSlack.has(run.trigger.event.event as never) ? tSlack(run.trigger.event.event as never) : run.trigger.event.event,

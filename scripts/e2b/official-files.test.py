@@ -549,6 +549,60 @@ class OfficialFiles(unittest.TestCase):
 
 
 
+class RotatingProviderCertificates(unittest.TestCase):
+    """2026-11-16 control 43921160007: E2B rotates its own provider CA per build and create."""
+    observed = ('/usr/local/share/ca-certificates/e2b-db7fc94a8da18b7124e1cffc506e989c8d59787215333e78a4ca1851b7e4daf5.crt',
+                '/etc/ssl/certs/e2b-64b11aac5ee6accf4bbae2ef8644947c33dcd558c2e8570c9d58c4a4b7842ca7.pem',
+                '/etc/ssl/certs/1560546e.0', '/etc/ssl/certs/1560546e.1',
+                # Validation run 43922227579: removed on claude's fresh create.
+                ROOT_CA,
+                # Validation run 43923511902: relinked to the replaced root, dangling.
+                '/etc/ssl/certs/e2b-ca.pem')
+
+    def test_only_the_measured_rotating_provider_names_match(self):
+        for path in self.observed:
+            self.assertTrue(files.ROTATING_PROVIDER_CA.fullmatch(path), path)
+        for path in ('/etc/ssl/certs/e2b-ca.pem.bak', '/etc/ssl/certs/e2b-ca.crt', '/usr/local/share/ca-certificates/e2b-ca.crt.bak', '/etc/ssl/certs/ca-certificates.crt',
+                     '/etc/ssl/certs/002c0b4f.0', '/etc/ssl/certs/1560546e', '/etc/ssl/certs/1560546e.0x',
+                     '/usr/local/share/ca-certificates/e2b-' + 'a' * 63 + '.crt',
+                     '/usr/local/share/ca-certificates/e2b-' + 'A' * 64 + '.crt',
+                     '/usr/local/share/ca-certificates/sub/e2b-' + 'a' * 64 + '.crt',
+                     '/usr/local/share/ca-certificates/e2b-' + 'a' * 64 + '.crt.bak',
+                     '/opt/e2b-' + 'a' * 64 + '.crt'):
+            self.assertIsNone(files.ROTATING_PROVIDER_CA.fullmatch(path), path)
+
+    def test_capture_leaves_rotating_names_out_and_protects_their_neighbours(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            store = root / 'ca'
+            store.mkdir()
+            rotating = store / ('e2b-' + 'b' * 64 + '.crt')
+            rotating.write_text('provider')
+            fixed = store / 'e2b-ca.crt'
+            fixed.write_text('fixed')
+            scoped = __import__('re').compile(__import__('re').escape(str(store)) + r'/e2b-[0-9a-f]{64}\.crt')
+            with patch.object(files, 'ROTATING_PROVIDER_CA', scoped):
+                baseline = files.capture([str(root)], root / 'mikka')
+            self.assertNotIn(str(rotating), [row['path'] for row in baseline['entries']])
+            os.chmod(rotating, 0o777)
+            rotating.unlink()
+            (store / ('e2b-' + 'c' * 64 + '.crt')).write_text('next create')
+            files.verify(baseline)
+            fixed.write_text('changed')
+            with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                files.verify(baseline)
+
+    def test_policy_must_declare_the_same_rotating_names(self):
+        policy = json.loads(files.FINALIZATION_POLICY.read_text())
+        self.assertEqual(policy['rotatingProviderCertificates']['pattern'], files.ROTATING_PROVIDER_CA.pattern)
+        self.assertEqual(policy['rotatingProviderCertificates']['controlRun'], 'https://github.com/alexj11324/Mikka/actions/runs/43921160007')
+        for kind in ('claude', 'codex', 'desktop'):
+            files.finalization_policy(kind)
+        with patch.object(files, 'ROTATING_PROVIDER_CA', __import__('re').compile('/etc/ssl/certs/.*')):
+            with self.assertRaisesRegex(ValueError, 'e2b_finalization_policy_invalid'):
+                files.finalization_policy('claude')
+
+
 class ProviderDirectoryFinalization(unittest.TestCase):
     @staticmethod
     def original_directory():

@@ -1,5 +1,5 @@
 import 'server-only'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import type { z } from 'zod'
@@ -12,7 +12,7 @@ import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 import type { WorkspaceTransaction } from '@/lib/workspace-access'
 import { ActionFailureError } from '@/lib/action-error'
-import { environmentConfiguration, projectDefaultEnvironmentInput, projectResourcesInput, saveEnvironmentInput, workspaceRepositoryPolicyInput, type EnvironmentConfiguration, type ProjectExecutionSnapshot } from './contracts'
+import { environmentConfiguration, listProjectSetupVersionsInput, rollbackProjectSetupInput, projectSetupScope, type ProjectSetupHistory, type ProjectSetupRecipe, projectDefaultEnvironmentInput, projectResourcesInput, saveEnvironmentInput, workspaceRepositoryPolicyInput, type EnvironmentConfiguration, type ProjectExecutionSnapshot } from './contracts'
 
 type Reader = Parameters<typeof withTaskWorkspace>[0]
 const actorId = (reader: Reader) => typeof reader === 'string' ? reader : reader.id
@@ -63,12 +63,12 @@ export function assertProjectExecutionTarget(snapshot: ProjectExecutionSnapshot,
   if (environment && ((environment.runtime !== 'any' && environment.runtime !== target.runtime) || (environment.harness !== 'any' && environment.harness !== target.harness))) throw new ActionFailureError('projectEnvironmentUnavailable')
 }
 
-async function resourceLock(tx: WorkspaceTransaction, workspaceId: string, write: boolean) {
+export async function resourceLock(tx: WorkspaceTransaction, workspaceId: string, write: boolean) {
   await tx.execute(write
     ? sql`select pg_advisory_xact_lock(hashtextextended(${'project-resources:' + workspaceId},0))`
     : sql`select pg_advisory_xact_lock_shared(hashtextextended(${'project-resources:' + workspaceId},0))`)
 }
-async function resourceWriteLock(tx: WorkspaceTransaction, workspaceId: string) {
+export async function resourceWriteLock(tx: WorkspaceTransaction, workspaceId: string) {
   // Configuration edits cannot upgrade an admission's shared lease. Every
   // independent writer takes relation -> resource -> entity locks, matching
   // admission and Project lifecycle operations across the split databases.
@@ -96,19 +96,44 @@ async function secretsFit(workspaceId: string, configuration: EnvironmentConfigu
   }
 }
 
-/** Configuration is visible only to current tenant members. It contains secret IDs, never values. */
-export async function listProjectResources(reader: Reader, workspaceId: string, projectId?: string) {
+/** Keep the Workspace Project row and its APP content policy locked during the
+ * resource operation. Missing and inaccessible Projects have one public result. */
+async function withConfiguredProject<T>(reader: Reader, workspaceId: string, projectId: string, write: boolean,
+  work: (tx: WorkspaceTransaction, project: { revision: number; archivedAt: Date | null }) => Promise<T>) {
+  const { withResourceAccess } = await import('@/lib/resource-access/store')
   return withTaskWorkspace(reader, workspaceId, async (_workspace, tx) => {
-    if (projectId) {
-      const found = await tx.execute(sql`select id from workspace_projects where id=${projectId} and "workspaceId"=${workspaceId}`)
-      if (!found.rowCount) throw new ActionFailureError('projectNotFound')
+    if (write) {
+      await admin(tx, reader, workspaceId)
+      await resourceWriteLock(tx, workspaceId)
     }
+    // Match the Project lifecycle writer: the APP policy is locked before
+    // the source row. The surrounding Workspace transaction owns both uses.
+    try {
+      return await withResourceAccess(reader, { kind: 'project', id: projectId, workspaceId }, write ? 'canSteer' : 'canReadContent', async () => {
+        const project = (await tx.execute<{ revision: number; archivedAt: Date | null }>(sql`select revision,"archivedAt"
+          from workspace_projects where id=${projectId} and "workspaceId"=${workspaceId} ${write ? sql`for update` : sql`for share`}`)).rows[0]
+        if (!project) throw new ActionFailureError('projectNotFound')
+        if (write && project.archivedAt) throw new ActionFailureError('projectArchived')
+        return work(tx, project)
+      })
+    } catch (error) {
+      if (error instanceof ActionFailureError && error.code === 'issueNotFound') throw new ActionFailureError('projectNotFound', undefined, undefined, { cause: error })
+      throw error
+    }
+  })
+}
+
+/** Workspace configuration stays tenant-scoped. Project bindings also require current Project content access. */
+export async function listProjectResources(reader: Reader, workspaceId: string, projectId?: string) {
+  const read = async (tx: WorkspaceTransaction) => {
     const policy = await tx.execute(sql`select mode,"repositoryKeys",revision from workspace_repository_policies where "workspaceId"=${workspaceId}`)
     const environments = await tx.execute<EnvironmentRow>(sql`select id,"workspaceId",name,configuration,revision,"archivedAt" from workspace_environments where "workspaceId"=${workspaceId} order by name,id`)
     const repositories = projectId ? await tx.execute(sql`select "repositoryKey","baseBranch","environmentId","isPrimary" from workspace_project_repositories where "projectId"=${projectId} and "workspaceId"=${workspaceId} order by "repositoryKey"`) : { rows: [] }
     const bindings = projectId ? await tx.execute(sql`select "environmentId","isDefault" from workspace_project_environments where "projectId"=${projectId} and "workspaceId"=${workspaceId} order by "environmentId"`) : { rows: [] }
     return { policy: policy.rows[0] ?? { mode: 'inherit', repositoryKeys: [], revision: 0 }, environments: environments.rows, repositories: repositories.rows, environmentBindings: bindings.rows }
-  })
+  }
+  return projectId ? withConfiguredProject(reader, workspaceId, projectId, false, read)
+    : withTaskWorkspace(reader, workspaceId, (_workspace, tx) => read(tx))
 }
 
 /** Restricted + an empty list is an explicit deny-all policy; no row means inherit. */
@@ -129,6 +154,27 @@ export async function saveWorkspaceRepositoryPolicy(reader: Reader, raw: z.input
   })
 }
 
+function setupRecipe(configuration: EnvironmentConfiguration): ProjectSetupRecipe | null {
+  const setup = configuration.setup
+  return setup ? { copyFiles: setup.copyFiles, ...(setup.command !== undefined ? { command: setup.command } : {}) } : null
+}
+
+async function recordSetupVersion(tx: WorkspaceTransaction, workspaceId: string, id: string, revision: number, configuration: EnvironmentConfiguration) {
+  const recipe = setupRecipe(configuration)
+  await tx.execute(sql`insert into workspace_environment_setup_versions ("workspaceId","environmentId",revision,recipe)
+    select ${workspaceId}::uuid,${id}::uuid,${revision}::integer,nullif(${JSON.stringify(recipe)}::jsonb,'null'::jsonb)
+    where not exists (select 1 from (select recipe from workspace_environment_setup_versions where "workspaceId"=${workspaceId}
+      and "environmentId"=${id} order by revision desc limit 1) latest
+      where latest.recipe is not distinct from nullif(${JSON.stringify(recipe)}::jsonb,'null'::jsonb))`)
+}
+
+async function persistEnvironment(tx: WorkspaceTransaction, reader: Reader, workspaceId: string, id: string, name: string, configuration: EnvironmentConfiguration, revision: number, archivedAt: Date | null) {
+  await tx.execute(sql`insert into workspace_environments(id,"workspaceId",name,configuration,revision,"archivedAt","createdBy","updatedBy")
+    values(${id},${workspaceId},${name},${JSON.stringify(configuration)}::jsonb,${revision},${archivedAt},${actorId(reader)},${actorId(reader)})
+    on conflict(id) do update set name=excluded.name,configuration=excluded.configuration,revision=excluded.revision,"archivedAt"=excluded."archivedAt","updatedBy"=excluded."updatedBy","updatedAt"=now()`)
+  await recordSetupVersion(tx, workspaceId, id, revision, configuration)
+}
+
 export async function saveEnvironment(reader: Reader, raw: z.input<typeof saveEnvironmentInput>) {
   const input = saveEnvironmentInput.parse(raw)
   return withTaskWorkspace(reader, input.workspaceId, async (_workspace, tx) => {
@@ -140,24 +186,73 @@ export async function saveEnvironment(reader: Reader, raw: z.input<typeof saveEn
     if (input.id && (!current.rowCount || Number(current.rows[0].revision) !== input.revision)) throw new ActionFailureError('projectResourceConflict')
     const revision = Number(current.rows[0]?.revision ?? 0) + 1
     const configuration = { ...input.configuration, secretIds: [...new Set(input.configuration.secretIds)], repositoryKeys: [...new Set(input.configuration.repositoryKeys)] }
-    await tx.execute(sql`insert into workspace_environments(id,"workspaceId",name,configuration,revision,"archivedAt","createdBy","updatedBy")
-      values(${id},${input.workspaceId},${input.name},${JSON.stringify(configuration)}::jsonb,${revision},${input.archived ? new Date() : null},${actorId(reader)},${actorId(reader)})
-      on conflict(id) do update set name=excluded.name,configuration=excluded.configuration,revision=excluded.revision,"archivedAt"=excluded."archivedAt","updatedBy"=excluded."updatedBy","updatedAt"=now()`)
+    await persistEnvironment(tx, reader, input.workspaceId, id, input.name, configuration, revision, input.archived ? new Date() : null)
     await audit(tx, reader, input.workspaceId, input.archived ? 'environment.archived' : 'environment.saved', id, { revision })
     await workspaceListChanged(tx, input.workspaceId, ['workspace_settings'])
     return { id, revision }
   })
 }
 
+type SetupScope = z.infer<typeof projectSetupScope>
+async function withProjectSetup<T>(reader: Reader, scope: SetupScope, write: boolean, work: (tx: WorkspaceTransaction, environment: EnvironmentRow, projects: string[], bindingSnapshot: string) => Promise<T>) {
+  const { withResourceAccess } = await import('@/lib/resource-access/store')
+  const { workspaceId, projectId, environmentId } = scope
+  return withTaskWorkspace(reader, workspaceId, async (_workspace, tx) => {
+    if (write) {
+      await admin(tx, reader, workspaceId)
+      await resourceWriteLock(tx, workspaceId)
+    } else {
+      await tx.execute(sql`select pg_advisory_xact_lock_shared(hashtextextended('mikka-team-relations',0))`)
+      await resourceLock(tx, workspaceId, false)
+    }
+    return withResourceAccess(reader, { kind: 'project', id: projectId, workspaceId }, write ? 'canSteer' : 'canReadContent', async () => {
+      const environment = (await tx.execute<EnvironmentRow>(sql`select e.id,e."workspaceId",e.name,e.revision,e.configuration,e."archivedAt"
+        from workspace_project_environments b join workspace_projects p on p.id=b."projectId" and p."workspaceId"=b."workspaceId"
+        join workspace_environments e on e.id=b."environmentId" and e."workspaceId"=b."workspaceId"
+        where b."workspaceId"=${workspaceId} and b."projectId"=${projectId} and b."environmentId"=${environmentId}
+          and b."isDefault" and p."archivedAt" is null and e."archivedAt" is null`)).rows[0]
+      if (!environment) throw new ActionFailureError('projectEnvironmentUnavailable')
+      const bindings = await tx.execute<{ projectId: string }>(sql`select "projectId" from workspace_project_environments where "workspaceId"=${workspaceId} and "environmentId"=${environmentId}
+        union select "projectId" from workspace_project_repositories where "workspaceId"=${workspaceId} and "environmentId"=${environmentId} order by 1`)
+      const projects = bindings.rows.map(row => row.projectId)
+      const snapshot = createHash('sha256').update(JSON.stringify([workspaceId, environmentId, projects])).digest('hex')
+      return work(tx, environment, projects, snapshot)
+    })
+  })
+}
+
+export async function listProjectSetupVersions(reader: Reader, raw: z.input<typeof listProjectSetupVersionsInput>): Promise<ProjectSetupHistory> {
+  const input = listProjectSetupVersionsInput.parse(raw)
+  return withProjectSetup(reader, input, false, async (tx, environment, projects, bindingSnapshot) => {
+    const page = await tx.execute<{ revision: number; recordedAt: Date | string; recipe: ProjectSetupRecipe | null }>(sql`
+      select revision,"recordedAt",recipe from workspace_environment_setup_versions where "workspaceId"=${input.workspaceId}
+      and "environmentId"=${input.environmentId} ${input.before ? sql`and revision < ${input.before}` : sql``} order by revision desc limit 31`)
+    const versions = page.rows.slice(0, 30).map(row => ({ ...row, recordedAt: new Date(row.recordedAt).toISOString() }))
+    return { revision: environment.revision, bindingSnapshot, totalProjects: projects.length, versions, before: page.rows.length > 30 ? versions.at(-1)!.revision : null }
+  })
+}
+
+export async function rollbackProjectSetup(reader: Reader, raw: z.input<typeof rollbackProjectSetupInput>) {
+  const input = rollbackProjectSetupInput.parse(raw)
+  return withProjectSetup(reader, input, true, async (tx, environment, _projects, snapshot) => {
+    if (environment.revision !== input.revision || snapshot !== input.bindingSnapshot) throw new ActionFailureError('projectResourceConflict')
+    const historical = (await tx.execute<{ recipe: ProjectSetupRecipe | null }>(sql`select recipe from workspace_environment_setup_versions
+      where "workspaceId"=${input.workspaceId} and "environmentId"=${environment.id} and revision=${input.version}`)).rows[0]
+    if (!historical) throw new ActionFailureError('projectEnvironmentUnavailable')
+    const { setup: _previous, ...current } = environment.configuration
+    const configuration = environmentConfiguration.parse({ ...current, ...(historical.recipe ? { setup: { ...historical.recipe, approved: false } } : {}) })
+    const revision = environment.revision + 1
+    await persistEnvironment(tx, reader, input.workspaceId, environment.id, environment.name, configuration, revision, null)
+    await audit(tx, reader, input.workspaceId, 'environment.setup_restored', environment.id, { projectId: input.projectId, fromRevision: input.version, revision })
+    await workspaceListChanged(tx, input.workspaceId, ['workspace_settings'])
+    return { id: environment.id, revision }
+  })
+}
+
 export async function saveProjectResources(reader: Reader, raw: z.input<typeof projectResourcesInput>) {
   const input = projectResourcesInput.parse(raw)
-  return withTaskWorkspace(reader, input.workspaceId, async (_workspace, tx) => {
-    await admin(tx, reader, input.workspaceId)
-    await resourceWriteLock(tx, input.workspaceId)
-    const current = await tx.execute(sql`select revision,"archivedAt" from workspace_projects where id=${input.projectId} and "workspaceId"=${input.workspaceId} for update`)
-    if (!current.rowCount) throw new ActionFailureError('projectNotFound')
-    if (current.rows[0].archivedAt) throw new ActionFailureError('projectArchived')
-    if (Number(current.rows[0].revision) !== input.revision) throw new ActionFailureError('projectResourceConflict')
+  return withConfiguredProject(reader, input.workspaceId, input.projectId, true, async (tx, project) => {
+    if (project.revision !== input.revision) throw new ActionFailureError('projectResourceConflict')
     const ids = [...new Set(input.environmentIds)]
     for (const id of ids) {
       const environment = await tx.execute(sql`select id from workspace_environments where id=${id} and "workspaceId"=${input.workspaceId} and "archivedAt" is null`)
@@ -178,13 +273,8 @@ export async function saveProjectResources(reader: Reader, raw: z.input<typeof p
 /** Change only the default; repository overrides and other admitted environments survive. */
 export async function setProjectDefaultEnvironment(reader: Reader, raw: z.input<typeof projectDefaultEnvironmentInput>) {
   const input = projectDefaultEnvironmentInput.parse(raw)
-  return withTaskWorkspace(reader, input.workspaceId, async (_workspace, tx) => {
-    await admin(tx, reader, input.workspaceId)
-    await resourceWriteLock(tx, input.workspaceId)
-    const project = await tx.execute(sql`select revision,"archivedAt" from workspace_projects where id=${input.projectId} and "workspaceId"=${input.workspaceId} for update`)
-    if (!project.rowCount) throw new ActionFailureError('projectNotFound')
-    if (project.rows[0].archivedAt) throw new ActionFailureError('projectArchived')
-    if (Number(project.rows[0].revision) !== input.revision) throw new ActionFailureError('projectResourceConflict')
+  return withConfiguredProject(reader, input.workspaceId, input.projectId, true, async (tx, project) => {
+    if (project.revision !== input.revision) throw new ActionFailureError('projectResourceConflict')
     if (input.environmentId) {
       const environment = await tx.execute(sql`select id from workspace_environments where id=${input.environmentId} and "workspaceId"=${input.workspaceId} and "archivedAt" is null`)
       if (!environment.rowCount) throw new ActionFailureError('projectEnvironmentUnavailable')

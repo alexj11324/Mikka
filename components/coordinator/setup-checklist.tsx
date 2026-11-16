@@ -4,7 +4,10 @@ import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import useSWR from 'swr'
 import { Circle, CircleCheck, X } from 'lucide-react'
-import { dismissSetupChecklist, setupChecklist } from '@/app/actions/onboarding'
+import { dismissSetupChecklist, restoreSetupChecklist, setupChecklist } from '@/app/actions/onboarding'
+import { SettingRow, SettingsSection } from '@/components/settings/primitives'
+import { FieldError } from '@/components/ui/field'
+import { useActionError } from '@/lib/use-action-error'
 import { Button } from '@/components/ui/button'
 import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'
 import { settingsHref, type SettingsSectionId } from '@/lib/settings-sections'
@@ -13,6 +16,10 @@ import { withBasePath } from '@/lib/base-path'
 import { cn } from '@/lib/utils'
 
 const ACTIONS: Partial<Record<SetupItem, SettingsSectionId>> = { model: 'models', device: 'computers', app: 'connections', invite: 'members' }
+
+function useChecklist(workspaceId: string | null | undefined) {
+  return useSWR(workspaceId ? ['setup-checklist', workspaceId] : null, () => setupChecklist(workspaceId!), { revalidateOnFocus: false })
+}
 
 /**
  * Capy's setup guide after the first-run guide (decision 2026-11-15-1900 rule 8):
@@ -23,7 +30,7 @@ export function SetupChecklist({ workspaceId }: { workspaceId: string | null | u
   const t = useTranslations('SetupChecklist')
   const [desktop, setDesktop] = useState(false)
   useEffect(() => { setDesktop(Boolean(bridgeFromWindow(window as MikkaWindow))) }, [])
-  const list = useSWR(workspaceId ? ['setup-checklist', workspaceId] : null, () => setupChecklist(workspaceId!), { revalidateOnFocus: false })
+  const list = useChecklist(workspaceId)
   const data = readSetupChecklist(list.data)
   if (!workspaceId || !data || !setupChecklistShown(data, desktop)) return null
   const items = visibleSetupItems(data, desktop)
@@ -51,4 +58,37 @@ export function SetupChecklist({ workspaceId }: { workspaceId: string | null | u
       })}
     </ul>
   </section>
+}
+
+/** Preferences is still reachable after the user hides the New Task checklist. */
+export function RestoreSetupChecklist({ workspaceId }: { workspaceId: string }) {
+  const t = useTranslations('SetupChecklist'), common = useTranslations('Common')
+  const actionError = useActionError()
+  const list = useChecklist(workspaceId)
+  const [saving, setSaving] = useState(false)
+  const [failed, setFailed] = useState(false)
+  if (!readSetupChecklist(list.data)?.dismissed) return null
+
+  async function restore() {
+    setSaving(true)
+    setFailed(false)
+    try {
+      await list.mutate(async () => {
+        await restoreSetupChecklist(workspaceId)
+        return setupChecklist(workspaceId)
+      }, { revalidate: false })
+    } catch {
+      setFailed(true)
+    } finally {
+      setSaving(false)
+    }
+  }
+  return <SettingsSection id="restore-setup-checklist">
+    <SettingRow title={t('title')}>
+      <Button type="button" variant="secondary" size="sm" disabled={saving} onClick={() => void restore()}>
+        {saving ? common('saving') : t('show')}
+      </Button>
+    </SettingRow>
+    {failed && <FieldError>{actionError()}</FieldError>}
+  </SettingsSection>
 }

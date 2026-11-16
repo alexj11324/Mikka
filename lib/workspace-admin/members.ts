@@ -119,33 +119,30 @@ export async function restoreReturningMember(workspaceId: string, userId: string
 /** An admin takes over a paused bot of someone who left, was suspended or deleted their account (null owner); it then runs on the admin's own resources. */
 export async function takeOverBot(actorId: string, workspaceId: string, botId: string): Promise<AssetTransfer> {
   z.uuid().parse(botId)
-  await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId, true))
-  let name = ''
-  const transferred = await db.transaction(async main => {
-    const [bot] = await main.select({ ownerId: bots.ownerId, name: bots.name }).from(bots)
-      .where(and(eq(bots.id, botId), eq(bots.workspaceId, workspaceId), isNotNull(bots.archivedAt))).for('update').limit(1)
-    if (!bot) throw new WorkspaceError('botNotFound')
-    name = bot.name
-    if (bot.ownerId === actorId) {
-      await main.update(bots).set({ archivedAt: null, updatedAt: new Date() }).where(eq(bots.id, botId))
-      await botListChanged(main, botId)
-      return { bots: 1 }
-    }
-    return transferBots(main, workspaceId, bot.ownerId, actorId, [botId])
-  })
-  // 接管 changes who pays for and owns the bot's runs, so it is in the workspace's activity log like 移除 and 停用.
-  await workspaceDb.transaction(async tx => {
+  return workspaceDb.transaction(async tx => {
     const { membership } = await requireWorkspace(tx, workspaceId, actorId, true)
-    await enqueueWorkspaceAudit(tx, { workspaceId, actor: { type: 'user', id: actorId, name: membership.name }, action: 'bot.taken_over', target: { type: 'bot', id: botId, label: name } })
+    return db.transaction(async main => {
+      const [bot] = await main.select({ ownerId: bots.ownerId, name: bots.name }).from(bots)
+        .where(and(eq(bots.id, botId), eq(bots.workspaceId, workspaceId), isNotNull(bots.archivedAt))).for('update').limit(1)
+      if (!bot) throw new WorkspaceError('botNotFound')
+      await enqueueWorkspaceAudit(tx, { workspaceId, actor: { type: 'user', id: actorId, name: membership.name }, action: 'bot.taken_over', target: { type: 'bot', id: botId, label: bot.name } })
+      if (bot.ownerId === actorId) {
+        await main.update(bots).set({ archivedAt: null, updatedAt: new Date() }).where(eq(bots.id, botId))
+        await botListChanged(main, botId)
+        return { bots: 1 }
+      }
+      return transferBots(main, workspaceId, bot.ownerId, actorId, [botId], tx)
+    })
   })
-  return transferred
 }
 
 /** Paused bots in this workspace, for its admins. */
 export async function archivedBots(actorId: string, workspaceId: string) {
-  await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId, true))
-  return db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, ownerId: bots.ownerId, archivedAt: bots.archivedAt })
-    .from(bots).where(and(eq(bots.workspaceId, workspaceId), isNotNull(bots.archivedAt))).orderBy(bots.name)
+  return workspaceDb.transaction(async tx => {
+    await requireWorkspace(tx, workspaceId, actorId, true)
+    return db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, ownerId: bots.ownerId, archivedAt: bots.archivedAt })
+      .from(bots).where(and(eq(bots.workspaceId, workspaceId), isNotNull(bots.archivedAt))).orderBy(bots.name)
+  })
 }
 
 /** An active admin other than `userId` remains. */

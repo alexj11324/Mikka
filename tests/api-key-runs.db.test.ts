@@ -166,6 +166,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
       const environment = await resources.saveEnvironment(p.id, { workspaceId: p.workspaceId, name: 'Actual claim environment', configuration })
       await pool.query(`INSERT INTO workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)
         VALUES($1,$2,$3,'Environment execution','','','planned','none','','','','','[]',1)`, [projectId, p.id, p.workspaceId])
+      await (await import('../lib/resource-access/projects')).registerProjectAccess(p.id, projectId, p.workspaceId)
       await seedProjectTasks(pool, projectId, [p.issueId, changedIssue, revokedIssue])
       await resources.saveProjectResources(p.id, { workspaceId: p.workspaceId, projectId, revision: 1,
         repositories: [{ repositoryKey, baseBranch: 'environment-base', environmentId: environment.id, isPrimary: true }],

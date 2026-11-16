@@ -267,15 +267,15 @@ export function conflictedDrivePaths(
 }
 
 /**
- * The layers of Drive this repository starts with. Capy has six; Mikka starts
- * with three, and adds a layer only when a caller needs it.
+ * The storage layers selected by Files. A team-wide volume belongs to the
+ * selected team Workspace, independently of each member and Project.
  *
  * The name is `driveScope` and not `scope`: it is the layer a volume sits in,
  * not a Capy "scope" and not Mikka's tenant. `workspace` is deliberately absent
  * for the same reason — that word already means the tenant, and reusing it here
  * would make every later reader guess which one a column holds.
  */
-export const DRIVE_SCOPES = ['user', 'project', 'project-user'] as const
+export const DRIVE_SCOPES = ['user', 'project', 'project-user', 'team-workspace'] as const
 export type DriveScope = (typeof DRIVE_SCOPES)[number]
 
 export function isDriveScope(value: unknown): value is DriveScope {
@@ -285,7 +285,7 @@ export function isDriveScope(value: unknown): value is DriveScope {
 /**
  * What a volume in `scope` is called and what it points at, checked before any
  * row is written. `project-user` names both the project and the person; the
- * other two name exactly one.
+ * other layers name exactly one.
  */
 export type DriveScopeProblem = 'scope_invalid' | 'scope_id_empty' | 'scope_user_required' | 'scope_user_unexpected'
 export function driveScopeProblem(driveScope: unknown, scopeId: unknown, scopeUserId: unknown): DriveScopeProblem | null {
@@ -297,3 +297,13 @@ export function driveScopeProblem(driveScope: unknown, scopeId: unknown, scopeUs
   if (driveScope === 'project-user') return hasUser && scopeUserId.length <= 200 ? null : 'scope_user_required'
   return scopeUserId === null || scopeUserId === undefined ? null : 'scope_user_unexpected'
 }
+
+
+export interface DriveSkillCursor { volumeId: string; path: string }
+export interface DriveSkillMetadata extends DriveSkillCursor { versionId: string; name: string; description: string }
+export interface DriveSkillPage { skills: DriveSkillMetadata[]; nextCursor: DriveSkillCursor | null }
+
+/** A signed-in link may narrow its underlying Drive audience, never expand it. */
+export type DriveFileLinkVisibility = 'private' | 'org'
+export type DriveFileLink = { id: string; path: string; visibility: DriveFileLinkVisibility }
+export type DriveFileLinkPage = { links: (DriveFileLink & { manageable: boolean })[]; nextCursor: string | null }

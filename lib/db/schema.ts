@@ -307,6 +307,7 @@ export type SupportedHarness = (typeof SUPPORTED_HARNESSES)[number]
 export const devices = pgTable('devices', {
   id: uuid('id').primaryKey(), ownerId: text('ownerId').notNull(),
   name: text('name').notNull(), hostname: text('hostname'),
+  description: varchar('description', { length: 500 }),
   kind: text('kind').$type<'local' | 'cloud'>().notNull().default('local'),
   deviceType: text('deviceType').$type<'laptop' | 'server'>().notNull().default('laptop'),
   platform: text('platform'), arch: text('arch'),
@@ -1316,6 +1317,7 @@ export const userPreferences = pgTable('user_preferences', {
   pushReview: boolean('pushReview').notNull().default(true),
   pushFinished: boolean('pushFinished').notNull().default(true),
   pushBriefing: boolean('pushBriefing').notNull().default(true),
+  organizationInvitationEmails: boolean('organizationInvitationEmails').notNull().default(true),
   pushWhen: text('pushWhen').$type<PushWhen>().notNull().default('always'),
   memoryEnabled: boolean('memoryEnabled').notNull().default(true),
   /** The chat composer's send key: Enter (Shift+Enter breaks the line) or ⌘/Ctrl+Enter (Enter breaks the line). */
@@ -1470,7 +1472,7 @@ export { factoryAgentProfiles, factoryAgentProfileVersions } from './agent-profi
  * `driveScope` is deliberately not `workspace`: workspace already means the
  * tenant, and a volume's scope is a layer of Drive, not a tenant.
  */
-export const DRIVE_SCOPES = ['user', 'project', 'project-user'] as const
+export const DRIVE_SCOPES = ['user', 'project', 'project-user', 'team-workspace'] as const
 export type DriveScope = (typeof DRIVE_SCOPES)[number]
 
 export const driveVolumes = pgTable('drive_volumes', {
@@ -1491,13 +1493,15 @@ export const driveVolumes = pgTable('drive_volumes', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [
-  uniqueIndex('drive_volumes_scope_name_key').on(table.driveScope, table.scopeId, sql`coalesce(${table.scopeUserId}, '')`, table.name),
+  // The SQL migration owns the NULLS NOT DISTINCT name index across tenant and storage scopes.
   index('drive_volumes_owner_idx').on(table.ownerId, table.updatedAt.desc()),
   index('drive_volumes_scope_idx').on(table.driveScope, table.scopeId, table.updatedAt.desc()),
 ])
 
 /** Content by digest, deduplicated within one owner and never across owners (lib/drive/blobs.ts). */
 export const driveBlobs = pgTable('drive_blobs', {
+  workspaceId: uuid('workspaceId'),
+  projectId: uuid('projectId'),
   ownerId: text('ownerId').notNull(),
   sha256: text('sha256').notNull(),
   sizeBytes: integer('sizeBytes').notNull(),
@@ -1523,6 +1527,20 @@ export const driveVolumeEntries = pgTable('drive_volume_entries', {
 }, table => [
   primaryKey({ columns: [table.volumeId, table.path] }),
   index('drive_volume_entries_blob_idx').on(table.sha256),
+])
+
+/** A signed-in pointer to one current Drive file. Readers still require the original Drive ACL. */
+export const driveFileLinks = pgTable('drive_file_links', {
+  id: uuid('id').primaryKey(),
+  volumeId: text('volumeId').notNull(),
+  path: text('path').notNull(),
+  createdBy: text('createdBy').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  visibility: text('visibility').$type<'private' | 'org'>().notNull().default('private'),
+}, table => [
+  foreignKey({ columns: [table.volumeId, table.path], foreignColumns: [driveVolumeEntries.volumeId, driveVolumeEntries.path] }).onDelete('cascade'),
+  unique().on(table.volumeId, table.path, table.createdBy),
+  check('drive_file_links_visibility_check', sql`${table.visibility} IN ('private', 'org')`),
+  index('drive_file_links_creator_idx').on(table.createdBy),
 ])
 
 /** An immutable version, with the `threadId` and `authorName` a history reads. */

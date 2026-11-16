@@ -15,12 +15,14 @@ const time = (value: unknown) => value instanceof Date ? value.getTime() : typeo
  * attribution: actual native claims, resumed SID, timing and candidate SHA. */
 export async function completedQuestionExecution(tx: Query, task: Task, candidate: Candidate) {
   const producer = candidate.producerExecution
+  // Only a run linked to a question can have a host continuation receipt.
   const { rows: [bound] } = await tx.query(`SELECT c.id,c.kind,${reportedCandidateShaSql('c', 'p')} AS "reportedSha",
       t."sourceEventId",t."botId",pa.id AS "producerAttemptId"
     FROM factory_tasks t JOIN factory_candidates c ON c."taskId"=t.id AND c.id=t."candidateId"
     JOIN agent_runs p ON p.id=c."runId" AND p."userId"=t."userId" AND p."issueId"=t."issueId"
     JOIN factory_attempts pa ON pa."taskId"=t.id AND pa."runId"=p.id AND pa.stage='execute'
     WHERE t.id=$1 AND t."userId"=$2 AND t."issueId"=$3 AND c.id=$4 AND p.id=$5 AND p."sessionId"=$6
+      AND p."questionContinuation"->>'questionId' IS NOT NULL
       AND t.stage IN ('review','verify') AND c.kind='deliverable'`,
   [task.id, task.userId, task.issueId, candidate.id, producer.runId, producer.sessionId])
   if (!bound || await resolveFactoryCandidateSha(tx, task, bound, bound.reportedSha) !== candidate.executionSha) return null

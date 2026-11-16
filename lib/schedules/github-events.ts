@@ -14,6 +14,7 @@ export type GitHubAutomationEvent = {
   number: number | null
   title: string | null
   url: string | null
+  pullAuthor?: string | null
   author: string | null
   /** A short excerpt of a comment or review body. */
   body: string | null
@@ -41,6 +42,7 @@ export function githubAutomationEvents(name: string, payload: Json): GitHubAutom
     source: 'github', event, repository: `v2/github.com/${repository.toLowerCase()}`,
     branch: str(obj(item?.base)?.ref), labels: labelNames(item?.labels), label: null,
     number: typeof item?.number === 'number' ? item.number : null, title: str(item?.title), url: str(item?.html_url),
+    ...(pr ? { pullAuthor: str(obj(pr.user)?.login) } : {}),
     author: str(obj(item?.user)?.login), body: null, ...extra,
   })
   if (name === 'pull_request' && pr) {
@@ -87,6 +89,7 @@ export function triggerMatches(trigger: EventTrigger, event: GitHubAutomationEve
   if (trigger.source !== 'github' || trigger.event !== event.event) return false
   if (!trigger.repositories.includes(event.repository)) return false
   if (trigger.branches?.length && !(event.branch && trigger.branches.includes(event.branch))) return false
+  if (trigger.pullAuthors?.length && !trigger.pullAuthors.some(name => name.toLowerCase() === event.pullAuthor?.toLowerCase())) return false
   const wanted = lower(trigger.labels)
   if (wanted?.length) {
     const have = new Set([...event.labels, ...(event.label ? [event.label] : [])].map(label => label.toLowerCase()))

@@ -98,6 +98,8 @@ test('unchanged rows invalidate the pre-projection chat version while current re
   const legacyVersion = createHash('sha256').update(`200|${storedHash}||`).digest('hex').slice(0, 32)
   const current = await store.chatVersionState(owner, 200, botId)
   assert.notEqual(current.version, legacyVersion, 'an old known version must trigger a body read')
+  const joinedTurnsVersion = createHash('sha256').update(`coordinator-chat:3|200|${storedHash}||`).digest('hex').slice(0, 32)
+  assert.notEqual(current.version, joinedTurnsVersion, 'a client that cached joined Eve turns must read the corrected body')
   assert.equal((await store.chatVersionState(owner, 200, botId)).version, current.version)
 })
 

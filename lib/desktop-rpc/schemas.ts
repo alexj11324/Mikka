@@ -1,7 +1,7 @@
 import { AVATAR_MAX_BYTES, isAvatarContentType } from '../account/avatar-file'
 import { threadModelChoice } from '@/lib/thread-model-choice'
 import { archiveIdleDays, conversationTargetInput, directoryInput } from '@/lib/conversation-directory-input'
-import { saveEnvironmentInput, projectDefaultEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
+import { projectPullAuthorInput, listProjectSetupVersionsInput, rollbackProjectSetupInput, saveEnvironmentInput, listDependencyRepositoriesInput, replaceDependencyRepositoriesInput, projectDefaultEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
 import { createOnlyCommand, dispatchReceiptInput } from '@/lib/task-create-command'
 import { taskListPageInput } from '@/lib/task-list-page'
 import { taskPresentationsInput } from '@/lib/task-presentation-input'
@@ -19,7 +19,8 @@ import { setAppPolicyInput } from '@/lib/app-policy/apps'
 import { POINTS_PURCHASE_AMOUNTS } from '@/lib/billing/hosted-usage'
 import { MAX_READ_BATCH, READ_BATCH_ACTIONS, type ReadBatchCall } from './read-batch-contract'
 import { USER_FACT_KINDS } from '@/lib/profile/kinds'
-import { definitionSchema as scheduleDefinition } from '@/lib/schedules/contract'
+import { definitionSchema as scheduleDefinition, webhookBatchListInput, webhookBatchInput } from '@/lib/schedules/contract'
+import { DEVICE_DESCRIPTION_MAX } from '@/lib/device-name'
 
 const uuid = z.uuid()
 const id = z.string().min(1).max(200)
@@ -75,7 +76,7 @@ const apiKey = z.discriminatedUnion('provider', [
 const preferences = object({
   archiveIdleAfterDays: z.literal(archiveIdleDays).optional(),
   proactive: bool, pushDecide: bool, pushReview: bool, pushFinished: bool, pushBriefing: bool,
-  pushWhen: z.enum(['always', 'away']), memoryEnabled: bool, sendKey: z.enum(['enter', 'modEnter']),
+  organizationInvitationEmails: bool, pushWhen: z.enum(['always', 'away']), memoryEnabled: bool, sendKey: z.enum(['enter', 'modEnter']),
   personalInstructions: text(8000).transform(value => value.trim()).refine(value => [...value].length <= 2000), dailySuggestions: bool,
 }).partial()
 const listPositions = (limit: number) => z.array(object({ id: uuid, version })).max(limit)
@@ -111,9 +112,14 @@ export const desktopActionSchemas = {
   'teams.archiveTeam': oneId,
   'teams.restoreTeam': oneId,
   'teams.removeTeamGrouping': tuple(uuid, text(120)),
+  'project-resources.listProjectSetupVersions': tuple(listProjectSetupVersionsInput),
+  'project-resources.rollbackProjectSetup': tuple(rollbackProjectSetupInput),
   'project-resources.listProjectResources': tuple(uuid, uuid.optional()),
   'project-resources.setProjectDefaultEnvironment': tuple(projectDefaultEnvironmentInput),
   'project-resources.saveEnvironment': tuple(saveEnvironmentInput),
+  'project-resources.searchProjectPullAuthors': tuple(projectPullAuthorInput),
+  'project-resources.listDependencyRepositories': tuple(listDependencyRepositoriesInput),
+  'project-resources.replaceDependencyRepositories': tuple(replaceDependencyRepositoriesInput),
   'project-resources.saveProjectResources': tuple(projectResourcesInput),
   'project-resources.saveWorkspaceRepositoryPolicy': tuple(workspaceRepositoryPolicyInput),
   'desktop.bootstrap': inWorkspace,
@@ -135,6 +141,7 @@ export const desktopActionSchemas = {
   'agents.pollDevices': none,
   'agents.setDeviceEnabled': tuple(object({ deviceId: uuid, enabled: bool })),
   'agents.renameDevice': tuple(uuid, text(100).trim().min(1)),
+  'agents.setDeviceDescription': tuple(uuid, z.string().trim().max(DEVICE_DESCRIPTION_MAX)),
   'agents.removeDevice': oneId,
   'agents.listAgents': none,
   'agents.pollTaskDetail': tuple(uuid, version.optional(), object({ version: version.optional(), positions: listPositions(51).optional() }).optional()),
@@ -175,27 +182,36 @@ export const desktopActionSchemas = {
   'billing.startChatPointsPurchase': tuple(z.number().finite().positive(), bot),
   'billing.startCardVerification': inWorkspace,
   'bots.listBots': none,
-  'bots.pollBots': none,
-  'bots.createBot': tuple(object({ name: text(200).trim().min(1), color: text(50).min(1), shape: text(50).min(1), model: text(1000).nullish(), repository: text(2048).nullish() })),
-  'bots.updateBot': tuple(object({ botId: uuid, name: text(200).trim().min(1).optional(), color: text(50).min(1).optional(), shape: text(50).min(1).optional(), publicRole: text(2000).optional() })),
-  'bots.listWorkspaceBots': none,
-  'bots.getWorkspaceBotDefaults': none,
-  'automations.listAutomations': tuple(object({ cursor: text(100).optional() })),
-  'automations.getAutomation': oneId,
-  'automations.automationHistory': oneId,
-  'automations.automationUsage': tuple(object({ scheduleId: uuid, days: z.number().int().min(1).max(90).optional() })),
-  'automations.createAutomation': tuple(object({ requestId: uuid, definition: scheduleDefinition })),
-  'automations.updateAutomation': tuple(object({ scheduleId: uuid, version: positive, definition: scheduleDefinition })),
-  'automations.pauseAutomation': tuple(object({ scheduleId: uuid, version: positive })),
-  'automations.takeOverAutomation': tuple(object({ scheduleId: uuid, version: positive })),
-  'automations.automationWebhookKey': tuple(object({ scheduleId: uuid, version: positive })),
+  'bots.pollBots': inWorkspace,
+  'bots.createBot': tuple(object({ name: text(200).trim().min(1), color: text(50).min(1), shape: text(50).min(1), model: text(1000).nullish(), repository: text(2048).nullish() }), workspace),
+  'bots.updateBot': tuple(object({ botId: uuid, name: text(200).trim().min(1).optional(), color: text(50).min(1).optional(), shape: text(50).min(1).optional(), publicRole: text(2000).optional() }), workspace),
+  'bots.listWorkspaceBots': inWorkspace,
+  'bots.getWorkspaceBotDefaults': inWorkspace,
+  'automations.listAutomations': tuple(object({ cursor: text(100).optional(), deleted: z.boolean().optional() }), workspace),
+  'automations.getAutomation': tuple(uuid, workspace),
+  'automations.flushAutomationBatch': tuple(webhookBatchInput, workspace),
+  'automations.cancelAutomationBatch': tuple(webhookBatchInput, workspace),
+  'automations.automationBatches': tuple(webhookBatchListInput, workspace),
+  'automations.automationHistory': tuple(uuid, workspace),
+  'automations.automationUsage': tuple(object({ scheduleId: uuid, days: z.number().int().min(1).max(90).optional() }), workspace),
+  'automations.createAutomation': tuple(object({ requestId: uuid, definition: scheduleDefinition }), workspace),
+  'automations.updateAutomation': tuple(object({ scheduleId: uuid, version: positive, definition: scheduleDefinition }), workspace),
+  'automations.pauseAutomation': tuple(object({ scheduleId: uuid, version: positive }), workspace),
+  'automations.takeOverAutomation': tuple(object({ scheduleId: uuid, version: positive }), workspace),
+  'automations.automationWebhookKey': tuple(object({ scheduleId: uuid, version: positive }), workspace),
+  'automations.automationLinearLabels': tuple(uuid),
   'automations.automationLinearTeams': none,
-  'automations.automationSlackChannels': none,
-  'automations.pinAutomation': tuple(object({ scheduleId: uuid, pinned: z.boolean() })),
-  'automations.organizeAutomation': tuple(object({ scheduleId: uuid, folder: z.string().trim().min(1).max(60).nullable(), tags: z.array(z.string().trim().min(1).max(30)).max(10) })),
-  'automations.resumeAutomation': tuple(object({ scheduleId: uuid, version: positive })),
+  'automations.automationSlackChannels': inWorkspace,
+  'automations.automationSlackEmojis': oneId,
+  'automations.automationSlackAuthors': tuple(uuid, text(512).optional()),
+  'automations.pinAutomation': tuple(object({ scheduleId: uuid, pinned: z.boolean() }), workspace),
+  'automations.organizeAutomation': tuple(object({ scheduleId: uuid, folder: z.string().trim().min(1).max(60).nullable(), tags: z.array(z.string().trim().min(1).max(30)).max(10) }), workspace),
+  'automations.resumeAutomation': tuple(object({ scheduleId: uuid, version: positive }), workspace),
+  'automations.deleteAutomation': tuple(object({ scheduleId: uuid, version: positive }), workspace),
+  'automations.restoreAutomation': tuple(object({ scheduleId: uuid, version: positive }), workspace),
   'automations.cancelAutomation': tuple(object({ scheduleId: uuid, version: positive })),
-  'automations.runAutomationNow': tuple(object({ scheduleId: uuid, version: positive, requestId: uuid })),
+  'automations.cancelAutomationRun': tuple(object({ scheduleId: uuid, version: positive, runId: uuid }), workspace),
+  'automations.runAutomationNow': tuple(object({ scheduleId: uuid, version: positive, requestId: uuid }), workspace),
   'bots.listBotsForWorkspace': oneId,
   'collaboration.exchangeDocument': tuple(object({ id: uuid, vector: text(1_400_000).regex(/^[A-Za-z0-9+/]*={0,2}$/).optional(), update: text(1_400_000).regex(/^[A-Za-z0-9+/]*={0,2}$/).optional(), seed: text(1_400_000).regex(/^[A-Za-z0-9+/]*={0,2}$/).optional(), known: version.optional() })),
   'collaboration.listMembers': oneId,
@@ -216,7 +232,7 @@ export const desktopActionSchemas = {
   'coordinator.sendSuggestion': oneId,
   'coordinator.issueCreationAvailable': none,
   'desktop-notifications.chooseDesktopNotifications': tuple(z.array(object({ id: text(300), issueId: text(100), kind: z.enum(['awaiting', 'failed', 'finished']) })).max(20)),
-  'execution-settings.getBotModelMenu': tuple(bot),
+  'execution-settings.getBotModelMenu': tuple(bot, workspace),
   'execution-settings.refreshBotModelMenuAction': tuple(bot),
   'execution-settings.chooseBotModel': tuple(bot, text(1000).min(1)),
   'issue-metadata.getIssuePropertyOptions': oneId,
@@ -224,7 +240,7 @@ export const desktopActionSchemas = {
   'issue-operations.listIssueConnections': oneId,
   'issue-operations.updateIssueRelation': tuple(object({ id: uuid, revision: positive, targetId: uuid.nullable(), kind: z.enum(['parent', 'child', 'related', 'blockedBy', 'blocks', 'duplicate']), remove: bool.optional() })),
   'issue-operations.createLinkedIssue': tuple(object({ id: uuid, revision: positive, kind: z.enum(['child', 'duplicate']), title: text(200).optional(), includeSubissues: bool.optional() })),
-  'issue-operations.toggleIssuePreference': tuple(object({ id: uuid, kind: z.enum(['favorite', 'subscribe']) })),
+  'issue-operations.toggleIssuePreference': tuple(object({ id: uuid, kind: z.enum(['favorite', 'subscribe']), enabled: z.boolean().optional() })),
   'issue-operations.getDeletedIssue': oneId,
   'issue-operations.setIssueDeleted': tuple(object({ id: uuid, revision: positive.optional(), restore: bool.optional() })),
   'issue-prefix.getIssuePrefixState': none,
@@ -234,6 +250,8 @@ export const desktopActionSchemas = {
   'issues.listIssues': none,
   'issues.pollIssues': tuple(version.optional(), listPositions(100).optional()),
   'issues.syncIssueList': tuple(version.optional(), listPositions(100).optional()),
+  'issues.countAssignedWorkspaceTasks': oneId,
+  'issues.countWorkspaceTaskViews': oneId,
   'issues.listWorkspaceIssues': oneId,
   'issues.listWorkspaceTaskPage': tuple(taskListPageInput),
   'issues.getIssue': oneId,
@@ -247,12 +265,12 @@ export const desktopActionSchemas = {
   'issues.listIssueVersions': oneId,
   'issues.pollIssueVersionSummaries': tuple(uuid, version.optional(), listPositions(5000).optional()),
   'issues.setIssueScope': tuple(object({ id: uuid, revision: positive, scope: z.enum(['personal', 'workspace']) })),
-  'linear-sync.getLinearIntegrationState': none,
-  'linear-sync.getLinearBoardSync': none,
+  'linear-sync.getLinearIntegrationState': inWorkspace,
+  'linear-sync.getLinearBoardSync': inWorkspace,
   'linear-sync.startLinearOAuth': none,
   'linear-sync.listLinearTeamOptions': none,
-  'linear-sync.enableLinearTeam': tuple(object({ teamId: id })),
-  'linear-sync.disableLinearTeam': oneId,
+  'linear-sync.enableLinearTeam': tuple(object({ teamId: id, workspaceId: workspace })),
+  'linear-sync.disableLinearTeam': tuple(uuid, workspace),
   'linear-sync.retryLinearIssue': oneId,
   'linear-sync.retryLinearDelivery': oneId,
   'linear-sync.disconnectLinearAccount': none,
@@ -288,6 +306,7 @@ export const desktopActionSchemas = {
   'onboarding.saveOnboardingStep': tuple(object({ step: z.number().int().min(0).max(4), status: z.record(z.string().regex(/^[0-3]$/), z.enum(['done', 'skipped'])) })),
   'onboarding.setupChecklist': tuple(uuid),
   'onboarding.dismissSetupChecklist': tuple(uuid),
+  'onboarding.restoreSetupChecklist': tuple(uuid),
   'pending-actions.decidePendingAction': tuple(uuid, bool),
   'personal-policy.getSharePolicy': inWorkspace,
   'personal-policy.updateSharePolicy': tuple(bool, workspace),

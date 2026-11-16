@@ -156,7 +156,8 @@ export function BoardPage({ issues, userId, workspaceId, teamId, presentationRea
   }, [sidebar, sheet, setSidebar])
   const [prefill, setPrefill] = useState<{ text: string; nonce: number }>()
   const [newTask, setNewTask] = useState(false)
-  const { data: linear } = useSWR('linear-board-sync', () => getLinearBoardSync(), { revalidateOnFocus: false })
+  const { data: linear, mutate: refreshLinear } = useSWR(workspaceId ? ['linear-board-sync', userId, workspaceId] : null,
+    ([, , workspace]) => getLinearBoardSync(workspace), { revalidateOnFocus: false })
   // Without a connected Linear team, the button only reloads the board.
   const linearSynced = !!linear && !linear.error && linear.synced
   const { data: agents } = useSWR('agents', () => listAgents())
@@ -240,7 +241,7 @@ export function BoardPage({ issues, userId, workspaceId, teamId, presentationRea
   const activeFilters = (Object.entries(filters) as [FilterField, string[]][]).filter(([, values]) => values?.length)
 
   const discuss = (issue: Issue) => { openPanel(); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }
-  const refreshButton = <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={linearSynced ? t('synced') : t('refresh')} className={cn(linearSynced && 'text-success-foreground')} onClick={() => { void onUpdated() }} />}><RefreshCw /></TooltipTrigger><TooltipContent side="bottom">{linearSynced ? t('synced') : t('refresh')}</TooltipContent></Tooltip>
+  const refreshButton = <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={linearSynced ? t('synced') : t('refresh')} className={cn(linearSynced && 'text-success-foreground')} onClick={() => { void onUpdated(); void refreshLinear() }} />}><RefreshCw /></TooltipTrigger><TooltipContent side="bottom">{linearSynced ? t('synced') : t('refresh')}</TooltipContent></Tooltip>
   const panelButton = <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', sidebar && 'xl:hidden')} aria-expanded={sheet} aria-label={t('expand')} aria-keyshortcuts="Control+j Meta+j" onClick={openPanel} />}><PanelRightOpen data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('expand')}<ShortcutKeys keys={['mod', 'J']} /></TooltipContent></Tooltip>
   // The template's own menus (the `board` slot's BoardScreen) carry the filters and the 显示 options.
   // No tabs: the board holds every task of its workspace, and one tab that does nothing reads as a broken filter.
@@ -286,6 +287,6 @@ export function BoardPage({ issues, userId, workspaceId, teamId, presentationRea
         <CoordinatorChat compact prefill={prefill} onOpenIssue={id => { setSheet(false); onOpen(id) }} />
       </SheetContent>
     </Sheet>
-    <NewTaskDialog teamId={teamId} workspaceId={workspaceId} open={newTask} onOpenChange={setNewTask} onSent={openPanel} initialIntent="create_only" onCreated={id => { void onUpdated(); onOpen(id) }} onAdded={() => { void onUpdated() }} />
+    <NewTaskDialog readerId={userId} teamId={teamId} workspaceId={workspaceId} open={newTask} onOpenChange={setNewTask} onSent={openPanel} initialIntent="create_only" onCreated={id => { void onUpdated(); onOpen(id) }} onAdded={() => { void onUpdated() }} />
   </div>
 }

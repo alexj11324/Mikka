@@ -25,11 +25,25 @@ test('settings recovery only accepts one validated workspace and an allowed sect
   for (const value of ['/settings?section=billing&workspace=evil', `/settings?section=members&workspace=${BOT}`, `/settings?section=models&workspace=${BOT}&next=//evil.dev`, `/settings?section=models&workspace=${BOT}&workspace=${BOT}`, '/settings?section=models&workspace=', '/settings?section=models&section=billing']) assert.equal(mobileWebTarget(value), '/', value)
 })
 
+test('Organization settings requires one selected workspace and no other destination', () => {
+  assert.equal(mobileWebTarget(`/settings?section=organization&workspace=${BOT.toUpperCase()}`), `/settings?section=organization&workspace=${BOT}`)
+  for (const target of ['/settings?section=organization', `/settings?section=organization&workspace=${BOT}#fragment`,
+    `/settings?section=organization&workspace=${BOT}&workspace=${BOT}`, `/settings?section=organization&workspace=${BOT}&next=/`])
+    assert.equal(mobileWebTarget(target), '/')
+})
+
 test('Members accepts only the exact Workspace destination from mobile Settings', () => {
   assert.equal(mobileWebTarget(`/settings/members?workspace=${BOT.toUpperCase()}`), `/settings/members?workspace=${BOT}`)
   for (const target of [`/settings/members/?workspace=${BOT}`, `/settings/members?workspace=${BOT}#x`,
     `/settings/members?workspace=${BOT}&workspace=${BOT}`, `/settings/members?section=members&workspace=${BOT}`,
     '/settings/members?workspace=invalid', '/settings/members?workspace=']) assert.equal(mobileWebTarget(target), '/')
+})
+
+test('personal Files reopens only the requested workspace', () => {
+  const target = `/?section=artifacts&workspace=${BOT}`
+  assert.equal(mobileWebTarget(target), target)
+  assert.equal(mobileWebTarget('/?section=artifacts'), '/')
+  assert.equal(mobileWebTarget(target + '&workspace=' + BOT), '/')
 })
 
 test('scoped chats reject malformed, extra and repeated authority parameters', () => {

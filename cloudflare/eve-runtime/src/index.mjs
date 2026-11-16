@@ -1,6 +1,6 @@
 import { bindWorkersAi, configureWorkersAi } from '../../workers-ai/binding.mjs'
-import { Container, getContainer } from '@cloudflare/containers'
-import { hostConfiguration, nativeRequest } from '../runtime/config.mjs'
+import { Container } from '@cloudflare/containers'
+import { hostConfiguration, nativeRequest, singletonContainerName } from '../runtime/config.mjs'
 
 const stateKey = 'mikka:eve-host:lifecycle:v1'
 const unavailable = () => Response.json({ ok: false, error: 'coordinatorUnavailable' }, {
@@ -48,7 +48,7 @@ export class EveRuntime extends Container {
     try {
       const response = await super.fetch(request)
       if (response.status >= 500 && !response.headers.get('content-type')?.includes('application/json')) {
-        await response.body?.cancel()
+        if (response.body) this.ctx.waitUntil(response.body.cancel().catch(() => {}))
         return unavailable()
       }
       return response
@@ -85,8 +85,8 @@ export default {
     const forwarded = nativeRequest(request)
     if (!forwarded) return Response.json({ ok: false, error: 'notFound' }, { status: 404 })
     try {
-      const configuration = hostConfiguration(env)
-      return await getContainer(env.EVE_RUNTIME, configuration.releaseId).fetch(forwarded)
+      const { EVE_RELEASE_ID: name = singletonContainerName } = env
+      return await env.EVE_RUNTIME.getByName(name).fetch(forwarded)
     } catch {
       console.error('CF_EVE_INGRESS_UNAVAILABLE')
       return unavailable()

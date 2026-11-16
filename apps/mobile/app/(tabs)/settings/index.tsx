@@ -3,7 +3,7 @@ import { ReadNotice } from '@/components/ReadNotice'
 import { ActionSheetIOS, Linking, Platform, ScrollView, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { ArrowUpRight, Bell, BookOpen, Blocks, BriefcaseBusiness, Globe, Hand, Info } from 'lucide-react-native'
+import { ArrowUpRight, Bell, BookOpen, Blocks, BriefcaseBusiness, Folder, Globe, Hand, Info } from 'lucide-react-native'
 import { CardButton } from '@/components/cards'
 import { Spinner } from '@/components/icons'
 import { NavBar, underBar } from '@/components/NavBar'
@@ -21,7 +21,8 @@ import { versionLabel } from '@/lib/updates'
 import { colors } from '@/lib/theme'
 import { currentAccount, servers } from '@/lib/config'
 import { serverCopy } from '@/lib/server-copy'
-import { openPrivacyPolicy } from '@/lib/web'
+import { openOnWeb, openPrivacyPolicy } from '@/lib/web'
+import { mobileFilesPath, mobileOrganizationPath } from '../../../../../lib/mobile-web-target'
 import { mobileMessages as messages } from '@/lib/messages'
 
 /** A row's icon (Comma design 18): a white glyph on a colored rounded square, as in the system Settings app. */
@@ -82,6 +83,8 @@ export default function SettingsScreen() {
           </Group>
           <Group>
             <Row icon={icon('briefcase.fill', BriefcaseBusiness, '#8E8E93')} label="工作区" value={data.workspace.name} onPress={() => router.push('/settings/workspaces')} />
+            {data.organizationSettingsAvailable && <Row label={messages.MobileCore.organizationOnWeb} onPress={() => void openOnWeb(mobileOrganizationPath(data.workspace.id), { confirmAccount: true })} />}
+            {data.personalFilesAvailable && <Row icon={icon('folder.fill', Folder, '#007AFF')} label={messages.MobileCore.personalFilesOnWeb} onPress={() => void openOnWeb(mobileFilesPath(data.workspace.id), { confirmAccount: true })} />}
             {data.billingScope && <Row label={messages.Billing.management.billingEntry} onPress={() => router.push('/settings/billing')} />}
           </Group>
           <Group>

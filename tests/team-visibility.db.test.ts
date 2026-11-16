@@ -207,7 +207,7 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
     await assert.rejects(addRunMessage(member,{runId:sharedRun,text:'must not send'}))
     await assert.rejects(requestRunStop(member,sharedRun), /runNotFound/)
     assert.equal((await pool.query('select "stopRequestedAt" from agent_runs where id=$1',[sharedRun])).rows[0].stopRequestedAt,null)
-    const choices = await issuePropertyChoices(member)
+    const choices = await issuePropertyChoices(member, workspace, db)
     assert.equal(Object.hasOwn(choices, 'agents'), false, 'task properties do not list execution identities, including your own')
     assert.deepEqual(choices.labels.map(row=>row.name).sort(),['invite-label','shared-label'])
     assert.equal(await readRun(foreign,sharedRun),null)

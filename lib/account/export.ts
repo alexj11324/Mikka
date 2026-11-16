@@ -84,7 +84,7 @@ export async function buildAccountExport(userId: string, now = new Date()) {
     tasks, memory, artifacts, savedLogins, integrations, linear, telegram, repositories, devices, subscriptions,
   ] = await Promise.all([
     rows('select "providerId" as provider, "createdAt" from account where "userId" = $1 order by "createdAt"', u),
-    rows('select "pushDecide", "pushReview", "pushFinished", "pushBriefing", "pushWhen", "memoryEnabled", "updatedAt" from user_preferences where "userId" = $1', u),
+    rows('select "pushDecide", "pushReview", "pushFinished", "pushBriefing", "organizationInvitationEmails", "pushWhen", "memoryEnabled", "updatedAt" from user_preferences where "userId" = $1', u),
     rows('select "timeZone", "updatedAt" from user_time_zones where "userId" = $1', u),
     rows('select id, "workspaceId", name, color, shape, "createdAt" from bots where "ownerId" = $1 order by "createdAt"', u),
     rows('select id, name, harness, description, instructions, "createdAt" from agents where "userId" = $1 order by "createdAt"', u),

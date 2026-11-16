@@ -23,6 +23,10 @@ export type BillingManagementView = {
   resourceTargetsAvailable: boolean
   budgets: ResourceBudgetView[]
   usage: { month: string; costMicroUsd: number; reservedMicroUsd: number; unknownCalls: number; externalUnknownRuns: number;
+    /** Returned when the existing hosted usage report entitlement is active. Older servers omit this field. */
+    daily?: { date: string; costMicroUsd: number; reservedMicroUsd: number; unknownCalls: number }[]
+    /** Details are read only for the selected actor and an entitled account. */
+    memberDetail?: { id: string; models: { model: string; costMicroUsd: number; inputTokens: string; outputTokens: string; unknownCalls: number }[] }
     members: { id: string | null; name: string | null; costMicroUsd: number; unknownCalls: number }[] }
 }
 export type BillingManagementOperation = (

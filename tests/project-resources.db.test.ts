@@ -10,6 +10,7 @@ test('Project repository/environment policy on real PostgreSQL', { skip: !dbUrl 
   const { withRunProjectExecution } = await import('../lib/project-resources/run-lease')
   const { environmentConfiguration } = await import('../lib/project-resources/contracts')
   const { ActionFailureError } = await import('../lib/action-error')
+  const { registerProjectAccess } = await import('../lib/resource-access/projects')
   const { pool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
   const { tokenWorkspace } = await import('../lib/tokens/principal')
@@ -22,6 +23,7 @@ test('Project repository/environment policy on real PostgreSQL', { skip: !dbUrl 
   const projectId = randomUUID()
   await connection.query(`insert into workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)
     values($1,$2,$3,'Shared project','','','planned','none','','','','','[]',1)`, [projectId, owner, workspace.id])
+  await registerProjectAccess(owner, projectId, workspace.id)
   await seedProjectTasks(connection, projectId, [issueId])
   const repoA = 'v2/github.com/acme/application', repoB = 'v2/github.com/acme/service', repoC = 'v2/github.com/elsewhere/private'
   const request = { userId: owner, workspaceId: workspace.id, issueId, repositoryKey: repoA, baseBranch: 'main', runtime: 'local' as const, harness: 'codex' }
@@ -66,6 +68,8 @@ test('Project repository/environment policy on real PostgreSQL', { skip: !dbUrl 
     await connection.query(`insert into workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)
       values($1,$3,$4,'Repository Project A','','','planned','none','','','','','[]',1),
         ($2,$3,$4,'Repository Project B','','','planned','none','','','','','[]',1)`, [projectA, projectB, owner, workspace.id])
+    await registerProjectAccess(owner, projectA, workspace.id)
+    await registerProjectAccess(owner, projectB, workspace.id)
     await seedProjectTasks(connection, projectA, [issueA])
     await seedProjectTasks(connection, projectB, [issueB])
     const environmentA = await resources.saveEnvironment(owner, { workspaceId: workspace.id, name: 'Repository A',

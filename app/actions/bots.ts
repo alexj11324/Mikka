@@ -44,30 +44,30 @@ export async function listBotsForWorkspace(workspaceId: string): Promise<BotView
 }
 
 /** The list cache is bound to this actual authorized Owner/workspace read. */
-export async function pollBots() {
-  const { ownerId, workspaceId } = await getOwner()
-  return { items: await listOwnerBots(ownerId, workspaceId), live: { ownerId, workspaceId } }
+export async function pollBots(workspaceId?: string) {
+  const owner = await getOwner(workspaceId)
+  return { items: await listOwnerBots(owner.ownerId, owner.workspaceId), live: owner }
 }
 
 /**
  * 新建 Bot: a name, a colour and a shape. Bots run on Mikka's own harness, so there is no machine to pick.
  * `model` and `repository` default to the workspace's 新 Bot 默认值 when omitted.
  */
-export async function createBot(input: { name: string; color: string; shape: string; model?: string | null; repository?: string | null }): Promise<BotView> {
-  return createOwnedBot(await getOwner(), input)
+export async function createBot(input: { name: string; color: string; shape: string; model?: string | null; repository?: string | null }, workspaceId?: string): Promise<BotView> {
+  return createOwnedBot(await getOwner(workspaceId), input)
 }
 
 /**
  * Rename a bot or change its shape and colour, from the right panel. Same rules
  * as createBot. The Coordinator keeps its name and look (the left column draws it).
  */
-export async function updateBot(input: { botId: string; name?: string; color?: string; shape?: string; publicRole?: string }): Promise<ActionResult<BotView>> {
-  return workspaceAction(async () => updateOwnedBot(await getOwner(), input))
+export async function updateBot(input: { botId: string; name?: string; color?: string; shape?: string; publicRole?: string }, workspaceId?: string): Promise<ActionResult<BotView>> {
+  return workspaceAction(async () => updateOwnedBot(await getOwner(workspaceId), input))
 }
 
 /** 设置 › 工作区 › Bot: the defaults a new bot starts with, and the choices. Any member may read. */
-export async function getWorkspaceBotDefaults(): Promise<ActionResult<BotDefaultOptions>> {
-  return workspaceAction(async () => botDefaultOptions((await currentWorkspaceActor()).workspaceId))
+export async function getWorkspaceBotDefaults(workspaceId?: string): Promise<ActionResult<BotDefaultOptions>> {
+  return workspaceAction(async () => botDefaultOptions((await currentWorkspaceActor(workspaceId)).workspaceId))
 }
 
 /** Set or clear (null) the default model and repository for new bots. Admins only. */
@@ -79,8 +79,8 @@ export async function updateWorkspaceBotDefaults(input: { defaultModel?: string 
 }
 
 /** Every bot in the current workspace: owner, 空闲 or 运行中 · N 个线程. Any member may read. */
-export async function listWorkspaceBots(): Promise<ActionResult<{ bots: WorkspaceBotView[] }>> {
-  return workspaceAction(async () => ({ bots: await workspaceBots((await currentWorkspaceActor()).workspaceId) }))
+export async function listWorkspaceBots(workspaceId?: string): Promise<ActionResult<{ bots: WorkspaceBotView[] }>> {
+  return workspaceAction(async () => ({ bots: await workspaceBots((await currentWorkspaceActor(workspaceId)).workspaceId) }))
 }
 
 /**

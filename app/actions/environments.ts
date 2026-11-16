@@ -11,7 +11,7 @@ import { listProjectResources } from '@/lib/project-resources/store'
 import type { EnvironmentConfiguration } from '@/lib/project-resources/contracts'
 
 export type EnvironmentView = { id: string; name: string; revision: number; configuration: EnvironmentConfiguration; archived: boolean }
-export type EnvironmentProject = { id: string; name: string; revision: number; environmentId: string | null }
+export type EnvironmentProject = { id: string; name: string; revision: number; environmentId: string | null; canEditProperties: boolean }
 export type EnvironmentsView = { environments: EnvironmentView[]; projects: EnvironmentProject[]; canManage: boolean }
 
 /** The editor and admission use the same Workspace environments and Project bindings. */
@@ -34,7 +34,7 @@ export async function listEnvironments(workspaceId?: string): Promise<Environmen
       .where(and(eq(workspaceMembers.workspaceId, context.workspace.id), eq(workspaceMembers.userId, user.id), eq(workspaceMembers.status, 'active')))
     return {
       environments: resources.environments.map(({ id, name, revision, configuration, archivedAt }) => ({ id, name, revision, configuration, archived: Boolean(archivedAt) })),
-      projects: projects.filter(project => !project.archivedAt).map(({ id, name, revision }) => ({ id, name, revision, environmentId: defaults.get(id) ?? null })),
+      projects: projects.filter(project => !project.archivedAt).map(({ id, name, revision, canEditProperties }) => ({ id, name, revision, canEditProperties, environmentId: defaults.get(id) ?? null })),
       canManage: member?.role === 'admin',
     }
   })

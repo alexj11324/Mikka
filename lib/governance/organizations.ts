@@ -1,6 +1,6 @@
 import 'server-only'
 import { randomUUID } from 'node:crypto'
-import { and, asc, desc, eq, isNotNull, isNull, inArray, or } from 'drizzle-orm'
+import { and, asc, desc, eq, isNotNull, isNull, inArray, or, getTableColumns } from 'drizzle-orm'
 import { z } from 'zod'
 import { organizationAuditEvents, organizationBillingAccounts, organizationEntitlements, organizationInvitations, organizationMembers, organizations, organizationWorkspaces } from '@/lib/db/governance-schema'
 import { requireWorkspace, type WorkspaceTransaction } from '@/lib/workspace-access'
@@ -9,16 +9,19 @@ import { invalidateTaskWorkspaceOrganization } from '@/lib/task-workspace'
 import { enqueueOrganizationAudit } from './audit'
 import { activeHumanSeats, lockWorkspaceEntitlements } from './entitlements'
 import { GovernanceError } from './errors'
+import { parseWorkspaceIcon } from '@/lib/workspace-admin/icon'
 import { assertOrganizationAccountWritable, assertOtherActiveOrganizationOwner } from './organization-ownership'
 import { pool } from '@/lib/db'
 import { workspaceMembers, workspaces } from '@/lib/db/workspace-schema'
 import { enqueueMemberLifecycle, drainMemberLifecycleOutbox } from './member-outbox'
 import { fenceWorkspaceLive, markWorkspaceLiveBinding, retireWorkspaceLiveBinding } from '../enterprise/live-authority'
 
-export async function requireOrganizationAdmin(tx: WorkspaceTransaction, organizationId: string, userId: string, includeArchived = false) {
+const { icon: organizationIcon, ...organizationIdentity } = getTableColumns(organizations)
+
+export async function requireOrganizationAdmin(tx: WorkspaceTransaction, organizationId: string, userId: string, includeArchived = false, withIcon = false) {
   z.uuid().parse(organizationId)
   // The organization row serializes ownership edits; callers touching a workspace lock it first.
-  const [organization] = await tx.select().from(organizations).where(eq(organizations.id, organizationId)).for('update').limit(1)
+  const [organization] = await tx.select({ ...organizationIdentity, ...(withIcon ? { icon: organizationIcon } : {}) }).from(organizations).where(eq(organizations.id, organizationId)).for('update').limit(1)
   const [membership] = await tx.select().from(organizationMembers).where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, userId), eq(organizationMembers.status, 'active'))).limit(1)
   if (!organization || (!includeArchived && organization.archivedAt) || !membership || membership.role === 'member') throw new GovernanceError('access_denied')
   return { organization, membership }
@@ -29,10 +32,11 @@ export async function getOrganizationWorkspaceIds(tx: WorkspaceTransaction, orga
   return rows.map(row => row.workspaceId)
 }
 
-export async function listOrganizations(userId: string) {
+export async function listOrganizations(userId: string, organizationId?: string) {
   return workspaceDb.select({ id: organizations.id, name: organizations.name, role: organizationMembers.role }).from(organizations)
     .innerJoin(organizationMembers, eq(organizationMembers.organizationId, organizations.id))
-    .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.status, 'active'), isNull(organizations.archivedAt))).orderBy(asc(organizations.createdAt))
+    .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.status, 'active'), isNull(organizations.archivedAt),
+      organizationId === undefined ? undefined : eq(organizations.id, organizationId))).orderBy(asc(organizations.createdAt))
 }
 
 /** Only a current owner may see the retained name after archiving. */
@@ -57,10 +61,30 @@ export async function createOrganization(user: { id: string; name: string; email
   })
 }
 
+async function organizationMemberRows(tx: WorkspaceTransaction, organizationId: string, includeDisabled: boolean) {
+  const members = await tx.select().from(organizationMembers).where(and(
+    eq(organizationMembers.organizationId, organizationId),
+    includeDisabled ? undefined : eq(organizationMembers.status, 'active'),
+  )).orderBy(asc(organizationMembers.createdAt), asc(organizationMembers.userId))
+  // Auth profiles live in the application database. Restrict the lookup to this authorized roster.
+  const ids = members.map(member => member.userId)
+  const pictures = ids.length ? (await pool.query<{ id: string; image: string | null }>(
+    'select id, image from "user" where id=any($1::text[])', [ids])).rows : []
+  const images = new Map(pictures.map(profile => [profile.id, profile.image]))
+  return members.map(member => ({ ...member, image: images.get(member.userId) ?? null }))
+}
+
+export async function listOrganizationMembers(organizationId: string, actorId: string, includeDisabled: boolean) {
+  return workspaceDb.transaction(async tx => {
+    await requireOrganizationAdmin(tx, organizationId, actorId)
+    return { members: await organizationMemberRows(tx, organizationId, includeDisabled) }
+  })
+}
+
 export async function organizationSummary(organizationId: string, userId: string) {
   return workspaceDb.transaction(async tx => {
-    const { organization, membership } = await requireOrganizationAdmin(tx, organizationId, userId)
-    const members = await tx.select().from(organizationMembers).where(eq(organizationMembers.organizationId, organizationId)).orderBy(asc(organizationMembers.createdAt))
+    const { organization, membership } = await requireOrganizationAdmin(tx, organizationId, userId, false, true)
+    const members = await organizationMemberRows(tx, organizationId, true)
     const workspaces = await getOrganizationWorkspaceIds(tx, organizationId)
     const activeHumans = (await activeHumanSeats(tx, workspaces[0] ?? organizationId, organizationId)).length
     const audit = await tx.select().from(organizationAuditEvents).where(eq(organizationAuditEvents.organizationId, organizationId)).orderBy(desc(organizationAuditEvents.createdAt)).limit(100)
@@ -112,6 +136,7 @@ export async function updateOrganizationMember(organizationId: string, actorId: 
     const [member] = await tx.select().from(organizationMembers).where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, userId))).limit(1)
     if (!member) throw new GovernanceError('not_found')
     if ((member.role === 'owner' || role === 'owner') && actor.membership.role !== 'owner') throw new GovernanceError('access_denied')
+    if (member.role === role) return
     if (member.role === 'owner' && member.status === 'active' && role !== 'owner') {
       await assertOtherActiveOrganizationOwner(tx, organizationId, userId)
     }
@@ -120,14 +145,32 @@ export async function updateOrganizationMember(organizationId: string, actorId: 
   })
 }
 
-export async function renameOrganization(organizationId: string, actorId: string, input: unknown) {
-  const { name } = z.object({ name: z.string().trim().min(1).max(120) }).strict().parse(input)
+const organizationProfile = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+  icon: z.string().nullable().optional(),
+}).strict().refine(input => input.name !== undefined || input.icon !== undefined)
+
+export async function updateOrganizationProfile(organizationId: string, actorId: string, input: unknown) {
+  const { name, icon } = organizationProfile.parse(input)
+  const parsedIcon = icon === undefined ? undefined : parseWorkspaceIcon(icon)
+  if (parsedIcon === false) throw new GovernanceError('invalid_request')
   return workspaceDb.transaction(async tx => {
-    await requireOrganizationAdmin(tx, organizationId, actorId)
-    const [organization] = await tx.update(organizations).set({ name, updatedAt: new Date() }).where(eq(organizations.id, organizationId)).returning()
-    await enqueueOrganizationAudit(tx, { organizationId, actorId, action: 'organization.renamed', targetId: organizationId })
+    const { organization: current } = await requireOrganizationAdmin(tx, organizationId, actorId, false, true)
+    const rename = name !== undefined && name !== current.name
+    const changeIcon = parsedIcon !== undefined && parsedIcon !== current.icon
+    if (!rename && !changeIcon) return { organization: current }
+    const [organization] = await tx.update(organizations).set({ name, icon: parsedIcon, updatedAt: new Date() })
+      .where(eq(organizations.id, organizationId)).returning()
+    if (rename) await enqueueOrganizationAudit(tx, { organizationId, actorId, action: 'organization.renamed', targetId: organizationId })
+    if (changeIcon) await enqueueOrganizationAudit(tx, { organizationId, actorId, action: 'organization.icon_changed', targetId: organizationId })
     return { organization }
   })
+}
+
+/** Existing callers update only the organization's name. */
+export async function renameOrganization(organizationId: string, actorId: string, input: unknown) {
+  const { name } = z.object({ name: z.string() }).strict().parse(input)
+  return updateOrganizationProfile(organizationId, actorId, { name })
 }
 
 /** Existing accounts are explicitly selected by ID; neither an email match nor an Org role grants workspace access. */

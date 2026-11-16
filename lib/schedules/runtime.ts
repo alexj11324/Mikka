@@ -15,7 +15,11 @@ const guard: WorkspaceGuard = async(owner,workspace,work)=>{
     await tx.query('BEGIN')
     const member=await tx.query<{role:'owner'|'admin'|'member'}>(`SELECT role FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status='active' FOR SHARE`,[workspace,owner])
     if(!member.rowCount)throw new ScheduleError('scheduleWorkspaceAccessDenied',403)
-    const value=await work({role:member.rows[0].role});await tx.query('COMMIT');return value
+    const requireActiveMember=async(userId:string)=>{
+      const found=await tx.query(`SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status='active' FOR SHARE`,[workspace,userId])
+      if(!found.rowCount)throw new ScheduleError('scheduleWorkspaceAccessDenied',403)
+    }
+    const value=await work({role:member.rows[0].role,requireActiveMember});await tx.query('COMMIT');return value
   }catch(error){await tx.query('ROLLBACK');throw error}finally{tx.release()}
 }
 /** The Bot a dispatch_task hands its request to: the named Bot, or the creator's Coordinator in that workspace. */
@@ -125,7 +129,7 @@ export async function scheduleActor(ownerId:string,botId:string|null,sourceEvent
   return {ownerId,botId,workspaceId:row?.workspaceId??null,...(sourceEventId?{sourceEventId}:{}),...(direct?{direct}:{})}
 }
 /** A committed create, update, resume or 立即运行 can move the next due time earlier: the schedules timer re-reads it (#1212). */
-const MOVES_DUE=new Set(['create','update','resume','run_now'])
+const MOVES_DUE=new Set(['create','update','resume','restore','run_now','flush_batch'])
 /**
  * The one writer. A chat command names the person's message (`sourceEventId`); the 自动化 page passes `{ direct: true }`
  * from a server action that authenticated the person, with the workspace's Coordinator as the chat that gets the reports.

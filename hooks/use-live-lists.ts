@@ -129,7 +129,7 @@ export function useLiveGroupList(ownerId: string, workspaceId: string | null, en
 export function useLiveBotRoster(ownerId: string, workspaceId: string | undefined, paused = false) {
   const key = workspaceId ? botListKey(ownerId, workspaceId) : null
   const result = useSWR(key, snapshotReadFetcher(() => observeListRead(async () => {
-    const next = await pollBots()
+    const next = await pollBots(workspaceId)
     if (next.live.ownerId !== ownerId) throw new ListReadScopeError('owner')
     if (next.live.workspaceId !== workspaceId) throw new ListReadScopeError('workspace')
     return next

@@ -22,7 +22,7 @@ import { db } from '@/lib/db'
 import { agents, issues, issueDocuments, issueVersions, issueMembers, users } from '@/lib/db/schema'
 import { requireIssueAccess, requireIssueAccessWithoutBody, requireUser } from '@/lib/issue-access'
 import { checklistView, issueAttrsContent, issueChecklistChecked, issueChecklistTotal } from '@/lib/issue-summary-columns'
-import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
+import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES, type IssueStatus } from '@/lib/issue-meta'
 import type { JSONContent } from '@tiptap/react'
 import { blockFlagSchema, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import type { BlockFlag } from '@/lib/task-blocked'
@@ -110,15 +110,48 @@ export async function listWorkspaceIssues(workspaceId: string) {
   return (await readIssues(workspaceId)).items!
 }
 
+/** Count the current reader's human assignments across the full authorized collection. */
+export async function countAssignedWorkspaceTasks(workspaceId: string) {
+  z.uuid().parse(workspaceId)
+  const user = await requireUser()
+  return withTaskWorkspace(user, workspaceId, async () => {
+    const assignee = sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->'assignee'`
+    const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(issues).where(and(
+      issueVisibilityPredicate(user.id, { allowedIds: [], workspaceIds: [workspaceId] }),
+      sql`${assignee}->>'kind' = 'member' and ${assignee}->>'id' = ${user.id}`,
+    ))
+    return { count: row.count }
+  })
+}
+
+/** Views belongs to the selected workspace. Its totals span the same visible
+ * Tasks as the paginated list, including those the client has not loaded. */
+export async function countWorkspaceTaskViews(workspaceId: string) {
+  z.uuid().parse(workspaceId)
+  const user = await requireUser()
+  if (await effectiveRequestWorkspace(user) !== workspaceId) throw new ActionFailureError('workspaceAccessDenied')
+  return withTaskWorkspace(user, workspaceId, async () => {
+    const metadata = sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')`
+    const statusCount = (status: IssueStatus) => sql<number>`count(*) filter (where ${issues.status} = ${status})::int`
+    const statuses = Object.fromEntries(ISSUE_STATUS_CODES.map(status => [status, statusCount(status)])) as Record<IssueStatus, ReturnType<typeof statusCount>>
+    const [counts] = await db.select({
+      ...statuses,
+      favorites: sql<number>`count(*) filter (where ${metadata}->'favoriteUserIds' @> jsonb_build_array(${user.id}::text))::int`,
+      following: sql<number>`count(*) filter (where ${metadata}->'subscriberUserIds' @> jsonb_build_array(${user.id}::text))::int`,
+    }).from(issues).where(issueVisibilityPredicate(user.id, { allowedIds: [], workspaceIds: [workspaceId] }))
+    return counts
+  })
+}
+
 async function readIssues(workspaceId?: string, known?: string, previous?: ListPosition[]) {
   return withDatabaseOperation('/actions/issues/poll', () => readIssueSnapshot(workspaceId, known, previous))
 }
 
 export async function listWorkspaceTaskPage(input: TaskListPageInput) {
-  const { workspaceId, after, dispatchedBy, projectId, teamId } = taskListPageInput.parse(input)
+  const { workspaceId, after, ...filters } = taskListPageInput.parse(input)
   if (await effectiveRequestWorkspace(await requireUser()) !== workspaceId) throw new ActionFailureError('workspaceAccessDenied')
   try {
-    const snapshot = await withDatabaseOperation('/actions/issues/page', () => readIssueSnapshot(workspaceId, undefined, undefined, after, dispatchedBy, projectId, teamId))
+    const snapshot = await withDatabaseOperation('/actions/issues/page', () => readIssueSnapshot(workspaceId, undefined, undefined, after, filters))
     const items = snapshot.items ?? []
     return { workspaceId, items, next: nextTaskListCursor(items), reset: false }
   } catch (error) {
@@ -127,7 +160,8 @@ export async function listWorkspaceTaskPage(input: TaskListPageInput) {
   }
 }
 
-async function readIssueSnapshot(workspaceId?: string, known?: string, previous?: ListPosition[], after?: TaskListPageInput['after'], dispatchedBy?: string, projectId?: string, teamId?: string) {
+async function readIssueSnapshot(workspaceId?: string, known?: string, previous?: ListPosition[], after?: TaskListPageInput['after'], filters: Omit<TaskListPageInput, 'workspaceId' | 'after'> = {}) {
+  const { dispatchedBy, projectId, teamId, parentId } = filters
   const userId = await getUserId()
   const context = await loadWorkspaceContext(workspaceId)
   // Before the list: the selected workspace's key and the home's key, both of which this list listens to.
@@ -172,18 +206,27 @@ async function readIssueSnapshot(workspaceId?: string, known?: string, previous?
   if (teamId && !teams.some(team => team.id === teamId)) throw new ActionFailureError('teamNotFound')
   const teamIssueIds = teamId ? visibility.links.filter(link => link.teamId === teamId && link.workspaceId === context.workspace.id).map(link => link.issueId) : null
   const inTeam = teamIssueIds ? inArray(issues.id, teamIssueIds) : undefined
+  // A relation belongs to the originator's tree. A retained parent UUID does
+  // not grant access after the parent is deleted, moved or made private.
+  const readParent = parentId ? db.select({ owner: issues.userId }).from(issues)
+    .where(and(visibility.predicate, eq(issues.id, parentId))).limit(1) : undefined
+  if (readParent && !(await readParent).length) throw new ActionFailureError('issueNotFound')
+  const inParent = parentId && readParent ? and(
+    sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'parentId' = ${parentId}`,
+    sql`${issues.userId} = (${readParent})`,
+  ) : undefined
   let continuation
   if (after) {
     // JavaScript timestamps carry milliseconds; PostgreSQL orders the exact
     // microsecond and UUID. Re-read the visible anchor before continuing.
     const [anchor] = await db.select({ time: sql<string>`${issues.updatedAt}::text` }).from(issues)
       .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-      .where(and(visibility.predicate, dispatched, inProject, inTeam, eq(issues.id, after.id), eq(issues.workspaceId, context.workspace.id),
+      .where(and(visibility.predicate, dispatched, inProject, inTeam, inParent, eq(issues.id, after.id), eq(issues.workspaceId, context.workspace.id),
         sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).limit(1)
     if (!anchor || new Date(anchor.time).getTime() !== Date.parse(after.updatedAt)) throw new ActionFailureError('issueStale')
     continuation = sql`(${issues.updatedAt}, ${issues.id}) < (${anchor.time}::timestamptz, ${after.id}::uuid)`
   }
-  const candidates = db.select({ id: issues.id, ownerId: issues.userId, issuedIdentifier: issues.issuedIdentifier, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issueAttrsContent.as('content'), checklistTotal: issueChecklistTotal.as('checklistTotal'), checklistChecked: issueChecklistChecked.as('checklistChecked'), status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, dispatched, inProject, inTeam, continuation, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt), desc(issues.id)).limit(TASK_LIST_PAGE_SIZE).as('task_list')
+  const candidates = db.select({ id: issues.id, ownerId: issues.userId, issuedIdentifier: issues.issuedIdentifier, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issueAttrsContent.as('content'), checklistTotal: issueChecklistTotal.as('checklistTotal'), checklistChecked: issueChecklistChecked.as('checklistChecked'), status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, dispatched, inProject, inTeam, inParent, continuation, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt), desc(issues.id)).limit(TASK_LIST_PAGE_SIZE).as('task_list')
   // Issued identifiers are part of the Task row and do not follow Team,
   // personal-prefix or provider renames. Current human profile changes still
   // invalidate responsibility without rewriting historical Task metadata.

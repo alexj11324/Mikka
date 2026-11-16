@@ -43,6 +43,60 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
     await pool.query('insert into mikka_workspaces (id,"userId",name,kind) values ($1,$2,\'Workspace ACL fixture\',\'team\')', [id, owner.id])
     for (const [user, role] of [[owner, 'admin'], [member, 'member']] as const) await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role) values ($1,$2,$3,$4,$5)', [id, user.id, user.name, user.email, role])
   }
+  await t.test('the Organization directory filters suspended members and retains the full administrative summary', async () => {
+    const directory = (userId: string, includeDisabled: boolean) => org.listOrganizationMembers(organizationId, userId, includeDisabled)
+    for (const actor of [member, outsider]) await assert.rejects(directory(actor.id, true), /access_denied/)
+    await pool.query("update mikka_organization_members set status='suspended' where \"organizationId\"=$1 and \"userId\"=$2", [organizationId, member.id])
+    await pool.query('update "user" set image=$2 where id=$1', [owner.id, '/avatars/green.webp'])
+    try {
+      const active = await directory(admin.id, false)
+      assert.deepEqual(active.members.map(row => row.userId).sort(), [owner.id, admin.id].sort())
+      assert.equal(active.members.find(row => row.userId === owner.id)?.image, '/avatars/green.webp')
+      assert.equal(active.members.find(row => row.userId === admin.id)?.image, null)
+      const all = await directory(owner.id, true)
+      assert.equal(all.members.find(row => row.userId === member.id)?.status, 'suspended')
+      assert.deepEqual(all.members, (await org.organizationSummary(organizationId, owner.id)).members)
+    } finally {
+      await pool.query("update mikka_organization_members set status='active' where \"organizationId\"=$1 and \"userId\"=$2", [organizationId, member.id])
+    }
+  })
+  await t.test('concurrent and repeated role saves only audit effective changes after checking authority', async () => {
+    const setRole = (actorId: string, role: 'admin' | 'member') =>
+      org.updateOrganizationMember(organizationId, actorId, { userId: member.id, role })
+    const read = async () => {
+      const { rows } = await pool.query<{ role: string; stamp: string; changes: number }>(
+        `select m.role, m."updatedAt"::text as stamp,
+            (select count(*)::int from mikka_organization_audit_events a where a."organizationId"=m."organizationId"
+              and a."targetId"=m."userId" and a.action='organization.member_changed') as changes
+          from mikka_organization_members m where m."organizationId"=$1 and m."userId"=$2`, [organizationId, member.id])
+      return rows[0]!
+    }
+    const before = await read()
+    await assert.rejects(setRole(member.id, 'member'), /access_denied/)
+    await Promise.all([setRole(owner.id, 'admin'), setRole(owner.id, 'admin')])
+    const changed = await read()
+    assert.equal(changed.role, 'admin')
+    assert.equal(changed.changes, before.changes + 1)
+    await setRole(owner.id, 'admin')
+    assert.deepEqual(await read(), changed)
+    await setRole(owner.id, 'member')
+  })
+  await t.test('Organization administrators can set and clear a bounded icon without changing Workspace identity or adding duplicate audits', async () => {
+    const icon = 'data:image/png;base64,iVBORw0KGgo='
+    const profile = (actor: string, input: unknown) => org.updateOrganizationProfile(organizationId, actor, input)
+    assert.equal((await org.organizationSummary(organizationId, owner.id)).organization.icon, null)
+    for (const denied of [member, outsider]) await assert.rejects(profile(denied.id, { icon }), /access_denied/)
+    await assert.rejects(profile(owner.id, { icon: 'https://example.invalid/image.png' }), /invalid_request/)
+    await assert.rejects(profile(owner.id, { icon: 'data:image/png;base64,AA==' }), /invalid_request/)
+    assert.equal((await profile(admin.id, { icon })).organization.icon, icon)
+    assert.equal((await profile(owner.id, { icon })).organization.icon, icon)
+    assert.equal((await org.organizationSummary(organizationId, admin.id)).organization.icon, icon)
+    assert.equal((await profile(owner.id, { icon: null })).organization.icon, null)
+    assert.equal((await profile(owner.id, { icon: null })).organization.icon, null)
+    const audits = await pool.query('SELECT metadata FROM mikka_organization_audit_events WHERE "organizationId"=$1 AND action=$2', [organizationId, 'organization.icon_changed'])
+    assert.deepEqual(audits.rows, [{ metadata: {} }, { metadata: {} }])
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM mikka_workspaces WHERE id=ANY($1::uuid[]) AND icon IS NOT NULL', [[wsA,wsB,unrelated]])).rows[0].n, 0)
+  })
   await t.test('Org roles cannot grant Workspace access or elevate other owners', async () => {
     await assert.rejects(org.renameOrganization(organizationId, member.id, { name: 'Unauthorized' }))
     await assert.rejects(org.addOrganizationMember(organizationId, admin.id, { userId: outsider.id, role: 'owner' }))
@@ -60,6 +114,12 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
     await assert.rejects(org.archiveOrganization(organizationId, owner.id), error => (error as { detail?: string }).detail === 'workspace_attached')
   })
   const policy = { modelCredentialSharing: 'approval_required', mcpSharing: 'approval_required', allowedModelProviders: null, auditRetentionDays: null, legalHold: false } as const
+  await t.test('the organization machine catalog membership filter admits active members only for a named live organization', async () => {
+    assert.deepEqual((await org.listOrganizations(member.id, organizationId)).map(row => row.id), [organizationId])
+    assert.deepEqual(await org.listOrganizations(outsider.id, organizationId), [])
+    assert.deepEqual(await org.listOrganizations(member.id, randomUUID()), [])
+  })
+
   await t.test('operator Enterprise grants serialize expected-plan changes and preserve historical seat metadata without payments', async () => {
     const grant = { organizationId, expectedPlan: 'free', plan: 'enterprise', source: 'cloud', seatLimit: 2,
       expiresAt: new Date(Date.now() + 3600_000).toISOString(), reason: 'evaluation', operator: 'enterprise-fixture' }
@@ -190,8 +250,19 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
     await assert.rejects(workspaceDb.transaction(tx => requireWorkspace(tx, wsA, admin.id)))
     await decideOrganizationResourceApproval(organizationId, admin.id, { id: approval.id, status: 'denied' })
     assert.equal(await organizationResourceAllowed(wsA, 'subscription', member.id, member.id), false)
+    const prior = (await pool.query('select "updatedAt", "decidedBy" from mikka_organization_resource_approvals where id=$1', [approval.id])).rows[0]
+    const outboxCount = async () => (await pool.query('select count(*)::int as count from mikka_organization_policy_outbox where "organizationId"=$1', [organizationId])).rows[0].count
+    const before = await outboxCount()
+    await Promise.all([admin, owner].map(actor => decideOrganizationResourceApproval(organizationId, actor.id, { id: approval.id, status: 'denied' })))
+    assert.equal(await outboxCount(), before)
+    assert.deepEqual((await pool.query('select "updatedAt", "decidedBy" from mikka_organization_resource_approvals where id=$1', [approval.id])).rows[0], prior)
     await requestOrganizationResourceApproval(organizationId, member.id, { workspaceId: wsA, kind: 'subscription', resourceId: member.id })
     assert.equal(await organizationResourceAllowed(wsA, 'subscription', member.id, member.id), false, 'replay cannot erase a denial')
+    const events = await pool.query('select action,count(*)::int as count from mikka_organization_audit_events where "targetId"=$1 group by action order by action', [approval.id])
+    assert.deepEqual(events.rows, [
+      { action: 'organization.resource_decided', count: 2 },
+      { action: 'organization.resource_requested', count: 1 },
+    ])
   })
   await t.test('a member can request approval for their own installed Skill and an administrator can decide it', async () => {
     const skillId = randomUUID()

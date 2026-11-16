@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
 import { actAs } from '@/lib/acting-user'
 import { ActionFailureError } from '@/lib/action-error'
@@ -5,7 +6,7 @@ import { withTaskWorkspace } from '@/lib/task-workspace'
 import { WorkspaceError } from '@/lib/workspace-error'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { nextTaskListCursor, taskListPageInput } from '@/lib/task-list-page'
-import { pollIssues, listWorkspaceIssues, listWorkspaceTaskPage } from '@/app/actions/issues'
+import { countAssignedWorkspaceTasks, pollIssues, listWorkspaceIssues, listWorkspaceTaskPage } from '@/app/actions/issues'
 import { json, mobileUser, unauthorized } from '@/lib/mobile-api'
 import { boardBlocks } from '@/components/blocks/kanban-board-1/components/data'
 import { newestTaskRuns, taskScheduleLabels } from '@/lib/task-block-runs'
@@ -24,10 +25,17 @@ async function handleGET(request: Request) {
       const tokenWorkspaceId = (user as typeof user & { [tokenWorkspace]?: string })[tokenWorkspace]
       // Keep the selected workspace already resolved by the existing list read; no extra context query.
       const params = new URL(request.url).searchParams
+      if (params.has('count')) {
+        const workspace = params.get('workspaceId')
+        if (params.get('count') !== 'assigned' || !workspace || !z.uuid().safeParse(workspace).success
+          || [...params.keys()].some(key => key !== 'workspaceId' && key !== 'count')) return json({ error: 'invalidRequest' }, 400)
+        return json(await countAssignedWorkspaceTasks(workspace))
+      }
       const continuation = params.has('after') || params.has('updatedAt')
       const dispatchedBy = params.get('dispatchedBy')
-      const page = continuation || dispatchedBy !== null ? taskListPageInput.safeParse({ workspaceId: params.get('workspaceId'),
-        ...(dispatchedBy !== null ? { dispatchedBy } : {}), after: continuation ? { id: params.get('after'), updatedAt: params.get('updatedAt') } : null }) : null
+      const parentId = params.get('parentId')
+      const page = continuation || dispatchedBy !== null || parentId !== null ? taskListPageInput.safeParse({ workspaceId: params.get('workspaceId'),
+        ...(dispatchedBy !== null ? { dispatchedBy } : {}), ...(parentId !== null ? { parentId } : {}), after: continuation ? { id: params.get('after'), updatedAt: params.get('updatedAt') } : null }) : null
       if (page && !page.success) return json({ error: 'validationGeneric' }, 400)
       const nextPage = page?.success ? await listWorkspaceTaskPage(page.data) : null
       if (nextPage?.reset) return json({ error: 'issueStale' }, 409)
@@ -62,6 +70,7 @@ async function handleGET(request: Request) {
       })
     })
   } catch (error) {
+    if (error instanceof ActionFailureError && error.code === 'issueNotFound') return json({ error: 'issueNotFound' }, 404)
     if (error instanceof ActionFailureError && error.code === 'issueStale') return json({ error: 'issueStale' }, 409)
     if (error instanceof WorkspaceError || (error instanceof ActionFailureError && error.code === 'workspaceAccessDenied'))
       return json({ error: 'workspaceAccessDenied' }, 403)
