@@ -33,6 +33,7 @@ const ORGANIZATION_DOMAIN = new RegExp(`^/api/organizations/${UUID}/allowed-doma
 const ORGANIZATION_JOIN = new RegExp(`^/api/organizations/${UUID}/join-by-domain$`)
 const ORGANIZATION_KEY = new RegExp(`^/api/organizations/${UUID}/api-keys/${UUID}$`)
 const WORKSPACE_GOVERNANCE = new RegExp(`^/api/workspaces/${UUID}/governance$`)
+const ORGANIZATION_MEMBERS = new RegExp(`^/api/organizations/${UUID}/members$`)
 const ORGANIZATION_INVITATIONS = new RegExp(`^/api/organizations/${UUID}/invitations$`)
 const SERVICE_IDENTITY_DIRECTORY = `/api/workspaces/${UUID}/service-identities`
 const SERVICE_IDENTITY_ROUTES: ReadonlyArray<readonly [RegExp, string]> = [
@@ -102,6 +103,7 @@ export function allowedApiPath(path: string, method: string): boolean {
   if (ORGANIZATION_DOMAIN.test(path)) return method === 'DELETE'
   if (ORGANIZATION_JOIN.test(path)) return method === 'POST'
   if (ORGANIZATION_KEY.test(path)) return method === 'PATCH'
+  if (ORGANIZATION_MEMBERS.test(path)) return method === 'POST' || method === 'PATCH' || method === 'DELETE'
   if (ORGANIZATION_INVITATIONS.test(path)) return method === 'GET' || method === 'POST' || method === 'DELETE'
   if (path === '/api/organization-invitations/accept') return method === 'POST'
   // Viewer grants are capabilities and must be obtained through owner-bound IPC.
