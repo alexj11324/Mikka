@@ -38,7 +38,7 @@ test('billing management HTTP preserves independent tenants, owners and immutabl
     { method, headers: { ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...headers }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) })
   const get = (id = first.id, headers?: Record<string, string>, query = '') => workspace.GET(request('workspace', id, 'GET', undefined, headers, query), { params: Promise.resolve({ workspaceId: id }) })
   const post = (body: unknown, id = first.id, headers?: Record<string, string>) => workspace.POST(request('workspace', id, 'POST', body, headers), { params: Promise.resolve({ workspaceId: id }) })
-  const orgGet = (id = organizationId, headers?: Record<string, string>) => organization.GET(request('organization', id, 'GET', undefined, headers), { params: Promise.resolve({ organizationId: id }) })
+  const orgGet = (id = organizationId, headers?: Record<string, string>, query = '') => organization.GET(request('organization', id, 'GET', undefined, headers, query), { params: Promise.resolve({ organizationId: id }) })
   const orgPost = (body: unknown) => organization.POST(request('organization', organizationId, 'POST', body), { params: Promise.resolve({ organizationId }) })
   t.after(async () => {
     actor = null
@@ -117,6 +117,8 @@ test('billing management HTTP preserves independent tenants, owners and immutabl
     assert.deepEqual([row.spentPoints, row.reservedPoints, row.remainingPoints, row.thresholdReached, row.exhausted], [250, 40, 10, true, false])
     assert.deepEqual([view.usage.costMicroUsd, view.usage.reservedMicroUsd, view.usage.unknownCalls], [2500000, 400000, 1])
     assert.equal(view.usage.daily, undefined)
+    const freeDetail = await (await orgGet(organizationId, {}, `?usageMember=${member}`)).json() as BillingManagementView
+    assert.equal(freeDetail.usage.memberDetail, undefined)
     assert.equal((await post({ action: 'budget', workspaceId: first.id, budget: { ...budget, limitPoints: 0 } })).status, 200)
     assert.equal((await (await get()).json()).budgets[0].exhausted, true)
     assert.equal((await post({ action: 'budget', workspaceId: first.id, budget: { ...budget, scopeId: outsider } })).status, 403)
@@ -157,6 +159,19 @@ test('billing management HTTP preserves independent tenants, owners and immutabl
     assert.ok(view.usage.daily?.some(row => row.date !== day && row.costMicroUsd === 0 && row.reservedMicroUsd === 0 && row.unknownCalls === 0))
     assert.equal(view.billing?.entitlementPlan, 'free')
     assert.equal(view.billing?.live, false)
+  })
+
+  await t.test('entitled organization finance reads settled model usage only for the selected member and payer', async () => {
+    actor = owner
+    const detail = async (memberId: string) => (await (await orgGet(organizationId, {}, `?usageMember=${encodeURIComponent(memberId)}`)).json()) as BillingManagementView
+    const usage = (await detail(member)).usage
+    assert.deepEqual(usage.memberDetail, { id: member,
+      models: [{ model: 'synthetic-platform', costMicroUsd: 2500000, inputTokens: '0', outputTokens: '0', unknownCalls: 0 }] })
+    assert.equal(usage.reservedMicroUsd, 400000)
+    assert.deepEqual((await detail(outsider)).usage.memberDetail, { id: outsider, models: [] })
+    assert.equal(((await (await orgGet()).json()) as BillingManagementView).usage.memberDetail, undefined)
+    actor = member
+    assert.equal((await orgGet(organizationId, {}, `?usageMember=${member}`)).status, 403)
   })
 
   await t.test('organization cost attribution ranks confirmed spend and resolves ties consistently', async () => {
