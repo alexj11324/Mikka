@@ -31,6 +31,17 @@ export const projectVisibilityDefault = z.strictObject({
 })
 export type ProjectVisibilityDefault = z.infer<typeof projectVisibilityDefault>
 
+export const personalProjectSelection = z.object({
+  organizationId: z.uuid().nullable(),
+  projectId: z.uuid().nullable(),
+  revision: z.number().int().nonnegative(),
+  projects: z.array(z.object({ id: z.uuid(), name: z.string() })),
+})
+export const changePersonalProject = z.strictObject({
+  readerId: z.string().min(1).max(255), organizationId: z.uuid(), projectId: z.uuid().nullable(),
+  expectedRevision: z.number().int().nonnegative(),
+})
+
 export const projectInput = projectFields.extend({ id: z.uuid().optional(), workspaceId: z.uuid().optional(), expectedVisibility: projectVisibilityDefault.optional(), revision: z.number().int().positive().optional() }).refine(value => !value.startDate || !value.targetDate || value.startDate <= value.targetDate, 'validationProjectDateOrder')
 export const projectPatch = z.object({ id: z.uuid(), revision: z.number().int().positive(), changes: projectFields.partial().extend({ team: z.string().trim().max(100).optional(), properties: projectProperties.optional() }).refine(value => Object.keys(value).length > 0, 'validationProjectChangesRequired') })
 export type ProjectDraft = z.output<typeof projectFields>

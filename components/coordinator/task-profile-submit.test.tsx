@@ -270,6 +270,42 @@ test('Team creation retains its chosen identity when switching from backlog to d
 })
 
 
+test('new task uses the visible personal Project, accepts No project and preserves an explicit Project page', async t => {
+  const saved = '12250000-0000-4000-8000-000000000004'
+  const other = '12250000-0000-4000-8000-000000000005'
+  let stored: string | null = saved
+  let revision = 2
+  const requests: string[] = []
+  t.mock.method(globalThis, 'fetch', async (_path: unknown, options?: RequestInit) => {
+    requests.push(options?.method ?? 'GET')
+    if (options?.method === 'PUT') {
+      const change = JSON.parse(String(options.body))
+      assert.equal(change.readerId, 'reader')
+      assert.equal(change.expectedRevision, revision++)
+      stored = change.projectId
+    }
+    return Response.json({ organizationId: workspaceId, projectId: stored, revision,
+      projects: [{ id: saved, name: 'First' }, { id: other, name: 'Second' }] })
+  })
+  const form = (explicit?: string) => <NewTaskDialog key={explicit ?? 'global'} readerId="reader" open workspaceId={workspaceId}
+    projectId={explicit} project={explicit ? 'Second' : undefined} initialText="Prepare release."
+    initialIntent="create_only" onCreated={() => {}} onOpenChange={() => {}} />
+  await render(form())
+  const select = container.querySelector<HTMLSelectElement>('select')!
+  assert.equal(select.value, saved)
+  await act(async () => create().click())
+  assert.equal(manualCommands[0].projectId, saved)
+  await act(async () => {
+    select.value = ''
+    select.dispatchEvent(new browser.Event('change', { bubbles: true }) as unknown as Event)
+  })
+  assert.equal(stored, null)
+  await render(form(other))
+  await act(async () => create().click())
+  assert.equal(manualCommands.at(-1)?.projectId, other)
+  assert.deepEqual(requests, ['GET', 'PUT'])
+})
+
 test('Project creation binds the UUID and retries only after a real access refusal is confirmed', async () => {
   const projectId = '12250000-0000-4000-8000-000000000004'
   requireConsent = true

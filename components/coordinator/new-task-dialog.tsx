@@ -31,6 +31,7 @@ import { CHAT_FILE_ACCEPT } from '@mikka/protocol/chat-attachments'
 import { taskProfileSelectable, useAgentProfiles } from '@/components/settings/factory-profiles-data'
 import { TaskProfileNotice, useTaskProfileChoices } from './task-profile-picker'
 import { SetupChecklist } from './setup-checklist'
+import { PersonalProjectPicker, usePersonalProjectPicker } from './personal-project-picker'
 import { NewTask } from '@ui-slot/new-task'
 import type { NewTaskMachine } from '@/components/slots/new-task-contract'
 import { DEFAULT_MACHINE_SIZE, machineHourlyUsd } from '@/lib/cloud-computer/machine-pricing'
@@ -63,7 +64,7 @@ function MachineIcon({ machine, cloudBotId }: { machine: Machine; cloudBotId: st
  * request goes into the Coordinator conversation, where its reply shows up. A UI layer's new-task slot draws the
  * window instead (docs/ui-overlay.md); the data, state and sending stay here.
  */
-export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, workspaceId, teamId, onCreated, onAdded, initialIntent = 'create_and_dispatch', initialBotId, initialText = '' }: {
+export function NewTaskDialog({ open, onOpenChange, onSent, project: pageProject, projectId: pageProjectId, readerId, workspaceId, teamId, onCreated, onAdded, initialIntent = 'create_and_dispatch', initialBotId, initialText = '' }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSent?: () => void
@@ -75,12 +76,16 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
   /** Project page the request came from. */
   project?: string | null
   projectId?: string
+  readerId?: string
   workspaceId?: string
   teamId?: string
   /** Keys typed before the dialog finished opening. */
   initialText?: string
 }) {
   const t = useTranslations('Shell.newTaskDialog')
+  const projectPicker = usePersonalProjectPicker(open && !pageProjectId ? readerId : undefined, workspaceId)
+  const projectId = pageProjectId ?? projectPicker.project?.id
+  const project = pageProjectId ? pageProject : projectPicker.project?.name
   const tShell = useTranslations('Shell')
   const tDevices = useTranslations('Devices')
   const locationT = useTranslations('Settings.modelOrder')
@@ -161,7 +166,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
     const text = draft.trim() || name
     const fingerprint = JSON.stringify([workspaceId, teamId, projectId, name, text, intent, picked, botPick, profileId])
     const confirmAccess = confirmedFingerprint === fingerprint
-    if (!text || pending.current || attachments.locked || (only && !workspaceId) || (!only && (!available || !profileAllowed || botPick && !handler))) return
+    if (!text || pending.current || projectPicker.pending || attachments.locked || (only && !workspaceId) || (!only && (!available || !profileAllowed || botPick && !handler))) return
     // A task on Mikka 额度 (its chat's model, or a Cloudflare machine) with nothing to pay opens 选择套餐 instead (decision 2026-11-15-1900).
     // Claim the submit before the paywall's balance read, so a second click cannot slip in while it runs.
     pending.current = true
@@ -227,6 +232,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
   const machineNote = (machine: Machine) => machine.cloud && !machine.usable ? t('addE2BKey') : !machine.cloud && !machine.usable ? machine.status : undefined
   const slotMachine = (machine: Machine, group: NewTaskMachine['group']): NewTaskMachine => ({ value: machine.value, label: machine.label, icon: <MachineIcon machine={machine} cloudBotId={cloudBotId} />, usable: machine.usable, note: machineNote(machine), group })
   const notices = <>
+    {!pageProjectId && <PersonalProjectPicker picker={projectPicker} disabled={sending} />}
     {!only && <TaskProfileNotice value={profileId ?? null} data={profiles.data} error={profiles.error} onRetry={() => { void profiles.mutate() }} />}
     {!only && !available && <p className="text-sm text-muted-foreground">{t('unavailable')}</p>}
     {!only && coordinatorUnavailable && <Alert variant="destructive"><AlertTitle>{tCoordinator('unavailable', { name: 'Coordinator' })}</AlertTitle></Alert>}
@@ -241,7 +247,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
       bots={!only && botChoices.length > 0 ? [{ id: null, name: 'Coordinator', avatar: <CoordinatorAvatar size="row" /> }, ...botChoices.map(bot => ({ id: bot.id, name: bot.name, avatar: <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="row" /> }))] : []}
       bot={handler?.id ?? null} onBot={setBotPick}
       profile={{ ...profileChoices, value: profileId ?? 'auto', onChange: id => setProfilePick(id !== 'auto' && workspaceId ? { workspaceId, id } : null), disabled: sending || !workspaceId }}
-      intent={only || chooseIntent ? intent : undefined} chooseIntent={chooseIntent} more={{ checked: more, onChange: setMore }} notices={notices} sending={sending} canSubmit={(only ? Boolean(workspaceId) : available && profileAllowed && (!botPick || !!handler)) && !!(draft.trim() || title.trim()) && !attachments.locked} onSubmit={() => { void submit() }} />}
+      intent={only || chooseIntent ? intent : undefined} chooseIntent={chooseIntent} more={{ checked: more, onChange: setMore }} notices={notices} sending={sending} canSubmit={!projectPicker.pending && (only ? Boolean(workspaceId) : available && profileAllowed && (!botPick || !!handler)) && !!(draft.trim() || title.trim()) && !attachments.locked} onSubmit={() => { void submit() }} />}
     {keyDialogNode}
     {accessChange && <AccessChangeDialog change={accessChange} pending={sending} onCancel={() => setAccessChange(null)} onConfirm={async () => {
       const current = accessChange

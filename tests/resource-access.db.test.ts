@@ -118,6 +118,30 @@ test('resource ACL: real split PostgreSQL migrations, fresh grants and concurren
       }
     })
 
+    await t.test('personal selected Project is scoped to the member and visible Workspace without changing content access or sharing defaults', async () => {
+      const { personalProjectSelectionFor } = await import('../lib/resource-access/personal-project-selection')
+      const read = (reader: string, workspaceId = alpha) => personalProjectSelectionFor({ id: reader }, workspaceId)
+      const initial = await read(owner)
+      assert.ok(initial.organizationId)
+      assert.ok(initial.projects.some(item => item.id === project))
+      const change = { readerId: owner, organizationId: initial.organizationId, projectId: project, expectedRevision: 0 }
+      try {
+        assert.equal((await personalProjectSelectionFor({ id: owner }, alpha, change)).revision, 1)
+        assert.equal((await personalProjectSelectionFor({ id: owner }, alpha, change)).revision, 1)
+        assert.equal((await read(owner)).projectId, project)
+        assert.equal((await read(member)).projectId, null)
+        assert.equal((await read(owner, beta)).projectId, null)
+        assert.equal((await read(owner, personal)).organizationId, null)
+        await assert.rejects(personalProjectSelectionFor({ id: member }, alpha, change), /governance_denied/)
+        await assert.rejects(personalProjectSelectionFor({ id: owner }, alpha, { ...change, projectId: null }), /governance_denied/)
+        const cleared = await personalProjectSelectionFor({ id: owner }, alpha, { ...change, projectId: null, expectedRevision: 1 })
+        assert.deepEqual([cleared.projectId, cleared.revision], [null, 2])
+        assert.equal((await ws.query('select visibility from mikka_organization_member_project_defaults where "organizationId"=$1 and "userId"=$2', [initial.organizationId, owner])).rows[0].visibility, 'shared')
+      } finally {
+        await ws.query('delete from mikka_organization_member_project_defaults where "organizationId"=$1 and "userId"=$2', [initial.organizationId, owner])
+      }
+    })
+
     await t.test('repeated Task follow and unfollow commands each write one revision and old toggle callers remain supported', async () => {
       const { actAs } = await import('../lib/acting-user')
       const { toggleIssuePreference } = await import('../app/actions/issue-operations')

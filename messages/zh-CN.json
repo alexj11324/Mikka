@@ -5269,6 +5269,8 @@
       "noneToday": "今天还没有新的建议。"
     },
     "newTaskDialog": {
+      "defaultProject": "我的默认项目",
+      "projectPreferenceUnavailable": "未能读取或保存项目。",
       "intent": "创建方式",
       "backlogTitlePlaceholder": "标题（可选，默认为首行）",
       "createOnly": "仅创建",
