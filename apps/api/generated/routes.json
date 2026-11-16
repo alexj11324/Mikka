@@ -864,6 +864,15 @@
       "sourceHash": "2626cc2b4623bdfdb7387ab0debef43b2a9cb334eaced7a85f5f446ae950d799"
     },
     {
+      "path": "/mikka/api/devices/[deviceId]/active-threads",
+      "template": "/api/devices/[deviceId]/active-threads",
+      "source": "app/api/devices/[deviceId]/active-threads/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "7aabc8355a4c6c7b13e2bd3f11c1a8a28ebfe9481ce445f496597b56bc9a28be"
+    },
+    {
       "path": "/mikka/api/devices/[deviceId]/commands",
       "template": "/api/devices/[deviceId]/commands",
       "source": "app/api/devices/[deviceId]/commands/route.ts",
@@ -1657,7 +1666,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "1469260962c79b5f754b9f2b8b7bb0c452a01522440110c8215bd2da7db3bd95"
+      "sourceHash": "a4f6e8b5c5b332cf089d5b4686857d7ae110588fdefbf624878b53b6706c943e"
     },
     {
       "path": "/mikka/api/mobile/tasks/[id]",
@@ -1778,7 +1787,7 @@
         "GET",
         "PATCH"
       ],
-      "sourceHash": "b8fc718d704bb3843de16f2bf3824b720f1c25a215236ad993017bb87568724e"
+      "sourceHash": "4216e9e05aa5f78ab65fd2299d19f040d19d2978fa13259f5178926d3f01e3b2"
     },
     {
       "path": "/mikka/api/organizations/[organizationId]/allowed-domains",
@@ -1876,6 +1885,15 @@
         "POST"
       ],
       "sourceHash": "bb106c0c4b667782813cebe47ec7f5e812e71d672bf9cf006c5dea201b072118"
+    },
+    {
+      "path": "/mikka/api/organizations/[organizationId]/machine-sizes",
+      "template": "/api/organizations/[organizationId]/machine-sizes",
+      "source": "app/api/organizations/[organizationId]/machine-sizes/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "0bf6776b787066547fef29af81e103994c505496c135168ef4b34b92cc141a74"
     },
     {
       "path": "/mikka/api/organizations/[organizationId]/members",
