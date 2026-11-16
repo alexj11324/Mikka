@@ -176,6 +176,16 @@ test('billing metadata and commands have exact scoped routes and methods', () =>
   }
 })
 
+test('organization membership sends only the declared add, role and removal writes', () => {
+  const org = 'ab81a708-013c-4e44-9ab2-a500bd59f381'
+  const members = `/api/organizations/${org}/members`
+  for (const method of ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) {
+    assert.equal(allowedApiPath(members, method), ['POST', 'PATCH', 'DELETE'].includes(method))
+    assert.equal(allowedApiPath(members.replace(org, 'unknown'), method), false)
+    assert.equal(allowedApiPath(members + '/roles', method), false)
+  }
+})
+
 test('installed Organization invitations expose only listing, issuing, revoking and accepting', () => {
   const org = 'ab81a708-013c-4e44-9ab2-a500bd59f381'
   const collection = `/api/organizations/${org}/invitations`
