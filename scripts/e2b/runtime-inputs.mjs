@@ -133,11 +133,12 @@ export async function rememberFailure({ sourceCommit, runId, runAttempt, token, 
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const digest = runtimeInputsDigest({ ref: process.env.GITHUB_SHA })
+  const source = process.env.MIKKA_RUNTIME_SOURCE || process.env.GITHUB_SHA
+  const digest = runtimeInputsDigest({ ref: source })
   if (process.argv[2] === 'remember') {
-    const remember = await rememberFailure({ sourceCommit: process.env.GITHUB_SHA, runId: process.env.GITHUB_RUN_ID,
+    const remember = await rememberFailure({ sourceCommit: source, runId: process.env.GITHUB_RUN_ID,
       runAttempt: process.env.GITHUB_RUN_ATTEMPT, token: process.env.GITHUB_TOKEN })
-    if (remember) writeFileSync(process.argv[3], JSON.stringify({ digest, sourceCommit: process.env.GITHUB_SHA,
+    if (remember) writeFileSync(process.argv[3], JSON.stringify({ digest, sourceCommit: source,
       runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT }) + '\n')
     appendFileSync(process.env.GITHUB_OUTPUT, `digest=${digest}\nremember=${remember}\n`)
     console.log(remember ? `Remember failed runtime inputs ${digest}` : 'No current-source build/gate failure to remember')

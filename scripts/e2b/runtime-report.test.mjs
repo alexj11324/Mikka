@@ -138,7 +138,8 @@ test('the actual workflow producer and pre-publication scripts keep large proofs
   const f = withReport(t), output = join(f.dir, 'outputs')
   const candidateDirectory = join(f.dir, 'e2b-candidates'), candidatePath = join(candidateDirectory, 'candidates.json')
   mkdirSync(candidateDirectory); writeFileSync(candidatePath, f.bytes)
-  const env = { PATH: process.env.PATH, GITHUB_SHA: expected.sourceCommit, SOURCE_SHA: expected.workerSha,
+  // A later main publishes the Cloudflare-served commit: the source is MIKKA_RUNTIME_SOURCE, not GITHUB_SHA.
+  const env = { PATH: process.env.PATH, GITHUB_SHA: 'f'.repeat(40), MIKKA_RUNTIME_SOURCE: expected.sourceCommit, SOURCE_SHA: expected.workerSha,
     GITHUB_RUN_ID: expected.runId, GITHUB_RUN_ATTEMPT: expected.runAttempt, GITHUB_OUTPUT: output,
     RUNNER_TEMP: f.dir, CANDIDATE_SHA256: f.expected.sha256, TEMPLATE_MODELS_SHA256: templateModelsDigest(f.report) }
   const run = (workflow, argument, extra = {}) => spawnSync(process.execPath, ['--input-type=module', '-', f.path], {

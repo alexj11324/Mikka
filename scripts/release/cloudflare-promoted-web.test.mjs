@@ -36,6 +36,9 @@ function fixture(change = {}) {
     if (u.origin === 'https://api.github.com') {
       if (change.observation && u.pathname.includes('/actions/runs/99/attempts/1')) return Response.json(u.pathname.endsWith('/jobs') ? change.observation.jobs : change.observation.run)
       assert.equal(options.headers.authorization, 'Bearer test')
+      if (u.pathname === '/repos/' + repo + '/compare/' + product + '...' + env.GITHUB_SHA) {
+        return Response.json({ status: 'ahead', merge_base_commit: { sha: product }, ...change.served })
+      }
       if (u.pathname.includes('/compare/')) {
         const path = '/repos/' + repo + '/compare/' + env.GITHUB_SHA + '...' + product
         assert.equal(u.pathname, path)
@@ -84,7 +87,7 @@ test('rejects dispatch, owner, hash, inventory, timing and current-main changes'
     [{ prior: { author_association: 'MEMBER' } }, 'ownerComment'],
     [{ post: { user: { id: 1, login: 'alexj11324' } } }, 'ownerComment'],
     [{ record: { approvalSha256: 'f'.repeat(64) } }, 'commentChanged'],
-    [{ record: { product: 'b'.repeat(40), releasePin: 'bbbbbbb-902-1' } }, 'dispatchSource'],
+    [{ env: { MIKKA_RUNTIME_SOURCE: 'b'.repeat(40) } }, 'dispatchSource'],
     [{ record: { releasePin: 'abc1234-x-1' } }, 'clientPin'],
     [{ raw: record => JSON.stringify(record, null, 2) }, 'receiptShape'],
     [{ raw: record => JSON.stringify({ ...record, privateMapping: 'extra' }) }, 'receiptShape'],
@@ -101,6 +104,19 @@ test('rejects dispatch, owner, hash, inventory, timing and current-main changes'
     [{ elapsed: 3 * 3600_000 }, 'approvalWindow'],
     [{ main: 'f'.repeat(40) }, 'mainChanged'],
   ]) await assert.rejects(fixture(change).verify(), new RegExp(code), code)
+})
+test('a later main dispatch publishes the served product only when it is already part of main', async () => {
+  const head = '7'.repeat(40), env = { GITHUB_SHA: head }, run = { head_sha: head }
+  const later = fixture({ env, run, main: head })
+  assert.deepEqual(await later.verify(), { product, releasePin })
+  assert.ok(later.calls.includes('/repos/' + repo + '/compare/' + product + '...' + head))
+  assert.deepEqual(await fixture({ env: { ...env, MIKKA_RUNTIME_SOURCE: product }, run, main: head }).verify(), { product, releasePin })
+  for (const [change, code] of [
+    [{ served: { status: 'diverged' } }, 'servedOnMain'],
+    [{ served: { merge_base_commit: { sha: 'f'.repeat(40) } } }, 'servedOnMain'],
+    [{ main: 'f'.repeat(40) }, 'mainChanged'],
+    [{ env: { ...env, MIKKA_RUNTIME_SOURCE: head } }, 'dispatchSource'],
+  ]) await assert.rejects(fixture({ env, run, main: head, ...change, env: { ...env, ...change.env } }).verify(), new RegExp(code), code)
 })
 test('rejects stale DNS, rollback, a legacy gateway serving the same SHA, and client skew', async () => {
   for (const [change, code] of [
@@ -123,7 +139,7 @@ test('Desktop binds its own original attempt, installer ancestry, overlay and se
   const good = fixture({ env, run, elapsed: 5400000 })
   assert.deepEqual(await good.desktop(), { product, releasePin, overlay })
   assert.ok(good.calls.some(path => path.includes('/compare/')))
-  await assert.rejects(good.verify(), /dispatchSource/)
+  await assert.rejects(good.verify(), /runIdentity/)
   const exact = fixture({ run: { ...run, head_sha: product } })
   assert.deepEqual(await exact.desktop(), { product, releasePin, overlay })
   assert.ok(!exact.calls.some(path => path.includes('/compare/')))
