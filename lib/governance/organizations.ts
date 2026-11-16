@@ -61,11 +61,17 @@ export async function createOrganization(user: { id: string; name: string; email
   })
 }
 
-function organizationMemberRows(tx: WorkspaceTransaction, organizationId: string, includeDisabled: boolean) {
-  return tx.select().from(organizationMembers).where(and(
+async function organizationMemberRows(tx: WorkspaceTransaction, organizationId: string, includeDisabled: boolean) {
+  const members = await tx.select().from(organizationMembers).where(and(
     eq(organizationMembers.organizationId, organizationId),
     includeDisabled ? undefined : eq(organizationMembers.status, 'active'),
   )).orderBy(asc(organizationMembers.createdAt), asc(organizationMembers.userId))
+  // Auth profiles live in the application database. Restrict the lookup to this authorized roster.
+  const ids = members.map(member => member.userId)
+  const pictures = ids.length ? (await pool.query<{ id: string; image: string | null }>(
+    'select id, image from "user" where id=any($1::text[])', [ids])).rows : []
+  const images = new Map(pictures.map(profile => [profile.id, profile.image]))
+  return members.map(member => ({ ...member, image: images.get(member.userId) ?? null }))
 }
 
 export async function listOrganizationMembers(organizationId: string, actorId: string, includeDisabled: boolean) {
