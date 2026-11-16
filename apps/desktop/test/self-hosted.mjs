@@ -11,6 +11,7 @@ import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { verifyDesktopVersionHistory } from './self-hosted-version-history.mjs'
 import { verifyWorkspaceAutomation } from './self-hosted-automations.mjs'
 import { verifyPersonalDriveUploads } from './self-hosted-drive.mjs'
+import { verifyOrganizationLifecycle } from './self-hosted-organization.mjs'
 import { verifyConversationOrganization } from './self-hosted-conversations.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
 import { readNativeStartup } from './native-startup.mjs'
@@ -186,6 +187,7 @@ async function main() {
       phase = 'conversation_owner_member'
       const controls = { page, fixture, rpc, passed, setPhase: value => { phase = value } }
       const sharedWorkspace = await verifyConversationOrganization(controls)
+      await verifyOrganizationLifecycle({ ...controls, workspaceId: sharedWorkspace })
       report.driveFolder = {}
       report.driveUploads = []
       await verifyPersonalDriveUploads({ ...controls, application, workspaceId: sharedWorkspace, directory, folderCheck: report.driveFolder, receipts: report.driveUploads })
