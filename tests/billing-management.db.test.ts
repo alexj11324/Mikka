@@ -174,6 +174,22 @@ test('billing management HTTP preserves independent tenants, owners and immutabl
     assert.equal((await orgGet(organizationId, {}, `?usageMember=${member}`)).status, 403)
   })
 
+  await t.test('organization cost attribution ranks confirmed spend and resolves ties consistently', async () => {
+    actor = owner
+    const ownerCall = randomUUID(), unattributedCall = randomUUID()
+    try {
+      await pool.query(`insert into hosted_usage(id,"workspaceId","usageWorkspaceId","actorId",model,state,"costMicroUsd","freeMicroUsd","purchasedMicroUsd")
+        values ($1,$2,$2,$3,'synthetic-platform','settled',3000000,0,3000000),($4,$2,$2,null,'synthetic-platform','settled',2500000,0,2500000)`,
+        [ownerCall, first.id, owner, unattributedCall])
+      const readMembers = async () => ((await (await orgGet()).json()) as BillingManagementView).usage.members.map(row => row.id)
+      assert.deepEqual(await readMembers(), [owner, member, null])
+      await pool.query('update hosted_usage set "costMicroUsd"=1000000, "purchasedMicroUsd"=1000000 where id=$1', [ownerCall])
+      assert.deepEqual(await readMembers(), [member, null, owner])
+    } finally {
+      await pool.query('delete from hosted_usage where id=any($1::text[])', [[ownerCall, unattributedCall]])
+    }
+  })
+
   await t.test('an inactive historical personal credit share remains revocable while the Organization pays', async () => {
     const { creditShareView, setOwnCreditShare } = await import('../lib/credit-shares')
     await pool.query('insert into workspace_credit_shares("workspaceId","userId") values($1,$2)', [first.id, member])
