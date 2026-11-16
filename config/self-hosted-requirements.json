@@ -1859,6 +1859,17 @@
     "test": "lib/issue-threads.test.ts",
     "suite": "test:issues"
   },
+  "lib/linear-sync/client.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "LINEAR_CLIENT_ID",
+      "LINEAR_CLIENT_SECRET",
+      "LINEAR_TOKEN_ENCRYPTION_KEY"
+    ],
+    "behavior": "The existing Linear client reads issue labels in pages through the signed-in person's authorized Linear connection. Selecting an automation label does not require an active two-way sync.",
+    "test": "lib/linear-sync/label-options.test.ts",
+    "suite": "test:linear-sync"
+  },
   "lib/linear-sync/markdown.ts": {
     "mode": "built-in",
     "environment": [],
