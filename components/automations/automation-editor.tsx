@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import useSWR from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { ArrowLeft, Play } from 'lucide-react'
@@ -23,7 +23,7 @@ import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { useAgentProfiles } from '@/components/settings/factory-profiles-data'
 import { useTaskProfileChoices } from '@/components/coordinator/task-profile-picker'
 import { openTask } from '@/components/workspace/workspace-navigation'
-import { useAutomation } from '@/hooks/use-automations'
+import { invalidateAutomationList, useAutomation } from '@/hooks/use-automations'
 import { cancelAutomationRun } from '@/app/actions/automations'
 import { useActionError } from '@/lib/use-action-error'
 import { newTaskBotChoices } from '@/lib/new-task-bot'
@@ -59,6 +59,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
   const tErrors = useTranslations('Errors')
   const errorText = (code: string) => tErrors.has(code as never) ? tErrors(code as never) : code
   const creating = id === 'new'
+  const { mutate: mutateCache } = useSWRConfig()
   const { automation, history } = useAutomation(workspaceId, creating ? null : id)
   const current = automation.data ?? null
   const tTemplates = useTranslations('Automations.templates')
@@ -173,11 +174,12 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
     } finally { setBusy(null) }
   }
   async function remove() {
-    if (!current || busy) return
+    if (!current || !workspaceId || busy) return
     setBusy('delete')
     try {
-      const result = await deleteAutomation({ scheduleId: current.id, version: current.version }, workspaceId ?? undefined)
+      const result = await deleteAutomation({ scheduleId: current.id, version: current.version }, workspaceId)
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
+      await Promise.all([invalidateAutomationList(mutateCache, workspaceId, false), invalidateAutomationList(mutateCache, workspaceId, true)])
       setConfirmDelete(false)
       onBack()
     } finally { setBusy(null) }
