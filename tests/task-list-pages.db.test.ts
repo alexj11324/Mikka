@@ -11,7 +11,7 @@ if (process.env.REQUIRE_DB === '1' && !enabled) throw new Error('Task page tests
 
 test('authorized Task collection traverses every threadless issue, including microsecond ties and the last page', { skip: !enabled }, async () => {
   const { pool } = await import('../lib/db')
-  const { listWorkspaceIssues, listWorkspaceTaskPage } = await import('../app/actions/issues')
+  const { countAssignedWorkspaceTasks, listWorkspaceIssues, listWorkspaceTaskPage } = await import('../app/actions/issues')
   const user = 'task-page-' + randomUUID(), other = 'task-page-' + randomUUID()
   async function createUser(id: string) {
     await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,true,now(),now())', [id, id+'@example.invalid'])
@@ -24,6 +24,13 @@ test('authorized Task collection traverses every threadless issue, including mic
       '2022-09-12T00:00Z'::timestamptz + (n % 3) * interval '1 microsecond' from generate_series(1,$3::int) n`, [owner,id,count])
     await insert(workspaceId, user, 205); await insert(foreign, other, 1)
     const run = <T,>(fn: () => Promise<T>) => withActivitySession(user, fn, workspaceId)
+    // Only explicit human assignments count, including Tasks beyond the first page.
+    await pool.query(`update issues set content=jsonb_build_object('type','doc','attrs',jsonb_build_object('mikka',
+      jsonb_build_object('assignee', jsonb_build_object('kind','member','id',$1::text,'name','Assignee','image',null))))
+      where "workspaceId"=$2`, [user,workspaceId])
+    assert.deepEqual(await run(() => countAssignedWorkspaceTasks(workspaceId)), { count: 205 })
+    assert.deepEqual(await withActivitySession(other, () => countAssignedWorkspaceTasks(foreign), foreign), { count: 0 })
+    await assert.rejects(run(() => countAssignedWorkspaceTasks(foreign)), /workspaceAccessDenied/)
     const first = await run(() => listWorkspaceIssues(workspaceId))
     assert.equal(first.length, 100)
     const cursor = nextTaskListCursor(first)!

@@ -9,6 +9,7 @@ import { runAwaitingApproval, runDeviceOffline } from './task-state-query'
 import { threadUnread } from './thread-reads'
 import { runBotId } from './run-bot-name'
 import { runChainSql, RUN_CHAIN_MAX_DEPTH, type RunChainQueryable } from './run-chain'
+import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
 import { threadName } from './issue-threads'
 import { pullRequestSchema, type IssuePullRequest } from './issue-metadata'
 import { threadTitle } from './short-title'
@@ -41,6 +42,7 @@ function conversationQuery() {
       LEFT JOIN conversation_reads ON conversation_reads."userId"=${owner} AND conversation_reads."conversationId"='run:' || agent_runs.id::text
       WHERE receipt.root=root.id AND NOT receipt."depthExceeded" AND (${unread.sql})) AS unread, coalesce(agent_runs.title,root.title) AS title, agents.name AS "agentName",agents.harness,
       root."issueId",i."issuedIdentifier" AS identifier,i.title AS "taskTitle",i.status,agent_runs.status AS "runStatus",
+      agent_runs."deviceId" AS "currentDeviceId", root."threadReplacedBy" IS NOT NULL AS replaced,
       root."conversationPinnedAt" IS NOT NULL AS pinned,root."conversationArchivedAt" AS manual,
       root."conversationRestoredAt" AS restored,latest.touched,root.source,
       CASE WHEN root."promptTaskStart">=0 AND root."promptTaskLength" BETWEEN 0 AND length(root.prompt)-root."promptTaskStart"::bigint
@@ -105,6 +107,30 @@ function conversationQuery() {
     CROSS JOIN LATERAL (SELECT greatest(c."createdAt",last."createdAt") AS touched) activity
     WHERE c."workspaceId"=${workspace} AND c."createdBy"=${owner} AND c."creationPurpose"='conversation' AND c.kind='group'
   )`
+}
+
+/** Human device view over the same first-class roots and Task ACL as the thread directory. */
+export async function activeThreadsOnOwnedDevice(database: RunChainQueryable, reader: ConversationReader, workspaceId: string, deviceId: string, after?: string) {
+  const { userId } = taskReaderScope(reader)
+  return withConversationWorkspace(reader, workspaceId, async () => {
+    const values = [...facts.params, userId, workspaceId, RUN_CHAIN_MAX_DEPTH]
+    const device = '$' + values.push(deviceId)
+    const statuses = '$' + values.push([...UNFINISHED_RUN_STATUSES])
+    const cursor = '$' + values.push(after ?? null)
+    const result = await database.query(conversationQuery() + `
+      SELECT v.id, v."runStatus" AS status FROM devices d
+      LEFT JOIN LATERAL (
+        SELECT id,"runStatus" FROM roots WHERE "currentDeviceId"=d.id
+          AND NOT replaced AND "runStatus"=ANY(${statuses}::text[])
+          AND (${cursor}::uuid IS NULL OR id>${cursor}::uuid)
+        ORDER BY id LIMIT 101
+      ) v ON true
+      WHERE d.id=${device} AND d."ownerId"=$${facts.params.length + 1}
+        AND d.kind='local' AND d."removedAt" IS NULL ORDER BY v.id`, values)
+    if (!result.rows.length) return null
+    const threads = result.rows.slice(0, 100).flatMap(row => row.id ? [{ id: String(row.id), status: String(row.status) }] : [])
+    return { threads, cursor: result.rows.length > 100 ? threads.at(-1)!.id : null }
+  })
 }
 
 export async function effectiveStandaloneOrganization(database: RunChainQueryable, owner: string, workspace: string, id: string) {

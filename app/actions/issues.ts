@@ -110,6 +110,20 @@ export async function listWorkspaceIssues(workspaceId: string) {
   return (await readIssues(workspaceId)).items!
 }
 
+/** Count the current reader's human assignments across the full authorized collection. */
+export async function countAssignedWorkspaceTasks(workspaceId: string) {
+  z.uuid().parse(workspaceId)
+  const user = await requireUser()
+  return withTaskWorkspace(user, workspaceId, async () => {
+    const assignee = sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->'assignee'`
+    const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(issues).where(and(
+      issueVisibilityPredicate(user.id, { allowedIds: [], workspaceIds: [workspaceId] }),
+      sql`${assignee}->>'kind' = 'member' and ${assignee}->>'id' = ${user.id}`,
+    ))
+    return { count: row.count }
+  })
+}
+
 async function readIssues(workspaceId?: string, known?: string, previous?: ListPosition[]) {
   return withDatabaseOperation('/actions/issues/poll', () => readIssueSnapshot(workspaceId, known, previous))
 }
