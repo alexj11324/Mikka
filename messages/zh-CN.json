@@ -1218,6 +1218,8 @@
     "scheduleWorkspaceRequired": "自动化只能在工作区中创建。",
     "scheduleRequestConflict": "这次保存与之前的请求冲突，请刷新后重试。",
     "scheduleNotFound": "自动化不存在或已删除。",
+    "scheduleBatchNotFound": "找不到此 Webhook 批次。",
+    "scheduleBatchClosed": "此批次已停止收集请求。",
     "scheduleAdminRequired": "只有创建者或管理员可以修改、恢复或运行这个自动化。",
     "scheduleVersionConflict": "自动化已被修改，请刷新后重试。",
     "scheduleCancelled": "自动化已删除。",

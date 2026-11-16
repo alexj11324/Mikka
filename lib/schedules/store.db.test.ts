@@ -98,10 +98,10 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
     const insert = async (status: 'pending' | 'succeeded' | 'cancelled' | 'skipped', definition: unknown, event: unknown, due: number) =>
       (await pool.query<{id: string}>(`INSERT INTO schedule_occurrences
         (id,schedule_id,version,due_at,created_at,definition,status,execution_decision,operation_id,next_retry_at,trigger)
-        VALUES(gen_random_uuid(),$1,1,now()+$2*interval '1 minute','2030-01-01 01:02:03.123456+00',$3,$4,'execute',gen_random_uuid(),now()+$2*interval '1 minute',$5) RETURNING id`,
+        VALUES(gen_random_uuid(),$1,1,now()+$2*interval '1 minute','2030-01-01 01:02:03.123456+00'::timestamptz + CASE WHEN $4='pending' THEN interval '1 second' ELSE interval '0' END,$3,$4,'execute',gen_random_uuid(),now()+$2*interval '1 minute',$5) RETURNING id`,
       [schedule.id,due,definition,status,event])).rows[0]!.id
     const finished = (await Promise.all([insert('succeeded', batched, trigger, 1), insert('succeeded', batched, trigger, 2)])).sort().reverse()
-    const gathering = await insert('pending', batched, trigger, 3)
+    const gathering = await insert('pending', batched, trigger, 8)
     const cancelled = await insert('cancelled', batched, trigger, 4)
     await insert('skipped', batched, trigger, 5)
     await insert('pending', { ...batched, webhook: { batchMinutes: 0 } }, trigger, -5)

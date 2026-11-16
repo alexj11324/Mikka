@@ -104,10 +104,13 @@ export const scheduleHistoryInput = z.object({
   }).optional(),
 }).strict()
 
+export const webhookBatchInput = z.object({ scheduleId: z.uuid(), batchId: z.uuid(), version: z.number().int().positive() }).strict()
+
 export const commandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('create'), requestId: z.string().min(1).max(200), definition: definitionSchema }).strict(),
   scheduleListInput.extend({ action: z.literal('list') }),
   scheduleHistoryInput.extend({ action: z.literal('history') }),
+  webhookBatchInput.extend({ action: z.enum(['flush_batch', 'cancel_batch']) }),
   z.object({ action: z.literal('update'), scheduleId: z.uuid(), version: z.number().int().positive(), definition: definitionSchema }).strict(),
   z.object({ action: z.enum(['pause', 'resume', 'cancel']), scheduleId: z.uuid(), version: z.number().int().positive() }).strict(),
   // 接手: an owner or admin makes a workspace automation theirs; from then on it runs as them (decision 2026-11-15-1840).

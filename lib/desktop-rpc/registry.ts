@@ -112,6 +112,8 @@ const functions = {
   'bots.getWorkspaceBotDefaults': actions6.getWorkspaceBotDefaults,
   'automations.listAutomations': automations.listAutomations,
   'automations.getAutomation': automations.getAutomation,
+  'automations.flushAutomationBatch': automations.flushAutomationBatch,
+  'automations.cancelAutomationBatch': automations.cancelAutomationBatch,
   'automations.automationHistory': automations.automationHistory,
   'automations.automationUsage': automations.automationUsage,
   'automations.createAutomation': automations.createAutomation,

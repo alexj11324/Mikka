@@ -273,6 +273,14 @@ Decision [2026-11-15-1830](../design/decisions/2026-11-15-1830-automation-webhoo
     (`next_retry_at` in the future) under 50 requests and 256 KB: appended (`batched`);
   - otherwise a new occurrence due `now + batchMinutes` (`queued`), or `skipped` with
     `concurrencyLimit` / `dailyRunLimit` and no chat report.
+- The signed-in automation actions `flushAutomationBatch` and `cancelAutomationBatch`
+  (also available through Desktop RPC) take `scheduleId`, `batchId` and the schedule
+  `version`. The creator or a workspace owner/admin can close the collecting window.
+  Flush makes its existing occurrence due and wakes the scheduler. Dispatch still
+  checks the creator's authority and run limits. Cancel keeps its count and times,
+  removes the request bodies and hashes sender request IDs for redelivery checks.
+  A repeat of the same action on that batch returns its prior result. An opposing
+  action or a window already closed by time or capacity returns a conflict.
 - The occurrence's `trigger` is `{ webhook: { requests: [{ at, body, key? }] } }`; history
   blanks it for members as it does GitHub triggers. The dispatch appends
   `describeWebhook(requests)` and marks the submission `schedule.webhook: true`, which
