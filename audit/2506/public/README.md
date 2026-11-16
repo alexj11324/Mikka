@@ -4,10 +4,10 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 
 | Code path status | Count at this ledger revision |
 |---|---:|
-| complete | 102 |
+| complete | 106 |
 | partial | 28 |
 | prior-partial | 36 |
-| unreviewed | 6390 |
+| unreviewed | 6386 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -18,3 +18,7 @@ main-delta.jsonl records 28 distinct changed paths between this fixed start and 
 changes.jsonl indexes source/merge IDs, original PR rationale, official links cited in that record, and the isolated receipt where available. Check the PR and its protections for current state before taking further action.
 
 api-entries.jsonl maps all 324 generated API route declarations (430 HTTP methods) to their exact source objects, template, router path, lazy loading, effective methods and duration. Source hashes and matcher coverage have been checked for every entry. Audit each handler and its full downstream chain using its separate path row.
+
+## 2026-11-16 World and main reconciliation
+
+Four previously unreviewed World Node, business binding and SQL catalog files now have individual source conclusions. The fixed source and exact package runs are in reviews.jsonl. In addition to its earlier snapshot, main-delta.jsonl now enumerates the union of changed names between the fixed tree and a1e31323a381b97d8e0a7b7d098fadb3c4b767e3 including old/new modes and Git objects. 1350 changed names (974 modified, 361 added, 15 deleted); 8342 tracked paths on this main. This inventory retains deleted paths and represents a rename as one removal and one addition. It does not certify the changed consumers. G-046 source ad84143b9665375d278fbe31f35a7e22d87f610f is tracked by PR #2613.
