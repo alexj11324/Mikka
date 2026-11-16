@@ -34,10 +34,6 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - name: Refuse an obsolete source before runtime validation
-        run: node scripts/release/web-deploy.mjs main
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
       - name: Recheck the promoted Cloudflare Web after entering the release queue
         run: node scripts/release/cloudflare-promoted-web.mjs
         env:
@@ -104,10 +100,6 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - name: Refuse an obsolete source before real subscription work
-        run: node scripts/release/web-deploy.mjs main
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
       - name: Require one immutable candidate artifact reference
         run: node scripts/e2b/runtime-report.mjs reference
         env:
@@ -184,7 +176,6 @@ jobs:
       - name: Make only fully accepted candidates public
         id: publish
         run: |
-          node scripts/release/web-deploy.mjs main
           node --input-type=module - "$RUNNER_TEMP/accepted.json" <<'JS'
           import { readFileSync } from 'node:fs'
           import { join } from 'node:path'

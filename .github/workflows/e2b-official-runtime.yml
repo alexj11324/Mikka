@@ -128,11 +128,6 @@ jobs:
         run: node scripts/release/cloudflare-promoted-web.mjs trigger runtime
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      - name: Refuse an obsolete source before runtime validation
-        if: github.event_name == 'workflow_dispatch'
-        run: node scripts/release/web-deploy.mjs main
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
       - name: Compare canonical worker inputs across this push and check failed attempts
         id: history
         if: github.event_name != 'workflow_run' || steps.trigger.outputs.ready == 'true'

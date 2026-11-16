@@ -441,7 +441,9 @@ test('the runtime release holds one non-cancelling queue and never publishes thr
   assert.match(e2b, /uses: \.\/\.github\/workflows\/e2b-runtime-release\.yml\n    with:\n      cloudflare_receipt: \$\{\{ needs\.check\.outputs\.receipt \}\}/)
   assert.doesNotMatch(e2b, /github\.event\.inputs\.cloudflare_receipt \}\}/)
   assert.match(checkJob, /fetch-depth: 0/)
-  assert.match(checkJob, /if: github\.event_name == 'workflow_dispatch'\n        run: node scripts\/release\/web-deploy\.mjs main/)
+  // The runtime publishes the served commit; later merges to main do not invalidate a running release.
+  assert.doesNotMatch(e2b, /web-deploy\.mjs main/)
+  assert.match(e2b, /source_sha: \$\{\{ needs\.web-ready\.outputs\.source \}\}/)
   assert.doesNotMatch(checkJob, /Infisical|VERCEL_TEAM_TOKEN|publish-template-env|RUNTIME_REFRESH/)
   assert.match(checkJob, /steps\.history\.outputs\.changed/)
   assert.match(web, /workflow_call:/)

@@ -45,10 +45,6 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - name: Refuse an obsolete source before building candidates
-        run: node scripts/release/web-deploy.mjs main
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
       - name: Install the pinned E2B SDK
         run: |
           python3 -m venv "$RUNNER_TEMP/e2b"

@@ -36,8 +36,8 @@ function fixture(change = {}) {
     if (u.origin === 'https://api.github.com') {
       if (change.observation && u.pathname.includes('/actions/runs/99/attempts/1')) return Response.json(u.pathname.endsWith('/jobs') ? change.observation.jobs : change.observation.run)
       assert.equal(options.headers.authorization, 'Bearer test')
-      if (u.pathname === '/repos/' + repo + '/compare/' + product + '...' + env.GITHUB_SHA) {
-        return Response.json({ status: 'ahead', merge_base_commit: { sha: product }, ...change.served })
+      if (u.pathname === '/repos/' + repo + '/compare/' + product + '...main') {
+        return Response.json({ status: (change.main ?? product) === product ? 'identical' : 'ahead', merge_base_commit: { sha: product }, ...change.served })
       }
       if (u.pathname.includes('/compare/')) {
         const path = '/repos/' + repo + '/compare/' + env.GITHUB_SHA + '...' + product
@@ -76,7 +76,7 @@ test('revalidates the live promoted Web on the original dispatch after 3976 seco
     const f = fixture({ elapsed })
     assert.deepEqual(await f.verify(), { product, releasePin })
     assert.equal(f.calls.length, 7)
-    assert.equal(f.calls.at(-1), '/repos/' + repo + '/git/ref/heads/main')
+    assert.equal(f.calls.at(-1), '/repos/' + repo + '/compare/' + product + '...main')
   }
 })
 test('rejects dispatch, owner, hash, inventory, timing and current-main changes', async () => {
@@ -102,19 +102,20 @@ test('rejects dispatch, owner, hash, inventory, timing and current-main changes'
     [{ run: { run_started_at: iso(600001) } }, 'staleDispatch'],
     [{ run: { run_started_at: iso(-30000) } }, 'staleDispatch'],
     [{ elapsed: 3 * 3600_000 }, 'approvalWindow'],
-    [{ main: 'f'.repeat(40) }, 'mainChanged'],
+    [{ served: { status: 'diverged' } }, 'servedOnMain'],
   ]) await assert.rejects(fixture(change).verify(), new RegExp(code), code)
 })
 test('a later main dispatch publishes the served product only when it is already part of main', async () => {
   const head = '7'.repeat(40), env = { GITHUB_SHA: head }, run = { head_sha: head }
   const later = fixture({ env, run, main: head })
   assert.deepEqual(await later.verify(), { product, releasePin })
-  assert.ok(later.calls.includes('/repos/' + repo + '/compare/' + product + '...' + head))
+  assert.ok(later.calls.includes('/repos/' + repo + '/compare/' + product + '...main'))
+  // A merge to main during the release does not block publishing the served commit.
+  assert.deepEqual(await fixture({ env, run, main: 'e'.repeat(40) }).verify(), { product, releasePin })
   assert.deepEqual(await fixture({ env: { ...env, MIKKA_RUNTIME_SOURCE: product }, run, main: head }).verify(), { product, releasePin })
   for (const [change, code] of [
     [{ served: { status: 'diverged' } }, 'servedOnMain'],
     [{ served: { merge_base_commit: { sha: 'f'.repeat(40) } } }, 'servedOnMain'],
-    [{ main: 'f'.repeat(40) }, 'mainChanged'],
     [{ env: { ...env, MIKKA_RUNTIME_SOURCE: head } }, 'dispatchSource'],
   ]) await assert.rejects(fixture({ env, run, main: head, ...change, env: { ...env, ...change.env } }).verify(), new RegExp(code), code)
 })
@@ -209,7 +210,7 @@ test('Desktop and E2B accept only an original successful protected serving obser
     {observation:{...observation,jobs:{total_count:2,jobs:[jobs.jobs[0],{...jobs.jobs[1],name:'Prepared release'}]}}},
     {observation:{...observation,jobs:{total_count:1,jobs:[jobs.jobs[1]]}}},
     {headers:{'x-mikka-gateway-version-sha256':'1'.repeat(64)}}, {version:{overlaySha:'1'.repeat(40)}},
-    {run:{...consumer,actor:{id:1}}}, {main:'a'.repeat(40)}]) {
+    {run:{...consumer,actor:{id:1}}}, {served:{status:'diverged'}}]) {
     await assert.rejects(fixture({observation,env,run:consumer,...change}).verify())
   }
 })
