@@ -323,3 +323,41 @@ test('the hosted image verifies its bundled WDK business client and requires sco
   }
   assert.throws(() => verifyConfiguration({ ...bindings, MIKKA_EVE_ORIGIN: 'https://other.example' }), /PRIVATE_BINDINGS_REQUIRED/)
 })
+
+test('the private LiteLLM bridge forwards only the conversion routes with their auth and content headers', async () => {
+  const { liteLlmRequest } = await import('../../../cloudflare/api/ingress/services.mjs')
+  const seen = []
+  const binding = { fetch: async request => { seen.push(request); return new Response('ok') } }
+  const body = JSON.stringify({ model: 'm', api_key: 'person-key', api_base: 'https://provider.example/v1' })
+  const headers = { authorization: 'Bearer master', 'content-type': 'application/json', cookie: 'session=1',
+    'x-forwarded-for': '1.2.3.4', 'cf-connecting-ip': '1.2.3.4', 'anthropic-version': '2023-06-01' }
+  for (const path of ['/v1/messages', '/v1/messages/count_tokens', '/v1/responses']) {
+    const res = await liteLlmRequest(new Request('https://litellm.internal' + path, { method: 'POST', headers, body }), binding)
+    assert.equal(res.status, 200)
+  }
+  assert.equal(seen.length, 3)
+  for (const request of seen) {
+    assert.equal(request.headers.get('authorization'), 'Bearer master')
+    assert.equal(request.headers.get('anthropic-version'), '2023-06-01')
+    for (const name of ['cookie', 'x-forwarded-for', 'cf-connecting-ip']) assert.equal(request.headers.get(name), null)
+  }
+  assert.equal(await seen[2].text(), body)
+  for (const [url, method] of [['https://litellm.internal/v1/chat/completions', 'POST'], ['https://litellm.internal/v1/messages', 'GET'],
+    ['https://litellm.internal/v1/messages?x=1', 'POST'], ['https://other.internal/v1/messages', 'POST'], ['https://litellm.internal/key/generate', 'POST']]) {
+    assert.equal((await liteLlmRequest(new Request(url, { method, body: method === 'POST' ? '{}' : undefined }), binding)).status, 404)
+  }
+  assert.equal((await liteLlmRequest(new Request('https://litellm.internal/v1/messages', { method: 'POST', body: '{}' }), undefined)).status, 503)
+  assert.equal(seen.length, 3)
+})
+
+test('the API binds the LiteLLM service only when a release names one, and the service exposes only conversion routes', async () => {
+  const input = { release: id, origin: 'https://test.example', image: 'registry.cloudflare.com/' + '0'.repeat(32) + '/mikka-api@sha256:' + '2'.repeat(64) }
+  assert.equal(ingressConfig(input).services, undefined)
+  assert.deepEqual(ingressConfig({ ...input, liteLlmService: 'mikka-litellm-staging' }).services, [{ binding: 'LITELLM', service: 'mikka-litellm-staging' }])
+  const { converterRequest } = await import('../../../cloudflare/litellm/request.mjs')
+  const forwarded = converterRequest(new Request('https://anything.example/v1/responses', { method: 'POST', body: '{}' }))
+  assert.equal(forwarded.url, 'http://litellm/v1/responses')
+  for (const [path, method] of [['/v1/chat/completions', 'POST'], ['/v1/responses', 'GET'], ['/v1/responses?debug=1', 'POST'], ['/health', 'GET']]) {
+    assert.equal(converterRequest(new Request('https://anything.example' + path, { method, body: method === 'POST' ? '{}' : undefined })), null)
+  }
+})
