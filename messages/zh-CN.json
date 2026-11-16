@@ -5599,6 +5599,8 @@
     "denied": "已拒绝",
     "returnToTerminal": "回到终端启动 daemon",
     "done": "完成",
+    "expires": "到期时间",
+    "expired": "验证码已过期，请在终端重新发起设备登录。",
     "invalid": "验证码无效或已过期",
     "rateLimited": "查询次数过多，30 分钟后再试",
     "failed": "连接失败",
