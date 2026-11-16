@@ -23,6 +23,20 @@ export async function verifyOrganizationLifecycle({ page, workspaceId, passed, s
   assert.deepEqual((await request(path)).data.workspaceIds, [workspaceId])
   passed('packaged_owner_creates_renames_and_binds_current_team_workspace')
 
+  setPhase('organization_read_audit_and_explicit_export')
+  const audit = path + '/audit-log'
+  const listed = await request(audit + '?view=events&limit=1')
+  assert.equal(listed.status, 200)
+  assert.equal(listed.data.events.length, 1)
+  const exported = await request(audit, 'POST', {})
+  assert.equal(exported.status, 200)
+  assert.equal(exported.data.manifest.organizationId, created.data.id)
+  const frozen = await request(audit + '?exportId=' + exported.data.manifest.id + '&limit=1')
+  assert.equal(frozen.status, 200)
+  assert.equal(frozen.data.manifest.digest, exported.data.manifest.digest)
+  assert.equal(frozen.data.events.length, 1)
+  passed('packaged_organization_owner_reads_live_audit_and_frozen_export')
+
   setPhase('organization_detach_and_archive')
   const blocked = await request(path, 'DELETE')
   assert.equal(blocked.status, 409)
