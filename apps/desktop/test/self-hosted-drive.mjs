@@ -26,10 +26,11 @@ async function createFixtureFile(directory, sizeMiB) {
   return { path, name, sizeBytes: sizeMiB * MiB, sha256: hash.digest('hex') }
 }
 
-async function verifyDownloadedFile(application, page, fixture) {
+async function verifyDownloadedFile(application, page, fixture, receipt, stage) {
   // Playwright leaves Electron downloads under the OS's normal save-dialog
   // policy. Select the isolated destination on the actual DownloadItem.
   const destination = fixture.path + '.download'
+  stage('start_download')
   const window = await application.browserWindow(page)
   try {
     const [result] = await Promise.all([
@@ -52,8 +53,11 @@ async function verifyDownloadedFile(application, page, fixture) {
       }), { destination, expected: fixture.name }),
       page.getByText(fixture.name, { exact: true }).click(),
     ])
+    receipt.downloadState = result.state
+    receipt.downloadBytes = result.bytes
     assert.deepEqual(result, { state: 'completed', name: fixture.name, bytes: fixture.sizeBytes })
   } finally { await window.dispose() }
+  stage('verify_downloaded_bytes')
   const hash = createHash('sha256')
   let size = 0
   for await (const chunk of createReadStream(destination)) {
@@ -62,9 +66,10 @@ async function verifyDownloadedFile(application, page, fixture) {
   }
   assert.equal(size, fixture.sizeBytes)
   assert.equal(hash.digest('hex'), fixture.sha256)
+  receipt.sha256 = fixture.sha256
 }
 
-export async function verifyPersonalDriveUploads({ application, page, rpc, fixture, passed, setPhase, workspaceId, directory, folderCheck }) {
+export async function verifyPersonalDriveUploads({ application, page, rpc, fixture, passed, setPhase, workspaceId, directory, folderCheck, receipts }) {
   const files = await mkdtemp(join(directory, 'personal-drive-'))
   try {
     setPhase('personal_drive_open_artifacts')
@@ -105,31 +110,50 @@ export async function verifyPersonalDriveUploads({ application, page, rpc, fixtu
     if (!await upload.isVisible()) await folder.click()
     await expect(upload).toBeVisible()
     passed('packaged_personal_drive_new_folder_committed_and_open')
-    const receipts = []
     const headPath = volumes + '/' + encodeURIComponent(volume.id)
     for (const size of [33, DRIVE_MAX_FILE_BYTES / MiB]) {
-      setPhase('personal_drive_upload_' + size + '_MiB')
+      const stage = action => setPhase('personal_drive_' + size + '_MiB_' + action)
+      const receipt = { sizeBytes: size * MiB }
+      receipts.push(receipt)
+      stage('create_fixture')
       const file = await createFixtureFile(files, size)
+      stage('open_file_chooser')
       const [chooser] = await Promise.all([page.waitForEvent('filechooser'), upload.click()])
-      const [blob, published] = await Promise.all([
-        page.waitForResponse(r => r.request().method() === 'POST' && new URL(r.url()).pathname === headPath + '/blobs', { timeout: 60_000 }),
-        page.waitForResponse(r => r.request().method() === 'PATCH' && new URL(r.url()).pathname === headPath + '/entries', { timeout: 60_000 }),
-        chooser.setFiles(file.path),
+      stage('submit_upload')
+      // Keep each observed status even when a later step fails or the head is never published.
+      await Promise.all([
+        page.waitForResponse(r => r.request().method() === 'POST' && new URL(r.url()).pathname === headPath + '/blobs', { timeout: 60_000 })
+          .then(response => { receipt.blobStatus = response.status(); assert.equal(receipt.blobStatus, 201) }),
+        page.waitForResponse(r => r.request().method() === 'PATCH' && new URL(r.url()).pathname === headPath + '/entries', { timeout: 60_000 })
+          .then(response => { receipt.commitStatus = response.status(); assert.equal(receipt.commitStatus, 200) }),
+        chooser.setFiles(file.path).then(() => { receipt.fileSelected = true }),
       ])
-      assert.equal(blob.status(), 201)
-      assert.deepEqual(await blob.json(), { sha256: file.sha256, sizeBytes: file.sizeBytes })
-      assert.equal(published.status(), 200)
-      const { headVersionId } = await published.json()
-      assert.ok(isVolumeVersionId(headVersionId))
+      stage('read_committed_manifest')
+      // Chromium can evict the network-inspector entry for a large upload, including its
+      // response body. The authenticated renderer reads the persisted version and file hash.
+      const stored = await page.evaluate(async ({ path, name }) => {
+        const response = await fetch(path, { cache: 'no-store' })
+        if (!response.ok) return { status: response.status }
+        const { head } = await response.json()
+        return { status: response.status, version: head.headVersionId, entry: head.entries.find(item => item.path === name) }
+      }, { path: headPath + '?workspaceId=' + encodeURIComponent(workspaceId), name: file.name })
+      receipt.headStatus = stored.status
+      assert.equal(stored.status, 200)
+      assert.ok(isVolumeVersionId(stored.version))
+      assert.deepEqual(stored.entry, { path: file.name, mode: 420, sha256: file.sha256, sizeBytes: file.sizeBytes })
+      receipt.headVersionId = stored.version
+      receipt.manifestVerified = true
+      stage('reload_directory')
       await page.reload({ waitUntil: 'domcontentloaded' })
       // The folder selector may be local to the Artifact page. Reopen the
       // persisted folder when reloading takes the user to its directory.
       const visibleFile = page.getByText(file.name, { exact: true })
-      await expect(visibleFile.or(folder).first()).toBeVisible()
+      stage('find_folder_or_file')
+      await expect(visibleFile.or(folder).filter({ visible: true }).first()).toBeVisible()
       if (!await visibleFile.isVisible()) await folder.click()
+      stage('find_reloaded_file')
       await expect(visibleFile).toBeVisible()
-      await verifyDownloadedFile(application, page, file)
-      receipts.push({ sizeBytes: file.sizeBytes, sha256: file.sha256, headVersionId })
+      await verifyDownloadedFile(application, page, file, receipt, stage)
       passed('packaged_personal_drive_' + size + '_MiB_uploaded_committed_and_downloaded_after_reload')
     }
     assert.notEqual(receipts[0].headVersionId, receipts[1].headVersionId)
@@ -148,6 +172,5 @@ export async function verifyPersonalDriveUploads({ application, page, rpc, fixtu
     assert.deepEqual(peer, { list: 200, present: false, head: 404, file: 404 })
     passed('packaged_personal_drive_same_workspace_member_cannot_list_or_read_owner_files')
     await signInDesktopAccount(page, fixture, fixture.ownerId)
-    return receipts
   } finally { await rm(files, { recursive: true, force: true }) }
 }

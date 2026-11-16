@@ -53,8 +53,8 @@ export async function pollBots(workspaceId?: string) {
  * 新建 Bot: a name, a colour and a shape. Bots run on Mikka's own harness, so there is no machine to pick.
  * `model` and `repository` default to the workspace's 新 Bot 默认值 when omitted.
  */
-export async function createBot(input: { name: string; color: string; shape: string; model?: string | null; repository?: string | null }): Promise<BotView> {
-  return createOwnedBot(await getOwner(), input)
+export async function createBot(input: { name: string; color: string; shape: string; model?: string | null; repository?: string | null }, workspaceId?: string): Promise<BotView> {
+  return createOwnedBot(await getOwner(workspaceId), input)
 }
 
 /**
