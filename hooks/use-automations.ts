@@ -31,7 +31,7 @@ export function useAutomations(workspaceId: string | null, deleted = false) {
   const getKey = workspaceId ? listKey(workspaceId, deleted) : () => null
   const pages = useSWRInfinite<AutomationList>(getKey, ([, selectedWorkspace, deleted, cursor]: readonly [string, string, boolean, string | null]) =>
     listAutomations({ deleted, ...(cursor ? { cursor } : {}) }, selectedWorkspace).then(unwrap<AutomationList>), { revalidateOnFocus: false, shouldRetryOnError: false, revalidateFirstPage: false })
-  useLiveKey('schedule_list', workspaceId, workspaceId ? [unstable_serialize(getKey)] : [], workspaceId)
+  useLiveKey('schedule_list', workspaceId, workspaceId ? [unstable_serialize(getKey)] : [], workspaceId, { revalidate: pages.mutate })
   const automations = [...new Map((pages.data ?? []).flatMap(page => page.schedules).map(row => [row.id, row])).values()]
   return { ...pages, automations, more: Boolean(pages.data?.at(-1)?.nextCursor) }
 }
@@ -57,7 +57,7 @@ export function useWebhookBatches(workspaceId: string, scheduleId: string) {
   const pages = useSWRInfinite<WebhookBatchPage>(getKey, ([, selectedWorkspace, id, cursor]: readonly [string, string, string, string | null]) =>
     automationBatches({ scheduleId: id, ...(cursor ? { cursor } : {}) }, selectedWorkspace).then(unwrap<WebhookBatchPage>),
     { revalidateOnFocus: false, shouldRetryOnError: false, revalidateFirstPage: false })
-  useLiveKey('schedule_list', workspaceId, [unstable_serialize(getKey)], workspaceId)
+  useLiveKey('schedule_list', workspaceId, [unstable_serialize(getKey)], workspaceId, { revalidate: pages.mutate })
   return pages
 }
 
