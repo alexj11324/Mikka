@@ -24,6 +24,7 @@ const api = { version: 1, provider: 'github-actions', repository: 'alexj11324/Mi
     apiIngress: { path: 'ingress.mjs', sha256: '1'.repeat(64), bytes: 120 },
     eveRuntime: { path: 'workers/eve-runtime.mjs', sha256: '3'.repeat(64), bytes: 220 },
     taskSandbox: { path: 'workers/task-sandbox.mjs', sha256: '4'.repeat(64), bytes: 320 },
+    liteLlm: { path: 'workers/litellm.mjs', sha256: '4'.repeat(64), bytes: 320 },
     web: { path: 'workers/web.mjs', sha256: '5'.repeat(64), bytes: 420 },
     credentialIdentity: { path: 'workers/credential-identity.mjs', sha256: '6'.repeat(64), bytes: 520 },
     credentialBroker: { path: 'workers/credential-broker.mjs', sha256: '7'.repeat(64), bytes: 620 },

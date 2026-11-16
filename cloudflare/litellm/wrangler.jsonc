@@ -1,6 +1,5 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
-  // Deployed by the private release publisher; never routed publicly.
   "name": "mikka-litellm",
   "main": "worker.mjs",
   "compatibility_date": "2026-11-01",
@@ -9,13 +8,10 @@
   "preview_urls": false,
   "durable_objects": { "bindings": [{ "name": "LITELLM_CONTAINER", "class_name": "LiteLlm" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LiteLlm"] }],
-  // basic: 1/4 vCPU, 1 GiB. LiteLLM's proxy idles at a few hundred MB and only
-  // relays streams; one instance sleeps after five idle minutes.
   "containers": [{
     "class_name": "LiteLlm",
     "image": "../../deploy/litellm/Dockerfile",
     "instance_type": "basic",
     "max_instances": 1
   }]
-  // LITELLM_MASTER_KEY is a Worker secret delivered by the publisher.
 }
