@@ -3556,7 +3556,7 @@ test('isolated PG: producer command records bind owner/session/candidate and ret
   try {
     // Isolated real SQL/provenance boundaries; the native events themselves
     // are synthetic fixtures, not a live provider acceptance.
-    await db.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"sessionId" text,status text,"startedAt" timestamptz,"finishedAt" timestamptz,report jsonb);
+    await db.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"sessionId" text,status text,"startedAt" timestamptz,"finishedAt" timestamptz,report jsonb,"questionContinuation" jsonb);
       CREATE TABLE factory_tasks (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"candidateId" uuid,"sourceEventId" uuid,"botId" uuid,stage text);
       CREATE TABLE factory_attempts (id uuid PRIMARY KEY,"taskId" uuid,"runId" uuid,stage text);
       CREATE TABLE factory_candidates (id uuid PRIMARY KEY,"taskId" uuid,"runId" uuid,kind text,sha text);
