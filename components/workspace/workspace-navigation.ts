@@ -1,4 +1,4 @@
-import { pushSettingsHistory } from '@/lib/settings-navigation'
+import { pushSettingsHistory } from '../../lib/settings-navigation'
 
 /**
  * The workspace's address. One URL describes what is on screen, and every
@@ -186,6 +186,13 @@ export function openGroupConversation(id: string) {
 /** An app-root link to a place, e.g. `/?issue=<id>`; prefix the base path and locale where the caller needs them. */
 export function workspaceLink(place: Partial<WorkspaceLocation>): string {
   return `/${workspaceSearch(place)}`
+}
+
+/** Open one existing rail destination in an explicitly selected tenant. */
+export function workspaceSectionLink(section: WorkspaceSection, workspaceId: string): string {
+  const link = new URL(workspaceLink({ section }), 'https://mikka.invalid')
+  link.searchParams.set('workspace', workspaceId)
+  return link.pathname + link.search
 }
 
 /**

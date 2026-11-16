@@ -1,8 +1,9 @@
 import { readTaskEvidenceTarget, taskEvidenceHref } from './task-factory-events'
+import { workspaceSectionLink } from '../components/workspace/workspace-navigation'
 import { desktopWebTarget } from './desktop-web-target'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-export const mobileFilesPath = (workspaceId: string) => `/?section=artifacts&workspace=${workspaceId.toLowerCase()}`
+export const mobileFilesPath = (workspaceId: string) => workspaceSectionLink('artifacts', workspaceId.toLowerCase())
 export const mobileMembersPage = '/settings/members'
 /** A plugin's id, as the web's ?app= takes it (TOOLKIT_SLUG in lib/composio-accounts.ts). */
 const APP = /^[a-z][a-z0-9_]{0,63}$/
