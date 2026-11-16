@@ -284,3 +284,51 @@ dbTest('initial claim repository handoff removes a real cloud repos request with
     await scope.close()
   }
 })
+
+dbTest('an owned device lists authorized active thread roots from the current workspace only', async t => {
+  const [{ createRequestDatabaseScope, pool }, { activeThreadsOnOwnedDevice }] = await Promise.all([
+    import('./db'), import('./conversation-directory'),
+  ])
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const owner = 'device-threads-' + randomUUID(), peer = 'device-peer-' + randomUUID()
+  const owners = [owner, peer]
+  t.after(async () => {
+    await scope.run(async () => {
+      await pool.query('DELETE FROM agent_runs WHERE "userId"=ANY($1)', [owners])
+      await pool.query('DELETE FROM agents WHERE "userId"=ANY($1)', [owners])
+      await pool.query('DELETE FROM devices WHERE "ownerId"=ANY($1)', [owners])
+      await pool.query('DELETE FROM "user" WHERE id=ANY($1)', [owners])
+    })
+    await scope.close()
+  })
+  await scope.run(async () => {
+    for (const user of owners) await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,false,now(),now())', [user,user+'@example.invalid'])
+    const home = await seedFixtureWorkspace(pool, owner), other = await seedFixtureWorkspace(pool, peer)
+    const team = await seedFixtureWorkspace(pool, owner, 'team')
+    const device = randomUUID(), spare = randomUUID(), agent = randomUUID()
+    await pool.query(`INSERT INTO devices(id,"ownerId",name,kind) VALUES ($1,$3,'mine','local'),($2,$3,'spare','local')`, [device,spare,owner])
+    await pool.query(`INSERT INTO agents(id,"userId",name,harness) VALUES($1,$2,'device test','codex')`, [agent,owner])
+    const seedRun = async (status: string, workspace = home, machine = device, previous?: string) => {
+      const id = randomUUID()
+      await pool.query(`INSERT INTO agent_runs(id,"userId","workspaceId","agentId","deviceId",status,"continuesRunId")
+        VALUES($1,$2,$3,$4,$5,$6,$7)`, [id,owner,workspace,agent,machine,status,previous ?? null])
+      return id
+    }
+    const root = await seedRun('succeeded', home, spare)
+    await seedRun('waiting_input', home, device, root)
+    const terminal = await seedRun('running')
+    await seedRun('succeeded', home, device, terminal)
+    const moved = await seedRun('running')
+    await seedRun('running', home, spare, moved)
+    const queued = await seedRun('queued')
+    await seedRun('running', team)
+    const read = (actor: string, workspace: string, after?: string) => activeThreadsOnOwnedDevice(pool, actor, workspace, device, after)
+    const threads = [{id: root, status: 'waiting_input'}, {id: queued, status: 'queued'}].sort((a,b) => a.id.localeCompare(b.id))
+    assert.deepEqual(await read(owner,home), {threads, cursor:null})
+    assert.deepEqual(await read(owner,home,threads[0].id), {threads:threads.slice(1), cursor:null})
+    assert.equal(await read(peer,other), null)
+    assert.equal(await read(peer,home), null)
+    await pool.query('UPDATE devices SET "removedAt"=now() WHERE id=$1', [device])
+    assert.equal(await read(owner,home), null)
+  })
+})

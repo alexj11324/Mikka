@@ -864,6 +864,15 @@
       "sourceHash": "2626cc2b4623bdfdb7387ab0debef43b2a9cb334eaced7a85f5f446ae950d799"
     },
     {
+      "path": "/mikka/api/devices/[deviceId]/active-threads",
+      "template": "/api/devices/[deviceId]/active-threads",
+      "source": "app/api/devices/[deviceId]/active-threads/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "31df0d2e9016a30360983bfcd494dae02259f48da432da6080faf58d4b6cc1fd"
+    },
+    {
       "path": "/mikka/api/devices/[deviceId]/commands",
       "template": "/api/devices/[deviceId]/commands",
       "source": "app/api/devices/[deviceId]/commands/route.ts",
