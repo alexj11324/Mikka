@@ -4,7 +4,7 @@ base=Path(sys.argv[1]);qa=base/'run/case'
 def optional(p):
  try: return p.read_text()
  except (OSError,UnicodeError): return ''
-diagnostic=optional(qa/'daemon.log')
+diagnostic=optional(qa/'daemon.log'); build=optional(base/'build.log')
 fields = {name: bool(re.search(pattern,diagnostic,re.I)) for name,pattern in {
  'nodePackageMissing':r'ERR_MODULE_NOT_FOUND|MODULE_NOT_FOUND|Cannot find package',
  'filePermission':r'permission denied|EACCES|EPERM','tlsTrust':r'CERT_|self.signed|certificate','requestFailed':r'fetch failed|ECONNREFUSED|network unreachable',
@@ -17,4 +17,4 @@ fields = {name: bool(re.search(pattern,diagnostic,re.I)) for name,pattern in {
  }.items()}
 def version(p): return p.read_text().strip() if p.is_file() else None
 proof=json.loads(optional(qa/'proof.json') or '{}')
-print(json.dumps({'source':version(base/'source.sha'),'stage':proof.get('diagnostic'), 'phases':[x['phase'] for x in proof.get('checks',[])], 'success':proof.get('success'), 'kernel':version(base/'kernel'), 'nativeLogBytes':len(diagnostic), 'knownMarkers':{k:v for k,v in fields.items() if v}, 'nonSecretClasses':sorted(set(re.findall(r'\b(?:E[A-Z_]{2,40}|[A-Z][a-zA-Z]{0,18}Error)\b',diagnostic)))[:16]},indent=2))
+print(json.dumps({'source':version(base/'source.sha'),'stage':proof.get('diagnostic'), 'phases':[x['phase'] for x in proof.get('checks',[])], 'success':proof.get('success'), 'workbenchStage':version(base/'stage'), 'buildClasses':sorted(set(re.findall(r'\b(?:E[A-Z_]{2,40}|[A-Z][a-zA-Z]{0,18}Error)\b',build)))[:18], 'buildIndicators':[a for a,p in {'missingModule':r'Cannot find module|Cannot find package|could not resolve','outOfMemory':r'heap out|out of memory','killed':r'killed','diskFull':r'no space left','permissionDenied':r'EACCES|permission denied','database':r'POSTGRES|DATABASE_URL','missingBuild':r'build manifest','git':r'not a git repository','path':r'ENOENT','workflowModel':r'model-metadata-unavailable'}.items() if re.search(p,build,re.I)],'image':version(base/'image.id'), 'nativeLogBytes':len(diagnostic), 'knownMarkers':{k:v for k,v in fields.items() if v}, 'nonSecretClasses':sorted(set(re.findall(r'\b(?:E[A-Z_]{2,40}|[A-Z][a-zA-Z]{0,18}Error)\b',diagnostic)))[:16]},indent=2))

@@ -9,6 +9,15 @@ git init -q "$base/product"
 git -C "$base/product" fetch -q --depth 1 "file://$project" "$PUBLIC_SOURCE"
 git -C "$base/product" checkout -q --detach FETCH_HEAD
 test "$(git -C "$base/product" rev-parse HEAD)" = "$PUBLIC_SOURCE"
+image="ghcr.io/alexj11324/mikka:$PUBLIC_SOURCE"
+docker pull "$image" > "$base/image.log"
+test "$(docker inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")" = "$PUBLIC_SOURCE"
+container=$(docker create "$image")
+trap 'docker rm -v "$container" >/dev/null' EXIT
+docker cp "$container:/app/eve" "$base/product/apps/eve/.output"
+test "$(jq -r .revision "$base/product/apps/eve/.output/mikka-eve-build.json")" = "$PUBLIC_SOURCE"
+docker image inspect -f '{{.Id}}' "$image" > "$base/image.id"
+(cd "$project" && ELECTRON_SKIP_BINARY_DOWNLOAD=1 pnpm install --frozen-lockfile >"$base/build-install.log" 2>&1)
 harness="$1/original/evidence/2257/local-provider"
 cp "$harness"/{package.json,package-lock.json,provider.mjs} "$base/harness/"
 cp "$1/original-review/evidence/2271/current-review/provider.mjs" "$base/harness/provider-current.mjs"
@@ -44,5 +53,12 @@ import sys
 p=Path(sys.argv[1]);s=p.read_text()
 line=[l for l in s.splitlines() if 'if(native){const {withPackagedDeliveryWindow}' in l]
 assert len(line)==1
-p.write_text(s.replace(line[0], "  record('independent_registration_and_native_discovery');"))
+s=s.replace(line[0], "  record('independent_registration_and_native_discovery');")
+needle="  const enrolled=await scope.owner.request"
+s=s.replace(needle,"""  const transport=spawn(program,[...launcherArgs,'--input-type=module','-e',
+    'const origin="https://127.0.0.1:3859/mikka"; try { const version=await fetch(origin+"/api/version"); if(version.status!==200)process.exit(8); const denied=await fetch(origin+"/v1/devices/enroll",{method:"POST"}); if(denied.status!==401)process.exit(9); } catch(e) { process.exit(e.cause?.code==="ECONNREFUSED"?3:e.cause?.code==="SELF_SIGNED_CERT_IN_CHAIN"?4:e.cause?.code==="EPERM"?5:7) }'],{env:daemonEnv,stdio:'ignore'})
+  const [transportExit]=await once(transport,'exit')
+  record('separate_device_https_version_and_empty_grant_response',{exit:transportExit})
+  const enrolled=await scope.owner.request""")
+p.write_text(s)
 PY
