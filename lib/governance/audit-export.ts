@@ -4,8 +4,10 @@ import { and, asc, desc, eq, gt, inArray, lt, lte, sql, getTableColumns } from '
 import { z } from 'zod'
 import { organizationAuditEvents, organizationAuditExports, organizationResourcePolicies, organizations } from '@/lib/db/governance-schema'
 import { workspaceDb } from '@/lib/workspace-db'
+import { AUDIT_PAGE_DEFAULT, AUDIT_PAGE_MAX, decodeAuditCursor, encodeAuditCursor } from '@/lib/audit/cursor'
 import { auditDigest, auditExportRecords } from '@/lib/audit/integrity'
 import { AuditExportError, AUDIT_EXPORT_MAX } from '@/lib/audit/export'
+import { GovernanceError } from './errors'
 import { requireOrganizationAdmin } from './organizations'
 import { enqueueOrganizationAudit } from './audit'
 import { armDueTimerAfterCommit } from '@/lib/due-timer'
@@ -18,6 +20,47 @@ const exportInput = z.object({ from: z.iso.datetime({ offset: true }).optional()
 const columns = { ...getTableColumns(organizationAuditEvents), createdAtMicros: sql<string>`(extract(epoch from ${organizationAuditEvents.createdAt})*1000000)::bigint::text` }
 type Event = typeof organizationAuditEvents.$inferSelect & { createdAtMicros: string }
 const view = (row: Event) => ({ ...row, createdAt: row.createdAt.toISOString() })
+
+const auditListInput = z.object({
+  cursor: z.string().min(1).max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(AUDIT_PAGE_MAX).default(AUDIT_PAGE_DEFAULT),
+  order: z.enum(['asc', 'desc']).default('desc'),
+  actor: z.string().min(1).max(200).optional(),
+  userId: z.string().min(1).max(200).optional(),
+  family: z.string().regex(/^[a-z][a-z0-9_]{0,49}$/).optional(),
+  from: z.iso.datetime({ offset: true }).optional(),
+  to: z.iso.datetime({ offset: true }).optional(),
+  q: z.string().trim().min(1).max(200).optional(),
+}).strict()
+
+/** A live page of administrative events. Reading it never creates an export or an audit event. */
+export async function listOrganizationAuditEvents(organizationId: string, actorId: string, input: unknown) {
+  const args = auditListInput.parse(input)
+  const position = args.cursor ? decodeAuditCursor(args.cursor) : null
+  if ((args.cursor && !position) || (args.from && args.to && Date.parse(args.from) > Date.parse(args.to)))
+    throw new GovernanceError('invalid_request')
+  return workspaceDb.transaction(async tx => {
+    await requireOrganizationAdmin(tx, organizationId, actorId)
+    const events = organizationAuditEvents
+    const sort = args.order === 'asc' ? asc : desc
+    const comparator = args.order === 'asc' ? sql`>` : sql`<`
+    const rows = await tx.select(columns).from(events).where(and(
+      eq(events.organizationId, organizationId),
+      args.actor ? eq(events.actorId, args.actor) : undefined,
+      args.userId ? sql`(${events.actorId} = ${args.userId} OR ${events.metadata}->>'memberId' = ${args.userId}
+        OR (${events.action} IN ('organization.member_changed','organization.member_removed') AND ${events.targetId} = ${args.userId}))` : undefined,
+      args.family ? sql`split_part(${events.action}, '.', 1) = ${args.family}` : undefined,
+      args.from ? sql`${events.createdAt} >= ${args.from}::timestamptz` : undefined,
+      args.to ? sql`${events.createdAt} <= ${args.to}::timestamptz` : undefined,
+      args.q ? sql`strpos(lower(concat_ws(' ', ${events.action}, ${events.actorId}, ${events.targetId}, ${events.result})), lower(${args.q}::text)) > 0` : undefined,
+      position ? sql`(${events.createdAt}, ${events.id}) ${comparator}
+        (timestamptz 'epoch' + ${position.micros}::bigint * interval '1 microsecond', ${position.id}::uuid)` : undefined,
+    )).orderBy(sort(events.createdAt), sort(events.id)).limit(args.limit + 1)
+    const page = rows.slice(0, args.limit)
+    const last = page.at(-1)
+    return { events: page.map(view), nextCursor: last && rows.length > args.limit ? encodeAuditCursor({ micros: last.createdAtMicros, id: last.id }) : null }
+  })
+}
 
 /** Org events contain administrative metadata only. Workspace event exports keep their separate Workspace-admin ACL. */
 export async function createOrganizationAuditExport(organizationId: string, actorId: string, input: unknown, now = new Date(), cap = AUDIT_EXPORT_MAX) {
