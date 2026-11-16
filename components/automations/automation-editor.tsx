@@ -127,18 +127,20 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
       const saved = (result as { schedule: AutomationView }).schedule
       toast.success(t('saved'))
+      await invalidateAutomationList(mutateCache, workspaceId, false)
       if (creating) onOpen(saved.id)
       else { loaded.current = null; await automation.mutate(saved, { revalidate: false }) }
     } finally { setBusy(null) }
   }
   async function toggle(on: boolean) {
-    if (!current || busy) return
+    if (!current || !workspaceId || busy) return
     setBusy('toggle')
     try {
       const result = await (on ? resumeAutomation : pauseAutomation)({ scheduleId: current.id, version: current.version }, workspaceId ?? undefined)
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
       loaded.current = null
       await automation.mutate((result as { schedule: AutomationView }).schedule, { revalidate: false })
+      await invalidateAutomationList(mutateCache, workspaceId, false)
     } finally { setBusy(null) }
   }
   async function runNow() {
