@@ -8,7 +8,7 @@ import { join, matchesGlob } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { buildEnvironment, productionSha, verifyProductionBuild, PRODUCTION_VERSION_URL, REQUIRED,
-  assertCurrentMain, waitForWebDeployment, webDeploymentWaitOptions, deploymentPlan } from './web-deploy.mjs'
+  assertCurrentMain, waitForWebDeployment, containsDesktopSource, deploymentPlan } from './web-deploy.mjs'
 
 const SHA = 'a'.repeat(40)
 const pulled = [
@@ -460,67 +460,6 @@ test('runtime env, build and upload are ordered under the same job with fixed id
 })
 
 
-function desktopWebFixture({ headers = { 'x-vercel-id': 'legacy' }, version = () => OTHER, overlay = () => undefined, main = () => OTHER, budget = 500,
-  comparison = (base, head) => ({ url: `https://api.github.com/repos/alexj11324/Mikka/compare/${base}...${head}`,
-    base_commit: { sha: base }, merge_base_commit: { sha: base }, status: 'ahead', ahead_by: 1, behind_by: 0 }),
-  runs = build => [webRun({ head_sha: build })], job = build => buildJob({ head_sha: build }),
-} = {}) {
-  let elapsed = 0, activeBuild = null
-  const calls = []
-  const fetchImpl = async (input, init = {}) => {
-    const url = new URL(input)
-    calls.push({ url: String(url), method: init.method ?? 'GET', at: elapsed })
-    assert.equal(init.redirect, 'error')
-    if (url.origin === 'https://app.aspectlylabs.com') {
-      assert.equal(String(url), PRODUCTION_VERSION_URL)
-      assert.equal(init.headers.authorization, undefined)
-      assert.equal(init.cache, 'no-store')
-      activeBuild = version(elapsed, value => { elapsed = value })
-      return Response.json({ build: activeBuild, overlaySha: overlay(elapsed) }, { headers })
-    }
-    assert.equal(url.origin, 'https://api.github.com')
-    assert.equal(init.headers.authorization, 'Bearer read-only-fixture')
-    if (url.pathname.endsWith('/git/ref/heads/main')) return Response.json({ object: { type: 'commit', sha: main(elapsed) } })
-    if (url.pathname.includes('/compare/')) {
-      const [base, head] = url.pathname.split('/compare/')[1].split('...')
-      return Response.json(comparison(base, head, elapsed))
-    }
-    if (url.pathname.endsWith('/actions/workflows/web-deploy.yml/runs')) {
-      assert.equal(url.searchParams.get('head_sha'), activeBuild)
-      assert.equal(url.searchParams.get('branch'), 'main')
-      return Response.json({ workflow_runs: runs(activeBuild, elapsed) })
-    }
-    const match = /^\/repos\/alexj11324\/Mikka\/actions\/runs\/(70|71)\/attempts\/2\/jobs$/.exec(url.pathname)
-    assert.ok(match)
-    return Response.json({ total_count: 1, jobs: [job(activeBuild, elapsed, Number(match[1]))] })
-  }
-  return { calls, run: extra => waitForWebDeployment({ expectedBuild: SHA, allowDescendant: true,
-    token: 'read-only-fixture', fetchImpl, now: () => elapsed,
-    wait: async ms => { elapsed += ms }, intervalMs: 100, maxWaitMs: budget, ...extra }),
-  elapsed: () => elapsed }
-}
-
-test('desktop release accepts a deployed descendant while preserving its own source identity', async () => {
-  const fixture = desktopWebFixture()
-  const result = await fixture.run()
-  assert.equal(result.sourceCommit, SHA)
-  assert.equal(result.publicBuild, OTHER)
-  assert.equal(result.webRunId, 70)
-  assert.equal(result.webAttempt, 2)
-  assert.ok(fixture.calls.every(call => call.method === 'GET'))
-  assert.equal(fixture.calls.some(call => call.url.includes('/git/ref/heads/main')), false,
-    'an unrelated later main commit does not invalidate an already deployed descendant')
-})
-
-test('desktop cannot use the legacy publisher after cutover, even if the public source is unchanged', async () => {
-  for (const headers of [{}, { 'cf-ray': 'edge', 'x-mikka-gateway-version-sha256': 'a'.repeat(64) },
-    { 'x-vercel-id': 'old', 'x-mikka-gateway-version-sha256': 'a'.repeat(64) }]) {
-    const fixture = desktopWebFixture({ headers })
-    await assert.rejects(fixture.run(), /desktopProviderRequiresReceipt/)
-    assert.equal(fixture.calls.length, 1)
-  }
-})
-
 test('desktop replaces obsolete preflights while preserving active signing and documentation does not trigger a release', () => {
   const desktop = readFileSync(new URL('../../.github/workflows/desktop-release.yml', import.meta.url), 'utf8')
   assert.doesNotMatch(desktop, /^concurrency:/m, 'a new workflow must not cancel a running signing job')
@@ -543,7 +482,7 @@ test('desktop replaces obsolete preflights while preserving active signing and d
   }
 })
 
-test('real Git ancestry admits the same source or descendants and never an older or divergent Web', async () => {
+test('real Git ancestry admits the same source or descendants and never an older or divergent public commit', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'desktop-web-ancestry-'))
   const git = args => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
   const commit = text => {
@@ -564,15 +503,15 @@ test('real Git ancestry admits the same source or descendants and never an older
         status: ahead && behind ? 'diverged' : ahead ? 'ahead' : behind ? 'behind' : 'identical',
         ahead_by: ahead, behind_by: behind }
     }
+    const fetchImpl = async (input, init = {}) => {
+      const url = new URL(input)
+      assert.equal(init.headers.authorization, 'Bearer read-only-fixture')
+      const [base, head] = url.pathname.split('/compare/')[1].split('...')
+      return Response.json(comparison(base, head))
+    }
     for (const [candidate, allowed] of [[desktop, true], [descendant, true], [older, false], [divergent, false]]) {
-      const fixture = desktopWebFixture({ version: () => candidate, comparison, budget: 200 })
-      if (allowed) {
-        const result = await fixture.run({ expectedBuild: desktop })
-        assert.equal(result.sourceCommit, desktop)
-        assert.equal(result.publicBuild, candidate)
-      } else {
-        await assert.rejects(fixture.run({ expectedBuild: desktop }), /matchingWebDeploymentTimedOut/)
-      }
+      assert.equal(await containsDesktopSource({ expectedBuild: desktop, publicCommit: candidate,
+        token: 'read-only-fixture', fetchImpl }), allowed, candidate)
     }
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
@@ -584,77 +523,16 @@ test('an unbound or malformed GitHub comparison cannot admit a desktop release',
     { base_commit: { sha: OTHER } }, { merge_base_commit: {} },
     { status: 'unknown' }, { ahead_by: -1 }, { behind_by: null },
   ]) {
-    const fixture = desktopWebFixture({ comparison: (base, head) => ({
-      url: 'https://api.github.com/repos/alexj11324/Mikka/compare/' + base + '...' + head,
-      base_commit: { sha: base }, merge_base_commit: { sha: base }, status: 'ahead', ahead_by: 1, behind_by: 0,
-      ...patch,
-    }) })
-    await assert.rejects(fixture.run(), /invalidCommitComparison/)
+    const fetchImpl = async input => {
+      const [base, head] = new URL(input).pathname.split('/compare/')[1].split('...')
+      return Response.json({ url: 'https://api.github.com/repos/alexj11324/Mikka/compare/' + base + '...' + head,
+        base_commit: { sha: base }, merge_base_commit: { sha: base }, status: 'ahead', ahead_by: 1, behind_by: 0, ...patch })
+    }
+    await assert.rejects(containsDesktopSource({ expectedBuild: SHA, publicCommit: OTHER, token: 'read-only-fixture', fetchImpl }),
+      /invalidCommitComparison/)
   }
 })
 
-test('desktop waits for a newer compatible Web instead of stopping at its obsolete failed build', async () => {
-  const fixture = desktopWebFixture({ version: elapsed => elapsed < 100 ? 'c'.repeat(40) : OTHER,
-    comparison: (base, head) => ({
-      url: 'https://api.github.com/repos/alexj11324/Mikka/compare/' + base + '...' + head,
-      base_commit: { sha: base }, merge_base_commit: { sha: head === OTHER ? base : head },
-      status: head === OTHER ? 'ahead' : 'behind', ahead_by: head === OTHER ? 1 : 0, behind_by: head === OTHER ? 0 : 1,
-    }) })
-  const result = await fixture.run()
-  assert.equal(result.publicBuild, OTHER)
-  assert.equal(fixture.elapsed(), 100)
-  assert.equal(fixture.calls.some(call => call.url.includes('head_sha=' + SHA)), false,
-    'the failed obsolete Web source is not treated as evidence for the live candidate')
-})
-
-test('a changed public candidate is reverified before the desktop can be released', async () => {
-  let publicReads = 0
-  const later = 'c'.repeat(40)
-  const fixture = desktopWebFixture({
-    version: () => ++publicReads === 1 ? OTHER : later,
-    runs: build => [webRun({ head_sha: build, id: build === OTHER ? 70 : 71 })],
-  })
-  const result = await fixture.run()
-  assert.equal(result.publicBuild, later)
-  assert.equal(result.webRunId, 71)
-  assert.equal(fixture.elapsed(), 100)
-  assert.ok(fixture.calls.some(call => call.url.includes('/compare/' + SHA + '...' + later)))
-})
-
-test('descendant mode retains successful same-source Web build, upload and public verification gates', async () => {
-  for (const conclusion of ['failure', 'cancelled', 'timed_out', 'skipped']) {
-    const fixture = desktopWebFixture({ runs: build => [webRun({ head_sha: build, conclusion })] })
-    await assert.rejects(fixture.run(), /matchingWebRunFailed:70/)
-  }
-  for (const step of [0, 1, 2]) {
-    const fixture = desktopWebFixture({ job: build => {
-      const job = buildJob({ head_sha: build })
-      job.steps[step].conclusion = 'skipped'
-      return job
-    } })
-    await assert.rejects(fixture.run(), /matchingWebBuildSkippedOrIncomplete/)
-  }
-  const foreign = desktopWebFixture({ runs: build => [webRun({ head_sha: build,
-    repository: { full_name: 'fork/Mikka' } })], budget: 200 })
-  await assert.rejects(foreign.run(), /matchingWebDeploymentTimedOut/)
-})
-
-test('desktop verification cannot succeed after its deadline or start without a GitHub identity', async () => {
-  const expired = desktopWebFixture({ version: (_elapsed, advance) => { advance(501); return OTHER } })
-  await assert.rejects(expired.run(), /matchingWebDeploymentTimedOut/)
-  const missing = desktopWebFixture()
-  await assert.rejects(missing.run({ token: undefined }), /githubTokenRequired/)
-  assert.equal(missing.calls.length, 0)
-})
-
-test('private-push dispatch waits through an older overlay on an otherwise valid desktop descendant', async () => {
-  const fixture = desktopWebFixture({ overlay: elapsed => elapsed < 200 ? OTHER : SHA })
-  const result = await fixture.run({ expectedOverlay: SHA })
-  assert.equal(result.publicBuild, OTHER)
-  assert.equal(fixture.elapsed(), 200)
-  const mismatch = desktopWebFixture({ overlay: () => OTHER, budget: 250 })
-  await assert.rejects(mismatch.run({ expectedOverlay: SHA }), /matchingWebDeploymentTimedOut/)
-})
 test('private-push exact-source wait keeps matching overlay behavior', async () => {
   const fixture = webFixture({ overlay: elapsed => elapsed < 200 ? OTHER : SHA })
   assert.equal((await fixture.run({ expectedOverlay: SHA })).publicBuild, SHA)
@@ -726,7 +604,7 @@ test('duplicate required step cannot hide a failure or pending record behind one
   ])
 })
 
-test('runtime CLI waits beyond forty minutes for the latest Web run instead of accepting an older successful push', async () => {
+test('a ninety-minute wait passes forty minutes for the latest Web run instead of accepting an older successful push', async () => {
   const latestSucceedsAt = 40 * 60_000 + 9_000
   const fixture = webFixture({
     // An older successful push and matching public version cannot admit the latest pending dispatch.
@@ -737,7 +615,7 @@ test('runtime CLI waits beyond forty minutes for the latest Web run instead of a
     ],
     version: () => SHA,
   })
-  const result = await fixture.run({ ...webDeploymentWaitOptions('await-web'), intervalMs: 10_000 })
+  const result = await fixture.run({ maxWaitMs: 90 * 60_000, intervalMs: 10_000 })
   assert.equal(result.webRunId, 70)
   assert.equal(result.webAttempt, 2)
   assert.equal(result.sourceCommit, SHA)
@@ -747,27 +625,11 @@ test('runtime CLI waits beyond forty minutes for the latest Web run instead of a
     [40 * 60_000 + 10_000], 'an older successful push cannot bypass the latest pending dispatch')
 })
 
-test('desktop CLI still times out at forty minutes while the latest Web run is pending', async () => {
-  const latestSucceedsAt = 40 * 60_000 + 9_000
-  const fixture = desktopWebFixture({
-    runs: (build, elapsed) => [
-      webRun({ head_sha: build, id: 69, run_attempt: 1, event: 'push' }),
-      webRun({ head_sha: build, event: 'workflow_dispatch',
-        ...(elapsed < latestSucceedsAt ? { status: 'in_progress', conclusion: null } : {}) }),
-    ],
-  })
-  await assert.rejects(fixture.run({ ...webDeploymentWaitOptions('await-desktop-web'), intervalMs: 10_000 }),
-    /matchingWebDeploymentTimedOut/)
-  assert.equal(fixture.elapsed(), 40 * 60_000)
-  assert.equal(fixture.calls.some(call => /\/actions\/runs\/\d+\/attempts\/\d+\/jobs/.test(call.url)), false,
-    'the older successful push cannot provide build evidence while the latest dispatch is pending')
-})
-
-test('runtime CLI stops at ninety minutes while required Web step evidence remains pending without reading public', async () => {
+test('a ninety-minute wait stops while required Web step evidence remains pending without reading public', async () => {
   const job = buildJob()
   Object.assign(job.steps[2], { status: 'pending', conclusion: null })
   const fixture = webFixture({ job })
-  await assert.rejects(fixture.run({ ...webDeploymentWaitOptions('await-web'), intervalMs: 10_000 }),
+  await assert.rejects(fixture.run({ maxWaitMs: 90 * 60_000, intervalMs: 10_000 }),
     /matchingWebDeploymentTimedOut/)
   assert.equal(fixture.elapsed(), 90 * 60_000)
   assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0,
