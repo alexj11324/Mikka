@@ -44,6 +44,17 @@ export type AutomationRun = {
     | { event: { source: 'linear'; event: string; identifier: string | null; title: string | null; url: string | null } }
     | { event: { source: 'slack'; event: string; channel: string; reaction: string | null } } | { webhook: { requests: { at: string }[] } } | null
 }
+export type WebhookBatchPage = {
+  batches: {
+    id: string
+    status: 'collecting' | 'queued' | 'cancelled'
+    runStatus: AutomationRun['status']
+    created_at: string | Date
+    due_at: string | Date
+    requestCount: number
+  }[]
+  nextCursor: string | null
+}
 export type AutomationHistory = { occurrences: AutomationRun[] }
 export type AutomationUsageDay = { day: string; runs: number; skipped: number; tasks: number; costMicroUsd: number | null }
 export type AutomationUsage = { timezone: string; maxRunsPerDay: number | null; days: AutomationUsageDay[] }
