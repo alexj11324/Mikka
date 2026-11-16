@@ -740,6 +740,27 @@
     "test": "tests/resource-access.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "app/api/workspaces/[workspaceId]/project-visibility-default/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads or updates the current Organization member’s new Project sharing default using the installation Workspace database.",
+    "test": "tests/resource-access.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "lib/project-input.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validates the Project draft and optional observed Organization sharing default without external services.",
+    "test": "tests/resource-access.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "lib/resource-access/project-creation-default.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Resolves the member’s default and compares the observed Organization binding before registering a new Project in this installation.",
+    "test": "tests/resource-access.db.test.ts",
+    "suite": "test:visibility-db"
+  },
   "lib/abuse/workers-ai.ts": {
     "mode": "optional-cloud",
     "environment": [
