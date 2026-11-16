@@ -196,6 +196,47 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
       outcome.release()
     }
   })
+  await t.test('Drive Skill metadata uses current authorized files, paginates literal paths and never returns instructions', async () => {
+    const group = await seedTeam(fixture, team.id, owner)
+    const projectId = await seedProject(fixture, owner, [{ teamId: group.id, workspaceId: team.id }])
+    const writer = { token: sharedToken, workspaceId: team.id, projectId, driveScope: 'project' }
+    const reader = { ...writer, token: peerToken }
+    const volume = (await (await call('', { ...writer, method: 'POST', body: { name: 'Shared skills' } })).json()).volume
+    const files = [
+      ['SKILL.md', '---\nname: root-guide\ndescription: First guide\n---\nHidden root instructions'],
+      ['a fragment/#guide/SKILL.md', '---\nname: "second"\ndescription: Another guide\n---\nInvisible instructions'],
+      ['b/SKILL.md', 'bad\0binary'], ['big/SKILL.md', 'a'.repeat(20_001)], ['not-SKILL.md', 'not metadata'],
+    ]
+    const changes = []
+    for (const [path, content] of files) {
+      const response = await call('/' + volume.id + '/blobs', { ...writer, method: 'POST', raw: content })
+      assert.equal(response.status, 201)
+      changes.push({ op: 'put', mode: 0o644, path, ...await response.json() })
+    }
+    const publish = await call('/' + volume.id + '/entries', { ...writer, method: 'PATCH',
+      body: { expectedDigest: volume.headDigest, mutationId: randomUUID(), changes } })
+    assert.equal(publish.status, 200)
+    const receipt = await publish.json()
+    const first = await (await call('?view=skills&limit=1', reader)).json()
+    assert.deepEqual(first.skills, [{ volumeId: volume.id, versionId: receipt.headVersionId, path: 'SKILL.md', name: 'root-guide', description: 'First guide' }])
+    const next = new URLSearchParams({ view: 'skills', afterVolume: first.nextCursor.volumeId, afterPath: first.nextCursor.path })
+    const second = await (await call('?' + next, reader)).json()
+    assert.deepEqual(second.skills, [{ volumeId: volume.id, versionId: receipt.headVersionId, path: 'a fragment/#guide/SKILL.md', name: 'second', description: 'Another guide' }])
+    assert.equal(second.nextCursor, null)
+    assert.deepEqual(await (await call('?view=skills', { token: sharedToken, workspaceId: team.id, projectId })).json(), { skills: [], nextCursor: null })
+    assert.equal((await call('?view=skills', { ...writer, token: null })).status, 401)
+    assert.equal((await call('?view=skills&afterPath=SKILL.md', writer)).status, 400)
+    assert.equal((await call('?view=skills&threadId=' + randomUUID(), writer)).status, 400)
+    const removed = await call('/' + volume.id + '/entries', { ...writer, method: 'PATCH', body: {
+      expectedDigest: receipt.headDigest, mutationId: randomUUID(), changes: [{ op: 'delete', path: 'SKILL.md' }],
+    } })
+    assert.equal(removed.status, 200)
+    assert.deepEqual((await (await call('?view=skills', reader)).json()).skills.map((row: { name: string }) => row.name), ['second'])
+    assert.equal((await call('/' + volume.id + '/archive', { ...writer, method: 'POST' })).status, 200)
+    assert.deepEqual(await (await call('?view=skills', reader)).json(), { skills: [], nextCursor: null })
+    await fixture.query("update resource_access_policies set visibility='private' where kind='project' and id=$1", [projectId])
+    assert.equal((await call('?view=skills', reader)).status, 404)
+  })
   const created = await call('', { method: 'POST', body: { name: `Drive ${randomUUID()}` } })
   assert.equal(created.status, 201)
   const volume = (await created.json()).volume

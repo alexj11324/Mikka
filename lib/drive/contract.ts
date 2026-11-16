@@ -297,3 +297,8 @@ export function driveScopeProblem(driveScope: unknown, scopeId: unknown, scopeUs
   if (driveScope === 'project-user') return hasUser && scopeUserId.length <= 200 ? null : 'scope_user_required'
   return scopeUserId === null || scopeUserId === undefined ? null : 'scope_user_unexpected'
 }
+
+
+export interface DriveSkillCursor { volumeId: string; path: string }
+export interface DriveSkillMetadata extends DriveSkillCursor { versionId: string; name: string; description: string }
+export interface DriveSkillPage { skills: DriveSkillMetadata[]; nextCursor: DriveSkillCursor | null }

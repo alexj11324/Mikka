@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import { artifactStorage, getArtifactObjectStream, putArtifactObject } from '@/lib/artifacts/storage'
 import { DRIVE_MAX_FILE_BYTES } from './contract'
+import { DriveError } from './store'
 
 /**
  * Drive's blobs: the same object storage and the same sha256 convention the
@@ -78,4 +79,24 @@ export async function recordDriveBlob(client: Pick<PoolClient, 'query'>, blob: S
   await client.query(`INSERT INTO drive_blobs ("ownerId",sha256,"sizeBytes","storageKey","inlineContent","workspaceId","projectId")
     VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT ("ownerId",sha256) DO NOTHING`,
     [blob.ownerId, blob.sha256, blob.sizeBytes, storageKey, storageKey === null ? Buffer.from(bytes) : null, blob.project?.workspaceId ?? null, blob.project?.projectId ?? null])
+}
+
+export async function boundedDriveBytes(body: ReadableStream<Uint8Array> | null, limit: number) {
+  const reader = body?.getReader()
+  if (!reader) return new Uint8Array(0)
+  const chunks: Uint8Array[] = []
+  let size = 0
+  try {
+    for (;;) {
+      const next = await reader.read()
+      if (next.done) break
+      size += next.value.byteLength
+      if (size > limit) {
+        await reader.cancel()
+        throw new DriveError('drive_limit_exceeded', 413)
+      }
+      chunks.push(next.value)
+    }
+  } finally { reader.releaseLock() }
+  return driveBytes(Buffer.concat(chunks, size))
 }

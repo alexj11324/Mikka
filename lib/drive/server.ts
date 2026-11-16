@@ -10,10 +10,11 @@ import { accessibleProjectNames, withReadableProject } from '@/lib/project-acces
 import { withTaskWorkspace } from '@/lib/task-workspace'
 import { workspaceListChanged } from '@/lib/live/lists'
 import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, isVolumeId, isVolumeVersionId } from './contract'
-import { driveBytes, driveSha256, readDriveBlobObject, recordDriveBlob, storeDriveBlob } from './blobs'
+import { boundedDriveBytes, driveBytes, driveSha256, readDriveBlobObject, recordDriveBlob, storeDriveBlob } from './blobs'
 import { applyDriveWrite, DriveError, readDriveFileHistory, readDriveHistory, readDriveVersion, restoreDriveVersion } from './store'
 import { createDriveVolume, listDriveVolumes, readDriveVolume, setPersonalDriveArchive } from './volumes'
 import { driveErrorResponse } from './http'
+import { listDriveSkills } from './skills'
 
 const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }
 const digest = z.string().regex(/^[a-f0-9]{64}$/)
@@ -28,28 +29,8 @@ type Operation = 'scopes' | 'volumes' | 'volume' | 'write' | 'upload' | 'file' |
 type Params = { volumeId?: string; versionId?: string }
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers })
 
-async function bytes(request: Request, limit: number) {
-  const reader = request.body?.getReader()
-  if (!reader) return new Uint8Array(0)
-  const chunks: Uint8Array[] = []
-  let size = 0
-  try {
-    for (;;) {
-      const next = await reader.read()
-      if (next.done) break
-      size += next.value.byteLength
-      if (size > limit) {
-        await reader.cancel()
-        throw new DriveError('drive_limit_exceeded', 413)
-      }
-      chunks.push(next.value)
-    }
-  } finally { reader.releaseLock() }
-  return driveBytes(Buffer.concat(chunks, size))
-}
-
 async function body(request: Request) {
-  return JSON.parse(new TextDecoder().decode(await bytes(request, 16 * 1024 * 1024))) as unknown
+  return JSON.parse(new TextDecoder().decode(await boundedDriveBytes(request.body, 16 * 1024 * 1024))) as unknown
 }
 
 /** First HTTP surface over the existing volume, CAS and object-store implementation. */
@@ -63,6 +44,8 @@ export async function driveResponse(request: Request, operation: Operation, para
     const selection = search.get('driveScope')
     if (selection !== null && selection !== 'project') return json({ error: 'drive_write_invalid' }, 400)
     const sharedProject = selection === 'project'
+    const view = search.get('view')
+    if (view !== null && (view !== 'skills' || operation !== 'volumes' || request.method !== 'GET')) return json({ error: 'drive_write_invalid' }, 400)
     if (operation === 'scopes') {
       return await withTaskWorkspace(session.user, workspaceId, async (_workspace, tx) => {
         const projects = await accessibleProjectNames(session.user, workspaceId, tx)
@@ -89,6 +72,17 @@ export async function driveResponse(request: Request, operation: Operation, para
       ? { driveScope: 'project-user' as const, scopeId: projectId, scopeUserId: session.user.id }
       : { driveScope: 'user' as const, scopeId: session.user.id }
     const serve = async () => {
+      if (view === 'skills') {
+        if (search.has('threadId')) return json({ error: 'drive_write_invalid' }, 400)
+        const afterVolume = search.get('afterVolume')
+        const afterPath = search.get('afterPath')
+        if ((afterVolume === null) !== (afterPath === null)) return json({ error: 'drive_write_invalid' }, 400)
+        const after = afterVolume === null ? undefined : {
+          volumeId: z.string().refine(isVolumeId).parse(afterVolume), path: z.string().refine(isDrivePath).parse(afterPath),
+        }
+        const limit = z.coerce.number().int().min(1).max(25).parse(search.get('limit') ?? '25')
+        return json(await listDriveSkills(pool, actor, { ...scope, workspaceId }, { after, limit }, request.signal))
+      }
       if (operation === 'volumes') {
         if (request.method === 'POST') {
           const input = z.object({ name: z.string().trim().min(1).max(200) }).strict().parse(await body(request))
@@ -144,7 +138,7 @@ export async function driveResponse(request: Request, operation: Operation, para
         return json(result)
       }
       if (operation === 'upload') {
-        const content = await bytes(request, DRIVE_MAX_FILE_BYTES)
+        const content = await boundedDriveBytes(request.body, DRIVE_MAX_FILE_BYTES)
         const blob = await storeDriveBlob(actor.ownerId, content, projectStorage)
         await recordDriveBlob(pool, blob, content)
         await pool.query(`INSERT INTO drive_blob_admissions("ownerId",sha256,"workspaceId") VALUES($1,$2,$3)
