@@ -116,11 +116,11 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
   if (!draft) return <EditorFrame onBack={onBack} backLabel={t('back')}><div role="status" aria-label={tAll('loading')} className="flex flex-col gap-3">{[0, 1, 2].map(index => <Skeleton key={index} className="h-24 w-full rounded-2xl" />)}</div></EditorFrame>
 
   async function save() {
-    if (!check || !('definition' in check) || busy) return
+    if (!workspaceId || !check || !('definition' in check) || busy) return
     setBusy('save')
     try {
       const result = creating
-        ? await createAutomation({ requestId: requestId.current, definition: check.definition })
+        ? await createAutomation({ requestId: requestId.current, definition: check.definition }, workspaceId)
         : await updateAutomation({ scheduleId: current!.id, version: current!.version, definition: check.definition })
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
       const saved = (result as { schedule: AutomationView }).schedule
@@ -186,7 +186,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
   const otherBot = draft.botId && !ownBots.some(bot => bot.id === draft.botId) ? workspaceBots.get(draft.botId) : null
   const localDevices = devices.filter(device => device.enabled || device.id === draft.machine)
   const active = current?.status === 'active'
-  const canSave = Boolean(check && 'definition' in check) && !busy
+  const canSave = Boolean(workspaceId && check && 'definition' in check) && !busy
   const creator = !current || current.owner_id === userId ? t('you') : current.owner_name ?? ''
   const field = (label: string, control: React.ReactNode) => <SettingRow title={label}><div className="flex flex-wrap items-center justify-end gap-2">{control}</div></SettingRow>
 
