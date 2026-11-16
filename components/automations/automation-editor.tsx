@@ -299,7 +299,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
       </div>}
       {!draft.otherTask && <>
         <SettingRow title={t('github.title')} />
-        <GitHubTriggers value={draft.github} repositories={repositories} disabled={busy !== null} onChange={github => set({ github })} />
+        <GitHubTriggers workspaceId={workspaceId} userId={userId} value={draft.github} repositories={repositories} disabled={busy !== null} onChange={github => set({ github })} />
         <SettingRow title={t('linear.title')}>
           {!linearWanted && !draft.linear.length && <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => setLinearWanted(true)}>{t('linear.show')}</Button>}
         </SettingRow>

@@ -4,7 +4,7 @@ import type { TaskDestination } from '@/lib/task-destination'
 
 export type ScheduleKind = 'once' | 'interval' | 'daily' | 'cron'
 /** One GitHub event trigger as the editor holds it; lists are comma-separated text. */
-export type GitHubTriggerDraft = { event: GitHubTriggerEvent; repositories: string[]; branches: string; labels: string; runWhen: string }
+export type GitHubTriggerDraft = { event: GitHubTriggerEvent; repositories: string[]; branches: string; labels: string; pullAuthors?: string; runWhen: string }
 export type LinearTriggerDraft = { event: LinearTriggerEvent; teams: string[]; labels: string; runWhen: string }
 export type SlackTriggerDraft = { event: SlackTriggerEvent; channels: string[]; reactions: string; runWhen: string }
 export type IntervalUnit = 'minutes' | 'hours' | 'days'
@@ -104,7 +104,7 @@ export function draftFrom(definition: Definition, now = new Date()): AutomationD
     taskTitle: task.kind === 'dispatch_task' ? task.title ?? '' : '',
     misfire: definition.misfire, lateness: definition.maxLatenessMinutes, concurrent: definition.maxConcurrent ?? 1, perDay: definition.maxRunsPerDay ?? 0, eachRun: definition.eachRun ?? 'new_task',
     github: (definition.events ?? []).flatMap(trigger => trigger.source === 'github' ? [{ event: trigger.event, repositories: [...trigger.repositories],
-      branches: (trigger.branches ?? []).join(', '), labels: (trigger.labels ?? []).join(', '), runWhen: trigger.runWhen ?? '' }] : []),
+      branches: (trigger.branches ?? []).join(', '), labels: (trigger.labels ?? []).join(', '), ...(trigger.pullAuthors?.length ? { pullAuthors: trigger.pullAuthors.join(', ') } : {}), runWhen: trigger.runWhen ?? '' }] : []),
     linear: (definition.events ?? []).flatMap(trigger => trigger.source === 'linear' ? [{ event: trigger.event, teams: [...trigger.teams],
       labels: (trigger.labels ?? []).join(', '), runWhen: trigger.runWhen ?? '' }] : []),
     slack: (definition.events ?? []).flatMap(trigger => trigger.source === 'slack' ? [{ event: trigger.event, channels: [...trigger.channels],
@@ -118,8 +118,9 @@ export function draftFrom(definition: Definition, now = new Date()): AutomationD
 const list = (text: string) => [...new Set(text.split(/[,，]/).map(item => item.trim()).filter(Boolean))]
 function eventTrigger(draft: GitHubTriggerDraft): EventTrigger {
   const branches = list(draft.branches), labels = list(draft.labels)
+  const pullAuthors = list(draft.pullAuthors ?? '').map(name => name.replace(/^@/, '').toLowerCase())
   return { source: 'github', event: draft.event, repositories: draft.repositories,
-    ...(branches.length ? { branches } : {}), ...(labels.length ? { labels } : {}), ...(draft.runWhen.trim() ? { runWhen: draft.runWhen.trim() } : {}) }
+    ...(branches.length ? { branches } : {}), ...(labels.length ? { labels } : {}), ...(pullAuthors.length ? { pullAuthors: [...new Set(pullAuthors)] } : {}), ...(draft.runWhen.trim() ? { runWhen: draft.runWhen.trim() } : {}) }
 }
 function slackTrigger(draft: SlackTriggerDraft): EventTrigger {
   const reactions = list(draft.reactions).map(name => name.replace(/^:|:$/g, '').toLowerCase()).filter(Boolean)

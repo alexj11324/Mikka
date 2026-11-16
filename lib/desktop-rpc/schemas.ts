@@ -1,7 +1,7 @@
 import { AVATAR_MAX_BYTES, isAvatarContentType } from '../account/avatar-file'
 import { threadModelChoice } from '@/lib/thread-model-choice'
 import { archiveIdleDays, conversationTargetInput, directoryInput } from '@/lib/conversation-directory-input'
-import { listProjectSetupVersionsInput, rollbackProjectSetupInput, saveEnvironmentInput, listDependencyRepositoriesInput, replaceDependencyRepositoriesInput, projectDefaultEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
+import { projectPullAuthorInput, listProjectSetupVersionsInput, rollbackProjectSetupInput, saveEnvironmentInput, listDependencyRepositoriesInput, replaceDependencyRepositoriesInput, projectDefaultEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
 import { createOnlyCommand, dispatchReceiptInput } from '@/lib/task-create-command'
 import { taskListPageInput } from '@/lib/task-list-page'
 import { taskPresentationsInput } from '@/lib/task-presentation-input'
@@ -117,6 +117,7 @@ export const desktopActionSchemas = {
   'project-resources.listProjectResources': tuple(uuid, uuid.optional()),
   'project-resources.setProjectDefaultEnvironment': tuple(projectDefaultEnvironmentInput),
   'project-resources.saveEnvironment': tuple(saveEnvironmentInput),
+  'project-resources.searchProjectPullAuthors': tuple(projectPullAuthorInput),
   'project-resources.listDependencyRepositories': tuple(listDependencyRepositoriesInput),
   'project-resources.replaceDependencyRepositories': tuple(replaceDependencyRepositoriesInput),
   'project-resources.saveProjectResources': tuple(projectResourcesInput),
