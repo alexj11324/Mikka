@@ -1472,7 +1472,7 @@ export { factoryAgentProfiles, factoryAgentProfileVersions } from './agent-profi
  * `driveScope` is deliberately not `workspace`: workspace already means the
  * tenant, and a volume's scope is a layer of Drive, not a tenant.
  */
-export const DRIVE_SCOPES = ['user', 'project', 'project-user'] as const
+export const DRIVE_SCOPES = ['user', 'project', 'project-user', 'team-workspace'] as const
 export type DriveScope = (typeof DRIVE_SCOPES)[number]
 
 export const driveVolumes = pgTable('drive_volumes', {

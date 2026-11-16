@@ -29,6 +29,16 @@ test('shared Project selection has separate request URLs and caches from each pe
   assert.notDeepEqual(driveHeadKey(location, 'member', 'volume'), driveHeadKey(shared, 'member', 'volume'))
 })
 
+test('Workspace Files select the team location independently of private and Project caches', () => {
+  const location = { workspaceId: 'tenant', driveScope: 'team-workspace' as const }
+  const url = new URL(driveFileURL(location, 'folder', 'notes.md'), 'https://example.invalid')
+  assert.equal(url.searchParams.get('workspaceId'), 'tenant')
+  assert.equal(url.searchParams.get('driveScope'), 'team-workspace')
+  assert.equal(url.searchParams.has('projectId'), false)
+  assert.notDeepEqual(driveVolumesKey(location, 'user'), driveVolumesKey('tenant', 'user'))
+  assert.notDeepEqual(driveVolumesKey(location, 'user'), driveVolumesKey({ workspaceId: 'tenant', projectId: 'project' }, 'user'))
+})
+
 test('file links and caches distinguish the selected tenant, account and immutable version', () => {
   const url = new URL(driveFileURL('workspace-a', 'volume', 'a b/#notes.md', 'version-1'), 'https://example.invalid')
   assert.equal(url.pathname, '/mikka/api/drive/volumes/volume/files')
