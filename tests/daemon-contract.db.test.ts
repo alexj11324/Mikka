@@ -18,7 +18,7 @@ import { DAEMON_FIXTURE } from './support/daemon-fixture'
 type ReleasedLink = {
   registerDevice(credential: string, info: unknown, knownDeviceId?: string): Promise<{ deviceId: string }>
   heartbeat(deviceId: string, status: unknown): Promise<{ leases: Record<string, string> }>
-  listRepos(deviceId: string): Promise<{ repoId: string }[]>
+  listRepos(deviceId: string): Promise<{ repoId: string; path: string; name: string; remoteUrl?: string | null }[]>
   pendingRuns(deviceId: string): Promise<string[]>
   claimRun(deviceId: string, runId: string): Promise<{ runId: string; remoteUrl?: string }>
 }
@@ -93,7 +93,19 @@ test(`daemon ${MIN_DAEMON_VERSION} as released works against today's device rout
   const registered = await link.registerDevice(token, { name: 'Laptop', platform: 'linux', arch: 'x64', daemonVersion: MIN_DAEMON_VERSION, protocolVersion: DAEMON_PROTOCOL_VERSION, harnesses }, deviceId)
   assert.equal(registered.deviceId, deviceId)
   assert.deepEqual((await link.heartbeat(deviceId, { harnesses, runs: [], worktreeDiskBytes: 0 })).leases, {})
-  assert.ok((await link.listRepos(deviceId)).some(repo => repo.repoId === repoId))
+  const legacyId = randomUUID(), legacyRemote = 'https://github.com/mikka-ci/archived-repository.git'
+  const historicalDirectory = '/fixture/personal-checkout'
+  await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5)', [legacyId, deviceId, owner, historicalDirectory, legacyRemote])
+  await t.test('the released daemon reads a logical key for a historical personal checkout and retains its repository identity', async () => {
+    const directory = await link.listRepos(deviceId)
+    assert.equal(directory.find(repo => repo.repoId === repoId)?.path, normalizeRepository(remote).key)
+    const legacy = directory.find(repo => repo.repoId === legacyId)
+    assert.ok(legacy)
+    assert.equal(legacy.path, normalizeRepository(legacyRemote).key)
+    assert.equal(legacy.name, 'archived-repository')
+    assert.equal(legacy.remoteUrl, legacyRemote)
+    assert.equal((await pool.query('SELECT "repoPath" FROM device_repos WHERE id=$1', [legacyId])).rows[0].repoPath, historicalDirectory)
+  })
 
   const { runId } = await queueRun(owner, { issueId, agentId, repo: remote, model: 'fixture-model',
     modelDispatch: { mode: 'preference', routing: { version: 1, difficulty: 'hard', model: 'fixture-model', harness: 'claude_code', tier: 'standard', effort: 'high', reason: 'difficulty_fit' } } }, botId)
