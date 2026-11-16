@@ -20,6 +20,7 @@ import { POINTS_PURCHASE_AMOUNTS } from '@/lib/billing/hosted-usage'
 import { MAX_READ_BATCH, READ_BATCH_ACTIONS, type ReadBatchCall } from './read-batch-contract'
 import { USER_FACT_KINDS } from '@/lib/profile/kinds'
 import { definitionSchema as scheduleDefinition } from '@/lib/schedules/contract'
+import { DEVICE_DESCRIPTION_MAX } from '@/lib/device-name'
 
 const uuid = z.uuid()
 const id = z.string().min(1).max(200)
@@ -135,6 +136,7 @@ export const desktopActionSchemas = {
   'agents.pollDevices': none,
   'agents.setDeviceEnabled': tuple(object({ deviceId: uuid, enabled: bool })),
   'agents.renameDevice': tuple(uuid, text(100).trim().min(1)),
+  'agents.setDeviceDescription': tuple(uuid, z.string().trim().max(DEVICE_DESCRIPTION_MAX)),
   'agents.removeDevice': oneId,
   'agents.listAgents': none,
   'agents.pollTaskDetail': tuple(uuid, version.optional(), object({ version: version.optional(), positions: listPositions(51).optional() }).optional()),

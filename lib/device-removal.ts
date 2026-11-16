@@ -2,7 +2,7 @@ import 'server-only'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { pool } from '@/lib/db'
-import { DEVICE_NAME_MAX } from './device-name'
+import { DEVICE_DESCRIPTION_MAX, DEVICE_NAME_MAX } from './device-name'
 import { deviceIsOnline } from '@/lib/device-presence'
 import { notifyDeviceWork } from '@/lib/device-gateway-notify'
 import { DEVICE_WORK_CHANNEL, notifyChannel } from '@/lib/db/listen'
@@ -48,6 +48,26 @@ export async function renameOwnedDevice(userId: string, id: unknown, name: unkno
   if (!rows[0]) throw new ActionFailureError('deviceNotFound')
   await ownerListChanged(pool, userId, ['thread_list', 'device_list'])
   return { id: rows[0].id, name: rows[0].name }
+}
+
+/** A private note on an owned local device. Daemon registration does not write this field. */
+export async function setOwnedDeviceDescription(userId: string, id: unknown, description: unknown): Promise<{ id: string; description: string | null }> {
+  const target = deviceId(id)
+  const parsed = z.string().trim().max(DEVICE_DESCRIPTION_MAX).safeParse(description)
+  if (!parsed.success || parsed.data.includes('\0')) throw new ActionFailureError('agentInvalidInput')
+  // Lock the owned row before comparing so a concurrent save or removal has one order.
+  const { rows: [row] } = await pool.query<{ id: string; changed: boolean }>(
+    `WITH owned AS (
+       SELECT id, description FROM devices WHERE id=$1 AND "ownerId"=$2 AND kind='local' AND "removedAt" IS NULL FOR UPDATE
+     ), changed AS (
+       UPDATE devices SET description=$3, "updatedAt"=now() FROM owned
+       WHERE devices.id=owned.id AND owned.description IS DISTINCT FROM $3 RETURNING devices.id
+     ) SELECT owned.id, EXISTS(SELECT 1 FROM changed) AS changed FROM owned`,
+    [target, userId, parsed.data || null],
+  )
+  if (!row) throw new ActionFailureError('deviceNotFound')
+  if (row.changed) await ownerListChanged(pool, userId, ['device_list'])
+  return { id: row.id, description: parsed.data || null }
 }
 
 /**
