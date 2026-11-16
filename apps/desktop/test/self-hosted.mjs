@@ -9,6 +9,7 @@ import { decode, encode } from '../../../lib/desktop-rpc/wire.ts'
 import { launchElectron } from './electron-launch.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { verifyDesktopVersionHistory } from './self-hosted-version-history.mjs'
+import { verifyPersonalDriveUploads } from './self-hosted-drive.mjs'
 import { verifyConversationOrganization } from './self-hosted-conversations.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
 import { readNativeStartup } from './native-startup.mjs'
@@ -180,7 +181,8 @@ async function main() {
     if (overlaySha) {
       phase = 'conversation_owner_member'
       const controls = { page, fixture, rpc, passed, setPhase: value => { phase = value } }
-      await verifyConversationOrganization(controls)
+      const sharedWorkspace = await verifyConversationOrganization(controls)
+      report.driveUploads = await verifyPersonalDriveUploads({ ...controls, workspaceId: sharedWorkspace, directory })
       report.versionAdmissions = await verifyDesktopVersionHistory(controls)
     }
     phase = 'sign_out_and_return'
