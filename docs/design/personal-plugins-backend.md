@@ -24,6 +24,7 @@ be supplied in request bodies; all row operations include the authenticated owne
 | `PATCH /api/integrations/mcp` | `{id,name?,enabled?,auth?:{name,value}\|null}` | `{server}`; null removes authentication |
 | `DELETE /api/integrations/mcp` | `{id}` | `{deleted:true}` |
 | `PATCH /api/integrations/mcp/shares` | `{serverId,workspaceId,shared}` | Owner-authorized workspace share state |
+| `GET /api/skills?id={id}` | One personal installation ID | `{skill}` with the pinned metadata, including disabled installations. Missing and other owners’ IDs return 404 |
 | `GET /api/skills` | — | `{skills,count,scope:"personal"}`; metadata includes source kind, source revision/path and SHA-256 |
 | `POST /api/skills` | `{source:"owner/repository",slug:"skill-name"}` from a skills.sh search result | `{skill}`; repeated installation returns the existing pinned version |
 | `PATCH /api/skills` | `{id,enabled}` | `{skill}` |

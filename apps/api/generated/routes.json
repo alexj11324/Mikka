@@ -2327,7 +2327,7 @@
         "PATCH",
         "POST"
       ],
-      "sourceHash": "3116dd2c167eb45a1f36b99aa5ead921e8f18b84130bba54d85285eaf0b22476"
+      "sourceHash": "e060fa64d418c7743b86fa4dfe7abecc50b15064fe4d77007466bb909437a3f6"
     },
     {
       "path": "/mikka/api/skills/search",
