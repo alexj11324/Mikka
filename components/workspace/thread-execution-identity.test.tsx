@@ -115,3 +115,12 @@ test('legacy evidence never shows a made-up routing decision', () => {
     assert.doesNotMatch(html, /data-model-routing|routingTier|routingDifficulty|routingEffort|routingReason/)
   }
 })
+
+test('a model the task followed from its chat says so; a named or older one claims nothing', () => {
+  // Decision 2026-11-15-1630: the thread shows who decided its model; a followed model is not the person's pick.
+  const followed = renderToStaticMarkup(<Content evidence={{ ...evidence, modelFollowed: true }} />)
+  assert.ok(followed.includes('· modelFollowed'))
+  for (const modelFollowed of [false, null, undefined]) {
+    assert.doesNotMatch(renderToStaticMarkup(<Content evidence={{ ...evidence, modelFollowed }} />), /modelFollowed/)
+  }
+})

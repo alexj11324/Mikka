@@ -4813,6 +4813,7 @@
         "not_applicable": "不适用"
       },
       "modelRouting": "模型选择",
+      "modelFollowed": "跟随主线程",
       "routingReason": "选择原因",
       "previousModel": "升级前的模型",
       "routingDifficulty": {
