@@ -6,7 +6,7 @@ import { releaseRoutePath, versionPath } from './route-path.mjs'
 import { publicVersion } from './version.mjs'
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url)
     let decoded
     try { decoded = decodeURIComponent(url.pathname) } catch { return env.API.fetch(request) }
@@ -35,7 +35,7 @@ export default {
     // Workflow callbacks, SSE, WebSocket upgrades and API bodies reach their
     // service intact. Never convert them to a document or cache them.
     if ((request.method === 'GET' || request.method === 'HEAD') && releaseRoutePath(url.pathname) === versionPath) {
-      return applySecurityHeaders(request, await publicVersion(request, env))
+      return applySecurityHeaders(request, await publicVersion(request, env, ctx))
     }
     if (isMachinePath(url.pathname)) return env.API.fetch(request)
 

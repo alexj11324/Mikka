@@ -398,3 +398,26 @@ test('published actions retain the compiler evidence and use the same deployment
     assert.equal(count, 1)
   }
 })
+
+test('a cold version HEAD returns the backend status while its body cancellation is pending', async () => {
+  const started = Promise.withResolvers()
+  const releaseBody = Promise.withResolvers()
+  const cleanup = []
+  const env = { API: { fetch: () => new Response(new ReadableStream({
+    cancel() { started.resolve(); return releaseBody.promise },
+  }), { status: 429 }) } }
+  const pending = release.fetch(request('/mikka/api/version', { method: 'HEAD' }), env, {
+    waitUntil(task) { cleanup.push(task) },
+  })
+  try {
+    await started.promise
+    const head = await Promise.race([pending, new Promise(resolve => setImmediate(resolve))])
+    assert.equal(head?.status, 429)
+    assert.equal(head.body, null)
+    assert.equal(cleanup.length, 1)
+  } finally {
+    releaseBody.resolve()
+    await pending
+    await Promise.all(cleanup)
+  }
+})
