@@ -6359,6 +6359,7 @@
       "default": "任务未能完成，请查看错误详情或重试。"
     },
     "governance_denied": {
+      "project_selection_changed": "你的默认项目已更改。请核对当前选择后重试。",
       "project_visibility_changed": "此项目的默认可见性已更改。请核对当前设置后重试。",
       "service_projects_changed": "项目授权已变更，请重新加载后再替换。",
       "service_identity_disabled": "请先恢复此服务身份，再授予新的项目访问权限。",
