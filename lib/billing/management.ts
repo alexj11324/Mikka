@@ -97,18 +97,20 @@ export async function billingManagementView(actorId: string, target: BillingScop
       .where(and(eq(organizationMembers.organizationId, target.id), eq(organizationMembers.status, 'active'))) : members
     const month = currentMonth(), { start, end } = monthBounds(month)
     const usageIds = available.map(row => row.id)
+    const dayExpression = `to_char("createdAt" at time zone 'UTC','YYYY-MM-DD')`
+    const usageGrouping = effective.usageExport ? `grouping sets (("actorId"), (${dayExpression}))` : '"actorId"'
     const [billing, credits, budgets, totals, external, policies] = await Promise.all([
       accountId ? readBillingAccount(accountId, process.env, memberCount) : null,
       accountId ? readCreditBillingAccount(accountId) : null,
       budgetWorkspaceId ? readResourceBudgets(pool, [budgetWorkspaceId]) : [],
       pool.query<{ id: string | null; day: string | null; cost: number; held: number; unknown: number }>(`select "actorId" id,
-        to_char("createdAt" at time zone 'UTC','YYYY-MM-DD') AS "day",
+        ${effective.usageExport ? dayExpression : 'null::text'} AS "day",
         coalesce(sum("costMicroUsd") filter(where state='settled'),0)::float8 cost,
         coalesce(sum(coalesce("costMicroUsd","holdMicroUsd")) filter(where state in ('pending','unknown')),0)::float8 held,
         count(*) filter(where state='unknown' or (state='settled' and "costMicroUsd" is null))::int unknown
         from hosted_usage where "createdAt">=$1 and "createdAt"<$2 and state<>'failed'
         and ($3::boolean and "workspaceId"=$4::uuid or not $3::boolean and coalesce("usageWorkspaceId","workspaceId")=any($5::uuid[]))
-        group by grouping sets (("actorId"), (to_char("createdAt" at time zone 'UTC','YYYY-MM-DD')))`,
+        group by ${usageGrouping}`,
         [start, end, target.kind === 'organization', accountId, usageIds]),
       pool.query<{ count: number }>(`select count(*)::int count from agent_runs where "workspaceId"=any($1::uuid[]) and "createdAt">=$2 and "createdAt"<$3
         and "agentDefinition"->'executionIdentity'->>'version' in ('1','2') and (
@@ -130,10 +132,10 @@ export async function billingManagementView(actorId: string, target: BillingScop
       resourceTargets: resources, resourceTargetsAvailable: Boolean(policies.rows[0]?.available), budgets,
       usage: { month, costMicroUsd: byMember.reduce((sum, row) => sum + row.cost, 0), reservedMicroUsd: byMember.reduce((sum, row) => sum + row.held, 0),
         unknownCalls: byMember.reduce((sum, row) => sum + row.unknown, 0), externalUnknownRuns: external.rows[0]?.count ?? 0,
-        daily: monthDays(month).map(date => {
+        daily: effective.usageExport ? monthDays(month).map(date => {
           const row = byDay.get(date)
           return { date, costMicroUsd: row?.cost ?? 0, reservedMicroUsd: row?.held ?? 0, unknownCalls: row?.unknown ?? 0 }
-        }),
+        }) : undefined,
         members: byMember.map(row => ({ id: row.id, name: row.id ? names.get(row.id) ?? null : null, costMicroUsd: row.cost, unknownCalls: row.unknown })) } }
   })
 }
