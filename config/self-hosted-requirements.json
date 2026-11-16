@@ -2910,5 +2910,12 @@
     "behavior": "Verifies the installation's existing GitHub authority for the selected repository before returning visible metadata for an immutable revision. Missing GitHub configuration or a denied repository cannot return a tree.",
     "test": "lib/github/user-access.test.ts",
     "suite": "test:github"
+  },
+  "lib/coding-workspace/diff/github-manifest.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validates Git tree structure and revision identity locally for repository browsing and existing coding workspace comparisons. It has no independent network or credential requirement.",
+    "test": "lib/github/user-access.test.ts",
+    "suite": "test:github"
   }
 }
