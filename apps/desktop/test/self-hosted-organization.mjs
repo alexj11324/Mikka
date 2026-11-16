@@ -37,6 +37,17 @@ export async function verifyOrganizationLifecycle({ page, workspaceId, passed, s
   assert.equal(frozen.data.events.length, 1)
   passed('packaged_organization_owner_reads_live_audit_and_frozen_export')
 
+  setPhase('organization_default_resource_policy')
+  const original = await request(path + '/policy')
+  assert.equal(original.status, 200)
+  const { modelCredentialSharing, mcpSharing, allowedModelProviders, auditRetentionDays, legalHold, revision } = original.data.policy
+  assert.equal(revision, 0)
+  const refused = await request(path + '/policy', 'PATCH', { modelCredentialSharing, mcpSharing, allowedModelProviders, auditRetentionDays, legalHold })
+  assert.equal(refused.status, 409)
+  assert.equal(refused.data.error.detail, 'feature_unavailable')
+  assert.equal((await request(path + '/policy')).data.policy.revision, 0)
+  passed('packaged_owner_reads_organization_resource_policy_and_community_refuses_paid_change')
+
   setPhase('organization_detach_and_archive')
   const blocked = await request(path, 'DELETE')
   assert.equal(blocked.status, 409)
