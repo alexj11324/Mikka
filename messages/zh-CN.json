@@ -8164,6 +8164,7 @@
       "cancel": "取消",
       "notFound": "自动化不存在或已删除",
       "missing": {
+        "slackAuthors": "每个事件最多可填写 20 个有效的 Slack 成员 ID",
         "repository": "每个 GitHub 事件都要选仓库",
         "title": "写上名称才能保存",
         "prompt": "写上要它做什么才能保存",
@@ -8213,6 +8214,9 @@
         "event": "事件",
         "channel": "频道",
         "remove": "移除",
+        "authors": "作者（可选，输入 Slack 成员 ID，用逗号分隔）",
+        "authorsError": "无法加载 Slack 成员。",
+        "moreAuthors": "更多成员",
         "emojisError": "无法加载 Slack 自定义表情。",
         "reactions": "表情（可选，逗号分隔，例如 eyes, white_check_mark）",
         "runWhen": "条件",

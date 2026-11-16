@@ -126,3 +126,15 @@ test('从模板开始: each template opens a draft with its timing or trigger; o
   }))
   assert.deepEqual(missing, { standup: '0 9 * * 1-5', weeklyDeps: '0 10 * * 1', prReview: 'repository', ciFix: 'repository', linearTriage: 'team', slackQuestion: 'channel' })
 })
+
+test('Slack author choices round-trip as stable member IDs; an empty list keeps existing channel-only triggers', () => {
+  const trigger = { event: 'message', channels: ['CTEAM'], reactions: '', runWhen: '', authors: 'UONE， WTWO, UONE' }
+  const checked = definitionFrom(filled({ slack: [trigger] }), now)
+  assert.ok('definition' in checked)
+  assert.deepEqual(checked.definition.events, [{ source: 'slack', event: 'message', channels: ['CTEAM'], authors: ['UONE', 'WTWO'] }])
+  assert.equal(draftFrom(checked.definition, now).slack[0]?.authors, 'UONE, WTWO')
+  assert.deepEqual(definitionFrom(filled({ slack: [{ ...trigger, authors: 'Alice' }] }), now), { missing: 'slackAuthors' })
+  const empty = definitionFrom(filled({ slack: [{ ...trigger, authors: '' }] }), now)
+  assert.ok('definition' in empty)
+  assert.deepEqual(empty.definition.events, [{ source: 'slack', event: 'message', channels: ['CTEAM'] }])
+})
