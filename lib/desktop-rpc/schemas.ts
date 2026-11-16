@@ -246,6 +246,7 @@ export const desktopActionSchemas = {
   'issues.listIssues': none,
   'issues.pollIssues': tuple(version.optional(), listPositions(100).optional()),
   'issues.syncIssueList': tuple(version.optional(), listPositions(100).optional()),
+  'issues.countAssignedWorkspaceTasks': oneId,
   'issues.listWorkspaceIssues': oneId,
   'issues.listWorkspaceTaskPage': tuple(taskListPageInput),
   'issues.getIssue': oneId,
