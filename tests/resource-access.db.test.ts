@@ -105,7 +105,7 @@ test('resource ACL: real split PostgreSQL migrations, fresh grants and concurren
         [undefined, true, 3], [undefined, false, 4],
       ] as const) {
         const result = await setFollow(enabled)
-        assert.ok(result.issue)
+        assert.ok('issue' in result && result.issue)
         assert.equal(result.issue.metadata.subscriberUserIds.includes(owner), expected)
         assert.equal(result.issue.revision, initialRevision + delta)
       }
