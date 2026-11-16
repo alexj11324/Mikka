@@ -27,6 +27,35 @@ test('project default editor preserves repository overrides and canonical task s
     store.setProjectDefaultEnvironment(user, { workspaceId: tenant, projectId, revision, environmentId })
   await assert.rejects(choose(second.id, 2, member), { code: 'workspaceAccessDenied' })
   await assert.rejects(choose(second.id, 2, owner, other.id), { code: 'projectNotFound' })
+  await t.test('Project binding reads and writes follow an explicitly granted Project capability', async () => {
+    const { changeResourceAccess } = await import('../lib/resource-access/store')
+    const selected = await seedProject(fixture, owner, [{ teamId: team.id, workspaceId: workspace.id }])
+    const reference = { kind: 'project' as const, workspaceId: workspace.id, id: selected }
+    const save = (revision: number) => store.saveProjectResources(member, { workspaceId: workspace.id, projectId: selected,
+      revision, repositories: [{ repositoryKey, baseBranch: 'feature' }], environmentIds: [first.id], defaultEnvironmentId: first.id })
+    const select = (revision: number) => store.setProjectDefaultEnvironment(member, { workspaceId: workspace.id,
+      projectId: selected, revision, environmentId: second.id })
+    const access = (expectedRevision: number, capabilities: ('canReadContent' | 'canSteer')[]) =>
+      changeResourceAccess(owner, reference, { expectedRevision, visibility: 'private',
+        grants: capabilities.length ? [{ subjectId: member, capabilities }] : [], confirmExpansion: true })
+    await fixture.query(`UPDATE mikka_workspace_members SET role='admin' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspace.id, member])
+    try {
+      const readOnly = await access(1, ['canReadContent'])
+      assert.deepEqual((await store.listProjectResources(member, workspace.id, selected)).repositories, [])
+      await assert.rejects(save(1), { code: 'projectNotFound' })
+      await assert.rejects(select(1), { code: 'projectNotFound' })
+      const editable = await access(readOnly.revision, ['canReadContent', 'canSteer'])
+      assert.deepEqual(await save(1), { revision: 2 })
+      assert.deepEqual(await select(2), { revision: 3 })
+      await access(editable.revision, [])
+      await assert.rejects(store.listProjectResources(member, workspace.id, selected), { code: 'projectNotFound' })
+      const config = await store.listProjectResources(owner, workspace.id, selected)
+      assert.deepEqual(config.repositories.map(row => row.baseBranch), ['feature'])
+      assert.deepEqual(config.environmentBindings.filter(row => row.isDefault).map(row => row.environmentId), [second.id])
+    } finally {
+      await fixture.query(`UPDATE mikka_workspace_members SET role='member' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspace.id, member])
+    }
+  })
   await assert.rejects(choose(randomUUID(), 2), { code: 'projectEnvironmentUnavailable' })
   assert.deepEqual(await choose(second.id, 2), { revision: 3 })
   const configuration = await store.listProjectResources(owner, workspace.id, projectId)

@@ -31,6 +31,8 @@ const UUID = '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89aAbB][0-9A-Fa
 const ORGANIZATION_OVERVIEW = new RegExp(`^/api/organizations/${UUID}$`)
 const ORGANIZATION_KEYS = new RegExp(`^/api/organizations/${UUID}/api-keys$`)
 const ORGANIZATION_WORKSPACES = new RegExp(`^/api/organizations/${UUID}/workspaces$`)
+const ORGANIZATION_POLICY = new RegExp(`^/api/organizations/${UUID}/policy$`)
+const ORGANIZATION_APPROVALS = new RegExp(`^/api/organizations/${UUID}/approvals$`)
 const ORGANIZATION_AUDIT = new RegExp(`^/api/organizations/${UUID}/audit-log$`)
 const ORGANIZATION_DOMAINS = new RegExp(`^/api/organizations/${UUID}/allowed-domains$`)
 const ORGANIZATION_DOMAIN = new RegExp(`^/api/organizations/${UUID}/allowed-domains/${UUID}$`)
@@ -106,6 +108,8 @@ export function allowedApiPath(path: string, method: string): boolean {
   if (ORGANIZATION_OVERVIEW.test(path)) return method === 'GET' || method === 'PATCH' || method === 'DELETE'
   if (ORGANIZATION_WORKSPACES.test(path)) return method === 'POST' || method === 'DELETE'
   if (path === '/api/me/joinable-organizations' || path === '/api/me/invitations') return method === 'GET'
+  if (ORGANIZATION_POLICY.test(path)) return method === 'GET' || method === 'PATCH'
+  if (ORGANIZATION_APPROVALS.test(path)) return method === 'POST' || method === 'PATCH'
   if (ORGANIZATION_AUDIT.test(path)) return method === 'GET' || method === 'POST'
   if (ORGANIZATION_DOMAINS.test(path)) return method === 'GET' || method === 'POST'
   if (ORGANIZATION_DOMAIN.test(path)) return method === 'DELETE'

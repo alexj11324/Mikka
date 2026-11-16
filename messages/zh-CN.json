@@ -8076,6 +8076,10 @@
       "unlimited": "不限",
       "autoPaused": "已自动暂停：{reason}",
       "github": {
+        "pullAuthors": "PR 作者（可选）",
+        "authorsProject": "选择项目以查找 PR 作者",
+        "authorProjectsError": "无法加载项目",
+        "authorsError": "无法加载 PR 作者",
         "title": "GitHub 事件",
         "item": "GitHub 事件 {number}",
         "event": "事件",

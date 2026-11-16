@@ -167,6 +167,8 @@ migration/Worker deployment, real external write or final issue closure is claim
 
 ## Event triggers (2026-11-15)
 
+For GitHub PR and review deliveries the editor can restrict `events[].pullAuthors` to up to 20 PR openers. The webhook matches the PR's own author independently of the sender or reviewer. The optional Project selector searches matching logins on the most recently updated 50 pull requests in the event's single selected repository. Suggestions require current Project access, the workspace's repository policy, and the person's authorized GitHub repository. The Project choice applies only to suggestions.
+
 Decision [2026-11-15-1704](../design/decisions/2026-11-15-1704-automation-github-triggers.md).
 
 - **Definition.** A `dispatch_task` definition may carry `events`: 1–20 GitHub

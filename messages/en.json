@@ -8076,6 +8076,10 @@
       "unlimited": "No limit",
       "autoPaused": "Paused automatically: {reason}",
       "github": {
+        "pullAuthors": "PR authors (optional)",
+        "authorsProject": "Project for author suggestions",
+        "authorProjectsError": "Could not load projects",
+        "authorsError": "Could not load PR authors",
         "title": "GitHub events",
         "item": "GitHub event {number}",
         "event": "Event",

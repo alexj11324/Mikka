@@ -159,6 +159,16 @@ test('organization audit permits only listing and named export requests for a si
   }
 })
 
+test('resource policy and approval requests use only their own declared methods', () => {
+  const root = '/api/organizations/' + identity.user.id
+  for (const method of ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) {
+    assert.equal(allowedApiPath(root + '/policy', method), ['GET', 'PATCH'].includes(method))
+    assert.equal(allowedApiPath(root + '/approvals', method), ['POST', 'PATCH'].includes(method))
+    assert.equal(allowedApiPath(root + '/approvals/all', method), false)
+    assert.equal(allowedApiPath('/api/organizations/unknown/policy', method), false)
+  }
+})
+
 test('Organization domain discovery and admission forward only the declared routes and methods', () => {
   const org = 'ab81a708-013c-4e44-9ab2-a500bd59f381'
   const domain = 'ebb7878e-6918-4b68-9300-d956761b5011'

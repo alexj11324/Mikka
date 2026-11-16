@@ -73,6 +73,73 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
       ...(options.method ? { origin: options.origin ?? origin } : {}), ...(options.body ? { 'content-type': 'application/json' } : {}) },
       body: options.raw ?? (options.body ? JSON.stringify(options.body) : undefined) })
   }
+  await t.test('Workspace Files follow active membership, protect private bytes and retain a departing member’s storage', async () => {
+    const location = { workspaceId: team.id, driveScope: 'team-workspace', token: peerToken }
+    const administrator = { ...location, token: sharedToken }
+    const personalLocation = { workspaceId: team.id, token: sharedToken }
+    const directory = async (workspaceId: string, token: string) =>
+      fetch(`${origin}/api/drive/scopes?workspaceId=${workspaceId}&driveScope=team-workspace`, { headers: { authorization: 'Bearer ' + token } })
+    assert.deepEqual((await (await directory(team.id, peerToken)).json()).scopes, [{ driveScope: 'team-workspace', workspaceId: team.id }])
+    assert.deepEqual((await (await directory(personal, ownerToken)).json()).scopes, [])
+    assert.equal((await call('', { workspaceId: personal, driveScope: 'team-workspace' })).status, 404)
+    assert.equal((await call('', { ...location, projectId: randomUUID() })).status, 400)
+    const create = async (options: typeof personalLocation | typeof location) => {
+      const response = await call('', { ...options, method: 'POST', body: { name: 'Team notes' } })
+      assert.equal(response.status, 201)
+      return (await response.json()).volume
+    }
+    const volume = await create(location)
+    const own = await create(personalLocation)
+    assert.equal(volume.driveScope, 'team-workspace')
+    assert.equal(volume.scopeId, team.id)
+    assert.deepEqual((await (await call('', administrator)).json()).volumes.map((r: {id: string}) => r.id), [volume.id])
+    assert.equal((await call('/' + own.id, location)).status, 404)
+    assert.equal((await call('/' + volume.id, personalLocation)).status, 404)
+    const bytes = 'Shared workspace notes'
+    const upload = async (id: string, options: typeof personalLocation | typeof location) => {
+      const response = await call('/' + id + '/blobs', { ...options, method: 'POST', raw: bytes })
+      assert.equal(response.status, 201)
+      return response.json()
+    }
+    const personalBlob = await upload(own.id, personalLocation)
+    const change = { expectedDigest: volume.headDigest, mutationId: randomUUID(), changes: [{ op: 'put', path: 'notes.txt', mode: 0o644, ...personalBlob }] }
+    const write = () => call('/' + volume.id + '/entries', { ...location, method: 'PATCH', body: change })
+    assert.equal((await write()).status, 422)
+    await upload(volume.id, location)
+    assert.equal((await write()).status, 200)
+    assert.equal((await (await write()).json()).replayed, true)
+    assert.equal(await (await call('/' + volume.id + '/files?path=notes.txt', administrator)).text(), bytes)
+    assert.equal((await call('/' + volume.id + '/archive', { ...administrator, method: 'POST' })).status, 200)
+    assert.equal((await call('/' + volume.id, location)).status, 404)
+    assert.equal((await call('/' + volume.id + '/unarchive', { ...location, method: 'POST' })).status, 200)
+    assert.equal((await call('/' + volume.id + '/versions', administrator)).status, 200)
+    await fixture.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2', [team.id, peer])
+    try {
+      assert.equal((await call('/' + volume.id + '/files?path=notes.txt', location)).status, 401)
+      assert.equal((await call('/' + volume.id + '/blobs', { ...location, method: 'POST', raw: 'former member' })).status, 401)
+      assert.equal(await (await call('/' + volume.id + '/files?path=notes.txt', administrator)).text(), bytes)
+    } finally {
+      await fixture.query('update mikka_workspace_members set status=\'active\' where "workspaceId"=$1 and "userId"=$2', [team.id, peer])
+    }
+    const { workspaceDeletionStatements } = await import('../workspace-rows')
+    const { accountStorageKeys } = await import('../account/delete')
+    const { driveStorageKey } = await import('./blobs')
+    const tx = await fixture.connect()
+    try {
+      await tx.query('BEGIN')
+      const principal = 'drive-team:' + team.id
+      const key = driveStorageKey(principal, personalBlob.sha256)
+      assert.equal((await tx.query('update drive_blobs set "storageKey"=$1,"inlineContent"=null where "ownerId"=$2 and sha256=$3 and "workspaceId"=$4 and "projectId" is null',
+        [key, principal, personalBlob.sha256, team.id])).rowCount, 1)
+      const leaving = await accountStorageKeys(tx, peer, { solo: [], shared: [team.id], keptIssueIds: [] })
+      assert.ok(!leaving.keys.includes(key))
+      const sweep = (await workspaceDeletionStatements(tx, team.id)).find(item => item.table === 'drive_blobs' && item.text.includes('"workspaceId"'))
+      assert.ok(sweep)
+      await tx.query(sweep.text, sweep.values)
+      assert.equal((await tx.query('select 1 from chat_attachment_retirements where "teamDriveId"=$1 and "storageKey"=$2', [team.id, key])).rowCount, 1)
+      assert.equal((await tx.query('select 1 from drive_blobs where "ownerId"=$1 and sha256=$2', [owner, personalBlob.sha256])).rowCount, 1)
+    } finally { await tx.query('ROLLBACK'); tx.release() }
+  })
   await t.test('personal Project folders keep their author and require present access to the selected Project', async () => {
     const group = await seedTeam(fixture, team.id, owner)
     const projectId = await seedProject(fixture, owner, [{ teamId: group.id, workspaceId: team.id }])

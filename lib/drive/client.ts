@@ -22,9 +22,11 @@ export class DriveRequestError extends Error {
 }
 
 export type DriveLocation = string | { workspaceId: string; projectId: string; driveScope?: 'project' }
+  | { workspaceId: string; driveScope: 'team-workspace'; projectId?: never }
 
 function locationKey(location: DriveLocation) {
   if (typeof location === 'string') return [location] as const
+  if (location.driveScope === 'team-workspace') return [location.workspaceId, 'team-workspace'] as const
   const ids = [location.workspaceId, location.projectId] as const
   return location.driveScope === 'project' ? [...ids, 'project'] as const : ids
 }
@@ -36,7 +38,7 @@ export const driveHistoryKey = (location: DriveLocation, ownerId: string, volume
 function url(location: DriveLocation, suffix = '', query: Record<string, string | undefined> = {}) {
   const params = new URLSearchParams(typeof location === 'string'
     ? { workspaceId: location }
-    : { workspaceId: location.workspaceId, projectId: location.projectId, ...(location.driveScope ? { driveScope: location.driveScope } : {}) })
+    : { workspaceId: location.workspaceId, ...(location.projectId ? { projectId: location.projectId } : {}), ...(location.driveScope ? { driveScope: location.driveScope } : {}) })
   for (const [key, value] of Object.entries(query)) if (value !== undefined) params.set(key, value)
   return withBasePath(`/api/drive/volumes${suffix}?${params}`)
 }
@@ -59,6 +61,11 @@ async function request<T>(target: string, init: RequestInit = {}, send: typeof f
 
 export type PersonalDriveScope = { driveScope: 'user'; workspaceId: string }
   | { driveScope: 'project-user'; workspaceId: string; projectId: string; name: string }
+
+export function readTeamDriveScopes(workspaceId: string, send?: typeof fetch) {
+  const params = new URLSearchParams({ workspaceId, driveScope: 'team-workspace' })
+  return request<{ scopes: { driveScope: 'team-workspace'; workspaceId: string }[] }>(withBasePath(`/api/drive/scopes?${params}`), {}, send)
+}
 
 export function readProjectDriveScopes(workspaceId: string, send?: typeof fetch) {
   const params = new URLSearchParams({ workspaceId, driveScope: 'project' })

@@ -748,6 +748,15 @@
     "test": "tests/organization-join-domains.db.test.ts",
     "suite": "test:organization-join-domains-db"
   },
+  "drizzle/20261116170813_workspace_shared_drive.sql": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "Keep shared Workspace Files in tenant-owned storage across member departure and retire their blobs on Workspace deletion.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "drizzle/20261116145316_isolate_shared_project_drive_storage.sql": {
     "mode": "built-in",
     "environment": [
@@ -1243,11 +1252,18 @@
     "test": "tests/project-dependency-repositories.db.test.ts",
     "suite": "test:project-resources-db"
   },
+  "lib/project-resources/pull-authors.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "Project PR author suggestions require the signed account's configured GitHub App, the exact bound repository and current Project access.",
+    "test": "tests/project-dependency-repositories.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
   "lib/project-resources/store.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Project resource transactions use the installation PostgreSQL database and workspace locks. The installation PostgreSQL database stores versioned recipes. A restore checks the shared binding snapshot, clears approval and preserves current settings.",
-    "test": "tests/project-dependency-repositories.db.test.ts",
+    "behavior": "Project resource transactions use the installation PostgreSQL database and workspace locks. The installation PostgreSQL database stores versioned recipes. A restore checks the shared binding snapshot, clears approval and preserves current settings. Project-specific bindings require content access for reads and steering plus an active Workspace admin for writes.",
+    "test": "tests/environment-settings.db.test.ts",
     "suite": "test:project-resources-db"
   },
   "lib/thread-artifacts.ts": {

@@ -8,6 +8,10 @@ const directory = new Map<string, { id: string; fullName: string }[]>()
 const requests: string[] = []
 mock.module(new URL('../lib/github/user-access.ts', import.meta.url).href, { namedExports: {
   GitHubAccessError,
+  recentRepositoryPullAuthors: async (actor: string, key: string, term: string) => {
+    requests.push(actor + '/' + key + '/' + term)
+    return ['Ada']
+  },
   listRepositoriesForUser: async (userId: string) => {
     requests.push(userId)
     const repositories = directory.get(userId)
@@ -19,6 +23,7 @@ mock.module(new URL('../lib/github/user-access.ts', import.meta.url).href, { nam
 test('dependency references use stable GitHub ids, retain hidden selections and never grant execution repository access', { skip: !dbUrl }, async t => {
   const pool = new Pool({ connectionString: dbUrl })
   const { listDependencyRepositories: list, replaceDependencyRepositories: replace } = await import('../lib/project-resources/dependency-repositories')
+  const { projectPullAuthors } = await import('../lib/project-resources/pull-authors')
   const { pool: app } = await import('../lib/db'), { workspacePool } = await import('../lib/workspace-db')
   t.after(async () => { await Promise.all([pool.end(), app.end(), workspacePool.end()]) })
   const admin = await seedUser(pool, 'dependency-admin'), member = await seedUser(pool, 'dependency-reader')
@@ -50,6 +55,17 @@ test('dependency references use stable GitHub ids, retain hidden selections and 
   assert.equal((await replace(admin, { ...scope, revision: 2, repos: [] })).revision, 3)
   const sql = await pool.query('select (select count(*)::int from workspace_project_repositories where "projectId"=$1) as checkout, (select count(*)::int from workspace_resource_events where "resourceId"=$1 and kind=\'project_dependencies.changed\') as events', [projectId])
   assert.deepEqual(sql.rows[0], { checkout: 0, events: 2 })
+  const key = 'v2/github.com/fixture/first'
+  const search = () => projectPullAuthors({ id: member }, { ...scope, readerId: member, repository: key, query: 'ad' })
+  const countBeforeSearch = requests.length
+  assert.deepEqual(await search(), [])
+  assert.equal(requests.length, countBeforeSearch)
+  await pool.query('insert into workspace_project_repositories ("projectId","workspaceId","repositoryKey") values ($1,$2,$3)', [projectId, ws.id, key])
+  assert.deepEqual(await search(), ['Ada'])
+  assert.equal(requests.at(-1), member + '/' + key + '/ad')
+  await pool.query(`insert into workspace_repository_policies ("workspaceId",mode,"repositoryKeys","updatedBy") values ($1,'restricted','[]',$2)`, [ws.id, admin])
+  assert.deepEqual(await search(), [])
+  assert.equal(requests.length, countBeforeSearch + 1)
   directory.delete(admin)
   await assert.rejects(list(admin,scope), {code:'projectDependencyReaderUnavailable'})
   await pool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2',[ws.id,member]);const count=requests.length

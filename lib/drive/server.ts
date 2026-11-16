@@ -42,12 +42,15 @@ export async function driveResponse(request: Request, operation: Operation, para
     const search = new URL(request.url).searchParams
     const workspaceId = z.uuid().parse(search.get('workspaceId')).toLowerCase()
     const selection = search.get('driveScope')
-    if (selection !== null && selection !== 'project') return json({ error: 'drive_write_invalid' }, 400)
+    if (selection !== null && selection !== 'project' && selection !== 'team-workspace') return json({ error: 'drive_write_invalid' }, 400)
     const sharedProject = selection === 'project'
+    const teamFiles = selection === 'team-workspace'
+    if (teamFiles && search.has('projectId')) return json({ error: 'drive_write_invalid' }, 400)
     const view = search.get('view')
     if (view !== null && (view !== 'skills' || operation !== 'volumes' || request.method !== 'GET')) return json({ error: 'drive_write_invalid' }, 400)
     if (operation === 'scopes') {
-      return await withTaskWorkspace(session.user, workspaceId, async (_workspace, tx) => {
+      return await withTaskWorkspace(session.user, workspaceId, async (workspace, tx) => {
+        if (teamFiles) return json({ scopes: workspace.kind === 'team' ? [{ driveScope: 'team-workspace', workspaceId }] : [] })
         const projects = await accessibleProjectNames(session.user, workspaceId, tx)
         if (sharedProject) return json({ scopes: projects.map(project => ({
           driveScope: 'project', workspaceId, projectId: project.id, name: project.name,
@@ -63,14 +66,16 @@ export async function driveResponse(request: Request, operation: Operation, para
     if (sharedProject && !projectId) return json({ error: 'drive_write_invalid' }, 400)
     // A project names its own storage namespace. A member's existing private bytes and
     // versions never move into it, even when they have the same digest.
-    const projectStorage = sharedProject && projectId ? { workspaceId, projectId } : undefined
-    const storageOwner = projectStorage ? `drive-project:${workspaceId}:${projectId}` : session.user.id
-    const actor = { ownerId: storageOwner, authorName: session.user.name, workspaceId, projectId, sharedProject }
-    const scope = projectStorage
-      ? { driveScope: 'project' as const, scopeId: projectStorage.projectId }
+    const storage = sharedProject || teamFiles ? { workspaceId, projectId } : undefined
+    const storageOwner = teamFiles ? `drive-team:${workspaceId}` : sharedProject ? `drive-project:${workspaceId}:${projectId}` : session.user.id
+    const scope = teamFiles
+      ? { driveScope: 'team-workspace' as const, scopeId: workspaceId }
+      : sharedProject && projectId
+      ? { driveScope: 'project' as const, scopeId: projectId }
       : projectId
       ? { driveScope: 'project-user' as const, scopeId: projectId, scopeUserId: session.user.id }
       : { driveScope: 'user' as const, scopeId: session.user.id }
+    const actor = { ownerId: storageOwner, authorName: session.user.name, workspaceId, ...scope }
     const serve = async () => {
       if (view === 'skills') {
         if (search.has('threadId')) return json({ error: 'drive_write_invalid' }, 400)
@@ -139,7 +144,7 @@ export async function driveResponse(request: Request, operation: Operation, para
       }
       if (operation === 'upload') {
         const content = await boundedDriveBytes(request.body, DRIVE_MAX_FILE_BYTES)
-        const blob = await storeDriveBlob(actor.ownerId, content, projectStorage)
+        const blob = await storeDriveBlob(actor.ownerId, content, storage)
         await recordDriveBlob(pool, blob, content)
         await pool.query(`INSERT INTO drive_blob_admissions("ownerId",sha256,"workspaceId") VALUES($1,$2,$3)
           ON CONFLICT("ownerId",sha256,"workspaceId") DO NOTHING`, [actor.ownerId, blob.sha256, workspaceId])
@@ -163,7 +168,10 @@ export async function driveResponse(request: Request, operation: Operation, para
     }
     const response = projectId
       ? await withReadableProject(session.user, workspaceId, projectId, serve, sharedProject && request.method !== 'GET' ? 'canSteer' : 'canReadContent')
-      : await withTaskWorkspace(session.user, workspaceId, serve)
+      : await withTaskWorkspace(session.user, workspaceId, async workspace => {
+        if (teamFiles && workspace.kind !== 'team') return json({ error: 'drive_not_found' }, 404)
+        return serve()
+      })
     // Both the file mutation and its membership lease have finished. The
     // existing invalidation path resolves recipients afresh and carries no content.
     if (changed) await workspaceListChanged(pool, workspaceId, ['workspace_settings'])

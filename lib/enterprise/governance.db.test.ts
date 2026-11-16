@@ -247,8 +247,19 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
     await assert.rejects(workspaceDb.transaction(tx => requireWorkspace(tx, wsA, admin.id)))
     await decideOrganizationResourceApproval(organizationId, admin.id, { id: approval.id, status: 'denied' })
     assert.equal(await organizationResourceAllowed(wsA, 'subscription', member.id, member.id), false)
+    const prior = (await pool.query('select "updatedAt", "decidedBy" from mikka_organization_resource_approvals where id=$1', [approval.id])).rows[0]
+    const outboxCount = async () => (await pool.query('select count(*)::int as count from mikka_organization_policy_outbox where "organizationId"=$1', [organizationId])).rows[0].count
+    const before = await outboxCount()
+    await Promise.all([admin, owner].map(actor => decideOrganizationResourceApproval(organizationId, actor.id, { id: approval.id, status: 'denied' })))
+    assert.equal(await outboxCount(), before)
+    assert.deepEqual((await pool.query('select "updatedAt", "decidedBy" from mikka_organization_resource_approvals where id=$1', [approval.id])).rows[0], prior)
     await requestOrganizationResourceApproval(organizationId, member.id, { workspaceId: wsA, kind: 'subscription', resourceId: member.id })
     assert.equal(await organizationResourceAllowed(wsA, 'subscription', member.id, member.id), false, 'replay cannot erase a denial')
+    const events = await pool.query('select action,count(*)::int as count from mikka_organization_audit_events where "targetId"=$1 group by action order by action', [approval.id])
+    assert.deepEqual(events.rows, [
+      { action: 'organization.resource_decided', count: 2 },
+      { action: 'organization.resource_requested', count: 1 },
+    ])
   })
   await t.test('a member can request approval for their own installed Skill and an administrator can decide it', async () => {
     const skillId = randomUUID()

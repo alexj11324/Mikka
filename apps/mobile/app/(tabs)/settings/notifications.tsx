@@ -70,8 +70,7 @@ function PushDevices() {
 
 /**
  * 通知 (07c): 主动消息 and which of the Coordinator's own messages reach the
- * phone; above them, whether pushes can reach it at all (PushRow). 待审阅 and 电脑不在用时 come back when the server tracks reviews and
- * whether the computer is in use.
+ * phone; above them, whether pushes can reach it at all (PushRow).
  */
 export default function NotificationsScreen() {
   const { data, savePreferences, preferenceSave } = useSettings()
@@ -91,6 +90,7 @@ export default function NotificationsScreen() {
       {p.proactive ? (
         <Group label={messages.MobileCore.notifications.pushTypes}>
           <ToggleRow label={copy.pushDecide} value={p.pushDecide} disabled={preferenceSave.status !== 'idle'} onChange={pushDecide => save({ pushDecide })} />
+          <ToggleRow label={copy.pushReview} value={p.pushReview} disabled={preferenceSave.status !== 'idle'} onChange={pushReview => save({ pushReview })} />
           <ToggleRow label={copy.pushFinished} value={p.pushFinished} disabled={preferenceSave.status !== 'idle'} onChange={pushFinished => save({ pushFinished })} />
           <ToggleRow label={copy.pushBriefing} value={p.pushBriefing} disabled={preferenceSave.status !== 'idle'} onChange={pushBriefing => save({ pushBriefing })} />
         </Group>

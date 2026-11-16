@@ -284,6 +284,7 @@ const functions = {
   'project-resources.listProjectResources': projectResourcesActions.listProjectResources,
   'project-resources.setProjectDefaultEnvironment': projectResourcesActions.setProjectDefaultEnvironment,
   'project-resources.saveEnvironment': projectResourcesActions.saveEnvironment,
+  'project-resources.searchProjectPullAuthors': projectResourcesActions.searchProjectPullAuthors,
   'project-resources.listDependencyRepositories': projectResourcesActions.listDependencyRepositories,
   'project-resources.replaceDependencyRepositories': projectResourcesActions.replaceDependencyRepositories,
   'project-resources.saveProjectResources': projectResourcesActions.saveProjectResources,
