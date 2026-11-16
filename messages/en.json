@@ -7051,6 +7051,8 @@
       "workspaceEventsNote": "Task, run and resource events are viewed and exported in Audit log, by that workspace's admins.",
       "workspaceEventsLink": "Open Audit log",
       "recentTitle": "Recent events",
+      "searchLabel": "Search events",
+      "searchEmpty": "No matching events.",
       "recentEmpty": "No Organization events yet.",
       "exportTitle": "Export",
       "exportDescription": "An export freezes the events in the range. For 15 minutes you can page through and download it; each page checks your admin access and the records' integrity again.",
