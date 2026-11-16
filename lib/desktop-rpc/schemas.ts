@@ -1,7 +1,7 @@
 import { AVATAR_MAX_BYTES, isAvatarContentType } from '../account/avatar-file'
 import { threadModelChoice } from '@/lib/thread-model-choice'
 import { archiveIdleDays, conversationTargetInput, directoryInput } from '@/lib/conversation-directory-input'
-import { saveEnvironmentInput, listDependencyRepositoriesInput, replaceDependencyRepositoriesInput, projectDefaultEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
+import { listProjectSetupVersionsInput, rollbackProjectSetupInput, saveEnvironmentInput, listDependencyRepositoriesInput, replaceDependencyRepositoriesInput, projectDefaultEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
 import { createOnlyCommand, dispatchReceiptInput } from '@/lib/task-create-command'
 import { taskListPageInput } from '@/lib/task-list-page'
 import { taskPresentationsInput } from '@/lib/task-presentation-input'
@@ -112,6 +112,8 @@ export const desktopActionSchemas = {
   'teams.archiveTeam': oneId,
   'teams.restoreTeam': oneId,
   'teams.removeTeamGrouping': tuple(uuid, text(120)),
+  'project-resources.listProjectSetupVersions': tuple(listProjectSetupVersionsInput),
+  'project-resources.rollbackProjectSetup': tuple(rollbackProjectSetupInput),
   'project-resources.listProjectResources': tuple(uuid, uuid.optional()),
   'project-resources.setProjectDefaultEnvironment': tuple(projectDefaultEnvironmentInput),
   'project-resources.saveEnvironment': tuple(saveEnvironmentInput),
@@ -184,14 +186,14 @@ export const desktopActionSchemas = {
   'bots.updateBot': tuple(object({ botId: uuid, name: text(200).trim().min(1).optional(), color: text(50).min(1).optional(), shape: text(50).min(1).optional(), publicRole: text(2000).optional() })),
   'bots.listWorkspaceBots': none,
   'bots.getWorkspaceBotDefaults': none,
-  'automations.listAutomations': tuple(object({ cursor: text(100).optional(), deleted: z.boolean().optional() })),
-  'automations.getAutomation': oneId,
+  'automations.listAutomations': tuple(object({ cursor: text(100).optional(), deleted: z.boolean().optional() }), workspace),
+  'automations.getAutomation': tuple(uuid, workspace),
   'automations.flushAutomationBatch': tuple(webhookBatchInput),
   'automations.cancelAutomationBatch': tuple(webhookBatchInput),
   'automations.automationBatches': tuple(webhookBatchListInput),
   'automations.automationHistory': oneId,
   'automations.automationUsage': tuple(object({ scheduleId: uuid, days: z.number().int().min(1).max(90).optional() })),
-  'automations.createAutomation': tuple(object({ requestId: uuid, definition: scheduleDefinition })),
+  'automations.createAutomation': tuple(object({ requestId: uuid, definition: scheduleDefinition }), workspace),
   'automations.updateAutomation': tuple(object({ scheduleId: uuid, version: positive, definition: scheduleDefinition })),
   'automations.pauseAutomation': tuple(object({ scheduleId: uuid, version: positive })),
   'automations.takeOverAutomation': tuple(object({ scheduleId: uuid, version: positive })),
@@ -298,6 +300,7 @@ export const desktopActionSchemas = {
   'onboarding.saveOnboardingStep': tuple(object({ step: z.number().int().min(0).max(4), status: z.record(z.string().regex(/^[0-3]$/), z.enum(['done', 'skipped'])) })),
   'onboarding.setupChecklist': tuple(uuid),
   'onboarding.dismissSetupChecklist': tuple(uuid),
+  'onboarding.restoreSetupChecklist': tuple(uuid),
   'pending-actions.decidePendingAction': tuple(uuid, bool),
   'personal-policy.getSharePolicy': inWorkspace,
   'personal-policy.updateSharePolicy': tuple(bool, workspace),

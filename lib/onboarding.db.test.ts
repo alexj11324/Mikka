@@ -26,7 +26,7 @@ test('onboarding backfill, new accounts and session-owned idempotent completion'
     mock.module('next/headers', { namedExports: { headers: async () => new Headers() } })
     // Only the existing session boundary is synthetic; storage and the action execute for real.
     mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => sessionUser ? { user: { id: sessionUser }, session: { id: 'onboarding-fixture-session' } } : null } } } })
-    const { onboardingDone, readOnboardingProgress, setupChecklistDismissed, dismissSetupChecklist } = await import('./onboarding')
+    const { onboardingDone, readOnboardingProgress, setupChecklistDismissed, dismissSetupChecklist, restoreSetupChecklist } = await import('./onboarding')
     const { completeOnboarding, resetOnboarding, saveOnboardingStep } = await import('../app/actions/onboarding')
 
     await t.test('existing accounts are backfilled; new accounts remain incomplete on migration replay', async () => {
@@ -83,6 +83,18 @@ test('onboarding backfill, new accounts and session-owned idempotent completion'
       assert.equal(await setupChecklistDismissed('bob', workspace), true)
       assert.equal(await setupChecklistDismissed('carol', workspace), false)
       assert.equal(await setupChecklistDismissed('bob', randomUUID()), false)
+    })
+
+    await t.test('restoring a checklist preserves another person, another workspace and the completed guide', async () => {
+      const workspace = randomUUID(), otherWorkspace = randomUUID()
+      for (const [user, id] of [['bob', workspace], ['carol', workspace], ['bob', otherWorkspace]]) await dismissSetupChecklist(user, id)
+      await completeOnboarding()
+      await restoreSetupChecklist('bob', workspace)
+      await restoreSetupChecklist('bob', workspace)
+      assert.equal(await setupChecklistDismissed('bob', workspace), false)
+      assert.equal(await setupChecklistDismissed('carol', workspace), true)
+      assert.equal(await setupChecklistDismissed('bob', otherWorkspace), true)
+      assert.equal(await onboardingDone('bob'), true)
     })
 
     await t.test('an absent session cannot complete another account', async () => {

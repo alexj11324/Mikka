@@ -3521,6 +3521,14 @@
       "pushReminder": "只提醒"
     },
     "environments": {
+      "history": "设置历史",
+      "historyFor": "{name} 的设置历史",
+      "restoreSetup": "恢复准备设置",
+      "emptySetup": "无准备命令或文件",
+      "newer": "较新版本",
+      "older": "较早版本",
+      "confirmSetup": "在{name}中恢复第 {revision} 版？",
+      "setupImpact": "使用此环境的 {count} 个项目都将采用恢复后的准备设置。请在运行前重新审查并批准。",
       "archive": "归档",
       "title": "运行环境",
       "add": "添加环境",
@@ -7740,6 +7748,8 @@
     "notifications": {
       "on": "开",
       "off": "关",
+      "registeredDevices": "已注册的推送设备",
+      "noRegisteredDevices": "暂无已注册的设备",
       "pushTypes": "推送这些事",
       "unavailable": "推送无法送达",
       "openSettings": "打开设置",
@@ -8217,6 +8227,7 @@
     }
   },
   "SetupChecklist": {
+    "show": "显示清单",
     "title": "设置清单",
     "left": "还剩 {count} 项",
     "hide": "隐藏设置清单",

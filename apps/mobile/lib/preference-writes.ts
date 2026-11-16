@@ -28,27 +28,34 @@ export class PreferenceWrites<T extends object> {
   }
   private start() {
     if (this.running) return this.running
-    this.running = this.drain().finally(() => { this.running = null })
-    return this.running
+    // Install the shared result before starting I/O, including a synchronous write failure.
+    let settle!: (result: Promise<boolean>) => void
+    const result = new Promise<boolean>(resolve => { settle = resolve })
+    this.running = result
+    settle(this.drain())
+    return result
   }
   private async drain(): Promise<boolean> {
-    while (Object.keys(this.queued).length) {
-      if (!this.deps.current()) return false
+    while (Object.keys(this.queued).length && this.deps.current()) {
       const sent = this.queued
       this.queued = {}
       try {
         const confirmed = await this.deps.write(sent)
-        if (!this.deps.current()) return false
+        if (!this.deps.current()) break
         this.deps.confirm(confirmed)
-        this.publish(Object.keys(this.queued).length ? 'saving' : 'idle', { ...this.queued })
       } catch {
+        this.running = null
         if (this.deps.current()) {
           this.queued = { ...sent, ...this.queued }
           this.publish('unconfirmed', { ...this.queued })
         }
         return false
       }
+      if (Object.keys(this.queued).length) this.publish('saving', { ...this.queued })
     }
+    this.running = null
+    if (!this.deps.current()) return false
+    this.publish('idle', {})
     return true
   }
 }

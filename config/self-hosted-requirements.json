@@ -16,7 +16,7 @@
   "app/actions/project-resources.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Signed-in members read and administrators update Project repository references with current user access.",
+    "behavior": "Signed-in members read and administrators update Project repository references with current user access. Signed-in members can read setup history for an accessible Project. Restoring a recipe also requires project steering and active workspace administration.",
     "test": "tests/project-dependency-repositories.db.test.ts",
     "suite": "test:project-resources-db"
   },
@@ -207,6 +207,13 @@
     "behavior": "Confirm the signed-in native account on its issuing origin. Self-hosted Task destinations use the configured official client, an expiring single-use record in the existing auth database, and a fresh Task access check.",
     "test": "tests/mobile-handoff.test.ts",
     "suite": "test:desktop-auth"
+  },
+  "app/api/mobile/push-tokens/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the installation PostgreSQL database and the current authenticated session to list the person's active native push registrations, register a device or remove its current session binding.",
+    "test": "tests/mobile-push-workspace.db.test.ts",
+    "suite": "test:visibility-db"
   },
   "app/api/organization-invitations/accept/route.ts": {
     "mode": "built-in",
@@ -691,6 +698,13 @@
     "test": "tests/thread-detail-bytes.db.test.ts",
     "suite": "test:activity-actor-db"
   },
+  "drizzle/20261116075300_environment_setup_history.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Adds a workspace-scoped PostgreSQL recipe history and records the currently available recipe for existing environments.",
+    "test": "tests/project-setup-history.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
   "drizzle/20261116082600_project_dependency_repositories.sql": {
     "mode": "built-in",
     "environment": [],
@@ -1059,7 +1073,7 @@
   "lib/project-resources/contracts.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Dependency repository reads and replacements validate Project scope, revision and stable GitHub IDs.",
+    "behavior": "Dependency repository reads and replacements validate Project scope, revision and stable GitHub IDs. Project setup history and restore validate the current workspace, project, environment and acknowledged binding snapshot.",
     "test": "tests/project-dependency-repositories.db.test.ts",
     "suite": "test:project-resources-db"
   },
@@ -1073,7 +1087,7 @@
   "lib/project-resources/store.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Project resource transactions use the installation PostgreSQL database and workspace locks.",
+    "behavior": "Project resource transactions use the installation PostgreSQL database and workspace locks. The installation PostgreSQL database stores versioned recipes. A restore checks the shared binding snapshot, clears approval and preserves current settings.",
     "test": "tests/project-dependency-repositories.db.test.ts",
     "suite": "test:project-resources-db"
   },

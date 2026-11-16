@@ -22,8 +22,8 @@ const listKey = (workspaceId: string, deleted: boolean) => (index: number, previ
  */
 export function useAutomations(workspaceId: string | null, deleted = false) {
   const getKey = workspaceId ? listKey(workspaceId, deleted) : () => null
-  const pages = useSWRInfinite<AutomationList>(getKey, ([, , deleted, cursor]: readonly [string, string, boolean, string | null]) =>
-    listAutomations({ deleted, ...(cursor ? { cursor } : {}) }).then(unwrap<AutomationList>), { revalidateOnFocus: false, shouldRetryOnError: false, revalidateFirstPage: false })
+  const pages = useSWRInfinite<AutomationList>(getKey, ([, selectedWorkspace, deleted, cursor]: readonly [string, string, boolean, string | null]) =>
+    listAutomations({ deleted, ...(cursor ? { cursor } : {}) }, selectedWorkspace).then(unwrap<AutomationList>), { revalidateOnFocus: false, shouldRetryOnError: false, revalidateFirstPage: false })
   useLiveKey('schedule_list', workspaceId, workspaceId ? [unstable_serialize(getKey)] : [], workspaceId)
   const automations = [...new Map((pages.data ?? []).flatMap(page => page.schedules).map(row => [row.id, row])).values()]
   return { ...pages, automations, more: Boolean(pages.data?.at(-1)?.nextCursor) }
@@ -36,7 +36,7 @@ export const automationHistoryKey = (workspaceId: string, id: string) => ['autom
 export function useAutomation(workspaceId: string | null, id: string | null) {
   const key = workspaceId && id ? automationKey(workspaceId, id) : null
   const historyKey = workspaceId && id ? automationHistoryKey(workspaceId, id) : null
-  const automation = useSWR<AutomationView | null>(key, () => getAutomation(id!).then(unwrap<{ automation: AutomationView | null }>).then(value => value.automation),
+  const automation = useSWR<AutomationView | null>(key, () => getAutomation(id!, workspaceId!).then(unwrap<{ automation: AutomationView | null }>).then(value => value.automation),
     { revalidateOnFocus: false, shouldRetryOnError: false })
   const history = useSWR<AutomationHistory>(historyKey, () => automationHistory(id!).then(unwrap<AutomationHistory>),
     { revalidateOnFocus: false, shouldRetryOnError: false })

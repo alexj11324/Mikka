@@ -3521,6 +3521,14 @@
       "pushReminder": "Reminder only"
     },
     "environments": {
+      "history": "Setup history",
+      "historyFor": "Setup history for {name}",
+      "restoreSetup": "Restore setup",
+      "emptySetup": "No setup command or files",
+      "newer": "Newer versions",
+      "older": "Older versions",
+      "confirmSetup": "Restore version {revision} in {name}?",
+      "setupImpact": "This changes setup for {count, plural, one {# project} other {# projects}} using this environment. Review and approve the restored setup before it can run.",
       "archive": "Archive",
       "title": "Run environments",
       "add": "Add environment",
@@ -7740,6 +7748,8 @@
     "notifications": {
       "on": "On",
       "off": "Off",
+      "registeredDevices": "Registered push devices",
+      "noRegisteredDevices": "No registered devices",
       "pushTypes": "Send notifications for",
       "unavailable": "Push notifications are unavailable",
       "openSettings": "Open settings",
@@ -8217,6 +8227,7 @@
     }
   },
   "SetupChecklist": {
+    "show": "Show checklist",
     "title": "Setup checklist",
     "left": "{count, plural, one {# left} other {# left}}",
     "hide": "Hide setup checklist",

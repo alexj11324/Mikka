@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { SettingsContentFrame } from '@ui-slot/settings-content'
 import { ApiAndSubscriptions } from '@ui-slot/settings-models'
 import { SecurityAndSignIn } from '@ui-slot/settings-security'
+import { RestoreSetupChecklist } from '@/components/coordinator/setup-checklist'
 import { PreferencesSettings } from '@ui-slot/settings-preferences'
 import { WorkspaceGeneral } from '@ui-slot/settings-general'
 import { MembersScreen } from '@ui-slot/settings-members'
@@ -149,7 +150,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'privacy': return <PrivacySettings />
     case 'logins':
     case 'secrets': return <SecretsPage side={section === 'logins' ? 'mine' : 'workspace'} onSide={side => onSection(side === 'mine' ? 'logins' : 'secrets')} workspaceId={workspaceId && !preview ? workspaceId : undefined} workspaceName={workspaceName} waiting={waiting} />
-    case 'preferences': return <PreferencesSettings />
+    case 'preferences': return <><PreferencesSettings />{workspaceId && !preview && !workspaceError && <RestoreSetupChecklist key={workspaceId} workspaceId={workspaceId} />}</>
     case 'notifications': return <NotificationSettings />
     case 'memory': return <MemorySettings />
     case 'bot-permissions': return <BotPermissionsSettings admin={admin} workspaceId={workspaceId} />

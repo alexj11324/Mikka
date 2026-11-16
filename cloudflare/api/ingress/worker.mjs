@@ -1,6 +1,6 @@
 import { bindWorkersAi, configureWorkersAi, workersAiRequest } from '../../workers-ai/binding.mjs'
 import { WorkerEntrypoint } from 'cloudflare:workers'
-import { Container, getContainer } from '@cloudflare/containers'
+import { Container } from '@cloudflare/containers'
 import { apiRequest } from './request.mjs'
 import { applicationEnvironment } from './environment.mjs'
 import { configureTaskBridge, taskMachine } from './task-machine.mjs'
@@ -60,7 +60,7 @@ export class BusinessApi extends Container {
 }
 
 export class WorkersAiOutbound extends WorkerEntrypoint {
-  fetch(request) { return workersAiRequest(request, this.env.WORKERS_AI, this.ctx.props.capability) }
+  fetch(request) { return workersAiRequest(request, this.env.WORKERS_AI, this.ctx.props.capability, this.ctx) }
 }
 
 export class CredentialIdentityOutbound extends WorkerEntrypoint {
@@ -83,7 +83,7 @@ export class BusinessWorldOutbound extends WorkerEntrypoint {
 
 export class BusinessWorkflowDelivery extends WorkerEntrypoint {
   fetch(request) {
-    return businessWorkflowDelivery(request, this.env, forwarded => getContainer(this.env.BUSINESS_API, 'shared-api').fetch(forwarded))
+    return businessWorkflowDelivery(request, this.env, forwarded => this.env.BUSINESS_API.getByName('shared-api').fetch(forwarded))
   }
 }
 
@@ -97,7 +97,7 @@ export default class ApiIngress extends WorkerEntrypoint {
     const forwarded = apiRequest(request, env.PUBLIC_ORIGIN)
     if (!forwarded) return new Response(null, { status: 400, headers: { 'cache-control': 'no-store' } })
     // One active request or task never owns shutdown of the shared host.
-    return getContainer(env.BUSINESS_API, 'shared-api').fetch(forwarded)
+    return env.BUSINESS_API.getByName('shared-api').fetch(forwarded)
   }
 
   eveProduct(request, scope) {
@@ -109,6 +109,6 @@ export default class ApiIngress extends WorkerEntrypoint {
     forwarded.headers.delete('authorization')
     forwarded.headers.delete('cookie')
     forwarded.headers.set('x-mikka-eve-binding-scope', scope)
-    return getContainer(this.env.BUSINESS_API, 'shared-api').fetch(forwarded)
+    return this.env.BUSINESS_API.getByName('shared-api').fetch(forwarded)
   }
 }
