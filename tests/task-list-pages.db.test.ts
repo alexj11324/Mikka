@@ -38,6 +38,20 @@ test('authorized Task collection traverses every threadless issue, including mic
     await assert.rejects(run(() => listWorkspaceTaskPage({ workspaceId: foreign, after: cursor })), /workspaceAccessDenied/)
     const anchor = (await pool.query('select id from issues where "userId"=$1', [other])).rows[0].id
     assert.deepEqual(await run(() => listWorkspaceTaskPage({ workspaceId, after: { ...cursor, id: anchor } })), { workspaceId, items: [], next: null, reset: true })
+    const parentId = expected.rows[0].id, otherParent = expected.rows[1].id
+    const children = expected.rows.slice(2, 107).map(row => row.id)
+    await pool.query(`update issues set content=jsonb_build_object('attrs',jsonb_build_object(
+      'mikka',jsonb_build_object('parentId',$1::text)))
+      where id=any($2::uuid[])`, [parentId, children])
+    const byParent = (id: string, after: Parameters<typeof listWorkspaceTaskPage>[0]['after'] = null) =>
+      run(() => listWorkspaceTaskPage({ workspaceId, parentId: id, after }))
+    const firstChildren = await byParent(parentId)
+    assert.equal(firstChildren.items.length, 100)
+    const moreChildren = await byParent(parentId, firstChildren.next)
+    assert.deepEqual([...firstChildren.items, ...moreChildren.items].map(row => row.id), children)
+    assert.equal(moreChildren.next, null)
+    assert.equal((await byParent(otherParent, firstChildren.next)).reset, true)
+    await assert.rejects(byParent(anchor), /issueNotFound/)
     const { seedAgent, seedBot, seedRun } = await import('./support/workspace-admin-db')
     const agent = await seedAgent(pool, user)
     const firstBot = await seedBot(pool, workspaceId, user, 'First dispatcher'), laterBot = await seedBot(pool, workspaceId, user, 'Later dispatcher')
