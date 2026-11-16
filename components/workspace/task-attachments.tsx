@@ -6,12 +6,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { downloadServerFile } from '@/lib/web-connection/assets'
+import { webSelectionVersion } from '@/lib/web-connection/selection'
 import { withBasePath } from '@/lib/base-path'
 import { TASK_FILE_MAX_BYTES, TASK_FILE_MAX_COUNT, type TaskFileList } from '@/lib/task-attachments/contract'
 
 type Trigger = (label: string, open: () => void) => ReactNode
 
-export function TaskAttachments({ taskId, trigger }: { taskId: string; trigger: Trigger }) {
+export function TaskAttachments({ taskId, taskCode, trigger }: { taskId: string; taskCode?: string | null; trigger: Trigger }) {
   const [open, setOpen] = useState(false)
   const t = useTranslations('TaskAttachments')
   return <>
@@ -19,13 +20,13 @@ export function TaskAttachments({ taskId, trigger }: { taskId: string; trigger: 
     <Dialog open={open} onOpenChange={setOpen}>
       {open && <DialogContent>
         <DialogHeader><DialogTitle>{t('title')}</DialogTitle></DialogHeader>
-        <FileList taskId={taskId} />
+        <FileList taskId={taskId} taskCode={taskCode} />
       </DialogContent>}
     </Dialog>
   </>
 }
 
-function FileList({ taskId }: { taskId: string }) {
+function FileList({ taskId, taskCode }: { taskId: string; taskCode?: string | null }) {
   const t = useTranslations('TaskAttachments')
   const common = useTranslations('Common')
   const input = useRef<HTMLInputElement>(null)
@@ -82,7 +83,22 @@ function FileList({ taskId }: { taskId: string }) {
   async function download(id: string, name: string) {
     setError('')
     try {
-      const asset = await downloadServerFile(`${endpoint}?id=${id}`)
+      const generation = webSelectionVersion()
+      const downloadPath = `${endpoint}?id=${encodeURIComponent(id)}`
+      if (taskCode) {
+        const lookup = withBasePath(`/api/tasks/${encodeURIComponent(taskCode)}/attachments?id=${encodeURIComponent(id)}&format=url&fresh=1`)
+        const response = await fetch(lookup, { cache: 'no-store' })
+        // Older servers and ambiguous historical codes still support the saved Task UUID.
+        if (response.status !== 404) {
+          if (!response.ok) throw new Error('taskFileNotFound')
+          const link = await response.json()
+          const expected = new URL(downloadPath, window.location.origin)
+          if (typeof link?.url !== 'string' || new URL(link.url, new URL(lookup, expected)).href !== expected.href)
+            throw new Error('taskFileUnavailable')
+        }
+      }
+      if (generation !== webSelectionVersion()) throw new Error('taskFileUnavailable')
+      const asset = await downloadServerFile(downloadPath)
       setDownloadFile({ url: asset.url, name })
       window.setTimeout(asset.revoke, 60_000)
     } catch { setError(t('downloadFailed')) }
