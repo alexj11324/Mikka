@@ -130,6 +130,8 @@ binding contains `repositoryKey`, optional `baseBranch`, optional
 environment is allowed. A selected per-repository environment must also be
 bound to that Project. Composite database keys reject cross-Workspace links.
 
+Project overview → Dependency repositories lists and replaces read-only references by stable GitHub repository ID. The original caller's current GitHub App repository intersection and Workspace repository policy determine which names they can see. Changing a list requires project steering, an active workspace administrator, a current project revision and access to the complete prior selection. These references use the installation database and do not add execution targets or GitHub grants.
+
 No Workspace policy row, or `inherit`, preserves existing authorization.
 `restricted` intersects its allow-list with that authority; an empty list
 denies repository work but does not ban a non-repository Task. A Project

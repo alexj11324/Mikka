@@ -16,8 +16,8 @@
   "app/actions/project-resources.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Signed-in members can read setup history for an accessible Project. Restoring a recipe also requires project steering and active workspace administration.",
-    "test": "tests/project-setup-history.db.test.ts",
+    "behavior": "Signed-in members read and administrators update Project repository references with current user access. Signed-in members can read setup history for an accessible Project. Restoring a recipe also requires project steering and active workspace administration.",
+    "test": "tests/project-dependency-repositories.db.test.ts",
     "suite": "test:project-resources-db"
   },
   "app/actions/task-runs.ts": {
@@ -705,6 +705,13 @@
     "test": "tests/project-setup-history.db.test.ts",
     "suite": "test:project-resources-db"
   },
+  "drizzle/20261116082600_project_dependency_repositories.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Adds Project-scoped references to immutable GitHub IDs in the installation PostgreSQL database.",
+    "test": "tests/project-dependency-repositories.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
   "lib/abuse/workers-ai.ts": {
     "mode": "optional-cloud",
     "environment": [
@@ -1066,15 +1073,22 @@
   "lib/project-resources/contracts.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Project setup history and restore validate the current workspace, project, environment and acknowledged binding snapshot.",
-    "test": "tests/project-setup-history.db.test.ts",
+    "behavior": "Dependency repository reads and replacements validate Project scope, revision and stable GitHub IDs. Project setup history and restore validate the current workspace, project, environment and acknowledged binding snapshot.",
+    "test": "tests/project-dependency-repositories.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "lib/project-resources/dependency-repositories.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "The installation stores Project references and intersects the current operator-configured GitHub App directory, active workspace policy and Project ACL. No credentials are persisted.",
+    "test": "tests/project-dependency-repositories.db.test.ts",
     "suite": "test:project-resources-db"
   },
   "lib/project-resources/store.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "The installation PostgreSQL database stores versioned recipes. A restore checks the shared binding snapshot, clears approval and preserves current settings.",
-    "test": "tests/project-setup-history.db.test.ts",
+    "behavior": "Project resource transactions use the installation PostgreSQL database and workspace locks. The installation PostgreSQL database stores versioned recipes. A restore checks the shared binding snapshot, clears approval and preserves current settings.",
+    "test": "tests/project-dependency-repositories.db.test.ts",
     "suite": "test:project-resources-db"
   },
   "lib/thread-artifacts.ts": {
@@ -2608,7 +2622,7 @@
   "app/actions/onboarding.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "The signed-in person reads and saves their first-run step and can hide or restore their own workspace checklist in the installation PostgreSQL database.",
+    "behavior": "The signed-in person reads and saves their own first-run step and setup-checklist dismissal in the installation PostgreSQL database.",
     "test": "lib/onboarding.db.test.ts",
     "suite": "test:onboarding-db"
   },
@@ -2772,7 +2786,7 @@
   "lib/onboarding.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Reads and saves first-run progress, and hides or restores one person’s checklist in one workspace in the installation database.",
+    "behavior": "Reads and saves first-run progress and checklist dismissal in the installation database.",
     "test": "lib/onboarding.db.test.ts",
     "suite": "test:onboarding-db"
   },

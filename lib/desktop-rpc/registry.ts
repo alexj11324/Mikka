@@ -279,6 +279,8 @@ const functions = {
   'project-resources.listProjectResources': projectResourcesActions.listProjectResources,
   'project-resources.setProjectDefaultEnvironment': projectResourcesActions.setProjectDefaultEnvironment,
   'project-resources.saveEnvironment': projectResourcesActions.saveEnvironment,
+  'project-resources.listDependencyRepositories': projectResourcesActions.listDependencyRepositories,
+  'project-resources.replaceDependencyRepositories': projectResourcesActions.replaceDependencyRepositories,
   'project-resources.saveProjectResources': projectResourcesActions.saveProjectResources,
   'project-resources.saveWorkspaceRepositoryPolicy': projectResourcesActions.saveWorkspaceRepositoryPolicy,
   'teams.listTeams': actions28.listTeams,
