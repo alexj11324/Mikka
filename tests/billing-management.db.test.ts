@@ -100,6 +100,19 @@ test('billing management HTTP preserves independent tenants, owners and immutabl
       ($1,$2,$2,$3,'synthetic-platform','settled',2500000,0,0,2500000),($4,$2,$2,$3,'synthetic-platform','unknown',null,400000,0,0)`, [call, first.id, member, held])
     const budget = { scope: 'member', scopeId: member, period: 'month', limitPoints: 300, warningPercent: 80 }
     assert.equal((await post({ action: 'budget', workspaceId: first.id, budget })).status, 200)
+    const saveBudget = (limitPoints: number | null, warningPercent = budget.warningPercent) => post({
+      action: 'budget', workspaceId: first.id, budget: { ...budget, limitPoints, warningPercent },
+    })
+    const changeCount = async () => (await pool.query(`select count(*)::int n from workspace_audit_events
+      where "workspaceId"=$1 and action='billing.limits_changed' and "targetType"='budget_member' and "targetId"=$2`, [first.id, member])).rows[0].n
+    const originalTime = async () => (await pool.query(`select "updatedAt"::text as stamp from billing_resource_budgets
+      where "workspaceId"=$1 and scope='member' and "scopeId"=$2 and period='month'`, [first.id, member])).rows[0].stamp
+    const firstTime = await originalTime()
+    assert.deepEqual((await Promise.all([saveBudget(300), saveBudget(300)])).map(result => result.status), [200, 200])
+    assert.equal(await originalTime(), firstTime)
+    assert.equal(await changeCount(), 1)
+    assert.equal((await saveBudget(300, 90)).status, 200)
+    assert.equal(await changeCount(), 2, 'a warning threshold change is a real edit')
     const view = await (await get()).json() as BillingManagementView, row = view.budgets.find(item => item.scope === 'member')!
     assert.deepEqual([row.spentPoints, row.reservedPoints, row.remainingPoints, row.thresholdReached, row.exhausted], [250, 40, 10, true, false])
     assert.deepEqual([view.usage.costMicroUsd, view.usage.reservedMicroUsd, view.usage.unknownCalls], [2500000, 400000, 1])
@@ -109,7 +122,8 @@ test('billing management HTTP preserves independent tenants, owners and immutabl
     await pool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2', [first.id, member])
     assert.equal((await post({ action: 'budget', workspaceId: first.id, budget: { ...budget, limitPoints: null } })).status, 200, 'an obsolete member limit can be removed without resurrecting their membership')
     assert.equal((await pool.query('select count(*)::int n from hosted_usage where id=any($1::text[])', [[call, held]])).rows[0].n, 2)
-    assert.equal((await pool.query(`select count(*)::int n from workspace_audit_events where "workspaceId"=$1 and action='billing.limits_changed'`, [first.id])).rows[0].n, 3)
+    assert.deepEqual((await Promise.all([saveBudget(null), saveBudget(null)])).map(result => result.status), [200, 200])
+    assert.equal(await changeCount(), 4)
     const unavailable = await post({ action: 'budget', workspaceId: first.id, budget: { ...budget, scope: 'project', scopeId: randomUUID() } })
     assert.equal(unavailable.status, view.resourceTargetsAvailable ? 403 : 409)
     await pool.query('update mikka_workspace_members set status=\'active\' where "workspaceId"=$1 and "userId"=$2', [first.id, member])
