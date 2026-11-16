@@ -530,6 +530,13 @@
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "drizzle/20261116070600_organization_invitation_email_preference.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Store the recipient’s organization invitation email preference before the installation sends an invitation.",
+    "test": "tests/organization-invitations.db.test.ts",
+    "suite": "test:organization-invitations-db"
+  },
   "drizzle/20261112061146_organization_member_invitations.sql": {
     "mode": "built-in",
     "environment": [

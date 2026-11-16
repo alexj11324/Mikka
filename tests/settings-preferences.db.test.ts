@@ -85,7 +85,7 @@ dbTest('preferences read both optional owner rows in one statement without losin
   }
   const stored = {
     archiveIdleAfterDays: 30,
-    pushDecide: false, pushReview: false, pushFinished: false, pushBriefing: false,
+    pushDecide: false, pushReview: false, pushFinished: false, pushBriefing: false, organizationInvitationEmails: false,
     pushWhen: schema.PUSH_WHEN.find(value => value !== 'always')!,
     memoryEnabled: false, sendKey: 'modEnter' as const, personalInstructions: 'Synthetic owner preference',
     dailySuggestions: true,

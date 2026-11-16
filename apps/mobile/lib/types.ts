@@ -268,6 +268,7 @@ export interface Preferences {
   pushReview: boolean
   pushFinished: boolean
   pushBriefing: boolean
+  organizationInvitationEmails?: boolean
   pushWhen: 'always' | 'away'
   memoryEnabled: boolean
   /** The web composer's send key; mobile keeps its own keyboard behaviour. */

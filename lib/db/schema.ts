@@ -1316,6 +1316,7 @@ export const userPreferences = pgTable('user_preferences', {
   pushReview: boolean('pushReview').notNull().default(true),
   pushFinished: boolean('pushFinished').notNull().default(true),
   pushBriefing: boolean('pushBriefing').notNull().default(true),
+  organizationInvitationEmails: boolean('organizationInvitationEmails').notNull().default(true),
   pushWhen: text('pushWhen').$type<PushWhen>().notNull().default('always'),
   memoryEnabled: boolean('memoryEnabled').notNull().default(true),
   /** The chat composer's send key: Enter (Shift+Enter breaks the line) or ⌘/Ctrl+Enter (Enter breaks the line). */

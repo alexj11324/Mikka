@@ -35,6 +35,9 @@ export default function NotificationsScreen() {
           <ToggleRow label={copy.pushBriefing} value={p.pushBriefing} disabled={preferenceSave.status !== 'idle'} onChange={pushBriefing => save({ pushBriefing })} />
         </Group>
       ) : null}
+      {typeof p.organizationInvitationEmails === 'boolean' ? <Group>
+        <ToggleRow label={copy.organizationInvitationEmails} value={p.organizationInvitationEmails} disabled={preferenceSave.status !== 'idle'} onChange={organizationInvitationEmails => { void savePreferences({ organizationInvitationEmails }) }} />
+      </Group> : null}
       <PreferenceSaveNotice />
     </SettingsPage>
   )
