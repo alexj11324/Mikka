@@ -13,7 +13,7 @@ import type { ScheduledRead } from '../schedules/contract'
 // Eve persists these business choices before evaluating the turn's definitions.
 export const turnModel = defineState<HostedRuntimeSnapshot | null>('mikka.model', () => null)
 export const turnPolicy = defineState<Pick<DefinitionSnapshot, 'definition' | 'effectiveTools' | 'personalPlugins'> | null>('mikka.policy', () => null)
-export const turnRequest = defineState<{ sourceEventId?: string; scheduledRead: ScheduledRead | null }>('mikka.request', () => ({ scheduledRead: null }))
+export const turnRequest = defineState<{ sourceEventId?: string; scheduledRead: ScheduledRead | null; startIndex?: number }>('mikka.request', () => ({ scheduledRead: null }))
 
 export async function modelForSession(ctx: DynamicModelContext) {
   const evaluation=await evaluationForSession(ctx)
