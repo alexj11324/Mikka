@@ -11,8 +11,8 @@ import { isValidDeploymentId } from '../lib/deployment-id.mjs'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const sha = /^[a-f0-9]{40}$/
 const digest = /^sha256:[a-f0-9]{64}$/
-const workflows = { eve: 'cloudflare-eve-image.yml', task: 'cloudflare-task-sandbox.yml' }
-const repositories = { eve: 'mikka-eve', task: 'mikka-native-task' }
+const workflows = { eve: 'cloudflare-eve-image.yml', task: 'cloudflare-task-sandbox.yml', litellm: 'cloudflare-litellm-image.yml' }
+const repositories = { eve: 'mikka-eve', task: 'mikka-native-task', litellm: 'mikka-litellm' }
 const hash = bytes => 'sha256:' + createHash('sha256').update(bytes).digest('hex')
 const output = (bin, args, options) => command(bin, args, { ...options, encoding: 'utf8' }).trim()
 

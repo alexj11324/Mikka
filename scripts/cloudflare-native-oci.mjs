@@ -13,7 +13,7 @@ const ACCOUNT = /^[a-f0-9]{32}$/
 const WORKER_PATHS = { apiIngress: 'ingress.mjs', eveRuntime: 'workers/eve-runtime.mjs',
   taskSandbox: 'workers/task-sandbox.mjs', web: 'workers/web.mjs',
   credentialIdentity: 'workers/credential-identity.mjs', credentialBroker: 'workers/credential-broker.mjs',
-  appGateway: 'workers/app-gateway.mjs' }
+  appGateway: 'workers/app-gateway.mjs', liteLlm: 'workers/litellm.mjs' }
 const fail = code => { throw new Error(code) }
 const hash = value => createHash('sha256').update(value).digest('hex')
 const git = (cwd, ...args) => stdout('git', args, { cwd, stage: 'SOURCE_CHECKOUT', timeout: 30000 })
@@ -161,9 +161,11 @@ async function prepareArtifacts(work, selected, env, webRenderer) {
   await mkdir(join(artifacts, 'workers'))
   const workerBundles = { apiIngress: { path: WORKER_PATHS.apiIngress, sha256: hash(worker), bytes: worker.length } }
   command('npm', ['ci', '--prefix', 'cloudflare/task-sandbox', '--ignore-scripts'], { cwd: work, env, stage: 'TASK_WORKER_INSTALL' })
+  command('npm', ['ci', '--prefix', 'cloudflare/litellm', '--ignore-scripts'], { cwd: work, env, stage: 'LITELLM_WORKER_INSTALL' })
   const configurations = {
     eveRuntime: { directory: 'cloudflare/eve-runtime', stage: 'EVE_WORKER_BUNDLE' },
     taskSandbox: { directory: 'cloudflare/task-sandbox', stage: 'TASK_WORKER_BUNDLE' },
+    liteLlm: { directory: 'cloudflare/litellm', stage: 'LITELLM_WORKER_BUNDLE' },
     web: { config: prepared, stage: 'WEB_WORKER_BUNDLE' },
     appGateway: { config: gatewayConfig({ current: selected.id, retained: [selected.id] }), stage: 'APP_GATEWAY_BUNDLE' },
     credentialIdentity: { config: { main: join(work, 'cloudflare/credential-identity/worker.mjs'),

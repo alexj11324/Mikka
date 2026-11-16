@@ -25,6 +25,22 @@ export function businessWorldRequest(request, binding, capability) {
   return binding.fetch(new Request(request, { headers, redirect: 'manual' }))
 }
 
+// The model gateway's protocol converter (decision 2026-11-15-2000): the exact
+// conversion routes the gateway calls, POST only, with the LiteLLM master key
+// the API holds. The person's provider key rides in the JSON body.
+const liteLlmPaths = new Set(['/v1/messages', '/v1/messages/count_tokens', '/v1/responses'])
+export function liteLlmRequest(request, binding) {
+  const url = new URL(request.url)
+  if (url.origin !== 'https://litellm.internal' || url.username || url.password || url.hash || url.search
+      || request.method !== 'POST' || !liteLlmPaths.has(url.pathname)) return no(404)
+  if (!binding) return no(503)
+  const headers = new Headers()
+  for (const name of ['accept', 'content-type', 'authorization', 'x-api-key', 'anthropic-version', 'anthropic-beta']) {
+    if (request.headers.has(name)) headers.set(name, request.headers.get(name))
+  }
+  return binding.fetch(new Request(request, { headers, redirect: 'manual' }))
+}
+
 export function eveServiceRequest(request, binding) {
   const url = new URL(request.url)
   if (url.origin !== 'https://eve.internal' || url.username || url.password || url.hash

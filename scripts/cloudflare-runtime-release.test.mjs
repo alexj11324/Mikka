@@ -24,6 +24,7 @@ const api = { version: 1, provider: 'github-actions', repository: 'alexj11324/Mi
     apiIngress: { path: 'ingress.mjs', sha256: '1'.repeat(64), bytes: 120 },
     eveRuntime: { path: 'workers/eve-runtime.mjs', sha256: '3'.repeat(64), bytes: 220 },
     taskSandbox: { path: 'workers/task-sandbox.mjs', sha256: '4'.repeat(64), bytes: 320 },
+    liteLlm: { path: 'workers/litellm.mjs', sha256: '4'.repeat(64), bytes: 320 },
     web: { path: 'workers/web.mjs', sha256: '5'.repeat(64), bytes: 420 },
     credentialIdentity: { path: 'workers/credential-identity.mjs', sha256: '6'.repeat(64), bytes: 520 },
     credentialBroker: { path: 'workers/credential-broker.mjs', sha256: '7'.repeat(64), bytes: 620 },
@@ -190,7 +191,7 @@ test('prebuilt packaging carries accepted API resource bytes into the official E
 
 
 test('runtime workflow callers pass genuine API run identity and keep the Registry username unmasked', async () => {
-  for (const name of ['cloudflare-eve-image.yml', 'cloudflare-task-sandbox.yml']) {
+  for (const name of ['cloudflare-eve-image.yml', 'cloudflare-task-sandbox.yml', 'cloudflare-litellm-image.yml']) {
     const workflow = await readFile(new URL('../.github/workflows/' + name, import.meta.url), 'utf8')
     assert.ok(workflow.includes('api_run_id:'))
     assert.ok(workflow.includes('api_run_attempt:'))
@@ -285,7 +286,7 @@ set -euo pipefail
 [[ "$1" == 'scripts/cloudflare-runtime-release.mjs' && "$2" == 'publish' ]]
 [[ "$(cat "$DOCKER_CONFIG/auth")" == "$CF_RUNTIME_REGISTRY_PASSWORD" ]]
 `, { mode: 0o700 })
-    for (const name of ['cloudflare-eve-image.yml', 'cloudflare-task-sandbox.yml']) {
+    for (const name of ['cloudflare-eve-image.yml', 'cloudflare-task-sandbox.yml', 'cloudflare-litellm-image.yml']) {
       const workflow = await readFile(new URL('../.github/workflows/' + name, import.meta.url), 'utf8')
       const step = workflow.split('      - name: Publish the verified runtime image\n')[1]?.split('\n      - ')[0]
       assert.ok(step)
