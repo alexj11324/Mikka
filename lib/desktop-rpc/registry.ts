@@ -274,6 +274,8 @@ const functions = {
   'teams.archiveTeam': actions28.archiveTeam,
   'teams.restoreTeam': actions28.restoreTeam,
   'teams.removeTeamGrouping': actions28.removeTeamGrouping,
+  'project-resources.listProjectSetupVersions': projectResourcesActions.listProjectSetupVersions,
+  'project-resources.rollbackProjectSetup': projectResourcesActions.rollbackProjectSetup,
   'project-resources.listProjectResources': projectResourcesActions.listProjectResources,
   'project-resources.setProjectDefaultEnvironment': projectResourcesActions.setProjectDefaultEnvironment,
   'project-resources.saveEnvironment': projectResourcesActions.saveEnvironment,

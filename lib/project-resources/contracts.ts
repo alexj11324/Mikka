@@ -44,6 +44,21 @@ export const projectDefaultEnvironmentInput = z.object({
   workspaceId: z.uuid(), projectId: z.uuid(), revision: z.number().int().positive(),
   environmentId: z.uuid().nullable(),
 }).strict()
+export const projectSetupScope = z.object({
+  workspaceId: z.uuid(), projectId: z.uuid(), environmentId: z.uuid(),
+}).strict()
+export const listProjectSetupVersionsInput = projectSetupScope.extend({ before: z.number().int().positive().optional() })
+export const rollbackProjectSetupInput = projectSetupScope.extend({
+  revision: z.number().int().positive(), version: z.number().int().positive(),
+  bindingSnapshot: z.string().regex(/^[a-f0-9]{64}$/),
+})
+export type ProjectSetupRecipe = Omit<NonNullable<EnvironmentConfiguration['setup']>, 'approved'>
+export type ProjectSetupHistory = {
+  revision: number; totalProjects: number; bindingSnapshot: string
+  versions: { revision: number; recordedAt: string; recipe: ProjectSetupRecipe | null }[]
+  before: number | null
+}
+
 export const workspaceRepositoryPolicyInput = z.object({
   workspaceId: z.uuid(), revision: z.number().int().nonnegative(),
   mode: z.enum(['inherit', 'restricted']), repositoryKeys: z.array(projectRepositoryKey).max(500),
