@@ -4,10 +4,10 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 
 | Code path status | Count at this ledger revision |
 |---|---:|
-| complete | 135 |
+| complete | 149 |
 | partial | 28 |
 | prior-partial | 36 |
-| unreviewed | 6357 |
+| unreviewed | 6343 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -28,3 +28,5 @@ Sixteen Expo route entries now have independent records for the exact reachable 
 13 previously unreviewed Mobile files now bind the real root and tab entries, settings provider, preference serialization, identity cache, sheet configuration and push routing to their fixed blobs and individual consumers. The setting writer exposed G-049 / #2620. Expo resolved all seven layout entries per platform. Two supporting test groups passed 43/43 and 14/14 on the fixed checkout.
 
 Full name/mode/blob difference inventory refreshed through 295f53ba18177329d162bb62da44d7e66bb46ac6 (8344 paths): 1364 changed names vs fixed baseline, {'modified': 986, 'added': 363, 'deleted': 15}. Relative to a1e31323a381b97d8e0a7b7d098fadb3c4b767e3, 40 names changed in eight ordinary main merges. 15 G-affected names link the exact tested change to its merge and receipt. The remaining names and earlier changes to these files stay in scope; owner B/E merges remain attributed to their PRs.
+
+Fourteen fixed source paths cover gateway admission, DO wiring, native WebSocket presence, Eve image configuration, the retired restart machine, and the actual G-048 and G-015 consumers. Both native 90-second expiry and recovery paths were run in isolated workerd, with supporting route and Eve scopes recorded per path.
