@@ -109,6 +109,7 @@ test('a selected project missing from the current directory retains an explicit 
 
 test('project activity uses the displayed workspace and obtains a fresh read when the reader changes', async () => {
   const nested = [
+    ['../components/workspace/project-dependency-repositories.tsx', { ProjectDependencyRepositories: empty }],
     ['../components/workspace/project-lifecycle-controls.tsx', { ProjectLifecycleControls: empty }],
     ['../components/teams/project-team-control.tsx', { ProjectTeamControl: empty }],
     ['../components/workspace/project-issue-picker.tsx', { ProjectIssuePicker: empty }],
