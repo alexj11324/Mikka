@@ -7,7 +7,7 @@ import { setTimeout as wait } from 'node:timers/promises'
 
 // This loopback fixture exposes only the two previous real-GGUF providers. A
 // pause between actual SSE frames keeps the live turn open while a user types.
-const dir = process.env.E_CODEX_QA
+const dir = process.env.E_GATE_QA_DIR ?? process.env.E_CODEX_QA
 const model = 'SmolLM2-135M-Instruct-Q4_K_M'
 const allowed = new Set(['/v1/models', '/v1/messages', '/v1/messages/count_tokens', '/v1/responses'])
 const secret = process.env.E_LOOPBACK_KEY

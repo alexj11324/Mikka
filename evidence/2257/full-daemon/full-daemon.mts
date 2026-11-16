@@ -23,6 +23,7 @@ import { threadDeliveryView } from '../../lib/thread-delivery-queue'
 
 const dir = process.env.E_CODEX_QA!, origin = process.env.BETTER_AUTH_URL!
 const modelDir = process.env.E_MODEL_QA_DIR ?? dir
+const gateDir = process.env.E_GATE_QA_DIR ?? modelDir
 const model = 'SmolLM2-135M-Instruct-Q4_K_M'
 const source = process.env.E_RUN_SOURCE
 const native = process.env.E_DESKTOP_WINDOW === '1'
@@ -80,12 +81,12 @@ async function fullWork(window?:any){
     assert.ok(issue?.id);const issueId=issue.id
     const definition=apiKeyWorkerDefinition({schemaVersion:1,kind:'worker',harness,instructions:'Answer only the synthetic test request.',definitionDigest:hash(prompt),promptDigest:hash(prompt),model,modelSource:'native-default',parent:null,readOnly:true} as never,prompt,{keyId:keys[harness].id,model})
     const input={id:runId,userId:owner,issueId,agentId:agent.id,deviceId,deviceRepoId:repo.id,botId:null,origin:'web' as const,prompt,promptTaskStart:0,promptTaskLength:[...prompt].length,definition,dispatch:{issueId,agentId:agent.id,deviceRepoId:repo.id,requestKey:ident()}}
-    writeFileSync(join(modelDir,'current-gate.json'),JSON.stringify({id:runId,marker:prompt}),{mode:0o600})
-    const release=()=>writeFileSync(join(modelDir,runId+'.release'),'',{mode:0o600})
+    writeFileSync(join(gateDir,'current-gate.json'),JSON.stringify({id:runId,marker:prompt}),{mode:0o600})
+    const release=()=>writeFileSync(join(gateDir,runId+'.release'),'',{mode:0o600})
     if(mode==='interrupt')await withProjectResourceLease(owner,workspaceId,()=>queueFactoryTask(pool,owner,{issueId,botId:null,agentId:agent.id,deviceRepoId:repo.id,note:prompt,key:ident(),queue:(tx,userId,_request,botId,context)=>acceptLocalRun({...input,userId,botId,factoryContext:context},tx)}));else await acceptLocalRun(input)
     record('ordinary_run_admitted',{mode,harness,runId,issueId,deviceId})
     try {
-      await until(async()=>existsSync(join(modelDir,runId+'.observed'))&&((await row(runId))?.status==='running'),mode+'_genuine_first_frame',95)
+      await until(async()=>existsSync(join(gateDir,runId+'.observed'))&&((await row(runId))?.status==='running'),mode+'_genuine_first_frame',95)
       const modes=await threadDeliveryView(pool,owner,runId,runId);assert.ok(modes.modes.includes(activeSteer?'steer':mode));assert.equal(modes.modes.includes('steer'),harness==='codex')
       const grant=(await observer.query('select harness,model,"sourceKind" from model_gateway_tokens where "runId"=$1 and "ownerId"=$2 and "workspaceId"=$3 and "keyId"=$4',[runId,owner,workspaceId,keys[harness].id])).rows
       assert.ok(grant.some(g=>g.harness===harness&&g.model===model&&g.sourceKind==='api_key'))
@@ -93,7 +94,7 @@ async function fullWork(window?:any){
       const send=async(account:any,delivery:string,text:string,requestId:string)=>rpc(account,'agents.sendIssueThreadReply',[{issueId,runId,expectedOwnerId:account.userId,expectedWorkspaceId:workspaceId,text,delivery,requestId}])
       const ui=window?await window.openThread(target):{submit:async(delivery:string,text:string)=>{const id=ident();const sent=await send(scope.owner,delivery,text,id);assert.equal(sent.runId,runId);return id},changeQueued:async(text:string,action:string)=>{const queue=(await threadDeliveryView(pool,owner,runId,runId)).queued;const message=queue.find(m=>m.text===text);assert.ok(message);const result=await rpc(scope.owner,'agents.changeQueuedThreadReply',[{issueId,runId,messageId:message.id,action}]);assert.ok(['cancelled','sent'].includes(result.status));return message.id}}
       const refused=await send(scope.peer,mode==='sendNow'?'steer':mode,follow,ident());assert.ok(refused.error)
-      record('live_turn_before_owner_action',{runId,harness,modes:modes.modes,peerDenied:true,runBoundGrant:true,firstFrame:JSON.parse(readFileSync(join(modelDir,runId+'.observed'),'utf8'))})
+      record('live_turn_before_owner_action',{runId,harness,modes:modes.modes,peerDenied:true,runBoundGrant:true,firstFrame:JSON.parse(readFileSync(join(gateDir,runId+'.observed'),'utf8'))})
       if(window&&mode==='steer')await ui.expectDefaultQueue()
       const cancelText='Remove this synthetic queued note.'
       const cancelId=await ui.submit('queue',cancelText);if(window)await ui.expectQueued(cancelText)

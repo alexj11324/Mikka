@@ -78,7 +78,9 @@ launch_model() {
   # model endpoint material is inherited, including the public CA trust root.
   local -a command=("$(command -v node)" "$1")
   if [ -n "${E_MODEL_LAUNCH:-}" ] && [ "$1" != "$harness/relay.mjs" ]; then command=("$E_MODEL_LAUNCH" "${command[@]}"); fi
-  exec env -i PATH="$PATH" HOME="${E_MODEL_HOME:-$HOME}" LANG=C.UTF-8 E_CODEX_QA="$model_directory" E_WEIGHT_FILE="$E_WEIGHT_FILE" E_LOOPBACK_KEY="$E_LOOPBACK_KEY" NODE_EXTRA_CA_CERTS="$model_directory/ephemeral-ca.pem" SSL_CERT_FILE="$model_directory/ephemeral-ca.pem" "${command[@]}"
+  local -a gate_env=()
+  if [ "$1" = "$harness/relay.mjs" ]; then gate_env=("E_GATE_QA_DIR=${E_GATE_QA_DIR:-$model_directory}"); fi
+  exec env -i "${gate_env[@]}" PATH="$PATH" HOME="${E_MODEL_HOME:-$HOME}" LANG=C.UTF-8 E_CODEX_QA="$model_directory" E_WEIGHT_FILE="$E_WEIGHT_FILE" E_LOOPBACK_KEY="$E_LOOPBACK_KEY" NODE_EXTRA_CA_CERTS="$model_directory/ephemeral-ca.pem" SSL_CERT_FILE="$model_directory/ephemeral-ca.pem" "${command[@]}"
 }
 launch_model "$harness/provider.mjs" > "$qa/codex-model.log" 2>&1 & codexpid=$!
 launch_model "$harness/relay.mjs" > "$qa/relay.log" 2>&1 & relaypid=$!

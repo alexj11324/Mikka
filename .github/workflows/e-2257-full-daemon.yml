@@ -13,8 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 43
     env:
-      PUBLIC_SOURCE: ca6c1b17caf92d4a8f4dd56c5c9aad1670022eb0
-      PUBLIC_TREE: db549b556f0a9a4ce426f0e90614244833c5b8f0
+      PUBLIC_SOURCE: d8c0925622b6baf830704aeae645d68aecada531
+      PUBLIC_TREE: 152e9fdca818a0206eba25d468bdcb2cc620624a
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -29,7 +29,7 @@ jobs:
           sparse-checkout: evidence/2257/local-provider
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ca6c1b17caf92d4a8f4dd56c5c9aad1670022eb0
+          ref: d8c0925622b6baf830704aeae645d68aecada531
           path: product
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
