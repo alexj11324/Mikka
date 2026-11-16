@@ -9,6 +9,7 @@ export const ACTION_ERROR_CODES = [
   'scheduleVersionConflict',
   'scheduleCancelled',
   'scheduleNotPaused',
+  'scheduleNotDeleted',
   'scheduleNotActive',
   'scheduleConcurrencyLimit',
   'scheduleDailyRunLimit',

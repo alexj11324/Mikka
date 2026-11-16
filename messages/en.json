@@ -1222,6 +1222,7 @@
     "scheduleBatchClosed": "This batch has stopped collecting requests.",
     "scheduleAdminRequired": "Only its creator or an admin can change, resume or run this automation.",
     "scheduleVersionConflict": "The automation was changed. Please reload and try again.",
+    "scheduleNotDeleted": "The automation is not in the trash.",
     "scheduleCancelled": "The automation was deleted.",
     "scheduleNotPaused": "The automation isn't paused.",
     "scheduleNotActive": "The automation is paused or finished. Resume it to run it.",
@@ -7960,7 +7961,10 @@
     "fromScratch": "Start from scratch",
     "askBotPrompt": "Set up an automation for me: ",
     "search": "Search automations",
+    "restore": "Restore",
+    "emptyDeleted": "No deleted automations",
     "filter": {
+      "deleted": "Deleted",
       "all": "All",
       "active": "On",
       "paused": "Paused"

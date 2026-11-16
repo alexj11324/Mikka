@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { ArrowLeft, Play } from 'lucide-react'
 import { listDevices } from '@/app/actions/agents'
 import { getWorkspaceBotDefaults, listBots } from '@/app/actions/bots'
-import { automationLinearTeams, automationSlackChannels, cancelAutomation, createAutomation, pauseAutomation, resumeAutomation, runAutomationNow, takeOverAutomation, updateAutomation } from '@/app/actions/automations'
+import { automationLinearTeams, automationSlackChannels, deleteAutomation, createAutomation, pauseAutomation, resumeAutomation, runAutomationNow, takeOverAutomation, updateAutomation } from '@/app/actions/automations'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -175,7 +175,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
     if (!current || busy) return
     setBusy('delete')
     try {
-      const result = await cancelAutomation({ scheduleId: current.id, version: current.version })
+      const result = await deleteAutomation({ scheduleId: current.id, version: current.version })
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
       setConfirmDelete(false)
       onBack()

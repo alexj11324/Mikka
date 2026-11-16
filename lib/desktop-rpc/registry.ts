@@ -127,6 +127,8 @@ const functions = {
   'automations.pinAutomation': automations.pinAutomation,
   'automations.organizeAutomation': automations.organizeAutomation,
   'automations.resumeAutomation': automations.resumeAutomation,
+  'automations.deleteAutomation': automations.deleteAutomation,
+  'automations.restoreAutomation': automations.restoreAutomation,
   'automations.cancelAutomation': automations.cancelAutomation,
   'automations.cancelAutomationRun': automations.cancelAutomationRun,
   'automations.runAutomationNow': automations.runAutomationNow,

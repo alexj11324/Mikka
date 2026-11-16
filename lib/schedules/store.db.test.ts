@@ -25,7 +25,9 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
  const guard:WorkspaceGuard=async(user,workspace,work)=>{
   if(!workspace)return work({role:'member'})
   const tx=await members.connect()
-  try{await tx.query('BEGIN');const member=await tx.query<{role:'owner'|'admin'|'member'}>(`SELECT role FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status='active' FOR SHARE`,[workspace,user]);if(!member.rowCount)throw new ScheduleError('scheduleWorkspaceAccessDenied',403);const v=await work({role:member.rows[0].role});await tx.query('COMMIT');return v}catch(e){await tx.query('ROLLBACK');throw e}finally{tx.release()}
+  try{await tx.query('BEGIN');const member=await tx.query<{role:'owner'|'admin'|'member'}>(`SELECT role FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status='active' FOR SHARE`,[workspace,user]);if(!member.rowCount)throw new ScheduleError('scheduleWorkspaceAccessDenied',403);const v=await work({role:member.rows[0].role,requireActiveMember:async target=>{
+    if(!(await tx.query(`SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status='active' FOR SHARE`,[workspace,target])).rowCount)throw new ScheduleError('scheduleWorkspaceAccessDenied',403)
+  }});await tx.query('COMMIT');return v}catch(e){await tx.query('ROLLBACK');throw e}finally{tx.release()}
  }
  let agentReady=true
  const store=()=>new ScheduleStore(pool,guard,async(tx,user,id)=>(await tx.query<{id:string;title:string;status:string}>('SELECT id,title,status FROM issues WHERE id=$1 AND "userId"=$2 FOR SHARE',[id,user])).rows[0]??null,async()=>{},()=>agentReady,()=>now)
@@ -88,6 +90,67 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
     for (const input of [{limit:0},{limit:101},{cursor:'invalid'},{scheduleId:'invalid'}]) {
       assert.equal(scheduleListInput.safeParse(input).success,false)
       await assert.rejects(store().command(actor,{action:'list',...input}),/invalidScheduleCommand/)
+    }
+  })
+  await t.test('workspace trash restores the same schedule under creator authority without replaying a deleted occurrence', async t => {
+    const originalNow = now
+    const d = def()
+    d.timing = {kind:'interval',start:new Date(now.getTime()+60_000).toISOString(),minutes:1}
+    const row = await create(d)
+    t.after(async () => {
+      now = originalNow
+      await pool.query('DELETE FROM user_schedules WHERE id=$1',[row.id])
+      await members.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`,[workspace,owner])
+    })
+    const change = (who: Actor, action: 'delete' | 'restore' | 'resume', version: number) =>
+      store().command(who,{action,scheduleId:row.id,version}) as Promise<{schedule:{id:string;status:string;deleted:boolean;version:number;next_at:Date|null}}>
+    const list = async (deleted: boolean) =>
+      (await store().command(actor,{action:'list',scheduleId:row.id,deleted}) as {schedules:{id:string}[]}).schedules.map(s=>s.id)
+    const occurrence = randomUUID()
+    await pool.query(`INSERT INTO schedule_occurrences(id,schedule_id,version,due_at,definition,operation_id,status,execution_decision,next_retry_at)
+      VALUES($1,$2,1,$3,$4,$5,'pending','execute',$3)`,[occurrence,row.id,now,d,randomUUID()])
+    assert.deepEqual(await list(false),[row.id])
+    const removal = await Promise.allSettled([change(memberActor,'delete',1),change(actor,'delete',1)])
+    assert.equal(removal.filter(r=>r.status==='fulfilled').length,1)
+    assert.match(String((removal.find(r=>r.status==='rejected') as PromiseRejectedResult).reason),/scheduleVersionConflict/)
+    assert.deepEqual(await list(false),[]); assert.deepEqual(await list(true),[row.id])
+    await assert.rejects(store().command(actor,{action:'organize',scheduleId:row.id,folder:'new',tags:[]}),/scheduleCancelled/)
+    await assert.rejects(change(memberActor,'restore',2),/scheduleAdminRequired/)
+    await assert.rejects(change(actor,'resume',2),/scheduleCancelled/)
+    await assert.rejects(change(actor,'restore',1),/scheduleVersionConflict/)
+    // Admin must not restore an active schedule on behalf of a creator who is no longer active.
+    await members.query(`UPDATE mikka_workspace_members SET role='admin' WHERE "workspaceId"=$1 AND "userId"=$2`,[workspace,member])
+    t.after(async()=>{await members.query(`UPDATE mikka_workspace_members SET role='member' WHERE "workspaceId"=$1 AND "userId"=$2`,[workspace,member])})
+    await members.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`,[workspace,owner])
+    await assert.rejects(change(memberActor,'restore',2),/scheduleWorkspaceAccessDenied/)
+    await members.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`,[workspace,owner])
+    now = new Date(now.getTime()+180_000)
+    const restored = (await change(memberActor,'restore',2)).schedule
+    assert.equal(restored.id,row.id); assert.equal(restored.status,'active'); assert.equal(restored.deleted,false); assert.equal(restored.version,3)
+    assert.ok(restored.next_at && restored.next_at>now)
+    assert.deepEqual(await list(true),[]); assert.deepEqual(await list(false),[row.id])
+    assert.deepEqual((await history(row.id)).map(r=>[r.id,r.status]),[[occurrence,'cancelled']])
+    await assert.rejects(change(actor,'restore',3),/scheduleNotDeleted/)
+    // Existing terminal cancellation is never mistaken for a deleted automation.
+    await store().command(actor,{action:'cancel',scheduleId:row.id,version:3})
+    await assert.rejects(change(actor,'restore',4),/scheduleNotDeleted/)
+    assert.deepEqual(await list(true),[])
+  })
+  await t.test('restoring paused or elapsed one-time automations preserves their non-running state', async () => {
+    for (const paused of [true,false]) {
+      const row = await create()
+      try {
+        if(paused) await store().command(actor,{action:'pause',scheduleId:row.id,version:1})
+        const version = paused ? 2 : 1
+        await store().command(actor,{action:'delete',scheduleId:row.id,version})
+        const previous = now
+        try {
+          now = new Date(now.getTime()+120_000)
+          const {schedule} = await store().command(actor,{action:'restore',scheduleId:row.id,version:version+1}) as {schedule:{status:string;next_at:Date|null}}
+          assert.deepEqual([schedule.status,schedule.next_at],[paused?'paused':'completed',null])
+          assert.deepEqual(await history(row.id),[])
+        } finally { now=previous }
+      } finally { await pool.query('DELETE FROM user_schedules WHERE id=$1',[row.id]) }
     }
   })
   await t.test('schedule_history lists webhook batches by status and cursor without returning request bodies', async t => {

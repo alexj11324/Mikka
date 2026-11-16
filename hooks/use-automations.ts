@@ -13,17 +13,17 @@ function unwrap<T>(result: Read<T>): T {
   return result as T
 }
 
-const listKey = (workspaceId: string) => (index: number, previous: AutomationList | null) =>
-  index > 0 && !previous?.nextCursor ? null : ['automations', workspaceId, previous?.nextCursor ?? null] as const
+const listKey = (workspaceId: string, deleted: boolean) => (index: number, previous: AutomationList | null) =>
+  index > 0 && !previous?.nextCursor ? null : ['automations', workspaceId, deleted, previous?.nextCursor ?? null] as const
 
 /**
  * 自动化: the workspace's automations, a page at a time. Read when the page opens and again only when the live
  * channel says a schedule changed (`schedule_list`); no timer.
  */
-export function useAutomations(workspaceId: string | null) {
-  const getKey = workspaceId ? listKey(workspaceId) : () => null
-  const pages = useSWRInfinite<AutomationList>(getKey, ([, , cursor]: readonly [string, string, string | null]) =>
-    listAutomations(cursor ? { cursor } : {}).then(unwrap<AutomationList>), { revalidateOnFocus: false, shouldRetryOnError: false, revalidateFirstPage: false })
+export function useAutomations(workspaceId: string | null, deleted = false) {
+  const getKey = workspaceId ? listKey(workspaceId, deleted) : () => null
+  const pages = useSWRInfinite<AutomationList>(getKey, ([, , deleted, cursor]: readonly [string, string, boolean, string | null]) =>
+    listAutomations({ deleted, ...(cursor ? { cursor } : {}) }).then(unwrap<AutomationList>), { revalidateOnFocus: false, shouldRetryOnError: false, revalidateFirstPage: false })
   useLiveKey('schedule_list', workspaceId, workspaceId ? [unstable_serialize(getKey)] : [], workspaceId)
   const automations = [...new Map((pages.data ?? []).flatMap(page => page.schedules).map(row => [row.id, row])).values()]
   return { ...pages, automations, more: Boolean(pages.data?.at(-1)?.nextCursor) }

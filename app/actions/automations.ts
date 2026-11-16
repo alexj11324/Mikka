@@ -50,8 +50,8 @@ async function withCreators(workspaceId: string, list: AutomationList): Promise<
 const versioned = z.object({ scheduleId: z.uuid(), version: z.number().int().positive() }).strict()
 
 /** The workspace's automations, newest first; `cursor` continues a page. */
-export async function listAutomations(input: { cursor?: string } = {}): Promise<ActionResult<AutomationList>> {
-  const parsed = scheduleListInput.safeParse({ cursor: input.cursor })
+export async function listAutomations(input: { cursor?: string; deleted?: boolean } = {}): Promise<ActionResult<AutomationList>> {
+  const parsed = scheduleListInput.safeParse({ cursor: input.cursor, deleted: input.deleted })
   if (!parsed.success) return { error: 'validationGeneric' }
   return command<AutomationList>({ action: 'list', ...parsed.data }, withCreators)
 }
@@ -173,7 +173,17 @@ export async function organizeAutomation(input: { scheduleId: string; folder: st
   return parsed.success ? command({ action: 'organize', ...parsed.data }) : { error: 'validationGeneric' }
 }
 
-/** 删除: cancels every future run. Past runs and the tasks they made stay. */
+export async function deleteAutomation(input: { scheduleId: string; version: number }): Promise<ActionResult<{ schedule: AutomationView }>> {
+  const parsed = versioned.safeParse(input)
+  return parsed.success ? command({ action: 'delete', ...parsed.data }) : { error: 'validationGeneric' }
+}
+
+export async function restoreAutomation(input: { scheduleId: string; version: number }): Promise<ActionResult<{ schedule: AutomationView }>> {
+  const parsed = versioned.safeParse(input)
+  return parsed.success ? command({ action: 'restore', ...parsed.data }) : { error: 'validationGeneric' }
+}
+
+/** The original terminal cancellation. */
 export async function cancelAutomation(input: { scheduleId: string; version: number }): Promise<ActionResult<{ schedule: AutomationView }>> {
   const parsed = versioned.safeParse(input)
   return parsed.success ? command({ action: 'cancel', ...parsed.data }) : { error: 'validationGeneric' }

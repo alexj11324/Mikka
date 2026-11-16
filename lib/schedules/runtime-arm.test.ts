@@ -16,12 +16,12 @@ let runtime: typeof import('./runtime')
 before(async () => { runtime = await import('./runtime') })
 beforeEach(() => { armed = 0; failed = 0 })
 
-for (const action of ['create', 'update', 'resume', 'flush_batch'] as const) test(`${action} can move the next due time earlier, so it arms the timer after it commits`, async () => {
+for (const action of ['create', 'update', 'resume', 'restore', 'flush_batch'] as const) test(`${action} can move the next due time earlier, so it arms the timer after it commits`, async () => {
   await runtime.executeScheduleCommand('owner', null, 'event', { action } as never)
   assert.equal(armed, 1)
 })
 
-for (const action of ['list', 'history', 'pause', 'cancel', 'cancel_batch'] as const) test(`${action} adds no due work and arms nothing`, async () => {
+for (const action of ['list', 'history', 'pause', 'cancel', 'delete', 'cancel_batch'] as const) test(`${action} adds no due work and arms nothing`, async () => {
   await runtime.executeScheduleCommand('owner', null, 'event', { action } as never)
   assert.equal(armed, 0)
 })

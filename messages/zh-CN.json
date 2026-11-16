@@ -1222,6 +1222,7 @@
     "scheduleBatchClosed": "此批次已停止收集请求。",
     "scheduleAdminRequired": "只有创建者或管理员可以修改、恢复或运行这个自动化。",
     "scheduleVersionConflict": "自动化已被修改，请刷新后重试。",
+    "scheduleNotDeleted": "自动化不在回收站。",
     "scheduleCancelled": "自动化已删除。",
     "scheduleNotPaused": "自动化没有暂停。",
     "scheduleNotActive": "自动化已暂停或已结束，恢复后才能运行。",
@@ -7960,7 +7961,10 @@
     "fromScratch": "从零开始",
     "askBotPrompt": "帮我建一个自动化：",
     "search": "搜索自动化",
+    "restore": "恢复",
+    "emptyDeleted": "没有已删除的自动化",
     "filter": {
+      "deleted": "已删除",
       "all": "全部",
       "active": "已启用",
       "paused": "已暂停"

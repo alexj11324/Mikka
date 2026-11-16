@@ -2514,6 +2514,13 @@
     "test": "lib/slack/automation-notice.test.ts",
     "suite": "test:schedules"
   },
+  "drizzle/20261116063000_schedule_restore.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Save the previous automation state when a person deletes it so that an authorized restore preserves its identity and history.",
+    "test": "lib/schedules/store.db.test.ts",
+    "suite": "test:schedules-db"
+  },
   "drizzle/20261115204500_schedule_organize.sql": {
     "mode": "built-in",
     "environment": [],

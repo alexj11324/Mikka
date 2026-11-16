@@ -359,3 +359,14 @@ Decision [2026-11-15-2100](../design/decisions/2026-11-15-2100-automation-templa
   `{ action: 'organize', scheduleId, folder, tags }` (creator or owner/admin, `scheduleAdminRequired`; no version
   bump). `list` rows carry `folder`, `tags` and the reader's `pinned`. Page actions `pinAutomation`,
   `organizeAutomation`.
+
+
+## Deleted automations (#2060)
+
+The signed-in editor uses `deleteAutomation`. Deletion cancels pending and running occurrences, clears the next due time
+and saves the prior active, paused or completed state in `user_schedules.status_before_delete`. The Deleted filter
+uses the same paginated list with `deleted: true`. A creator or workspace admin/owner can use `restoreAutomation`
+there. Both mutations require the displayed version and publish on `schedule_list`. Restoring an active automation
+checks the creator's membership and execution permissions, then computes its next future slot. An elapsed one-time
+schedule stays completed. Previously cancelled occurrences stay cancelled. The original `schedule_cancel` command
+is terminal, including for rows created before this migration.
