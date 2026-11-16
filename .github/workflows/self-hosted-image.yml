@@ -101,6 +101,7 @@ jobs:
           build-args: |
             WORKFLOW_TARGET_WORLD=${{ env.PUBLISH_IMAGE != 'true' && '@workflow/world-postgres' || '' }}
             MIKKA_BUILD_REVISION=${{ github.sha }}
+            MIKKA_TEST_DEPLOYMENT_SHA=${{ env.DESKTOP_ACCEPTANCE_REVISION }}
             MIKKA_BUILD_WORKER_SHA=${{ steps.image-inputs.outputs.worker-sha }}
           # A fork PR cannot borrow the owner's cache through its own ref.
           # Missing/expired cache never replaces an actual build.
@@ -315,13 +316,14 @@ jobs:
     name: Official packaged Desktop against the self-hosted image
     if: github.event_name == 'workflow_dispatch' && inputs.overlay_sha != '' && github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' && github.ref == 'refs/heads/main' && github.actor_id == '183887963' && github.triggering_actor == 'alexj11324'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 65
     permissions:
       contents: read
     environment: cloudflare-runtime-release
     env:
       COMPOSE_FILE: docker-compose.yml:tests/self-hosted/compose.services.yml
       COMPOSE_PROJECT_NAME: mikka-selfhost-ci
+      DESKTOP_ACCEPTANCE_REVISION: ${{ github.sha }}
       EXPECTED_OVERLAY_SHA: ${{ inputs.overlay_sha }}
       MIKKA_DESKTOP_MEMBER_FIXTURE: '1'
     steps:
@@ -419,5 +421,27 @@ jobs:
           path: .artifacts/self-hosted/desktop/report.json
           if-no-files-found: error
           retention-days: 14
+      - name: Prepare isolated public runtime for active Desktop delivery
+        timeout-minutes: 12
+        run: scripts/acceptance/desktop-delivery/prepare.sh
+      - name: Qualify active delivery in the same official packaged Desktop
+        timeout-minutes: 18
+        env:
+          MIKKA_UI_OVERLAY_SHA: ${{ inputs.overlay_sha }}
+        run: scripts/acceptance/desktop-delivery/qualify.sh
+      - name: Collect only the version-bound live-delivery receipt
+        if: always() && env.E_DESKTOP_BASE != ''
+        run: node scripts/acceptance/desktop-delivery/receipt.mjs "$E_DESKTOP_BASE"
+      - name: Retain the isolated installed Desktop delivery result
+        if: always() && env.E_DESKTOP_BASE != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: official-desktop-delivery-${{ github.sha }}-${{ inputs.overlay_sha }}
+          path: ${{ env.E_DESKTOP_BASE }}/public-receipt.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove the dedicated local delivery identities and test installation
+        if: always()
+        run: scripts/acceptance/desktop-delivery/cleanup.sh
       - *clean_desktop_fixture
       - *stop_community
