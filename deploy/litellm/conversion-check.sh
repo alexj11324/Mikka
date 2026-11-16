@@ -24,7 +24,8 @@ for _ in $(seq 1 90); do
   sleep 2
 done
 curl -fsS --noproxy '*' http://127.0.0.1:4012/health/liveliness > /dev/null
-output=$(MIKKA_LITELLM_TEST_URL=http://127.0.0.1:4012 MIKKA_LITELLM_TEST_MASTER_KEY="$key" \
+# TAP regardless of Node's default reporter, so the counts below are exact.
+output=$(NODE_OPTIONS=--test-reporter=tap MIKKA_LITELLM_TEST_URL=http://127.0.0.1:4012 MIKKA_LITELLM_TEST_MASTER_KEY="$key" \
   MIKKA_LITELLM_TEST_PROVIDER=http://litellm-proof-provider:9911/v1 NO_PROXY=127.0.0.1,localhost \
   corepack pnpm run --silent test:model-gateway-litellm 2>&1) || {
   # Show why, never the generated key; then the converter's own log tail.
