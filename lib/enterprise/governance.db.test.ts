@@ -60,6 +60,12 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
     await assert.rejects(org.archiveOrganization(organizationId, owner.id), error => (error as { detail?: string }).detail === 'workspace_attached')
   })
   const policy = { modelCredentialSharing: 'approval_required', mcpSharing: 'approval_required', allowedModelProviders: null, auditRetentionDays: null, legalHold: false } as const
+  await t.test('the organization machine catalog membership filter admits active members only for a named live organization', async () => {
+    assert.deepEqual((await org.listOrganizations(member.id, organizationId)).map(row => row.id), [organizationId])
+    assert.deepEqual(await org.listOrganizations(outsider.id, organizationId), [])
+    assert.deepEqual(await org.listOrganizations(member.id, randomUUID()), [])
+  })
+
   await t.test('operator Enterprise grants serialize expected-plan changes and preserve historical seat metadata without payments', async () => {
     const grant = { organizationId, expectedPlan: 'free', plan: 'enterprise', source: 'cloud', seatLimit: 2,
       expiresAt: new Date(Date.now() + 3600_000).toISOString(), reason: 'evaluation', operator: 'enterprise-fixture' }

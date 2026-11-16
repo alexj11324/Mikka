@@ -1878,6 +1878,15 @@
       "sourceHash": "bb106c0c4b667782813cebe47ec7f5e812e71d672bf9cf006c5dea201b072118"
     },
     {
+      "path": "/mikka/api/organizations/[organizationId]/machine-sizes",
+      "template": "/api/organizations/[organizationId]/machine-sizes",
+      "source": "app/api/organizations/[organizationId]/machine-sizes/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "0bf6776b787066547fef29af81e103994c505496c135168ef4b34b92cc141a74"
+    },
+    {
       "path": "/mikka/api/organizations/[organizationId]/members",
       "template": "/api/organizations/[organizationId]/members",
       "source": "app/api/organizations/[organizationId]/members/route.ts",

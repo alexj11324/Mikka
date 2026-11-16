@@ -29,10 +29,11 @@ export async function getOrganizationWorkspaceIds(tx: WorkspaceTransaction, orga
   return rows.map(row => row.workspaceId)
 }
 
-export async function listOrganizations(userId: string) {
+export async function listOrganizations(userId: string, organizationId?: string) {
   return workspaceDb.select({ id: organizations.id, name: organizations.name, role: organizationMembers.role }).from(organizations)
     .innerJoin(organizationMembers, eq(organizationMembers.organizationId, organizations.id))
-    .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.status, 'active'), isNull(organizations.archivedAt))).orderBy(asc(organizations.createdAt))
+    .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.status, 'active'), isNull(organizations.archivedAt),
+      organizationId === undefined ? undefined : eq(organizations.id, organizationId))).orderBy(asc(organizations.createdAt))
 }
 
 /** Only a current owner may see the retained name after archiving. */
