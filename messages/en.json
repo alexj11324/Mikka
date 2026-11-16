@@ -4813,6 +4813,7 @@
         "not_applicable": "Not applicable"
       },
       "modelRouting": "Model selection",
+      "modelFollowed": "Follows the main thread",
       "routingReason": "Selection reason",
       "previousModel": "Model before escalation",
       "routingDifficulty": {

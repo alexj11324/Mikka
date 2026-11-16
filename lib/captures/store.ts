@@ -386,6 +386,8 @@ export async function runEvidence(userId: string, runId: string) {
     model: sql<string | null>`${agentRuns.agentDefinition}->>'model'`,
     executionIdentity: sql<unknown>`${agentRuns.agentDefinition}->'executionIdentity'`,
     modelRouting: sql<unknown>`${agentRuns.agentDefinition}->'modelDispatch'->'routing'`,
+    // The model followed the dispatching chat's own (decision 2026-11-15-1630); null when someone named it or on older runs.
+    modelFollowed: sql<boolean | null>`(${agentRuns.agentDefinition}->'modelDispatch'->>'followed')::boolean`,
     // What the prompt carried of the run's skills; a body it only deferred is
     // shown beside the run so the person knows a skill waited on a file read.
     skillPrompt: sql<unknown>`${agentRuns.report}->'skillPrompt'`,

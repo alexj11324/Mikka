@@ -20,6 +20,9 @@ export interface WorkerModelDispatch {
   entry?: OrderEntry
   /** Host-validated difficulty choice, frozen with the actual model. */
   routing?: FrozenModelRoutingSnapshot
+  /** The model was not named: the task followed the dispatching chat's own
+   * (decision 2026-11-15-1630). Still pinned like a pick, never swapped silently. */
+  followed?: true
 }
 
 export interface WorkerDefinitionSnapshot {

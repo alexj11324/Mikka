@@ -125,7 +125,7 @@ export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadE
   return <div className="flex flex-col gap-6 text-sm" data-execution-evidence-run={evidence.id}>
     <dl className="flex flex-col gap-3">
       <ValueRow label={t('harness')}>{evidence.harness ? <HarnessLabel harness={evidence.harness} /> : t('unknown')}</ValueRow>
-      <ValueRow label={t('model')}>{evidence.model ? <Line><span title={evidence.model}><ModelLabel model={evidence.model} /></span>{routing && <Quiet>· {t(`routingReasons.${routing.reason}`)}</Quiet>}</Line> : t('unknown')}</ValueRow>
+      <ValueRow label={t('model')}>{evidence.model ? <Line><span title={evidence.model}><ModelLabel model={evidence.model} /></span>{routing ? <Quiet>· {t(`routingReasons.${routing.reason}`)}</Quiet> : evidence.modelFollowed ? <Quiet>· {t('modelFollowed')}</Quiet> : null}</Line> : t('unknown')}</ValueRow>
       {where && <ValueRow label={t('runsOn')}><Line><where.Icon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />{where.name}</Line></ValueRow>}
       {identity && <ValueRow label={t('workspace')}>{labels.workspace?.name ?? t('notRecorded')}</ValueRow>}
     </dl>
