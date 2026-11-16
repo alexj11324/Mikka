@@ -33,8 +33,8 @@ export type WorkspaceBotRow = { id: string; name: string; color: string; shape: 
 /** The workspace's Bots by ID, for 交给 (any member may read them; the list follows `bot_list`). */
 export function useWorkspaceBotNames(workspaceId: string | null) {
   const key = workspaceId ? ['automations-workspace-bots', workspaceId] as const : null
-  const read = useSWR(key, async () => {
-    const result = await listWorkspaceBots()
+  const read = useSWR(key, async ([, shown]) => {
+    const result = await listWorkspaceBots(shown)
     if ('error' in result && result.error) throw new Error(result.error)
     return (result as { bots: WorkspaceBotRow[] }).bots
   }, { revalidateOnFocus: false, shouldRetryOnError: false })

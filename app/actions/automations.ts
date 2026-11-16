@@ -144,12 +144,12 @@ export async function automationLinearTeams(): Promise<ActionResult<{ connected:
 }
 
 /** Slack triggers' channels: those of the workspace's Slack installation; `installed: false` when the person is not in one. */
-export async function automationSlackChannels(): Promise<ActionResult<{ installed: boolean; channels: { id: string; name: string; private: boolean }[] }>> {
+export async function automationSlackChannels(workspaceId?: string): Promise<ActionResult<{ installed: boolean; channels: { id: string; name: string; private: boolean }[] }>> {
   return runAction(async () => {
     if (actingContext.getStore()) throw new ActionFailureError('authRequired')
     const app = process.env.SLACK_APP_ID
     let actor
-    try { actor = await currentWorkspaceActor() } catch (error) {
+    try { actor = await currentWorkspaceActor(workspaceId) } catch (error) {
       if (error instanceof WorkspaceError) throw new ActionFailureError(isActionErrorCode(error.code) ? error.code : 'generic', undefined, undefined, { cause: error })
       throw error
     }

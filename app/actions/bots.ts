@@ -66,8 +66,8 @@ export async function updateBot(input: { botId: string; name?: string; color?: s
 }
 
 /** 设置 › 工作区 › Bot: the defaults a new bot starts with, and the choices. Any member may read. */
-export async function getWorkspaceBotDefaults(): Promise<ActionResult<BotDefaultOptions>> {
-  return workspaceAction(async () => botDefaultOptions((await currentWorkspaceActor()).workspaceId))
+export async function getWorkspaceBotDefaults(workspaceId?: string): Promise<ActionResult<BotDefaultOptions>> {
+  return workspaceAction(async () => botDefaultOptions((await currentWorkspaceActor(workspaceId)).workspaceId))
 }
 
 /** Set or clear (null) the default model and repository for new bots. Admins only. */
@@ -79,8 +79,8 @@ export async function updateWorkspaceBotDefaults(input: { defaultModel?: string 
 }
 
 /** Every bot in the current workspace: owner, 空闲 or 运行中 · N 个线程. Any member may read. */
-export async function listWorkspaceBots(): Promise<ActionResult<{ bots: WorkspaceBotView[] }>> {
-  return workspaceAction(async () => ({ bots: await workspaceBots((await currentWorkspaceActor()).workspaceId) }))
+export async function listWorkspaceBots(workspaceId?: string): Promise<ActionResult<{ bots: WorkspaceBotView[] }>> {
+  return workspaceAction(async () => ({ bots: await workspaceBots((await currentWorkspaceActor(workspaceId)).workspaceId) }))
 }
 
 /**
