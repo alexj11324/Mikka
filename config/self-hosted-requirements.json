@@ -13,6 +13,13 @@
     "test": "tests/task-create-only.db.test.ts",
     "suite": "test:coordinator-issue-create-db"
   },
+  "app/actions/project-resources.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Signed-in members can read setup history for an accessible Project. Restoring a recipe also requires project steering and active workspace administration.",
+    "test": "tests/project-setup-history.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
   "app/actions/task-runs.ts": {
     "mode": "built-in",
     "environment": [],
@@ -677,6 +684,13 @@
     "test": "tests/thread-detail-bytes.db.test.ts",
     "suite": "test:activity-actor-db"
   },
+  "drizzle/20261116075300_environment_setup_history.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Adds a workspace-scoped PostgreSQL recipe history and records the currently available recipe for existing environments.",
+    "test": "tests/project-setup-history.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
   "lib/abuse/workers-ai.ts": {
     "mode": "optional-cloud",
     "environment": [
@@ -1027,6 +1041,20 @@
     "behavior": "Derive a task's activity events (status, priority, description, assignee, parent, relations and pull requests) from its local history.",
     "test": "lib/issue-activity.test.ts",
     "suite": "test:issues"
+  },
+  "lib/project-resources/contracts.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Project setup history and restore validate the current workspace, project, environment and acknowledged binding snapshot.",
+    "test": "tests/project-setup-history.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "lib/project-resources/store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The installation PostgreSQL database stores versioned recipes. A restore checks the shared binding snapshot, clears approval and preserves current settings.",
+    "test": "tests/project-setup-history.db.test.ts",
+    "suite": "test:project-resources-db"
   },
   "lib/thread-artifacts.ts": {
     "mode": "built-in",
