@@ -24,9 +24,11 @@ PRIVATE = Path('/opt/mikka')
 # E2B's own provider CA artifacts that the platform rotates per build and per
 # create (2026-11-16 control, see e2b-finalization-files.json): the hashed
 # provider certificate, its /etc/ssl/certs PEM aliases and the provider CA's
-# OpenSSL subject-hash links. Exactly these names; every other path under the
-# CA roots, including fixed e2b-ca.* rules and all public CAs, stays protected.
-ROTATING_PROVIDER_CA = re.compile(r'/usr/local/share/ca-certificates/e2b-[0-9a-f]{64}\.crt'
+# OpenSSL subject-hash links; validation run 43922227579 showed the fixed-name
+# provider root e2b-ca.crt is now replaced per create as well. Exactly these
+# names; every other path under the CA roots, including /etc/ssl/certs/e2b-ca.pem
+# and all public CAs, stays protected.
+ROTATING_PROVIDER_CA = re.compile(r'/usr/local/share/ca-certificates/e2b-(?:[0-9a-f]{64}|ca)\.crt'
                                   r'|/etc/ssl/certs/e2b-[0-9a-f]{64}\.pem'
                                   r'|/etc/ssl/certs/1560546e\.[0-9]+')
 FINALIZATION_POLICY = Path(__file__).with_name('e2b-finalization-files.json')
