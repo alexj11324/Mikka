@@ -109,6 +109,26 @@ test('resource ACL: real split PostgreSQL migrations, fresh grants and concurren
       await assert.rejects(requireResourceAccess(stranger, reference('task', task)), { code: 'issueNotFound' })
     })
 
+    await t.test('a Task member can mute and unmute their own notifications without changing another member', async () => {
+      const { actAs } = await import('../lib/acting-user')
+      const { setMemberSubscribed } = await import('../app/actions/collaboration')
+      await app.query('insert into issue_members("issueId","userId","memberId") values($1,$2,$3),($1,$2,$4)',
+        [task, owner, member, manager])
+      const set = (target: string, subscribed: boolean) => actAs({ id: member, [tokenWorkspace]: alpha },
+        () => setMemberSubscribed(task, target, subscribed))
+      try {
+        assert.deepEqual(await set(member, false), { success: true })
+        assert.deepEqual(await set(member, false), { success: true })
+        assert.equal((await set(manager, false)).error, 'memberOwnerOnly')
+        const { rows } = await app.query('select "memberId",subscribed from issue_members where "issueId"=$1', [task])
+        assert.equal(rows.find(row => row.memberId === member)?.subscribed, false)
+        assert.equal(rows.find(row => row.memberId === manager)?.subscribed, true)
+        assert.deepEqual(await set(member, true), { success: true })
+      } finally {
+        await app.query('delete from issue_members where "issueId"=$1 and "memberId"=any($2::text[])', [task, [member, manager]])
+      }
+    })
+
     await t.test('one SQL action contract; ownership and management do not authorize personal credentials, machines or billing', async () => {
       for (const action of RESOURCE_ACTIONS) {
         assert.equal(await allowed(owner, 'task', task, action), OWNER_RESOURCE_ACTIONS.includes(action), action)
