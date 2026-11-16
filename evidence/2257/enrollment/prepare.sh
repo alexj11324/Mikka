@@ -23,8 +23,13 @@ cp "$harness"/{package.json,package-lock.json,provider.mjs} "$base/harness/"
 cp "$1/original-review/evidence/2271/current-review/provider.mjs" "$base/harness/provider-current.mjs"
 cp "$1/review/evidence/2257/full-daemon/provider-relay.mjs" "$base/harness/relay.mjs"
 (cd "$base/harness" && npm ci --omit=optional --ignore-scripts --no-audit --no-fund >/dev/null)
-(cd "$base/product" && umask 022 && ELECTRON_SKIP_BINARY_DOWNLOAD=1 pnpm install --prefer-offline --frozen-lockfile --ignore-scripts >/dev/null)
-mkdir -p "$base/repaired"
+(cd "$base/product" && umask 022 && ELECTRON_SKIP_BINARY_DOWNLOAD=1 pnpm install --prefer-offline --frozen-lockfile --ignore-scripts --package-import-method=copy >/dev/null)
+# Normalize only this public workspace's dedicated dependency copies.
+for modules in "$base/product/node_modules" "$base/product"/{apps,packages}/*/node_modules; do
+  [[ ! -d "$modules" ]] || chmod -R a+rX -- "$modules"
+done
+stat --format='Dedicated public tsx package mode=%a hardlinks=%h' "$base/product/node_modules/tsx/package.json"
+test "$(stat -c %h "$base/product/node_modules/tsx/package.json")" = 1
 
 curl -fsSL --retry 2 'https://huggingface.co/bartowski/SmolLM2-135M-Instruct-GGUF/resolve/d255afaffd3441b95abca9b5cc4c819b93f66936/SmolLM2-135M-Instruct-Q4_K_M.gguf' -o "$base/material/model.gguf"
 echo "2e8040ceae7815abe0dcb3540b9995eaa1fa0d2ca9e797d0a635ae4433c68c2d  $base/material/model.gguf" | sha256sum -c -

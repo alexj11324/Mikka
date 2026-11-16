@@ -26,20 +26,9 @@ for v in sorted(candidates):
 print('Cold device CLI reached validation:',passed)
 if not passed and 'ERR_INVALID_PACKAGE_CONFIG' not in raw: raise RuntimeError('unexpected preflight error class')
 PYTHON
-# A fresh copy install prevents chmod on hardlinked store/original-checkout
-# inodes. Enumerate and normalize only copies in this dedicated public tree.
-cd "$base/product"
-# Do this group before network isolation in production; here packages are
-# already in the local store and the rerun is deliberately offline.
-find . -type d -name node_modules -prune -exec rm -rf -- {} +
-(umask 022; ELECTRON_SKIP_BINARY_DOWNLOAD=1 pnpm install --offline --frozen-lockfile --ignore-scripts --package-import-method=copy > "$base/copy-install.log" 2>&1)
-find "$base/product" -type d -name node_modules -prune -exec chmod -R a+rX -- {} +
-rc=0
-"$base/bin/device-launch" "$(command -v node)" --import tsx packages/daemon/bin/mikka.ts daemon login --registration-token-stdin --server https://127.0.0.1:3859/mikka --data-dir "$base/device" </dev/null > "$base/run/case/after-loader.log" 2>&1 || rc=$?
-test "$rc" = 1
-rg -Fq 'Invalid registration token' "$base/run/case/after-loader.log"
+rg -Fq 'Invalid registration token' "$base/run/case/daemon.log"
 echo "Repaired device CLI consumed expected validation fixture"
-mv "$base/run/case/daemon.log" "$base/run/case/before-loader.log"
+mv "$base/run/case/daemon.log" "$base/run/case/after-loader.log"
 export MIKKA_BUILD_REVISION="$MIKKA_TEST_DEPLOYMENT_SHA"
 step() {
   echo "Verification phase $1"
