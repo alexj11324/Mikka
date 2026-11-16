@@ -8157,6 +8157,7 @@
       },
       "save": "保存",
       "create": "创建",
+      "loadSavedVersion": "放弃修改并载入已保存版本",
       "saving": "正在保存…",
       "saved": "已保存",
       "started": "已开始运行",
