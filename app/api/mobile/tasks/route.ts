@@ -33,8 +33,9 @@ async function handleGET(request: Request) {
       }
       const continuation = params.has('after') || params.has('updatedAt')
       const dispatchedBy = params.get('dispatchedBy')
-      const page = continuation || dispatchedBy !== null ? taskListPageInput.safeParse({ workspaceId: params.get('workspaceId'),
-        ...(dispatchedBy !== null ? { dispatchedBy } : {}), after: continuation ? { id: params.get('after'), updatedAt: params.get('updatedAt') } : null }) : null
+      const parentId = params.get('parentId')
+      const page = continuation || dispatchedBy !== null || parentId !== null ? taskListPageInput.safeParse({ workspaceId: params.get('workspaceId'),
+        ...(dispatchedBy !== null ? { dispatchedBy } : {}), ...(parentId !== null ? { parentId } : {}), after: continuation ? { id: params.get('after'), updatedAt: params.get('updatedAt') } : null }) : null
       if (page && !page.success) return json({ error: 'validationGeneric' }, 400)
       const nextPage = page?.success ? await listWorkspaceTaskPage(page.data) : null
       if (nextPage?.reset) return json({ error: 'issueStale' }, 409)
@@ -69,6 +70,7 @@ async function handleGET(request: Request) {
       })
     })
   } catch (error) {
+    if (error instanceof ActionFailureError && error.code === 'issueNotFound') return json({ error: 'issueNotFound' }, 404)
     if (error instanceof ActionFailureError && error.code === 'issueStale') return json({ error: 'issueStale' }, 409)
     if (error instanceof WorkspaceError || (error instanceof ActionFailureError && error.code === 'workspaceAccessDenied'))
       return json({ error: 'workspaceAccessDenied' }, 403)
