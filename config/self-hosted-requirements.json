@@ -294,6 +294,13 @@
     "test": "tests/organization-invitations.db.test.ts",
     "suite": "test:organization-invitations-db"
   },
+  "app/api/organizations/[organizationId]/members/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Return current active Organization members to a current owner or administrator. An explicit includeDisabled also returns suspended memberships. Existing membership changes use the same PostgreSQL authority.",
+    "test": "lib/enterprise/governance.db.test.ts",
+    "suite": "test:enterprise-db"
+  },
   "app/api/organizations/[organizationId]/join-by-domain/route.ts": {
     "mode": "built-in",
     "environment": [],
