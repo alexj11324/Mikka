@@ -208,6 +208,13 @@
     "test": "tests/mobile-handoff.test.ts",
     "suite": "test:desktop-auth"
   },
+  "app/api/mobile/settings/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Community installations keep their usual account and workspace settings. Only a human session on a cloud deployment serving a pinned official UI receives the personal Files entry.",
+    "test": "tests/mobile-service-members.db.test.ts",
+    "suite": "test:web-auth-db"
+  },
   "app/api/mobile/push-tokens/route.ts": {
     "mode": "built-in",
     "environment": [],
