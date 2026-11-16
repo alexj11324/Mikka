@@ -5269,6 +5269,8 @@
       "noneToday": "No new suggestions today."
     },
     "newTaskDialog": {
+      "defaultProject": "My default project",
+      "projectPreferenceUnavailable": "Could not load or save your project.",
       "intent": "Action",
       "backlogTitlePlaceholder": "Title (optional, defaults to the first line)",
       "createOnly": "Create only",
@@ -6357,6 +6359,7 @@
       "default": "The task could not be completed. Check the error details or try again."
     },
     "governance_denied": {
+      "project_selection_changed": "Your default project changed. Review the current selection and try again.",
       "project_visibility_changed": "The default visibility for this project changed. Review the current setting and try again.",
       "service_projects_changed": "Project assignments changed. Reload before replacing the list.",
       "service_identity_disabled": "Restore this service identity before granting new Project access.",

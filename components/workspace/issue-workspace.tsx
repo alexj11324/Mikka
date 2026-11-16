@@ -728,7 +728,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const coordinatorSummary = coordinatorBot ? botChatSummaries?.items[coordinatorBot.id] : undefined
   const coordinatorUpdatedAt = coordinatorSummary?.at ?? undefined
   const dialogs = <>
-    {creationScopeReady && <NewTaskDialog
+    {creationScopeReady && <NewTaskDialog readerId={user.id}
       key={JSON.stringify([user.id, creationWorkspace, section, activeTeam?.id, selectedProject?.id, activeBot?.id])}
       workspaceId={creationWorkspace} open={creating} initialBotId={activeBot?.id}
       teamId={section.startsWith('team-') ? activeTeam?.id : undefined} projectId={selectedProject?.id} project={selectedProject?.name}
