@@ -4,6 +4,8 @@ export const ACTION_ERROR_CODES = [
   'scheduleRequestConflict',
   'scheduleNotFound',
   'scheduleAdminRequired',
+  'scheduleBatchNotFound',
+  'scheduleBatchClosed',
   'scheduleVersionConflict',
   'scheduleCancelled',
   'scheduleNotPaused',

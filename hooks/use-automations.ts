@@ -2,9 +2,9 @@
 
 import useSWR, { unstable_serialize as serialize } from 'swr'
 import useSWRInfinite, { unstable_serialize } from 'swr/infinite'
-import { automationHistory, automationUsage, getAutomation, listAutomations } from '@/app/actions/automations'
+import { automationBatches, automationHistory, automationUsage, getAutomation, listAutomations } from '@/app/actions/automations'
 import { useLiveKey } from '@/hooks/use-live-key'
-import type { AutomationHistory, AutomationList, AutomationUsage, AutomationView } from '@/lib/schedules/automation-view'
+import type { AutomationHistory, AutomationList, AutomationUsage, AutomationView, WebhookBatchPage } from '@/lib/schedules/automation-view'
 
 type Read<T> = { error?: string } | T
 
@@ -42,6 +42,16 @@ export function useAutomation(workspaceId: string | null, id: string | null) {
     { revalidateOnFocus: false, shouldRetryOnError: false })
   useLiveKey('schedule_list', workspaceId, key && historyKey ? [serialize(key), serialize(historyKey)] : [], workspaceId)
   return { automation, history }
+}
+
+export function useWebhookBatches(workspaceId: string, scheduleId: string) {
+  const getKey = (index: number, previous: WebhookBatchPage | null) =>
+    index > 0 && !previous?.nextCursor ? null : ['automation-batches', workspaceId, scheduleId, previous?.nextCursor ?? null] as const
+  const pages = useSWRInfinite<WebhookBatchPage>(getKey, ([, , id, cursor]: readonly [string, string, string, string | null]) =>
+    automationBatches({ scheduleId: id, ...(cursor ? { cursor } : {}) }).then(unwrap<WebhookBatchPage>),
+    { revalidateOnFocus: false, shouldRetryOnError: false, revalidateFirstPage: false })
+  useLiveKey('schedule_list', workspaceId, [unstable_serialize(getKey)], workspaceId)
+  return pages
 }
 
 /** 用量 per day, read on open and again when the live channel says a schedule changed. */

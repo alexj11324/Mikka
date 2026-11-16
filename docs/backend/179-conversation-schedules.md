@@ -24,6 +24,15 @@ and the result falls back to the creator's Coordinator chat.
 creation time and schedule ID, newest first. Each read checks the current
 workspace membership and conversation visibility.
 
+`schedule_history` accepts `batches: {}` to list webhook windows for a single
+schedule. The creator and workspace owners or administrators can read batch IDs,
+request counts, creation and due times. A batch can be collecting requests,
+queued for a run, or cancelled. Its occurrence status is reported separately. Optional `batches.status`,
+`batches.limit` and `batches.cursor` filter and page these windows. Pass
+`nextCursor` back unchanged for the next page. Individual webhook requests
+with batching off do not have a window. This view omits bodies and request
+keys. Omit `batches` to read ordinary occurrence history.
+
 Request deduplication uses a frozen internal `request_origin` rather than the
 mutable `bot_id`. Two Bots can use the same SDK tool-call ID; removing either
 Bot preserves its schedule without merging their request keys. The internal
@@ -264,6 +273,14 @@ Decision [2026-11-15-1830](../design/decisions/2026-11-15-1830-automation-webhoo
     (`next_retry_at` in the future) under 50 requests and 256 KB: appended (`batched`);
   - otherwise a new occurrence due `now + batchMinutes` (`queued`), or `skipped` with
     `concurrencyLimit` / `dailyRunLimit` and no chat report.
+- The signed-in automation actions `flushAutomationBatch` and `cancelAutomationBatch`
+  (also available through Desktop RPC) take `scheduleId`, `batchId` and the schedule
+  `version`. The creator or a workspace owner/admin can close the collecting window.
+  Flush makes its existing occurrence due and wakes the scheduler. Dispatch still
+  checks the creator's authority and run limits. Cancel keeps its count and times,
+  removes the request bodies and hashes sender request IDs for redelivery checks.
+  A repeat of the same action on that batch returns its prior result. An opposing
+  action or a window already closed by time or capacity returns a conflict.
 - The occurrence's `trigger` is `{ webhook: { requests: [{ at, body, key? }] } }`; history
   blanks it for members as it does GitHub triggers. The dispatch appends
   `describeWebhook(requests)` and marks the submission `schedule.webhook: true`, which

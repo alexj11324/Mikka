@@ -129,7 +129,7 @@ export async function scheduleActor(ownerId:string,botId:string|null,sourceEvent
   return {ownerId,botId,workspaceId:row?.workspaceId??null,...(sourceEventId?{sourceEventId}:{}),...(direct?{direct}:{})}
 }
 /** A committed create, update, resume or 立即运行 can move the next due time earlier: the schedules timer re-reads it (#1212). */
-const MOVES_DUE=new Set(['create','update','resume','restore','run_now'])
+const MOVES_DUE=new Set(['create','update','resume','restore','run_now','flush_batch'])
 /**
  * The one writer. A chat command names the person's message (`sourceEventId`); the 自动化 page passes `{ direct: true }`
  * from a server action that authenticated the person, with the workspace's Coordinator as the chat that gets the reports.
