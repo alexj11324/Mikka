@@ -1382,6 +1382,13 @@
     "test": "lib/eve/product-tool.test.ts",
     "suite": "test:eve-product-tool"
   },
+  "lib/eve/projection.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The existing Eve workflow store supplies committed text when a person stops a reply. Chat keeps interrupted text in its display history and records Stop if that store cannot be read.",
+    "test": "lib/eve/projection.test.ts",
+    "suite": "test:eve"
+  },
   "lib/eve/runtime.ts": {
     "mode": "built-in",
     "environment": [],

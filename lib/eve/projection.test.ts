@@ -75,9 +75,12 @@ test('a cancelled turn keeps published interrupted text for display without impo
     { type: 'content.delta', scope: { turnId }, data: { kind: 'text', delta: 'Partial words.' } },
     { type: 'content.completed', scope: { turnId }, data: { kind: 'reasoning', value: 'Private thought', interrupted: true } },
     { type: 'content.completed', scope: { turnId }, data: { kind: 'text', value: 'Partial words.', interrupted: true } },
+    { type: 'turn.settled', data: {turnId, outcome:'cancelled'} },
+    { type: 'turn.settled', data: {turnId:'before_first_token', outcome:'cancelled'} },
   ]
   const reader = { async *stream(options: { follow: boolean; startIndex: number }) {
-    assert.deepEqual(options, { follow: false, startIndex: 7 })
+    assert.equal(options.follow, false)
+    assert.equal(options.startIndex, 7)
     yield* records
   } }
   const display = await stoppedTurnDisplay(reader as never, turnId, 7)
@@ -93,4 +96,23 @@ test('a cancelled turn keeps published interrupted text for display without impo
   assert.deepEqual(row.tools, ['list_issues'])
   assert.equal(row.activity?.tools[0].state, 'done')
   assert.equal(await stoppedTurnDisplay(reader as never, 'before_first_token', 7), undefined)
+})
+
+test('reading a stopped transcript retries incomplete history once and preserves Stop when the journal is unavailable', async t => {
+  const { stoppedTurnDisplay } = await import('./projection')
+  const part = {type:'content.completed', scope:{turnId:'turn_1'}, data:{kind:'text', value:'Already shown.', interrupted:true}}
+  let attempts = 0
+  const recovering = {async *stream() {
+    yield part
+    if (++attempts === 2) yield {type:'turn.settled', data:{turnId:'turn_1', outcome:'cancelled'}}
+  }}
+  assert.equal(await stoppedTurnDisplay(recovering as never, 'turn_1', 0), 'Already shown.')
+  assert.equal(attempts,2)
+
+  const warning = t.mock.method(console,'warn',()=>{})
+  const unavailable = {async *stream() { yield part; throw new Error('private transport diagnostic') }}
+  const display = await stoppedTurnDisplay(unavailable as never, 'turn_1', 0)
+  const messages = projectEveTurn(emptySessionView(),'wrun_stop','turn_1','cancelled',display)
+  assert.deepEqual(messages[0],{role:'assistant', content:[], mikkaStreamId:'eve:wrun_stop:turn_1', mikkaStopped:true})
+  assert.deepEqual(warning.mock.calls.map(call=>call.arguments), [['eve_stopped_transcript_unavailable']])
 })

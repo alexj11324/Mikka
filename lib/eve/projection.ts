@@ -19,16 +19,25 @@ export function projectEveTurn(view:SessionView,sessionId:string,turnId:string,o
   ]
 }
 
-/** Eve retains interrupted text on the stream; the model's committed view can omit it. */
+/** The settled frame can omit interrupted output. Read the committed native facts through this turn's end. */
 export async function stoppedTurnDisplay(reader:ReturnType<typeof sessions.attach>,turnId:string,startIndex:number) {
-  const text: string[] = []
-  let interrupted = false
-  for await (const event of reader.stream({follow:false,startIndex})) {
-    if (event.type !== 'content.completed' || event.scope?.turnId !== turnId || event.data.kind !== 'text' || typeof event.data.value !== 'string') continue
-    text.push(event.data.value)
-    if (event.data.interrupted) interrupted = true
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const text: string[] = []
+    let interrupted = false
+    try {
+      for await (const event of reader.stream({ follow:false, startIndex, signal:AbortSignal.timeout(5_000) })) {
+        if (event.type === 'turn.settled' && event.data.turnId === turnId) return interrupted ? text.join('\n\n') : undefined
+        if (event.type !== 'content.completed' || event.scope?.turnId !== turnId || event.data.kind !== 'text' || typeof event.data.value !== 'string') continue
+        text.push(event.data.value)
+        if (event.data.interrupted) interrupted = true
+      }
+    } catch {
+      // Open a fresh bounded reader once. A partially read attempt never contributes duplicate text.
+    }
   }
-  return interrupted ? text.join('\n\n') : undefined
+  // A failed display read must not prevent the product from recording Stop and releasing its lease.
+  console.warn('eve_stopped_transcript_unavailable')
+  return undefined
 }
 
 export async function projectTurnState(scope:EveScope,sessionId:string,turnId:string,working:boolean,messages?:unknown[],settlement?:{outcome:TurnOutcome;sourceEventId?:string}) {
