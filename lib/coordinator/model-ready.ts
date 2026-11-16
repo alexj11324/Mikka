@@ -23,7 +23,10 @@ export async function botModelReady(ownerId: string, botId: string | null): Prom
   const scope = { ownerId, workspaceId }
   const settings = new ExecutionSettings(pool)
   const choice = await resolveBotModelChoice(pool, settings, scope, botId, await botModelPreference(pool, scope, botId))
-  if (choice.kind === 'apiKey') return true
+  // Background wakes (dispatched-task reports, schedules) run on whatever the
+  // chat uses: subscription, own key or Mikka 额度 alike (Alex, 2026-11-16).
+  // A Mikka 额度 chat that cannot pay is refused by the run itself, with its card.
+  if (choice.kind === 'apiKey' || choice.kind === 'hosted') return true
   if (choice.kind !== 'subscription') return false
   const { binding } = choice
   // A stale allowance may queue the next authoritative check, just as the
