@@ -33,7 +33,7 @@ export function bindWorkersAi(ctx, envVars) {
     ctx.exports.WorkersAiOutbound({ props: { capability: envVars.MIKKA_WORKERS_AI_CAPABILITY } }))
 }
 
-export async function workersAiRequest(request, ai, capability) {
+export async function workersAiRequest(request, ai, capability, ctx) {
   if (request.url !== 'https://' + host + '/v1/chat/completions' || request.method !== 'POST') return unavailable(404)
   if (!capability) return unavailable(403)
   const expected = Buffer.from('Bearer ' + capability)
@@ -53,14 +53,13 @@ export async function workersAiRequest(request, ai, capability) {
   try {
     const result = await ai.run(target, input, { returnRawResponse: true, signal: request.signal })
     if (!(result instanceof Response)) return unavailable(502)
-    if (!result.ok) {
-      await result.body?.cancel()
-      return unavailable(result.status === 429 ? 429 : 502)
-    }
     const type = result.headers.get('content-type')?.split(';')[0].trim()
-    if (type !== (body.stream === true ? 'text/event-stream' : 'application/json')) {
-      await result.body?.cancel()
-      return unavailable(502)
+    if (!result.ok || type !== (body.stream === true ? 'text/event-stream' : 'application/json')) {
+      if (result.body) {
+        const cleanup = result.body.cancel().catch(() => {})
+        ctx?.waitUntil(cleanup)
+      }
+      return unavailable(result.status === 429 ? 429 : 502)
     }
     return new Response(body.stream === true ? nativeChatStream(result.body) : result.body, { headers: { 'content-type': type, 'cache-control': 'no-store' } })
   } catch { return unavailable(502) }
