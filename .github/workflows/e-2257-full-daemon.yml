@@ -1,10 +1,10 @@
-name: E 2257 isolated device registration on the original public QA runner
+name: E 2257 scoped community system-browser entry on original QA runner
 on:
   push:
     branches: [evidence/2254-sidebar-85dfc396]
     paths:
       - .github/workflows/e-2257-full-daemon.yml
-      - evidence/2257/enrollment/**
+      - evidence/2257/browser-entry/**
 permissions:
   contents: read
 jobs:
@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 43
     env:
-      PUBLIC_SOURCE: efcccbd42cb8ef9d34be3d75c87c8d060b2ce527
+      PUBLIC_SOURCE: e34ac0ebdfb19f096b887c99286a81065a4dda20
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -22,7 +22,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             evidence/2257/full-daemon
-            evidence/2257/enrollment
+            evidence/2257/browser-entry
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: 46d60aa6802ef48600fbe2fa3d48015b14f6d50b
@@ -31,7 +31,7 @@ jobs:
           sparse-checkout: evidence/2257/local-provider
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: efcccbd42cb8ef9d34be3d75c87c8d060b2ce527
+          ref: e34ac0ebdfb19f096b887c99286a81065a4dda20
           path: product
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -52,7 +52,7 @@ jobs:
           set -euo pipefail
           base=$(mktemp -d /tmp/mikka-desktop-delivery.XXXXXXXX)
           echo "CASE_BASE=$base" >> "$GITHUB_ENV"
-          bash review/evidence/2257/enrollment/prepare.sh "$GITHUB_WORKSPACE" "$base"
+          bash review/evidence/2257/browser-entry/prepare.sh "$GITHUB_WORKSPACE" "$base"
           echo "$PUBLIC_SOURCE" > "$base/source.sha"
           if [ ! -x /usr/lib/postgresql/17/bin/initdb ]; then
             . /etc/os-release
@@ -63,7 +63,7 @@ jobs:
             sudo apt-get update -qq
             sudo apt-get install -y --no-install-recommends postgresql-17
           fi
-      - name: Check true CLI loader then perform only the ordinary device registration
+      - name: Verify real system browser and ordinary isolated loopback login
         shell: bash
         run: |
           set -euo pipefail
@@ -81,14 +81,14 @@ jobs:
                 "$filter" -A OUTPUT -m owner --uid-owner "$uid" -j REJECT
               done
             done
-            exec setpriv --reuid="$1" --regid="$2" --init-groups bash "$GITHUB_WORKSPACE/review/evidence/2257/enrollment/execute.sh" "$3"
+            exec setpriv --reuid="$1" --regid="$2" --init-groups bash "$GITHUB_WORKSPACE/review/evidence/2257/browser-entry/execute.sh" "$3"
           ' isolate "$(id -u)" "$(id -g)" "$base"
       - name: Retain only enumerated diagnostic codes and registration phases
         if: always() && env.CASE_BASE != ''
-        run: python3 review/evidence/2257/enrollment/classify.py "$CASE_BASE" | tee public-receipt.json
+        run: python3 review/evidence/2257/browser-entry/classify.py "$CASE_BASE" | tee public-receipt.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always() && env.CASE_BASE != ''
         with:
-          name: e2257-independent-enrollment-${{ github.run_id }}-${{ github.run_attempt }}
+          name: e2257-community-system-browser-${{ github.run_id }}-${{ github.run_attempt }}
           path: public-receipt.json
           if-no-files-found: error
