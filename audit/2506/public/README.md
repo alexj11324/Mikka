@@ -4,8 +4,8 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 
 | Code path status | Count at this ledger revision |
 |---|---:|
-| complete | 176 |
-| partial | 30 |
+| complete | 177 |
+| partial | 29 |
 | prior-partial | 36 |
 | unreviewed | 6314 |
 
@@ -34,3 +34,5 @@ Fourteen fixed source paths cover gateway admission, DO wiring, native WebSocket
 15 additional settings and workspace sources identify each route, writer, authoritative read and the historical one-step drawer mover. Thirteen meet the fixed-source semantic criteria; the legacy singular picker and same-key order hydration remain partial. Source, tests and current consumer are recorded for G-052 #2627.
 
 14 fixed API paths trace server-only aliases, request/header/cookie scopes, Next adaptation, deferred response disposal, and matching original regressions. Each path now records its concrete consumer and the runtime evidence. Locale fallback used to parse the entire request cookie jar twice; G-057 tracks the verified consumer correction.
+
+Full Git tree inventory at 834571eb2383fc2f0768142d1b38a1db5217d158: 8350 paths, 1384 changed names against fixed base b19eed9081d9858686d57547e7afcec73d6e9005 ({'modified': 1000, 'added': 369, 'deleted': 15}). From the preceding 295f53ba snapshot 42 names changed across ten ordinary main merges. Eight G-affected file deltas carry their precise acceptance; other main changes preserve their integrating owner and remain in the review queue. G-055 closes the fixed workspace order hook behavioral gap.
