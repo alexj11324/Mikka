@@ -1252,6 +1252,13 @@
     "test": "lib/coordinator/prompt-preferences.test.ts",
     "suite": "test:agent-kit-model"
   },
+  "lib/coordinator/wake-recovery.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The installed database decides which coordinator wakes are due; the reconcile check and its wake sweep read the same predicate and need no service or configuration.",
+    "test": "lib/reconcile-due.db.test.ts",
+    "suite": "test:run-recovery-db"
+  },
   "lib/credentials/runtime-identity.ts": {
     "mode": "optional-cloud",
     "environment": [
