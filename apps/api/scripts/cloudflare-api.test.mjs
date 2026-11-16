@@ -184,6 +184,7 @@ test('the private API receives its sign-in and product bindings without inheriti
     BETTER_AUTH_SECRET: 'auth', TURNSTILE_SECRET_KEY: 'signup-verification', MIKKA_CLOUDFLARE_TASKS_DISABLED: 'sponsor',
     MIKKA_DEPLOYMENT_ID: id, MIKKA_WORKFLOW_QUEUE_PUBLIC_KEY: 'public-verification-key',
     DECISIONS_API_KEY: 'decision-gateway-fixture', OPENAI_DECISIONS_API_KEY: 'decisions', CLOUDFLARE_WORKERS_AI_TOKEN: 'models',
+    AI_GATEWAY_API_KEY: 'credits-gateway-fixture', MIKKA_LITELLM_URL: 'http://litellm.internal:4000', MIKKA_LITELLM_MASTER_KEY: 'converter-fixture',
     DEVICE_GATEWAY_URL: 'https://gateway.example', DEVICE_GATEWAY_PUSH_SECRET: 'device-signing',
     WORKSPACE_SECRETS_KEY: 'workspace-sealing',
     COMPOSIO_API_KEY: 'integrations', COMPOSIO_WEBHOOK_SECRET: 'hook-verification',
