@@ -32,6 +32,10 @@ export function validateSelfHostedDesktopTarget(value, env) {
     assert.ok(member && typeof member.id === 'string' && member.id.length > 0 && member.id.length <= 128)
     assert.match(member.email ?? '', /^selfhost-[a-f0-9-]{36}@selfhost\.example\.test$/i)
     assert.ok(typeof member.password === 'string' && member.password.length >= 24 && member.password.length <= 200)
+    if (env.MIKKA_UI_OVERLAY_SHA) {
+      assert.match(member.invitation?.id ?? '', UUID)
+      assert.match(member.invitation?.organizationId ?? '', UUID)
+    }
     assert.ok(member.id !== value.ownerId && member.email !== value.email && member.password !== value.password)
   }
   assert.ok(env.RUNNER_TEMP && env.GITHUB_WORKSPACE && env.MIKKA_DESKTOP_EXECUTABLE)
