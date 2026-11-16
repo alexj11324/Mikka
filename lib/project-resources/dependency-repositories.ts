@@ -2,7 +2,7 @@ import 'server-only'
 import { sql } from 'drizzle-orm'
 import type { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
-import { withResourceAccess, requireResourceAccess } from '@/lib/resource-access/store'
+import { withResourceAccess, requireResourceAccess, resourceActionAllowed } from '@/lib/resource-access/store'
 import { taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 import { GitHubAccessError, listRepositoriesForUser } from '@/lib/github/user-access'
 import { resourceLock, resourceWriteLock } from './store'
@@ -37,7 +37,8 @@ async function projectDependencies(reader: Reader, scope: Scope, update?: z.infe
   return withTaskWorkspace(reader, workspaceId, async (_workspace, tx) => {
     if (update) await resourceWriteLock(tx, workspaceId)
     else await resourceLock(tx, workspaceId, false)
-    return withResourceAccess(reader, { kind: 'project', workspaceId, id: projectId }, update ? 'canSteer' : 'canReadContent', async () => {
+    const reference = { kind: 'project' as const, workspaceId, id: projectId }
+    return withResourceAccess(reader, reference, update ? 'canSteer' : 'canReadContent', async (_policy, acl) => {
       const project = (await tx.execute<{ revision: number; archivedAt: Date | null }>(sql`select revision,"archivedAt" from workspace_projects where id=${projectId} and "workspaceId"=${workspaceId} ${update ? sql`for update` : sql``}`)).rows[0]
       if (!project) throw new ActionFailureError('projectNotFound')
       const membership = (await tx.execute<{ role: string }>(sql`select role from mikka_workspace_members where "workspaceId"=${workspaceId} and "userId"=${actor} and status='active'`)).rows[0]
@@ -64,7 +65,11 @@ async function projectDependencies(reader: Reader, scope: Scope, update?: z.infe
           selected = next
         }
       }
-      return { revision, selected: selected.filter(id => allowedIds.has(id)), repositories: allowed.map(({ id, name }) => ({ id, name })).sort((a,b) => a.name.localeCompare(b.name)), canReplace: membership?.role === 'admin' && !project.archivedAt && complete }
+      const canReplace = membership?.role === 'admin' && !project.archivedAt && complete
+        && (!!update || await resourceActionAllowed(acl, actor, reference, 'canSteer'))
+      const visibleIds = selected.filter(id => allowedIds.has(id))
+      const visible = canReplace ? allowed : allowed.filter(repo => visibleIds.includes(repo.id))
+      return { revision, selected: visibleIds, repositories: visible.map(({ id, name }) => ({ id, name })).sort((a,b) => a.name.localeCompare(b.name)), canReplace }
     })
   })
 }

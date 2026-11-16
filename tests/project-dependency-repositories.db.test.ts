@@ -25,7 +25,7 @@ test('dependency references use stable GitHub ids, retain hidden selections and 
   const ws = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }])
   const team = await seedTeam(pool, ws.id, admin), projectId = await seedProject(pool, admin, [{ teamId: team.id, workspaceId: ws.id }])
   const scope = { workspaceId: ws.id, projectId }, a = { id: '11', fullName: 'fixture/first' }, b = { id: '12', fullName: 'fixture/second' }
-  directory.set(admin, [a,b]); directory.set(member, [a])
+  directory.set(admin, [a,b]); directory.set(member, [a, { id: '17', fullName: 'fixture/unselected' }])
   const before = await list(admin, scope)
   assert.deepEqual(before.selected, [])
   assert.equal(before.canReplace, true)

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { FieldError } from '@/components/ui/field'
+import { Label } from '@/components/ui/label'
 
 export function ProjectDependencyRepositories({ workspaceId, projectId, readerId, readOnly, onSaved }: {
   workspaceId: string; projectId: string; readerId: string; readOnly: boolean; onSaved: () => void
@@ -46,8 +47,8 @@ export function ProjectDependencyRepositories({ workspaceId, projectId, readerId
           : !data ? <p role="status">{common('loading')}</p>
           : <div className="grid max-h-[55vh] gap-2 overflow-y-auto">
               {data.repositories.filter(repo => writable || data.selected.includes(repo.id)).map(repo =>
-                <label className="flex items-center gap-2" key={repo.id}><Checkbox checked={selected.includes(repo.id)} disabled={!writable || saving}
-                  onCheckedChange={checked => toggle(repo.id, checked === true)} />{repo.name}</label>)}
+                <Label key={repo.id}><Checkbox checked={selected.includes(repo.id)} disabled={!writable || saving}
+                  onCheckedChange={checked => toggle(repo.id, checked === true)} />{repo.name}</Label>)}
               {!(writable ? data.repositories : data.selected).length && <p>{t('empty')}</p>}
               {!readOnly && !data.canReplace && <p>{t('unavailable')}</p>}
             </div>}
