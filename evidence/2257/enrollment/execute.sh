@@ -26,7 +26,7 @@ for v in sorted(candidates):
 print('Cold device CLI reached validation:',passed)
 if not passed and 'ERR_INVALID_PACKAGE_CONFIG' not in raw: raise RuntimeError('unexpected preflight error class')
 PYTHON
-rg -Fq 'Invalid registration token' "$base/run/case/daemon.log"
+grep -Fq 'Invalid registration token' "$base/run/case/daemon.log"
 echo "Repaired device CLI consumed expected validation fixture"
 mv "$base/run/case/daemon.log" "$base/run/case/after-loader.log"
 export MIKKA_BUILD_REVISION="$MIKKA_TEST_DEPLOYMENT_SHA"
