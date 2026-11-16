@@ -18,12 +18,24 @@ services:
       MIKKA_DEFAULT_MODEL_BASE_URL: ${MIKKA_DEFAULT_MODEL_BASE_URL:-}
       MIKKA_DEFAULT_MODEL_API_KEY: ${MIKKA_DEFAULT_MODEL_API_KEY:-}
       MIKKA_DEFAULT_MODEL_ID: ${MIKKA_DEFAULT_MODEL_ID:-}
+      # The model gateway's protocol converter, when the `litellm` profile runs it.
+      MIKKA_LITELLM_URL: ${MIKKA_LITELLM_URL:-}
+      MIKKA_LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-}
     volumes:
       - app-data:/data
     depends_on:
       postgres:
         condition: service_healthy
     stop_grace_period: 60s
+  # Converts Claude Code's and Codex's protocols for API keys of providers that
+  # speak only Chat Completions. Start with `--profile litellm` and set
+  # MIKKA_LITELLM_URL=http://litellm:4000 and LITELLM_MASTER_KEY in .env.
+  litellm:
+    profiles: ["litellm"]
+    build: ./deploy/litellm
+    restart: unless-stopped
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-}
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped

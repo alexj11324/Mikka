@@ -1,5 +1,5 @@
 import 'server-only'
-import { COORDINATOR_MODEL } from './coordinator/model'
+import { FEATURED_MODELS } from './model-catalog'
 import { selfHostedDefaultModelConfig } from './default-model-config'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
@@ -33,9 +33,12 @@ async function sources(query: Pick<Pool | PoolClient, 'query'>, scope: Scope): P
   const hosted = await query.query<{ enabled: boolean }>('SELECT "hostedModelEnabled" AS enabled FROM "user" WHERE id=$1', [scope.ownerId])
   const localModel = selfHostedDefaultModelConfig()
   const target = localModel ? await (await import('./default-model')).defaultModelTarget(scope.ownerId) : null
-  const hostedModelId = target?.kind === 'self-hosted' ? localModel!.modelId : COORDINATOR_MODEL
-  return [...subscriptions.rows, ...keys.rows, { id: 'hosted', kind: 'hosted', ids: [hostedModelId],
-    settings: { autoEnable: false, models: { [hostedModelId]: { enabled: hosted.rows[0]?.enabled ?? true, fresh: false, manual: true } } },
+  // Mikka 额度 serves the catalogue (decision 2026-11-15-1900); its one switch covers every model on it.
+  // A self-hosted server lists the one model its own provider serves. The internal background model is never listed.
+  const hostedIds = target?.kind === 'self-hosted' ? [localModel!.modelId] : [...FEATURED_MODELS]
+  const hostedEnabled = hosted.rows[0]?.enabled ?? true
+  return [...subscriptions.rows, ...keys.rows, { id: 'hosted', kind: 'hosted', ids: hostedIds,
+    settings: { autoEnable: false, models: Object.fromEntries(hostedIds.map(id => [id, { enabled: hostedEnabled, fresh: false, manual: true }])) },
     refreshedAt: null, refreshError: null }]
 }
 export async function readEnabledModels(query: Pick<Pool | PoolClient, 'query'>, scope: Scope) {
@@ -79,7 +82,7 @@ export async function changeEnabledModels(pool: Pool, scope: Scope, sourceId: st
       const prior = settings.models[id] ?? { enabled: true, fresh: false, manual: false }
       settings.models[id] = change.kind === 'seen' ? { ...prior, fresh: false } : { enabled: change.enabled, fresh: false, manual: true }
     }
-    if (kind === 'hosted') await client.query('UPDATE "user" SET "hostedModelEnabled"=$2 WHERE id=$1', [scope.ownerId, settings.models[row.ids[0]].enabled])
+    if (kind === 'hosted') await client.query('UPDATE "user" SET "hostedModelEnabled"=$2 WHERE id=$1', [scope.ownerId, change.kind === 'model' || change.kind === 'all' ? change.enabled : settings.models[row.ids[0]].enabled])
     else {
       // The table name is selected solely from this closed, server-derived set.
       const table = kind === 'subscription' ? 'byos_connections' : 'model_api_keys'

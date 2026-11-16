@@ -70,7 +70,8 @@ test('hosted calls check positive balance, debit only after receipts, and resume
   const userId = await seedUser(pool, 'model-postpay')
   const workspace = (await seedWorkspace(pool, userId, [{ userId, role: 'admin' }])).id
   await store.verify(workspace, 'cus_synthetic_postpay', `synthetic-${workspace}`)
-  await pool.query('UPDATE hosted_allowances SET remaining=1 WHERE "workspaceId"=$1', [workspace])
+  // An allowance granted before 2026-11-15; new verifications grant none.
+  await pool.query('INSERT INTO hosted_allowances ("workspaceId",remaining) VALUES ($1,1) ON CONFLICT ("workspaceId") DO UPDATE SET remaining=1', [workspace])
   const { hostedModel } = await import('./model')
   const model = await hostedModel(workspace, 'postpay-fixture', provider)
   const firstCall = model.doGenerate({ prompt: [] })
@@ -102,7 +103,7 @@ test('hosted calls check positive balance, debit only after receipts, and resume
   await Promise.all([store.settle(paid.id, 9_999), store.settle(paid.id, 9_999)])
   assert.deepEqual(await store.balance(workspace), settled)
   assert.equal(settled.purchased, 0)
-  await assert.rejects(Promise.resolve(model.doStream({ prompt: [] })), /free_allowance_used/)
+  await assert.rejects(Promise.resolve(model.doStream({ prompt: [] })), /points_exhausted/)
   assert.equal(providerCalls, 2)
   await credit()
   cost = '0.01'

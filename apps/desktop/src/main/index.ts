@@ -34,6 +34,7 @@ import { ServerDirectory } from './server-directory'
 import { BundledServers } from './bundled-servers'
 import { AppLinks, appLinkFromArgv, appLinkScheme } from './app-link'
 import { pickRepo } from './repo-picker'
+import { agentLogins } from './agent-logins'
 import { openBundledWebPage } from './bundled-web'
 import { markStartup } from '../startup'
 
@@ -630,6 +631,7 @@ async function start(): Promise<void> {
     claudeCallback: url => catchClaudeCallback(url, page => shell.openExternal(page)),
     localDevice: localDeviceStatus,
     pickRepo,
+    agentLogins,
     localAccount: () => readLocalDeviceAccount((url, init) => bundledAuth ? bundledAuth.request('/api/devices/enrollment', init) : session.fromPartition(PARTITION).fetch(url, init), APP_URL),
     localOwner: () => readLocalDeviceOwner((url, init) => bundledAuth ? bundledAuth.request('/api/devices/enrollment?view=owner', init) : session.fromPartition(PARTITION).fetch(url, init), APP_URL),
     quota: localQuota,

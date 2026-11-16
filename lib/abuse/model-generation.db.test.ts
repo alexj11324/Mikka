@@ -55,6 +55,8 @@ test('early Gateway lookup identity is durable after interrupted/cancelled HTTP 
     const workspace = randomUUID()
     generation = `synthetic-${randomUUID()}`
     await store.verify(workspace, 'synthetic-generation-customer', `synthetic-${workspace}`)
+    // An allowance granted before 2026-11-15; new verifications grant none.
+    await pool.query('INSERT INTO hosted_allowances ("workspaceId",remaining) VALUES ($1,1000000) ON CONFLICT DO NOTHING', [workspace])
     const model = await hostedModel(workspace, 'synthetic/gateway-stream', gateway('synthetic/gateway-stream'))
     const reader = (await model.doStream({ prompt: [] })).stream.getReader()
     for (;;) {

@@ -13,6 +13,7 @@ import { taskDestinationSchema } from '@/lib/task-destination'
 import { agentProfileReferenceSchema } from '@/lib/factory/agent-profile-reference'
 import { taskTitleInputSchema } from '@/lib/task-title-input'
 import { API_KEY_PRESETS } from '@/lib/model-api-key-providers'
+import { gatewayFeaturesSchema } from '@/lib/model-gateway/features'
 import { userImageInputsSchema } from '@/lib/coordinator/user-attachments'
 import { setAppPolicyInput } from '@/lib/app-policy/apps'
 import { POINTS_PURCHASE_AMOUNTS } from '@/lib/billing/hosted-usage'
@@ -271,6 +272,7 @@ export const desktopActionSchemas = {
   'model-api-keys.createApiKey': tuple(apiKey, workspace),
   'model-api-keys.deleteApiKey': tuple(uuid, workspace),
   'model-api-keys.updateApiKeyShare': tuple(object({ id: uuid, shared: bool }), workspace),
+  'model-api-keys.updateApiKeyFeatures': tuple(uuid, gatewayFeaturesSchema, workspace),
   'enabled-models.getEnabledModels': tuple(uuid),
   'enabled-models.setModelEnabled': tuple(uuid, z.union([uuid, z.literal('hosted')]), text(128).min(1), bool),
   'enabled-models.setAllModelsEnabled': tuple(uuid, z.union([uuid, z.literal('hosted')]), bool),
@@ -282,6 +284,10 @@ export const desktopActionSchemas = {
   'model-order.changeModelOrder': tuple(orderChange, workspace),
   'onboarding.completeOnboarding': none,
   'onboarding.resetOnboarding': none,
+  'onboarding.onboardingStart': inWorkspace,
+  'onboarding.saveOnboardingStep': tuple(object({ step: z.number().int().min(0).max(4), status: z.record(z.string().regex(/^[0-3]$/), z.enum(['done', 'skipped'])) })),
+  'onboarding.setupChecklist': tuple(uuid),
+  'onboarding.dismissSetupChecklist': tuple(uuid),
   'pending-actions.decidePendingAction': tuple(uuid, bool),
   'personal-policy.getSharePolicy': inWorkspace,
   'personal-policy.updateSharePolicy': tuple(bool, workspace),

@@ -71,6 +71,8 @@ async function query(sql: string, values: unknown[] = []) {
   if (sql.includes('EXISTS (SELECT 1 FROM computer_run_bindings')) return { rows: [{ cloud: true }], rowCount: 1 }
   if (sql.includes('FROM agent_runs')) return { rows: previous ? [{ ...previous, remoteUrl: null, harness: 'codex', cloudWorkspaceId: workspaceId, cloudBotId: botId }] : [], rowCount: Number(Boolean(previous)) }
   if (sql.includes('FROM factory_tasks')) { factoryReadCalls++; return { rows: pendingSpec ? [{ stage: 'spec', status: 'pending' }] : [], rowCount: Number(pendingSpec) } }
+  // The dispatching chat saved no model, so the task keeps its own placement (decision 2026-11-15-1630).
+  if (sql.includes('FROM bot_model_choices')) return { rows: [], rowCount: 0 }
   if (sql.includes('FROM bots') || sql.includes('FROM bot_cloud_runtimes')) return { rows: present && values[0] === botId && values[1] === owner ? [target()] : [], rowCount: Number(present) }
   throw new Error(`Unexpected query in startup fixture: ${sql}`)
 }

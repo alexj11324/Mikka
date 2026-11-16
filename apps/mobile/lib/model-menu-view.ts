@@ -11,14 +11,14 @@ const providerName = (provider?: string) => provider === 'claude' ? 'Claude' : '
 export function groupTitle(group: ModelGroup) {
   const credential = group.credentialLabel ? ` · ${group.credentialLabel}` : ''
   switch (group.kind) {
-    case 'hosted': return 'Mikka'
+    case 'hosted': return messages.Coordinator.modelPicker.creditsGroup
     case 'subscription': return `${group.plan ? `${providerName(group.provider)} ${group.plan}` : providerName(group.provider)}${credential}`
     case 'apiKey': return `API Key${credential}`
     case 'shared': return `${messages.Coordinator.modelPicker.shared}${credential}`
   }
 }
 export function groupTag(group: ModelGroup) {
-  if (group.kind === 'hosted') return group.hostedSource === 'cloud' ? messages.Coordinator.modelPicker.cloudCredits : group.hostedSource === 'self-hosted' ? messages.Coordinator.modelPicker.ownProvider : messages.Coordinator.modelPicker.credits
+  if (group.kind === 'hosted') return group.hostedSource === 'cloud' ? messages.Coordinator.modelPicker.cloudCredits : group.hostedSource === 'self-hosted' ? messages.Coordinator.modelPicker.ownProvider : null
   if (group.kind === 'apiKey') return messages.Coordinator.modelPicker.metered
   if (group.kind === 'shared' && group.owner) return messages.Coordinator.modelPicker.sharedKey.replace('{name}', group.owner)
   return null
@@ -44,8 +44,13 @@ export function modelDisplayName(id: string) {
   }
   return parts.join(' ')
 }
-export function optionName(option: Pick<ModelOption, 'id' | 'modelId'>) {
-  return option.id === HOSTED_CHOICE ? messages.Coordinator.modelPicker.hosted : option.modelId ? modelDisplayName(option.modelId) : messages.Coordinator.modelPicker.unknownModel
+export function optionName(option: Pick<ModelOption, 'id' | 'modelId'> & Partial<Pick<ModelOption, 'name'>>) {
+  if (!option.id) return messages.Coordinator.modelPicker.choose
+  return option.name || (option.modelId ? modelDisplayName(option.modelId) : messages.Coordinator.modelPicker.unknownModel)
+}
+/** Mikka 额度 lists its featured models on the phone; the rest of the catalogue stays on the web's search. */
+export function shownOptions(group: ModelGroup, currentId?: string) {
+  return group.kind === 'hosted' ? group.options.filter(option => option.featured || option.id === currentId) : group.options
 }
 export function modelMenuLabel(current: BotModelCurrent, _running = false) {
   return optionName(current)

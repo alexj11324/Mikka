@@ -82,7 +82,7 @@ export async function getHostedUsage(workspaceId?: string) {
     const { hostedUsage, ensureLegacyVerification } = await import('@/lib/abuse/runtime')
     await ensureLegacyVerification(actor.workspaceId)
     const { workspacePool } = await import('@/lib/workspace-db')
-    // Card verification is the person's and lands on their personal workspace (C19): only there does 验证银行卡 help.
+    // A personal workspace is its owner's to pay for; in a team only admins choose a plan or add credits.
     const personal = (await workspacePool.query<{ kind: string }>('SELECT kind FROM mikka_workspaces WHERE id=$1', [actor.workspaceId])).rows[0]?.kind === 'personal'
     // The person's own subscription serves them in every workspace (#838): with one connected, 连接订阅 is no way on.
     const { pool } = await import('@/lib/db')
@@ -91,7 +91,7 @@ export async function getHostedUsage(workspaceId?: string) {
     const { hostedBillingScope } = await import('@/lib/abuse/context')
     const status = await hostedBillingScope.run({ workspaceId: actor.workspaceId, ownerId: actor.userId, actorId: actor.userId,
       billingAccountWorkspaceId: account.accountWorkspaceId, billingOrganizationId: account.organizationId }, () => hostedUsage.status(account.accountWorkspaceId))
-    return { ...status, workspaceId: actor.workspaceId, billingAccount: account, personal, subscribed,
+    return { ...status, workspaceId: actor.workspaceId, billingAccount: account, personal, subscribed, admin: personal || actor.role === 'admin',
       recent: actor.role === 'admin' ? await hostedUsage.recent(account.accountWorkspaceId, actor.workspaceId) : [] }
   })
 }

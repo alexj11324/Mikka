@@ -36,9 +36,9 @@ export function failureLine(failure: ChatFailure): FailureLine {
       return { text: SUBSCRIPTION_LINES[failure.notice], retry: recovery === 'retry', recovery: recovery === 'retry' ? null : recovery === 'settings' ? 'models' : 'model' }
     }
     case 'hosted': {
-      const lines: Record<string, string> = { verification_required: '使用 Mikka 默认模型前需要验证银行卡', free_allowance_used: '免费额度已用完', points_exhausted: '点数已用完', platform_paused: '免费额度暂时停用' }
+      const lines: Record<string, string> = { verification_required: 'Mikka 额度已用完', free_allowance_used: 'Mikka 额度已用完', points_exhausted: 'Mikka 额度已用完', platform_paused: 'Mikka 额度暂时不可用' }
       const recovery = failure.code === 'platform_paused' ? 'model' : Object.hasOwn(lines, failure.code) ? 'billing' : null
-      return { text: lines[failure.code] ?? 'Mikka 默认模型暂时不可用', retry: recovery === null, recovery }
+      return { text: lines[failure.code] ?? '暂时不可用', retry: recovery === null, recovery }
     }
     case 'wake': return {
       text: { wake_failed: '回复等待重试', wake_start_unconfirmed: '回复启动未确认', wake_exhausted: '回复重试已停止' }[failure.code],

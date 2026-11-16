@@ -11,8 +11,8 @@ import { apiKeyHarnesses } from './model-api-key-providers'
 import { hasStaleOfficialAllowance, shownSubscriptionAvailability, subscriptionAvailability } from './subscription-quota'
 import { providerHealthStates, providerSourceKey } from './model-provider-health'
 import {
-  agentsByOffer, defaultOrderByAgent, deviceModel, dispatchOrder, entryKey, latestDefaultCandidates, offerKey, onPreferredAgent, placeStage, planDispatch, whyNoDevice,
-  type CredentialState, type DeviceStage, type NoDeviceWhy, type OrderCandidate, type OrderEntry, type OrderHarness, type PoolDevice, type RunLocation,
+  agentsByOffer, defaultOrderByAgent, deviceModel, dispatchOrder, entryKey, latestDefaultCandidates, offerKey, placeStage, planDispatch, sourceId as entrySourceId, whyNoDevice,
+  type CredentialState, type StoredEntry, type DeviceStage, type NoDeviceWhy, type OrderCandidate, type OrderEntry, type OrderHarness, type PoolDevice, type RunLocation,
 } from './model-order-plan'
 
 /**
@@ -28,7 +28,8 @@ type Query = Pick<Pool | PoolClient, 'query'>
 export interface OrderScope { ownerId: string; workspaceId: string }
 
 /** One allowed model as the page shows it. */
-export interface OrderRow extends OrderEntry {
+export interface OrderRow extends Omit<OrderEntry, 'source'> {
+  source: StoredEntry['source']
   /** The subscription's provider or the key's provider, for its mark and label. */
   provider: string
   /** The Agents this model and credential can run on: one, or both for a DeepSeek or Kimi key (the row's Agent menu). */
@@ -73,11 +74,11 @@ export interface OrderView {
 export type OrderContextView = Pick<OrderView, 'location' | 'preferredHarness' | 'entries' | 'candidates' | 'cloudReady' | 'cloudModels'>
 
 interface EntryRow { id: string; harness: OrderHarness; model: string; sourceKind: 'subscription' | 'api_key'; sourceId: string }
-const toEntry = (row: EntryRow): OrderEntry => ({
+const toEntry = (row: EntryRow): StoredEntry => ({
   id: row.id, harness: row.harness, model: row.model,
   source: row.sourceKind === 'subscription' ? { kind: 'subscription', connectionId: row.sourceId } : { kind: 'api_key', keyId: row.sourceId },
 })
-const sourceId = (entry: Pick<OrderEntry, 'source'>) => entry.source.kind === 'subscription' ? entry.source.connectionId : entry.source.keyId
+const sourceId = (entry: Pick<OrderEntry, 'source'>) => entrySourceId(entry.source)
 
 /** What the person can add here: their usable subscriptions' models and their usable keys' models. */
 export async function orderCandidates(query: Query, scope: OrderScope): Promise<(OrderCandidate & { provider: string; credentialOwnerId: string })[]> {
@@ -120,6 +121,8 @@ export async function orderCandidates(query: Query, scope: OrderScope): Promise<
  * Default/inherited selection still uses orderCandidates and its full ordering.
  * This is a fresh candidate read, not a credential grant or cached admission. */
 export async function selectedOrderCandidates(query: Query, scope: OrderScope, entry: OrderEntry): ReturnType<typeof orderCandidates> {
+  // Mikka 额度 is no connected credential; it has no candidates to select.
+  if (entry.source.kind === 'credits') return []
   if (!z.uuid().safeParse(sourceId(entry)).success) return []
   if (entry.source.kind === 'api_key') {
     const { usableApiKeys } = await import('./model-api-keys')
@@ -155,18 +158,14 @@ async function settingsRow(query: Query, scope: OrderScope) {
 }
 
 /** The allowed models in order: the stored list, or for an untouched list the default preference (ids are stable per entry). */
-export async function readOrder(query: Query, scope: OrderScope, candidates?: (OrderCandidate & { provider: string })[]): Promise<{ location: RunLocation; customized: boolean; preferredHarness: OrderHarness; autoModelRouting: boolean; entries: OrderEntry[] }> {
+export async function readOrder(query: Query, scope: OrderScope, candidates?: (OrderCandidate & { provider: string })[]): Promise<{ location: RunLocation; customized: boolean; preferredHarness: OrderHarness; autoModelRouting: boolean; entries: StoredEntry[] }> {
   const settings = await settingsRow(query, scope)
   if (!settings.customized) {
     const available = latestDefaultCandidates(candidates ?? await orderCandidates(query, scope))
     const defaults = defaultOrderByAgent(available, settings.preferredHarness)
-    // Include lighter reported models from the default credentials without
-    // silently adding a different paid key. Turning routing off restores each
-    // Agent's default list; saved lists remain exactly as set.
-    const sources = new Set(defaults.map(item => `${item.source.kind}:${sourceId(item)}`))
-    const extra = settings.autoModelRouting ? onPreferredAgent(available, settings.preferredHarness)
-      .filter(item => sources.has(`${item.source.kind}:${sourceId(item)}`)) : []
-    const list = [...new Map([...defaults, ...extra].map(item => [entryKey(item), item])).values()]
+    // Each Agent's default list. The lighter models it once added for the
+    // retired difficulty routing are no longer included (decision 2026-11-15-1630).
+    const list = [...new Map(defaults.map(item => [entryKey(item), item])).values()]
     // The entry is also frozen in a run's JSONB definition. Keep the NUL-separated
     // identity key in memory, but give its opaque row id a stable JSONB-safe form.
     return { ...settings, entries: list.map(item => ({ id: `default:${encodeURIComponent(entryKey(item))}`, harness: item.harness, model: item.model, source: item.source })) }
@@ -248,6 +247,9 @@ export async function credentialStates(query: Query, scope: OrderScope, entries:
   const health = await providerHealthStates(query, scope, authorizedCandidates, checkedAt)
   const states = new Map<string, { credential: CredentialState; provider: string; quotaCheckPending?: true }>()
   for (const entry of entries) {
+    // A Mikka 额度 model runs through the model gateway, which charges or refuses
+    // each request itself (decision 2026-11-15-2000).
+    if (entry.source.kind === 'credits') { states.set(entry.id, { credential: { usable: true }, provider: 'mikka' }); continue }
     if (entry.source.kind === 'subscription') {
       const row = connections.get(entry.source.connectionId)
       const provider = row?.provider ?? (entry.harness === 'codex' ? 'codex' : 'claude')
@@ -447,7 +449,7 @@ export async function changeOrder(pool: Pool, scope: OrderScope, change: OrderCh
     if (change.kind === 'add') {
       const available = new Map(candidates.map(candidate => [entryKey(candidate), candidate]))
       const have = new Set(entries.map(entryKey))
-      const added: OrderEntry[] = []
+      const added: StoredEntry[] = []
       for (const raw of z.array(candidateInput).min(1).max(100).parse(change.entries)) {
         const key = entryKey(raw)
         if (!available.has(key)) throw new ActionFailureError('executionModelUnknown')

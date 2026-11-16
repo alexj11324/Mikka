@@ -1,0 +1,17 @@
+# The Mikka model gateway's protocol converter (decision 2026-11-15-2000).
+# It stores no provider key: every request from the Mikka API carries the
+# person's key and the provider's Chat Completions base URL (`api_key`,
+# `api_base`), and LiteLLM converts Anthropic messages or the Responses API
+# into Chat Completions for that one request. Reachable only from the Mikka API.
+model_list:
+  - model_name: "*"
+    litellm_params:
+      model: "openai/chat_completions/*"
+      configurable_clientside_auth_params: ["api_base"]
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+litellm_settings:
+  # A provider that rejects an optional parameter still answers the rest.
+  drop_params: true
+  # No prompts, completions or keys in LiteLLM's own logs.
+  turn_off_message_logging: true

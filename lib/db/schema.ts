@@ -1,7 +1,7 @@
 import type { ExecutionIdentity } from '../execution-identity'
 import type { WorkerDefinitionSnapshot } from '../agent-kit/worker'
 import type { SendKey } from '../send-key'
-import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, check, foreignKey, type AnyPgColumn } from 'drizzle-orm/pg-core'
+import { pgTable, text, uuid, smallint, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, check, foreignKey, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
@@ -20,6 +20,21 @@ export const userOnboarding = pgTable('user_onboarding', {
   userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
   completedAt: timestamp('completedAt', { withTimezone: true }).notNull().defaultNow(),
 })
+
+/** An unfinished first-run guide's place: its step and what was done or skipped (decision 2026-11-15-1900). */
+export const userOnboardingProgress = pgTable('user_onboarding_progress', {
+  userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  step: smallint('step').notNull().default(0),
+  status: jsonb('status').$type<Record<string, 'done' | 'skipped'>>().notNull().default({}),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/** The setup checklist on 新建任务, hidden by this person in this workspace. */
+export const setupChecklistDismissals = pgTable('setup_checklist_dismissals', {
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  workspaceId: uuid('workspaceId').notNull(),
+  dismissedAt: timestamp('dismissedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.userId, table.workspaceId] })])
 
 export const issueMembers = pgTable('issue_members', {
   issueId: uuid('issueId').notNull(), userId: text('userId').notNull(), memberId: text('memberId').notNull(),
@@ -174,6 +189,8 @@ export const botModelChoices = pgTable('bot_model_choices', {
   botKey:text('botKey').notNull(),bindingId:uuid('bindingId'),
   /** Or a model an API key / custom provider serves (C22); exactly one of the two. */
   apiKeyId:uuid('apiKeyId'),apiKeyModel:text('apiKeyModel'),
+  /** Or a catalogue model (`vendor/model`) run on Mikka 额度; a row with none of the three is no choice (decision 2026-11-15-1900). */
+  creditsModel:text('creditsModel'),
 }, table=>[primaryKey({columns:[table.ownerId,table.workspaceId,table.botKey]})])
 
 export const agentSessions = pgTable('agent_sessions', {

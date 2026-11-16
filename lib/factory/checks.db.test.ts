@@ -159,6 +159,8 @@ test(
       await db.query(`INSERT INTO coordinator_bots("ownerId","workspaceId","botId") VALUES('owner',$1,$2)`,[billingWorkspaceId,coordinatorBot]);
       const usage = new HostedUsageStore(db);
       await usage.verify(billingWorkspaceId, "synthetic-factory-customer", `factory-${billingWorkspaceId}`);
+      // Card verification grants nothing since the trial was removed (decision 2026-11-15-1900); an allowance from before still spends.
+      await db.query('INSERT INTO hosted_allowances ("workspaceId",remaining) VALUES ($1,1000000) ON CONFLICT ("workspaceId") DO UPDATE SET remaining=1000000',[billingWorkspaceId]);
       // Bind the runtime to this test's actual accounting store, never a fake
       // successful budget response. Model admission uses its real implementation.
       t.mock.module(new URL("../abuse/runtime.ts",import.meta.url).href,{namedExports:{

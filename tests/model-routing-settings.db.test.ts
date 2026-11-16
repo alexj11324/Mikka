@@ -8,7 +8,7 @@ import type { OrderCandidate } from '../lib/model-order-plan'
 
 if (dbUrl && !disposableDatabase(process.env, dbUrl)) throw Error('Model routing settings require isolated loopback *_e2e targets')
 
-test('routing settings default on, preserve saved lists and isolate owner/workspace scope', { skip: !dbUrl }, async t => {
+test('the retired routing column is stored per owner and workspace, never expands the default list and never rewrites a saved list', { skip: !dbUrl }, async t => {
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const { pool: appPool } = await import('../lib/db')
@@ -36,8 +36,8 @@ test('routing settings default on, preserve saved lists and isolate owner/worksp
   const initial = await readOrder(pool, scope, candidates)
   assert.equal(initial.autoModelRouting, true)
   assert.equal(initial.customized, false)
-  assert.deepEqual(initial.entries.map(entry => entry.model), ['reported-opus', 'reported-light', 'reported-standard'])
-  assert.ok(initial.entries.every(entry => entry.source.kind === 'subscription'), 'routing does not silently add a different paid credential')
+  // Decision 2026-11-15-1630: the default list is each Agent's default model only.
+  assert.deepEqual(initial.entries.map(entry => entry.model), ['reported-opus'])
   assert.equal((await pool.query('SELECT count(*)::int AS n FROM model_order_settings WHERE "ownerId"=$1', [ownerId])).rows[0].n, 0)
   assert.equal((await orderView(pool, { ownerId: otherId, workspaceId: first.id })).autoModelRouting, true)
 
@@ -45,7 +45,7 @@ test('routing settings default on, preserve saved lists and isolate owner/worksp
   const disabled = await readOrder(pool, scope, candidates)
   assert.equal(disabled.autoModelRouting, false)
   assert.equal(disabled.customized, false)
-  assert.deepEqual(disabled.entries.map(entry => entry.model), ['reported-opus'])
+  assert.deepEqual(disabled.entries, initial.entries, 'the switch changes nothing')
   assert.equal((await readOrder(pool, { ownerId, workspaceId: second.id }, candidates)).autoModelRouting, true)
   assert.equal((await readOrder(pool, { ownerId: otherId, workspaceId: first.id }, candidates)).autoModelRouting, true)
   assert.equal((await pool.query('SELECT count(*)::int AS n FROM model_order_entries WHERE "ownerId"=$1', [ownerId])).rows[0].n, 0)
@@ -54,9 +54,9 @@ test('routing settings default on, preserve saved lists and isolate owner/worksp
 
   const catalogue = ['claude-opus-5', 'claude-sonnet-5', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-fable-5-1']
     .map(model => ({ harness: 'claude_code' as const, model, name: model, source, provider: 'claude' }))
-  assert.deepEqual((await readOrder(pool, scope, catalogue)).entries.map(entry => entry.model), ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-fable-5-1'])
+  assert.deepEqual((await readOrder(pool, scope, catalogue)).entries.map(entry => entry.model), ['claude-opus-5-5'])
   const futureCatalogue = [...catalogue, { ...catalogue[0], model: 'claude-opus-6', name: 'claude-opus-6' }]
-  assert.deepEqual((await readOrder(pool, scope, futureCatalogue)).entries.map(entry => entry.model), ['claude-opus-6', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-fable-5-1'])
+  assert.deepEqual((await readOrder(pool, scope, futureCatalogue)).entries.map(entry => entry.model), ['claude-opus-6'])
   assert.equal(catalogue.length, 6, 'the complete manual catalogue is untouched')
 
   const entryId = randomUUID()

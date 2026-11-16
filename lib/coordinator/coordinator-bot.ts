@@ -311,8 +311,8 @@ async function movedSummary(ownerId: string, botId: string, summary: string): Pr
 }
 
 async function moveKeyedRows(client: PoolClient, ownerId: string, { botId, workspaceId }: CoordinatorBot) {
-  await client.query(`INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId","apiKeyId","apiKeyModel")
-      SELECT "ownerId","workspaceId",$3,"bindingId","apiKeyId","apiKeyModel" FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"='coordinator'
+  await client.query(`INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId","apiKeyId","apiKeyModel","creditsModel")
+      SELECT "ownerId","workspaceId",$3,"bindingId","apiKeyId","apiKeyModel","creditsModel" FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"='coordinator'
       ON CONFLICT ("ownerId","workspaceId","botKey") DO NOTHING`, [ownerId, workspaceId, botId])
   await client.query(`DELETE FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"='coordinator'`, [ownerId, workspaceId])
   await client.query(`INSERT INTO chat_preferences ("userId","chatKey",pinned,muted,"updatedAt")

@@ -27,6 +27,7 @@ export interface BridgeOptions {
   claudeCallback(authorizationUrl: unknown): Promise<string | null>
   localDevice(): Promise<LocalDevice>
   pickRepo?(): Promise<import('@mikka/protocol/bridge').PickRepoResult>
+  agentLogins?(): Promise<import('@mikka/protocol/bridge').AgentLogins>
   localAccount(): Promise<LocalDeviceAccount>
   localOwner(): Promise<Pick<LocalDeviceAccount, 'ownerId'>>
   quota(): Promise<QuotaSnapshotReport>
@@ -90,6 +91,7 @@ export function registerBridge(options: BridgeOptions, sshInstaller?: SshInstall
   handle(IPC.appRequireUpdate, () => options.requireUpdate())
   handle(IPC.deviceStatus, () => options.localDevice())
   handle(IPC.devicePickRepo, () => options.pickRepo?.() ?? { status: 'cancelled' })
+  handle(IPC.deviceAgentLogins, () => options.agentLogins?.() ?? { claudeCode: { login: 'unknown', plan: null }, codex: { login: 'unknown', plan: null } })
   handle(IPC.quotaGet, () => options.quota())
   handle(IPC.notificationsShow, notification => options.notifications.show(notification))
   handle(IPC.notificationsSetBadge, count => options.notifications.setBadge(count))

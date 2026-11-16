@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
-import { dbUrl, seedAgent, seedRun, seedUser, seedWorkspace, useUpFreeMessages } from './support/workspace-admin-db'
+import { dbUrl, seedAgent, seedRun, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
 const uuidFrom = (seed: string) => {
   const hash = createHash('sha256').update(seed).digest('hex')
@@ -102,7 +102,7 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     assert.equal(ids[0], uuidFrom(`orvilo-default:${racer}`), 'a new user keeps the sign-up id')
   })
 
-  await t.test('a card verified on a workspace that became a team keeps working: the fresh personal workspace is verified too', async () => {
+  await t.test('no trial: a verified card funds nothing, and every unfunded workspace is refused for points', async () => {
     const { ensurePersonalWorkspace } = await import('../lib/personal-workspace')
     const { canUseMikkaPaid, hostedUsage } = await import('../lib/abuse/runtime')
     const { executionWorkspace } = await import('../lib/execution-settings')
@@ -110,24 +110,16 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     const team = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }, { userId: peer, role: 'member' }])
     await hostedUsage.verify(team.id, 'cus_synthetic_team', `card_${randomUUID()}`)
     const personal = await ensurePersonalWorkspace({ id: owner, email: `${owner}@example.invalid`, name: 'verified' }, 'zh-CN')
-    // Decision 2026-10-31-2225: verification is per person, and a new personal workspace starts like a new sign-up.
-    const balance = await canUseMikkaPaid(personal)
-    assert.equal(balance.verified, true)
-    assert.ok(balance.free > 0, 'the free allowance')
-    // Triage keeps running where it ran before: the team, with its verified card.
+    // Decision 2026-11-15-1900: no trial and no card allowance; Mikka 额度 comes from a plan or a top-up.
+    await assert.rejects(canUseMikkaPaid(personal), { code: 'points_exhausted' })
     assert.equal(await executionWorkspace(owner, null), team.id)
-    assert.equal((await canUseMikkaPaid(team.id)).verified, true)
-    // Someone who never verified is told so, never silently stopped.
+    await assert.rejects(canUseMikkaPaid(team.id), { code: 'points_exhausted' })
     const stranger = await seedUser(pool, 'unverified')
     const theirs = await ensurePersonalWorkspace({ id: stranger, email: `${stranger}@example.invalid`, name: 'unverified' }, 'zh-CN')
-    // A new sign-up's first messages are free (TRIAL_MESSAGES); past them, a card.
-    assert.equal(((await canUseMikkaPaid(theirs)) as { trialLeft?: number }).trialLeft, 20)
-    await useUpFreeMessages(pool, theirs, stranger)
-    await assert.rejects(canUseMikkaPaid(theirs), { code: 'verification_required' })
-    // A peer's verification on a team they do not own does not verify their personal workspace.
-    const peerPersonal = await ensurePersonalWorkspace({ id: peer, email: `${peer}@example.invalid`, name: 'peer' }, 'zh-CN')
-    await useUpFreeMessages(pool, peerPersonal, peer)
-    await assert.rejects(canUseMikkaPaid(peerPersonal), { code: 'verification_required' })
+    await assert.rejects(canUseMikkaPaid(theirs), { code: 'points_exhausted' })
+    // A top-up funds it at once.
+    await pool.query(`INSERT INTO workspace_credit_grants (id,"workspaceId",bucket,points,reason,"externalId") VALUES ($1,$2,'purchased',100,'pack',$3)`, [randomUUID(), theirs, `points-${randomUUID()}`])
+    assert.equal((await canUseMikkaPaid(theirs)).purchased, 1_000_000)
   })
 
   await t.test('sharing is the member\'s own opt-in; the admin has one switch, audited, and none in a personal workspace', async () => {
@@ -373,8 +365,10 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     assert.equal(await coordinatorEnabled(owner, bot), false, 'a known exhausted selected model remains unavailable')
     await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [connection, JSON.stringify(quota(0.2, 120_000))])
     assert.equal(await coordinatorEnabled(owner, bot), true, 'a stale official allowance can queue its normal authoritative execution check')
-    await settings.setBotModel({ ownerId: owner, workspaceId: workspace.id }, bot, HOSTED_CHOICE)
-    assert.equal(await coordinatorEnabled(owner, bot), false, 'explicit Mikka default does not silently spend an available subscription')
+    // 「Mikka 默认」 is gone (decision 2026-11-15-1900), and with no server model Mikka 额度 offers nothing here.
+    await assert.rejects(settings.setBotModel({ ownerId: owner, workspaceId: workspace.id }, bot, HOSTED_CHOICE), { code: 'executionModelUnknown' })
+    await assert.rejects(settings.setBotModel({ ownerId: owner, workspaceId: workspace.id }, bot, 'credits:deepseek/deepseek-v4.1-flash'), { code: 'executionModelUnknown' })
+    assert.equal(await coordinatorEnabled(owner, bot), true, 'the chosen subscription stays chosen')
     await settings.setBotModel({ ownerId: owner, workspaceId: workspace.id }, bot, binding)
     await pool.query('UPDATE bots SET "archivedAt"=now() WHERE id=$1', [bot])
     assert.equal(await coordinatorEnabled(owner, bot), false, 'an archived bot remains disabled')

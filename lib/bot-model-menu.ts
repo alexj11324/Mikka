@@ -13,8 +13,10 @@ import { defaultModelTarget } from "./default-model";
 export { quotaExhausted } from "./subscription-quota";
 import {
   apiKeyOptionId,
-  HOSTED_CHOICE,
+  creditsOptionId,
+  NO_MODEL,
   type BotModelCurrent,
+  type BotModelMenuOption,
   type BotModelMenu,
   type BotModelMenuGroup,
 } from "./bot-model-menu-view";
@@ -32,7 +34,6 @@ export async function botModelScope(ownerId: string, botId: string | null, onlyW
   return { ownerId, workspaceId };
 }
 
-const HOSTED = { id: HOSTED_CHOICE, modelId: "", provider: "mikka" } as const;
 
 /**
  * The composer's model menu for one bot, or the Coordinator (`botId` null),
@@ -87,16 +88,27 @@ export async function botModelMenu(
     group.options.push({ id: row.bindingId, modelId: row.modelId, provider: row.provider });
     sharedSubscriptions.set(row.connectionId, group);
   }
-  // Mikka 默认 is listed only where this chat's workspace has points for it, with how many (decision 2026-11-02-1450).
+  // Mikka 额度: every catalogue model, listed whenever the source is on; the balance is checked when a message is sent
+  // (decision 2026-11-15-1900). A self-hosted server lists the one model its own provider serves.
   const { hostedPointsHere } = await import("./points-fallback");
+  const { creditsModels } = await import("./credits-models");
   const local = !isCloudEdition();
   const target = local ? await defaultModelTarget(scope.ownerId) : null;
-  const { points, trialLeft } = local ? { points: 0, trialLeft: 0 } : await hostedPointsHere(scope.workspaceId);
-  const usable = await hostedModelEnabled(pool, scope.ownerId) && (local ? target !== null : points > 0 || trialLeft > 0);
+  const { points } = local ? { points: 0 } : await hostedPointsHere(scope.workspaceId);
+  const enabled = await hostedModelEnabled(pool, scope.ownerId) && (!local || target !== null);
+  const usable = enabled && (local || points > 0);
   const hostedSource = local ? target?.kind === "cloud" ? "cloud" as const : "self-hosted" as const : undefined;
-  const hostedOption = { ...HOSTED, ...(hostedSource ? { hostedSource } : {}) };
+  const catalogue = enabled ? await creditsModels(scope.ownerId) : [];
+  const creditsOption = (model: { id: string; name?: string; pricing?: { input: number; output: number } | null }, featured?: boolean): BotModelMenuOption => ({
+    id: creditsOptionId(model.id), modelId: model.id, provider: "mikka", ...(model.name ? { name: model.name } : {}),
+    ...(model.pricing ? { price: { input: model.pricing.input, output: model.pricing.output } } : {}),
+    ...(featured ? { featured } : {}), ...(hostedSource ? { hostedSource } : {}),
+  });
+  const { FEATURED_MODELS } = await import("./model-catalog");
+  const featured = new Set<string>(FEATURED_MODELS);
   const groups: BotModelMenuGroup[] = [
-    ...(usable ? [{ kind: "hosted" as const, ...(hostedSource ? { hostedSource } : { points, ...(points > 0 ? {} : { trialLeft }) }), options: [hostedOption] }] : []),
+    ...(catalogue.length ? [{ kind: "hosted" as const, ...(hostedSource ? { hostedSource } : { points }),
+      options: catalogue.map((model) => creditsOption(model, local || featured.has(model.id))) }] : []),
     ...subscriptions.values(),
     ...sharedSubscriptions.values(),
     ...ownKeys.map((key) => ({ kind: "apiKey" as const, credentialLabel: keyLabel(key), options: keyOptions(key) })),
@@ -109,8 +121,11 @@ export async function botModelMenu(
     preference, { rows, pooled, keys, now });
   const state = { chosen: choice.chosen, ...(choice.fallback ? { fallback: choice.fallback } : {}) };
   let current: BotModelCurrent;
-  if (choice.kind === "hosted") {
-    current = { ...hostedOption, kind: "hosted", ...state, available: usable, availability: usable ? "available" : "exhausted" };
+  if (choice.kind === "none") {
+    current = { ...NO_MODEL, ...state };
+  } else if (choice.kind === "hosted") {
+    const model = catalogue.find((item) => item.id === choice.model) ?? { id: choice.model };
+    current = { ...creditsOption(model, featured.has(choice.model)), kind: "hosted", ...state, available: usable, availability: usable ? "available" : "exhausted" };
   } else if (choice.kind === "apiKey") {
     current = {
       id: apiKeyOptionId(choice.key.id, choice.model), modelId: choice.model, provider: choice.key.provider,
@@ -180,7 +195,7 @@ export async function refreshBotModelMenu(
 
 /**
  * Saves a chat's model pick for the bot's next runs (a run already going keeps
- * its model) and returns the menu: a binding id, Mikka 默认 (HOSTED_CHOICE), or
+ * its model) and returns the menu: a binding id, a Mikka 额度 model (`credits:<vendor/model>`), or
  * an API key model (`apikey:<keyId>:<model>`, saved as that key's choice). The
  * web's action and the iOS app's route both save through here, so every option
  * the menu lists can be picked from either.

@@ -82,6 +82,7 @@ if (appOrigin && window.top === window && (bundled ? localOrigin === appOrigin &
     device: {
       status: () => ipcRenderer.invoke(IPC.deviceStatus),
       pickRepo: () => ipcRenderer.invoke(IPC.devicePickRepo),
+      agentLogins: () => ipcRenderer.invoke(IPC.deviceAgentLogins),
     },
     quota: {
       get: () => ipcRenderer.invoke(IPC.quotaGet),

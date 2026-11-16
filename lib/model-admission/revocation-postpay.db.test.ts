@@ -23,7 +23,8 @@ test('a real policy rejection after accounting admission settles zero and leaves
   const ownerId=await seedUser(pool,'revocation-postpay')
   const workspace=await seedWorkspace(pool,ownerId,[{userId:ownerId,role:'admin'}])
   await usage.verify(workspace.id,'synthetic-revocation-postpay',`synthetic-${workspace.id}`)
-  await pool.query('UPDATE hosted_allowances SET remaining=1 WHERE "workspaceId"=$1',[workspace.id])
+  // Card verification grants nothing now (decision 2026-11-15-1900); an allowance from before still spends.
+  await pool.query('INSERT INTO hosted_allowances ("workspaceId",remaining) VALUES ($1,1) ON CONFLICT ("workspaceId") DO UPDATE SET remaining=1',[workspace.id])
   let calls=0
   const server=createServer((_request,response)=>{
     calls++

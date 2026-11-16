@@ -2,7 +2,6 @@ import "server-only";
 import { pool } from "./db";
 import { ActionFailureError } from "./action-error";
 import { ExecutionSettings, executionWorkspace } from "./execution-settings";
-import { COORDINATOR_MODEL } from "./coordinator/model";
 import { botApiKeyChoice, usableApiKeys } from "./model-api-keys";
 import { apiKeyServesBotModel, resolveBotModelChoice } from "./bot-model-choice";
 import {
@@ -33,7 +32,9 @@ export async function freezeBotModel(
   const selected = savedKey ? undefined : await settings.botModel(settingsScope, scope.botId);
   const choice = await resolveBotModelChoice(pool, settings, settingsScope, scope.botId,
     { selected, key: keyChoice }, { keys });
-  if (choice.kind === "hosted") return { harness: "ai_sdk", model: COORDINATOR_MODEL };
+  if (choice.kind === "hosted") return { harness: "ai_sdk", model: choice.model };
+  // Nothing chosen and nothing to fall back to: the chat asks for a model first (decision 2026-11-15-1900).
+  if (choice.kind === "none") throw new ActionFailureError("executionModelUnknown");
   if (choice.kind === "apiKey")
     return {
       harness: "ai_sdk",

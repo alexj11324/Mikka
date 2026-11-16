@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { test } from 'node:test'
-import { dbUrl, seedUser, seedWorkspace, useUpFreeMessages } from './support/workspace-admin-db'
+import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
 // Subscription chats answer only on validated routes (lib/subscription-routes.ts); these tests run with both on.
 process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
 
@@ -78,9 +78,9 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
 
   await t.test('an explicitly sponsored cloud uses the selected active subscription without an E2B key or catalogue', async () => {
     const scope = {...await person('sponsored-dispatch'), botId:null}
-    const previous = {cohort: process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES, token: process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN}
+    const previous = {cohort: process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED, token: process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN}
     try {
-      process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES = scope.workspaceId
+      delete process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED
       process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN = 'synthetic-test-only'
       for (const [provider, harness, model] of [
         ['claude','claude_code','claude-haiku-5-5'], ['codex','codex','gpt-6-luna'],
@@ -97,8 +97,8 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
         assert.equal((await resolve()).kind,'none')
       }
     } finally {
-      if (previous.cohort === undefined) delete process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES
-      else process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES = previous.cohort
+      if (previous.cohort === undefined) delete process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED
+      else process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED = previous.cohort
       if (previous.token === undefined) delete process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN
       else process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN = previous.token
     }
@@ -240,47 +240,43 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     await assert.rejects(order.checkOrderQuota(pool, scope, foreign, async () => { throw new Error('foreign retry reached quota probe') }), { code: 'executionAccountUnavailable' })
   })
 
-  await t.test('an untouched routing list keeps its default prefix and includes the same credentials\' reported models; nothing is stored', async () => {
+  await t.test('an untouched list is each Agent\'s default, with no extra models, whatever the old routing column says; nothing is stored', async () => {
     const scope = await person('order-default')
     const claude = await subscribe(scope, 'claude', ['acct-sonnet-a', 'acct-opus-a'])
     await subscribe(scope, 'codex', ['acct-codex-top', 'acct-codex-next'])
     const view = await order.orderView(pool, scope)
     assert.equal(view.customized, false)
-    assert.deepEqual(view.entries.map(entry => [entry.harness, entry.model]), [['claude_code', 'acct-opus-a'], ['codex', 'acct-codex-top'], ['claude_code', 'acct-sonnet-a'], ['codex', 'acct-codex-next']])
+    // Decision 2026-11-15-1630: no lighter models are added for automatic routing.
+    assert.deepEqual(view.entries.map(entry => [entry.harness, entry.model]), [['claude_code', 'acct-opus-a'], ['codex', 'acct-codex-top']])
     assert.deepEqual(view.entries[0].source, { kind: 'subscription', connectionId: claude })
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM model_order_entries WHERE "ownerId"=$1', [scope.ownerId])).rows[0].n, 0)
     assert.equal(view.candidates.length, 4)
-    await order.changeOrder(pool, scope, { kind: 'autoRouting', enabled: false })
-    assert.deepEqual((await order.readOrder(pool, scope)).entries.map(entry => [entry.harness, entry.model]), [['claude_code', 'acct-opus-a'], ['codex', 'acct-codex-top']], 'off restores each Agent\'s default list')
-    await order.changeOrder(pool, scope, { kind: 'autoRouting', enabled: true })
-    assert.deepEqual((await order.readOrder(pool, scope)).entries, view.entries.map(({ id, harness, model, source }) => ({ id, harness, model, source })), 'on restores the same expanded entries and IDs')
+    for (const enabled of [false, true]) {
+      await order.changeOrder(pool, scope, { kind: 'autoRouting', enabled })
+      assert.deepEqual((await order.readOrder(pool, scope)).entries, view.entries.map(({ id, harness, model, source }) => ({ id, harness, model, source })), 'the retired switch changes nothing')
+    }
     // Each Agent still gets its own default when Claude reports no Opus model.
     const noOpus = await person('order-default-per-agent')
     await subscribe(noOpus, 'claude', ['acct-sonnet-only', 'acct-haiku-only'])
     await subscribe(noOpus, 'codex', ['acct-codex-only'])
-    assert.deepEqual((await order.readOrder(pool, noOpus)).entries.map(entry => [entry.harness, entry.model]), [['claude_code', 'acct-sonnet-only'], ['codex', 'acct-codex-only'], ['claude_code', 'acct-haiku-only']])
-    await order.changeOrder(pool, noOpus, { kind: 'autoRouting', enabled: false })
     assert.deepEqual((await order.readOrder(pool, noOpus)).entries.map(entry => [entry.harness, entry.model]), [['claude_code', 'acct-sonnet-only'], ['codex', 'acct-codex-only']])
     // Only a ChatGPT subscription: its Codex model.
     const chatgptOnly = await person('order-default-chatgpt')
     await subscribe(chatgptOnly, 'codex', ['acct-codex-top', 'acct-codex-next'])
-    assert.deepEqual((await order.orderView(pool, chatgptOnly)).entries.map(entry => [entry.harness, entry.model]), [['codex', 'acct-codex-top'], ['codex', 'acct-codex-next']])
+    assert.deepEqual((await order.orderView(pool, chatgptOnly)).entries.map(entry => [entry.harness, entry.model]), [['codex', 'acct-codex-top']])
     // Only a DeepSeek key: DeepSeek's first reported model, on the key.
     const deepseekOnly = await person('order-default-deepseek')
     const key = await keys.addApiKey(pool, deepseekOnly.ownerId, { provider: 'deepseek', apiKey: `sk-${randomBytes(12).toString('hex')}` }, { fetch: (async () => Response.json({ data: [{ id: 'key-deepseek-first' }, { id: 'key-deepseek-second' }] })) as unknown as typeof fetch })
     const deepseekView = await order.orderView(pool, deepseekOnly)
-    assert.deepEqual(deepseekView.entries.map(entry => [entry.model, entry.source]), [['key-deepseek-first', { kind: 'api_key', keyId: key.id }], ['key-deepseek-second', { kind: 'api_key', keyId: key.id }]])
+    assert.deepEqual(deepseekView.entries.map(entry => [entry.model, entry.source]), [['key-deepseek-first', { kind: 'api_key', keyId: key.id }]])
   })
 
   await t.test('no points for Mikka 默认: the next allowed model a chat can run on, in the person\'s order', async () => {
     const { hostedPointsRefusal, pointsFallback, hostedPointsHere } = await import('../lib/points-fallback')
     const scope = await person('order-points')
-    // A new workspace with nothing bought or verified: its free messages first (TRIAL_MESSAGES), then refused for points.
-    assert.equal(await hostedPointsRefusal(scope.workspaceId), null)
-    assert.deepEqual(await hostedPointsHere(scope.workspaceId), { points: 0, trialLeft: 20 }, 'the menu lists Mikka 默认 with its free messages')
-    await useUpFreeMessages(pool, scope.workspaceId, scope.ownerId)
-    assert.equal(await hostedPointsRefusal(scope.workspaceId), 'verification_required')
-    assert.deepEqual(await hostedPointsHere(scope.workspaceId), { points: 0, trialLeft: 0 }, 'the menu leaves Mikka 默认 out')
+    // A new workspace with nothing bought: no trial (decision 2026-11-15-1900), refused for points at once.
+    assert.equal(await hostedPointsRefusal(scope.workspaceId), 'points_exhausted')
+    assert.deepEqual(await hostedPointsHere(scope.workspaceId), { points: 0 }, 'nothing to spend on Mikka 额度')
     assert.equal(await pointsFallback(pool, scope), null, 'nothing else to run on')
     const claude = await subscribe(scope, 'claude', ['acct-opus-p'])
     const key = await keys.addApiKey(pool, scope.ownerId, { provider: 'deepseek', apiKey: `sk-${randomBytes(12).toString('hex')}` }, { fetch: (async () => Response.json({ data: [{ id: 'key-deepseek-p' }] })) as unknown as typeof fetch })
@@ -299,7 +295,7 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     // Points bought: Mikka 默认 runs, no fallback asked for.
     await pool.query(`INSERT INTO workspace_credit_grants (id,"workspaceId",bucket,points,reason,"externalId") VALUES ($1,$2,'purchased',100,'pack',$3)`, [randomUUID(), scope.workspaceId, `points-${randomUUID()}`])
     assert.equal(await hostedPointsRefusal(scope.workspaceId), null)
-    assert.deepEqual(await hostedPointsHere(scope.workspaceId), { points: 100, trialLeft: 0 }, 'the menu shows what this workspace can spend')
+    assert.deepEqual(await hostedPointsHere(scope.workspaceId), { points: 100 }, 'the menu shows what this workspace can spend')
   })
 
   await t.test('edits: the first change stores what was shown; adds must be candidates; reorder, remove and 运行位置 save', async () => {
@@ -676,7 +672,7 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     // An untouched list follows the preferred Agent at read time: Codex has the DeepSeek model now.
     await order.changeOrder(pool, scope, { kind: 'preferred', harness: 'codex' })
     view = await order.orderView(pool, scope)
-    assert.deepEqual([view.preferredHarness, view.customized, view.entries.map(entry => [entry.model, entry.harness])], ['codex', false, [['acct-opus-p', 'claude_code'], ['ds-a', 'codex'], ['ds-b', 'codex']]])
+    assert.deepEqual([view.preferredHarness, view.customized, view.entries.map(entry => [entry.model, entry.harness])], ['codex', false, [['acct-opus-p', 'claude_code'], ['ds-a', 'codex']]])
     // A stored list: each Agent keeps its own rows; switching 优先使用的 Agent moves none (decision 2026-11-05-0400).
     await order.changeOrder(pool, scope, { kind: 'add', entries: [{ harness: 'codex', model: 'ds-b', source: key }] })
     await order.changeOrder(pool, scope, { kind: 'preferred', harness: 'claude_code' })
@@ -703,4 +699,24 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     const run = await resolveModelDispatch(pool, { ...scope, botId: null })
     assert.deepEqual(run.kind === 'device' && [run.entry.model, run.entry.harness, run.entry.source], ['ds-a', 'codex', key])
   })
+
+  await t.test('a catalogue model no credential offers runs on Mikka 额度; a model a credential offers keeps that credential', async () => {
+    const scope = { ...await person('credits-dispatch'), botId: null }
+    await device(scope.ownerId, [{ harness: 'claude_code', installed: true }, { harness: 'codex', installed: true }], true, { name: 'both' })
+    // Nothing connected: a catalogue model still has somewhere to run, on Mikka 额度 (decision 2026-11-15-2000).
+    const run = await resolveModelDispatch(pool, scope, { harness: 'claude_code', model: 'deepseek/deepseek-v4-pro' }, 'local')
+    assert.equal(run.kind, 'device')
+    assert.deepEqual(run.kind === 'device' && [run.entry.harness, run.entry.model, run.entry.source], ['claude_code', 'deepseek/deepseek-v4-pro', { kind: 'credits' }])
+    assert.equal(run.kind === 'device' && run.subscriptionBindingId, undefined, 'Mikka 额度 binds no subscription')
+    const { modelNotAllowed } = await import('../lib/model-dispatch')
+    assert.equal(await modelNotAllowed(pool as never, scope, { harness: 'codex', model: 'openai/gpt-6-sol' }), null, 'any catalogue model is allowed')
+    // A bare model id is not a catalogue model: still only what a credential offers.
+    const bare = await resolveModelDispatch(pool, scope, { harness: 'claude_code', model: 'deepseek-v4-pro' }, 'local')
+    assert.deepEqual(bare.kind === 'none' && bare.reason, 'notOffered')
+    // A subscription that lists the same model id keeps that credential instead.
+    await subscribe(scope, 'claude', ['anthropic/claude-sonnet-5.5'])
+    const sub = await resolveModelDispatch(pool, scope, { harness: 'claude_code', model: 'anthropic/claude-sonnet-5.5' }, 'local')
+    assert.equal(sub.kind === 'device' && sub.entry.source.kind, 'subscription')
+  })
+
 })

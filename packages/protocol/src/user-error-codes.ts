@@ -154,6 +154,7 @@ export const USER_ERROR_CODES = {
     "adapter_start_failed",
     "cleanup_failed",
   ],
+  cloud_machine_unfunded: [],
 } as const satisfies Record<string, readonly string[]>
 
 export type UserErrorCode = keyof typeof USER_ERROR_CODES

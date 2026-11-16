@@ -131,14 +131,14 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     const binding = await (await import('./native-run-binding')).nativeRunBinding(client, actor.userId, input.agentId, target.harness, actor.workspaceId, input.subscriptionBindingId)
     if (input.subscriptionBindingId && (!binding || model !== binding.modelId)) throw new ComputerError(409, 'Bot subscription unavailable')
     const runBotId = input.withoutBot ? null : input.botId
-    const { subscription, apiKey } = input.apiKey ? { subscription: null, apiKey: input.apiKey } : await runCredentialSource(client, { ownerId: actor.userId, botId: runBotId, harness: target.harness, model, keyId: input.apiKeyId,
+    const { subscription, apiKey, credits } = input.apiKey ? { subscription: null, apiKey: input.apiKey, credits: undefined } : await runCredentialSource(client, { ownerId: actor.userId, botId: runBotId, harness: target.harness, model, keyId: input.apiKeyId,
       botWorkspaceId: runBotId ? actor.workspaceId : null, choiceWorkspaceId: actor.workspaceId, subscription: binding })
     // A key selected before runtime preparation can be withdrawn during wake.
     if (input.apiKeyId && apiKey?.keyId !== input.apiKeyId) throw new ComputerError(409, 'Bot subscription unavailable')
-    if (!subscription && !apiKey) throw new ComputerError(409,'Bot subscription unavailable')
+    if (!subscription && !apiKey && !credits) throw new ComputerError(409,'Bot subscription unavailable')
     // The hosted runner starts a subscription run only on that subscription's own model: a different one is refused here, not at startup.
     if (subscription && subscription.modelId !== model) throw new ComputerError(409, 'Bot subscription unavailable')
-    const frozen = freezeWorkerDefinition({ harness:target.harness,instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,apiKey,model,modelDispatch:input.modelDispatch,agentProfile:input.agentProfile,policyCeiling:input.policyCeiling,allowLocalRecovery,mailboxEnabled:personalMailboxEnabled(),mailboxScope:{botId:runBotId,workspaceId:actor.workspaceId},readOnly:input.readOnly })
+    const frozen = freezeWorkerDefinition({ harness:target.harness,instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,apiKey,credits,model,modelDispatch:input.modelDispatch,agentProfile:input.agentProfile,policyCeiling:input.policyCeiling,allowLocalRecovery,mailboxEnabled:personalMailboxEnabled(),mailboxScope:{botId:runBotId,workspaceId:actor.workspaceId},readOnly:input.readOnly })
     const sourceId = input.frozenSourceRunId ?? input.threadRunId
     const prior = sourceId ? (await client.query('select "agentDefinition","baseBranch" from agent_runs where id=$1 and "userId"=$2 and "workspaceId"=$3 and "issueId"=$4 FOR SHARE', [sourceId, actor.userId, actor.workspaceId, input.issueId])).rows[0] : undefined
     if (sourceId && !prior) throw new ComputerError(409, 'Original task execution is unavailable')

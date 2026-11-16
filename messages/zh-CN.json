@@ -3044,12 +3044,12 @@
       "loading": "正在加载计费",
       "loadFailed": "读不到计费信息",
       "plan": "方案",
-      "team": "Team",
+      "team": "Mikka Pro",
       "free": "免费",
-      "noPlan": "未订阅",
+      "noPlan": "Mikka Pro $20/月 · 每月 $20 Mikka 额度",
       "renews": "下次扣款 {date}",
-      "changePlan": "更改方案",
-      "subscribe": "订阅 Team",
+      "changePlan": "管理套餐",
+      "subscribe": "订阅 Mikka Pro",
       "seats": "席位",
       "seatsUsed": "已用 {used} / {total}",
       "legacySubscription": "这是历史订阅。在你明确更改或取消前，Stripe 原有的计费条款继续有效。",
@@ -3150,7 +3150,13 @@
       "protocolAgents": "{protocols} 协议 · 可用 {agents}",
       "customAgents": "选了协议才知道能用哪个 Agent",
       "noResponsesApi": "{protocol} 协议 · 不支持 Responses API · Codex 用不了",
-      "afterQuotaSection": "额度用完时"
+      "afterQuotaSection": "额度用完时",
+      "features": {
+        "strict": "严格工具格式",
+        "customTools": "自定义工具",
+        "fallbacks": "备用路由",
+        "thinking": "思考"
+      }
     },
     "modelOrder": {
       "fallbackNeedsKey": "需先添加 API 密钥并连接订阅。",
@@ -3256,7 +3262,6 @@
       "openApiKey": "查看 API Key",
       "openSubscription": "查看订阅",
       "description": "派发给 Agent 的任务从这里选模型",
-      "autoRouting": "按任务难度自动选模型",
       "e2bKeyHint": "云端跑任务用",
       "emptyUseOther": "{agent} 没有能用的模型，任务会交给 {other}",
       "switchAgent": "改用 {agent}",
@@ -3312,6 +3317,7 @@
       "empty": "没有自定义 Agent 配置",
       "automatic": "自动选择 Agent 配置",
       "automaticShort": "自动选择",
+      "none": "不用 Agent 配置",
       "newTab": "（新标签页）",
       "unavailableNamed": "{name} · 已不可用",
       "taskProfile": "Agent 配置",
@@ -3326,7 +3332,7 @@
       "skillUnavailable": "所选 Skill 已不可用",
       "removedSkill": "已移除的 Skill",
       "limitReached": "已达到 100 个 Agent 配置上限",
-      "invalid": "检查名称、角色与模型来源",
+      "invalid": "检查名称",
       "profileMissing": "Agent 配置已归档或已删除",
       "accessChanged": "工作区访问权限已变更",
       "frozenProfile": "本次运行的 Agent 配置",
@@ -3472,7 +3478,7 @@
       "revoked": "授权已撤销",
       "billing": "额度来源",
       "personalBilling": "我的 Mikka 额度",
-      "defaultModel": "Mikka 默认（Mikka Cloud 额度）",
+      "defaultModel": "Mikka 额度上的模型（Mikka Cloud）",
       "topUp": "去 Mikka Cloud 充值",
       "teamBilling": "团队 Mikka 额度",
       "services": "服务",
@@ -4016,13 +4022,9 @@
       "retryLoad": "模型加载失败，重试",
       "label": "模型：{name}",
       "labelUnavailable": "模型：{name}，不可用",
-      "hosted": "Mikka 默认",
-      "credits": "点数",
       "cloudCredits": "Mikka Cloud 额度",
       "ownProvider": "自带服务商",
-      "points": "{points} 点",
-      "trialLeft": "剩 {count} 条免费",
-      "hostedUnavailable": "Mikka 默认在这个工作区不可用",
+      "hostedUnavailable": "Mikka 额度在这个工作区不可用",
       "changeModel": "换模型",
       "useMyPoints": "把我的点数用于这个团队",
       "apiKey": "API Key",
@@ -4037,7 +4039,22 @@
       "refreshFailed": "刷新失败，重试",
       "nextMessage": "下一条",
       "fallback": "自动改用",
-      "checking": "待检查"
+      "checking": "待检查",
+      "choose": "选择模型",
+      "creditsGroup": "Mikka 额度",
+      "search": "搜索模型",
+      "noMatch": "没有匹配的模型",
+      "source": {
+        "subscription": "用你的 {service} 订阅",
+        "sharedSubscription": "用 {name} 共享的 {service} 订阅",
+        "apiKey": "用 {vendor} API Key（尾号 {last4}），不扣 Mikka 额度",
+        "apiKeyPlain": "用 {vendor} API Key，不扣 Mikka 额度",
+        "sharedKey": "用 {name} 共享的 {vendor} API Key，不扣 Mikka 额度",
+        "credits": "用 Mikka 额度，按厂商原价",
+        "ownProvider": "用这台服务器自带的服务商",
+        "usedUntil": "{service} 订阅到 {time} 前用完了",
+        "usedUp": "{service} 订阅额度用完了"
+      }
     },
     "empty": "告诉 {name} 你要做什么",
     "starters": {
@@ -4722,8 +4739,8 @@
       "costModelSubscription": "模型费用由{owner} {provider} 订阅承担",
       "costModelApiKey": "模型费用由{owner} {provider} API key 承担",
       "costModelLogin": "模型用电脑上已登录的 Agent 账号运行",
-      "sponsoredCloudflare": "Mikka 付费的 Cloudflare 任务机器",
-      "costRuntimeCloudflare": "此任务的 Cloudflare 机器费用由 Mikka 支付",
+      "sponsoredCloudflare": "Cloudflare 编程机器 · Mikka 额度",
+      "costRuntimeCloudflare": "此任务的 Cloudflare 机器按 ${price}/小时从 Mikka 额度扣除",
       "costRuntimeE2b": "云电脑费用由{owner} E2B 账号承担",
       "costRuntimeDevice": "电脑是{owner} {device}",
       "costMikkaFree": "Mikka 不收费",
@@ -5212,7 +5229,7 @@
       "backlogTitlePlaceholder": "标题（可选，默认为首行）",
       "createOnly": "仅创建",
       "createAndDispatch": "创建并派发",
-      "sponsoredCloud": "Cloudflare 编程机器 · Mikka 付费",
+      "sponsoredCloud": "Cloudflare 编程机器 · ${price}/小时",
       "title": "新建任务",
       "description": "用一句话描述要做的事，会自动建好任务。",
       "label": "任务描述",
@@ -5866,6 +5883,15 @@
     }
   },
   "Billing": {
+    "paywall": {
+      "title": "选择套餐",
+      "caption": "套餐每月包含用量，随时可换",
+      "plan": "Mikka Pro",
+      "price": "$20/月 · 每月 $20 Mikka 额度",
+      "subscribe": "订阅",
+      "member": "请管理员选择套餐或充值",
+      "openBilling": "打开计费"
+    },
     "management": {
       "scope": "计费范围",
       "workspaceScope": "工作区",
@@ -5989,24 +6015,23 @@
       }
     },
     "refusal": {
-      "verificationRequiredPlain": "使用 Mikka 默认模型前需要验证银行卡",
-      "branded": "Mikka 默认{reason}",
-      "verification_required": "使用 <model><mark></mark> Mikka 默认模型</model>前需要验证银行卡",
-      "free_allowance_used": "免费额度已用完",
-      "points_exhausted": "点数已用完",
-      "platform_paused": "免费额度暂时停用",
+      "verificationRequiredPlain": "Mikka 额度已用完",
+      "verification_required": "Mikka 额度已用完",
+      "free_allowance_used": "Mikka 额度已用完",
+      "points_exhausted": "Mikka 额度已用完",
+      "platform_paused": "Mikka 额度暂时不可用",
       "usage_budget_exhausted": "用量预算已达到上限，请联系管理员查看预算。",
       "billing_authorization_revoked": "付款授权已变更，请选择获授权的计费账户后继续。",
-      "unavailable": "Mikka 默认暂时不可用",
-      "trialUsed": "免费线程已用完",
+      "unavailable": "暂时不可用",
       "bindSubscription": "绑定订阅",
       "topUp": "充值",
-      "verifyCard": "验证银行卡",
-      "teamNoPoints": "这个团队没有可用点数",
+      "teamNoPoints": "这个团队的 Mikka 额度已用完",
       "useMyPoints": "把我的点数用于这个团队",
       "openBilling": "打开计费",
       "useSubscription": "改用我的 {name} 订阅",
-      "connect": "连接 <claude></claude> Claude / <openai></openai> ChatGPT 订阅"
+      "connect": "连接 <claude></claude> Claude / <openai></openai> ChatGPT 订阅",
+      "choosePlan": "选择套餐",
+      "askAdmin": "请管理员充值"
     }
   },
   "BeUi": {
@@ -6163,6 +6188,7 @@
     "chatUnavailable": "这个 Bot 的聊天模型使用其所有者的个人配置，当前消息无法代用该授权。请使用你自己的 Bot，或请其所有者发起这次聊天；任务委派会另行检查你自己的执行资源。"
   },
   "RunErrors": {
+    "cloud_machine_unfunded": {"default":"额度不足，无法继续使用云端机器"},
     "review_auth_required": {"default":"请登录后审阅任务。"},
     "review_not_found": {"default":"任务审阅不可用。"},
     "not_owner_terminal": {"default":"只有任务负责人可以使用终端。"},
@@ -7432,6 +7458,12 @@
     }
   },
   "HostedOnboarding": {
+    "detected": {
+      "claude": "已检测到：这台电脑的 Claude Code 已登录",
+      "claudePlan": "已检测到：这台电脑的 Claude Code 已登录 {plan}",
+      "codex": "已检测到：这台电脑的 Codex 已用 ChatGPT 登录",
+      "codexPlan": "已检测到：这台电脑的 Codex 已用 ChatGPT {plan} 登录"
+    },
     "loading": "正在准备引导",
     "root": "Mikka",
     "page": "开始使用",
@@ -7443,7 +7475,7 @@
     "kicker": "开始使用",
     "doneKicker": "准备好了",
     "title": "设置 Mikka",
-    "sub": "四步设置好工作区和你的第一个 Bot。",
+    "sub": "四步设置好工作区、模型和套餐。",
     "doneSub": "工作区已经准备好。",
     "checklist": "设置清单",
     "count": "已完成 {done}/{total}",
@@ -7462,47 +7494,61 @@
     "emailInvalid": "「{text}」不是邮箱地址。",
     "roleMember": "成员",
     "roleAdmin": "管理员",
-    "alone": "个人工作区只有你一个人。要和别人一起用，在设置里新建团队工作区。",
-    "justYou": "只有你",
-    "createBot": "创建 Bot",
     "sendInvites": "发送邀请",
     "connectedCount": "已连接 {count} 项",
     "invitedCount": "已邀请 {count} 人",
-    "doneTitle": "{name} 准备好了",
-    "botNameNeeded": "给 Bot 起个名字再继续。",
+    "doneTitle": "准备好了",
     "claudeText": "用你的 Claude 订阅运行 Claude Code",
     "codexText": "用你的 ChatGPT 订阅运行 Codex",
     "computer": "云电脑",
     "computerText": "填上 E2B Key 后，Bot 能浏览网页，线程也能在云端运行",
-    "nextTask": "给 {name} 第一个任务",
-    "nextTaskText": "打开线程，说说要做什么。",
+    "nextTask": "交第一件事",
+    "nextTaskText": "写下要做的事，Mikka 派给 Agent。",
     "nextSubscription": "绑定订阅",
-    "nextSubscriptionText": "Claude 或 ChatGPT 订阅，在设置 › 模型与订阅。",
+    "nextSubscriptionText": "Claude、ChatGPT 订阅或 API Key，在设置 › 模型与订阅。",
     "nextComputer": "开通云电脑",
     "nextComputerText": "填上 E2B Key，在设置 › 密钥与环境。",
     "workspace": {
       "title": "工作区",
       "heading": "设置工作区",
-      "text": "起一个名字和地址，团队一看就认得。",
+      "text": "起一个名字和地址，再告诉大家怎么称呼你。",
       "time": "约 1 分钟"
     },
-    "connect": {
-      "title": "连接",
-      "heading": "连接订阅、云电脑和应用",
-      "text": "Bot 用你的订阅干活，在连接的应用里读取和办事。之后随时可以改。",
-      "time": "约 2 分钟"
+    "personLabel": "你的名字",
+    "finish": "完成",
+    "enter": "开始使用",
+    "doneText": "交给 Mikka 第一件事吧。",
+    "model": {
+      "title": "模型",
+      "heading": "选择模型",
+      "text": "用你已经付费的订阅或 Key，或者先用 Mikka 额度。之后随时可以换。",
+      "time": "约 1 分钟",
+      "apiKey": "API Key",
+      "apiKeyText": "DeepSeek、Kimi 或任何兼容的服务，在设置里添加",
+      "pick": "Coordinator 用的模型",
+      "needed": "选一个模型再继续。"
     },
-    "team": {
-      "title": "邀请团队",
-      "heading": "邀请团队",
-      "text": "一起用线程、任务和 Bot。他们会收到邮件邀请。",
-      "time": "不到 1 分钟"
+    "recommended": {
+      "title": "推荐",
+      "heading": "值得打开的几项",
+      "text": "都是可选的，之后都能在设置里打开。",
+      "time": "约 1 分钟",
+      "thisComputer": "这台电脑",
+      "thisComputerText": "在你自己的文件夹里跑线程",
+      "linear": "Linear",
+      "linearText": "在 Linear 里把 Issue 交给 Mikka"
     },
-    "bot": {
-      "title": "第一个 Bot",
-      "heading": "创建你的第一个 Bot",
-      "text": "给它起个名字，选个外观。",
-      "time": "约 1 分钟"
+    "plan": {
+      "title": "套餐",
+      "heading": "选择套餐",
+      "text": "套餐每月包含用量，随时可换。",
+      "time": "不到 1 分钟",
+      "name": "Mikka Pro",
+      "price": "$20/月",
+      "credits": "每月 $20 Mikka 额度，按厂商原价付模型",
+      "machines": "Cloudflare 云端机器，按小时从额度里扣",
+      "models": "网关上的全部模型，不用自己带 Key",
+      "subscribe": "订阅"
     }
   },
   "HostedPermissions": {
@@ -8127,6 +8173,24 @@
       "message": "频道新消息",
       "mention": "提到 Mikka",
       "reaction_added": "加了表情回应"
+    }
+  },
+  "SetupChecklist": {
+    "title": "设置清单",
+    "left": "还剩 {count} 项",
+    "hide": "隐藏设置清单",
+    "items": {
+      "task": "交第一件事",
+      "model": "绑订阅或 Key",
+      "device": "连这台电脑",
+      "app": "连一个应用",
+      "invite": "邀请成员"
+    },
+    "actions": {
+      "model": "去绑定",
+      "device": "去连接",
+      "app": "去连接",
+      "invite": "去邀请"
     }
   }
 }

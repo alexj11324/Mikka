@@ -19,6 +19,8 @@ test('eve scheduled turns retain the persisted read-only authority and original 
     await pool.query(`INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,$2,'Eve schedule test')`, [workspaceId, ownerId])
     await pool.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES($1,$2,'Owner',$3,'admin')`, [workspaceId, ownerId, `${ownerId}@example.invalid`])
     await pool.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,'Eve schedule test')`, [botId, ownerId, workspaceId])
+    // A chat runs only on a model the person chose (no 「Mikka 默认」, decision 2026-11-15-1900).
+    await pool.query(`INSERT INTO bot_model_choices("ownerId","workspaceId","botKey","creditsModel") VALUES($1,$2,$3,'deepseek/deepseek-v4.1-flash')`, [ownerId, workspaceId, botId])
     await pool.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload,tier) VALUES($1,$2,$3,'run_report',$5,$4,'attention')`, [eventId, ownerId, botId, { source: 'schedule_due', allowedActions: ['dispatch_run'], text: 'Forged payload is not authority' }, eventId])
     await pool.query(`INSERT INTO user_schedules(id,owner_id,workspace_id,bot_id,source_event_id,request_id,definition,request_definition,status) VALUES($1,$2,$3,$4,$5,$7,$6,$6,'active')`, [scheduleId, ownerId, workspaceId, botId, eventId, definition, scheduleId])
     await pool.query(`INSERT INTO schedule_occurrences(id,schedule_id,version,due_at,definition,status,execution_decision,operation_id,event_id,attempts,next_retry_at,lease_token,lease_until) VALUES($1,$2,1,now(),$3,'running','execute',$4,$5,1,now(),$6,now()+interval '5 minutes')`, [occurrenceId, scheduleId, definition, randomUUID(), eventId, leaseToken])

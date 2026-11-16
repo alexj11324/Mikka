@@ -1,6 +1,6 @@
 import { Button, HStack, Host, Image, Menu, Section, Text, Toggle } from '@expo/ui/swift-ui'
 import { buttonStyle, controlSize, disabled, tint } from '@expo/ui/swift-ui/modifiers'
-import { groupTag, groupTitle, modelMenuLabel, modelMenuReadLabel, optionName, type ModelMenuControls } from '@/lib/model-menu'
+import { groupTag, groupTitle, modelMenuLabel, modelMenuReadLabel, shownOptions, optionName, type ModelMenuControls } from '@/lib/model-menu'
 import { colors } from '@/lib/theme'
 import { mobileMessages as copy } from '@/lib/messages'
 
@@ -24,7 +24,7 @@ export function ModelMenu({ model, running = false, label: override }: { model: 
       <Menu label={<HStack spacing={3}><Text>{label}</Text><Image systemName="chevron.down" size={10} /></HStack>} modifiers={[buttonStyle('borderless'), controlSize('small'), disabled(busy), tint(override ? colors.accent : unavailable ? colors.secondary : colors.ink)]}>
         {groups.map((group, index) => (
           <Section key={`${group.kind}-${index}`} title={groupTitle(group)}>
-            {group.options.map(option => {
+            {shownOptions(group, current.id).map(option => {
               const tag = groupTag(group)
               return (
                 <Toggle key={option.id} isOn={current.id === option.id} onIsOnChange={() => { void choose(option.id) }}>

@@ -10,7 +10,6 @@ import { SettingRow, SettingsSaveError, SettingsSection, settingsSectionAction }
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { FieldError, FieldLegend, FieldSet } from '@/components/ui/field'
@@ -95,10 +94,6 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
           <ToggleGroupItem value="claude_code">{harnessName('claude_code')}</ToggleGroupItem>
           <ToggleGroupItem value="codex">{harnessName('codex')}</ToggleGroupItem>
         </ToggleGroup>
-      </SettingRow>
-      <SettingRow title={t('autoRouting')}>
-        <Switch aria-label={t('autoRouting')} checked={data.autoModelRouting} disabled={pending}
-          onCheckedChange={enabled => { void save({ kind: 'autoRouting', enabled }, { ...data, autoModelRouting: enabled }) }} />
       </SettingRow>
       {shown.length === 0
         ? <div className="flex flex-col items-center gap-3 px-5 py-7">

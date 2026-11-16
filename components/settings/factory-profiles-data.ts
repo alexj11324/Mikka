@@ -28,15 +28,15 @@ export type AgentProfilesView = {
   defaultAvailability?: ProfileAvailability
 }
 
-/** A pending allowance check may be requested; only dispatch grants execution.
- * A missing read or a disabled/archived role never becomes selectable this way. */
+/** An Agent 配置 is selectable when it is enabled and its Skills are still
+ * authorized. A missing read or a disabled/archived one never becomes selectable. */
 export function taskProfileSelectable(value: string | null | undefined, data?: AgentProfilesView): boolean {
-  if (!value) return true
+  // No Agent 配置, or a draft saved with the retired Default choice, is always allowed.
+  if (!value || value === BUILTIN_AGENT_PROFILE_ID) return true
   if (!data) return false
-  const builtin = value === BUILTIN_AGENT_PROFILE_ID
-  const profile = builtin ? undefined : data.profiles.find(item => item.id === value)
-  if (!builtin && (!profile?.enabled || profile.archivedAt)) return false
-  const availability = builtin ? data.defaultAvailability : data.availability[value]
+  const profile = data.profiles.find(item => item.id === value)
+  if (!profile?.enabled || profile.archivedAt) return false
+  const availability = data.availability[value]
   return availability?.available === true || availability?.reason === 'checking'
 }
 

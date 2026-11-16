@@ -3044,12 +3044,12 @@
       "loading": "Loading billing",
       "loadFailed": "Couldn’t load billing",
       "plan": "Plan",
-      "team": "Team",
+      "team": "Mikka Pro",
       "free": "Free",
-      "noPlan": "No subscription",
+      "noPlan": "Mikka Pro $20/mo · $20 of Mikka credits every month",
       "renews": "Next charge {date}",
-      "changePlan": "Change plan",
-      "subscribe": "Subscribe to Team",
+      "changePlan": "Manage plan",
+      "subscribe": "Subscribe to Mikka Pro",
       "seats": "Seats",
       "seatsUsed": "{used} of {total} used",
       "legacySubscription": "This is a historical subscription. Its existing Stripe billing terms remain in effect until you explicitly change or cancel it.",
@@ -3150,7 +3150,13 @@
       "protocolAgents": "{protocols} protocol · runs on {agents}",
       "customAgents": "Pick a protocol to see which Agent runs it",
       "noResponsesApi": "{protocol} protocol · No Responses API · Codex can't use it",
-      "afterQuotaSection": "When quota runs out"
+      "afterQuotaSection": "When quota runs out",
+      "features": {
+        "strict": "Strict tools",
+        "customTools": "Custom tools",
+        "fallbacks": "Fallbacks",
+        "thinking": "Thinking"
+      }
     },
     "modelOrder": {
       "fallbackNeedsKey": "Add an API key and connect a subscription to use this.",
@@ -3256,7 +3262,6 @@
       "openApiKey": "Open API key",
       "openSubscription": "Open subscription",
       "description": "Tasks dispatched to an Agent choose from these models",
-      "autoRouting": "Choose models automatically by task difficulty",
       "e2bKeyHint": "For cloud tasks",
       "emptyUseOther": "{agent} has no models it can use; tasks go to {other}",
       "switchAgent": "Use {agent}",
@@ -3312,6 +3317,7 @@
       "empty": "No custom agent profiles",
       "automatic": "Choose profile automatically",
       "automaticShort": "Automatic",
+      "none": "No agent profile",
       "newTab": " (new tab)",
       "unavailableNamed": "{name} · unavailable",
       "taskProfile": "Agent profile",
@@ -3326,7 +3332,7 @@
       "skillUnavailable": "A selected skill is no longer available",
       "removedSkill": "Removed skill",
       "limitReached": "The 100-profile limit has been reached",
-      "invalid": "Check the name, roles and model source",
+      "invalid": "Check the name",
       "profileMissing": "This profile has been archived or removed",
       "accessChanged": "Workspace access has changed",
       "frozenProfile": "Agent profile for this run",
@@ -3472,7 +3478,7 @@
       "revoked": "Authorization revoked",
       "billing": "Credits",
       "personalBilling": "My Mikka credits",
-      "defaultModel": "Mikka default (Mikka Cloud credits)",
+      "defaultModel": "Models on Mikka credits (Mikka Cloud)",
       "topUp": "Top up in Mikka Cloud",
       "teamBilling": "Team Mikka credits",
       "services": "Services",
@@ -4016,13 +4022,9 @@
       "retryLoad": "Couldn’t load models. Retry",
       "label": "Model: {name}",
       "labelUnavailable": "Model: {name}, unavailable",
-      "hosted": "Mikka Default",
-      "credits": "Credits",
       "cloudCredits": "Mikka Cloud credits",
       "ownProvider": "Own provider",
-      "points": "{points} points",
-      "trialLeft": "{count} free left",
-      "hostedUnavailable": "Mikka Default can’t run in this workspace",
+      "hostedUnavailable": "Mikka credits can’t run in this workspace",
       "changeModel": "Change model",
       "useMyPoints": "Use my points for this team",
       "apiKey": "API Key",
@@ -4037,7 +4039,22 @@
       "refreshFailed": "Refresh failed. Try again",
       "nextMessage": "Next message",
       "fallback": "Fallback",
-      "checking": "Checking"
+      "checking": "Checking",
+      "choose": "Choose a model",
+      "creditsGroup": "Mikka credits",
+      "search": "Search models",
+      "noMatch": "No matching models",
+      "source": {
+        "subscription": "Runs on your {service} subscription",
+        "sharedSubscription": "Runs on {name}'s {service} subscription",
+        "apiKey": "Runs on your {vendor} key (…{last4}), not charged",
+        "apiKeyPlain": "Runs on your {vendor} key, not charged",
+        "sharedKey": "Runs on {name}'s {vendor} key, not charged",
+        "credits": "Runs on Mikka credits at list price",
+        "ownProvider": "Runs on this server's own provider",
+        "usedUntil": "{service} subscription is used up until {time}",
+        "usedUp": "{service} subscription is used up"
+      }
     },
     "empty": "Tell {name} what you need",
     "starters": {
@@ -4722,8 +4739,8 @@
       "costModelSubscription": "{owner} {provider} subscription pays for the model",
       "costModelApiKey": "{owner} {provider} API key pays for the model",
       "costModelLogin": "The model runs on the Agent account signed in on the computer",
-      "sponsoredCloudflare": "Mikka-sponsored Cloudflare machine",
-      "costRuntimeCloudflare": "Mikka pays for this task’s Cloudflare machine",
+      "sponsoredCloudflare": "Cloudflare coding machine · Mikka credits",
+      "costRuntimeCloudflare": "This task’s Cloudflare machine is paid from Mikka credits at ${price}/hour",
       "costRuntimeE2b": "{owner} E2B account pays for the cloud computer",
       "costRuntimeDevice": "the computer is {owner} {device}",
       "costMikkaFree": "Mikka charges nothing",
@@ -5212,7 +5229,7 @@
       "backlogTitlePlaceholder": "Title (optional, defaults to the first line)",
       "createOnly": "Create only",
       "createAndDispatch": "Create and dispatch",
-      "sponsoredCloud": "Cloudflare coding machine · paid by Mikka",
+      "sponsoredCloud": "Cloudflare coding machine · ${price}/hour",
       "title": "New task",
       "description": "Describe what needs doing and the task is created for you.",
       "label": "Task description",
@@ -5866,6 +5883,15 @@
     }
   },
   "Billing": {
+    "paywall": {
+      "title": "Choose a plan",
+      "caption": "Plans include monthly usage, switch anytime",
+      "plan": "Mikka Pro",
+      "price": "$20/mo · $20 of Mikka credits every month",
+      "subscribe": "Subscribe",
+      "member": "Ask an admin to choose a plan or add credits",
+      "openBilling": "Open billing"
+    },
     "management": {
       "scope": "Billing scope",
       "workspaceScope": "Workspace",
@@ -5989,24 +6015,23 @@
       }
     },
     "refusal": {
-      "verificationRequiredPlain": "Mikka Default needs a verified card",
-      "branded": "Mikka Default: {reason}",
-      "verification_required": "<model><mark></mark> Mikka Default</model> needs a verified card",
-      "free_allowance_used": "Free allowance used up",
-      "points_exhausted": "Points used up",
-      "platform_paused": "Free allowance paused",
+      "verificationRequiredPlain": "Out of Mikka credits",
+      "verification_required": "Out of Mikka credits",
+      "free_allowance_used": "Out of Mikka credits",
+      "points_exhausted": "Out of Mikka credits",
+      "platform_paused": "Mikka credits are unavailable right now",
       "usage_budget_exhausted": "The spending budget has been reached. Ask an administrator to review the limit.",
       "billing_authorization_revoked": "The payment authorization has changed. Select an authorized billing account before continuing.",
-      "unavailable": "Mikka Default is unavailable",
-      "trialUsed": "Free messages used up",
+      "unavailable": "Unavailable right now",
       "bindSubscription": "Connect a subscription",
       "topUp": "Top up",
-      "verifyCard": "Verify card",
-      "teamNoPoints": "This team has no points to use",
+      "teamNoPoints": "This team is out of Mikka credits",
       "useMyPoints": "Use my points for this team",
       "openBilling": "Open billing",
       "useSubscription": "Use my {name} subscription",
-      "connect": "Connect <claude></claude> Claude / <openai></openai> ChatGPT subscription"
+      "connect": "Connect <claude></claude> Claude / <openai></openai> ChatGPT subscription",
+      "choosePlan": "Choose a plan",
+      "askAdmin": "Ask an admin to add credits"
     }
   },
   "BeUi": {
@@ -6163,6 +6188,7 @@
     "chatUnavailable": "This Bot uses its owner’s personal chat model settings, which this request cannot access. Use your own Bot or ask its owner to start this chat. Task delegation checks your own execution resources separately."
   },
   "RunErrors": {
+    "cloud_machine_unfunded": {"default":"Not enough Mikka credits to keep the cloud machine running"},
     "review_auth_required": {"default":"Sign in to review this task."},
     "review_not_found": {"default":"This task review is unavailable."},
     "not_owner_terminal": {"default":"Only the task owner can use this terminal."},
@@ -7432,6 +7458,12 @@
     }
   },
   "HostedOnboarding": {
+    "detected": {
+      "claude": "Detected: Claude Code is signed in on this computer",
+      "claudePlan": "Detected: Claude Code is signed in with {plan} on this computer",
+      "codex": "Detected: Codex is signed in with ChatGPT on this computer",
+      "codexPlan": "Detected: Codex is signed in with ChatGPT {plan} on this computer"
+    },
     "loading": "Getting the guide ready",
     "root": "Mikka",
     "page": "Getting started",
@@ -7443,7 +7475,7 @@
     "kicker": "Getting started",
     "doneKicker": "All set",
     "title": "Set up Mikka",
-    "sub": "Four steps for your workspace and your first Bot.",
+    "sub": "Four steps: your workspace, a model and a plan.",
     "doneSub": "Your workspace is ready.",
     "checklist": "Setup checklist",
     "count": "{done} of {total} done",
@@ -7462,47 +7494,61 @@
     "emailInvalid": "“{text}” isn't an email address.",
     "roleMember": "Member",
     "roleAdmin": "Admin",
-    "alone": "A personal workspace is just you. To work with others, create a team workspace in Settings.",
-    "justYou": "Just you",
-    "createBot": "Create Bot",
     "sendInvites": "Send invites",
     "connectedCount": "{count} connected",
     "invitedCount": "{count} invited",
-    "doneTitle": "{name} is ready",
-    "botNameNeeded": "Give your Bot a name to continue.",
+    "doneTitle": "You're all set",
     "claudeText": "Runs Claude Code on your Claude subscription",
     "codexText": "Runs Codex on your ChatGPT subscription",
     "computer": "Cloud computer",
     "computerText": "With an E2B key the Bot can browse and threads can run in the cloud",
-    "nextTask": "Give {name} its first task",
-    "nextTaskText": "Open the chat and say what to do.",
+    "nextTask": "Give the first task",
+    "nextTaskText": "Write what needs doing; Mikka hands it to an Agent.",
     "nextSubscription": "Add a subscription",
-    "nextSubscriptionText": "Claude or ChatGPT, in Settings › Models and subscriptions.",
+    "nextSubscriptionText": "A Claude or ChatGPT subscription or an API key, in Settings › Models and subscriptions.",
     "nextComputer": "Set up the cloud computer",
     "nextComputerText": "Add an E2B key in Settings › Secrets and environment.",
     "workspace": {
       "title": "Workspace",
       "heading": "Set up your workspace",
-      "text": "A name and an address your team will recognize.",
+      "text": "Give it a name and an address, and tell people what to call you.",
       "time": "About 1 min"
     },
-    "connect": {
-      "title": "Connect",
-      "heading": "Connect subscriptions, the cloud computer and apps",
-      "text": "Your Bot works on your subscriptions and reads and acts in the apps you connect. Change this anytime.",
-      "time": "About 2 min"
+    "personLabel": "Your name",
+    "finish": "Finish",
+    "enter": "Get started",
+    "doneText": "Give Mikka its first task.",
+    "model": {
+      "title": "Model",
+      "heading": "Pick a model",
+      "text": "Use a subscription or key you already pay for, or start on Mikka credits. You can change it anytime.",
+      "time": "About 1 min",
+      "apiKey": "API key",
+      "apiKeyText": "DeepSeek, Kimi or any compatible service, added in Settings",
+      "pick": "Model for the Coordinator",
+      "needed": "Pick a model to continue."
     },
-    "team": {
-      "title": "Invite your team",
-      "heading": "Invite your team",
-      "text": "Work together on chats, tasks and Bots. They'll get an email invite.",
-      "time": "Under a minute"
+    "recommended": {
+      "title": "Recommended",
+      "heading": "A few things worth turning on",
+      "text": "All optional, and all in Settings later.",
+      "time": "About 1 min",
+      "thisComputer": "This computer",
+      "thisComputerText": "Run threads in your own folders",
+      "linear": "Linear",
+      "linearText": "Hand Linear issues to Mikka"
     },
-    "bot": {
-      "title": "Your first Bot",
-      "heading": "Create your first Bot",
-      "text": "Give it a name and pick its look.",
-      "time": "About 1 min"
+    "plan": {
+      "title": "Plan",
+      "heading": "Pick a plan",
+      "text": "Plans include monthly usage, switch anytime.",
+      "time": "Under 1 min",
+      "name": "Mikka Pro",
+      "price": "$20/mo",
+      "credits": "$20 of Mikka credits each month, models at list price",
+      "machines": "Cloudflare cloud machines, billed by the hour from credits",
+      "models": "Every model on the gateway, no keys to bring",
+      "subscribe": "Subscribe"
     }
   },
   "HostedPermissions": {
@@ -8127,6 +8173,24 @@
       "message": "New message in a channel",
       "mention": "Mikka is mentioned",
       "reaction_added": "Reaction added"
+    }
+  },
+  "SetupChecklist": {
+    "title": "Setup checklist",
+    "left": "{count, plural, one {# left} other {# left}}",
+    "hide": "Hide setup checklist",
+    "items": {
+      "task": "Give the first task",
+      "model": "Add a subscription or key",
+      "device": "Connect this computer",
+      "app": "Connect an app",
+      "invite": "Invite teammates"
+    },
+    "actions": {
+      "model": "Add",
+      "device": "Connect",
+      "app": "Connect",
+      "invite": "Invite"
     }
   }
 }

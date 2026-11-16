@@ -144,13 +144,13 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
         [eventId, requester, bot, taskId, 'sponsored:'+eventId])
         const input = { botId: bot, issueId: taskId, agentId: cloudAgent, deviceRepoId: cloudRepo, sourceEventId: eventId,
           title: 'Sponsored task', body: '', model: 'gpt-5', subscriptionBindingId: binding }
-        const oldCohort = process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES
+        const oldCohort = process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED
         const oldToken = process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN
         try {
           process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN = 'synthetic-test-only'
-          process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES = randomUUID()
+          process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED = '1'
           await assert.rejects(() => queueCloudRun(pool, actor, input))
-          process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES = workspace
+          delete process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED
           const { runId: sponsored } = await queueCloudRun(pool, actor, input)
           const machines = await import('./cloud-computer/thread-machines')
           const originalOrigin = process.env.MIKKA_CLOUD_WORKER_URL
@@ -201,8 +201,8 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
           } finally { await cleanup.query('ROLLBACK'); cleanup.release() }
 
         } finally {
-          if (oldCohort === undefined) delete process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES
-          else process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES = oldCohort
+          if (oldCohort === undefined) delete process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED
+          else process.env.MIKKA_CLOUDFLARE_TASKS_DISABLED = oldCohort
           if (oldToken === undefined) delete process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN
           else process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN = oldToken
         }

@@ -7,6 +7,7 @@ import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
+import { gatewayFeaturesSchema, parseGatewayFeatures, type GatewayFeatures } from './model-gateway/features'
 import { isPrivateAddress } from '@/lib/link-preview-parse'
 import { isLoopbackHost } from '@/lib/loopback'
 import { memberSubscriptionsAllowed } from '@/lib/personal-policy'
@@ -111,9 +112,10 @@ export async function probeResponsesApi(baseUrl: string, apiKey: string, fetchIm
   } catch { return null }
 }
 
-interface Row { id: string; ownerId: string; provider: ApiKeyProvider; name: string | null; baseUrl: string | null; protocol: ApiKeyProtocol; last4: string; models: string[]; modelsError: ApiKeyView['modelsError']; responsesApi: boolean; modelSettings?: ModelSettings | null }
-const COLUMNS = 'id,"ownerId",provider,name,"baseUrl",protocol,last4,models,"modelsError","responsesApi"'
-const view = (row: Row): ApiKeyView => ({ id: row.id, provider: row.provider, name: row.name, baseUrl: row.baseUrl, protocol: row.protocol, last4: row.last4, models: row.models, modelsError: row.modelsError ?? null, responsesApi: row.responsesApi })
+interface Row { id: string; ownerId: string; provider: ApiKeyProvider; name: string | null; baseUrl: string | null; protocol: ApiKeyProtocol; last4: string; models: string[]; modelsError: ApiKeyView['modelsError']; responsesApi: boolean; modelSettings?: ModelSettings | null; features?: unknown }
+const COLUMNS = 'id,"ownerId",provider,name,"baseUrl",protocol,last4,models,"modelsError","responsesApi",features'
+const view = (row: Row): ApiKeyView => ({ id: row.id, provider: row.provider, name: row.name, baseUrl: row.baseUrl, protocol: row.protocol, last4: row.last4, models: row.models, modelsError: row.modelsError ?? null, responsesApi: row.responsesApi,
+  ...(row.features ? { features: parseGatewayFeatures(row.features) } : {}) })
 /** Only a custom OpenAI-protocol provider is probed; the presets' endpoints serve the Responses API. */
 const probed = (row: Pick<Row, 'provider' | 'protocol' | 'baseUrl'>) => row.provider === 'custom' && row.protocol === 'openai' && row.baseUrl
 
@@ -291,6 +293,27 @@ async function openKey(query: Query, keyId: string, env: Env) {
   }
 }
 
+/**
+ * A key opened for one request of the Mikka model gateway (decision
+ * 2026-11-15-2000): the run that may use it was checked at claim
+ * (`validateRunApiKey`) and is checked again by its gateway token.
+ */
+export async function openGatewayApiKey(query: Query, keyId: string, env: Env = process.env) {
+  z.uuid().parse(keyId)
+  const { row, apiKey } = await openKey(query, keyId, env)
+  return { key: view(row), apiKey, features: parseGatewayFeatures(row.features) }
+}
+
+/** The owner turns request features off for a provider that rejects them (decision 2026-11-15-2000). */
+export async function setApiKeyFeatures(query: Query, ownerId: string, id: string, features: GatewayFeatures): Promise<void> {
+  z.uuid().parse(id)
+  const parsed = gatewayFeaturesSchema.parse(features)
+  const off = Object.fromEntries(Object.entries(parsed).filter(([, on]) => on === false))
+  const { rowCount } = await query.query('UPDATE model_api_keys SET features=$3::jsonb WHERE id=$1 AND "ownerId"=$2',
+    [id, ownerId, Object.keys(off).length ? JSON.stringify(off) : null])
+  if (!rowCount) throw new WorkspaceError('apiKeyNotFound')
+}
+
 /** A bot's saved API key model (bot_model_choices), with the Agents its threads can run on (§ 3). */
 export interface BotApiKeyChoice { keyId: string; model: string; harnesses: ApiKeyHarness[] }
 
@@ -316,7 +339,7 @@ export async function setBotApiKeyChoice(query: Query, scope: { ownerId: string;
   const key = (await usableApiKeys(query, scope.ownerId, scope.workspaceId)).find(item => item.id === keyId)
   if (!key || !apiKeyChatBaseUrl(key) || !key.models.includes(modelName)) throw new WorkspaceError('executionModelUnknown')
   await query.query(`INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId","apiKeyId","apiKeyModel") VALUES ($1,$2,$3,NULL,$4,$5)
-    ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=NULL,"apiKeyId"=EXCLUDED."apiKeyId","apiKeyModel"=EXCLUDED."apiKeyModel"`,
+    ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=NULL,"apiKeyId"=EXCLUDED."apiKeyId","apiKeyModel"=EXCLUDED."apiKeyModel","creditsModel"=NULL`,
   [scope.ownerId, scope.workspaceId, botId ?? 'coordinator', keyId, modelName])
   return { keyId, model: modelName, harnesses: apiKeyHarnesses(key) }
 }
@@ -349,7 +372,7 @@ const ACTIVE_RUN = ['queued', 'preparing', 'running', 'paused', 'waiting_input',
  * otherwise, so a withdrawn share or a deleted key stops the run instead of
  * switching (§ 2).
  */
-export async function apiKeyForRun(query: Query, runId: string, keyId: string, harness: ApiKeyHarness, env: Env = process.env): Promise<ApiKeyRunCredential> {
+export async function validateRunApiKey(query: Query, runId: string, keyId: string): Promise<{ ownerId: string; workspaceId: string | null }> {
   z.uuid().parse(runId); z.uuid().parse(keyId)
   const { rows: [run] } = await query.query<{ userId: string; botId: string | null; deviceId: string | null; agentDefinition: WorkerDefinitionSnapshot | null; workspaceId: string | null; status: string; stopRequestedAt: Date | null }>(
     'SELECT r."userId",r."botId",r."deviceId",r."agentDefinition",b."workspaceId"::text AS "workspaceId",r.status,r."stopRequestedAt" FROM agent_runs r LEFT JOIN bots b ON b.id=r."botId" WHERE r.id=$1', [runId])
@@ -364,12 +387,22 @@ export async function apiKeyForRun(query: Query, runId: string, keyId: string, h
   if (!usable) throw new WorkspaceError('apiKeyNotFound')
   const { rows: [owner] } = await query.query<{ ownerId: string }>('SELECT "ownerId" FROM model_api_keys WHERE id=$1', [keyId])
   if (!owner || (owner.ownerId !== run.userId && (!run.agentDefinition?.apiKey || !run.workspaceId || !await executionMembersActive(run.workspaceId, [run.userId, owner.ownerId])))) throw new WorkspaceError('apiKeyNotFound')
-  const { row, apiKey } = await openKey(query, keyId, env)
-  const endpoint = apiKeyEndpoint(row, harness)
-  if (!endpoint) throw new WorkspaceError('apiKeyNotFound')
   // Recorded so withdrawing the key or its share stops this run (stopRunsUsingApiKeys).
   await query.query(`INSERT INTO model_api_key_runs ("runId","keyId","workspaceId") VALUES ($1,$2,$3)
     ON CONFLICT ("runId") DO UPDATE SET "keyId"=EXCLUDED."keyId","workspaceId"=EXCLUDED."workspaceId"`, [runId, keyId, run.workspaceId])
+  return { ownerId: owner.ownerId, workspaceId: run.workspaceId }
+}
+
+/**
+ * The key a run uses, opened for injection at the start of that run, for a
+ * deployment without the Mikka model gateway: the endpoint of the protocol the
+ * run's Agent speaks. Same checks as `validateRunApiKey`.
+ */
+export async function apiKeyForRun(query: Query, runId: string, keyId: string, harness: ApiKeyHarness, env: Env = process.env): Promise<ApiKeyRunCredential> {
+  await validateRunApiKey(query, runId, keyId)
+  const { row, apiKey } = await openKey(query, keyId, env)
+  const endpoint = apiKeyEndpoint(row, harness)
+  if (!endpoint) throw new WorkspaceError('apiKeyNotFound')
   if (harness === 'claude_code') return { harness: 'claude_code', keyId: row.id, ownerId: row.ownerId, env: { ANTHROPIC_API_KEY: apiKey, ANTHROPIC_BASE_URL: endpoint.baseUrl } }
   return {
     harness: 'codex', keyId: row.id, ownerId: row.ownerId, env: { MIKKA_MODEL_API_KEY: apiKey },

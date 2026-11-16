@@ -58,6 +58,8 @@ import { ThreadOutlineIndex } from './thread-outline-index'
 import { threadOutline } from '@/lib/thread-outline'
 import { useRightColumnWiden } from './right-column-widen'
 import { RunErrorDetails, useRunErrorText } from './run-error-text'
+import { CreditsRefusalActions } from '@/components/billing/paywall'
+import { hostedRefusal } from '@/lib/billing/hosted-usage'
 import { ThreadModelFallbackNotice, ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
 import { cn } from '@/lib/utils'
 import { ThreadArtifactButton, ThreadArtifactCards } from './artifact-review'
@@ -137,6 +139,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const t = useTranslations('IssueThreads')
   const messages = useMessages()
   const runErrorText = useRunErrorText()
+  const refusalText = useTranslations('Billing.refusal')
   const format = useFormatter()
   const { mutate: mutateCache, cache } = useSWRConfig()
   // The task owns its mounted collection. Older servers still use the thread-list cache.
@@ -259,12 +262,14 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   // A message to an ended thread runs it again in the same thread (R-81): 重试 is that message, one tap (N2).
   const replyBlocked = transcriptOnly || data?.thread.replyAvailable === false
   const canRetry = !transcriptOnly && !!failure && !!data?.thread.detail && data.thread.ownedByCurrentUser && data.thread.retryAvailable && !runIsActive(view?.status ?? '')
-  const failureText = runErrorText(failure)
+  const creditsRefusal = data?.thread.error ? hostedRefusal(data.thread.error) ?? (data.thread.error.includes('cloud_machine_unfunded') ? 'cloud_machine_unfunded' : null) : null
+  const failureText = creditsRefusal && creditsRefusal !== 'cloud_machine_unfunded' ? { message: refusalText('points_exhausted'), code: null } : runErrorText(failure)
   const failureLine = failure && !providerExplained && <div className="flex items-start gap-2" data-slot="thread-failure">
     <div className="flex min-w-0 flex-1 flex-col">
       <p className="line-clamp-2 text-xs break-words text-destructive-foreground" title={failureText.message ?? undefined}>{failureText.message}</p>
       {failureText.code && <RunErrorDetails code={failureText.code} />}
     </div>
+    {creditsRefusal && <CreditsRefusalActions />}
     {canRetry && <Button variant="outline" size="xs" className="shrink-0 pointer-coarse:h-11" disabled={sending} onClick={() => { void send(t('retry'), true) }}>{t('retry')}</Button>}
   </div>
   useEffect(() => {
@@ -511,6 +516,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     }
     if (failure && !providerExplained) bot('failure', [{ kind: 'error', text: failureText.message ?? '', actions: <>
       {failureText.code && <RunErrorDetails code={failureText.code} />}
+      {creditsRefusal && <CreditsRefusalActions />}
       {canRetry && <Button variant="outline" size="xs" className="shrink-0 pointer-coarse:h-11" disabled={sending} onClick={() => { void send(t('retry'), true) }}>{t('retry')}</Button>}
     </> }])
     const tail = <>

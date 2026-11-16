@@ -22,11 +22,11 @@ export async function prepareBotCloudTaskRuntime(pool: Pool, actor: { userId: st
   const binding = await nativeRunBinding(pool, actor.userId, input.agentId, input.harness, actor.workspaceId, input.subscriptionBindingId)
   if (input.subscriptionBindingId && (!binding || binding.id !== input.subscriptionBindingId || binding.modelId !== model)) throw new ComputerError(409, 'Bot subscription unavailable')
   const botId = input.withoutBot ? null : input.botId
-  const { subscription, apiKey } = await runCredentialSource(pool, {
+  const { subscription, apiKey, credits } = await runCredentialSource(pool, {
     ownerId: actor.userId, botId, harness: input.harness, model, keyId: input.apiKeyId,
     botWorkspaceId: botId ? actor.workspaceId : null, choiceWorkspaceId: actor.workspaceId, subscription: binding,
   })
-  if ((!subscription && !apiKey) || (subscription && subscription.modelId !== model) || (apiKey && apiKey.model !== model) ||
+  if ((!subscription && !apiKey && !credits) || (subscription && subscription.modelId !== model) || (apiKey && apiKey.model !== model) ||
     (input.apiKeyId && apiKey?.keyId !== input.apiKeyId)) throw new ComputerError(409, 'Bot subscription unavailable')
   // Omitting model is intentional: runtime preparation must not auto-bind the
   // owner's newest subscription or replace the caller's explicit selection.

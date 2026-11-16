@@ -6,7 +6,8 @@ import { createHash } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { othersMayUse, pooledOwners, runMayUseCredentialSql } from "./personal-policy";
-import { HOSTED_CHOICE } from "./bot-model-menu-view";
+import { HOSTED_CHOICE, creditsOptionId, parseCreditsOption } from "./bot-model-menu-view";
+import { creditsModelOffered } from "./credits-models";
 import { subscriptionRouteReady } from "./subscription-routes";
 import { executionBinding, executionModelOptions } from "./execution-model-options";
 
@@ -222,12 +223,14 @@ export class ExecutionSettings {
         throw new ActionFailureError("botNotFound");
     }
     const key = botId ?? "coordinator";
-    // Mikka 默认 picked on purpose: no binding behind it (decision 2026-10-31-2330).
-    if (bindingId === HOSTED_CHOICE) {
+    // A model run on Mikka 额度 (decision 2026-11-15-1900): `credits:<vendor/model>`, no binding or key behind it.
+    const credits = parseCreditsOption(bindingId ?? "");
+    if (credits) {
+      if (!(await creditsModelOffered(credits, scope.ownerId))) throw new ActionFailureError("executionModelUnknown");
       await this.pool.query(
-        // The pick replaces an API key model saved before, as a subscription pick does; else the key choice wins on read.
-        'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=EXCLUDED."bindingId","apiKeyId"=NULL,"apiKeyModel"=NULL',
-        [scope.ownerId, scope.workspaceId, key, null],
+        // The pick replaces a subscription or API key model saved before.
+        'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","creditsModel") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=NULL,"apiKeyId"=NULL,"apiKeyModel"=NULL,"creditsModel"=EXCLUDED."creditsModel"',
+        [scope.ownerId, scope.workspaceId, key, credits],
       );
       return;
     }
@@ -245,7 +248,7 @@ export class ExecutionSettings {
       bindingId = await this.bindingForOthersBot(scope, botId, shared.ownerId, bindingId);
     }
     await this.pool.query(
-      'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=EXCLUDED."bindingId","apiKeyId"=NULL,"apiKeyModel"=NULL',
+      'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=EXCLUDED."bindingId","apiKeyId"=NULL,"apiKeyModel"=NULL,"creditsModel"=NULL',
       [scope.ownerId, scope.workspaceId, key, bindingId],
     );
   }
@@ -321,22 +324,23 @@ export class ExecutionSettings {
   ): Promise<string | undefined> {
     const row = (
       await this.pool.query(
-        'SELECT "bindingId","apiKeyId" FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3',
+        'SELECT "bindingId","apiKeyId","creditsModel" FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3',
         [scope.ownerId, scope.workspaceId, botId ?? "coordinator"],
       )
     ).rows[0];
     if (row?.bindingId) return row.bindingId;
     // The saved choice is an API key's model (lib/model-api-keys.ts botApiKeyChoice), not a binding.
     if (row?.apiKeyId) return undefined;
-    // A saved row without either is Mikka 默认, picked on purpose.
-    if (row) return HOSTED_CHOICE;
+    if (row?.creditsModel) return creditsOptionId(row.creditsModel);
+    // A row with none of the three was 「Mikka 默认」 (gone, decision 2026-11-15-1900): no choice,
+    // so the usual order below fills it in when a subscription exists.
     // Decision 2026-10-30 (#537): a Claude subscription first, otherwise ChatGPT/Codex, as `suggested` does.
     const models = await this.chatModels(scope);
     const first = models.find((m) => m.provider === "claude") ?? models[0];
     if (!first) return undefined;
     const bindingId = await this.bindingForBot(scope, botId, first.bindingId);
     await this.pool.query(
-      'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO NOTHING',
+      'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=EXCLUDED."bindingId" WHERE bot_model_choices."bindingId" IS NULL AND bot_model_choices."apiKeyId" IS NULL AND bot_model_choices."creditsModel" IS NULL',
       [scope.ownerId, scope.workspaceId, botId ?? "coordinator", bindingId],
     );
     return this.botModel(scope, botId);

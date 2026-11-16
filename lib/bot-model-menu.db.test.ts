@@ -36,24 +36,26 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
       CREATE TABLE mikka_workspace_members ("workspaceId" uuid,"userId" text,name text,status text);
       CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,epoch bigint,state text,provider text,"accountLabel" text,quota jsonb,"removedAt" timestamptz,paused boolean NOT NULL DEFAULT false,"modelSettings" jsonb);
       CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,"modelId" text,route text,"createdAt" timestamptz DEFAULT now())`);
-    for (const file of ["20261030193000_device_enrollment_management.sql", "20261030200610_execution_rules.sql", "20261030233002_byos_model_catalog.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101020201_workspace_personal_policies.sql", "20261101020202_bot_archive.sql", "20261101021000_model_api_keys.sql", "20261101021100_bot_api_key_choice.sql", "20261102120000_model_api_key_models_error.sql", "20261102190000_model_api_key_responses_api.sql"])
+    for (const file of ["20261030193000_device_enrollment_management.sql", "20261030200610_execution_rules.sql", "20261030233002_byos_model_catalog.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101020201_workspace_personal_policies.sql", "20261101020202_bot_archive.sql", "20261101021000_model_api_keys.sql", "20261101021100_bot_api_key_choice.sql", "20261102120000_model_api_key_models_error.sql", "20261102190000_model_api_key_responses_api.sql", "20261115175552_bot_model_choices_credits_model.sql", "20261115204738_model_gateway_tokens.sql"])
       await pool.query(await readFile(new URL(`../drizzle/${file}`, import.meta.url), "utf8"));
     // Resource policy still runs against real non-Org rows in this isolated schema.
     await pool.query(await readFile(new URL("../drizzle/20261109035020_organization_governance.sql", import.meta.url), "utf8"));
 
     mock.module(new URL("./db/index.ts", import.meta.url).href, { namedExports: { pool } });
     mock.module(new URL("./workspace-db.ts", import.meta.url).href, { namedExports: { workspaceDb: drizzle(pool), workspacePool: pool } });
-    // Points and their fallback have their own tests: here Mikka 默认 has points.
+    // The Gateway catalogue has its own tests: here Mikka 额度 offers the shipped snapshot.
+    const { CATALOG_SNAPSHOT } = await import("./model-catalog");
+    mock.module(new URL("./model-catalog-server.ts", import.meta.url).href, { namedExports: { modelCatalog: async () => [...CATALOG_SNAPSHOT] } });
+    // Points and their fallback have their own tests: here Mikka 额度 has points.
     let hostedPoints = 98;
-    let hostedTrial = 0;
     let pointsChoice: { kind: "api_key"; keyId: string; model: string } | null = null;
-    mock.module(new URL("./points-fallback.ts", import.meta.url).href, { namedExports: { hostedPointsRefusal: async () => hostedPoints > 0 || hostedTrial > 0 ? null : "points_exhausted", pointsFallback: async () => pointsChoice, hostedPointsHere: async () => ({ points: hostedPoints, trialLeft: hostedTrial }) } });
+    mock.module(new URL("./points-fallback.ts", import.meta.url).href, { namedExports: { hostedPointsRefusal: async () => hostedPoints > 0 ? null : "points_exhausted", pointsFallback: async () => pointsChoice, hostedPointsHere: async () => ({ points: hostedPoints }) } });
     const { ExecutionSettings } = await import("./execution-settings");
     const { botModelMenu } = await import("./bot-model-menu");
-    const { HOSTED_CHOICE } = await import("./bot-model-menu-view");
+    const { creditsOptionId } = await import("./bot-model-menu-view");
+    const CREDITS_MODEL = "anthropic/claude-sonnet-5.5", CREDITS = creditsOptionId(CREDITS_MODEL);
     const { freezeBotModel } = await import("./bot-model-selection");
     const { SubscriptionRepository } = await import("./subscription-repository");
-    const { COORDINATOR_MODEL } = await import("./coordinator/model");
 
     const settings = new ExecutionSettings(pool);
     const workspace = randomUUID(), elsewhere = randomUUID();
@@ -87,7 +89,7 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     const bobsModel = await binding("bob", workspace, bobs, "claude-bob-fixture", "claude_cpa");
     const elsewhereModel = await binding("alice", elsewhere, otherWs, "claude-elsewhere-fixture", "claude_cpa");
 
-    // 1. Only credentials usable here: Mikka 默认, then Claude, then ChatGPT; never another person's or a disconnected one.
+    // 1. Only credentials usable here: Mikka 额度, then Claude, then ChatGPT; never another person's or a disconnected one.
     // A subscription is the person's own from any workspace once shared here (decision 2026-10-31-2130), so the
     // Claude account first connected elsewhere is listed too, after this workspace's.
     const menu = await botModelMenu(pool, settings, alice, botA);
@@ -97,7 +99,9 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     assert.notEqual(menu.groups[1].credentialLabel, menu.groups[2].credentialLabel, "same-provider connections remain identifiable");
     assert.equal(menu.current.credentialLabel, "alice-claude@example.test");
     const listed = menu.groups.flatMap((group) => group.options.map((option) => option.id));
-    assert.deepEqual(new Set(listed), new Set([HOSTED_CHOICE, sonnet, opus, gpt, elsewhereModel]));
+    const credits = menu.groups.find((group) => group.kind === "hosted")!.options;
+    assert.deepEqual(credits.map((option) => option.modelId), CATALOG_SNAPSHOT.map((model) => model.id), "Mikka 额度 offers the catalogue");
+    assert.deepEqual(new Set(listed.filter((id) => !id.startsWith("credits:"))), new Set([sonnet, opus, gpt, elsewhereModel]));
     for (const id of [stale, bobsModel]) assert.ok(!listed.includes(id));
     // Nothing picked: the chip shows what the resolver gives the next run (Claude first), not a saved choice.
     assert.equal(menu.current.provider, "claude");
@@ -119,9 +123,11 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     await assert.rejects(settings.setBotModel(alice, botA, bobsModel), { code: "executionModelUnknown" });
     await assert.rejects(settings.setBotModel(alice, botA, stale), { code: "executionModelUnknown" });
 
-    // 2. Saved per bot: bot A takes GPT, bot B stays on the default, the Coordinator takes Mikka 默认.
+    // 2. Saved per bot: bot A takes GPT, bot B stays on the default, the Coordinator takes a Mikka 额度 model.
     await settings.setBotModel(alice, botA, gpt);
-    await settings.setBotModel(alice, null, HOSTED_CHOICE);
+    await settings.setBotModel(alice, null, CREDITS);
+    await assert.rejects(settings.setBotModel(alice, null, "credits:acme/not-in-the-catalogue"), { code: "executionModelUnknown" });
+    await assert.rejects(settings.setBotModel(alice, null, "00000000-0000-0000-0000-000000000000"), { code: "executionModelUnknown" }, "the retired 「Mikka 默认」 id is no pick");
     const a = await botModelMenu(pool, settings, alice, botA);
     const optionFor = (menu: Awaited<ReturnType<typeof botModelMenu>>, model: string) => menu.groups.flatMap((group) => group.options).find((option) => option.modelId === model)?.id;
     // The bot runs on its own copy of the binding; the menu ticks the one option for that account and model.
@@ -131,19 +137,19 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     assert.deepEqual([b.current.provider, b.current.chosen], ["claude", false]);
     assert.equal((await botModelMenu(pool, settings, alice, botA, Date.now(), true)).preferenceState, "present");
     const coordinator = await botModelMenu(pool, settings, alice, null);
-    assert.deepEqual([coordinator.current.id, coordinator.current.kind, coordinator.current.chosen], [HOSTED_CHOICE, "hosted", true]);
+    assert.deepEqual([coordinator.current.id, coordinator.current.kind, coordinator.current.chosen, coordinator.current.name], [CREDITS, "hosted", true, "Claude Sonnet 5.5"]);
 
     // 3. The Coordinator's picker chooses a model only: no Agent (harness) in its menu.
     assert.ok(!JSON.stringify(coordinator).includes("harness"));
-    for (const option of coordinator.groups.flatMap((group) => group.options))
-      assert.deepEqual(Object.keys(option).sort(), ["id", "modelId", "provider"]);
+    for (const group of coordinator.groups) for (const option of group.options)
+      assert.deepEqual(Object.keys(option).filter((key) => !(group.kind === "hosted" && ["name", "price", "featured"].includes(key))).sort(), ["id", "modelId", "provider"]);
 
     // 4. The next run freezes the pick; a run already frozen keeps its model.
     const dependencies = { service: () => ({ repository: new SubscriptionRepository(pool) }) as never, workspace: async () => {} };
     const runA = await freezeBotModel({ ownerId: "alice", botId: botA, workspaceId: workspace }, dependencies);
     assert.equal(runA.model, "gpt-fixture");
     assert.equal((runA.modelSelection as { connectionId?: string } | undefined)?.connectionId, codex);
-    assert.deepEqual(await freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies), { harness: "ai_sdk", model: COORDINATOR_MODEL });
+    assert.deepEqual(await freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies), { harness: "ai_sdk", model: CREDITS_MODEL });
     await settings.setBotModel(alice, botA, opus);
     assert.equal(runA.model, "gpt-fixture", "the frozen run is not switched");
     const nextA = await freezeBotModel({ ownerId: "alice", botId: botA, workspaceId: workspace }, dependencies);
@@ -238,17 +244,17 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
       harness: "ai_sdk", model: "deepseek-chat",
       modelSelection: { coordinator: true, type: "api_key", keyId: key.id, ownerId: "alice", workspaceId: workspace, modelId: "deepseek-chat" },
     });
-    // Mikka 默认 picked after a key model: it is what the chip shows and what the next turn runs on, not the key
+    // A Mikka 额度 model picked after a key model: it is what the chip shows and what the next turn runs on, not the key
     // (production, 2026-11-02: the pick saved, but the old key choice won on read and the chip went back to the key).
-    const { HOSTED_CHOICE: hostedChoice } = await import("./bot-model-menu-view");
+    const hostedChoice = CREDITS;
     const hostedMenu = await chooseBotModel(pool, settings, alice, null, hostedChoice);
     assert.deepEqual([hostedMenu.current.id, hostedMenu.current.kind, hostedMenu.current.chosen, hostedMenu.current.available], [hostedChoice, "hosted", true, true]);
     assert.notEqual((await freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies)).modelSelection?.type, "api_key");
     assert.equal(hostedMenu.groups.find((group) => group.kind === "hosted")?.points, 98, "the points it can spend in this workspace");
-    // No points in this workspace (decision 2026-11-02-1450): not listed; the pick stays, named and unavailable, so the chat says so before sending.
+    // No points in this workspace: still listed (the picker shows no balance, decision 2026-11-15-1900); the pick stays, named and unavailable.
     hostedPoints = 0;
     const noPoints = await botModelMenu(pool, settings, alice, null);
-    assert.equal(noPoints.groups.some((group) => group.kind === "hosted"), false);
+    assert.equal(noPoints.groups.some((group) => group.kind === "hosted"), true);
     assert.deepEqual([noPoints.current.id, noPoints.current.chosen, noPoints.current.available], [hostedChoice, true, false]);
     pointsChoice = { kind: "api_key", keyId: key.id, model: "deepseek-chat" };
     const pointsMenu = await botModelMenu(pool, settings, alice, null);
@@ -258,11 +264,6 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     assert.equal(pointsMenu.current.credentialLabel, `····${key.last4}`);
     assert.equal((pointsRun.modelSelection as { afterPoints?: boolean })?.afterPoints, true);
     pointsChoice = null;
-    // No card yet but free messages left: listed, the tag names them.
-    hostedTrial = 12;
-    const trial = await botModelMenu(pool, settings, alice, null);
-    assert.deepEqual([trial.groups.find((group) => group.kind === "hosted")?.trialLeft, trial.current.available], [12, true]);
-    hostedTrial = 0;
     hostedPoints = 98;
     // Picking the key again moves back to it.
     keyMenu = await chooseBotModel(pool, settings, alice, null, keyOption);
