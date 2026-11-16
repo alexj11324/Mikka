@@ -116,8 +116,16 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
   if (!creating && automation.data === null) return <EditorFrame onBack={onBack} backLabel={t('back')}><p role="status" className="text-sm text-muted-foreground">{t('notFound')}</p></EditorFrame>
   if (!draft) return <EditorFrame onBack={onBack} backLabel={t('back')}><div role="status" aria-label={tAll('loading')} className="flex flex-col gap-3">{[0, 1, 2].map(index => <Skeleton key={index} className="h-24 w-full rounded-2xl" />)}</div></EditorFrame>
 
+  const canManage = creating || current?.owner_id === userId || current?.can_take_over === true
+
+  async function readAfterChange(schedule: AutomationView) {
+    // The writer returns the schedule. A different creator's name and the reader's role come from the authorized view.
+    if (schedule.owner_id !== userId) await automation.mutate()
+    else await automation.mutate(schedule, { revalidate: false })
+  }
+
   async function save() {
-    if (!workspaceId || !check || !('definition' in check) || busy) return
+    if (!canManage || !workspaceId || !check || !('definition' in check) || busy) return
     setBusy('save')
     try {
       const result = creating
@@ -127,21 +135,21 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
       const saved = (result as { schedule: AutomationView }).schedule
       toast.success(t('saved'))
       if (creating) onOpen(saved.id)
-      else { loaded.current = null; await automation.mutate(saved, { revalidate: false }) }
+      else { loaded.current = null; await readAfterChange(saved) }
     } finally { setBusy(null) }
   }
   async function toggle(on: boolean) {
-    if (!current || busy) return
+    if (!current || busy || (on && !canManage)) return
     setBusy('toggle')
     try {
       const result = await (on ? resumeAutomation : pauseAutomation)({ scheduleId: current.id, version: current.version }, workspaceId ?? undefined)
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
       loaded.current = null
-      await automation.mutate((result as { schedule: AutomationView }).schedule, { revalidate: false })
+      await readAfterChange((result as { schedule: AutomationView }).schedule)
     } finally { setBusy(null) }
   }
   async function runNow() {
-    if (!current || busy) return
+    if (!current || !canManage || busy) return
     setBusy('run')
     try {
       const result = await runAutomationNow({ scheduleId: current.id, version: current.version, requestId: crypto.randomUUID() }, workspaceId ?? undefined)
@@ -187,18 +195,19 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
   const otherBot = draft.botId && !ownBots.some(bot => bot.id === draft.botId) ? workspaceBots.get(draft.botId) : null
   const localDevices = devices.filter(device => device.enabled || device.id === draft.machine)
   const active = current?.status === 'active'
-  const canSave = Boolean(workspaceId && check && 'definition' in check) && !busy
+  const canToggle = current?.status !== 'completed' && (active || canManage)
+  const canSave = canManage && Boolean(workspaceId && check && 'definition' in check) && !busy
   const creator = !current || current.owner_id === userId ? t('you') : current.owner_name ?? ''
   const field = (label: string, control: React.ReactNode) => <SettingRow title={label}><div className="flex flex-wrap items-center justify-end gap-2">{control}</div></SettingRow>
 
   return <EditorFrame onBack={onBack} backLabel={t('back')}>
     <header className="flex flex-col gap-3">
       <div className="flex items-start gap-3">
-        <Input aria-label={t('name')} value={draft.title} maxLength={200} placeholder={t('namePlaceholder')} onChange={event => set({ title: event.target.value })}
+        <Input aria-label={t('name')} value={draft.title} readOnly={!canManage} maxLength={200} placeholder={t('namePlaceholder')} onChange={event => set({ title: event.target.value })}
           className="h-auto min-w-0 flex-1 border-0 bg-transparent px-0 text-xl font-semibold shadow-none focus-visible:ring-0 md:text-xl dark:bg-transparent" />
         {!creating && <div className="flex shrink-0 items-center gap-2 pt-1.5">
           <Label htmlFor="automation-enabled">{t('enabled')}</Label>
-          <Switch id="automation-enabled" checked={active} disabled={busy !== null || current?.status === 'completed'} onCheckedChange={on => { void toggle(on) }} />
+          <Switch id="automation-enabled" checked={active} disabled={busy !== null || !canToggle} onCheckedChange={on => { void toggle(on) }} />
         </div>}
       </div>
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -209,6 +218,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
       </div>
     </header>
 
+    <fieldset disabled={!canManage} className="contents">
     {!draft.otherTask && <SettingsSection id="automation-settings" title={t('settings')}>
       {field(t('bot'), <NativeSelect aria-label={t('bot')} value={draft.botId ?? ''} onChange={event => set({ botId: event.target.value || null })}>
         <NativeSelectOption value="">{tAll('coordinator')}</NativeSelectOption>
@@ -294,7 +304,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
           <SlackTriggers value={draft.slack} channels={slackChannels.data?.channels ?? []} installed={slackChannels.data?.installed ?? true} disabled={busy !== null || (!slackChannels.data && !slackChannels.error)} onChange={slack => set({ slack })} />
         </>}
         <WebhookTrigger value={draft.webhook} onChange={webhook => set({ webhook })} automation={current ?? null} disabled={busy !== null}
-          onSaved={schedule => automation.mutate(schedule, { revalidate: false })} />
+          onSaved={readAfterChange} />
       </>}
       <SettingRow title={t('manual')}>
         {!creating && <Button size="sm" variant="secondary" disabled={!active || busy !== null} onClick={() => { void runNow() }}><Play data-icon="inline-start" />{t('runNow')}</Button>}
@@ -324,6 +334,8 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
       </NativeSelect>)}
     </SettingsSection>
 
+    </fieldset>
+
     {!creating && current && <AutomationUsagePanel workspaceId={workspaceId} id={current.id} />}
 
     {workspaceId && current && (current.definition.webhook || current.webhook_key_set) && (current.owner_id === userId || current.can_take_over) &&
@@ -340,7 +352,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
 
     <footer className="flex flex-wrap items-center justify-between gap-2 pb-8">
       <div className="flex items-center gap-2">
-        {current && current.status !== 'completed' && <Button variant="outline" disabled={busy !== null} onClick={() => { void toggle(!active) }}>{active ? t('pause') : t('resume')}</Button>}
+        {current && current.status !== 'completed' && <Button variant="outline" disabled={busy !== null || !canToggle} onClick={() => { void toggle(!active) }}>{active ? t('pause') : t('resume')}</Button>}
         {current && <Button variant="ghost" className="text-destructive-foreground" disabled={busy !== null} onClick={() => setConfirmDelete(true)}>{t('delete')}</Button>}
       </div>
       <div className="flex items-center gap-3">
