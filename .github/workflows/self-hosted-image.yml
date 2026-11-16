@@ -92,7 +92,7 @@ jobs:
       - name: Build the public standalone application
         if: steps.existing.outputs.digest == ''
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-        with: &public_image_build
+        with:
           context: .
           file: Dockerfile
           load: true
@@ -101,7 +101,6 @@ jobs:
           build-args: |
             WORKFLOW_TARGET_WORLD=${{ env.PUBLISH_IMAGE != 'true' && '@workflow/world-postgres' || '' }}
             MIKKA_BUILD_REVISION=${{ github.sha }}
-            MIKKA_TEST_DEPLOYMENT_SHA=${{ env.DESKTOP_ACCEPTANCE_REVISION }}
             MIKKA_BUILD_WORKER_SHA=${{ steps.image-inputs.outputs.worker-sha }}
           # A fork PR cannot borrow the owner's cache through its own ref.
           # Missing/expired cache never replaces an actual build.
@@ -323,7 +322,6 @@ jobs:
     env:
       COMPOSE_FILE: docker-compose.yml:tests/self-hosted/compose.services.yml
       COMPOSE_PROJECT_NAME: mikka-selfhost-ci
-      DESKTOP_ACCEPTANCE_REVISION: ${{ github.sha }}
       EXPECTED_OVERLAY_SHA: ${{ inputs.overlay_sha }}
       MIKKA_DESKTOP_MEMBER_FIXTURE: '1'
     steps:
@@ -352,7 +350,18 @@ jobs:
       - *public_image_inputs
       - name: Build the exact community image without a private UI checkout
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
-        with: *public_image_build
+        with:
+          context: .
+          file: Dockerfile
+          load: true
+          push: false
+          tags: mikka-self-hosted:check
+          cache-from: type=gha,scope=mikka-selfhost-public
+          build-args: |
+            WORKFLOW_TARGET_WORLD=@workflow/world-postgres
+            MIKKA_BUILD_REVISION=${{ github.sha }}
+            MIKKA_BUILD_WORKER_SHA=${{ steps.image-inputs.outputs.worker-sha }}
+            MIKKA_TEST_DEPLOYMENT_SHA=${{ github.sha }}
       - *isolated_community_secrets
       - uses: ./.github/actions/pnpm-install
         env:
