@@ -1778,7 +1778,7 @@
         "GET",
         "PATCH"
       ],
-      "sourceHash": "b8fc718d704bb3843de16f2bf3824b720f1c25a215236ad993017bb87568724e"
+      "sourceHash": "4216e9e05aa5f78ab65fd2299d19f040d19d2978fa13259f5178926d3f01e3b2"
     },
     {
       "path": "/mikka/api/organizations/[organizationId]/allowed-domains",

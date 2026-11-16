@@ -712,6 +712,13 @@
     "test": "tests/project-dependency-repositories.db.test.ts",
     "suite": "test:project-resources-db"
   },
+  "drizzle/20261116103048_organization_icon.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Stores an optional raster icon on its administrative Organization in the installation workspace database.",
+    "test": "lib/enterprise/governance.db.test.ts",
+    "suite": "test:enterprise-db"
+  },
   "lib/abuse/workers-ai.ts": {
     "mode": "optional-cloud",
     "environment": [

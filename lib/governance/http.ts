@@ -21,11 +21,34 @@ export async function governanceMutationSession(request: Request, workspaceId: s
   return session
 }
 
-export async function governanceJson(request: Request): Promise<unknown> {
-  if (Number(request.headers.get('content-length')) > 16384) throw new GovernanceError('invalid_request')
-  const text = await request.text()
-  if (text.length > 16384) throw new GovernanceError('invalid_request')
-  try { return JSON.parse(text) } catch (cause) { throw new GovernanceError('invalid_request', cause) }
+class OversizedGovernanceBody extends GovernanceError {
+  constructor() { super('invalid_request') }
+}
+
+export async function governanceJson(request: Request, maxBytes = 16384): Promise<unknown> {
+  if (Number(request.headers.get('content-length')) > maxBytes) throw new OversizedGovernanceBody()
+  if (!request.body) throw new GovernanceError('invalid_request')
+  const reader = request.body.getReader()
+  const parts: Uint8Array[] = []
+  let bytes = 0
+  try {
+    for (;;) {
+      const part = await reader.read()
+      if (part.done) break
+      bytes += part.value.byteLength
+      if (bytes > maxBytes) {
+        await reader.cancel()
+        throw new OversizedGovernanceBody()
+      }
+      parts.push(part.value)
+    }
+    return JSON.parse(Buffer.concat(parts).toString('utf8'))
+  } catch (cause) {
+    if (cause instanceof GovernanceError) throw cause
+    throw new GovernanceError('invalid_request', cause)
+  } finally {
+    reader.releaseLock()
+  }
 }
 
 export async function governanceResponse(work: () => Promise<Response | unknown>): Promise<Response> {
@@ -42,6 +65,9 @@ export async function governanceResponse(work: () => Promise<Response | unknown>
       return Response.json({ error: { code: 'governance_denied' } }, { status: 500, headers: { 'cache-control': 'private, no-store' } })
     }
     const status = known.detail === 'access_denied' ? 403 : known.detail === 'not_found' ? 404 : known.detail === 'invalid_request' ? 400 : 409
-    return Response.json({ error: { code: known.code, detail: known.detail } }, { status, headers: { 'cache-control': 'private, no-store' } })
+    return Response.json({ error: { code: known.code, detail: known.detail } }, { status, headers: {
+      'cache-control': 'private, no-store',
+      ...(known instanceof OversizedGovernanceBody ? { connection: 'close' } : {}),
+    } })
   }
 }
