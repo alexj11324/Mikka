@@ -6,6 +6,7 @@ import { existsSync, readFileSync, writeFileSync, openSync, closeSync } from 'no
 import { join } from 'node:path'
 import { setTimeout as wait } from 'node:timers/promises'
 import { Pool } from 'pg'
+import { isTerminalRunState } from '@mikka/protocol/run-state'
 import { seedWorkspace } from '../../tests/support/workspace-admin-db'
 import { acquireTestAccounts } from '../../scripts/test-accounts/session.mjs'
 import { loadEnvironment } from '../../scripts/test-accounts/environment.mjs'
@@ -58,6 +59,68 @@ async function until<T>(test:()=>Promise<T>, name:string, seconds=75):Promise<No
 async function rpc(account:any,action:string,args:unknown[]){const res=await account.request('/api/rpc',{method:'POST',headers:{'content-type':'application/json','x-mikka-rpc':'1','sec-fetch-site':'same-origin'},body:JSON.stringify({version:1,action,args})});assert.equal(res.status,200);const body=await res.json();assert.equal(body.ok,true);return body.result}
 async function row(id:string) {return (await observer.query('select id,status,"sessionId","stopReason","deviceId","workspaceId","continuesRunId","lastReply",prompt from agent_runs where id=$1 and "userId"=$2',[id,owner])).rows[0]}
 async function queued(requestId:string){return (await observer.query('select id,status,"sentRunId","claimMode" from thread_queued_messages where "requestId"=$1 and "userId"=$2 and "workspaceId"=$3',[requestId,owner,workspaceId])).rows[0]}
+async function expectedStopped(runId:string, phase:string, seconds:number) {
+  const final = await until(async () => {
+    const run = await row(runId)
+    return run && isTerminalRunState(run.status) && run
+  }, phase, seconds)
+  assert.equal(final.status, 'stopped')
+  assert.ok(final.sessionId)
+  return final
+}
+function failureMetadata(error:unknown) {
+  const cause = error as {stack?:string, code?:string} | null
+  const location = String(cause?.stack ?? '').match(/full-daemon\.mts:\d+:\d+/)?.[0]
+  const code = /^[A-Z_0-9]{2,60}$/.test(cause?.code ?? '') ? cause?.code : undefined
+  return { location, code }
+}
+// Read-only inspection of just this fixture's freshly created task. Stop through the
+// normal Owner action; finals or delivery claims can commit during that action.
+async function drainCase(issueId:string, rootRun:string) {
+  const deadline = Date.now() + 25_000
+  while (Date.now() < deadline) {
+    const { rows: attempts } = await observer.query(
+      'SELECT id,status,"stopRequestedAt" FROM agent_runs WHERE "issueId"=$1 AND "workspaceId"=$2 AND "userId"=$3',
+      [issueId, workspaceId, owner])
+    const { rows: pending } = await observer.query(
+      `SELECT id,status FROM thread_queued_messages WHERE "rootRunId"=$1 AND "workspaceId"=$2
+       AND "userId"=$3 AND status IN ('queued','delivering')`, [rootRun, workspaceId, owner])
+    if (attempts.every(run => isTerminalRunState(run.status)) && !pending.length) return
+    for (const message of pending.filter(message => message.status === 'queued')) {
+      const result = await rpc(scope.owner, 'agents.changeQueuedThreadReply', [
+        { issueId, runId: rootRun, messageId: message.id, action: 'cancel' }])
+      assert.ok(['cancelled','tooLate'].includes(result.status))
+    }
+    if (attempts.some(run => !isTerminalRunState(run.status) && !run.stopRequestedAt)) {
+      try { await rpc(scope.owner, 'agents.stopRun', [rootRun]) }
+      catch (error) {
+        const active = await observer.query(
+          'SELECT status FROM agent_runs WHERE "issueId"=$1 AND "workspaceId"=$2 AND "userId"=$3',
+          [issueId,workspaceId,owner])
+        if (active.rows.some(run => !isTerminalRunState(run.status))) throw error
+      }
+    }
+    await wait(250)
+  }
+  throw Error('case_cleanup_timeout')
+}
+async function revokeDevice(id:string, afterDesktopSignOut:boolean) {
+  const revoke = () => scope.owner.request('/api/device-tokens/'+id+'/revoke',{method:'POST'})
+  let response=await revoke()
+  if(afterDesktopSignOut && response.status===401) {
+    await response.body?.cancel()
+    await scope.owner.reauthenticate()
+    record('same_lease_owner_reauthenticated')
+    response=await revoke()
+  }
+  if(response.status!==200) {
+    record('device_revoke_rejected',{status:response.status})
+    await response.body?.cancel()
+    throw Error('device_revoke_rejected')
+  }
+  assert.equal((await response.json()).tokenId,id)
+  record('device_credential_revoked')
+}
 async function fullWork(window?:any){
   const agents=(await observer.query('select id,harness from agents where "deviceId"=$1 and "userId"=$2',[deviceId,owner])).rows
   const remote='https://github.com/mikka-e2e/core-loop.git'
@@ -70,22 +133,31 @@ async function fullWork(window?:any){
   }
   record('both_authenticated_catalogues')
   if(window)record('packaged_application',{platform:window.platform})
+  let failed = false
   for(const mode of ['steer','interrupt','queue','sendNow'] as const){
     const activeSteer=mode==='steer'||mode==='sendNow'
     const harness=activeSteer?'codex':'claude_code'
-    const runId=ident(),agent=agents.find(a=>a.harness===harness);assert.ok(agent)
-    lastRun=runId
-    const prompt=mark(mode==='queue'?'The user wants the finished report delivered. Choose submit, not answer. The report should say which color a clear daytime sky is.':'List twenty vegetables with a sentence about each.')
-    const follow=mark(mode==='interrupt'?'What color is a ripe banana? Answer in one short sentence.':'Name the capital of France in one short sentence.')
-    const issue=await withTaskWorkspace(owner,workspaceId,()=>db.transaction(tx=>createIssueForUserInTransaction(tx,owner,{title:'Isolated live '+mode,content:{type:'doc',content:[]},priority:'normal',status:'todo'},userActor(owner),{workspaceId})))
-    assert.ok(issue?.id);const issueId=issue.id
-    const definition=apiKeyWorkerDefinition({schemaVersion:1,kind:'worker',harness,instructions:'Answer only the synthetic test request.',definitionDigest:hash(prompt),promptDigest:hash(prompt),model,modelSource:'native-default',parent:null,readOnly:true} as never,prompt,{keyId:keys[harness].id,model})
-    const input={id:runId,userId:owner,issueId,agentId:agent.id,deviceId,deviceRepoId:repo.id,botId:null,origin:'web' as const,prompt,promptTaskStart:0,promptTaskLength:[...prompt].length,definition,dispatch:{issueId,agentId:agent.id,deviceRepoId:repo.id,requestKey:ident()}}
-    writeFileSync(join(gateDir,'current-gate.json'),JSON.stringify({id:runId,marker:prompt}),{mode:0o600})
+    const runId=ident()
+    let issueId:string|undefined
     const release=()=>writeFileSync(join(gateDir,runId+'.release'),'',{mode:0o600})
-    if(mode==='interrupt')await withProjectResourceLease(owner,workspaceId,()=>queueFactoryTask(pool,owner,{issueId,botId:null,agentId:agent.id,deviceRepoId:repo.id,note:prompt,key:ident(),queue:(tx,userId,_request,botId,context)=>acceptLocalRun({...input,userId,botId,factoryContext:context},tx)}));else await acceptLocalRun(input)
-    record('ordinary_run_admitted',{mode,harness,runId,issueId,deviceId})
+    lastRun=runId
+    stage=mode+'_admission'
+    await scope.assertActive()
     try {
+      const agent=agents.find(a=>a.harness===harness);assert.ok(agent)
+      // The relay binds the frame to this run. Keep the original marked model instruction.
+      const prompt='Case '+runId+'. '+mark(mode==='queue'?'The user wants the finished report delivered. Choose submit, not answer. The report should say which color a clear daytime sky is.':'List twenty vegetables with a sentence about each.')
+      const follow=mark(mode==='interrupt'?'What color is a ripe banana? Answer in one short sentence.':'Name the capital of France in one short sentence.')
+      const resultsFile = join(modelDir,activeSteer?'results.jsonl':'claude-results.jsonl')
+      const initialResults = existsSync(resultsFile) ? readFileSync(resultsFile,'utf8').length : 0
+      const caseOutputs = () => readFileSync(resultsFile,'utf8').slice(initialResults).trim().split('\n').filter(Boolean).map(line=>JSON.parse(line))
+      const issue=await withTaskWorkspace(owner,workspaceId,()=>db.transaction(tx=>createIssueForUserInTransaction(tx,owner,{title:'Isolated live '+mode,content:{type:'doc',content:[]},priority:'normal',status:'todo'},userActor(owner),{workspaceId})))
+      assert.ok(issue?.id);issueId=issue.id
+      const definition=apiKeyWorkerDefinition({schemaVersion:1,kind:'worker',harness,instructions:'Answer only the synthetic test request.',definitionDigest:hash(prompt),promptDigest:hash(prompt),model,modelSource:'native-default',parent:null,readOnly:true} as never,prompt,{keyId:keys[harness].id,model})
+      const input={id:runId,userId:owner,issueId,agentId:agent.id,deviceId,deviceRepoId:repo.id,botId:null,origin:'web' as const,prompt,promptTaskStart:0,promptTaskLength:[...prompt].length,definition,dispatch:{issueId,agentId:agent.id,deviceRepoId:repo.id,requestKey:ident()}}
+      writeFileSync(join(gateDir,'current-gate.json'),JSON.stringify({id:runId,marker:prompt}),{mode:0o600})
+      if(mode==='interrupt')await withProjectResourceLease(owner,workspaceId,()=>queueFactoryTask(pool,owner,{issueId,botId:null,agentId:agent.id,deviceRepoId:repo.id,note:prompt,key:ident(),queue:(tx,userId,_request,botId,context)=>acceptLocalRun({...input,userId,botId,factoryContext:context},tx)}));else await acceptLocalRun(input)
+      record('ordinary_run_admitted',{mode,harness,runId,issueId,deviceId})
       await until(async()=>existsSync(join(gateDir,runId+'.observed'))&&((await row(runId))?.status==='running'),mode+'_genuine_first_frame',95)
       const modes=await threadDeliveryView(pool,owner,runId,runId);assert.ok(modes.modes.includes(activeSteer?'steer':mode));assert.equal(modes.modes.includes('steer'),harness==='codex')
       const grant=(await observer.query('select harness,model,"sourceKind" from model_gateway_tokens where "runId"=$1 and "ownerId"=$2 and "workspaceId"=$3 and "keyId"=$4',[runId,owner,workspaceId,keys[harness].id])).rows
@@ -95,6 +167,7 @@ async function fullWork(window?:any){
       const ui=window?await window.openThread(target):{submit:async(delivery:string,text:string)=>{const id=ident();const sent=await send(scope.owner,delivery,text,id);assert.equal(sent.runId,runId);return id},changeQueued:async(text:string,action:string)=>{const queue=(await threadDeliveryView(pool,owner,runId,runId)).queued;const message=queue.find(m=>m.text===text);assert.ok(message);const result=await rpc(scope.owner,'agents.changeQueuedThreadReply',[{issueId,runId,messageId:message.id,action}]);assert.ok(['cancelled','sent'].includes(result.status));return message.id}}
       const refused=await send(scope.peer,mode==='sendNow'?'steer':mode,follow,ident());assert.ok(refused.error)
       record('live_turn_before_owner_action',{runId,harness,modes:modes.modes,peerDenied:true,runBoundGrant:true,firstFrame:JSON.parse(readFileSync(join(gateDir,runId+'.observed'),'utf8'))})
+      stage=mode+'_desktop_or_http_writer'
       if(window&&mode==='steer')await ui.expectDefaultQueue()
       const cancelText='Remove this synthetic queued note.'
       const cancelId=await ui.submit('queue',cancelText);if(window)await ui.expectQueued(cancelText)
@@ -112,21 +185,38 @@ async function fullWork(window?:any){
       }
       release()
       if(activeSteer){
-        const final=await until(async()=>{const r=await row(runId);return r?.sessionId&&r.status==='stopped'&&r},'codex_terminal_result')
-        const results=readFileSync(join(modelDir,'results.jsonl'),'utf8').trim().split('\n').map(s=>JSON.parse(s));
+        const final=await expectedStopped(runId, 'codex_terminal_result', 75)
+        const results=caseOutputs();
         const matches=results.findLast(s=>mark(s.prompt)===follow&&s.outputTokens>0&&final.lastReply?.includes(s.result));assert.ok(matches)
         record('steer_terminal_readback',{mode,runId,deviceId,sessionId:final.sessionId,status:final.status,outputSha256:hash(matches.result)})
       }else{
         const next=await until(async()=>{const rows=(await observer.query('select id from agent_runs where "continuesRunId"=$1 and "workspaceId"=$2 and "userId"=$3',[runId,workspaceId,owner])).rows;assert.ok(rows.length<=1);return rows[0]?.id},mode+'_child_admission',90)
-        const child=await until(async()=>{const r=await row(next);return r?.sessionId&&r.status==='stopped'&&r},mode+'_child_native_result',90)
+        const child=await expectedStopped(next, mode+'_child_native_result', 90)
         const prior=await row(runId);assert.equal(prior.deviceId,deviceId);assert.equal(child.deviceId,deviceId);assert.ok(child.prompt.includes(follow));assert.ok(child.lastReply)
-        const actual=readFileSync(join(modelDir,'claude-results.jsonl'),'utf8').trim().split('\n').map(x=>JSON.parse(x)).findLast(s=>mark(s.prompt)===follow&&s.output_tokens>0&&child.lastReply.includes(s.output));assert.ok(actual)
+        const actual=caseOutputs().findLast(s=>mark(s.prompt)===follow&&s.output_tokens>0&&child.lastReply.includes(s.output));assert.ok(actual)
         if(mode==='queue'){const q=await queued(sendId);assert.deepEqual([q.status,q.claimMode,q.sentRunId],['sent','afterRun',next]);assert.equal(prior.status,'succeeded')}
         if(mode==='interrupt'){const q=await queued(heldId);assert.equal(q.status,'failed');assert.equal(q.sentRunId,null);assert.ok(!child.prompt.includes(heldText));assert.equal(prior.status,'cancelled')}
         record('terminal_and_native_continuation_readback',{mode,runId,childId:next,deviceId,sessionId:child.sessionId,prior:prior.status,status:child.status,outputSha256:hash(actual.output)})
       }
-    }finally{release()}
+      record('case_passed',{mode,harness,runId,issueId})
+    } catch (error) {
+      failed = true
+      const failedStage = stage
+      const failedRun = await row(runId).catch(() => null)
+      record('case_failed',{mode,harness,runId,issueId,stage:failedStage,
+        ...failureMetadata(error),state:failedRun?.status,reason:failedRun?.stopReason,
+        sessionPresent:Boolean(failedRun?.sessionId)})
+      release()
+      if (issueId) {
+        try { await drainCase(issueId,runId) }
+        catch (cleanupError) {
+          record('case_cleanup_failed',{mode,harness,runId,issueId,...failureMetadata(cleanupError)})
+          throw cleanupError
+        }
+      }
+    } finally { release() }
   }
+  if (failed) process.exitCode=1
 }
 try {
   const environment=await loadEnvironment();assert.equal(environment.deploymentSha,source)
@@ -149,12 +239,31 @@ try {
   const versions=Object.fromEntries(daemonReport.filter((r:any)=>['codex','claude_code'].includes(r.harness)&&r.installed).map((r:any)=>[r.harness,r.version]));assert.deepEqual(versions,{codex:'0.163.0',claude_code:'2.1.309'})
   record('one_registered_full_device_with_pinned_harnesses',{deviceId,versions,registration:'one-use HTTPS enrollment'})
   if(native){const {withPackagedDeliveryWindow}=await import('../../apps/desktop/test/self-hosted-delivery.mjs');await withPackagedDeliveryWindow({scope,authorityCertificate:join(dir,'ephemeral-ca.pem'),workspaceDirectory:dir},fullWork)}else await fullWork()
-  trace.success=true
+  trace.success=process.exitCode !== 1
 }catch(error){const location=String(error?.stack??'').match(/full-daemon\.mts:\d+:\d+/)?.[0];const named=String(error?.code??'');trace.diagnostic={stage,location,code:/^[A-Z_0-9]{2,60}$/.test(named)?named:undefined};if(lastRun){const run=await row(lastRun).catch(()=>null);if(run)Object.assign(trace.diagnostic,{run:lastRun,state:run.status,reason:run.stopReason,sessionPresent:Boolean(run.sessionId),tokens:(await observer.query('select count(*)::int as n from model_gateway_tokens where "runId"=$1',[lastRun])).rows[0].n})};process.exitCode=1}
 finally{
-  try{if(daemon?.pid&&daemon.exitCode===null){const end=once(daemon,'exit');daemon.kill('SIGTERM');const timer=setTimeout(()=>daemon?.kill('SIGKILL'),8000);try{await end}finally{clearTimeout(timer)}}
-    if(tokenId){const r=await scope.owner.request('/api/device-tokens/'+tokenId+'/revoke',{method:'POST'});assert.equal(r.status,200);assert.equal((await r.json()).tokenId,tokenId)}
-    if(scope){const result=await scope.release({outcome:'dirty'});record('lease_closed',{state:result.state})}
-  }catch{record('cleanup_failed');process.exitCode=1;trace.success=false}
+  // Never skip the lease release because a different cleanup action failed.
+  async function clean(step:string, action:()=>Promise<void>) {
+    try { await action() }
+    catch (error) {
+      record('cleanup_failed',{step,...failureMetadata(error)})
+      process.exitCode=1;trace.success=false
+    }
+  }
+  await clean('daemon_process', async()=>{
+    if(!daemon?.pid || daemon.exitCode!==null || daemon.signalCode!==null)return
+    const end=once(daemon,'exit')
+    daemon.kill('SIGTERM')
+    const timer=setTimeout(()=>daemon?.kill('SIGKILL'),8000)
+    try { await end } finally { clearTimeout(timer) }
+  })
+  await clean('device_credential',async()=>{
+    if(tokenId) await revokeDevice(tokenId,native)
+  })
+  await clean('account_lease',async()=>{
+    if(!scope)return
+    const result=await scope.release({outcome:'dirty'})
+    record('lease_closed',{state:result.state})
+  })
   closeSync(cliLog);write();await observer.end();const {workspacePool}=await import('../../lib/workspace-db');await Promise.all([pool.end(),workspacePool.end()]);const {builtinGateway}=await import('../../lib/builtin-gateway/runtime');await builtinGateway()?.stop()
 }
