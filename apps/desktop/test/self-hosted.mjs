@@ -14,6 +14,7 @@ import { verifyPersonalDriveUploads } from './self-hosted-drive.mjs'
 import { verifyOrganizationLifecycle } from './self-hosted-organization.mjs'
 import { verifyConversationOrganization } from './self-hosted-conversations.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
+import { verifyPickedRepository } from './native-repository-picker.mjs'
 import { readNativeStartup } from './native-startup.mjs'
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
@@ -197,6 +198,9 @@ async function main() {
       await verifyPersonalDriveUploads({ ...controls, application, workspaceId: sharedWorkspace, directory, folderCheck: report.driveFolder, receipts: report.driveUploads })
       report.versionAdmissions = await verifyDesktopVersionHistory(controls)
       await verifyWorkspaceAutomation({ ...controls, workspaceId: sharedWorkspace })
+      phase = 'native_repository_picker'
+      await verifyPickedRepository(application, page, directory)
+      passed('packaged_repository_picker_resolves_origin_and_upstream_with_fixture_dialog_selection')
     }
     phase = 'sign_out_and_return'
     await page.evaluate(() => window.mikka.bundled.signOut())
