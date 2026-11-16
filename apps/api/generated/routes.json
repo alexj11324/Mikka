@@ -2480,6 +2480,16 @@
       "sourceHash": "c12fc4b721f87d76416e0e2ab4c66f717110c855dc39909f1013a08d09d95bdf"
     },
     {
+      "path": "/mikka/api/tasks/[taskId]/review/machine-sessions",
+      "template": "/api/tasks/[taskId]/review/machine-sessions",
+      "source": "app/api/tasks/[taskId]/review/machine-sessions/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "4a5ec8712ba271c03aac9eb62832f1ddc87e9f946b4ca1d0f98415cbcc182bf4"
+    },
+    {
       "path": "/mikka/api/tasks/[taskId]/review/merge",
       "template": "/api/tasks/[taskId]/review/merge",
       "source": "app/api/tasks/[taskId]/review/merge/route.ts",
