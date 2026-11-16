@@ -12,13 +12,13 @@ export type BotPatch = Partial<Pick<BotView, 'name' | 'color' | 'shape'>>
  * (bot list, chat title, right panel) and rolls back if it does not save; the
  * returned promise then rejects with an `Errors` code as its message.
  */
-export function useSaveBot() {
+export function useSaveBot(workspaceId?: string) {
   const { mutate } = useSWRConfig()
   return async (botId: string, patch: BotPatch) => {
     await mutate<BotView[]>(botKeys.all(), async current => {
       let result: Awaited<ReturnType<typeof updateBot>>
       try {
-        result = await updateBot({ botId, ...patch })
+        result = await updateBot({ botId, ...patch }, workspaceId)
       } catch (cause) {
         throw new Error('generic', { cause })
       }
