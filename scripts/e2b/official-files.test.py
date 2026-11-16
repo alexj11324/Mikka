@@ -553,12 +553,14 @@ class RotatingProviderCertificates(unittest.TestCase):
     """2026-11-16 control 43921160007: E2B rotates its own provider CA per build and create."""
     observed = ('/usr/local/share/ca-certificates/e2b-db7fc94a8da18b7124e1cffc506e989c8d59787215333e78a4ca1851b7e4daf5.crt',
                 '/etc/ssl/certs/e2b-64b11aac5ee6accf4bbae2ef8644947c33dcd558c2e8570c9d58c4a4b7842ca7.pem',
-                '/etc/ssl/certs/1560546e.0', '/etc/ssl/certs/1560546e.1')
+                '/etc/ssl/certs/1560546e.0', '/etc/ssl/certs/1560546e.1',
+                # Validation run 43922227579: removed on claude's fresh create.
+                ROOT_CA)
 
     def test_only_the_measured_rotating_provider_names_match(self):
         for path in self.observed:
             self.assertTrue(files.ROTATING_PROVIDER_CA.fullmatch(path), path)
-        for path in (ROOT_CA, '/etc/ssl/certs/e2b-ca.pem', '/etc/ssl/certs/ca-certificates.crt',
+        for path in ('/etc/ssl/certs/e2b-ca.pem', '/usr/local/share/ca-certificates/e2b-ca.crt.bak', '/etc/ssl/certs/ca-certificates.crt',
                      '/etc/ssl/certs/002c0b4f.0', '/etc/ssl/certs/1560546e', '/etc/ssl/certs/1560546e.0x',
                      '/usr/local/share/ca-certificates/e2b-' + 'a' * 63 + '.crt',
                      '/usr/local/share/ca-certificates/e2b-' + 'A' * 64 + '.crt',
