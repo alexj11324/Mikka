@@ -726,5 +726,42 @@ class ProviderAndWorkerProof(unittest.TestCase):
             child.stdout.close()
 
 
+class PrivateNetfilterBuild(unittest.TestCase):
+    """The desktop base ships nftables 1.0.2; its guard uses a pinned private build."""
+    here = Path(__file__).parent
+    script = (here / 'build-netfilter.sh').read_text()
+    bootstrap = (here / 'official-e2b-instance-bootstrap.sh').read_text()
+
+    def test_private_prefix_is_the_guard_tool_path_first_entry(self):
+        prefix = '/opt/mikka/runtime/netfilter'
+        self.assertEqual(guard.TOOL_PATH.split(':')[0], prefix + '/sbin')
+        build = 'if [[ "$mikka_kind" = desktop ]]; then bash packages/daemon/scripts/build-netfilter.sh ' + prefix + '; fi'
+        self.assertEqual(self.bootstrap.count(build), 1)
+        # Built before the guard is installed or prepared; never on claude or codex.
+        self.assertLess(self.bootstrap.index(build), self.bootstrap.index('install -m 444 -o root -g root packages/daemon/scripts/workspace-ingress.py'))
+
+    def test_every_source_is_pinned_and_the_build_never_touches_the_system(self):
+        fetches = re.findall(r'^fetch (https://\S+) \S+ ([0-9a-f]{64})$', self.script, re.M)
+        self.assertEqual([url.rsplit('/', 1)[1] for url, _ in fetches],
+                         ['jansson-2.14.tar.gz', 'libmnl-1.0.5.tar.bz2', 'libnftnl-1.2.6.tar.xz', 'nftables-1.0.9.tar.xz'])
+        self.assertIn('sha256sum --check --strict', self.script)
+        commands = '\n'.join(line for line in self.script.splitlines() if not line.lstrip().startswith('#'))
+        self.assertNotRegex(commands, r'\bapt(-get)?\b|\bdpkg\b|ldconfig|/etc/ld\.so')
+        self.assertIn('--with-json', self.script)
+        # The guard requires >= 1.0.6; the build refuses anything but the pinned 1.0.9.
+        self.assertIn("grep -Eq '^nftables v1\\.0\\.9 '", self.script)
+        self.assertIsNotNone(re.match(rb'nftables v([0-9]+)\.([0-9]+)\.([0-9]+)(?:[ .(]|$)', b'nftables v1.0.9 (Old Doc Yak #3)'))
+
+    def test_guard_accepts_the_private_version_and_still_refuses_the_desktop_distribution(self):
+        for output, accepted in ((b'nftables v1.0.9 (Old Doc Yak #3)\n', True), (b'nftables v1.0.2 (Lester Gooch)\n', False)):
+            with patch.object(guard.shutil, 'which', return_value='/opt/mikka/runtime/netfilter/sbin/nft'), \
+                    patch.object(guard.subprocess, 'run', return_value=SimpleNamespace(returncode=0, stdout=output)):
+                if accepted:
+                    self.assertEqual(guard.program(), '/opt/mikka/runtime/netfilter/sbin/nft')
+                else:
+                    with self.assertRaisesRegex(guard.IngressError, 'backend'):
+                        guard.program()
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
