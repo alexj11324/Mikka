@@ -24,6 +24,15 @@ and the result falls back to the creator's Coordinator chat.
 creation time and schedule ID, newest first. Each read checks the current
 workspace membership and conversation visibility.
 
+`schedule_history` accepts `batches: {}` to list webhook windows for a single
+schedule. The creator and workspace owners or administrators can read batch IDs,
+request counts, creation and due times. A batch can be collecting requests,
+queued for a run, or cancelled. Its occurrence status is reported separately. Optional `batches.status`,
+`batches.limit` and `batches.cursor` filter and page these windows. Pass
+`nextCursor` back unchanged for the next page. Individual webhook requests
+with batching off do not have a window. This view omits bodies and request
+keys. Omit `batches` to read ordinary occurrence history.
+
 Request deduplication uses a frozen internal `request_origin` rather than the
 mutable `bot_id`. Two Bots can use the same SDK tool-call ID; removing either
 Bot preserves its schedule without merging their request keys. The internal
