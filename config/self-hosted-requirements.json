@@ -285,6 +285,20 @@
     "test": "tests/team-issue-create.db.test.ts",
     "suite": "test:scope-detachment-db"
   },
+  "app/api/tasks/[taskId]/review/machine-metrics/route.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "Reads a recent measurement from a Task owner's configured E2B machine. Returns unavailable for unsupported machine providers and for missing owner configuration.",
+    "test": "lib/coding-workspace/machine-metrics.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/computer/e2b-provider.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "Reads a recent measurement from a Task owner's configured E2B machine. Returns unavailable for unsupported machine providers and for missing owner configuration.",
+    "test": "lib/coding-workspace/machine-metrics.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
   "app/api/tasks/[taskId]/review/preview/route.ts": {
     "mode": "operator-configured",
     "environment": [
