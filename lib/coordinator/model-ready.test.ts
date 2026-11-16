@@ -8,6 +8,7 @@ import type { UsableApiKey } from '../model-api-keys'
 const botId = '10000000-0000-4000-8000-000000000001', workspaceId = '10000000-0000-4000-8000-000000000002'
 let selected: string | null | undefined, rows: BotSubscriptionChoice[] = [], keys: UsableApiKey[] = []
 let key: { keyId: string; model: string } | undefined
+let credits: string | undefined, offered: string[] = [], refusal: string | null = null
 let fallback: { key: UsableApiKey; model: string } | null = null
 const scopes: Array<{ ownerId: string; workspaceId: string }> = []
 mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { pool: { query: async (sql: string, args: unknown[]) => {
@@ -20,6 +21,7 @@ mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { p
   }
   assert.deepEqual(args, ['alice', workspaceId, botId])
   if (key) return { rows: [{ bindingId: null, apiKeyId: key.keyId, apiKeyModel: key.model }] }
+  if (credits) return { rows: [{ bindingId: null, apiKeyId: null, apiKeyModel: null, creditsModel: credits }] }
   return { rows: selected === undefined ? [] : [{ bindingId: selected, apiKeyId: null, apiKeyModel: null }] }
 } } } })
 mock.module(new URL('../execution-settings.ts', import.meta.url).href, { namedExports: {
@@ -40,11 +42,18 @@ mock.module(new URL('../quota-fallback.ts', import.meta.url).href, { namedExport
 // The existing core hosted ledger admits an unmetered community default;
 // readiness must still reject that default when no provider is configured.
 mock.module(new URL('../points-fallback.ts', import.meta.url).href, { namedExports: {
-  hostedPointsRefusal: async () => null, pointsFallback: async () => null,
+  hostedPointsRefusal: async () => refusal, pointsFallback: async () => null,
+} })
+mock.module(new URL('../credits-models.ts', import.meta.url).href, { namedExports: {
+  creditsModels: async () => offered.map(id => ({ id })),
+  creditsModelOffered: async (model: string) => offered.includes(model),
 } })
 let botModelReady: typeof import('./model-ready')['botModelReady']
 before(async () => { process.env.MIKKA_EDITION = 'community'; ({ botModelReady } = await import('./model-ready')) })
-beforeEach(() => { selected = undefined; rows = []; keys = []; key = undefined; fallback = null; scopes.length = 0 })
+beforeEach(() => {
+  selected = undefined; rows = []; keys = []; key = undefined; fallback = null; scopes.length = 0
+  credits = undefined; offered = []; refusal = null; process.env.MIKKA_EDITION = 'community'
+})
 function subscription(provider = 'claude', used = 0.2, age = 0): BotSubscriptionChoice {
   return { bindingId: 'fixture-binding', connectionId: 'fixture-connection', ownerId: 'alice', provider,
     modelId: 'fixture-model', quota: { vendor: provider === 'codex' ? 'codex' : 'claude_code', source: 'official', status: 'ok', plan: null,
@@ -89,4 +98,16 @@ test('a selected usable API key works; an inaccessible or unsupported key does n
   assert.equal(await botModelReady('alice', botId), false)
   keys = [{ ...savedKey, models: ['another-model'] }]
   assert.equal(await botModelReady('alice', botId), false)
+})
+
+test('a Mikka 额度 model wakes like any other source when it is offered and paid for', async () => {
+  // Decision 2026-11-16-0100: task reports and schedules wake every model source alike.
+  credits = 'deepseek/deepseek-v4'; offered = [credits]
+  assert.equal(await botModelReady('alice', botId), true)
+  offered = ['other/model']
+  assert.equal(await botModelReady('alice', botId), false, 'a model this server no longer offers cannot run')
+  process.env.MIKKA_EDITION = 'cloud'; offered = [credits]
+  assert.equal(await botModelReady('alice', botId), true)
+  refusal = 'points_exhausted'
+  assert.equal(await botModelReady('alice', botId), false, 'an empty balance with no fallback is the known exhausted case')
 })
