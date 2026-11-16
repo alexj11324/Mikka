@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { decode, encode } from '../../../lib/desktop-rpc/wire.ts'
 import { launchElectron } from './electron-launch.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
+import { verifyDesktopVersionHistory } from './self-hosted-version-history.mjs'
 import { verifyConversationOrganization } from './self-hosted-conversations.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
 import { readNativeStartup } from './native-startup.mjs'
@@ -178,7 +179,9 @@ async function main() {
     }
     if (overlaySha) {
       phase = 'conversation_owner_member'
-      await verifyConversationOrganization({ page, fixture, rpc, passed, setPhase: value => { phase = value } })
+      const controls = { page, fixture, rpc, passed, setPhase: value => { phase = value } }
+      await verifyConversationOrganization(controls)
+      report.versionAdmissions = await verifyDesktopVersionHistory(controls)
     }
     phase = 'sign_out_and_return'
     await page.evaluate(() => window.mikka.bundled.signOut())

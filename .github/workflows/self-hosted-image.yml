@@ -409,6 +409,8 @@ jobs:
           MIKKA_DESKTOP_EXECUTABLE: ${{ github.workspace }}/apps/desktop/release-acceptance/linux-unpacked/mikka-selfhost-acceptance
         run: *native_check
         timeout-minutes: 5
+      - name: Verify the two Desktop version admissions in the same isolated PostgreSQL
+        run: docker compose exec -T app node scripts/acceptance/self-hosted-version-history.mjs < .artifacts/self-hosted/desktop/report.json
       - name: Retain the sanitized official Desktop qualification receipt
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
