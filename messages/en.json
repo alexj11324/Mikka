@@ -1269,6 +1269,7 @@
     "factoryHumanRequired": "Sign in again to answer.",
     "originRejected": "This server did not authorize the request.",
     "decisionOffline": "Reconnect to answer.",
+    "projectDependencyReaderUnavailable": "Connect your GitHub account and allow the Mikka app to read your repository list, then retry.",
     "projectRepositoryDenied": "This repository or target branch is not permitted by the workspace or project.",
     "projectEnvironmentUnavailable": "The selected environment or one of its required resources is unavailable for this run.",
     "projectResourceConflict": "These resource settings changed. Refresh and try again.",
@@ -1830,6 +1831,11 @@
     "backToAccessible": "Back to an accessible workspace"
   },
   "Projects": {
+    "dependencies": {
+      "title": "Dependency repositories",
+      "empty": "No repositories to show.",
+      "unavailable": "The complete dependency list cannot be edited with your current access."
+    },
     "lifecycle": {
       "actions": "Project actions",
       "impact": "Project impact",

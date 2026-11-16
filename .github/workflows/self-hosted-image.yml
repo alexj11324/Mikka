@@ -409,6 +409,7 @@ jobs:
           pnpm --dir .hosted-ui install --ignore-workspace --prod --ignore-scripts --frozen-lockfile > "$RUNNER_TEMP/official-ui-install.log" 2>&1
           pnpm --filter @mikka/desktop build > "$RUNNER_TEMP/official-desktop-build.log" 2>&1
       - name: Package the official Linux acceptance executable
+        id: official_package
         env:
           MIKKA_DESKTOP_FLAVOR: dev
           MIKKA_DESKTOP_APP_URL: http://localhost:3001/mikka
@@ -431,9 +432,12 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - name: Prepare isolated public runtime for active Desktop delivery
+        id: delivery_runtime
+        if: ${{ !cancelled() && steps.official_package.outcome == 'success' }}
         timeout-minutes: 12
         run: scripts/acceptance/desktop-delivery/prepare.sh
       - name: Qualify active delivery in the same official packaged Desktop
+        if: ${{ !cancelled() && steps.delivery_runtime.outcome == 'success' }}
         timeout-minutes: 18
         env:
           MIKKA_UI_OVERLAY_SHA: ${{ inputs.overlay_sha }}

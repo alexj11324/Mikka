@@ -1,7 +1,7 @@
 import { AVATAR_MAX_BYTES, isAvatarContentType } from '../account/avatar-file'
 import { threadModelChoice } from '@/lib/thread-model-choice'
 import { archiveIdleDays, conversationTargetInput, directoryInput } from '@/lib/conversation-directory-input'
-import { listProjectSetupVersionsInput, rollbackProjectSetupInput, saveEnvironmentInput, projectDefaultEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
+import { listProjectSetupVersionsInput, rollbackProjectSetupInput, saveEnvironmentInput, listDependencyRepositoriesInput, replaceDependencyRepositoriesInput, projectDefaultEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
 import { createOnlyCommand, dispatchReceiptInput } from '@/lib/task-create-command'
 import { taskListPageInput } from '@/lib/task-list-page'
 import { taskPresentationsInput } from '@/lib/task-presentation-input'
@@ -117,6 +117,8 @@ export const desktopActionSchemas = {
   'project-resources.listProjectResources': tuple(uuid, uuid.optional()),
   'project-resources.setProjectDefaultEnvironment': tuple(projectDefaultEnvironmentInput),
   'project-resources.saveEnvironment': tuple(saveEnvironmentInput),
+  'project-resources.listDependencyRepositories': tuple(listDependencyRepositoriesInput),
+  'project-resources.replaceDependencyRepositories': tuple(replaceDependencyRepositoriesInput),
   'project-resources.saveProjectResources': tuple(projectResourcesInput),
   'project-resources.saveWorkspaceRepositoryPolicy': tuple(workspaceRepositoryPolicyInput),
   'desktop.bootstrap': inWorkspace,
@@ -182,8 +184,8 @@ export const desktopActionSchemas = {
   'bots.pollBots': none,
   'bots.createBot': tuple(object({ name: text(200).trim().min(1), color: text(50).min(1), shape: text(50).min(1), model: text(1000).nullish(), repository: text(2048).nullish() })),
   'bots.updateBot': tuple(object({ botId: uuid, name: text(200).trim().min(1).optional(), color: text(50).min(1).optional(), shape: text(50).min(1).optional(), publicRole: text(2000).optional() })),
-  'bots.listWorkspaceBots': none,
-  'bots.getWorkspaceBotDefaults': none,
+  'bots.listWorkspaceBots': inWorkspace,
+  'bots.getWorkspaceBotDefaults': inWorkspace,
   'automations.listAutomations': tuple(object({ cursor: text(100).optional(), deleted: z.boolean().optional() }), workspace),
   'automations.getAutomation': tuple(uuid, workspace),
   'automations.flushAutomationBatch': tuple(webhookBatchInput, workspace),
@@ -197,7 +199,7 @@ export const desktopActionSchemas = {
   'automations.takeOverAutomation': tuple(object({ scheduleId: uuid, version: positive }), workspace),
   'automations.automationWebhookKey': tuple(object({ scheduleId: uuid, version: positive }), workspace),
   'automations.automationLinearTeams': none,
-  'automations.automationSlackChannels': none,
+  'automations.automationSlackChannels': inWorkspace,
   'automations.pinAutomation': tuple(object({ scheduleId: uuid, pinned: z.boolean() }), workspace),
   'automations.organizeAutomation': tuple(object({ scheduleId: uuid, folder: z.string().trim().min(1).max(60).nullable(), tags: z.array(z.string().trim().min(1).max(30)).max(10) }), workspace),
   'automations.resumeAutomation': tuple(object({ scheduleId: uuid, version: positive }), workspace),

@@ -6,7 +6,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { ArrowLeft, Play } from 'lucide-react'
 import { listDevices } from '@/app/actions/agents'
-import { getWorkspaceBotDefaults, listBots } from '@/app/actions/bots'
+import { getWorkspaceBotDefaults, listBotsForWorkspace } from '@/app/actions/bots'
 import { automationLinearTeams, automationSlackChannels, deleteAutomation, createAutomation, pauseAutomation, resumeAutomation, runAutomationNow, takeOverAutomation, updateAutomation } from '@/app/actions/automations'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
@@ -80,12 +80,13 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
   const [confirmTakeOver, setConfirmTakeOver] = useState(false)
   const set = (patch: Partial<AutomationDraft>) => setDraft(value => value ? { ...value, ...patch } : value)
 
-  const { data: bots = [] } = useSWR('bots', listBots, { revalidateOnFocus: false })
+  const { data: bots = [] } = useSWR(workspaceId ? ['bots', 'workspace', workspaceId] as const : null,
+    ([, , shown]) => listBotsForWorkspace(shown), { revalidateOnFocus: false })
   const { data: devices = [] } = useSWR('devices', listDevices, { revalidateOnFocus: false })
   const workspaceBots = useWorkspaceBotNames(workspaceId)
   // The workspace's installed repositories, the ones a GitHub trigger may name (any member may read them).
-  const { data: repositories = [] } = useSWR(workspaceId ? ['automation-repositories', workspaceId] : null, async () => {
-    const result = await getWorkspaceBotDefaults()
+  const { data: repositories = [] } = useSWR(workspaceId ? ['automation-repositories', workspaceId] as const : null, async ([, shown]) => {
+    const result = await getWorkspaceBotDefaults(shown)
     return 'error' in result && result.error ? [] : (result as { repositories: string[] }).repositories
   }, { revalidateOnFocus: false })
   // Linear triggers' teams, read only once the person adds a Linear event or the automation has one.
@@ -97,8 +98,8 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
   }, { revalidateOnFocus: false })
   // Slack triggers' channels, read only once the person adds a Slack event or the automation has one.
   const [slackWanted, setSlackWanted] = useState(false)
-  const slackChannels = useSWR(slackWanted || Boolean(draft?.slack.length) || Boolean(draft?.notify) ? ['automation-slack-channels', workspaceId] : null, async () => {
-    const result = await automationSlackChannels()
+  const slackChannels = useSWR(workspaceId && (slackWanted || Boolean(draft?.slack.length) || Boolean(draft?.notify)) ? ['automation-slack-channels', workspaceId] as const : null, async ([, shown]) => {
+    const result = await automationSlackChannels(shown)
     if ('error' in result && result.error) throw new Error(result.error)
     return result as { installed: boolean; channels: { id: string; name: string; private: boolean }[] }
   }, { revalidateOnFocus: false })

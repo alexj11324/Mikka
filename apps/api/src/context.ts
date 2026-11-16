@@ -19,14 +19,15 @@ export function requireRequestScope(): RequestScope {
   if (!scope) throw new Error('API_REQUEST_SCOPE_REQUIRED')
   return scope
 }
-export function requestLocale(request: Request): Locale {
+function requestLocale(request: Request, cookies: CookieJar): Locale {
   const explicit = request.headers.get('x-mikka-locale')
   if (explicit === 'en' || explicit === 'zh-CN') return explicit
-  return new CookieJar(request.headers.get('cookie')).get('NEXT_LOCALE')?.value === 'en' ? 'en' : 'zh-CN'
+  return cookies.get('NEXT_LOCALE')?.value === 'en' ? 'en' : 'zh-CN'
 }
 export function createRequestScope(request: Request): RequestScope {
-  return { request, headers: new Headers(request.headers), cookies: new CookieJar(request.headers.get('cookie')),
-    locale: requestLocale(request), after: new AfterQueue(), memo: new Map() }
+  const cookies = new CookieJar(request.headers.get('cookie'))
+  return { request, headers: new Headers(request.headers), cookies,
+    locale: requestLocale(request, cookies), after: new AfterQueue(), memo: new Map() }
 }
 export function runRequestScope<T>(scope: RequestScope, work: () => T): T { return storage.run(scope, work) }
 export function bindRequestCallback<T>(work: () => T): () => T {

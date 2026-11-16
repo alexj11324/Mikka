@@ -161,8 +161,8 @@ export async function setMemberSubscribed(id: string, memberId: string, subscrib
     // Anyone may read for themselves through the task; only its owner changes another member.
     if (!maySetSubscription({ accountId: user.id, ownerId: issue.userId, role: null }, parsed.data.memberId)) return { error: 'memberOwnerOnly' }
     if (!mayMuteMember(parsed.data.memberId, issue.userId)) return { error: 'validationGeneric' }
-    return withIssueWorkspace(user, issue.workspaceId, { issueId: issue.id, action: 'canReadContent' }, () => db.transaction(async tx => {
-      const [locked] = await tx.select({ workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion }).from(issues).where(and(eq(issues.id, id), eq(issues.userId, user.id))).for('update')
+    return withIssueWorkspace(user, issue.workspaceId, { issueId: issue.id, action: 'canReadContent' }, async (_workspace, tx) => {
+      const [locked] = await tx.select({ workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion }).from(issues).where(and(eq(issues.id, id), eq(issues.userId, issue.userId))).for('update')
       requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
       const [updated] = await tx.update(issueMembers).set({ subscribed: parsed.data.subscribed })
         .where(and(eq(issueMembers.issueId, id), eq(issueMembers.userId, issue.userId), eq(issueMembers.memberId, parsed.data.memberId)))
@@ -170,7 +170,7 @@ export async function setMemberSubscribed(id: string, memberId: string, subscrib
       if (!updated) return { error: 'memberNotFound' }
       await issueMembersChanged(tx, id)
       return { success: true as const }
-    }))
+    })
   })
 }
 

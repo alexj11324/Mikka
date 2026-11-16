@@ -185,7 +185,8 @@ async function main() {
       phase = 'conversation_owner_member'
       const controls = { page, fixture, rpc, passed, setPhase: value => { phase = value } }
       const sharedWorkspace = await verifyConversationOrganization(controls)
-      report.driveUploads = await verifyPersonalDriveUploads({ ...controls, application, workspaceId: sharedWorkspace, directory })
+      report.driveFolder = {}
+      report.driveUploads = await verifyPersonalDriveUploads({ ...controls, application, workspaceId: sharedWorkspace, directory, folderCheck: report.driveFolder })
       report.versionAdmissions = await verifyDesktopVersionHistory(controls)
     }
     phase = 'sign_out_and_return'
