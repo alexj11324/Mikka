@@ -306,7 +306,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
         </SettingRow>
         {(slackWanted || draft.slack.length > 0) && <>
           {slackChannels.error && <div className="px-5 pb-2"><InlineLoadError message={t('slack.channelsError')} retryLabel={tCommon('retry')} onRetry={() => { void slackChannels.mutate() }} /></div>}
-          <SlackTriggers value={draft.slack} channels={slackChannels.data?.channels ?? []} installed={slackChannels.data?.installed ?? true} disabled={busy !== null || (!slackChannels.data && !slackChannels.error)} onChange={slack => set({ slack })} />
+          <SlackTriggers workspaceId={workspaceId} userId={userId} value={draft.slack} channels={slackChannels.data?.channels ?? []} installed={slackChannels.data?.installed ?? true} disabled={busy !== null || (!slackChannels.data && !slackChannels.error)} onChange={slack => set({ slack })} />
         </>}
         <WebhookTrigger value={draft.webhook} onChange={webhook => set({ webhook })} automation={current ?? null} disabled={busy !== null}
           onSaved={readAfterChange} />

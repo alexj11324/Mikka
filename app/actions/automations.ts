@@ -162,6 +162,24 @@ export async function automationSlackChannels(workspaceId?: string): Promise<Act
   })
 }
 
+/** Custom reaction suggestions for the Slack installation in the workspace shown in the editor. */
+export async function automationSlackEmojis(workspaceId: string): Promise<ActionResult<{ emojis: string[] }>> {
+  return runAction(async () => {
+    if (actingContext.getStore()) throw new ActionFailureError('authRequired')
+    if (!z.uuid().safeParse(workspaceId).success) throw new ActionFailureError('validationGeneric')
+    let actor
+    try { actor = await currentWorkspaceActor(workspaceId) } catch (error) {
+      if (error instanceof WorkspaceError) throw new ActionFailureError(isActionErrorCode(error.code) ? error.code : 'generic', undefined, undefined, { cause: error })
+      throw error
+    }
+    const app = process.env.SLACK_APP_ID
+    if (!app) return { emojis: [] }
+    const { slackInstallationEmojis } = await import('@/lib/slack/automation-channels')
+    try { return { emojis: await slackInstallationEmojis(app, actor.userId, actor.workspaceId) } }
+    catch (error) { throw new ActionFailureError('scheduleSlackUnreachable', undefined, undefined, { cause: error }) }
+  })
+}
+
 /** 置顶: the signed-in person's own pin. */
 export async function pinAutomation(input: { scheduleId: string; pinned: boolean }, workspaceId?: string): Promise<ActionResult<{ pinned: boolean }>> {
   const parsed = z.object({ scheduleId: z.uuid(), pinned: z.boolean() }).strict().safeParse(input)

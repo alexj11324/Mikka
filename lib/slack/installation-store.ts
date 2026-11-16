@@ -181,13 +181,13 @@ type CredentialUse = {
 export function installationCredential(
   pool: Database,
   input: CredentialUse,
-  options: { settings?: boolean; env?: NodeJS.ProcessEnv; send?: typeof fetch } = {},
+  options: { settings?: boolean; requiredScope?: string; env?: NodeJS.ProcessEnv; send?: typeof fetch } = {},
 ) {
   return transaction(pool, async (client) => {
     const { rows } = await client.query<Installation>(
       'SELECT i.* FROM mikka_slack_installations i JOIN mikka_slack_members m ON m.installation_id=i.id' +
         ' WHERE i.app_id=$1 AND i.workspace_id=$2 AND m.user_id=$3 AND ($4::text IS NULL OR i.team_id=$4)' +
-        ' AND ($5::text IS NULL OR m.slack_user_id=$5) AND ($6::uuid IS NULL OR i.id=$6) AND ($7 OR (m.enabled AND m.link_id=$8::uuid)) AND NOT i.revoking FOR UPDATE OF i',
+        ' AND ($5::text IS NULL OR m.slack_user_id=$5) AND ($6::uuid IS NULL OR i.id=$6) AND ($7 OR (m.enabled AND m.link_id=$8::uuid)) AND NOT i.revoking AND ($9::text IS NULL OR $9=ANY(i.scopes)) FOR UPDATE OF i',
       [
         input.app,
         input.workspace,
@@ -197,6 +197,7 @@ export function installationCredential(
         input.installationId ?? null,
         options.settings === true,
         input.linkId ?? null,
+        options.requiredScope ?? null,
       ],
     )
     const row = rows[0]

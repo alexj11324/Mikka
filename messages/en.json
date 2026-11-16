@@ -8198,6 +8198,7 @@
         "event": "Event",
         "channel": "Channel",
         "remove": "Remove",
+        "emojisError": "Could not load custom Slack emoji.",
         "reactions": "Emoji (optional, comma-separated, e.g. eyes, white_check_mark)",
         "runWhen": "Condition",
         "runWhenPlaceholder": "Condition (optional): e.g. \"the message asks about a deploy\"",

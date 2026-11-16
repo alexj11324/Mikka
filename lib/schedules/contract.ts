@@ -38,6 +38,8 @@ export const githubRepositoryKey = z.string().regex(/^v2\/github\.com\/[a-z0-9-]
 /** Linear events an automation can run on (decision 2026-11-15-1930): those the Linear app's webhook already sends. */
 export const LINEAR_TRIGGER_EVENTS = ['issue_created', 'issue_status_changed', 'issue_label_added', 'issue_assigned', 'comment_created'] as const
 export type LinearTriggerEvent = typeof LINEAR_TRIGGER_EVENTS[number]
+export const slackReactionName = z.string().trim().regex(/^[a-z0-9_+'-]{1,100}$/)
+
 /** Slack events an automation can run on (decision 2026-11-15-2010); reaction_added needs the app's reactions subscription. */
 export const SLACK_TRIGGER_EVENTS = ['message', 'mention', 'reaction_added'] as const
 export type SlackTriggerEvent = typeof SLACK_TRIGGER_EVENTS[number]
@@ -62,7 +64,7 @@ export const eventTriggerSchema = z.discriminatedUnion('source', [
     /** Channel IDs of the workspace's Slack installation the Bot can see. */
     channels: z.array(z.string().regex(/^[CG][A-Z0-9]{2,30}$/)).min(1).max(20),
     /** reaction_added: the emoji names that count (without colons); empty or absent is any. */
-    reactions: z.array(z.string().trim().regex(/^[a-z0-9_+'-]{1,100}$/)).max(20).optional(),
+    reactions: z.array(slackReactionName).max(20).optional(),
     runWhen: z.string().trim().min(1).max(500).optional(),
   }).strict(),
 ])

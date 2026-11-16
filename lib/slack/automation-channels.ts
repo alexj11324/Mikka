@@ -1,4 +1,5 @@
 import 'server-only'
+import { slackReactionName } from '@/lib/schedules/contract'
 import { pool } from '@/lib/db'
 import { installationCredential } from './installation-store'
 
@@ -29,4 +30,26 @@ export async function slackInstallationChannels(app: string, owner: string, work
     if (!cursor) break
   }
   return channels.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/** Only custom names are returned by Slack, including aliases. Standard reaction names remain valid without a grant. */
+export async function slackInstallationEmojis(app: string, owner: string, workspace: string, send: typeof fetch = fetch): Promise<string[]> {
+  let token: string
+  try {
+    token = await installationCredential(pool, { app, owner, workspace }, { settings: true, requiredScope: 'emoji:read' })
+  } catch (error) {
+    if (error instanceof Error && error.message === 'slackInstallNotAuthorized') return []
+    throw error
+  }
+  const response = await send('https://slack.com/api/emoji.list', {
+    headers: { authorization: `Bearer ${token}` },
+    redirect: 'error',
+    signal: AbortSignal.timeout(10_000),
+  })
+  const body = await response.json() as { ok?: boolean; error?: string; emoji?: Record<string, unknown> }
+  if (response.ok && body.error === 'missing_scope') return []
+  if (!response.ok || !body.ok || !body.emoji || typeof body.emoji !== 'object' || Array.isArray(body.emoji)) {
+    throw new Error('slackEmojisUnavailable')
+  }
+  return Object.keys(body.emoji).filter(name => slackReactionName.safeParse(name).success).sort()
 }

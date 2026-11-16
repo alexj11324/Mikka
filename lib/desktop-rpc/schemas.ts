@@ -200,6 +200,7 @@ export const desktopActionSchemas = {
   'automations.automationWebhookKey': tuple(object({ scheduleId: uuid, version: positive }), workspace),
   'automations.automationLinearTeams': none,
   'automations.automationSlackChannels': inWorkspace,
+  'automations.automationSlackEmojis': oneId,
   'automations.pinAutomation': tuple(object({ scheduleId: uuid, pinned: z.boolean() }), workspace),
   'automations.organizeAutomation': tuple(object({ scheduleId: uuid, folder: z.string().trim().min(1).max(60).nullable(), tags: z.array(z.string().trim().min(1).max(30)).max(10) }), workspace),
   'automations.resumeAutomation': tuple(object({ scheduleId: uuid, version: positive }), workspace),
