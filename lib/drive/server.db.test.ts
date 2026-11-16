@@ -63,10 +63,11 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
   const ownerToken = (await tokens.createLegacyPersonalAccessToken(owner, personal, { name: 'Drive HTTP personal' })).token
   const sharedToken = (await tokens.createLegacyPersonalAccessToken(owner, team.id, { name: 'Drive HTTP other tenant' })).token
   const peerToken = (await tokens.createLegacyPersonalAccessToken(peer, team.id, { name: 'Drive HTTP peer' })).token
-  const call = (suffix = '', options: { token?: string | null; workspaceId?: string; projectId?: string; method?: string; body?: unknown; raw?: string; origin?: string } = {}) => {
+  const call = (suffix = '', options: { token?: string | null; workspaceId?: string; projectId?: string; driveScope?: string; method?: string; body?: unknown; raw?: string; origin?: string } = {}) => {
     const url = new URL(`/api/drive/volumes${suffix}`, origin)
     url.searchParams.set('workspaceId', options.workspaceId ?? personal)
     if (options.projectId) url.searchParams.set('projectId', options.projectId)
+    if (options.driveScope) url.searchParams.set('driveScope', options.driveScope)
     const bearer = options.token === undefined ? ownerToken : options.token
     return fetch(url, { method: options.method ?? 'GET', headers: { ...(bearer ? { authorization: `Bearer ${bearer}` } : {}),
       ...(options.method ? { origin: options.origin ?? origin } : {}), ...(options.body ? { 'content-type': 'application/json' } : {}) },
@@ -102,6 +103,91 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
     await fixture.query('update workspace_projects set "archivedAt"=now() where id=$1', [projectId])
     assert.deepEqual(await directory(sharedToken), [{ driveScope: 'user', workspaceId: team.id }])
     assert.equal((await call('/' + volume.id + '/versions', own)).status, 404)
+  })
+  await t.test('explicit shared Project Files use current Project permissions and project-owned bytes', async () => {
+    const group = await seedTeam(fixture, team.id, owner)
+    const create = () => seedProject(fixture, owner, [{ teamId: group.id, workspaceId: team.id }])
+    const projectId = await create(), otherProject = await create()
+    const shared = { token: sharedToken, workspaceId: team.id, projectId, driveScope: 'project' }
+    const recipient = { ...shared, token: peerToken }, other = { ...shared, projectId: otherProject }
+    const privateFiles = { token: sharedToken, workspaceId: team.id, projectId }
+    const folder = async (location: typeof privateFiles) => {
+      const result = await call('', { ...location, method: 'POST', body: { name: 'Shared test' } })
+      assert.equal(result.status, 201)
+      return (await result.json()).volume as { id: string; headDigest: string; driveScope: string }
+    }
+    const volume = await folder(shared), foreign = await folder(other), privateVolume = await folder(privateFiles)
+    assert.equal(volume.driveScope, 'project')
+    assert.equal((await call('/' + volume.id, { ...shared, workspaceId: team.id.toUpperCase(), projectId: projectId.toUpperCase() })).status, 200)
+    assert.equal(privateVolume.driveScope, 'project-user')
+    assert.equal((await call('/' + volume.id, privateFiles)).status, 404)
+    assert.equal((await call('/' + privateVolume.id, recipient)).status, 404)
+    assert.equal((await call('/' + foreign.id, recipient)).status, 404)
+    const directory = await fetch(`${origin}/api/drive/scopes?workspaceId=${team.id}&driveScope=project`, { headers: { authorization: 'Bearer ' + peerToken } })
+    const destinations = (await directory.json()).scopes as { driveScope: string; projectId: string }[]
+    assert.ok(destinations.some(scope => scope.projectId === projectId))
+    assert.ok(destinations.every(scope => scope.driveScope === 'project'))
+    const upload = async (id: string, location: typeof privateFiles, content: string) => {
+      const response = await call('/' + id + '/blobs', { ...location, method: 'POST', raw: content })
+      assert.equal(response.status, 201)
+      return await response.json() as { sha256: string; sizeBytes: number }
+    }
+    const bytes = 'Explicitly shared project bytes'
+    const privateBlob = await upload(privateVolume.id, privateFiles, bytes)
+    const foreignBlob = await upload(foreign.id, other, bytes)
+    const put = (digest: string, blob: typeof privateBlob) => ({
+      expectedDigest: digest, mutationId: randomUUID(), changes: [{ op: 'put', mode: 0o644, path: 'notes.txt', ...blob }],
+    })
+    const write = (location: typeof privateFiles, content: ReturnType<typeof put>) =>
+      call('/' + volume.id + '/entries', { ...location, method: 'PATCH', body: content })
+    assert.equal((await write(shared, put(volume.headDigest, privateBlob))).status, 422)
+    assert.equal((await write(shared, put(volume.headDigest, foreignBlob))).status, 422)
+    const ownBlob = await upload(volume.id, recipient, bytes)
+    const change = put(volume.headDigest, ownBlob)
+    const applied = await write(recipient, change)
+    assert.equal(applied.status, 200)
+    assert.equal((await (await write(recipient, change)).json()).replayed, true)
+    assert.equal(await (await call('/' + volume.id + '/files?path=notes.txt', shared)).text(), bytes)
+    assert.equal((await call('/' + volume.id + '/versions', recipient)).status, 200)
+    assert.equal((await call('/' + volume.id + '/files?path=notes.txt', other)).status, 404)
+    await fixture.query("update resource_access_policies set visibility='private' where kind='project' and id=$1", [projectId])
+    assert.equal((await call('/' + volume.id + '/files?path=notes.txt', recipient)).status, 404)
+    await fixture.query(`insert into resource_access_grants("resourceKind","resourceId","subjectKind","subjectId",capabilities)
+      values('project',$1,'account',$2,ARRAY['canReadContent'])`, [projectId, peer])
+    assert.equal((await call('/' + volume.id + '/files?path=notes.txt', recipient)).status, 200)
+    assert.equal((await call('/' + volume.id + '/blobs', { ...recipient, method: 'POST', raw: 'denied' })).status, 404)
+    const blobOwners = await fixture.query('select "ownerId","projectId","workspaceId" from drive_blobs where sha256=$1',[ownBlob.sha256])
+    assert.equal(blobOwners.rows.length, 3)
+    assert.equal(blobOwners.rows.filter(row => row.projectId === projectId && row.workspaceId === team.id && row.ownerId !== owner && row.ownerId !== peer).length, 1)
+    const storageOwner = blobOwners.rows.find(row => row.projectId === projectId)!.ownerId
+    // Use the real workspace sweep predicate and a synthetic bucket key. No bucket is contacted.
+    const { driveStorageKey } = await import('./blobs')
+    const key = driveStorageKey(storageOwner, ownBlob.sha256)
+    const { workspaceDeletionStatements } = await import('../workspace-rows')
+    const outcome = await fixture.connect()
+    try {
+      await outcome.query('BEGIN')
+      await outcome.query('update drive_blobs set "storageKey"=$1,"inlineContent"=null where "ownerId"=$2 and sha256=$3',
+        [key, storageOwner, ownBlob.sha256])
+      const stagedDigest = createHash('sha256').update(randomUUID()).digest('hex')
+      const stagedKey = driveStorageKey(storageOwner, stagedDigest)
+      await outcome.query(`insert into drive_blobs("ownerId",sha256,"sizeBytes","storageKey","workspaceId","projectId") values($1,$2,36,$3,$4,$5)`,
+        [storageOwner, stagedDigest, stagedKey, team.id, projectId])
+      const deletes = await workspaceDeletionStatements(outcome, team.id)
+      const blobDelete = deletes.find(item => item.table === 'drive_blobs' && item.text.includes('"workspaceId"'))
+      assert.ok(blobDelete)
+      const { accountStorageKeys } = await import('../account/delete')
+      const retirement = await accountStorageKeys(outcome, peer, { solo: [], shared: [team.id], keptIssueIds: [] })
+      assert.ok(!retirement.keys.includes(key), 'the departing contributor must not retire Project storage')
+      assert.ok(!retirement.keys.includes(stagedKey), 'the departing contributor must not retire an unreferenced Project upload')
+      await outcome.query(blobDelete.text, blobDelete.values)
+      assert.equal((await outcome.query('select 1 from chat_attachment_retirements where "projectDriveId"=$1 and "storageKey"=any($2::text[])',
+        [projectId, [key, stagedKey]])).rowCount, 2)
+      assert.equal((await outcome.query('select 1 from drive_blobs where "ownerId"=$1 and sha256=$2', [owner, privateBlob.sha256])).rowCount, 1)
+    } finally {
+      await outcome.query('ROLLBACK')
+      outcome.release()
+    }
   })
   const created = await call('', { method: 'POST', body: { name: `Drive ${randomUUID()}` } })
   assert.equal(created.status, 201)

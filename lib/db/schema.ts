@@ -1500,6 +1500,8 @@ export const driveVolumes = pgTable('drive_volumes', {
 
 /** Content by digest, deduplicated within one owner and never across owners (lib/drive/blobs.ts). */
 export const driveBlobs = pgTable('drive_blobs', {
+  workspaceId: uuid('workspaceId'),
+  projectId: uuid('projectId'),
   ownerId: text('ownerId').notNull(),
   sha256: text('sha256').notNull(),
   sizeBytes: integer('sizeBytes').notNull(),

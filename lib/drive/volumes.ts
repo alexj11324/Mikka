@@ -134,7 +134,7 @@ export async function listDriveVolumes(
  * requires the selected workspace and the owner's personal scope in this same read. */
 export async function readDriveVolume(
   database: Pick<PoolClient, 'query'>,
-  actor: { ownerId: string; workspaceId?: string; projectId?: string },
+  actor: { ownerId: string; workspaceId?: string; projectId?: string; sharedProject?: boolean },
   volumeId: string | undefined,
 ): Promise<DriveVolumeSummary> {
   if (!isVolumeId(volumeId)) throw new DriveVolumeError('drive_not_found', 404)
@@ -146,8 +146,9 @@ export async function readDriveVolume(
       FROM drive_volumes WHERE id=$1 AND "ownerId"=$2 AND "archivedAt" IS NULL
         AND (NOT $3::boolean OR ("workspaceId"=$4 AND (
           ($5::text IS NULL AND "driveScope"='user' AND "scopeId"=$2) OR
-          ("driveScope"='project-user' AND "scopeId"=$5 AND "scopeUserId"=$2))))`,
-    [volumeId, actor.ownerId, personal, actor.workspaceId ?? null, actor.projectId ?? null])
+          ("scopeId"=$5 AND (("driveScope"='project-user' AND NOT $6::boolean AND "scopeUserId"=$2) OR
+            ("driveScope"='project' AND $6::boolean AND "scopeUserId" IS NULL))))))`,
+    [volumeId, actor.ownerId, personal, actor.workspaceId ?? null, actor.projectId ?? null, actor.sharedProject === true])
   if (!row) throw new DriveVolumeError('drive_not_found', 404)
   return { ...row, totalBytes: Number(row.totalBytes) }
 }
@@ -155,7 +156,7 @@ export async function readDriveVolume(
 /** The row lock also serializes this transition with the content store's CAS. */
 export async function setPersonalDriveArchive(
   database: { connect: Pool['connect'] },
-  actor: { ownerId: string; workspaceId: string; projectId?: string },
+  actor: { ownerId: string; workspaceId: string; projectId?: string; sharedProject?: boolean },
   volumeId: string | undefined,
   archived: boolean,
 ): Promise<boolean> {
@@ -167,8 +168,9 @@ export async function setPersonalDriveArchive(
       `SELECT "archivedAt" IS NOT NULL AS archived FROM drive_volumes
        WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND (
          ($4::text IS NULL AND "driveScope"='user' AND "scopeId"=$2) OR
-         ("driveScope"='project-user' AND "scopeId"=$4 AND "scopeUserId"=$2)) FOR UPDATE`,
-      [volumeId, actor.ownerId, actor.workspaceId, actor.projectId ?? null])
+         ("scopeId"=$4 AND (("driveScope"='project-user' AND NOT $5::boolean AND "scopeUserId"=$2) OR
+           ("driveScope"='project' AND $5::boolean AND "scopeUserId" IS NULL)))) FOR UPDATE`,
+      [volumeId, actor.ownerId, actor.workspaceId, actor.projectId ?? null, actor.sharedProject === true])
     if (!volume) throw new DriveVolumeError('drive_not_found', 404)
     const changed = archived !== volume.archived
     if (changed) await client.query(

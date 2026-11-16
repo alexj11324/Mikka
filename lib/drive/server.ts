@@ -59,10 +59,16 @@ export async function driveResponse(request: Request, operation: Operation, para
   if (request.method !== 'GET' && !writeAllowed(request)) return json({ error: 'originNotAllowed' }, 403)
   try {
     const search = new URL(request.url).searchParams
-    const workspaceId = z.uuid().parse(search.get('workspaceId'))
+    const workspaceId = z.uuid().parse(search.get('workspaceId')).toLowerCase()
+    const selection = search.get('driveScope')
+    if (selection !== null && selection !== 'project') return json({ error: 'drive_write_invalid' }, 400)
+    const sharedProject = selection === 'project'
     if (operation === 'scopes') {
       return await withTaskWorkspace(session.user, workspaceId, async (_workspace, tx) => {
         const projects = await accessibleProjectNames(session.user, workspaceId, tx)
+        if (sharedProject) return json({ scopes: projects.map(project => ({
+          driveScope: 'project', workspaceId, projectId: project.id, name: project.name,
+        })) })
         return json({ scopes: [
           { driveScope: 'user', workspaceId },
           ...projects.map(project => ({ driveScope: 'project-user', workspaceId, projectId: project.id, name: project.name })),
@@ -70,9 +76,16 @@ export async function driveResponse(request: Request, operation: Operation, para
       })
     }
     let changed = false
-    const projectId = search.has('projectId') ? z.uuid().parse(search.get('projectId')) : undefined
-    const actor = { ownerId: session.user.id, authorName: session.user.name, workspaceId, projectId }
-    const scope = projectId
+    const projectId = search.has('projectId') ? z.uuid().parse(search.get('projectId')).toLowerCase() : undefined
+    if (sharedProject && !projectId) return json({ error: 'drive_write_invalid' }, 400)
+    // A project names its own storage namespace. A member's existing private bytes and
+    // versions never move into it, even when they have the same digest.
+    const projectStorage = sharedProject && projectId ? { workspaceId, projectId } : undefined
+    const storageOwner = projectStorage ? `drive-project:${workspaceId}:${projectId}` : session.user.id
+    const actor = { ownerId: storageOwner, authorName: session.user.name, workspaceId, projectId, sharedProject }
+    const scope = projectStorage
+      ? { driveScope: 'project' as const, scopeId: projectStorage.projectId }
+      : projectId
       ? { driveScope: 'project-user' as const, scopeId: projectId, scopeUserId: session.user.id }
       : { driveScope: 'user' as const, scopeId: session.user.id }
     const serve = async () => {
@@ -132,7 +145,7 @@ export async function driveResponse(request: Request, operation: Operation, para
       }
       if (operation === 'upload') {
         const content = await bytes(request, DRIVE_MAX_FILE_BYTES)
-        const blob = await storeDriveBlob(actor.ownerId, content)
+        const blob = await storeDriveBlob(actor.ownerId, content, projectStorage)
         await recordDriveBlob(pool, blob, content)
         await pool.query(`INSERT INTO drive_blob_admissions("ownerId",sha256,"workspaceId") VALUES($1,$2,$3)
           ON CONFLICT("ownerId",sha256,"workspaceId") DO NOTHING`, [actor.ownerId, blob.sha256, workspaceId])
@@ -155,7 +168,7 @@ export async function driveResponse(request: Request, operation: Operation, para
         'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(path.split('/').at(-1)!)}` } })
     }
     const response = projectId
-      ? await withReadableProject(session.user, workspaceId, projectId, serve)
+      ? await withReadableProject(session.user, workspaceId, projectId, serve, sharedProject && request.method !== 'GET' ? 'canSteer' : 'canReadContent')
       : await withTaskWorkspace(session.user, workspaceId, serve)
     // Both the file mutation and its membership lease have finished. The
     // existing invalidation path resolves recipients afresh and carries no content.

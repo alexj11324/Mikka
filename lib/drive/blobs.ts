@@ -40,7 +40,8 @@ export function driveStorageKey(ownerId: string, sha256: string): string {
   return `${DRIVE_STORAGE_PREFIX}${encodeURIComponent(ownerId)}/${sha256.slice(0, 2)}/${sha256}`
 }
 
-export interface StoredDriveBlob { ownerId: string; sha256: string; sizeBytes: number }
+type ProjectStorage = { workspaceId: string; projectId: string }
+export interface StoredDriveBlob { ownerId: string; sha256: string; sizeBytes: number; project?: ProjectStorage }
 
 /** The bytes behind a digest, streamed so a large file is not buffered whole. */
 export async function readDriveBlobObject(ownerId: string, sha256: string, signal: AbortSignal): Promise<ReadableStream<Uint8Array>> {
@@ -61,12 +62,12 @@ export function driveBytes(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
  * of the same bytes re-puts it, and `if-none-match` makes that a 412 rather than
  * an overwrite), while a row without an object would be a dangling entry.
  */
-export async function storeDriveBlob(ownerId: string, bytes: Uint8Array<ArrayBuffer>): Promise<StoredDriveBlob> {
+export async function storeDriveBlob(ownerId: string, bytes: Uint8Array<ArrayBuffer>, project?: ProjectStorage): Promise<StoredDriveBlob> {
   const sha256 = driveSha256(bytes), sizeBytes = bytes.byteLength
   if (sizeBytes > DRIVE_MAX_FILE_BYTES) throw new Error('driveBlobTooLarge')
   // The storage mode is process-wide configuration, so this is one decision, not one per byte.
   if (artifactStorage() === 'r2') await putArtifactObject(driveStorageKey(ownerId, sha256), bytes, 'application/octet-stream')
-  return { ownerId, sha256, sizeBytes }
+  return { ownerId, sha256, sizeBytes, ...(project ? { project } : {}) }
 }
 
 /** Record the digest's row for this owner, keeping the first row if it exists. */
@@ -74,7 +75,7 @@ export async function recordDriveBlob(client: Pick<PoolClient, 'query'>, blob: S
   // Community installs and previews have no bucket: the bytes live in the row,
   // which is exactly the split the artifacts already use for their versions.
   const storageKey = artifactStorage() === 'inline' ? null : driveStorageKey(blob.ownerId, blob.sha256)
-  await client.query(`INSERT INTO drive_blobs ("ownerId",sha256,"sizeBytes","storageKey","inlineContent")
-    VALUES ($1,$2,$3,$4,$5) ON CONFLICT ("ownerId",sha256) DO NOTHING`,
-    [blob.ownerId, blob.sha256, blob.sizeBytes, storageKey, storageKey === null ? Buffer.from(bytes) : null])
+  await client.query(`INSERT INTO drive_blobs ("ownerId",sha256,"sizeBytes","storageKey","inlineContent","workspaceId","projectId")
+    VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT ("ownerId",sha256) DO NOTHING`,
+    [blob.ownerId, blob.sha256, blob.sizeBytes, storageKey, storageKey === null ? Buffer.from(bytes) : null, blob.project?.workspaceId ?? null, blob.project?.projectId ?? null])
 }
