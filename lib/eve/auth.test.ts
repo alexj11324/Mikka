@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import {signInternalEveAuthorization} from './host-authorization.mjs'
 import {internalEveAuthorization,internalEveScope} from './auth'
 import {conversationAddress,scopeAuth,scopeFromAuth} from './scope'
 
@@ -18,4 +19,30 @@ test('host eve credentials bind exact owner, Bot, Workspace and surface with exp
     assert.notEqual(conversationAddress(scope),conversationAddress({...scope,surface:'slack'}))
     assert.throws(()=>scopeFromAuth({...scopeAuth(scope),authenticator:'unknown'}),/authRequired/)
   } finally {if(prior===undefined)delete process.env.BETTER_AUTH_SECRET;else process.env.BETTER_AUTH_SECRET=prior}
+})
+
+test('self-hosted Eve tolerates a small clock offset while keeping the strict expiry window', t => {
+  t.mock.property(process, 'env', { ...process.env, BETTER_AUTH_SECRET: 'synthetic-self-hosted-clock-fixture-key' })
+  const scope = { ownerId: 'owner', botId: '11111111-1111-4111-8111-111111111111', workspaceId: '22222222-2222-4222-8222-222222222222', surface: 'web' as const }
+  const issuedAt = 100_000
+  const header = internalEveAuthorization(scope, issuedAt)
+  for (const offset of [-1_000, -1, 0, 29_000, 58_999]) {
+    assert.deepEqual(internalEveScope(header, issuedAt + offset), scope, `verifier offset ${offset}ms`)
+  }
+  for (const offset of [-1_001, -2_000, 59_000, 59_001]) {
+    assert.equal(internalEveScope(header, issuedAt + offset), null, `verifier offset ${offset}ms`)
+  }
+})
+
+test('an isolated operator can issue the same Eve credential with its explicit host key', t => {
+  const hostSecret = 'synthetic-eve-operator-fixture-key'
+  const scope = { ownerId: 'operator', botId: '11111111-1111-4111-8111-111111111111', workspaceId: '22222222-2222-4222-8222-222222222222', surface: 'web' as const }
+  const issuedAt = 100_000
+  t.mock.property(process, 'env', { ...process.env, BETTER_AUTH_SECRET: 'different-environment-fixture-key' })
+  const header = signInternalEveAuthorization(scope, hostSecret, issuedAt)
+  assert.equal(internalEveScope(header, issuedAt), null)
+  assert.throws(() => signInternalEveAuthorization(scope, '', issuedAt), /authRequired/)
+  process.env.BETTER_AUTH_SECRET = hostSecret
+  assert.equal(header, internalEveAuthorization(scope, issuedAt))
+  assert.deepEqual(internalEveScope(header, issuedAt - 1), scope)
 })
