@@ -963,6 +963,27 @@
       "sourceHash": "2db93bc30c9850d560d9a0c3e2dbc6f477c4510db113173ed91dd3fa7d3f66ee"
     },
     {
+      "path": "/mikka/api/drive/volumes/[volumeId]/shares",
+      "template": "/api/drive/volumes/[volumeId]/shares",
+      "source": "app/api/drive/volumes/[volumeId]/shares/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "sourceHash": "af359facd2c5654a2ea78c32d183efb7b95fab6bfbbb444a5b84781a7cf0fa5b"
+    },
+    {
+      "path": "/mikka/api/drive/volumes/[volumeId]/shares/[shareId]",
+      "template": "/api/drive/volumes/[volumeId]/shares/[shareId]",
+      "source": "app/api/drive/volumes/[volumeId]/shares/[shareId]/route.ts",
+      "methods": [
+        "DELETE",
+        "GET",
+        "PATCH"
+      ],
+      "sourceHash": "9b5ba7c48c104ffe5e9f2a916fcfeb0c8181791d1f07f28313254a8ba6307280"
+    },
+    {
       "path": "/mikka/api/drive/volumes/[volumeId]/unarchive",
       "template": "/api/drive/volumes/[volumeId]/unarchive",
       "source": "app/api/drive/volumes/[volumeId]/unarchive/route.ts",

@@ -1,5 +1,5 @@
 import { withBasePath } from '../base-path'
-import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, type DriveManifestEntry, type DriveSkillCursor, type DriveSkillPage } from './contract'
+import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, type DriveFileLink, type DriveFileLinkVisibility, type DriveManifestEntry, type DriveSkillCursor, type DriveSkillPage } from './contract'
 import type { DriveVolumeSummary } from './volumes'
 import type { DriveVersionSummary } from './store'
 
@@ -76,6 +76,28 @@ export function readProjectDriveScopes(workspaceId: string, send?: typeof fetch)
 export function readPersonalDriveScopes(workspaceId: string, send?: typeof fetch) {
   const params = new URLSearchParams({ workspaceId })
   return request<{ scopes: PersonalDriveScope[] }>(withBasePath(`/api/drive/scopes?${params}`), {}, send)
+}
+
+export function driveFileLinkUrl(location: DriveLocation, volumeId: string, linkId: string) {
+  return url(location, `/${encodeURIComponent(volumeId)}/shares/${encodeURIComponent(linkId)}`)
+}
+
+export function readOwnDriveFileLink(location: DriveLocation, volumeId: string, path: string, send?: typeof fetch) {
+  return request<{ link: DriveFileLink | null }>(url(location, `/${encodeURIComponent(volumeId)}/shares`, { path }), {}, send)
+}
+
+export function createDriveFileLink(location: DriveLocation, volumeId: string, path: string, send?: typeof fetch) {
+  return request<{ link: DriveFileLink }>(url(location, `/${encodeURIComponent(volumeId)}/shares`),
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) }, send)
+}
+
+export function updateDriveFileLink(location: DriveLocation, volumeId: string, linkId: string, visibility: DriveFileLinkVisibility, send?: typeof fetch) {
+  return request<{ link: DriveFileLink }>(driveFileLinkUrl(location, volumeId, linkId),
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visibility }) }, send)
+}
+
+export function revokeDriveFileLink(location: DriveLocation, volumeId: string, linkId: string, send?: typeof fetch) {
+  return request<{ revoked: true }>(driveFileLinkUrl(location, volumeId, linkId), { method: 'DELETE' }, send)
 }
 
 export function readDriveSkills(location: DriveLocation, after?: DriveSkillCursor, send?: typeof fetch) {

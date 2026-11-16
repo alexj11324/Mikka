@@ -79,6 +79,8 @@ test('private Drive forwarding has exact identifiers, paths and HTTP methods', (
     [`/api/drive/volumes/${volume}/files`, ['GET']],
     [`/api/drive/volumes/${volume}/versions`, ['GET']],
     [`/api/drive/volumes/${volume}/versions/${version}`, ['GET']],
+    [`/api/drive/volumes/${volume}/shares`, ['GET', 'POST']],
+    [`/api/drive/volumes/${volume}/shares/4bd6cdd3-9660-48ed-9db1-15f98f5bb844`, ['GET', 'PATCH', 'DELETE']],
     [`/api/drive/volumes/${volume}/blobs`, ['POST']],
     [`/api/drive/volumes/${volume}/entries`, ['PATCH']],
     [`/api/drive/volumes/${volume}/restore`, ['POST']],
@@ -91,7 +93,7 @@ test('private Drive forwarding has exact identifiers, paths and HTTP methods', (
     }
   }
   for (const path of ['/api/drive/admin', '/api/drive/scopes/extra', '/api/drive/volumes/not-a-volume', `/api/drive/volumes/${volume}/files/extra`,
-    `/api/drive/volumes/${volume}/versions/not-a-version`, `/api/drive/volumes/${volume}/shares`, `/api/drive/volumes/${volume}/delete`]) {
+    `/api/drive/volumes/${volume}/versions/not-a-version`, `/api/drive/volumes/${volume}/shares/non-uuid`, `/api/drive/volumes/${volume}/delete`]) {
     for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']) assert.equal(allowedApiPath(path, method), false, `${method} ${path}`)
   }
 })

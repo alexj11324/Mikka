@@ -1529,6 +1529,20 @@ export const driveVolumeEntries = pgTable('drive_volume_entries', {
   index('drive_volume_entries_blob_idx').on(table.sha256),
 ])
 
+/** A signed-in pointer to one current Drive file. Readers still require the original Drive ACL. */
+export const driveFileLinks = pgTable('drive_file_links', {
+  id: uuid('id').primaryKey(),
+  volumeId: text('volumeId').notNull(),
+  path: text('path').notNull(),
+  createdBy: text('createdBy').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  visibility: text('visibility').$type<'private' | 'org'>().notNull().default('private'),
+}, table => [
+  foreignKey({ columns: [table.volumeId, table.path], foreignColumns: [driveVolumeEntries.volumeId, driveVolumeEntries.path] }).onDelete('cascade'),
+  unique().on(table.volumeId, table.path, table.createdBy),
+  check('drive_file_links_visibility_check', sql`${table.visibility} IN ('private', 'org')`),
+  index('drive_file_links_creator_idx').on(table.createdBy),
+])
+
 /** An immutable version, with the `threadId` and `authorName` a history reads. */
 export const driveVolumeVersions = pgTable('drive_volume_versions', {
   id: text('id').primaryKey(),

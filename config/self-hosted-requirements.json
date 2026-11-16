@@ -83,6 +83,34 @@
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
+  "app/api/drive/volumes/[volumeId]/shares/[shareId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "An authenticated file link points to one existing Drive path. Its creator manages private or already-authorized member access while each opening rechecks the original Drive.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "app/api/drive/volumes/[volumeId]/shares/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "An authenticated file link points to one existing Drive path. Its creator manages private or already-authorized member access while each opening rechecks the original Drive.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "drizzle/20261116190048_drive_file_links.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "An authenticated file link points to one existing Drive path. Its creator manages private or already-authorized member access while each opening rechecks the original Drive.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "lib/drive/file-links.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "An authenticated file link points to one existing Drive path. Its creator manages private or already-authorized member access while each opening rechecks the original Drive.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "app/api/drive/volumes/[volumeId]/restore/route.ts": {
     "mode": "built-in",
     "environment": [],

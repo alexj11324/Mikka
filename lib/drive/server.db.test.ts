@@ -31,6 +31,8 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
   const restore = await import('../../app/api/drive/volumes/[volumeId]/restore/route')
   const archive = await import('../../app/api/drive/volumes/[volumeId]/archive/route')
   const unarchive = await import('../../app/api/drive/volumes/[volumeId]/unarchive/route')
+  const links = await import('../../app/api/drive/volumes/[volumeId]/shares/route')
+  const link = await import('../../app/api/drive/volumes/[volumeId]/shares/[shareId]/route')
   const handlers = { archive: archive.POST, unarchive: unarchive.POST, blobs: upload.POST, entries: entries.PATCH, files: file.GET, versions: history.GET, restore: restore.POST }
   const server = createServer(async (incoming, outgoing) => {
     try {
@@ -39,10 +41,13 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
       const request = new Request(`http://${incoming.headers.host}${incoming.url}`, { method: incoming.method,
         headers: incoming.headers as Record<string, string>, ...(chunks.length ? { body: Buffer.concat(chunks) } : {}) })
       const segments = new URL(request.url).pathname.split('/').filter(Boolean).slice(3)
-      const params = Promise.resolve({ volumeId: segments[0], versionId: segments[2] })
+      const params = Promise.resolve({ volumeId: segments[0], versionId: segments[2], shareId: segments[2] })
       const response = new URL(request.url).pathname === '/api/drive/scopes' ? await scopes.GET(request) : !segments.length
         ? await (request.method === 'POST' ? collection.POST : collection.GET)(request)
         : segments.length === 1 ? await detail.GET(request, { params })
+          : segments[1] === 'shares' ? segments.length === 2
+            ? await (request.method === 'POST' ? links.POST : links.GET)(request, { params })
+            : await link[request.method as 'GET' | 'PATCH' | 'DELETE'](request, { params })
           : segments.length === 3 ? await version.GET(request, { params })
             : await handlers[segments[1] as keyof typeof handlers](request, { params })
       outgoing.writeHead(response.status, Object.fromEntries(response.headers))
@@ -538,6 +543,52 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
     const foreignCursor = await call(historyPath + '&before=' + volume.headVersionId)
     assert.equal(foreignCursor.status, 200)
     assert.deepEqual(await foreignCursor.json(), { versions: [], nextCursor: null })
+  })
+
+  await t.test('signed-in Drive file links default to the creator, follow live Drive membership and expire when the path is removed', async () => {
+    const mine = { workspaceId: team.id, token: sharedToken }
+    const teamDrive = { ...mine, driveScope: 'team-workspace' }
+    const member = { ...teamDrive, token: peerToken }
+    async function makeFile(location: typeof mine) {
+      const volume = (await (await call('', { ...location, method: 'POST', body: { name: randomUUID() } })).json()).volume
+      const blob = await (await call('/' + volume.id + '/blobs', { ...location, method: 'POST', raw: 'selected file' })).json()
+      const change = { op: 'put', path: 'notes.txt', mode: 0o644, ...blob }
+      const entries = '/' + volume.id + '/entries'
+      const write = (head: string, changes: unknown[]) => call(entries, { ...location, method: 'PATCH',
+        body: { expectedDigest: head, mutationId: randomUUID(), changes } })
+      const applied = await (await write(volume.headDigest, [change])).json()
+      return { collection: '/' + volume.id + '/shares', write, head: applied.headDigest, change }
+    }
+    const { collection, write, head, change } = await makeFile(teamDrive)
+    const create = () => call(collection, { ...teamDrive, method: 'POST', body: { path: 'notes.txt' } })
+    const created = (await (await create()).json()).link
+    assert.equal(created.visibility, 'private')
+    const address = collection + '/' + created.id
+    assert.equal(await (await call(address, teamDrive)).text(), 'selected file')
+    assert.equal((await call(address, member)).status, 404)
+    assert.equal((await (await call(collection + '?path=notes.txt', member)).json()).link, null)
+    assert.equal((await call(address, { ...teamDrive, method: 'PATCH', body: { visibility: 'public' } })).status, 400)
+    const visibility = (location: typeof mine, value: string) => call(address, { ...location, method: 'PATCH', body: { visibility: value } })
+    assert.equal((await visibility(teamDrive, 'org')).status, 200)
+    assert.deepEqual((await (await create()).json()).link, { ...created, visibility: 'org' })
+    assert.equal(await (await call(address, member)).text(), 'selected file')
+    assert.equal((await visibility(member, 'private')).status, 404)
+    await fixture.query("update mikka_workspace_members set status='suspended' where \"workspaceId\"=$1 and \"userId\"=$2", [team.id, peer])
+    try { assert.equal((await call(address, member)).status, 401) }
+    finally { await fixture.query("update mikka_workspace_members set status='active' where \"workspaceId\"=$1 and \"userId\"=$2", [team.id, peer]) }
+    assert.equal((await visibility(teamDrive, 'private')).status, 200)
+    assert.equal((await call(address, member)).status, 404)
+    assert.equal((await call(address, { ...teamDrive, method: 'DELETE' })).status, 200)
+    assert.equal((await call(address, teamDrive)).status, 404)
+    const next = (await (await create()).json()).link
+    assert.notEqual(next.id, created.id)
+    const removed = await (await write(head, [{ op: 'delete', path: 'notes.txt' }])).json()
+    assert.equal((await write(removed.headDigest, [change])).status, 200)
+    assert.equal((await call(collection + '/' + next.id, teamDrive)).status, 404)
+    const privateFile = await makeFile(mine)
+    const onlyOwner = (await (await call(privateFile.collection, { ...mine, method: 'POST', body: { path: 'notes.txt' } })).json()).link
+    assert.equal((await call(privateFile.collection + '/' + onlyOwner.id, { ...mine, method: 'PATCH', body: { visibility: 'org' } })).status, 422)
+    assert.equal((await call(privateFile.collection + '/' + onlyOwner.id, { ...mine, token: peerToken })).status, 404)
   })
 
   await fixture.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [team.id, owner])
