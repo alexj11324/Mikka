@@ -237,6 +237,20 @@ export async function readRepositoryBranches(userId: string, fullName: string, p
   } finally { noteGitHubRequest(Date.now() - started) }
 }
 
+// A PR author is its user.login. Reviewers, assignees and commit authors are different people.
+export async function recentRepositoryPullAuthors(userId: string, remoteKey: string, query: string, budget: RequestBudget) {
+  const { token, repository } = await githubRepositoryReadCredential(userId, remoteKey, budget)
+  const { data } = await githubRequest(token, `/repositories/${repository.id}/pulls?state=all&sort=updated&direction=desc&per_page=50`, budget)
+  if (!Array.isArray(data)) throw new GitHubAccessError('githubUnavailable', 502)
+  const names = new Map<string, string>()
+  for (const item of data) {
+    const login = item?.user?.login
+    if (typeof login !== 'string' || !/^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/.test(login)) continue
+    if (login.toLowerCase().includes(query.toLowerCase())) names.set(login.toLowerCase(), login)
+  }
+  return [...names.values()].sort((a, b) => a.localeCompare(b)).slice(0, 20)
+}
+
 /** Resolve the selected Git ref inside the admitted repository and return visible metadata only. */
 export async function readRepositoryTree(userId: string, fullName: string, ref: string, budget: RequestBudget) {
   const { token, repository } = await githubRepositoryReadCredential(userId, 'v2/github.com/' + fullName.toLowerCase(), budget)

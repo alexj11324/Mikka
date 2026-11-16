@@ -34,6 +34,11 @@ export const GITHUB_TRIGGER_EVENTS = [
   'issue_opened', 'comment', 'review_submitted', 'review_comment', 'checks_completed', 'checks_failed',
 ] as const
 export type GitHubTriggerEvent = typeof GITHUB_TRIGGER_EVENTS[number]
+/** These deliveries include the PR itself, independently of the sender, commenter or reviewer. */
+export function supportsPullAuthors(event: GitHubTriggerEvent) {
+  return event.startsWith('pull_request_') || event === 'draft_opened' || event === 'review_submitted' || event === 'review_comment'
+}
+export const githubLogin = z.string().trim().min(1).max(39).regex(/^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/)
 /** A repository as the workspace names it, `v2/github.com/<owner>/<name>` in lower case. */
 export const githubRepositoryKey = z.string().regex(/^v2\/github\.com\/[a-z0-9-]{1,39}\/[a-z0-9._-]{1,100}$/)
 /** Linear events an automation can run on (decision 2026-11-15-1930): those the Linear app's webhook already sends. */
@@ -48,6 +53,7 @@ export const eventTriggerSchema = z.discriminatedUnion('source', [
   z.object({
     source: z.literal('github'), event: z.enum(GITHUB_TRIGGER_EVENTS),
     repositories: z.array(githubRepositoryKey).min(1).max(20),
+    pullAuthors: z.array(githubLogin).min(1).max(20).optional(),
     branches: z.array(z.string().trim().min(1).max(250)).max(20).optional(),
     labels: z.array(z.string().trim().min(1).max(100)).max(20).optional(),
     /** One sentence checked against each event before a run starts; an event that does not match is skipped. */
@@ -69,7 +75,7 @@ export const eventTriggerSchema = z.discriminatedUnion('source', [
     reactions: z.array(slackReactionName).max(20).optional(),
     runWhen: z.string().trim().min(1).max(500).optional(),
   }).strict(),
-])
+]).refine(value => value.source !== 'github' || !value.pullAuthors?.length || supportsPullAuthors(value.event))
 export type EventTrigger = z.infer<typeof eventTriggerSchema>
 export type GitHubEventTrigger = Extract<EventTrigger, { source: 'github' }>
 export type LinearEventTrigger = Extract<EventTrigger, { source: 'linear' }>

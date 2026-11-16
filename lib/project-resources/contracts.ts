@@ -41,6 +41,9 @@ export const projectResourcesInput = z.object({
   .refine(value => !value.defaultEnvironmentId || value.environmentIds.includes(value.defaultEnvironmentId))
   .refine(value => value.repositories.every(item => !item.environmentId || value.environmentIds.includes(item.environmentId)))
 export const listDependencyRepositoriesInput = z.object({ workspaceId: z.uuid(), projectId: z.uuid() }).strict()
+export const projectPullAuthorInput = listDependencyRepositoriesInput.extend({
+  readerId: z.string().min(1).max(128), repository: projectRepositoryKey, query: z.string().trim().min(1).max(39).regex(/^[A-Za-z0-9-]+$/),
+})
 export const replaceDependencyRepositoriesInput = listDependencyRepositoriesInput.extend({
   revision: z.number().int().positive(), repos: z.array(z.string().regex(/^[1-9][0-9]{0,29}$/)).max(100),
 }).refine(input => new Set(input.repos).size === input.repos.length)

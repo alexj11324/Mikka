@@ -1236,6 +1236,13 @@
     "test": "tests/project-dependency-repositories.db.test.ts",
     "suite": "test:project-resources-db"
   },
+  "lib/project-resources/pull-authors.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "Project PR author suggestions require the signed account's configured GitHub App, the exact bound repository and current Project access.",
+    "test": "tests/project-dependency-repositories.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
   "lib/project-resources/store.ts": {
     "mode": "built-in",
     "environment": [],

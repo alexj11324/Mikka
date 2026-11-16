@@ -525,3 +525,17 @@ test('repository tree resolves the admitted numeric repository and checks its im
   truncated = true
   await assert.rejects(read, /workspace_snapshot_unavailable/)
 })
+
+test('admitted repository returns matching recent PR openers, independent of reviewers and repeated names', async () => {
+  const previous = answer
+  answer = url => {
+    if (url.pathname === '/repositories/91/pulls') {
+      assert.equal(url.searchParams.get('state'), 'all')
+      assert.equal(url.searchParams.get('per_page'), '50')
+      return Response.json([{ user: { login: 'Ada' } }, { user: { login: 'Ada' } },
+        { user: { login: 'Grace' }, requested_reviewers: [{ login: 'Ada-Reviewer' }] }])
+    }
+    return previous(url)
+  }
+  assert.deepEqual(await access.recentRepositoryPullAuthors('person-1', 'v2/github.com/owner/project', 'ad', { deadline: Date.now() + 25_000 }), ['Ada'])
+})

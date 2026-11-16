@@ -63,3 +63,15 @@ test('event triggers belong to dispatch_task and name lower-case repository keys
   assert.equal(definitionSchema.safeParse({ ...base, task: { kind: 'dispatch_task', botId: null, prompt: 'x' }, events: [{ ...events[0], repositories: ['Acme/Web'] }] }).success, false)
   assert.equal(definitionSchema.safeParse({ ...base, task: { kind: 'dispatch_task', botId: null, prompt: 'x' }, events: [] }).success, false)
 })
+
+test('PR author filter uses the PR opener even when another person submits the review', () => {
+  const [event] = githubAutomationEvents('pull_request_review', {
+    action: 'submitted', repository, sender: { type: 'User', login: 'grace' }, pull_request: pr(), review: { user: { login: 'grace' } },
+  })
+  const trigger: GitHubEventTrigger = { source: 'github', event: 'review_submitted', repositories: ['v2/github.com/acme/web'] }
+  assert.equal(event!.author, 'grace')
+  assert.equal(triggerMatches({ ...trigger, pullAuthors: ['ADA'] }, event!), true)
+  assert.equal(triggerMatches({ ...trigger, pullAuthors: ['grace'] }, event!), false)
+  assert.equal(triggerMatches({ ...trigger, pullAuthors: ['ada'] }, { ...event!, pullAuthor: null }), false)
+  assert.equal(triggerMatches(trigger, event!), true)
+})
