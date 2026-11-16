@@ -93,6 +93,33 @@ test('the device list key reaches only the owner home, after real device writers
       assert.deepEqual(await deliveries(), ownerHome, 'a new harness shows in the list')
     })
 
+    await t.test('only the owner can set or clear a local device description, with no repeated invalidation', async () => {
+      const { setOwnedDeviceDescription } = await import('../device-removal')
+      const save = (user: string, text: string, id = device) => scope.run(() => setOwnedDeviceDescription(user, id, text))
+      const read = () => database.query('SELECT description, "updatedAt"::text AS updated FROM devices WHERE id=$1', [device]).then(result => result.rows[0])
+      assert.equal((await read()).description, null)
+      await assert.rejects(save('peer', 'private'), /deviceNotFound/)
+      await assert.rejects(save('owner', 'a'.repeat(501)), /agentInvalidInput/)
+      await assert.rejects(save('owner', 'null\0byte'), /agentInvalidInput/)
+      const cloudDevice = randomUUID(), removedDevice = randomUUID()
+      await database.query(`INSERT INTO devices(id,name,"ownerId",kind,"removedAt") VALUES
+        ($1,'cloud','owner','cloud',NULL),($2,'removed','owner','local',now())`, [cloudDevice, removedDevice])
+      await assert.rejects(save('owner', 'private', cloudDevice), /deviceNotFound/)
+      await assert.rejects(save('owner', 'private', removedDevice), /deviceNotFound/)
+      assert.deepEqual(await deliveries(), [])
+      const description = 'a'.repeat(500)
+      assert.deepEqual(await save('owner', ' ' + description + ' '), { id: device, description })
+      assert.deepEqual(await deliveries(), ownerHome)
+      const saved = await read()
+      assert.equal(saved.description, description)
+      await save('owner', description)
+      assert.deepEqual(await read(), saved)
+      assert.deepEqual(await deliveries(), [])
+      assert.deepEqual(await save('owner', '   '), { id: device, description: null })
+      assert.equal((await read()).description, null)
+      assert.deepEqual(await deliveries(), ownerHome)
+    })
+
     await t.test('rename and removal publish after COMMIT only; another owner and a rollback publish nothing', async () => {
       const { removeOwnedDevice, renameOwnedDevice } = await import('../device-removal')
       await assert.rejects(scope.run(() => renameOwnedDevice('peer', device, 'stolen')), /deviceNotFound/)

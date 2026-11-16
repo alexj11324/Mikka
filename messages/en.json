@@ -980,7 +980,9 @@
       },
       "queued": "{name} is offline; it runs when it reconnects"
     },
+    "descriptionLabel": "Device description",
     "actions": {
+      "editDescription": "Edit description",
       "rename": "Rename",
       "restart": "Restart daemon",
       "update": "Update daemon",

@@ -307,6 +307,7 @@ export type SupportedHarness = (typeof SUPPORTED_HARNESSES)[number]
 export const devices = pgTable('devices', {
   id: uuid('id').primaryKey(), ownerId: text('ownerId').notNull(),
   name: text('name').notNull(), hostname: text('hostname'),
+  description: varchar('description', { length: 500 }),
   kind: text('kind').$type<'local' | 'cloud'>().notNull().default('local'),
   deviceType: text('deviceType').$type<'laptop' | 'server'>().notNull().default('laptop'),
   platform: text('platform'), arch: text('arch'),

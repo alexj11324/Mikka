@@ -2344,6 +2344,13 @@
     "test": "lib/schedules/dispatch.db.test.ts",
     "suite": "test:schedules-db"
   },
+  "drizzle/20261116063804_add_device_description.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Store an optional owner-managed description on a local device in the installation database.",
+    "test": "lib/live/devices.db.test.ts",
+    "suite": "test:live-db"
+  },
   "drizzle/20261115132401_schedule_page_requests.sql": {
     "mode": "built-in",
     "environment": [],

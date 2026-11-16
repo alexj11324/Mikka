@@ -67,6 +67,7 @@ const functions = {
   'agents.pollDevices': actions1.pollDevices,
   'agents.setDeviceEnabled': actions1.setDeviceEnabled,
   'agents.renameDevice': actions1.renameDevice,
+  'agents.setDeviceDescription': actions1.setDeviceDescription,
   'agents.removeDevice': actions1.removeDevice,
   'agents.listAgents': actions1.listAgents,
   'agents.pollTaskDetail': actions1.pollTaskDetail,

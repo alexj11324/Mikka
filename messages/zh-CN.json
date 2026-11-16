@@ -980,7 +980,9 @@
       },
       "queued": "{name} 离线，上线后执行"
     },
+    "descriptionLabel": "设备说明",
     "actions": {
+      "editDescription": "编辑说明",
       "rename": "重命名",
       "restart": "重启 daemon",
       "update": "更新 daemon",
