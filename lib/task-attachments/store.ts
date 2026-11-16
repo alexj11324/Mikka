@@ -11,7 +11,7 @@ import { withIssueWorkspace } from '@/lib/issue-scope-authorization'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import type { IssueReader } from '@/lib/issue-visibility'
 import { resourceActionAllowed } from '@/lib/resource-access/store'
-import { TASK_FILE_MAX_COUNT, taskFileDownloadReference, type TaskFile, type TaskFileList } from './contract'
+import { TASK_FILE_MAX_COUNT, type TaskFile, type TaskFileList } from './contract'
 
 type Actor = { user: Exclude<IssueReader, string>; workspaceId: string; taskId: string }
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -44,11 +44,10 @@ export function listTaskFiles(actor: Actor): Promise<TaskFileList> {
   })
 }
 
-export function resolveTaskFileDownload(actor: Actor, fileId: string) {
+export function requireTaskFileDownload(actor: Actor, fileId: string) {
   return withFiles(actor, false, async tx => {
     const { rowCount } = await tx.execute(sql`SELECT 1 FROM task_attachments WHERE "taskId"=${actor.taskId} AND id=${fileId}`)
     if (!rowCount) throw new TaskFileError('notFound')
-    return { url: taskFileDownloadReference(actor.taskId, fileId), expiresAt: null }
   })
 }
 

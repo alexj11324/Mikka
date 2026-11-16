@@ -3,7 +3,7 @@ import { ActionFailureError } from '@/lib/action-error'
 import { auth } from '@/lib/api-auth'
 import { writeAllowed } from '@/lib/mobile-api'
 import { TASK_FILE_MAX_BYTES } from '@/lib/task-attachments/contract'
-import { listTaskFiles, readTaskFile, resolveTaskFileDownload, removeTaskFile, saveTaskFile, TaskFileError } from '@/lib/task-attachments/store'
+import { listTaskFiles, readTaskFile, removeTaskFile, requireTaskFileDownload, saveTaskFile, TaskFileError } from '@/lib/task-attachments/store'
 import { resolveTaskIdentifierAlias } from '@/lib/task-identity-store'
 import { loadWorkspaceContext, WorkspaceError } from '@/lib/workspace-access'
 
@@ -31,7 +31,13 @@ async function attachments(request: Request, context: Context) {
       resolvedId = resolved.issueId
     }
     const actor = { taskId: resolvedId, user: session.user, workspaceId: workspace.id }
-    if (readUrl && id) return Response.json(await resolveTaskFileDownload(actor, id), { headers })
+    if (readUrl && id) {
+      await requireTaskFileDownload(actor, id)
+      // The address must work when opened from the Task page itself, even at a different base path.
+      const url = new URL(`../${encodeURIComponent(resolvedId)}/attachments`, request.url)
+      url.searchParams.set('id', id)
+      return Response.json({ url: url.href, expiresAt: null }, { headers })
+    }
     if (request.method === 'GET' && id === null) return Response.json(await listTaskFiles(actor), { headers })
     if (!id) return failure('invalid', 400)
     if (request.method === 'GET') {

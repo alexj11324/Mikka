@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { downloadServerFile } from '@/lib/web-connection/assets'
 import { webSelectionVersion } from '@/lib/web-connection/selection'
 import { withBasePath } from '@/lib/base-path'
-import { TASK_FILE_MAX_BYTES, TASK_FILE_MAX_COUNT, type TaskFileList } from '@/lib/task-attachments/contract'
+import { publicServiceLink } from '@/lib/platform/public-origin'
+import { TASK_FILE_MAX_BYTES, TASK_FILE_MAX_COUNT, taskFileDownloadPath, type TaskFileList } from '@/lib/task-attachments/contract'
 
 type Trigger = (label: string, open: () => void) => ReactNode
 
@@ -84,7 +85,7 @@ function FileList({ taskId, taskCode }: { taskId: string; taskCode?: string | nu
     setError('')
     try {
       const generation = webSelectionVersion()
-      const downloadPath = `${endpoint}?id=${encodeURIComponent(id)}`
+      const downloadPath = taskFileDownloadPath(taskId, id)
       if (taskCode) {
         const lookup = withBasePath(`/api/tasks/${encodeURIComponent(taskCode)}/attachments?id=${encodeURIComponent(id)}&format=url&fresh=1`)
         const response = await fetch(lookup, { cache: 'no-store' })
@@ -92,13 +93,12 @@ function FileList({ taskId, taskCode }: { taskId: string; taskCode?: string | nu
         if (response.status !== 404) {
           if (!response.ok) throw new Error('taskFileNotFound')
           const link = await response.json()
-          const expected = new URL(downloadPath, window.location.origin)
-          if (typeof link?.url !== 'string' || new URL(link.url, new URL(lookup, expected)).href !== expected.href)
+          if (link?.url !== publicServiceLink(downloadPath))
             throw new Error('taskFileUnavailable')
         }
       }
       if (generation !== webSelectionVersion()) throw new Error('taskFileUnavailable')
-      const asset = await downloadServerFile(downloadPath)
+      const asset = await downloadServerFile(withBasePath(downloadPath))
       setDownloadFile({ url: asset.url, name })
       window.setTimeout(asset.revoke, 60_000)
     } catch { setError(t('downloadFailed')) }

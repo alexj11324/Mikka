@@ -4,7 +4,7 @@ export const TASK_FILE_MAX_COUNT = 10
 export type TaskFile = { id: string; name: string; size: number }
 export type TaskFileList = { files: TaskFile[]; canEdit: boolean }
 
-/** Relative to the lookup endpoint so cloud and self-hosted installations keep their own mount path. */
-export function taskFileDownloadReference(taskId: string, fileId: string) {
-  return `../${encodeURIComponent(taskId)}/attachments?id=${encodeURIComponent(fileId)}`
+/** Canonical authenticated bytes, relative to the selected installation's mount. */
+export function taskFileDownloadPath(taskId: string, fileId: string) {
+  return `/api/tasks/${encodeURIComponent(taskId)}/attachments?id=${encodeURIComponent(fileId)}`
 }

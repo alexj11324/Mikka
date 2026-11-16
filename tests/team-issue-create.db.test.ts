@@ -233,7 +233,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
       assert.equal(metadata.headers.get('cache-control'), 'private, no-store')
       const link = await metadata.json()
       assert.equal(link.expiresAt, null)
-      const resolved = new URL(link.url, lookup).href
+      const resolved = new URL(link.url).href
       assert.equal(resolved, `${endpoint}?id=${fileId}`)
       assert.deepEqual(new Uint8Array(await (await request(member, 'GET', '', data, resolved)).arrayBuffer()), data)
       const download = await request(member, 'GET', fileId)
