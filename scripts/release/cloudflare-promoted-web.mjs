@@ -180,7 +180,12 @@ async function verifyPromotion(workflow, { env = process.env, event, fetchImpl =
     record = parsePromotionRecord(raw)
     requireProof(record.approvalComment !== pin[1], 'dispatchSource')
   }
-  requireProof(workflow === desktopWorkflow || record.product === env.GITHUB_SHA, 'dispatchSource')
+  // The runtime release publishes the worker of the commit Cloudflare serves. A
+  // dispatch on a later main builds that served commit (MIKKA_RUNTIME_SOURCE once
+  // chosen); it never builds HEAD in its place.
+  const runtimeSource = env.MIKKA_RUNTIME_SOURCE || record.product
+  requireProof(workflow === desktopWorkflow ? true : record.product === runtimeSource
+    && (record.product === env.GITHUB_SHA || !chained), 'dispatchSource')
   const run = await githubRead('/actions/runs/' + env.GITHUB_RUN_ID + '/attempts/' + env.GITHUB_RUN_ATTEMPT, api)
   requireProof(run.repository?.full_name === repository && run.event === (chained ? 'workflow_run' : 'workflow_dispatch') && run.path === workflow
     && run.head_sha === env.GITHUB_SHA && run.head_branch === 'main' && String(run.id) === env.GITHUB_RUN_ID
@@ -211,7 +216,13 @@ async function verifyPromotion(workflow, { env = process.env, event, fetchImpl =
   }
   if (observed) await liveServingRelease(record, fetchImpl)
   else await liveProof(record, raw, fetchImpl)
-  await assertCurrentMain({ ...api, expectedBuild: record.product })
+  if (workflow === desktopWorkflow) await assertCurrentMain({ ...api, expectedBuild: record.product })
+  else {
+    // The runtime publishes the served commit; it must already be part of main.
+    // Later merges to main neither replace it nor block its publication.
+    const compared = await githubRead('/compare/' + record.product + '...main', api)
+    requireProof((compared.status === 'identical' || compared.status === 'ahead') && compared.merge_base_commit?.sha === record.product, 'servedOnMain')
+  }
   if (!observed) requireProof(now() < until, 'approvalWindow')
   const result = { product: record.product, releasePin: record.releasePin }
   return workflow === desktopWorkflow ? { ...result, overlay: record.overlay } : result
@@ -262,7 +273,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         `ready=${result.ready}\nreceipt=${result.ready ? result.receipt : ''}\n`)
       if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY,
         `\n### ${result.ready ? 'Released after the Cloudflare promotion' : 'Nothing to release'}\n\n${result.reason}\n`)
-    } else if (process.argv.length === 2) await verifyPromotedWeb()
+    } else if (process.argv.length === 2) {
+      const { product } = await verifyPromotedWeb()
+      if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, `source=${product}\n`)
+    }
     else {
       requireProof(process.argv.length === 3 && process.argv[2] === 'desktop', 'consumer')
       const { overlay } = await verifyDesktopPromotedWeb()

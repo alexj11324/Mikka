@@ -61,10 +61,24 @@ export async function createOrganization(user: { id: string; name: string; email
   })
 }
 
+function organizationMemberRows(tx: WorkspaceTransaction, organizationId: string, includeDisabled: boolean) {
+  return tx.select().from(organizationMembers).where(and(
+    eq(organizationMembers.organizationId, organizationId),
+    includeDisabled ? undefined : eq(organizationMembers.status, 'active'),
+  )).orderBy(asc(organizationMembers.createdAt), asc(organizationMembers.userId))
+}
+
+export async function listOrganizationMembers(organizationId: string, actorId: string, includeDisabled: boolean) {
+  return workspaceDb.transaction(async tx => {
+    await requireOrganizationAdmin(tx, organizationId, actorId)
+    return { members: await organizationMemberRows(tx, organizationId, includeDisabled) }
+  })
+}
+
 export async function organizationSummary(organizationId: string, userId: string) {
   return workspaceDb.transaction(async tx => {
     const { organization, membership } = await requireOrganizationAdmin(tx, organizationId, userId, false, true)
-    const members = await tx.select().from(organizationMembers).where(eq(organizationMembers.organizationId, organizationId)).orderBy(asc(organizationMembers.createdAt))
+    const members = await organizationMemberRows(tx, organizationId, true)
     const workspaces = await getOrganizationWorkspaceIds(tx, organizationId)
     const activeHumans = (await activeHumanSeats(tx, workspaces[0] ?? organizationId, organizationId)).length
     const audit = await tx.select().from(organizationAuditEvents).where(eq(organizationAuditEvents.organizationId, organizationId)).orderBy(desc(organizationAuditEvents.createdAt)).limit(100)

@@ -1,12 +1,13 @@
 import { dailyTimeRepeats, resolveLocal } from '@/lib/schedules/wall-time'
 import type { Definition, DispatchTask, EventTrigger, GitHubTriggerEvent, LinearTriggerEvent, SlackTriggerEvent } from '@/lib/schedules/contract'
+import { slackUserId } from '@/lib/slack/user-id'
 import type { TaskDestination } from '@/lib/task-destination'
 
 export type ScheduleKind = 'once' | 'interval' | 'daily' | 'cron'
 /** One GitHub event trigger as the editor holds it; lists are comma-separated text. */
 export type GitHubTriggerDraft = { event: GitHubTriggerEvent; repositories: string[]; branches: string; labels: string; runWhen: string }
 export type LinearTriggerDraft = { event: LinearTriggerEvent; teams: string[]; labels: string; runWhen: string }
-export type SlackTriggerDraft = { event: SlackTriggerEvent; channels: string[]; reactions: string; runWhen: string }
+export type SlackTriggerDraft = { event: SlackTriggerEvent; channels: string[]; authors: string; reactions: string; runWhen: string }
 export type IntervalUnit = 'minutes' | 'hours' | 'days'
 const UNIT_MINUTES: Record<IntervalUnit, number> = { minutes: 1, hours: 60, days: 1440 }
 
@@ -108,7 +109,7 @@ export function draftFrom(definition: Definition, now = new Date()): AutomationD
     linear: (definition.events ?? []).flatMap(trigger => trigger.source === 'linear' ? [{ event: trigger.event, teams: [...trigger.teams],
       labels: (trigger.labels ?? []).join(', '), runWhen: trigger.runWhen ?? '' }] : []),
     slack: (definition.events ?? []).flatMap(trigger => trigger.source === 'slack' ? [{ event: trigger.event, channels: [...trigger.channels],
-      reactions: (trigger.reactions ?? []).join(', '), runWhen: trigger.runWhen ?? '' }] : []),
+      authors: (trigger.authors ?? []).join(', '), reactions: (trigger.reactions ?? []).join(', '), runWhen: trigger.runWhen ?? '' }] : []),
     notify: definition.notify?.slack ? { ...definition.notify.slack } : null,
     webhook: definition.webhook?.batchMinutes ?? null,
     otherTask: task.kind === 'dispatch_task' ? null : task,
@@ -122,8 +123,9 @@ function eventTrigger(draft: GitHubTriggerDraft): EventTrigger {
     ...(branches.length ? { branches } : {}), ...(labels.length ? { labels } : {}), ...(draft.runWhen.trim() ? { runWhen: draft.runWhen.trim() } : {}) }
 }
 function slackTrigger(draft: SlackTriggerDraft): EventTrigger {
+  const authors = list(draft.authors)
   const reactions = list(draft.reactions).map(name => name.replace(/^:|:$/g, '').toLowerCase()).filter(Boolean)
-  return { source: 'slack', event: draft.event, channels: draft.channels, ...(draft.event === 'reaction_added' && reactions.length ? { reactions } : {}), ...(draft.runWhen.trim() ? { runWhen: draft.runWhen.trim() } : {}) }
+  return { source: 'slack', event: draft.event, channels: draft.channels, ...(authors.length ? { authors } : {}), ...(draft.event === 'reaction_added' && reactions.length ? { reactions } : {}), ...(draft.runWhen.trim() ? { runWhen: draft.runWhen.trim() } : {}) }
 }
 function linearTrigger(draft: LinearTriggerDraft): EventTrigger {
   const labels = list(draft.labels)
@@ -144,13 +146,17 @@ export function foldNeeded(draft: Pick<AutomationDraft, 'scheduleOn' | 'schedule
 }
 
 /** The definition to save, or the first field that keeps it from saving. */
-export function definitionFrom(draft: AutomationDraft, now = new Date()): { definition: Definition } | { missing: 'title' | 'prompt' | 'time' | 'fold' | 'interval' | 'cron' | 'repository' | 'team' | 'channel' } {
+export function definitionFrom(draft: AutomationDraft, now = new Date()): { definition: Definition } | { missing: 'title' | 'prompt' | 'time' | 'fold' | 'interval' | 'cron' | 'repository' | 'team' | 'channel' | 'slackAuthors' } {
   const title = draft.title.trim()
   if (!title) return { missing: 'title' }
   if (!draft.otherTask && !draft.prompt.trim()) return { missing: 'prompt' }
   if (draft.github.some(trigger => !trigger.repositories.length)) return { missing: 'repository' }
   if (draft.linear.some(trigger => !trigger.teams.length)) return { missing: 'team' }
   if (draft.slack.some(trigger => !trigger.channels.length)) return { missing: 'channel' }
+  if (draft.slack.some(trigger => {
+    const authors = list(trigger.authors)
+    return authors.length > 20 || !authors.every(slackUserId)
+  })) return { missing: 'slackAuthors' }
   let timing: Definition['timing']
   if (!draft.scheduleOn) timing = { kind: 'manual' }
   else if (draft.scheduleKind === 'once') {

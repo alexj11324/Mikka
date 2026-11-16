@@ -47,8 +47,9 @@ export function slackAutomationEvents(payload: Json): SlackAutomationEvent[] {
 }
 
 /** Whether a Slack trigger takes an event: its event, one of its channels, and for a reaction any of its emoji. */
-export function slackTriggerMatches(trigger: { event: string; channels: string[]; reactions?: string[] }, event: SlackAutomationEvent): boolean {
+export function slackTriggerMatches(trigger: { event: string; channels: string[]; authors?: string[]; reactions?: string[] }, event: SlackAutomationEvent): boolean {
   if (trigger.event !== event.event || !trigger.channels.includes(event.channel)) return false
+  if (trigger.authors?.length && !trigger.authors.includes(event.user)) return false
   return event.event !== 'reaction_added' || !trigger.reactions?.length || Boolean(event.reaction && trigger.reactions.includes(event.reaction))
 }
 

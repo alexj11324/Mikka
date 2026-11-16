@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { SCHEDULE_READ_TOOL_IDS } from '@/lib/coordinator/scheduled-read-tools'
 import { taskDestinationSchema } from '@/lib/task-destination'
+import { slackUserId } from '@/lib/slack/user-id'
 import { taskTitleInputSchema } from '@/lib/task-title-input'
 import { agentProfileReferenceSchema } from '@/lib/factory/agent-profile-reference'
 
@@ -63,6 +64,7 @@ export const eventTriggerSchema = z.discriminatedUnion('source', [
     source: z.literal('slack'), event: z.enum(SLACK_TRIGGER_EVENTS),
     /** Channel IDs of the workspace's Slack installation the Bot can see. */
     channels: z.array(z.string().regex(/^[CG][A-Z0-9]{2,30}$/)).min(1).max(20),
+    authors: z.array(z.string().refine(slackUserId)).max(20).optional(),
     /** reaction_added: the emoji names that count (without colons); empty or absent is any. */
     reactions: z.array(slackReactionName).max(20).optional(),
     runWhen: z.string().trim().min(1).max(500).optional(),

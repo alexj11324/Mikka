@@ -312,9 +312,10 @@ Decision [2026-11-15-1930](../design/decisions/2026-11-15-1930-automation-linear
 
 Decision [2026-11-15-2010](../design/decisions/2026-11-15-2010-automation-slack-triggers.md).
 
-- `events[]` may hold `{ source: 'slack', event: 'message' | 'mention' | 'reaction_added', channels (1–20 IDs), reactions?, runWhen? }`.
+- `events[]` may hold `{ source: 'slack', event: 'message' | 'mention' | 'reaction_added', channels (1–20 IDs), authors?, reactions?, runWhen? }`.
   A message or `app_mention` with no `bot_id`/`bot_profile` and no subtype (or `thread_broadcast`), or a
   `reaction_added` on a message, by a user (`lib/schedules/slack-events.ts`).
+- An optional list of up to 20 member IDs filters events by the Slack author as well as the channel. The editor accepts IDs directly and reads a page of active human members when the current installation already has `users:read`.
 - `permission` asks the `slackChannels(owner, workspace)` seam: the workspace's installation of `SLACK_APP_ID` the
   creator is a member of, its bot token's `conversations.list` (`lib/slack/automation-channels.ts`); null →
   `scheduleSlackUnavailable` 403 (authority loss), Slack unreachable → `scheduleSlackUnreachable` 503. Page action

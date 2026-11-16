@@ -27,7 +27,8 @@ async function handleGET(request: Request) {
   const target = mobileWebTarget(url.searchParams.get('to'))
   const token = url.searchParams.get('token')
   const page = new URL(target, url.origin)
-  const requiresConfirmation = page.pathname === mobileMembersPage || page.searchParams.get('section') === 'artifacts'
+  const section = page.searchParams.get('section')
+  const requiresConfirmation = page.pathname === mobileMembersPage || section === 'artifacts' || section === 'organization'
   if (requiresConfirmation && !token) return new NextResponse(null, { status: 403, headers: safeHeaders })
   if (!token) return NextResponse.redirect(new URL(withBasePath(target), url.origin), { status: 303, headers: safeHeaders })
   try {

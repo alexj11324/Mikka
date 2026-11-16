@@ -45,10 +45,18 @@ export async function verifyWorkspaceAutomation({ page, workspaceId, fixture, rp
   assert.equal(created.next_at, null)
   passed('packaged_manual_automation_created_in_shown_workspace')
 
-  setPhase('automation_reopen_from_warm_list_after_create')
-  const back = page.getByRole('button', { name: words.editor.back, exact: true })
+  // The editor's return button and the workspace sidebar both use the translated Automations title.
+  const back = page.getByRole('region', { name: words.editor.back, exact: true })
+    .getByRole('button', { name: words.editor.back, exact: true })
+  setPhase('automation_return_from_created_editor')
   await back.click()
+  await page.waitForURL(url => !url.searchParams.has('automation') && url.searchParams.get('section') === 'automations')
+  setPhase('automation_find_created_row_in_warm_list')
+  await expect(row).toHaveCount(1)
+  setPhase('automation_open_created_row_from_warm_list')
   await row.getByText(title, { exact: true }).click()
+  await page.waitForURL(url => url.searchParams.get('automation') === scheduleId)
+  setPhase('automation_read_reopened_editor_title')
   await expect(name).toHaveValue(title)
 
   setPhase('automation_pause_delete_restore')

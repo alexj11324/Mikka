@@ -9,8 +9,14 @@ on:
         description: The caller's verified Cloudflare promotion receipt
         type: string
         required: true
+      source_sha:
+        description: The commit that receipt shows Cloudflare serving; its worker is built and published
+        type: string
+        required: true
 permissions:
   contents: read
+env:
+  MIKKA_RUNTIME_SOURCE: ${{ inputs.source_sha }}
 jobs:
   recheck:
     runs-on: ubuntu-latest
@@ -24,14 +30,12 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          # The served commit may precede this run's main; its worker inputs come from git.
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - name: Refuse an obsolete source before runtime validation
-        run: node scripts/release/web-deploy.mjs main
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
       - name: Recheck the promoted Cloudflare Web after entering the release queue
         run: node scripts/release/cloudflare-promoted-web.mjs
         env:
@@ -51,6 +55,8 @@ jobs:
       contents: read
       id-token: write
     uses: ./.github/workflows/e2b-template.yml
+    with:
+      source_sha: ${{ inputs.source_sha }}
   # Cloudflare must still serve this exact commit after the paid candidate build.
   await-web:
     needs: validate
@@ -63,6 +69,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          # The served commit may precede this run's main; its worker inputs come from git.
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -92,14 +100,12 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          # The served commit may precede this run's main; its worker inputs come from git.
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - name: Refuse an obsolete source before real subscription work
-        run: node scripts/release/web-deploy.mjs main
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
       - name: Require one immutable candidate artifact reference
         run: node scripts/e2b/runtime-report.mjs reference
         env:
@@ -176,14 +182,13 @@ jobs:
       - name: Make only fully accepted candidates public
         id: publish
         run: |
-          node scripts/release/web-deploy.mjs main
           node --input-type=module - "$RUNNER_TEMP/accepted.json" <<'JS'
           import { readFileSync } from 'node:fs'
           import { join } from 'node:path'
           import { assertCandidatePreserved, assertReportIdentity, readRuntimeReport, reportStep, templateModelsDigest } from './scripts/e2b/runtime-report.mjs'
           reportStep(() => {
             const report = JSON.parse(readFileSync(process.argv[2]))
-            const expected = { sourceCommit: process.env.GITHUB_SHA, workerSha: process.env.SOURCE_SHA,
+            const expected = { sourceCommit: process.env.MIKKA_RUNTIME_SOURCE, workerSha: process.env.SOURCE_SHA,
               runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT }
             assertReportIdentity(report, expected)
             const candidate = readRuntimeReport(join(process.env.RUNNER_TEMP, 'e2b-candidates/candidates.json'), {
@@ -200,7 +205,7 @@ jobs:
           import { assertCandidatePreserved, assertReportIdentity, readRuntimeReport, reportDigest, reportStep, TEMPLATE_KINDS } from './scripts/e2b/runtime-report.mjs'
           reportStep(() => {
             const bytes = readFileSync(process.argv[2]), report = JSON.parse(bytes)
-            const expected = { sourceCommit: process.env.GITHUB_SHA, workerSha: process.env.SOURCE_SHA,
+            const expected = { sourceCommit: process.env.MIKKA_RUNTIME_SOURCE, workerSha: process.env.SOURCE_SHA,
               runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT }
             assertReportIdentity(report, expected)
             const candidate = readRuntimeReport(join(process.env.RUNNER_TEMP, 'e2b-candidates/candidates.json'), {
@@ -244,6 +249,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          # The served commit may precede this run's main; its worker inputs come from git.
+          fetch-depth: 0
           persist-credentials: false
       - name: Install the pinned cleanup SDK
         run: |
@@ -297,6 +304,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          # The served commit may precede this run's main; its worker inputs come from git.
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:

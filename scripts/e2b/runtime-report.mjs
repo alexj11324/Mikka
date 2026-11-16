@@ -103,7 +103,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     const reference = { artifactId: process.env.RUNTIME_REPORT_ARTIFACT_ID, sha256: process.env.RUNTIME_REPORT_SHA256 }
     assertArtifactReference(reference)
     if (process.argv[2] === 'verify') {
-      const report = readRuntimeReport(process.argv[3], { sha256: reference.sha256, sourceCommit: process.env.GITHUB_SHA,
+      const report = readRuntimeReport(process.argv[3], { sha256: reference.sha256, sourceCommit: process.env.MIKKA_RUNTIME_SOURCE || process.env.GITHUB_SHA,
         workerSha: process.env.SOURCE_SHA, runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT })
       console.log(JSON.stringify({ event: 'runtime_report_verified', sourceCommit: report.sourceCommit, workerSha: report.workerSha, sha256: reference.sha256 }))
     } else if (process.argv[2] !== 'reference') fail('runtime_report_command_invalid')

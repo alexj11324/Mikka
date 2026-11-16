@@ -24,10 +24,13 @@ test('a Slack trigger takes an event by event and channel; a reaction trigger by
   assert.equal(slackTriggerMatches({ event: 'message', channels: ['C1'] }, posted!), true)
   assert.equal(slackTriggerMatches({ event: 'message', channels: ['C2'] }, posted!), false)
   assert.equal(slackTriggerMatches({ event: 'mention', channels: ['C1'] }, posted!), false)
+  assert.equal(slackTriggerMatches({ event: 'message', channels: ['C1'], authors: ['U1', 'U2'] }, posted!), true)
+  assert.equal(slackTriggerMatches({ event: 'message', channels: ['C1'], authors: ['U2'] }, posted!), false)
   const [reaction] = slackAutomationEvents(envelope({ type: 'reaction_added', user: 'U2', reaction: 'eyes', item: { type: 'message', channel: 'C1', ts: '1.1' } }))
   assert.equal(slackTriggerMatches({ event: 'reaction_added', channels: ['C1'] }, reaction!), true)
   assert.equal(slackTriggerMatches({ event: 'reaction_added', channels: ['C1'], reactions: ['white_check_mark'] }, reaction!), false)
-  assert.equal(slackTriggerMatches({ event: 'reaction_added', channels: ['C1'], reactions: ['eyes'] }, reaction!), true)
+  assert.equal(slackTriggerMatches({ event: 'reaction_added', channels: ['C1'], reactions: ['eyes'], authors: ['U2'] }, reaction!), true)
+  assert.equal(slackTriggerMatches({ event: 'reaction_added', channels: ['C1'], reactions: ['eyes'], authors: ['U1'] }, reaction!), false)
 })
 
 test('the Bot reads the event as marked Slack data it cannot close', () => {

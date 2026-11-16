@@ -216,9 +216,10 @@
     "mode": "operator-configured",
     "environment": [
       "MIKKA_OFFICIAL_WEB_URL",
-      "MIKKA_OFFICIAL_WEB_ENABLED"
+      "MIKKA_OFFICIAL_WEB_ENABLED",
+      "MIKKA_UI_OVERLAY_SHA"
     ],
-    "behavior": "Confirm the signed-in native account on its issuing origin. Self-hosted Task destinations use the configured official client, an expiring single-use record in the existing auth database, and a fresh Task access check.",
+    "behavior": "Confirm the signed-in native account on its issuing origin. Self-hosted Task destinations use the configured official client, an expiring single-use record in the existing auth database, and a fresh Task access check. Organization settings requires account confirmation for an authorized workspace on a paired cloud deployment.",
     "test": "tests/mobile-handoff.test.ts",
     "suite": "test:desktop-auth"
   },
@@ -227,7 +228,7 @@
     "environment": [
       "MIKKA_UI_OVERLAY_SHA"
     ],
-    "behavior": "Community installations keep their usual account and workspace settings. Only a human session on a cloud deployment serving a pinned official UI receives the personal Files entry.",
+    "behavior": "Community installations keep their usual account and workspace settings. Only a human session on a cloud deployment serving a pinned official UI receives the personal Files and Organization settings entries.",
     "test": "tests/mobile-service-members.db.test.ts",
     "suite": "test:web-auth-db"
   },
@@ -293,6 +294,13 @@
     "behavior": "Let an active Organization member invite ordinary members, and revoke only their own pending invitations. Administrator access is explicitly scoped.",
     "test": "tests/organization-invitations.db.test.ts",
     "suite": "test:organization-invitations-db"
+  },
+  "app/api/organizations/[organizationId]/members/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Return current active Organization members to a current owner or administrator. An explicit includeDisabled also returns suspended memberships. Existing membership changes use the same PostgreSQL authority.",
+    "test": "lib/enterprise/governance.db.test.ts",
+    "suite": "test:enterprise-db"
   },
   "app/api/organizations/[organizationId]/join-by-domain/route.ts": {
     "mode": "built-in",
@@ -742,7 +750,9 @@
   },
   "drizzle/20261116145316_isolate_shared_project_drive_storage.sql": {
     "mode": "built-in",
-    "environment": ["MIKKA_DATABASE_URL"],
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
     "behavior": "Keep explicitly shared Project file bytes in their own tenant and Project namespace, retiring storage using the existing installation object cleanup worker when the Workspace is deleted.",
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
@@ -1982,6 +1992,15 @@
     "test": "lib/mobile-web-target.test.ts",
     "suite": "test:mobile"
   },
+  "lib/mobile-web-scope.ts": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_UI_OVERLAY_SHA"
+    ],
+    "behavior": "Verify the signed-in account can open its selected workspace. The Organization destination also requires a cloud installation paired to its official UI. Community keeps existing destinations.",
+    "test": "tests/mobile-service-members.db.test.ts",
+    "suite": "test:web-auth-db"
+  },
   "lib/mobile-web-target.ts": {
     "mode": "built-in",
     "environment": [],
@@ -2165,6 +2184,13 @@
     "behavior": "Read coordinates only from the platform-signed Slack app/team envelope, bound sender and validated revocation events.",
     "test": "lib/slack/install-provider.test.ts",
     "suite": "test:slack"
+  },
+  "lib/slack/user-id.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validate Slack member IDs consistently for installations and automation author filters.",
+    "test": "lib/schedules/slack-events.test.ts",
+    "suite": "test:schedules"
   },
   "lib/standalone-chat-controls.ts": {
     "mode": "built-in",
