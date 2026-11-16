@@ -11,6 +11,35 @@ sudo -u mikka-e-device bash -c 'test -x "$1" && test -r "$2/node_modules/tsx/pac
 rc=0; "$base/bin/device-launch" "$(command -v node)" --import tsx packages/daemon/bin/mikka.ts daemon login --registration-token-stdin --server https://127.0.0.1:3859/mikka --data-dir "$base/device" </dev/null >"$base/run/case/daemon.log" 2>&1 || rc=$?
 echo "inputOnlyDiagnosticExit=$rc"
 python3 "$GITHUB_WORKSPACE/review/evidence/2257/enrollment/classify.py" "$base"
+# Observe the real public package paths that the service UID could not read.
+python3 - "$base" <<'PYTHON'
+from pathlib import Path
+import re,sys
+p=Path(sys.argv[1])
+raw=(p/'run/case/daemon.log').read_text()
+passed='Invalid registration token' in raw
+candidates=set(r.strip("':.,") for r in re.findall(r"[/][^\s,'"]+?package[.]json",raw))
+for v in sorted(candidates):
+ f=Path(v)
+ if f.is_relative_to(p/'product') and f.is_file():
+  print('Public package location:',f.relative_to(p/'product'),'mode',oct(f.stat().st_mode&0o777),'hardLinks',f.stat().st_nlink)
+print('Cold device CLI reached validation:',passed)
+if not passed and 'ERR_INVALID_PACKAGE_CONFIG' not in raw: raise RuntimeError('unexpected preflight error class')
+PYTHON
+# A fresh copy install prevents chmod on hardlinked store/original-checkout
+# inodes. Enumerate and normalize only copies in this dedicated public tree.
+cd "$base/product"
+# Do this group before network isolation in production; here packages are
+# already in the local store and the rerun is deliberately offline.
+find . -type d -name node_modules -prune -exec rm -rf -- {} +
+(umask 022; ELECTRON_SKIP_BINARY_DOWNLOAD=1 pnpm install --offline --frozen-lockfile --ignore-scripts --package-import-method=copy > "$base/copy-install.log" 2>&1)
+find "$base/product" -type d -name node_modules -prune -exec chmod -R a+rX -- {} +
+rc=0
+"$base/bin/device-launch" "$(command -v node)" --import tsx packages/daemon/bin/mikka.ts daemon login --registration-token-stdin --server https://127.0.0.1:3859/mikka --data-dir "$base/device" </dev/null > "$base/run/case/after-loader.log" 2>&1 || rc=$?
+test "$rc" = 1
+rg -Fq 'Invalid registration token' "$base/run/case/after-loader.log"
+echo "Repaired device CLI consumed expected validation fixture"
+mv "$base/run/case/daemon.log" "$base/run/case/before-loader.log"
 export MIKKA_BUILD_REVISION="$MIKKA_TEST_DEPLOYMENT_SHA"
 step() {
   echo "Verification phase $1"
