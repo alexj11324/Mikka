@@ -99,3 +99,33 @@ test('authorized Task collection traverses every threadless issue, including mic
     }
   }
 })
+
+test('Views counts all seven statuses and each reader’s preferences across pages of the selected visible collection', { skip: !enabled }, async () => {
+  const { pool } = await import('../lib/db')
+  const { countWorkspaceTaskViews } = await import('../app/actions/issues')
+  const owner = 'task-view-' + randomUUID(), peer = 'task-view-' + randomUUID()
+  try {
+    for (const id of [owner, peer]) {
+      await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,true,now(),now())', [id, id+'@example.invalid'])
+    }
+    const { workspaceId } = await seedCoordinator(owner)
+    const { workspaceId: personal } = await seedCoordinator(peer)
+    await pool.query(`insert into issues(id,"userId","workspaceId","ownershipState",scope,title,content,status,priority)
+      select gen_random_uuid(),$1,$2,'bound','personal','Status '||n,jsonb_build_object('type','doc','attrs',
+        jsonb_build_object('mikka',
+          jsonb_build_object('favoriteUserIds',jsonb_build_array($1::text),'subscriberUserIds',jsonb_build_array($3::text))
+          || case when n = 109 then '{"deletedAt":"2026-10-01T00:00:00.000Z"}'::jsonb else '{}'::jsonb end)),
+        case when n > 7 then 'todo' else (array['backlog','todo','doing','review','done','canceled','duplicate'])[n] end,
+        'normal' from generate_series(1,109) n`, [owner, workspaceId, peer])
+    const counts = await withActivitySession(owner, () => countWorkspaceTaskViews(workspaceId), workspaceId)
+    assert.deepEqual(counts, { backlog: 1, todo: 102, doing: 1, review: 1, done: 1, canceled: 1, duplicate: 1, favorites: 108, following: 0 })
+    const empty = await withActivitySession(peer, () => countWorkspaceTaskViews(personal), personal)
+    assert.ok(Object.values(empty).every(value => value === 0))
+    await assert.rejects(withActivitySession(peer, () => countWorkspaceTaskViews(workspaceId), personal), /workspaceAccessDenied/)
+  } finally {
+    for (const id of [owner, peer]) {
+      await pool.query('delete from issues where "userId"=$1', [id])
+      await pool.query('delete from "user" where id=$1', [id])
+    }
+  }
+})
