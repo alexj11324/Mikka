@@ -22,7 +22,7 @@ import { db } from '@/lib/db'
 import { agents, issues, issueDocuments, issueVersions, issueMembers, users } from '@/lib/db/schema'
 import { requireIssueAccess, requireIssueAccessWithoutBody, requireUser } from '@/lib/issue-access'
 import { checklistView, issueAttrsContent, issueChecklistChecked, issueChecklistTotal } from '@/lib/issue-summary-columns'
-import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
+import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES, type IssueStatus } from '@/lib/issue-meta'
 import type { JSONContent } from '@tiptap/react'
 import { blockFlagSchema, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import type { BlockFlag } from '@/lib/task-blocked'
@@ -121,6 +121,25 @@ export async function countAssignedWorkspaceTasks(workspaceId: string) {
       sql`${assignee}->>'kind' = 'member' and ${assignee}->>'id' = ${user.id}`,
     ))
     return { count: row.count }
+  })
+}
+
+/** Views belongs to the selected workspace. Its totals span the same visible
+ * Tasks as the paginated list, including those the client has not loaded. */
+export async function countWorkspaceTaskViews(workspaceId: string) {
+  z.uuid().parse(workspaceId)
+  const user = await requireUser()
+  if (await effectiveRequestWorkspace(user) !== workspaceId) throw new ActionFailureError('workspaceAccessDenied')
+  return withTaskWorkspace(user, workspaceId, async () => {
+    const metadata = sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')`
+    const statusCount = (status: IssueStatus) => sql<number>`count(*) filter (where ${issues.status} = ${status})::int`
+    const statuses = Object.fromEntries(ISSUE_STATUS_CODES.map(status => [status, statusCount(status)])) as Record<IssueStatus, ReturnType<typeof statusCount>>
+    const [counts] = await db.select({
+      ...statuses,
+      favorites: sql<number>`count(*) filter (where ${metadata}->'favoriteUserIds' @> jsonb_build_array(${user.id}::text))::int`,
+      following: sql<number>`count(*) filter (where ${metadata}->'subscriberUserIds' @> jsonb_build_array(${user.id}::text))::int`,
+    }).from(issues).where(issueVisibilityPredicate(user.id, { allowedIds: [], workspaceIds: [workspaceId] }))
+    return counts
   })
 }
 
