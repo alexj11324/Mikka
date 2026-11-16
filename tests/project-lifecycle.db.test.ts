@@ -99,6 +99,17 @@ test('Project archive and strict deletion preserve canonical work and frozen his
     assert.equal((await connection.query('select id from issues where id=$1', [issueId])).rowCount, 1)
   })
 
+  await t.test('a Project with a personal Drive folder cannot be deleted', async () => {
+    const id = await emptyProject()
+    const { createDriveVolume } = await import('../lib/drive/volumes')
+    const { createHash } = await import('node:crypto')
+    await createDriveVolume(connection, { ownerId: member, authorName: 'Member' },
+      { driveScope: 'project-user', scopeId: id, scopeUserId: member, workspaceId: workspace.id, name: 'Notes' },
+      text => createHash('sha256').update(text).digest('hex'))
+    assert.equal((await lifecycle.projectLifecycleImpact(owner, workspace.id, id)).canDelete, false)
+    await assert.rejects(lifecycle.deleteProjectData(owner, workspace.id, { id, revision: 1, confirmation: 'Pristine' }), /projectDeleteNotEmpty/)
+  })
+
   await t.test('hard delete requires admin, exact revision, explicit name and no relationships or history', async () => {
     const id = await emptyProject()
     const input = { id, revision: 1, confirmation: 'Pristine' }

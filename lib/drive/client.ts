@@ -21,12 +21,19 @@ export class DriveRequestError extends Error {
   }
 }
 
-export const driveVolumesKey = (workspaceId: string, ownerId: string) => ['drive:volumes', ownerId, workspaceId] as const
-export const driveHeadKey = (workspaceId: string, ownerId: string, volumeId: string) => ['drive:head', ownerId, workspaceId, volumeId] as const
-export const driveHistoryKey = (workspaceId: string, ownerId: string, volumeId: string) => ['drive:history', ownerId, workspaceId, volumeId] as const
+export type DriveLocation = string | { workspaceId: string; projectId: string }
 
-function url(workspaceId: string, suffix = '', query: Record<string, string | undefined> = {}) {
-  const params = new URLSearchParams({ workspaceId })
+const locationKey = (location: DriveLocation) => typeof location === 'string'
+  ? [location] as const : [location.workspaceId, location.projectId] as const
+
+export const driveVolumesKey = (location: DriveLocation, ownerId: string) => ['drive:volumes', ownerId, ...locationKey(location)] as const
+export const driveHeadKey = (location: DriveLocation, ownerId: string, volumeId: string) => ['drive:head', ownerId, ...locationKey(location), volumeId] as const
+export const driveHistoryKey = (location: DriveLocation, ownerId: string, volumeId: string) => ['drive:history', ownerId, ...locationKey(location), volumeId] as const
+
+function url(location: DriveLocation, suffix = '', query: Record<string, string | undefined> = {}) {
+  const params = new URLSearchParams(typeof location === 'string'
+    ? { workspaceId: location }
+    : { workspaceId: location.workspaceId, projectId: location.projectId })
   for (const [key, value] of Object.entries(query)) if (value !== undefined) params.set(key, value)
   return withBasePath(`/api/drive/volumes${suffix}?${params}`)
 }
@@ -47,48 +54,48 @@ async function request<T>(target: string, init: RequestInit = {}, send: typeof f
   return body as T
 }
 
-export function readDriveVolumes(workspaceId: string, before?: string, send?: typeof fetch) {
-  return request<DriveVolumePage>(url(workspaceId, '', { before }), {}, send)
+export function readDriveVolumes(location: DriveLocation, before?: string, send?: typeof fetch) {
+  return request<DriveVolumePage>(url(location, '', { before }), {}, send)
 }
 
-export function readArchivedDriveVolumes(workspaceId: string, before?: string, send?: typeof fetch) {
-  return request<DriveVolumePage>(url(workspaceId, '', { archived: 'true', before }), {}, send)
+export function readArchivedDriveVolumes(location: DriveLocation, before?: string, send?: typeof fetch) {
+  return request<DriveVolumePage>(url(location, '', { archived: 'true', before }), {}, send)
 }
 
-export function setPersonalDriveArchive(workspaceId: string, volumeId: string, archived: boolean, send?: typeof fetch) {
+export function setPersonalDriveArchive(location: DriveLocation, volumeId: string, archived: boolean, send?: typeof fetch) {
   const operation = archived ? 'archive' : 'unarchive'
-  return request<{ archived: boolean }>(url(workspaceId, `/${encodeURIComponent(volumeId)}/${operation}`), { method: 'POST' }, send)
+  return request<{ archived: boolean }>(url(location, `/${encodeURIComponent(volumeId)}/${operation}`), { method: 'POST' }, send)
 }
 
-export function readDriveHead(workspaceId: string, volumeId: string, send?: typeof fetch) {
-  return request<DriveHead>(url(workspaceId, `/${encodeURIComponent(volumeId)}`), {}, send)
+export function readDriveHead(location: DriveLocation, volumeId: string, send?: typeof fetch) {
+  return request<DriveHead>(url(location, `/${encodeURIComponent(volumeId)}`), {}, send)
 }
 
-export function readDriveHistory(workspaceId: string, volumeId: string, before?: string, send?: typeof fetch) {
-  return request<DriveHistoryPage>(url(workspaceId, `/${encodeURIComponent(volumeId)}/versions`, { before }), {}, send)
+export function readDriveHistory(location: DriveLocation, volumeId: string, before?: string, send?: typeof fetch) {
+  return request<DriveHistoryPage>(url(location, `/${encodeURIComponent(volumeId)}/versions`, { before }), {}, send)
 }
 
-export function readDriveFileHistory(workspaceId: string, volumeId: string, path: string, before?: string, send?: typeof fetch) {
+export function readDriveFileHistory(location: DriveLocation, volumeId: string, path: string, before?: string, send?: typeof fetch) {
   return request<{ versions: (DriveVersion & { file: DriveManifestEntry | null })[]; nextCursor: string | null }>(
-    url(workspaceId, `/${encodeURIComponent(volumeId)}/versions`, { path, before }), {}, send)
+    url(location, `/${encodeURIComponent(volumeId)}/versions`, { path, before }), {}, send)
 }
 
-export function readDriveVersion(workspaceId: string, volumeId: string, versionId: string, send?: typeof fetch) {
-  return request<DriveVersionRead>(url(workspaceId, `/${encodeURIComponent(volumeId)}/versions/${encodeURIComponent(versionId)}`), {}, send)
+export function readDriveVersion(location: DriveLocation, volumeId: string, versionId: string, send?: typeof fetch) {
+  return request<DriveVersionRead>(url(location, `/${encodeURIComponent(volumeId)}/versions/${encodeURIComponent(versionId)}`), {}, send)
 }
 
-export function driveFileURL(workspaceId: string, volumeId: string, path: string, versionId?: string) {
-  return url(workspaceId, `/${encodeURIComponent(volumeId)}/files`, { path, versionId })
+export function driveFileURL(location: DriveLocation, volumeId: string, path: string, versionId?: string) {
+  return url(location, `/${encodeURIComponent(volumeId)}/files`, { path, versionId })
 }
 
-export function createDriveVolume(workspaceId: string, name: string, send?: typeof fetch) {
-  return request<{ volume: DriveVolume }>(url(workspaceId), {
+export function createDriveVolume(location: DriveLocation, name: string, send?: typeof fetch) {
+  return request<{ volume: DriveVolume }>(url(location), {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name }),
   }, send)
 }
 
 /** Upload bytes first; the compare-and-swap then publishes the complete file selection. */
-export async function uploadDriveFiles(workspaceId: string, volumeId: string, expectedDigest: string,
+export async function uploadDriveFiles(location: DriveLocation, volumeId: string, expectedDigest: string,
   files: readonly File[], mutationId: string, send: typeof fetch = fetch) {
   if (!files.length || files.some(file => file.size > DRIVE_MAX_FILE_BYTES)) throw new DriveRequestError('drive_limit_exceeded', 413)
   if (files.length > DRIVE_MAX_CHANGES || files.some(file => !isDrivePath(file.name)))
@@ -97,28 +104,28 @@ export async function uploadDriveFiles(workspaceId: string, volumeId: string, ex
     throw new DriveRequestError('drive_write_invalid', 422)
   const changes: { op: 'put'; path: string; mode: 420; sha256: string; sizeBytes: number }[] = []
   for (const file of files) {
-    const blob = await request<{ sha256: string; sizeBytes: number }>(url(workspaceId, `/${encodeURIComponent(volumeId)}/blobs`), {
+    const blob = await request<{ sha256: string; sizeBytes: number }>(url(location, `/${encodeURIComponent(volumeId)}/blobs`), {
       method: 'POST', headers: { 'content-type': 'application/octet-stream' }, body: file,
     }, send)
     changes.push({ op: 'put', path: file.name, mode: 420, sha256: blob.sha256, sizeBytes: blob.sizeBytes })
   }
-  return request<{ headDigest: string; headVersionId: string }>(url(workspaceId, `/${encodeURIComponent(volumeId)}/entries`), {
+  return request<{ headDigest: string; headVersionId: string }>(url(location, `/${encodeURIComponent(volumeId)}/entries`), {
     method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ expectedDigest, mutationId, changes }),
   }, send)
 }
 
 /** Remove one path from the displayed head and retain all earlier immutable versions. */
-export function deleteDriveFile(workspaceId: string, volumeId: string, path: string, expectedDigest: string,
+export function deleteDriveFile(location: DriveLocation, volumeId: string, path: string, expectedDigest: string,
   mutationId: string, send?: typeof fetch) {
-  return request<{ headDigest: string; headVersionId: string }>(url(workspaceId, `/${encodeURIComponent(volumeId)}/entries`), {
+  return request<{ headDigest: string; headVersionId: string }>(url(location, `/${encodeURIComponent(volumeId)}/entries`), {
     method: 'PATCH', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ expectedDigest, mutationId, changes: [{ op: 'delete', path }] }),
   }, send)
 }
 
-export function restoreDriveVersion(workspaceId: string, volumeId: string, versionId: string, expectedDigest: string,
+export function restoreDriveVersion(location: DriveLocation, volumeId: string, versionId: string, expectedDigest: string,
   mutationId: string, send?: typeof fetch) {
-  return request<{ headDigest: string; headVersionId: string }>(url(workspaceId, `/${encodeURIComponent(volumeId)}/restore`), {
+  return request<{ headDigest: string; headVersionId: string }>(url(location, `/${encodeURIComponent(volumeId)}/restore`), {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ versionId, expectedDigest, mutationId }),
   }, send)
 }

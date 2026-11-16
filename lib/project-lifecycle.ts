@@ -34,7 +34,7 @@ async function contents(tx: ProjectTransaction, project: Project, workspaceId: s
     (select count(*)::int from workspace_resource_events where "workspaceId"=${workspaceId} and "resourceId"=${project.id}) as "resourceEvents",
     (select count(*)::int from workspace_projects where "workspaceId"=${workspaceId} and id<>${project.id} and properties->'dependencyIds' @> ${JSON.stringify([project.id])}::jsonb) as "incomingDependencies"`)
   const { issueIds, ...workspaceCounts } = linked.rows[0]
-  const history = await db.execute<HistoryCounts>(sql`with scoped_tasks as (
+  const history = await db.execute<HistoryCounts & { hasProjectFiles: boolean }>(sql`with scoped_tasks as (
       select id from issues where id=any(${sql.param(issueIds)}::uuid[]) and "workspaceId"=${workspaceId} and "ownershipState"='bound'
     ), historical_runs as (
       select id,status from agent_runs where
@@ -46,16 +46,18 @@ async function contents(tx: ProjectTransaction, project: Project, workspaceId: s
       (select count(*)::int from factory_tasks f where (f."workspaceId"=${workspaceId} or f."workspaceId" is null)
         and (f."issueId" in (select id from scoped_tasks) or exists (
           select 1 from factory_attempts a where a."taskId"=f.id and a."runId" in (select id from historical_runs)))) as "factoryTasks",
-      (select count(*)::int from project_decisions where "workspaceId"=${workspaceId} and "projectId"=${project.id}) as decisions`)
-  const counts = { ...workspaceCounts, ...history.rows[0], tasks: issueIds.length,
+      (select count(*)::int from project_decisions where "workspaceId"=${workspaceId} and "projectId"=${project.id}) as decisions,
+      exists(select 1 from drive_volumes where "workspaceId"=${workspaceId} and "scopeId"=${project.id} and "driveScope" in ('project','project-user')) as "hasProjectFiles"`)
+  const { hasProjectFiles, ...historyCounts } = history.rows[0]
+  const counts = { ...workspaceCounts, ...historyCounts, tasks: issueIds.length,
     dependencies: project.properties.dependencyIds?.length ?? 0, milestones: project.properties.milestones?.length ?? 0,
     legacyTaskReferences: project.issueIds?.length ?? 0 }
   return { projectId: project.id, workspaceId, name: project.name, revision: project.revision,
     archivedAt: project.archivedAt?.toISOString() ?? null, counts,
-    canDelete: Object.values(counts).every(count => count === 0), recovery: 'restore_archive' }
+    canDelete: !hasProjectFiles && Object.values(counts).every(count => count === 0), recovery: 'restore_archive' }
 }
 
-async function lockedProject<T>(reader: ProjectReader, workspaceId: string, id: string,
+export async function withLockedProject<T>(reader: ProjectReader, workspaceId: string, id: string,
   action: 'canReadContent' | 'canSteer', operation: (tx: ProjectTransaction, project: Project) => Promise<T>) {
   // Keep the established Workspace -> relations -> APP ACL lock order shared
   // with Project mutations; taking the ACL first can deadlock a concurrent
@@ -86,13 +88,13 @@ async function journal(tx: ProjectTransaction, project: Project, reader: Project
 }
 
 export async function projectLifecycleImpact(reader: ProjectReader, workspaceId: string, id: string) {
-  return lockedProject(reader, workspaceId, id, 'canReadContent', (tx, project) => contents(tx, project, workspaceId))
+  return withLockedProject(reader, workspaceId, id, 'canReadContent', (tx, project) => contents(tx, project, workspaceId))
 }
 
 /** Archive is independent of delivery status. Existing tasks, Runs, decisions
  * and bindings remain addressable; new admission fails until an explicit restore. */
 export async function setProjectArchive(reader: ProjectReader, workspaceId: string, input: { id: string; revision?: number; archived: boolean; message: string }) {
-  return lockedProject(reader, workspaceId, input.id, 'canSteer', async (tx, project) => {
+  return withLockedProject(reader, workspaceId, input.id, 'canSteer', async (tx, project) => {
     if (input.revision !== undefined && input.revision !== project.revision) throw new ActionFailureError('projectSaveConflict')
     if (Boolean(project.archivedAt) !== input.archived) {
       const actorId = taskReaderScope(reader).userId, updatedAt = new Date()
@@ -111,7 +113,7 @@ export async function setProjectArchive(reader: ProjectReader, workspaceId: stri
 /** A hard delete never becomes an implicit archive. History is not recoverable
  * by this API, so only a confirmed, truly unused Project may be removed. */
 export async function deleteProjectData(reader: ProjectReader, workspaceId: string, input: { id: string; revision: number; confirmation: string }) {
-  return lockedProject(reader, workspaceId, input.id, 'canSteer', async (tx, project) => {
+  return withLockedProject(reader, workspaceId, input.id, 'canSteer', async (tx, project) => {
     const [member] = await tx.select({ role: workspaceMembers.role }).from(workspaceMembers)
       .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, taskReaderScope(reader).userId)))
     if (member?.role !== 'admin') throw new ActionFailureError('workspaceAccessDenied')

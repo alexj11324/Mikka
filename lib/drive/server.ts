@@ -6,6 +6,7 @@ import { pool } from '@/lib/db'
 import { writeAllowed } from '@/lib/mobile-api'
 import { ActionFailureError } from '@/lib/action-error'
 import { WorkspaceError } from '@/lib/workspace-error'
+import { withLockedProject } from '@/lib/project-lifecycle'
 import { withTaskWorkspace } from '@/lib/task-workspace'
 import { workspaceListChanged } from '@/lib/live/lists'
 import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, isVolumeId, isVolumeVersionId } from './contract'
@@ -60,28 +61,32 @@ export async function driveResponse(request: Request, operation: Operation, para
     const search = new URL(request.url).searchParams
     const workspaceId = z.uuid().parse(search.get('workspaceId'))
     let changed = false
-    const response = await withTaskWorkspace(session.user, workspaceId, async () => {
-      const actor = { ownerId: session.user.id, authorName: session.user.name }
+    const projectId = search.has('projectId') ? z.uuid().parse(search.get('projectId')) : undefined
+    const actor = { ownerId: session.user.id, authorName: session.user.name, workspaceId, projectId }
+    const scope = projectId
+      ? { driveScope: 'project-user' as const, scopeId: projectId, scopeUserId: session.user.id }
+      : { driveScope: 'user' as const, scopeId: session.user.id }
+    const serve = async () => {
       if (operation === 'volumes') {
         if (request.method === 'POST') {
           const input = z.object({ name: z.string().trim().min(1).max(200) }).strict().parse(await body(request))
-          const volume = await createDriveVolume(pool, actor, { ...input, workspaceId, driveScope: 'user', scopeId: actor.ownerId }, text => createHash('sha256').update(text).digest('hex'))
+          const volume = await createDriveVolume(pool, actor, { ...input, workspaceId, ...scope }, text => createHash('sha256').update(text).digest('hex'))
           changed = true
           return json({ volume }, 201)
         }
         const limit = z.coerce.number().int().min(1).max(100).parse(search.get('limit') ?? '50')
         const before = search.has('before') ? z.string().refine(isVolumeId).parse(search.get('before')) : null
         const archived = z.enum(['true', 'false']).parse(search.get('archived') ?? 'false') === 'true'
-        const result = await listDriveVolumes(pool, actor, { driveScope: 'user', scopeId: actor.ownerId, workspaceId }, { limit: limit + 1, beforeId: before ?? undefined, archived })
+        const result = await listDriveVolumes(pool, actor, { ...scope, workspaceId }, { limit: limit + 1, beforeId: before ?? undefined, archived })
         const volumes = result.slice(0, limit)
         return json({ volumes, nextCursor: result.length > limit ? volumes.at(-1)!.id : null })
       }
       if (operation === 'archive' || operation === 'unarchive') {
         const archived = operation === 'archive'
-        changed = await setPersonalDriveArchive(pool, { ownerId: actor.ownerId, workspaceId }, params.volumeId, archived)
+        changed = await setPersonalDriveArchive(pool, actor, params.volumeId, archived)
         return json({ archived })
       }
-      const volume = await readDriveVolume(pool, { ownerId: actor.ownerId, workspaceId }, params.volumeId)
+      const volume = await readDriveVolume(pool, actor, params.volumeId)
       if (operation === 'volume') {
         // Read an immutable manifest named by the head receipt, so a concurrent
         // write cannot mix an old digest with a newer mutable entry tree.
@@ -107,7 +112,7 @@ export async function driveResponse(request: Request, operation: Operation, para
             WHERE "ownerId"=$1 AND "workspaceId"=$2 AND sha256=ANY($3::text[])`, [actor.ownerId, workspaceId, digests])
           if (admitted.rows.length !== digests.length) throw new DriveError('drive_blob_unknown', 422)
         }
-        const result = await applyDriveWrite(pool, { ownerId: actor.ownerId, volumeId: volume.id, driveScope: 'user' }, actor, input)
+        const result = await applyDriveWrite(pool, { ownerId: actor.ownerId, volumeId: volume.id, driveScope: scope.driveScope }, actor, input)
         changed = !result.replayed
         return json(result)
       }
@@ -139,14 +144,20 @@ export async function driveResponse(request: Request, operation: Operation, para
       const content = blob.inlineContent ? driveBytes(blob.inlineContent) : await readDriveBlobObject(actor.ownerId, blob.sha256, request.signal)
       return new Response(content, { headers: { ...headers, 'Content-Type': 'application/octet-stream', 'Content-Length': String(blob.sizeBytes),
         'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(path.split('/').at(-1)!)}` } })
-    })
+    }
+    const response = projectId
+      ? await withLockedProject(session.user, workspaceId, projectId, 'canReadContent', (_tx, project) => {
+        if (project.archivedAt) throw new DriveError('drive_not_found', 404)
+        return serve()
+      })
+      : await withTaskWorkspace(session.user, workspaceId, serve)
     // Both the file mutation and its membership lease have finished. The
     // existing invalidation path resolves recipients afresh and carries no content.
     if (changed) await workspaceListChanged(pool, workspaceId, ['workspace_settings'])
     return response
   } catch (error) {
     if (error instanceof z.ZodError || error instanceof SyntaxError) return json({ error: 'drive_write_invalid' }, 400)
-    if (error instanceof ActionFailureError && error.code === 'workspaceAccessDenied' || error instanceof WorkspaceError && error.code === 'workspaceAccessDenied') return json({ error: 'drive_not_found' }, 404)
+    if (error instanceof ActionFailureError && (error.code === 'workspaceAccessDenied' || error.code === 'projectNotFound') || error instanceof WorkspaceError && error.code === 'workspaceAccessDenied') return json({ error: 'drive_not_found' }, 404)
     return driveErrorResponse(error, headers)
   }
 }
