@@ -1,0 +1,188 @@
+{
+  "scope": "public isolated owner HTTPS, real Codex first-case only",
+  "revision": "470258c05e8c081aefd23a8b4a9c7435cf07bbbd",
+  "environment": "PostgreSQL 17, original Ubuntu isolated service UIDs, official CLI and CPU GGUF",
+  "success": false,
+  "checks": [
+    {
+      "phase": "isolated_target_and_two_active_accounts",
+      "at": "2026-11-16T10:52:24.125Z",
+      "mode": null
+    },
+    {
+      "phase": "one_registered_full_device_with_pinned_harnesses",
+      "at": "2026-11-16T10:52:26.447Z",
+      "mode": null
+    },
+    {
+      "phase": "both_authenticated_catalogues",
+      "at": "2026-11-16T10:52:26.541Z",
+      "mode": null
+    },
+    {
+      "phase": "ordinary_run_admitted",
+      "at": "2026-11-16T10:52:27.379Z",
+      "mode": "steer"
+    },
+    {
+      "phase": "live_turn_before_owner_action",
+      "at": "2026-11-16T10:52:28.403Z",
+      "mode": null
+    },
+    {
+      "phase": "native_steer_ack",
+      "at": "2026-11-16T10:52:29.411Z",
+      "mode": "steer"
+    },
+    {
+      "phase": "lease_closed",
+      "at": "2026-11-16T10:52:33.098Z",
+      "mode": null
+    }
+  ],
+  "diagnostic": {
+    "stage": "codex_terminal_result",
+    "location": "full-daemon.mts:115:98",
+    "run": "f6fa4af7-37fb-4cb3-a4e5-e538796bb075",
+    "state": "failed",
+    "reason": "error",
+    "sessionPresent": true,
+    "tokens": 1
+  },
+  "journal": [
+    {
+      "state": "failed",
+      "reason": "error",
+      "markers": [
+        "stream_disconnected",
+        "codex",
+        "needs_end",
+        "completion"
+      ],
+      "errorBytes": 85,
+      "seq": 38
+    }
+  ],
+  "model": {
+    "requests": {
+      "count": 5,
+      "entries": [
+        {
+          "at": "2026-11-16T10:52:26.511Z",
+          "accepted": false
+        },
+        {
+          "at": "2026-11-16T10:52:27.753Z",
+          "stream": true,
+          "accepted": true
+        },
+        {
+          "at": "2026-11-16T10:52:29.438Z",
+          "stream": true,
+          "accepted": true
+        },
+        {
+          "at": "2026-11-16T10:52:30.023Z",
+          "stream": true,
+          "accepted": true
+        },
+        {
+          "at": "2026-11-16T10:52:30.740Z",
+          "stream": true,
+          "accepted": true
+        }
+      ],
+      "markers": [
+        [],
+        [],
+        [],
+        [],
+        []
+      ]
+    },
+    "results": {
+      "count": 0,
+      "entries": [],
+      "markers": []
+    },
+    "first-token": {
+      "count": 4,
+      "entries": [
+        {
+          "at": "2026-11-16T10:52:28.091Z"
+        },
+        {
+          "at": "2026-11-16T10:52:29.713Z"
+        },
+        {
+          "at": "2026-11-16T10:52:30.286Z"
+        },
+        {
+          "at": "2026-11-16T10:52:30.995Z"
+        }
+      ],
+      "markers": [
+        [],
+        [],
+        [],
+        []
+      ]
+    },
+    "provider-ends": {
+      "count": 4,
+      "entries": [
+        {
+          "at": "2026-11-16T10:52:29.446Z",
+          "aborted": true,
+          "textBytes": 54
+        },
+        {
+          "at": "2026-11-16T10:52:29.793Z",
+          "aborted": false,
+          "textBytes": 31
+        },
+        {
+          "at": "2026-11-16T10:52:30.357Z",
+          "aborted": false,
+          "textBytes": 31
+        },
+        {
+          "at": "2026-11-16T10:52:31.063Z",
+          "aborted": false,
+          "textBytes": 31
+        }
+      ],
+      "markers": [
+        [
+          "ERR_ABORTED"
+        ],
+        [],
+        [],
+        []
+      ]
+    },
+    "decisions": {
+      "count": 0,
+      "entries": [],
+      "markers": []
+    },
+    "claude-results": {
+      "count": 0,
+      "entries": [],
+      "markers": []
+    }
+  },
+  "daemonWarnings": [],
+  "modelLog": [],
+  "relayLog": [],
+  "appLog": [
+    "loopback",
+    "timed_out",
+    "transport",
+    "retrying",
+    "other_bad_gateway",
+    "identity"
+  ],
+  "buildStage": "offline-installed-window",
+  "compileMarkers": []
+}

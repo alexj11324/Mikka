@@ -1,0 +1,162 @@
+{
+  "scope": "public isolated owner HTTPS, real Codex first-case only",
+  "revision": "470258c05e8c081aefd23a8b4a9c7435cf07bbbd",
+  "environment": "PostgreSQL 17, original Ubuntu isolated service UIDs, official CLI and CPU GGUF",
+  "success": true,
+  "checks": [
+    {
+      "phase": "isolated_target_and_two_active_accounts",
+      "at": "2026-11-16T11:00:26.532Z",
+      "mode": null
+    },
+    {
+      "phase": "one_registered_full_device_with_pinned_harnesses",
+      "at": "2026-11-16T11:00:29.420Z",
+      "mode": null
+    },
+    {
+      "phase": "both_authenticated_catalogues",
+      "at": "2026-11-16T11:00:29.538Z",
+      "mode": null
+    },
+    {
+      "phase": "ordinary_run_admitted",
+      "at": "2026-11-16T11:00:30.305Z",
+      "mode": "steer"
+    },
+    {
+      "phase": "live_turn_before_owner_action",
+      "at": "2026-11-16T11:00:31.534Z",
+      "mode": null
+    },
+    {
+      "phase": "native_steer_ack",
+      "at": "2026-11-16T11:00:32.566Z",
+      "mode": "steer"
+    },
+    {
+      "phase": "steer_terminal_readback",
+      "at": "2026-11-16T11:00:35.963Z",
+      "mode": "steer"
+    },
+    {
+      "phase": "case_passed",
+      "at": "2026-11-16T11:00:35.963Z",
+      "mode": "steer"
+    },
+    {
+      "phase": "device_credential_revoked",
+      "at": "2026-11-16T11:00:36.039Z",
+      "mode": null
+    },
+    {
+      "phase": "lease_closed",
+      "at": "2026-11-16T11:00:36.053Z",
+      "mode": null
+    }
+  ],
+  "diagnostic": {},
+  "journal": [
+    {
+      "state": "stopped",
+      "reason": "turn_ended",
+      "markers": [
+        "session"
+      ],
+      "errorBytes": 34,
+      "seq": 20
+    }
+  ],
+  "model": {
+    "requests": {
+      "count": 3,
+      "entries": [
+        {
+          "at": "2026-11-16T11:00:29.527Z",
+          "accepted": false
+        },
+        {
+          "at": "2026-11-16T11:00:30.751Z",
+          "stream": true,
+          "accepted": true
+        },
+        {
+          "at": "2026-11-16T11:00:32.591Z",
+          "stream": true,
+          "accepted": true
+        }
+      ],
+      "markers": [
+        [],
+        [],
+        []
+      ]
+    },
+    "results": {
+      "count": 1,
+      "entries": [
+        {
+          "at": "2026-11-16T11:00:33.118Z",
+          "inputTokens": 27,
+          "outputTokens": 7
+        }
+      ],
+      "markers": [
+        []
+      ]
+    },
+    "first-token": {
+      "count": 2,
+      "entries": [
+        {
+          "at": "2026-11-16T11:00:31.220Z"
+        },
+        {
+          "at": "2026-11-16T11:00:33.024Z"
+        }
+      ],
+      "markers": [
+        [],
+        []
+      ]
+    },
+    "provider-ends": {
+      "count": 1,
+      "entries": [
+        {
+          "at": "2026-11-16T11:00:32.601Z",
+          "aborted": true,
+          "textBytes": 54
+        }
+      ],
+      "markers": [
+        [
+          "ERR_ABORTED"
+        ]
+      ]
+    },
+    "decisions": {
+      "count": 0,
+      "entries": [],
+      "markers": []
+    },
+    "claude-results": {
+      "count": 0,
+      "entries": [],
+      "markers": []
+    }
+  },
+  "daemonWarnings": [],
+  "modelLog": [],
+  "relayLog": [],
+  "appLog": [
+    "loopback",
+    "timed_out",
+    "transport",
+    "retrying",
+    "other_bad_gateway",
+    "identity"
+  ],
+  "buildStage": "offline-installed-window",
+  "compileMarkers": []
+}

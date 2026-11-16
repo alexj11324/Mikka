@@ -1,0 +1,51 @@
+{
+  "productRevision": "470258c05e8c081aefd23a8b4a9c7435cf07bbbd",
+  "originalInstalledPackage": {
+    "run": 43844614660,
+    "attempt": 2,
+    "artifact": 14217936270,
+    "zipSha256": "18166b292c4e97c2be585b2bf1096dceed38cbfc70732bd3005d27f334d301ee",
+    "phase": "Native Codex steer ACK followed by failed/error terminal."
+  },
+  "isolatedControl": {
+    "run": 43851705153,
+    "job": 133245613418,
+    "artifact": 14219595481,
+    "digest": "f45d8e255fe60af3a72dca7d85ac8532195dd903c4e4adad737750c58912b15a",
+    "observed": "4 real streamed first tokens, 3 subsequent completed inference outputs (31 bytes each) missing publication of their terminal result. Native CLI reported disconnected stream; server stored failed/error."
+  },
+  "causeProbe": {
+    "run": 43852826597,
+    "job": 133249486237,
+    "at": "2026-11-16T11:00:08.2488123Z",
+    "file": "results.jsonl",
+    "oldFileGid": 1001,
+    "producingServiceGid": 986,
+    "oldServiceCanWrite": false,
+    "secondFile": "claude-results.jsonl",
+    "secondFileAlsoAffected": true,
+    "scope": "Isolated test harness omitted explicit receipt file ownership. No customer data or production rate was measured."
+  },
+  "repair": {
+    "run": 43852826597,
+    "job": 133249486237,
+    "artifact": 14220540391,
+    "digest": "4f85fedbd21d5c13a0e914b60475366ecebd52ea866b2b4d9317f296d3716a04",
+    "newMode": "0640",
+    "modelWrites": true,
+    "controllerMayRead": true,
+    "controllerMayWrite": false,
+    "actualOutputTokens": 7,
+    "terminal": "stopped/turn_ended",
+    "verified": "2026-11-16T11:00:35.963Z",
+    "credentialRevoked": true,
+    "leaseReleased": true
+  },
+  "risk": {
+    "likelihood": 10,
+    "impact": 4,
+    "score": 40,
+    "incidence": "1/1 measured failed public control and 1 observed qualifying run in the installed package. Qualification fails whenever the isolated model is not allowed to write the generated result."
+  },
+  "scope": "CPU GGUF + official Codex 0.163.0. This diagnosis ran only the first case; installed UI, subscription and production results are separately qualified."
+}
