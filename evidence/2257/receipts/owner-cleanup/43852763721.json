@@ -1,0 +1,82 @@
+{
+  "source": "2668bb99330057f3873a8f0e724d52ebe05ddd2f",
+  "interface": "real-system-chrome-pkce-and-owner-lease-cleanup",
+  "observed": [
+    {
+      "phase": "isolated_target_and_two_active_accounts",
+      "at": "2026-11-16T10:59:59.427Z"
+    },
+    {
+      "phase": "browser_nss_setup_pending_sandbox",
+      "at": "2026-11-16T11:00:00.659Z"
+    },
+    {
+      "phase": "real_system_chrome_with_sandbox",
+      "at": "2026-11-16T11:00:05.915Z",
+      "version": "157.0.8103.50"
+    },
+    {
+      "phase": "browser_trusts_target_revision",
+      "at": "2026-11-16T11:00:09.932Z"
+    },
+    {
+      "phase": "normal_begin_precedes_real_continue",
+      "at": "2026-11-16T11:00:10.002Z"
+    },
+    {
+      "phase": "actual_browser_continue_and_loopback_return",
+      "at": "2026-11-16T11:00:11.350Z"
+    },
+    {
+      "phase": "community_pkce_exchange_owner_identity",
+      "at": "2026-11-16T11:00:11.382Z",
+      "actualGoogleOAuth": false,
+      "packagedDesktop": false
+    },
+    {
+      "phase": "native_logout_invalidates_original_owner_revoke",
+      "at": "2026-11-16T11:00:11.452Z",
+      "status": 401
+    },
+    {
+      "phase": "same_lease_owner_reauthenticated",
+      "at": "2026-11-16T11:00:11.617Z"
+    },
+    {
+      "phase": "device_credential_revoked",
+      "at": "2026-11-16T11:00:11.630Z"
+    },
+    {
+      "phase": "same_lease_same_owner_fresh_session_revokes_real_device",
+      "at": "2026-11-16T11:00:11.638Z"
+    },
+    {
+      "phase": "second_owner_logout_before_independent_lease_release",
+      "at": "2026-11-16T11:00:11.691Z"
+    },
+    {
+      "phase": "device_revoke_rejected",
+      "at": "2026-11-16T11:00:11.854Z",
+      "status": 401
+    },
+    {
+      "phase": "cleanup_failed",
+      "at": "2026-11-16T11:00:11.855Z",
+      "step": "device_credential"
+    },
+    {
+      "phase": "lease_closed",
+      "at": "2026-11-16T11:00:11.868Z",
+      "state": "quarantined"
+    }
+  ],
+  "scenarioExit": 1,
+  "stage": null,
+  "pass": true,
+  "runId": 43852763721,
+  "attempt": 1,
+  "jobId": 133249266422,
+  "artifactId": 14220575367,
+  "artifactSha256": "7b6aebee8fa029ec0a00e817453749974bf81e8ac1413d402459b22c74510553",
+  "evidenceRevision": "b80e31e5f803c52a518f98e87f1b5f7fbfca6d51"
+}
