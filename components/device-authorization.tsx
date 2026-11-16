@@ -14,7 +14,7 @@ import { Link } from '@/i18n/navigation'
 import { withBasePath } from '@/lib/base-path'
 
 /** What the machine asking to connect reports about itself (lib/daemon-authorization.ts). */
-type ClientInfo = { name: string | null; platform: string | null; version: string | null; expiresAt: string | null }
+type ClientInfo = { name: string | null; platform: string | null; arch: string | null; version: string | null; expiresAt: string | null }
 const PLATFORMS: Record<string, string> = { darwin: 'macOS', linux: 'Linux', win32: 'Windows' }
 
 type State = 'entry' | 'loading' | 'review' | 'approving' | 'denying' | 'approved' | 'denied' | 'invalid' | 'expired' | 'rateLimited' | 'error'
@@ -55,12 +55,12 @@ export function DeviceAuthorization({ account, initialCode }: { account: string;
         if (!signal?.aborted) setState(state)
         return
       }
-      const data = await response.json() as { client_id?: string; status?: string; device_name?: string | null; device_platform?: string | null; client_version?: string | null; expires_at?: string | null }
+      const data = await response.json() as { client_id?: string; status?: string; device_name?: string | null; device_platform?: string | null; device_arch?: string | null; client_version?: string | null; expires_at?: string | null }
       if (signal?.aborted) return
       // Better Auth binds review to the signed-in owner. A grant owned by
       // someone else does not disclose client_id and cannot be approved here.
       if (data.client_id !== DAEMON_CLIENT_ID) { setState('invalid'); return }
-      setClient({ name: data.device_name ?? null, platform: data.device_platform ?? null, version: data.client_version ?? null, expiresAt: data.expires_at ?? null })
+      setClient({ name: data.device_name ?? null, platform: data.device_platform ?? null, arch: data.device_arch ?? null, version: data.client_version ?? null, expiresAt: data.expires_at ?? null })
       setMatched(false)
       setState(data.status === 'pending' ? 'review' : data.status === 'approved' ? 'approved' : data.status === 'denied' ? 'denied' : 'invalid')
     } catch {
@@ -108,9 +108,12 @@ export function DeviceAuthorization({ account, initialCode }: { account: string;
         {(state === 'review' || state === 'approving' || state === 'denying') && <>
           <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3 text-sm" data-slot="device-request">
             <dt className="text-muted-foreground">{t('device')}</dt>
-            <dd className="min-w-0 break-words">{client?.name
-              ? <><span className="font-medium">{client.name}</span>{[client.platform && (PLATFORMS[client.platform] ?? client.platform), client.version && t('clientVersion', { version: client.version })].filter(Boolean).map(part => <span key={part} className="text-muted-foreground"> · {part}</span>)}</>
-              : <span className="text-muted-foreground">{t('deviceUnreported')}</span>}</dd>
+            <dd className="min-w-0 break-words">
+              {client?.name ? <span className="font-medium">{client.name}</span> : <span className="text-muted-foreground">{t('deviceUnreported')}</span>}
+              {client?.platform && <span className="text-muted-foreground"> · {PLATFORMS[client.platform] ?? client.platform}</span>}
+              {client?.arch && <span className="text-muted-foreground"> · {client.arch}</span>}
+              {client?.version && <span className="text-muted-foreground"> · {t('clientVersion', { version: client.version })}</span>}
+            </dd>
             <dt className="text-muted-foreground">{t('code')}</dt>
             <dd className="font-mono text-2xl leading-none">{code}</dd>
             {client?.expiresAt && <>
