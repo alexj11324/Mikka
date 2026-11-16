@@ -10,6 +10,7 @@ import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { listOrganizations } from '@/lib/governance/organizations'
 import { enterprisePrincipal } from '@/lib/enterprise/principal'
 import { isCloudEdition } from '@/lib/edition'
+import { pairedMobileCloudUI } from '@/lib/mobile-web-scope'
 import { mobileMembersPage } from '@/lib/mobile-web-target'
 import { mobilePluginConnections } from '@/lib/mobile-plugin-connections'
 import { json, mobileUser, unauthorized } from '@/lib/mobile-api'
@@ -57,9 +58,10 @@ async function handleGET(request: Request) {
   ])
   if (!profile) return unauthorized()
   const organization = context.role === 'admin' ? null : (await listOrganizations(user.id)).find(item => item.role === 'owner' || item.role === 'admin')
+  const pairedHumanSession = pairedMobileCloudUI() && user[enterprisePrincipal]?.kind === 'session'
   return json({
-    personalFilesAvailable: isCloudEdition() && user[enterprisePrincipal]?.kind === 'session' &&
-      /^[0-9a-f]{40}$/i.test(process.env.MIKKA_UI_OVERLAY_SHA ?? ''),
+    personalFilesAvailable: pairedHumanSession,
+    organizationSettingsAvailable: pairedHumanSession,
     billingScope: context.role === 'admin' ? { kind: 'workspace', id: context.workspace.id } : organization ? { kind: 'organization', id: organization.id } : null,
     user: { id: profile.id, name: profile.name, email: profile.email, image: profile.image },
     workspace: {

@@ -7855,6 +7855,7 @@
     "priority": "{priority} priority",
     "noPriority": "No",
     "activity": "Activity",
+    "organizationOnWeb": "Organization (web)",
     "personalFilesOnWeb": "Personal files (web)",
     "taskPropertiesOnWeb": "Status and priority (web)",
     "comment": "+ Comment",

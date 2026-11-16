@@ -7855,6 +7855,7 @@
     "priority": "{priority}优先级",
     "noPriority": "无",
     "activity": "活动",
+    "organizationOnWeb": "组织（网页版）",
     "personalFilesOnWeb": "个人文件（网页版）",
     "taskPropertiesOnWeb": "状态和优先级（网页版）",
     "comment": "+ 评论",

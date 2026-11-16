@@ -4,6 +4,7 @@ import { desktopWebTarget } from './desktop-web-target'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export const mobileFilesPath = (workspaceId: string) => workspaceSectionLink('artifacts', workspaceId.toLowerCase())
+export const mobileOrganizationPath = (workspaceId: string) => `/settings?section=organization&workspace=${workspaceId.toLowerCase()}`
 export const mobileMembersPage = '/settings/members'
 /** A plugin's id, as the web's ?app= takes it (TOOLKIT_SLUG in lib/composio-accounts.ts). */
 const APP = /^[a-z][a-z0-9_]{0,63}$/
@@ -30,6 +31,8 @@ export function mobileWebTarget(value: string | null): string {
   const settingsWorkspace = url.searchParams.get('workspace')
   if (settingsWorkspace && UUID.test(settingsWorkspace) && value === `${mobileMembersPage}?workspace=${settingsWorkspace}`)
     return `${mobileMembersPage}?workspace=${settingsWorkspace.toLowerCase()}`
+  if (settingsWorkspace && UUID.test(settingsWorkspace) && value === `/settings?section=organization&workspace=${settingsWorkspace}`)
+    return mobileOrganizationPath(settingsWorkspace)
   const settingsKeys = [...url.searchParams.keys()]
   if (url.origin === 'https://mikka.invalid' && url.pathname === '/settings' && !url.hash && settingsKeys.every(key => key === 'section' || key === 'workspace') && settingsKeys.length === (settingsWorkspace ? 2 : 1) && (!settingsWorkspace || UUID.test(settingsWorkspace)) && (settingsSection === 'computers' || settingsSection === 'models' || settingsSection === 'billing')) return `/settings?section=${settingsSection}${settingsWorkspace ? `&workspace=${settingsWorkspace.toLowerCase()}` : ''}`
   // An HTML artifact's page (资料库 on a bot's page): the viewer's sandboxed frame.
