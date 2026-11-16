@@ -2,7 +2,7 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import { DriveError } from './store'
-import type { DriveFileLink, DriveFileLinkVisibility } from './contract'
+import type { DriveFileLink, DriveFileLinkPage, DriveFileLinkVisibility } from './contract'
 
 type Database = Pick<PoolClient, 'query'>
 
@@ -21,6 +21,19 @@ export async function readOwnDriveFileLink(database: Database, volumeId: string,
   const { rows: [link] } = await database.query<DriveFileLink>(
     'SELECT id,path,visibility FROM drive_file_links WHERE "volumeId"=$1 AND path=$2 AND "createdBy"=$3', [volumeId, path, creator])
   return link ?? null
+}
+
+/** The enclosing Drive read holds its normal ACL. An opaque link ID orders
+ * the page and conveys no authority to open or manage another person's link. */
+export async function listDriveFileLinks(database: Database, volumeId: string, reader: string,
+  page: { after: string | null; limit: number }): Promise<DriveFileLinkPage> {
+  const { rows } = await database.query<DriveFileLinkPage['links'][number]>(`SELECT l.id,l.path,l.visibility,
+      l."createdBy"=$2 AS manageable FROM drive_file_links l JOIN drive_volumes v ON v.id=l."volumeId"
+    WHERE l."volumeId"=$1 AND v."archivedAt" IS NULL AND ($3::uuid IS NULL OR l.id>$3)
+      AND (l."createdBy"=$2 OR l.visibility='org' AND v."driveScope" IN ('project','team-workspace'))
+    ORDER BY l.id LIMIT $4`, [volumeId, reader, page.after, page.limit + 1])
+  const links = rows.slice(0, page.limit)
+  return { links, nextCursor: rows.length > page.limit ? links.at(-1)!.id : null }
 }
 
 export async function updateDriveFileLink(database: Database, volumeId: string, id: string, creator: string, visibility: DriveFileLinkVisibility) {

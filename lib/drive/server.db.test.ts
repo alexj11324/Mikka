@@ -545,7 +545,7 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
     assert.deepEqual(await foreignCursor.json(), { versions: [], nextCursor: null })
   })
 
-  await t.test('signed-in Drive file links default to the creator, follow live Drive membership and expire when the path is removed', async () => {
+  await t.test('signed-in Drive file links default to the creator, follow live Drive membership and expire when the path is removed', async context => {
     const mine = { workspaceId: team.id, token: sharedToken }
     const teamDrive = { ...mine, driveScope: 'team-workspace' }
     const member = { ...teamDrive, token: peerToken }
@@ -573,6 +573,22 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
     assert.deepEqual((await (await create()).json()).link, { ...created, visibility: 'org' })
     assert.equal(await (await call(address, member)).text(), 'selected file')
     assert.equal((await visibility(member, 'private')).status, 404)
+    await context.test('a paged Drive link directory lists only readable links with their real manager', async () => {
+      const other = (await (await call(collection, { ...member, method: 'POST', body: { path: 'notes.txt' } })).json()).link
+      const ownerDirectory = await (await call(collection, teamDrive)).json()
+      assert.deepEqual(ownerDirectory.links, [{ ...created, visibility: 'org', manageable: true }])
+      const first = await (await call(collection + '?limit=1', member)).json()
+      assert.equal(first.links.length, 1)
+      assert.equal(first.nextCursor, first.links[0].id)
+      const second = await (await call(collection + '?limit=1&after=' + first.nextCursor, member)).json()
+      assert.equal(second.nextCursor, null)
+      const links: { id: string; manageable: boolean }[] = [...first.links, ...second.links]
+      assert.deepEqual(links.map(link => link.id), [created.id, other.id].sort())
+      assert.equal(links.find(link => link.id === other.id)?.manageable, true)
+      assert.equal(links.find(link => link.id === created.id)?.manageable, false)
+      await call(collection + '/' + other.id, { ...member, method: 'DELETE' })
+      assert.deepEqual((await (await call(collection, member)).json()).links, [{ ...created, visibility: 'org', manageable: false }])
+    })
     await fixture.query("update mikka_workspace_members set status='suspended' where \"workspaceId\"=$1 and \"userId\"=$2", [team.id, peer])
     try { assert.equal((await call(address, member)).status, 401) }
     finally { await fixture.query("update mikka_workspace_members set status='active' where \"workspaceId\"=$1 and \"userId\"=$2", [team.id, peer]) }

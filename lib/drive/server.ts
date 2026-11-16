@@ -15,7 +15,7 @@ import { applyDriveWrite, DriveError, readDriveFileHistory, readDriveHistory, re
 import { createDriveVolume, listDriveVolumes, readDriveVolume, setPersonalDriveArchive } from './volumes'
 import { driveErrorResponse } from './http'
 import { listDriveSkills } from './skills'
-import { createDriveFileLink, readLinkedDriveFile, readOwnDriveFileLink, revokeDriveFileLink, updateDriveFileLink, type DriveFileBytes } from './file-links'
+import { createDriveFileLink, listDriveFileLinks, readLinkedDriveFile, readOwnDriveFileLink, revokeDriveFileLink, updateDriveFileLink, type DriveFileBytes } from './file-links'
 
 const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }
 const digest = z.string().regex(/^[a-f0-9]{64}$/)
@@ -114,8 +114,13 @@ export async function driveResponse(request: Request, operation: Operation, para
           const { path } = z.object({ path: z.string().refine(isDrivePath) }).strict().parse(await body(request))
           return json({ link: await createDriveFileLink(pool, volume.id, path, session.user.id) })
         }
-        const path = z.string().refine(isDrivePath).parse(search.get('path'))
-        return json({ link: await readOwnDriveFileLink(pool, volume.id, path, session.user.id) })
+        if (search.has('path')) {
+          const path = z.string().refine(isDrivePath).parse(search.get('path'))
+          return json({ link: await readOwnDriveFileLink(pool, volume.id, path, session.user.id) })
+        }
+        const limit = z.coerce.number().int().min(1).max(100).parse(search.get('limit') ?? '50')
+        const after = search.has('after') ? z.uuid().parse(search.get('after')) : null
+        return json(await listDriveFileLinks(pool, volume.id, session.user.id, { limit, after }))
       }
       const linkId = operation === 'link' ? z.uuid().parse(params.shareId) : null
       if (linkId && request.method === 'PATCH') {
