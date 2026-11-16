@@ -1,0 +1,412 @@
+{
+  "scope": "public isolated owner HTTPS, real Codex unmodified canonical four-case",
+  "revision": "7bf85ed9fefc0592ce02b76b14a2b3cede7188de",
+  "environment": "PostgreSQL 17, original Ubuntu isolated service UIDs, official CLI and CPU GGUF",
+  "driver": "b80e31e5f803c52a518f98e87f1b5f7fbfca6d51",
+  "success": true,
+  "checks": [
+    {
+      "phase": "isolated_target_and_two_active_accounts",
+      "at": "2026-11-16T11:08:39.339Z"
+    },
+    {
+      "phase": "one_registered_full_device_with_pinned_harnesses",
+      "at": "2026-11-16T11:08:41.294Z",
+      "deviceId": "0cba9d1b-bf7c-4070-ad78-912dc272703e",
+      "versions": {
+        "claude_code": "2.1.309",
+        "codex": "0.163.0"
+      }
+    },
+    {
+      "phase": "both_authenticated_catalogues",
+      "at": "2026-11-16T11:08:41.376Z"
+    },
+    {
+      "phase": "ordinary_run_admitted",
+      "at": "2026-11-16T11:08:41.884Z",
+      "mode": "steer",
+      "harness": "codex",
+      "runId": "b382cc3d-3d1d-4845-bfe7-a347e04d287b",
+      "deviceId": "0cba9d1b-bf7c-4070-ad78-912dc272703e"
+    },
+    {
+      "phase": "live_turn_before_owner_action",
+      "at": "2026-11-16T11:08:42.704Z",
+      "runId": "b382cc3d-3d1d-4845-bfe7-a347e04d287b",
+      "harness": "codex",
+      "peerDenied": true,
+      "runBoundGrant": true,
+      "firstFrame": {
+        "at": "2026-11-16T11:08:42.602Z",
+        "frameSha256": "aba96eff2017b3dd89c01b1b984795b11d7c63ccac24c8c3a0790d9556439269"
+      }
+    },
+    {
+      "phase": "native_steer_ack",
+      "at": "2026-11-16T11:08:42.849Z",
+      "mode": "steer",
+      "runId": "b382cc3d-3d1d-4845-bfe7-a347e04d287b"
+    },
+    {
+      "phase": "steer_terminal_readback",
+      "at": "2026-11-16T11:08:46.403Z",
+      "mode": "steer",
+      "runId": "b382cc3d-3d1d-4845-bfe7-a347e04d287b",
+      "deviceId": "0cba9d1b-bf7c-4070-ad78-912dc272703e",
+      "sessionId": "01a1e40b-8306-7b43-b6a1-d385c47183f0",
+      "status": "stopped",
+      "outputSha256": "a1b7eb2ee7a6aded8dda4e6cf30826f5afffb28a5597ee9389e91eb326d4e319"
+    },
+    {
+      "phase": "case_passed",
+      "at": "2026-11-16T11:08:46.403Z",
+      "mode": "steer",
+      "harness": "codex",
+      "runId": "b382cc3d-3d1d-4845-bfe7-a347e04d287b"
+    },
+    {
+      "phase": "ordinary_run_admitted",
+      "at": "2026-11-16T11:08:46.729Z",
+      "mode": "interrupt",
+      "harness": "claude_code",
+      "runId": "68458093-54f1-4259-a265-93f5e005ac44",
+      "deviceId": "0cba9d1b-bf7c-4070-ad78-912dc272703e"
+    },
+    {
+      "phase": "live_turn_before_owner_action",
+      "at": "2026-11-16T11:08:47.984Z",
+      "runId": "68458093-54f1-4259-a265-93f5e005ac44",
+      "harness": "claude_code",
+      "peerDenied": true,
+      "runBoundGrant": true,
+      "firstFrame": {
+        "at": "2026-11-16T11:08:47.834Z",
+        "frameSha256": "15536774bc9b2043a18206ceac2f31714e20eead1c5ca1cbbdc197f5836ecfcc"
+      }
+    },
+    {
+      "phase": "terminal_and_native_continuation_readback",
+      "at": "2026-11-16T11:08:49.761Z",
+      "mode": "interrupt",
+      "runId": "68458093-54f1-4259-a265-93f5e005ac44",
+      "childId": "cd9d706a-28a3-4333-934c-ffcf828d0dd3",
+      "deviceId": "0cba9d1b-bf7c-4070-ad78-912dc272703e",
+      "sessionId": "f60a2cc3-e8db-49ce-9251-090e3fdebfec",
+      "prior": "cancelled",
+      "status": "stopped",
+      "outputSha256": "32a0179510e3bf5042a0d8cb262cdece6c3ab8e95fc191a7d222613b975f4c2d"
+    },
+    {
+      "phase": "case_passed",
+      "at": "2026-11-16T11:08:49.762Z",
+      "mode": "interrupt",
+      "harness": "claude_code",
+      "runId": "68458093-54f1-4259-a265-93f5e005ac44"
+    },
+    {
+      "phase": "ordinary_run_admitted",
+      "at": "2026-11-16T11:08:49.795Z",
+      "mode": "queue",
+      "harness": "claude_code",
+      "runId": "40640fcb-abf7-4940-aff8-f98faf793ea8",
+      "deviceId": "0cba9d1b-bf7c-4070-ad78-912dc272703e"
+    },
+    {
+      "phase": "live_turn_before_owner_action",
+      "at": "2026-11-16T11:08:50.824Z",
+      "runId": "40640fcb-abf7-4940-aff8-f98faf793ea8",
+      "harness": "claude_code",
+      "peerDenied": true,
+      "runBoundGrant": true,
+      "firstFrame": {
+        "at": "2026-11-16T11:08:50.614Z",
+        "frameSha256": "4681b6d7ae12d91629e3ace4bf0f5663cbf57b837c9480bc5c72789ddff3510d"
+      }
+    },
+    {
+      "phase": "terminal_and_native_continuation_readback",
+      "at": "2026-11-16T11:08:53.929Z",
+      "mode": "queue",
+      "runId": "40640fcb-abf7-4940-aff8-f98faf793ea8",
+      "childId": "65778784-457d-4970-9617-775fc2b34a3c",
+      "deviceId": "0cba9d1b-bf7c-4070-ad78-912dc272703e",
+      "sessionId": "172dc53e-5141-4b56-94fc-b404c403b93c",
+      "prior": "succeeded",
+      "status": "stopped",
+      "outputSha256": "a1b7eb2ee7a6aded8dda4e6cf30826f5afffb28a5597ee9389e91eb326d4e319"
+    },
+    {
+      "phase": "case_passed",
+      "at": "2026-11-16T11:08:53.930Z",
+      "mode": "queue",
+      "harness": "claude_code",
+      "runId": "40640fcb-abf7-4940-aff8-f98faf793ea8"
+    },
+    {
+      "phase": "ordinary_run_admitted",
+      "at": "2026-11-16T11:08:53.958Z",
+      "mode": "sendNow",
+      "harness": "codex",
+      "runId": "d5bef1cf-8219-412d-9d7a-6af5933098c7",
+      "deviceId": "0cba9d1b-bf7c-4070-ad78-912dc272703e"
+    },
+    {
+      "phase": "live_turn_before_owner_action",
+      "at": "2026-11-16T11:08:54.811Z",
+      "runId": "d5bef1cf-8219-412d-9d7a-6af5933098c7",
+      "harness": "codex",
+      "peerDenied": true,
+      "runBoundGrant": true,
+      "firstFrame": {
+        "at": "2026-11-16T11:08:54.638Z",
+        "frameSha256": "18628bc7e4c607535927215b961c681d29cf55ccc59545df60f945c052edf241"
+      }
+    },
+    {
+      "phase": "native_steer_ack",
+      "at": "2026-11-16T11:08:55.019Z",
+      "mode": "sendNow",
+      "runId": "d5bef1cf-8219-412d-9d7a-6af5933098c7"
+    },
+    {
+      "phase": "steer_terminal_readback",
+      "at": "2026-11-16T11:08:58.620Z",
+      "mode": "sendNow",
+      "runId": "d5bef1cf-8219-412d-9d7a-6af5933098c7",
+      "deviceId": "0cba9d1b-bf7c-4070-ad78-912dc272703e",
+      "sessionId": "01a1e40b-b23e-7761-8181-7b45dfafb95d",
+      "status": "stopped",
+      "outputSha256": "a1b7eb2ee7a6aded8dda4e6cf30826f5afffb28a5597ee9389e91eb326d4e319"
+    },
+    {
+      "phase": "case_passed",
+      "at": "2026-11-16T11:08:58.620Z",
+      "mode": "sendNow",
+      "harness": "codex",
+      "runId": "d5bef1cf-8219-412d-9d7a-6af5933098c7"
+    },
+    {
+      "phase": "device_credential_revoked",
+      "at": "2026-11-16T11:08:58.693Z"
+    },
+    {
+      "phase": "lease_closed",
+      "at": "2026-11-16T11:08:58.703Z",
+      "state": "quarantined"
+    }
+  ],
+  "diagnostic": {},
+  "journal": [
+    {
+      "state": "stopped",
+      "reason": "turn_ended",
+      "markers": [
+        "session"
+      ],
+      "errorBytes": 34,
+      "seq": 20
+    },
+    {
+      "state": "failed",
+      "reason": "device_lost",
+      "markers": [],
+      "errorBytes": 0,
+      "seq": 8
+    },
+    {
+      "state": "stopped",
+      "reason": "turn_ended",
+      "markers": [
+        "session"
+      ],
+      "errorBytes": 34,
+      "seq": 11
+    },
+    {
+      "state": "succeeded",
+      "reason": "submitted",
+      "markers": [],
+      "errorBytes": 0,
+      "seq": 17
+    },
+    {
+      "state": "stopped",
+      "reason": "turn_ended",
+      "markers": [
+        "session"
+      ],
+      "errorBytes": 34,
+      "seq": 11
+    },
+    {
+      "state": "stopped",
+      "reason": "turn_ended",
+      "markers": [
+        "session"
+      ],
+      "errorBytes": 34,
+      "seq": 20
+    }
+  ],
+  "model": {
+    "requests": {
+      "count": 5,
+      "entries": [
+        {
+          "at": "2026-11-16T11:08:41.347Z",
+          "accepted": false
+        },
+        {
+          "at": "2026-11-16T11:08:42.240Z",
+          "stream": true,
+          "accepted": true
+        },
+        {
+          "at": "2026-11-16T11:08:42.875Z",
+          "stream": true,
+          "accepted": true
+        },
+        {
+          "at": "2026-11-16T11:08:54.323Z",
+          "stream": true,
+          "accepted": true
+        },
+        {
+          "at": "2026-11-16T11:08:55.042Z",
+          "stream": true,
+          "accepted": true
+        }
+      ],
+      "markers": [
+        [],
+        [],
+        [],
+        [],
+        []
+      ]
+    },
+    "results": {
+      "count": 2,
+      "entries": [
+        {
+          "at": "2026-11-16T11:08:43.124Z",
+          "inputTokens": 27,
+          "outputTokens": 7
+        },
+        {
+          "at": "2026-11-16T11:08:55.291Z",
+          "inputTokens": 27,
+          "outputTokens": 7
+        }
+      ],
+      "markers": [
+        [],
+        []
+      ]
+    },
+    "first-token": {
+      "count": 4,
+      "entries": [
+        {
+          "at": "2026-11-16T11:08:42.476Z"
+        },
+        {
+          "at": "2026-11-16T11:08:43.068Z"
+        },
+        {
+          "at": "2026-11-16T11:08:54.512Z"
+        },
+        {
+          "at": "2026-11-16T11:08:55.235Z"
+        }
+      ],
+      "markers": [
+        [],
+        [],
+        [],
+        []
+      ]
+    },
+    "provider-ends": {
+      "count": 2,
+      "entries": [
+        {
+          "at": "2026-11-16T11:08:42.878Z",
+          "aborted": true,
+          "textBytes": 15
+        },
+        {
+          "at": "2026-11-16T11:08:55.046Z",
+          "aborted": true,
+          "textBytes": 26
+        }
+      ],
+      "markers": [
+        [
+          "ERR_ABORTED"
+        ],
+        [
+          "ERR_ABORTED"
+        ]
+      ]
+    },
+    "decisions": {
+      "count": 2,
+      "entries": [
+        {
+          "at": "2026-11-16T11:08:51.061Z"
+        },
+        {
+          "at": "2026-11-16T11:08:51.789Z"
+        }
+      ],
+      "markers": [
+        [],
+        []
+      ]
+    },
+    "claude-results": {
+      "count": 4,
+      "entries": [
+        {
+          "at": "2026-11-16T11:08:49.293Z"
+        },
+        {
+          "at": "2026-11-16T11:08:50.667Z"
+        },
+        {
+          "at": "2026-11-16T11:08:52.126Z"
+        },
+        {
+          "at": "2026-11-16T11:08:53.455Z"
+        }
+      ],
+      "markers": [
+        [],
+        [],
+        [],
+        []
+      ]
+    }
+  },
+  "daemonWarnings": [
+    {
+      "markers": [],
+      "level": 40
+    }
+  ],
+  "modelLog": [],
+  "relayLog": [],
+  "appLog": [
+    "loopback",
+    "timed_out",
+    "model",
+    "transport",
+    "retrying",
+    "other_bad_gateway",
+    "identity"
+  ],
+  "buildStage": "offline-installed-window",
+  "compileMarkers": []
+}
