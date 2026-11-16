@@ -82,11 +82,14 @@ for proof that a ready PR is safe to merge.
 - The special suites (`analytics-ssr`, `cloud-computer`, `desktop`,
   `e2b-byos`, `site-search`, `ssh-device-backend`, `unattended-sandbox`) run on
   pull requests only, selected by trusted dependencies or their existing path filters; each can still be run
-  by hand (`workflow_dispatch`). The Web release workflow builds and deploys
-  `main` through Vercel.
+  by hand (`workflow_dispatch`). Production Web is promoted through the
+  Cloudflare deployment workflow; the Vercel `web-deploy.yml` is disabled and
+  no release workflow waits for it.
 - `publish-daemon.yml` uses daemon/package-input path filters.
-  `desktop-release.yml` also watches the shared frontend, UI and API inputs, so
-  a Web UI change can trigger a desktop release. A Markdown file under a
+  `desktop-release.yml` also watches the shared frontend, UI and API inputs.
+  On a push it builds nothing and leaves a note in the run summary; the
+  installer is built from a dispatch on main that carries the Cloudflare
+  promotion receipt (`cloudflare_receipt`). A Markdown file under a
   watched directory still matches those release filters. Read the exact
   workflow paths before predicting release work.
 - The run-dispatch and Controlled Skill improvement suites run in the CI
@@ -136,30 +139,32 @@ entering the release queue or creating E2B machines. The queue checks again afte
 entry to suppress already-queued duplicates. Obsolete sources, cancellations,
 Web failures and cleanup-only failures do not create failure fingerprints.
 
-To retry after an external service recovers, dispatch **E2B additive runtime
-release** on current main and fill in `reason`; the Actions dispatch event records
-it. Manual dispatch always runs validation, even for a matching worker. Changed
+A push only compares the worker inputs and builds no candidate. When they
+changed, its run summary says so. The release itself starts after Cloudflare
+serves that commit: dispatch **E2B additive runtime release** on current main
+with `reason` and the promotion's `cloudflare_receipt`. A dispatch without a
+receipt fails before any template builder starts. Every gate rechecks the
+receipt against the live gateway and current main.
+
+To retry after an external service recovers, dispatch the same way; the Actions
+dispatch event records the reason. Manual dispatch always runs validation, even for a matching worker. Changed
 runtime inputs produce a new fingerprint. Missing or expired failure artifacts
 permit the normal worker comparison; history API errors fail the check. Do not
 retry only failed candidate/gate jobs: cleanup has removed their candidates.
 
-After both gates pass, the workflow makes the candidates public and publishes
-all three IDs, their official base kinds, worker digest, source commit and
-measured models in one verified Vercel upsert inside Web deploy's production
-queue. `MIKKA_CLOUD_RUNTIME_PREVIOUS` retains the previous paired configuration;
-old template IDs and aliases are never updated or deleted. A failure before
-publication leaves the selected release unchanged. Exact-main and exact-serving
-source checks reject stale jobs. Per-variable readback detects a partial upsert;
-an inconsistent tuple requires revalidation and cannot overwrite the last valid
-previous configuration. A rollback uses the normal rollback PR and matched
-application/worker release, preserving these gates.
+After both gates pass, the workflow makes the candidates public and keeps the
+release report (all three IDs, their official base kinds, worker digest, source
+commit and measured models) as an immutable artifact for the private Cloudflare
+API deployment. Old template IDs and aliases are never updated or deleted. A
+failure before publication leaves the selected release unchanged. Exact-main and
+exact-serving source checks reject stale jobs. A rollback uses the normal
+rollback PR and matched application/worker release, preserving these gates.
 
 PR runs use no release credentials. Main builds read the existing `E2B_API_KEY`
 from Infisical `prod:/vercel`. The subscription gate reads the authorized
 `SMOKE_OWNER_EMAIL` / `SMOKE_OWNER_PASSWORD` from `prod:/`, signs in normally, uses
 tasks titled “测试” in `alexj11324/Mikka-handoff`, then removes its own fixtures.
-Publication uses `VERCEL_TEAM_TOKEN` from `prod:/platform`. Delivery uses the
-existing GitHub OIDC identity; credential values never enter reports or logs.
+Delivery uses the existing GitHub OIDC identity; credential values never enter reports or logs.
 
 The worker digest excludes unrelated Web lock entries and package scripts.
 Every main push compares that wanted digest with the published production

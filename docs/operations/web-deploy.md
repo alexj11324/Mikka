@@ -51,15 +51,15 @@ streaming and rollback on the same source pair.
 
 ## Official runtime configuration
 
-Changed template inputs require a successful Web build serving the exact current
-main commit before the E2B release takes its lock or allocates builders. A
-frozen publisher with no matching run leaves the runtime unpublished. After
-the matching Web release is serving, the existing manual E2B release accepts a
-retry reason. It rechecks the live version after building and validates both
-official subscriptions before publishing template IDs.
+Changed template inputs require Cloudflare to serve the exact current main
+commit before the E2B release takes its lock or allocates builders. A push only
+reports changed inputs in its run summary and builds nothing; the paused Vercel
+publisher is never awaited. The release rechecks the live version after
+building and validates both official subscriptions before publishing template IDs.
 
-After a Cloudflare promotion, dispatch the same official runtime workflow on
-current main with its retry reason and `cloudflare_receipt`. For a Cloudflare-to-Cloudflare
+After a Cloudflare promotion, dispatch the official runtime workflow on
+current main with its retry reason and `cloudflare_receipt`. A dispatch without
+a receipt fails before any builder starts. For a Cloudflare-to-Cloudflare
 promotion, run the existing Cloudflare application deployment workflow with phase
 `gateway-observe` on the reviewed operations commit containing the prepared
 checklist. The observer only reads the provider and canonical application.
@@ -70,15 +70,14 @@ fingerprint, product, overlay, pinned client and current product main.
 The first Vercel-to-Cloudflare transition keeps its historical issue #1954
 comment/body hash, approval window and DNS TXT verification.
 The same release produces the immutable template report for the private
-Cloudflare API deployment. The legacy Web publisher runs only on the original
-release path with an empty Cloudflare receipt.
+Cloudflare API deployment.
 
-Desktop uses its existing signed and notarized macOS workflow. After promotion,
-dispatch Desktop release on main with the same fresh `cloudflare_receipt`.
+Desktop uses its existing signed and notarized macOS workflow. A push records
+in its run summary that no installer was built. After promotion, dispatch
+Desktop release on main with the same fresh `cloudflare_receipt`.
 It verifies the serving Web version and exact overlay before allocating the
 Mac, before loading credentials, and immediately before publishing the sealed
-installer. The approved backend must contain the installer commit. The
-original Vercel path remains available while Vercel serves the canonical app.
+installer. The approved backend must contain the installer commit.
 
 See the [private runbook](https://github.com/alexj11324/mikka-cloud/blob/main/docs/operations/web-deploy.md).
 

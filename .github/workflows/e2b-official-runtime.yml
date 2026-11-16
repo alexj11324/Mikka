@@ -1,6 +1,9 @@
 name: E2B additive runtime release
 # Build private candidates, preserve official files, prove both subscriptions,
-# then publish through the same version-bound Web deployment queue.
+# then publish them for the Cloudflare release that serves this exact commit.
+# A push only reports changed runtime inputs: production Web is promoted by the
+# Cloudflare deployment workflow, and the release starts from a dispatch that
+# carries that promotion's receipt (docs/operations/web-deploy.md).
 on:
   push:
     branches: [main]
@@ -38,9 +41,7 @@ on:
       - 'scripts/acceptance/team-workspace.mjs'
       - 'scripts/acceptance/team-workspace.test.mjs'
       - 'lib/smoke-account.ts'
-      - '.github/workflows/web-deploy.yml'
       - 'scripts/release/web-deploy.mjs'
-      - 'scripts/release/build-vercel.mjs'
       - 'scripts/release/web-deploy.test.mjs'
       - 'scripts/release/cloudflare-promoted-web*.mjs'
       - 'cloudflare/web/gateway.mjs'
@@ -117,6 +118,7 @@ jobs:
         with:
           node-version: 24
       - name: Refuse an obsolete source before runtime validation
+        if: github.event_name == 'workflow_dispatch'
         run: node scripts/release/web-deploy.mjs main
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -126,9 +128,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           RETRY_REASON: ${{ inputs.reason }}
+      - name: Leave publication to the Cloudflare promotion
+        if: github.event_name == 'push' && steps.history.outputs.changed == 'true'
+        run: |
+          echo "::notice title=Runtime inputs changed::Publish after Cloudflare serves this commit: dispatch this workflow on main with a reason and cloudflare_receipt."
+          printf '### Runtime inputs changed\n\nThis push publishes nothing. After Cloudflare serves this commit, dispatch this workflow on main with a reason and `cloudflare_receipt` (docs/operations/web-deploy.md).\n' >> "$GITHUB_STEP_SUMMARY"
   web-ready:
     needs: check
-    if: needs.check.outputs.changed == 'true'
+    if: needs.check.outputs.changed == 'true' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 95
     permissions:
@@ -142,20 +149,19 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
+      - name: Require the Cloudflare promotion receipt
+        if: github.event.inputs.cloudflare_receipt == ''
+        run: |
+          echo "::error title=cloudflare_receipt required::Production Web is promoted by the Cloudflare deployment workflow. Dispatch again with that promotion's cloudflare_receipt."
+          exit 1
       - name: Verify the promoted Cloudflare Web before allocating template builders
-        if: github.event.inputs.cloudflare_receipt != ''
         run: node scripts/release/cloudflare-promoted-web.mjs
         env:
           GITHUB_TOKEN: ${{ github.token }}
           CLOUDFLARE_RECEIPT: ${{ github.event.inputs.cloudflare_receipt }}
-      - name: Require this source's published Web build before allocating template builders
-        if: github.event.inputs.cloudflare_receipt == ''
-        run: node scripts/release/web-deploy.mjs await-web
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
   release:
     needs: [test, check, web-ready]
-    if: needs.check.outputs.changed == 'true'
+    if: needs.check.outputs.changed == 'true' && github.event_name == 'workflow_dispatch'
     concurrency:
       group: e2b-official-runtime-release
       cancel-in-progress: false
