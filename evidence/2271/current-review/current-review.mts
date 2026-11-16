@@ -23,7 +23,7 @@ const runId=randomUUID(),deviceId=randomUUID(),agentId=randomUUID(),repoId=rando
 const handin=true
 const trace:any={evaluation:'Real independent Factory report reviewer, native producer and two distinct sessions. A human approval follows only if their unmodified device claims, genuine MCP reports and stage advancement all succeed. No reviewer SQL seeding, no new GitHub PR.',source:process.env.E_RUN_SOURCE,runId,deviceId,cli:process.env.E_CODEX_VERSION,model,weightSha256:process.env.E_WEIGHT_SHA,cliSha256:process.env.E_CLI_BINARY_SHA,stages:[],scope:'Two automatically leased authenticated QA identities, real public API and device REST over loopback TLS. Only the bridge between returned device commands and the unmodified ClaudeAdapter is an explicit QA driver. Provider uses real GGUF inference and paced transport. Independent native model inference through canonical Mikka HTTPS gateway; no external subscription or production release.'}
 const persist=()=>writeFileSync(join(dir,'delivery.json'),JSON.stringify(trace,null,2),{mode:0o600})
-const note=(stage:string,data:any={})=>{trace.stages.push({stage,at:new Date().toISOString(),...data});persist()}
+const note=(stage:string,data:any={})=>{trace.stages.push({...data,phase:data.stage??null,stage,at:new Date().toISOString()});persist()}
 const wait=(ms:number)=>new Promise(r=>setTimeout(r,ms))
 const mark=(s:string)=>'E2262_QA_BEGIN '+s+' E2262_QA_END'
 const initial=true?'The user wants the finished report delivered. Choose submit, not answer. The report should say which color a clear daytime sky is.':'List twenty vegetables with a sentence about each.',steer='Name the capital of France in one short sentence.'
@@ -113,7 +113,7 @@ try {
   await dcall('runs/'+id,'PATCH',{state:'running',sessionId:session.sessionId},204)
   let terminal:any;const chunks:any[]=[]
   for await(const e of session.events()){if(e.type==='exit')terminal=e;else if(e.type==='chunk')chunks.push(e.chunk)}
-  assert.equal(terminal?.outcome,'succeeded');assert.equal(terminal.stopReason,'submitted');assert.ok(terminal.report.summary)
+  note('Native CLI terminal outcome',{stage:review?'review':'execute',outcome:terminal?.outcome,stopReason:terminal?.stopReason,criteria:terminal?.report?.criteria?.length??0});assert.equal(terminal?.outcome,'succeeded');assert.equal(terminal.stopReason,'submitted');assert.ok(terminal.report.summary)
   assert.deepEqual(await fixedCheckSnapshot(sourceDir,cwd,candidate),fixed)
   const observed=readFileSync(join(dir,'decisions.jsonl'),'utf8').trim().split('\n').map(line=>JSON.parse(line)).some(row=>row.prompt===marker&&JSON.parse(row.generated).summary===terminal.report.summary)
   assert.ok(observed,'The real model summary must equal the MCP handoff')
@@ -166,7 +166,7 @@ try {
  const policy=await factoryCheckAssignment(pool,owner,prior.runId)
  assert.equal(policy.factoryCheck.stage,'review');assert.equal(policy.factoryCheck.reportOnly,true);assert.equal(policy.policy.readOnly,true)
  note('Canonical independent report-only reviewer allocated',{candidateId:actualCandidate.id,sourceCommit:candidate,reviewer:prior.runId,producer:runId,stage:policy.factoryCheck.stage,reportOnly:policy.factoryCheck.reportOnly,readOnly:policy.policy.readOnly,chosenAgentId:reviewAssignment.agentId,chosenDeviceId:reviewAssignment.deviceId,frozenAPIKey:reviewAssignment.apiKey})
- const reviewQuestion='Review the producer report against the requirement to identify the color of a clear daytime sky: '+producer.report.summary.slice(0,145)+'. Choose submit to report your own evidence.'
+ const reviewQuestion='Review the producer report against the requirement. Deliver the review by calling submit. Requirement: name the colour of a clear daytime sky. Producer report: '+producer.report.summary.trim().slice(0,135)+'.'
  const reviewed=await execute(prior.runId,reviewWork,reviewQuestion,true)
  assert.notEqual(reviewed.sessionId,producer.sessionId);assert.ok(reviewed.report.criteria?.length)
  note('Complete independent read-only reviewer report, obtained through the allocated device and an independent native MCP session',{reviewer:prior.runId,session:reviewed.sessionId,criteria:reviewed.report.criteria,producerSession:producer.sessionId,producer:runId})
@@ -214,7 +214,7 @@ try {
  trace.success=true;persist()
 
 }catch(e){
- trace.failure={name:e.name,code:e.code??null,location:String(e.stack).split('\n').slice(1,3).join('\n').slice(0,380)};persist();process.exitCode=1
+ trace.failure={name:e.name,code:e.code??null,location:String(e.stack).match(/(?:current-review|work-independent-review)\.mts:\d+:\d+/)?.[0]??null};persist();process.exitCode=1
  }finally{
  const cleanup=(stage:string)=>appendFileSync(join(dir,'cleanup-'+(interrupt?'interrupt':handin?'after-run':'steer')+'.jsonl'),JSON.stringify({at:new Date().toISOString(),stage,resources:process.getActiveResourcesInfo().sort()})+'\n',{mode:0o600})
  cleanup('application assertions settled')
