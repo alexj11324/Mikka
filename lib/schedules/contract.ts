@@ -124,6 +124,7 @@ export const commandSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('organize'), scheduleId: z.uuid(), folder: z.string().trim().min(1).max(60).nullable(), tags: z.array(z.string().trim().min(1).max(30)).max(10) }).strict(),
   // 立即运行: one occurrence due now. The same requestId never adds a second one.
   z.object({ action: z.literal('run_now'), scheduleId: z.uuid(), version: z.number().int().positive(), requestId: z.uuid() }).strict(),
+  z.object({ action: z.literal('cancel_run'), scheduleId: z.uuid(), runId: z.uuid(), version: z.number().int().positive() }).strict(),
   // 用量: runs and cost per day in the automation's time zone, newest first.
   z.object({ action: z.literal('usage'), scheduleId: z.uuid(), days: z.number().int().min(1).max(90).optional() }).strict(),
 ])

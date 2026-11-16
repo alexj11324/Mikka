@@ -24,6 +24,7 @@ import { useAgentProfiles } from '@/components/settings/factory-profiles-data'
 import { useTaskProfileChoices } from '@/components/coordinator/task-profile-picker'
 import { openTask } from '@/components/workspace/workspace-navigation'
 import { useAutomation } from '@/hooks/use-automations'
+import { cancelAutomationRun } from '@/app/actions/automations'
 import { useActionError } from '@/lib/use-action-error'
 import { newTaskBotChoices } from '@/lib/new-task-bot'
 import { TASK_TITLE_MAX } from '@/lib/task-title-input'
@@ -74,6 +75,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
   }, [current])
   const requestId = useRef(crypto.randomUUID())
   const [busy, setBusy] = useState<null | 'save' | 'toggle' | 'run' | 'delete' | 'takeOver'>(null)
+  const [cancellingRun, setCancellingRun] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmTakeOver, setConfirmTakeOver] = useState(false)
   const set = (patch: Partial<AutomationDraft>) => setDraft(value => value ? { ...value, ...patch } : value)
@@ -146,6 +148,16 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
       toast.success(t('started'))
       await history.mutate()
     } finally { setBusy(null) }
+  }
+  async function cancelRun(runId: string) {
+    if (!current || cancellingRun) return
+    setCancellingRun(runId)
+    try {
+      const result = await cancelAutomationRun({ scheduleId: current.id, version: current.version, runId })
+      if ('error' in result && result.error) toast.error(actionError(result.error))
+      await history.mutate()
+    } catch { toast.error(actionError('generic')) }
+    finally { setCancellingRun(null) }
   }
   async function takeOver() {
     if (!current || busy) return
@@ -320,7 +332,9 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
       {history.error && !history.data ? <div className="p-4"><InlineLoadError message={tAll('loadError')} retryLabel={tCommon('retry')} onRetry={() => { void history.mutate() }} /></div>
         : !history.data ? <div className="p-4"><Skeleton className="h-10 w-full" /></div>
           : !history.data.occurrences.length ? <p className="px-5 py-4 text-sm text-muted-foreground">{t('historyEmpty')}</p>
-            : history.data.occurrences.map(run => <RunRow key={run.id} run={run} timezone={current?.definition.timezone ?? draft.timezone} />)}
+            : history.data.occurrences.map(run => <RunRow key={run.id} run={run} timezone={current?.definition.timezone ?? draft.timezone}
+              onCancel={current && run.can_cancel ? () => { void cancelRun(run.id) } : undefined}
+              cancelling={cancellingRun !== null} />)}
     </SettingsSection>}
 
     <footer className="flex flex-wrap items-center justify-between gap-2 pb-8">
@@ -359,7 +373,7 @@ function EditorFrame({ children, onBack, backLabel }: { children: React.ReactNod
 }
 
 /** One run: when, how it ended (and why when it did not), and the task it made as a chip that opens it. */
-function RunRow({ run, timezone }: { run: AutomationRun; timezone: string }) {
+function RunRow({ run, timezone, onCancel, cancelling }: { run: AutomationRun; timezone: string; onCancel?: () => void; cancelling: boolean }) {
   const t = useTranslations('Automations')
   const tEvent = useTranslations('Automations.githubEvent')
   const tLinear = useTranslations('Automations.linearEvent')
@@ -373,6 +387,7 @@ function RunRow({ run, timezone }: { run: AutomationRun; timezone: string }) {
   return <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 text-sm">
     <time className="tabular-nums text-muted-foreground" dateTime={new Date(at).toISOString()}>{when(at, timezone)}</time>
     <Badge variant={runVariant[run.status]}>{t(`run.${run.status}`)}</Badge>
+    {onCancel && <Button size="sm" variant="outline" disabled={cancelling} onClick={onCancel}>{t('cancelRun')}</Button>}
     {run.trigger && 'event' in run.trigger && run.trigger.event.source === 'linear' && <span className="min-w-0 text-muted-foreground">{t('run.from', { event: tLinear.has(run.trigger.event.event as never) ? tLinear(run.trigger.event.event as never) : run.trigger.event.event,
       what: run.trigger.event.identifier ?? run.trigger.event.title ?? '' })}</span>}
     {run.trigger && 'event' in run.trigger && run.trigger.event.source === 'slack' && <span className="min-w-0 text-muted-foreground">{t('run.from', { event: tSlack.has(run.trigger.event.event as never) ? tSlack(run.trigger.event.event as never) : run.trigger.event.event,

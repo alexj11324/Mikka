@@ -1234,6 +1234,9 @@
     "scheduleLinearUnreachable": "现在连不上 Linear，稍后会重试。",
     "scheduleSlackUnavailable": "Slack 触发器用到的频道 Mikka 的 Slack 应用看不到，或者你不在这个工作区的 Slack 里。",
     "scheduleSlackUnreachable": "现在连不上 Slack，稍后会重试。",
+    "scheduleRunNotFound": "没有找到这次运行。",
+    "scheduleRunNotQueued": "仅可取消尚未开始的运行。",
+    "scheduleRunCancelled": "已在运行开始前取消。",
     "scheduleRunConflict": "运行未开始，请重试。",
     "scheduleTimeMustBeFuture": "开始时间必须晚于现在。",
     "invalidIanaTimezone": "时区无效。",
@@ -7883,6 +7886,7 @@
     "failedUnknown": "出了点问题，详情在 Mikka 的运行记录里"
   },
   "Automations": {
+    "cancelRun": "取消这次运行",
     "fromTemplate": "从模板开始",
     "pin": "置顶",
     "unpin": "取消置顶",

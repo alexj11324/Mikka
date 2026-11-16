@@ -35,6 +35,7 @@ export type AutomationRun = {
   started_at: string | Date | null
   finished_at: string | Date | null
   status: 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped' | 'cancelled'
+  can_cancel?: boolean
   attempts: number
   error: string | null
   result: unknown

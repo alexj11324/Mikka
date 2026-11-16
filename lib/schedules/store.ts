@@ -55,6 +55,9 @@ const OPEN_WEBHOOK_WINDOW = `FROM schedule_occurrences
     AND status='pending' AND attempts=0 AND next_retry_at>statement_timestamp()`
 const COLLECTING_WINDOW = `SELECT id ${OPEN_WEBHOOK_WINDOW}
   AND jsonb_array_length(trigger->'webhook'->'requests')<${WEBHOOK_BATCH_REQUESTS} AND octet_length(trigger::text)<=${WEBHOOK_BATCH_BYTES}`
+// A pending retry may already have dispatched. Collection windows have a separate batch lifecycle.
+const cancellableRun = `status='pending' AND attempts=0 AND lease_token IS NULL AND event_id IS NULL
+  AND NOT (COALESCE(trigger ? 'webhook', false) AND COALESCE((definition#>>'{webhook,batchMinutes}')::int,0)>0)`
 export const SCHEDULE_LEASE_MS = 5 * 60_000
 const MAX_ATTEMPTS = 3
 // The frozen request key is internal; keep the existing tool-response fields.
@@ -210,8 +213,25 @@ export class ScheduleStore {
             nextCursor: rows.length > limit ? page[limit-1]!.page_cursor : null,
           }
         }
-        const seen=await tx.query('SELECT id,schedule_id,operation_id,event_id,version,due_at,status,attempts,result,error,trigger,started_at,finished_at,reported_at FROM schedule_occurrences WHERE schedule_id=$1 ORDER BY due_at DESC LIMIT 100',[row.id])
-        return {occurrences:privileged?seen.rows:seen.rows.map(o=>({...o,operation_id:null,event_id:null,result:null,error:null,trigger:null}))}
+        const seen=await tx.query(`SELECT id,schedule_id,operation_id,event_id,version,due_at,status,attempts,result,error,trigger,started_at,finished_at,reported_at,
+          (${cancellableRun} AND version=$2) AS can_cancel
+          FROM schedule_occurrences WHERE schedule_id=$1 ORDER BY due_at DESC LIMIT 100`,[row.id,row.version])
+        return {occurrences:privileged?seen.rows:seen.rows.map(o=>({...o,operation_id:null,event_id:null,result:null,error:null,trigger:null,can_cancel:false}))}
+      }
+      if(cmd.action==='cancel_run'){
+        if(row.owner_id!==actor.ownerId && access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
+        await this.source(tx,actor,row.workspace_id)
+        if(row.version!==cmd.version) throw new ScheduleError('scheduleVersionConflict')
+        const run=(await tx.query<Occurrence & {can_cancel:boolean}>(`SELECT *,${cancellableRun} AS can_cancel
+          FROM schedule_occurrences WHERE id=$1 AND schedule_id=$2 FOR UPDATE`,[cmd.runId,row.id])).rows[0]
+        if(!run) throw new ScheduleError('scheduleRunNotFound',404)
+        if(run.version!==row.version) throw new ScheduleError('scheduleVersionConflict')
+        if(run.status==='cancelled' && run.error==='scheduleRunCancelled') return {runId:run.id,status:'cancelled' as const}
+        if(!run.can_cancel) throw new ScheduleError('scheduleRunNotQueued')
+        await tx.query(`UPDATE schedule_occurrences SET status='cancelled',error='scheduleRunCancelled',finished_at=$2 WHERE id=$1`,[run.id,this.clock()])
+        await this.lockChat(tx,row)
+        await this.report(tx,row,run,'cancelled',null,'scheduleRunCancelled')
+        return {runId:run.id,status:'cancelled' as const}
       }
       if(cmd.action==='pin'){
         if(cmd.pinned)await tx.query('INSERT INTO schedule_pins(user_id,schedule_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[actor.ownerId,row.id])
