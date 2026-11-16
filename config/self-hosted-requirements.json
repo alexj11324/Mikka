@@ -3082,5 +3082,12 @@
     "behavior": "A fresh owner session lists only tool names for one of their enabled HTTP or SSE installations through the existing MCP connection and credential policy.",
     "test": "lib/plugins/routes.test.ts",
     "suite": "test:plugins"
+  },
+  "drizzle/20261116194342_device_code_architecture.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Stores the optional architecture reported by the daemon on its pending sign-in request. An existing daemon that omits it can still sign in.",
+    "test": "lib/daemon-authorization.test.ts",
+    "suite": "test:auth-composio"
   }
 }
