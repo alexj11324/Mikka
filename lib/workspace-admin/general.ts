@@ -52,12 +52,12 @@ export async function updateWorkspaceGeneral(actorId: string, workspaceId: strin
   if (icon === false) throw new WorkspaceError('workspaceIconInvalid')
   return workspaceDb.transaction(async tx => {
     const { workspace, membership } = await requireWorkspace(tx, workspaceId, actorId, true)
-    // One lock for every slug change, so two renames cannot claim the same slug.
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended('mikka-workspace-slugs', 0))`)
     const changes: Partial<typeof workspaces.$inferInsert> = {}
-    if (values.name !== undefined) changes.name = values.name
-    if (icon !== undefined) changes.icon = icon
+    if (values.name !== undefined && values.name !== workspace.name) changes.name = values.name
+    if (icon !== undefined && icon !== workspace.icon) changes.icon = icon
     if (values.slug !== undefined && values.slug !== workspace.slug) {
+      // Serialize namespace changes across Workspaces before checking redirects.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended('mikka-workspace-slugs', 0))`)
       if (await slugBelongsElsewhere(tx, values.slug, workspaceId)) throw new WorkspaceError('workspaceSlugTaken')
       // Taking back one of this workspace's own old slugs removes its redirect.
       await tx.delete(workspaceSlugRedirects).where(and(eq(workspaceSlugRedirects.slug, values.slug), eq(workspaceSlugRedirects.workspaceId, workspaceId)))

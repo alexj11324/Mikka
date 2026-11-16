@@ -28,6 +28,12 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     const renamed = await general.updateWorkspaceGeneral(admin, ws.id, { name: 'Renamed', icon: png })
     assert.equal(renamed.name, 'Renamed')
     assert.equal(renamed.icon, png)
+    const storedVersion = async () => (await pool.query<{ version: string }>(
+      'SELECT xmin::text AS version FROM mikka_workspaces WHERE id=$1', [ws.id],
+    )).rows[0].version
+    const version = await storedVersion()
+    assert.deepEqual(await general.updateWorkspaceGeneral(admin, ws.id, { name: ' Renamed ', icon: png, slug: ws.slug }), renamed)
+    assert.equal(await storedVersion(), version, 'replaying the same profile keeps the existing Workspace row')
     await rejects(general.updateWorkspaceGeneral(admin, ws.id, { icon: 'data:image/svg+xml;base64,PHN2Zz4=' }), 'workspaceIconInvalid')
     await rejects(general.updateWorkspaceGeneral(admin, ws.id, { slug: other.slug }), 'workspaceSlugTaken')
     const newSlug = `moved-${randomUUID().slice(0, 8)}`
