@@ -26,16 +26,37 @@ async function createFixtureFile(directory, sizeMiB) {
   return { path, name, sizeBytes: sizeMiB * MiB, sha256: hash.digest('hex') }
 }
 
-async function verifyDownloadedFile(page, fixture) {
-  const [download] = await Promise.all([
-    page.waitForEvent('download', { timeout: 60_000 }),
-    page.getByText(fixture.name, { exact: true }).click(),
-  ])
-  assert.equal(download.suggestedFilename(), fixture.name)
-  assert.equal(await download.failure(), null)
+async function verifyDownloadedFile(application, page, fixture) {
+  // Playwright leaves Electron downloads under the OS's normal save-dialog
+  // policy. Select the isolated destination on the actual DownloadItem.
+  const destination = fixture.path + '.download'
+  const window = await application.browserWindow(page)
+  try {
+    const [result] = await Promise.all([
+      window.evaluate((win, { destination, expected }) => new Promise((resolve, reject) => {
+        const session = win.webContents.session
+        const timeout = setTimeout(() => {
+          session.removeListener('will-download', onDownload)
+          reject(new Error('PERSONAL_DRIVE_DOWNLOAD_TIMEOUT'))
+        }, 60_000)
+        function onDownload(_event, item, source) {
+          if (source !== win.webContents || item.getFilename() !== expected) return
+          session.removeListener('will-download', onDownload)
+          item.setSavePath(destination)
+          item.once('done', (_event, state) => {
+            clearTimeout(timeout)
+            resolve({ state, name: item.getFilename(), bytes: item.getReceivedBytes() })
+          })
+        }
+        session.on('will-download', onDownload)
+      }), { destination, expected: fixture.name }),
+      page.getByText(fixture.name, { exact: true }).click(),
+    ])
+    assert.deepEqual(result, { state: 'completed', name: fixture.name, bytes: fixture.sizeBytes })
+  } finally { await window.dispose() }
   const hash = createHash('sha256')
   let size = 0
-  for await (const chunk of createReadStream(await download.path())) {
+  for await (const chunk of createReadStream(destination)) {
     hash.update(chunk)
     size += chunk.length
   }
@@ -43,7 +64,7 @@ async function verifyDownloadedFile(page, fixture) {
   assert.equal(hash.digest('hex'), fixture.sha256)
 }
 
-export async function verifyPersonalDriveUploads({ page, rpc, fixture, passed, setPhase, workspaceId, directory }) {
+export async function verifyPersonalDriveUploads({ application, page, rpc, fixture, passed, setPhase, workspaceId, directory }) {
   const files = await mkdtemp(join(directory, 'personal-drive-'))
   try {
     setPhase('personal_drive_new_folder')
@@ -95,7 +116,7 @@ export async function verifyPersonalDriveUploads({ page, rpc, fixture, passed, s
       await expect(visibleFile.or(folder).first()).toBeVisible()
       if (!await visibleFile.isVisible()) await folder.click()
       await expect(visibleFile).toBeVisible()
-      await verifyDownloadedFile(page, file)
+      await verifyDownloadedFile(application, page, file)
       receipts.push({ sizeBytes: file.sizeBytes, sha256: file.sha256, headVersionId })
       passed('packaged_personal_drive_' + size + '_MiB_uploaded_committed_and_downloaded_after_reload')
     }
