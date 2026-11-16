@@ -149,6 +149,16 @@ test('organization lifecycle, workspace binding and service keys use their decla
   }
 })
 
+test('organization audit permits only listing and named export requests for a single organization', () => {
+  const organization = 'ab81a708-013c-4e44-9ab2-a500bd59f381'
+  const path = `/api/organizations/${organization}/audit-log`
+  for (const method of ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) {
+    assert.equal(allowedApiPath(path, method), method === 'GET' || method === 'POST')
+    assert.equal(allowedApiPath(path.replace(organization, 'unknown'), method), false)
+    assert.equal(allowedApiPath(path + '/events', method), false)
+  }
+})
+
 test('Organization domain discovery and admission forward only the declared routes and methods', () => {
   const org = 'ab81a708-013c-4e44-9ab2-a500bd59f381'
   const domain = 'ebb7878e-6918-4b68-9300-d956761b5011'
