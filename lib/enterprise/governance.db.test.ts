@@ -43,6 +43,20 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
     await pool.query('insert into mikka_workspaces (id,"userId",name,kind) values ($1,$2,\'Workspace ACL fixture\',\'team\')', [id, owner.id])
     for (const [user, role] of [[owner, 'admin'], [member, 'member']] as const) await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role) values ($1,$2,$3,$4,$5)', [id, user.id, user.name, user.email, role])
   }
+  await t.test('the Organization directory filters suspended members and retains the full administrative summary', async () => {
+    const directory = (userId: string, includeDisabled: boolean) => org.listOrganizationMembers(organizationId, userId, includeDisabled)
+    for (const actor of [member, outsider]) await assert.rejects(directory(actor.id, true), /access_denied/)
+    await pool.query("update mikka_organization_members set status='suspended' where \"organizationId\"=$1 and \"userId\"=$2", [organizationId, member.id])
+    try {
+      const active = await directory(admin.id, false)
+      assert.deepEqual(active.members.map(row => row.userId).sort(), [owner.id, admin.id].sort())
+      const all = await directory(owner.id, true)
+      assert.equal(all.members.find(row => row.userId === member.id)?.status, 'suspended')
+      assert.deepEqual(all.members, (await org.organizationSummary(organizationId, owner.id)).members)
+    } finally {
+      await pool.query("update mikka_organization_members set status='active' where \"organizationId\"=$1 and \"userId\"=$2", [organizationId, member.id])
+    }
+  })
   await t.test('concurrent and repeated role saves only audit effective changes after checking authority', async () => {
     const setRole = (actorId: string, role: 'admin' | 'member') =>
       org.updateOrganizationMember(organizationId, actorId, { userId: member.id, role })

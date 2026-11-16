@@ -111,7 +111,7 @@ export function allowedApiPath(path: string, method: string): boolean {
   if (ORGANIZATION_DOMAIN.test(path)) return method === 'DELETE'
   if (ORGANIZATION_JOIN.test(path)) return method === 'POST'
   if (ORGANIZATION_KEY.test(path)) return method === 'PATCH'
-  if (ORGANIZATION_MEMBERS.test(path)) return method === 'POST' || method === 'PATCH' || method === 'DELETE'
+  if (ORGANIZATION_MEMBERS.test(path)) return method === 'GET' || method === 'POST' || method === 'PATCH' || method === 'DELETE'
   if (ORGANIZATION_INVITATIONS.test(path)) return method === 'GET' || method === 'POST' || method === 'DELETE'
   if (path === '/api/organization-invitations/accept') return method === 'POST'
   // Viewer grants are capabilities and must be obtained through owner-bound IPC.
