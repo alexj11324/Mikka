@@ -206,6 +206,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const [draft, setDraft] = useViewState(`thread:${runId}:draft`, '')
   const feedback = useTranslations('Coordinator')
   const deliveryLabels = useTranslations('HostedThread')
+  const quoteLabel = useTranslations('AiElements.message')('quote')
   const writer = useThreadReplyCommand()
   const [deliveryMode, setDeliveryMode] = useViewState<ThreadDeliveryMode>('thread:delivery-mode', 'queue')
   const modes = data?.delivery?.modes ?? []
@@ -533,7 +534,13 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     status: row.phase === 'accepted' ? 'sent' : row.phase, deliveryMessage: row.error,
     ...(row.phase === 'failed' && (!replyBlocked || row.review) ? { onRetry: () => { void send(undefined, undefined, row) } } : {}) })
   for (const entry of entries) {
-    if (entry.role === 'person' && /\[\[(?:issue|run|chat):|https:\/\/github\.com\//i.test(entry.text)) entry.body = <PersonReferences text={entry.text} />
+    if (entry.role !== 'person') continue
+    const { quote, text } = splitReplyQuote(entry.text)
+    if (quote) {
+      entry.text = text
+      entry.attachments = [{ id: 'reply-quote', name: quote, meta: quoteLabel }]
+    }
+    if (/\[\[(?:issue|run|chat):|https:\/\/github\.com\//i.test(entry.text)) entry.body = <PersonReferences text={entry.text} />
   }
   // Re-publish the admitted read itself. Identical message lengths or tool
   // counts do not prove the content, grant or attempt result is unchanged.
@@ -582,7 +589,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     composer={{ ref: inputRef, model: modelControl, label: replyBlocked ? t('checkEnded') : t('composer', { agent: harnessLabel(threadComposerHarness(detail.harness, liveRunId, modelFallback)) }), value: draft, onChange: setDraft, onSubmit: () => { void send() },
       attachmentScope: { kind: 'thread', id: liveRunId }, sending: sending || stopPending, editableWhileSending: true, submitDisabled: changeRequest ? false : replyBlocked || stopRequested || question === 'resuming',
       running: working || (question === 'resuming' && !data?.thread.questionWake), thread: true }}
-    pending={[...changeRequest ? [{ id: 'change-request', name: changeRequest.label, onRemove: changeRequest.onCancel }] : [], ...replyQuote ? [{ id: 'reply-quote', name: replyQuote, onRemove: () => setReplyQuote(null) }] : []]}
+    pending={[...changeRequest ? [{ id: 'change-request', name: changeRequest.label, onRemove: changeRequest.onCancel }] : [], ...replyQuote ? [{ id: 'reply-quote', name: replyQuote, meta: quoteLabel, onRemove: () => setReplyQuote(null) }] : []]}
     notices={<>
       {queueControls}
       {references}
