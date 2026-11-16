@@ -817,6 +817,13 @@
     "test": "lib/bot-model-optimistic.test.ts",
     "suite": "test:execution-rules"
   },
+  "lib/browser-rpc/session.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "After the signed-in browser changes its profile, return the session cache issued by this installation for the updated name or image.",
+    "test": "tests/account-actions.test.ts",
+    "suite": "test:account"
+  },
   "lib/captures/publication-contract.ts": {
     "mode": "built-in",
     "environment": [],

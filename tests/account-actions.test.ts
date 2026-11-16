@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
+import { browserAuthentication } from '../lib/browser-rpc/session'
 import { withDesktopSession, desktopRotatedToken } from '../lib/desktop-rpc/session'
 
 // Settings › 账户 actions: each one reads the person from the session (never
@@ -15,7 +16,7 @@ let deletion: { ok: true; receipt?: { id: string; warnings: string[] } } | { ok:
 let tokens: Record<string, string> = {}
 
 const calls = {
-  updateUser: mock.fn(async (_input: unknown) => ({})),
+  updateUser: mock.fn(async (_input: unknown) => ({ response: { status: true }, headers: new Headers() })),
   changePassword: mock.fn(async (_input: unknown) => { if (authFailure) throw authFailure; return {} }),
   setPassword: mock.fn(async (_input: unknown) => { if (authFailure) throw authFailure; return {} }),
   revokeSession: mock.fn(async (_input: unknown) => ({ status: true })),
@@ -93,7 +94,22 @@ test('a new avatar must be a small PNG, JPEG or WebP; it is stored for the sessi
   assert.deepEqual(saved, { image: `/api/avatars/alice/${'b'.repeat(64)}` })
   assert.equal(calls.saveAvatar.mock.calls[0].arguments[0], 'alice')
   assert.equal(calls.saveAvatar.mock.calls[0].arguments[1], 'image/png')
-  assert.deepEqual(calls.updateUser.mock.calls[0].arguments[0], { body: { image: `/api/avatars/alice/${'b'.repeat(64)}` }, headers: new Headers({ cookie: 'session=x' }) })
+  assert.deepEqual(calls.updateUser.mock.calls[0].arguments[0], { body: { image: `/api/avatars/alice/${'b'.repeat(64)}` }, headers: new Headers({ cookie: 'session=x' }), returnHeaders: true })
+})
+
+test('editing the name in a browser RPC returns the SDK’s replacement cache to that browser', async () => {
+  const headers = new Headers({ cookie: 'session=x' })
+  const auth = browserAuthentication(async () => ({ response: ALICE, headers: new Headers() }), async () => 'fixture.session_data')
+  const identity = await auth.authenticate(headers)
+  assert.ok(identity)
+  const cache = 'fixture.session_data=updated; HttpOnly; Path=/'
+  calls.updateUser.mock.mockImplementationOnce(async () => ({ response: { status: true }, headers: new Headers({ 'set-cookie': cache }) }))
+  const response = await auth.scope(identity, async () => {
+    const result = await account.updateDisplayName('Updated')
+    assert.deepEqual(result, { name: 'Updated' })
+    return Response.json(result)
+  })
+  assert.deepEqual(response.headers.getSetCookie(), [cache])
 })
 
 test('password: change needs the current one, accounts without one set one, and failures come back coded', async () => {
