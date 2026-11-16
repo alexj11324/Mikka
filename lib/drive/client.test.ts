@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { DRIVE_MAX_CHANGES } from './contract'
 const previousBase = process.env.MIKKA_BASE_PATH
 process.env.MIKKA_BASE_PATH = '/mikka'
 const {
@@ -42,6 +43,25 @@ test('an upload sends actual bytes before publishing one atomic manifest change'
     assert.equal(call.url.searchParams.get('workspaceId'), 'workspace-a')
     assert.equal(call.init.cache, 'no-store')
     assert.equal(call.init.credentials, 'same-origin')
+  }
+})
+
+test('a refused selection sends no file contents and keeps the original error', async () => {
+  const first = new File(['first'], 'notes.txt')
+  const cases = [
+    { files: [first, new File(['second'], 'notes.txt')], status: 422 },
+    { files: [first, new File(['second'], '../notes.txt')], status: 400 },
+    { files: Array<File>(DRIVE_MAX_CHANGES + 1).fill(first), status: 400 },
+  ]
+  for (const { files, status } of cases) {
+    let requests = 0
+    const send: typeof fetch = async () => {
+      requests++
+      return Response.json({ error: 'unexpected_upload' }, { status: 400 })
+    }
+    await assert.rejects(uploadDriveFiles('workspace-a', 'volume', 'head', files, 'mutation-1', send),
+      (error: unknown) => error instanceof DriveRequestError && error.code === 'drive_write_invalid' && error.status === status)
+    assert.equal(requests, 0)
   }
 })
 

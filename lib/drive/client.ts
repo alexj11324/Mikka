@@ -1,5 +1,5 @@
 import { withBasePath } from '../base-path'
-import { DRIVE_MAX_FILE_BYTES, type DriveManifestEntry } from './contract'
+import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, type DriveManifestEntry } from './contract'
 import type { DriveVolumeSummary } from './volumes'
 import type { DriveVersionSummary } from './store'
 
@@ -91,6 +91,10 @@ export function createDriveVolume(workspaceId: string, name: string, send?: type
 export async function uploadDriveFiles(workspaceId: string, volumeId: string, expectedDigest: string,
   files: readonly File[], mutationId: string, send: typeof fetch = fetch) {
   if (!files.length || files.some(file => file.size > DRIVE_MAX_FILE_BYTES)) throw new DriveRequestError('drive_limit_exceeded', 413)
+  if (files.length > DRIVE_MAX_CHANGES || files.some(file => !isDrivePath(file.name)))
+    throw new DriveRequestError('drive_write_invalid', 400)
+  if (new Set(files.map(file => file.name)).size !== files.length)
+    throw new DriveRequestError('drive_write_invalid', 422)
   const changes: { op: 'put'; path: string; mode: 420; sha256: string; sizeBytes: number }[] = []
   for (const file of files) {
     const blob = await request<{ sha256: string; sizeBytes: number }>(url(workspaceId, `/${encodeURIComponent(volumeId)}/blobs`), {
