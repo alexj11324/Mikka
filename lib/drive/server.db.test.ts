@@ -205,6 +205,7 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
     const files = [
       ['SKILL.md', '---\nname: root-guide\ndescription: First guide\n---\nHidden root instructions'],
       ['a fragment/#guide/SKILL.md', '---\nname: "second"\ndescription: Another guide\n---\nInvisible instructions'],
+      ['skills/checklist/SKILL.md', '---\nname: display name\ndescription:\nversion: 2\n---\nPrivate body must stay out of the directory'],
       ['b/SKILL.md', 'bad\0binary'], ['big/SKILL.md', 'a'.repeat(20_001)], ['not-SKILL.md', 'not metadata'],
     ]
     const changes = []
@@ -221,7 +222,10 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
     assert.deepEqual(first.skills, [{ volumeId: volume.id, versionId: receipt.headVersionId, path: 'SKILL.md', name: 'root-guide', description: 'First guide' }])
     const next = new URLSearchParams({ view: 'skills', afterVolume: first.nextCursor.volumeId, afterPath: first.nextCursor.path })
     const second = await (await call('?' + next, reader)).json()
-    assert.deepEqual(second.skills, [{ volumeId: volume.id, versionId: receipt.headVersionId, path: 'a fragment/#guide/SKILL.md', name: 'second', description: 'Another guide' }])
+    assert.deepEqual(second.skills, [
+      { volumeId: volume.id, versionId: receipt.headVersionId, path: 'a fragment/#guide/SKILL.md', name: 'second', description: 'Another guide' },
+      { volumeId: volume.id, versionId: receipt.headVersionId, path: 'skills/checklist/SKILL.md', name: 'checklist', description: '' },
+    ])
     assert.equal(second.nextCursor, null)
     assert.deepEqual(await (await call('?view=skills', { token: sharedToken, workspaceId: team.id, projectId })).json(), { skills: [], nextCursor: null })
     assert.equal((await call('?view=skills', { ...writer, token: null })).status, 401)
@@ -231,7 +235,7 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
       expectedDigest: receipt.headDigest, mutationId: randomUUID(), changes: [{ op: 'delete', path: 'SKILL.md' }],
     } })
     assert.equal(removed.status, 200)
-    assert.deepEqual((await (await call('?view=skills', reader)).json()).skills.map((row: { name: string }) => row.name), ['second'])
+    assert.deepEqual((await (await call('?view=skills', reader)).json()).skills.map((row: { name: string }) => row.name), ['second', 'checklist'])
     assert.equal((await call('/' + volume.id + '/archive', { ...writer, method: 'POST' })).status, 200)
     assert.deepEqual(await (await call('?view=skills', reader)).json(), { skills: [], nextCursor: null })
     await fixture.query("update resource_access_policies set visibility='private' where kind='project' and id=$1", [projectId])

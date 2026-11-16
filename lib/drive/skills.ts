@@ -1,7 +1,7 @@
 import 'server-only'
 import type { PoolClient } from 'pg'
 import { MAX_SKILL_INSTRUCTIONS_LENGTH, MAX_SKILL_NAME_LENGTH } from '@mikka/protocol/skill'
-import { skillDescription, skillName } from '../plugins/skill-metadata'
+import { declaredSkillDescription, skillName } from '../plugins/skill-metadata'
 import { boundedDriveBytes, driveBytes, driveSha256, readDriveBlobObject } from './blobs'
 import type { DriveScope, DriveSkillCursor, DriveSkillMetadata, DriveSkillPage } from './contract'
 import { DriveError } from './store'
@@ -36,8 +36,10 @@ export async function listDriveSkills(database: Pick<PoolClient, 'query'>, actor
     let body: string
     try { body = new TextDecoder('utf-8', { fatal: true }).decode(bytes) } catch { continue }
     if (!body.trim() || body.includes('\0')) continue
-    const name = skillName(body, entry.path.split('/').at(-2) || entry.folder).slice(0, MAX_SKILL_NAME_LENGTH)
-    skills.push({ volumeId: entry.volumeId, path: entry.path, versionId: entry.versionId, name, description: skillDescription(body, '') })
+    const parts = entry.path.split('/')
+    const canonical = parts.length === 3 && parts[0] === 'skills'
+    const name = (canonical ? parts[1] : skillName(body, parts.at(-2) || entry.folder)).slice(0, MAX_SKILL_NAME_LENGTH)
+    skills.push({ volumeId: entry.volumeId, path: entry.path, versionId: entry.versionId, name, description: declaredSkillDescription(body) })
   }
   const last = entries.at(-1)
   return { skills, nextCursor: rows.length > page.limit && last ? { volumeId: last.volumeId, path: last.path } : null }
