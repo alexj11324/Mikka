@@ -1727,6 +1727,17 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       }
     });
 
+    await t.test('a manual pause reports a conflict if the machine binding changed before parking', async () => {
+      const before = await parked(await task());
+      const { epoch } = (await pool.query('SELECT epoch FROM thread_machines WHERE "runId"=$1', [before.runId])).rows[0];
+      await pool.query(`UPDATE thread_machines SET state='running',epoch=epoch+1 WHERE "runId"=$1`, [before.runId]);
+      await assert.rejects(
+        threadMachineAction(pool, actor, before.runId, 'pause', { epoch, sandboxId: before.sandboxId }),
+        { status: 409 },
+      );
+      assert.equal((await machine(before.runId)).state, 'running');
+    });
+
     await t.test('an admitted adjacent stage keeps the same live VM and fences old lifecycle callbacks', async () => {
       const issueId = await task(), before = await parked(issueId), next = await run(issueId);
       await pool.query(`UPDATE agent_runs SET report='{"safePoint":{"session":"exited","checkpoint":"unavailable"}}' WHERE id=$1`, [before.runId]);
