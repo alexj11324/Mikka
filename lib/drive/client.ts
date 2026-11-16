@@ -1,4 +1,6 @@
 import { withBasePath } from '../base-path'
+import { driveFileLinkUrl, driveVolumeUrl as url, type DriveLocation } from './location'
+export { driveFileLinkUrl, type DriveLocation } from './location'
 import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, type DriveFileLink, type DriveFileLinkPage, type DriveWorkspaceFileLinkPage, type DriveFileLinkVisibility, type DriveManifestEntry, type DriveSkillCursor, type DriveSkillPage } from './contract'
 import type { DriveVolumeSummary } from './volumes'
 import type { DriveVersionSummary } from './store'
@@ -21,9 +23,6 @@ export class DriveRequestError extends Error {
   }
 }
 
-export type DriveLocation = string | { workspaceId: string; projectId: string; driveScope?: 'project' }
-  | { workspaceId: string; driveScope: 'team-workspace'; projectId?: never }
-
 function locationKey(location: DriveLocation) {
   if (typeof location === 'string') return [location] as const
   if (location.driveScope === 'team-workspace') return [location.workspaceId, 'team-workspace'] as const
@@ -34,14 +33,6 @@ function locationKey(location: DriveLocation) {
 export const driveVolumesKey = (location: DriveLocation, ownerId: string) => ['drive:volumes', ownerId, ...locationKey(location)] as const
 export const driveHeadKey = (location: DriveLocation, ownerId: string, volumeId: string) => ['drive:head', ownerId, ...locationKey(location), volumeId] as const
 export const driveHistoryKey = (location: DriveLocation, ownerId: string, volumeId: string) => ['drive:history', ownerId, ...locationKey(location), volumeId] as const
-
-function url(location: DriveLocation, suffix = '', query: Record<string, string | undefined> = {}) {
-  const params = new URLSearchParams(typeof location === 'string'
-    ? { workspaceId: location }
-    : { workspaceId: location.workspaceId, ...(location.projectId ? { projectId: location.projectId } : {}), ...(location.driveScope ? { driveScope: location.driveScope } : {}) })
-  for (const [key, value] of Object.entries(query)) if (value !== undefined) params.set(key, value)
-  return withBasePath(`/api/drive/volumes${suffix}?${params}`)
-}
 
 async function request<T>(target: string, init: RequestInit = {}, send: typeof fetch = fetch): Promise<T> {
   let response: Response
@@ -76,10 +67,6 @@ export function readProjectDriveScopes(workspaceId: string, send?: typeof fetch)
 export function readPersonalDriveScopes(workspaceId: string, send?: typeof fetch) {
   const params = new URLSearchParams({ workspaceId })
   return request<{ scopes: PersonalDriveScope[] }>(withBasePath(`/api/drive/scopes?${params}`), {}, send)
-}
-
-export function driveFileLinkUrl(location: DriveLocation, volumeId: string, linkId: string) {
-  return url(location, `/${encodeURIComponent(volumeId)}/shares/${encodeURIComponent(linkId)}`)
 }
 
 export function readWorkspaceDriveFileLinks(workspaceId: string, page = 1, send?: typeof fetch) {
