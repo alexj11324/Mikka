@@ -184,7 +184,7 @@ export function Onboarding({ computer = 'none', saveKey, workspaceId, onDone }: 
     if (!trimmed || busy) return
     setBusy(true); setError('')
     try {
-      const created = await createBot({ name: trimmed, color, shape })
+      const created = await createBot({ name: trimmed, color, shape }, workspaceId)
       void mutate(isBotListKey)
       setBot(created)
       setCard(null)
