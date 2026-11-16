@@ -116,6 +116,9 @@ test('billing management HTTP preserves independent tenants, owners and immutabl
     const view = await (await get()).json() as BillingManagementView, row = view.budgets.find(item => item.scope === 'member')!
     assert.deepEqual([row.spentPoints, row.reservedPoints, row.remainingPoints, row.thresholdReached, row.exhausted], [250, 40, 10, true, false])
     assert.deepEqual([view.usage.costMicroUsd, view.usage.reservedMicroUsd, view.usage.unknownCalls], [2500000, 400000, 1])
+    const day = (await pool.query<{ date: string }>(`select to_char("createdAt" at time zone 'UTC','YYYY-MM-DD') date from hosted_usage where id=$1`, [call])).rows[0].date
+    assert.deepEqual(view.usage.daily?.find(row => row.date === day), { date: day, costMicroUsd: 2500000, reservedMicroUsd: 400000, unknownCalls: 1 })
+    assert.ok(view.usage.daily?.some(row => row.date !== day && row.costMicroUsd === 0 && row.reservedMicroUsd === 0 && row.unknownCalls === 0))
     assert.equal((await post({ action: 'budget', workspaceId: first.id, budget: { ...budget, limitPoints: 0 } })).status, 200)
     assert.equal((await (await get()).json()).budgets[0].exhausted, true)
     assert.equal((await post({ action: 'budget', workspaceId: first.id, budget: { ...budget, scopeId: outsider } })).status, 403)

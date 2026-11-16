@@ -11,7 +11,7 @@ import { deploymentMode } from '@/lib/governance/edition'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { requireOrganizationAdmin } from '@/lib/governance/organizations'
 import type { EnterprisePrincipal } from '@/lib/enterprise/principal'
-import { currentMonth, monthBounds } from '@/lib/usage/month'
+import { currentMonth, monthBounds, monthDays } from '@/lib/usage/month'
 import { readBillingAccount, billingPortalUrl, planCheckoutUrl } from './service'
 import { readCreditBillingAccount } from './history'
 import { readResourceBudgets } from './resource-budgets'
@@ -101,12 +101,14 @@ export async function billingManagementView(actorId: string, target: BillingScop
       accountId ? readBillingAccount(accountId, process.env, memberCount) : null,
       accountId ? readCreditBillingAccount(accountId) : null,
       budgetWorkspaceId ? readResourceBudgets(pool, [budgetWorkspaceId]) : [],
-      pool.query<{ id: string | null; cost: number; held: number; unknown: number }>(`select "actorId" id,
+      pool.query<{ id: string | null; day: string | null; cost: number; held: number; unknown: number }>(`select "actorId" id,
+        to_char("createdAt" at time zone 'UTC','YYYY-MM-DD') AS "day",
         coalesce(sum("costMicroUsd") filter(where state='settled'),0)::float8 cost,
         coalesce(sum(coalesce("costMicroUsd","holdMicroUsd")) filter(where state in ('pending','unknown')),0)::float8 held,
         count(*) filter(where state='unknown' or (state='settled' and "costMicroUsd" is null))::int unknown
         from hosted_usage where "createdAt">=$1 and "createdAt"<$2 and state<>'failed'
-        and ($3::boolean and "workspaceId"=$4::uuid or not $3::boolean and coalesce("usageWorkspaceId","workspaceId")=any($5::uuid[])) group by "actorId"`,
+        and ($3::boolean and "workspaceId"=$4::uuid or not $3::boolean and coalesce("usageWorkspaceId","workspaceId")=any($5::uuid[]))
+        group by grouping sets (("actorId"), (to_char("createdAt" at time zone 'UTC','YYYY-MM-DD')))`,
         [start, end, target.kind === 'organization', accountId, usageIds]),
       pool.query<{ count: number }>(`select count(*)::int count from agent_runs where "workspaceId"=any($1::uuid[]) and "createdAt">=$2 and "createdAt"<$3
         and "agentDefinition"->'executionIdentity'->>'version' in ('1','2') and (
@@ -116,6 +118,9 @@ export async function billingManagementView(actorId: string, target: BillingScop
     ])
     const resources = budgetWorkspaceId && policies.rows[0]?.available ? (await pool.query<BillingManagementView['resourceTargets'][number]>(`
       select id,kind,visibility,"ownerId" from resource_access_policies where "workspaceId"=$1 and kind in ('project','thread') order by kind,id limit 200`, [budgetWorkspaceId])).rows : []
+    // A null day is the member grouping (including historical unattributed calls).
+    const byMember = totals.rows.filter(row => row.day === null)
+    const byDay = new Map(totals.rows.filter(row => row.day !== null).map(row => [row.day, row]))
     const names = new Map(attributionMembers.map(member => [member.id, member.name]))
     return { scope: { ...target, name: scopeName! }, account: account ? { workspaceId: account.id, name: account.name } : null,
       billing, credits, organizations: organizationChoices, platformAccountWorkspaceId, canPurchasePlatform: accountId === platformAccountWorkspaceId, canManagePayments: Boolean(accountId && administrable.has(accountId)), canManageRecharge,
@@ -123,9 +128,13 @@ export async function billingManagementView(actorId: string, target: BillingScop
       capacity: { plan: effective.plan, hostedMaxInFlight: effective.hostedMaxInFlight, activeHumanLimit: effective.activeHumanLimit },
       budgetWorkspaceId, workspaces: available.map(row => ({ id: row.id, name: row.name, canEdit: administrable.has(row.id) })), members,
       resourceTargets: resources, resourceTargetsAvailable: Boolean(policies.rows[0]?.available), budgets,
-      usage: { month, costMicroUsd: totals.rows.reduce((sum, row) => sum + row.cost, 0), reservedMicroUsd: totals.rows.reduce((sum, row) => sum + row.held, 0),
-        unknownCalls: totals.rows.reduce((sum, row) => sum + row.unknown, 0), externalUnknownRuns: external.rows[0]?.count ?? 0,
-        members: totals.rows.map(row => ({ id: row.id, name: row.id ? names.get(row.id) ?? null : null, costMicroUsd: row.cost, unknownCalls: row.unknown })) } }
+      usage: { month, costMicroUsd: byMember.reduce((sum, row) => sum + row.cost, 0), reservedMicroUsd: byMember.reduce((sum, row) => sum + row.held, 0),
+        unknownCalls: byMember.reduce((sum, row) => sum + row.unknown, 0), externalUnknownRuns: external.rows[0]?.count ?? 0,
+        daily: monthDays(month).map(date => {
+          const row = byDay.get(date)
+          return { date, costMicroUsd: row?.cost ?? 0, reservedMicroUsd: row?.held ?? 0, unknownCalls: row?.unknown ?? 0 }
+        }),
+        members: byMember.map(row => ({ id: row.id, name: row.id ? names.get(row.id) ?? null : null, costMicroUsd: row.cost, unknownCalls: row.unknown })) } }
   })
 }
 

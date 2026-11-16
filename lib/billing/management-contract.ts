@@ -23,6 +23,8 @@ export type BillingManagementView = {
   resourceTargetsAvailable: boolean
   budgets: ResourceBudgetView[]
   usage: { month: string; costMicroUsd: number; reservedMicroUsd: number; unknownCalls: number; externalUnknownRuns: number;
+    /** Older servers omit the daily UTC breakdown. */
+    daily?: { date: string; costMicroUsd: number; reservedMicroUsd: number; unknownCalls: number }[]
     members: { id: string | null; name: string | null; costMicroUsd: number; unknownCalls: number }[] }
 }
 export type BillingManagementOperation = (

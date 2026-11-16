@@ -42,6 +42,7 @@ export default function BillingScreen() {
 function BillingContext({ initial }: { initial: BillingScope }) {
   const [scope, setScope] = useState(initial), [workspace, setWorkspace] = useState<string | null>(null)
   const read = useApi<BillingManagementView>(billingManagementPath(scope, workspace))
+  const [showDaily, setShowDaily] = useState(false)
   const [pending, setPending] = useState<BillingManagementOperation['action'] | null>(null), [failure, setFailure] = useState<string | null>(null)
   const alive = useRef(true), writing = useRef(false)
   const currentScope = useRef(scope)
@@ -105,6 +106,14 @@ function BillingContext({ initial }: { initial: BillingScope }) {
         <Metric label={copy.externalUnknown} value={`${copy.unknown} · ${number(data.usage.externalUnknownRuns)}`} />
         <FieldGroup.SectionFooter><NativeText>{copy.unknownHelp}</NativeText></FieldGroup.SectionFooter>
       </FieldGroup.Section>
+      {data.usage.daily && <FieldGroup.Section title={copy.dailyUsage}>
+        <Button label={showDaily ? copy.hideDays : copy.showDays} variant="text" onPress={() => setShowDaily(value => !value)} />
+        {showDaily && data.usage.daily.map(day => <ListItem key={day.date}
+          supportingText={`${copy.platformReserved} · ${money(day.reservedMicroUsd)} · ${copy.platformUnknown} · ${number(day.unknownCalls)}`}
+          trailing={<NativeText>{money(day.costMicroUsd)}</NativeText>}>
+          <NativeText>{day.date}</NativeText>
+        </ListItem>)}
+      </FieldGroup.Section>}
       <FieldGroup.Section title={copy.memberUsage}>
         {data.usage.members.length ? data.usage.members.map((row, index) => <ListItem key={row.id ?? index} supportingText={row.unknownCalls ? `${copy.unknown} · ${number(row.unknownCalls)}` : undefined} trailing={<NativeText>{money(row.costMicroUsd)}</NativeText>}><NativeText>{row.name ?? row.id ?? copy.unattributed}</NativeText></ListItem>) : <NativeText>{copy.noMemberUsage}</NativeText>}
       </FieldGroup.Section>
