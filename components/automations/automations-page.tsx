@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment, useState, type MouseEvent } from 'react'
-import useSWR from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
 import { ChevronDown, Ellipsis, Pin, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -22,7 +22,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { InlineLoadError } from '@/components/load-error'
 import { BotAvatar, CoordinatorAvatar } from '@/components/nav/bot-avatar'
 import { useLiveKey } from '@/hooks/use-live-key'
-import { useAutomations } from '@/hooks/use-automations'
+import { invalidateAutomationList, useAutomations } from '@/hooks/use-automations'
 import type { AutomationView } from '@/lib/schedules/automation-view'
 import { useNextRunLabel, useTimingSummary } from './automation-summary'
 import { AUTOMATION_TEMPLATES } from './automation-templates'
@@ -69,6 +69,7 @@ export function AutomationsPage({ workspaceId, userId, href, onOpen, onAskBot }:
   const [filter, setFilter] = useState<Filter>('all')
   const [restoring, setRestoring] = useState<string | null>(null)
   const { automations, error, data, mutate, setSize, size, more, isValidating } = useAutomations(workspaceId, filter === 'deleted')
+  const { mutate: mutateCache } = useSWRConfig()
   const bots = useWorkspaceBotNames(workspaceId)
   const [query, setQuery] = useState('')
   const [tag, setTag] = useState<string | null>(null)
@@ -85,11 +86,12 @@ export function AutomationsPage({ workspaceId, userId, href, onOpen, onAskBot }:
     { key: 'rest', label: folders.length ? t('noFolder') : null, rows: visible.filter(row => !row.pinned && !row.folder) },
   ].filter(group => group.rows.length)
   async function restore(row: AutomationView) {
-    if (restoring) return
+    if (restoring || !workspaceId) return
     setRestoring(row.id)
     try {
-      const result = await restoreAutomation({ scheduleId: row.id, version: row.version }, workspaceId ?? undefined)
+      const result = await restoreAutomation({ scheduleId: row.id, version: row.version }, workspaceId)
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
+      await invalidateAutomationList(mutateCache, workspaceId, false)
       await mutate()
     } catch { toast.error(actionError('generic')) }
     finally { setRestoring(null) }

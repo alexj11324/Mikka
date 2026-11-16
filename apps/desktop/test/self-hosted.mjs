@@ -9,6 +9,7 @@ import { decode, encode } from '../../../lib/desktop-rpc/wire.ts'
 import { launchElectron } from './electron-launch.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { verifyDesktopVersionHistory } from './self-hosted-version-history.mjs'
+import { verifyWorkspaceAutomation } from './self-hosted-automations.mjs'
 import { verifyPersonalDriveUploads } from './self-hosted-drive.mjs'
 import { verifyConversationOrganization } from './self-hosted-conversations.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
@@ -189,6 +190,7 @@ async function main() {
       report.driveUploads = []
       await verifyPersonalDriveUploads({ ...controls, application, workspaceId: sharedWorkspace, directory, folderCheck: report.driveFolder, receipts: report.driveUploads })
       report.versionAdmissions = await verifyDesktopVersionHistory(controls)
+      await verifyWorkspaceAutomation({ ...controls, workspaceId: sharedWorkspace })
     }
     phase = 'sign_out_and_return'
     await page.evaluate(() => window.mikka.bundled.signOut())

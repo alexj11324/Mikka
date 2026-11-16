@@ -1,6 +1,6 @@
 'use client'
 
-import useSWR, { unstable_serialize as serialize } from 'swr'
+import useSWR, { unstable_serialize as serialize, type useSWRConfig } from 'swr'
 import useSWRInfinite, { unstable_serialize } from 'swr/infinite'
 import { automationBatches, automationHistory, automationUsage, getAutomation, listAutomations } from '@/app/actions/automations'
 import { useLiveKey } from '@/hooks/use-live-key'
@@ -15,6 +15,13 @@ function unwrap<T>(result: Read<T>): T {
 
 const listKey = (workspaceId: string, deleted: boolean) => (index: number, previous: AutomationList | null) =>
   index > 0 && !previous?.nextCursor ? null : ['automations', workspaceId, deleted, previous?.nextCursor ?? null] as const
+
+// Forget each old cursor before refreshing its infinite key. Revalidation also clears SWR's
+// in-flight deduplication when the destination filter is hidden, so reopening it reads the writer's result.
+export async function invalidateAutomationList(mutate: ReturnType<typeof useSWRConfig>['mutate'], workspaceId: string, deleted: boolean) {
+  await mutate(key => Array.isArray(key) && key[0] === 'automations' && key[1] === workspaceId && key[2] === deleted, undefined, { revalidate: false })
+  await mutate(unstable_serialize(listKey(workspaceId, deleted)), undefined, { revalidate: true })
+}
 
 /**
  * 自动化: the workspace's automations, a page at a time. Read when the page opens and again only when the live
