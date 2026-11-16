@@ -116,6 +116,7 @@ export async function updateOrganizationMember(organizationId: string, actorId: 
     const [member] = await tx.select().from(organizationMembers).where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, userId))).limit(1)
     if (!member) throw new GovernanceError('not_found')
     if ((member.role === 'owner' || role === 'owner') && actor.membership.role !== 'owner') throw new GovernanceError('access_denied')
+    if (member.role === role) return
     if (member.role === 'owner' && member.status === 'active' && role !== 'owner') {
       await assertOtherActiveOrganizationOwner(tx, organizationId, userId)
     }
