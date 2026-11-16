@@ -106,11 +106,13 @@ async function withConfiguredProject<T>(reader: Reader, workspaceId: string, pro
       await admin(tx, reader, workspaceId)
       await resourceWriteLock(tx, workspaceId)
     }
-    const project = (await tx.execute<{ revision: number; archivedAt: Date | null }>(sql`select revision,"archivedAt"
-      from workspace_projects where id=${projectId} and "workspaceId"=${workspaceId} ${write ? sql`for update` : sql`for share`}`)).rows[0]
-    if (!project) throw new ActionFailureError('projectNotFound')
+    // Match the Project lifecycle writer: the APP policy is locked before
+    // the source row. The surrounding Workspace transaction owns both uses.
     try {
-      return await withResourceAccess(reader, { kind: 'project', id: projectId, workspaceId }, write ? 'canSteer' : 'canReadContent', () => {
+      return await withResourceAccess(reader, { kind: 'project', id: projectId, workspaceId }, write ? 'canSteer' : 'canReadContent', async () => {
+        const project = (await tx.execute<{ revision: number; archivedAt: Date | null }>(sql`select revision,"archivedAt"
+          from workspace_projects where id=${projectId} and "workspaceId"=${workspaceId} ${write ? sql`for update` : sql`for share`}`)).rows[0]
+        if (!project) throw new ActionFailureError('projectNotFound')
         if (write && project.archivedAt) throw new ActionFailureError('projectArchived')
         return work(tx, project)
       })
