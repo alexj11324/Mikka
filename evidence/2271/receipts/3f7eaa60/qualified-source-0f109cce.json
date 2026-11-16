@@ -1,0 +1,304 @@
+{
+  "publicRevision": "3f7eaa6042d04fc85c4c1c45d4be361e1796fa57",
+  "publicTree": "cb7a5f3f00075a88a220ce6bd300b97dffac9149",
+  "harnessRevision": "0f109ccec64515a7196d81eed656a29c9f0c75c9",
+  "cli": "official Claude Code 2.1.309",
+  "cliSha256": "4d704a8aecbe038affa3000f498ae17c1b4f753add8facb8764120affc99b658",
+  "modelId": "SmolLM2-135M-Instruct-Q4_K_M",
+  "ggufSha256": "2e8040ceae7815abe0dcb3540b9995eaa1fa0d2ca9e797d0a635ae4433c68c2d",
+  "providerKind": "isolated CPU GGUF, no commercial subscription",
+  "job": "43818552178",
+  "success": true,
+  "environment": {
+    "leaseId": "7b247468-e28a-47f9-b901-1bbce27f8acc",
+    "instanceId": "c323af61-743a-441b-99b4-6fa19d499191",
+    "scope": "loopback-only TLS/isolated PG17, two leased identities"
+  },
+  "progress": [
+    {
+      "stage": "isolated migrated PostgreSQL",
+      "at": "2026-11-16T06:45:51.038Z",
+      "run": null,
+      "candidate": null
+    },
+    {
+      "stage": "two independent lease identities and attested isolated DB/HTTPS origin",
+      "at": "2026-11-16T06:45:54.411Z",
+      "run": null,
+      "candidate": null
+    },
+    {
+      "stage": "repository-supported test catalogue verified the loaded model through authenticated local HTTP",
+      "at": "2026-11-16T06:45:55.261Z",
+      "run": null,
+      "candidate": null
+    },
+    {
+      "stage": "canonical admission",
+      "at": "2026-11-16T06:45:57.719Z",
+      "run": null,
+      "candidate": null
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:45:58.297Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 200
+    },
+    {
+      "stage": "explicit owner dispatch initializes selected agent",
+      "at": "2026-11-16T06:45:58.324Z",
+      "run": "357c3724-2f83-4329-93cd-bde534adac85",
+      "candidate": null
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:45:58.341Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 200
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:45:58.498Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 200
+    },
+    {
+      "stage": "authenticated device claimed an exact admitted run",
+      "phase": "execute",
+      "at": "2026-11-16T06:45:58.499Z",
+      "run": "357c3724-2f83-4329-93cd-bde534adac85",
+      "candidate": null
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:45:58.619Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 204
+    },
+    {
+      "stage": "Native CLI terminal outcome",
+      "phase": "execute",
+      "outcome": "succeeded",
+      "stopReason": "submitted",
+      "at": "2026-11-16T06:46:02.754Z",
+      "run": null,
+      "candidate": null
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:46:02.824Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 200
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:46:08.810Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 201
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:46:08.835Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 200
+    },
+    {
+      "stage": "genuine producer Chromium PNG submitted via canonical run capture REST before daemon completion",
+      "at": "2026-11-16T06:46:08.843Z",
+      "run": "357c3724-2f83-4329-93cd-bde534adac85",
+      "candidate": null
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:46:09.179Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 204
+    },
+    {
+      "stage": "real native MCP report and clean fixed candidate persisted",
+      "phase": "execute",
+      "at": "2026-11-16T06:46:09.182Z",
+      "run": "357c3724-2f83-4329-93cd-bde534adac85",
+      "candidate": null
+    },
+    {
+      "stage": "independent Factory state after canonical producer completion",
+      "phase": "review",
+      "at": "2026-11-16T06:46:09.185Z",
+      "run": null,
+      "candidate": null
+    },
+    {
+      "stage": "producer receipt created a real candidate and allocated its independent reviewer",
+      "at": "2026-11-16T06:46:09.186Z",
+      "run": null,
+      "candidate": "ca95757a-10a8-478e-9e23-43ea3586ab39"
+    },
+    {
+      "stage": "Canonical independent report-only reviewer allocated",
+      "phase": "review",
+      "at": "2026-11-16T06:46:09.192Z",
+      "run": null,
+      "candidate": "ca95757a-10a8-478e-9e23-43ea3586ab39"
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:46:09.278Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 200
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:46:09.394Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 200
+    },
+    {
+      "stage": "authenticated device claimed an exact admitted run",
+      "phase": "review",
+      "at": "2026-11-16T06:46:09.395Z",
+      "run": "d448d345-6a2c-4b22-bb96-239a2cc061d8",
+      "candidate": null
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:46:09.458Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 204
+    },
+    {
+      "stage": "Native CLI terminal outcome",
+      "phase": "review",
+      "outcome": "succeeded",
+      "stopReason": "submitted",
+      "at": "2026-11-16T06:46:15.587Z",
+      "run": null,
+      "candidate": null
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:46:15.656Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 200
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:46:15.766Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 204
+    },
+    {
+      "stage": "real native MCP report and clean fixed candidate persisted",
+      "phase": "review",
+      "at": "2026-11-16T06:46:15.767Z",
+      "run": "d448d345-6a2c-4b22-bb96-239a2cc061d8",
+      "candidate": null
+    },
+    {
+      "stage": "Complete independent read-only reviewer report, obtained through the allocated device and an independent native MCP session",
+      "at": "2026-11-16T06:46:15.767Z",
+      "run": null,
+      "candidate": null
+    },
+    {
+      "stage": "canonical reviewer completed and consent is required before acceptance",
+      "at": "2026-11-16T06:46:15.768Z",
+      "run": null,
+      "candidate": null
+    },
+    {
+      "stage": "canonical authorized task detail",
+      "at": "2026-11-16T06:46:16.122Z",
+      "run": null,
+      "candidate": null
+    },
+    {
+      "stage": "persisted Factory stage receipts versus human Activity",
+      "at": "2026-11-16T06:46:16.124Z",
+      "run": null,
+      "candidate": null
+    },
+    {
+      "stage": "human history, authorized Work and an expressly attached existing PR, independent of report acceptance",
+      "at": "2026-11-16T06:46:16.301Z",
+      "run": null,
+      "candidate": null
+    },
+    {
+      "stage": "case-specific populated lease quarantined and all its sessions revoked prior to owned DB teardown",
+      "at": "2026-11-16T06:46:16.317Z",
+      "run": null,
+      "candidate": null
+    }
+  ],
+  "native": [
+    {
+      "stage": "execute",
+      "run": "357c3724-2f83-4329-93cd-bde534adac85",
+      "session": "bbfff754-0e87-4a4e-b5f1-fb2ba45e238a",
+      "model": "SmolLM2-135M-Instruct-Q4_K_M",
+      "reportSha256": "c3cef5529b591f6e754a162759975abddc4adb6451760272b0cebef06468b3fd",
+      "criteriaCount": 0
+    },
+    {
+      "stage": "review",
+      "run": "d448d345-6a2c-4b22-bb96-239a2cc061d8",
+      "session": "4bb153d3-c45c-4747-a00d-ada9c21c9086",
+      "model": "SmolLM2-135M-Instruct-Q4_K_M",
+      "reportSha256": "fdefe0990d93a77a5f741fd7f0b624b4742d471976c5d9583406e217bae5e60d",
+      "criteriaCount": 1
+    }
+  ],
+  "generation": [
+    {
+      "tokens": 24,
+      "mode": "discovery",
+      "model": "SmolLM2-135M-Instruct-Q4_K_M",
+      "selectedAction": "search",
+      "outputSha256": "9b65007ccfd6b9d31e118ed12ea8710f93698c000ae2652f8468bee395b42e54"
+    },
+    {
+      "tokens": 51,
+      "mode": "handoff",
+      "model": "SmolLM2-135M-Instruct-Q4_K_M",
+      "selectedAction": "submit",
+      "outputSha256": "457bfaff9410fc0023f5183d0b97b847dc1d04eedf93c6f37aa9fd9a2484ae13"
+    },
+    {
+      "tokens": 24,
+      "mode": "discovery",
+      "model": "SmolLM2-135M-Instruct-Q4_K_M",
+      "selectedAction": "search",
+      "outputSha256": "9b65007ccfd6b9d31e118ed12ea8710f93698c000ae2652f8468bee395b42e54"
+    },
+    {
+      "tokens": 85,
+      "mode": "handoff",
+      "model": "SmolLM2-135M-Instruct-Q4_K_M",
+      "selectedAction": "submit",
+      "outputSha256": "ab73747af6fa72624cb6acf9905aa2494622cdc6485725ed67e006f70bcff452"
+    }
+  ],
+  "target": {
+    "state": "done",
+    "group": "done",
+    "ownerKind": "agent",
+    "humanReceipts": 1,
+    "memberStatus": 404
+  },
+  "failure": null
+}

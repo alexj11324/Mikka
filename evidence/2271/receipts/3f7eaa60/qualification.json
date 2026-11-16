@@ -1,0 +1,23 @@
+{
+  "productSha": "3f7eaa6042d04fc85c4c1c45d4be361e1796fa57",
+  "candidate": "ca95757a-10a8-478e-9e23-43ea3586ab39",
+  "evidenceCommit": "0f109ccec64515a7196d81eed656a29c9f0c75c9",
+  "run": 43818552178,
+  "job": 133136062604,
+  "artifact": 14203920526,
+  "archiveSha256": "b5cf0f3b4840be32c128b1badcf400cf5b1ee112980424f73a0584b490be8c2c",
+  "receiptJsonSha256": "7ccc8334cf9e095435a3d4642a62757fb0f5c94ed370d38756a11c2d219be8d9",
+  "qualification": "Qualified same-candidate, independent reviewer and owner acceptance for a report-only Factory task under isolated real GGUF inference. No subscription, production or installed native claim. The PR in Work was explicitly linked and was not produced by this report candidate.",
+  "reviewDisposition": {
+    "generatedAction": "submit",
+    "criterion": "unverified",
+    "verdict": "needs_judgment",
+    "proof": "The independently reproduced 85-token model output hashes to the exact GitHub inference output; its summary also hashes to the stored native reviewer report. The owner accepted using the canonical approval action after the product reached approval.",
+    "rawGeneratedJson": "{\n    \"action\": \"submit\",\n    \"summary\": \"The producer report is reviewed. The sky is clear and blue during the day. The sky is blue during the day. The sky is blue during the day. 1\",\"assessment\": \"unverified\", \"observation\": \"The sky is blue during the day. The sky is blue during the day. The sky is blue during the day. 1\"}"
+  },
+  "memberHttp": 404,
+  "ownerState": "done",
+  "receiptCount": 1,
+  "sourceOfTruth": "https://github.com/alexj11324/Mikka/actions/runs/43818552178/job/133136062604",
+  "savedUtc": "2026-11-16T06:47:16.807663+00:00"
+}

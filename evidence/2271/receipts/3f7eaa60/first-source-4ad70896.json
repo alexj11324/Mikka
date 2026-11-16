@@ -1,0 +1,206 @@
+{
+  "publicRevision": "3f7eaa6042d04fc85c4c1c45d4be361e1796fa57",
+  "publicTree": "cb7a5f3f00075a88a220ce6bd300b97dffac9149",
+  "harnessRevision": "4ad708968d2d657f3783c78b40dc1e5574a8d769",
+  "cli": "official Claude Code 2.1.309",
+  "cliSha256": "4d704a8aecbe038affa3000f498ae17c1b4f753add8facb8764120affc99b658",
+  "modelId": "SmolLM2-135M-Instruct-Q4_K_M",
+  "ggufSha256": "2e8040ceae7815abe0dcb3540b9995eaa1fa0d2ca9e797d0a635ae4433c68c2d",
+  "providerKind": "isolated CPU GGUF, no commercial subscription",
+  "job": "43817772327",
+  "success": false,
+  "environment": {
+    "leaseId": "2c9d1dc0-c0a6-4bcf-86de-ef88af0946f7",
+    "instanceId": "f1d13da2-cb57-4087-8e2c-8a61bb3f1e7d",
+    "scope": "loopback-only TLS/isolated PG17, two leased identities"
+  },
+  "progress": [
+    {
+      "stage": "isolated migrated PostgreSQL",
+      "at": "2026-11-16T06:38:44.401Z",
+      "run": null,
+      "candidate": null
+    },
+    {
+      "stage": "two independent lease identities and attested isolated DB/HTTPS origin",
+      "at": "2026-11-16T06:38:46.836Z",
+      "run": null,
+      "candidate": null
+    },
+    {
+      "stage": "repository-supported test catalogue verified the loaded model through authenticated local HTTP",
+      "at": "2026-11-16T06:38:47.461Z",
+      "run": null,
+      "candidate": null
+    },
+    {
+      "stage": "canonical admission",
+      "at": "2026-11-16T06:38:49.288Z",
+      "run": null,
+      "candidate": null
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:38:49.695Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 200
+    },
+    {
+      "stage": "explicit owner dispatch initializes selected agent",
+      "at": "2026-11-16T06:38:49.719Z",
+      "run": "6383a92e-997e-41d1-a1c0-777f8592fd26",
+      "candidate": null
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:38:49.730Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 200
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:38:49.850Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 200
+    },
+    {
+      "stage": "execute",
+      "at": "2026-11-16T06:38:49.851Z",
+      "run": "6383a92e-997e-41d1-a1c0-777f8592fd26",
+      "candidate": null
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:38:49.946Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 204
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:38:53.272Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 200
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:38:55.892Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 201
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:38:55.952Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 200
+    },
+    {
+      "stage": "genuine producer Chromium PNG submitted via canonical run capture REST before daemon completion",
+      "at": "2026-11-16T06:38:55.953Z",
+      "run": "6383a92e-997e-41d1-a1c0-777f8592fd26",
+      "candidate": null
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:38:56.178Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 204
+    },
+    {
+      "stage": "execute",
+      "at": "2026-11-16T06:38:56.179Z",
+      "run": "6383a92e-997e-41d1-a1c0-777f8592fd26",
+      "candidate": null
+    },
+    {
+      "stage": "review",
+      "at": "2026-11-16T06:38:56.180Z",
+      "run": null,
+      "candidate": null
+    },
+    {
+      "stage": "producer receipt created a real candidate and allocated its independent reviewer",
+      "at": "2026-11-16T06:38:56.181Z",
+      "run": null,
+      "candidate": "52d84733-8454-47e3-91c4-e76274c4d501"
+    },
+    {
+      "stage": "review",
+      "at": "2026-11-16T06:38:56.185Z",
+      "run": null,
+      "candidate": "52d84733-8454-47e3-91c4-e76274c4d501"
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:38:56.235Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 200
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:38:56.318Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 200
+    },
+    {
+      "stage": "review",
+      "at": "2026-11-16T06:38:56.318Z",
+      "run": "d4edeefe-3e43-41b6-928b-8ab99abf72bd",
+      "candidate": null
+    },
+    {
+      "stage": "device REST response",
+      "at": "2026-11-16T06:38:56.367Z",
+      "run": null,
+      "candidate": null,
+      "ownerStatus": 204
+    },
+    {
+      "stage": "case-specific populated lease quarantined and all its sessions revoked prior to owned DB teardown",
+      "at": "2026-11-16T06:39:01.478Z",
+      "run": null,
+      "candidate": null
+    }
+  ],
+  "native": [],
+  "generation": [
+    {
+      "tokens": 24,
+      "mode": "discovery",
+      "model": "SmolLM2-135M-Instruct-Q4_K_M",
+      "outputSha256": "9b65007ccfd6b9d31e118ed12ea8710f93698c000ae2652f8468bee395b42e54"
+    },
+    {
+      "tokens": 55,
+      "mode": "handoff",
+      "model": "SmolLM2-135M-Instruct-Q4_K_M",
+      "outputSha256": "fafdc717b64f8e210e0678b795f9b8f7c11e51077ec4caf0d79ce1014ee56c7e"
+    },
+    {
+      "tokens": 24,
+      "mode": "discovery",
+      "model": "SmolLM2-135M-Instruct-Q4_K_M",
+      "outputSha256": "9b65007ccfd6b9d31e118ed12ea8710f93698c000ae2652f8468bee395b42e54"
+    },
+    {
+      "tokens": 75,
+      "mode": "handoff",
+      "model": "SmolLM2-135M-Instruct-Q4_K_M",
+      "outputSha256": "875e785d4d731c21ac83343cbce9b26c800df0ffa401fd0d9c8c138d94ab36cc"
+    }
+  ],
+  "target": null,
+  "failure": {
+    "kind": "AssertionError",
+    "code": "ERR_ASSERTION"
+  }
+}
