@@ -306,3 +306,4 @@ export interface DriveSkillPage { skills: DriveSkillMetadata[]; nextCursor: Driv
 /** A signed-in link may narrow its underlying Drive audience, never expand it. */
 export type DriveFileLinkVisibility = 'private' | 'org'
 export type DriveFileLink = { id: string; path: string; visibility: DriveFileLinkVisibility }
+export type DriveFileLinkPage = { links: (DriveFileLink & { manageable: boolean })[]; nextCursor: string | null }

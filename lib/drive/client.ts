@@ -1,5 +1,5 @@
 import { withBasePath } from '../base-path'
-import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, type DriveFileLink, type DriveFileLinkVisibility, type DriveManifestEntry, type DriveSkillCursor, type DriveSkillPage } from './contract'
+import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, type DriveFileLink, type DriveFileLinkPage, type DriveFileLinkVisibility, type DriveManifestEntry, type DriveSkillCursor, type DriveSkillPage } from './contract'
 import type { DriveVolumeSummary } from './volumes'
 import type { DriveVersionSummary } from './store'
 
@@ -80,6 +80,10 @@ export function readPersonalDriveScopes(workspaceId: string, send?: typeof fetch
 
 export function driveFileLinkUrl(location: DriveLocation, volumeId: string, linkId: string) {
   return url(location, `/${encodeURIComponent(volumeId)}/shares/${encodeURIComponent(linkId)}`)
+}
+
+export function readDriveFileLinks(location: DriveLocation, volumeId: string, after?: string, send?: typeof fetch) {
+  return request<DriveFileLinkPage>(url(location, `/${encodeURIComponent(volumeId)}/shares`, { after }), {}, send)
 }
 
 export function readOwnDriveFileLink(location: DriveLocation, volumeId: string, path: string, send?: typeof fetch) {
