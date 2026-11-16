@@ -2873,5 +2873,33 @@
     "behavior": "Works out the setup checklist from the installation's own data.",
     "test": "lib/onboarding.db.test.ts",
     "suite": "test:onboarding-db"
+  },
+  "app/api/integrations/github/repositories/branches/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads a branch page through the installation's existing GitHub repository authorization. Without the configured GitHub App or an authorized repository, the read is refused.",
+    "test": "lib/github/user-access.test.ts",
+    "suite": "test:github"
+  },
+  "lib/github/user-access.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads a branch page through the installation's existing GitHub repository authorization. Without the configured GitHub App or an authorized repository, the read is refused.",
+    "test": "lib/github/user-access.test.ts",
+    "suite": "test:github"
+  },
+  "lib/github/repository-input.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validates the existing repository selector for signed GitHub repository reads and verification settings.",
+    "test": "lib/github/user-access.test.ts",
+    "suite": "test:github"
+  },
+  "app/api/integrations/github/repositories/verification/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validates the existing repository selector for signed GitHub repository reads and verification settings.",
+    "test": "lib/github/user-access.test.ts",
+    "suite": "test:github"
   }
 }

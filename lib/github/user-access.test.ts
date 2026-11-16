@@ -100,6 +100,28 @@ function deferred<T>() {
 }
 const nextTurn = () => new Promise<void>(resolve => setImmediate(resolve))
 
+test('branch pages use the admitted repository ID and return only names and commit SHAs', async () => {
+  connected = { token: expectedToken, githubAccountId: '42' }
+  const original = answer
+  const sha = 'a'.repeat(40)
+  answer = url => url.pathname === '/repositories/91/branches'
+    ? Response.json([{ name: 'team/feature', commit: { sha, url: 'unused' } }], {
+      headers: url.searchParams.get('page') === '1' ? { link: '<https://api.github.com/unused>; rel="next"' } : {},
+    }) : original(url)
+  const { GET } = await import('../../app/api/integrations/github/repositories/branches/route')
+  const call = (query: string) => GET({ url: 'https://mikka.test/api/integrations/github/repositories/branches?' + query, headers: requestHeaders, signal: new AbortController().signal } as Request)
+  const first = await call('repository=Owner/Project')
+  assert.equal(first.status, 200)
+  assert.deepEqual(await first.json(), { repository: 'Owner/Project', branches: [{ name: 'team/feature', sha }], nextPage: 2 })
+  assert.equal((await (await call('repository=Owner/Project&page=2')).json()).nextPage, null)
+  assert.equal((await call('repository=Other/Repo')).status, 403)
+  assert.equal((await call('repository=Owner/Project&page=-1')).status, 400)
+  assert.equal((await call('repository=../Project')).status, 400)
+  user = null
+  assert.equal((await call('repository=Owner/Project')).status, 401)
+  assert.equal(paths().filter(path => path.endsWith('/branches')).length, 2)
+})
+
 test('an exact repository read uses one viewer token for live user/App intersection and the final repository identity', async () => {
   connected = { token: 'private-test-token', githubAccountId: '42' }
   const budget = { deadline: Date.now() + 25_000, signal: new AbortController().signal }
