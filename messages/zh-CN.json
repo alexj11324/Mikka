@@ -8198,6 +8198,7 @@
         "event": "事件",
         "channel": "频道",
         "remove": "移除",
+        "emojisError": "无法加载 Slack 自定义表情。",
         "reactions": "表情（可选，逗号分隔，例如 eyes, white_check_mark）",
         "runWhen": "条件",
         "runWhenPlaceholder": "条件（可选）：例如「消息里在问部署」",
