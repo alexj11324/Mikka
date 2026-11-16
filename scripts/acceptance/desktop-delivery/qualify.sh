@@ -52,5 +52,17 @@ sudo env -i PATH="$PATH" HOME="$HOME" USER="$(id -un)" LANG=C.UTF-8 \
   unshare --net bash -euc '
     ip link set lo up
     test -z "$(ip route show default)" && test -z "$(ip -6 route show default)"
+    # The installed window and OS browser expose ephemeral debugging sockets to
+    # Playwright. Workers can only answer existing requests or contact the API.
+    for worker in mikka-e-model mikka-e-device; do
+      uid=$(id -u "$worker")
+      for filter in iptables ip6tables; do
+        "$filter" -A OUTPUT -m owner --uid-owner "$uid" -m conntrack --ctstate ESTABLISHED -j ACCEPT
+        if [[ "$filter" == iptables && "$worker" == mikka-e-device ]]; then
+          "$filter" -A OUTPUT -m owner --uid-owner "$uid" -p tcp -d 127.0.0.1 --dport 3859 -j ACCEPT
+        fi
+        "$filter" -A OUTPUT -m owner --uid-owner "$uid" -j REJECT
+      done
+    done
     exec setpriv --reuid="$1" --regid="$2" --init-groups bash "$3/scripts/acceptance/desktop-delivery/session.sh" "$4"
   ' isolate "$(id -u)" "$(id -g)" "$GITHUB_WORKSPACE" "$base"
