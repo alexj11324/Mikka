@@ -870,7 +870,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "31df0d2e9016a30360983bfcd494dae02259f48da432da6080faf58d4b6cc1fd"
+      "sourceHash": "7aabc8355a4c6c7b13e2bd3f11c1a8a28ebfe9481ce445f496597b56bc9a28be"
     },
     {
       "path": "/mikka/api/devices/[deviceId]/commands",
