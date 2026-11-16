@@ -183,7 +183,7 @@ export const desktopActionSchemas = {
   'bots.listBots': none,
   'bots.pollBots': none,
   'bots.createBot': tuple(object({ name: text(200).trim().min(1), color: text(50).min(1), shape: text(50).min(1), model: text(1000).nullish(), repository: text(2048).nullish() })),
-  'bots.updateBot': tuple(object({ botId: uuid, name: text(200).trim().min(1).optional(), color: text(50).min(1).optional(), shape: text(50).min(1).optional(), publicRole: text(2000).optional() })),
+  'bots.updateBot': tuple(object({ botId: uuid, name: text(200).trim().min(1).optional(), color: text(50).min(1).optional(), shape: text(50).min(1).optional(), publicRole: text(2000).optional() }), workspace),
   'bots.listWorkspaceBots': inWorkspace,
   'bots.getWorkspaceBotDefaults': inWorkspace,
   'automations.listAutomations': tuple(object({ cursor: text(100).optional(), deleted: z.boolean().optional() }), workspace),
