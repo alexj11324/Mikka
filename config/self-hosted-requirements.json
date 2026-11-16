@@ -324,6 +324,13 @@
     "test": "lib/coding-workspace/terminal/http.test.ts",
     "suite": "test:coding-workspace-review-runtime"
   },
+  "app/api/workspaces/[workspaceId]/project-visibility-default/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the selected workspace's project creation default and let the authenticated active organization member update only their own default. Existing project and thread permissions remain separate.",
+    "test": "tests/resource-access.db.test.ts",
+    "suite": "test:visibility-db"
+  },
   "app/api/workspaces/[workspaceId]/service-identities/[identityId]/credential/route.ts": {
     "mode": "built-in",
     "environment": [],
@@ -712,6 +719,13 @@
     "test": "tests/project-dependency-repositories.db.test.ts",
     "suite": "test:project-resources-db"
   },
+  "drizzle/20261116111059_personal_organization_project_visibility.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Store the personal Project default in the Workspace database under the existing composite Organization membership foreign key.",
+    "test": "tests/resource-access.db.test.ts",
+    "suite": "test:visibility-db"
+  },
   "lib/abuse/workers-ai.ts": {
     "mode": "optional-cloud",
     "environment": [
@@ -1070,6 +1084,13 @@
     "test": "lib/issue-activity.test.ts",
     "suite": "test:issues"
   },
+  "lib/project-input.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validate the existing Project input and its optional expected organization and visibility during new Project creation.",
+    "test": "tests/resource-access.db.test.ts",
+    "suite": "test:visibility-db"
+  },
   "lib/project-resources/contracts.ts": {
     "mode": "built-in",
     "environment": [],
@@ -1090,6 +1111,13 @@
     "behavior": "Project resource transactions use the installation PostgreSQL database and workspace locks. The installation PostgreSQL database stores versioned recipes. A restore checks the shared binding snapshot, clears approval and preserves current settings.",
     "test": "tests/project-dependency-repositories.db.test.ts",
     "suite": "test:project-resources-db"
+  },
+  "lib/resource-access/project-creation-default.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the current member preference from the selected organization under existing Workspace admission and membership locks before creating a Project ACL.",
+    "test": "tests/resource-access.db.test.ts",
+    "suite": "test:visibility-db"
   },
   "lib/thread-artifacts.ts": {
     "mode": "built-in",

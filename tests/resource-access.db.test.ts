@@ -94,6 +94,30 @@ test('resource ACL: real split PostgreSQL migrations, fresh grants and concurren
       (await app.query('select mikka_resource_acl_allowed($1,$2,$3,$4,$5,$6) as allowed', [subjectKind, subject, tenant, kind, id, action])).rows[0].allowed
     const policy = async (kind: string, id: string) => (await app.query('select * from resource_access_policies where kind=$1 and id=$2', [kind, id])).rows[0]
 
+    await t.test('personal organization visibility governs only new Projects and rejects a stale creation scope across split stores', async () => {
+      const { registerProjectAccess } = await import('../lib/resource-access/projects')
+      const { organizationId } = (await ws.query('select "organizationId" from mikka_organization_workspaces where "workspaceId"=$1', [alpha])).rows[0]
+      const fresh = async (actor: string, tenant: string, expected?: Parameters<typeof registerProjectAccess>[3]) => {
+        const id = randomUUID()
+        await registerProjectAccess(actor, id, tenant, expected)
+        const { rows } = await app.query("select visibility from resource_access_policies where kind='project' and id=$1", [id])
+        return rows[0].visibility
+      }
+      assert.equal(await fresh(owner, alpha), 'shared')
+      await ws.query('insert into mikka_organization_member_project_defaults("organizationId","userId",visibility) values($1,$2,$3)', [organizationId, owner, 'private'])
+      try {
+        assert.equal(await fresh(owner, alpha, { organizationId, visibility: 'private' }), 'private')
+        await assert.rejects(fresh(owner, alpha, { organizationId, visibility: 'shared' }), /projectVisibilityChanged/)
+        assert.equal(await fresh(member, alpha), 'shared')
+        assert.equal(await fresh(owner, beta), 'shared')
+        assert.equal(await fresh(owner, personal), 'private')
+        assert.equal((await ws.query("select to_regclass('resource_access_policies') as relation")).rows[0].relation, null)
+        assert.equal((await app.query("select to_regclass('mikka_organization_member_project_defaults') as relation")).rows[0].relation, null)
+      } finally {
+        await ws.query('delete from mikka_organization_member_project_defaults where "organizationId"=$1 and "userId"=$2', [organizationId, owner])
+      }
+    })
+
     await t.test('legacy shared Tasks stay shared; old run/chat/bot/artifact stay private; unknown remains quarantined', async () => {
       assert.equal((await issueForUser(member, task))?.id, task)
       assert.equal(await issueForUser(stranger, task), null)

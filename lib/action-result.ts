@@ -170,6 +170,7 @@ export const ACTION_ERROR_CODES = [
   'teamLifecycleConflict',
   'projectStale',
   'projectSaveConflict',
+  'projectVisibilityChanged',
   'projectDependencyNotFound',
   'projectDependencyCycle',
   'projectSaveFailed',
