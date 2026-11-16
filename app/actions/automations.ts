@@ -15,12 +15,13 @@ import type { AutomationHistory, AutomationList, AutomationUsage, AutomationView
  * signed-in person in the workspace they have open, with that workspace's Coordinator as the chat that gets the run
  * reports. Who may list, pause, cancel, update, resume and run is the store's rule, unchanged.
  */
-async function command<T>(input: Command, finish?: (workspaceId: string, result: T) => Promise<T>): Promise<ActionResult<T>> {
+async function command<T>(input: Command, workspaceId?: string, finish?: (workspaceId: string, result: T) => Promise<T>): Promise<ActionResult<T>> {
   return runAction(async () => {
     // A Bot acting for the person names their message instead (schedule tools); only a person uses this page.
     if (actingContext.getStore()) throw new ActionFailureError('authRequired')
+    if (workspaceId !== undefined && !z.uuid().safeParse(workspaceId).success) throw new ActionFailureError('validationGeneric')
     let actor
-    try { actor = await currentWorkspaceActor() } catch (error) {
+    try { actor = await currentWorkspaceActor(workspaceId) } catch (error) {
       if (error instanceof WorkspaceError) throw new ActionFailureError(isActionErrorCode(error.code) ? error.code : 'generic', undefined, undefined, { cause: error })
       throw error
     }
@@ -50,16 +51,16 @@ async function withCreators(workspaceId: string, list: AutomationList): Promise<
 const versioned = z.object({ scheduleId: z.uuid(), version: z.number().int().positive() }).strict()
 
 /** The workspace's automations, newest first; `cursor` continues a page. */
-export async function listAutomations(input: { cursor?: string; deleted?: boolean } = {}): Promise<ActionResult<AutomationList>> {
+export async function listAutomations(input: { cursor?: string; deleted?: boolean } = {}, workspaceId?: string): Promise<ActionResult<AutomationList>> {
   const parsed = scheduleListInput.safeParse({ cursor: input.cursor, deleted: input.deleted })
   if (!parsed.success) return { error: 'validationGeneric' }
-  return command<AutomationList>({ action: 'list', ...parsed.data }, withCreators)
+  return command<AutomationList>({ action: 'list', ...parsed.data }, workspaceId, withCreators)
 }
 
 /** One automation, or `automation: null` when it is not visible here. */
-export async function getAutomation(scheduleId: string): Promise<ActionResult<{ automation: AutomationView | null }>> {
+export async function getAutomation(scheduleId: string, workspaceId?: string): Promise<ActionResult<{ automation: AutomationView | null }>> {
   if (!id.safeParse(scheduleId).success) return { error: 'validationGeneric' }
-  const result = await command<AutomationList>({ action: 'list', scheduleId }, withCreators)
+  const result = await command<AutomationList>({ action: 'list', scheduleId }, workspaceId, withCreators)
   return 'error' in result && result.error ? result : { automation: (result as AutomationList).schedules[0] ?? null }
 }
 
@@ -94,10 +95,10 @@ export async function automationUsage(input: { scheduleId: string; days?: number
   return command({ action: 'usage', ...parsed.data })
 }
 
-export async function createAutomation(input: { requestId: string; definition: Definition }): Promise<ActionResult<{ schedule: AutomationView; replayed: boolean }>> {
+export async function createAutomation(input: { requestId: string; definition: Definition }, workspaceId?: string): Promise<ActionResult<{ schedule: AutomationView; replayed: boolean }>> {
   const parsed = z.object({ requestId: z.uuid(), definition: definitionSchema }).strict().safeParse(input)
   if (!parsed.success) return { error: 'validationGeneric' }
-  return command({ action: 'create', ...parsed.data })
+  return command({ action: 'create', ...parsed.data }, workspaceId)
 }
 
 export async function updateAutomation(input: { scheduleId: string; version: number; definition: Definition }): Promise<ActionResult<{ schedule: AutomationView }>> {
