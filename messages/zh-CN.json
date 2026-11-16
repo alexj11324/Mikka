@@ -7734,6 +7734,8 @@
     "notifications": {
       "on": "开",
       "off": "关",
+      "registeredDevices": "已注册的推送设备",
+      "noRegisteredDevices": "暂无已注册的设备",
       "pushTypes": "推送这些事",
       "unavailable": "推送无法送达",
       "openSettings": "打开设置",

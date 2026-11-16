@@ -122,7 +122,7 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
     await admin.query('INSERT INTO mobile_push_tokens(id,"userId","sessionId",token,platform) VALUES($1,$2,$3,$4,\'ios\')', [randomUUID(), user, sessionId, value])
   }
   const { pushReply } = await import('../lib/mobile-push')
-  const { POST, DELETE } = await import('../app/api/mobile/push-tokens/route')
+  const { GET, POST, DELETE } = await import('../app/api/mobile/push-tokens/route')
   const request = (method: 'POST' | 'DELETE', bearer: string, body: unknown, cookie?: string) => new Request(origin + '/api/mobile/push-tokens', {
     method, headers: { authorization: 'Bearer ' + bearer, 'content-type': 'application/json', ...(cookie ? { cookie } : {}) },
     body: JSON.stringify(body),
@@ -136,6 +136,45 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
     assert.equal((await POST(request('POST', ownerSession.token, { token, platform: 'ios' }))).status, 200)
     assert.equal((await admin.query('SELECT "sessionId" FROM mobile_push_tokens WHERE token=$1', [token])).rows[0].sessionId, ownerSession.id)
   }
+
+  await t.test('the installation directory returns only the viewer’s active session bindings and safe display fields', async () => {
+    const list = async (bearer: string) => {
+      const response = await GET(new Request(origin + '/api/mobile/push-tokens', { headers: { authorization: 'Bearer ' + bearer } }))
+      assert.equal(response.status, 200)
+      assert.match(response.headers.get('cache-control') ?? '', /private, no-store/)
+      const { installations } = await response.json() as {
+        installations: { id: string; deviceName: string | null; platform: string; updatedAt: string; currentSession: boolean }[]
+      }
+      for (const item of installations) {
+        assert.deepEqual(Object.keys(item).sort(), ['currentSession', 'deviceName', 'id', 'platform', 'updatedAt'])
+        assert.ok(Number.isFinite(Date.parse(item.updatedAt)))
+      }
+      return installations
+    }
+    const otherSession = await nativeSession(owner)
+    const otherToken = 'ExpoPushToken[' + randomUUID() + ']'
+    try {
+      const unauthenticated = await GET(new Request(origin + '/api/mobile/push-tokens'))
+      assert.equal(unauthenticated.status, 401)
+      assert.equal((await POST(request('POST', otherSession.token, { token: otherToken, platform: 'android', deviceName: 'Tablet' }))).status, 200)
+      const owned = await list(ownerSession.token)
+      assert.equal(owned.length, 2)
+      assert.deepEqual(owned.map(item => [item.platform, item.deviceName, item.currentSession]), [
+        ['android', 'Tablet', false], ['ios', null, true],
+      ])
+      const peerOnly = await list(peerSession.token)
+      assert.equal(peerOnly.length, 1)
+      assert.ok(!owned.some(item => item.id === peerOnly[0].id))
+      assert.deepEqual((await list(otherSession.token)).map(item => item.currentSession), [true, false])
+      assert.equal((await DELETE(request('DELETE', ownerSession.token, { token: otherToken }))).status, 204)
+      assert.equal((await list(ownerSession.token)).length, 2)
+      await admin.query('UPDATE "session" SET "expiresAt"=now() WHERE id=$1', [otherSession.id])
+      assert.deepEqual(await list(ownerSession.token), owned.filter(item => item.currentSession))
+    } finally {
+      await admin.query('DELETE FROM mobile_push_tokens WHERE token=$1', [otherToken])
+      await admin.query('DELETE FROM "session" WHERE id=$1', [otherSession.id])
+    }
+  })
 
   await t.test('personal and both shared origins reach only the current owner tokens', async t => {
     const raw = await workspace.connect()

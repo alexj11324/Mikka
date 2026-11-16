@@ -21,7 +21,7 @@ async function pushSession(request: Request): Promise<PushSession | null> {
 
 /** Authentication and mutation share a fresh session row lock. A logout or
  * reassignment cannot commit between the check and the token write. */
-async function withPushSession(session: PushSession, write: () => Promise<Response>): Promise<Response> {
+async function withPushSession(session: PushSession, action: () => Promise<Response>): Promise<Response> {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
@@ -30,7 +30,7 @@ async function withPushSession(session: PushSession, write: () => Promise<Respon
         const active = await client.query(
           'SELECT id FROM "session" WHERE id=$1 AND "userId"=$2 AND "expiresAt">clock_timestamp() FOR SHARE',
           [session.sessionId, session.userId])
-        return active.rowCount ? write() : unauthorized()
+        return active.rowCount ? action() : unauthorized()
       })
       await client.query('COMMIT')
       return response
@@ -39,6 +39,24 @@ async function withPushSession(session: PushSession, write: () => Promise<Respon
       throw error
     }
   } finally { client.release() }
+}
+
+/** List only this person's bindings that are still eligible for native delivery. */
+async function handleGET(request: Request) {
+  const session = await pushSession(request)
+  noteLogUser(session?.userId)
+  if (!session) return unauthorized()
+  return withPushSession(session, async () => {
+    const { rows } = await pool.query(
+      `SELECT binding.id, binding.platform, binding."deviceName", binding."updatedAt",
+              binding."sessionId" = $2 AS "currentSession"
+         FROM mobile_push_tokens AS binding
+         JOIN "session" AS active ON active.id = binding."sessionId" AND active."userId" = binding."userId"
+        WHERE binding."userId" = $1 AND active."expiresAt" > clock_timestamp()
+        ORDER BY binding."updatedAt" DESC, binding.id`,
+      [session.userId, session.sessionId])
+    return json({ installations: rows })
+  })
 }
 
 /**
@@ -77,5 +95,6 @@ async function handleDELETE(request: Request) {
   })
 }
 
+export const GET = withRequestLog('/api/mobile/push-tokens', handleGET)
 export const POST = withRequestLog('/api/mobile/push-tokens', handlePOST)
 export const DELETE = withRequestLog('/api/mobile/push-tokens', handleDELETE)
