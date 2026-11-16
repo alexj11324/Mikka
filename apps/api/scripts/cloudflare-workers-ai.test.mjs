@@ -126,3 +126,34 @@ test('oversize ordinary data passes through and downstream cancellation releases
   await reader.cancel('fixture stop')
   assert.equal(await cancelled, 'fixture stop')
 })
+
+test('provider failure status is available while its discarded body is still cancelling', async () => {
+  for (const [status, expected] of [[429, 429], [503, 502], [200, 502]]) {
+    const started = Promise.withResolvers()
+    const release = Promise.withResolvers()
+    const work = []
+    const body = new ReadableStream({ cancel() { started.resolve(); return release.promise } })
+    const ai = { run: () => new Response(body, { status, headers: { 'content-type': 'text/html' } }) }
+    const pending = workersAiRequest(request(), ai, capability, { waitUntil(task) { work.push(task) } })
+    try {
+      await started.promise
+      const response = await Promise.race([pending, new Promise(resolve => setImmediate(resolve))])
+      assert.equal(response?.status, expected)
+      assert.equal(await response.text(), '')
+      assert.equal(work.length, 1)
+    } finally {
+      release.resolve()
+      await pending
+      await Promise.all(work)
+    }
+  }
+})
+
+test('a failed response-body cancellation preserves native rate limiting', async () => {
+  const body = new ReadableStream({ cancel() { throw new Error('upstream reset') } })
+  const work = []
+  const response = await workersAiRequest(request(), { run: () => new Response(body, { status: 429 }) },
+    capability, { waitUntil(task) { work.push(task) } })
+  assert.equal(response.status, 429)
+  await Promise.all(work)
+})
