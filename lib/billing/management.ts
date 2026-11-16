@@ -110,7 +110,8 @@ export async function billingManagementView(actorId: string, target: BillingScop
         count(*) filter(where state='unknown' or (state='settled' and "costMicroUsd" is null))::int unknown
         from hosted_usage where "createdAt">=$1 and "createdAt"<$2 and state<>'failed'
         and ($3::boolean and "workspaceId"=$4::uuid or not $3::boolean and coalesce("usageWorkspaceId","workspaceId")=any($5::uuid[]))
-        group by ${usageGrouping}`,
+        group by ${usageGrouping}
+        order by cost desc, id asc nulls last`,
         [start, end, target.kind === 'organization', accountId, usageIds]),
       pool.query<{ count: number }>(`select count(*)::int count from agent_runs where "workspaceId"=any($1::uuid[]) and "createdAt">=$2 and "createdAt"<$3
         and "agentDefinition"->'executionIdentity'->>'version' in ('1','2') and (
