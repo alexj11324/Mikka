@@ -2,6 +2,8 @@
 
 The integration maps one Linear team to one Mikka workspace. The team sync (`linear_team_syncs.workspaceId`) belongs to the workspace; a member's personal Linear connection is only the credential that establishes it and never authorizes another workspace's sync. Every sync, dispatch and issue write is scoped to that team's workspace, and the same team cannot be enabled in another workspace. New issues and changes to already linked issues sync in both directions. The Neon inbox records signed webhook deliveries before responding; an outbox trigger captures app edits in the same transaction as the issue or collaboration write. The Mikka app and OAuth callback remain on Vercel; a Cloudflare Worker receives Linear webhooks and drains the durable inbox and outbox through Hyperdrive.
 
+The settings page reads, enables and pauses team sync in the workspace displayed in that window, including when another tab changes the account’s selected workspace.
+
 ## Thread origin and write-back
 
 Target contract: a Linear issue that starts work creates one thread in the team's Mikka workspace and records the Linear team, issue id and triggering event as its origin. The thread's final reply, PR link and status are written back to the same Linear issue. Issue-field and comment sync below do not start another thread.
