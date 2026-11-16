@@ -53,10 +53,10 @@ export function useBotLibrary(botId: string | null, enabled = true) {
 }
 
 /** An ordinary bot's authorized name and appearance commands. */
-function useBotEdits(botId: string, color?: string, shape?: string): NonNullable<BotOverviewProps['edit']> {
+function useBotEdits(botId: string, workspaceId?: string, color?: string, shape?: string): NonNullable<BotOverviewProps['edit']> {
   const t = useTranslations('Shell.panel')
   const actionError = useActionError()
-  const saveBot = useSaveBot()
+  const saveBot = useSaveBot(workspaceId)
   const failed = (failure: unknown) => actionError(failure instanceof Error ? failure.message : null)
   const tone = known(color, BOT_COLORS, DEFAULT_BOT_COLOR)
   const form = known(shape, BOT_SHAPES, DEFAULT_BOT_SHAPE)
@@ -103,8 +103,8 @@ function RoleOf({ botId, workspaceId, visible, children }: { botId: string; work
   return children(useBotPublicRole(botId, workspaceId, visible))
 }
 
-function EditsOf({ botId, color, shape, children }: { botId: string; color?: string; shape?: string; children: (edit: BotOverviewProps['edit']) => ReactNode }) {
-  return children(useBotEdits(botId, color, shape))
+function EditsOf({ botId, workspaceId, color, shape, children }: { botId: string; workspaceId?: string; color?: string; shape?: string; children: (edit: BotOverviewProps['edit']) => ReactNode }) {
+  return children(useBotEdits(botId, workspaceId, color, shape))
 }
 
 /**
@@ -152,5 +152,5 @@ export function BotOverviewBody({ conversation, tabs, tab, onTab, query, onQuery
     edit={edit} details={{ role, routines: [], library }} glance={glance} tasks={tasks} pullRequests={pullRequests} computer={computer} dialogs={dialogs} />
   if (!botId) return draw(null, null)
   return <RoleOf key={botId} botId={botId} workspaceId={workspaceId} visible={tab === 'details'}>{role =>
-    <EditsOf botId={botId} color={conversation.color} shape={conversation.shape}>{edit => draw(role, edit)}</EditsOf>}</RoleOf>
+    <EditsOf botId={botId} workspaceId={workspaceId} color={conversation.color} shape={conversation.shape}>{edit => draw(role, edit)}</EditsOf>}</RoleOf>
 }

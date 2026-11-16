@@ -53,16 +53,16 @@ export async function pollBots() {
  * 新建 Bot: a name, a colour and a shape. Bots run on Mikka's own harness, so there is no machine to pick.
  * `model` and `repository` default to the workspace's 新 Bot 默认值 when omitted.
  */
-export async function createBot(input: { name: string; color: string; shape: string; model?: string | null; repository?: string | null }): Promise<BotView> {
-  return createOwnedBot(await getOwner(), input)
+export async function createBot(input: { name: string; color: string; shape: string; model?: string | null; repository?: string | null }, workspaceId?: string): Promise<BotView> {
+  return createOwnedBot(await getOwner(workspaceId), input)
 }
 
 /**
  * Rename a bot or change its shape and colour, from the right panel. Same rules
  * as createBot. The Coordinator keeps its name and look (the left column draws it).
  */
-export async function updateBot(input: { botId: string; name?: string; color?: string; shape?: string; publicRole?: string }): Promise<ActionResult<BotView>> {
-  return workspaceAction(async () => updateOwnedBot(await getOwner(), input))
+export async function updateBot(input: { botId: string; name?: string; color?: string; shape?: string; publicRole?: string }, workspaceId?: string): Promise<ActionResult<BotView>> {
+  return workspaceAction(async () => updateOwnedBot(await getOwner(workspaceId), input))
 }
 
 /** 设置 › 工作区 › Bot: the defaults a new bot starts with, and the choices. Any member may read. */

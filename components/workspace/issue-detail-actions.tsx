@@ -165,7 +165,7 @@ export function useIssueDetailMenu(props: ActionsProps): { items: TaskMenuItem[]
   const { task, userId, documentTools, onStatus, onPriority, onProperty, onHistory, onMembers, onDocumentTools } = props
   const { tMenu, tWorkspaceDetail, relationTitle, statusOptions, priorityOptions, copyItems, setRelation, setError, openDialog, createChild, run, copy, favorite, toggleFavorite, subscribed, unavailable, setDeleteOpen, dialogs } = useIssueDetailActions(props)
   const relation = (kind: RelationKind) => () => { setError(''); setRelation(kind) }
-  const subscribe = () => { void run(() => toggleIssuePreference({ id: task.id, kind: 'subscribe' })) }
+  const subscribe = () => { void run(() => toggleIssuePreference({ id: task.id, kind: 'subscribe', enabled: !subscribed })) }
   const items: TaskMenuItem[] = [
     { id: 'status', label: tMenu('setStatus'), mark: { kind: 'icon', icon: 'status' }, submenu: statusOptions.map(status => ({ id: status.value, label: status.label, mark: { kind: 'status', value: status.value }, checked: task.status === status.value, onSelect: () => onStatus(status.value) })) },
     { id: 'priority', label: tMenu('setPriority'), mark: { kind: 'icon', icon: 'priority' }, submenu: priorityOptions.map(priority => ({ id: priority.value, label: priority.label, mark: { kind: 'priority', value: priority.value }, checked: task.priority === priority.value, onSelect: () => onPriority(priority.value) })) },

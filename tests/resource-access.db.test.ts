@@ -118,6 +118,23 @@ test('resource ACL: real split PostgreSQL migrations, fresh grants and concurren
       }
     })
 
+    await t.test('repeated Task follow and unfollow commands each write one revision and old toggle callers remain supported', async () => {
+      const { actAs } = await import('../lib/acting-user')
+      const { toggleIssuePreference } = await import('../app/actions/issue-operations')
+      const setFollow = (enabled?: boolean) => actAs({ id: owner, [tokenWorkspace]: alpha },
+        () => toggleIssuePreference({ id: task, kind: 'subscribe', enabled }))
+      const initialRevision = (await app.query('select revision from issues where id=$1', [task])).rows[0].revision
+      for (const [enabled, expected, delta] of [
+        [true, true, 1], [true, true, 1], [false, false, 2], [false, false, 2],
+        [undefined, true, 3], [undefined, false, 4],
+      ] as const) {
+        const result = await setFollow(enabled)
+        assert.ok('issue' in result && result.issue)
+        assert.equal(result.issue.metadata.subscriberUserIds.includes(owner), expected)
+        assert.equal(result.issue.revision, initialRevision + delta)
+      }
+    })
+
     await t.test('legacy shared Tasks stay shared; old run/chat/bot/artifact stay private; unknown remains quarantined', async () => {
       assert.equal((await issueForUser(member, task))?.id, task)
       assert.equal(await issueForUser(stranger, task), null)
