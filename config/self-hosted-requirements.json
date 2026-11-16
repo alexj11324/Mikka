@@ -55,6 +55,13 @@
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
+  "app/api/drive/shares/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The signed-in person lists current file links in one team Workspace, filtered by original volume access, Project access, link visibility and creator.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "app/api/drive/volumes/[volumeId]/archive/route.ts": {
     "mode": "built-in",
     "environment": [],

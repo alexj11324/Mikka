@@ -48,16 +48,20 @@ export async function accessibleProjectReferences(reader: ProjectReader, workspa
 
 /** Only the names needed by a selected-workspace picker. Load from the
  * canonical Project table after the current content ACL has selected the IDs. */
-export async function accessibleProjectNames(reader: ProjectReader, workspaceId: string, tx: ProjectTransaction) {
+export async function accessibleProjectNames(reader: ProjectReader, workspaceId: string, tx: ProjectTransaction, fileLinkProjectIds?: ReadonlySet<string>) {
   const references = await accessibleProjectReferences(reader, workspaceId)
-  if (!references.length) return []
-  return tx.select({ id: projects.id, name: projects.name }).from(projects)
+  const ids = references.map(reference => reference.id).filter(id => !fileLinkProjectIds || fileLinkProjectIds.has(id))
+  if (!ids.length) return []
+  const query = tx.select({ id: projects.id, name: projects.name }).from(projects)
     .where(and(
       eq(projects.workspaceId, workspaceId),
       isNull(projects.archivedAt),
-      sql`${projects.id} = any(${sql.param(references.map(item => item.id))}::uuid[])`,
+      sql`${projects.id} = any(${sql.param(ids)}::uuid[])`,
     ))
     .orderBy(projects.name, projects.id)
+  // File metadata resides in the installation database. Keep these canonical
+  // rows active until the subsequent content query finishes.
+  return fileLinkProjectIds ? query.for('share', { of: projects }) : query
 }
 
 /** Workspace membership is already held. Readers then pin just this Project

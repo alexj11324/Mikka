@@ -2,7 +2,7 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import { DriveError } from './store'
-import type { DriveFileLink, DriveFileLinkPage, DriveFileLinkVisibility } from './contract'
+import type { DriveFileLink, DriveFileLinkPage, DriveFileLinkVisibility, DriveWorkspaceFileLinkPage } from './contract'
 
 type Database = Pick<PoolClient, 'query'>
 
@@ -32,6 +32,39 @@ export async function listDriveFileLinks(database: Database, volumeId: string, r
     WHERE l."volumeId"=$1 AND v."archivedAt" IS NULL AND ($3::uuid IS NULL OR l.id>$3)
       AND (l."createdBy"=$2 OR l.visibility='org' AND v."driveScope" IN ('project','team-workspace'))
     ORDER BY l.id LIMIT $4`, [volumeId, reader, page.after, page.limit + 1])
+  const links = rows.slice(0, page.limit)
+  return { links, nextCursor: rows.length > page.limit ? links.at(-1)!.id : null }
+}
+
+/** Only Projects containing a potentially visible link need a canonical row
+ * lock. This intermediate set is never exposed to the client. */
+export async function fileLinkProjectIds(database: Database, workspaceId: string, reader: string) {
+  const { rows } = await database.query<{ id: string }>(`SELECT DISTINCT v."scopeId" AS id
+    FROM drive_volumes v JOIN drive_file_links l ON l."volumeId"=v.id
+    WHERE v."workspaceId"=$1 AND v."archivedAt" IS NULL AND v."driveScope" IN ('project','project-user')
+      AND (l."createdBy"=$2 OR l.visibility='org' AND v."driveScope"='project')`, [workspaceId, reader])
+  return new Set(rows.map(row => row.id))
+}
+
+/** The tenant membership and selected canonical Project rows are held by the caller.
+ * Recheck each Project's current ACL in the same APP statement as its link metadata. */
+export async function listWorkspaceDriveFileLinks(database: Database, workspaceId: string, reader: string, projects: string[],
+  page: { after: string | null; limit: number }): Promise<DriveWorkspaceFileLinkPage> {
+  const { rows } = await database.query<DriveWorkspaceFileLinkPage['links'][number]>(`SELECT l.id,l.path,l.visibility,
+      v.id AS "volumeId",v.name AS "volumeName",v."driveScope",p.id::text AS "projectId",l."createdBy"=$2 AS manageable
+    FROM drive_file_links l JOIN drive_volumes v ON v.id=l."volumeId"
+    LEFT JOIN unnest($3::uuid[]) AS p(id) ON v."driveScope" IN ('project','project-user') AND p.id::text=v."scopeId"
+    WHERE v."workspaceId"=$1::uuid AND v."archivedAt" IS NULL AND ($4::uuid IS NULL OR l.id>$4)
+      AND (l."createdBy"=$2 OR l.visibility='org' AND v."driveScope" IN ('project','team-workspace'))
+      AND (
+        (v."driveScope"='user' AND v."ownerId"=$2 AND v."scopeId"=$2 AND v."scopeUserId" IS NULL)
+        OR (v."driveScope"='team-workspace' AND v."scopeId"=v."workspaceId"::text
+          AND v."ownerId"='drive-team:'||v."workspaceId"::text AND v."scopeUserId" IS NULL)
+        OR (p.id IS NOT NULL AND mikka_resource_acl_allowed('account',$2,v."workspaceId",'project',p.id,'canReadContent')
+          AND ((v."driveScope"='project-user' AND v."scopeUserId"=$2 AND v."ownerId"=$2)
+            OR (v."driveScope"='project' AND v."scopeUserId" IS NULL AND v."ownerId"='drive-project:'||v."workspaceId"::text||':'||p.id::text)))
+      )
+    ORDER BY l.id LIMIT $5`, [workspaceId, reader, projects, page.after, page.limit + 1])
   const links = rows.slice(0, page.limit)
   return { links, nextCursor: rows.length > page.limit ? links.at(-1)!.id : null }
 }
