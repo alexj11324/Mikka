@@ -1,14 +1,16 @@
 import { readTaskEvidenceTarget, taskEvidenceHref } from './task-factory-events'
+import { workspaceSectionLink } from '../components/workspace/workspace-navigation'
 import { desktopWebTarget } from './desktop-web-target'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+export const mobileFilesPath = (workspaceId: string) => workspaceSectionLink('artifacts', workspaceId.toLowerCase())
 export const mobileMembersPage = '/settings/members'
 /** A plugin's id, as the web's ?app= takes it (TOOLKIT_SLUG in lib/composio-accounts.ts). */
 const APP = /^[a-z][a-z0-9_]{0,63}$/
 
 /**
  * The web pages the iOS app may open signed in (app/api/mobile/open): the
- * Coordinator chat, a bot's chat, a task, Settings, 插件 and one plugin's
+ * Coordinator chat, a bot's chat, a task, workspace Files, Settings, 插件 and one plugin's
  * page (where an app connects), or an HTML artifact's frame. Anything else becomes the home
  * page, so the handoff cannot be pointed at another site or an auth endpoint.
  * Paths are without the base path.
@@ -39,6 +41,7 @@ export function mobileWebTarget(value: string | null): string {
   const bot = url.searchParams.get('bot')
   const workspace = url.searchParams.get('workspace')
   const issue = url.searchParams.get('issue')
+  if (section === 'artifacts' && workspace && UUID.test(workspace) && keys.length === 2) return mobileFilesPath(workspace)
   if (section === 'coordinator' && keys.every(key => key === 'section' || key === 'bot' || key === 'workspace') && keys.length === 1 + (bot ? 1 : 0) + (workspace ? 1 : 0) && (!bot || UUID.test(bot)) && (!workspace || UUID.test(workspace))) return `/?section=coordinator${bot ? `&bot=${bot.toLowerCase()}` : ''}${workspace ? `&workspace=${workspace.toLowerCase()}` : ''}`
   if (issue && UUID.test(issue) && keys.length === 1) return `/?issue=${issue.toLowerCase()}`
   const app = url.searchParams.get('app')
