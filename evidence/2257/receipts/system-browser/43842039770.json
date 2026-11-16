@@ -1,0 +1,67 @@
+{
+  "source": "e34ac0ebdfb19f096b887c99286a81065a4dda20",
+  "interface": "community-system-browser-only",
+  "actualChecks": [
+    {
+      "phase": "isolated_target_and_two_active_accounts",
+      "at": "2026-11-16T09:48:07.122Z"
+    },
+    {
+      "phase": "browser_nss_setup_pending_sandbox",
+      "at": "2026-11-16T09:48:07.586Z"
+    },
+    {
+      "phase": "real_system_chrome_with_sandbox",
+      "at": "2026-11-16T09:48:21.316Z",
+      "version": "157.0.8103.50"
+    },
+    {
+      "phase": "browser_trusts_target_revision",
+      "at": "2026-11-16T09:48:23.375Z"
+    },
+    {
+      "phase": "normal_begin_precedes_real_continue",
+      "at": "2026-11-16T09:48:23.430Z"
+    },
+    {
+      "phase": "actual_browser_continue_and_loopback_return",
+      "at": "2026-11-16T09:48:24.031Z"
+    },
+    {
+      "phase": "community_pkce_exchange_owner_identity",
+      "at": "2026-11-16T09:48:24.060Z",
+      "actualGoogleOAuth": false,
+      "packagedDesktop": false
+    },
+    {
+      "phase": "lease_closed",
+      "at": "2026-11-16T09:48:24.140Z"
+    }
+  ],
+  "stage": {},
+  "phases": [
+    "isolated_target_and_two_active_accounts",
+    "browser_nss_setup_pending_sandbox",
+    "real_system_chrome_with_sandbox",
+    "browser_trusts_target_revision",
+    "normal_begin_precedes_real_continue",
+    "actual_browser_continue_and_loopback_return",
+    "community_pkce_exchange_owner_identity",
+    "lease_closed"
+  ],
+  "success": true,
+  "workbenchStage": "offline-installed-window",
+  "buildClasses": [],
+  "buildIndicators": [],
+  "image": null,
+  "nativeLogBytes": 82,
+  "knownMarkers": {
+    "sudoDenied": true
+  },
+  "permittedTransportResult": null,
+  "before": {
+    "permissionRejected": false,
+    "readableAfterDedicatedCopy": true
+  },
+  "nonSecretClasses": []
+}
