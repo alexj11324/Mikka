@@ -22,7 +22,7 @@ import { colors } from '@/lib/theme'
 import { currentAccount, servers } from '@/lib/config'
 import { serverCopy } from '@/lib/server-copy'
 import { openOnWeb, openPrivacyPolicy } from '@/lib/web'
-import { mobileFilesPath } from '../../../../../lib/mobile-web-target'
+import { mobileFilesPath, mobileOrganizationPath } from '../../../../../lib/mobile-web-target'
 import { mobileMessages as messages } from '@/lib/messages'
 
 /** A row's icon (Comma design 18): a white glyph on a colored rounded square, as in the system Settings app. */
@@ -83,6 +83,7 @@ export default function SettingsScreen() {
           </Group>
           <Group>
             <Row icon={icon('briefcase.fill', BriefcaseBusiness, '#8E8E93')} label="工作区" value={data.workspace.name} onPress={() => router.push('/settings/workspaces')} />
+            {data.organizationSettingsAvailable && <Row label={messages.MobileCore.organizationOnWeb} onPress={() => void openOnWeb(mobileOrganizationPath(data.workspace.id), { confirmAccount: true })} />}
             {data.personalFilesAvailable && <Row icon={icon('folder.fill', Folder, '#007AFF')} label={messages.MobileCore.personalFilesOnWeb} onPress={() => void openOnWeb(mobileFilesPath(data.workspace.id), { confirmAccount: true })} />}
             {data.billingScope && <Row label={messages.Billing.management.billingEntry} onPress={() => router.push('/settings/billing')} />}
           </Group>

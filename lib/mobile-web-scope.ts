@@ -1,12 +1,17 @@
 import { isCloudEdition } from './edition'
 import { mobileMembersPage, mobileWebTarget } from './mobile-web-target'
 
+export function pairedMobileCloudUI() {
+  return isCloudEdition() && /^[0-9a-f]{40}$/i.test(process.env.MIKKA_UI_OVERLAY_SHA ?? '')
+}
+
 export class MobileWebScopeError extends Error { constructor() { super('mobile_handoff_scope_unavailable') } }
 
 /** A target's workspace belongs to the token's authenticated person. Bot
  * identity comes from owner-scoped metadata, never an asserted workspace. */
 export async function mobileWebWorkspace(userId: string, target: string, sessionId: string): Promise<string | null> {
   const url = new URL(mobileWebTarget(target), 'https://mikka.invalid')
+  if (url.searchParams.get('section') === 'organization' && !pairedMobileCloudUI()) throw new MobileWebScopeError()
   let workspaceId = url.searchParams.get('workspace')
   const botId = url.searchParams.get('bot')
   if (botId) {
