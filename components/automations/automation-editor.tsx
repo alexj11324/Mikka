@@ -11,6 +11,7 @@ import { automationLinearTeams, automationSlackChannels, deleteAutomation, creat
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { FieldSet } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
@@ -222,7 +223,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
       </div>
     </header>
 
-    <fieldset disabled={!canManage} className="contents">
+    <FieldSet disabled={!canManage} className="contents">
     {!draft.otherTask && <SettingsSection id="automation-settings" title={t('settings')}>
       {field(t('bot'), <NativeSelect aria-label={t('bot')} value={draft.botId ?? ''} onChange={event => set({ botId: event.target.value || null })}>
         <NativeSelectOption value="">{tAll('coordinator')}</NativeSelectOption>
@@ -338,7 +339,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
       </NativeSelect>)}
     </SettingsSection>
 
-    </fieldset>
+    </FieldSet>
 
     {!creating && current && <AutomationUsagePanel workspaceId={workspaceId} id={current.id} />}
 
