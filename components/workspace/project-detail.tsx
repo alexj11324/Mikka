@@ -113,7 +113,7 @@ export function ProjectDetail({ readerId, paging, project, projects, issues, dir
         </ResizablePane>}
       </div>
     </Tabs>
-    {!readOnly && editDialog.value && <ProjectForm open={editDialog.open} onOpenChangeComplete={editDialog.onOpenChangeComplete} project={project} projects={projects} directory={directory} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); onUpdated() }} />}
+    {!readOnly && editDialog.value && <ProjectForm key={readerId + (directory?.workspaceId ?? '')} readerId={readerId} open={editDialog.open} onOpenChangeComplete={editDialog.onOpenChangeComplete} project={project} projects={projects} directory={directory} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); onUpdated() }} />}
     {!readOnly && linking && <ProjectIssuePicker paging={paging} project={project} projects={projects} issues={issues} onClose={() => setLinking(false)} onSaved={() => { setLinking(false); onUpdated() }} />}
   </div>
 }

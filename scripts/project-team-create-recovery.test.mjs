@@ -8,13 +8,27 @@ const team = 'a432688c-38ce-47d1-b1eb-434ad1957713'
 const saved = { id: '720d08f2-1d52-4b51-9fc3-6c1f1c649f55', revision: 1 }
 const calls = []
 const activityReads = []
+const workspaceId = '8d8ca6d3-50cc-492c-802c-be06ae80b049'
+const visibility = { organizationId: null, visibility: 'shared' }
 let relation
 const empty = () => null
 const children = ({ children }) => createElement(Fragment, null, children)
 mock.module('../app/actions/projects.ts', { namedExports: {
   listProjectEvents: async (...args) => { activityReads.push(args); return [] },
-  saveProject: async () => { calls.push('create'); return { project: saved } },
+  saveProject: async input => {
+    assert.equal(input.workspaceId, workspaceId)
+    assert.deepEqual(input.expectedVisibility, visibility)
+    calls.push('create')
+    return { project: saved }
+  },
   updateProjectProperties: () => assert.fail('Unexpected project edit'),
+} })
+mock.module('../components/workspace/use-project-visibility-default.ts', { namedExports: {
+  useProjectVisibilityDefault: (readerId, id) => {
+    assert.equal(readerId, 'reader')
+    assert.equal(id, workspaceId)
+    return { data: visibility, saving: false }
+  },
 } })
 mock.module('../app/actions/teams.ts', { namedExports: { listTeams: async () => [{ id: team, name: 'Design' }] } })
 mock.module('../app/actions/team-relations.ts', { namedExports: {
@@ -57,7 +71,7 @@ test('project creation reports the team actually attached so the saved project o
     const received = []
     try {
       await act(async () => root.render(createElement(ProjectForm, {
-        directory: { workspaceId: 'workspace', members: [] }, initialTeamId: chosen,
+        readerId: 'reader', directory: { workspaceId, members: [] }, initialTeamId: chosen,
         onClose() {}, onSaved: (...args) => received.push(args),
       })))
       await act(async () => host.querySelector('form').dispatchEvent(new page.Event('submit', { bubbles: true, cancelable: true })))

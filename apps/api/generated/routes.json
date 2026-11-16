@@ -2866,6 +2866,16 @@
       "sourceHash": "0509851de5373ea456b2ce596f004b70e9f22b849e371315e61f60d2ec55ddd0"
     },
     {
+      "path": "/mikka/api/workspaces/[workspaceId]/project-visibility-default",
+      "template": "/api/workspaces/[workspaceId]/project-visibility-default",
+      "source": "app/api/workspaces/[workspaceId]/project-visibility-default/route.ts",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "sourceHash": "080e75b968dbc25bc9d07d4ca5237913edc711467b34defa9bcb3634e5f892e2"
+    },
+    {
       "path": "/mikka/api/workspaces/[workspaceId]/service-identities",
       "template": "/api/workspaces/[workspaceId]/service-identities",
       "source": "app/api/workspaces/[workspaceId]/service-identities/route.ts",
