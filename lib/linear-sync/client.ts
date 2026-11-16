@@ -49,6 +49,34 @@ export async function linearTeams(token: string): Promise<LinearTeamOption[]> {
   return result
 }
 
+export interface LinearLabelOption {
+  id: string
+  name: string
+  teamId: string | null
+}
+
+/** Workspace-wide and team-specific issue labels visible to this person's Linear account. */
+export async function linearLabelOptions(token: string): Promise<LinearLabelOption[]> {
+  type Label = { id: string; name: string; team: { id: string } | null }
+  type Page = { issueLabels: { nodes: Label[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } } }
+  const result: LinearLabelOption[] = []
+  const cursors = new Set<string>()
+  let after: string | null = null
+  do {
+    const data: Page = await linearGraphQL<Page>(token, `query MikkaLinearLabelOptions($first: Int!, $after: String) {
+      issueLabels(first: $first, after: $after, filter: { isGroup: { eq: false } }) {
+        nodes { id name team { id } } pageInfo { hasNextPage endCursor }
+      }
+    }`, { first: CONNECTION_PAGE, after })
+    result.push(...data.issueLabels.nodes.map(label => ({ id: label.id, name: label.name, teamId: label.team?.id ?? null })))
+    if (!data.issueLabels.pageInfo.hasNextPage) break
+    after = data.issueLabels.pageInfo.endCursor
+    if (!after || cursors.has(after)) throw new Error('Linear returned an invalid label cursor')
+    cursors.add(after)
+  } while (after)
+  return result
+}
+
 export async function linearIssue(token: string, id: string): Promise<LinearIssueSnapshot | null> {
   type IssueWire = Omit<LinearIssueSnapshot, 'labels'> & { labels: { nodes: LinearIssueSnapshot['labels'] } }
   const data = await linearGraphQL<{ issue: IssueWire | null }>(token, `query MikkaLinearIssue($id: String!) {

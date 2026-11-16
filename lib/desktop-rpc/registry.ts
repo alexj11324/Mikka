@@ -123,6 +123,7 @@ const functions = {
   'automations.pauseAutomation': automations.pauseAutomation,
   'automations.takeOverAutomation': automations.takeOverAutomation,
   'automations.automationWebhookKey': automations.automationWebhookKey,
+  'automations.automationLinearLabels': automations.automationLinearLabels,
   'automations.automationLinearTeams': automations.automationLinearTeams,
   'automations.automationSlackChannels': automations.automationSlackChannels,
   'automations.automationSlackEmojis': automations.automationSlackEmojis,

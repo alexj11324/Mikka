@@ -8196,6 +8196,7 @@
         "add": "Add a Linear event",
         "notConnected": "Connect Linear in Settings first",
         "noTeams": "Your Linear has no teams",
+        "labelsError": "Could not load your Linear labels",
         "teamsError": "Could not load your Linear teams"
       },
       "slack": {

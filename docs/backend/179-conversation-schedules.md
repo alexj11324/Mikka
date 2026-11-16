@@ -298,7 +298,7 @@ Decision [2026-11-15-1930](../design/decisions/2026-11-15-1930-automation-linear
   `user` yields no event (`lib/schedules/linear-events.ts`).
 - `permission` asks the `linearTeams(owner)` seam (the person's own Linear connection's teams;
   null without one → `scheduleLinearUnavailable` 403, an authority loss; Linear unreachable →
-  `scheduleLinearUnreachable` 503, retried). Page action `automationLinearTeams`.
+  `scheduleLinearUnreachable` 503, retried). Page action `automationLinearTeams`. On focus, the label filter reads `automationLinearLabels` with the shown workspace and the signed-in person’s own Linear connection. Suggestions include workspace-wide labels and labels for the selected teams. Comma-separated names can also be typed when suggestions are unavailable.
 - `fireLinearAutomations(deliveryId, payload)` → `ScheduleStore.fireLinearEvents`: candidates are
   active automations with a matching Linear trigger whose creator has an unrevoked
   `linear_connections` row for the event's organization; then the shared `queueEvent`
