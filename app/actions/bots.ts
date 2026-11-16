@@ -44,9 +44,9 @@ export async function listBotsForWorkspace(workspaceId: string): Promise<BotView
 }
 
 /** The list cache is bound to this actual authorized Owner/workspace read. */
-export async function pollBots() {
-  const { ownerId, workspaceId } = await getOwner()
-  return { items: await listOwnerBots(ownerId, workspaceId), live: { ownerId, workspaceId } }
+export async function pollBots(workspaceId?: string) {
+  const owner = await getOwner(workspaceId)
+  return { items: await listOwnerBots(owner.ownerId, owner.workspaceId), live: owner }
 }
 
 /**
