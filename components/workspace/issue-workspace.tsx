@@ -751,7 +751,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
         openChat({ kind: 'group', ...group })
       }}
       onNewBot={() => { closeComposer(); setCreatingBot(true) }} onReviewGroups={() => { closeComposer(); if (creation === 'conversation') navigateSection('conversations'); void reloadGroups().catch(() => {}) }} />}
-    <NewBotDialog open={creatingBot} onOpenChange={setCreatingBot} onCreated={bot => { setCreatingBot(false); openChat({ kind: 'bot', botId: bot.id }, bot) }} />
+    {creationWorkspace && <NewBotDialog key={creationWorkspace} workspaceId={creationWorkspace} open={creatingBot} onOpenChange={setCreatingBot} onCreated={bot => { setCreatingBot(false); openChat({ kind: 'bot', botId: bot.id }, bot) }} />}
     {search.value && <GlobalSearch open={search.open} onOpenChange={setSearchOpen} onOpenChangeComplete={search.onOpenChangeComplete} bots={bots} sessions={conversationSessions} coordinatorLine={coordinatorSummary?.line ? chatPreview(coordinatorSummary.line) ?? i18nText('Nav.cardPreview') : undefined} issues={tasks} projects={projects} threads={threads} onThread={runId => openThread(runId)} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null}
       onChat={openChat} onNewBot={() => setCreatingBot(true)} onIssue={open} onCreateIssue={() => create()}
       reviewTaskId={reviewEnabled ? reviewTarget : null} onReview={reviewEnabled ? openReview : undefined}
