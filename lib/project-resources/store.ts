@@ -12,7 +12,7 @@ import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 import type { WorkspaceTransaction } from '@/lib/workspace-access'
 import { ActionFailureError } from '@/lib/action-error'
-import { environmentConfiguration, listProjectSetupVersionsInput, rollbackProjectSetupInput, projectSetupScope, type ProjectSetupHistory, type ProjectSetupRecipe, projectDefaultEnvironmentInput, projectResourcesInput, saveEnvironmentInput, workspaceRepositoryPolicyInput, type EnvironmentConfiguration, type ProjectExecutionSnapshot } from './contracts'
+import { environmentConfiguration, projectEnvironmentVariableInput, listProjectSetupVersionsInput, rollbackProjectSetupInput, projectSetupScope, type ProjectSetupHistory, type ProjectSetupRecipe, projectDefaultEnvironmentInput, projectResourcesInput, saveEnvironmentInput, workspaceRepositoryPolicyInput, type EnvironmentConfiguration, type ProjectExecutionSnapshot } from './contracts'
 
 type Reader = Parameters<typeof withTaskWorkspace>[0]
 const actorId = (reader: Reader) => typeof reader === 'string' ? reader : reader.id
@@ -134,6 +134,19 @@ export async function listProjectResources(reader: Reader, workspaceId: string, 
   }
   return projectId ? withConfiguredProject(reader, workspaceId, projectId, false, read)
     : withTaskWorkspace(reader, workspaceId, (_workspace, tx) => read(tx))
+}
+
+/** Read one ordinary variable from the Project's current default environment. */
+export async function readProjectEnvironmentVariable(reader: Reader, raw: z.input<typeof projectEnvironmentVariableInput>) {
+  const { workspaceId, projectId, name } = projectEnvironmentVariableInput.parse(raw)
+  return withConfiguredProject(reader, workspaceId, projectId, false, async tx => {
+    const { rows: [row] } = await tx.execute<{ value: string | null }>(sql`
+      SELECT e.configuration->'variables'->>${name}::text AS value
+      FROM workspace_project_environments AS b
+      JOIN workspace_environments AS e ON e.id=b."environmentId" AND e."workspaceId"=b."workspaceId"
+      WHERE b."workspaceId"=${workspaceId} AND b."projectId"=${projectId} AND b."isDefault" AND e."archivedAt" IS NULL`)
+    return row?.value == null ? null : { name, value: row.value }
+  })
 }
 
 /** Restricted + an empty list is an explicit deny-all policy; no row means inherit. */
