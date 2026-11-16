@@ -13,6 +13,7 @@ stub('./runtime.ts', { personalPlugins: {
   createMcp: async (...args: unknown[]) => { calls.push(['createMcp', ...args]); return { id: randomUUID(), authKind: 'header' } },
   updateMcp: async (...args: unknown[]) => { calls.push(['updateMcp', ...args]); return {} },
   deleteMcp: async (...args: unknown[]) => { calls.push(['deleteMcp', ...args]) },
+  getSkill: async (userId: string, id: string) => { calls.push(['getSkill', userId, id]); return { id } },
   listSkills: async (userId: string) => { calls.push(['listSkills', userId]); return [] },
   installSkill: async (...args: unknown[]) => { calls.push(['installSkill', ...args]); return {} },
   updateSkill: async (...args: unknown[]) => { calls.push(['updateSkill', ...args]); return {} },
@@ -79,6 +80,19 @@ test('actual routes use the authenticated owner, reject injected owners and expo
   assert.deepEqual(await store.json(), { configured: true, apps: [{ id: 'googledrive' }], popular: ['googledrive'], latest: [], categories: [] })
   const oversized = request('/api/skills', 'POST', { source: 'x'.repeat(17_000), slug: 'x' })
   assert.equal((await skills.POST(oversized)).status, 413)
+})
+
+test('one installed Skill is read by its authenticated owner and exact installation id', async () => {
+  owner = 'owner'
+  const id = randomUUID()
+  calls.length = 0
+  const response = await skills.GET(request('/api/skills?id=' + id))
+  assert.equal(response.status, 200)
+  assert.deepEqual(await response.json(), { skill: { id } })
+  for (const query of ['id=', 'id=invalid', 'id=' + id + '&id=' + id]) {
+    assert.equal((await skills.GET(request('/api/skills?' + query))).status, 400)
+  }
+  assert.deepEqual(calls, [['getSkill', 'owner', id]])
 })
 
 test('an app page needs a signed-in person, not a connected account', async () => {

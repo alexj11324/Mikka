@@ -49,6 +49,8 @@ test('real Postgres: personal ownership, encrypted auth, revocation, installatio
     const skill: SkillContent = { name: 'Example', source: 'owner/skills', slug: 'example', sourceKind: 'skills.sh', sourceRevision: 'a'.repeat(40), sourcePath: 'skills/example/SKILL.md', body: '# Fixed skill', sha256: 'b'.repeat(64) }
     const installed = await store.installSkill('owner', skill)
     assert.equal((await store.installSkill('owner', { ...skill, body: '# Changed upstream' })).id, installed.id)
+    assert.deepEqual(await store.getSkill('owner', installed.id), installed)
+    await assert.rejects(store.getSkill('peer', installed.id), /skillNotFound/)
     assert.equal((await store.listSkills('owner')).length, 1); assert.deepEqual(await store.listSkills('peer'), [])
     await assert.rejects(store.updateSkill('peer', installed.id, false), /skillNotFound/)
     await assert.rejects(store.deleteSkill('peer', installed.id), /skillNotFound/)
@@ -64,6 +66,7 @@ test('real Postgres: personal ownership, encrypted auth, revocation, installatio
     assert.deepEqual(execution.snapshot.definition.tools, ['web_search'])
     const saved = JSON.stringify(execution.snapshot)
     await store.updateSkill('owner', installed.id, false)
+    assert.equal((await store.getSkill('owner', installed.id)).enabled, false)
     await store.updateMcp('owner', { id: server.id, enabled: false })
     const replay = await kit.beginExecution(scope, 'first', 'new host', { harness: 'ai_sdk', model: 'changed' }, definition, async () => { throw Error('Must not refresh a replay') })
     assert.deepEqual(replay.snapshot, execution.snapshot); assert.equal(JSON.stringify(execution.snapshot), saved)

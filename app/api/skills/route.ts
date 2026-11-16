@@ -1,12 +1,19 @@
 import { withRequestLog } from '@/lib/request-log'
 import { pluginActor } from '@/lib/plugins/actor'
-import { deletePluginSchema, installSkillSchema, updateSkillSchema } from '@/lib/plugins/contracts'
+import { deletePluginSchema, installSkillSchema, PluginError, updateSkillSchema } from '@/lib/plugins/contracts'
 import { pluginBody, pluginResponse } from '@/lib/plugins/http'
 import { personalPlugins } from '@/lib/plugins/runtime'
 import { fetchSkillSource } from '@/lib/plugins/skill-source'
 
 export const GET = withRequestLog('/api/skills', request => pluginResponse(async () => {
-  const skills = await personalPlugins.listSkills(await pluginActor(request))
+  const userId = await pluginActor(request)
+  const ids = new URL(request.url).searchParams.getAll('id')
+  if (ids.length) {
+    const input = deletePluginSchema.safeParse({ id: ids[0] })
+    if (ids.length !== 1 || !input.success) throw new PluginError('invalidPluginInput', 400)
+    return { skill: await personalPlugins.getSkill(userId, input.data.id) }
+  }
+  const skills = await personalPlugins.listSkills(userId)
   return { skills, count: skills.length, scope: 'personal' }
 }))
 export const POST = withRequestLog('/api/skills', request => pluginResponse(async () => {

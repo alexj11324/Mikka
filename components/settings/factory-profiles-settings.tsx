@@ -1,6 +1,9 @@
 'use client'
 
 import { useId, useState } from 'react'
+import useSWR from 'swr'
+import { withBasePath } from '@/lib/base-path'
+import type { InstalledSkill } from '@/lib/plugins/contracts'
 import { useTranslations } from 'next-intl'
 import { Archive, CircleAlert, CircleCheck, CircleSlash, Copy, MoreHorizontal, Pencil, Plus, Share2 } from 'lucide-react'
 import type { AgentProfile } from '@/lib/factory/agent-profile-definition'
@@ -145,6 +148,7 @@ function ProfileEditorDialog({ workspaceId, editor, catalog, onCatalogReload, on
                       {description && <span className="text-xs font-normal text-muted-foreground">{description}</span>}
                       {!skill.available && <span className="text-xs font-normal text-destructive-foreground">{t(`skillStates.${skill.reason ?? 'missing'}`)}</span>}
                     </FieldLabel>
+                    {skill.source === 'personal' && <PersonalSkillDetails id={skill.id.slice('personal:'.length)} name={skill.name} />}
                     {skill.source === 'personal' && skill.shareable && <Button type="button" variant="ghost" size="sm" className="shrink-0" disabled={pending || frozen || sharing === skill.id} onClick={() => { void toggleShare(skill) }}>
                       <Share2 data-icon="inline-start" />{skill.shared ? t('unshareSkill') : t('shareSkill')}
                     </Button>}
@@ -187,6 +191,31 @@ function ProfileEditorDialog({ workspaceId, editor, catalog, onCatalogReload, on
       </form>
     </DialogContent>
   </Dialog>
+}
+
+/** Only the installer can inspect a personal installation's pinned source. */
+function PersonalSkillDetails({ id, name }: { id: string; name: string }) {
+  const t = useTranslations('Settings.agentProfiles')
+  const common = useTranslations('Common')
+  const [open, setOpen] = useState(false)
+  const { data, error, isValidating, mutate } = useSWR(open ? ['personal-skill-installation', id] : null, async () => {
+    const response = await fetch(withBasePath('/api/skills?id=' + encodeURIComponent(id)), {
+      credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(20_000),
+    })
+    if (!response.ok) throw new Error('skillUnavailable')
+    const { skill } = await response.json() as { skill: InstalledSkill }
+    if (skill.id !== id) throw new Error('skillUnavailable')
+    return skill
+  }, { dedupingInterval: 0, shouldRetryOnError: false, revalidateOnFocus: false, revalidateOnReconnect: false })
+  return <details className="min-w-0 text-sm" onToggle={event => setOpen(event.currentTarget.open)}>
+    <summary className="cursor-pointer" aria-label={t('installationDetailsNamed', { name })}>{t('installationDetails')}</summary>
+    {open && (error ? <SettingsSaveError message={t('installationLoadFailed')} retryLabel={common('retry')} onRetry={() => { void mutate() }} />
+      : !data || isValidating ? <p role="status">{t('loading')}</p>
+      : <dl className="mt-2 space-y-1 break-all text-xs">
+        <div><dt className="font-medium">{t('installationSource')}</dt><dd>{data.source} · {data.sourcePath}</dd></div>
+        <div><dt className="font-medium">{t('installationRevision')}</dt><dd>{data.sourceRevision}</dd></div>
+      </dl>)}
+  </details>
 }
 
 /** A Profile's state as the shared status badge (R-34, R-87): icon, colour and word. */

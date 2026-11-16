@@ -92,6 +92,13 @@ export class PersonalPluginStore {
   async listSkills(userId: string): Promise<InstalledSkill[]> {
     return (await this.pool.query<InstalledSkill>(`SELECT ${skillColumns} FROM personal_skills WHERE user_id=$1 ORDER BY created_at,id`, [userId])).rows
   }
+  async getSkill(userId: string, id: string): Promise<InstalledSkill> {
+    const { rows: [skill] } = await this.pool.query<InstalledSkill>(
+      `SELECT ${skillColumns} FROM personal_skills WHERE user_id=$1 AND id=$2`, [userId, id],
+    )
+    if (!skill) throw new PluginError('skillNotFound', 404)
+    return skill
+  }
   async installSkill(userId: string, skill: SkillContent) {
     return this.write(userId, async client => {
       const existing = (await client.query<InstalledSkill>(`SELECT ${skillColumns} FROM personal_skills WHERE user_id=$1 AND source=$2 AND slug=$3`, [userId, skill.source, skill.slug])).rows[0]
