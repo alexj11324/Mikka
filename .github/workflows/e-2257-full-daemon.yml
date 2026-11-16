@@ -1,10 +1,10 @@
-name: E 2257 one isolated Codex steer and terminal diagnosis
+name: E 2257 four native deliveries with dedicated real service identities
 on:
   push:
     branches: [evidence/2254-sidebar-85dfc396]
     paths:
       - .github/workflows/e-2257-full-daemon.yml
-      - evidence/2257/steer-diagnostic/**
+      - evidence/2257/four-cases/**
 permissions:
   contents: read
 jobs:
@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 43
     env:
-      PUBLIC_SOURCE: 470258c05e8c081aefd23a8b4a9c7435cf07bbbd
+      PUBLIC_SOURCE: 7bf85ed9fefc0592ce02b76b14a2b3cede7188de
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -22,7 +22,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             evidence/2257/full-daemon
-            evidence/2257/steer-diagnostic
+            evidence/2257/four-cases
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: 46d60aa6802ef48600fbe2fa3d48015b14f6d50b
@@ -31,7 +31,7 @@ jobs:
           sparse-checkout: evidence/2257/local-provider
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: 470258c05e8c081aefd23a8b4a9c7435cf07bbbd
+          ref: 7bf85ed9fefc0592ce02b76b14a2b3cede7188de
           path: product
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -40,6 +40,12 @@ jobs:
           path: original-review
           persist-credentials: false
           sparse-checkout: evidence/2271/current-review
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: b80e31e5f803c52a518f98e87f1b5f7fbfca6d51
+          path: original-driver
+          persist-credentials: false
+          sparse-checkout: evidence/2257/full-daemon
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
         with:
           version: 10.34.3
@@ -52,7 +58,7 @@ jobs:
           set -euo pipefail
           base=$(mktemp -d /tmp/mikka-desktop-delivery.XXXXXXXX)
           echo "CASE_BASE=$base" >> "$GITHUB_ENV"
-          bash review/evidence/2257/steer-diagnostic/prepare.sh "$GITHUB_WORKSPACE" "$base"
+          bash review/evidence/2257/four-cases/prepare.sh "$GITHUB_WORKSPACE" "$base"
           echo "$PUBLIC_SOURCE" > "$base/source.sha"
           if [ ! -x /usr/lib/postgresql/17/bin/initdb ]; then
             . /etc/os-release
@@ -63,7 +69,7 @@ jobs:
             sudo apt-get update -qq
             sudo apt-get install -y --no-install-recommends postgresql-17
           fi
-      - name: Verify only the real steer and resulting terminal state
+      - name: Verify all four canonical deliveries on the precise public candidate
         shell: bash
         run: |
           set -euo pipefail
@@ -81,14 +87,14 @@ jobs:
                 "$filter" -A OUTPUT -m owner --uid-owner "$uid" -j REJECT
               done
             done
-            exec setpriv --reuid="$1" --regid="$2" --init-groups bash "$GITHUB_WORKSPACE/review/evidence/2257/steer-diagnostic/execute.sh" "$3"
+            exec setpriv --reuid="$1" --regid="$2" --init-groups bash "$GITHUB_WORKSPACE/review/evidence/2257/four-cases/execute.sh" "$3"
           ' isolate "$(id -u)" "$(id -g)" "$base"
       - name: Retain only enumerated diagnostic codes and registration phases
         if: always() && env.CASE_BASE != ''
-        run: python3 review/evidence/2257/steer-diagnostic/diagnostics.py "$CASE_BASE" | tee public-receipt.json
+        run: python3 review/evidence/2257/four-cases/diagnostics.py "$CASE_BASE" | tee public-receipt.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always() && env.CASE_BASE != ''
         with:
-          name: e2257-codex-steer-result-${{ github.run_id }}-${{ github.run_attempt }}
+          name: e2257-canonical-four-modes-${{ github.run_id }}-${{ github.run_attempt }}
           path: public-receipt.json
           if-no-files-found: error
