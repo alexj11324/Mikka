@@ -6,6 +6,7 @@ import type { z } from 'zod'
 import { withBasePath } from '@/lib/base-path'
 import { personalProjectSelection } from '@/lib/project-input'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 
 type Selection = z.infer<typeof personalProjectSelection>
@@ -68,11 +69,11 @@ export function PersonalProjectPicker({ picker, disabled }: { picker: ReturnType
     {t('projectPreferenceUnavailable')}{picker.continueUnbound && <Button type="button" variant="outline" size="sm" onClick={picker.continueUnbound}>{board('noProject')}</Button>}<Button type="button" variant="link" size="sm" onClick={picker.reload}>{common('retry')}</Button>
   </div>
   if (!picker.data?.organizationId || !picker.data.projects.length) return null
-  return <label className="flex items-center gap-2 text-sm">{t('defaultProject')}
+  return <Label className="flex items-center gap-2 text-sm">{t('defaultProject')}
     <NativeSelect size="sm" disabled={disabled || picker.pending} value={picker.project?.id ?? ''}
       onChange={event => { void picker.choose(event.currentTarget.value || null) }}>
       <NativeSelectOption value="">{board('noProject')}</NativeSelectOption>
       {picker.data.projects.map(item => <NativeSelectOption key={item.id} value={item.id}>{item.name}</NativeSelectOption>)}
     </NativeSelect>
-  </label>
+  </Label>
 }

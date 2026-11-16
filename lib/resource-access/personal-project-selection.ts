@@ -36,7 +36,7 @@ export function personalProjectSelectionFor(reader: { id: string }, workspaceId:
     try {
       return await withReadableProject(reader, workspaceId, change.projectId, save)
     } catch (error) {
-      if (error instanceof ActionFailureError && ['issueNotFound', 'projectNotFound'].includes(error.code)) throw new GovernanceError('not_found')
+      if (error instanceof ActionFailureError && ['issueNotFound', 'projectNotFound'].includes(error.code)) throw new GovernanceError('not_found', error)
       throw error
     }
   })
