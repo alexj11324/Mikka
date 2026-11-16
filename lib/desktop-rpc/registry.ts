@@ -171,6 +171,7 @@ const functions = {
   'issues.listIssues': actions14.listIssues,
   'issues.pollIssues': actions14.pollIssues,
   'issues.syncIssueList': actions14.syncIssueList,
+  'issues.countAssignedWorkspaceTasks': actions14.countAssignedWorkspaceTasks,
   'issues.listWorkspaceIssues': actions14.listWorkspaceIssues,
   'issues.listWorkspaceTaskPage': actions14.listWorkspaceTaskPage,
   'issues.getIssue': actions14.getIssue,
