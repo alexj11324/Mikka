@@ -190,7 +190,7 @@ test('prebuilt packaging carries accepted API resource bytes into the official E
 
 
 test('runtime workflow callers pass genuine API run identity and keep the Registry username unmasked', async () => {
-  for (const name of ['cloudflare-eve-image.yml', 'cloudflare-task-sandbox.yml']) {
+  for (const name of ['cloudflare-eve-image.yml', 'cloudflare-task-sandbox.yml', 'cloudflare-litellm-image.yml']) {
     const workflow = await readFile(new URL('../.github/workflows/' + name, import.meta.url), 'utf8')
     assert.ok(workflow.includes('api_run_id:'))
     assert.ok(workflow.includes('api_run_attempt:'))
@@ -285,7 +285,7 @@ set -euo pipefail
 [[ "$1" == 'scripts/cloudflare-runtime-release.mjs' && "$2" == 'publish' ]]
 [[ "$(cat "$DOCKER_CONFIG/auth")" == "$CF_RUNTIME_REGISTRY_PASSWORD" ]]
 `, { mode: 0o700 })
-    for (const name of ['cloudflare-eve-image.yml', 'cloudflare-task-sandbox.yml']) {
+    for (const name of ['cloudflare-eve-image.yml', 'cloudflare-task-sandbox.yml', 'cloudflare-litellm-image.yml']) {
       const workflow = await readFile(new URL('../.github/workflows/' + name, import.meta.url), 'utf8')
       const step = workflow.split('      - name: Publish the verified runtime image\n')[1]?.split('\n      - ')[0]
       assert.ok(step)
