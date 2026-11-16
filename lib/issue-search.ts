@@ -35,10 +35,10 @@ export class SearchInputError extends Error {
 export function parseSearchQuery(raw: string | null | undefined): SearchQuery {
   const text = (raw ?? '').trim()
   if (!text) return { kind: 'recent' }
+  if (text.length > 200) throw new SearchInputError('searchQueryTooLong')
   if (text.startsWith('https://github.com/') && pullRequestSchema.shape.url.safeParse(text).success) {
     return { kind: 'pull', url: text.replace(/\/$/, '').toLowerCase() }
   }
-  if (text.length > 200) throw new SearchInputError('searchQueryTooLong')
   const number = /^([1-9]\d{0,8})$/.exec(text)
   if (number) return { kind: 'number', number: Number(number[1]) }
   if (/^[a-z][a-z0-9_]{0,63}-[1-9]\d{0,15}$/i.test(text)) return { kind: 'identifier', identifier: text.toUpperCase() }

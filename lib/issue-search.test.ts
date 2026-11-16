@@ -12,6 +12,7 @@ test('a full recorded pull-request URL selects its normalized identity', () => {
     kind: 'pull', url: 'https://github.com/example/repo/pull/12',
   })
   assert.equal(parseSearchQuery('https://github.com/Example/Repo/issues/12').kind, 'title')
+  rejects(() => parseSearchQuery('https://github.com/example/' + 'x'.repeat(180) + '/pull/12'), 'searchQueryTooLong')
 })
 
 test('q: numeric counters and issued identifiers retain distinct namespaces', () => {
