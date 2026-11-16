@@ -101,6 +101,10 @@ jobs:
           image_id=$(docker image inspect --format '{{.Id}}' mikka-litellm)
           echo "RUNTIME_TESTED_IMAGE_ID=$image_id" >> "$GITHUB_ENV"
           bash deploy/litellm/offline-check.sh mikka-litellm
+      - name: Install the product's test dependencies for the conversion proof
+        run: corepack pnpm install --frozen-lockfile --ignore-scripts
+      - name: Prove Anthropic and Responses conversion against a Chat-Completions-only provider
+        run: bash deploy/litellm/conversion-check.sh mikka-litellm
       - name: Tag the verified LiteLLM runtime for release
         run: docker tag mikka-litellm "mikka-litellm:$MIKKA_DEPLOYMENT_ID"
       - name: Issue a short-lived Registry publication credential
