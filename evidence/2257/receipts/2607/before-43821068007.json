@@ -1,0 +1,122 @@
+{
+  "revision": "3f7eaa6042d04fc85c4c1c45d4be361e1796fa57",
+  "interface": "owner-http",
+  "success": false,
+  "checks": [
+    {
+      "phase": "isolated_target_and_two_active_accounts",
+      "at": "2026-11-16T07:07:35.702Z",
+      "workspaceId": "c6def2ad-3e6e-4a65-8721-ba5004ecee94",
+      "pg": "170012",
+      "environmentId": "local-e3e61610-1805-43f0-8ce2-784389c3a302",
+      "lease": "083f9bdb-d84b-4217-9ecc-591a94c5464c"
+    },
+    {
+      "phase": "one_registered_full_device_with_pinned_harnesses",
+      "at": "2026-11-16T07:07:38.347Z",
+      "deviceId": "47e83bd2-9644-458a-a094-07351f7bac48",
+      "versions": {
+        "claude_code": "2.1.309",
+        "codex": "0.163.0"
+      },
+      "registration": "one-use HTTPS enrollment"
+    },
+    {
+      "phase": "both_authenticated_catalogues",
+      "at": "2026-11-16T07:07:38.444Z"
+    },
+    {
+      "phase": "ordinary_run_admitted",
+      "at": "2026-11-16T07:07:39.042Z",
+      "mode": "steer",
+      "harness": "codex",
+      "runId": "3112047a-2e6c-470f-83b6-cdd5d1e2eba2",
+      "issueId": "6eea0465-c59b-41c4-a5ce-8540d51e5fe5",
+      "deviceId": "47e83bd2-9644-458a-a094-07351f7bac48"
+    },
+    {
+      "phase": "live_turn_before_owner_action",
+      "at": "2026-11-16T07:07:40.267Z",
+      "runId": "3112047a-2e6c-470f-83b6-cdd5d1e2eba2",
+      "harness": "codex",
+      "modes": [
+        "queue",
+        "steer"
+      ],
+      "peerDenied": true,
+      "runBoundGrant": true,
+      "firstFrame": {
+        "at": "2026-11-16T07:07:40.181Z",
+        "frameSha256": "9982758d2f9939ffaae37b8bdb5badd15ddf6a93485bc00bfe3a364bc5bd0c29"
+      }
+    },
+    {
+      "phase": "native_steer_ack",
+      "at": "2026-11-16T07:07:40.716Z",
+      "runId": "3112047a-2e6c-470f-83b6-cdd5d1e2eba2",
+      "messageId": "906a0fd9-db9c-59f7-8018-9d02b05681cf"
+    },
+    {
+      "phase": "steer_terminal_readback",
+      "at": "2026-11-16T07:07:44.482Z",
+      "runId": "3112047a-2e6c-470f-83b6-cdd5d1e2eba2",
+      "deviceId": "47e83bd2-9644-458a-a094-07351f7bac48",
+      "sessionId": "01a1e32e-d4c6-7fa1-844e-aaf4822439b2",
+      "status": "stopped",
+      "outputSha256": "a1b7eb2ee7a6aded8dda4e6cf30826f5afffb28a5597ee9389e91eb326d4e319"
+    },
+    {
+      "phase": "ordinary_run_admitted",
+      "at": "2026-11-16T07:07:44.879Z",
+      "mode": "interrupt",
+      "harness": "claude_code",
+      "runId": "caffa8ca-f9cb-46f5-9db6-b942c5522afd",
+      "issueId": "f79791aa-8764-4926-a8ff-baef436533f2",
+      "deviceId": "47e83bd2-9644-458a-a094-07351f7bac48"
+    },
+    {
+      "phase": "live_turn_before_owner_action",
+      "at": "2026-11-16T07:07:46.542Z",
+      "runId": "caffa8ca-f9cb-46f5-9db6-b942c5522afd",
+      "harness": "claude_code",
+      "modes": [
+        "queue",
+        "interrupt"
+      ],
+      "peerDenied": true,
+      "runBoundGrant": true,
+      "firstFrame": {
+        "at": "2026-11-16T07:07:46.469Z",
+        "frameSha256": "15536774bc9b2043a18206ceac2f31714e20eead1c5ca1cbbdc197f5836ecfcc"
+      }
+    },
+    {
+      "phase": "lease_closed",
+      "at": "2026-11-16T07:07:48.843Z",
+      "state": "quarantined"
+    }
+  ],
+  "diagnostic": {
+    "stage": "interrupt_child_native_result",
+    "location": "full-daemon.mts:116:175",
+    "run": "caffa8ca-f9cb-46f5-9db6-b942c5522afd",
+    "state": "failed",
+    "reason": "device_lost",
+    "sessionPresent": true,
+    "tokens": 1
+  },
+  "source": "3f7eaa6042d04fc85c4c1c45d4be361e1796fa57",
+  "evidenceRevision": "49941eb8a3812f65e3aa5904be0ce8eac5128ed6",
+  "run": "43821068007",
+  "counts": {
+    "requests.jsonl": 3,
+    "results.jsonl": 1,
+    "claude-requests.jsonl": 3,
+    "claude-results.jsonl": 1,
+    "decisions.jsonl": 0
+  },
+  "heartbeats": [],
+  "model": "SmolLM2-135M-Instruct-Q4_K_M",
+  "weightSha256": "2e8040ceae7815abe0dcb3540b9995eaa1fa0d2ca9e797d0a635ae4433c68c2d",
+  "paidSubscription": false
+}

@@ -1,0 +1,58 @@
+{
+  "baseForLocalTests": "1611e49bc54e01bcb051a308117b76a7a631ed79",
+  "candidateForRemoteExecution": "ca6c1b17caf92d4a8f4dd56c5c9aad1670022eb0",
+  "testedFileSha256": {
+    "lib/run-publications.ts": "99b48547cd7c9a43a03eb84a8616ff21526f9745e9de25e3cb5973976e5cc05d",
+    "lib/factory/continuity.db.test.ts": "7de4b9ad6151e214ca0cab49b2800e6c56bb690a2e607322a7ccb893c7676fc0"
+  },
+  "suite": "isolated PostgreSQL 17, separate ephemeral clusters on loopback, ordinary source tests",
+  "case": "2257 owner interrupt keeps its exact superseded run cancelled when a heartbeat revocation arrives first",
+  "before": {
+    "case": "failed",
+    "expected": [
+      "cancelled",
+      "cancelled"
+    ],
+    "actual": [
+      "failed",
+      "device_lost"
+    ],
+    "tapSha256": "92750645b4de6942d7ce5c780c152bd27f416ef16c79ff00768f0b0a82b68cb1",
+    "note": "Subsequent watchdog assertions in this initial test runner also failed. The final regression is placed after those scenarios, where all 37 checks passed."
+  },
+  "after": {
+    "files": [
+      "lib/device-revocation.db.test.ts",
+      "lib/factory/continuity.db.test.ts",
+      "lib/factory/run-end-paths.db.test.ts"
+    ],
+    "total": 37,
+    "passed": 37,
+    "failed": 0,
+    "skipped": 0,
+    "tapSha256": "fc7822533966d2f0735352c238bc7b419c6725e37354b2571385ff9c6efc85a2",
+    "coverage": [
+      "wrong device returns null with no state change",
+      "authenticated supersession + lease revocation persists cancelled/cancelled",
+      "replay preserves original finishedAt",
+      "stop flag alone leaves failed/device_lost",
+      "actual independent device credential revocation leaves failed/device_lost even if owner epoch changed"
+    ]
+  },
+  "fullDaemonBefore": {
+    "run": "43821068007",
+    "job": "133144018292",
+    "artifact": "14204233834",
+    "zipSha256": "3a9c86b2ab7ef39e0ff3aa00eeb698c67dcfb327cc0f5d853b472eebab4f2243",
+    "publicSource": "3f7eaa6042d04fc85c4c1c45d4be361e1796fa57",
+    "evidenceRevision": "49941eb8a3812f65e3aa5904be0ce8eac5128ed6"
+  },
+  "exposure": {
+    "productionOccurrenceRate": "unmeasured",
+    "fullDaemonObservedBefore": "1/1 exercised interrupt",
+    "occurrenceRating": 6,
+    "impactRating": 5,
+    "product": 30,
+    "impact": "The old conversation attempt shows a device failure following an ordinary owner replacement. The replacement ran, and queued input did not leak into it."
+  }
+}
