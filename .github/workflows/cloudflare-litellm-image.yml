@@ -44,13 +44,10 @@ jobs:
         with:
           node-version: 24
       - run: npm ci --ignore-scripts --prefix cloudflare/litellm
-      - name: Build the LiteLLM image and check its health and master-key guard
+      - name: Build the LiteLLM image and check its health and master-key guard offline
         run: |
           docker build --platform linux/amd64 -t mikka-litellm deploy/litellm
-          docker run -d --name litellm -p 4000:4000 -e LITELLM_MASTER_KEY="$(openssl rand -hex 32)" mikka-litellm
-          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:4000/health/liveliness && break; sleep 2; done
-          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:4000/v1/messages -H 'content-type: application/json' -d '{}')" = 401
-          docker rm -f litellm
+          bash deploy/litellm/offline-check.sh mikka-litellm
   publish:
     permissions:
       contents: read
@@ -103,10 +100,7 @@ jobs:
           docker build --platform linux/amd64 --label "org.opencontainers.image.revision=$MIKKA_BUILD_REVISION" --label "com.mikka.overlay=$MIKKA_UI_OVERLAY_SHA" --label "com.mikka.release=$MIKKA_DEPLOYMENT_ID" -t mikka-litellm deploy/litellm
           image_id=$(docker image inspect --format '{{.Id}}' mikka-litellm)
           echo "RUNTIME_TESTED_IMAGE_ID=$image_id" >> "$GITHUB_ENV"
-          docker run -d --name litellm -p 4000:4000 -e LITELLM_MASTER_KEY="$(openssl rand -hex 32)" mikka-litellm
-          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:4000/health/liveliness && break; sleep 2; done
-          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:4000/v1/messages -H 'content-type: application/json' -d '{}')" = 401
-          docker rm -f litellm
+          bash deploy/litellm/offline-check.sh mikka-litellm
       - name: Tag the verified LiteLLM runtime for release
         run: docker tag mikka-litellm "mikka-litellm:$MIKKA_DEPLOYMENT_ID"
       - name: Issue a short-lived Registry publication credential
