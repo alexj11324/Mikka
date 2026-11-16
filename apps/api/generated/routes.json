@@ -1617,9 +1617,10 @@
       "source": "app/api/mobile/push-tokens/route.ts",
       "methods": [
         "DELETE",
+        "GET",
         "POST"
       ],
-      "sourceHash": "1a487f5cc4d42af4db45318ac438a1351662e6e446ffcc4dbdf2f8f2cd0286d6"
+      "sourceHash": "6550502ce978c00ea8689dfebd05a8f2fbcb23ad970bd47acef43f12269c9139"
     },
     {
       "path": "/mikka/api/mobile/reactions",

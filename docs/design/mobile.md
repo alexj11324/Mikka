@@ -185,6 +185,7 @@ precedent. Figma frames 07, 07a–07e.
 | Account: avatar, name, email → 个人资料 (photo, name; email read-only) | top → 07a | Comma iOS Account row → Profile; Claude (name + email); ChatGPT (avatar + name). None shows the sign-in provider |
 | 工作区 | top → 07b | Comma iOS workspace picker; ChatGPT 工作空间 |
 | 通知 (value 开/关) | top → 07c | ChatGPT, Claude, Comma (Comma shows On/Off on the row) |
+| 已注册的推送设备 | 07c | The signed-in person’s active Expo registrations show their platform, known device name, registration update date and matching login session. |
 | 主动消息 | 07c | Claude Code "Push when Claude decides"; Comma "Proactive messages" |
 | 需要你决策 / 待审阅 / 线程完成 | 07c | Claude Code "Push when actions required"; Cursor (needs input, finished, ready for review); Replit; GitHub Mobile per-type toggles |
 | 每日简报 | 07c | ChatGPT notifications "Tasks" (scheduled-task results) |

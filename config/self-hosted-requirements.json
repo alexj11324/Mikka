@@ -201,6 +201,13 @@
     "test": "tests/mobile-handoff.test.ts",
     "suite": "test:desktop-auth"
   },
+  "app/api/mobile/push-tokens/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the installation PostgreSQL database and the current authenticated session to list the person's active native push registrations, register a device or remove its current session binding.",
+    "test": "tests/mobile-push-workspace.db.test.ts",
+    "suite": "test:visibility-db"
+  },
   "app/api/organization-invitations/accept/route.ts": {
     "mode": "built-in",
     "environment": [],

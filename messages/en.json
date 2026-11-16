@@ -7734,6 +7734,8 @@
     "notifications": {
       "on": "On",
       "off": "Off",
+      "registeredDevices": "Registered push devices",
+      "noRegisteredDevices": "No registered devices",
       "pushTypes": "Send notifications for",
       "unavailable": "Push notifications are unavailable",
       "openSettings": "Open settings",
