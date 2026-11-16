@@ -265,7 +265,7 @@ linked in Where it lives. An accepted frame alone is not runtime evidence.
   installed app, removed on sign-out. A Coordinator or bot reply to Mikka's own
   events (never to the person's message, never a quiet reply) is pushed when
   the settings allow it: 需要你决策 for events that need the person (handed-over
-  matters included), 线程完成 for finished runs, 每日简报 for the 08:00
+  matters included), 待审阅 for a reply classified as ready for review, 线程完成 for finished runs, 每日简报 for the 08:00
   briefing (`lib/push-reasons.ts`, `lib/mobile-push.ts`). A verification code
   stays in the app chat; its push only says one came. A card is pushed as its
   words (`lib/openui-lang.ts`). Registering needs the EAS project id
