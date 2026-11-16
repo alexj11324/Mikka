@@ -3,7 +3,7 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { issues } from '@/lib/db/schema'
 import { resourceAccessPredicate } from '@/lib/resource-access/predicate'
 import { ActionFailureError } from '@/lib/action-error'
-import { readIssueMetadata } from '@/lib/issue-metadata'
+import { pullRequestSchema, readIssueMetadata } from '@/lib/issue-metadata'
 
 /** Backend relation-picker search. Authorization is applied before the SQL limit,
  * with owner-only personal tasks, active workspace membership and no 100-row cap.
@@ -25,6 +25,7 @@ export type SearchQuery =
   | { kind: 'number'; number: number }
   | { kind: 'identifier'; identifier: string }
   | { kind: 'title'; text: string }
+  | { kind: 'pull'; url: string }
 
 export class SearchInputError extends Error {
   constructor(public code: 'searchQueryTooShort' | 'searchQueryTooLong' | 'searchInvalidParam') { super(code) }
@@ -35,6 +36,9 @@ export function parseSearchQuery(raw: string | null | undefined): SearchQuery {
   const text = (raw ?? '').trim()
   if (!text) return { kind: 'recent' }
   if (text.length > 200) throw new SearchInputError('searchQueryTooLong')
+  if (text.startsWith('https://github.com/') && pullRequestSchema.shape.url.safeParse(text).success) {
+    return { kind: 'pull', url: text.replace(/\/$/, '').toLowerCase() }
+  }
   const number = /^([1-9]\d{0,8})$/.exec(text)
   if (number) return { kind: 'number', number: Number(number[1]) }
   if (/^[a-z][a-z0-9_]{0,63}-[1-9]\d{0,15}$/i.test(text)) return { kind: 'identifier', identifier: text.toUpperCase() }
@@ -164,6 +168,9 @@ export function searchCondition(query: SearchQuery): SQL | undefined {
   if (query.kind === 'identifier') return sql`(${issues.issuedIdentifier}=${query.identifier} OR EXISTS (
     SELECT 1 FROM task_identifier_aliases a WHERE a."issueId"=${issues.id} AND a."workspaceId"=${issues.workspaceId} AND a.identifier=${query.identifier}
   ))`
+  if (query.kind === 'pull') return sql`exists (
+    select 1 from task_pull_links link where link."issueId" = ${issues.id} and lower(link.url) = ${query.url}
+  )`
   if (query.kind === 'title') return sql`${issues.title} ilike ${'%' + escapeLike(query.text) + '%'}`
   return undefined
 }

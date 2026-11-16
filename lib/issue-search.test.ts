@@ -7,6 +7,14 @@ import { encodeCursor, escapeLike, existingRelation, idIn, parseSearchParams, pa
 const A = '00000000-0000-4000-8000-00000000000a', B = '00000000-0000-4000-8000-00000000000b'
 const rejects = (fn: () => unknown, code: string) => assert.throws(fn, (error: unknown) => error instanceof SearchInputError && error.code === code)
 
+test('a full recorded pull-request URL selects its normalized identity', () => {
+  assert.deepEqual(parseSearchQuery('https://github.com/Example/Repo/pull/12/'), {
+    kind: 'pull', url: 'https://github.com/example/repo/pull/12',
+  })
+  assert.equal(parseSearchQuery('https://github.com/Example/Repo/issues/12').kind, 'title')
+  rejects(() => parseSearchQuery('https://github.com/example/' + 'x'.repeat(180) + '/pull/12'), 'searchQueryTooLong')
+})
+
 test('q: numeric counters and issued identifiers retain distinct namespaces', () => {
   assert.deepEqual(parseSearchQuery(''), { kind: 'recent' })
   assert.deepEqual(parseSearchQuery('   '), { kind: 'recent' })
