@@ -15,7 +15,7 @@ import { applyDriveWrite, DriveError, readDriveFileHistory, readDriveHistory, re
 import { createDriveVolume, listDriveVolumes, readDriveVolume, setPersonalDriveArchive } from './volumes'
 import { driveErrorResponse } from './http'
 import { listDriveSkills } from './skills'
-import { createDriveFileLink, readOwnDriveFileLink, revokeDriveFileLink, updateDriveFileLink } from './file-links'
+import { createDriveFileLink, readLinkedDriveFile, readOwnDriveFileLink, revokeDriveFileLink, updateDriveFileLink, type DriveFileBytes } from './file-links'
 
 const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }
 const digest = z.string().regex(/^[a-f0-9]{64}$/)
@@ -174,18 +174,15 @@ export async function driveResponse(request: Request, operation: Operation, para
       if (linkId && (search.has('path') || search.has('versionId'))) throw new DriveError('drive_write_invalid', 400)
       const path = linkId ? null : z.string().refine(isDrivePath).parse(search.get('path'))
       const selectedVersion = search.has('versionId') ? versionId.parse(search.get('versionId')) : volume.headVersionId
-      const { rows: [blob] } = await pool.query<{ path: string; sha256: string; inlineContent: Buffer | null; sizeBytes: number }>(
-        `SELECT entry->>'path' AS path,b.sha256, b."inlineContent", b."sizeBytes"
-         FROM drive_volume_versions v JOIN drive_volumes d ON d.id = v."volumeId"
-         CROSS JOIN LATERAL jsonb_array_elements(v.manifest) AS entry
-         JOIN drive_blobs b ON b.sha256 = entry->>'sha256' AND d."ownerId" = b."ownerId"
-         WHERE v.id = CASE WHEN $5::uuid IS NULL THEN $1 ELSE d."headVersionId" END
-           AND v."volumeId" = $2 AND d."ownerId" = $3 AND d."archivedAt" IS NULL
-           AND entry->>'path' = CASE WHEN $5::uuid IS NULL THEN $4 ELSE (
-             SELECT l.path FROM drive_file_links l WHERE l.id=$5 AND l."volumeId"=d.id
-               AND (l."createdBy"=$6 OR l.visibility='org' AND d."driveScope" IN ('project','team-workspace'))
-           ) END AND entry->'sizeBytes' = to_jsonb(b."sizeBytes")
-         LIMIT 1`, [selectedVersion, volume.id, actor.ownerId, path, linkId, session.user.id])
+      const { rows: [blob] } = linkId ? await readLinkedDriveFile(pool, volume.id, linkId, session.user.id, actor.ownerId)
+        : await pool.query<DriveFileBytes>(
+          `SELECT $4::text AS path,b.sha256,b."inlineContent",b."sizeBytes"
+           FROM drive_volume_versions v JOIN drive_volumes d ON d.id = v."volumeId"
+           CROSS JOIN LATERAL jsonb_array_elements(v.manifest) AS entry
+           JOIN drive_blobs b ON b.sha256 = entry->>'sha256' AND d."ownerId" = b."ownerId"
+           WHERE v.id = $1 AND v."volumeId" = $2 AND d."ownerId" = $3 AND d."archivedAt" IS NULL
+             AND entry->>'path' = $4 AND entry->'sizeBytes' = to_jsonb(b."sizeBytes")
+           LIMIT 1`, [selectedVersion, volume.id, actor.ownerId, path])
       if (!blob) throw new DriveError('drive_not_found', 404)
       if (blob.inlineContent && driveSha256(driveBytes(blob.inlineContent)) !== blob.sha256) throw new DriveError('drive_blob_size_mismatch', 422)
       const content = blob.inlineContent ? driveBytes(blob.inlineContent) : await readDriveBlobObject(actor.ownerId, blob.sha256, request.signal)
