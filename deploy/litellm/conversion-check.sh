@@ -24,7 +24,12 @@ done
 curl -fsS --noproxy '*' http://127.0.0.1:4012/health/liveliness > /dev/null
 output=$(MIKKA_LITELLM_TEST_URL=http://127.0.0.1:4012 MIKKA_LITELLM_TEST_MASTER_KEY="$key" \
   MIKKA_LITELLM_TEST_PROVIDER=http://litellm-proof-provider:9911/v1 NO_PROXY=127.0.0.1,localhost \
-  corepack pnpm run --silent test:model-gateway-litellm 2>&1) || { printf '%s\n' "$output" | grep -E '^(not )?ok |^# ' >&2; exit 1; }
+  corepack pnpm run --silent test:model-gateway-litellm 2>&1) || {
+  # Show why, never the generated key; then the converter's own log tail.
+  printf '%s\n' "$output" | sed "s/$key/<master-key>/g" | tail -n 60 >&2
+  docker logs --tail 40 litellm-proof 2>&1 | sed "s/$key/<master-key>/g" >&2
+  exit 1
+}
 printf '%s\n' "$output" | grep -E '^ok |^# (pass|fail|skipped)'
 # Both conversions ran: a skipped test is not a proof.
 printf '%s\n' "$output" | grep -qx '# pass 2' && printf '%s\n' "$output" | grep -qx '# skipped 0'
