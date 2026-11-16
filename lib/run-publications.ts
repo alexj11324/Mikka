@@ -219,6 +219,7 @@ async function completionTransaction(userId: string, runId: string, completion: 
             AND e.request->>'sourceEventId'=a.output->>'supersededBy'
           WHERE a."runId"=$1 AND a.status='cancelled' AND t."userId"=$2 AND t."workspaceId"=$3 AND t."issueId"=$4
             AND e.request->'supersededRunIds' ? $1::text
+            AND ($5::uuid IS NULL OR EXISTS (SELECT 1 FROM device_tokens d WHERE d.id=$5 AND d."userId"=$2 AND d."revokedAt" IS NULL))
             AND NOT EXISTS (SELECT 1 FROM device_credential_revocations v WHERE v."tokenId"=$5 AND v."ownerId"=$2)
           LIMIT 1`, [run.id, run.userId, run.workspaceId, run.issueId, run.deviceTokenId])
         if (superseded.rowCount) completion = { ...completion, stopReason: 'cancelled' }
