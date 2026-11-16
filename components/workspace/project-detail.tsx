@@ -71,7 +71,10 @@ export function ProjectDetail({ readerId, paging, project, projects, issues, dir
     if (flush) flushes.current.set(field, flush)
     else flushes.current.delete(field)
   }
-  const { data: events, error, mutate } = useSWR(['project-events', project.id, project.revision], () => listProjectEvents(project.id))
+  const { data: events, error, mutate } = useSWR(
+    ['project-events', readerId, project.workspaceId, project.id, project.revision],
+    () => listProjectEvents(project.id, project.workspaceId),
+  )
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
       if (event.isComposing || event.keyCode === 229 || event.target instanceof HTMLElement && event.target.closest('input, textarea, [contenteditable="true"], [role="dialog"]')) return

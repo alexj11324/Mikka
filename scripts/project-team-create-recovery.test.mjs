@@ -7,10 +7,12 @@ const page = new Window({ url: 'https://example.invalid/mikka/en' })
 const team = 'a432688c-38ce-47d1-b1eb-434ad1957713'
 const saved = { id: '720d08f2-1d52-4b51-9fc3-6c1f1c649f55', revision: 1 }
 const calls = []
+const activityReads = []
 let relation
 const empty = () => null
 const children = ({ children }) => createElement(Fragment, null, children)
 mock.module('../app/actions/projects.ts', { namedExports: {
+  listProjectEvents: async (...args) => { activityReads.push(args); return [] },
   saveProject: async () => { calls.push('create'); return { project: saved } },
   updateProjectProperties: () => assert.fail('Unexpected project edit'),
 } })
@@ -38,6 +40,8 @@ before(async () => {
   for (const key of ['window', 'document', 'HTMLElement', 'HTMLInputElement', 'Event', 'Node']) {
     Object.defineProperty(globalThis, key, { configurable: true, value: key === 'window' ? page : page[key] })
   }
+  globalThis.requestAnimationFrame = page.requestAnimationFrame.bind(page)
+  globalThis.cancelAnimationFrame = page.cancelAnimationFrame.bind(page)
   globalThis.IS_REACT_ACT_ENVIRONMENT = true
   ;({ createRoot } = await import('react-dom/client'))
   ;({ ProjectForm } = await import('../components/workspace/project-form.tsx'))
@@ -100,5 +104,36 @@ test('a selected project missing from the current directory retains an explicit 
   } finally {
     await act(async () => root.unmount())
     host.remove()
+  }
+})
+
+test('project activity uses the displayed workspace and obtains a fresh read when the reader changes', async () => {
+  const nested = [
+    ['../components/workspace/project-lifecycle-controls.tsx', { ProjectLifecycleControls: empty }],
+    ['../components/teams/project-team-control.tsx', { ProjectTeamControl: empty }],
+    ['../components/workspace/project-issue-picker.tsx', { ProjectIssuePicker: empty }],
+    ['../components/workspace/issue-list.tsx', { IssueList: empty }],
+  ].map(([file, namedExports]) => mock.module(file, { namedExports }))
+  const { ProjectDetail } = await import('../components/workspace/project-detail.tsx')
+  const { DEFAULT_PROJECT_PROPERTIES } = await import('../lib/project-input.ts')
+  const { SWRConfig } = await import('swr')
+  const cache = new Map()
+  const host = document.body.appendChild(document.createElement('main'))
+  const root = createRoot(host)
+  const project = { ...saved, workspaceId: team, name: 'Project', summary: '', description: '', properties: DEFAULT_PROJECT_PROPERTIES,
+    archivedAt: null, issueIds: [], memberIds: [], priority: 'none', status: 'planned', health: 'none', canEditProperties: false }
+  const detail = readerId => createElement(SWRConfig, { value: { provider: () => cache } },
+    createElement(ProjectDetail, { readerId, project, projects: [project], issues: [],
+      directory: { workspaceId: team, members: [] }, paging: {}, admin: false, onUpdated() {} }))
+  activityReads.length = 0
+  try {
+    await act(async () => root.render(detail('first-reader')))
+    assert.deepEqual(activityReads, [[saved.id, team]])
+    await act(async () => root.render(detail('second-reader')))
+    assert.deepEqual(activityReads, [[saved.id, team], [saved.id, team]])
+  } finally {
+    await act(async () => root.unmount())
+    host.remove()
+    for (const child of nested) child.restore()
   }
 })
