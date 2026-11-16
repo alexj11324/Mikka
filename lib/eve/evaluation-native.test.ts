@@ -57,7 +57,7 @@ test('Agent Kit evaluations run through compiled public Eve sessions with inert 
  await writeFile(join(fixture,'lib/deployment-switches.ts'),`export function deploymentSwitch(){throw Error('Real product switches forbidden')}`)
  await writeFile(join(fixture,'lib/factory/reconcile-pending.ts'),`export async function pendingFactoryReconciliation(){throw Error('Real Factory reconciliation forbidden')}`)
  await writeFile(join(fixture,'lib/eve/product-tool.ts'),`export function createProductTool(){throw Error('Real product tools forbidden')}`)
- await writeFile(join(fixture,'lib/eve/projection.ts'),`export function projectEveTurn(){throw Error('Chat projection forbidden')}export const projectTurnState=projectEveTurn`)
+ await writeFile(join(fixture,'lib/eve/projection.ts'),`export function projectEveTurn(){throw Error('Chat projection forbidden')}export const projectTurnState=projectEveTurn, stoppedTurnDisplay=projectEveTurn`)
  await writeFile(join(fixture,'lib/eve/scheduled-read.ts'),`export async function loadScheduledRead(){throw Error('Scheduled authority forbidden')}`)
  await mkdir(join(fixture,'lib/plugins'),{recursive:true})
  await writeFile(join(fixture,'lib/plugins/runtime.ts'),`export const personalPlugins={async snapshot(){throw Error('Personal MCP forbidden')}}`)
