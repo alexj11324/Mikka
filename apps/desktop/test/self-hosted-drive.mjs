@@ -69,6 +69,15 @@ async function verifyDownloadedFile(application, page, fixture, receipt, stage) 
   receipt.sha256 = fixture.sha256
 }
 
+async function readDriveDirectory(page, workspaceId, query = {}) {
+  return page.evaluate(async ({ workspaceId, query }) => {
+    const params = new URLSearchParams({ workspaceId, ...query })
+    const response = await fetch('/mikka/api/drive/volumes?' + params, { cache: 'no-store' })
+    if (!response.ok) throw new Error('Drive directory returned ' + response.status)
+    return response.json()
+  }, { workspaceId, query })
+}
+
 export async function verifyPersonalDriveUploads({ application, page, rpc, fixture, passed, setPhase, workspaceId, directory, folderCheck, receipts }) {
   const files = await mkdtemp(join(directory, 'personal-drive-'))
   try {
@@ -96,6 +105,30 @@ export async function verifyPersonalDriveUploads({ application, page, rpc, fixtu
     }, { workspaceId, projectId: project.id, projectName })
     assert.equal(directoryMatches, true)
     passed('packaged_personal_drive_project_scope_directory_through_main_protocol')
+    setPhase('shared_files_create_workspace_folder')
+    const sharedName = 'Shared Desktop folder ' + randomUUID()
+    const shared = await page.evaluate(async ({ workspaceId, projectId, name }) => {
+      const team = new URLSearchParams({ workspaceId, driveScope: 'team-workspace' })
+      const project = new URLSearchParams({ workspaceId, driveScope: 'project' })
+      const readScopes = async params => {
+        const response = await fetch('/mikka/api/drive/scopes?' + params)
+        if (!response.ok) throw new Error('Drive destinations returned ' + response.status)
+        return (await response.json()).scopes
+      }
+      const [teams, projects] = await Promise.all([readScopes(team), readScopes(project)])
+      const create = await fetch('/mikka/api/drive/volumes?' + team, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name }),
+      })
+      if (create.status !== 201) throw new Error('Create team folder returned ' + create.status)
+      const { volume } = await create.json()
+      return { teams, hasProject: projects.some(row => row.driveScope === 'project' && row.projectId === projectId),
+        id: volume.id, scope: volume.driveScope, scopeId: volume.scopeId }
+    }, { workspaceId, projectId: project.id, name: sharedName })
+    assert.deepEqual(shared.teams, [{ workspaceId, driveScope: 'team-workspace' }])
+    assert.equal(shared.hasProject, true)
+    assert.equal(shared.scope, 'team-workspace')
+    assert.equal(shared.scopeId, workspaceId)
+    passed('packaged_shared_files_workspace_and_project_destinations_through_main_protocol')
     const folderName = 'Personal upload ' + randomUUID()
     const newFolder = page.getByRole('button', { name: 'New folder', exact: true }).filter({ visible: true })
     setPhase('personal_drive_open_folder_dialog')
@@ -175,6 +208,22 @@ export async function verifyPersonalDriveUploads({ application, page, rpc, fixtu
       passed('packaged_personal_drive_' + size + '_MiB_uploaded_committed_and_downloaded_after_reload')
     }
     assert.notEqual(receipts[0].headVersionId, receipts[1].headVersionId)
+    setPhase('personal_drive_select_skill_file')
+    const skillName = 'desktop-guide-' + randomUUID()
+    const [chooser] = await Promise.all([page.waitForEvent('filechooser'), upload.click()])
+    const [committed] = await Promise.all([
+      page.waitForResponse(r => r.request().method() === 'PATCH' && new URL(r.url()).pathname === headPath + '/entries'),
+      chooser.setFiles({ name: 'SKILL.md', mimeType: 'text/markdown',
+        buffer: Buffer.from(`---\nname: ${skillName}\ndescription: File guide\n---\nPrivate fixture instructions`) }),
+    ])
+    assert.equal(committed.status(), 200)
+    const { headVersionId } = await committed.json()
+    assert.ok(isVolumeVersionId(headVersionId))
+    const ownerSkills = await readDriveDirectory(page, workspaceId, { view: 'skills' })
+    assert.deepEqual(ownerSkills.skills.filter(skill => skill.volumeId === volume.id), [
+      { volumeId: volume.id, path: 'SKILL.md', versionId: headVersionId, name: skillName, description: 'File guide' },
+    ])
+    passed('packaged_owner_uploads_skill_through_file_chooser_and_reads_current_metadata')
     setPhase('personal_drive_same_workspace_member')
     await signInDesktopAccount(page, fixture.member, fixture.member.id)
     assert.ok((await rpc('workspace.switchWorkspace', [workspaceId])).ok)
@@ -189,6 +238,14 @@ export async function verifyPersonalDriveUploads({ application, page, rpc, fixtu
     }, { volumes, headPath, workspaceId, volumeId: volume.id })
     assert.deepEqual(peer, { list: 200, present: false, head: 404, file: 404 })
     passed('packaged_personal_drive_same_workspace_member_cannot_list_or_read_owner_files')
+    setPhase('member_shared_files_and_own_skills')
+    const [teamDirectory, ownSkills] = await Promise.all([
+      readDriveDirectory(page, workspaceId, { driveScope: 'team-workspace' }),
+      readDriveDirectory(page, workspaceId, { view: 'skills' }),
+    ])
+    assert.ok(teamDirectory.volumes.some(folder => folder.id === shared.id && folder.name === sharedName))
+    assert.ok(ownSkills.skills.every(skill => skill.volumeId !== volume.id))
+    passed('packaged_member_reads_shared_folder_and_separate_personal_skill_directory')
     await signInDesktopAccount(page, fixture, fixture.ownerId)
   } finally { await rm(files, { recursive: true, force: true }) }
 }
