@@ -18,7 +18,7 @@ test "$(git -C "$base/product" rev-parse HEAD)" = "$GITHUB_SHA"
 product="$base/product"
 mkdir -p "$base"/{material,harness,run/case,accounts,bin}
 # These are reviewed, immutable objects from this repository's original E evidence.
-delivery=6a422ef3b048c2032cfc105de08ba53b53df9a56
+delivery=b80e31e5f803c52a518f98e87f1b5f7fbfca6d51
 stage pinned-public-materials
 df -h /tmp
 for evidence in "$delivery" 46d60aa6802ef48600fbe2fa3d48015b14f6d50b 0f109ccec64515a7196d81eed656a29c9f0c75c9; do
