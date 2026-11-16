@@ -54,6 +54,14 @@ async function request<T>(target: string, init: RequestInit = {}, send: typeof f
   return body as T
 }
 
+export type PersonalDriveScope = { driveScope: 'user'; workspaceId: string }
+  | { driveScope: 'project-user'; workspaceId: string; projectId: string; name: string }
+
+export function readPersonalDriveScopes(workspaceId: string, send?: typeof fetch) {
+  const params = new URLSearchParams({ workspaceId })
+  return request<{ scopes: PersonalDriveScope[] }>(withBasePath(`/api/drive/scopes?${params}`), {}, send)
+}
+
 export function readDriveVolumes(location: DriveLocation, before?: string, send?: typeof fetch) {
   return request<DriveVolumePage>(url(location, '', { before }), {}, send)
 }

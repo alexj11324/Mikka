@@ -6,6 +6,7 @@ import { pool } from '@/lib/db'
 import { writeAllowed } from '@/lib/mobile-api'
 import { ActionFailureError } from '@/lib/action-error'
 import { WorkspaceError } from '@/lib/workspace-error'
+import { accessibleProjectNames } from '@/lib/project-access'
 import { withLockedProject } from '@/lib/project-lifecycle'
 import { withTaskWorkspace } from '@/lib/task-workspace'
 import { workspaceListChanged } from '@/lib/live/lists'
@@ -24,7 +25,7 @@ const write = z.object({ expectedDigest: digest, mutationId, changes: z.array(z.
   z.object({ op: z.literal('delete'), path: z.string().refine(isDrivePath) }).strict(),
 ])).min(1).max(DRIVE_MAX_CHANGES) }).strict()
 const restore = z.object({ versionId, expectedDigest: digest, mutationId }).strict()
-type Operation = 'volumes' | 'volume' | 'write' | 'upload' | 'file' | 'history' | 'version' | 'restore' | 'archive' | 'unarchive'
+type Operation = 'scopes' | 'volumes' | 'volume' | 'write' | 'upload' | 'file' | 'history' | 'version' | 'restore' | 'archive' | 'unarchive'
 type Params = { volumeId?: string; versionId?: string }
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers })
 
@@ -60,6 +61,15 @@ export async function driveResponse(request: Request, operation: Operation, para
   try {
     const search = new URL(request.url).searchParams
     const workspaceId = z.uuid().parse(search.get('workspaceId'))
+    if (operation === 'scopes') {
+      return await withTaskWorkspace(session.user, workspaceId, async (_workspace, tx) => {
+        const projects = await accessibleProjectNames(session.user, workspaceId, tx)
+        return json({ scopes: [
+          { driveScope: 'user', workspaceId },
+          ...projects.map(project => ({ driveScope: 'project-user', workspaceId, projectId: project.id, name: project.name })),
+        ] })
+      })
+    }
     let changed = false
     const projectId = search.has('projectId') ? z.uuid().parse(search.get('projectId')) : undefined
     const actor = { ownerId: session.user.id, authorName: session.user.name, workspaceId, projectId }

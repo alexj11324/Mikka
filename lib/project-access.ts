@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, eq, inArray, or, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { db } from '@/lib/db'
@@ -44,6 +44,20 @@ async function readProjectAccess(reader: ProjectReader, workspaceId: string) {
 
 export async function accessibleProjectReferences(reader: ProjectReader, workspaceId: string): Promise<ResourceReference[]> {
   return (await readProjectAccess(reader, workspaceId)).map(({ id, workspaceId }) => ({ kind: 'project', id, workspaceId }))
+}
+
+/** Only the names needed by a selected-workspace picker. Load from the
+ * canonical Project table after the current content ACL has selected the IDs. */
+export async function accessibleProjectNames(reader: ProjectReader, workspaceId: string, tx: ProjectTransaction) {
+  const references = await accessibleProjectReferences(reader, workspaceId)
+  if (!references.length) return []
+  return tx.select({ id: projects.id, name: projects.name }).from(projects)
+    .where(and(
+      eq(projects.workspaceId, workspaceId),
+      isNull(projects.archivedAt),
+      sql`${projects.id} = any(${sql.param(references.map(item => item.id))}::uuid[])`,
+    ))
+    .orderBy(projects.name, projects.id)
 }
 
 /** Caller holds withTaskWorkspace and lockTeamRelations before taking this row lock.
