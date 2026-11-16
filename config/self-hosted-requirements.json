@@ -229,6 +229,20 @@
     "test": "tests/mobile-service-members.db.test.ts",
     "suite": "test:web-auth-db"
   },
+  "app/api/mobile/push-tokens/[id]/test/route.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "Uses the installation's existing push relay for an explicit test of the current authenticated session's registered installation. A disconnected relay returns unavailable.",
+    "test": "tests/mobile-push-workspace.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "lib/mobile-push-session.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "Uses the installation's existing push relay for an explicit test of the current authenticated session's registered installation. A disconnected relay returns unavailable.",
+    "test": "tests/mobile-push-workspace.db.test.ts",
+    "suite": "test:visibility-db"
+  },
   "app/api/mobile/push-tokens/route.ts": {
     "mode": "built-in",
     "environment": [],

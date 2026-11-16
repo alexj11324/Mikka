@@ -1647,7 +1647,17 @@
         "GET",
         "POST"
       ],
-      "sourceHash": "6550502ce978c00ea8689dfebd05a8f2fbcb23ad970bd47acef43f12269c9139"
+      "sourceHash": "3a4339fdb86c115a18fff1e4f85b409334e6c92572c5859b887a640680d6f8b0"
+    },
+    {
+      "path": "/mikka/api/mobile/push-tokens/[id]/test",
+      "template": "/api/mobile/push-tokens/[id]/test",
+      "source": "app/api/mobile/push-tokens/[id]/test/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": 90,
+      "sourceHash": "3c6cdec2cdb5b8a1cd637566a711926b029cb90136bd28b72f2be833039fa899"
     },
     {
       "path": "/mikka/api/mobile/reactions",

@@ -5553,6 +5553,8 @@
     "removeNote": "Remove note {n}"
   },
   "MobilePush": {
+    "genericNotification": "New message",
+    "testNotification": "Test notification",
     "verificationCode": "A verification code arrived"
   },
   "MobileHandoff": {
@@ -7763,6 +7765,11 @@
       "on": "On",
       "off": "Off",
       "registeredDevices": "Registered push devices",
+      "testDevice": "Send a test notification",
+      "testSending": "Sending…",
+      "testAccepted": "Accepted by the notification service",
+      "testFailed": "Couldn’t confirm the test notification",
+      "testLimited": "Wait a minute before trying again",
       "noRegisteredDevices": "No registered devices",
       "pushTypes": "Send notifications for",
       "unavailable": "Push notifications are unavailable",

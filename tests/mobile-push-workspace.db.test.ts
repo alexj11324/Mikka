@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { createHmac, randomBytes, randomUUID } from 'node:crypto'
+import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto'
 import test, { mock } from 'node:test'
 import { Pool, type PoolClient } from 'pg'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
@@ -71,6 +71,7 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
   t.after(async () => {
     provider.mock.restore(); wake.restore(); workflow.restore()
     globals.mikkaPool = previous.app; globals.workspacePool = previous.workspace
+    await admin.query('DELETE FROM "rateLimit" WHERE key=$1', ['push-test:' + createHash('sha256').update(owner).digest('hex')])
     await admin.query('DELETE FROM mobile_push_receipts WHERE user_id=ANY($1::text[])', [[owner, peer]])
     await admin.query('DELETE FROM enterprise_org_policy WHERE "organizationId"=$1', [organizationId])
     await admin.query('DELETE FROM mikka_organizations WHERE id=$1', [organizationId])
@@ -143,11 +144,12 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
       assert.equal(response.status, 200)
       assert.match(response.headers.get('cache-control') ?? '', /private, no-store/)
       const { installations } = await response.json() as {
-        installations: { id: string; deviceName: string | null; platform: string; updatedAt: string; currentSession: boolean }[]
+        installations: { id: string; deviceName: string | null; platform: string; updatedAt: string; currentSession: boolean; canTest: boolean }[]
       }
       for (const item of installations) {
-        assert.deepEqual(Object.keys(item).sort(), ['currentSession', 'deviceName', 'id', 'platform', 'updatedAt'])
+        assert.deepEqual(Object.keys(item).sort(), ['canTest', 'currentSession', 'deviceName', 'id', 'platform', 'updatedAt'])
         assert.ok(Number.isFinite(Date.parse(item.updatedAt)))
+        assert.equal(item.canTest, item.currentSession)
       }
       return installations
     }
@@ -407,6 +409,38 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
       partialFailure = false
       await admin.query('DELETE FROM mobile_push_tokens WHERE token=$1', [second])
     }
+  })
+
+  await t.test('explicit push tests target only the current installation and limit concurrent requests before delivery', async () => {
+    const { POST: testPush } = await import('../app/api/mobile/push-tokens/[id]/test/route')
+    await rebind()
+    const { rows: [device] } = await admin.query('SELECT id FROM mobile_push_tokens WHERE token=$1', [token])
+    const url = origin + '/api/mobile/push-tokens/' + device.id + '/test'
+    const call = (bearer: string, extra: HeadersInit = {}) => testPush(new Request(url, {
+      method: 'POST', headers: { authorization: 'Bearer ' + bearer, ...extra },
+    }), { params: Promise.resolve({ id: device.id }) })
+    const other = await nativeSession(owner)
+    const before = sent.length
+    assert.equal((await call(peerSession.token)).status, 404)
+    assert.equal((await call(other.token)).status, 404)
+    assert.equal((await call(ownerSession.token, { origin: 'https://elsewhere.invalid' })).status, 403)
+    assert.equal(sent.length, before)
+    const streamRequest = (body: string) => testPush(new Request(url, {
+      method: 'POST', headers: { authorization: 'Bearer ' + ownerSession.token }, body,
+    }), { params: Promise.resolve({ id: device.id }) })
+    assert.equal((await streamRequest('{}')).status, 400)
+    const rateKey = 'push-test:' + createHash('sha256').update(owner).digest('hex')
+    // An independent connection must already observe the quota before the transport sees any bytes.
+    onSend = async () => {
+      assert.equal((await admin.query('SELECT 1 FROM "rateLimit" WHERE key=$1', [rateKey])).rowCount, 1)
+    }
+    const results = await Promise.all([streamRequest(''), call(ownerSession.token)]).finally(() => { onSend = undefined })
+    assert.deepEqual(results.map(result => result.status).sort(), [202, 429])
+    assert.deepEqual(await results.find(result => result.status === 202)?.json(), { accepted: true })
+    assert.equal(sent.length, before + 1)
+    assert.deepEqual(sent.at(-1)?.message.to, [token])
+    assert.deepEqual(Object.keys(sent.at(-1)!.message.data).sort(), ['serverUrl', 'userId'])
+    assert.equal(sent.at(-1)?.message.data.userId, owner)
   })
 
   // P2 adds a real organization policy without manufacturing SSO assurance.
