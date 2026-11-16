@@ -42,7 +42,7 @@ function conversationQuery() {
       LEFT JOIN conversation_reads ON conversation_reads."userId"=${owner} AND conversation_reads."conversationId"='run:' || agent_runs.id::text
       WHERE receipt.root=root.id AND NOT receipt."depthExceeded" AND (${unread.sql})) AS unread, coalesce(agent_runs.title,root.title) AS title, agents.name AS "agentName",agents.harness,
       root."issueId",i."issuedIdentifier" AS identifier,i.title AS "taskTitle",i.status,agent_runs.status AS "runStatus",
-      agent_runs."deviceId" AS "currentDeviceId", agent_runs."threadReplacedBy" IS NOT NULL AS replaced,
+      agent_runs."deviceId" AS "currentDeviceId", root."threadReplacedBy" IS NOT NULL AS replaced,
       root."conversationPinnedAt" IS NOT NULL AS pinned,root."conversationArchivedAt" AS manual,
       root."conversationRestoredAt" AS restored,latest.touched,root.source,
       CASE WHEN root."promptTaskStart">=0 AND root."promptTaskLength" BETWEEN 0 AND length(root.prompt)-root."promptTaskStart"::bigint
