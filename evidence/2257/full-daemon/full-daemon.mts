@@ -4,7 +4,6 @@ import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { existsSync, readFileSync, writeFileSync, openSync, closeSync } from 'node:fs'
 import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
 import { setTimeout as wait } from 'node:timers/promises'
 import { Pool } from 'pg'
 import { seedWorkspace } from '../../tests/support/workspace-admin-db'
@@ -23,6 +22,7 @@ import { addApiKey } from '../../lib/model-api-keys'
 import { threadDeliveryView } from '../../lib/thread-delivery-queue'
 
 const dir = process.env.E_CODEX_QA!, origin = process.env.BETTER_AUTH_URL!
+const modelDir = process.env.E_MODEL_QA_DIR ?? dir
 const model = 'SmolLM2-135M-Instruct-Q4_K_M'
 const source = process.env.E_RUN_SOURCE
 const native = process.env.E_DESKTOP_WINDOW === '1'
@@ -37,11 +37,15 @@ const ident = () => randomUUID()
 const hash = (text:string) => createHash('sha256').update(text).digest('hex')
 const mark = (s:string) => 'E2262_QA_BEGIN '+s+' E2262_QA_END'
 const cli = 'packages/daemon/bin/mikka.ts'
-const daemonDir = join(dir,'daemon')
-const cliArgs = ['--import','tsx',cli,'daemon']
+const daemonDir = process.env.E_DEVICE_DATA_DIR ?? join(dir,'daemon')
+const program = process.env.E_DEVICE_LAUNCH ?? process.execPath
+const launcherArgs = process.env.E_DEVICE_LAUNCH ? [process.execPath] : []
+const cliArgs = [...launcherArgs,'--import','tsx',cli,'daemon']
 const cliLog = openSync(join(dir,'daemon.log'),'a',0o600)
 const daemonEnv = Object.fromEntries(['PATH','HOME','LANG','TERM','NODE_EXTRA_CA_CERTS','SSL_CERT_FILE','GIT_CONFIG_GLOBAL'].map(name=>[name,process.env[name]]))
-Object.assign(daemonEnv,{MIKKA_TEST_MODE:'1',CI:'true',GIT_TERMINAL_PROMPT:'0'})
+Object.assign(daemonEnv,{MIKKA_TEST_MODE:'1',CI:'true',GIT_TERMINAL_PROMPT:'0',
+  ...(process.env.E_DEVICE_GIT_CONFIG?{GIT_CONFIG_GLOBAL:process.env.E_DEVICE_GIT_CONFIG}:{}),
+  ...(process.env.E_DEVICE_TRUST?{SSL_CERT_FILE:process.env.E_DEVICE_TRUST,NODE_EXTRA_CA_CERTS:process.env.E_DEVICE_TRUST}:{})})
 let scope:any, daemon:ReturnType<typeof spawn>|undefined, owner:string, workspaceId:string, deviceId:string
 let lastRun:string|undefined, tokenId:string|undefined, stage='start'
 async function until<T>(test:()=>Promise<T>, name:string, seconds=75):Promise<NonNullable<T>> {
@@ -65,8 +69,9 @@ async function fullWork(window?:any){
   }
   record('both_authenticated_catalogues')
   if(window)record('packaged_application',{platform:window.platform})
-  for(const mode of ['steer','interrupt','queue'] as const){
-    const harness=mode==='steer'?'codex':'claude_code'
+  for(const mode of ['steer','interrupt','queue','sendNow'] as const){
+    const activeSteer=mode==='steer'||mode==='sendNow'
+    const harness=activeSteer?'codex':'claude_code'
     const runId=ident(),agent=agents.find(a=>a.harness===harness);assert.ok(agent)
     lastRun=runId
     const prompt=mark(mode==='queue'?'The user wants the finished report delivered. Choose submit, not answer. The report should say which color a clear daytime sky is.':'List twenty vegetables with a sentence about each.')
@@ -75,43 +80,46 @@ async function fullWork(window?:any){
     assert.ok(issue?.id);const issueId=issue.id
     const definition=apiKeyWorkerDefinition({schemaVersion:1,kind:'worker',harness,instructions:'Answer only the synthetic test request.',definitionDigest:hash(prompt),promptDigest:hash(prompt),model,modelSource:'native-default',parent:null,readOnly:true} as never,prompt,{keyId:keys[harness].id,model})
     const input={id:runId,userId:owner,issueId,agentId:agent.id,deviceId,deviceRepoId:repo.id,botId:null,origin:'web' as const,prompt,promptTaskStart:0,promptTaskLength:[...prompt].length,definition,dispatch:{issueId,agentId:agent.id,deviceRepoId:repo.id,requestKey:ident()}}
-    writeFileSync(join(dir,'current-gate.json'),JSON.stringify({id:runId,marker:prompt}),{mode:0o600})
-    const release=()=>writeFileSync(join(dir,runId+'.release'),'',{mode:0o600})
+    writeFileSync(join(modelDir,'current-gate.json'),JSON.stringify({id:runId,marker:prompt}),{mode:0o600})
+    const release=()=>writeFileSync(join(modelDir,runId+'.release'),'',{mode:0o600})
     if(mode==='interrupt')await withProjectResourceLease(owner,workspaceId,()=>queueFactoryTask(pool,owner,{issueId,botId:null,agentId:agent.id,deviceRepoId:repo.id,note:prompt,key:ident(),queue:(tx,userId,_request,botId,context)=>acceptLocalRun({...input,userId,botId,factoryContext:context},tx)}));else await acceptLocalRun(input)
     record('ordinary_run_admitted',{mode,harness,runId,issueId,deviceId})
     try {
-      await until(async()=>existsSync(join(dir,runId+'.observed'))&&((await row(runId))?.status==='running'),mode+'_genuine_first_frame',95)
-      const modes=await threadDeliveryView(pool,owner,runId,runId);assert.ok(modes.modes.includes(mode));assert.equal(modes.modes.includes('steer'),harness==='codex')
+      await until(async()=>existsSync(join(modelDir,runId+'.observed'))&&((await row(runId))?.status==='running'),mode+'_genuine_first_frame',95)
+      const modes=await threadDeliveryView(pool,owner,runId,runId);assert.ok(modes.modes.includes(activeSteer?'steer':mode));assert.equal(modes.modes.includes('steer'),harness==='codex')
       const grant=(await observer.query('select harness,model,"sourceKind" from model_gateway_tokens where "runId"=$1 and "ownerId"=$2 and "workspaceId"=$3 and "keyId"=$4',[runId,owner,workspaceId,keys[harness].id])).rows
       assert.ok(grant.some(g=>g.harness===harness&&g.model===model&&g.sourceKind==='api_key'))
       const target={issueId,runId,ownerId:owner,workspaceId,harness}
       const send=async(account:any,delivery:string,text:string,requestId:string)=>rpc(account,'agents.sendIssueThreadReply',[{issueId,runId,expectedOwnerId:account.userId,expectedWorkspaceId:workspaceId,text,delivery,requestId}])
       const ui=window?await window.openThread(target):{submit:async(delivery:string,text:string)=>{const id=ident();const sent=await send(scope.owner,delivery,text,id);assert.equal(sent.runId,runId);return id},changeQueued:async(text:string,action:string)=>{const queue=(await threadDeliveryView(pool,owner,runId,runId)).queued;const message=queue.find(m=>m.text===text);assert.ok(message);const result=await rpc(scope.owner,'agents.changeQueuedThreadReply',[{issueId,runId,messageId:message.id,action}]);assert.ok(['cancelled','sent'].includes(result.status));return message.id}}
-      const refused=await send(scope.peer,mode,follow,ident());assert.ok(refused.error)
-      record('live_turn_before_owner_action',{runId,harness,modes:modes.modes,peerDenied:true,runBoundGrant:true,firstFrame:JSON.parse(readFileSync(join(dir,runId+'.observed'),'utf8'))})
+      const refused=await send(scope.peer,mode==='sendNow'?'steer':mode,follow,ident());assert.ok(refused.error)
+      record('live_turn_before_owner_action',{runId,harness,modes:modes.modes,peerDenied:true,runBoundGrant:true,firstFrame:JSON.parse(readFileSync(join(modelDir,runId+'.observed'),'utf8'))})
+      if(window&&mode==='steer')await ui.expectDefaultQueue()
       const cancelText='Remove this synthetic queued note.'
-      const cancelId=await ui.submit('queue',cancelText);await ui.changeQueued(cancelText,'cancel');assert.equal((await queued(cancelId)).status,'cancelled')
+      const cancelId=await ui.submit('queue',cancelText);if(window)await ui.expectQueued(cancelText)
+      await ui.changeQueued(cancelText,'cancel');assert.equal((await queued(cancelId)).status,'cancelled');if(window)await ui.expectNoPendingRow(cancelText)
       const heldText=mark('Do not deliver this earlier question to a replacement.')
       let heldId
       if(mode==='interrupt'){heldId=await ui.submit('queue',heldText);assert.equal((await queued(heldId)).status,'queued')}
-      const sendId=await ui.submit(mode,follow)
+      const sendId=await ui.submit(mode==='sendNow'?'queue':mode,follow)
+      if(mode==='sendNow'){const pending=await queued(sendId);assert.equal(pending.status,'queued');if(window)await ui.expectQueued(follow);const id=await ui.changeQueued(follow,'sendNow');assert.equal(id,pending.id);const posted=await queued(sendId);assert.deepEqual([posted.status,posted.claimMode,posted.sentRunId],['sent','steer',runId])}
       if(mode==='queue')assert.equal((await queued(sendId)).status,'queued')
-      if(mode==='steer'){
+      if(activeSteer){
         // Steer acknowledgement is written only after the assigned native CLI accepts the new input.
         const stored=await until(async()=>{const r=await observer.query('select id,"deliveredAt",failure from run_messages where "runId"=$1 and text=$2',[runId,follow]);return r.rows.find(m=>m.deliveredAt&&!m.failure)},'native_steer_ack',25)
-        record('native_steer_ack',{runId,messageId:stored.id,at:stored.deliveredAt})
+        record('native_steer_ack',{mode,runId,messageId:stored.id,at:stored.deliveredAt})
       }
       release()
-      if(mode==='steer'){
+      if(activeSteer){
         const final=await until(async()=>{const r=await row(runId);return r?.sessionId&&r.status==='stopped'&&r},'codex_terminal_result')
-        const results=readFileSync(join(dir,'results.jsonl'),'utf8').trim().split('\n').map(s=>JSON.parse(s));
+        const results=readFileSync(join(modelDir,'results.jsonl'),'utf8').trim().split('\n').map(s=>JSON.parse(s));
         const matches=results.findLast(s=>mark(s.prompt)===follow&&s.outputTokens>0&&final.lastReply?.includes(s.result));assert.ok(matches)
-        record('steer_terminal_readback',{runId,deviceId,sessionId:final.sessionId,status:final.status,outputSha256:hash(matches.result)})
+        record('steer_terminal_readback',{mode,runId,deviceId,sessionId:final.sessionId,status:final.status,outputSha256:hash(matches.result)})
       }else{
         const next=await until(async()=>{const rows=(await observer.query('select id from agent_runs where "continuesRunId"=$1 and "workspaceId"=$2 and "userId"=$3',[runId,workspaceId,owner])).rows;assert.ok(rows.length<=1);return rows[0]?.id},mode+'_child_admission',90)
         const child=await until(async()=>{const r=await row(next);return r?.sessionId&&r.status==='stopped'&&r},mode+'_child_native_result',90)
         const prior=await row(runId);assert.equal(prior.deviceId,deviceId);assert.equal(child.deviceId,deviceId);assert.ok(child.prompt.includes(follow));assert.ok(child.lastReply)
-        const actual=readFileSync(join(dir,'claude-results.jsonl'),'utf8').trim().split('\n').map(x=>JSON.parse(x)).findLast(s=>mark(s.prompt)===follow&&s.output_tokens>0&&child.lastReply.includes(s.output));assert.ok(actual)
+        const actual=readFileSync(join(modelDir,'claude-results.jsonl'),'utf8').trim().split('\n').map(x=>JSON.parse(x)).findLast(s=>mark(s.prompt)===follow&&s.output_tokens>0&&child.lastReply.includes(s.output));assert.ok(actual)
         if(mode==='queue'){const q=await queued(sendId);assert.deepEqual([q.status,q.claimMode,q.sentRunId],['sent','afterRun',next]);assert.equal(prior.status,'succeeded')}
         if(mode==='interrupt'){const q=await queued(heldId);assert.equal(q.status,'failed');assert.equal(q.sentRunId,null);assert.ok(!child.prompt.includes(heldText));assert.equal(prior.status,'cancelled')}
         record('terminal_and_native_continuation_readback',{mode,runId,childId:next,deviceId,sessionId:child.sessionId,prior:prior.status,status:child.status,outputSha256:hash(actual.output)})
@@ -131,9 +139,9 @@ try {
   const enrolled=await scope.owner.request('/api/devices/enrollment',{method:'POST'});assert.equal(enrolled.status,200)
   const {token}=await enrolled.json();assert.ok(token)
   const common=['--server',origin+'/mikka','--data-dir',daemonDir]
-  const login=spawn(process.execPath,[...cliArgs,'login','--registration-token-stdin','--workspace',workspaceId,...common],{env:daemonEnv,stdio:['pipe',cliLog,cliLog]});const logged=once(login,'exit');login.stdin.end(token);assert.equal((await logged)[0],0)
+  const login=spawn(program,[...cliArgs,'login','--registration-token-stdin','--workspace',workspaceId,...common],{env:daemonEnv,stdio:['pipe',cliLog,cliLog]});const logged=once(login,'exit');login.stdin.end(token);assert.equal((await logged)[0],0)
   const found=await(await scope.owner.request('/api/device-tokens')).json();assert.equal(found.tokens.length,1);tokenId=found.tokens[0].id
-  daemon=spawn(process.execPath,[...cliArgs,...common,'--no-auto-update','--retain-resources'],{env:daemonEnv,stdio:['ignore',cliLog,cliLog]})
+  daemon=spawn(program,[...cliArgs,...common,'--no-auto-update','--retain-resources'],{env:daemonEnv,stdio:['ignore',cliLog,cliLog]})
   const device=await until(async()=>{const owned=await(await scope.owner.request('/api/devices/enrollment')).json();assert.equal(owned.ownerId,owner);assert.ok(owned.deviceIds.length<=1);const id=owned.deviceIds[0];if(!id)return;const listed=await rpc(scope.owner,'agents.pollDevices',[]);return listed.devices.find((d:any)=>d.id===id&&d.online)},'official_daemon_registered')
   deviceId=device.id
   const daemonReport=(await observer.query('select harnesses from devices where id=$1 and "ownerId"=$2',[deviceId,owner])).rows[0].harnesses
@@ -141,7 +149,7 @@ try {
   record('one_registered_full_device_with_pinned_harnesses',{deviceId,versions,registration:'one-use HTTPS enrollment'})
   if(native){const {withPackagedDeliveryWindow}=await import('../../apps/desktop/test/self-hosted-delivery.mjs');await withPackagedDeliveryWindow({scope,authorityCertificate:join(dir,'ephemeral-ca.pem'),workspaceDirectory:dir},fullWork)}else await fullWork()
   trace.success=true
-}catch(error){const location=String(error?.stack??'').match(/full-daemon\.mts:\d+:\d+/)?.[0];trace.diagnostic={stage,location};if(lastRun){const run=await row(lastRun).catch(()=>null);if(run)Object.assign(trace.diagnostic,{run:lastRun,state:run.status,reason:run.stopReason,sessionPresent:Boolean(run.sessionId),tokens:(await observer.query('select count(*)::int as n from model_gateway_tokens where "runId"=$1',[lastRun])).rows[0].n})};process.exitCode=1}
+}catch(error){const location=String(error?.stack??'').match(/full-daemon\.mts:\d+:\d+/)?.[0];const named=String(error?.code??'');trace.diagnostic={stage,location,code:/^[A-Z_0-9]{2,60}$/.test(named)?named:undefined};if(lastRun){const run=await row(lastRun).catch(()=>null);if(run)Object.assign(trace.diagnostic,{run:lastRun,state:run.status,reason:run.stopReason,sessionPresent:Boolean(run.sessionId),tokens:(await observer.query('select count(*)::int as n from model_gateway_tokens where "runId"=$1',[lastRun])).rows[0].n})};process.exitCode=1}
 finally{
   try{if(daemon?.pid&&daemon.exitCode===null){const end=once(daemon,'exit');daemon.kill('SIGTERM');const timer=setTimeout(()=>daemon?.kill('SIGKILL'),8000);try{await end}finally{clearTimeout(timer)}}
     if(tokenId){const r=await scope.owner.request('/api/device-tokens/'+tokenId+'/revoke',{method:'POST'});assert.equal(r.status,200);assert.equal((await r.json()).tokenId,tokenId)}

@@ -13,8 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 43
     env:
-      PUBLIC_SOURCE: 3f7eaa6042d04fc85c4c1c45d4be361e1796fa57
-      PUBLIC_TREE: cb7a5f3f00075a88a220ce6bd300b97dffac9149
+      PUBLIC_SOURCE: ca6c1b17caf92d4a8f4dd56c5c9aad1670022eb0
+      PUBLIC_TREE: db549b556f0a9a4ce426f0e90614244833c5b8f0
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -29,7 +29,7 @@ jobs:
           sparse-checkout: evidence/2257/local-provider
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: 3f7eaa6042d04fc85c4c1c45d4be361e1796fa57
+          ref: ca6c1b17caf92d4a8f4dd56c5c9aad1670022eb0
           path: product
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -44,7 +44,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 24.22.1
-      - name: Prepare public components and exact-source release Eve without running the image
+      - name: Prepare pinned public components
         shell: bash
         run: |
           set -euo pipefail
@@ -61,13 +61,6 @@ jobs:
           node product/packages/daemon/harness/cli.mjs run/case/daemon/harness claude_code > "$RUNNER_TEMP/claude-install.log"
           curl -fsSL --retry 2 https://huggingface.co/bartowski/SmolLM2-135M-Instruct-GGUF/resolve/d255afaffd3441b95abca9b5cc4c819b93f66936/SmolLM2-135M-Instruct-Q4_K_M.gguf -o material/model.gguf
           echo "2e8040ceae7815abe0dcb3540b9995eaa1fa0d2ca9e797d0a635ae4433c68c2d  material/model.gguf" | sha256sum -c -
-          image=ghcr.io/alexj11324/mikka@sha256:076f20b19385e4cf0c775a6fdf5a109ada55497ca2bc89433b0a5de21b7b08fe
-          docker pull "$image"
-          test "$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")" = "$PUBLIC_SOURCE"
-          container=$(docker create "$image")
-          trap 'docker rm "$container" >/dev/null' EXIT
-          docker cp "$container:/app/eve" product/apps/eve/.output
-          test "$(jq -r .revision product/apps/eve/.output/mikka-eve-build.json)" = "$PUBLIC_SOURCE"
           if [ ! -x /usr/lib/postgresql/17/bin/initdb ]; then
             . /etc/os-release
             curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o "$RUNNER_TEMP/pgdg.asc"
@@ -89,6 +82,7 @@ jobs:
             test -z "$(ip route show default)"
             exec setpriv --reuid="$1" --regid="$2" --clear-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs env -i PATH="$3" HOME="$4/run/home" MIKKA_TEST_DEPLOYMENT_SHA="$5" RAYON_NUM_THREADS=2 UV_THREADPOOL_SIZE=2 NODE_OPTIONS=--max-old-space-size=3072 bash -euc '"'"'
               cd "$1/product"
+              node scripts/build-eve.mjs
               node apps/frontend/scripts/build.mjs --server-pages
               node apps/api/scripts/build.mjs
               node scripts/package-eve.mjs
