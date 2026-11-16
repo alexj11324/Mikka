@@ -14,11 +14,13 @@ export async function pickRepo(): Promise<PickRepoResult> {
   try {
     const { stdout } = await exec('git', ['-C', path, 'rev-parse', '--show-toplevel'], gitOptions)
     const root = stdout.trim()
-    let remoteUrl: string | null = null
-    const remotes = (await exec('git', ['-C', root, 'remote'], gitOptions)).stdout.trim().split('\n')
-    const remote = remotes.includes('origin') ? 'origin' : remotes[0]
-    if (remote) {
-      try { remoteUrl = (await exec('git', ['-C', root, 'remote', 'get-url', '--', remote], gitOptions)).stdout.trim() || null } catch { /* A remote may have no fetch URL. */ }
+    const readGit = async (...args: string[]) => {
+      try { return (await exec('git', ['-C', root, ...args], gitOptions)).stdout.trim() || null } catch { return null }
+    }
+    let remoteUrl = await readGit('remote', 'get-url', 'origin')
+    if (!remoteUrl) {
+      const first = (await readGit('remote'))?.split('\n')[0]
+      if (first && first !== 'origin') remoteUrl = await readGit('remote', 'get-url', '--', first)
     }
     // Never send URL userinfo (embedded Git credentials) back to a renderer.
     if (remoteUrl && /^[a-z][a-z0-9+.-]*:\/\//i.test(remoteUrl)) {
