@@ -1,6 +1,7 @@
 'use server'
 
 import { z } from 'zod'
+import type { LinearLabelOption } from '@/lib/linear-sync/client'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { actingContext } from '@/lib/activity-actor'
@@ -139,6 +140,25 @@ export async function automationLinearTeams(): Promise<ActionResult<{ connected:
     const [{ linearAccessToken }, { linearTeams }] = await Promise.all([import('@/lib/linear-sync/tokens'), import('@/lib/linear-sync/client')])
     try {
       return { connected: true, teams: (await linearTeams(await linearAccessToken(user.id))).map(({ id, key, name }) => ({ id, key, name })) }
+    } catch (error) { throw new ActionFailureError('scheduleLinearUnreachable', undefined, undefined, { cause: error }) }
+  })
+}
+
+/** Labels for the creator's Linear triggers, fetched only when they edit the label filter. */
+export async function automationLinearLabels(workspaceId: string): Promise<ActionResult<{ labels: LinearLabelOption[] }>> {
+  return runAction(async () => {
+    if (actingContext.getStore()) throw new ActionFailureError('authRequired')
+    if (!z.uuid().safeParse(workspaceId).success) throw new ActionFailureError('validationGeneric')
+    let actor
+    try { actor = await currentWorkspaceActor(workspaceId) } catch (error) {
+      if (error instanceof WorkspaceError) throw new ActionFailureError(isActionErrorCode(error.code) ? error.code : 'generic', undefined, undefined, { cause: error })
+      throw error
+    }
+    const { pool } = await import('@/lib/db')
+    if (!(await pool.query('SELECT 1 FROM linear_connections WHERE "userId"=$1 AND "revokedAt" IS NULL', [actor.userId])).rowCount) return { labels: [] }
+    const [{ linearAccessToken }, { linearLabelOptions }] = await Promise.all([import('@/lib/linear-sync/tokens'), import('@/lib/linear-sync/client')])
+    try {
+      return { labels: await linearLabelOptions(await linearAccessToken(actor.userId)) }
     } catch (error) { throw new ActionFailureError('scheduleLinearUnreachable', undefined, undefined, { cause: error }) }
   })
 }

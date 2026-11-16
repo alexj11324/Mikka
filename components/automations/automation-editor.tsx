@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { ArrowLeft, Play } from 'lucide-react'
 import { listDevices } from '@/app/actions/agents'
 import { getWorkspaceBotDefaults, listBotsForWorkspace } from '@/app/actions/bots'
-import { automationLinearTeams, automationSlackChannels, deleteAutomation, createAutomation, pauseAutomation, resumeAutomation, runAutomationNow, takeOverAutomation, updateAutomation } from '@/app/actions/automations'
+import { automationLinearLabels, automationLinearTeams, automationSlackChannels, deleteAutomation, createAutomation, pauseAutomation, resumeAutomation, runAutomationNow, takeOverAutomation, updateAutomation } from '@/app/actions/automations'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -93,11 +93,17 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
   }, { revalidateOnFocus: false })
   // Linear triggers' teams, read only once the person adds a Linear event or the automation has one.
   const [linearWanted, setLinearWanted] = useState(false)
-  const linearTeams = useSWR(linearWanted || Boolean(draft?.linear.length) ? 'automation-linear-teams' : null, async () => {
+  const linearTeams = useSWR(linearWanted || Boolean(draft?.linear.length) ? ['automation-linear-teams', userId] : null, async () => {
     const result = await automationLinearTeams()
     if ('error' in result && result.error) throw new Error(result.error)
     return result as { connected: boolean; teams: { id: string; key: string; name: string }[] }
   }, { revalidateOnFocus: false })
+  const [labelsWanted, setLabelsWanted] = useState(false)
+  const linearLabels = useSWR(labelsWanted && workspaceId && linearTeams.data?.connected ? ['automation-linear-labels', userId, workspaceId] as const : null, async ([, , shown]) => {
+    const result = await automationLinearLabels(shown)
+    if (result.error) throw new Error(result.error)
+    return result.labels
+  }, { revalidateOnFocus: false, shouldRetryOnError: false })
   // Slack triggers' channels, read only once the person adds a Slack event or the automation has one.
   const [slackWanted, setSlackWanted] = useState(false)
   const slackChannels = useSWR(workspaceId && (slackWanted || Boolean(draft?.slack.length) || Boolean(draft?.notify)) ? ['automation-slack-channels', workspaceId] as const : null, async ([, shown]) => {
@@ -299,7 +305,8 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
         </SettingRow>
         {(linearWanted || draft.linear.length > 0) && <>
           {linearTeams.error && <div className="px-5 pb-2"><InlineLoadError message={t('linear.teamsError')} retryLabel={tCommon('retry')} onRetry={() => { void linearTeams.mutate() }} /></div>}
-          <LinearTriggers value={draft.linear} teams={linearTeams.data?.teams ?? []} connected={linearTeams.data?.connected ?? true} disabled={busy !== null || (!linearTeams.data && !linearTeams.error)} onChange={linear => set({ linear })} />
+          {linearLabels.error && <div className="px-5 pb-2"><InlineLoadError message={t('linear.labelsError')} retryLabel={tCommon('retry')} onRetry={() => { void linearLabels.mutate() }} /></div>}
+          <LinearTriggers labels={linearLabels.data ?? []} onEditLabels={() => setLabelsWanted(true)} value={draft.linear} teams={linearTeams.data?.teams ?? []} connected={linearTeams.data?.connected ?? true} disabled={busy !== null || (!linearTeams.data && !linearTeams.error)} onChange={linear => set({ linear })} />
         </>}
         <SettingRow title={t('slack.title')}>
           {!slackWanted && !draft.slack.length && <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => setSlackWanted(true)}>{t('slack.show')}</Button>}

@@ -8189,6 +8189,7 @@
         "add": "添加 Linear 事件",
         "notConnected": "先在设置里连接 Linear",
         "noTeams": "你的 Linear 里没有团队",
+        "labelsError": "Linear 标签没加载出来",
         "teamsError": "Linear 团队没加载出来"
       },
       "slack": {
