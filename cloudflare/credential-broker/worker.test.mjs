@@ -11,8 +11,7 @@ const hooks = registerHooks({ resolve(specifier, context, nextResolve) {
       async start() { this.ctx.events.push('start') }
       async startAndWaitForPorts() { this.ctx.events.push('startAndWaitForPorts') }
     }
-    export class ContainerProxy {}
-    export function getContainer(binding, name) { return binding.getByName(name) }`,
+    export class ContainerProxy {}`,
     capnweb: 'export class RpcTarget {} export function newWebSocketRpcSession() { throw new Error("Unrelated task transport invoked") }',
   }
   if (modules[specifier]) return { url: 'data:text/javascript,' + encodeURIComponent(modules[specifier]), shortCircuit: true }
