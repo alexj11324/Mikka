@@ -1947,10 +1947,11 @@
       "source": "app/api/organizations/[organizationId]/members/route.ts",
       "methods": [
         "DELETE",
+        "GET",
         "PATCH",
         "POST"
       ],
-      "sourceHash": "036b5df41e35b354861597231988421a5437441c7ea0fcb3a66a7f74410439a5"
+      "sourceHash": "8f11f7dff1244dc3bc4038219f01035b49bb3b7e6bd287c5ecf68849f9694ccb"
     },
     {
       "path": "/mikka/api/organizations/[organizationId]/policy",
