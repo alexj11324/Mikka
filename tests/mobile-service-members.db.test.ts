@@ -151,6 +151,8 @@ test('mobile Settings and confirmed browser handoff require a current team admin
     process.env.MIKKA_UI_OVERLAY_SHA = 'a'.repeat(40)
     assert.equal(await available({ cookie: memberCookie }), true)
     assert.equal(await available({ authorization: 'Bearer ' + pat.token }), false)
+    const bare = await fetch(api + 'mobile/open?' + new URLSearchParams({ to: target }), { redirect: 'manual' })
+    assert.equal(bare.status, 403)
     const accepted = await confirm(await open(memberCookie, first.id, target))
     assert.equal(accepted.status, 303)
     assert.equal(accepted.headers.get('location'), origin + '/mikka' + target.slice(1))
