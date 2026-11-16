@@ -121,7 +121,7 @@
   "app/api/drive/volumes/route.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "List and create the current owner's private volumes within an authorized workspace.",
+    "behavior": "List and create authorized Drive volumes, or explicitly list bounded SKILL.md metadata from active folders in the selected personal or Project scope.",
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
@@ -831,6 +831,13 @@
     "test": "tests/resource-access.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "lib/plugins/skill-metadata.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Parse names and descriptions from local Markdown bytes without executing content or contacting a provider.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "lib/resource-access/personal-project-selection.ts": {
     "mode": "built-in",
     "environment": [],
@@ -1531,6 +1538,13 @@
     "test": "lib/dispatch-timing.test.ts",
     "suite": "test:agent-kit-model"
   },
+  "lib/drive/blobs.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the existing local database or configured object store, and stop reading bytes at the requested file limit.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "lib/drive/client.ts": {
     "mode": "built-in",
     "environment": [],
@@ -1542,6 +1556,13 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Authorize workspace-scoped Drive requests and update versioned manifests in PostgreSQL. File bytes use the installation's existing artifact storage configuration, with inline database storage when no bucket is configured.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "lib/drive/skills.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read bounded names and descriptions from current SKILL.md entries in the authorized Drive location using the existing installation storage.",
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },

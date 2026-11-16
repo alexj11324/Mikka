@@ -1,5 +1,5 @@
 import { withBasePath } from '../base-path'
-import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, type DriveManifestEntry } from './contract'
+import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, type DriveManifestEntry, type DriveSkillCursor, type DriveSkillPage } from './contract'
 import type { DriveVolumeSummary } from './volumes'
 import type { DriveVersionSummary } from './store'
 
@@ -76,6 +76,10 @@ export function readProjectDriveScopes(workspaceId: string, send?: typeof fetch)
 export function readPersonalDriveScopes(workspaceId: string, send?: typeof fetch) {
   const params = new URLSearchParams({ workspaceId })
   return request<{ scopes: PersonalDriveScope[] }>(withBasePath(`/api/drive/scopes?${params}`), {}, send)
+}
+
+export function readDriveSkills(location: DriveLocation, after?: DriveSkillCursor, send?: typeof fetch) {
+  return request<DriveSkillPage>(url(location, '', { view: 'skills', afterVolume: after?.volumeId, afterPath: after?.path }), {}, send)
 }
 
 export function readDriveVolumes(location: DriveLocation, before?: string, send?: typeof fetch) {

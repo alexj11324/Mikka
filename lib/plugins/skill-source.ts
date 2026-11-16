@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import { abortable } from '@/lib/search/url-policy'
+import { skillName } from './skill-metadata'
 import { installSkillSchema, PluginError, type SkillContent } from './contracts'
 
 async function boundedText(response: Response, signal: AbortSignal, max: number) {
@@ -39,9 +40,7 @@ export async function fetchSkillSource(input: z.infer<typeof installSkillSchema>
         if (path.split('/').some(part => part === '..' || part === '.')) throw new PluginError('invalidSkillSource', 422)
         const body = await get(`https://raw.githubusercontent.com/${source}/${commit.sha}/${path.split('/').map(encodeURIComponent).join('/')}`, 20_000)
         if (!body.trim() || body.includes('\0')) return null
-        const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(body)?.[1] ?? ''
-        const name = /^name:\s*([^\r\n]+)$/m.exec(frontmatter)?.[1]?.trim().replace(/^["']|["']$/g, '')
-          || path.split('/').at(-2) || source.split('/')[1]
+        const name = skillName(body, path.split('/').at(-2) || source.split('/')[1])
         return name.toLowerCase() === slug.toLowerCase() ? { path, body, name } : null
       }))
       matches.push(...batch.filter((match): match is NonNullable<typeof match> => match !== null))

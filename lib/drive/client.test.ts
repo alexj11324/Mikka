@@ -5,7 +5,7 @@ const previousBase = process.env.MIKKA_BASE_PATH
 process.env.MIKKA_BASE_PATH = '/mikka'
 const {
   deleteDriveFile, driveFileURL, driveHeadKey, driveHistoryKey, driveVolumesKey, DriveRequestError,
-  readDriveFileHistory, readDriveVolumes, restoreDriveVersion, uploadDriveFiles,
+  readDriveFileHistory, readDriveSkills, readDriveVolumes, restoreDriveVersion, uploadDriveFiles,
 } = await import('./client')
 if (previousBase === undefined) delete process.env.MIKKA_BASE_PATH
 else process.env.MIKKA_BASE_PATH = previousBase
@@ -27,6 +27,18 @@ test('shared Project selection has separate request URLs and caches from each pe
   assert.equal(new URL(driveFileURL(location, 'volume', 'a.txt'), 'https://example.invalid').searchParams.has('driveScope'), false)
   assert.notDeepEqual(driveVolumesKey(location, 'member'), driveVolumesKey(shared, 'member'))
   assert.notDeepEqual(driveHeadKey(location, 'member', 'volume'), driveHeadKey(shared, 'member', 'volume'))
+})
+
+test('Skill metadata pages keep the explicit Drive location and literal continuation path', async () => {
+  const location = { workspaceId: 'workspace', projectId: 'project', driveScope: 'project' as const }
+  await readDriveSkills(location, { volumeId: 'volume', path: 'a #/SKILL.md' }, async target => {
+    const url = new URL(String(target), 'https://example.invalid')
+    assert.equal(url.pathname, '/mikka/api/drive/volumes')
+    assert.deepEqual(Object.fromEntries(url.searchParams), {
+      workspaceId: 'workspace', projectId: 'project', driveScope: 'project', view: 'skills', afterVolume: 'volume', afterPath: 'a #/SKILL.md',
+    })
+    return Response.json({ skills: [], nextCursor: null })
+  })
 })
 
 test('Workspace Files select the team location independently of private and Project caches', () => {
