@@ -37,11 +37,11 @@ export async function getLinearIntegrationState(workspaceId?: string) {
 }
 
 /** True when the board's refresh is a Linear sync: connected, with an active team sync. */
-export async function getLinearBoardSync() {
+export async function getLinearBoardSync(workspaceId?: string) {
   return runAction(async () => {
     if (!await linearSyncEnabled()) return { synced: false }
     const user = await requireUser()
-    const context = await loadWorkspaceContext(undefined, user)
+    const context = await loadWorkspaceContext(workspaceId, user)
     const [row] = await db.select({ id: linearTeamSyncs.id }).from(linearTeamSyncs)
       .innerJoin(linearConnections, and(eq(linearConnections.userId, linearTeamSyncs.ownerId), isNull(linearConnections.revokedAt)))
       .where(and(eq(linearTeamSyncs.ownerId, user.id), eq(linearTeamSyncs.workspaceId, context.workspace.id), eq(linearTeamSyncs.active, true))).limit(1)
@@ -95,9 +95,11 @@ export async function disableLinearTeam(id: string, workspaceId?: string) {
   const parsed = z.uuid().safeParse(id)
   if (!parsed.success) return { error: 'linearTeamInvalid' as const }
   return withTaskWorkspace(user, context.workspace.id, async () => {
-    const [row] = await db.update(linearTeamSyncs).set({ active: false, updatedAt: new Date() }).where(and(
-      eq(linearTeamSyncs.id, parsed.data), eq(linearTeamSyncs.ownerId, user.id), eq(linearTeamSyncs.workspaceId, context.workspace.id),
-    )).returning({ id: linearTeamSyncs.id })
+    const binding = and(eq(linearTeamSyncs.id, parsed.data), eq(linearTeamSyncs.ownerId, user.id), eq(linearTeamSyncs.workspaceId, context.workspace.id))
+    const [changed] = await db.update(linearTeamSyncs).set({ active: false, updatedAt: new Date() })
+      .where(and(binding, eq(linearTeamSyncs.active, true))).returning({ id: linearTeamSyncs.id })
+    if (changed) return { success: true as const }
+    const [row] = await db.select({ id: linearTeamSyncs.id }).from(linearTeamSyncs).where(binding).limit(1)
     return row ? { success: true as const } : { error: 'linearTeamUnavailable' as const }
   })
 }
