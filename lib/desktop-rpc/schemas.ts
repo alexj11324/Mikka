@@ -19,7 +19,7 @@ import { setAppPolicyInput } from '@/lib/app-policy/apps'
 import { POINTS_PURCHASE_AMOUNTS } from '@/lib/billing/hosted-usage'
 import { MAX_READ_BATCH, READ_BATCH_ACTIONS, type ReadBatchCall } from './read-batch-contract'
 import { USER_FACT_KINDS } from '@/lib/profile/kinds'
-import { definitionSchema as scheduleDefinition, webhookBatchInput } from '@/lib/schedules/contract'
+import { definitionSchema as scheduleDefinition, webhookBatchListInput, webhookBatchInput } from '@/lib/schedules/contract'
 
 const uuid = z.uuid()
 const id = z.string().min(1).max(200)
@@ -184,6 +184,7 @@ export const desktopActionSchemas = {
   'automations.getAutomation': oneId,
   'automations.flushAutomationBatch': tuple(webhookBatchInput),
   'automations.cancelAutomationBatch': tuple(webhookBatchInput),
+  'automations.automationBatches': tuple(webhookBatchListInput),
   'automations.automationHistory': oneId,
   'automations.automationUsage': tuple(object({ scheduleId: uuid, days: z.number().int().min(1).max(90).optional() })),
   'automations.createAutomation': tuple(object({ requestId: uuid, definition: scheduleDefinition })),

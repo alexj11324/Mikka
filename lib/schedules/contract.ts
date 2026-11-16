@@ -104,6 +104,7 @@ export const scheduleHistoryInput = z.object({
   }).optional(),
 }).strict()
 
+export const webhookBatchListInput = scheduleListInput.pick({ scheduleId: true, cursor: true }).required({ scheduleId: true })
 export const webhookBatchInput = z.object({ scheduleId: z.uuid(), batchId: z.uuid(), version: z.number().int().positive() }).strict()
 
 export const commandSchema = z.discriminatedUnion('action', [

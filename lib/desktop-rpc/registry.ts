@@ -114,6 +114,7 @@ const functions = {
   'automations.getAutomation': automations.getAutomation,
   'automations.flushAutomationBatch': automations.flushAutomationBatch,
   'automations.cancelAutomationBatch': automations.cancelAutomationBatch,
+  'automations.automationBatches': automations.automationBatches,
   'automations.automationHistory': automations.automationHistory,
   'automations.automationUsage': automations.automationUsage,
   'automations.createAutomation': automations.createAutomation,
