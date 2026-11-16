@@ -264,7 +264,7 @@ export const desktopActionSchemas = {
   'issues.pollIssueVersionSummaries': tuple(uuid, version.optional(), listPositions(5000).optional()),
   'issues.setIssueScope': tuple(object({ id: uuid, revision: positive, scope: z.enum(['personal', 'workspace']) })),
   'linear-sync.getLinearIntegrationState': inWorkspace,
-  'linear-sync.getLinearBoardSync': none,
+  'linear-sync.getLinearBoardSync': inWorkspace,
   'linear-sync.startLinearOAuth': none,
   'linear-sync.listLinearTeamOptions': none,
   'linear-sync.enableLinearTeam': tuple(object({ teamId: id, workspaceId: workspace })),
