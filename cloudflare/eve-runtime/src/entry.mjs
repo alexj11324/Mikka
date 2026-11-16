@@ -14,7 +14,7 @@ export class WorkersAiOutbound extends WorkerEntrypoint {
 
 export class EveProductOutbound extends WorkerEntrypoint {
   fetch(request) {
-    return productRequest(request, this.env.BUSINESS_API, this.env.EVE_PUBLIC_ORIGIN, this.ctx.props.capability)
+    return productRequest(request, this.env.BUSINESS_API, this.env.EVE_PUBLIC_ORIGIN, this.ctx.props.capability, this.ctx)
   }
 }
 

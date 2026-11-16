@@ -112,3 +112,26 @@ test('SDK error bodies and thrown messages never become public configuration dis
   }
   assert.ok(errors.every(value => !value.includes('private-token')))
 })
+
+test('an unavailable host replies before its private error body finishes cancelling', async () => {
+  const { host } = fixture()
+  const started = Promise.withResolvers()
+  const releaseBody = Promise.withResolvers()
+  const work = []
+  host.ctx.waitUntil = task => work.push(task)
+  host.respond = () => new Response(new ReadableStream({
+    cancel() { started.resolve(); return releaseBody.promise },
+  }), { status: 500, headers: { 'content-type': 'text/plain' } })
+  const pending = host.fetch(new Request('https://app.example.test/eve/v1/health'))
+  try {
+    await started.promise
+    const result = await Promise.race([pending, new Promise(resolve => setImmediate(resolve))])
+    assert.equal(result?.status, 503)
+    assert.deepEqual(await result.json(), { ok: false, error: 'coordinatorUnavailable' })
+    assert.equal(work.length, 1)
+  } finally {
+    releaseBody.resolve()
+    await pending
+    await Promise.all(work)
+  }
+})

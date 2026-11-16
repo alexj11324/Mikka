@@ -48,7 +48,7 @@ export class EveRuntime extends Container {
     try {
       const response = await super.fetch(request)
       if (response.status >= 500 && !response.headers.get('content-type')?.includes('application/json')) {
-        await response.body?.cancel()
+        if (response.body) this.ctx.waitUntil(response.body.cancel().catch(() => {}))
         return unavailable()
       }
       return response
