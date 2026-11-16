@@ -317,6 +317,41 @@ export function registerHTTPDaemonAcceptance(kind: 'shared' | 'personal') {
       assert.equal((await getFile(ownerToken.token, '.env')).status, 404)
     })
 
+    await t.test('a retained Run directory crosses real Files HTTP, daemon delivery and acknowledgement', async () => {
+      const url = new URL(endpoint + '/files')
+      url.search = new URLSearchParams({ workspaceId, repoId: clientIdentity.repoId, kind: 'tree', path: 'src' }).toString()
+      const getTree = (token?: string) => fetch(url, {
+        headers: token ? { authorization: `Bearer ${token}` } : {}, signal: AbortSignal.timeout(20_000),
+      })
+      const before = deliveries.length
+      assert.equal((await getTree()).status, 401)
+      assert.equal((await getTree(memberToken.token)).status, 404)
+      assert.equal((await getTree(otherToken.token)).status, 404)
+      assert.equal(deliveries.length, before)
+
+      const response = await getTree(ownerToken.token)
+      assert.equal(response.status, 200, await statusDiagnostic(response))
+      assert.equal(response.headers.get('cache-control'), 'private, no-store')
+      const result = await response.json()
+      assert.equal(result.kind, 'tree')
+      assert.equal(result.path, 'src')
+      assert.deepEqual(result.identity, clientIdentity)
+      assert.equal(result.revision.source, 'working')
+      assert.equal(result.revision.headSha, headSha)
+      assert.deepEqual(result.entries, [
+        { path: 'src/example.ts', name: 'example.ts', kind: 'file', size: Buffer.byteLength(source) },
+        { path: 'src/lazy.ts', name: 'lazy.ts', kind: 'file', size: Buffer.byteLength('export const lazy = "base"\n') },
+      ])
+      const sent = deliveries.slice(before).find(command => command.kind === 'tree' && command.runId === runId && command.repoId === repoId)
+      assert.ok(sent)
+      const acknowledged = receiptEvents.get(sent.id)
+      assert.ok(acknowledged)
+      await acknowledged.promise
+      assert.ok(receipts.some(receipt => receipt.requestId === sent.id && receipt.status === 204
+        && receipt.body.result.ok && receipt.body.result.kind === 'tree'))
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM coding_workspace_requests WHERE "runId"=$1', [runId])).rows[0].n, 0)
+    })
+
     await t.test('mention create and resolve cross the same daemon transport and reject changed source', async () => {
       const created = await mention({ action: 'create', selection: { kind: 'file', path: 'src/example.ts', range: { startLine: 1, endLine: 1 } } })
       assert.equal(created.status, 201)
