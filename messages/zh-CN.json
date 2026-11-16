@@ -2522,6 +2522,7 @@
       "pushReview": "待审阅",
       "pushFinished": "线程完成",
       "pushBriefing": "每日简报",
+      "organizationInvitationEmails": "组织邀请邮件",
       "pushWhen": "推送时机",
       "always": "立即",
       "away": "电脑不在用时",

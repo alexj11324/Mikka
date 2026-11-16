@@ -76,7 +76,7 @@ const apiKey = z.discriminatedUnion('provider', [
 const preferences = object({
   archiveIdleAfterDays: z.literal(archiveIdleDays).optional(),
   proactive: bool, pushDecide: bool, pushReview: bool, pushFinished: bool, pushBriefing: bool,
-  pushWhen: z.enum(['always', 'away']), memoryEnabled: bool, sendKey: z.enum(['enter', 'modEnter']),
+  organizationInvitationEmails: bool, pushWhen: z.enum(['always', 'away']), memoryEnabled: bool, sendKey: z.enum(['enter', 'modEnter']),
   personalInstructions: text(8000).transform(value => value.trim()).refine(value => [...value].length <= 2000), dailySuggestions: bool,
 }).partial()
 const listPositions = (limit: number) => z.array(object({ id: uuid, version })).max(limit)

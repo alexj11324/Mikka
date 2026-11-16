@@ -2522,6 +2522,7 @@
       "pushReview": "Ready for review",
       "pushFinished": "Thread finished",
       "pushBriefing": "Daily briefing",
+      "organizationInvitationEmails": "Organization invitation emails",
       "pushWhen": "When to push",
       "always": "Immediately",
       "away": "When the computer is away",
