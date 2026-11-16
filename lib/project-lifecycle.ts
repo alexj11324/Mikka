@@ -57,7 +57,7 @@ async function contents(tx: ProjectTransaction, project: Project, workspaceId: s
     canDelete: !hasProjectFiles && Object.values(counts).every(count => count === 0), recovery: 'restore_archive' }
 }
 
-export async function withLockedProject<T>(reader: ProjectReader, workspaceId: string, id: string,
+async function lockedProject<T>(reader: ProjectReader, workspaceId: string, id: string,
   action: 'canReadContent' | 'canSteer', operation: (tx: ProjectTransaction, project: Project) => Promise<T>) {
   // Keep the established Workspace -> relations -> APP ACL lock order shared
   // with Project mutations; taking the ACL first can deadlock a concurrent
@@ -88,13 +88,13 @@ async function journal(tx: ProjectTransaction, project: Project, reader: Project
 }
 
 export async function projectLifecycleImpact(reader: ProjectReader, workspaceId: string, id: string) {
-  return withLockedProject(reader, workspaceId, id, 'canReadContent', (tx, project) => contents(tx, project, workspaceId))
+  return lockedProject(reader, workspaceId, id, 'canReadContent', (tx, project) => contents(tx, project, workspaceId))
 }
 
 /** Archive is independent of delivery status. Existing tasks, Runs, decisions
  * and bindings remain addressable; new admission fails until an explicit restore. */
 export async function setProjectArchive(reader: ProjectReader, workspaceId: string, input: { id: string; revision?: number; archived: boolean; message: string }) {
-  return withLockedProject(reader, workspaceId, input.id, 'canSteer', async (tx, project) => {
+  return lockedProject(reader, workspaceId, input.id, 'canSteer', async (tx, project) => {
     if (input.revision !== undefined && input.revision !== project.revision) throw new ActionFailureError('projectSaveConflict')
     if (Boolean(project.archivedAt) !== input.archived) {
       const actorId = taskReaderScope(reader).userId, updatedAt = new Date()
@@ -113,7 +113,7 @@ export async function setProjectArchive(reader: ProjectReader, workspaceId: stri
 /** A hard delete never becomes an implicit archive. History is not recoverable
  * by this API, so only a confirmed, truly unused Project may be removed. */
 export async function deleteProjectData(reader: ProjectReader, workspaceId: string, input: { id: string; revision: number; confirmation: string }) {
-  return withLockedProject(reader, workspaceId, input.id, 'canSteer', async (tx, project) => {
+  return lockedProject(reader, workspaceId, input.id, 'canSteer', async (tx, project) => {
     const [member] = await tx.select({ role: workspaceMembers.role }).from(workspaceMembers)
       .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, taskReaderScope(reader).userId)))
     if (member?.role !== 'admin') throw new ActionFailureError('workspaceAccessDenied')

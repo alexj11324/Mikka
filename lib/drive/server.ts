@@ -6,8 +6,7 @@ import { pool } from '@/lib/db'
 import { writeAllowed } from '@/lib/mobile-api'
 import { ActionFailureError } from '@/lib/action-error'
 import { WorkspaceError } from '@/lib/workspace-error'
-import { accessibleProjectNames } from '@/lib/project-access'
-import { withLockedProject } from '@/lib/project-lifecycle'
+import { accessibleProjectNames, withReadableProject } from '@/lib/project-access'
 import { withTaskWorkspace } from '@/lib/task-workspace'
 import { workspaceListChanged } from '@/lib/live/lists'
 import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, isVolumeId, isVolumeVersionId } from './contract'
@@ -156,10 +155,7 @@ export async function driveResponse(request: Request, operation: Operation, para
         'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(path.split('/').at(-1)!)}` } })
     }
     const response = projectId
-      ? await withLockedProject(session.user, workspaceId, projectId, 'canReadContent', (_tx, project) => {
-        if (project.archivedAt) throw new DriveError('drive_not_found', 404)
-        return serve()
-      })
+      ? await withReadableProject(session.user, workspaceId, projectId, serve)
       : await withTaskWorkspace(session.user, workspaceId, serve)
     // Both the file mutation and its membership lease have finished. The
     // existing invalidation path resolves recipients afresh and carries no content.
@@ -167,7 +163,8 @@ export async function driveResponse(request: Request, operation: Operation, para
     return response
   } catch (error) {
     if (error instanceof z.ZodError || error instanceof SyntaxError) return json({ error: 'drive_write_invalid' }, 400)
-    if (error instanceof ActionFailureError && (error.code === 'workspaceAccessDenied' || error.code === 'projectNotFound') || error instanceof WorkspaceError && error.code === 'workspaceAccessDenied') return json({ error: 'drive_not_found' }, 404)
+    if (error instanceof ActionFailureError && ['workspaceAccessDenied', 'projectNotFound', 'issueNotFound'].includes(error.code)
+      || error instanceof WorkspaceError && error.code === 'workspaceAccessDenied') return json({ error: 'drive_not_found' }, 404)
     return driveErrorResponse(error, headers)
   }
 }

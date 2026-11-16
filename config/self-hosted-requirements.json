@@ -1084,13 +1084,6 @@
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
-  "lib/project-lifecycle.ts": {
-    "mode": "built-in",
-    "environment": [],
-    "behavior": "Keep Project and membership authorization through a personal Project folder operation. A Project containing Drive data cannot be hard deleted.",
-    "test": "tests/project-lifecycle.db.test.ts",
-    "suite": "test:project-v2-db"
-  },
   "lib/project-resources/contracts.ts": {
     "mode": "built-in",
     "environment": [],
