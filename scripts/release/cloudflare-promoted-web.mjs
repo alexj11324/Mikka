@@ -216,12 +216,12 @@ async function verifyPromotion(workflow, { env = process.env, event, fetchImpl =
   }
   if (observed) await liveServingRelease(record, fetchImpl)
   else await liveProof(record, raw, fetchImpl)
-  if (workflow === desktopWorkflow || record.product === env.GITHUB_SHA) await assertCurrentMain({ ...api, expectedBuild: record.product })
+  if (workflow === desktopWorkflow) await assertCurrentMain({ ...api, expectedBuild: record.product })
   else {
-    // This run is current main and the served product is already part of it.
-    await assertCurrentMain({ ...api, expectedBuild: env.GITHUB_SHA })
-    const compared = await githubRead('/compare/' + record.product + '...' + env.GITHUB_SHA, api)
-    requireProof(compared.status === 'ahead' && compared.merge_base_commit?.sha === record.product, 'servedOnMain')
+    // The runtime publishes the served commit; it must already be part of main.
+    // Later merges to main neither replace it nor block its publication.
+    const compared = await githubRead('/compare/' + record.product + '...main', api)
+    requireProof((compared.status === 'identical' || compared.status === 'ahead') && compared.merge_base_commit?.sha === record.product, 'servedOnMain')
   }
   if (!observed) requireProof(now() < until, 'approvalWindow')
   const result = { product: record.product, releasePin: record.releasePin }
