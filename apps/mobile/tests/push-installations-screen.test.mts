@@ -12,15 +12,20 @@ const stub = (file: string, namedExports: Record<string, unknown>) =>
 const none = () => null
 const group = ({ label, children }: { label?: string; children?: ReactNode }) => h('section', null, label, children)
 const paths: string[] = []
-const send = mock.fn(async (_path: string) => ({ accepted: true }))
+const send = mock.fn(async (path: string, init?: { method: string; body?: { label: string } }) =>
+  init?.method === 'PATCH' ? { id: path.split('/').at(-1), label: init.body?.label } : { accepted: true })
 let registered = false
 class ApiError extends Error { constructor(readonly status: number) { super() } }
 const read = { loading: true, data: null as { installations: object[] } | null, error: null as Error | null,
   reload: mock.fn(), reloadAfterWrite: mock.fn() }
-mock.module('react-native', { namedExports: { View: 'div' } })
+mock.module('react-native', { namedExports: { View: 'div',
+  TextInput: ({ accessibilityLabel, value, onChangeText }: { accessibilityLabel: string; value: string; onChangeText: (value: string) => void }) =>
+    h('input', { 'aria-label': accessibilityLabel, value, onInput: (event: { currentTarget: { value: string } }) => onChangeText(event.currentTarget.value), onChange: none }),
+} })
 stub('components/settings.tsx', { SettingsPage: group, ToggleRow: none,
   Row: ({ label, detail, value, onPress, disabled }: { label: string; detail?: string; value?: string; onPress?: () => void; disabled?: boolean }) =>
     onPress ? h('button', { onClick: onPress, disabled }, label, detail) : h('p', null, label, detail, value) })
+stub('lib/theme.ts', { colors: {}, font: undefined })
 stub('components/ui.tsx', { Group: group })
 stub('components/PushRow.tsx', { PushRow: none })
 stub('components/PreferenceSaveNotice.tsx', { PreferenceSaveNotice: none })
@@ -74,6 +79,29 @@ test('Notification settings reads active push devices, refreshes after registrat
     await act(async () => document.querySelector('button')!.click())
     assert.deepEqual(send.mock.calls.map(call => call.arguments[0]), ['/api/mobile/push-tokens/first/test'])
     assert.ok(contents().includes(copy.testAccepted))
+    assert.ok(!contents().includes(copy.renameDevice))
+    read.data = { installations: [
+      { id: 'first', platform: 'ios', label: 'Primary', deviceName: 'Pocket', currentSession: true, canRename: true, updatedAt: '2026-01-02T12:00:00Z' },
+      { id: 'peer', platform: 'android', deviceName: 'Other', currentSession: false, canRename: false, updatedAt: '2026-01-01T12:00:00Z' },
+    ] }
+    await render()
+    assert.ok(contents().includes('Primary') && !contents().includes('Pocket'))
+    const button = (label: string) => Array.from(document.querySelectorAll('button')).find(node => node.textContent === label)!
+    assert.equal(document.querySelectorAll('button').length, 1)
+    await act(async () => button(copy.renameDevice).click())
+    const input = document.querySelector('input')!
+    assert.equal(input.value, 'Primary')
+    const change = (label: string) => act(async () => {
+      input.value = label
+      input.dispatchEvent(new browser.Event('input', { bubbles: true }))
+    })
+    await change(' ')
+    assert.equal(button(messages.Common.save).disabled, true)
+    await change('Office')
+    await act(async () => button(messages.Common.save).click())
+    assert.deepEqual(send.mock.calls.at(-1)?.arguments.slice(0, 2), ['/api/mobile/push-tokens/first', { method: 'PATCH', body: { label: 'Office' } }])
+    assert.equal(read.reloadAfterWrite.mock.callCount(), 2)
+    assert.equal(document.querySelector('input'), null)
     read.data = null
     read.error = new ApiError(405)
     await render()

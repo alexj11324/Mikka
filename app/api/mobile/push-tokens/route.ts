@@ -16,8 +16,9 @@ async function handleGET(request: Request) {
   if (!session) return unauthorized()
   return withPushSession(session, async () => {
     const { rows } = await pool.query(
-      `SELECT binding.id, binding.platform, binding."deviceName", binding."updatedAt",
-              binding."sessionId" = $2 AS "currentSession", binding."sessionId" = $2 AS "canTest"
+      `SELECT binding.id, binding.platform, binding."deviceName", binding.label, binding."updatedAt",
+              binding."sessionId" = $2 AS "currentSession", binding."sessionId" = $2 AS "canTest",
+              binding."sessionId" = $2 AS "canRename"
          FROM mobile_push_tokens AS binding
          JOIN "session" AS active ON active.id = binding."sessionId" AND active."userId" = binding."userId"
         WHERE binding."userId" = $1 AND active."expiresAt" > clock_timestamp()

@@ -124,7 +124,7 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
   }
   const { pushReply } = await import('../lib/mobile-push')
   const { GET, POST, DELETE } = await import('../app/api/mobile/push-tokens/route')
-  const request = (method: 'POST' | 'DELETE', bearer: string, body: unknown, cookie?: string) => new Request(origin + '/api/mobile/push-tokens', {
+  const request = (method: 'POST' | 'DELETE' | 'PATCH', bearer: string, body: unknown, cookie?: string) => new Request(origin + '/api/mobile/push-tokens', {
     method, headers: { authorization: 'Bearer ' + bearer, 'content-type': 'application/json', ...(cookie ? { cookie } : {}) },
     body: JSON.stringify(body),
   })
@@ -144,12 +144,13 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
       assert.equal(response.status, 200)
       assert.match(response.headers.get('cache-control') ?? '', /private, no-store/)
       const { installations } = await response.json() as {
-        installations: { id: string; deviceName: string | null; platform: string; updatedAt: string; currentSession: boolean; canTest: boolean }[]
+        installations: { id: string; deviceName: string | null; platform: string; updatedAt: string; currentSession: boolean; canTest: boolean; canRename: boolean; label: string | null }[]
       }
       for (const item of installations) {
-        assert.deepEqual(Object.keys(item).sort(), ['canTest', 'currentSession', 'deviceName', 'id', 'platform', 'updatedAt'])
+        assert.deepEqual(Object.keys(item).sort(), ['canRename', 'canTest', 'currentSession', 'deviceName', 'id', 'label', 'platform', 'updatedAt'])
         assert.ok(Number.isFinite(Date.parse(item.updatedAt)))
         assert.equal(item.canTest, item.currentSession)
+        assert.equal(item.canRename, item.currentSession)
       }
       return installations
     }
@@ -174,6 +175,41 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
       assert.deepEqual(await list(ownerSession.token), owned.filter(item => item.currentSession))
     } finally {
       await admin.query('DELETE FROM mobile_push_tokens WHERE token=$1', [otherToken])
+      await admin.query('DELETE FROM "session" WHERE id=$1', [otherSession.id])
+    }
+  })
+
+  await t.test('installation labels belong to the person through re-registration and only the bound current session can edit them', async () => {
+    const { PATCH } = await import('../app/api/mobile/push-tokens/[id]/route')
+    const extraToken = 'ExpoPushToken[' + randomUUID() + ']'
+    const otherSession = await nativeSession(owner)
+    const register = async (bearer: string, deviceName: string) => {
+      assert.equal((await POST(request('POST', bearer, { token: extraToken, platform: 'ios', deviceName }))).status, 200)
+    }
+    const stored = async () => (await admin.query('SELECT id, label, "deviceName", "updatedAt" FROM mobile_push_tokens WHERE token=$1', [extraToken])).rows[0]
+    try {
+      await register(ownerSession.token, 'Phone')
+      const { id, label } = await stored()
+      assert.equal(label, null)
+      const rename = (bearer: string, body: unknown) =>
+        PATCH(request('PATCH', bearer, body), { params: Promise.resolve({ id }) })
+      assert.equal((await rename(otherSession.token, { label: 'Tablet' })).status, 404)
+      assert.equal((await rename(peerSession.token, { label: 'Other' })).status, 404)
+      for (const label of ['', '   ', 'x'.repeat(81)]) assert.equal((await rename(ownerSession.token, { label })).status, 400)
+      const name = 'x'.repeat(80)
+      assert.deepEqual(await (await rename(ownerSession.token, { label: name })).json(), { id, label: name })
+      const first = await stored()
+      assert.equal((await rename(ownerSession.token, { label: name })).status, 200)
+      assert.deepEqual(await stored(), first)
+      await register(otherSession.token, 'New OS name')
+      assert.deepEqual([(await stored()).label, (await stored()).deviceName], [name, 'New OS name'])
+      assert.equal((await rename(ownerSession.token, { label: 'Unavailable' })).status, 404)
+      await register(peerSession.token, 'Peer phone')
+      assert.deepEqual([(await stored()).id, (await stored()).label], [id, null])
+      assert.equal((await rename(peerSession.token, { label: 'Second phone' })).status, 200)
+      assert.equal((await stored()).label, 'Second phone')
+    } finally {
+      await admin.query('DELETE FROM mobile_push_tokens WHERE token=$1', [extraToken])
       await admin.query('DELETE FROM "session" WHERE id=$1', [otherSession.id])
     }
   })

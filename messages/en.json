@@ -7779,6 +7779,9 @@
     "notifications": {
       "on": "On",
       "off": "Off",
+      "renameDevice": "Rename device",
+      "deviceLabel": "Device label",
+      "renameFailed": "Couldn’t save the label. Try again.",
       "registeredDevices": "Registered push devices",
       "testDevice": "Send a test notification",
       "testSending": "Sending…",
