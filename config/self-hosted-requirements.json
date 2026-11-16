@@ -313,6 +313,13 @@
     "test": "tests/team-issue-create.db.test.ts",
     "suite": "test:scope-detachment-db"
   },
+  "app/api/tasks/[taskId]/review/machine-sessions/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read current terminal and preview lease kinds and expiration times for the authenticated owner's Task Run and credential.",
+    "test": "lib/coding-workspace/machine-sessions.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
   "app/api/tasks/[taskId]/review/machine-metrics/route.ts": {
     "mode": "operator-configured",
     "environment": [],
