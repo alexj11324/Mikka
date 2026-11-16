@@ -1,5 +1,6 @@
 import { bigint, boolean, foreignKey, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core'
 import { workspaces } from './workspace-schema'
+import { projects } from './project-schema'
 import type { GovernancePlan } from './team-entitlements-schema'
 import type { AuditExportRecord } from '@/lib/audit/integrity'
 import type { OrganizationAuditManifest } from '@/lib/governance/audit-export'
@@ -34,6 +35,8 @@ export const organizationMemberProjectDefaults = pgTable('mikka_organization_mem
   organizationId: uuid('organizationId').notNull(),
   userId: text('userId').notNull(),
   visibility: text('visibility').$type<'private' | 'shared'>().notNull(),
+  defaultProjectId: uuid('defaultProjectId').references(() => projects.id, { onDelete: 'set null' }),
+  selectionRevision: integer('selectionRevision').notNull().default(0),
 }, table => [
   primaryKey({ columns: [table.organizationId, table.userId] }),
   foreignKey({ columns: [table.organizationId, table.userId], foreignColumns: [organizationMembers.organizationId, organizationMembers.userId] }).onDelete('cascade'),

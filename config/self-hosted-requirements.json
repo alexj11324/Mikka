@@ -805,6 +805,27 @@
     "test": "tests/resource-access.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "app/api/workspaces/[workspaceId]/personal-default-project/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Stores a personal Organization Project choice in the Workspace database and reads it through existing Project access.",
+    "test": "tests/resource-access.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "lib/resource-access/personal-project-selection.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Stores a personal Organization Project choice in the Workspace database and reads it through existing Project access.",
+    "test": "tests/resource-access.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "drizzle/20261116150500_personal_organization_default_project.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Stores a personal Organization Project choice in the Workspace database and reads it through existing Project access.",
+    "test": "tests/resource-access.db.test.ts",
+    "suite": "test:visibility-db"
+  },
   "lib/project-input.ts": {
     "mode": "built-in",
     "environment": [],
