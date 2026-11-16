@@ -43,6 +43,23 @@ chmod -R a+rX "$base/harness" "$base/material"
 for name in device-launch model-launch runtime-prepare; do
   install -m 755 "$base/product/scripts/acceptance/desktop-delivery/$name.sh" "$base/bin/$name"
 done
+# Make model receipts writable by the producing UID and readable by the trusted
+# controller, without granting access to the private CA, app, lease or PG files.
+python3 - "$base/bin/runtime-prepare" <<'OWNERSHIP'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1]);s=p.read_text()
+a='  install -m 660 /dev/null "$model/$file"'
+replacement="""  if sudo -n -u mikka-e-model -- test -w "$model/$file"; then before=writable; else before=unwritable; fi
+  echo "Before model receipt setup: $file directory_gid=$(stat -c %g "$model") file_gid=$(stat -c %g "$model/$file") worker_gid=$(id -g mikka-e-model) $before"
+  sudo install -m 640 -o mikka-e-model -g "$(id -gn)" /dev/null "$model/$file"
+  sudo -n -u mikka-e-model -- test -w "$model/$file"
+  test -r "$model/$file"
+  test ! -w "$model/$file"
+  echo "After model receipt setup: $file writer owns private-readback file" """
+assert s.count(a)==1
+p.write_text(s.replace(a,a+'\n'+replacement))
+OWNERSHIP
 chmod 755 "$base/bin"
 mkdir -p "$base/product/.cache/e-codex-actual"
 cp "$1/review/evidence/2257/full-daemon/full-daemon.mts" "$base/product/.cache/e-codex-actual/full-daemon.mts"
