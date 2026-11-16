@@ -31,6 +31,7 @@ import { runTask, type AutomationRun, type AutomationView } from '@/lib/schedule
 import { definitionFrom, draftFrom, emptyDraft, foldNeeded, type AutomationDraft, type IntervalUnit, type ScheduleKind } from './automation-draft'
 import { useWorkspaceBotNames } from './automations-page'
 import { GitHubTriggers } from './github-triggers'
+import { WebhookBatches } from './webhook-batches'
 import { WebhookTrigger } from './webhook-trigger'
 import { templateDraft, type AutomationTemplate } from './automation-templates'
 import { LinearTriggers } from './linear-triggers'
@@ -311,6 +312,9 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
     </SettingsSection>
 
     {!creating && current && <AutomationUsagePanel workspaceId={workspaceId} id={current.id} />}
+
+    {workspaceId && current && (current.definition.webhook || current.webhook_key_set) && (current.owner_id === userId || current.can_take_over) &&
+      <WebhookBatches key={current.id} workspaceId={workspaceId} automation={current} />}
 
     {!creating && <SettingsSection id="automation-history" title={t('history')}>
       {history.error && !history.data ? <div className="p-4"><InlineLoadError message={tAll('loadError')} retryLabel={tCommon('retry')} onRetry={() => { void history.mutate() }} /></div>

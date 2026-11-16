@@ -47,6 +47,14 @@ export type AutomationSeams = {
 }
 export type Schedule = { id: string; owner_id: string; workspace_id: string | null; bot_id: string | null; visibility: 'owner' | 'workspace'; source_event_id: string; definition: Definition; request_definition: Definition; status: string; version: number; next_at: Date | null; disabled_reason?: string | null }
 export type Occurrence = { id: string; schedule_id: string; operation_id: string; event_id: string | null; definition: Definition; version: number; due_at: Date; status: string; attempts: number; lease_token: string | null; lease_until: Date; error: string | null; execution_decision: 'execute' | 'skip'; trigger: OccurrenceTrigger | null; report_next_at: Date; report_attempts: number; started_at: Date | null; created_at: Date }
+// The newest admitted batch supersedes older windows, even after someone closes it early.
+const WEBHOOK_BATCH = `trigger ? 'webhook' AND (definition#>>'{webhook,batchMinutes}')::int > 0 AND NOT (status='skipped' AND attempts=0)`
+const OPEN_WEBHOOK_WINDOW = `FROM schedule_occurrences
+  WHERE id=(SELECT id FROM schedule_occurrences WHERE schedule_id=$1 AND version=$2 AND ${WEBHOOK_BATCH}
+    ORDER BY due_at DESC,id DESC LIMIT 1)
+    AND status='pending' AND attempts=0 AND next_retry_at>statement_timestamp()`
+const COLLECTING_WINDOW = `SELECT id ${OPEN_WEBHOOK_WINDOW}
+  AND jsonb_array_length(trigger->'webhook'->'requests')<${WEBHOOK_BATCH_REQUESTS} AND octet_length(trigger::text)<=${WEBHOOK_BATCH_BYTES}`
 export const SCHEDULE_LEASE_MS = 5 * 60_000
 const MAX_ATTEMPTS = 3
 // The frozen request key is internal; keep the existing tool-response fields.
@@ -170,14 +178,39 @@ export class ScheduleStore {
       if(!row) throw new ScheduleError('scheduleNotFound',404)
       if(row.visibility==='owner'&&(row.owner_id!==actor.ownerId||row.bot_id!==actor.botId)) throw new ScheduleError('scheduleNotFound',404)
       if(row.visibility==='workspace'&&!actor.workspaceId) throw new ScheduleError('scheduleNotFound',404)
-      if((cmd.action==='update'||cmd.action==='resume'||cmd.action==='run_now')&&row.visibility==='workspace'&&row.owner_id!==actor.ownerId&&access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
+      if((cmd.action==='update'||cmd.action==='resume'||cmd.action==='run_now'||cmd.action==='flush_batch'||cmd.action==='cancel_batch')&&row.visibility==='workspace'&&row.owner_id!==actor.ownerId&&access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
       if(cmd.action==='history'){
-        const seen=await tx.query('SELECT id,schedule_id,operation_id,event_id,version,due_at,status,attempts,result,error,trigger,started_at,finished_at,reported_at FROM schedule_occurrences WHERE schedule_id=$1 ORDER BY due_at DESC LIMIT 100',[row.id])
         // Seeing that a workspace schedule ran is collaboration; reading what it returned is not. Only the
         // creator, and an owner/admin, get result, error and the operation identity; any other active member
         // sees the run's status and timestamps with those fields blank. A member of a workspace that has no
         // roles runs as 'member'. Visibility is unchanged: an owner-only row is already 404 above.
         const privileged=row.owner_id===actor.ownerId||access.role!=='member'
+        if (cmd.batches) {
+          if (!privileged) throw new ScheduleError('scheduleAdminRequired', 403)
+          const { status, limit = SCHEDULE_PAGE_MAX, cursor } = cmd.batches
+          const [at, id] = cursor?.split('/') ?? []
+          const { rows } = await tx.query<{
+            id: string; status: string; runStatus: string; created_at: Date; due_at: Date; requestCount: number; page_cursor: string
+          }>(`WITH batches AS (
+              SELECT id, created_at, due_at, status AS "runStatus", jsonb_array_length(trigger->'webhook'->'requests') AS "requestCount",
+                CASE WHEN status='cancelled' THEN 'cancelled'
+                  WHEN id = (${COLLECTING_WINDOW}) THEN 'collecting'
+                  ELSE 'queued' END AS status
+              FROM schedule_occurrences
+              WHERE schedule_id=$1 AND ${WEBHOOK_BATCH}
+            )
+            SELECT *, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') || '/' || id AS page_cursor
+            FROM batches WHERE ($3::text IS NULL OR status=$3)
+              AND ($4::timestamptz IS NULL OR (created_at, id) < ($4::timestamptz, $5::uuid))
+            ORDER BY created_at DESC, id DESC LIMIT $6`,
+          [row.id, row.version, status ?? null, at ?? null, id ?? null, limit+1])
+          const page = rows.slice(0, limit)
+          return {
+            batches: page.map(({ page_cursor: _cursor, ...batch }) => batch),
+            nextCursor: rows.length > limit ? page[limit-1]!.page_cursor : null,
+          }
+        }
+        const seen=await tx.query('SELECT id,schedule_id,operation_id,event_id,version,due_at,status,attempts,result,error,trigger,started_at,finished_at,reported_at FROM schedule_occurrences WHERE schedule_id=$1 ORDER BY due_at DESC LIMIT 100',[row.id])
         return {occurrences:privileged?seen.rows:seen.rows.map(o=>({...o,operation_id:null,event_id:null,result:null,error:null,trigger:null}))}
       }
       if(cmd.action==='pin'){
@@ -214,6 +247,7 @@ export class ScheduleStore {
       await this.source(tx,actor,row.workspace_id)
       if(row.version!==cmd.version) throw new ScheduleError('scheduleVersionConflict')
       if(row.status==='cancelled') throw new ScheduleError('scheduleCancelled')
+      if(cmd.action==='flush_batch'||cmd.action==='cancel_batch') return this.closeWebhookBatch(tx, row, cmd.batchId, cmd.action)
       if(cmd.action==='run_now') return this.runNow(tx,row,cmd.requestId)
       if(cmd.action==='take_over') return this.takeOver(tx,actor,access,row)
       if(cmd.action==='webhook_key'){
@@ -243,6 +277,33 @@ export class ScheduleStore {
       await this.listChanged(tx,row.workspace_id)
       return {schedule:updated}
     }))
+  }
+  /** Close only a collecting window under the same schedule lock used by ingress. The normal worker owns dispatch. */
+  private async closeWebhookBatch(tx: PoolClient, row: Schedule, batchId: string, action: 'flush_batch' | 'cancel_batch') {
+    if (row.status !== 'active') throw new ScheduleError('scheduleNotActive')
+    const batch = (await tx.query<{ closedBy: string | null }>(`SELECT trigger#>>'{webhook,closedBy}' AS "closedBy"
+      FROM schedule_occurrences WHERE schedule_id=$1 AND version=$2 AND id=$3 AND ${WEBHOOK_BATCH} FOR UPDATE`,
+    [row.id, row.version, batchId])).rows[0]
+    if (!batch) throw new ScheduleError('scheduleBatchNotFound', 404)
+    const status: 'queued' | 'cancelled' = action === 'flush_batch' ? 'queued' : 'cancelled'
+    if (batch.closedBy === action) return {batchId, status, replayed: true}
+    const open = await tx.query(`SELECT 1 WHERE $3::uuid=(${COLLECTING_WINDOW})`, [row.id, row.version, batchId])
+    if (!open.rowCount) throw new ScheduleError('scheduleBatchClosed')
+    if (action === 'flush_batch') {
+      await this.permission(tx, row.owner_id, row.bot_id, row.workspace_id, row.definition)
+      await tx.query(`UPDATE schedule_occurrences SET next_retry_at=clock_timestamp(),
+        trigger=jsonb_set(trigger,'{webhook,closedBy}','"flush_batch"') WHERE id=$1`, [batchId])
+    } else {
+      // Keep timestamps and hashed request IDs for deduplication after cancellation; discard every request body.
+      await tx.query(`UPDATE schedule_occurrences SET status='cancelled',finished_at=now(),reported_at=now(),
+        trigger=jsonb_build_object('webhook',jsonb_build_object('closedBy','cancel_batch','requests',(
+          SELECT jsonb_agg(jsonb_strip_nulls(jsonb_build_object('at',r->'at','keyHash',
+            encode(sha256(convert_to(r->>'key','UTF8')),'hex'))) ORDER BY n)
+          FROM jsonb_array_elements(trigger->'webhook'->'requests') WITH ORDINALITY AS requests(r,n)
+        ))) WHERE id=$1`, [batchId])
+    }
+    await this.listChanged(tx,row.workspace_id)
+    return {batchId, status, replayed: false}
   }
   /**
    * 接手: the automation becomes the actor's. It runs as them from now on, reports to their chat, and its authority is
@@ -503,13 +564,15 @@ export class ScheduleStore {
       const row=(await tx.query<Schedule>('SELECT * FROM user_schedules WHERE webhook_key_hash=$1 FOR UPDATE',[keyHash])).rows[0]
       if(!row||!row.definition.webhook||row.status==='cancelled'||row.status==='completed'||!row.workspace_id) throw new ScheduleError('scheduleNotFound',404)
       if(row.status!=='active') throw new ScheduleError('scheduleNotActive',409)
-      if(requestKey&&(await tx.query(`SELECT 1 FROM schedule_occurrences WHERE schedule_id=$1 AND trigger->'webhook'->'requests' @> $2::jsonb LIMIT 1`,[row.id,JSON.stringify([{key:requestKey}])])).rowCount) return {status:'duplicate' as const}
+      if(requestKey&&(await tx.query(`SELECT 1 FROM schedule_occurrences WHERE schedule_id=$1
+        AND (trigger->'webhook'->'requests' @> $2::jsonb OR trigger->'webhook'->'requests' @> $3::jsonb) LIMIT 1`,
+      [row.id,JSON.stringify([{key:requestKey}]),JSON.stringify([{keyHash:createHash('sha256').update(requestKey).digest('hex')}])])).rowCount) return {status:'duplicate' as const}
       const now=(await tx.query<{now:Date}>('SELECT clock_timestamp() now')).rows[0]!.now
       const request:WebhookRequest={at:now.toISOString(),body,...(requestKey?{key:requestKey}:{})}
       const batch=row.definition.webhook.batchMinutes
       if(batch>0){
-        const open=(await tx.query<{id:string;n:number;bytes:number;due:Date}>(`SELECT id,jsonb_array_length(trigger->'webhook'->'requests')::int n,octet_length(trigger::text)::int bytes,next_retry_at due FROM schedule_occurrences
-          WHERE schedule_id=$1 AND version=$2 AND status='pending' AND attempts=0 AND trigger ? 'webhook' AND next_retry_at>$3 ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,[row.id,row.version,now])).rows[0]
+        const open=(await tx.query<{id:string;n:number;bytes:number;due:Date}>(`SELECT id,jsonb_array_length(trigger->'webhook'->'requests')::int n,octet_length(trigger::text)::int bytes,next_retry_at due
+          ${OPEN_WEBHOOK_WINDOW} FOR UPDATE`,[row.id,row.version])).rows[0]
         if(open&&open.n<WEBHOOK_BATCH_REQUESTS&&open.bytes+Buffer.byteLength(body)<=WEBHOOK_BATCH_BYTES){
           await tx.query(`UPDATE schedule_occurrences SET trigger=jsonb_set(trigger,'{webhook,requests}',(trigger->'webhook'->'requests')||$2::jsonb) WHERE id=$1`,[open.id,JSON.stringify([request])])
           await this.listChanged(tx,row.workspace_id)
