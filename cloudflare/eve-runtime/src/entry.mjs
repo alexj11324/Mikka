@@ -14,7 +14,7 @@ const methods = new Map([
 const missing = () => new Response(null, { status: 404 })
 
 export class WorkersAiOutbound extends WorkerEntrypoint {
-  fetch(request) { return workersAiRequest(request, this.env.WORKERS_AI, this.ctx.props.capability) }
+  fetch(request) { return workersAiRequest(request, this.env.WORKERS_AI, this.ctx.props.capability, this.ctx) }
 }
 
 export class EveWorldOutbound extends WorkerEntrypoint {
