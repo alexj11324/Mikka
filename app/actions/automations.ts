@@ -65,34 +65,34 @@ export async function getAutomation(scheduleId: string, workspaceId?: string): P
 }
 
 /** Its runs, newest first. Only its creator and owners or admins see each run's result and task. */
-export async function automationHistory(scheduleId: string): Promise<ActionResult<AutomationHistory>> {
+export async function automationHistory(scheduleId: string, workspaceId?: string): Promise<ActionResult<AutomationHistory>> {
   if (!id.safeParse(scheduleId).success) return { error: 'validationGeneric' }
-  return command({ action: 'history', scheduleId })
+  return command({ action: 'history', scheduleId }, workspaceId)
 }
 
-export async function automationBatches(input: { scheduleId: string; cursor?: string }): Promise<ActionResult<WebhookBatchPage>> {
+export async function automationBatches(input: { scheduleId: string; cursor?: string }, workspaceId?: string): Promise<ActionResult<WebhookBatchPage>> {
   const parsed = webhookBatchListInput.safeParse(input)
   if (!parsed.success) return { error: 'validationGeneric' }
-  return command({ action: 'history', scheduleId: parsed.data.scheduleId, batches: { cursor: parsed.data.cursor, limit: 20 } })
+  return command({ action: 'history', scheduleId: parsed.data.scheduleId, batches: { cursor: parsed.data.cursor, limit: 20 } }, workspaceId)
 }
 
 type BatchResult = {batchId: string; status: 'queued' | 'cancelled'; replayed: boolean}
 
-export async function flushAutomationBatch(input: z.infer<typeof webhookBatchInput>): Promise<ActionResult<BatchResult>> {
+export async function flushAutomationBatch(input: z.infer<typeof webhookBatchInput>, workspaceId?: string): Promise<ActionResult<BatchResult>> {
   const parsed = webhookBatchInput.safeParse(input)
-  return parsed.success ? command({action:'flush_batch', ...parsed.data}) : {error:'validationGeneric'}
+  return parsed.success ? command({action:'flush_batch', ...parsed.data}, workspaceId) : {error:'validationGeneric'}
 }
 
-export async function cancelAutomationBatch(input: z.infer<typeof webhookBatchInput>): Promise<ActionResult<BatchResult>> {
+export async function cancelAutomationBatch(input: z.infer<typeof webhookBatchInput>, workspaceId?: string): Promise<ActionResult<BatchResult>> {
   const parsed = webhookBatchInput.safeParse(input)
-  return parsed.success ? command({action:'cancel_batch', ...parsed.data}) : {error:'validationGeneric'}
+  return parsed.success ? command({action:'cancel_batch', ...parsed.data}, workspaceId) : {error:'validationGeneric'}
 }
 
 /** 用量: runs and, for the creator and owners/admins, what the tasks it made spent, per day in its own time zone. */
-export async function automationUsage(input: { scheduleId: string; days?: number }): Promise<ActionResult<AutomationUsage>> {
+export async function automationUsage(input: { scheduleId: string; days?: number }, workspaceId?: string): Promise<ActionResult<AutomationUsage>> {
   const parsed = z.object({ scheduleId: z.uuid(), days: z.number().int().min(1).max(90).optional() }).strict().safeParse(input)
   if (!parsed.success) return { error: 'validationGeneric' }
-  return command({ action: 'usage', ...parsed.data })
+  return command({ action: 'usage', ...parsed.data }, workspaceId)
 }
 
 export async function createAutomation(input: { requestId: string; definition: Definition }, workspaceId?: string): Promise<ActionResult<{ schedule: AutomationView; replayed: boolean }>> {
@@ -101,32 +101,32 @@ export async function createAutomation(input: { requestId: string; definition: D
   return command({ action: 'create', ...parsed.data }, workspaceId)
 }
 
-export async function updateAutomation(input: { scheduleId: string; version: number; definition: Definition }): Promise<ActionResult<{ schedule: AutomationView }>> {
+export async function updateAutomation(input: { scheduleId: string; version: number; definition: Definition }, workspaceId?: string): Promise<ActionResult<{ schedule: AutomationView }>> {
   const parsed = versioned.extend({ definition: definitionSchema }).safeParse(input)
   if (!parsed.success) return { error: 'validationGeneric' }
-  return command({ action: 'update', ...parsed.data })
+  return command({ action: 'update', ...parsed.data }, workspaceId)
 }
 
-export async function pauseAutomation(input: { scheduleId: string; version: number }): Promise<ActionResult<{ schedule: AutomationView }>> {
+export async function pauseAutomation(input: { scheduleId: string; version: number }, workspaceId?: string): Promise<ActionResult<{ schedule: AutomationView }>> {
   const parsed = versioned.safeParse(input)
-  return parsed.success ? command({ action: 'pause', ...parsed.data }) : { error: 'validationGeneric' }
+  return parsed.success ? command({ action: 'pause', ...parsed.data }, workspaceId) : { error: 'validationGeneric' }
 }
 
-export async function resumeAutomation(input: { scheduleId: string; version: number }): Promise<ActionResult<{ schedule: AutomationView }>> {
+export async function resumeAutomation(input: { scheduleId: string; version: number }, workspaceId?: string): Promise<ActionResult<{ schedule: AutomationView }>> {
   const parsed = versioned.safeParse(input)
-  return parsed.success ? command({ action: 'resume', ...parsed.data }) : { error: 'validationGeneric' }
+  return parsed.success ? command({ action: 'resume', ...parsed.data }, workspaceId) : { error: 'validationGeneric' }
 }
 
 /** 接手: an owner or admin makes another person's automation theirs; it runs as them from now on. */
-export async function takeOverAutomation(input: { scheduleId: string; version: number }): Promise<ActionResult<{ schedule: AutomationView }>> {
+export async function takeOverAutomation(input: { scheduleId: string; version: number }, workspaceId?: string): Promise<ActionResult<{ schedule: AutomationView }>> {
   const parsed = versioned.safeParse(input)
-  return parsed.success ? command({ action: 'take_over', ...parsed.data }) : { error: 'validationGeneric' }
+  return parsed.success ? command({ action: 'take_over', ...parsed.data }, workspaceId) : { error: 'validationGeneric' }
 }
 
 /** Webhook 地址: a new secret URL key for the automation, returned once; the previous URL stops working. */
-export async function automationWebhookKey(input: { scheduleId: string; version: number }): Promise<ActionResult<{ schedule: AutomationView; key: string }>> {
+export async function automationWebhookKey(input: { scheduleId: string; version: number }, workspaceId?: string): Promise<ActionResult<{ schedule: AutomationView; key: string }>> {
   const parsed = versioned.safeParse(input)
-  return parsed.success ? command({ action: 'webhook_key', ...parsed.data }) : { error: 'validationGeneric' }
+  return parsed.success ? command({ action: 'webhook_key', ...parsed.data }, workspaceId) : { error: 'validationGeneric' }
 }
 
 /** Linear triggers' teams: those of the person's own Linear connection; `connected: false` without one. */
@@ -163,25 +163,25 @@ export async function automationSlackChannels(): Promise<ActionResult<{ installe
 }
 
 /** 置顶: the signed-in person's own pin. */
-export async function pinAutomation(input: { scheduleId: string; pinned: boolean }): Promise<ActionResult<{ pinned: boolean }>> {
+export async function pinAutomation(input: { scheduleId: string; pinned: boolean }, workspaceId?: string): Promise<ActionResult<{ pinned: boolean }>> {
   const parsed = z.object({ scheduleId: z.uuid(), pinned: z.boolean() }).strict().safeParse(input)
-  return parsed.success ? command({ action: 'pin', ...parsed.data }) : { error: 'validationGeneric' }
+  return parsed.success ? command({ action: 'pin', ...parsed.data }, workspaceId) : { error: 'validationGeneric' }
 }
 
 /** 文件夹和标签: the workspace's folder and tags for an automation (its creator or an owner/admin). */
-export async function organizeAutomation(input: { scheduleId: string; folder: string | null; tags: string[] }): Promise<ActionResult<{ schedule: AutomationView }>> {
+export async function organizeAutomation(input: { scheduleId: string; folder: string | null; tags: string[] }, workspaceId?: string): Promise<ActionResult<{ schedule: AutomationView }>> {
   const parsed = z.object({ scheduleId: z.uuid(), folder: z.string().trim().min(1).max(60).nullable(), tags: z.array(z.string().trim().min(1).max(30)).max(10) }).strict().safeParse(input)
-  return parsed.success ? command({ action: 'organize', ...parsed.data }) : { error: 'validationGeneric' }
+  return parsed.success ? command({ action: 'organize', ...parsed.data }, workspaceId) : { error: 'validationGeneric' }
 }
 
-export async function deleteAutomation(input: { scheduleId: string; version: number }): Promise<ActionResult<{ schedule: AutomationView }>> {
+export async function deleteAutomation(input: { scheduleId: string; version: number }, workspaceId?: string): Promise<ActionResult<{ schedule: AutomationView }>> {
   const parsed = versioned.safeParse(input)
-  return parsed.success ? command({ action: 'delete', ...parsed.data }) : { error: 'validationGeneric' }
+  return parsed.success ? command({ action: 'delete', ...parsed.data }, workspaceId) : { error: 'validationGeneric' }
 }
 
-export async function restoreAutomation(input: { scheduleId: string; version: number }): Promise<ActionResult<{ schedule: AutomationView }>> {
+export async function restoreAutomation(input: { scheduleId: string; version: number }, workspaceId?: string): Promise<ActionResult<{ schedule: AutomationView }>> {
   const parsed = versioned.safeParse(input)
-  return parsed.success ? command({ action: 'restore', ...parsed.data }) : { error: 'validationGeneric' }
+  return parsed.success ? command({ action: 'restore', ...parsed.data }, workspaceId) : { error: 'validationGeneric' }
 }
 
 /** The original terminal cancellation. */
@@ -190,13 +190,13 @@ export async function cancelAutomation(input: { scheduleId: string; version: num
   return parsed.success ? command({ action: 'cancel', ...parsed.data }) : { error: 'validationGeneric' }
 }
 
-export async function cancelAutomationRun(input: { scheduleId: string; version: number; runId: string }): Promise<ActionResult<{ runId: string; status: 'cancelled' }>> {
+export async function cancelAutomationRun(input: { scheduleId: string; version: number; runId: string }, workspaceId?: string): Promise<ActionResult<{ runId: string; status: 'cancelled' }>> {
   const parsed = versioned.extend({ runId: z.uuid() }).safeParse(input)
-  return parsed.success ? command({ action: 'cancel_run', ...parsed.data }) : { error: 'validationGeneric' }
+  return parsed.success ? command({ action: 'cancel_run', ...parsed.data }, workspaceId) : { error: 'validationGeneric' }
 }
 
 /** 立即运行: one run now. The same `requestId` never starts a second one. */
-export async function runAutomationNow(input: { scheduleId: string; version: number; requestId: string }): Promise<ActionResult<{ schedule: AutomationView; replayed: boolean }>> {
+export async function runAutomationNow(input: { scheduleId: string; version: number; requestId: string }, workspaceId?: string): Promise<ActionResult<{ schedule: AutomationView; replayed: boolean }>> {
   const parsed = versioned.extend({ requestId: z.uuid() }).safeParse(input)
-  return parsed.success ? command({ action: 'run_now', ...parsed.data }) : { error: 'validationGeneric' }
+  return parsed.success ? command({ action: 'run_now', ...parsed.data }, workspaceId) : { error: 'validationGeneric' }
 }

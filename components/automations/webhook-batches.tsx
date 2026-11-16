@@ -31,7 +31,7 @@ export function WebhookBatches({ workspaceId, automation }: { workspaceId: strin
     if (busy) return
     setBusy(true)
     try {
-      const result = await action({ scheduleId: automation.id, batchId, version: automation.version })
+      const result = await action({ scheduleId: automation.id, batchId, version: automation.version }, workspaceId)
       if ('error' in result && result.error) toast.error(actionError(result.error))
       setConfirm(null)
     } catch {
