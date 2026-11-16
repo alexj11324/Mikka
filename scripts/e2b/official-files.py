@@ -26,10 +26,10 @@ PRIVATE = Path('/opt/mikka')
 # provider certificate, its /etc/ssl/certs PEM aliases and the provider CA's
 # OpenSSL subject-hash links; validation run 43922227579 showed the fixed-name
 # provider root e2b-ca.crt is now replaced per create as well. Exactly these
-# names; every other path under the CA roots, including /etc/ssl/certs/e2b-ca.pem
-# and all public CAs, stays protected.
+# names (validation run 43923511902: its e2b-ca.pem alias then dangles); every
+# other path under the CA roots, including all public CAs, stays protected.
 ROTATING_PROVIDER_CA = re.compile(r'/usr/local/share/ca-certificates/e2b-(?:[0-9a-f]{64}|ca)\.crt'
-                                  r'|/etc/ssl/certs/e2b-[0-9a-f]{64}\.pem'
+                                  r'|/etc/ssl/certs/e2b-(?:[0-9a-f]{64}|ca)\.pem'
                                   r'|/etc/ssl/certs/1560546e\.[0-9]+')
 FINALIZATION_POLICY = Path(__file__).with_name('e2b-finalization-files.json')
 CERTIFICATE_RELINKS = Path(__file__).with_name('e2b-certificate-relinks.json')
@@ -318,7 +318,11 @@ def verify(manifest, e2b_finalization=None):
             # Converting a duplicated certificate into a link must keep the
             # certificate bytes. Only the two explicit E2B root references may
             # instead point to the freshly supplied provider root certificate.
-            resolved = Path(change['path']).resolve(strict=True)
+            try:
+                resolved = Path(change['path']).resolve(strict=True)
+            except (FileNotFoundError, NotADirectoryError, RuntimeError) as error:
+                # A dangling provider link is a named refusal, not an unclassified crash.
+                raise RuntimeError('e2b_certificate_target_invalid') from error
             resolved_row = entry(resolved)
             if resolved_row.get('kind') != 'file':
                 raise RuntimeError('e2b_certificate_target_invalid')

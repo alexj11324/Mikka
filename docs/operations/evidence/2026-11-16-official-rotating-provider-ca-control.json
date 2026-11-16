@@ -293,16 +293,29 @@
     }
   },
   "replay": "The observations replayed through official-files.py rules: with the rotating names excluded, ready and fresh refuse nothing for claude, codex and desktop; without it, each kind refuses the rotating .crt (ready mode, fresh removal) and claude/codex the 1560546e.0 provider-root relink.",
-  "policyConclusion": "Exclude exactly the rotating provider CA names (pattern in e2b-finalization-files.json rotatingProviderCertificates, including the fixed-name provider root e2b-ca.crt) from the protected manifest; every other entry, including /etc/ssl/certs/e2b-ca.pem, all public CA files and their measured relinks, stays protected.",
-  "validation": {
-    "runId": 43922227579,
-    "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/43922227579",
-    "sourceCommit": "9e316caa5091fa0372e20277a85f14cf36d8318f",
-    "results": {
-      "codex": "ready and fresh-create conservation passed",
-      "claude": "ready passed; fresh_scan official_files_removed /usr/local/share/ca-certificates/e2b-ca.crt (provider root written during the build, replaced per create)",
-      "desktop": "start guard_prepare failed: workspace-ingress backend (nft >= 1.0.6 required); unrelated to CA conservation"
+  "policyConclusion": "Exclude exactly the rotating provider CA names (pattern in e2b-finalization-files.json rotatingProviderCertificates, including the fixed-name provider root e2b-ca.crt and its e2b-ca.pem alias) from the protected manifest; every other entry, all public CA files and their measured relinks, stays protected.",
+  "validation": [
+    {
+      "runId": 43922227579,
+      "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/43922227579",
+      "sourceCommit": "9e316caa5091fa0372e20277a85f14cf36d8318f",
+      "results": {
+        "codex": "ready and fresh-create conservation passed",
+        "claude": "ready passed; fresh_scan official_files_removed /usr/local/share/ca-certificates/e2b-ca.crt (provider root written during the build, replaced per create)",
+        "desktop": "start guard_prepare failed: workspace-ingress backend (nft >= 1.0.6 required); unrelated to CA conservation"
+      },
+      "cleanup": "all three private candidates deleted; no publication"
     },
-    "cleanup": "all three private candidates deleted; no publication"
-  }
+    {
+      "runId": 43923511902,
+      "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/43923511902",
+      "sourceCommit": "1bbf7f2955febbbb21d05ccd3ae48f1cf413e1d2",
+      "results": {
+        "codex": "ready and fresh-create conservation passed",
+        "claude": "ready passed; fresh_scan conservation_failed: the measured providerRoot relink of /etc/ssl/certs/e2b-ca.pem resolves to the replaced e2b-ca.crt and dangles",
+        "desktop": "start guard_prepare failed: workspace-ingress backend (unrelated)"
+      },
+      "cleanup": "all three private candidates deleted; no publication"
+    }
+  ]
 }
