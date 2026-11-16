@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import type { Sandbox } from 'e2b'
 import { CodedError, type CodedErrorOptions } from '@mikka/protocol/coded-error'
 import { connectComputer, computerGone, computerState } from '@/lib/computer/e2b-provider'
+import { isPreviewPort } from './port'
 import { authTrustedOrigins } from '@/lib/auth-config'
 import { cloudflareReview, reviewReply, type CloudflareReview } from '../cloudflare-review'
 import type { ReviewSessionLease } from '../review-sessions'
@@ -111,7 +112,7 @@ async function control(sandbox: Sandbox, message: Json): Promise<Json> {
 export async function prepareRunPreview(authority: TaskReviewAuthority, options: { expiresAt?: string; port?: number; lease?: ReviewSessionLease } = {}, connect: Connector = connectComputer, state: StateReader = computerState): Promise<PreparedPreview | PreviewUnavailable> {
   if (authority.machineKind !== 'cloud' || !authority.sandboxId || authority.machineEpoch === null)
     throw new PreviewRuntimeError('configuration', 404)
-  if (options.port !== undefined && (!Number.isInteger(options.port) || options.port < 1024 || options.port > 65535))
+  if (options.port !== undefined && !isPreviewPort(options.port))
     throw new PreviewRuntimeError('configuration', 400)
   const expires = Math.min(Date.now() + PREVIEW_LIFETIME_MS,
     options.expiresAt ? Date.parse(options.expiresAt) : Infinity,
@@ -128,8 +129,7 @@ export async function prepareRunPreview(authority: TaskReviewAuthority, options:
       const reply = await reviewReply(review,'preview-prepare',{port:options.port})
       if (reply.running === false && reply.code === 'no_loopback_server')
         return {running:false,state:'unavailable',code:'no_loopback_server',observedAt:Date.now()}
-      if (reply.running !== true || typeof reply.port !== 'number' || !Number.isInteger(reply.port) ||
-          reply.port < 1024 || reply.port > 65535 || typeof reply.origin !== 'string' ||
+      if (reply.running !== true || !isPreviewPort(reply.port) || typeof reply.origin !== 'string' ||
           typeof reply.expiresAt !== 'number' || reply.expiresAt > binding.expiresAt + 1 || reply.expiresAt <= Date.now()/1000)
         throw new PreviewRuntimeError('protocol')
       const origin = new URL(reply.origin)
@@ -146,12 +146,12 @@ export async function prepareRunPreview(authority: TaskReviewAuthority, options:
     const reply = await control(sandbox, { operation: 'prepare', binding, ...(options.port === undefined ? {} : { port: options.port }) })
     if (reply.running === false && reply.code === 'no_loopback_server')
       return { running: false, state: 'unavailable', code: 'no_loopback_server', observedAt: Date.now() }
-    if (reply.running !== true || !Number.isInteger(reply.gatewayPort) || Number(reply.gatewayPort) < 1024 || Number(reply.gatewayPort) > 65535
-      || !Number.isInteger(reply.port) || Number(reply.port) < 1024 || Number(reply.port) > 65535
+    if (reply.running !== true || !isPreviewPort(reply.gatewayPort)
+      || !isPreviewPort(reply.port)
       || typeof reply.expiresAt !== 'number' || reply.expiresAt > binding.expiresAt + 1 || reply.expiresAt <= Date.now() / 1000)
       throw new PreviewRuntimeError('protocol')
     binding.expiresAt = reply.expiresAt
-    return { running: true, sandbox, binding, gatewayPort: Number(reply.gatewayPort), port: Number(reply.port), expiresAt: new Date(reply.expiresAt * 1000).toISOString() }
+    return { running: true, sandbox, binding, gatewayPort: reply.gatewayPort, port: reply.port, expiresAt: new Date(reply.expiresAt * 1000).toISOString() }
   } catch (cause) {
     if (cause instanceof PreviewRuntimeError) throw cause
     throw new PreviewRuntimeError(computerGone(cause) ? 'scope_changed' : 'runtime', computerGone(cause) ? 409 : 503, { cause })
