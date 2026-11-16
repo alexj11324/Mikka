@@ -18,6 +18,7 @@ const DRIVE_VOLUME_ID = 'vol_[0-9A-HJKMNP-TV-Z]{26}'
 const DRIVE_VERSION_ID = 'vver_[0-9A-HJKMNP-TV-Z]{26}'
 export const DRIVE_BLOB_UPLOAD = new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/blobs$`)
 const DRIVE_ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
+  [/^\/api\/drive\/scopes$/, ['GET']],
   [/^\/api\/drive\/volumes$/, ['GET', 'POST']],
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}$`), ['GET']],
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/(?:files|versions)$`), ['GET']],
