@@ -1,0 +1,20 @@
+from pathlib import Path
+import sys,json,re
+base=Path(sys.argv[1]);qa=base/'run/case'
+def optional(p):
+ try: return p.read_text()
+ except (OSError,UnicodeError): return ''
+diagnostic=optional(qa/'daemon.log')
+fields = {name: bool(re.search(pattern,diagnostic,re.I)) for name,pattern in {
+ 'nodePackageMissing':r'ERR_MODULE_NOT_FOUND|MODULE_NOT_FOUND|Cannot find package',
+ 'filePermission':r'permission denied|EACCES|EPERM','tlsTrust':r'CERT_|self.signed|certificate','requestFailed':r'fetch failed|ECONNREFUSED|network unreachable',
+ 'registrationRejected':r'Device registration token expired or already used','sudoDenied':r'sudo:','gitConfig':r'gitconfig','esbuild':r'esbuild','tsx':r'tsx','invalidGrantInput':r'Invalid registration token',
+ 'registrationPersisted':r'Logged in|Credential stored|Signed in',
+ 'childExited':r'ELIFECYCLE|spawn','pino':r'pino','readPackageJson':r'package.json','packageEsm':r'ERR_PACKAGE|ERR_REQUIRE',
+ 'cannotReadDirectory':r'scandir|readdir','deviceFile':r'device.json','vscodeJsonrpc':r'vscode-jsonrpc','typescriptLoader':r'TransformError|TypeScript','blockedIpc':r'connect EACCES',
+ 'accessUtf8':r'EINVAL','deprecated':r'DeprecationWarning','http2':r'HTTP 2','cwdUnreadable':r'uv_cwd|getcwd','unsupported':r'not supported','fsEnoent':r'ENOENT',
+ 'editorGraph':r'@mikka/protocol','swc':r'swc','hashAlgorithm':r'unsupported hash/crypto','pathPrivateNamespace':r'/home/runner/work/_temp/',
+ }.items()}
+def version(p): return p.read_text().strip() if p.is_file() else None
+proof=json.loads(optional(qa/'proof.json') or '{}')
+print(json.dumps({'source':version(base/'source.sha'),'stage':proof.get('diagnostic'), 'phases':[x['phase'] for x in proof.get('checks',[])], 'success':proof.get('success'), 'kernel':version(base/'kernel'), 'nativeLogBytes':len(diagnostic), 'knownMarkers':{k:v for k,v in fields.items() if v}, 'nonSecretClasses':sorted(set(re.findall(r'\b(?:E[A-Z_]{2,40}|[A-Z][a-zA-Z]{0,18}Error)\b',diagnostic)))[:16]},indent=2))

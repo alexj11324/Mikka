@@ -1,10 +1,10 @@
-name: E 2257 full daemon on the pinned public QA build
+name: E 2257 isolated device registration on the original public QA runner
 on:
   push:
     branches: [evidence/2254-sidebar-85dfc396]
     paths:
       - .github/workflows/e-2257-full-daemon.yml
-      - evidence/2257/full-daemon/**
+      - evidence/2257/enrollment/**
 permissions:
   contents: read
 jobs:
@@ -13,14 +13,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 43
     env:
-      PUBLIC_SOURCE: d8c0925622b6baf830704aeae645d68aecada531
-      PUBLIC_TREE: 152e9fdca818a0206eba25d468bdcb2cc620624a
+      PUBLIC_SOURCE: efcccbd42cb8ef9d34be3d75c87c8d060b2ce527
+
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           path: review
           persist-credentials: false
-          sparse-checkout: evidence/2257/full-daemon
+          sparse-checkout: |
+            evidence/2257/full-daemon
+            evidence/2257/enrollment
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: 46d60aa6802ef48600fbe2fa3d48015b14f6d50b
@@ -29,7 +31,7 @@ jobs:
           sparse-checkout: evidence/2257/local-provider
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: d8c0925622b6baf830704aeae645d68aecada531
+          ref: efcccbd42cb8ef9d34be3d75c87c8d060b2ce527
           path: product
           persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -48,19 +50,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git -C product rev-parse HEAD)" = "$PUBLIC_SOURCE"
-          test "$(git -C product rev-parse 'HEAD^{tree}')" = "$PUBLIC_TREE"
-          mkdir -m 700 material harness run run/home
-          cp original/evidence/2257/local-provider/{package.json,package-lock.json,provider.mjs} harness/
-          cp original-review/evidence/2271/current-review/provider.mjs harness/provider-current.mjs
-          cp review/evidence/2257/full-daemon/provider-relay.mjs harness/relay.mjs
-          (cd product && pnpm install --frozen-lockfile)
-          (cd harness && npm ci --omit=optional --ignore-scripts --no-audit --no-fund)
-          mkdir -p run/case/daemon
-          node product/packages/daemon/harness/cli.mjs run/case/daemon/harness codex > "$RUNNER_TEMP/codex-install.log"
-          node product/packages/daemon/harness/cli.mjs run/case/daemon/harness claude_code > "$RUNNER_TEMP/claude-install.log"
-          curl -fsSL --retry 2 https://huggingface.co/bartowski/SmolLM2-135M-Instruct-GGUF/resolve/d255afaffd3441b95abca9b5cc4c819b93f66936/SmolLM2-135M-Instruct-Q4_K_M.gguf -o material/model.gguf
-          echo "2e8040ceae7815abe0dcb3540b9995eaa1fa0d2ca9e797d0a635ae4433c68c2d  material/model.gguf" | sha256sum -c -
+          base=$(mktemp -d /tmp/mikka-desktop-delivery.XXXXXXXX)
+          echo "CASE_BASE=$base" >> "$GITHUB_ENV"
+          bash review/evidence/2257/enrollment/prepare.sh "$GITHUB_WORKSPACE" "$base"
+          echo "$PUBLIC_SOURCE" > "$base/source.sha"
           if [ ! -x /usr/lib/postgresql/17/bin/initdb ]; then
             . /etc/os-release
             curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o "$RUNNER_TEMP/pgdg.asc"
@@ -70,32 +63,32 @@ jobs:
             sudo apt-get update -qq
             sudo apt-get install -y --no-install-recommends postgresql-17
           fi
-          /usr/bin/google-chrome --version
-          mkdir -p product/.cache/e-codex-actual
-          cp review/evidence/2257/full-daemon/full-daemon.mts product/.cache/e-codex-actual/full-daemon.mts
-      - name: Compile exact source and exercise the full isolated daemon
+      - name: Check true CLI loader then perform only the ordinary device registration
         shell: bash
         run: |
           set -euo pipefail
-          sudo unshare --net bash -euc '
+          base=$CASE_BASE
+          sudo env -i PATH="$PATH" HOME="$HOME" USER="$(id -un)" LANG=C.UTF-8 GITHUB_WORKSPACE="$GITHUB_WORKSPACE" RUNNER_TEMP="$RUNNER_TEMP" E_MODEL_QA_DIR="$base/model-state" E_MODEL_HOME="$base/model-state/home" E_GATE_QA_DIR="$base/run/case" E_DEVICE_DATA_DIR="$base/device" E_DEVICE_GIT_CONFIG="$base/device/gitconfig" E_DEVICE_TRUST="$base/device/ca.pem" E_MODEL_LAUNCH="$base/bin/model-launch" E_DEVICE_LAUNCH="$base/bin/device-launch" E_ISOLATE_RUNTIME_PREPARE="$base/bin/runtime-prepare" MIKKA_TEST_DEPLOYMENT_SHA="$PUBLIC_SOURCE" unshare --net bash -euc '
             ip link set lo up
             test -z "$(ip route show default)"
-            exec setpriv --reuid="$1" --regid="$2" --clear-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs env -i PATH="$3" HOME="$4/run/home" MIKKA_TEST_DEPLOYMENT_SHA="$5" RAYON_NUM_THREADS=2 UV_THREADPOOL_SIZE=2 NODE_OPTIONS=--max-old-space-size=3072 bash -euc '"'"'
-              cd "$1/product"
-              node scripts/build-eve.mjs
-              node apps/frontend/scripts/build.mjs --server-pages
-              node apps/api/scripts/build.mjs
-              node scripts/package-eve.mjs
-              cd "$1"
-              bash review/evidence/2257/full-daemon/run.sh "$1"
-            '"'"' execute "$4"
-          ' isolate "$(id -u)" "$(id -g)" "$PATH" "$GITHUB_WORKSPACE" "$PUBLIC_SOURCE"
-      - name: Retain only the explicitly allowlisted report
-        if: always()
-        run: node review/evidence/2257/full-daemon/receipt.mjs "$GITHUB_WORKSPACE"
+            for worker in mikka-e-model mikka-e-device; do
+              uid=$(id -u "$worker")
+              for filter in iptables ip6tables; do
+                "$filter" -A OUTPUT -m owner --uid-owner "$uid" -m conntrack --ctstate ESTABLISHED -j ACCEPT
+                if [[ "$filter" == iptables && "$worker" == mikka-e-device ]]; then
+                  "$filter" -A OUTPUT -m owner --uid-owner "$uid" -p tcp -d 127.0.0.1 --dport 3859 -j ACCEPT
+                fi
+                "$filter" -A OUTPUT -m owner --uid-owner "$uid" -j REJECT
+              done
+            done
+            exec setpriv --reuid="$1" --regid="$2" --init-groups bash "$GITHUB_WORKSPACE/review/evidence/2257/enrollment/execute.sh" "$3"
+          ' isolate "$(id -u)" "$(id -g)" "$base"
+      - name: Retain only enumerated diagnostic codes and registration phases
+        if: always() && env.CASE_BASE != ''
+        run: python3 review/evidence/2257/enrollment/classify.py "$CASE_BASE" | tee public-receipt.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
+        if: always() && env.CASE_BASE != ''
         with:
-          name: e2257-full-daemon-${{ github.run_id }}-${{ github.run_attempt }}
+          name: e2257-independent-enrollment-${{ github.run_id }}-${{ github.run_attempt }}
           path: public-receipt.json
           if-no-files-found: error
