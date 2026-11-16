@@ -78,6 +78,24 @@ export async function verifyPersonalDriveUploads({ application, page, rpc, fixtu
     const location = new URL('mikka://app/mikka/en/')
     location.search = new URLSearchParams({ workspace: workspaceId, section: 'artifacts' }).toString()
     await page.goto(location.href, { waitUntil: 'domcontentloaded' })
+    setPhase('personal_drive_project_scope_directory')
+    const projectName = 'Desktop Files scope ' + randomUUID()
+    const { project } = await rpc('projects.saveProject', [{
+      workspaceId, name: projectName, description: '', summary: '', priority: 'normal', status: 'planned',
+      lead: '', memberIds: [fixture.ownerId], startDate: '', targetDate: '',
+    }])
+    assert.ok(project?.id)
+    const directoryMatches = await page.evaluate(async ({ workspaceId, projectId, projectName }) => {
+      const query = new URLSearchParams({ workspaceId })
+      const response = await fetch('/mikka/api/drive/scopes?' + query)
+      if (!response.ok) return false
+      const { scopes } = await response.json()
+      return scopes.every(scope => scope.workspaceId === workspaceId)
+        && scopes.some(scope => scope.driveScope === 'user')
+        && scopes.some(scope => scope.driveScope === 'project-user' && scope.projectId === projectId && scope.name === projectName)
+    }, { workspaceId, projectId: project.id, projectName })
+    assert.equal(directoryMatches, true)
+    passed('packaged_personal_drive_project_scope_directory_through_main_protocol')
     const folderName = 'Personal upload ' + randomUUID()
     const newFolder = page.getByRole('button', { name: 'New folder', exact: true }).filter({ visible: true })
     setPhase('personal_drive_open_folder_dialog')
