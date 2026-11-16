@@ -4,7 +4,7 @@ import { requireUser } from '@/lib/issue-access'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { runAction } from '@/lib/action-error'
 import * as store from '@/lib/project-resources/store'
-import { saveEnvironmentInput, projectDefaultEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
+import { saveEnvironmentInput, listDependencyRepositoriesInput, replaceDependencyRepositoriesInput, projectDefaultEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
 
 export async function listProjectResources(workspaceId: string, projectId?: string) {
   const user = await requireUser()
@@ -22,4 +22,13 @@ export async function setProjectDefaultEnvironment(input: z.input<typeof project
 }
 export async function saveWorkspaceRepositoryPolicy(input: z.input<typeof workspaceRepositoryPolicyInput>) {
   return runAction(async () => store.saveWorkspaceRepositoryPolicy(await requireUser(), input))
+}
+
+export async function listDependencyRepositories(input: z.input<typeof listDependencyRepositoriesInput>) {
+  const store = await import('@/lib/project-resources/dependency-repositories')
+  return runAction(async () => store.listDependencyRepositories(await requireUser(), input))
+}
+export async function replaceDependencyRepositories(input: z.input<typeof replaceDependencyRepositoriesInput>) {
+  const store = await import('@/lib/project-resources/dependency-repositories')
+  return runAction(async () => store.replaceDependencyRepositories(await requireUser(), input))
 }

@@ -1269,6 +1269,7 @@
     "factoryHumanRequired": "请重新登录后回答。",
     "originRejected": "服务器未授权此请求。",
     "decisionOffline": "重新连接后可回答。",
+    "projectDependencyReaderUnavailable": "请连接 GitHub 账号并允许 Mikka 应用读取仓库列表，然后重试。",
     "projectRepositoryDenied": "此仓库或目标分支不在工作区或项目允许的范围内。",
     "projectEnvironmentUnavailable": "所选环境或其所需资源无法用于本次运行。",
     "projectResourceConflict": "资源配置已被更新，请刷新后重试。",
@@ -1830,6 +1831,11 @@
     "backToAccessible": "返回可访问的工作区"
   },
   "Projects": {
+    "dependencies": {
+      "title": "依赖仓库",
+      "empty": "暂无可显示的仓库。",
+      "unavailable": "当前权限无法编辑完整的依赖仓库列表。"
+    },
     "lifecycle": {
       "actions": "项目操作",
       "impact": "项目影响范围",

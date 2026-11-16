@@ -13,6 +13,13 @@
     "test": "tests/task-create-only.db.test.ts",
     "suite": "test:coordinator-issue-create-db"
   },
+  "app/actions/project-resources.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Signed-in members read and administrators update Project repository references with current user access.",
+    "test": "tests/project-dependency-repositories.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
   "app/actions/task-runs.ts": {
     "mode": "built-in",
     "environment": [],
@@ -684,6 +691,13 @@
     "test": "tests/thread-detail-bytes.db.test.ts",
     "suite": "test:activity-actor-db"
   },
+  "drizzle/20261116082600_project_dependency_repositories.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Adds Project-scoped references to immutable GitHub IDs in the installation PostgreSQL database.",
+    "test": "tests/project-dependency-repositories.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
   "lib/abuse/workers-ai.ts": {
     "mode": "optional-cloud",
     "environment": [
@@ -1041,6 +1055,27 @@
     "behavior": "Derive a task's activity events (status, priority, description, assignee, parent, relations and pull requests) from its local history.",
     "test": "lib/issue-activity.test.ts",
     "suite": "test:issues"
+  },
+  "lib/project-resources/contracts.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Dependency repository reads and replacements validate Project scope, revision and stable GitHub IDs.",
+    "test": "tests/project-dependency-repositories.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "lib/project-resources/dependency-repositories.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "The installation stores Project references and intersects the current operator-configured GitHub App directory, active workspace policy and Project ACL. No credentials are persisted.",
+    "test": "tests/project-dependency-repositories.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "lib/project-resources/store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Project resource transactions use the installation PostgreSQL database and workspace locks.",
+    "test": "tests/project-dependency-repositories.db.test.ts",
+    "suite": "test:project-resources-db"
   },
   "lib/thread-artifacts.ts": {
     "mode": "built-in",

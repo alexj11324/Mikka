@@ -159,6 +159,7 @@ export const ACTION_ERROR_CODES = [
   'projectPropertyInvalid',
   'projectNotFound',
   'projectRepositoryDenied',
+  'projectDependencyReaderUnavailable',
   'projectEnvironmentUnavailable',
   'projectArchived',
   'projectDeleteNotEmpty',

@@ -63,12 +63,12 @@ export function assertProjectExecutionTarget(snapshot: ProjectExecutionSnapshot,
   if (environment && ((environment.runtime !== 'any' && environment.runtime !== target.runtime) || (environment.harness !== 'any' && environment.harness !== target.harness))) throw new ActionFailureError('projectEnvironmentUnavailable')
 }
 
-async function resourceLock(tx: WorkspaceTransaction, workspaceId: string, write: boolean) {
+export async function resourceLock(tx: WorkspaceTransaction, workspaceId: string, write: boolean) {
   await tx.execute(write
     ? sql`select pg_advisory_xact_lock(hashtextextended(${'project-resources:' + workspaceId},0))`
     : sql`select pg_advisory_xact_lock_shared(hashtextextended(${'project-resources:' + workspaceId},0))`)
 }
-async function resourceWriteLock(tx: WorkspaceTransaction, workspaceId: string) {
+export async function resourceWriteLock(tx: WorkspaceTransaction, workspaceId: string) {
   // Configuration edits cannot upgrade an admission's shared lease. Every
   // independent writer takes relation -> resource -> entity locks, matching
   // admission and Project lifecycle operations across the split databases.
