@@ -380,20 +380,7 @@ jobs:
       - name: Check out the approved private main ancestor with read-only access
         env:
           HOSTED_UI_READ_KEY: ${{ secrets.HOSTED_UI_READ_KEY }}
-        run: |
-          node --input-type=module <<'JS'
-          import { execFileSync } from 'node:child_process'
-          import { withOverlayKey } from './scripts/cloudflare-ci.mjs'
-          import { verifyOverlayMain } from './scripts/cloudflare-native-oci.mjs'
-          const sha = process.env.EXPECTED_OVERLAY_SHA
-          execFileSync('git', ['init', '--quiet', '.hosted-ui'])
-          await withOverlayKey(process.env, async env => {
-            const options = { cwd: '.hosted-ui', env, stdio: 'pipe' }
-            execFileSync('git', ['fetch', '--quiet', '--no-tags', '--depth=1', 'git@github.com:alexj11324/mikka-hosted-ui.git', sha], options)
-            execFileSync('git', ['checkout', '--quiet', '--detach', 'FETCH_HEAD'], options)
-            verifyOverlayMain('.hosted-ui', sha, env)
-          }).catch(() => { throw new Error('OFFICIAL_UI_CHECKOUT_OR_MAIN_ANCESTRY_FAILED') })
-          JS
+        run: bash scripts/acceptance/desktop-delivery/checkout-overlay.sh
       - name: Verify the fixed pair and build the official Desktop client
         env:
           MIKKA_UI_OVERLAY_SHA: ${{ inputs.overlay_sha }}
