@@ -47,6 +47,10 @@ const query = { query: async (sql: string, args: unknown[]) => {
 mock.module(new URL('./model-api-keys.ts', import.meta.url).href, { namedExports: {
   usableApiKeys: async () => keys, botApiKeyChoice: async () => saved, apiKeyAfterQuota: async () => afterQuotaAllowed,
 } })
+// The fixture pool is not an observed node-postgres client. Where the live
+// gateway is configured (the self-hosted image check sets BETTER_AUTH_*), the
+// run list notification would reject it; live delivery is not under test here.
+for (const name of ['DEVICE_GATEWAY_URL', 'BETTER_AUTH_URL', 'BETTER_AUTH_SECRET']) delete process.env[name]
 mock.module(new URL('./computer/native-run-binding.ts', import.meta.url).href, { namedExports: {
   nativeRunBinding: async () => ({ ...subscription, workspaceId: id(2), consumerId: id(21), route: 'claude_code_cli' }),
 } })
