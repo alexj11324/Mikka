@@ -234,7 +234,7 @@ export const desktopActionSchemas = {
   'issue-operations.listIssueConnections': oneId,
   'issue-operations.updateIssueRelation': tuple(object({ id: uuid, revision: positive, targetId: uuid.nullable(), kind: z.enum(['parent', 'child', 'related', 'blockedBy', 'blocks', 'duplicate']), remove: bool.optional() })),
   'issue-operations.createLinkedIssue': tuple(object({ id: uuid, revision: positive, kind: z.enum(['child', 'duplicate']), title: text(200).optional(), includeSubissues: bool.optional() })),
-  'issue-operations.toggleIssuePreference': tuple(object({ id: uuid, kind: z.enum(['favorite', 'subscribe']) })),
+  'issue-operations.toggleIssuePreference': tuple(object({ id: uuid, kind: z.enum(['favorite', 'subscribe']), enabled: z.boolean().optional() })),
   'issue-operations.getDeletedIssue': oneId,
   'issue-operations.setIssueDeleted': tuple(object({ id: uuid, revision: positive.optional(), restore: bool.optional() })),
   'issue-prefix.getIssuePrefixState': none,
