@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from '@/components/reui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Dialog, DialogContent, DialogFooter, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Field, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
@@ -207,15 +208,19 @@ function PersonalSkillDetails({ id, name }: { id: string; name: string }) {
     if (skill.id !== id) throw new Error('skillUnavailable')
     return skill
   }, { dedupingInterval: 0, shouldRetryOnError: false, revalidateOnFocus: false, revalidateOnReconnect: false })
-  return <details className="min-w-0 text-sm" onToggle={event => setOpen(event.currentTarget.open)}>
-    <summary className="cursor-pointer" aria-label={t('installationDetailsNamed', { name })}>{t('installationDetails')}</summary>
-    {open && (error ? <SettingsSaveError message={t('installationLoadFailed')} retryLabel={common('retry')} onRetry={() => { void mutate() }} />
+  return <Collapsible className="min-w-0" open={open} onOpenChange={setOpen}>
+    <CollapsibleTrigger render={<Button type="button" variant="ghost" size="sm" aria-label={t('installationDetailsNamed', { name })} />}>
+      {t('installationDetails')}
+    </CollapsibleTrigger>
+    <CollapsibleContent>
+      {error ? <SettingsSaveError message={t('installationLoadFailed')} retryLabel={common('retry')} onRetry={() => { void mutate() }} />
       : !data || isValidating ? <p role="status">{t('loading')}</p>
-      : <dl className="mt-2 space-y-1 break-all text-xs">
+      : <dl className="flex flex-col gap-1 break-all text-xs">
         <div><dt className="font-medium">{t('installationSource')}</dt><dd>{data.source} · {data.sourcePath}</dd></div>
         <div><dt className="font-medium">{t('installationRevision')}</dt><dd>{data.sourceRevision}</dd></div>
-      </dl>)}
-  </details>
+      </dl>}
+    </CollapsibleContent>
+  </Collapsible>
 }
 
 /** A Profile's state as the shared status badge (R-34, R-87): icon, colour and word. */
