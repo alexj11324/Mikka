@@ -427,12 +427,19 @@ test('the runtime release holds one non-cancelling queue and never publishes thr
   assert.match(e2b, /workflow_dispatch:\n    inputs:\n      runtime-refresh:\n        description: [^\n]+\n        type: boolean\n        default: false/)
   // A push only reports changed inputs; the paid release starts from a dispatch carrying the Cloudflare receipt.
   const webReady = e2b.slice(e2b.indexOf('\n  web-ready:'), e2b.indexOf('\n  release:'))
-  assert.match(webReady, /needs: check\n    if: needs\.check\.outputs\.changed == 'true' && github\.event_name == 'workflow_dispatch'/)
-  assert.match(webReady, /if: github\.event\.inputs\.cloudflare_receipt == ''\n        run: \|\n[^\n]+\n          exit 1\n/)
+  assert.match(webReady, /needs: check\n    if: needs\.check\.outputs\.changed == 'true' && github\.event_name != 'push'/)
+  assert.match(webReady, /if: needs\.check\.outputs\.receipt == ''\n        run: \|\n[^\n]+\n          exit 1\n/)
   assert.match(webReady, /run: node scripts\/release\/cloudflare-promoted-web\.mjs\n/)
   assert.doesNotMatch(webReady, /id-token:|Infisical|web-deploy-production|e2b-official-runtime-release/)
-  assert.match(e2b, /release:\n    needs: \[test, check, web-ready\]\n    if: needs\.check\.outputs\.changed == 'true' && github\.event_name == 'workflow_dispatch'/)
+  assert.match(e2b, /release:\n    needs: \[test, check, web-ready\]\n    if: needs\.check\.outputs\.changed == 'true' && github\.event_name != 'push'/)
   const checkJob = e2b.slice(e2b.indexOf('\n  check:'), e2b.indexOf('\n  release:'))
+  // A Cloudflare gateway observation starts the release; only that run's receipt is used.
+  assert.match(e2b, /workflow_run:\n    workflows: \[Cloudflare application deployment\]\n    types: \[completed\]/)
+  assert.match(checkJob, /receipt: \$\{\{ github\.event\.inputs\.cloudflare_receipt \|\| steps\.trigger\.outputs\.receipt \}\}/)
+  assert.match(checkJob, /if: github\.event_name == 'workflow_run'\n        run: node scripts\/release\/cloudflare-promoted-web\.mjs trigger runtime/)
+  assert.match(checkJob, /if: github\.event_name != 'workflow_run' \|\| steps\.trigger\.outputs\.ready == 'true'\n        run: node scripts\/e2b\/runtime-inputs\.mjs\n/)
+  assert.match(e2b, /uses: \.\/\.github\/workflows\/e2b-runtime-release\.yml\n    with:\n      cloudflare_receipt: \$\{\{ needs\.check\.outputs\.receipt \}\}/)
+  assert.doesNotMatch(e2b, /github\.event\.inputs\.cloudflare_receipt \}\}/)
   assert.match(checkJob, /fetch-depth: 0/)
   assert.match(checkJob, /if: github\.event_name == 'workflow_dispatch'\n        run: node scripts\/release\/web-deploy\.mjs main/)
   assert.doesNotMatch(checkJob, /Infisical|VERCEL_TEAM_TOKEN|publish-template-env|RUNTIME_REFRESH/)
@@ -465,7 +472,7 @@ test('desktop replaces obsolete preflights while preserving active signing and d
   assert.doesNotMatch(desktop, /^concurrency:/m, 'a new workflow must not cancel a running signing job')
   const preflight = desktop.slice(desktop.indexOf('\n  preflight:'), desktop.indexOf('\n  macos:'))
   const signing = desktop.slice(desktop.indexOf('\n  macos:'))
-  assert.ok(preflight.includes("group: desktop-release-preflight-${{ github.ref }}-${{ inputs.cloudflare_receipt && 'promoted' || 'push' }}"),
+  assert.ok(preflight.includes("group: desktop-release-preflight-${{ github.ref }}-${{ github.event_name == 'workflow_run' && format('observed-{0}', github.event.workflow_run.id) || github.event_name == 'push' && 'push' || 'promoted' }}"),
     'a push must not supersede the independently verified Cloudflare promotion')
   assert.match(preflight, /cancel-in-progress: true/)
   assert.match(signing, /group: .*'desktop-release'.*\n      cancel-in-progress: false/)

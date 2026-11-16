@@ -87,9 +87,10 @@ for proof that a ready PR is safe to merge.
   no release workflow waits for it.
 - `publish-daemon.yml` uses daemon/package-input path filters.
   `desktop-release.yml` also watches the shared frontend, UI and API inputs.
-  On a push it builds nothing and leaves a note in the run summary; the
-  installer is built from a dispatch on main that carries the Cloudflare
-  promotion receipt (`cloudflare_receipt`). A Markdown file under a
+  On a push it builds nothing and leaves a note in the run summary. The
+  installer is built when the Cloudflare deployment workflow's serving-release
+  observation shows current main, or from a dispatch carrying
+  `cloudflare_receipt`. A Markdown file under a
   watched directory still matches those release filters. Read the exact
   workflow paths before predicting release work.
 - The run-dispatch and Controlled Skill improvement suites run in the CI
@@ -140,11 +141,13 @@ entry to suppress already-queued duplicates. Obsolete sources, cancellations,
 Web failures and cleanup-only failures do not create failure fingerprints.
 
 A push only compares the worker inputs and builds no candidate. When they
-changed, its run summary says so. The release itself starts after Cloudflare
-serves that commit: dispatch **E2B additive runtime release** on current main
-with `reason` and the promotion's `cloudflare_receipt`. A dispatch without a
-receipt fails before any template builder starts. Every gate rechecks the
-receipt against the live gateway and current main.
+changed, its run summary says so. The release starts by itself when the
+Cloudflare deployment workflow's serving-release observation shows current main
+and the worker differs from the last release that made templates public. A
+dispatch of **E2B additive runtime release** on current main with `reason` and
+`cloudflare_receipt` also starts it; a dispatch without a receipt fails before
+any template builder starts. Every gate rechecks the receipt against the live
+gateway and current main.
 
 To retry after an external service recovers, dispatch the same way; the Actions
 dispatch event records the reason. Manual dispatch always runs validation, even for a matching worker. Changed

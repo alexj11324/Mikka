@@ -74,17 +74,26 @@ test('official jobs keep private code out of public artifacts and pin desktop to
   const approved = job => job.steps.filter(step => step.run === proof)
   assert.equal(approved(desktop.jobs.preflight).length, 1)
   assert.equal(approved(desktop.jobs.macos).length, 2)
-  for (const step of [...approved(desktop.jobs.preflight), ...approved(desktop.jobs.macos)]) {
-    assert.equal(step.env.CLOUDFLARE_RECEIPT, '${{ github.event.inputs.cloudflare_receipt }}')
-  }
   const { preflight, macos } = desktop.jobs
-  // A push builds nothing; every dispatch verifies its promotion receipt, and only that unlocks macOS.
-  assert.equal(approved(preflight)[0].if, "github.event_name != 'push'")
-  for (const step of approved(macos)) assert.equal(step.if, undefined)
+  // A push builds nothing. A dispatch's receipt, or the receipt of the Cloudflare gateway observation
+  // that started this run, is verified in preflight, and only that unlocks macOS.
+  assert.deepEqual(Object.keys(desktop.on).sort(), ['push', 'workflow_dispatch', 'workflow_run'])
+  assert.deepEqual(desktop.on.workflow_run, { workflows: ['Cloudflare application deployment'], types: ['completed'] })
+  const trigger = preflight.steps.find(step => step.id === 'trigger')
+  assert.equal(trigger.if, "github.event_name == 'workflow_run'")
+  assert.equal(trigger.run, 'node scripts/release/cloudflare-promoted-web.mjs trigger desktop')
+  assert.equal(approved(preflight)[0].env.CLOUDFLARE_RECEIPT, '${{ github.event.inputs.cloudflare_receipt || steps.trigger.outputs.receipt }}')
+  assert.equal(approved(preflight)[0].if, "github.event_name == 'workflow_dispatch' || steps.trigger.outputs.ready == 'true'")
+  assert.ok(preflight.steps.indexOf(trigger) < preflight.steps.indexOf(approved(preflight)[0]))
+  assert.equal(preflight.outputs.receipt, '${{ github.event.inputs.cloudflare_receipt || steps.trigger.outputs.receipt }}')
+  for (const step of approved(macos)) {
+    assert.equal(step.if, undefined)
+    assert.equal(step.env.CLOUDFLARE_RECEIPT, '${{ needs.preflight.outputs.receipt }}')
+  }
   assert.equal(preflight.outputs.release, "${{ steps.promoted.outcome == 'success' }}")
   assert.equal(macos.if, "needs.preflight.outputs.release == 'true'")
   const missing = preflight.steps.find(step => step.name === 'Require the Cloudflare promotion receipt')
-  assert.equal(missing.if, "github.event_name != 'push' && github.event.inputs.cloudflare_receipt == ''")
+  assert.equal(missing.if, "github.event_name == 'workflow_dispatch' && github.event.inputs.cloudflare_receipt == ''")
   assert.match(missing.run, /exit 1/)
   assert.ok(preflight.steps.indexOf(missing) < preflight.steps.indexOf(approved(preflight)[0]))
   assert.equal(preflight.outputs['overlay-sha'], '${{ steps.promoted.outputs.overlay-sha }}')

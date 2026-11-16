@@ -27,6 +27,12 @@ export function releaseDecision({ workerHash, beforeWorkerHash, failedRunId, eve
     if (!reason?.trim()) throw Error('runtimeInputs:retryReasonRequired')
     return { changed: true, reason: 'manual retry' }
   }
+  if (eventName === 'workflow_run') {
+    if (!/^[a-f0-9]{40}$/.test(workerHash ?? '')) throw Error('runtimeInputs:workerHashRequired')
+    if (workerHash === beforeWorkerHash) return { changed: false, reason: 'the last published release has the same installed worker and template inputs' }
+    if (failedRunId) return { changed: false, reason: `skipped: same inputs as failed run ${failedRunId}` }
+    return { changed: true, reason: beforeWorkerHash ? 'installed worker or template inputs changed since the last published release' : 'no published release found' }
+  }
   if (eventName !== 'push') return { changed: false, reason: 'not a production push' }
   if (![workerHash, beforeWorkerHash].every(value => /^[a-f0-9]{40}$/.test(value ?? ''))) throw Error('runtimeInputs:workerHashRequired')
   if (workerHash === beforeWorkerHash) return { changed: false, reason: 'installed worker and template inputs unchanged' }
@@ -40,6 +46,25 @@ export function pushRuntimeInputs({ ref, event, cwd = process.cwd() }, hash = ru
   if (!/^[a-f0-9]{40}$/.test(ref ?? '') || !/^[a-f0-9]{40}$/.test(event?.before ?? '')
     || /^0+$/.test(event.before) || event.after !== ref || event.ref !== 'refs/heads/main') throw Error('runtimeInputs:invalidPushSource')
   return { workerHash: hash({ ref, cwd }), beforeWorkerHash: hash({ ref: event.before, cwd }) }
+}
+
+const PUBLISH_STEP = 'Make only fully accepted candidates public'
+
+/** The source of the newest run that actually made templates public. A Cloudflare
+ * promotion compares against it, not against the previous push. */
+export async function lastPublishedSource({ token, fetchImpl = fetch, maxRuns = 200 }) {
+  const options = { token, fetchImpl }
+  let seen = 0
+  for await (const run of pages(`/actions/workflows/${WORKFLOW.split('/').pop()}/runs?branch=main&status=success`, 'workflow_runs', options)) {
+    if (++seen > maxRuns) return null
+    if (run.path !== WORKFLOW || run.head_branch !== 'main' || run.repository?.full_name !== REPOSITORY
+      || !['workflow_dispatch', 'workflow_run'].includes(run.event) || !/^[a-f0-9]{40}$/.test(run.head_sha ?? '') || !id(run.run_attempt)) continue
+    for await (const job of pages(`/actions/runs/${run.id}/attempts/${run.run_attempt}/jobs`, 'jobs', options)) {
+      if (/^(?:release \/ )?subscriptions$/.test(job.name ?? '') && job.head_sha === run.head_sha
+        && job.steps?.some(step => step.name === PUBLISH_STEP && step.conclusion === 'success')) return run.head_sha
+    }
+  }
+  return null
 }
 
 async function githubRead(path, { token, fetchImpl }) {
@@ -79,7 +104,7 @@ export async function findFailedInputs({ digest, currentRunId, token, fetchImpl 
     const run = await githubRead(`/actions/runs/${source.id}`, options)
     if (run.id !== source.id || run.path !== WORKFLOW || run.head_branch !== 'main' || run.head_sha !== source.head_sha
       || run.repository?.full_name !== REPOSITORY || run.head_repository?.full_name !== REPOSITORY
-      || !['push', 'workflow_dispatch'].includes(run.event)
+      || !['push', 'workflow_dispatch', 'workflow_run'].includes(run.event)
       || !(run.status === 'completed' && run.conclusion === 'failure' || run.status === 'in_progress' && run.conclusion === null)
       || !id(run.run_attempt) || !(Date.parse(artifact.created_at) >= Date.parse(run.run_started_at))) continue
     if (await failedRuntimeAttempt(run, options)) return run.id
@@ -122,8 +147,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     // never as commands, job outputs or operator-supplied Markdown.
     if (manual) releaseDecision({ eventName: 'workflow_dispatch', reason: process.env.RETRY_REASON })
     const recheck = process.argv[2] === 'recheck'
+    const promotion = process.env.GITHUB_EVENT_NAME === 'workflow_run'
     let inputs
-    if (!manual && !recheck) {
+    if (promotion && !recheck) {
+      const published = await lastPublishedSource({ token: process.env.GITHUB_TOKEN })
+      inputs = { workerHash: digest, beforeWorkerHash: published ? runtimeInputsDigest({ ref: published }) : null }
+    } else if (!manual && !recheck) {
       let event
       try { event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')) } catch (cause) { throw Error('runtimeInputs:invalidPushEvent', { cause }) }
       inputs = pushRuntimeInputs({ ref: process.env.GITHUB_SHA, event })

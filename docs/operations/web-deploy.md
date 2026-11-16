@@ -57,9 +57,19 @@ reports changed inputs in its run summary and builds nothing; the paused Vercel
 publisher is never awaited. The release rechecks the live version after
 building and validates both official subscriptions before publishing template IDs.
 
-After a Cloudflare promotion, dispatch the official runtime workflow on
-current main with its retry reason and `cloudflare_receipt`. A dispatch without
-a receipt fails before any builder starts. For a Cloudflare-to-Cloudflare
+The release starts by itself. When a run of the Cloudflare application
+deployment workflow finishes with a serving-release observation
+(`gateway-observe`), the runtime workflow and Desktop release run on that
+`workflow_run` event. Each one goes ahead only when the observed product is
+current main. Otherwise it records why in its run summary and ends green.
+E2B also compares the worker inputs with the last release that made templates
+public and skips an unchanged worker. Desktop skips a commit whose installer is
+already the latest release. Both use `actions:RUN_ID:ATTEMPT` of that observation
+as their receipt, and every gate rechecks it as below.
+
+To retry by hand, dispatch the official runtime workflow on current main with
+its retry reason and `cloudflare_receipt`. A dispatch without a receipt fails
+before any builder starts. For a Cloudflare-to-Cloudflare
 promotion, run the existing Cloudflare application deployment workflow with phase
 `gateway-observe` on the reviewed operations commit containing the prepared
 checklist. The observer only reads the provider and canonical application.
@@ -73,8 +83,9 @@ The same release produces the immutable template report for the private
 Cloudflare API deployment.
 
 Desktop uses its existing signed and notarized macOS workflow. A push records
-in its run summary that no installer was built. After promotion, dispatch
-Desktop release on main with the same fresh `cloudflare_receipt`.
+in its run summary that no installer was built. The serving-release observation
+starts it as described above; a manual dispatch on main with a fresh
+`cloudflare_receipt` still works.
 It verifies the serving Web version and exact overlay before allocating the
 Mac, before loading credentials, and immediately before publishing the sealed
 installer. The approved backend must contain the installer commit.

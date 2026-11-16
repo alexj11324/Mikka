@@ -4,6 +4,11 @@ name: E2B serialized runtime publication
 # the dispatched Cloudflare promotion receipt; there is no other Web publisher.
 on:
   workflow_call:
+    inputs:
+      cloudflare_receipt:
+        description: The caller's verified Cloudflare promotion receipt
+        type: string
+        required: true
 permissions:
   contents: read
 jobs:
@@ -31,7 +36,7 @@ jobs:
         run: node scripts/release/cloudflare-promoted-web.mjs
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          CLOUDFLARE_RECEIPT: ${{ github.event.inputs.cloudflare_receipt }}
+          CLOUDFLARE_RECEIPT: ${{ inputs.cloudflare_receipt }}
       - name: Recheck failures after entering the serialized release queue
         id: history
         run: node scripts/e2b/runtime-inputs.mjs recheck
@@ -66,7 +71,7 @@ jobs:
         run: node scripts/release/cloudflare-promoted-web.mjs
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          CLOUDFLARE_RECEIPT: ${{ github.event.inputs.cloudflare_receipt }}
+          CLOUDFLARE_RECEIPT: ${{ inputs.cloudflare_receipt }}
   subscriptions:
     needs: [validate, await-web]
     runs-on: ubuntu-latest
@@ -167,7 +172,7 @@ jobs:
         run: node scripts/release/cloudflare-promoted-web.mjs
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          CLOUDFLARE_RECEIPT: ${{ github.event.inputs.cloudflare_receipt }}
+          CLOUDFLARE_RECEIPT: ${{ inputs.cloudflare_receipt }}
       - name: Make only fully accepted candidates public
         id: publish
         run: |
@@ -225,7 +230,7 @@ jobs:
           node scripts/release/cloudflare-promoted-web.mjs
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          CLOUDFLARE_RECEIPT: ${{ github.event.inputs.cloudflare_receipt }}
+          CLOUDFLARE_RECEIPT: ${{ inputs.cloudflare_receipt }}
           RUNTIME_REPORT_ARTIFACT_ID: ${{ steps.release.outputs.artifact-id }}
           RUNTIME_REPORT_SHA256: ${{ steps.publish.outputs.release-sha256 }}
   cleanup:
